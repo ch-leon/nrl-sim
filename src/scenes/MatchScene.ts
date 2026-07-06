@@ -19,6 +19,8 @@ import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
 import type { TeamSheet, MatchResult } from '../sim/events';
 import type { Fixture } from '../core/state';
+import { PlaybackController, type PlaybackSpeed } from '../world/playback';
+import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
 import {
   FIELD_LONG,
   FIELD_WIDE,
@@ -95,6 +97,10 @@ export class MatchScene extends Phaser.Scene {
   public readonly awayDots: Phaser.GameObjects.Image[] = [];
   /** The single ball sprite (starts at field centre). */
   public ball!: Phaser.GameObjects.Image;
+  /** Home team id — consumed by PlaybackController (in-goal direction / sides). */
+  public get homeId(): string {
+    return this.home.clubId;
+  }
 
   private home!: TeamSheet;
   private away!: TeamSheet;
@@ -104,6 +110,13 @@ export class MatchScene extends Phaser.Scene {
   private offsetX = fieldOffsetX();
   private camController!: CameraController;
   private backBtn: HTMLButtonElement | null = null;
+
+  // ── WU-12 playback + overlay ──────────────────────────────────────────────
+  private playback: PlaybackController | null = null;
+  private overlay: MatchOverlayHandle | null = null;
+  private controlsEl: HTMLDivElement | null = null;
+  private speedButtons: HTMLButtonElement[] = [];
+  private finished = false;
 
   constructor() {
     super('Match'); // scene key per ARCHITECTURE.md §7
@@ -124,7 +137,23 @@ export class MatchScene extends Phaser.Scene {
     this.spawnBall();
     this.mountBackButton();
 
+    // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then
+    // the playback controller which re-emits the event stream on a compressed
+    // clock. Both are presentation-only (never mutate GameState).
+    this.startPlayback();
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
+  }
+
+  private startPlayback(): void {
+    if (this.result) {
+      this.overlay = mountMatchOverlay({ home: this.home, away: this.away, result: this.result });
+      this.playback = new PlaybackController(this, this.result, this.fixture);
+      this.mountPlaybackControls();
+      // 'match:finished' (fired by playback at full-time or on skip) reveals the
+      // Back-to-Club button and swaps the controls out.
+      bus.on('match:finished', this.onFinished);
+    }
   }
 
   /**
@@ -142,7 +171,11 @@ export class MatchScene extends Phaser.Scene {
     return depth(gx, gy, layer);
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
+    // Advance playback (fires due events, moves sprites) before panning so the
+    // camera follows the freshly-tweened ball this frame.
+    if (this.playback) this.playback.update(delta);
+
     // Slow auto-pan: ease camera scrollX toward the ball's world x. The
     // controller's clamp keeps the view inside world bounds; roundPixels (global
     // config) avoids shimmering.
@@ -279,20 +312,71 @@ export class MatchScene extends Phaser.Scene {
     this.cameras.main.centerOn(b.x + b.width / 2, b.y + b.height / 2);
   }
 
-  // ── DOM return button ───────────────────────────────────────────────────────
+  // ── DOM playback controls (speed ×1/×2/×4 + Skip) ────────────────────────────
+  private mountPlaybackControls(): void {
+    const wrap = document.createElement('div');
+    wrap.className = 'nrl-mo-controls';
+    wrap.style.position = 'fixed';
+    wrap.style.left = '50%';
+    wrap.style.bottom = '0.5rem';
+    wrap.style.transform = 'translateX(-50%)';
+    wrap.style.zIndex = '20';
+    wrap.style.display = 'flex';
+    wrap.style.gap = '0.35rem';
+    wrap.style.pointerEvents = 'auto';
+
+    const speeds: PlaybackSpeed[] = [1, 2, 4];
+    this.speedButtons = speeds.map((s) => {
+      const b = button(`×${s}`, () => this.setSpeed(s));
+      if (s === 1) b.setAttribute('data-active', 'true');
+      wrap.append(b);
+      return b;
+    });
+
+    const skip = button('Skip', () => this.playback?.skip());
+    wrap.append(skip);
+
+    this.controlsEl = wrap;
+    mount(wrap);
+  }
+
+  private setSpeed(speed: PlaybackSpeed): void {
+    this.playback?.setSpeed(speed);
+    const labels: Record<number, string> = { 1: '×1', 2: '×2', 4: '×4' };
+    for (const b of this.speedButtons) {
+      b.toggleAttribute('data-active', b.textContent === labels[speed]);
+    }
+  }
+
+  // ── DOM return button (shown only at full-time) ──────────────────────────────
   private mountBackButton(): void {
-    // Fallback/early-exit control; BAK-194 playback drives the real flow.
+    // Hidden until full-time; before then, playback + Skip drive the flow.
     const btn = button('Back to Club', () => this.exitToGrounds());
     btn.style.position = 'fixed';
     btn.style.left = '0.5rem';
     btn.style.bottom = '0.5rem';
     btn.style.zIndex = '20';
+    // If no result was provided (defensive), keep the classic fallback visible.
+    btn.style.display = this.result ? 'none' : '';
     this.backBtn = btn;
     mount(btn);
   }
 
+  /** On full-time: reveal Back-to-Club, remove the playback controls. */
+  private onFinished = (): void => {
+    if (this.finished) return;
+    this.finished = true;
+    if (this.backBtn) this.backBtn.style.display = '';
+    if (this.controlsEl) {
+      this.controlsEl.remove();
+      this.controlsEl = null;
+    }
+  };
+
   private exitToGrounds(): void {
-    if (this.fixture) {
+    // Playback owns the single 'match:finished' emission; if it never fired
+    // (e.g. no result / early exit before full-time), emit the fallback here.
+    if (!this.finished && this.fixture) {
       bus.emit('match:finished', { fixture: this.fixture, result: this.result });
     }
     this.scene.start('Grounds');
@@ -300,6 +384,15 @@ export class MatchScene extends Phaser.Scene {
 
   private teardown(): void {
     this.camController.destroy();
+    bus.off('match:finished', this.onFinished);
+    this.overlay?.destroy();
+    this.overlay = null;
+    this.playback = null;
+    if (this.controlsEl) {
+      this.controlsEl.remove();
+      this.controlsEl = null;
+    }
+    this.speedButtons = [];
     if (this.backBtn) {
       this.backBtn.remove(); // DOM overlay persists across scenes (§7) — clean it up.
       this.backBtn = null;
