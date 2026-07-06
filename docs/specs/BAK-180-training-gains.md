@@ -36,7 +36,7 @@ import { STAT_MAX } from '../config';
 
 export const STAT_FLOOR = 1;
 
-// Level multiplier for a facility: L1 ×1.0, L2 ×1.6, L3 ×2.4.
+// Level multiplier for a facility: L1 ×1.0, L2 ×1.6, L3 ×2.2 (import LEVEL_MULT from src/data/facility.ts — canonical per BAK-168).
 export function levelMult(level: 1 | 2 | 3): number;
 
 // Age-based development modifier applied to all gains.
