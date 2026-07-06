@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { TILE_W, TILE_H } from '../config';
-import { GroundsScene } from './GroundsScene';
 
 // Isometric diamond outline (2:1) in local texture space, TILE_W x TILE_H.
 const DIAMOND: Phaser.Types.Math.Vector2Like[] = [
@@ -42,10 +41,7 @@ export class BootScene extends Phaser.Scene {
     this.generateCharacterTextures();
     this.registerCharacterAnims();
 
-    // Deviation from BAK-158 wording (main.ts is orchestrator-owned): register &
-    // start Grounds dynamically instead of editing main.ts. The orchestrator will
-    // move registration into main.ts later.
-    this.scene.add('Grounds', GroundsScene, true);
+    this.scene.start('Grounds');
   }
 
   /** Generate the 2:1 iso diamond tile textures. */
