@@ -3,6 +3,15 @@ import { GRID_W, GRID_H, TILE_W, TILE_H } from '../config';
 import { gridToScreen, screenToGrid, depth, inBounds } from '../world/iso';
 import { CameraController } from '../world/camera';
 import { WalkGrid, findPath, type PathNode } from '../world/path';
+import {
+  PlacementController,
+  footprintTiles,
+  setActiveGroundsScene,
+} from '../world/placement';
+import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
+import { getState, type PlacedFacility } from '../core/state';
+import { bus } from '../core/events';
+import { openFacilityPopup } from '../ui/screens/build';
 
 type Dir = 'n' | 'e' | 's' | 'w';
 
@@ -48,6 +57,13 @@ export class GroundsScene extends Phaser.Scene {
   private path: PathNode[] = [];
   private lastDir: Dir = 's';
 
+  // Facility placement (WU-8 / BAK-178).
+  private placement!: PlacementController;
+  // Rendered facility sprites keyed by PlacedFacility instance id (for re-render).
+  private facilitySprites = new Map<string, Phaser.GameObjects.Image>();
+  private offFacilityPlaced: (() => void) | null = null;
+  private offStateChanged: (() => void) | null = null;
+
   constructor() {
     super('Grounds'); // scene key per ARCHITECTURE.md §7
   }
@@ -57,10 +73,37 @@ export class GroundsScene extends Phaser.Scene {
     this.renderGround();
     this.setupCamera();
     this.setupCharacter();
+    this.setupPlacement();
     this.setupTapToMove();
+    this.renderFacilities();
 
-    // Detach camera listeners when the scene shuts down (Grounds -> Match).
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.camController.destroy());
+    // Register with the DOM ↔ scene bridge so build.ts can start placement mode.
+    setActiveGroundsScene(this);
+
+    // Re-render facilities whenever one is placed or state otherwise changes
+    // (e.g. an upgrade bumps a level). Kept unsubscribed on shutdown.
+    this.offFacilityPlaced = bus.on('facility:placed', () => this.renderFacilities());
+    this.offStateChanged = bus.on('state:changed', () => this.renderFacilities());
+
+    // Detach camera listeners + bus subs when the scene shuts down (Grounds -> Match).
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.camController.destroy();
+      this.offFacilityPlaced?.();
+      this.offStateChanged?.();
+      setActiveGroundsScene(null);
+    });
+  }
+
+  private setupPlacement(): void {
+    this.placement = new PlacementController(this, this.walkGrid, {
+      cellToWorld: (gx, gy) => this.cellToWorld(gx, gy),
+      depth,
+    });
+  }
+
+  /** Enter facility placement mode (called from the DOM build menu via the registry). */
+  enterPlacementMode(defId: FacilityDefId): void {
+    this.placement.enterPlacementMode(defId);
   }
 
   /** Grid -> world (screen) point with the centering offset baked in. */
@@ -88,11 +131,32 @@ export class GroundsScene extends Phaser.Scene {
   }
 
   private setupTapToMove(): void {
+    // While in placement mode the ghost follows the pointer (grid-snapped).
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.placement.active) return;
+      const cell = screenToGrid(pointer.worldX - this.offsetX, pointer.worldY);
+      this.placement.moveGhost(cell.gx, cell.gy);
+    });
+
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       // BAK-159 contract: ignore taps that were actually pans.
       if (this.camController.wasDragging()) return;
-      // Undo the centering offset before inverting the iso projection.
       const cell = screenToGrid(pointer.worldX - this.offsetX, pointer.worldY);
+
+      // Placement mode: a tap snaps to and confirms the current cell.
+      if (this.placement.active) {
+        this.placement.moveGhost(cell.gx, cell.gy);
+        this.placement.confirm(); // commits if valid; notifies + stays on ghost logic if not
+        return;
+      }
+
+      // Tapping a placed facility opens its upgrade/info popup.
+      const hit = this.facilityAt(cell.gx, cell.gy);
+      if (hit) {
+        openFacilityPopup(hit);
+        return;
+      }
+
       if (!inBounds(cell.gx, cell.gy)) return;
       if (!this.walkGrid.isWalkable(cell.gx, cell.gy)) return;
       this.path = findPath(
@@ -101,6 +165,59 @@ export class GroundsScene extends Phaser.Scene {
         { x: cell.gx, y: cell.gy },
       );
     });
+  }
+
+  /** The placed facility whose footprint covers (gx, gy), if any. */
+  private facilityAt(gx: number, gy: number): PlacedFacility | undefined {
+    return getState().facilities.find((f) => {
+      const def = FACILITY_CATALOG[f.defId];
+      return gx >= f.x && gx < f.x + def.footprint.w && gy >= f.y && gy < f.y + def.footprint.h;
+    });
+  }
+
+  /**
+   * Render every placed facility from state as a `facility-<defId>` sprite and
+   * block its footprint tiles for pathing. Idempotent: existing sprites are
+   * reused/updated (levels can change on upgrade); removed facilities are culled.
+   */
+  private renderFacilities(): void {
+    const facilities = getState().facilities;
+    const seen = new Set<string>();
+
+    for (const f of facilities) {
+      seen.add(f.id);
+      const def = FACILITY_CATALOG[f.defId];
+      // Anchor the sprite at the top-vertex of the footprint's origin (x, y) tile
+      // — the same top-vertex convention the tile images use (origin 0.5, 0).
+      const world = this.cellToWorld(f.x, f.y);
+      // Depth uses the footprint's FRONT tile (max gx+gy) so it layers above
+      // tiles/characters standing behind it (ARCHITECTURE §7).
+      const frontGx = f.x + def.footprint.w - 1;
+      const frontGy = f.y + def.footprint.h - 1;
+      const d = depth(frontGx, frontGy, 1);
+
+      let sprite = this.facilitySprites.get(f.id);
+      if (!sprite) {
+        sprite = this.add.image(world.x, world.y, `facility-${f.defId}`);
+        sprite.setOrigin(0.5, 0);
+        this.facilitySprites.set(f.id, sprite);
+      }
+      sprite.setPosition(world.x, world.y);
+      sprite.setDepth(d);
+
+      // Block the footprint for pathfinding (safe to repeat).
+      for (const t of footprintTiles(def, f.x, f.y)) {
+        this.walkGrid.setBlocked(t.x, t.y, true);
+      }
+    }
+
+    // Cull sprites for facilities no longer in state (defensive; no removal yet).
+    for (const [id, sprite] of this.facilitySprites) {
+      if (!seen.has(id)) {
+        sprite.destroy();
+        this.facilitySprites.delete(id);
+      }
+    }
   }
 
   update(_time: number, delta: number): void {
