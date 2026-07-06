@@ -12,6 +12,7 @@ import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
 import { getState, type PlacedFacility } from '../core/state';
 import { bus } from '../core/events';
 import { openFacilityPopup } from '../ui/screens/build';
+import { attachGroundsFx } from '../fx/particles';
 
 type Dir = 'n' | 'e' | 's' | 'w';
 
@@ -79,6 +80,7 @@ export class GroundsScene extends Phaser.Scene {
 
     // Register with the DOM ↔ scene bridge so build.ts can start placement mode.
     setActiveGroundsScene(this);
+    attachGroundsFx(this); // BAK-201: pooled coin/dust/confetti particle FX (WU-14)
 
     // Re-render facilities whenever one is placed or state otherwise changes
     // (e.g. an upgrade bumps a level). Kept unsubscribed on shutdown.

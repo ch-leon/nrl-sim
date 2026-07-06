@@ -21,6 +21,7 @@ import type { TeamSheet, MatchResult } from '../sim/events';
 import type { Fixture } from '../core/state';
 import { PlaybackController, type PlaybackSpeed } from '../world/playback';
 import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
+import { attachMatchFx } from '../fx/particles';
 import {
   FIELD_LONG,
   FIELD_WIDE,
@@ -136,6 +137,7 @@ export class MatchScene extends Phaser.Scene {
     this.spawnDots();
     this.spawnBall();
     this.mountBackButton();
+    attachMatchFx(this); // BAK-201: pooled try/big-hit/crowd particle FX (WU-14)
 
     // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then
     // the playback controller which re-emits the event stream on a compressed
