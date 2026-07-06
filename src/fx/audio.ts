@@ -701,7 +701,7 @@ function ensureAudioStyles(): void {
 .nrl-audio-launcher {
   pointer-events: none;
   position: fixed;
-  top: 0.5rem;
+  top: 3rem; /* below the HUD's Advance Week button */
   right: 0.5rem;
   z-index: 20;
 }

@@ -18,6 +18,9 @@ import { openBuildScreen } from './ui/screens/build';
 import { openSquadScreen } from './ui/screens/squad';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
+import { initAudio, initAudioUi } from './fx/audio';
+import { initPwa } from './fx/pwa';
+import { startTutorial } from './ui/tutorial';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
@@ -96,6 +99,12 @@ async function boot(): Promise<void> {
   nav.registerScreen('build', 'Build', () => openBuildScreen());
   nav.registerScreen('fixtures', 'Fixtures', () => openFixturesScreen());
   nav.registerScreen('ladder', 'Ladder', () => openLadderScreen());
+  nav.registerScreen('help', '?', () => startTutorial(true));
+
+  initAudio();
+  initAudioUi();
+  initPwa();
+  startTutorial(); // self-guards on settings.tutorialDone
 }
 
 void boot();
