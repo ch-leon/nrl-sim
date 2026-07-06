@@ -7,7 +7,7 @@ import type {
 
 // MatchResult / MatchEvent are the canonical match-sim contract types, exported
 // from src/sim/events.ts (WU-6, ARCHITECTURE §6).
-import type { MatchResult, MatchEvent } from '../sim/events';
+import type { MatchResult, MatchEvent, TeamSheet } from '../sim/events';
 
 /** Event name -> payload type map (verbatim from ARCHITECTURE §5). */
 export interface Events {
@@ -17,7 +17,9 @@ export interface Events {
   'money:changed': { delta: number; reason: string; balance: number };
   'facility:placed': PlacedFacility;
   'player:signed': Player;
-  'match:started': { fixture: Fixture; sim: MatchResult };
+  // home/away sheets ride along so the Match scene can render kits/names
+  // without re-deriving them (wave-4 integration extension).
+  'match:started': { fixture: Fixture; sim: MatchResult; home: TeamSheet; away: TeamSheet };
   'match:event': MatchEvent; // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
   'bankruptcy:warning': { balance: number };

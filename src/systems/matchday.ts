@@ -61,7 +61,7 @@ export function registerPlayerMatchSystem(): void {
     });
 
     if (!ctx.fastForward) {
-      bus.emit('match:started', { fixture, sim });
+      bus.emit('match:started', { fixture, sim, home, away });
     }
   });
 }

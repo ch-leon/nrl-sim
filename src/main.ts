@@ -79,8 +79,16 @@ async function boot(): Promise<void> {
   registerFreeAgencySystem();
   registerAgingSystem();
 
-  new Phaser.Game(config);
+  const game = new Phaser.Game(config);
   createHud({ onAdvanceWeek: () => advanceWeek() });
+
+  // Grounds → Match handoff: state/ladder are already applied by the matchday
+  // tick hook before this fires; the Match scene is pure playback. The scene's
+  // own Back-to-Club button returns to Grounds at full-time.
+  bus.on('match:started', ({ fixture, sim, home, away }) => {
+    game.scene.stop('Grounds');
+    game.scene.start('Match', { home, away, result: sim, fixture });
+  });
 
   const nav = createNav();
   nav.registerScreen('squad', 'Squad', () => openSquadScreen());

@@ -353,8 +353,10 @@ export class MatchScene extends Phaser.Scene {
     // Hidden until full-time; before then, playback + Skip drive the flow.
     const btn = button('Back to Club', () => this.exitToGrounds());
     btn.style.position = 'fixed';
-    btn.style.left = '0.5rem';
-    btn.style.bottom = '0.5rem';
+    // Centred above the nav bar so it never overlaps the nav buttons.
+    btn.style.left = '50%';
+    btn.style.transform = 'translateX(-50%)';
+    btn.style.bottom = '3.25rem';
     btn.style.zIndex = '20';
     // If no result was provided (defensive), keep the classic fallback visible.
     btn.style.display = this.result ? 'none' : '';
