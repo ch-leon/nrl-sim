@@ -2,3 +2,6 @@ node_modules
 dist
 *.local
 .DS_Store
+# PWA icons are generated at build time (prebuild → scripts/gen-icons.mjs);
+# per ARCHITECTURE §4 no binary assets are committed. (BAK-204)
+public/icons/
