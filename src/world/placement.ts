@@ -204,10 +204,11 @@ export class PlacementController {
       return v;
     }
 
-    // Commit. spendMoney is the single source of truth for the deduction.
-    spendMoney(def.cost, `build:${defId}`);
+    // Commit. Place first, pay only on success — addFacility re-checks bounds/
+    // overlap independently, so paying first could deduct with no facility.
     const placed = addFacility(defId, this.gx, this.gy, 1); // emits facility:placed
     if (placed) {
+      spendMoney(def.cost, `build:${defId}`);
       for (const t of footprintTiles(def, this.gx, this.gy)) {
         this.path.setBlocked(t.x, t.y, true);
       }

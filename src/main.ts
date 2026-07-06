@@ -13,6 +13,7 @@ import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
 import { registerPlayerMatchSystem } from './systems/matchday';
+import { registerAgingSystem } from './systems/aging';
 import { openBuildScreen } from './ui/screens/build';
 import { openSquadScreen } from './ui/screens/squad';
 import { openRecruitScreen } from './ui/screens/recruit';
@@ -76,6 +77,7 @@ async function boot(): Promise<void> {
   registerFixturesSystem();
   registerPlayerMatchSystem();
   registerFreeAgencySystem();
+  registerAgingSystem();
 
   new Phaser.Game(config);
   createHud({ onAdvanceWeek: () => advanceWeek() });

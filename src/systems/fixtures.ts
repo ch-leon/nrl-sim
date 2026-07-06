@@ -339,9 +339,11 @@ export function runFinals(state: GameState, rng: Rng): GameState {
   const playerPos = ladderPosition(state, PLAYER_ID);
   const playerPremiership = premier === PLAYER_ID;
 
+  // runFinals executes inside the season hook, AFTER resetForNewSeason() has
+  // already bumped state.season — the season that just ended is season - 1.
   const history = [
     ...state.history,
-    { season: state.season, ladderPosition: playerPos, premiership: playerPremiership },
+    { season: state.season - 1, ladderPosition: playerPos, premiership: playerPremiership },
   ];
   const reputation = playerPremiership
     ? Math.min(100, state.reputation + PREMIERSHIP_REP_BONUS)

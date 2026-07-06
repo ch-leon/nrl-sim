@@ -119,10 +119,10 @@ export function tickContracts(state: GameState): GameState {
  * (club stays in debt but fieldable). Terminates: each sale reduces squad size
  * and the loop halts at SQUAD_MIN.
  */
-export function handleBankruptcy(state: GameState): GameState {
-  // `state` is the entry snapshot; live reads use getState() since the loop and
-  // prior pipeline steps mutate the store. Reference it once for the warning gate.
-  if (state.money < ECON.BANKRUPTCY_WARN) {
+export function handleBankruptcy(_state: GameState): GameState {
+  // Gate on the settled live balance, not the entry snapshot — prior pipeline
+  // steps may have moved money after `state` was captured.
+  if (getState().money < ECON.BANKRUPTCY_WARN) {
     const balance = getState().money;
     bus.emit('bankruptcy:warning', { balance });
     bus.emit('ui:notify', {
