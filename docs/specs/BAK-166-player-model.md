@@ -76,7 +76,7 @@ Stat bands per quality (each stat rolled `rng.int(lo,hi)`, clamped 1..STAT_MAX):
 Derived fields:
 - `id`: `` `p_${rng.state().toString(36)}_${rng.int(0, 1e6)}` `` (deterministic; no `crypto`).
 - `morale`: `rng.int(55, 85)`; `injuryRisk`: `rng.int(5, 40)`; `injuredWeeks`: 0.
-- `wage`: `Math.round(overallRating * 120 + 200)` per week (star ~11k, rookie ~4k).
+- `wage`: `Math.round(overallRating * 15 + 100)` per week (star ~1.4k, rookie ~600). Retuned during wave-3 integration: the original ×120 scale made the squad wage bill ~7× total income under BAK-188 economy scales.
 - `contractWeeks`: `rng.int(1, 3) * WEEKS_PER_SEASON` (import from `../config`).
 - Traits (deduped array): base roll — 25% each independent of `workhorse`,
   `finisher`, `hardMan`, `playmaker`, `injuryProne` (via `rng.next() < 0.15` each).

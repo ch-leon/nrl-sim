@@ -91,7 +91,7 @@ describe('generatePlayer — shape & bounds', () => {
   it('wage derives from overall rating', () => {
     const rng = makeRng(8);
     const p = generatePlayer(rng);
-    expect(p.wage).toBe(Math.round(overallRating(p) * 120 + 200));
+    expect(p.wage).toBe(Math.round(overallRating(p) * 15 + 100));
   });
 
   it('contractWeeks is a multiple of WEEKS_PER_SEASON (1..3 seasons)', () => {

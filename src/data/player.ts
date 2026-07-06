@@ -75,7 +75,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
 
   const morale = rng.int(55, 85);
   const injuryRisk = rng.int(5, 40);
-  const wage = Math.round(overall * 120 + 200);
+  const wage = Math.round(overall * 15 + 100); // tuned: squad of 20 ≈ $18k/wk vs BAK-188 income scales
   const contractWeeks = rng.int(1, 3) * WEEKS_PER_SEASON;
 
   // Base traits: each independent 15% roll.
