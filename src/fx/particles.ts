@@ -177,10 +177,20 @@ export function attachMatchFx(scene: Phaser.Scene): FxHandle {
 
   const emitters = [tryBurst, goldShower, bigHitRing, crowdHome, crowdAway];
 
+  // Prefer the scene's true iso projection (MatchScene.fieldToWorld) so bursts
+  // land exactly where the ball/dots are; the AABB-linear helper is the
+  // fallback (and remains the pure, unit-tested path).
+  const project =
+    'fieldToWorld' in scene && typeof (scene as { fieldToWorld?: unknown }).fieldToWorld === 'function'
+      ? (fx: number, fy: number) =>
+          (scene as unknown as { fieldToWorld(fx: number, fy: number): { x: number; y: number } })
+            .fieldToWorld(fx, fy)
+      : (fx: number, fy: number) => fieldToWorld(fx, fy, bounds);
+
   const onEvent = (ev: MatchEvent): void => {
     const effect = matchEffectFor(ev.kind);
     if (!effect) return;
-    const w = fieldToWorld(ev.x ?? 50, ev.y ?? 50, bounds);
+    const w = project(ev.x ?? 50, ev.y ?? 50);
     if (effect === 'try') {
       tryBurst.explode(MATCH_CAPS.tryBurst, w.x, w.y);
       // Shower rains from above the try line down toward the event position.

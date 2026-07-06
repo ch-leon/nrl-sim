@@ -31,7 +31,13 @@ export function registerPlayerMatchSystem(): void {
     const state = getState();
     const fixture = getCurrentFixture(state, PLAYER_ID);
     if (!fixture || fixture.result) return;
-    if (state.squad.filter((p) => p.injuredWeeks <= 0).length === 0) return;
+    if (state.squad.filter((p) => p.injuredWeeks <= 0).length === 0) {
+      bus.emit('ui:notify', {
+        text: 'No fit players — this round’s match was forfeited.',
+        kind: 'danger',
+      });
+      return;
+    }
 
     const rng = makeRng(state.rngSeed);
     const seed = rng.int(1, 2 ** 31);

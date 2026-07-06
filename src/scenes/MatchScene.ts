@@ -137,6 +137,9 @@ export class MatchScene extends Phaser.Scene {
     this.spawnDots();
     this.spawnBall();
     this.mountBackButton();
+    // Publish sheets for the crowd emitters' kit tints (read by attachMatchFx).
+    this.data.set('home', this.home);
+    this.data.set('away', this.away);
     attachMatchFx(this); // BAK-201: pooled try/big-hit/crowd particle FX (WU-14)
 
     // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then

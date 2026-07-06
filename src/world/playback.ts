@@ -149,7 +149,9 @@ export class PlaybackController {
 
       const next = this.events[this.cursor];
       if (!next) {
-        // No more events; advancing the clock changes nothing observable.
+        // Event log exhausted. The engine always ends with 'full-time', but
+        // don't depend on that sentinel — finish robustly either way.
+        this.emitFinished();
         break;
       }
       const dueAt = eventTimeMs(next.t, 1);

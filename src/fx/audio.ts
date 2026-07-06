@@ -362,6 +362,11 @@ export class AudioEngine {
   private master: GainNode | null = null;
   private schedulerId: ReturnType<typeof setInterval> | null = null;
   private active: ActiveMusic | null = null;
+
+  /** True once any music track is playing (or fading in). */
+  get musicPlaying(): boolean {
+    return this.active !== null;
+  }
   private fadingOut: ActiveMusic[] = [];
   private unsubs: (() => void)[] = [];
   private disposed = false;
@@ -629,7 +634,9 @@ export function initAudio(): AudioEngine {
       window.removeEventListener('pointerdown', onGesture);
       window.removeEventListener('keydown', onGesture);
       void engine?.resume().then(() => {
-        engine?.playMusic('grounds');
+        // The gesture may itself have triggered a match (Advance Week click);
+        // don't crossfade grounds music over a track that already started.
+        if (!engine?.musicPlaying) engine?.playMusic('grounds');
       });
     };
     window.addEventListener('pointerdown', onGesture, { once: true });
