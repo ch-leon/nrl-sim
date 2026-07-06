@@ -5,13 +5,9 @@ import type {
   GameState, PlacedFacility, Player, Fixture,
 } from './state';
 
-// MatchResult / MatchEvent live in src/sim (WU-6), which is not yet built.
-// Declare the event payloads as `unknown` placeholders so this module compiles
-// standalone; tighten once the sim types land.
-// TODO(WU-6): tighten once sim types land
-type MatchResult = unknown;
-// TODO(WU-6): tighten once sim types land
-type MatchEvent = unknown;
+// MatchResult / MatchEvent are the canonical match-sim contract types, exported
+// from src/sim/events.ts (WU-6, ARCHITECTURE §6).
+import type { MatchResult, MatchEvent } from '../sim/events';
 
 /** Event name -> payload type map (verbatim from ARCHITECTURE §5). */
 export interface Events {
