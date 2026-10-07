@@ -15,9 +15,14 @@
 3. **Typed event bus.** Systems communicate via a single typed `EventBus`
    (see §5). Scenes/UI subscribe; systems publish. No direct scene→system calls
    other than through exported system functions.
-4. **Generated placeholder art.** No binary assets in the repo. All textures are
-   generated at boot in `BootScene` via `Phaser.GameObjects.Graphics` +
-   `generateTexture()` (see §7). Real pixel art can replace them later by texture key.
+4. **Generated pixel art.** No binary assets in the repo. All textures are
+   painted pixel-by-pixel into a `PixelBuffer` (`src/art/pixel.ts`: palette
+   sprite grids, hard-edged polygons, deterministic `noise2`/`bayer` dither) and
+   uploaded once with `toTexture`. Generators are pure (unit-tested in node) and
+   live under `src/art/grounds/` and `src/art/match/`. Eyeball changes with
+   `npx vite-node scripts/art-preview.ts <module> <out.png> <scale>`. Art never
+   uses `Math.random`. Texture keys (see §7) are the swap point if hand-drawn
+   art ever replaces them.
 5. **Deterministic RNG.** All randomness in sim/systems goes through the seeded
    RNG in `src/utils/rng.ts` (mulberry32). UI-only cosmetic randomness may use
    `Math.random`.
