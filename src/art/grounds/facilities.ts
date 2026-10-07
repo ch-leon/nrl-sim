@@ -40,7 +40,7 @@ import {
   iconPal,
   PAL,
 } from './parts';
-import { OUTLINE, WHITE, CLUB, GRASS, STONE, METAL, WOOD, RED, GLASS, LEAF } from './palette';
+import { OUTLINE, WHITE, CLUB, GRASS, STONE, METAL, WOOD, RED, LEAF } from './palette';
 
 /** Headroom painted above the top vertex before cropping (multiple of 4). */
 const MAX_LIFT = 96;
@@ -535,17 +535,7 @@ function scoutOffice(lot: Lot): void {
     l.line([25, 14, b.h + 24], [31, 14, b.h + 24], METAL.dark);
     l.dot(28, 14, b.h + 29, RED.light);
   });
-  // Telescope on a tripod, pointed at the training paddock.
-  lot.layer((l) => {
-    const [u, v] = [52, 34];
-    l.line([u - 3, v, 0], [u, v, 9], WOOD.dark);
-    l.line([u + 3, v, 0], [u, v, 9], WOOD.dark);
-    l.line([u, v + 3, 0], [u, v, 9], WOOD.mid);
-    // Tube angled up toward the back-left, lens glinting.
-    l.line([u + 3, v + 3, 8], [u - 5, v - 5, 13], METAL.dark);
-    l.line([u + 3, v + 3, 9], [u - 5, v - 5, 14], METAL.light);
-    l.dot(u - 5, v - 5, 14, GLASS.hi);
-  });
+  lot.layer((l) => prop(l, SHRUB, SHRUB_PAL, 22, 56));
 }
 
 function medicalBay(lot: Lot): void {
