@@ -3,15 +3,15 @@ import {
   FIELD_LONG,
   FIELD_WIDE,
   IN_GOAL_DEPTH,
-  PLAYERS_PER_TEAM,
+  PLAY_LONG,
+  TEN_METRES,
   colorToInt,
+  depthAtWorldY,
   fieldToGrid,
   fieldToWorldPoint,
   fieldOffsetX,
   fieldWorldBounds,
-  formationPositions,
   panTowards,
-  tileVariantFor,
 } from '../../src/scenes/matchField';
 import { gridToScreen } from '../../src/world/iso';
 import { TILE_W } from '../../src/config';
@@ -36,18 +36,21 @@ describe('matchField.colorToInt', () => {
 });
 
 describe('matchField.fieldToGrid', () => {
-  it('maps normalized coords to fractional grid cells', () => {
-    expect(fieldToGrid(0, 0)).toEqual({ gx: 0, gy: 0 });
-    expect(fieldToGrid(100, 100)).toEqual({ gx: FIELD_LONG - 1, gy: FIELD_WIDE - 1 });
-    expect(fieldToGrid(50, 50)).toEqual({
-      gx: (FIELD_LONG - 1) / 2,
-      gy: (FIELD_WIDE - 1) / 2,
-    });
+  it('maps fx 0..100 onto try-line → try-line (in-goal beyond)', () => {
+    expect(fieldToGrid(0, 0)).toEqual({ gx: IN_GOAL_DEPTH, gy: 0 });
+    expect(fieldToGrid(100, 100)).toEqual({ gx: FIELD_LONG - IN_GOAL_DEPTH, gy: FIELD_WIDE });
+    expect(fieldToGrid(50, 50)).toEqual({ gx: FIELD_LONG / 2, gy: FIELD_WIDE / 2 });
+    expect(PLAY_LONG).toBe(FIELD_LONG - 2 * IN_GOAL_DEPTH);
+    expect(TEN_METRES * 10).toBeCloseTo(PLAY_LONG);
+  });
+
+  it('places fx outside 0..100 in the in-goal areas', () => {
+    expect(fieldToGrid(-12.5, 50).gx).toBeCloseTo(0);
+    expect(fieldToGrid(112.5, 50).gx).toBeCloseTo(FIELD_LONG);
   });
 
   it('produces fractional cells for off-grid values', () => {
     const { gx } = fieldToGrid(33, 0);
-    expect(gx).toBeCloseTo((33 / 100) * (FIELD_LONG - 1));
     expect(Number.isInteger(gx)).toBe(false);
   });
 });
@@ -62,7 +65,7 @@ describe('matchField.fieldToWorldPoint', () => {
   });
 
   it('offsetX keeps the widest cell on non-negative screenX (AC: off-canvas)', () => {
-    // fy=100 -> gy = FIELD_WIDE-1 (most negative raw screenX at fx=0).
+    // fy=100 at fx=0 is the most negative raw screenX inside the try-lines.
     const p = fieldToWorldPoint(0, 100, off);
     expect(p.x).toBeGreaterThanOrEqual(0);
   });
@@ -103,56 +106,12 @@ describe('matchField.fieldWorldBounds', () => {
   });
 });
 
-describe('matchField.tileVariantFor', () => {
-  it('marks the in-goal columns at both ends as ingoal', () => {
-    expect(tileVariantFor(0)).toBe('ingoal');
-    expect(tileVariantFor(IN_GOAL_DEPTH - 1)).toBe('ingoal');
-    expect(tileVariantFor(FIELD_LONG - 1)).toBe('ingoal');
-    expect(tileVariantFor(FIELD_LONG - IN_GOAL_DEPTH)).toBe('ingoal');
-  });
-
-  it('alternates light/dark bands across the field of play', () => {
-    // First playable band is light, next band is dark.
-    expect(tileVariantFor(IN_GOAL_DEPTH)).toBe('light');
-    expect(tileVariantFor(IN_GOAL_DEPTH + 3)).toBe('dark');
-    expect(tileVariantFor(IN_GOAL_DEPTH + 6)).toBe('light');
-  });
-});
-
-describe('matchField.formationPositions', () => {
-  it('returns one dot per player, all within field bounds', () => {
-    for (const attackingRight of [true, false]) {
-      const spots = formationPositions(attackingRight);
-      expect(spots).toHaveLength(PLAYERS_PER_TEAM);
-      for (const s of spots) {
-        expect(s.fx).toBeGreaterThanOrEqual(0);
-        expect(s.fx).toBeLessThanOrEqual(100);
-        expect(s.fy).toBeGreaterThanOrEqual(0);
-        expect(s.fy).toBeLessThanOrEqual(100);
-      }
-    }
-  });
-
-  it('mirrors the two teams onto opposite halves (fx reflected around 50)', () => {
-    const left = formationPositions(false);
-    const right = formationPositions(true);
-    for (let i = 0; i < left.length; i++) {
-      expect(right[i]!.fx).toBeCloseTo(100 - left[i]!.fx);
-      expect(right[i]!.fy).toBe(left[i]!.fy); // width unchanged
-    }
-    // Defending-left team sits in the low-fx half; attacking-right in the high half.
-    const avgLeft = left.reduce((a, s) => a + s.fx, 0) / left.length;
-    const avgRight = right.reduce((a, s) => a + s.fx, 0) / right.length;
-    expect(avgLeft).toBeLessThan(50);
-    expect(avgRight).toBeGreaterThan(50);
-  });
-
-  it('spreads dots across the full width (wingers wide, spine central)', () => {
-    const spots = formationPositions(false);
-    const fys = spots.map((s) => s.fy);
-    expect(Math.min(...fys)).toBeLessThanOrEqual(10); // a winger hugs one touchline
-    expect(Math.max(...fys)).toBeGreaterThanOrEqual(90); // the other winger the far
-    expect(fys).toContain(50); // spine players on the middle
+describe('matchField.depthAtWorldY', () => {
+  it('sorts by ground-contact y (iso convention: depth = screenY + layer)', () => {
+    const near = fieldToWorldPoint(60, 80, fieldOffsetX());
+    const far = fieldToWorldPoint(40, 20, fieldOffsetX());
+    expect(depthAtWorldY(near.y)).toBeGreaterThan(depthAtWorldY(far.y));
+    expect(depthAtWorldY(100, 2)).toBe(102);
   });
 });
 

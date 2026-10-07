@@ -8,6 +8,12 @@
 // MatchResult exactly; possession/tackles are self-consistent (possession is the
 // tackle-count ratio, mirroring the engine) and land within rounding of
 // MatchResult.stats — see tests/ui/matchOverlayAccumulator.test.ts.
+//
+// Layout: while mounted the overlay puts `nrl-match-active` on <body>, which
+// hides the HUD strip and bottom nav (no Advance Week / screen hopping
+// mid-match, and nothing for the scoreboard or the ×1/×2/×4/Skip controls to
+// collide with) and moves the sound button to the bottom-right corner. Removed
+// again on destroy (full-time / exit), when the Back-to-Club button takes over.
 import { el, panel, button, mount, ensureStyles } from '../dom';
 import { bus } from '../../core/events';
 import { makeRng } from '../../utils/rng';
@@ -214,6 +220,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   root.append(scoreboard, statsPanel, commentaryPanel);
   mount(root);
+  document.body?.classList.add(MATCH_ACTIVE_CLASS);
 
   const render = (): void => {
     scoreEl.textContent = `${state.homeScore} – ${state.awayScore}`;
@@ -250,6 +257,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       offEvent();
       offFinished();
       root.remove();
+      document.body?.classList.remove(MATCH_ACTIVE_CLASS);
       if (active === handle) active = null;
     },
   };
@@ -290,6 +298,8 @@ function deriveSeed(result: MatchResult): number {
 }
 
 const OVERLAY_STYLE_ID = 'nrl-match-overlay-styles';
+/** Body class set while a match overlay is mounted (see header). */
+export const MATCH_ACTIVE_CLASS = 'nrl-match-active';
 
 function injectOverlayStyles(): void {
   if (typeof document === 'undefined') return;
@@ -302,19 +312,27 @@ function injectOverlayStyles(): void {
 
 const OVERLAY_CSS = `
 .nrl-match-overlay { font-family: 'Courier New', monospace; }
+/* Match mode: the HUD strip and nav bar step aside; sound button moves down. */
+body.nrl-match-active .nrl-hud,
+body.nrl-match-active .nrl-nav { display: none; }
+body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: 0.5rem; }
 .nrl-mo-scoreboard {
   position: fixed; top: 0.5rem; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 0.75rem; z-index: 15;
   padding: 0.4rem 0.75rem;
+  max-width: calc(100vw - 1rem); box-sizing: border-box;
 }
-.nrl-mo-chip { display: flex; align-items: center; gap: 0.35rem; font-weight: bold; }
-.nrl-mo-swatch { width: 0.9rem; height: 0.9rem; border: 2px solid #000; display: inline-block; }
-.nrl-mo-name { font-size: clamp(0.65rem, 2.5vw, 0.9rem); }
-.nrl-mo-centre { text-align: center; min-width: 6rem; }
+.nrl-mo-chip { display: flex; align-items: center; gap: 0.35rem; font-weight: bold; min-width: 0; }
+.nrl-mo-swatch { width: 0.9rem; height: 0.9rem; border: 2px solid #000; display: inline-block; flex: 0 0 auto; }
+.nrl-mo-name {
+  font-size: clamp(0.65rem, 2.5vw, 0.9rem);
+  max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nrl-mo-centre { text-align: center; min-width: 5.5rem; flex: 0 0 auto; }
 .nrl-mo-score { font-size: clamp(1rem, 4vw, 1.4rem); font-weight: bold; display: block; }
-.nrl-mo-meta { display: flex; gap: 0.4rem; justify-content: center; font-size: clamp(0.55rem, 2vw, 0.7rem); }
+.nrl-mo-meta { display: flex; gap: 0.4rem; justify-content: center; font-size: clamp(0.55rem, 2vw, 0.7rem); white-space: nowrap; }
 .nrl-mo-stats {
-  position: fixed; top: 4rem; right: 0.5rem; z-index: 15; min-width: 10rem;
+  position: fixed; top: 4.5rem; right: 0.5rem; z-index: 15; min-width: 9.5rem;
 }
 .nrl-mo-stats-toggle { width: 100%; margin-bottom: 0.35rem; }
 .nrl-mo-stat-line { font-size: 0.7rem; margin: 0.15rem 0; }
@@ -326,4 +344,18 @@ const OVERLAY_CSS = `
 }
 .nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: 8rem; overflow-y: auto; }
 .nrl-mo-line { font-size: clamp(0.6rem, 2.4vw, 0.8rem); line-height: 1.25; }
+/* Playback controls (mounted by MatchScene): bottom-centre, where the nav bar
+   sits outside a match; the commentary feed stacks above them. */
+.nrl-mo-controls {
+  position: fixed; left: 50%; bottom: 0.5rem; transform: translateX(-50%);
+  z-index: 20; display: flex; gap: 0.35rem; pointer-events: auto;
+}
+.nrl-mo-controls .nrl-btn[data-active] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; }
+/* Short (landscape phone) viewports: keep stats and commentary apart. */
+@media (max-height: 480px) {
+  .nrl-mo-stats { top: 4rem; min-width: 8.5rem; padding: 0.3rem 0.5rem; }
+  .nrl-mo-stat-line { font-size: 0.62rem; margin: 0.05rem 0; }
+  .nrl-mo-feed { max-height: 3.4rem; }
+  .nrl-mo-commentary { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
+}
 `;

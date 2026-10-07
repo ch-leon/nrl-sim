@@ -1,83 +1,88 @@
-// src/scenes/MatchScene.ts — isometric rugby-league match field (BAK-189, WU-11).
+// src/scenes/MatchScene.ts — isometric rugby-league match day (BAK-189, WU-11;
+// playback/overlay WU-12).
 //
-// Static presentation only: an iso field (~30x18) with 10m stripe shading, white
-// try-lines, darker in-goal areas and a halfway line; 26 kit-tinted player dots
-// in loose formation lines; a ball at centre; a camera that frames the whole
-// field and slow-pans following the ball's x. Event playback/animation is BAK-194
-// (WU-12) and consumes the public surface documented at the bottom of this file.
+// Presentation only. Builds a generated pixel-art stadium (src/art/match/*):
+// a mown field with full markings, H goalposts, hoardings, a grandstand, a hill
+// and near terraces full of bobbing spectators in both teams' colours; 26
+// palette-swapped animated players with ground shadows; and a ball. The
+// PlaybackController (src/world/playback.ts) drives the players from the
+// MatchResult event log; this scene only provides sprites through the
+// structural PlaybackActor/PlaybackBall interfaces and keeps the camera on the
+// ball.
 //
-// Textures are generated locally in create() (guarded by this.textures.exists) so
-// this scene owns its assets without editing BootScene (owned by another agent
-// this wave). See ARCHITECTURE.md §7 for the texture keys.
+// Depth convention (ARCHITECTURE §7): depth = world (screen) y of a thing's
+// ground contact + layer. Static layers sit outside the field's y range:
+//   BG (field, back stands)  < back crowd < shadows < players/posts/ball (y+1)
+//   < particles (10 000) < FG near terraces < front crowd.
 //
-// Pure geometry/formation math lives in ./matchField (Phaser-free, unit-tested).
+// Pure geometry lives in ./matchField and src/art/match (Phaser-free, tested).
 import Phaser from 'phaser';
-import { TILE_W, TILE_H } from '../config';
-import { gridToScreen, depth } from '../world/iso';
 import { CameraController } from '../world/camera';
 import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
-import type { TeamSheet, MatchResult } from '../sim/events';
+import type { TeamSheet, MatchResult, MatchEvent } from '../sim/events';
 import type { Fixture } from '../core/state';
-import { PlaybackController, type PlaybackSpeed } from '../world/playback';
+import {
+  PlaybackController,
+  type PlaybackActor,
+  type PlaybackBall,
+  type PlaybackSpeed,
+} from '../world/playback';
+import { PLAYERS } from '../world/formation';
 import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
 import { attachMatchFx } from '../fx/particles';
+import { resolveKits } from '../art/match/kit';
+import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
-  FIELD_LONG,
-  FIELD_WIDE,
-  IN_GOAL_DEPTH,
-  colorToInt,
-  fieldToGrid,
-  fieldToWorldPoint,
-  fieldOffsetX,
-  fieldWorldBounds,
-  formationPositions,
-  panTowards,
-  tileVariantFor,
-} from './matchField';
+  CROSSBAR_Z,
+  POST_GX,
+  POST_GY,
+  cameraWorldBounds,
+  crowdSeats,
+  paintBackground,
+  paintForeground,
+  type CrowdSeat,
+} from '../art/match/stadium';
+import { CROSSBAR_AX, CROSSBAR_AY, UPRIGHT_H, UPRIGHT_W } from '../art/match/props';
+import {
+  CROWD_BASE,
+  CROWD_FW,
+  crowdFrameName,
+  crowdPose,
+  lookForSeat,
+  shirtForSeat,
+  shirtSide,
+  type CrowdMood,
+} from '../art/match/crowd';
+import { isoProject } from '../art/match/iso3d';
+import { MatchArtRegistry, playerAnimKey } from './matchArt';
+import { fieldToWorldPoint, fieldOffsetX, panTowards } from './matchField';
 
-// Re-export the pure helpers so playback (BAK-194) and tests have a single import
-// site alongside the scene class.
+// Re-export the pure helpers so tests and playback have a single import site.
 export {
   FIELD_LONG,
   FIELD_WIDE,
   IN_GOAL_DEPTH,
-  STRIPE_BAND,
   PLAYERS_PER_TEAM,
   colorToInt,
   fieldToGrid,
   fieldToWorldPoint,
   fieldOffsetX,
   fieldWorldBounds,
-  formationPositions,
   panTowards,
-  tileVariantFor,
 } from './matchField';
 
-// Texture keys generated locally (ARCHITECTURE.md §7). Two stripe variants of
-// field-tile so alternating bands read as mown grass.
-const KEY_TILE_LIGHT = 'field-tile'; // §7 canonical key = the light stripe
-const KEY_TILE_DARK = 'field-tile-dark';
-const KEY_TILE_INGOAL = 'field-tile-ingoal';
-const KEY_LINE = 'field-line';
-const KEY_BALL = 'ball';
-const KEY_DOT = 'player-dot';
+// Static layer depths (see header).
+const DEPTH_BG = -100_000;
+const DEPTH_CROWD_BACK = -90_000;
+const DEPTH_SHADOW = -80_000;
+const DEPTH_FG = 50_000;
+const DEPTH_CROWD_FRONT = 60_000;
 
-// Palette (spec): distinct from Grounds' `tile-grass #3a7d34` via striping + lines.
-const GRASS_LIGHT = 0x3f8b39;
-const GRASS_DARK = 0x357a2f;
-const GRASS_INGOAL = 0x28601f;
-const LINE_COLOR = 0xf5f5f5;
-
-// Iso diamond outline (2:1) in local texture space.
-const DIAMOND: Phaser.Types.Math.Vector2Like[] = [
-  { x: TILE_W / 2, y: 0 },
-  { x: TILE_W, y: TILE_H / 2 },
-  { x: TILE_W / 2, y: TILE_H },
-  { x: 0, y: TILE_H / 2 },
-];
-
-const TILE_KEY = { ingoal: KEY_TILE_INGOAL, light: KEY_TILE_LIGHT, dark: KEY_TILE_DARK } as const;
+/** Default match zoom: players read clearly, ~half the pitch in view. */
+const MATCH_ZOOM = 1.5;
+/** Crowd animation tick (real ms). */
+const CROWD_TICK_MS = 220;
 
 export interface MatchSceneData {
   home: TeamSheet;
@@ -86,19 +91,67 @@ export interface MatchSceneData {
   fixture?: Fixture; // carried through so `match:finished` can echo it (BAK-194)
 }
 
+/** A player sprite + ground shadow, driven through PlaybackActor. */
+class MatchActor implements PlaybackActor {
+  readonly sprite: Phaser.GameObjects.Sprite;
+  private readonly shadow: Phaser.GameObjects.Image;
+  private readonly atlas: string;
+  private readonly look: number;
+  private current = '';
+
+  constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string) {
+    this.atlas = atlas;
+    this.look = look;
+    this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW);
+    this.sprite = scene.add.sprite(0, 0, atlas, `${look}-idle-0`);
+    this.sprite.setOrigin((CENTER_X + 0.5) / FRAME_W, (BASE_Y + 1) / FRAME_H);
+  }
+
+  place(x: number, y: number, depth: number): void {
+    this.sprite.setPosition(x, y).setDepth(depth);
+    this.shadow.setPosition(x, y);
+  }
+
+  play(anim: PlayerAnim, faceLeft: boolean, timeScale: number): void {
+    const key = playerAnimKey(this.atlas, this.look, anim);
+    if (key !== this.current) {
+      this.current = key;
+      this.sprite.play(key);
+    }
+    this.sprite.setFlipX(faceLeft);
+    this.sprite.anims.timeScale = timeScale;
+  }
+}
+
+/** The ball sprite + its ground shadow (shown while in the air). */
+class MatchBall implements PlaybackBall {
+  readonly sprite: Phaser.GameObjects.Image;
+  private readonly shadow: Phaser.GameObjects.Image;
+  /** Ground position — what the camera follows. */
+  gx = 0;
+  gy = 0;
+
+  constructor(scene: Phaser.Scene, key: string, shadowKey: string) {
+    this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW + 1);
+    this.sprite = scene.add.image(0, 0, key).setOrigin(0.5, 1);
+  }
+
+  place(x: number, y: number, lift: number, depth: number): void {
+    this.gx = x;
+    this.gy = y;
+    this.sprite.setPosition(x, y - lift + 2).setDepth(depth);
+    this.shadow.setPosition(x, y).setVisible(lift > 3);
+  }
+}
+
 /**
- * MatchScene renders the isometric match field and exposes a minimal, typed
- * public surface for WU-12 playback (see bottom of file).
+ * MatchScene renders the stadium and exposes the PlaybackScene surface
+ * (fieldToWorld, players, ball, cameras, homeId) to the PlaybackController.
  */
 export class MatchScene extends Phaser.Scene {
-  // ── Public surface consumed by WU-12 playback (BAK-194) ────────────────────
-  /** Home player dots (length 13), tinted with home.colors[0]. */
-  public readonly homeDots: Phaser.GameObjects.Image[] = [];
-  /** Away player dots (length 13), tinted with away.colors[0]. */
-  public readonly awayDots: Phaser.GameObjects.Image[] = [];
-  /** The single ball sprite (starts at field centre). */
-  public ball!: Phaser.GameObjects.Image;
-  /** Home team id — consumed by PlaybackController (in-goal direction / sides). */
+  // ── Public surface consumed by playback (structural PlaybackScene) ─────────
+  public readonly players: { home: MatchActor[]; away: MatchActor[] } = { home: [], away: [] };
+  public ball!: MatchBall;
   public get homeId(): string {
     return this.home.clubId;
   }
@@ -108,9 +161,17 @@ export class MatchScene extends Phaser.Scene {
   private result!: MatchResult;
   private fixture: Fixture | undefined;
 
-  private offsetX = fieldOffsetX();
+  private readonly offsetX = fieldOffsetX();
+  private art!: MatchArtRegistry;
   private camController!: CameraController;
   private backBtn: HTMLButtonElement | null = null;
+
+  // Crowd.
+  private crowdBobs: { bob: Phaser.GameObjects.Bob; seat: CrowdSeat; shirt: number; look: number; side: 'home' | 'away' | null }[] = [];
+  private crowdTick = 0;
+  private mood: CrowdMood = { home: 0, away: 0 };
+  private moodUntil = { home: 0, away: 0 };
+  private offCrowd: (() => void) | null = null;
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
   private playback: PlaybackController | null = null;
@@ -128,14 +189,35 @@ export class MatchScene extends Phaser.Scene {
     this.away = data.away;
     this.result = data.result;
     this.fixture = data.fixture;
+    this.players.home = [];
+    this.players.away = [];
+    this.crowdBobs = [];
+    this.finished = false;
   }
 
   create(): void {
-    this.generateTextures();
-    this.renderField();
+    this.art = new MatchArtRegistry(this);
+    const kits = resolveKits(this.home, this.away);
+
+    // Static stadium layers.
+    this.art.layer('match-bg', paintBackground(this.offsetX, kits.home, kits.away), DEPTH_BG);
+    this.art.layer('match-fg', paintForeground(this.offsetX, kits.home, kits.away), DEPTH_FG);
+    const props = this.art.props('match', kits.home);
+    this.spawnPosts(props.upright, props.crossbar);
+    this.spawnCrowd(this.art.crowd('match-crowd', kits.home, kits.away));
+
+    // Players + ball.
+    const homeAtlas = this.art.players(`pl-${this.home.clubId}`, kits.home);
+    const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayAlt ? '-alt' : ''}`, kits.away);
+    for (let i = 0; i < PLAYERS; i++) {
+      this.players.home.push(new MatchActor(this, homeAtlas, lookForSlot(i), props.shadow));
+      this.players.away.push(new MatchActor(this, awayAtlas, lookForSlot(i + 5), props.shadow));
+    }
+    this.ball = new MatchBall(this, props.ball, props.ballShadow);
+    const centre = this.fieldToWorld(50, 50);
+    this.ball.place(centre.x, centre.y, 0, centre.y + 2);
+
     this.setupCamera();
-    this.spawnDots();
-    this.spawnBall();
     this.mountBackButton();
     // Publish sheets for the crowd emitters' kit tints (read by attachMatchFx).
     this.data.set('home', this.home);
@@ -162,173 +244,130 @@ export class MatchScene extends Phaser.Scene {
   }
 
   /**
-   * Map sim field coords (fx 0-100 length, fy 0-100 width) to Phaser world x/y.
-   * Public — WU-12 playback positions sprites through this. `fieldToWorld(0,50)`
-   * and `fieldToWorld(100,50)` land on opposite try-line ends.
+   * Map sim field coords (fx 0-100 try-line to try-line, fy 0-100 width) to
+   * Phaser world x/y. `fieldToWorld(0,50)` and `fieldToWorld(100,50)` land on
+   * the two try-lines.
    */
   fieldToWorld(fx: number, fy: number): { x: number; y: number } {
     return fieldToWorldPoint(fx, fy, this.offsetX);
   }
 
-  /** Depth for a sprite sitting on the field at the given field coords. */
-  fieldDepth(fx: number, fy: number, layer = 1): number {
-    const { gx, gy } = fieldToGrid(fx, fy);
-    return depth(gx, gy, layer);
-  }
-
   update(_time: number, delta: number): void {
-    // Advance playback (fires due events, moves sprites) before panning so the
-    // camera follows the freshly-tweened ball this frame.
+    // Advance playback (fires due events, steps sprites) before panning so the
+    // camera follows the freshly-moved ball this frame.
     if (this.playback) this.playback.update(delta);
 
-    // Slow auto-pan: ease camera scrollX toward the ball's world x. The
-    // controller's clamp keeps the view inside world bounds; roundPixels (global
-    // config) avoids shimmering.
+    // Slow auto-pan toward the ball; Phaser clamps scroll to the camera bounds
+    // and roundPixels (global config) avoids shimmering.
     if (!this.ball) return;
     const cam = this.cameras.main;
-    const targetX = this.ball.x - cam.width / 2 / cam.zoom;
-    cam.setScroll(panTowards(cam.scrollX, targetX), cam.scrollY);
+    const tx = this.ball.gx - cam.width / 2;
+    const ty = this.ball.gy - cam.height / 2;
+    cam.setScroll(panTowards(cam.scrollX, tx, 0.03), panTowards(cam.scrollY, ty, 0.03));
   }
 
-  // ── Texture generation (local; guarded against duplicate keys) ─────────────
-  private generateTextures(): void {
-    this.makeTile(KEY_TILE_LIGHT, GRASS_LIGHT);
-    this.makeTile(KEY_TILE_DARK, GRASS_DARK);
-    this.makeTile(KEY_TILE_INGOAL, GRASS_INGOAL);
-    this.makeLine();
-    this.makeBall();
-    this.makeDot();
-  }
-
-  private makeTile(key: string, fill: number): void {
-    if (this.textures.exists(key)) return;
-    const gfx = this.add.graphics();
-    gfx.fillStyle(fill, 1);
-    gfx.fillPoints(DIAMOND, true);
-    // Faint darker edge so tile seams read in iso.
-    gfx.lineStyle(1, 0x000000, 0.12);
-    gfx.strokePoints(DIAMOND, true, true);
-    gfx.generateTexture(key, TILE_W, TILE_H);
-    gfx.destroy();
-  }
-
-  /** A thin white diamond overlay used for try-lines and the halfway line. */
-  private makeLine(): void {
-    if (this.textures.exists(KEY_LINE)) return;
-    const gfx = this.add.graphics();
-    gfx.lineStyle(3, LINE_COLOR, 0.95);
-    gfx.strokePoints(DIAMOND, true, true);
-    gfx.generateTexture(KEY_LINE, TILE_W, TILE_H);
-    gfx.destroy();
-  }
-
-  /** A small tan football (near-white body so any later tint reads true). */
-  private makeBall(): void {
-    if (this.textures.exists(KEY_BALL)) return;
-    const gfx = this.add.graphics();
-    const r = 4;
-    gfx.fillStyle(0x2a1a10, 1);
-    gfx.fillEllipse(r + 1, r + 1, r * 2 + 2, r * 2 - 1);
-    gfx.fillStyle(0xe8d8b0, 1); // tan football
-    gfx.fillEllipse(r + 1, r + 1, r * 2, r * 2 - 3);
-    gfx.generateTexture(KEY_BALL, r * 2 + 2, r * 2 + 2);
-    gfx.destroy();
-  }
-
-  /** Near-white round dot so setTint shows the true kit colour (spec risk). */
-  private makeDot(): void {
-    if (this.textures.exists(KEY_DOT)) return;
-    const gfx = this.add.graphics();
-    const r = 6;
-    gfx.fillStyle(0x111111, 1);
-    gfx.fillCircle(r + 1, r + 1, r + 1); // dark outline for contrast
-    gfx.fillStyle(0xf2f2f2, 1); // near-white body (tint target)
-    gfx.fillCircle(r + 1, r + 1, r);
-    gfx.generateTexture(KEY_DOT, (r + 1) * 2, (r + 1) * 2);
-    gfx.destroy();
-  }
-
-  // ── Field render ───────────────────────────────────────────────────────────
-  private renderField(): void {
-    for (let gy = 0; gy < FIELD_WIDE; gy++) {
-      for (let gx = 0; gx < FIELD_LONG; gx++) {
-        const p = gridToScreen(gx, gy);
-        const img = this.add.image(p.x + this.offsetX, p.y, TILE_KEY[tileVariantFor(gx)]);
-        img.setOrigin(0.5, 0); // diamond top vertex anchors at the projected point
-        img.setDepth(depth(gx, gy));
+  // ── Stadium pieces ─────────────────────────────────────────────────────────
+  private spawnPosts(uprightKey: string, crossbarKey: string): void {
+    for (const gx of POST_GX) {
+      const a = isoProject(gx, POST_GY[0], 0, this.offsetX);
+      const b = isoProject(gx, POST_GY[1], 0, this.offsetX);
+      for (const p of [a, b]) {
+        this.add
+          .image(p.x, p.y, uprightKey)
+          .setOrigin((Math.floor(UPRIGHT_W / 2) + 0.5) / UPRIGHT_W, (UPRIGHT_H - 1) / UPRIGHT_H)
+          .setDepth(p.y + 1);
       }
+      // Crossbar: its A end pinned to upright A at crossbar height; sorts at the
+      // midpoint between the two uprights' bases.
+      this.add
+        .image(a.x - CROSSBAR_AX + 0.5, a.y - CROSSBAR_Z - CROSSBAR_AY, crossbarKey)
+        .setOrigin(0, 0)
+        .setDepth((a.y + b.y) / 2 + 1);
     }
-    this.renderLines();
   }
 
-  /** White line overlays: a try-line at each in-goal edge + the halfway line. */
-  private renderLines(): void {
-    const lineCols = [
-      IN_GOAL_DEPTH, // near try-line
-      FIELD_LONG - 1 - IN_GOAL_DEPTH, // far try-line
-      Math.floor(FIELD_LONG / 2), // halfway
-    ];
-    for (const gx of lineCols) {
-      for (let gy = 0; gy < FIELD_WIDE; gy++) {
-        const p = gridToScreen(gx, gy);
-        const img = this.add.image(p.x + this.offsetX, p.y, KEY_LINE);
-        img.setOrigin(0.5, 0);
-        img.setDepth(depth(gx, gy, 0.5)); // just above the floor tile, below sprites
+  private spawnCrowd(atlas: string): void {
+    const back = this.add.blitter(0, 0, atlas).setDepth(DEPTH_CROWD_BACK);
+    const front = this.add.blitter(0, 0, atlas).setDepth(DEPTH_CROWD_FRONT);
+    const seats = crowdSeats()
+      .map((seat) => ({ seat, w: isoProject(seat.gx, seat.gy, seat.z, this.offsetX) }))
+      .sort((p, q) => p.w.y - q.w.y); // bobs draw in insertion order → y-sorted
+    for (const { seat, w } of seats) {
+      const shirt = shirtForSeat(seat);
+      const look = lookForSeat(seat);
+      const blitter = seat.layer === 'back' ? back : front;
+      const bob = blitter.create(
+        Math.round(w.x - Math.floor(CROWD_FW / 2)),
+        Math.round(w.y - CROWD_BASE),
+        crowdFrameName(shirt, look, seat.view, 0),
+      );
+      this.crowdBobs.push({ bob, seat, shirt, look, side: shirtSide(shirt) });
+    }
+    this.time.addEvent({ delay: CROWD_TICK_MS, loop: true, callback: () => this.animateCrowd() });
+    this.offCrowd = bus.on('match:event', (ev) => this.crowdReact(ev));
+  }
+
+  /** Raise a side's excitement for a while (decays on the crowd tick). */
+  private hype(side: 'home' | 'away', level: number, ms: number): void {
+    this.mood[side] = Math.max(this.mood[side], level);
+    this.moodUntil[side] = Math.max(this.moodUntil[side], this.time.now + ms);
+  }
+
+  private crowdReact(ev: MatchEvent): void {
+    const side = ev.teamId === this.home.clubId ? 'home' : 'away';
+    switch (ev.kind) {
+      case 'try':
+        this.hype(side, 0.95, 3200);
+        break;
+      case 'conversion':
+        if (ev.detail !== 'missed') this.hype(side, 0.7, 1800);
+        break;
+      case 'penalty-goal':
+      case 'field-goal':
+        this.hype(side, 0.7, 1800);
+        break;
+      case 'break':
+        this.hype(side, 0.35, 1200);
+        break;
+      case 'big-hit':
+        this.hype(side, 0.3, 900);
+        break;
+      case 'full-time': {
+        const { homeScore, awayScore } = this.result;
+        if (homeScore !== awayScore) this.hype(homeScore > awayScore ? 'home' : 'away', 0.9, 60_000);
+        break;
       }
+      default:
+        break;
     }
   }
 
-  // ── Sprites ────────────────────────────────────────────────────────────────
-  private spawnDots(): void {
-    const homeTint = colorToInt(this.home.colors[0]);
-    const awayTint = colorToInt(this.away.colors[0]);
-    // Home attacks right (toward far try-line); away attacks left.
-    this.placeTeam(this.homeDots, formationPositions(true), homeTint);
-    this.placeTeam(this.awayDots, formationPositions(false), awayTint);
-  }
-
-  private placeTeam(
-    into: Phaser.GameObjects.Image[],
-    formation: { fx: number; fy: number }[],
-    tint: number,
-  ): void {
-    for (const spot of formation) {
-      const w = this.fieldToWorld(spot.fx, spot.fy);
-      const dot = this.add.image(w.x, w.y, KEY_DOT);
-      dot.setOrigin(0.5, 0.5);
-      dot.setTint(tint);
-      dot.setDepth(this.fieldDepth(spot.fx, spot.fy, 1));
-      into.push(dot);
+  private animateCrowd(): void {
+    this.crowdTick++;
+    for (const s of ['home', 'away'] as const) {
+      if (this.time.now > this.moodUntil[s]) this.mood[s] = Math.max(0, this.mood[s] - 0.2);
     }
-  }
-
-  private spawnBall(): void {
-    const w = this.fieldToWorld(50, 50);
-    this.ball = this.add.image(w.x, w.y, KEY_BALL);
-    this.ball.setOrigin(0.5, 0.5);
-    this.ball.setDepth(this.fieldDepth(50, 50, 2));
+    for (const c of this.crowdBobs) {
+      const pose = crowdPose(c.seat.r, c.side, this.crowdTick, this.mood);
+      c.bob.setFrame(crowdFrameName(c.shirt, c.look, c.seat.view, pose));
+    }
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
   private setupCamera(): void {
-    this.camController = new CameraController(this, { world: fieldWorldBounds(this.offsetX) });
-    // Centre on the field initially so the whole thing is framed before panning.
-    const b = fieldWorldBounds(this.offsetX);
-    this.cameras.main.centerOn(b.x + b.width / 2, b.y + b.height / 2);
+    this.camController = new CameraController(this, { world: cameraWorldBounds(this.offsetX), minZoom: 0.75, maxZoom: 2.5 });
+    const cam = this.cameras.main;
+    cam.setZoom(MATCH_ZOOM);
+    const c = this.fieldToWorld(50, 50);
+    cam.centerOn(c.x, c.y);
   }
 
   // ── DOM playback controls (speed ×1/×2/×4 + Skip) ────────────────────────────
   private mountPlaybackControls(): void {
     const wrap = document.createElement('div');
+    // Positioned by the overlay stylesheet (bottom-centre; the nav bar is hidden
+    // while the match overlay is up, so nothing sits underneath).
     wrap.className = 'nrl-mo-controls';
-    wrap.style.position = 'fixed';
-    wrap.style.left = '50%';
-    wrap.style.bottom = '0.5rem';
-    wrap.style.transform = 'translateX(-50%)';
-    wrap.style.zIndex = '20';
-    wrap.style.display = 'flex';
-    wrap.style.gap = '0.35rem';
-    wrap.style.pointerEvents = 'auto';
 
     const speeds: PlaybackSpeed[] = [1, 2, 4];
     this.speedButtons = speeds.map((s) => {
@@ -392,6 +431,8 @@ export class MatchScene extends Phaser.Scene {
   private teardown(): void {
     this.camController.destroy();
     bus.off('match:finished', this.onFinished);
+    this.offCrowd?.();
+    this.offCrowd = null;
     this.overlay?.destroy();
     this.overlay = null;
     this.playback = null;
@@ -404,18 +445,22 @@ export class MatchScene extends Phaser.Scene {
       this.backBtn.remove(); // DOM overlay persists across scenes (§7) — clean it up.
       this.backBtn = null;
     }
+    // Game objects are destroyed by the scene; free the per-fixture textures
+    // and animations once they are no longer displayed.
+    this.crowdBobs = [];
+    this.players.home = [];
+    this.players.away = [];
+    // Deferred a tick so the scene has finished destroying its game objects.
+    const art = this.art;
+    setTimeout(() => art.destroy(), 0);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC SURFACE FOR WU-12 PLAYBACK (BAK-194):
+// PUBLIC SURFACE FOR PLAYBACK (structural PlaybackScene, src/world/playback.ts):
 //   scene.fieldToWorld(fx, fy): { x, y }   — sim field coords -> Phaser world.
-//   scene.fieldDepth(fx, fy, layer?): number — depth for a sprite at field coords.
-//   scene.homeDots: Image[13]              — home kit-tinted dots.
-//   scene.awayDots: Image[13]              — away kit-tinted dots.
-//   scene.ball: Image                      — ball sprite (centre at kickoff).
-// Pure helpers (re-exported from ./matchField for headless tests / tween math):
-//   FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, STRIPE_BAND, PLAYERS_PER_TEAM,
-//   colorToInt, fieldToGrid, fieldToWorldPoint, fieldOffsetX, fieldWorldBounds,
-//   formationPositions, panTowards, tileVariantFor.
+//   scene.players.home / .away: PlaybackActor[13] — animated player sprites.
+//   scene.ball: PlaybackBall              — ball sprite + shadow.
+//   scene.cameras.main.shake(...)          — tackle / big-hit shake.
+//   scene.homeId                           — which side an event's teamId is.
 // ─────────────────────────────────────────────────────────────────────────────
