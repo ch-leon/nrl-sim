@@ -13,7 +13,7 @@
 // hides the HUD strip and bottom nav (no Advance Week / screen hopping
 // mid-match, and nothing for the scoreboard or the ×1/×2/×4/Skip controls to
 // collide with) and moves the sound button to the bottom-right corner. Removed
-// again on destroy (full-time / exit), when the Back-to-Club button takes over.
+// again at full-time (the scoreboard stays, frozen on the result) and on destroy.
 import { el, panel, button, mount, ensureStyles } from '../dom';
 import { bus } from '../../core/events';
 import { makeRng } from '../../utils/rng';
@@ -261,7 +261,14 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       if (active === handle) active = null;
     },
   };
-  offFinished = bus.on('match:finished', () => handle.destroy());
+  // Full-time: freeze on the final score (the result toast is transient) and
+  // hand the HUD/nav back; MatchScene destroys the overlay when leaving.
+  offFinished = bus.on('match:finished', () => {
+    offEvent();
+    halfEl.textContent = 'Full-time';
+    root.classList.add('nrl-mo-final');
+    document.body?.classList.remove(MATCH_ACTIVE_CLASS);
+  });
 
   active = handle;
   render();
@@ -351,11 +358,17 @@ body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: 0.5rem; }
   z-index: 20; display: flex; gap: 0.35rem; pointer-events: auto;
 }
 .nrl-mo-controls .nrl-btn[data-active] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; }
+/* Full-time: HUD is back, so the scoreboard drops below it and the toast row;
+   the feed gives way to the Back-to-Club button. */
+.nrl-mo-final .nrl-mo-scoreboard { top: 5.5rem; }
+.nrl-mo-final .nrl-mo-commentary { display: none; }
 /* Short (landscape phone) viewports: keep stats and commentary apart. */
 @media (max-height: 480px) {
   .nrl-mo-stats { top: 4rem; min-width: 8.5rem; padding: 0.3rem 0.5rem; }
   .nrl-mo-stat-line { font-size: 0.62rem; margin: 0.05rem 0; }
   .nrl-mo-feed { max-height: 3.4rem; }
   .nrl-mo-commentary { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
+  /* No room for both beside the returning HUD: the final score wins. */
+  .nrl-mo-final .nrl-mo-stats { display: none; }
 }
 `;

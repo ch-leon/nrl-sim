@@ -260,10 +260,16 @@ export function simulateMatch(home: TeamSheet, away: TeamSheet,
 - Phaser config: `pixelArt: true`, `roundPixels: true`, FIT scale mode, background `#1a1a2e`.
 - Iso projection (src/world/iso.ts): `screenX = (gx - gy) * TILE_W/2`,
   `screenY = (gx + gy) * TILE_H/2`; depth = `screenY` (+1 for objects on tile).
-- Texture keys generated in BootScene: `tile-grass`, `tile-dirt`, `tile-path`,
-  `tile-highlight-ok`, `tile-highlight-bad`, `char-idle-<dir>`, `char-walk-<dir>-<frame>`
-  (dirs: n/e/s/w), `facility-<defId>` (footprint-sized diamond blocks),
-  `field-tile`, `field-line`, `ball`, `particle-square`.
+- Grounds textures (BootScene → `registerGroundsArt`, `src/art/grounds/`):
+  `tile-grass`, `tile-grass-1`, `tile-grass-2`, `tile-dirt`, `tile-path`,
+  `tile-highlight-ok`, `tile-highlight-bad`, path/dirt edge overlays, the
+  surround, `char-idle-<dir>`, `char-walk-<dir>-<frame>` (dirs n/e/s/w; anims
+  `walk-<dir>`), `facility-<defId>` (anchored via `facilityOrigin`), and decor.
+- Match textures (generated per match in MatchScene from `src/art/match/`, freed
+  on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
+  from club colours; away side switches to its alt strip on a clash), ball,
+  shadows, goalpost parts, the stadium background/foreground layers and crowd.
+  `particle-square` comes from `src/fx/particles.ts`.
 - Scene keys: `'Boot'`, `'Grounds'`, `'Match'`. Only one world scene active at a time;
   switch via `this.scene.start(...)`. UI overlay is DOM and persists across scenes.
 
