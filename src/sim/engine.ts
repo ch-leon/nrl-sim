@@ -10,6 +10,7 @@ import { STAT_MAX } from '../config';
 import type { Player, RivalClub, WeatherKind } from '../core/state';
 import type { MatchEvent, MatchResult, TeamSheet } from './events';
 import { mkEvent } from './events';
+import { stageEvents } from './staging';
 import {
   rollWeather,
   weatherMods,
@@ -68,6 +69,7 @@ export function teamSheetFromSquad(
     kicking,
     fitness,
     colors,
+    roster: best.map((p) => ({ name: p.name, position: p.position })),
   };
 }
 
@@ -311,12 +313,16 @@ export function simulateMatch(
 
   events.push(mkEvent(80, 'full-time', home.clubId));
 
+  // Presentation staging (absolute x, lateral y, player names) on its own rng
+  // stream — never alters outcomes. Runs in append order, before sorting.
+  const staged = stageEvents(events, home, away, opts.seed);
+
   // Ensure events are ordered by t (they are appended in time order, but the
   // forced-try and full-time land at fixed minutes). Ties break by a phase rank
   // so kickoff sorts first and full-time always sorts last within a minute.
   const rank = (k: MatchEvent['kind']): number =>
     k === 'kickoff' ? -1 : k === 'full-time' ? 1 : 0;
-  events.sort((a, b) => a.t - b.t || rank(a.kind) - rank(b.kind));
+  staged.sort((a, b) => a.t - b.t || rank(a.kind) - rank(b.kind));
 
   const totalTackles = homeSide.tackleCount + awaySide.tackleCount;
   const homePoss = totalTackles === 0 ? 50 : Math.round((homeSide.tackleCount / totalTackles) * 100);
@@ -325,7 +331,7 @@ export function simulateMatch(
   const result: MatchResult = {
     homeScore: homeSide.score,
     awayScore: awaySide.score,
-    events,
+    events: staged,
     stats: {
       possession: [homePoss, awayPoss],
       tackles: [homeSide.tackleCount, awaySide.tackleCount],

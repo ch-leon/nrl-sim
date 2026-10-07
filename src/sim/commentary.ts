@@ -1,8 +1,8 @@
 // src/sim/commentary.ts — event → Aussie-footy commentary lines (BAK-196, WU-12).
 // Pure TypeScript: no Phaser, no DOM. `commentaryFor` maps a MatchEvent to a
 // flavourful string, choosing a template variant via the passed seeded rng so
-// replays read identically. Low-signal kinds (set-start/kickoff) return '' to
-// avoid feed spam; every scoring/impact kind has ≥4 non-empty variants.
+// replays read identically. set-start returns '' unless it marks a change
+// of possession (detail turnover/kick/restart from staging.ts); every scoring/impact kind has ≥4 non-empty variants.
 import type { MatchEvent, MatchEventKind } from './events';
 
 // Placeholders: {player} (from ev.player, generic fallback) and {team} (home or
@@ -94,6 +94,25 @@ const TEMPLATES: Record<MatchEventKind, string[]> = {
   ],
 };
 
+// set-start is silent unless possession changed hands (staging tags the
+// detail), so the feed explains why the other team suddenly has the ball.
+const POSSESSION_TEMPLATES: Record<string, string[]> = {
+  turnover: [
+    '{team} pounce on the loose ball.',
+    'Turnover — {team} take over.',
+    '{team} gratefully accept the gift.',
+  ],
+  kick: [
+    '{team} field the kick and bring it back.',
+    'Last-tackle kick, {team} with the ball now.',
+    '{team} gather the bomb safely.',
+  ],
+  restart: [
+    '{team} receive the restart.',
+    'Back to halfway — {team} take the kick-off.',
+  ],
+};
+
 const GENERIC_PLAYER = 'the ball-runner';
 
 /**
@@ -111,7 +130,8 @@ export function commentaryFor(
   rng: () => number,
   homeId?: string,
 ): string {
-  const variants = TEMPLATES[ev.kind];
+  const variants =
+    ev.kind === 'set-start' ? (POSSESSION_TEMPLATES[ev.detail ?? ''] ?? []) : TEMPLATES[ev.kind];
   if (!variants || variants.length === 0) return '';
   const idx = Math.min(variants.length - 1, Math.floor(rng() * variants.length));
   const template = variants[idx] as string;

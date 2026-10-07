@@ -4,6 +4,13 @@
 // re-exported here so all sim/UI code imports match types from one place.
 
 export type { WeatherKind } from '../core/state';
+import type { Position } from '../core/state';
+
+/** One named player on a team sheet (presentation: commentary + playback). */
+export interface RosterEntry {
+  name: string;
+  position: Position;
+}
 
 /** Aggregate team profile fed into simulateMatch (built from squad or rival). */
 export interface TeamSheet {
@@ -14,6 +21,8 @@ export interface TeamSheet {
   kicking: number; // 1-100 aggregate
   fitness: number; // 1-100 aggregate
   colors: [string, string];
+  /** The 13 on the field, if known (rival sheets omit it; staging generates one). */
+  roster?: RosterEntry[];
 }
 
 export type MatchEventKind =

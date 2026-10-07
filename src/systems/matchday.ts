@@ -61,13 +61,24 @@ export function registerPlayerMatchSystem(): void {
       ? [sim.homeScore, sim.awayScore]
       : [sim.awayScore, sim.homeScore];
     const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
-    bus.emit('ui:notify', {
-      text: `Round ${fixture.round}: ${verdict} ${us}–${them}`,
-      kind: us > them ? 'success' : us < them ? 'danger' : 'info',
-    });
+    const notifyResult = (): void => {
+      bus.emit('ui:notify', {
+        text: `Round ${fixture.round}: ${verdict} ${us}–${them}`,
+        kind: us > them ? 'success' : us < them ? 'danger' : 'info',
+      });
+    };
 
-    if (!ctx.fastForward) {
-      bus.emit('match:started', { fixture, sim, home, away });
+    if (ctx.fastForward) {
+      notifyResult();
+      return;
     }
+    // Hold the result toast until playback reaches full-time (or is skipped) —
+    // announcing it at kick-off spoils the match.
+    const off = bus.on('match:finished', ({ fixture: done }) => {
+      if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
+      off();
+      notifyResult();
+    });
+    bus.emit('match:started', { fixture, sim, home, away });
   });
 }

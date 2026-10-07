@@ -89,3 +89,14 @@ describe('commentaryFor — determinism', () => {
     expect(lines.size).toBeGreaterThan(1);
   });
 });
+
+describe('possession-change lines', () => {
+  it('set-start speaks only when possession changed', () => {
+    const r = () => 0;
+    expect(commentaryFor({ t: 1, kind: 'set-start', teamId: 'A' }, 'Home', 'Away', r, 'H')).toBe('');
+    for (const detail of ['turnover', 'kick', 'restart']) {
+      const line = commentaryFor({ t: 1, kind: 'set-start', teamId: 'A', detail }, 'Home', 'Away', r, 'H');
+      expect(line).toContain('Away');
+    }
+  });
+});
