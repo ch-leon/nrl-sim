@@ -5,6 +5,7 @@
 import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
 import { registerTickHook, TICK_ORDER } from '../core/time';
+import { FORFEIT_SCORE, SQUAD_MIN } from '../config';
 import { applyResult, getCurrentFixture, PLAYER_ID } from './fixtures';
 import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
 import type { TeamSheet } from '../sim/events';
@@ -26,14 +27,48 @@ function sheetFor(clubId: string): TeamSheet {
   return teamSheetFromRival(rival);
 }
 
+/** Fit (non-injured) squad size. */
+export function fitSquadCount(injuredWeeks: readonly { injuredWeeks: number }[]): number {
+  return injuredWeeks.filter((p) => p.injuredWeeks <= 0).length;
+}
+
+/**
+ * Forfeit result when the player cannot field SQUAD_MIN fit players.
+ * Opponent is awarded FORFEIT_SCORE; player scores 0.
+ */
+export function forfeitResult(
+  fixture: { homeId: string; awayId: string },
+  playerId: string = PLAYER_ID,
+): { homeScore: number; awayScore: number } {
+  const playerHome = fixture.homeId === playerId;
+  return playerHome
+    ? { homeScore: 0, awayScore: FORFEIT_SCORE }
+    : { homeScore: FORFEIT_SCORE, awayScore: 0 };
+}
+
+function roundLabel(round: number): string {
+  if (round === 25) return 'Qualifying Final';
+  if (round === 26) return 'Semi Final';
+  if (round === 27) return 'Grand Final';
+  return `Round ${round}`;
+}
+
 export function registerPlayerMatchSystem(): void {
   registerTickHook('matchday-player', TICK_ORDER.match, (ctx) => {
     const state = getState();
     const fixture = getCurrentFixture(state, PLAYER_ID);
     if (!fixture || fixture.result) return;
-    if (state.squad.filter((p) => p.injuredWeeks <= 0).length === 0) {
+
+    const fit = fitSquadCount(state.squad);
+    if (fit < SQUAD_MIN) {
+      const result = forfeitResult(fixture);
+      const applied = applyResult(getState(), fixture, result);
+      setState({ league: applied.league });
       bus.emit('ui:notify', {
-        text: 'No fit players — this round’s match was forfeited.',
+        text:
+          fit === 0
+            ? `No fit players — ${roundLabel(fixture.round)} forfeited (${result.homeScore}–${result.awayScore}).`
+            : `Only ${fit} fit (need ${SQUAD_MIN}) — ${roundLabel(fixture.round)} forfeited (${result.homeScore}–${result.awayScore}).`,
         kind: 'danger',
       });
       return;
@@ -50,6 +85,7 @@ export function registerPlayerMatchSystem(): void {
       away,
       state.weather ? { seed, weather: state.weather } : { seed },
     );
+    // Finals draws still stamp as-is; knockoutWinner favours home (higher seed).
     const applied = applyResult(getState(), fixture, {
       homeScore: sim.homeScore,
       awayScore: sim.awayScore,
@@ -63,7 +99,7 @@ export function registerPlayerMatchSystem(): void {
     const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
     const notifyResult = (): void => {
       bus.emit('ui:notify', {
-        text: `Round ${fixture.round}: ${verdict} ${us}–${them}`,
+        text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}`,
         kind: us > them ? 'success' : us < them ? 'danger' : 'info',
       });
     };
