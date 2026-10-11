@@ -258,4 +258,26 @@ const CSS = `
   max-height: 85vh;
   overflow: auto;
 }
+
+/* ── History (season-end / past seasons) ─────────────────────────────── */
+.nrl-history h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+.nrl-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.nrl-history-row {
+  background: #f4efe0;
+  border: 2px solid #000;
+  padding: 0.4rem 0.6rem;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+.nrl-history-premiers {
+  background: #f4d03f;
+}
 `;
