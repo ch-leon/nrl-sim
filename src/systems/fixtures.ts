@@ -23,7 +23,7 @@ import {
 import { makeRng, type Rng } from '../utils/rng';
 import { rollWeather } from '../sim/weather';
 import { registerTickHook, registerSeasonHook, TICK_ORDER, type TickContext } from '../core/time';
-import { SEASON_ROUNDS, FINALS_WEEKS } from '../config';
+import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON } from '../config';
 import { RIVAL_CLUBS } from '../data/league';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -160,17 +160,46 @@ export function sortLadder(ladder: LadderRow[]): LadderRow[] {
   return ladder.slice().sort(ladderCompare);
 }
 
+/** True for finals weeks (25..27). Knockout results do not update the ladder. */
+export function isFinalsRound(round: number): boolean {
+  return round > SEASON_ROUNDS && round <= WEEKS_PER_SEASON;
+}
+
+/**
+ * Stamp a result onto the matching fixture without touching the ladder.
+ * Used for finals knockout ties (ladder reflects regular-season finish only).
+ */
+export function stampFixtureResult(
+  state: GameState,
+  fixture: Fixture,
+  result: { homeScore: number; awayScore: number },
+): GameState {
+  const fixtures = state.league.fixtures.map((f) =>
+    f.round === fixture.round && f.homeId === fixture.homeId && f.awayId === fixture.awayId
+      ? { ...f, result }
+      : f,
+  );
+  return { ...state, league: { ...state.league, fixtures } };
+}
+
 /**
  * Apply a completed result to the ladder and return a NEW GameState with the
  * re-sorted ladder. 2 pts win / 1 pt draw / 0 loss; accumulates played, W/D/L,
  * pointsFor/Against. Missing rows are created on demand. Does NOT mutate the
  * passed state or its ladder; also stamps the result onto the matching fixture.
+ *
+ * Finals fixtures (round > SEASON_ROUNDS) only stamp the score — knockout ties
+ * must not alter regular-season ladder bookkeeping.
  */
 export function applyResult(
   state: GameState,
   fixture: Fixture,
   result: { homeScore: number; awayScore: number },
 ): GameState {
+  if (isFinalsRound(fixture.round)) {
+    return stampFixtureResult(state, fixture, result);
+  }
+
   const rows = new Map<string, LadderRow>();
   for (const row of state.league.ladder) rows.set(row.clubId, { ...row });
 
@@ -224,13 +253,13 @@ export function ladderPosition(state: GameState, clubId: string): number {
 // ── Current fixture lookup ────────────────────────────────────────────────────
 
 /**
- * The club's fixture for the current week's regular-season round, or undefined
- * during finals weeks / when no such fixture exists. `state.week` maps directly
- * to the round number for weeks 1..SEASON_ROUNDS.
+ * The club's fixture for the current week/round, or undefined on a bye /
+ * finals-skip (not qualified / already eliminated). `state.week` maps directly
+ * to the round number for weeks 1..WEEKS_PER_SEASON (regular season + finals).
  */
 export function getCurrentFixture(state: GameState, clubId: string): Fixture | undefined {
   const round = state.week;
-  if (round < 1 || round > SEASON_ROUNDS) return undefined;
+  if (round < 1 || round > WEEKS_PER_SEASON) return undefined;
   return state.league.fixtures.find(
     (f) => f.round === round && (f.homeId === clubId || f.awayId === clubId),
   );
@@ -260,12 +289,13 @@ export function cheapSimScore(
 
 /**
  * Cheap-sim every RIVAL-vs-rival fixture in the current round and apply the
- * results to the ladder. Fixtures involving the player are skipped (the
- * orchestrator runs the player's match). Already-played fixtures are skipped.
- * Returns a NEW GameState. Deterministic given `rng`.
+ * results (ladder for regular season; stamp-only for finals). Fixtures involving
+ * the player are skipped (the orchestrator runs the player's match).
+ * Already-played fixtures are skipped. Returns a NEW GameState. Deterministic.
  */
 export function simulateRivalRound(state: GameState, rng: Rng): GameState {
   const round = state.week;
+  if (round < 1 || round > WEEKS_PER_SEASON) return state;
   const byId = new Map(state.league.clubs.map((c) => [c.id, c] as const));
 
   let next = state;
@@ -286,61 +316,132 @@ export function simulateRivalRound(state: GameState, rng: Rng): GameState {
 
 // ── Finals (top-8 knockout, weeks 25..27) ─────────────────────────────────────
 
-/**
- * Run the finals series for the current season and return a NEW GameState.
- *   - QF (round 25): seeds 1v8, 2v7, 3v6, 4v5.
- *   - SF (round 26): QF winners re-seeded by ladder rank (best survivors paired
- *     1v4 & 2v3).
- *   - GF (round 27): SF winners.
- * All ties are cheap-simmed here (player finals playback is orchestrated by
- * WU-12; this provides the headless resolution and premiership bookkeeping).
- * A premiership win pushes a `history` entry and grants +15 reputation.
- */
-export function runFinals(state: GameState, rng: Rng): GameState {
-  const seeds = sortLadder(state.league.ladder).slice(0, 8).map((r) => r.clubId);
-  if (seeds.length < 8) return state; // not enough clubs to run finals
+/** Knockout winner from a completed fixture. Draws favour home (higher seed). */
+export function knockoutWinner(fixture: Fixture): string | undefined {
+  if (!fixture.result) return undefined;
+  return fixture.result.homeScore >= fixture.result.awayScore
+    ? fixture.homeId
+    : fixture.awayId;
+}
 
-  const byId = new Map(state.league.clubs.map((c) => [c.id, c] as const));
-  const winner = (homeId: string, awayId: string): string => {
-    const home = byId.get(homeId);
-    const away = byId.get(awayId);
-    if (!home || !away) return homeId;
-    const res = cheapSimScore(home, away, rng);
-    // Break a drawn knockout in favour of the home (better-seeded) side.
-    return res.homeScore >= res.awayScore ? homeId : awayId;
+function roundFixtures(state: GameState, round: number): Fixture[] {
+  return state.league.fixtures.filter((f) => f.round === round);
+}
+
+function appendFixtures(state: GameState, added: Fixture[]): GameState {
+  if (added.length === 0) return state;
+  return {
+    ...state,
+    league: { ...state.league, fixtures: [...state.league.fixtures, ...added] },
   };
+}
 
-  // Ranking helper for re-seeding survivors (lower index = better seed).
-  const rankOf = (id: string): number => seeds.indexOf(id);
-  const higherSeedFirst = (a: string, b: string): [string, string] =>
-    rankOf(a) <= rankOf(b) ? [a, b] : [b, a];
+/** Top-8 club ids from the current ladder (regular-season seeds). */
+export function finalsSeeds(state: GameState): string[] {
+  return sortLadder(state.league.ladder).slice(0, 8).map((r) => r.clubId);
+}
 
-  // Quarter-finals: 1v8, 2v7, 3v6, 4v5 (home = better seed).
-  const qfPairs: Array<[string, string]> = [
+function higherSeedFirst(
+  seeds: readonly string[],
+  a: string,
+  b: string,
+): [string, string] {
+  const rankOf = (id: string): number => {
+    const i = seeds.indexOf(id);
+    return i < 0 ? 999 : i;
+  };
+  return rankOf(a) <= rankOf(b) ? [a, b] : [b, a];
+}
+
+/** QF pairs: 1v8, 2v7, 3v6, 4v5 (home = better seed). */
+export function quarterFinalPairs(seeds: readonly string[]): Array<[string, string]> {
+  if (seeds.length < 8) return [];
+  return [
     [seeds[0] as string, seeds[7] as string],
     [seeds[1] as string, seeds[6] as string],
     [seeds[2] as string, seeds[5] as string],
     [seeds[3] as string, seeds[4] as string],
   ];
-  const qfWinners = qfPairs.map(([h, a]) => winner(h, a));
+}
 
-  // Semi-finals: re-seed the four QF winners by ladder rank, pair 1v4 & 2v3.
-  const sfSeeds = qfWinners.slice().sort((a, b) => rankOf(a) - rankOf(b));
-  const sf1 = higherSeedFirst(sfSeeds[0] as string, sfSeeds[3] as string);
-  const sf2 = higherSeedFirst(sfSeeds[1] as string, sfSeeds[2] as string);
-  const sfWinners = [winner(sf1[0], sf1[1]), winner(sf2[0], sf2[1])];
+/** Build QF fixtures for round 25 from the current ladder. */
+export function makeQuarterFinalFixtures(state: GameState): Fixture[] {
+  return quarterFinalPairs(finalsSeeds(state)).map(([homeId, awayId]) => ({
+    round: QF_ROUND,
+    homeId,
+    awayId,
+  }));
+}
 
-  // Grand final: SF winners, higher seed at home.
-  const [gfHome, gfAway] = higherSeedFirst(sfWinners[0] as string, sfWinners[1] as string);
-  const premier = winner(gfHome, gfAway);
+/** Build SF fixtures for round 26 from completed QF results. */
+export function makeSemiFinalFixtures(state: GameState): Fixture[] {
+  const seeds = finalsSeeds(state);
+  const qf = roundFixtures(state, QF_ROUND);
+  if (qf.length < 4 || qf.some((f) => !f.result)) return [];
+  const winners = qf.map((f) => knockoutWinner(f)!);
+  const sfSeeds = winners.slice().sort((a, b) => seeds.indexOf(a) - seeds.indexOf(b));
+  const pairs: Array<[string, string]> = [
+    higherSeedFirst(seeds, sfSeeds[0] as string, sfSeeds[3] as string),
+    higherSeedFirst(seeds, sfSeeds[1] as string, sfSeeds[2] as string),
+  ];
+  return pairs.map(([homeId, awayId]) => ({ round: SF_ROUND, homeId, awayId }));
+}
 
-  // Premiership bookkeeping: history + reputation. Ladder position recorded is
-  // the pre-finals ladder rank (regular-season finish) for the player.
+/** Build GF fixture for round 27 from completed SF results. */
+export function makeGrandFinalFixtures(state: GameState): Fixture[] {
+  const seeds = finalsSeeds(state);
+  const sf = roundFixtures(state, SF_ROUND);
+  if (sf.length < 2 || sf.some((f) => !f.result)) return [];
+  const winners = sf.map((f) => knockoutWinner(f)!);
+  const [homeId, awayId] = higherSeedFirst(seeds, winners[0] as string, winners[1] as string);
+  return [{ round: GF_ROUND, homeId, awayId }];
+}
+
+/**
+ * Ensure the current finals week's fixtures exist (generated from the ladder /
+ * prior round winners). No-op outside finals weeks or when fixtures already
+ * exist. Returns a NEW GameState when fixtures are appended.
+ */
+export function ensureFinalsRound(state: GameState): GameState {
+  const week = state.week;
+  if (!isFinalsRound(week)) return state;
+  if (roundFixtures(state, week).length > 0) return state;
+
+  if (week === QF_ROUND) return appendFixtures(state, makeQuarterFinalFixtures(state));
+  if (week === SF_ROUND) return appendFixtures(state, makeSemiFinalFixtures(state));
+  if (week === GF_ROUND) return appendFixtures(state, makeGrandFinalFixtures(state));
+  return state;
+}
+
+/**
+ * Cheap-sim every unplayed fixture in `round` (including the player's tie).
+ * Used by the headless `runFinals` catch-up path / unit tests — not by the
+ * interactive week tick (player ties go through MatchScene via matchday).
+ */
+function cheapSimRoundAll(state: GameState, round: number, rng: Rng): GameState {
+  const byId = new Map(state.league.clubs.map((c) => [c.id, c] as const));
+  let next = state;
+  for (const fixture of state.league.fixtures) {
+    if (fixture.round !== round || fixture.result) continue;
+    const home = byId.get(fixture.homeId);
+    const away = byId.get(fixture.awayId);
+    if (!home || !away) continue;
+    next = applyResult(next, fixture, cheapSimScore(home, away, rng));
+  }
+  return next;
+}
+
+/**
+ * Record premiership history + reputation from the completed grand final.
+ * Ladder position is the player's regular-season finish. Season number is
+ * `state.season - 1` because this runs after `resetForNewSeason()`.
+ */
+export function recordPremiership(state: GameState): GameState {
+  const gf = roundFixtures(state, GF_ROUND).find((f) => f.result);
+  const premier = gf ? knockoutWinner(gf) : undefined;
   const playerPos = ladderPosition(state, PLAYER_ID);
   const playerPremiership = premier === PLAYER_ID;
 
-  // runFinals executes inside the season hook, AFTER resetForNewSeason() has
-  // already bumped state.season — the season that just ended is season - 1.
   const history = [
     ...state.history,
     { season: state.season - 1, ladderPosition: playerPos, premiership: playerPremiership },
@@ -350,6 +451,41 @@ export function runFinals(state: GameState, rng: Rng): GameState {
     : state.reputation;
 
   return { ...state, history, reputation };
+}
+
+/**
+ * Resolve the finals series and record premiership bookkeeping.
+ *
+ * Interactive path: weeks 25–27 generate fixtures via `ensureFinalsRound`, player
+ * ties via MatchScene, rivals via `simulateRivalRound`. At season rollover this
+ * only records history if the GF is already complete.
+ *
+ * Headless / catch-up: if any finals round is missing or unfinished, generate
+ * and cheap-sim the remainder (including player ties) so tests and mid-season
+ * saves still produce a correct history entry.
+ */
+export function runFinals(state: GameState, rng: Rng): GameState {
+  const seeds = finalsSeeds(state);
+  if (seeds.length < 8) return state;
+
+  let next = state;
+
+  if (roundFixtures(next, QF_ROUND).length === 0) {
+    next = appendFixtures(next, makeQuarterFinalFixtures(next));
+  }
+  next = cheapSimRoundAll(next, QF_ROUND, rng);
+
+  if (roundFixtures(next, SF_ROUND).length === 0) {
+    next = appendFixtures(next, makeSemiFinalFixtures(next));
+  }
+  next = cheapSimRoundAll(next, SF_ROUND, rng);
+
+  if (roundFixtures(next, GF_ROUND).length === 0) {
+    next = appendFixtures(next, makeGrandFinalFixtures(next));
+  }
+  next = cheapSimRoundAll(next, GF_ROUND, rng);
+
+  return recordPremiership(next);
 }
 
 // ── League initialisation ─────────────────────────────────────────────────────
@@ -386,14 +522,16 @@ export function initLeague(state: GameState): LeagueState {
  * Hooks:
  *   - 'weather' (order match-1): roll state.weather for the round via rollWeather
  *     (BAK-198 boundary — the fixtures system owns writing per-round weather).
- *   - 'fixtures-rivals' (order 40 / TICK_ORDER.match): cheap-sim the rival-vs-
- *     rival games for the round. The player's own match is run by the
- *     orchestrator alongside this via getCurrentFixture + applyResult.
+ *   - 'fixtures-finals' (order match-2): generate this week's finals fixtures
+ *     (QF/SF/GF) when entering weeks 25–27.
+ *   - 'fixtures-rivals' (order 40 / TICK_ORDER.match): cheap-sim rival-vs-rival
+ *     (and rival-only finals) for the round. The player's own match is run by
+ *     matchday via getCurrentFixture + applyResult.
  *   - 'fixtures-ladder' (order 50 / TICK_ORDER.ladder): keep the ladder sorted
  *     (defensive re-sort after all results for the round have landed).
- *   - season hook (order 10): record the previous season's finals outcome, then
- *     regenerate fixtures + reset the ladder for the new season (defensive init
- *     if the league is empty).
+ *   - season hook (order 10): record the previous season's finals outcome (or
+ *     catch-up cheap-sim if unfinished), then regenerate fixtures + reset the
+ *     ladder for the new season.
  */
 export function registerFixturesSystem(): void {
   // (a) Weather roll — must run before the match hook so the sim reads it.
@@ -404,11 +542,19 @@ export function registerFixturesSystem(): void {
     setState({ weather, rngSeed: rng.state() });
   });
 
+  // (a2) Generate this week's finals bracket ties before rivals/player match.
+  registerTickHook('fixtures-finals', TICK_ORDER.match - 2, (ctx: TickContext) => {
+    if (!isFinalsRound(ctx.week)) return;
+    const s = getState();
+    if (s.league.clubs.length === 0) return;
+    const next = ensureFinalsRound(s);
+    if (next !== s) setState({ league: next.league });
+  });
+
   // (b) Rival-vs-rival cheap sim for the round (order 40, alongside player match).
   registerTickHook('fixtures-rivals', TICK_ORDER.match, (ctx: TickContext) => {
     const s = getState();
-    // Only simulate during the regular season; finals are handled by runFinals.
-    if (ctx.week < 1 || ctx.week > SEASON_ROUNDS) return;
+    if (ctx.week < 1 || ctx.week > WEEKS_PER_SEASON) return;
     if (s.league.clubs.length === 0) return; // league not initialised yet
     const rng = makeRng(s.rngSeed);
     const next = simulateRivalRound(s, rng);
@@ -432,13 +578,16 @@ export function registerFixturesSystem(): void {
       return;
     }
 
-    // Record the just-completed season's finals result & premiership rep.
+    // Record premiership from the completed GF (or catch-up cheap-sim leftovers).
+    // Prefer recordPremiership alone when the GF is already done so we do not
+    // re-roll played ties; runFinals handles the unfinished / test path.
     const rngFinals = makeRng(s.rngSeed);
-    const afterFinals = runFinals(s, rngFinals);
+    const gfDone = roundFixtures(s, GF_ROUND).some((f) => !!f.result);
+    const afterFinals = gfDone ? recordPremiership(s) : runFinals(s, rngFinals);
     setState({
       history: afterFinals.history,
       reputation: afterFinals.reputation,
-      rngSeed: rngFinals.state(),
+      rngSeed: gfDone ? s.rngSeed : rngFinals.state(),
     });
 
     // Regenerate a fresh fixture list + zeroed ladder for the new season.
