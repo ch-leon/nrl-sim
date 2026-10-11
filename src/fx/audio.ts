@@ -15,6 +15,8 @@
 import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
 import { el, panel, button, mount, openModal, closeModal } from '../ui/dom';
+import { startTutorial } from '../ui/tutorial';
+import { canInstall, promptInstall } from './pwa';
 
 // ── Public sfx names (BAK-200) ─────────────────────────────────────────────
 
@@ -653,9 +655,10 @@ export function _resetAudioForTest(): void {
 }
 
 /**
- * Mount the self-contained settings popup (volume slider + mute toggle) into
- * #ui-root. Reads initial control state from getState().settings; changes flow
- * through the engine (which persists via setState). No-op in non-browser envs.
+ * Mount the settings popup (volume, mute, tutorial Replay, optional PWA Install)
+ * into #ui-root. Reads initial control state from getState().settings; changes
+ * flow through the engine (which persists via setState). No-op in non-browser
+ * envs. GitHub #9 / BAK-202 S6 + BAK-204 Install button.
  */
 export function initAudioUi(): void {
   if (typeof document === 'undefined') return;
@@ -684,15 +687,40 @@ export function initAudioUi(): void {
     eng.setMuted(muteBox.checked);
   });
 
+  const installBtn = button('Install app', () => {
+    void promptInstall().then((outcome) => {
+      if (outcome !== 'unavailable') syncInstallVisibility();
+    });
+  });
+  installBtn.classList.add('nrl-audio-install');
+  const syncInstallVisibility = (): void => {
+    installBtn.style.display = canInstall() ? '' : 'none';
+  };
+  syncInstallVisibility();
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeinstallprompt', () => syncInstallVisibility());
+    window.addEventListener('appinstalled', () => syncInstallVisibility());
+  }
+
+  const replayBtn = button('Replay tutorial', () => {
+    closeModal();
+    startTutorial(true);
+  });
+
   const content = panel(
     { class: 'nrl-audio-settings' },
-    el('h3', { text: 'Sound', class: 'nrl-audio-title' }),
+    el('h3', { text: 'Settings', class: 'nrl-audio-title' }),
     el('label', { class: 'nrl-audio-row' }, el('span', { text: 'Volume' }), slider),
     el('label', { class: 'nrl-audio-row' }, muteBox, el('span', { text: 'Mute' })),
+    el('div', { class: 'nrl-audio-row' }, replayBtn),
+    el('div', { class: 'nrl-audio-row nrl-audio-install-row' }, installBtn),
     button('Close', () => closeModal()),
   );
 
-  const openBtn = button('♪', () => openModal(content), { class: 'nrl-audio-gear' });
+  const openBtn = button('♪', () => {
+    syncInstallVisibility();
+    openModal(content);
+  }, { class: 'nrl-audio-gear' });
   const holder = el('div', { class: 'nrl-audio-launcher' }, openBtn);
   ensureAudioStyles();
   mount(holder);
