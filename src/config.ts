@@ -9,7 +9,11 @@ export const SEASON_ROUNDS = 24;     // home & away vs 15 rivals + repeats
 export const FINALS_WEEKS = 3;       // weeks 25-27 if qualified
 export const WEEKS_PER_SEASON = SEASON_ROUNDS + FINALS_WEEKS;
 export const SQUAD_CAP = 30;
-export const SQUAD_MIN = 13;         // cannot play a match below this
+export const SQUAD_MIN = 13;         // cannot play a match below this (club management)
+/** Players on the field per side in a match (Nines trial — BAK-206 / #1). */
+export const ON_FIELD = 9;
+/** Tackles per set before a last-tackle kick (Nines trial — BAK-206 / #1). */
+export const SET_TACKLES = 5;
 export const STARTING_MONEY = 200_000;
 export const STAT_MAX = 100;
 

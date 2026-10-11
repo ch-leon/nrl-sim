@@ -4,7 +4,7 @@ import { mkEvent } from '../../src/sim/events';
 import { teamSheetFromSquad, teamSheetFromRival } from '../../src/sim/engine';
 import { makeRng } from '../../src/utils/rng';
 import { generatePlayer } from '../../src/data/player';
-import { STAT_MAX } from '../../src/config';
+import { ON_FIELD, STAT_MAX } from '../../src/config';
 import type { Player, RivalClub } from '../../src/core/state';
 
 const COLORS: [string, string] = ['#001122', '#334455'];
@@ -34,7 +34,7 @@ describe('mkEvent', () => {
 
 describe('teamSheetFromSquad', () => {
   it('excludes injured players', () => {
-    const fitPlayers = Array.from({ length: 13 }, () =>
+    const fitPlayers = Array.from({ length: ON_FIELD }, () =>
       player({ injuredWeeks: 0, stats: { speed: 40, strength: 40, stamina: 40, skill: 40, footyIQ: 40 }, morale: 50 }),
     );
     // Add injured superstars that would inflate stats if wrongly included.
@@ -47,24 +47,25 @@ describe('teamSheetFromSquad', () => {
     expect(sheet.defense).toBeLessThan(60);
   });
 
-  it('uses the best 13 by overall rating', () => {
-    const strong = Array.from({ length: 13 }, () =>
+  it('uses the best ON_FIELD by overall rating', () => {
+    const strong = Array.from({ length: ON_FIELD }, () =>
       player({ injuredWeeks: 0, stats: { speed: 80, strength: 80, stamina: 80, skill: 80, footyIQ: 80 }, morale: 50 }),
     );
     const weak = Array.from({ length: 10 }, () =>
       player({ injuredWeeks: 0, stats: { speed: 20, strength: 20, stamina: 20, skill: 20, footyIQ: 20 }, morale: 50 }),
     );
     const sheet = teamSheetFromSquad([...weak, ...strong], 'player', 'Sharks', COLORS);
-    // Best 13 are the 80s (morale 50 → no modifier), so aggregates ~80.
+    expect(sheet.roster).toHaveLength(ON_FIELD);
+    // Best ON_FIELD are the 80s (morale 50 → no modifier), so aggregates ~80.
     expect(sheet.attack).toBe(80);
     expect(sheet.defense).toBe(80);
   });
 
   it('applies the morale modifier (±10% at morale 0/100)', () => {
-    const highMorale = Array.from({ length: 13 }, () =>
+    const highMorale = Array.from({ length: ON_FIELD }, () =>
       player({ injuredWeeks: 0, stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 }, morale: 100 }),
     );
-    const lowMorale = Array.from({ length: 13 }, () =>
+    const lowMorale = Array.from({ length: ON_FIELD }, () =>
       player({ injuredWeeks: 0, stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 }, morale: 0 }),
     );
     const hi = teamSheetFromSquad(highMorale, 'player', 'A', COLORS);
@@ -75,7 +76,7 @@ describe('teamSheetFromSquad', () => {
   });
 
   it('clamps aggregates to 1..STAT_MAX', () => {
-    const maxed = Array.from({ length: 13 }, () =>
+    const maxed = Array.from({ length: ON_FIELD }, () =>
       player({ injuredWeeks: 0, stats: { speed: 100, strength: 100, stamina: 100, skill: 100, footyIQ: 100 }, morale: 100 }),
     );
     const sheet = teamSheetFromSquad(maxed, 'player', 'A', COLORS);
@@ -85,7 +86,7 @@ describe('teamSheetFromSquad', () => {
   });
 
   it('derives kicking from halfback/five-eighth skill when present', () => {
-    const forwards = Array.from({ length: 12 }, () =>
+    const forwards = Array.from({ length: ON_FIELD - 1 }, () =>
       player({ position: 'prop', injuredWeeks: 0, stats: { speed: 50, strength: 50, stamina: 50, skill: 30, footyIQ: 50 }, morale: 50 }),
     );
     const half = player({ position: 'halfback', injuredWeeks: 0, stats: { speed: 50, strength: 50, stamina: 50, skill: 90, footyIQ: 50 }, morale: 50 });
@@ -94,15 +95,16 @@ describe('teamSheetFromSquad', () => {
   });
 
   it('throws when no fit players', () => {
-    const allInjured = Array.from({ length: 13 }, () => player({ injuredWeeks: 2 }));
+    const allInjured = Array.from({ length: ON_FIELD }, () => player({ injuredWeeks: 2 }));
     expect(() => teamSheetFromSquad(allInjured, 'player', 'A', COLORS)).toThrow('no fit players');
   });
 
-  it('uses all fit players when fewer than 13', () => {
+  it('uses all fit players when fewer than ON_FIELD', () => {
     const five = Array.from({ length: 5 }, () =>
       player({ injuredWeeks: 0, stats: { speed: 70, strength: 70, stamina: 70, skill: 70, footyIQ: 70 }, morale: 50 }),
     );
     const sheet = teamSheetFromSquad(five, 'player', 'A', COLORS);
+    expect(sheet.roster).toHaveLength(5);
     expect(sheet.attack).toBe(70);
   });
 });

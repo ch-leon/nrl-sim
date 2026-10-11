@@ -1,7 +1,7 @@
 // src/world/playback.ts — match event timeline → animated players (BAK-194, WU-12).
 //
 // PlaybackController consumes a MatchResult's timed event log and drives the
-// MatchScene's 26 player sprites, the ball and the camera on a COMPRESSED
+// MatchScene's 18 player sprites (Nines), the ball and the camera on a COMPRESSED
 // real-time clock (80 sim-minutes → ~90 real seconds at ×1). It re-emits each
 // MatchEvent on the bus as 'match:event' BEFORE moving any sprite, so the overlay
 // (BAK-196), audio and particles stay in lockstep with the visual. It emits
@@ -355,8 +355,17 @@ export class PlaybackController {
         if (at) this.onPlay(side, at, 'open', HOOKER_SLOT);
         break;
       case 'run':
+      case 'fend':
+      case 'break-tackle':
       case 'break':
-        if (at) this.onPlay(side, at, ev.kind === 'break' ? 'break' : 'open', null);
+        if (at) {
+          const phase =
+            ev.kind === 'break' || ev.kind === 'break-tackle' ? 'break' : 'open';
+          this.onPlay(side, at, phase, null);
+        }
+        break;
+      case 'kick':
+        if (at) this.onPlay(side, at, 'open', KICKER_SLOT);
         break;
       case 'tackle':
       case 'big-hit':

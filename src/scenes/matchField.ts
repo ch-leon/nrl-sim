@@ -22,7 +22,8 @@ export const IN_GOAL_DEPTH = 3; // tiles of in-goal at each end
 export const PLAY_LONG = FIELD_LONG - 2 * IN_GOAL_DEPTH; // try-line to try-line (100m)
 /** Tiles per 10 metres along the field (mowing stripes + 10m lines). */
 export const TEN_METRES = PLAY_LONG / 10;
-export const PLAYERS_PER_TEAM = 13;
+/** Nines trial (BAK-206) — keep in sync with world/formation PLAYERS. */
+export const PLAYERS_PER_TEAM = 9;
 
 /** Parse a `#rrggbb` (or `#rgb`) hex colour to a 24-bit int. */
 export function colorToInt(hex: string): number {

@@ -459,7 +459,7 @@ export class MatchScene extends Phaser.Scene {
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC SURFACE FOR PLAYBACK (structural PlaybackScene, src/world/playback.ts):
 //   scene.fieldToWorld(fx, fy): { x, y }   — sim field coords -> Phaser world.
-//   scene.players.home / .away: PlaybackActor[13] — animated player sprites.
+//   scene.players.home / .away: PlaybackActor[ON_FIELD] — animated player sprites.
 //   scene.ball: PlaybackBall              — ball sprite + shadow.
 //   scene.cameras.main.shake(...)          — tackle / big-hit shake.
 //   scene.homeId                           — which side an event's teamId is.

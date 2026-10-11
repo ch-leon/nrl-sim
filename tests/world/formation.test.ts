@@ -22,7 +22,7 @@ describe('formation basics', () => {
     expect(attackDir('away')).toBe(-1);
   });
 
-  it('returns 13 in-bounds targets per side for every phase', () => {
+  it('returns ON_FIELD (9) in-bounds targets per side for every phase', () => {
     for (const phase of ['open', 'break', 'kickoff', 'goal-kick'] as const) {
       const t = formationTargets({ attacking: 'away', ball: { fx: 30, fy: 70 }, phase, seed: 4 });
       for (const side of [t.home, t.away]) {
@@ -50,7 +50,7 @@ describe('open play shape', () => {
     const t = formationTargets({ attacking: 'home', ball, phase: 'open', seed: 1 });
     // Home attacks +fx: attackers behind = lower fx.
     for (const p of t.home) expect(p.fx).toBeLessThanOrEqual(ball.fx + 1.5);
-    const line = t.away.filter((_, i) => i !== FULLBACK_SLOT && i !== HOOKER_SLOT && i !== 8);
+    const line = t.away.filter((_, i) => i !== FULLBACK_SLOT && i !== HOOKER_SLOT);
     expect(mean(line.map((p) => p.fx))).toBeGreaterThan(ball.fx + 7);
     expect(mean(line.map((p) => p.fx))).toBeLessThan(ball.fx + 14);
     // Fullback deepest.

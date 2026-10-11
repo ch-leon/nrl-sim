@@ -90,10 +90,11 @@ describe('simulateMatch — determinism', () => {
 describe('simulateMatch — statistical calibration (equal teams)', () => {
   const results = runMany(sheet('H', 50), sheet('A', 50));
 
-  it('mean total score is 20-50', () => {
+  // BAK-206: Nines + contest/kicks raise event density; score band widened vs BAK-191.
+  it('mean total score is 18-60', () => {
     const meanTotal = results.reduce((sum, r) => sum + r.homeScore + r.awayScore, 0) / results.length;
-    expect(meanTotal).toBeGreaterThanOrEqual(20);
-    expect(meanTotal).toBeLessThanOrEqual(50);
+    expect(meanTotal).toBeGreaterThanOrEqual(18);
+    expect(meanTotal).toBeLessThanOrEqual(60);
   });
 
   it('home win rate is 45-55%', () => {
@@ -106,6 +107,23 @@ describe('simulateMatch — statistical calibration (equal teams)', () => {
   it('≤2% of runs end 0-0', () => {
     const zeros = results.filter((r) => r.homeScore === 0 && r.awayScore === 0).length;
     expect(zeros / results.length).toBeLessThanOrEqual(0.02);
+  });
+
+  it('emits tackles and last-tackle kicks across the sample', () => {
+    const withTackle = results.filter((r) => r.events.some((e) => e.kind === 'tackle')).length;
+    const withKick = results.filter((r) => r.events.some((e) => e.kind === 'kick')).length;
+    expect(withTackle / results.length).toBeGreaterThan(0.9);
+    expect(withKick / results.length).toBeGreaterThan(0.9);
+  });
+
+  it('produces more break-like events than a quiet baseline', () => {
+    const meanBreaks =
+      results.reduce(
+        (sum, r) =>
+          sum + r.events.filter((e) => e.kind === 'break' || e.kind === 'break-tackle' || e.kind === 'fend').length,
+        0,
+      ) / results.length;
+    expect(meanBreaks).toBeGreaterThan(3);
   });
 });
 

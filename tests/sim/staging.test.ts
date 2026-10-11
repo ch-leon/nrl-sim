@@ -43,9 +43,12 @@ describe('stageEvents', () => {
       }
       if (e.kind === 'run' || e.kind === 'try' || e.kind === 'break') expect(e.player).toBeTruthy();
     }
-    // Home names come from its roster; conversions go to its halfback.
+    // Home names come from its roster; conversions go to its halfback (slot 5).
     const homeConv = m.events.find((e) => e.kind === 'conversion' && e.teamId === 'H');
-    if (homeConv) expect(homeConv.player).toBe('H-6');
+    if (homeConv) expect(homeConv.player).toBe('H-5');
+    // Contests and kicks should appear in the staged log.
+    expect(m.events.some((e) => e.kind === 'tackle' || e.kind === 'big-hit')).toBe(true);
+    expect(m.events.some((e) => e.kind === 'kick')).toBe(true);
   });
 
   it('home tries land at x=100 and away tries at x=0', () => {
@@ -69,11 +72,11 @@ describe('stageEvents', () => {
 });
 
 describe('rosters', () => {
-  it('generatedRoster is stable per club, 13 unique names in standard positions', () => {
+  it('generatedRoster is stable per club, 9 unique names in Nines positions', () => {
     const r = generatedRoster('broncos');
     expect(r).toEqual(generatedRoster('broncos'));
-    expect(r).toHaveLength(13);
-    expect(new Set(r.map((p) => p.name)).size).toBe(13);
+    expect(r).toHaveLength(9);
+    expect(new Set(r.map((p) => p.name)).size).toBe(9);
     expect(r.map((p) => p.position)).toEqual([...STANDARD_POSITIONS]);
     expect(generatedRoster('storm')).not.toEqual(r);
   });

@@ -40,27 +40,24 @@ interface Slot {
   pull: number;
 }
 
+/** Nines slots (BAK-206 / #1) — one centre, one prop, one second-row; no lock. */
 export const SLOTS: readonly Slot[] = [
   { role: 'fullback', lane: 50, atk: 14, def: 26, pull: 0.45 },
   { role: 'winger', lane: 6, atk: 9, def: 12, pull: 0.12 },
   { role: 'winger', lane: 94, atk: 9, def: 12, pull: 0.12 },
-  { role: 'centre', lane: 22, atk: 7, def: 10, pull: 0.22 },
-  { role: 'centre', lane: 78, atk: 7, def: 10, pull: 0.22 },
-  { role: 'five-eighth', lane: 38, atk: 5, def: 10, pull: 0.32 },
-  { role: 'halfback', lane: 62, atk: 4, def: 10, pull: 0.32 },
+  { role: 'centre', lane: 28, atk: 7, def: 10, pull: 0.28 },
+  { role: 'five-eighth', lane: 40, atk: 5, def: 10, pull: 0.35 },
+  { role: 'halfback', lane: 60, atk: 4, def: 10, pull: 0.35 },
   { role: 'hooker', lane: 50, atk: 1.5, def: 1.5, pull: 0.9 },
-  { role: 'prop', lane: 44, atk: 3, def: 1.8, pull: 0.55 },
-  { role: 'prop', lane: 56, atk: 3, def: 10, pull: 0.5 },
-  { role: 'second-row', lane: 30, atk: 4, def: 10, pull: 0.38 },
-  { role: 'second-row', lane: 70, atk: 4, def: 10, pull: 0.38 },
-  { role: 'lock', lane: 50, atk: 3, def: 10, pull: 0.5 },
+  { role: 'prop', lane: 44, atk: 3, def: 2, pull: 0.55 },
+  { role: 'second-row', lane: 70, atk: 4, def: 10, pull: 0.4 },
 ];
 
 export const PLAYERS = SLOTS.length;
-/** The goal kicker / kick-off taker. */
-export const KICKER_SLOT = 6;
+/** The goal kicker / kick-off taker (halfback). */
+export const KICKER_SLOT = 5;
 /** Dummy-half: first receiver at every play-the-ball. */
-export const HOOKER_SLOT = 7;
+export const HOOKER_SLOT = 6;
 export const FULLBACK_SLOT = 0;
 
 /** Direction a side attacks along fx (home → 100, away → 0). */

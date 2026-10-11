@@ -74,7 +74,7 @@ describe('player frames', () => {
   });
 
   it('looks vary skin tone across a team', () => {
-    const skins = new Set(Array.from({ length: 13 }, (_, i) => LOOKS[lookForSlot(i)]!.skin));
+    const skins = new Set(Array.from({ length: 9 }, (_, i) => LOOKS[lookForSlot(i)]!.skin));
     expect(skins.size).toBeGreaterThanOrEqual(3);
   });
 });

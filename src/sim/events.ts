@@ -1,15 +1,27 @@
 // src/sim/events.ts — canonical import site for the match-sim contract types
-// (ARCHITECTURE §6) plus a small event-builder helper. See BAK-191 (WU-6).
-// Pure TypeScript, no Phaser. WeatherKind's single source is ../core/state;
-// re-exported here so all sim/UI code imports match types from one place.
+// (ARCHITECTURE §6) plus a small event-builder helper. See BAK-191 (WU-6) and
+// BAK-206 (Nines + richer contest/kicks). Pure TypeScript, no Phaser.
+// WeatherKind's single source is ../core/state; re-exported here so all sim/UI
+// code imports match types from one place.
 
 export type { WeatherKind } from '../core/state';
 import type { Position } from '../core/state';
 
-/** One named player on a team sheet (presentation: commentary + playback). */
+/** Per-player stats carried on a sheet roster for outcome-tied actor picks. */
+export interface RosterStats {
+  speed: number;
+  strength: number;
+  stamina: number;
+  skill: number;
+  footyIQ: number;
+}
+
+/** One named player on a team sheet (commentary + playback + actor rolls). */
 export interface RosterEntry {
   name: string;
   position: Position;
+  /** When present, weights outcome-tied actor selection (BAK-206 phase 4). */
+  stats?: RosterStats;
 }
 
 /** Aggregate team profile fed into simulateMatch (built from squad or rival). */
@@ -21,9 +33,12 @@ export interface TeamSheet {
   kicking: number; // 1-100 aggregate
   fitness: number; // 1-100 aggregate
   colors: [string, string];
-  /** The 13 on the field, if known (rival sheets omit it; staging generates one). */
+  /** The ON_FIELD players, if known (rivals get a generated roster). */
   roster?: RosterEntry[];
 }
+
+/** Attacking / territorial kick flavour (stored on MatchEvent.detail). */
+export type KickKind = 'find-touch' | 'bomb' | 'grubber' | 'chip' | '40-20';
 
 export type MatchEventKind =
   | 'kickoff'
@@ -32,8 +47,11 @@ export type MatchEventKind =
   | 'break'
   | 'tackle'
   | 'big-hit'
+  | 'fend'
+  | 'break-tackle'
   | 'error'
   | 'penalty'
+  | 'kick'
   | 'try'
   | 'conversion'
   | 'penalty-goal'

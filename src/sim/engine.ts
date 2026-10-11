@@ -1,16 +1,15 @@
 // src/sim/engine.ts — core stat-based, deterministic match simulation.
-// See BAK-191 (WU-6) and ARCHITECTURE §6. Pure TypeScript, no Phaser.
-// The match is simulated as alternating 6-tackle sets across 80 sim-minutes;
-// each tackle rolls a weighted outcome table driven by the attack-vs-defense
-// differential, momentum, and weather. All randomness routes through mulberry32.
+// See BAK-191 (WU-6), BAK-206 (Nines + contest/kicks), and ARCHITECTURE §6.
+// Pure TypeScript, no Phaser. Alternating SET_TACKLES sets across 80 sim-minutes;
+// each tackle rolls a weighted contest table. All randomness routes through mulberry32.
 
 import { makeRng, type Rng } from '../utils/rng';
 import { overallRating } from '../data/player';
-import { STAT_MAX } from '../config';
-import type { Player, RivalClub, WeatherKind } from '../core/state';
-import type { MatchEvent, MatchResult, TeamSheet } from './events';
+import { ON_FIELD, SET_TACKLES, STAT_MAX } from '../config';
+import type { Player, Position, RivalClub, WeatherKind } from '../core/state';
+import type { KickKind, MatchEvent, MatchResult, RosterEntry, TeamSheet } from './events';
 import { mkEvent } from './events';
-import { stageEvents } from './staging';
+import { generatedRoster, stageEvents } from './staging';
 import {
   rollWeather,
   weatherMods,
@@ -23,15 +22,32 @@ import {
 
 const clampStat = (n: number): number => Math.max(1, Math.min(STAT_MAX, n));
 
+/** Build mkEvent extras without passing `player: undefined` (exactOptionalPropertyTypes). */
+function evExtra(
+  base: { x?: number; y?: number; detail?: string },
+  player?: string,
+): Partial<Pick<MatchEvent, 'player' | 'x' | 'y' | 'detail'>> {
+  return player === undefined ? base : { ...base, player };
+}
+
 // ── TeamSheet builders ───────────────────────────────────────────────────────
 
 const mean = (xs: number[]): number =>
   xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length;
 
+function toRosterEntry(p: Player): RosterEntry {
+  return {
+    name: p.name,
+    position: p.position,
+    stats: { ...p.stats },
+  };
+}
+
 /**
  * Build a TeamSheet from a squad. Excludes injured players (injuredWeeks > 0),
- * uses the best 13 by overall rating, and applies a morale modifier. If fewer
- * than 13 fit players are available, uses all fit players; throws if zero.
+ * uses the best ON_FIELD by overall rating, and applies a morale modifier. If
+ * fewer than ON_FIELD fit players are available, uses all fit players; throws
+ * if zero.
  */
 export function teamSheetFromSquad(
   players: Player[],
@@ -42,10 +58,9 @@ export function teamSheetFromSquad(
   const fit = players.filter((p) => p.injuredWeeks <= 0);
   if (fit.length === 0) throw new Error('no fit players');
 
-  // Best 13 by overall rating (mean of the five stats via overallRating).
   const best = [...fit]
     .sort((a, b) => overallRating(b) - overallRating(a))
-    .slice(0, 13);
+    .slice(0, ON_FIELD);
 
   const attackRaw = mean(best.map((p) => (p.stats.speed + p.stats.skill + p.stats.footyIQ) / 3));
   const defenseRaw = mean(best.map((p) => (p.stats.strength + p.stats.stamina) / 2));
@@ -57,7 +72,6 @@ export function teamSheetFromSquad(
   const kickerPool = kickers.length > 0 ? kickers : best;
   const kicking = clampStat(Math.round(Math.max(...kickerPool.map((p) => p.stats.skill))));
 
-  // Morale modifier: ±10% on attack & defense at morale 0/100.
   const meanMorale = mean(best.map((p) => p.morale));
   const moraleMod = 1 + ((meanMorale - 50) / 50) * 0.1;
 
@@ -69,11 +83,10 @@ export function teamSheetFromSquad(
     kicking,
     fitness,
     colors,
-    roster: best.map((p) => ({ name: p.name, position: p.position })),
+    roster: best.map(toRosterEntry),
   };
 }
 
-// Small deterministic string hash for per-club jitter seeding.
 function hashString(s: string): number {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) {
@@ -84,28 +97,81 @@ function hashString(s: string): number {
 }
 
 /**
- * Build a TeamSheet from a rival club. All four aggregates derive from
- * club.strength with small deterministic jitter (±5, seeded by clubId hash),
- * clamped 1..100.
+ * Build a TeamSheet from a rival club. Aggregates derive from club.strength
+ * with ±5 jitter; roster is a generated Nines side with synthetic stats.
  */
 export function teamSheetFromRival(club: RivalClub): TeamSheet {
   const rng = makeRng(hashString(club.id));
   const jitter = (): number => clampStat(Math.round(club.strength + rng.int(-5, 5)));
+  const attack = jitter();
+  const defense = jitter();
+  const kicking = jitter();
+  const fitness = jitter();
+  const roster = generatedRoster(club.id).map((p) => ({
+    ...p,
+    stats: {
+      speed: clampStat(attack + rng.int(-8, 8)),
+      strength: clampStat(defense + rng.int(-8, 8)),
+      stamina: clampStat(fitness + rng.int(-8, 8)),
+      skill: clampStat(kicking + rng.int(-8, 8)),
+      footyIQ: clampStat(attack + rng.int(-8, 8)),
+    },
+  }));
   return {
     clubId: club.id,
     name: club.name,
-    attack: jitter(),
-    defense: jitter(),
-    kicking: jitter(),
-    fitness: jitter(),
+    attack,
+    defense,
+    kicking,
+    fitness,
     colors: club.colors,
+    roster,
   };
+}
+
+// ── Actor selection (BAK-206 phase 4) ────────────────────────────────────────
+
+const FORWARDS: ReadonlySet<Position> = new Set(['prop', 'hooker', 'second-row', 'lock']);
+const BACKS: ReadonlySet<Position> = new Set(['fullback', 'winger', 'centre']);
+const HALVES: ReadonlySet<Position> = new Set(['five-eighth', 'halfback']);
+
+type StatKey = 'speed' | 'strength' | 'stamina' | 'skill' | 'footyIQ';
+
+function pickActor(
+  roster: readonly RosterEntry[],
+  rng: Rng,
+  prefer: (p: Position) => boolean,
+  stat: StatKey,
+): string | undefined {
+  if (roster.length === 0) return undefined;
+  const weights = roster.map((p) => {
+    const base = prefer(p.position) ? 3 : 1;
+    const s = p.stats?.[stat] ?? 50;
+    return base * (0.35 + s / 100);
+  });
+  let r = rng.next() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < roster.length; i++) {
+    r -= weights[i] ?? 0;
+    if (r < 0) return roster[i]?.name;
+  }
+  return roster[roster.length - 1]?.name;
+}
+
+function kickerName(roster: readonly RosterEntry[]): string | undefined {
+  const ranked = [...roster].sort((a, b) => {
+    const rank = (p: RosterEntry): number =>
+      p.position === 'halfback' ? 3 : p.position === 'five-eighth' ? 2 : 1;
+    const sk = (p: RosterEntry): number => p.stats?.skill ?? 50;
+    return rank(b) - rank(a) || sk(b) - sk(a);
+  });
+  return ranked[0]?.name;
 }
 
 // ── Match simulation ─────────────────────────────────────────────────────────
 
 interface Side {
   sheet: TeamSheet;
+  roster: RosterEntry[];
   isHome: boolean;
   score: number;
   tackleCount: number;
@@ -113,15 +179,23 @@ interface Side {
   tryCount: number;
 }
 
-// Base per-tackle outcome probabilities (favourable = run/break, unfavourable =
-// error). These are the calibration knobs; tuned so equal 50s land 20-50 total
-// points and 80v40 wins ≥80% & <100%.
-const BASE_RUN = 0.62;
-const BASE_BREAK = 0.1;
-const BASE_ERROR = 0.09;
+// Contest weights (BAK-206): richer outcomes + more line breaks than BAK-191.
+const BASE_TACKLE = 0.38;
+const BASE_FEND = 0.11;
+const BASE_BREAK_TACKLE = 0.1;
+const BASE_BREAK = 0.14;
+const BASE_ERROR = 0.08;
 const BASE_PENALTY = 0.05;
-const BASE_BIGHIT = 0.06;
-// remainder (~0.08) folds into a plain tackle (no advance beyond run's minimum).
+const BASE_BIGHIT = 0.09;
+
+type ContestOutcome =
+  | 'tackle'
+  | 'fend'
+  | 'break-tackle'
+  | 'break'
+  | 'error'
+  | 'penalty'
+  | 'big-hit';
 
 /**
  * Simulate a full match. Synchronous, <50ms, fully deterministic per seed.
@@ -139,16 +213,28 @@ export function simulateMatch(
   const momentumTimeline: { t: number; value: number }[] = [];
 
   const homeSide: Side = {
-    sheet: home, isHome: true, score: 0, tackleCount: 0, errorCount: 0, tryCount: 0,
+    sheet: home,
+    roster: home.roster && home.roster.length > 0 ? home.roster : generatedRoster(home.clubId),
+    isHome: true,
+    score: 0,
+    tackleCount: 0,
+    errorCount: 0,
+    tryCount: 0,
   };
   const awaySide: Side = {
-    sheet: away, isHome: false, score: 0, tackleCount: 0, errorCount: 0, tryCount: 0,
+    sheet: away,
+    roster: away.roster && away.roster.length > 0 ? away.roster : generatedRoster(away.clubId),
+    isHome: false,
+    score: 0,
+    tackleCount: 0,
+    errorCount: 0,
+    tryCount: 0,
   };
 
-  let momentum = 0; // + = home
+  let momentum = 0;
   let possessing: Side = homeSide;
   let defending: Side = awaySide;
-  let fieldX = 20; // 0 = own line, 100 = opponent try-line
+  let fieldX = 20;
   let t = 0;
   let halfTimeEmitted = false;
 
@@ -167,11 +253,9 @@ export function simulateMatch(
     }
   };
 
-  // Main loop: sets until 80 minutes elapse.
   while (t < 80) {
     const atk = possessing.sheet;
     const def = defending.sheet;
-    // Attack-vs-defense differential in [-1, 1], scaled.
     const atkDiff = (atk.attack - def.defense) / 100;
 
     events.push(
@@ -179,18 +263,32 @@ export function simulateMatch(
     );
 
     let setEnded = false;
-    for (let tackle = 1; tackle <= 6 && !setEnded && t < 80; tackle++) {
+    for (let tackle = 1; tackle <= SET_TACKLES && !setEnded && t < 80; tackle++) {
       possessing.tackleCount++;
-      t = Math.min(80, t + 0.5 + rng.next()); // advance 0.5-1.5 min per tackle, cap at 80
+      t = Math.min(80, t + 0.5 + rng.next());
       maybeHalfTime();
 
-      const outcome = rollTackle(atkDiff, momentum, possessing.isHome, wmods, rng);
+      // Speculative early kick (tackle 1, mostly from own half).
+      if (tackle === 1 && fieldX < 45 && rng.next() < 0.04 + atk.kicking / 2000) {
+        const early = resolveKickInner(possessing, defending, t, events, fieldX, wmods, rng, true);
+        fieldX = early.fieldX;
+        if (early.scoredTry) {
+          momentum = applyMomentumEvent(momentum, 'try', possessing.isHome);
+        }
+        if (early.flip) flip();
+        setEnded = true;
+        break;
+      }
+
+      const outcome = rollContest(atkDiff, momentum, possessing.isHome, wmods, rng);
 
       if (outcome === 'error') {
-        events.push(mkEvent(t, 'error', atk.clubId, { x: Math.round(fieldX), y: 50 }));
+        const carrier = pickActor(possessing.roster, rng, () => true, 'skill');
+        events.push(
+          mkEvent(t, 'error', atk.clubId, evExtra({ x: Math.round(fieldX), y: 50 }, carrier)),
+        );
         possessing.errorCount++;
         momentum = applyMomentumEvent(momentum, 'error', possessing.isHome);
-        // Turnover: opponent starts near where the ball was lost (mirrored).
         fieldX = clampField(100 - fieldX + 10);
         flip();
         setEnded = true;
@@ -199,32 +297,41 @@ export function simulateMatch(
 
       if (outcome === 'penalty') {
         events.push(mkEvent(t, 'penalty', atk.clubId, { x: Math.round(fieldX), y: 50 }));
-        // Kick for goal if within range and worth it (fieldX >= 60).
         if (fieldX >= 60) {
+          const kicker = kickerName(possessing.roster);
           const prob = kickProb(atk.kicking, 0.62) * wmods.kickSuccessMult;
-          if (rng.next() < prob) {
-            possessing.score += 2;
-            events.push(mkEvent(t, 'penalty-goal', atk.clubId, { x: Math.round(fieldX), y: 50 }));
-          }
-          // Restart after a shot at goal: opponent kicks off to possessing? Keep
-          // it simple — possession flips, receiver starts ~30.
+          const good = rng.next() < prob;
+          if (good) possessing.score += 2;
+          events.push(
+            mkEvent(
+              t,
+              'penalty-goal',
+              atk.clubId,
+              evExtra({ x: Math.round(fieldX), y: 50, detail: good ? 'good' : 'missed' }, kicker),
+            ),
+          );
           fieldX = 30;
           flip();
           setEnded = true;
           break;
         }
-        // Otherwise take the tap and continue this set (gain field position).
         fieldX = clampField(fieldX + 10);
         continue;
       }
 
       if (outcome === 'big-hit') {
-        events.push(mkEvent(t, 'big-hit', def.clubId, { x: Math.round(fieldX), y: 50 }));
-        // Momentum swings toward the DEFENDING team (they made the hit).
+        const hitter = pickActor(defending.roster, rng, (p) => FORWARDS.has(p), 'strength');
+        const loss = 2 + Math.floor(rng.next() * 11); // 2-12m driven back
+        fieldX = clampField(fieldX - loss);
+        events.push(
+          mkEvent(t, 'big-hit', def.clubId, evExtra({ x: Math.round(fieldX), y: 50, detail: 'driven' }, hitter)),
+        );
         momentum = applyMomentumEvent(momentum, 'big-hit', defending.isHome);
-        // Chance the carrier coughs it up.
         if (rng.next() < 0.25 * wmods.errorMult) {
-          events.push(mkEvent(t, 'error', atk.clubId, { x: Math.round(fieldX), y: 50 }));
+          const carrier = pickActor(possessing.roster, rng, () => true, 'skill');
+          events.push(
+            mkEvent(t, 'error', atk.clubId, evExtra({ x: Math.round(fieldX), y: 50, detail: 'jarred' }, carrier)),
+          );
           possessing.errorCount++;
           momentum = applyMomentumEvent(momentum, 'error', possessing.isHome);
           fieldX = clampField(100 - fieldX + 10);
@@ -232,22 +339,27 @@ export function simulateMatch(
           setEnded = true;
           break;
         }
-        // Held; minimal advance.
-        fieldX = clampField(fieldX + 2);
         continue;
       }
 
       if (outcome === 'break') {
-        const gain = 20 + Math.floor(rng.next() * 21); // 20-40m
+        const runner = pickActor(
+          possessing.roster,
+          rng,
+          (p) => BACKS.has(p) || HALVES.has(p),
+          'speed',
+        );
+        const gain = 20 + Math.floor(rng.next() * 21);
         fieldX = clampField(fieldX + gain);
-        events.push(mkEvent(t, 'break', atk.clubId, { x: Math.round(fieldX), y: 50 }));
-        if (fieldX >= 80) {
-          // Try chance scaled by attack.
-          const tryProb = 0.35 + (atk.attack / 100) * 0.45; // 0.35-0.80
+        events.push(
+          mkEvent(t, 'break', atk.clubId, evExtra({ x: Math.round(fieldX), y: 50 }, runner)),
+        );
+        if (fieldX >= 75) {
+          const tryProb = 0.4 + (atk.attack / 100) * 0.45;
           if (rng.next() < tryProb) {
-            scoreTry(possessing, t, events, atk);
+            scoreTry(possessing, t, events, runner);
             momentum = applyMomentumEvent(momentum, 'try', possessing.isHome);
-            attemptConversion(possessing, t, events, atk, wmods, rng, fieldX);
+            attemptConversion(possessing, t, events, wmods, rng);
             fieldX = 20;
             flip();
             setEnded = true;
@@ -257,17 +369,58 @@ export function simulateMatch(
         continue;
       }
 
-      // outcome === 'run' (or plain tackle): advance 5-15m.
-      const gain = 5 + Math.floor(rng.next() * 11);
-      fieldX = clampField(fieldX + gain);
-      events.push(mkEvent(t, 'run', atk.clubId, { x: Math.round(fieldX), y: 50 }));
-      // If a run carries into the in-goal area, small try chance.
-      if (fieldX >= 95) {
-        const tryProb = 0.2 + (atk.attack / 100) * 0.3;
-        if (rng.next() < tryProb) {
-          scoreTry(possessing, t, events, atk);
+      if (outcome === 'break-tackle') {
+        const runner = pickActor(
+          possessing.roster,
+          rng,
+          (p) => FORWARDS.has(p) || HALVES.has(p),
+          'strength',
+        );
+        const gain = 12 + Math.floor(rng.next() * 14);
+        fieldX = clampField(fieldX + gain);
+        events.push(
+          mkEvent(
+            t,
+            'break-tackle',
+            atk.clubId,
+            evExtra({ x: Math.round(fieldX), y: 50, detail: 'through' }, runner),
+          ),
+        );
+        if (fieldX >= 95 && rng.next() < 0.25 + atk.attack / 400) {
+          scoreTry(possessing, t, events, runner);
           momentum = applyMomentumEvent(momentum, 'try', possessing.isHome);
-          attemptConversion(possessing, t, events, atk, wmods, rng, fieldX);
+          attemptConversion(possessing, t, events, wmods, rng);
+          fieldX = 20;
+          flip();
+          setEnded = true;
+          break;
+        }
+        continue;
+      }
+
+      if (outcome === 'fend') {
+        const runner = pickActor(possessing.roster, rng, (p) => FORWARDS.has(p), 'skill');
+        const gain = 8 + Math.floor(rng.next() * 11);
+        fieldX = clampField(fieldX + gain);
+        events.push(
+          mkEvent(t, 'fend', atk.clubId, evExtra({ x: Math.round(fieldX), y: 50, detail: 'fend' }, runner)),
+        );
+        continue;
+      }
+
+      // Completed tackle (held).
+      {
+        const tackler = pickActor(defending.roster, rng, (p) => FORWARDS.has(p), 'strength');
+        const gain = Math.floor(rng.next() * 9); // 0-8m
+        fieldX = clampField(fieldX + gain);
+        events.push(
+          mkEvent(t, 'tackle', def.clubId, evExtra({ x: Math.round(fieldX), y: 50, detail: 'held' }, tackler)),
+        );
+        if (fieldX >= 95 && rng.next() < 0.15 + atk.attack / 500) {
+          const scorer = pickActor(possessing.roster, rng, (p) => BACKS.has(p), 'speed');
+          scoreTry(possessing, t, events, scorer);
+          momentum = applyMomentumEvent(momentum, 'try', possessing.isHome);
+          attemptConversion(possessing, t, events, wmods, rng);
           fieldX = 20;
           flip();
           setEnded = true;
@@ -277,49 +430,50 @@ export function simulateMatch(
     }
 
     if (!setEnded) {
-      // 6th tackle with no score → downfield kick, flip possession.
-      const dist = kickDistance(possessing.sheet.kicking, wmods, rng);
-      // Receiver starts near ~30 from their own line (further with a big kick).
-      const receiverStart = clampField(30 - (dist - 40) * 0.2);
-      fieldX = clampField(receiverStart);
-      flip();
+      const kickResult = resolveKickInner(possessing, defending, t, events, fieldX, wmods, rng, false);
+      fieldX = kickResult.fieldX;
+      if (kickResult.scoredTry) {
+        momentum = applyMomentumEvent(momentum, 'try', possessing.isHome);
+      }
+      if (kickResult.flip) flip();
     }
 
-    // Late field-goal attempt: t≥75, margin ≤2, possessing team high attack.
+    // Late field-goal: t≥75, tied or trailing by ≤2, decent attack.
     if (t >= 75) {
       const margin = possessing.score - defending.score;
-      if (margin <= 0 && margin >= -2 && possessing.sheet.attack >= 60) {
+      if (margin <= 0 && margin >= -2 && possessing.sheet.attack >= 55) {
+        const kicker = kickerName(possessing.roster);
         const prob = kickProb(possessing.sheet.kicking, 0.4) * wmods.kickSuccessMult;
-        if (rng.next() < prob) {
-          possessing.score += 1;
-          events.push(mkEvent(t, 'field-goal', possessing.sheet.clubId));
-        }
+        const good = rng.next() < prob;
+        if (good) possessing.score += 1;
+        events.push(
+          mkEvent(
+            t,
+            'field-goal',
+            possessing.sheet.clubId,
+            evExtra({ detail: good ? 'good' : 'missed', x: Math.round(fieldX), y: 50 }, kicker),
+          ),
+        );
       }
     }
 
-    // Per-set momentum decay + sample.
     momentum = decayMomentum(momentum);
     momentumTimeline.push({ t: Math.round(t), value: momentum });
   }
 
   maybeHalfTime();
 
-  // 0-0 avoidance: force one late try for the higher-attack team.
   if (homeSide.score === 0 && awaySide.score === 0) {
     const winner = home.attack >= away.attack ? homeSide : awaySide;
-    scoreTry(winner, 79, events, winner.sheet);
-    attemptConversion(winner, 79, events, winner.sheet, wmods, rng, 90);
+    const scorer = pickActor(winner.roster, makeRng(opts.seed ^ 0x0dd), (p) => BACKS.has(p), 'speed');
+    scoreTry(winner, 79, events, scorer);
+    attemptConversion(winner, 79, events, wmods, rng);
   }
 
   events.push(mkEvent(80, 'full-time', home.clubId));
 
-  // Presentation staging (absolute x, lateral y, player names) on its own rng
-  // stream — never alters outcomes. Runs in append order, before sorting.
   const staged = stageEvents(events, home, away, opts.seed);
 
-  // Ensure events are ordered by t (they are appended in time order, but the
-  // forced-try and full-time land at fixed minutes). Ties break by a phase rank
-  // so kickoff sorts first and full-time always sorts last within a minute.
   const rank = (k: MatchEvent['kind']): number =>
     k === 'kickoff' ? -1 : k === 'full-time' ? 1 : 0;
   staged.sort((a, b) => a.t - b.t || rank(a.kind) - rank(b.kind));
@@ -328,7 +482,7 @@ export function simulateMatch(
   const homePoss = totalTackles === 0 ? 50 : Math.round((homeSide.tackleCount / totalTackles) * 100);
   const awayPoss = 100 - homePoss;
 
-  const result: MatchResult = {
+  return {
     homeScore: homeSide.score,
     awayScore: awaySide.score,
     events: staged,
@@ -341,59 +495,165 @@ export function simulateMatch(
     weather,
     momentumTimeline,
   };
-  return result;
+}
+
+// ── Kick resolution ──────────────────────────────────────────────────────────
+
+interface KickResolve {
+  fieldX: number;
+  flip: boolean;
+  scoredTry: boolean;
+}
+
+function chooseKickKind(fieldX: number, early: boolean, rng: Rng): KickKind {
+  if (early) {
+    if (rng.next() < 0.25) return '40-20';
+    return rng.next() < 0.55 ? 'bomb' : 'chip';
+  }
+  if (fieldX >= 72) {
+    const r = rng.next();
+    if (r < 0.45) return 'grubber';
+    if (r < 0.75) return 'bomb';
+    return 'chip';
+  }
+  if (fieldX >= 40) {
+    const r = rng.next();
+    if (r < 0.4) return 'bomb';
+    if (r < 0.75) return 'find-touch';
+    return 'grubber';
+  }
+  return rng.next() < 0.15 ? '40-20' : 'find-touch';
+}
+
+function resolveKickInner(
+  possessing: Side,
+  defending: Side,
+  t: number,
+  events: MatchEvent[],
+  fieldX: number,
+  wmods: WeatherMods,
+  rng: Rng,
+  early: boolean,
+): KickResolve {
+  const kind = chooseKickKind(fieldX, early, rng);
+  const kicker = kickerName(possessing.roster);
+  const dist = kickDistance(possessing.sheet.kicking, wmods, rng);
+
+  events.push(
+    mkEvent(
+      t,
+      'kick',
+      possessing.sheet.clubId,
+      evExtra({ x: Math.round(fieldX), y: 50, detail: kind }, kicker),
+    ),
+  );
+
+  if (kind === '40-20') {
+    const success = rng.next() < 0.1 + possessing.sheet.kicking / 500;
+    if (success) {
+      return { fieldX: clampField(78 + rng.next() * 10), flip: false, scoredTry: false };
+    }
+    return { fieldX: clampField(25 + (dist - 40) * 0.15), flip: true, scoredTry: false };
+  }
+
+  if (kind === 'bomb' || kind === 'chip') {
+    const chaser = pickActor(
+      possessing.roster,
+      rng,
+      (p) => p === 'winger' || p === 'fullback' || p === 'centre',
+      'speed',
+    );
+    const fullback = pickActor(
+      defending.roster,
+      rng,
+      (p) => p === 'fullback' || p === 'winger',
+      'skill',
+    );
+    const chaseAt = clampField(fieldX + dist * (kind === 'chip' ? 0.45 : 0.55));
+    const chaserSpeed =
+      possessing.roster.find((p) => p.name === chaser)?.stats?.speed ?? possessing.sheet.attack;
+    const fbSkill =
+      defending.roster.find((p) => p.name === fullback)?.stats?.skill ?? defending.sheet.defense;
+    const contest = (chaserSpeed - fbSkill) / 200 + (kind === 'bomb' ? 0.08 : 0.04);
+    if (rng.next() < 0.18 + contest) {
+      if (chaseAt >= 70 && rng.next() < 0.35 + possessing.sheet.attack / 300) {
+        scoreTry(possessing, t, events, chaser);
+        attemptConversion(possessing, t, events, wmods, rng);
+        return { fieldX: 20, flip: true, scoredTry: true };
+      }
+      return { fieldX: clampField(chaseAt - 5), flip: false, scoredTry: false };
+    }
+    return { fieldX: clampField(100 - chaseAt + 8), flip: true, scoredTry: false };
+  }
+
+  if (kind === 'grubber') {
+    const tipAt = clampField(fieldX + 12 + rng.next() * 18);
+    if (tipAt >= 88 && rng.next() < 0.28 + possessing.sheet.attack / 350) {
+      const scorer = pickActor(
+        possessing.roster,
+        rng,
+        (p) => BACKS.has(p) || HALVES.has(p),
+        'speed',
+      );
+      scoreTry(possessing, t, events, scorer);
+      attemptConversion(possessing, t, events, wmods, rng);
+      return { fieldX: 20, flip: true, scoredTry: true };
+    }
+    return { fieldX: clampField(22 + rng.next() * 10), flip: true, scoredTry: false };
+  }
+
+  const receiverStart = clampField(22 - (dist - 40) * 0.25);
+  return { fieldX: receiverStart, flip: true, scoredTry: false };
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
-
-type TackleOutcome = 'run' | 'break' | 'error' | 'penalty' | 'big-hit';
 
 function clampField(x: number): number {
   return Math.max(0, Math.min(100, x));
 }
 
-/**
- * Roll a weighted tackle outcome. atkDiff in ~[-1,1] shifts run/break up and
- * error down for the stronger attack. Momentum nudges the favourable split by
- * at most ±8%. Weather scales error (rain) and break (rain) chances.
- */
-function rollTackle(
+function rollContest(
   atkDiff: number,
   momentum: number,
   possIsHome: boolean,
   wmods: WeatherMods,
   rng: Rng,
-): TackleOutcome {
-  // Stat differential shifts weights: stronger attack → more breaks, fewer errors.
-  const diffShift = atkDiff * 0.12; // up to ±12 pts of attack differential
-  const momMod = momentumWeightMod(momentum, possIsHome); // ~0.92..1.08
+): ContestOutcome {
+  const diffShift = atkDiff * 0.12;
+  const momMod = momentumWeightMod(momentum, possIsHome);
 
   let breakW = (BASE_BREAK + diffShift) * wmods.breakMult * momMod;
-  let runW = (BASE_RUN + diffShift * 0.5) * momMod;
+  let breakTackleW = (BASE_BREAK_TACKLE + diffShift * 0.5) * momMod;
+  let fendW = (BASE_FEND + diffShift * 0.4) * momMod;
+  let tackleW = (BASE_TACKLE - diffShift * 0.3) / momMod;
   let errorW = (BASE_ERROR - diffShift) * wmods.errorMult;
   const penaltyW = BASE_PENALTY;
-  const bigHitW = BASE_BIGHIT;
+  let bigHitW = BASE_BIGHIT - diffShift * 0.3;
 
-  breakW = Math.max(0.01, breakW);
-  runW = Math.max(0.01, runW);
+  breakW = Math.max(0.02, breakW);
+  breakTackleW = Math.max(0.02, breakTackleW);
+  fendW = Math.max(0.02, fendW);
+  tackleW = Math.max(0.05, tackleW);
   errorW = Math.max(0.01, errorW);
+  bigHitW = Math.max(0.02, bigHitW);
 
-  const total = runW + breakW + errorW + penaltyW + bigHitW;
+  const total = tackleW + fendW + breakTackleW + breakW + errorW + penaltyW + bigHitW;
   let r = rng.next() * total;
-  if ((r -= runW) < 0) return 'run';
+  if ((r -= tackleW) < 0) return 'tackle';
+  if ((r -= fendW) < 0) return 'fend';
+  if ((r -= breakTackleW) < 0) return 'break-tackle';
   if ((r -= breakW) < 0) return 'break';
   if ((r -= errorW) < 0) return 'error';
   if ((r -= penaltyW) < 0) return 'penalty';
   return 'big-hit';
 }
 
-function scoreTry(side: Side, t: number, events: MatchEvent[], sheet: TeamSheet): void {
+function scoreTry(side: Side, t: number, events: MatchEvent[], player?: string): void {
   side.score += 4;
   side.tryCount++;
-  events.push(mkEvent(t, 'try', sheet.clubId, { x: 100, y: 50 }));
+  events.push(mkEvent(t, 'try', side.sheet.clubId, evExtra({ x: 100, y: 50 }, player)));
 }
 
-// Conversion success as a function of kicking rating; base at kicking 50.
 function kickProb(kicking: number, base: number): number {
   const p = base + ((kicking - 50) / 50) * 0.25;
   return Math.max(0.05, Math.min(0.98, p));
@@ -403,25 +663,26 @@ function attemptConversion(
   side: Side,
   t: number,
   events: MatchEvent[],
-  sheet: TeamSheet,
   wmods: WeatherMods,
   rng: Rng,
-  _fieldX: number,
 ): void {
-  const prob = kickProb(sheet.kicking, 0.75) * wmods.kickSuccessMult;
+  const prob = kickProb(side.sheet.kicking, 0.75) * wmods.kickSuccessMult;
   const good = rng.next() < prob;
   if (good) side.score += 2;
   events.push(
-    mkEvent(t, 'conversion', sheet.clubId, { detail: good ? 'good' : 'missed', x: 90, y: 50 }),
+    mkEvent(
+      t,
+      'conversion',
+      side.sheet.clubId,
+      evExtra({ detail: good ? 'good' : 'missed', x: 90, y: 50 }, kickerName(side.roster)),
+    ),
   );
 }
 
 function kickDistance(kicking: number, wmods: WeatherMods, rng: Rng): number {
-  const base = 30 + (kicking / 100) * 30; // 30-60m
-  // Wind ±15%: engine rolls direction per kick.
+  const base = 30 + (kicking / 100) * 30;
   let windFactor = wmods.kickDistanceMult;
   if (wmods.kickDistanceMult !== 1.0) {
-    // Wind: randomly help (×1.15) or hinder (×0.85).
     windFactor = rng.next() < 0.5 ? 1 + WIND_DISTANCE_JITTER : 1 - WIND_DISTANCE_JITTER;
   }
   return base * windFactor;

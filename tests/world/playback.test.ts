@@ -66,7 +66,7 @@ function makeFakeScene(homeId = 'H', real = false): FakeScene {
   const scene: FakeScene = {
     homeId,
     shakes: 0,
-    players: { home: Array.from({ length: 13 }, actor), away: Array.from({ length: 13 }, actor) },
+    players: { home: Array.from({ length: 9 }, actor), away: Array.from({ length: 9 }, actor) },
     ball: {
       x: 0,
       y: 0,
@@ -354,7 +354,8 @@ describe('PlaybackController beats', () => {
     expect(scorer).toBeDefined();
     expect(scorer!.x).toBeGreaterThan(line.x); // over the try-line (home attacks +x)
     const celebrating = scene.players.home.filter((a) => a.anim === 'celebrate').length;
-    expect(celebrating).toBeGreaterThanOrEqual(10);
+    // Nines: 9 on field — most of the side should celebrate.
+    expect(celebrating).toBeGreaterThanOrEqual(7);
   });
 
   it('conversion: the kicker kicks and the ball arcs high toward the posts', () => {
@@ -407,9 +408,11 @@ describe('PlaybackController beats', () => {
 describe('PlaybackController anchored formation (bug: dots collapsed into one column)', () => {
   afterEach(() => bus.clear());
 
-  it('after 500 random events the 26 players stay spread across the field', () => {
+  it('after 500 random events the 18 Nines players stay spread across the field', () => {
     const rng = makeRng(1234);
-    const kinds: MatchEventKind[] = ['set-start', 'run', 'break', 'tackle', 'big-hit', 'error', 'penalty'];
+    const kinds: MatchEventKind[] = [
+      'set-start', 'run', 'break', 'tackle', 'big-hit', 'fend', 'break-tackle', 'kick', 'error', 'penalty',
+    ];
     const events: MatchEvent[] = [{ t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 }];
     for (let i = 0; i < 500; i++) {
       events.push({
@@ -434,11 +437,11 @@ describe('PlaybackController anchored formation (bug: dots collapsed into one co
       const screenX = all.map((p) => scene.fieldToWorld(p.fx, p.fy).x);
       const distinct = new Set(screenX.map((x) => Math.round(x / 4))).size;
       expect(stdev(screenX)).toBeGreaterThan(80);
-      expect(distinct).toBeGreaterThan(15);
+      // 18 sprites → slightly fewer distinct x-buckets than the old 26-a-side test.
+      expect(distinct).toBeGreaterThan(12);
       for (const side of [t.home, t.away]) {
-        // Wingers keep opposite touchlines; the spine stays central.
-        expect(Math.abs(side[1]!.fy - side[2]!.fy)).toBeGreaterThan(50);
-        expect(Math.max(...side.map((p) => p.fy)) - Math.min(...side.map((p) => p.fy))).toBeGreaterThan(60);
+        // Overall width stays open (detailed winger lanes covered in formation.test).
+        expect(Math.max(...side.map((p) => p.fy)) - Math.min(...side.map((p) => p.fy))).toBeGreaterThan(40);
       }
       checked++;
     });

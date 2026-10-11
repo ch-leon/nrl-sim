@@ -55,11 +55,13 @@ export function initLiveState(): LiveState {
 /**
  * Fold one event into running state (pure — returns a new object). Scoring:
  * try +4, conversion +2 (only when successful — engine emits `conversion` with
- * detail 'good'/'missed'), penalty-goal +2, field-goal +1, to the side matching
- * `ev.teamId === homeId`. Tackles count one per tackle-loop iteration: each
- * run/break/penalty/big-hit for the possessing side, and each error that is NOT
- * the coughed-up ball from a big-hit (same iteration). Possession ticks mirror
- * tackles so possession % == tackle ratio (matching the engine's own derivation).
+ * detail 'good'/'missed'), penalty-goal +2 / field-goal +1 when not `missed`,
+ * to the side matching `ev.teamId === homeId`. Tackles count one per
+ * tackle-loop iteration: run/break/fend/break-tackle/penalty for the
+ * possessing side; big-hit/tackle attributed to the DEFENDING teamId but counted
+ * for the possessing (opposing) side; errors that are NOT the coughed-up ball
+ * from a big-hit (same iteration). Last-tackle `kick` is not a new iteration
+ * (the set already consumed SET_TACKLES contests). Possession ticks mirror tackles.
  * `half` flips on `half-time` and via `ev.t >= 40`.
  */
 export function reduceEvent(s: LiveState, ev: MatchEvent, homeId: string): LiveState {
@@ -84,13 +86,11 @@ export function reduceEvent(s: LiveState, ev: MatchEvent, homeId: string): LiveS
       next.tries[i]++;
       break;
     case 'conversion':
+    case 'penalty-goal':
       if (ev.detail !== 'missed') addScore(next, i, 2);
       break;
-    case 'penalty-goal':
-      addScore(next, i, 2);
-      break;
     case 'field-goal':
-      addScore(next, i, 1);
+      if (ev.detail !== 'missed') addScore(next, i, 1);
       break;
     case 'error':
       next.errors[i]++;
@@ -102,14 +102,19 @@ export function reduceEvent(s: LiveState, ev: MatchEvent, homeId: string): LiveS
   // Tackle iterations (possessing side). set-start resets the big-hit latch.
   if (ev.kind === 'set-start') {
     next._prevBigHit = false;
-  } else if (ev.kind === 'run' || ev.kind === 'break' || ev.kind === 'penalty') {
+  } else if (
+    ev.kind === 'run' ||
+    ev.kind === 'break' ||
+    ev.kind === 'fend' ||
+    ev.kind === 'break-tackle' ||
+    ev.kind === 'penalty'
+  ) {
     bumpTackle(next, i);
     next._prevBigHit = false;
-  } else if (ev.kind === 'big-hit') {
-    // big-hit is attributed to the DEFENDING team; the tackle belongs to the
-    // possessing (opposing) side.
+  } else if (ev.kind === 'big-hit' || ev.kind === 'tackle') {
+    // teamId is the DEFENDING side; the iteration belongs to the possessing side.
     bumpTackle(next, i === 0 ? 1 : 0);
-    next._prevBigHit = true;
+    next._prevBigHit = ev.kind === 'big-hit';
   } else if (ev.kind === 'error') {
     if (!next._prevBigHit) bumpTackle(next, i);
     next._prevBigHit = false;
