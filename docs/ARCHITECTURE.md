@@ -245,6 +245,10 @@ export interface MatchEvent {
   detail?: string;
 }
 
+export interface MatchInjury {
+  teamId: string; playerName: string; playerId?: string; weeks: number;
+}
+
 export interface MatchResult {
   homeScore: number; awayScore: number;
   events: MatchEvent[];
@@ -252,6 +256,7 @@ export interface MatchResult {
            errors: [number, number]; tries: [number, number] };
   weather: WeatherKind;
   momentumTimeline: { t: number; value: number }[]; // -100 (away) .. +100 (home)
+  injuries: MatchInjury[]; // big-hit rolls; matchday applies to squad (GitHub #7)
 }
 
 export function simulateMatch(home: TeamSheet, away: TeamSheet,

@@ -99,6 +99,7 @@ function mkResult(events: MatchEvent[], overrides: Partial<MatchResult> = {}): M
     stats: { possession: [50, 50], tackles: [0, 0], errors: [0, 0], tries: [0, 0] },
     weather: 'clear',
     momentumTimeline: [],
+    injuries: [],
     ...overrides,
   };
 }

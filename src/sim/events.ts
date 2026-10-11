@@ -22,6 +22,19 @@ export interface RosterEntry {
   position: Position;
   /** When present, weights outcome-tied actor selection (BAK-206 phase 4). */
   stats?: RosterStats;
+  /** Squad player id when built from a real Player (injury apply boundary). */
+  id?: string;
+  /** 1–100; used for big-hit injury rolls when present (GitHub #7). */
+  injuryRisk?: number;
+}
+
+/** Injury rolled in-sim; matchday applies `weeks` onto GameState.squad. */
+export interface MatchInjury {
+  teamId: string;
+  playerName: string;
+  /** Present when the roster entry carried a squad id. */
+  playerId?: string;
+  weeks: number;
 }
 
 /** Aggregate team profile fed into simulateMatch (built from squad or rival). */
@@ -81,6 +94,8 @@ export interface MatchResult {
   };
   weather: import('../core/state').WeatherKind;
   momentumTimeline: { t: number; value: number }[]; // -100 (away)..+100 (home)
+  /** Big-hit injuries; empty when none. Applied by matchday, not the engine. */
+  injuries: MatchInjury[];
 }
 
 /**

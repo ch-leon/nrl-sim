@@ -47,6 +47,24 @@ describe('teamSheetFromSquad', () => {
     expect(sheet.defense).toBeLessThan(60);
   });
 
+  it('carries player id and injuryRisk onto roster entries (GitHub #7)', () => {
+    const fitPlayers = Array.from({ length: ON_FIELD }, (_, i) =>
+      player({
+        id: `id-${i}`,
+        injuryRisk: 10 + i,
+        injuredWeeks: 0,
+        stats: { speed: 50, strength: 50, stamina: 50, skill: 50, footyIQ: 50 },
+        morale: 50,
+      }),
+    );
+    const sheet = teamSheetFromSquad(fitPlayers, 'player', 'Sharks', COLORS);
+    expect(sheet.roster).toHaveLength(ON_FIELD);
+    for (const entry of sheet.roster ?? []) {
+      expect(entry.id).toMatch(/^id-/);
+      expect(entry.injuryRisk).toBeGreaterThanOrEqual(10);
+    }
+  });
+
   it('uses the best ON_FIELD by overall rating', () => {
     const strong = Array.from({ length: ON_FIELD }, () =>
       player({ injuredWeeks: 0, stats: { speed: 80, strength: 80, stamina: 80, skill: 80, footyIQ: 80 }, morale: 50 }),

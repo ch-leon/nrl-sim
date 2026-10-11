@@ -280,10 +280,10 @@ Capture so nothing from the 2026-10-11 thread (and prior gap review) gets lost.
 ### Match sim / feel (next after BAK-206)
 | ID | Item | Notes |
 |----|------|-------|
-| B1 | **Wire `fitness`** into late-match error ↑ / break ↓ | Sheet field already exists; unused in loop. Deferred by choice. |
-| B2 | **Injury from big-hits** | Roll vs `injuryRisk`; set `injuredWeeks`; notify. |
+| B1 | **Wire `fitness`** into late-match error ↑ / break ↓ | Done — GitHub #6 (t≥60 fitness mods). |
+| B2 | **Injury from big-hits** | Done — GitHub #7 (engine emits; matchday applies). |
 | B3 | **New skill: step / acceleration** | Only if speed+skill still feel flat after phase 2–4. |
-| B4 | **Home advantage** | Small attack/defense nudge; retune 45–55% band. |
+| B4 | **Home advantage** | Done — GitHub #8 (~52–58% home win band). |
 | B5 | **Rival `cheapSimScore` ≈ full engine** | Ladder credibility. |
 | B6 | **Bench / interchanges** | Even a simple 4-man rotation. |
 | B7 | **Sin-bin / professional foul** | From repeated big-hits or cynical penalties. |
@@ -333,7 +333,7 @@ export type MatchIntent =
 | S3 | Forfeit when fit &lt; `SQUAD_MIN` + apply result |
 | S4 | Age retirement |
 | S5 | BAK-205 monetisation decision + optional cosmetic kits behind flag |
-| S6 | Tutorial Replay + PWA Install in settings |
+| S6 | Tutorial Replay + PWA Install in settings | Done — GitHub #9 |
 | S7 | Contract weeks on squad cards; HUD multi-week advance |
 
 ### Polish already noted

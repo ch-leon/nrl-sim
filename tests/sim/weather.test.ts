@@ -186,8 +186,9 @@ describe('momentum bounds & timeline through the engine', () => {
 });
 
 describe('equal-team fairness under all weathers', () => {
+  // GitHub #8: home attack/defense nudge → ~52–58% home wins (was 45–55%).
   for (const weather of ['clear', 'rain', 'wind'] as const) {
-    it(`home win rate stays 45-55% under ${weather}`, () => {
+    it(`home win rate stays 52-58% under ${weather}`, () => {
       const [h, a] = [sheet('H', 50), sheet('A', 50)];
       let homeWins = 0;
       for (let s = 0; s < RUNS; s++) {
@@ -195,8 +196,8 @@ describe('equal-team fairness under all weathers', () => {
         if (r.homeScore > r.awayScore) homeWins++;
       }
       const rate = (homeWins / RUNS) * 100;
-      expect(rate).toBeGreaterThanOrEqual(45);
-      expect(rate).toBeLessThanOrEqual(55);
+      expect(rate).toBeGreaterThanOrEqual(52);
+      expect(rate).toBeLessThanOrEqual(58);
     });
   }
 });

@@ -7,8 +7,40 @@ import { getState, setState } from '../core/state';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { applyResult, getCurrentFixture, PLAYER_ID } from './fixtures';
 import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
-import type { TeamSheet } from '../sim/events';
+import type { MatchInjury, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
+
+/**
+ * Apply sim-emitted injuries onto the player squad (by id, then name).
+ * Rival injuries are ignored — they have no GameState Player rows.
+ * Does not touch forfeit / SQUAD_MIN / bankruptcy flows.
+ */
+function applyMatchInjuries(injuries: readonly MatchInjury[]): void {
+  if (injuries.length === 0) return;
+  const state = getState();
+  let squad = state.squad;
+  let changed = false;
+  for (const inj of injuries) {
+    // Only mutate real squad rows; rival/synthetic injuries have no Player id.
+    if (inj.playerId === undefined && inj.teamId !== PLAYER_ID) continue;
+    const idx = squad.findIndex(
+      (p) =>
+        (inj.playerId !== undefined && p.id === inj.playerId) ||
+        (inj.playerId === undefined && p.name === inj.playerName),
+    );
+    if (idx < 0) continue;
+    const cur = squad[idx]!;
+    const weeks = Math.max(cur.injuredWeeks, inj.weeks);
+    if (weeks === cur.injuredWeeks) continue;
+    squad = squad.map((p, i) => (i === idx ? { ...p, injuredWeeks: weeks } : p));
+    changed = true;
+    bus.emit('ui:notify', {
+      text: `${cur.name} injured — out ${weeks}w`,
+      kind: 'danger',
+    });
+  }
+  if (changed) setState({ squad });
+}
 
 function sheetFor(clubId: string): TeamSheet {
   const state = getState();
@@ -55,6 +87,9 @@ export function registerPlayerMatchSystem(): void {
       awayScore: sim.awayScore,
     });
     setState({ league: applied.league });
+
+    // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
+    applyMatchInjuries(sim.injuries);
 
     const playerHome = fixture.homeId === PLAYER_ID;
     const [us, them] = playerHome
