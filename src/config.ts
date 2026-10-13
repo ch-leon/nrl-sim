@@ -10,6 +10,12 @@ export const FINALS_WEEKS = 3;       // weeks 25-27 if qualified
 export const WEEKS_PER_SEASON = SEASON_ROUNDS + FINALS_WEEKS;
 export const SQUAD_CAP = 30;
 export const SQUAD_MIN = 13;         // cannot play a match below this (club management)
+/** Points awarded to the non-forfeiting side (fit squad < SQUAD_MIN). */
+export const FORFEIT_SCORE = 24;
+/** Soft retirement age — chance ramps from here to RETIRE_HARD_AGE (GitHub #5). */
+export const RETIRE_SOFT_AGE = 34;
+/** Hard retirement age — players at/above this always retire at season rollover. */
+export const RETIRE_HARD_AGE = 38;
 /** Players on the field per side in a match (Nines trial — BAK-206 / #1). */
 export const ON_FIELD = 9;
 /** Tackles per set before a last-tackle kick (Nines trial — BAK-206 / #1). */

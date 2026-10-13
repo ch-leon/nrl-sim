@@ -53,6 +53,8 @@ src/
     economy.ts               # wages, sponsors, gate receipts         (WU-10 / BAK-188)
     training.ts              # weekly stat gains, adjacency           (WU-10 / BAK-180)
     freeagency.ts            # free agent pool gen/refresh, signing   (WU-9 / BAK-179)
+    matchday.ts              # player match of the round; SQUAD_MIN forfeit (GitHub #4)
+    aging.ts                 # season-rollover ageing + age retirement (GitHub #5)
   sim/
     engine.ts                # simulateMatch() core                   (WU-6 / BAK-191)
     events.ts                # MatchEvent types + MatchResult         (WU-6)
@@ -76,6 +78,7 @@ src/
       squad.ts               # squad list screen                      (WU-9)
       recruit.ts             # free agency screen                     (WU-9 / BAK-179)
       fixtures.ts            # fixtures + ladder screens              (WU-7 / BAK-184)
+      history.ts             # past-seasons screen + season-end toast (GitHub #3)
       build.ts               # facility build menu                    (WU-8 / BAK-178)
       matchOverlay.ts        # scoreboard/stats/commentary overlay    (WU-12 / BAK-196)
     tutorial.ts              # onboarding flow                        (WU-15 / BAK-202)
@@ -104,7 +107,10 @@ export const SEASON_ROUNDS = 24;     // home & away vs 15 rivals + repeats
 export const FINALS_WEEKS = 3;       // weeks 25-27 if qualified
 export const WEEKS_PER_SEASON = SEASON_ROUNDS + FINALS_WEEKS;
 export const SQUAD_CAP = 30;
-export const SQUAD_MIN = 13;         // cannot play a match below this (club management)
+export const SQUAD_MIN = 13;         // fewer fit than this → the player's match is forfeited
+export const FORFEIT_SCORE = 24;     // forfeit scoreline is 0–24 to the opponent
+export const RETIRE_SOFT_AGE = 34;   // retirement chance ramps 20%/yr from here…
+export const RETIRE_HARD_AGE = 38;   // …to certain retirement at this age
 export const ON_FIELD = 9;           // Nines trial (BAK-206 / GitHub #1)
 export const SET_TACKLES = 5;        // tackles per set before last-tackle kick
 export const STARTING_MONEY = 200_000;
@@ -217,6 +223,15 @@ Week tick pipeline order (WU-4, fixed): 1) training gains → 2) injuries tick �
 MatchScene) → 5) ladder update → 6) free agent pool refresh (every 4 weeks) →
 7) autosave → 8) emit `week:advanced`.
 
+Finals (weeks 25–27, GitHub #2): after the ladder step of week 24/25/26 the
+fixtures system appends the next knockout round — QF 1v8/2v7/3v6/4v5 from the
+regular-season ladder, SF re-seeded from QF winners, GF from SF winners (draws go
+to the home/higher seed). Player ties go through matchday → MatchScene like any
+round; rival ties are cheap-simmed. Finals results stamp the fixture only — the
+ladder stays the regular-season finish. At rollover the GF winner is recorded in
+`history` (headless `runFinals` catch-up if the bracket is unfinished), and
+`season:ended` carries that entry to the season-end toast.
+
 ## 6. Match simulation contract (src/sim/)
 
 ```ts
@@ -264,6 +279,13 @@ export function simulateMatch(home: TeamSheet, away: TeamSheet,
 ```
 
 `simulateMatch` must be synchronous, < 50ms, and fully deterministic per seed.
+
+Inside the sim (callers' sheets are never mutated): the home side gets a small
+attack/defence nudge (GitHub #8 — equal teams win ~52–58% at home); from minute
+60, `fitness` scales error and break weights (50 = neutral, GitHub #6); a big-hit
+can injure the ball carrier vs their `injuryRisk` (GitHub #7). The engine only
+reports injuries — matchday applies `injuredWeeks` to the player's squad and
+announces them with the result toast at full-time.
 
 ## 7. Rendering conventions
 

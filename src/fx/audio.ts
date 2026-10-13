@@ -698,8 +698,10 @@ export function initAudioUi(): void {
   };
   syncInstallVisibility();
   if (typeof window !== 'undefined') {
-    window.addEventListener('beforeinstallprompt', () => syncInstallVisibility());
-    window.addEventListener('appinstalled', () => syncInstallVisibility());
+    // initAudioUi runs before initPwa, so these fire before pwa.ts updates its
+    // deferred prompt — defer one task so canInstall() reads the new value.
+    window.addEventListener('beforeinstallprompt', () => setTimeout(syncInstallVisibility, 0));
+    window.addEventListener('appinstalled', () => setTimeout(syncInstallVisibility, 0));
   }
 
   const replayBtn = button('Replay tutorial', () => {
