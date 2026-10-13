@@ -8,7 +8,7 @@ import {
 } from '../../src/systems/aging';
 import { generatePlayer } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
-import { RETIRE_HARD_AGE, RETIRE_SOFT_AGE } from '../../src/config';
+import { RETIRE_HARD_AGE, RETIRE_SOFT_AGE, SQUAD_MIN } from '../../src/config';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { clearSeasonHooks, clearTickHooks, advanceWeeks } from '../../src/core/time';
@@ -114,5 +114,35 @@ describe('registerAgingSystem', () => {
     advanceWeeks(1);
     expect(toasts.some((t) => t.includes('Old Mate') && t.includes('retired'))).toBe(true);
     expect(getState().squad.every((p) => p.id !== 'vet')).toBe(true);
+  });
+
+  it('does not toast free-agent retirements', () => {
+    const toasts: string[] = [];
+    bus.on('ui:notify', ({ text }) => toasts.push(text));
+    setState({
+      freeAgents: [{ ...generatePlayer(makeRng(5), { age: RETIRE_HARD_AGE - 1 }), id: 'fa', name: 'Stranger Danger' }],
+      week: WEEKS_PER_SEASON,
+    });
+    registerAgingSystem();
+    advanceWeeks(1);
+    expect(getState().freeAgents.every((p) => p.id !== 'fa')).toBe(true);
+    expect(toasts.some((t) => t.includes('Stranger Danger'))).toBe(false);
+  });
+
+  it('warns when retirements drop the squad below SQUAD_MIN', () => {
+    const toasts: string[] = [];
+    bus.on('ui:notify', ({ text }) => toasts.push(text));
+    const young = Array.from({ length: SQUAD_MIN - 1 }, (_, i) => ({
+      ...generatePlayer(makeRng(100 + i), { age: 22 }),
+      id: `y${i}`,
+    }));
+    setState({
+      squad: [...young, { ...generatePlayer(makeRng(1), { age: RETIRE_HARD_AGE - 1 }), id: 'vet' }],
+      week: WEEKS_PER_SEASON,
+    });
+    registerAgingSystem();
+    advanceWeeks(1);
+    expect(getState().squad).toHaveLength(SQUAD_MIN - 1);
+    expect(toasts.some((t) => t.includes('after retirements') && t.includes(`need ${SQUAD_MIN}`))).toBe(true);
   });
 });

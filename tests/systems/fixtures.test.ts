@@ -24,7 +24,8 @@ import { createNewGame, getState, setState, type Fixture, type LadderRow, type R
 import { makeRng } from '../../src/utils/rng';
 import { bus } from '../../src/core/events';
 import { SEASON_ROUNDS } from '../../src/config';
-import { advanceWeek, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
+import { advanceWeek, advanceWeeks, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
+import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 
 beforeEach(() => {
   bus.clear();
@@ -538,5 +539,53 @@ describe('registerFixturesSystem', () => {
     advanceWeek();
     const ladder = getState().league.ladder;
     expect(ladder).toEqual(sortLadder(ladder));
+  });
+});
+
+// ── Finals through the real tick pipeline (GitHub #2) ─────────────────────────
+
+describe('playable finals via the week tick', () => {
+  it('pre-generates each finals round, plays it, and records history at rollover', () => {
+    createNewGame('Tester', 42);
+    initLeague(getState());
+    registerFixturesSystem();
+    registerPlayerMatchSystem();
+
+    advanceWeeks(SEASON_ROUNDS); // regular season done → week 25
+    let s = getState();
+    expect(s.week).toBe(SEASON_ROUNDS + 1);
+    // QF ties exist BEFORE the player advances into week 25.
+    const qf = s.league.fixtures.filter((f) => f.round === SEASON_ROUNDS + 1);
+    expect(qf).toHaveLength(4);
+    expect(qf.every((f) => !f.result)).toBe(true);
+    const ladderBefore = s.league.ladder.map((r) => ({ ...r }));
+    const posBefore = ladderPosition(s, PLAYER_ID);
+    const inFinals = posBefore <= 8;
+    expect(!!getCurrentFixture(s, PLAYER_ID)).toBe(inFinals);
+
+    advanceWeeks(1); // QF played → SF generated
+    s = getState();
+    expect(s.league.fixtures.filter((f) => f.round === SEASON_ROUNDS + 1).every((f) => !!f.result)).toBe(true);
+    expect(s.league.fixtures.filter((f) => f.round === SEASON_ROUNDS + 2)).toHaveLength(2);
+    // Knockout results never touch the regular-season ladder.
+    expect(s.league.ladder).toEqual(ladderBefore);
+
+    advanceWeeks(1); // SF played → GF generated
+    s = getState();
+    const gf = s.league.fixtures.filter((f) => f.round === SEASON_ROUNDS + 3);
+    expect(gf).toHaveLength(1);
+    const gfTeams = [gf[0]!.homeId, gf[0]!.awayId];
+
+    const ended: { premiership: boolean; ladderPosition: number }[] = [];
+    bus.on('season:ended', (e) => ended.push(e));
+    advanceWeeks(1); // GF played → rollover
+    s = getState();
+    expect(s.season).toBe(2);
+    expect(s.history).toHaveLength(1);
+    expect(s.history[0]!.ladderPosition).toBe(posBefore);
+    if (!gfTeams.includes(PLAYER_ID)) expect(s.history[0]!.premiership).toBe(false);
+    expect(ended).toEqual([{ season: 1, ladderPosition: posBefore, premiership: s.history[0]!.premiership }]);
+    // New season has no finals ties yet.
+    expect(s.league.fixtures.every((f) => f.round <= SEASON_ROUNDS)).toBe(true);
   });
 });

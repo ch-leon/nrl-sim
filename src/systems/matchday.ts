@@ -6,7 +6,7 @@ import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { FORFEIT_SCORE, SQUAD_MIN } from '../config';
-import { applyResult, getCurrentFixture, PLAYER_ID } from './fixtures';
+import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
 import type { TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
@@ -96,10 +96,15 @@ export function registerPlayerMatchSystem(): void {
     const [us, them] = playerHome
       ? [sim.homeScore, sim.awayScore]
       : [sim.awayScore, sim.homeScore];
+    // A drawn final is decided on seeding (home = higher seed advances), so say
+    // which way it went rather than leaving the player guessing.
     const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
+    const seedingNote = us === them && isFinalsRound(fixture.round)
+      ? (playerHome ? ' — through on seeding' : ' — out on seeding')
+      : '';
     const notifyResult = (): void => {
       bus.emit('ui:notify', {
-        text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}`,
+        text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
         kind: us > them ? 'success' : us < them ? 'danger' : 'info',
       });
     };

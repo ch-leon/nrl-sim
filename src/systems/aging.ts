@@ -8,7 +8,7 @@ import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
 import type { Player } from '../core/state';
 import { registerSeasonHook } from '../core/time';
-import { RETIRE_HARD_AGE, RETIRE_SOFT_AGE } from '../config';
+import { RETIRE_HARD_AGE, RETIRE_SOFT_AGE, SQUAD_MIN } from '../config';
 import { makeRng, type Rng } from '../utils/rng';
 
 export const VETERAN_AGE = 31;
@@ -99,10 +99,22 @@ export function registerAgingSystem(): void {
       freeAgents: result.freeAgents,
       rngSeed: result.rngSeed,
     });
-    for (const p of result.retired) {
+    // Only the player's own retirees are announced — free-agent pool exits are
+    // silent (a toast per stranger at every rollover is noise).
+    const squadIds = new Set(state.squad.map((p) => p.id));
+    const ownRetirees = result.retired.filter((p) => squadIds.has(p.id));
+    for (const p of ownRetirees) {
       bus.emit('ui:notify', {
         text: `${p.name} retired at ${p.age}.`,
         kind: 'info',
+      });
+    }
+    // Retirement ignores the SQUAD_MIN floor (careers end regardless), so warn
+    // the player before week 1 — below SQUAD_MIN fit, matchday forfeits (#4).
+    if (ownRetirees.length > 0 && result.squad.length < SQUAD_MIN) {
+      bus.emit('ui:notify', {
+        text: `Squad down to ${result.squad.length} after retirements — sign players (need ${SQUAD_MIN}) or forfeit.`,
+        kind: 'danger',
       });
     }
   });

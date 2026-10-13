@@ -529,6 +529,9 @@ export function initLeague(state: GameState): LeagueState {
  *     matchday via getCurrentFixture + applyResult.
  *   - 'fixtures-ladder' (order 50 / TICK_ORDER.ladder): keep the ladder sorted
  *     (defensive re-sort after all results for the round have landed).
+ *   - 'fixtures-finals-next' (order ladder+1): once the round is settled,
+ *     generate the NEXT week's finals ties (QF after R24, SF after QF, GF after
+ *     SF) so they are visible before the player advances.
  *   - season hook (order 10): record the previous season's finals outcome (or
  *     catch-up cheap-sim if unfinished), then regenerate fixtures + reset the
  *     ladder for the new season.
@@ -566,6 +569,20 @@ export function registerFixturesSystem(): void {
     const s = getState();
     if (s.league.ladder.length === 0) return;
     setState({ league: { ...s.league, ladder: sortLadder(s.league.ladder) } });
+  });
+
+  // (d) Pre-generate NEXT week's finals ties once this round's results are in,
+  // so the upcoming QF/SF/GF shows on the Fixtures screen before the player
+  // advances, and the economy hook (which runs before the match hooks) sees a
+  // home final for gate receipts. 'fixtures-finals' above stays as a fallback
+  // for saves made before this hook existed.
+  registerTickHook('fixtures-finals-next', TICK_ORDER.ladder + 1, (ctx: TickContext) => {
+    const nextWeek = ctx.week + 1;
+    if (!isFinalsRound(nextWeek)) return;
+    const s = getState();
+    if (s.league.clubs.length === 0) return;
+    const next = ensureFinalsRound({ ...s, week: nextWeek });
+    if (next.league !== s.league) setState({ league: next.league });
   });
 
   // Season rollover: record finals outcome, then regenerate the season.
