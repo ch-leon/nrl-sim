@@ -8,8 +8,35 @@ import { registerTickHook, TICK_ORDER } from '../core/time';
 import { FORFEIT_SCORE, SQUAD_MIN } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
-import type { TeamSheet } from '../sim/events';
+import type { MatchInjury, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
+
+/**
+ * Apply sim-emitted injuries onto the player squad (by id, then name) and
+ * return the toast lines to announce. Only the player's own side is applied —
+ * rivals have no GameState Player rows. The caller emits the toasts so they can
+ * be held until playback reaches full-time (same no-spoiler rule as the result).
+ * Does not touch forfeit / SQUAD_MIN / bankruptcy flows.
+ */
+function applyMatchInjuries(injuries: readonly MatchInjury[]): string[] {
+  const own = injuries.filter((inj) => inj.teamId === PLAYER_ID);
+  if (own.length === 0) return [];
+  let squad = getState().squad;
+  const toasts: string[] = [];
+  for (const inj of own) {
+    const idx = squad.findIndex((p) =>
+      inj.playerId !== undefined ? p.id === inj.playerId : p.name === inj.playerName,
+    );
+    if (idx < 0) continue;
+    const cur = squad[idx]!;
+    const weeks = Math.max(cur.injuredWeeks, inj.weeks);
+    if (weeks === cur.injuredWeeks) continue;
+    squad = squad.map((p, i) => (i === idx ? { ...p, injuredWeeks: weeks } : p));
+    toasts.push(`${cur.name} injured — out ${weeks}w`);
+  }
+  if (toasts.length > 0) setState({ squad });
+  return toasts;
+}
 
 function sheetFor(clubId: string): TeamSheet {
   const state = getState();
@@ -92,6 +119,9 @@ export function registerPlayerMatchSystem(): void {
     });
     setState({ league: applied.league });
 
+    // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
+    const injuryToasts = applyMatchInjuries(sim.injuries);
+
     const playerHome = fixture.homeId === PLAYER_ID;
     const [us, them] = playerHome
       ? [sim.homeScore, sim.awayScore]
@@ -107,6 +137,7 @@ export function registerPlayerMatchSystem(): void {
         text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
         kind: us > them ? 'success' : us < them ? 'danger' : 'info',
       });
+      for (const text of injuryToasts) bus.emit('ui:notify', { text, kind: 'danger' });
     };
 
     if (ctx.fastForward) {

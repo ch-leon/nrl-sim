@@ -260,6 +260,10 @@ export interface MatchEvent {
   detail?: string;
 }
 
+export interface MatchInjury {
+  teamId: string; playerName: string; playerId?: string; weeks: number;
+}
+
 export interface MatchResult {
   homeScore: number; awayScore: number;
   events: MatchEvent[];
@@ -267,6 +271,7 @@ export interface MatchResult {
            errors: [number, number]; tries: [number, number] };
   weather: WeatherKind;
   momentumTimeline: { t: number; value: number }[]; // -100 (away) .. +100 (home)
+  injuries: MatchInjury[]; // big-hit rolls; matchday applies to squad (GitHub #7)
 }
 
 export function simulateMatch(home: TeamSheet, away: TeamSheet,
@@ -274,6 +279,13 @@ export function simulateMatch(home: TeamSheet, away: TeamSheet,
 ```
 
 `simulateMatch` must be synchronous, < 50ms, and fully deterministic per seed.
+
+Inside the sim (callers' sheets are never mutated): the home side gets a small
+attack/defence nudge (GitHub #8 — equal teams win ~52–58% at home); from minute
+60, `fitness` scales error and break weights (50 = neutral, GitHub #6); a big-hit
+can injure the ball carrier vs their `injuryRisk` (GitHub #7). The engine only
+reports injuries — matchday applies `injuredWeeks` to the player's squad and
+announces them with the result toast at full-time.
 
 ## 7. Rendering conventions
 

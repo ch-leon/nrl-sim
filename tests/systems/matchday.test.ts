@@ -1,5 +1,5 @@
-// tests/systems/matchday.test.ts — player match tick: result toast timing +
-// SQUAD_MIN forfeit (GitHub #4).
+// tests/systems/matchday.test.ts — player match tick: result toast timing,
+// SQUAD_MIN forfeit (GitHub #4), big-hit injuries applied to squad (GitHub #7).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bus } from '../../src/core/events';
 import { createNewGame, getState, setState } from '../../src/core/state';
@@ -13,7 +13,7 @@ import {
 import { FORFEIT_SCORE, SQUAD_MIN } from '../../src/config';
 import { generatePlayer } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
-import type { Fixture } from '../../src/core/state';
+import type { Fixture, Player } from '../../src/core/state';
 import type { MatchResult } from '../../src/sim/events';
 
 function collect(): {
@@ -60,6 +60,86 @@ describe('player matchday result toast', () => {
     advanceWeeks(1);
     expect(c.started).toHaveLength(0);
     expect(c.toasts.filter((t) => t.startsWith('Round'))).toHaveLength(1);
+    c.stop();
+  });
+});
+
+describe('player matchday injuries (GitHub #7)', () => {
+  beforeEach(() => {
+    clearTickHooks();
+    clearSeasonHooks();
+    createNewGame('Tester', 7);
+    initLeague(getState());
+    registerPlayerMatchSystem();
+  });
+
+  it('applies sim injuries onto squad players and notifies', () => {
+    // Force high injuryRisk so a big-hit injury is likely across a few seeds.
+    const boosted: Player[] = getState().squad.map((p) => ({ ...p, injuryRisk: 95, injuredWeeks: 0 }));
+    setState({ squad: boosted });
+
+    let applied = false;
+    for (let attempt = 0; attempt < 40 && !applied; attempt++) {
+      clearTickHooks();
+      clearSeasonHooks();
+      createNewGame('Tester', 1000 + attempt);
+      initLeague(getState());
+      setState({
+        squad: getState().squad.map((p) => ({ ...p, injuryRisk: 95, injuredWeeks: 0 })),
+      });
+      registerPlayerMatchSystem();
+
+      const c = collect();
+      advanceWeeks(1); // fast-forward: apply + notify immediately
+      const injuredNow = getState().squad.filter((p) => p.injuredWeeks > 0);
+      if (injuredNow.length > 0) {
+        expect(c.toasts.some((t) => t.includes('injured — out'))).toBe(true);
+        for (const p of injuredNow) {
+          expect(p.injuredWeeks).toBeGreaterThanOrEqual(1);
+          expect(p.injuredWeeks).toBeLessThanOrEqual(3);
+        }
+        applied = true;
+      }
+      c.stop();
+    }
+    expect(applied).toBe(true);
+  });
+
+  it('holds injury toasts until playback finishes (no spoilers)', () => {
+    let checked = false;
+    for (let attempt = 0; attempt < 40 && !checked; attempt++) {
+      clearTickHooks();
+      clearSeasonHooks();
+      createNewGame('Tester', 1000 + attempt);
+      initLeague(getState());
+      setState({
+        squad: getState().squad.map((p) => ({ ...p, injuryRisk: 95, injuredWeeks: 0 })),
+      });
+      registerPlayerMatchSystem();
+
+      const c = collect();
+      advanceWeek(); // interactive: hands off to playback
+      if (getState().squad.some((p) => p.injuredWeeks > 0)) {
+        // Squad is already updated, but nothing is announced at kick-off.
+        expect(c.toasts.some((t) => t.includes('injured — out'))).toBe(false);
+        const { fixture, sim } = c.started[0]!;
+        bus.emit('match:finished', { fixture, result: sim });
+        expect(c.toasts.some((t) => t.includes('injured — out'))).toBe(true);
+        checked = true;
+      }
+      c.stop();
+    }
+    expect(checked).toBe(true);
+  });
+
+  it('still plays when some (not all) players are injured', () => {
+    const squad = getState().squad.map((p, i) =>
+      i < 3 ? { ...p, injuredWeeks: 2 } : { ...p, injuredWeeks: 0 },
+    );
+    setState({ squad });
+    const c = collect();
+    advanceWeek();
+    expect(c.started).toHaveLength(1);
     c.stop();
   });
 });

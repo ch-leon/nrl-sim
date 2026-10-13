@@ -7,7 +7,14 @@ import { makeRng, type Rng } from '../utils/rng';
 import { overallRating } from '../data/player';
 import { ON_FIELD, SET_TACKLES, STAT_MAX } from '../config';
 import type { Player, Position, RivalClub, WeatherKind } from '../core/state';
-import type { KickKind, MatchEvent, MatchResult, RosterEntry, TeamSheet } from './events';
+import type {
+  KickKind,
+  MatchEvent,
+  MatchInjury,
+  MatchResult,
+  RosterEntry,
+  TeamSheet,
+} from './events';
 import { mkEvent } from './events';
 import { generatedRoster, stageEvents } from './staging';
 import {
@@ -21,6 +28,13 @@ import {
 } from './weather';
 
 const clampStat = (n: number): number => Math.max(1, Math.min(STAT_MAX, n));
+
+/** Small home-ground edge (GitHub #8). Equal sheets → ~52–58% home wins. */
+const HOME_ATTACK_NUDGE = 5;
+const HOME_DEFENSE_NUDGE = 4;
+
+/** Late-match fitness window (GitHub #6): t ≥ this minute. */
+const FITNESS_LATE_T = 60;
 
 /** Build mkEvent extras without passing `player: undefined` (exactOptionalPropertyTypes). */
 function evExtra(
@@ -40,6 +54,17 @@ function toRosterEntry(p: Player): RosterEntry {
     name: p.name,
     position: p.position,
     stats: { ...p.stats },
+    id: p.id,
+    injuryRisk: p.injuryRisk,
+  };
+}
+
+/** Apply home attack/defense nudge without mutating the caller's sheet. */
+function withHomeAdvantage(sheet: TeamSheet): TeamSheet {
+  return {
+    ...sheet,
+    attack: clampStat(sheet.attack + HOME_ATTACK_NUDGE),
+    defense: clampStat(sheet.defense + HOME_DEFENSE_NUDGE),
   };
 }
 
@@ -210,10 +235,12 @@ export function simulateMatch(
   const wmods = weatherMods(weather);
 
   const events: MatchEvent[] = [];
+  const injuries: MatchInjury[] = [];
   const momentumTimeline: { t: number; value: number }[] = [];
 
+  const homeSheet = withHomeAdvantage(home);
   const homeSide: Side = {
-    sheet: home,
+    sheet: homeSheet,
     roster: home.roster && home.roster.length > 0 ? home.roster : generatedRoster(home.clubId),
     isHome: true,
     score: 0,
@@ -280,7 +307,15 @@ export function simulateMatch(
         break;
       }
 
-      const outcome = rollContest(atkDiff, momentum, possessing.isHome, wmods, rng);
+      const outcome = rollContest(
+        atkDiff,
+        momentum,
+        possessing.isHome,
+        wmods,
+        rng,
+        possessing.sheet.fitness,
+        t,
+      );
 
       if (outcome === 'error') {
         const carrier = pickActor(possessing.roster, rng, () => true, 'skill');
@@ -321,14 +356,17 @@ export function simulateMatch(
 
       if (outcome === 'big-hit') {
         const hitter = pickActor(defending.roster, rng, (p) => FORWARDS.has(p), 'strength');
+        const carrier = pickActor(possessing.roster, rng, () => true, 'skill');
         const loss = 2 + Math.floor(rng.next() * 11); // 2-12m driven back
         fieldX = clampField(fieldX - loss);
+        const inj = rollBigHitInjury(possessing.roster, carrier, atk.clubId, rng);
+        const detail = inj ? 'driven|injured' : 'driven';
+        if (inj) injuries.push(inj);
         events.push(
-          mkEvent(t, 'big-hit', def.clubId, evExtra({ x: Math.round(fieldX), y: 50, detail: 'driven' }, hitter)),
+          mkEvent(t, 'big-hit', def.clubId, evExtra({ x: Math.round(fieldX), y: 50, detail }, hitter)),
         );
         momentum = applyMomentumEvent(momentum, 'big-hit', defending.isHome);
         if (rng.next() < 0.25 * wmods.errorMult) {
-          const carrier = pickActor(possessing.roster, rng, () => true, 'skill');
           events.push(
             mkEvent(t, 'error', atk.clubId, evExtra({ x: Math.round(fieldX), y: 50, detail: 'jarred' }, carrier)),
           );
@@ -494,6 +532,7 @@ export function simulateMatch(
     },
     weather,
     momentumTimeline,
+    injuries,
   };
 }
 
@@ -612,21 +651,40 @@ function clampField(x: number): number {
   return Math.max(0, Math.min(100, x));
 }
 
+/**
+ * Late-match fitness mods (GitHub #6). fitness 50 = neutral; higher → fewer
+ * errors and better break retention after FITNESS_LATE_T.
+ */
+function fitnessContestMods(
+  fitness: number,
+  t: number,
+): { errorMult: number; breakMult: number } {
+  if (t < FITNESS_LATE_T) return { errorMult: 1, breakMult: 1 };
+  const delta = (clampStat(fitness) - 50) / 50; // ≈ −1 .. +1
+  return {
+    errorMult: Math.max(0.55, Math.min(1.55, 1 - delta * 0.4)),
+    breakMult: Math.max(0.65, Math.min(1.4, 1 + delta * 0.3)),
+  };
+}
+
 function rollContest(
   atkDiff: number,
   momentum: number,
   possIsHome: boolean,
   wmods: WeatherMods,
   rng: Rng,
+  fitness: number,
+  t: number,
 ): ContestOutcome {
   const diffShift = atkDiff * 0.12;
   const momMod = momentumWeightMod(momentum, possIsHome);
+  const fit = fitnessContestMods(fitness, t);
 
-  let breakW = (BASE_BREAK + diffShift) * wmods.breakMult * momMod;
-  let breakTackleW = (BASE_BREAK_TACKLE + diffShift * 0.5) * momMod;
+  let breakW = (BASE_BREAK + diffShift) * wmods.breakMult * momMod * fit.breakMult;
+  let breakTackleW = (BASE_BREAK_TACKLE + diffShift * 0.5) * momMod * fit.breakMult;
   let fendW = (BASE_FEND + diffShift * 0.4) * momMod;
   let tackleW = (BASE_TACKLE - diffShift * 0.3) / momMod;
-  let errorW = (BASE_ERROR - diffShift) * wmods.errorMult;
+  let errorW = (BASE_ERROR - diffShift) * wmods.errorMult * fit.errorMult;
   const penaltyW = BASE_PENALTY;
   let bigHitW = BASE_BIGHIT - diffShift * 0.3;
 
@@ -646,6 +704,28 @@ function rollContest(
   if ((r -= errorW) < 0) return 'error';
   if ((r -= penaltyW) < 0) return 'penalty';
   return 'big-hit';
+}
+
+/**
+ * Small deterministic injury chance on a big-hit vs carrier injuryRisk (GitHub #7).
+ * Returns null when the carrier walks away; weeks ∈ {1,2,3} when hurt.
+ */
+function rollBigHitInjury(
+  roster: readonly RosterEntry[],
+  carrierName: string | undefined,
+  teamId: string,
+  rng: Rng,
+): MatchInjury | null {
+  if (!carrierName) return null;
+  const entry = roster.find((p) => p.name === carrierName);
+  const risk = entry?.injuryRisk ?? 20;
+  // ~3.5% at risk 20, ~5.5% at 40, ~11.5% at 100 — rare but meaningful.
+  const chance = 0.015 + (risk / 100) * 0.1;
+  if (rng.next() >= chance) return null;
+  const weeks = 1 + Math.floor(rng.next() * 3);
+  const injury: MatchInjury = { teamId, playerName: carrierName, weeks };
+  if (entry?.id !== undefined) injury.playerId = entry.id;
+  return injury;
 }
 
 function scoreTry(side: Side, t: number, events: MatchEvent[], player?: string): void {
