@@ -12,6 +12,9 @@ describe('config constants', () => {
     expect(config.WEEKS_PER_SEASON).toBe(27);
     expect(config.SQUAD_CAP).toBe(30);
     expect(config.SQUAD_MIN).toBe(13);
+    expect(config.FORFEIT_SCORE).toBe(24);
+    expect(config.RETIRE_SOFT_AGE).toBe(34);
+    expect(config.RETIRE_HARD_AGE).toBe(38);
     expect(config.ON_FIELD).toBe(9);
     expect(config.SET_TACKLES).toBe(5);
     expect(config.STARTING_MONEY).toBe(200_000);
