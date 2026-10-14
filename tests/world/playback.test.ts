@@ -16,6 +16,7 @@ import {
   moveSpeedFactor,
   cruiseFactor,
   slotSpeeds,
+  slotRoster,
   SIM_MINUTES,
   REAL_SECONDS_AT_1X,
   type PlaybackActor,
@@ -24,7 +25,7 @@ import {
 } from '../../src/world/playback';
 import { fieldToWorldPoint, fieldOffsetX } from '../../src/scenes/matchField';
 import { HOOKER_SLOT, KICKER_SLOT, SLOTS } from '../../src/world/formation';
-import type { PlayerAnim } from '../../src/art/match/players';
+import { CELEBRATIONS, type PlayerAnim } from '../../src/art/match/players';
 import { bus } from '../../src/core/events';
 import type { MatchEvent, MatchEventKind, MatchResult } from '../../src/sim/events';
 import type { Fixture } from '../../src/core/state';
@@ -372,7 +373,7 @@ describe('PlaybackController beats', () => {
     const scorer = scene.players.home.find((a) => a.played.includes('dive'));
     expect(scorer).toBeDefined();
     expect(scorer!.x).toBeGreaterThan(line.x); // over the try-line (home attacks +x)
-    const celebrating = scene.players.home.filter((a) => a.anim === 'celebrate').length;
+    const celebrating = scene.players.home.filter((a) => CELEBRATIONS.includes(a.anim)).length;
     // Nines: 9 on field — most of the side should celebrate.
     expect(celebrating).toBeGreaterThanOrEqual(7);
   });
@@ -403,7 +404,7 @@ describe('PlaybackController beats', () => {
     ];
     const ctrl = new PlaybackController(scene, mkResult(evs, { homeScore: 4, awayScore: 22 }), FIX);
     ctrl.skip();
-    expect(scene.players.away.every((a) => a.anim === 'celebrate')).toBe(true);
+    expect(scene.players.away.every((a) => CELEBRATIONS.includes(a.anim))).toBe(true);
     expect(scene.players.home.every((a) => a.anim === 'idle')).toBe(true);
   });
 
@@ -781,5 +782,63 @@ describe('PlaybackController movement feel (#20)', () => {
       return Infinity;
     };
     expect(arrive(1.2)).toBeLessThan(arrive(0.9));
+  });
+});
+
+// ── Player variety (#21) ──────────────────────────────────────────────────────
+describe('PlaybackController celebrations (#21)', () => {
+  afterEach(() => bus.clear());
+
+  const tryAt = (t: number, y: number): MatchEvent[] => [
+    { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+    { t, kind: 'try', teamId: 'H', x: 100, y },
+    { t: 80, kind: 'full-time', teamId: 'H' },
+  ];
+
+  it('tries are celebrated in more than one way across a match', () => {
+    const seen = new Set<string>();
+    for (let k = 0; k < 12; k++) {
+      const scene = makeFakeScene('H', true);
+      // A few lead-in events shift the seed so each try draws differently.
+      const lead: MatchEvent[] = Array.from({ length: k }, (_, i) => ({ t: 1 + i * 0.1, kind: 'run', teamId: 'H', x: 50, y: 50 }));
+      const evs = [tryAt(4, 30)[0]!, ...lead, ...tryAt(4, 30).slice(1)];
+      const ctrl = new PlaybackController(scene, mkResult(evs), FIX);
+      run(ctrl, eventTimeMs(4, 1) + 4_000);
+      for (const a of scene.players.home) if (CELEBRATIONS.includes(a.anim)) seen.add(a.anim);
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(4);
+  });
+
+  it('a chest-bumping pair face each other', () => {
+    for (let k = 0; k < 20; k++) {
+      const scene = makeFakeScene('H', true);
+      const lead: MatchEvent[] = Array.from({ length: k }, (_, i) => ({ t: 1 + i * 0.1, kind: 'run', teamId: 'H', x: 50, y: 50 }));
+      const evs = [tryAt(4, 30)[0]!, ...lead, ...tryAt(4, 30).slice(1)];
+      const ctrl = new PlaybackController(scene, mkResult(evs), FIX);
+      run(ctrl, eventTimeMs(4, 1) + 4_000);
+      const pair = scene.players.home.filter((a) => a.anim === 'chestBump');
+      if (pair.length !== 2) continue;
+      const [a, b] = pair as [FakeActor, FakeActor];
+      // Each faces the other: the one on the left faces right and vice versa.
+      const left = a.x < b.x ? a : b;
+      const right = left === a ? b : a;
+      expect(left.faceLeft).toBe(false);
+      expect(right.faceLeft).toBe(true);
+      return;
+    }
+    throw new Error('no chest bump drawn in 20 seeds');
+  });
+
+  it('slotRoster gives every slot a distinct roster entry matched by role', () => {
+    const roster = [
+      { name: 'Prop Guy', position: 'prop' as const },
+      { name: 'Fullback Guy', position: 'fullback' as const },
+      { name: 'Half Guy', position: 'halfback' as const },
+    ];
+    const slots = slotRoster(roster);
+    expect(slots).toHaveLength(9);
+    expect(slots[0]?.name).toBe('Fullback Guy');
+    const named = slots.filter((e) => e !== undefined);
+    expect(new Set(named.map((e) => e!.name)).size).toBe(named.length);
   });
 });

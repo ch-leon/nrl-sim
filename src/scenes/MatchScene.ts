@@ -24,6 +24,7 @@ import type { TeamSheet, MatchResult, MatchEvent } from '../sim/events';
 import type { Fixture } from '../core/state';
 import {
   PlaybackController,
+  slotRoster,
   slotSpeeds,
   type PlaybackActor,
   type PlaybackBall,
@@ -34,7 +35,7 @@ import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchO
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { resolveKits } from '../art/match/kit';
-import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForSlot, type PlayerAnim } from '../art/match/players';
+import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForPlayer, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
   CROSSBAR_Z,
   POST_GX,
@@ -217,9 +218,17 @@ export class MatchScene extends Phaser.Scene {
     // Players + ball.
     const homeAtlas = this.art.players(`pl-${this.home.clubId}`, kits.home);
     const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayAlt ? '-alt' : ''}`, kits.away);
+    const homeSlots = slotRoster(this.home.roster);
+    const awaySlots = slotRoster(this.away.roster);
     for (let i = 0; i < PLAYERS; i++) {
-      this.players.home.push(new MatchActor(this, homeAtlas, lookForSlot(i), props.shadow));
-      this.players.away.push(new MatchActor(this, awayAtlas, lookForSlot(i + 5), props.shadow));
+      // #21: each slot wears its player's own look (stable across matches);
+      // a slot with no named player falls back to the slot cycle.
+      const h = homeSlots[i];
+      const a = awaySlots[i];
+      const homeLook = h ? lookForPlayer(h.id ?? h.name) : lookForSlot(i);
+      const awayLook = a ? lookForPlayer(a.id ?? a.name) : lookForSlot(i + 5);
+      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow));
+      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow));
     }
     this.ball = new MatchBall(this, props.ball, props.ballShadow);
     const centre = this.fieldToWorld(50, 50);
