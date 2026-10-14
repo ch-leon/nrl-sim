@@ -9,6 +9,9 @@ import {
   eventTimeMs,
   orderedEvents,
   PlaybackController,
+  KICK_FLIGHTS,
+  kickFlight,
+  flightLift,
   SIM_MINUTES,
   REAL_SECONDS_AT_1X,
   type PlaybackActor,
@@ -451,5 +454,123 @@ describe('PlaybackController anchored formation (bug: dots collapsed into one co
     // And the rendered sprites (snapped by skip) agree with the targets.
     const xs = [...scene.players.home, ...scene.players.away].map((a) => a.x);
     expect(stdev(xs)).toBeGreaterThan(80);
+  });
+});
+
+// ── Kick flights by type (#15) ─────────────────────────────────────────────────
+describe('PlaybackController kick flights (#15)', () => {
+  afterEach(() => bus.clear());
+
+  /** Kick for H at fx 45 (attacking +fx), followed by `next` in the same minute. */
+  function kickScenario(detail: string, next: MatchEvent): { scene: FakeScene; ctrl: PlaybackController; lifts: number[]; seen: string[] } {
+    const scene = makeFakeScene('H', true);
+    const evs: MatchEvent[] = [
+      { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+      { t: 10, kind: 'set-start', teamId: 'H', x: 40, y: 50 },
+      { t: 10, kind: 'kick', teamId: 'H', x: 45, y: 40, detail },
+      next,
+      { t: 80, kind: 'full-time', teamId: 'H' },
+    ];
+    const ctrl = new PlaybackController(scene, mkResult(evs), FIX);
+    const seen: string[] = [];
+    bus.on('match:event', (e) => seen.push(e.kind));
+    const lifts: number[] = [];
+    const place = scene.ball.place.bind(scene.ball);
+    scene.ball.place = (x, y, lift, depth) => {
+      if (seen.includes('kick')) lifts.push(lift);
+      place(x, y, lift, depth);
+    };
+    return { scene, ctrl, lifts, seen };
+  }
+
+  const nearest = (scene: FakeScene, x: number, y: number): { side: 'home' | 'away'; d: number } => {
+    let best = { side: 'home' as 'home' | 'away', d: Infinity };
+    for (const side of ['home', 'away'] as const) {
+      for (const a of scene.players[side]) {
+        const d = Math.hypot(a.x - x, a.y - y);
+        if (d < best.d) best = { side, d };
+      }
+    }
+    return best;
+  };
+
+  it('a bomb goes up high and slow, the kicker kicks, and the receivers claim it', () => {
+    const { scene, ctrl, lifts, seen } = kickScenario('bomb', { t: 10, kind: 'set-start', teamId: 'A', x: 75, y: 30 });
+    run(ctrl, eventTimeMs(10, 1) + 450); // set-start, kick share minute 10 with the next set
+    expect(seen).toContain('kick');
+    // The next event is held back until the bomb has come down.
+    expect(seen.filter((k) => k === 'set-start')).toHaveLength(1);
+    run(ctrl, 3_500);
+    expect(seen.filter((k) => k === 'set-start')).toHaveLength(2);
+    expect(scene.players.home.some((a) => a.played.includes('kick'))).toBe(true);
+    expect(Math.max(...lifts)).toBeGreaterThan(80);
+    // Contest: somebody leapt for it.
+    expect([...scene.players.home, ...scene.players.away].some((a) => a.played.includes('celebrate'))).toBe(true);
+  });
+
+  it('a bomb that leads to a set for the kicking side is regathered by the chaser', () => {
+    const { scene, ctrl } = kickScenario('bomb', { t: 10, kind: 'set-start', teamId: 'H', x: 72, y: 30 });
+    run(ctrl, eventTimeMs(10, 1) + 450);
+    // Stop just after landing, before the next set reshuffles possession.
+    let landed = false;
+    for (let i = 0; i < 400 && !landed; i++) {
+      run(ctrl, 16);
+      landed = scene.ball.lift === 10; // CARRY_LIFT: held again
+    }
+    expect(landed).toBe(true);
+    expect(nearest(scene, scene.ball.x, scene.ball.y).side).toBe('home');
+  });
+
+  it('a grubber stays low and bounces along the ground', () => {
+    const { ctrl, lifts } = kickScenario('grubber', { t: 10, kind: 'set-start', teamId: 'A', x: 70, y: 40 });
+    run(ctrl, eventTimeMs(10, 1) + 3_000);
+    const flight = lifts.slice(lifts.findIndex((l) => l < 2)); // after it leaves the boot
+    expect(Math.max(...flight)).toBeLessThan(12);
+    // Several touch-downs (near-zero lift) separated by hops.
+    let touches = 0;
+    for (let i = 1; i < flight.length; i++) if (flight[i - 1]! >= 1.5 && flight[i]! < 1.5) touches++;
+    expect(touches).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a find-touch kick lands over the touchline and is left dead', () => {
+    const { scene, ctrl } = kickScenario('find-touch', { t: 11, kind: 'set-start', teamId: 'A', x: 82, y: 20 });
+    // Snapshot the ball as the receiving set fires (bus emits before anything moves).
+    let atRestart: { x: number; y: number; lift: number } | null = null;
+    bus.on('match:event', (e) => {
+      if (e.kind === 'set-start' && e.teamId === 'A') atRestart = { x: scene.ball.x, y: scene.ball.y, lift: scene.ball.lift };
+    });
+    run(ctrl, eventTimeMs(11, 1) + 4_000);
+    expect(atRestart).not.toBeNull();
+    const off = fieldOffsetX();
+    const line = fieldToWorldPoint(82, 0, off);
+    const inside = fieldToWorldPoint(82, 5, off);
+    // fy < 0 lies on the far side of the fy=0 touchline from the field.
+    const outward = Math.sign(line.y - inside.y);
+    expect(Math.sign(atRestart!.y - line.y)).toBe(outward);
+    expect(atRestart!.lift).toBe(0);
+  });
+
+  it('each kick type has its own flight shape', () => {
+    expect(KICK_FLIGHTS.bomb.peak).toBeGreaterThan(KICK_FLIGHTS.chip.peak);
+    expect(KICK_FLIGHTS.bomb.dur).toBeGreaterThan(KICK_FLIGHTS.chip.dur);
+    expect(KICK_FLIGHTS.grubber.bounces).toBeGreaterThan(0);
+    expect(KICK_FLIGHTS['find-touch'].touch && KICK_FLIGHTS['40-20'].touch).toBe(true);
+    expect(kickFlight(undefined)).toBe(KICK_FLIGHTS['find-touch']);
+    expect(kickFlight('mystery')).toBe(KICK_FLIGHTS['find-touch']);
+    // Grubber hops decay and touch down; parabola peaks mid-flight.
+    expect(flightLift(0, 10, 0, 3)).toBeCloseTo(0);
+    expect(flightLift(0, 10, 1 / 3, 3)).toBeCloseTo(0, 5);
+    expect(flightLift(0, 10, 1 / 6, 3)).toBeGreaterThan(flightLift(0, 10, 5 / 6, 3));
+    expect(flightLift(0, 100, 0.5)).toBeCloseTo(100);
+  });
+
+  it('skip settles mid-kick cleanly and still finishes once', () => {
+    const { ctrl } = kickScenario('bomb', { t: 10, kind: 'set-start', teamId: 'A', x: 75, y: 30 });
+    let finished = 0;
+    bus.on('match:finished', () => finished++);
+    run(ctrl, eventTimeMs(10, 1) + 600); // mid wind-up / flight
+    ctrl.skip();
+    expect(ctrl.finished).toBe(true);
+    expect(finished).toBe(1);
   });
 });
