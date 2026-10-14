@@ -26,11 +26,12 @@ export interface PlaceValidation {
 }
 
 // Machine reasons (exact strings per spec) mapped to human copy for ui:notify.
-export type PlaceReason = 'out-of-bounds' | 'overlap' | 'insufficient-funds';
+export type PlaceReason = 'out-of-bounds' | 'overlap' | 'duplicate' | 'insufficient-funds';
 
 const REASON_TEXT: Record<PlaceReason, string> = {
   'out-of-bounds': "It won't fit there.",
   overlap: 'Something is already built there.',
+  duplicate: 'You already have one — a second earns nothing extra. Upgrade it instead.',
   'insufficient-funds': "You can't afford that.",
 };
 
@@ -59,7 +60,8 @@ export function footprintTiles(
 
 /**
  * Pure placement validation. Checks, in order: footprint fully inside the grid,
- * no overlap with an existing facility's footprint, and sufficient funds.
+ * no overlap with an existing facility's footprint, no second copy of a unique
+ * (income/gate) facility, and sufficient funds.
  * Returns the first failing reason (exact strings per spec) or { ok: true }.
  */
 export function validatePlacement(
@@ -89,6 +91,11 @@ export function validatePlacement(
     if (occupied.has(`${t.x},${t.y}`)) {
       return { ok: false, reason: 'overlap' };
     }
+  }
+
+  // Unique facilities (income/gate): a second copy would earn nothing extra.
+  if (def.unique && state.facilities.some((f) => f.defId === defId)) {
+    return { ok: false, reason: 'duplicate' };
   }
 
   // Funds — build cost is the level-1 cost.

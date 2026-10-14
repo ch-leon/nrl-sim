@@ -125,3 +125,20 @@ describe('reasonText', () => {
     expect(reasonText('???')).toBeTruthy();
   });
 });
+
+describe('validatePlacement — unique facilities', () => {
+  it('blocks a second Sponsor Board or Grandstand but allows a second non-unique facility', () => {
+    setState({
+      money: 1_000_000,
+      facilities: [
+        { id: 'a', defId: 'sponsorBoard', level: 1, x: 0, y: 0 },
+        { id: 'b', defId: 'grandstand', level: 1, x: 10, y: 10 },
+        { id: 'c', defId: 'trainingPaddock', level: 1, x: 20, y: 0 },
+      ],
+    });
+    expect(validatePlacement(getState(), 'sponsorBoard', 4, 4)).toEqual({ ok: false, reason: 'duplicate' });
+    expect(validatePlacement(getState(), 'grandstand', 4, 14)).toEqual({ ok: false, reason: 'duplicate' });
+    expect(validatePlacement(getState(), 'trainingPaddock', 4, 4)).toEqual({ ok: true });
+    expect(reasonText('duplicate')).not.toBe(reasonText('???'));
+  });
+});

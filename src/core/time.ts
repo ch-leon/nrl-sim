@@ -39,6 +39,7 @@ export const TICK_ORDER = {
   economy: 30,
   match: 40,
   ladder: 50,
+  morale: 55,
   freeagents: 60,
   autosave: 90,
 } as const;
