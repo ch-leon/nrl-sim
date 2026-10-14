@@ -54,7 +54,7 @@ export class MatchArtRegistry {
   }
 
   /**
-   * A big world-space layer split into ≤CHUNK textures, placed as Images at
+   * A big world-space layer split into ≤CHUNK(+1px overlap) textures, placed as Images at
    * `depth`. Returns the created images.
    */
   layer(keyPrefix: string, cv: Canvas3D, depth: number): Phaser.GameObjects.Image[] {
@@ -62,8 +62,10 @@ export class MatchArtRegistry {
     const { buf } = cv;
     for (let cy = 0; cy < buf.h; cy += CHUNK) {
       for (let cx = 0; cx < buf.w; cx += CHUNK) {
-        const w = Math.min(CHUNK, buf.w - cx);
-        const h = Math.min(CHUNK, buf.h - cy);
+        // Chunks overlap their right/bottom neighbour by 1px: at fractional camera
+        // zoom the quads round independently and would leave a 1px seam.
+        const w = Math.min(CHUNK + 1, buf.w - cx);
+        const h = Math.min(CHUNK + 1, buf.h - cy);
         const part = new PixelBuffer(w, h);
         // Row-wise copy (fast path: straight RGBA slices).
         for (let y = 0; y < h; y++) {
@@ -112,7 +114,7 @@ export class MatchArtRegistry {
     return {
       ball: this.texture(`${prefix}-ball`, drawBall()),
       shadow: this.texture(`${prefix}-shadow`, drawShadow(12, 5, 0.28)),
-      ballShadow: this.texture(`${prefix}-ball-shadow`, drawShadow(6, 3, 0.3)),
+      ballShadow: this.texture(`${prefix}-ball-shadow`, drawShadow(8, 4, 0.3)),
       upright: this.texture(`${prefix}-upright`, drawUpright(home)),
       crossbar: this.texture(`${prefix}-crossbar`, drawCrossbar()),
     };
