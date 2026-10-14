@@ -3,7 +3,7 @@
 // the DOM UI kit (src/ui/dom.ts). No Phaser imports. Also exports the shared
 // PlayerCard used by the squad screen.
 
-import { el, panel, button, mount, ensureStyles } from '../dom';
+import { el, panel, button, ensureStyles, openScreen, closeScreen } from '../dom';
 import { getState, type Player, type PlayerStats } from '../../core/state';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
@@ -28,11 +28,9 @@ export function ensureScreenStyles(): void {
 }
 
 const SCREEN_CSS = `
+/* Position/insets come from .nrl-screen-region (ui/dom.ts openScreen): the
+   screen sits between the HUD strip and the nav bar (GitHub #14). */
 .nrl-screen {
-  pointer-events: auto;
-  position: fixed;
-  inset: 0;
-  z-index: 50;
   display: flex;
   flex-direction: column;
   background: rgba(10, 10, 20, 0.7);
@@ -222,12 +220,11 @@ export function PlayerCard(p: Player, opts: PlayerCardOpts = {}): HTMLElement {
 
 // ── Recruit screen ──────────────────────────────────────────────────────────
 
-let recruitRoot: HTMLElement | null = null;
 let unsub: (() => void) | null = null;
 
-function closeRecruitScreen(): void {
+/** Teardown run by the shared screen slot whenever this screen closes. */
+function onRecruitClosed(): void {
   if (unsub) { unsub(); unsub = null; }
-  if (recruitRoot) { recruitRoot.remove(); recruitRoot = null; }
 }
 
 /**
@@ -240,7 +237,6 @@ function closeRecruitScreen(): void {
  */
 export function openRecruitScreen(): void {
   ensureScreenStyles();
-  closeRecruitScreen();
 
   const body = el('div', { class: 'nrl-screen-body' });
 
@@ -280,7 +276,7 @@ export function openRecruitScreen(): void {
     'div',
     { class: 'nrl-screen-head' },
     el('span', { class: 'nrl-screen-title', text: 'Free Agency' }),
-    button('CLOSE', closeRecruitScreen),
+    button('CLOSE', closeScreen),
   );
   const sub = el('div', {
     class: 'nrl-screen-sub',
@@ -288,10 +284,10 @@ export function openRecruitScreen(): void {
   });
 
   const screen = el('div', { class: 'nrl-screen' }, head, sub, body);
-  recruitRoot = screen;
+  // openScreen closes any other open screen (running its teardown) first.
+  openScreen(screen, onRecruitClosed);
   render();
   unsub = bus.on('state:changed', render);
-  mount(screen);
 }
 
 /** Map a signPlayer failure reason to player-facing copy. */

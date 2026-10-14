@@ -6,7 +6,7 @@
 import { bus } from '../core/events';
 import { getState, type GameState } from '../core/state';
 import { WEEKS_PER_SEASON } from '../config';
-import { el, button, mount, ensureStyles } from './dom';
+import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
 
 /** Options for {@link createHud}. */
 export interface HudOpts {
@@ -94,12 +94,15 @@ export function createHud(opts: HudOpts = {}): Hud {
   const offMoney = bus.on('money:changed', ({ balance }) => renderMoney(balance));
 
   mount(root);
+  // Screens sit below the HUD (GitHub #14): publish our live height.
+  const offInset = trackChromeInset(root, HUD_INSET_VAR);
 
   return {
     el: root,
     destroy() {
       offState();
       offMoney();
+      offInset();
       if (flashTimer) clearTimeout(flashTimer);
       root.remove();
     },

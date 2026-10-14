@@ -8,6 +8,7 @@ import { enableAutosave, load, showTitleFlow } from './core/save';
 import { advanceWeek } from './core/time';
 import { createHud } from './ui/hud';
 import { createNav } from './ui/nav';
+import { closeModal, closeScreen, ensureStyles } from './ui/dom';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
 import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem } from './systems/economy';
@@ -42,20 +43,18 @@ const config: Phaser.Types.Core.GameConfig = {
 const uiRoot = document.getElementById('ui-root') as HTMLElement;
 
 // Minimal toast renderer for 'ui:notify' — the §5 event every system emits;
-// no ticket owns a renderer, so the orchestrator provides one.
+// no ticket owns a renderer, so the orchestrator provides one. Placement lives
+// in the shared stylesheet (.nrl-toast-stack: just below the HUD, above open
+// screens); the match overlay re-anchors it clear of the scoreboard/stats.
 function initToasts(): void {
+  ensureStyles();
   const stack = document.createElement('div');
-  stack.style.cssText =
-    'position:absolute;top:56px;left:50%;transform:translateX(-50%);display:flex;' +
-    'flex-direction:column;gap:6px;align-items:center;pointer-events:none;z-index:50;';
+  stack.className = 'nrl-toast-stack';
   uiRoot.appendChild(stack);
-  const colors = { info: '#3a6ea5', success: '#2e7d32', danger: '#b03a2e' } as const;
   bus.on('ui:notify', ({ text, kind }) => {
     const toast = document.createElement('div');
+    toast.className = `nrl-toast nrl-toast-${kind}`;
     toast.textContent = text;
-    toast.style.cssText =
-      `background:${colors[kind]};color:#fff;border:3px solid #000;padding:6px 14px;` +
-      'font-family:"Courier New",monospace;font-size:14px;box-shadow:3px 3px 0 #000;';
     stack.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
   });
@@ -91,6 +90,10 @@ async function boot(): Promise<void> {
   // tick hook before this fires; the Match scene is pure playback. The scene's
   // own Back-to-Club button returns to Grounds at full-time.
   bus.on('match:started', ({ fixture, sim, home, away }) => {
+    // Screens stay usable alongside the HUD (Advance Week is reachable with one
+    // open), so clear any screen/dialog before the match takes over the view.
+    closeScreen();
+    closeModal();
     game.scene.stop('Grounds');
     game.scene.start('Match', { home, away, result: sim, fixture });
   });

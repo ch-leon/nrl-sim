@@ -735,13 +735,18 @@ function ensureAudioStyles(): void {
   const style = document.createElement('style');
   style.id = 'nrl-audio-styles';
   style.textContent = `
+/* Docked in the HUD strip's top-right corner: the HUD reserves room for it
+   (padding-right below), so it never overlaps Advance Week or the screen
+   region beneath the HUD (GitHub #14). In a match the HUD is hidden and the
+   overlay moves it to the bottom-right corner. */
 .nrl-audio-launcher {
   pointer-events: none;
   position: fixed;
-  top: 3rem; /* below the HUD's Advance Week button */
+  top: 0.5rem;
   right: 0.5rem;
   z-index: 20;
 }
+.nrl-hud { padding-right: 3.75rem; }
 .nrl-audio-gear { pointer-events: auto; font-size: 1.1rem; }
 .nrl-audio-settings { min-width: 220px; }
 .nrl-audio-title { margin: 0 0 0.5rem; }
