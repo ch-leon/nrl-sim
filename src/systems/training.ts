@@ -8,7 +8,7 @@
 
 import { getState, setState, type GameState, type Player, type PlacedFacility, type PlayerStats } from '../core/state';
 import { FACILITY_CATALOG, levelMult, type FacilityDef, type FacilityDefId } from '../data/facility';
-import { STAT_MAX } from '../config';
+import { STAT_MAX, TRAINING_CURVE } from '../config';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 
 /** Stats floor. Stats are clamped to [STAT_FLOOR, STAT_MAX] after each tick. */
@@ -93,6 +93,15 @@ const STAT_KEYS: readonly (keyof PlayerStats)[] = [
 const clamp = (n: number): number => Math.max(STAT_FLOOR, Math.min(STAT_MAX, n));
 
 /**
+ * Headroom factor for one stat: (1 − stat/STAT_MAX)^HEADROOM_EXP, floored at 0.
+ * Multiplies that week's gain so a stat gains less the closer it is to the
+ * ceiling (GitHub #35). Evaluated on the pre-tick stat value.
+ */
+export function headroom(stat: number): number {
+  return Math.max(0, 1 - stat / STAT_MAX) ** TRAINING_CURVE.HEADROOM_EXP;
+}
+
+/**
  * Compute one week of training for a single player against the given facilities.
  * Pure — returns a new PlayerStats; does not mutate. Exported for unit testing
  * of the exact per-player maths.
@@ -113,12 +122,13 @@ export function trainPlayer(player: Player, facilities: PlacedFacility[]): Playe
     }
   }
 
-  // 2. Scale summed gains by age × trait × injury modifiers.
-  const scale = ageMod(player.age) * traitMult(player) * injuryMult(player);
+  // 2. Scale summed gains by age × trait × injury modifiers, the tuning rate,
+  //    and each stat's headroom towards STAT_MAX.
+  const scale = ageMod(player.age) * traitMult(player) * injuryMult(player) * TRAINING_CURVE.GAIN_RATE;
 
   const next: PlayerStats = { ...player.stats };
   for (const stat of STAT_KEYS) {
-    next[stat] = next[stat] + gains[stat] * scale;
+    next[stat] = next[stat] + gains[stat] * scale * headroom(player.stats[stat]);
   }
 
   // 3. Veteran decline: age>=31 subtract flat 0.3 from speed & stamina, post-gain.
