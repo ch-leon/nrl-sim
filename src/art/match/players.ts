@@ -28,7 +28,11 @@ export type PlayerAnim =
   | 'pass'
   | 'celebrate'
   | 'dive'
-  | 'down';
+  | 'down'
+  | 'ptb'
+  | 'dummyHalf'
+  | 'fend'
+  | 'catch';
 
 export interface AnimSpec {
   frames: number;
@@ -47,6 +51,12 @@ export const PLAYER_ANIMS: Record<PlayerAnim, AnimSpec> = {
   celebrate: { frames: 2, frameRate: 5, repeat: -1 },
   dive: { frames: 2, frameRate: 6, repeat: 0 },
   down: { frames: 1, frameRate: 1, repeat: 0 },
+  // #19: play-the-ball (get up, step over, heel it back), dummy-half pick-up,
+  // straight-arm fend, and a leap for contested kicks.
+  ptb: { frames: 3, frameRate: 7, repeat: 0 },
+  dummyHalf: { frames: 2, frameRate: 6, repeat: 0 },
+  fend: { frames: 2, frameRate: 8, repeat: 0 },
+  catch: { frames: 2, frameRate: 6, repeat: 0 },
 };
 
 export const ANIM_ORDER: readonly PlayerAnim[] = [
@@ -59,6 +69,10 @@ export const ANIM_ORDER: readonly PlayerAnim[] = [
   'celebrate',
   'dive',
   'down',
+  'ptb',
+  'dummyHalf',
+  'fend',
+  'catch',
 ];
 
 // ── Looks (skin + hair), varied per formation slot ──────────────────────────
@@ -227,6 +241,31 @@ const POSES: Record<PlayerAnim, Pose[]> = {
   ],
   down: [
     { nearLeg: STAND_LEG_N, farLeg: L(1, 3, 2, 6), nearArm: L(1, -2, 2, -4), farArm: ARM_DOWN_F, rotate: 'ccw', lift: 0 },
+  ],
+  ptb: [
+    // Up off the deck: on one knee, hands still on the turf.
+    { dy: 3, lean: 2, nearLeg: L(2, 1, 0, 3), farLeg: L(-1, 2, -3, 3), nearArm: L(2, 2, 3, 4), farArm: L(1, 2, 2, 4) },
+    // Standing over the ball.
+    { lean: 1, nearLeg: L(1, 3, 1, 6), farLeg: L(-1, 3, -1, 6), nearArm: ARM_MID, farArm: L(0, 2, 1, 4) },
+    // Heel it back to the dummy-half (foot rolls the ball behind him).
+    { lean: 1, nearLeg: L(-1, 3, -4, 5), farLeg: STAND_LEG_F, nearArm: L(2, 1, 3, 2), farArm: ARM_BACK },
+  ],
+  dummyHalf: [
+    // Stooped behind the ruck, hands down at the ball.
+    { dy: 3, lean: 3, nearLeg: L(2, 2, 1, 3), farLeg: L(-2, 2, -3, 3), nearArm: L(2, 3, 3, 6), farArm: L(1, 3, 2, 6) },
+    // Rising with it, ready to fire the pass.
+    { dy: 1, lean: 1, nearLeg: L(1, 3, 2, 5), farLeg: L(-1, 3, -2, 5), nearArm: L(-1, 2, -3, 2), farArm: L(-2, 2, -4, 1) },
+  ],
+  fend: [
+    // Mid-stride with the near arm locked out at the defender.
+    { lean: 1, nearLeg: L(2, 2, 3, 6), farLeg: L(-1, 3, -3, 5), nearArm: L(3, 0, 6, -1), farArm: ARM_BACK },
+    { lean: 1, dy: -1, nearLeg: L(-1, 3, -3, 7), farLeg: L(2, 2, 2, 5), nearArm: L(3, 0, 6, 0), farArm: L(-1, 2, -2, 3) },
+  ],
+  catch: [
+    // Load: knees bent, eyes and hands up.
+    { dy: 1, nearLeg: L(1, 2, 1, 5), farLeg: L(-1, 2, -1, 5), nearArm: L(1, -3, 2, -6), farArm: L(-1, -3, -1, -6) },
+    // Airborne, arms at full stretch.
+    { dy: -3, nearLeg: L(1, 2, 2, 4), farLeg: L(-1, 3, -1, 5), nearArm: L(1, -4, 1, -7), farArm: L(0, -4, 0, -7) },
   ],
 };
 

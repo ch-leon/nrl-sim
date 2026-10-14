@@ -12,6 +12,10 @@ import {
   KICK_FLIGHTS,
   kickFlight,
   flightLift,
+  moveProgress,
+  moveSpeedFactor,
+  cruiseFactor,
+  slotSpeeds,
   SIM_MINUTES,
   REAL_SECONDS_AT_1X,
   type PlaybackActor,
@@ -19,7 +23,7 @@ import {
   type PlaybackSpeed,
 } from '../../src/world/playback';
 import { fieldToWorldPoint, fieldOffsetX } from '../../src/scenes/matchField';
-import { KICKER_SLOT } from '../../src/world/formation';
+import { HOOKER_SLOT, KICKER_SLOT, SLOTS } from '../../src/world/formation';
 import type { PlayerAnim } from '../../src/art/match/players';
 import { bus } from '../../src/core/events';
 import type { MatchEvent, MatchEventKind, MatchResult } from '../../src/sim/events';
@@ -34,6 +38,8 @@ interface FakeActor extends PlaybackActor {
   anim: PlayerAnim;
   faceLeft: boolean;
   played: PlayerAnim[];
+  /** Run-cycle time scales seen (one per frame while running). */
+  runScales: number[];
 }
 interface FakeScene extends PlaybackScene {
   shakes: number;
@@ -49,12 +55,14 @@ function actor(): FakeActor {
     anim: 'idle',
     faceLeft: false,
     played: [],
+    runScales: [],
     place(x, y, depth) {
       a.x = x;
       a.y = y;
       a.depth = depth;
     },
-    play(anim, faceLeft) {
+    play(anim, faceLeft, timeScale) {
+      if (anim === 'run') a.runScales.push(timeScale);
       if (a.played[a.played.length - 1] !== anim) a.played.push(anim);
       a.anim = anim;
       a.faceLeft = faceLeft;
@@ -306,9 +314,16 @@ describe('PlaybackController beats', () => {
     const carrier = scene.players.away.find((a) => Math.abs(a.x - spot.x) < 1 && Math.abs(a.y - spot.y) < 1);
     expect(carrier).toBeDefined();
     expect(carrier!.played).toContain('run');
-    // Everyone has arrived → idle, facing the end they attack (away faces left).
-    expect(scene.players.away.every((a) => a.anim === 'idle' && a.faceLeft)).toBe(true);
-    expect(scene.players.home.every((a) => a.anim === 'idle' && !a.faceLeft)).toBe(true);
+    // Everyone has arrived → idle, watching the ball (#20); anyone roughly level
+    // with it faces the end they attack (away faces left).
+    for (const side of ['home', 'away'] as const) {
+      for (const a of scene.players[side]) {
+        expect(a.anim).toBe('idle');
+        const dx = scene.ball.x - a.x;
+        const expected = Math.abs(dx) <= 12 ? side === 'away' : dx < 0;
+        expect(a.faceLeft).toBe(expected);
+      }
+    }
   });
 
   it('players face their direction of travel while running', () => {
@@ -504,8 +519,8 @@ describe('PlaybackController kick flights (#15)', () => {
     expect(seen.filter((k) => k === 'set-start')).toHaveLength(2);
     expect(scene.players.home.some((a) => a.played.includes('kick'))).toBe(true);
     expect(Math.max(...lifts)).toBeGreaterThan(80);
-    // Contest: somebody leapt for it.
-    expect([...scene.players.home, ...scene.players.away].some((a) => a.played.includes('celebrate'))).toBe(true);
+    // Contest: somebody leapt for it (#19 catch pose).
+    expect([...scene.players.home, ...scene.players.away].some((a) => a.played.includes('catch'))).toBe(true);
   });
 
   it('a bomb that leads to a set for the kicking side is regathered by the chaser', () => {
@@ -572,5 +587,199 @@ describe('PlaybackController kick flights (#15)', () => {
     ctrl.skip();
     expect(ctrl.finished).toBe(true);
     expect(finished).toBe(1);
+  });
+});
+
+// ── Ruck + contact animation (#19) ────────────────────────────────────────────
+describe('PlaybackController ruck and contact beats (#19)', () => {
+  afterEach(() => bus.clear());
+
+  const tackleThenRun = (kind: 'tackle' | 'big-hit'): MatchEvent[] => [
+    { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+    { t: 3, kind: 'run', teamId: 'H', x: 55, y: 50 },
+    { t: 4, kind: kind, teamId: 'A', x: 58, y: 52 },
+    { t: 5, kind: 'run', teamId: 'H', x: 62, y: 46 },
+    { t: 80, kind: 'full-time', teamId: 'H' },
+  ];
+
+  it('a tackled carrier plays the ball and the dummy-half stoops to collect it', () => {
+    const scene = makeFakeScene('H', true);
+    const ctrl = new PlaybackController(scene, mkResult(tackleThenRun('tackle')), FIX);
+    const dh = scene.players.home[HOOKER_SLOT]!;
+    let dhHeld = false;
+    const place = scene.ball.place.bind(scene.ball);
+    scene.ball.place = (x, y, lift, depth) => {
+      if (Math.hypot(x - dh.x, y - dh.y) < 9 && lift >= 3) dhHeld = true;
+      place(x, y, lift, depth);
+    };
+    run(ctrl, eventTimeMs(5, 1) + 3_000);
+    expect(scene.players.home.some((a) => a.played.includes('ptb'))).toBe(true);
+    expect(dh.played).toContain('dummyHalf');
+    // The next carry goes through the dummy-half's hands.
+    expect(dhHeld).toBe(true);
+  });
+
+  it('a big-hit drives the carrier back toward his own line', () => {
+    const spot = fieldToWorldPoint(58, 52, fieldOffsetX());
+    const lie = (kind: 'tackle' | 'big-hit'): number => {
+      const scene = makeFakeScene('H', true);
+      const ctrl = new PlaybackController(scene, mkResult(tackleThenRun(kind).slice(0, 3)), FIX);
+      run(ctrl, eventTimeMs(4, 1) + 3_000);
+      const carrier = scene.players.home.find((a) => a.played.includes('tackled'))!;
+      return carrier.x;
+    };
+    // Home attacks +x (screen-right): driven back = further left than a normal tackle.
+    expect(lie('big-hit')).toBeLessThan(lie('tackle') - 5);
+    expect(lie('tackle')).toBeCloseTo(spot.x, 0);
+  });
+
+  it('a fend: carrier straight-arms, defender is shrugged off', () => {
+    const scene = makeFakeScene('H', true);
+    const evs: MatchEvent[] = [
+      { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+      { t: 3, kind: 'fend', teamId: 'H', x: 58, y: 40 },
+      { t: 80, kind: 'full-time', teamId: 'H' },
+    ];
+    const ctrl = new PlaybackController(scene, mkResult(evs), FIX);
+    run(ctrl, eventTimeMs(3, 1) + 4_000);
+    expect(scene.players.home.some((a) => a.played.includes('fend'))).toBe(true);
+    expect(scene.players.away.some((a) => a.played.includes('tackled'))).toBe(true);
+  });
+
+  it('a break-tackle: the defender dives and misses', () => {
+    const scene = makeFakeScene('H', true);
+    const evs: MatchEvent[] = [
+      { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+      { t: 3, kind: 'break-tackle', teamId: 'H', x: 58, y: 40 },
+      { t: 80, kind: 'full-time', teamId: 'H' },
+    ];
+    const ctrl = new PlaybackController(scene, mkResult(evs), FIX);
+    run(ctrl, eventTimeMs(3, 1) + 4_000);
+    const missed = scene.players.away.find((a) => a.played.includes('tackle'));
+    expect(missed).toBeDefined();
+    expect(missed!.played).toContain('down');
+    expect(scene.players.home.some((a) => a.played.includes('fend'))).toBe(true);
+  });
+
+  it('a line break gets there faster than an ordinary carry', () => {
+    const arrival = (kind: 'run' | 'break'): number => {
+      const scene = makeFakeScene('H', true);
+      const evs: MatchEvent[] = [
+        { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+        { t: 3, kind, teamId: 'H', x: 75, y: 30 },
+        { t: 80, kind: 'full-time', teamId: 'H' },
+      ];
+      const ctrl = new PlaybackController(scene, mkResult(evs), FIX);
+      run(ctrl, eventTimeMs(3, 1));
+      const spot = fieldToWorldPoint(75, 30, fieldOffsetX());
+      for (let ms = 0; ms < 5_000; ms += 16) {
+        ctrl.update(16);
+        if (Math.abs(scene.ball.x - spot.x) <= 8 && Math.abs(scene.ball.y - spot.y) <= 1) return ms;
+      }
+      return Infinity;
+    };
+    expect(arrival('break')).toBeLessThan(arrival('run') * 0.8);
+  });
+});
+
+// ── Movement feel (#20) ───────────────────────────────────────────────────────
+describe('movement profile (#20)', () => {
+  it('moveProgress runs 0 → 1 monotonically for both profiles', () => {
+    for (const accel of [0, 0.25]) {
+      expect(moveProgress(0, accel)).toBeCloseTo(0);
+      expect(moveProgress(1, accel)).toBeCloseTo(1);
+      let prev = -1;
+      for (let u = 0; u <= 1.0001; u += 0.01) {
+        const e = moveProgress(u, accel);
+        expect(e).toBeGreaterThanOrEqual(prev - 1e-12);
+        prev = e;
+      }
+    }
+  });
+
+  it('from rest it accelerates; already running it does not; both pull up at the end', () => {
+    // From rest: slower than linear early, ~full cruise mid-move.
+    expect(moveProgress(0.05, 0.25)).toBeLessThan(0.05);
+    expect(moveSpeedFactor(0.05, 0.25)).toBeLessThan(moveSpeedFactor(0.5, 0.25));
+    // Running start: already at cruise speed (≥ average) on the first frame.
+    expect(moveSpeedFactor(0, 0)).toBeGreaterThanOrEqual(1);
+    expect(moveSpeedFactor(0, 0)).toBeCloseTo(moveSpeedFactor(0.5, 0));
+    // Both decelerate into the target.
+    expect(moveSpeedFactor(0.98, 0)).toBeLessThan(0.2);
+    expect(cruiseFactor(0.25)).toBeGreaterThan(cruiseFactor(0));
+  });
+
+  it('speed factor integrates to the progress curve', () => {
+    for (const accel of [0, 0.25]) {
+      let sum = 0;
+      const n = 4000;
+      for (let i = 0; i < n; i++) sum += moveSpeedFactor((i + 0.5) / n, accel) / n;
+      expect(sum).toBeCloseTo(1, 3);
+    }
+  });
+
+  it('slotSpeeds: outside backs out-pace props, and the speed stat matters', () => {
+    const roster = SLOTS.map((s) => ({ name: s.role, position: s.role as never, stats: { speed: 60, strength: 50, stamina: 50, skill: 50, footyIQ: 50 } }));
+    const base = slotSpeeds(roster);
+    const winger = SLOTS.findIndex((s) => s.role === 'winger');
+    const prop = SLOTS.findIndex((s) => s.role === 'prop');
+    expect(base[winger]!).toBeGreaterThan(base[prop]!);
+    const quick = roster.map((r, i) => (i === prop ? { ...r, stats: { ...r.stats, speed: 95 } } : r));
+    expect(slotSpeeds(quick)[prop]!).toBeGreaterThan(base[prop]!);
+    expect(slotSpeeds(undefined)).toHaveLength(SLOTS.length);
+    expect(slotSpeeds(roster)).toEqual(base); // deterministic
+  });
+});
+
+describe('PlaybackController movement feel (#20)', () => {
+  afterEach(() => bus.clear());
+
+  const setRetreat: MatchEvent[] = [
+    { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+    { t: 2, kind: 'set-start', teamId: 'H', x: 20, y: 50 },
+    { t: 80, kind: 'full-time', teamId: 'H' },
+  ];
+
+  it('players ease away from a standstill instead of starting at full speed', () => {
+    const scene = makeFakeScene('H', true);
+    const ctrl = new PlaybackController(scene, mkResult(setRetreat), FIX);
+    run(ctrl, eventTimeMs(2, 1) - 16);
+    const fb = scene.players.home[0]!;
+    const x0 = fb.x;
+    run(ctrl, 16 * 3); // the set fires and he sets off
+    const early = Math.abs(fb.x - x0);
+    run(ctrl, 16 * 6);
+    const later = Math.abs(fb.x - x0);
+    // Covers more in the next 6 frames than in the first 3 (accelerating).
+    expect(later - early).toBeGreaterThan(early * 2);
+  });
+
+  it('the run cycle speeds up and slows down with ground speed', () => {
+    const scene = makeFakeScene('H', true);
+    const ctrl = new PlaybackController(scene, mkResult(setRetreat), FIX);
+    run(ctrl, eventTimeMs(2, 1) + 3_000);
+    const scales = scene.players.home.flatMap((a) => a.runScales);
+    expect(scales.length).toBeGreaterThan(20);
+    expect(Math.min(...scales)).toBeGreaterThanOrEqual(0.45 - 1e-9);
+    expect(Math.max(...scales)).toBeLessThanOrEqual(1.7 + 1e-9);
+    expect(new Set(scales.map((v) => v.toFixed(2))).size).toBeGreaterThan(5);
+  });
+
+  it('a quicker player covers the same ground in less time', () => {
+    const arrive = (pace: number): number => {
+      const scene = makeFakeScene('H', true);
+      const speeds = { home: Array.from({ length: 9 }, () => pace), away: Array.from({ length: 9 }, () => 1) };
+      const ctrl = new PlaybackController(scene, mkResult(setRetreat), FIX, { speeds });
+      run(ctrl, eventTimeMs(2, 1));
+      const fb = scene.players.home[0]!;
+      let last = fb.x;
+      for (let ms = 0; ms < 6_000; ms += 16) {
+        ctrl.update(16);
+        if (ms > 100 && fb.x === last && fb.anim === 'idle') return ms;
+        last = fb.x;
+      }
+      return Infinity;
+    };
+    expect(arrive(1.2)).toBeLessThan(arrive(0.9));
   });
 });
