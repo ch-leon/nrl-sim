@@ -26,6 +26,7 @@ import { CHAR_H, CHAR_FOOT_Y } from '../art/grounds/manager';
 import { facilityOrigin } from '../art/grounds/facilities';
 import { decorLayout, surroundPaths, entranceColumn } from '../art/grounds/decor';
 import { ROUGH } from '../art/grounds/palette';
+import { GroundsLife } from './groundsLife';
 
 type Dir = 'n' | 'e' | 's' | 'w';
 
@@ -91,6 +92,8 @@ export class GroundsScene extends Phaser.Scene {
   private facilitySprites = new Map<string, Phaser.GameObjects.Image>();
   private offFacilityPlaced: (() => void) | null = null;
   private offStateChanged: (() => void) | null = null;
+  // Players, staff and fans using the facilities (#23).
+  private life: GroundsLife | null = null;
 
   constructor() {
     super('Grounds'); // scene key per ARCHITECTURE.md §7
@@ -113,12 +116,15 @@ export class GroundsScene extends Phaser.Scene {
     // (e.g. an upgrade bumps a level). Kept unsubscribed on shutdown.
     this.offFacilityPlaced = bus.on('facility:placed', () => this.renderFacilities());
     this.offStateChanged = bus.on('state:changed', () => this.renderFacilities());
+    this.life = new GroundsLife({ scene: this, walkGrid: () => this.walkGrid, cellToWorld: (gx, gy) => this.cellToWorld(gx, gy) });
 
     // Detach camera listeners + bus subs when the scene shuts down (Grounds -> Match).
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.camController.destroy();
       this.offFacilityPlaced?.();
       this.offStateChanged?.();
+      this.life?.destroy();
+      this.life = null;
       setActiveGroundsScene(null);
     });
   }
@@ -260,6 +266,7 @@ export class GroundsScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.stepCharacter(delta);
+    this.life?.update(delta);
   }
 
   private stepCharacter(delta: number): void {

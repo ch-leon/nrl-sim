@@ -297,6 +297,12 @@ announces them with the result toast at full-time.
   `tile-highlight-ok`, `tile-highlight-bad`, path/dirt edge overlays, the
   surround, `char-idle-<dir>`, `char-walk-<dir>-<frame>` (dirs n/e/s/w; anims
   `walk-<dir>`), `facility-<defId>` (anchored via `facilityOrigin`), and decor.
+- Grounds life (GitHub #23): `src/world/groundsLife.ts` (pure, seeded by season+week)
+  plans a capped cast (`MAX_AGENTS`) of squad players, staff and match-week fans
+  with looping itineraries; `src/scenes/groundsLife.ts` renders them as sprites that
+  A*-walk the scene's `WalkGrid` and sort at layer 2 like the manager. Looks are the
+  manager's frames palette-swapped (`src/art/grounds/people.ts`) from the player's
+  match look + club kit, one `life-*` strip atlas per distinct look. Presentation only.
 - Match textures (generated per match in MatchScene from `src/art/match/`, freed
   on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
   from club colours; away side switches to its alt strip on a clash), ball,
