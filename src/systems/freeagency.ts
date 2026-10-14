@@ -10,6 +10,7 @@ import { bus } from '../core/events';
 import { spendMoney } from '../data/club';
 import { generatePlayer, type Quality } from '../data/player';
 import { registerTickHook, TICK_ORDER, type TickContext } from '../core/time';
+import { SPECIAL_MAGNITUDE } from '../data/facility';
 import { SQUAD_CAP, SQUAD_MIN } from '../config';
 
 // ── Tuning constants (spec §Key interfaces) ─────────────────────────────────
@@ -28,15 +29,20 @@ export interface SignResult {
 
 // ── Quality bias ────────────────────────────────────────────────────────────
 
+function bestLevel(state: GameState, defId: 'scoutOffice' | 'academy'): number {
+  return state.facilities.reduce((m, f) => (f.defId === defId ? Math.max(m, f.level) : m), 0);
+}
+
 /**
- * Scouting bias derived from the club's built Scout Office level (0 if none) and
- * reputation. `bias = scoutLevel * 0.12 + rep / 250` (0..~0.76). Higher bias
+ * Scouting bias derived from the club's built Scout Office level (0 if none),
+ * Academy level (SPECIAL_MAGNITUDE.recruitQuality per level) and reputation.
+ * `bias = scoutLevel * 0.12 + academyLevel * 0.1 + rep / 250`. Higher bias
  * shifts the rolled quality upward toward 'average'/'star'.
  */
 function scoutBias(state: GameState): number {
-  const scout = state.facilities.find((f) => f.defId === 'scoutOffice');
-  const scoutLevel = scout ? scout.level : 0;
-  return scoutLevel * 0.12 + state.reputation / 250;
+  return bestLevel(state, 'scoutOffice') * 0.12
+    + bestLevel(state, 'academy') * SPECIAL_MAGNITUDE.recruitQuality
+    + state.reputation / 250;
 }
 
 /**

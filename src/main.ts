@@ -15,6 +15,7 @@ import { registerEconomySystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
 import { registerPlayerMatchSystem } from './systems/matchday';
 import { registerAgingSystem } from './systems/aging';
+import { registerMoraleSystem } from './systems/morale';
 import { openBuildScreen } from './ui/screens/build';
 import { openSquadScreen } from './ui/screens/squad';
 import { openRecruitScreen } from './ui/screens/recruit';
@@ -81,6 +82,7 @@ async function boot(): Promise<void> {
   registerFixturesSystem();
   registerPlayerMatchSystem();
   registerFreeAgencySystem();
+  registerMoraleSystem();
   registerAgingSystem();
 
   const game = new Phaser.Game(config);

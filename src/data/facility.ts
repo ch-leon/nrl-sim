@@ -19,6 +19,8 @@ export interface FacilityDef {
   footprint: { w: number; h: number };
   trains: Partial<PlayerStats>; // per-week stat gain at level 1 (pre-scaling)
   special?: FacilitySpecial; // non-training effect (magnitude read by systems)
+  /** Income/gate facilities earn from one copy only, so placement blocks a second (#38). */
+  unique?: boolean;
   adjacency?: { near: FacilityDefId; bonusMult: number }; // mult on this
   //                                        facility's trains when adjacent
 }
@@ -71,6 +73,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     footprint: { w: 2, h: 1 },
     trains: {},
     special: 'income',
+    unique: true,
   },
   grandstand: {
     id: 'grandstand',
@@ -79,6 +82,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     footprint: { w: 3, h: 3 },
     trains: {},
     special: 'gate',
+    unique: true,
   },
   academy: {
     id: 'academy',
@@ -130,9 +134,9 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
 export const SPECIAL_MAGNITUDE: Record<FacilitySpecial, number> = {
   income: 1500, // +$/week per Sponsor Board
   gate: 4000, // +$/week attendance uplift per Grandstand
-  recruitQuality: 0.1, // +quality bias per facility (Academy/Scout Office)
+  recruitQuality: 0.1, // +free-agent quality bias per Academy level (Scout Office uses 0.12; freeagency.ts)
   injuryRecovery: -0.5, // injuredWeeks decay accel per Physio/Medical
-  morale: 2, // +morale/week per Canteen/Coach's Office
+  morale: 1, // +morale/week per level of Canteen/Coach's Office (systems/morale.ts)
 };
 
 /** Level scaling multiplier applied to `trains` (and special magnitude). */
