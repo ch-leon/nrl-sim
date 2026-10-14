@@ -28,7 +28,15 @@ export type PlayerAnim =
   | 'pass'
   | 'celebrate'
   | 'dive'
-  | 'down';
+  | 'down'
+  | 'ptb'
+  | 'dummyHalf'
+  | 'fend'
+  | 'catch'
+  | 'kneeSlide'
+  | 'fistPump'
+  | 'point'
+  | 'chestBump';
 
 export interface AnimSpec {
   frames: number;
@@ -47,7 +55,21 @@ export const PLAYER_ANIMS: Record<PlayerAnim, AnimSpec> = {
   celebrate: { frames: 2, frameRate: 5, repeat: -1 },
   dive: { frames: 2, frameRate: 6, repeat: 0 },
   down: { frames: 1, frameRate: 1, repeat: 0 },
+  // #19: play-the-ball (get up, step over, heel it back), dummy-half pick-up,
+  // straight-arm fend, and a leap for contested kicks.
+  ptb: { frames: 3, frameRate: 7, repeat: 0 },
+  dummyHalf: { frames: 2, frameRate: 6, repeat: 0 },
+  fend: { frames: 2, frameRate: 8, repeat: 0 },
+  catch: { frames: 2, frameRate: 6, repeat: 0 },
+  // #21: try celebrations beyond the arms-up jump.
+  kneeSlide: { frames: 2, frameRate: 4, repeat: 0 },
+  fistPump: { frames: 2, frameRate: 5, repeat: -1 },
+  point: { frames: 2, frameRate: 1.5, repeat: -1 },
+  chestBump: { frames: 2, frameRate: 4, repeat: -1 },
 };
+
+/** Celebration anims a try scorer / his teammates / winners pick from (#21). */
+export const CELEBRATIONS: readonly PlayerAnim[] = ['celebrate', 'fistPump', 'point', 'kneeSlide', 'chestBump'];
 
 export const ANIM_ORDER: readonly PlayerAnim[] = [
   'idle',
@@ -59,25 +81,65 @@ export const ANIM_ORDER: readonly PlayerAnim[] = [
   'celebrate',
   'dive',
   'down',
+  'ptb',
+  'dummyHalf',
+  'fend',
+  'catch',
+  'kneeSlide',
+  'fistPump',
+  'point',
+  'chestBump',
 ];
 
 // ── Looks (skin + hair), varied per formation slot ──────────────────────────
 
+/** Head silhouettes (#21): headgear and headband take the kit's trim colour. */
+export type HairStyle = 'short' | 'buzz' | 'mullet' | 'headgear' | 'headband';
+
 export interface Look {
   skin: number;
   hair: number;
+  style: HairStyle;
+  beard: boolean;
 }
 
-const SKINS = [0xf3c9a0, 0xd59a68, 0x8a5636] as const;
-const HAIRS = [0x3a2416, 0x16141c, 0xd9b04c, 0x8a3c1c] as const;
+const SKINS = [0xf3c9a0, 0xd59a68, 0x8a5636, 0xb97a4e] as const;
+const HAIRS = [0x3a2416, 0x16141c, 0xd9b04c, 0x8a3c1c, 0x8c8a90] as const;
 
-/** Four skin/hair combinations; a team's 13 players cycle through them. */
+const look = (skin: number, hair: number, style: HairStyle = 'short', beard = false): Look => ({ skin, hair, style, beard });
+
+/**
+ * Skin × hair × style combinations. The first four are the original looks (the
+ * slot fallback still cycles them); the rest add hairstyles, beards and a
+ * fourth skin tone so a side of nine rarely repeats (#21).
+ */
 export const LOOKS: readonly Look[] = [
-  { skin: SKINS[0], hair: HAIRS[2] },
-  { skin: SKINS[1], hair: HAIRS[0] },
-  { skin: SKINS[2], hair: HAIRS[1] },
-  { skin: SKINS[0], hair: HAIRS[3] },
+  look(SKINS[0], HAIRS[2]),
+  look(SKINS[1], HAIRS[0]),
+  look(SKINS[2], HAIRS[1]),
+  look(SKINS[0], HAIRS[3]),
+  look(SKINS[3], HAIRS[1], 'buzz', true),
+  look(SKINS[0], HAIRS[0], 'mullet'),
+  look(SKINS[2], HAIRS[1], 'headgear'),
+  look(SKINS[1], HAIRS[3], 'headband', true),
+  look(SKINS[3], HAIRS[0], 'mullet', true),
+  look(SKINS[0], HAIRS[4], 'buzz'),
+  look(SKINS[1], HAIRS[1], 'headgear'),
+  look(SKINS[2], HAIRS[0], 'buzz', true),
 ];
+
+/**
+ * Stable look for a named player (#21): the same id/name always gets the same
+ * look, in every match and on every screen. FNV-1a hash → LOOKS index.
+ */
+export function lookForPlayer(key: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h % LOOKS.length;
+}
 
 /** Deterministic look index for a formation slot (0..12). */
 export function lookForSlot(slot: number): number {
@@ -88,7 +150,7 @@ export function lookForSlot(slot: number): number {
 
 // ── Grids ────────────────────────────────────────────────────────────────────
 // Head (8×8, facing right). H hair, h hair shade, L hair light, S skin,
-// s skin shade, E eye.
+// s skin shade, E eye, G/g headgear (kit trim), B headband (kit trim).
 const HEAD = [
   '..LHHHh.',
   '.LHHHHHh',
@@ -99,6 +161,25 @@ const HEAD = [
   '.hSSSSSs',
   '..sSSSs.',
 ];
+
+const HEADS: Record<HairStyle, readonly string[]> = {
+  short: HEAD,
+  buzz: ['..hhhhh.', '.hHHHHHh', 'hHHSSSSS', 'hHSSSSSS', 'hSSSSSES', 'hSsSSSSS', '.sSSSSSs', '..sSSSs.'],
+  // Business in front, party at the back (hair falls to the collar behind).
+  mullet: ['..LHHHh.', '.LHHHHHh', 'LHHHHHHH', 'HHHHSSSS', 'HHHSSSES', 'HHsSSSSS', 'hHSSSSSs', 'hhsSSSs.'],
+  headgear: ['..gGGGg.', '.gGGGGGg', 'gGGGGGGG', 'gGGGSSSS', 'gGGSSSES', 'gGsSSSSS', '.gSSSSSs', '..sSSSs.'],
+  headband: ['..LHHHh.', '.LHHHHHh', 'BBBBBBBB', 'hHHHSSSS', 'hHHSSSES', 'hHsSSSSS', '.hSSSSSs', '..sSSSs.'],
+};
+
+/** Head grid for a look: its style, with a beard along the jaw if it has one. */
+export function headGrid(lk: Look): readonly string[] {
+  const g = [...HEADS[lk.style]];
+  if (lk.beard) {
+    g[6] = '.hSHHHHh';
+    g[7] = '..hHHHh.';
+  }
+  return g;
+}
 
 // Torso (6×6, facing right). J jersey, j shade, l light, C collar (trim),
 // V chevron pixels, O hoop pixels. Pattern decides what V/O resolve to.
@@ -227,6 +308,51 @@ const POSES: Record<PlayerAnim, Pose[]> = {
   ],
   down: [
     { nearLeg: STAND_LEG_N, farLeg: L(1, 3, 2, 6), nearArm: L(1, -2, 2, -4), farArm: ARM_DOWN_F, rotate: 'ccw', lift: 0 },
+  ],
+  ptb: [
+    // Up off the deck: on one knee, hands still on the turf.
+    { dy: 3, lean: 2, nearLeg: L(2, 1, 0, 3), farLeg: L(-1, 2, -3, 3), nearArm: L(2, 2, 3, 4), farArm: L(1, 2, 2, 4) },
+    // Standing over the ball.
+    { lean: 1, nearLeg: L(1, 3, 1, 6), farLeg: L(-1, 3, -1, 6), nearArm: ARM_MID, farArm: L(0, 2, 1, 4) },
+    // Heel it back to the dummy-half (foot rolls the ball behind him).
+    { lean: 1, nearLeg: L(-1, 3, -4, 5), farLeg: STAND_LEG_F, nearArm: L(2, 1, 3, 2), farArm: ARM_BACK },
+  ],
+  dummyHalf: [
+    // Stooped behind the ruck, hands down at the ball.
+    { dy: 3, lean: 3, nearLeg: L(2, 2, 1, 3), farLeg: L(-2, 2, -3, 3), nearArm: L(2, 3, 3, 6), farArm: L(1, 3, 2, 6) },
+    // Rising with it, ready to fire the pass.
+    { dy: 1, lean: 1, nearLeg: L(1, 3, 2, 5), farLeg: L(-1, 3, -2, 5), nearArm: L(-1, 2, -3, 2), farArm: L(-2, 2, -4, 1) },
+  ],
+  fend: [
+    // Mid-stride with the near arm locked out at the defender.
+    { lean: 1, nearLeg: L(2, 2, 3, 6), farLeg: L(-1, 3, -3, 5), nearArm: L(3, 0, 6, -1), farArm: ARM_BACK },
+    { lean: 1, dy: -1, nearLeg: L(-1, 3, -3, 7), farLeg: L(2, 2, 2, 5), nearArm: L(3, 0, 6, 0), farArm: L(-1, 2, -2, 3) },
+  ],
+  kneeSlide: [
+    // On his knees, shins flat behind, leaning back with arms flung wide.
+    { dy: 4, lean: -2, nearLeg: L(1, 2, -3, 2), farLeg: L(0, 2, -4, 2), nearArm: L(2, -2, 4, -4), farArm: L(-2, -2, -4, -4) },
+    { dy: 4, lean: -1, nearLeg: L(1, 2, -3, 2), farLeg: L(0, 2, -4, 2), nearArm: L(2, -3, 3, -6), farArm: L(-2, -3, -3, -6) },
+  ],
+  fistPump: [
+    { nearLeg: L(1, 3, 2, 6), farLeg: L(-1, 3, -2, 6), nearArm: L(2, -1, 2, -4), farArm: ARM_DOWN_F },
+    { dy: 1, nearLeg: L(1, 2, 2, 5), farLeg: L(-1, 2, -2, 5), nearArm: L(2, 1, 2, -1), farArm: ARM_DOWN_F },
+  ],
+  point: [
+    // Both index fingers to the sky, then arms out to the crowd.
+    { nearLeg: L(1, 3, 1, 6), farLeg: L(-1, 3, -1, 6), nearArm: L(1, -4, 1, -7), farArm: L(0, -4, -1, -7) },
+    { nearLeg: L(1, 3, 1, 6), farLeg: L(-1, 3, -1, 6), nearArm: L(3, -1, 5, -2), farArm: L(-3, -1, -5, -2) },
+  ],
+  chestBump: [
+    // Leap, chest out, arms swept back…
+    { dy: -3, lean: -2, nearLeg: L(1, 2, 1, 4), farLeg: L(-1, 2, -2, 4), nearArm: L(-2, 1, -4, 2), farArm: L(-2, 1, -4, 1) },
+    // …and land, arms up.
+    { nearLeg: L(1, 3, 2, 6), farLeg: L(-1, 3, -2, 6), nearArm: L(2, -2, 3, -5), farArm: L(-1, -2, -2, -5) },
+  ],
+  catch: [
+    // Load: knees bent, eyes and hands up.
+    { dy: 1, nearLeg: L(1, 2, 1, 5), farLeg: L(-1, 2, -1, 5), nearArm: L(1, -3, 2, -6), farArm: L(-1, -3, -1, -6) },
+    // Airborne, arms at full stretch.
+    { dy: -3, nearLeg: L(1, 2, 2, 4), farLeg: L(-1, 3, -1, 5), nearArm: L(1, -4, 1, -7), farArm: L(0, -4, 0, -7) },
   ],
 };
 
@@ -363,8 +489,11 @@ function paintUpright(kit: Kit, look: Look, pose: Pose): PixelBuffer {
     S: col.skin,
     s: col.skinShade,
     E: 0x1c1424,
+    G: kit.trim,
+    g: shade(kit.trim, 0.72),
+    B: kit.trim,
   };
-  buf.sprite(HEAD, hPal, cx - 3 + lean, top);
+  buf.sprite([...headGrid(look)], hPal, cx - 3 + lean, top);
 
   drawArm(buf, col, nearShX, shY, pose.nearArm, false);
   return buf;

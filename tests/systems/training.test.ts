@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  ageMod, traitMult, injuryMult, adjacencyMult, levelMult,
+  ageMod, traitMult, injuryMult, adjacencyMult, levelMult, headroom,
   trainPlayer, applyTraining, applyInjuries, registerTrainingSystem,
   STAT_FLOOR, VETERAN_DECLINE,
 } from '../../src/systems/training';
@@ -9,7 +9,7 @@ import {
   type Player, type PlacedFacility, type PlayerStats,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { STAT_MAX } from '../../src/config';
+import { STAT_MAX, WEEKS_PER_SEASON } from '../../src/config';
 import {
   clearTickHooks, advanceWeek, TICK_ORDER,
 } from '../../src/core/time';
@@ -152,12 +152,13 @@ describe('trainPlayer — exact deterministic maths', () => {
     expect(trainPlayer(p, [])).toEqual(flatStats(50));
   });
 
-  it('single L1 weightsRoom trains strength by base×ageMod for prime age', () => {
-    // weightsRoom trains { strength: 2.0 }. L1 mult=1, lone adj=1, age25 mod=1.
+  it('single L1 weightsRoom trains strength by base×ageMod×rate×headroom', () => {
+    // weightsRoom trains { strength: 2.0 }. L1 mult=1, lone adj=1, age25 mod=1,
+    // GAIN_RATE 12, headroom(50) = (1 − 0.5)^2 = 0.25 → 2.0 × 12 × 0.25 = 6.0.
     const p = mkPlayer({ age: 25, stats: flatStats(50) });
     const facs = [pf({ defId: 'weightsRoom' })];
     const out = trainPlayer(p, facs);
-    expect(out.strength).toBeCloseTo(52.0, 10);
+    expect(out.strength).toBeCloseTo(56.0, 10);
     // other stats untouched
     expect(out.speed).toBe(50);
   });
@@ -165,15 +166,15 @@ describe('trainPlayer — exact deterministic maths', () => {
   it('level scaling: L2 weightsRoom → base×1.6', () => {
     const p = mkPlayer({ age: 25, stats: flatStats(50) });
     const out = trainPlayer(p, [pf({ defId: 'weightsRoom', level: 2 })]);
-    // 2.0 × 1.6 = 3.2
-    expect(out.strength).toBeCloseTo(53.2, 10);
+    // 2.0 × 1.6 × 12 × 0.25 = 9.6
+    expect(out.strength).toBeCloseTo(59.6, 10);
   });
 
   it('age curve: youth ×1.5 vs veteran ×0.25 (before veteran decline)', () => {
     const youth = mkPlayer({ age: 20, stats: flatStats(50) });
     const facs = [pf({ defId: 'weightsRoom' })];
-    // 2.0 × 1.5 = +3.0
-    expect(trainPlayer(youth, facs).strength).toBeCloseTo(53.0, 10);
+    // 2.0 × 1.5 × 12 × 0.25 = +9.0
+    expect(trainPlayer(youth, facs).strength).toBeCloseTo(59.0, 10);
   });
 
   it('adjacency raises gain: two adjacent facilities beat two apart', () => {
@@ -190,23 +191,24 @@ describe('trainPlayer — exact deterministic maths', () => {
     const gAdj = trainPlayer(p, adjacent).strength;
     const gApart = trainPlayer(p, apart).strength;
     expect(gAdj).toBeGreaterThan(gApart);
-    // exact: adjacent each 2.0×1.1 = 2.2 → sum 4.4 → 54.4 ; apart 2.0+2.0=4.0 → 54.0
-    expect(gAdj).toBeCloseTo(54.4, 10);
-    expect(gApart).toBeCloseTo(54.0, 10);
+    // exact (×12 rate, ×0.25 headroom at 50): adjacent each 2.0×1.1 = 2.2 → sum
+    // 4.4 → +13.2 → 63.2 ; apart 2.0+2.0=4.0 → +12.0 → 62.0
+    expect(gAdj).toBeCloseTo(63.2, 10);
+    expect(gApart).toBeCloseTo(62.0, 10);
   });
 
   it('trait stacking: workhorse+youngGun scales gains ×1.56', () => {
     const p = mkPlayer({ age: 25, traits: ['workhorse', 'youngGun'], stats: flatStats(50) });
     const out = trainPlayer(p, [pf({ defId: 'weightsRoom' })]);
-    // 2.0 × 1.56 = 3.12
-    expect(out.strength).toBeCloseTo(53.12, 10);
+    // 2.0 × 1.56 × 12 × 0.25 = 9.36
+    expect(out.strength).toBeCloseTo(59.36, 10);
   });
 
   it('injured player trains at ×0.3', () => {
     const p = mkPlayer({ age: 25, injuredWeeks: 3, stats: flatStats(50) });
     const out = trainPlayer(p, [pf({ defId: 'weightsRoom' })]);
-    // 2.0 × 0.3 = 0.6
-    expect(out.strength).toBeCloseTo(50.6, 10);
+    // 2.0 × 0.3 × 12 × 0.25 = 1.8
+    expect(out.strength).toBeCloseTo(51.8, 10);
   });
 
   it('veteran (31+) declines speed & stamina by 0.3/wk net of gains, no facilities', () => {
@@ -222,13 +224,20 @@ describe('trainPlayer — exact deterministic maths', () => {
     // then −0.3 decline → net +0.075.
     const vet = mkPlayer({ age: 33, stats: flatStats(50) });
     const out = trainPlayer(vet, [pf({ defId: 'trainingPaddock' })]);
-    expect(out.speed).toBeCloseTo(50 + 1.5 * 0.25 - VETERAN_DECLINE, 10);
+    // gain 1.5 × ageMod 0.25 × rate 12 × headroom(50) 0.25 = 1.125
+    expect(out.speed).toBeCloseTo(50 + 1.5 * 0.25 * 12 * headroom(50) - VETERAN_DECLINE, 10);
   });
 
-  it('clamps to STAT_MAX (100) with no overflow banking', () => {
-    const p = mkPlayer({ age: 20, stats: flatStats(99.9) });
+  it('at STAT_MAX (100) the gain is zero and the stat stays at the ceiling', () => {
+    const p = mkPlayer({ age: 20, stats: flatStats(STAT_MAX) });
     const out = trainPlayer(p, [pf({ defId: 'weightsRoom', level: 3 })]);
     expect(out.strength).toBe(STAT_MAX);
+  });
+
+  it('a near-max stat cannot overshoot STAT_MAX', () => {
+    const p = mkPlayer({ age: 20, stats: flatStats(99.9) });
+    const out = trainPlayer(p, [pf({ defId: 'weightsRoom', level: 3 })]);
+    expect(out.strength).toBeLessThanOrEqual(STAT_MAX);
   });
 
   it('clamps to STAT_FLOOR (1) — veteran with low speed cannot go below 1', () => {
@@ -247,8 +256,10 @@ describe('applyTraining over N weeks — exact accumulation', () => {
     for (let i = 0; i < 10; i++) applyTraining(getState());
 
     const out = getState().squad[0];
-    // +2.0/wk × 10 = +20 → 70
-    expect(out.stats.strength).toBeCloseTo(70, 6);
+    // Headroom shrinks each week, so 10 weeks gain less than 10 × the week-1 gain
+    // (+6.0 at stat 50 → 56) and the stat is still climbing (≈78 by hand-stepping).
+    expect(out.stats.strength).toBeGreaterThan(70);
+    expect(out.stats.strength).toBeLessThan(80);
     // all stats within range
     for (const v of Object.values(out.stats)) {
       expect(v).toBeGreaterThanOrEqual(1);
@@ -328,7 +339,7 @@ describe('pipeline ordering: training (10) before injuries (20)', () => {
     applyInjuries(getState());  // then recover
 
     const out = getState().squad[0];
-    expect(out.stats.strength).toBeCloseTo(50.6, 10); // 2.0×0.3
+    expect(out.stats.strength).toBeCloseTo(51.8, 10); // 2.0×0.3×12×0.25
     expect(out.injuredWeeks).toBe(0);
   });
 });
@@ -345,8 +356,8 @@ describe('registerTrainingSystem — hook installation', () => {
     advanceWeek();
 
     const out = getState().squad[0];
-    // trained injured (×0.3): +0.6, then injuredWeeks 2 → 1
-    expect(out.stats.strength).toBeCloseTo(50.6, 10);
+    // trained injured (×0.3): +1.8, then injuredWeeks 2 → 1
+    expect(out.stats.strength).toBeCloseTo(51.8, 10);
     expect(out.injuredWeeks).toBe(1);
   });
 
@@ -356,8 +367,76 @@ describe('registerTrainingSystem — hook installation', () => {
     registerTrainingSystem();
     registerTrainingSystem();
     advanceWeek();
-    // single +2.0, not +4.0
-    expect(getState().squad[0].stats.strength).toBeCloseTo(52.0, 10);
+    // single week's gain (+6.0 at stat 50 → 56), not doubled
+    expect(getState().squad[0].stats.strength).toBeCloseTo(56.0, 10);
+  });
+});
+
+describe('headroom — gains shrink as a stat rises (GitHub #35)', () => {
+  const gainAt = (v: number, over: Partial<Player> = {}): number =>
+    trainPlayer(mkPlayer({ age: 25, stats: flatStats(v), ...over }), [pf({ defId: 'weightsRoom' })]).strength - v;
+
+  it('headroom is 1 at zero and 0 at the ceiling', () => {
+    expect(headroom(0)).toBe(1);
+    expect(headroom(STAT_MAX)).toBe(0);
+  });
+
+  it('weekly gain falls monotonically as the stat rises', () => {
+    expect(gainAt(40)).toBeGreaterThan(gainAt(70));
+    expect(gainAt(70)).toBeGreaterThan(gainAt(90));
+    expect(gainAt(90)).toBeGreaterThan(0);
+  });
+
+  it('workhorse ×1.2 and youngGun ×1.3 still give a bonus at the same stat', () => {
+    const plain = gainAt(70);
+    expect(gainAt(70, { traits: ['workhorse'] })).toBeCloseTo(plain * 1.2, 10);
+    expect(gainAt(70, { traits: ['youngGun'] })).toBeCloseTo(plain * 1.3, 10);
+  });
+});
+
+// Representative average-band player (flat 60 overall) on one Training Paddock,
+// simulated weekly for 3 seasons. Ageing is not applied, so every season uses
+// ageMod 1.0 (ages 22–27) and the seasons are directly comparable.
+describe('projection — 3 seasons on one Training Paddock (GitHub #35)', () => {
+  // Stated ceiling: 3-season overall stays under this. Note that a Paddock trains
+  // only speed & stamina (35% of overall weight), so it cannot add more than +14
+  // from a 60 start regardless of the curve.
+  const OVERALL_CEILING = 80;
+  // Mirrors overallRating's weights, unrounded, so small season gains compare exactly.
+  const rawOverall = (s: PlayerStats): number =>
+    s.skill * 0.25 + s.footyIQ * 0.25 + s.speed * 0.2 + s.strength * 0.15 + s.stamina * 0.15;
+
+  it('season 1 gains 8–15 overall, then each season gains less than the last', () => {
+    const p = mkPlayer({ id: 'proj', age: 22, stats: flatStats(60) });
+    loadState({ ...getState(), squad: [p], facilities: [pf({ defId: 'trainingPaddock' })] });
+
+    const seasonGains: number[] = [];
+    let prev = rawOverall(getState().squad[0].stats);
+    for (let season = 0; season < 3; season++) {
+      for (let w = 0; w < WEEKS_PER_SEASON; w++) applyTraining(getState());
+      const now = rawOverall(getState().squad[0].stats);
+      seasonGains.push(now - prev);
+      prev = now;
+    }
+
+    expect(seasonGains[0]).toBeGreaterThanOrEqual(8);
+    expect(seasonGains[0]).toBeLessThanOrEqual(15);
+    expect(seasonGains[1]).toBeLessThan(seasonGains[0]);
+    expect(seasonGains[2]).toBeLessThan(seasonGains[1]);
+    expect(prev).toBeLessThan(OVERALL_CEILING);
+  });
+
+  it('is deterministic: two identical runs produce identical stats', () => {
+    const run = (): PlayerStats => {
+      loadState({
+        ...getState(),
+        squad: [mkPlayer({ id: 'det', age: 22, stats: flatStats(60) })],
+        facilities: [pf({ defId: 'trainingPaddock' })],
+      });
+      for (let w = 0; w < 3 * WEEKS_PER_SEASON; w++) applyTraining(getState());
+      return getState().squad[0].stats;
+    };
+    expect(run()).toEqual(run());
   });
 });
 

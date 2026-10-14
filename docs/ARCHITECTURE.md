@@ -296,7 +296,7 @@ announces them with the result toast at full-time.
   `tile-grass`, `tile-grass-1`, `tile-grass-2`, `tile-dirt`, `tile-path`,
   `tile-highlight-ok`, `tile-highlight-bad`, path/dirt edge overlays, the
   surround, `char-idle-<dir>`, `char-walk-<dir>-<frame>` (dirs n/e/s/w; anims
-  `walk-<dir>`), `facility-<defId>` (anchored via `facilityOrigin`), and decor.
+  `walk-<dir>`), `facility-<defId>-<level>` for levels 1-3 (anchored via `facilityOrigin`; L2 adds awning/annex/props, L3 an extra storey or lit sign, floodlights and flags; gold pips show the level), and decor.
 - Match textures (generated per match in MatchScene from `src/art/match/`, freed
   on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
   from club colours; away side switches to its alt strip on a clash), ball,
@@ -309,6 +309,13 @@ announces them with the result toast at full-time.
   additive floodlight/stand glows (71 000), crowd streamers/flashes (72 000) and
   screen-space rain/wind emitters (80 000; splashes on the ground at 9 000).
   Shared `atm-*` textures persist; the per-fixture light map is freed on shutdown.
+- Match readability (GitHub #17, `src/world/readability.ts`): default zoom 1.75 (a
+  player ≈ 36px tall at 1280×800), eased per beat (tighter at tackles/tries, wider
+  for kicks/breaks) until the player zooms by hand; a team-coloured ring under the
+  ball carrier; a ~1.5s surname tag over the sprite playback chose for the beat
+  (`PlaybackScene.focus`); a flight trail on the ball; and a slim two-line commentary
+  ticker with the full log behind a toggle. Stadium layer chunks overlap by 1px so
+  fractional zoom can't open a seam. Presentation only — no sim or event changes.
 - Scene keys: `'Boot'`, `'Grounds'`, `'Match'`. Only one world scene active at a time;
   switch via `this.scene.start(...)`. UI overlay is DOM and persists across scenes.
 

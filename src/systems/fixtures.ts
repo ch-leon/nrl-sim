@@ -25,6 +25,8 @@ import { rollWeather } from '../sim/weather';
 import { registerTickHook, registerSeasonHook, TICK_ORDER, type TickContext } from '../core/time';
 import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON } from '../config';
 import { RIVAL_CLUBS } from '../data/league';
+import { bus } from '../core/events';
+import { driftRivalStrengths, strengthChanges, applySeasonReputation } from './league';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -601,20 +603,49 @@ export function registerFixturesSystem(): void {
     const rngFinals = makeRng(s.rngSeed);
     const gfDone = roundFixtures(s, GF_ROUND).some((f) => !!f.result);
     const afterFinals = gfDone ? recordPremiership(s) : runFinals(s, rngFinals);
+    // Reputation from the season's results (ladder finish, finals, decay). The
+    // premiership bonus is already in afterFinals.reputation.
+    const playerFinals = [QF_ROUND, SF_ROUND, GF_ROUND].flatMap((r) =>
+      roundFixtures(afterFinals, r).filter((f) => f.result && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID)),
+    );
+    const grandFinal = playerFinals.find((f) => f.round === GF_ROUND);
+    const lastEntry = afterFinals.history[afterFinals.history.length - 1];
+    const rep = applySeasonReputation(afterFinals.reputation, {
+      ladderPosition: lastEntry ? lastEntry.ladderPosition : 0,
+      clubCount: s.league.clubs.length,
+      finalsWins: playerFinals.filter(
+        (f) => f.round !== GF_ROUND && knockoutWinner(f) === PLAYER_ID,
+      ).length,
+      playedGrandFinal: !!grandFinal,
+      premiership: !!lastEntry && lastEntry.premiership,
+    });
     setState({
       history: afterFinals.history,
-      reputation: afterFinals.reputation,
+      reputation: rep.reputation,
       rngSeed: gfDone ? s.rngSeed : rngFinals.state(),
     });
 
-    // Regenerate a fresh fixture list + zeroed ladder for the new season.
+    // Regenerate a fresh fixture list + zeroed ladder for the new season, and
+    // drift the rivals' strength (seeded, mean-reverting, bounded).
     const s2 = getState();
     const clubIds = s2.league.clubs.map((c) => c.id);
     const rng = makeRng(s2.rngSeed);
     const fixtures = generateFixtures(clubIds, rng);
+    const clubs = driftRivalStrengths(s2.league.clubs, rng, PLAYER_ID);
     setState({
-      league: { ...s2.league, fixtures, ladder: emptyLadder(clubIds) },
+      league: { ...s2.league, clubs, fixtures, ladder: emptyLadder(clubIds) },
       rngSeed: rng.state(),
+    });
+
+    // Tell the player why things changed (the season-end toast covers the finish).
+    const repText = rep.reputation === s.reputation
+      ? `Reputation steady at ${rep.reputation}.`
+      : `Reputation ${rep.reputation > s.reputation ? 'up' : 'down'} ${Math.abs(rep.reputation - s.reputation)} to ${rep.reputation}.`;
+    const movers = strengthChanges(s2.league.clubs, clubs).slice(0, 2)
+      .map((c) => `${c.name} ${c.to > c.from ? 'rising' : 'sliding'} (${c.from}→${c.to})`);
+    bus.emit('ui:notify', {
+      text: `${repText}${movers.length ? ` Rivals: ${movers.join(', ')}.` : ''}`,
+      kind: rep.reputation >= s.reputation ? 'success' : 'info',
     });
   });
 }

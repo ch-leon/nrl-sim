@@ -74,16 +74,22 @@ export { CROSSBAR_Z };
 
 // ── Ball ─────────────────────────────────────────────────────────────────────
 
-/** Steeden-style ball, side-on: cream leather, red panel stripe, highlight. */
+/**
+ * Steeden-style ball, side-on: cream leather, red panel stripe, highlight. 12×7
+ * inside a 1px near-black outline (14×9) so it reads against the white
+ * line markings and the crowd (#17).
+ */
 export function drawBall(): PixelBuffer {
   const rows = [
-    '..wwww..',
-    '.HwwRwws',
-    'wHwwRwss',
-    '.wwwRss.',
-    '..ssss..',
+    '...wwwwww...',
+    '.wHHwwwRwws.',
+    'wHHwwwwRwwss',
+    'wwwwwwwRwwss',
+    'wwwwwwwRwsss',
+    '.wwwwwwRssss',
+    '...ssssss...',
   ];
-  const b = new PixelBuffer(10, 7);
+  const b = new PixelBuffer(14, 9);
   b.sprite(rows, { w: 0xf3ead2, H: 0xffffff, R: 0xd8443a, s: 0xc7b48c }, 1, 1);
   b.outline(OUTLINE);
   return b;

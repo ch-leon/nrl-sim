@@ -21,15 +21,16 @@
 //
 // The class depends only on the structural PlaybackScene interface below (no
 // Phaser import), so tests drive it with a fake scene.
-import type { KickKind, MatchEvent, MatchResult } from '../sim/events';
+import type { KickKind, MatchEvent, MatchResult, RosterEntry } from '../sim/events';
 import type { Fixture } from '../core/state';
-import type { PlayerAnim } from '../art/match/players';
+import { CELEBRATIONS, type PlayerAnim } from '../art/match/players';
 import { bus } from '../core/events';
 import {
   FULLBACK_SLOT,
   HOOKER_SLOT,
   KICKER_SLOT,
   PLAYERS,
+  SLOTS,
   attackDir,
   formationTargets,
   nearestIndex,
@@ -39,6 +40,7 @@ import {
   type Phase,
   type Side,
 } from './formation';
+import { carrierMarkerTarget, nameTagFor, type NameTag } from './readability';
 
 // ── Clock constants (spec) ────────────────────────────────────────────────────
 export const SIM_MINUTES = 80;
@@ -99,6 +101,17 @@ export interface PlaybackCamera {
   shake(duration: number, intensity: number): void;
 }
 
+/**
+ * Optional readability hooks (#17): which sprite a beat used, and who holds the
+ * ball. Presentation only — the controller never reads anything back.
+ */
+export interface PlaybackFocus {
+  /** Name tag over the sprite playback picked for this beat. */
+  tag(tag: NameTag): void;
+  /** Ring target under the ball carrier in world px; null when nobody holds it. */
+  carrier(target: { side: Side; x: number; y: number } | null): void;
+}
+
 export interface PlaybackScene {
   fieldToWorld(fx: number, fy: number): { x: number; y: number };
   readonly players: { readonly home: readonly PlaybackActor[]; readonly away: readonly PlaybackActor[] };
@@ -106,6 +119,7 @@ export interface PlaybackScene {
   readonly cameras: { main: PlaybackCamera };
   /** Home team id — decides which side an event's teamId refers to. */
   readonly homeId: string;
+  readonly focus?: PlaybackFocus;
 }
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
@@ -172,11 +186,110 @@ export function flightLift(fromLift: number, peak: number, u: number, bounces = 
 
 const LYING: ReadonlySet<PlayerAnim> = new Set<PlayerAnim>(['dive', 'down', 'tackled']);
 
+// ── Ruck + contact beats (#19) ────────────────────────────────────────────────
+const PTB_MS = 420;
+const DUMMY_HALF_MS = 380;
+const FEND_MS = 300;
+/** Metres a big-hit drives the carrier back toward his own line. */
+const DRIVE_BACK = 2.5;
+/** Roll from the play-the-ball to the dummy-half before his pass goes out. */
+const PTB_ROLL_MS = 170;
+/** A line break covers ground this much faster than a normal carry. */
+const BREAK_BURST = 1.6;
+
+// ── Movement feel (#20) ──────────────────────────────────────────────────────
+/** Share of a move spent accelerating from a standstill. */
+const ACCEL_FRAC = 0.25;
+/** Share of a move spent pulling up at the target. */
+const DECEL_FRAC = 0.3;
+/** Run-cycle playback rate is scaled by ground speed, within these bounds. */
+const CADENCE_MIN = 0.45;
+const CADENCE_MAX = 1.7;
+/** Idle players turn to face the ball once it's this far to one side (px). */
+const FACE_BALL_PX = 12;
+
+/**
+ * Trapezoidal speed profile (#20): progress 0..1 at time fraction u when the
+ * first `accel` of the move speeds up from rest, the last `decel` slows to a
+ * stop and the middle cruises. accel = 0 for a player already running, so a
+ * retarget mid-run doesn't stutter. Monotonic, e(0) = 0, e(1) = 1.
+ */
+export function moveProgress(u: number, accel: number, decel = DECEL_FRAC): number {
+  const x = Math.max(0, Math.min(1, u));
+  const k = 1 / (1 - accel / 2 - decel / 2);
+  if (accel > 0 && x < accel) return (k * x * x) / (2 * accel);
+  if (x <= 1 - decel) return k * (accel / 2 + (x - accel));
+  const r = 1 - x;
+  return k * (accel / 2 + (1 - decel - accel) + (decel / 2 - (r * r) / (2 * decel)));
+}
+
+/** d(progress)/du for moveProgress — the speed relative to the move's average. */
+export function moveSpeedFactor(u: number, accel: number, decel = DECEL_FRAC): number {
+  const x = Math.max(0, Math.min(1, u));
+  const k = 1 / (1 - accel / 2 - decel / 2);
+  if (accel > 0 && x < accel) return (k * x) / accel;
+  if (x <= 1 - decel) return k;
+  return (k * (1 - x)) / decel;
+}
+
+/** Peak (cruise) speed over average speed for a profile — scales durations. */
+export function cruiseFactor(accel: number, decel = DECEL_FRAC): number {
+  return 1 / (1 - accel / 2 - decel / 2);
+}
+
+/** Position-based pace before stats: outside backs quickest, props slowest. */
+const ROLE_PACE: Readonly<Record<string, number>> = {
+  fullback: 1.06,
+  winger: 1.07,
+  centre: 1.03,
+  'five-eighth': 1.0,
+  halfback: 1.0,
+  hooker: 0.98,
+  'second-row': 0.96,
+  lock: 0.95,
+  prop: 0.92,
+};
+
+/**
+ * Per-formation-slot run-speed multipliers (#20) from a team sheet roster:
+ * each slot takes the first unused roster entry with its role (else any
+ * leftover), then pace = role factor × (0.85 + speed/100 × 0.3). A missing or
+ * stat-less roster falls back to the role factor alone. Pure + deterministic.
+ */
+export function slotSpeeds(roster?: readonly RosterEntry[]): number[] {
+  return slotRoster(roster).map((entry, i) => {
+    const role = ROLE_PACE[SLOTS[i]?.role ?? ''] ?? 1;
+    const stat = entry?.stats?.speed;
+    return stat === undefined ? role : role * (0.85 + (Math.max(1, Math.min(100, stat)) / 100) * 0.3);
+  });
+}
+
+/**
+ * Which roster entry plays each formation slot: the first unused entry with
+ * the slot's role, else any leftover; undefined when the roster runs out.
+ * Shared by pace (#20) and per-player looks (#21) so they agree.
+ */
+export function slotRoster(roster?: readonly RosterEntry[]): (RosterEntry | undefined)[] {
+  const pool = [...(roster ?? [])];
+  return SLOTS.map((slot) => {
+    let i = pool.findIndex((r) => r.position === slot.role);
+    if (i < 0) i = pool.length > 0 ? 0 : -1;
+    return i >= 0 ? pool.splice(i, 1)[0] : undefined;
+  });
+}
+
+export interface PlaybackOptions {
+  /** Run-speed multiplier per formation slot (see slotSpeeds); default 1. */
+  speeds?: Partial<Record<Side, readonly number[]>>;
+}
+
 interface Beat {
   anim: PlayerAnim;
   ms: number;
   /** Runs when this beat starts (e.g. launch the ball at the kick). */
   fn?: () => void;
+  /** Slide to this spot over the beat (a big-hit driving the carrier back). */
+  slide?: FieldPt;
 }
 
 interface Actor {
@@ -197,6 +310,18 @@ interface Actor {
   rest: PlayerAnim;
   anim: PlayerAnim;
   faceLeft: boolean;
+  /** Run-speed multiplier from the player's pace (#20). */
+  pace: number;
+  /** Acceleration share of the current move (0 when already running). */
+  accel: number;
+  /** Run-cycle rate for this frame, from current ground speed (#20). */
+  cadence: number;
+  /** In-progress beat slide (big-hit drive-back, fend stumble). */
+  slide: { from: FieldPt; to: FieldPt; t0: number; dur: number } | null;
+  /** Formation updates leave this actor alone until then (ruck/contact beats). */
+  busyUntil: number;
+  /** Fixed facing while resting (e.g. squared up for a chest bump); null = auto. */
+  restFace: boolean | null;
 }
 
 type BallState =
@@ -240,10 +365,12 @@ export class PlaybackController {
   private ballState: BallState;
   private pending: Pending[] = [];
   private seed = 0;
+  /** Sprite the current event's handler picked as its actor (for the name tag). */
+  private tagged: Actor | null = null;
   /** +1 when increasing fx moves right on screen (home faces right at rest). */
   private readonly screenDir: number;
 
-  constructor(scene: PlaybackScene, result: MatchResult, fixture?: Fixture) {
+  constructor(scene: PlaybackScene, result: MatchResult, fixture?: Fixture, opts: PlaybackOptions = {}) {
     this.scene = scene;
     this.result = result;
     this.events = orderedEvents(result.events);
@@ -270,6 +397,12 @@ export class PlaybackController {
           rest: 'idle',
           anim: 'idle',
           faceLeft: this.restFaceLeft(side),
+          pace: opts.speeds?.[side]?.[slot] ?? 1,
+          accel: ACCEL_FRAC,
+          cadence: 1,
+          slide: null,
+          busyUntil: 0,
+          restFace: null,
         };
       });
     this.actors = { home: mk('home'), away: mk('away') };
@@ -392,6 +525,7 @@ export class PlaybackController {
     // 1. Emit on the bus FIRST so the overlay/score update in lockstep.
     bus.emit('match:event', ev);
     this.seed++;
+    this.tagged = null;
 
     // 2. Formation + beat for the event kind.
     const side = this.sideOf(ev.teamId);
@@ -411,7 +545,7 @@ export class PlaybackController {
         if (at) {
           const phase =
             ev.kind === 'break' || ev.kind === 'break-tackle' ? 'break' : 'open';
-          this.onPlay(side, at, phase, null);
+          this.onPlay(side, at, phase, null, ev.kind);
         }
         break;
       case 'kick':
@@ -452,6 +586,10 @@ export class PlaybackController {
       default:
         break;
     }
+    if (!instant && this.tagged) {
+      const tag = nameTagFor(ev, this.tagged);
+      if (tag) this.scene.focus?.tag(tag);
+    }
     if (instant) this.settle();
   }
 
@@ -460,7 +598,8 @@ export class PlaybackController {
     const t = formationTargets({ attacking, ball, phase, seed: this.seed });
     for (const side of ['home', 'away'] as const) {
       this.actors[side].forEach((a, i) => {
-        if (except.includes(a)) return;
+        // Players mid play-the-ball / contact beat finish it first (#19).
+        if (except.includes(a) || a.busyUntil > this.vis) return;
         this.moveTo(a, t[side][i] ?? a.to);
       });
     }
@@ -495,14 +634,58 @@ export class PlaybackController {
    * rotating runner takes the ball — a quick pass from the current holder — and
    * runs to the event spot.
    */
-  private onPlay(attacking: Side, at: FieldPt, phase: Phase, carrierSlot: number | null): void {
+  private onPlay(
+    attacking: Side,
+    at: FieldPt,
+    phase: Phase,
+    carrierSlot: number | null,
+    kind: MatchEvent['kind'] = 'run',
+  ): void {
     const t = formationTargets({ attacking, ball: at, phase, seed: this.seed });
-    const slot = carrierSlot ?? pickRunner(t[attacking], at, this.seed);
+    let slot = carrierSlot ?? pickRunner(t[attacking], at, this.seed);
+    // Don't hand it to someone still getting up from the last tackle.
+    if (carrierSlot === null && (this.actors[attacking][slot]?.busyUntil ?? 0) > this.vis) {
+      const busy = this.actors[attacking].filter((a) => a.busyUntil > this.vis).map((a) => a.slot);
+      const alt = nearestIndex(t[attacking], at, [...busy, HOOKER_SLOT]);
+      if (alt >= 0) slot = alt;
+    }
     const carrier = this.actors[attacking][slot];
-    this.applyFormation(attacking, at, phase, carrier ? [carrier] : []);
+    const defending = otherSide(attacking);
+    const contact = kind === 'fend' || kind === 'break-tackle';
+    const defender = contact ? this.actors[defending][nearestIndex(t[defending], at, [HOOKER_SLOT])] : undefined;
+    this.applyFormation(attacking, at, phase, [carrier, defender].filter((a): a is Actor => !!a));
     if (!carrier) return;
-    this.moveTo(carrier, at);
+    this.tagged = carrier;
+    const dir = attackDir(attacking);
+    if (contact) {
+      // #19: straight-arm fend; the defender is shrugged off / dives and misses.
+      this.moveTo(carrier, at, [{ anim: 'fend', ms: FEND_MS }]);
+      if (defender) {
+        const meet = { fx: at.fx + dir * 1.2, fy: at.fy + 0.8 };
+        const beaten =
+          kind === 'fend'
+            ? [{ anim: 'tackled' as const, ms: 280, slide: { fx: meet.fx + dir * 1.2, fy: meet.fy + 1 } }]
+            : [
+                { anim: 'tackle' as const, ms: 300, slide: { fx: meet.fx - dir * 0.6, fy: meet.fy + 1.5 } },
+                { anim: 'down' as const, ms: 260 },
+              ];
+        this.moveTo(defender, meet, beaten);
+        this.markBusy(defender, beaten);
+      }
+    } else {
+      this.moveTo(carrier, at);
+    }
+    if (kind === 'break') {
+      // Line break: a burst of pace (and a quicker run cycle to match).
+      carrier.dur = Math.max(MIN_MOVE_MS, carrier.dur / BREAK_BURST);
+    }
     this.giveBall(carrier);
+  }
+
+  /** Keep `a` out of formation updates until its queued beats have played. */
+  private markBusy(a: Actor, beats: readonly Beat[]): void {
+    const arrive = a.moving ? Math.max(this.vis, a.t0) + a.dur : Math.max(this.vis, a.lockUntil);
+    a.busyUntil = arrive + beats.reduce((n, b) => n + b.ms, 0);
   }
 
   /**
@@ -522,6 +705,7 @@ export class PlaybackController {
     const held = this.ballState.mode === 'held' && this.ballState.holder.side === side ? this.ballState.holder : null;
     const kicker = held ?? this.actors[side][KICKER_SLOT];
     if (!kicker) return 0;
+    this.tagged = kicker;
     const chaser = flight.touch ? undefined : this.actors[side][nearestIndex(t[side], land.p, [kicker.slot])];
     const defender = flight.touch
       ? this.actors[def][nearestIndex(t[def], { fx: land.p.fx, fy: Math.max(5, Math.min(95, land.p.fy)) })]
@@ -548,7 +732,7 @@ export class PlaybackController {
         then: claimer ?? null,
       };
       const dir = attackDir(side);
-      const leap: Beat[] = flight.contest ? [{ anim: 'celebrate', ms: CATCH_BEAT_MS }] : [];
+      const leap: Beat[] = flight.contest ? [{ anim: 'catch', ms: CATCH_BEAT_MS }] : [];
       const contesters: [Actor | undefined, FieldPt][] = [
         [chaser, { fx: land.p.fx - dir * 1.2, fy: land.p.fy + 1.5 }],
         [defender, flight.touch ? { fx: land.p.fx, fy: land.p.fy < 50 ? 4 : 96 } : { ...land.p }],
@@ -616,25 +800,43 @@ export class PlaybackController {
     const held = this.ballState.mode === 'held' && this.ballState.holder.side === attacking ? this.ballState.holder : null;
     const carrier = held ?? this.actors[attacking][nearestIndex(t[attacking], at)];
     const tackler = this.actors[defending][nearestIndex(t[defending], at, [HOOKER_SLOT])];
+    this.tagged = tackler ?? null; // the event names the hitter, not the carrier
     this.applyFormation(attacking, at, 'open', [carrier, tackler].filter((a): a is Actor => !!a));
+    const dir = attackDir(attacking);
+    // #19: a big-hit drives the carrier (and his tackler) back toward his line.
+    const back = big ? -dir * DRIVE_BACK : 0;
+    const groundAt = { fx: at.fx + back, fy: at.fy };
     if (carrier) {
-      this.moveTo(carrier, at, [
-        { anim: 'tackled', ms: big ? 520 : 380 },
+      const beats: Beat[] = [
+        { anim: 'tackled', ms: big ? 520 : 380, ...(big ? { slide: groundAt } : {}) },
         { anim: 'down', ms: big ? 380 : 220 },
-      ]);
+        // Up, step over it and heel it back to the dummy-half.
+        { anim: 'ptb', ms: PTB_MS },
+      ];
+      this.moveTo(carrier, at, beats);
+      this.markBusy(carrier, beats);
       this.giveBall(carrier);
     }
     if (tackler) {
-      const dir = attackDir(attacking);
-      this.moveTo(tackler, { fx: at.fx + dir * 1.4, fy: at.fy + 1 }, [
-        { anim: 'tackle', ms: 360 },
+      const tAt = { fx: at.fx + dir * 1.4, fy: at.fy + 1 };
+      const beats: Beat[] = [
+        { anim: 'tackle', ms: 360, ...(big ? { slide: { fx: tAt.fx + back, fy: tAt.fy } } : {}) },
         { anim: 'down', ms: big ? 360 : 200 },
-      ]);
+      ];
+      this.moveTo(tackler, tAt, beats);
+    }
+    // Dummy-half gets in behind the ruck and stoops over the ball.
+    const dummyHalf = this.actors[attacking][HOOKER_SLOT];
+    if (dummyHalf && dummyHalf !== carrier) {
+      const beats: Beat[] = [{ anim: 'dummyHalf', ms: DUMMY_HALF_MS }];
+      this.moveTo(dummyHalf, { fx: groundAt.fx - dir * 1.6, fy: groundAt.fy + 0.6 }, beats);
+      this.markBusy(dummyHalf, beats);
     }
     if (!instant) this.scene.cameras.main.shake(120, big ? 0.006 : 0.003);
   }
 
   private onError(side: Side, at: FieldPt): void {
+    if (this.ballState.mode === 'held' && this.ballState.holder.side === side) this.tagged = this.ballState.holder;
     this.applyFormation(side, at, 'open');
     const from = this.ballPoint();
     const dir = attackDir(side);
@@ -650,25 +852,53 @@ export class PlaybackController {
     const held = this.ballState.mode === 'held' && this.ballState.holder.side === side ? this.ballState.holder : null;
     const others = this.actors[side].map((a) => a.pos);
     const scorer = held ?? this.actors[side][nearestIndex(others, spot)];
+    this.tagged = scorer ?? null;
     // Defenders trudge back under the posts.
     const t = formationTargets({ attacking: side, ball: spot, phase: 'goal-kick', seed: this.seed });
     this.actors[otherSide(side)].forEach((a, i) => this.moveTo(a, t[otherSide(side)][i] ?? a.to));
-    // Teammates swarm the scorer and celebrate.
-    this.actors[side].forEach((a, i) => {
-      if (a === scorer) return;
-      const near = {
-        fx: goal + dir * (1 + this.wobble(i * 3) * 6) - dir * 4,
-        fy: fy + (this.wobble(i * 3 + 1) - 0.5) * 22,
-      };
-      this.moveTo(a, near, [], 'celebrate');
+    // #21: the scorer gets his own celebration; teammates either mob him in a
+    // tight huddle or fan out celebrating — with a chest-bumping pair.
+    const huddle = this.wobble(41) < 0.4;
+    const mates = this.actors[side].filter((a) => a !== scorer);
+    mates.forEach((a, i) => {
+      const near = huddle
+        ? {
+            fx: spot.fx - dir * (1.5 + Math.cos(i * 0.9) * 1.6),
+            fy: fy + Math.sin(i * 0.9) * 3.2,
+          }
+        : {
+            fx: goal + dir * (1 + this.wobble(i * 3) * 6) - dir * 4,
+            fy: fy + (this.wobble(i * 3 + 1) - 0.5) * 22,
+          };
+      const rest = huddle ? (i % 2 === 0 ? 'celebrate' : 'fistPump') : this.pickCelebration(i * 5 + 2, ['kneeSlide']);
+      this.moveTo(a, near, [], rest);
     });
+    if (!huddle && mates.length >= 2) {
+      // Two of them square up for a chest bump.
+      const [a, b] = [mates[0]!, mates[1]!];
+      const mid = { ...a.to };
+      const pa = { fx: mid.fx - 0.9, fy: mid.fy };
+      const pb = { fx: mid.fx + 0.9, fy: mid.fy };
+      this.moveTo(a, pa, [], 'chestBump');
+      this.moveTo(b, pb, [], 'chestBump');
+      const wa = this.scene.fieldToWorld(pa.fx, pa.fy).x;
+      const wb = this.scene.fieldToWorld(pb.fx, pb.fy).x;
+      a.restFace = wb < wa;
+      b.restFace = wa < wb;
+    }
     if (scorer) {
       this.moveTo(scorer, spot, [
         { anim: 'dive', ms: 420 },
         { anim: 'down', ms: 320 },
-      ], 'celebrate');
+      ], this.pickCelebration(7, ['chestBump']));
       this.giveBall(scorer);
     }
+  }
+
+  /** Deterministic celebration pick for this event (#21). */
+  private pickCelebration(k: number, exclude: readonly PlayerAnim[] = []): PlayerAnim {
+    const pool = CELEBRATIONS.filter((c) => !exclude.includes(c));
+    return pool[Math.floor(this.wobble(k) * pool.length) % pool.length] ?? 'celebrate';
   }
 
   private onGoalKick(side: Side, at: FieldPt | null, missed: boolean): void {
@@ -676,6 +906,7 @@ export class PlaybackController {
     const spot = at ?? { fx: (dir > 0 ? 100 : 0) - dir * 10, fy: 50 };
     this.applyFormation(side, spot, 'goal-kick');
     const kicker = this.actors[side][KICKER_SLOT];
+    this.tagged = kicker ?? null;
     // Ball is placed on the tee at the mark.
     const from = this.ballPoint();
     this.ballState = { mode: 'flight', from: from.p, fromLift: from.lift, to: spot, t0: this.vis, dur: 260, peak: 6, then: null };
@@ -689,6 +920,7 @@ export class PlaybackController {
     const held = this.ballState.mode === 'held' ? this.ballState.holder : null;
     const kicker = held && held.side === side ? held : this.actors[side][KICKER_SLOT];
     if (!kicker) return;
+    this.tagged = kicker;
     const from = { ...kicker.pos };
     this.beat(kicker, [{ anim: 'kick', ms: 520, fn: () => this.later(160, () => this.kickAtPosts(side, from, false)) }]);
   }
@@ -720,10 +952,10 @@ export class PlaybackController {
     const { homeScore, awayScore } = this.result;
     const winner: Side | null = homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : null;
     for (const side of ['home', 'away'] as const) {
-      for (const a of this.actors[side]) {
-        a.rest = side === winner ? 'celebrate' : 'idle';
+      this.actors[side].forEach((a, i) => {
+        a.rest = side === winner ? this.pickCelebration(i * 7 + 3, ['kneeSlide', 'chestBump']) : 'idle';
         this.moveTo(a, a.pos, [], a.rest);
-      }
+      });
     }
   }
 
@@ -735,14 +967,20 @@ export class PlaybackController {
     const wa = this.scene.fieldToWorld(a.pos.fx, a.pos.fy);
     const wb = this.scene.fieldToWorld(to.fx, to.fy);
     const dist = Math.hypot(wb.x - wa.x, wb.y - wa.y);
+    // Already running → carry the pace (no fresh acceleration); from rest → ramp up.
+    a.accel = a.moving && a.anim === 'run' ? 0 : ACCEL_FRAC;
     a.from = { ...a.pos };
     a.to = { ...to };
     a.t0 = start;
-    a.dur = Math.max(MIN_MOVE_MS, Math.min(MAX_MOVE_MS, dist / RUN_PX_PER_MS));
+    a.dur = Math.max(
+      MIN_MOVE_MS,
+      Math.min(MAX_MOVE_MS, (dist / (RUN_PX_PER_MS * a.pace)) * cruiseFactor(a.accel)),
+    );
     a.moving = dist > 0.5;
     if (Math.abs(wb.x - wa.x) > 0.5) a.faceLeft = wb.x < wa.x;
     a.queue = [...queue];
     a.rest = rest;
+    a.restFace = null;
   }
 
   /** Play beats in place right now (interrupting any move). */
@@ -751,12 +989,30 @@ export class PlaybackController {
     a.to = { ...a.pos };
     a.moving = false;
     a.lockUntil = 0;
+    a.slide = null;
     a.queue = [...queue];
   }
 
   /** Pass the ball to `to` (a quick flat flight) unless he already has it. */
   private giveBall(to: Actor): void {
     if (this.ballState.mode === 'held' && this.ballState.holder === to) return;
+    // #19: out of a tackle the ball goes through the play-the-ball — rolled
+    // back to the dummy-half — before he passes it on.
+    const holder = this.ballState.mode === 'held' ? this.ballState.holder : null;
+    const dh = holder ? this.actors[holder.side][HOOKER_SLOT] : undefined;
+    if (
+      holder &&
+      dh &&
+      holder.side === to.side &&
+      holder !== dh &&
+      to !== dh &&
+      (LYING.has(holder.anim) || holder.anim === 'ptb' || holder.queue.some((b) => b.anim === 'ptb'))
+    ) {
+      const p = this.ballPoint();
+      this.ballState = { mode: 'flight', from: p.p, fromLift: p.lift, to: { ...dh.pos }, t0: this.vis, dur: PTB_ROLL_MS, peak: 1, then: dh };
+      this.later(PTB_ROLL_MS + 10, () => this.giveBall(to));
+      return;
+    }
     const from = this.ballPoint();
     const passer = this.ballState.mode === 'held' ? this.ballState.holder : null;
     if (passer && passer.side === to.side && passer.queue.length === 0 && passer.lockUntil <= this.vis) {
@@ -795,13 +1051,18 @@ export class PlaybackController {
       // Run beat callbacks (kicks) so their ball effects resolve too.
       for (const b of a.queue) b.fn?.();
       for (const p of this.pending.splice(0)) p.fn();
+      // A queued or running slide (big-hit drive-back) is where he ends up.
+      const slid = [...a.queue].reverse().find((b) => b.slide)?.slide ?? a.slide?.to;
       a.queue = [];
-      a.pos = { ...a.to };
-      a.from = { ...a.to };
+      a.pos = { ...(slid ?? a.to) };
+      a.to = { ...a.pos };
+      a.from = { ...a.pos };
       a.moving = false;
       a.lockUntil = 0;
+      a.slide = null;
+      a.busyUntil = 0;
       a.anim = a.rest;
-      a.faceLeft = this.restFaceLeft(a.side);
+      a.faceLeft = a.restFace ?? this.restFaceLeft(a.side);
     }
     if (this.ballState.mode === 'flight') {
       const f = this.ballState;
@@ -819,28 +1080,61 @@ export class PlaybackController {
   }
 
   private stepActor(a: Actor): void {
-    if (this.vis < a.lockUntil) return; // holding a beat
+    if (this.vis < a.lockUntil) {
+      // Holding a beat — possibly sliding (driven back in a big-hit).
+      if (a.slide) {
+        const u = Math.min(1, (this.vis - a.slide.t0) / a.slide.dur);
+        const e = u * (2 - u); // ease-out: the hit's momentum bleeds off
+        a.pos = {
+          fx: a.slide.from.fx + (a.slide.to.fx - a.slide.from.fx) * e,
+          fy: a.slide.from.fy + (a.slide.to.fy - a.slide.from.fy) * e,
+        };
+      }
+      return;
+    }
+    if (a.slide) {
+      a.pos = { ...a.slide.to };
+      a.to = { ...a.pos };
+      a.slide = null;
+    }
     if (a.moving) {
       if (this.vis < a.t0) return;
       const u = Math.min(1, (this.vis - a.t0) / a.dur);
-      a.pos = { fx: a.from.fx + (a.to.fx - a.from.fx) * u, fy: a.from.fy + (a.to.fy - a.from.fy) * u };
+      const e = moveProgress(u, a.accel);
+      a.pos = { fx: a.from.fx + (a.to.fx - a.from.fx) * e, fy: a.from.fy + (a.to.fy - a.from.fy) * e };
       a.anim = 'run';
+      // #20: legs turn over in step with actual ground speed (no foot-sliding).
+      const wa = this.scene.fieldToWorld(a.from.fx, a.from.fy);
+      const wb = this.scene.fieldToWorld(a.to.fx, a.to.fy);
+      const avg = Math.hypot(wb.x - wa.x, wb.y - wa.y) / a.dur;
+      const ground = avg * moveSpeedFactor(u, a.accel);
+      a.cadence = Math.max(CADENCE_MIN, Math.min(CADENCE_MAX, ground / RUN_PX_PER_MS));
       if (u < 1) return;
       a.moving = false;
       a.pos = { ...a.to };
     }
+    a.cadence = 1;
     const next = a.queue.shift();
     if (next) {
       a.anim = next.anim;
       a.faceLeft = this.restFaceLeft(a.side);
       a.lockUntil = this.vis + next.ms;
+      if (next.slide) a.slide = { from: { ...a.pos }, to: { ...next.slide }, t0: this.vis, dur: next.ms };
       next.fn?.();
       return;
     }
-    if (a.anim !== a.rest) {
-      a.anim = a.rest;
-      a.faceLeft = this.restFaceLeft(a.side);
-    }
+    if (a.anim !== a.rest) a.anim = a.rest;
+    a.faceLeft = a.restFace ?? (a.rest === 'idle' ? this.idleFaceLeft(a) : this.restFaceLeft(a.side));
+  }
+
+  /** Idle players watch the ball (#20); with it roughly level they face upfield. */
+  private idleFaceLeft(a: Actor): boolean {
+    const me = this.scene.fieldToWorld(a.pos.fx, a.pos.fy);
+    const b = this.ballPoint().p;
+    const ball = this.scene.fieldToWorld(b.fx, b.fy);
+    const dx = ball.x - me.x;
+    if (Math.abs(dx) <= FACE_BALL_PX) return this.restFaceLeft(a.side);
+    return dx < 0;
   }
 
   private stepBall(): void {
@@ -871,10 +1165,17 @@ export class PlaybackController {
         const w = this.scene.fieldToWorld(a.pos.fx, a.pos.fy);
         // Feet y is the iso sort key; tiny per-slot bias stops z-fighting flicker.
         a.view.place(w.x, w.y, w.y + 1 + a.slot * 0.001 + (side === 'away' ? 0.0005 : 0));
-        a.view.play(a.anim, a.faceLeft, ts);
+        a.view.play(a.anim, a.faceLeft, a.anim === 'run' ? ts * a.cadence : ts);
       }
     }
     const s = this.ballState;
+    const mark = carrierMarkerTarget(s);
+    if (mark) {
+      const m = this.scene.fieldToWorld(mark.fx, mark.fy);
+      this.scene.focus?.carrier({ side: mark.side, x: m.x, y: m.y });
+    } else {
+      this.scene.focus?.carrier(null);
+    }
     if (s.mode === 'held') {
       const h = s.holder;
       const w = this.scene.fieldToWorld(h.pos.fx, h.pos.fy);

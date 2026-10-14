@@ -24,6 +24,8 @@ import type { TeamSheet, MatchResult, MatchEvent } from '../sim/events';
 import type { Fixture } from '../core/state';
 import {
   PlaybackController,
+  slotRoster,
+  slotSpeeds,
   type PlaybackActor,
   type PlaybackBall,
   type PlaybackSpeed,
@@ -33,7 +35,7 @@ import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchO
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { resolveKits } from '../art/match/kit';
-import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForSlot, type PlayerAnim } from '../art/match/players';
+import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForPlayer, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
   CROSSBAR_Z,
   POST_GX,
@@ -57,6 +59,14 @@ import {
 } from '../art/match/crowd';
 import { isoProject } from '../art/match/iso3d';
 import { MatchArtRegistry, playerAnimKey } from './matchArt';
+import {
+  NAME_TAG_MS,
+  ZOOM_DEFAULT,
+  easeZoom,
+  zoomForEvent,
+  type NameTag,
+  type TeamSide,
+} from '../world/readability';
 import {
   fieldToWorldPoint,
   fieldOffsetX,
@@ -84,10 +94,17 @@ const DEPTH_BG = -100_000;
 const DEPTH_CROWD_BACK = -90_000;
 const DEPTH_SHADOW = -80_000;
 const DEPTH_FG = 50_000;
+/** Name tags sit above the light map and crowd FX (70–72k), below weather (80k). */
+const DEPTH_TAG = 73_000;
 const DEPTH_CROWD_FRONT = 60_000;
 
-/** Default match zoom: players read clearly, ~half the pitch in view. */
-const MATCH_ZOOM = 1.5;
+/** Default match zoom (#17): a player stands ~36px tall at 1280×800. Eases
+ *  tighter/wider per beat (see world/readability). */
+const MATCH_ZOOM = ZOOM_DEFAULT;
+/** Name tag sits this many world px above a player's feet (just over his head). */
+const TAG_LIFT = 26;
+/** Ghost balls trailing a flying ball. */
+const TRAIL_LEN = 5;
 /** Crowd animation tick (real ms). */
 const CROWD_TICK_MS = 220;
 
@@ -130,10 +147,12 @@ class MatchActor implements PlaybackActor {
   }
 }
 
-/** The ball sprite + its ground shadow (shown while in the air). */
+/** The ball sprite + its ground shadow (shown while in the air) + flight trail. */
 class MatchBall implements PlaybackBall {
   readonly sprite: Phaser.GameObjects.Image;
   private readonly shadow: Phaser.GameObjects.Image;
+  private readonly trail: Phaser.GameObjects.Image[] = [];
+  private readonly recent: { x: number; y: number }[] = [];
   /** Ground position — what the camera follows. */
   gx = 0;
   gy = 0;
@@ -141,13 +160,30 @@ class MatchBall implements PlaybackBall {
   constructor(scene: Phaser.Scene, key: string, shadowKey: string) {
     this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW + 1);
     this.sprite = scene.add.image(0, 0, key).setOrigin(0.5, 1);
+    for (let i = 0; i < TRAIL_LEN; i++) {
+      this.trail.push(scene.add.image(0, 0, key).setOrigin(0.5, 1).setVisible(false));
+    }
   }
 
   place(x: number, y: number, lift: number, depth: number): void {
     this.gx = x;
     this.gy = y;
-    this.sprite.setPosition(x, y - lift + 2).setDepth(depth);
+    const sy = y - lift + 2;
+    this.sprite.setPosition(x, sy).setDepth(depth);
     this.shadow.setPosition(x, y).setVisible(lift > 3);
+    // Short trail while the ball is in the air: fading ghosts of its last spots.
+    const flying = lift > 3;
+    const last = this.recent[this.recent.length - 1];
+    if (!flying || (last && Math.hypot(x - last.x, sy - last.y) > 400)) this.recent.length = 0;
+    if (flying && (!last || Math.hypot(x - last.x, sy - last.y) >= 4)) {
+      this.recent.push({ x, y: sy });
+      if (this.recent.length > TRAIL_LEN) this.recent.shift();
+    }
+    this.trail.forEach((g, i) => {
+      const p = this.recent[this.recent.length - 2 - i];
+      if (!flying || !p) return void g.setVisible(false);
+      g.setPosition(p.x, p.y).setDepth(depth - 0.01).setAlpha(0.5 - i * 0.09).setScale(1 - i * 0.12).setVisible(true);
+    });
   }
 }
 
@@ -159,6 +195,11 @@ export class MatchScene extends Phaser.Scene {
   // ── Public surface consumed by playback (structural PlaybackScene) ─────────
   public readonly players: { home: MatchActor[]; away: MatchActor[] } = { home: [], away: [] };
   public ball!: MatchBall;
+  /** Readability hooks driven by playback (#17): name tags + carrier ring. */
+  public readonly focus = {
+    tag: (t: NameTag): void => this.showTag(t),
+    carrier: (t: { side: TeamSide; x: number; y: number } | null): void => this.moveMarker(t),
+  };
   public get homeId(): string {
     return this.home.clubId;
   }
@@ -179,6 +220,17 @@ export class MatchScene extends Phaser.Scene {
   private mood: CrowdMood = { home: 0, away: 0 };
   private moodUntil = { home: 0, away: 0 };
   private offCrowd: (() => void) | null = null;
+  private offZoom: (() => void) | null = null;
+
+  // Readability (#17).
+  private tagText: Phaser.GameObjects.Text | null = null;
+  private tagActor: MatchActor | null = null;
+  private tagUntil = 0;
+  private marker: Phaser.GameObjects.Ellipse | null = null;
+  private markerColors: Record<TeamSide, number> = { home: 0xffffff, away: 0xffffff };
+  private zoomTarget = MATCH_ZOOM;
+  /** Zoom this scene last set; a mismatch means the player zoomed by hand. */
+  private autoZoom: number | null = MATCH_ZOOM;
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
   private playback: PlaybackController | null = null;
@@ -216,11 +268,35 @@ export class MatchScene extends Phaser.Scene {
     // Players + ball.
     const homeAtlas = this.art.players(`pl-${this.home.clubId}`, kits.home);
     const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayAlt ? '-alt' : ''}`, kits.away);
+    const homeSlots = slotRoster(this.home.roster);
+    const awaySlots = slotRoster(this.away.roster);
     for (let i = 0; i < PLAYERS; i++) {
-      this.players.home.push(new MatchActor(this, homeAtlas, lookForSlot(i), props.shadow));
-      this.players.away.push(new MatchActor(this, awayAtlas, lookForSlot(i + 5), props.shadow));
+      // #21: each slot wears its player's own look (stable across matches);
+      // a slot with no named player falls back to the slot cycle.
+      const h = homeSlots[i];
+      const a = awaySlots[i];
+      const homeLook = h ? lookForPlayer(h.id ?? h.name) : lookForSlot(i);
+      const awayLook = a ? lookForPlayer(a.id ?? a.name) : lookForSlot(i + 5);
+      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow));
+      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow));
     }
     this.ball = new MatchBall(this, props.ball, props.ballShadow);
+    this.markerColors = { home: kits.home.jersey, away: kits.away.jersey };
+    this.marker = this.add.ellipse(0, 0, 22, 11).setStrokeStyle(2, 0xffffff, 0.95).setFillStyle(0xffffff, 0.22).setVisible(false);
+    this.marker.setDepth(DEPTH_SHADOW + 2); // above the ground shadows, under every sprite
+    this.tagText = this.add
+      .text(0, 0, '', {
+        fontFamily: '"Courier New", monospace',
+        fontSize: '13px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        backgroundColor: 'rgba(16,16,28,0.82)',
+        padding: { x: 4, y: 1 },
+        resolution: 2,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(DEPTH_TAG)
+      .setVisible(false);
     const centre = this.fieldToWorld(50, 50);
     this.ball.place(centre.x, centre.y, 0, centre.y + 2);
 
@@ -237,6 +313,9 @@ export class MatchScene extends Phaser.Scene {
     // the playback controller which re-emits the event stream on a compressed
     // clock. Both are presentation-only (never mutate GameState).
     this.startPlayback();
+    this.offZoom = bus.on('match:event', (ev) => {
+      this.zoomTarget = zoomForEvent(ev.kind);
+    });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
   }
@@ -244,7 +323,10 @@ export class MatchScene extends Phaser.Scene {
   private startPlayback(): void {
     if (this.result) {
       this.overlay = mountMatchOverlay({ home: this.home, away: this.away, result: this.result });
-      this.playback = new PlaybackController(this, this.result, this.fixture);
+      // #20: each slot runs at its player's pace (team-sheet speed stats).
+      this.playback = new PlaybackController(this, this.result, this.fixture, {
+        speeds: { home: slotSpeeds(this.home.roster), away: slotSpeeds(this.away.roster) },
+      });
       this.mountPlaybackControls();
       // 'match:finished' (fired by playback at full-time or on skip) reveals the
       // Back-to-Club button and swaps the controls out.
@@ -266,6 +348,8 @@ export class MatchScene extends Phaser.Scene {
     // camera follows the freshly-moved ball this frame.
     if (this.playback) this.playback.update(delta);
 
+    this.updateReadability(delta);
+
     // Slow auto-pan toward the ball; Phaser clamps scroll to the camera bounds
     // and roundPixels (global config) avoids shimmering.
     if (!this.ball) return;
@@ -278,6 +362,51 @@ export class MatchScene extends Phaser.Scene {
       panTowards(cam.scrollX, tx, delta, PAN_RATE_PER_S, maxPx),
       panTowards(cam.scrollY, ty, delta, PAN_RATE_PER_S, maxPx),
     );
+  }
+
+  // ── Readability (#17): name tag, carrier ring, situational zoom ───────────
+  private showTag(t: NameTag): void {
+    const actor = this.players[t.side][t.slot];
+    if (!actor || !this.tagText) return;
+    this.tagActor = actor;
+    this.tagUntil = this.time.now + NAME_TAG_MS;
+    this.tagText.setText(t.text.toUpperCase());
+  }
+
+  private moveMarker(t: { side: TeamSide; x: number; y: number } | null): void {
+    if (!this.marker) return;
+    if (!t) {
+      this.marker.setVisible(false);
+      return;
+    }
+    const c = this.markerColors[t.side];
+    this.marker.setStrokeStyle(2, c, 0.95).setFillStyle(c, 0.3).setPosition(t.x, t.y).setVisible(true);
+  }
+
+  private updateReadability(delta: number): void {
+    const cam = this.cameras.main;
+    if (this.tagText) {
+      const a = this.tagActor;
+      if (a && this.time.now < this.tagUntil) {
+        // Pinned above the sprite's head, counter-scaled so it stays screen-sized.
+        this.tagText
+          .setScale(1 / cam.zoom)
+          .setPosition(a.sprite.x, a.sprite.y - TAG_LIFT)
+          .setVisible(true);
+      } else {
+        this.tagText.setVisible(false);
+        this.tagActor = null;
+      }
+    }
+    // Ease toward this beat's zoom unless the player has taken over (wheel/pinch).
+    if (this.autoZoom !== null) {
+      if (Math.abs(cam.zoom - this.autoZoom) > 0.01) {
+        this.autoZoom = null;
+      } else {
+        cam.setZoom(easeZoom(cam.zoom, this.zoomTarget, delta));
+        this.autoZoom = cam.zoom;
+      }
+    }
   }
 
   // ── Stadium pieces ─────────────────────────────────────────────────────────
@@ -372,6 +501,8 @@ export class MatchScene extends Phaser.Scene {
     this.camController = new CameraController(this, { world: cameraWorldBounds(this.offsetX), minZoom: 0.75, maxZoom: 2.5 });
     const cam = this.cameras.main;
     cam.setZoom(MATCH_ZOOM);
+    this.zoomTarget = MATCH_ZOOM;
+    this.autoZoom = MATCH_ZOOM;
     const c = this.fieldToWorld(50, 50);
     cam.centerOn(c.x, c.y);
   }
@@ -450,6 +581,11 @@ export class MatchScene extends Phaser.Scene {
     bus.off('match:finished', this.onFinished);
     this.offCrowd?.();
     this.offCrowd = null;
+    this.offZoom?.();
+    this.offZoom = null;
+    this.tagText = null;
+    this.tagActor = null;
+    this.marker = null;
     this.overlay?.destroy();
     this.overlay = null;
     this.playback = null;

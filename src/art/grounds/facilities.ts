@@ -618,6 +618,200 @@ const RECIPES: Record<FacilityDefId, (lot: Lot) => void> = {
   teamGym,
 };
 
+
+// ── Level upgrades ──────────────────────────────────────────────────────────
+//
+// L1 is the base recipe. L2 layers on an awning, accent trim, a side annex,
+// more props and a flag; L3 adds an extra storey (flat roofs) or a lit rooftop
+// sign (pitched roofs), floodlight masts and more flags. Everything stays
+// inside the lot so the footprint and anchor never change.
+
+export type FacilityLevel = 1 | 2 | 3;
+export const FACILITY_LEVELS: readonly FacilityLevel[] = [1, 2, 3];
+
+const LAMP = 0xfff3b0;
+
+interface Upgrade {
+  b: Block;
+  accent: number;
+  /** Flat roofs get an extra storey at L3; pitched roofs get a lit sign. */
+  flat: boolean;
+  /** Pitched roof rise, for placing the L3 rooftop sign. */
+  rise?: number;
+}
+
+const UPGRADES: Partial<Record<FacilityDefId, Upgrade>> = {
+  weightsRoom: { b: { u0: 10, v0: 8, u1: 54, v1: 48, h: 26 }, accent: CLUB.gold, flat: true },
+  videoRoom: { b: { u0: 10, v0: 10, u1: 54, v1: 50, h: 28 }, accent: 0x7fb2ea, flat: true },
+  physioCentre: { b: { u0: 10, v0: 8, u1: 54, v1: 48, h: 26 }, accent: 0x2fa59a, flat: true },
+  canteen: { b: { u0: 8, v0: 6, u1: 50, v1: 36, h: 20 }, accent: RED.mid, flat: false, rise: 12 },
+  academy: { b: { u0: 12, v0: 10, u1: 84, v1: 60, h: 36 }, accent: CLUB.gold, flat: false, rise: 18 },
+  coachsOffice: { b: { u0: 12, v0: 10, u1: 48, v1: 44, h: 20 }, accent: 0x3f8a4d, flat: false, rise: 14 },
+  scoutOffice: { b: { u0: 10, v0: 12, u1: 46, v1: 48, h: 22 }, accent: 0xd9a441, flat: false, rise: 14 },
+  medicalBay: { b: { u0: 10, v0: 8, u1: 52, v1: 46, h: 24 }, accent: RED.mid, flat: false, rise: 12 },
+  teamGym: { b: { u0: 8, v0: 10, u1: 84, v1: 72, h: 32 }, accent: CLUB.gold, flat: false, rise: 14 },
+};
+
+/** Floodlight mast with a lamp head. */
+function mast(l: IsoPainter, u: number, v: number, z: number): void {
+  pole(l, u, v, 0, z, METAL.dark, true);
+  l.box(u - 3, v - 1, u + 3, v + 1, z, z + 3, { top: LAMP, left: METAL.mid, right: METAL.dark });
+}
+
+/** Club flag on a pole. */
+function flag(l: IsoPainter, u: number, v: number, z: number): void {
+  pole(l, u, v, 0, z, METAL.light);
+  l.wallV(v, u, u + 8, z - 7, z, CLUB.gold, (_a, zz) => (zz < z - 3 ? CLUB.navy : CLUB.gold));
+}
+
+/** Gold level pips on the lot's front corner (1–3), readable at low zoom. */
+function pips(lot: Lot, level: FacilityLevel): void {
+  const { U, V } = lot;
+  lot.layer((l) => {
+    for (let i = 0; i < level; i++) {
+      const u = U / 2 - (level * 5) / 2 + i * 6;
+      l.box(u, V - 8, u + 4, V - 4, 0, 3, { top: CLUB.gold, left: CLUB.goldDark, right: CLUB.goldDark });
+    }
+  });
+}
+
+function upgradeBuilding(lot: Lot, up: Upgrade, level: FacilityLevel): void {
+  const { b, accent } = up;
+  const { U, V } = lot;
+  const cx = (b.u0 + b.u1) / 2;
+  const front = Math.min(b.v1 + 8, V - 4);
+  // L2: striped awning over the entrance, accent trim, side annex, props, flag.
+  lot.layer((l) => {
+    const u0 = cx - 14;
+    const u1 = cx + 14;
+    const zA = Math.min(b.h * 0.6, 18);
+    slope(l, [[u0, b.v1, zA], [u1, b.v1, zA], [u1, b.v1 + 8, zA - 4], [u0, b.v1 + 8, zA - 4]], accent, (_u, _v, _z, a) =>
+      pmod(Math.floor(a / 3), 2) ? WHITE : accent,
+    'u');
+    l.wallV(b.v1 + 8, u0, u1, zA - 6, zA - 4, accent, (a) => (pmod(Math.floor(a / 3), 2) ? WHITE : accent));
+    l.wallV(b.v1, b.u0, b.u1, b.h - 3, b.h - 1, accent);
+    l.wallU(b.u1, b.v0, b.v1, b.h - 3, b.h - 1, shade(accent, 0.76));
+  });
+  lot.layer((l) => {
+    const a = { u0: b.u0, v0: b.v1, u1: b.u0 + 10, v1: b.v1 + 8, h: 9 };
+    l.box(a.u0, a.v0, a.u1, a.v1, 0, a.h, { top: shade(accent, 1.1), left: mix(accent, WHITE, 0.5), right: shade(accent, 0.7) });
+    l.wallV(a.v1, a.u0 + 2, a.u1 - 2, 2, 7, 0xbfe6f5);
+  });
+  lot.layer((l) => {
+    l.box(b.u1 - 12, front, b.u1 - 6, front + 4, 0, 4, { top: WOOD.light, left: WOOD.mid, right: WOOD.dark });
+    l.box(b.u1 - 5, front, b.u1 - 1, front + 4, 0, 6, { top: WOOD.light, left: WOOD.mid, right: WOOD.dark });
+  });
+  lot.layer((l) => prop(l, SHRUB, SHRUB_PAL, b.u0 + 16, front + 2));
+  lot.layer((l) => flag(l, Math.min(b.u1 + 3, U - 4), b.v1 - 2, b.h + 12));
+  if (level < 3) return;
+
+  // L3: extra storey / lit rooftop sign, glass front, floodlights, more flags.
+  if (up.flat) {
+    lot.layer((l) => {
+      const s: Block = { u0: b.u0 + 8, v0: b.v0 + 8, u1: b.u1 - 8, v1: b.v1 - 8, h: 14 };
+      l.box(s.u0, s.v0, s.u1, s.v1, b.h, b.h + s.h, { top: shade(accent, 1.15), left: 0xe9edf2, right: 0xc2c8d0 });
+      l.wallV(s.v1, s.u0 + 3, s.u1 - 3, b.h + 4, b.h + 11, 0xbfe6f5);
+      l.wallV(s.v1, s.u0 + 3, s.u1 - 3, b.h + 7, b.h + 8, WHITE);
+      l.wallU(s.u1, s.v0 + 3, s.v1 - 3, b.h + 4, b.h + 11, 0x8cc3de);
+      l.wallV(s.v1, s.u0, s.u1, b.h + 12, b.h + 14, accent);
+    });
+  } else {
+    lot.layer((l) => {
+      const vm = (b.v0 + b.v1) / 2;
+      const z = b.h + (up.rise ?? 12);
+      pole(l, cx - 10, vm, z - 2, z + 4, METAL.dark);
+      pole(l, cx + 10, vm, z - 2, z + 4, METAL.dark);
+      l.box(cx - 14, vm - 1, cx + 14, vm + 1, z + 4, z + 14, { top: LAMP, left: LAMP, right: shade(accent, 0.8) }, {
+        left: (a, zz) => (a < 2 || a > 26 || zz < 5 || zz > 12 ? accent : mix(LAMP, WHITE, 0.4)),
+      });
+    });
+  }
+  lot.layer((l) => {
+    l.wallV(b.v1, cx - 11, cx + 11, 0, 3, accent); // lit threshold strip
+    l.wallV(b.v1, cx - 10, cx + 10, 3, 4, LAMP);
+  });
+  lot.layer((l) => mast(l, 5, V - 5, 44));
+  lot.layer((l) => mast(l, U - 5, V - 5, 44));
+  lot.layer((l) => flag(l, b.u0 + 4, V - 8, 30));
+}
+
+function upgradePaddock(lot: Lot, level: FacilityLevel): void {
+  const { U, V } = lot;
+  lot.layer((l) => {
+    l.box(10, 54, 24, 57, 0, 3, { top: WOOD.light, left: WOOD.mid, right: WOOD.dark }); // bench
+    l.box(40, 52, 50, 56, 0, 5, { top: WHITE, left: 0xd8dde3, right: 0xb7bec7 }); // water cooler
+    l.wallV(8, 14, 50, 14, 22, CLUB.navy, (a, z) => (z > 19 || a < 17 ? CLUB.gold : CLUB.navy)); // banner
+    pole(l, 14, 8, 0, 14, METAL.dark);
+    pole(l, 50, 8, 0, 14, METAL.dark);
+  });
+  lot.layer((l) => flag(l, U - 6, 8, 40));
+  if (level < 3) return;
+  lot.layer((l) => {
+    l.box(6, 12, 20, 24, 0, 14, { top: 0xdfe3e8, left: 0xe9edf2, right: 0xb9c1cc }); // pavilion
+    l.wallV(24, 8, 18, 0, 9, 0x3a4a63);
+    l.box(4, 10, 22, 26, 14, 17, { top: CLUB.navy, left: CLUB.navy, right: CLUB.navyDark });
+  });
+  lot.layer((l) => mast(l, 6, V - 6, 48));
+  lot.layer((l) => mast(l, U - 6, V - 6, 48));
+  lot.layer((l) => mast(l, U - 6, 10, 48));
+}
+
+function upgradeSponsorBoard(lot: Lot, level: FacilityLevel): void {
+  const { U } = lot;
+  const v = 18;
+  lot.layer((l) => {
+    // Front ticker screen with scrolling "text" bars.
+    l.box(12, v + 4, U - 12, v + 6, 2, 11, { top: METAL.light, left: CLUB.navy, right: METAL.dark }, {
+      left: (a, z) => (z > 4 && z < 7 && pmod(a, 6) < 4 ? LAMP : z > 8 ? CLUB.gold : CLUB.navy),
+    });
+    for (const u of [8, U - 8]) l.box(u - 1, v + 7, u + 1, v + 9, 0, 6, { top: LEAF.light, left: LEAF.mid, right: LEAF.dark });
+  });
+  lot.layer((l) => prop(l, SHRUB, SHRUB_PAL, 6, v + 12));
+  lot.layer((l) => prop(l, SHRUB, SHRUB_PAL, U - 6, v + 12));
+  if (level < 3) return;
+  lot.layer((l) => {
+    // Second tier on top, lit.
+    l.box(10, v - 2, U - 10, v, 39, 53, { top: METAL.light, left: LAMP, right: METAL.dark }, {
+      left: (a, z) => (a < 3 || a > U - 23 || z < 41 || z > 51 ? CLUB.navy : pmod(Math.floor(a / 5), 2) ? CLUB.gold : 0xfff7d0),
+    });
+    for (const u of [4, U - 4]) pole(l, u, v + 6, 0, 44, METAL.dark, true);
+  });
+  lot.layer((l) => flag(l, 4, v + 8, 56));
+  lot.layer((l) => flag(l, U - 12, v + 8, 56));
+}
+
+function upgradeGrandstand(lot: Lot, level: FacilityLevel): void {
+  const { U } = lot;
+  lot.layer((l) => {
+    // Ticket booth with a striped roof at the front-left.
+    l.box(10, 86, 24, 92, 0, 12, { top: RED.mid, left: 0xf2efe7, right: 0xc9c5ba });
+    l.wallV(92, 13, 21, 3, 9, 0xbfe6f5);
+    l.box(8, 85, 26, 93, 12, 14, { top: RED.light, left: RED.mid, right: RED.dark });
+    // Club banner across the front of the tiers.
+    l.wallV(84, 10, U - 10, 1, 5, CLUB.navy, (a) => (pmod(Math.floor(a / 6), 2) ? CLUB.navy : CLUB.gold));
+  });
+  lot.layer((l) => flag(l, U - 12, 88, 24));
+  lot.layer((l) => flag(l, U - 6, 90, 20));
+  if (level < 3) return;
+  for (const [u, v] of [[4, 8], [U - 4, 8], [4, 90], [U - 4, 90]] as const) lot.layer((l) => mast(l, u, v, 84));
+  lot.layer((l) => {
+    // Lit scoreboard on the back wall.
+    l.wallV(24, 20, U - 20, 36, 52, CLUB.navyDark);
+    l.wallV(24, 22, U - 22, 38, 50, 0x1b2a1e, (a, z) => (z > 43 && z < 46 && pmod(a, 5) < 3 ? LAMP : 0x1b2a1e));
+  });
+}
+
+function upgradeLot(defId: FacilityDefId, lot: Lot, level: FacilityLevel): void {
+  if (level >= 2) {
+    const up = UPGRADES[defId];
+    if (up) upgradeBuilding(lot, up, level);
+    else if (defId === 'trainingPaddock') upgradePaddock(lot, level);
+    else if (defId === 'sponsorBoard') upgradeSponsorBoard(lot, level);
+    else upgradeGrandstand(lot, level);
+  }
+  pips(lot, level);
+}
+
 /**
  * Sprite origin that lands a facility texture's footprint diamond on its tiles
  * when the sprite is positioned at the footprint origin's top vertex. Derived
@@ -629,18 +823,23 @@ export function facilityOrigin(footprint: { w: number; h: number }, texH: number
   return { x: h / (w + h), y: (texH - (w + h) * (TILE_H / 2)) / texH };
 }
 
-/** Generate the art for one catalog facility (pure; deterministic). */
-export function facilityArt(defId: FacilityDefId): FacilityArt {
+/** Generate the art for one catalog facility at a level (pure; deterministic). */
+export function facilityArt(defId: FacilityDefId, level: FacilityLevel = 1): FacilityArt {
   const { w, h } = FACILITY_CATALOG[defId].footprint;
   const lot = makeLot(w, h);
   RECIPES[defId](lot);
+  upgradeLot(defId, lot, level);
   return finish(lot, w, h);
 }
 
-/** Every facility texture keyed `facility-<defId>` (ARCHITECTURE §7). */
+/** Texture key for a facility at a level (ARCHITECTURE §7). */
+export function facilityTextureKey(defId: FacilityDefId, level: number): string {
+  return `facility-${defId}-${Math.min(3, Math.max(1, Math.floor(level) || 1))}`;
+}
+
+/** Every facility texture keyed `facility-<defId>-<level>` (levels 1–3). */
 export function facilityTextures(): { key: string; buf: PixelBuffer }[] {
-  return (Object.keys(FACILITY_CATALOG) as FacilityDefId[]).map((defId) => ({
-    key: `facility-${defId}`,
-    buf: facilityArt(defId).buf,
-  }));
+  return (Object.keys(FACILITY_CATALOG) as FacilityDefId[]).flatMap((defId) =>
+    FACILITY_LEVELS.map((level) => ({ key: facilityTextureKey(defId, level), buf: facilityArt(defId, level).buf })),
+  );
 }
