@@ -25,8 +25,14 @@ import {
 } from '../art/grounds/tiles';
 import { CHAR_H, CHAR_FOOT_Y } from '../art/grounds/manager';
 import { facilityOrigin, facilityTextureKey } from '../art/grounds/facilities';
-import { decorLayout, surroundPaths, entranceColumn } from '../art/grounds/decor';
+import {
+  decorLayout,
+  surroundPaths,
+  entranceColumn,
+  SURROUND_DEPTH,
+} from '../art/grounds/decor';
 import { ROUGH } from '../art/grounds/palette';
+import { GroundsLife } from './groundsLife';
 
 type Dir = 'n' | 'e' | 's' | 'w';
 
@@ -45,8 +51,6 @@ const CHAR_FOOT_DY = TILE_H / 2;
 // Characters sort one layer above facilities (layer 1) so that on a depth tie
 // (standing just in front of a building's front row) they draw in front.
 const CHAR_LAYER = 2;
-// CameraController's default minimum zoom — the surround fill covers that view.
-const MIN_ZOOM = 0.5;
 
 // Tile ids -> generated texture keys (BAK-158). Grass picks a lawn variant per cell.
 enum Tile {
@@ -95,6 +99,8 @@ export class GroundsScene extends Phaser.Scene {
   private buildFx?: BuildFx;
   private offFacilityPlaced: (() => void) | null = null;
   private offStateChanged: (() => void) | null = null;
+  // Players, staff and fans using the facilities (#23).
+  private life: GroundsLife | null = null;
 
   constructor() {
     super('Grounds'); // scene key per ARCHITECTURE.md §7
@@ -118,12 +124,15 @@ export class GroundsScene extends Phaser.Scene {
     // (e.g. an upgrade bumps a level). Kept unsubscribed on shutdown.
     this.offFacilityPlaced = bus.on('facility:placed', () => this.renderFacilities());
     this.offStateChanged = bus.on('state:changed', () => this.renderFacilities());
+    this.life = new GroundsLife({ scene: this, walkGrid: () => this.walkGrid, cellToWorld: (gx, gy) => this.cellToWorld(gx, gy) });
 
     // Detach camera listeners + bus subs when the scene shuts down (Grounds -> Match).
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.camController.destroy();
       this.offFacilityPlaced?.();
       this.offStateChanged?.();
+      this.life?.destroy();
+      this.life = null;
       setActiveGroundsScene(null);
     });
   }
@@ -272,6 +281,7 @@ export class GroundsScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.stepCharacter(delta);
+    this.life?.update(delta);
   }
 
   private stepCharacter(delta: number): void {
@@ -320,26 +330,29 @@ export class GroundsScene extends Phaser.Scene {
   }
 
   /**
-   * Pannable world bounds: the iso extent of the grid, padded far enough to
-   * pan out over the walkway, fence, trees and floodlights.
+   * Pannable world bounds: the iso extent of the scenery field, i.e. the grid
+   * plus SURROUND_DEPTH cells of decor on every side. The camera never shows past
+   * the outermost trees, and the fitView zoom floor keeps the view inside this box.
    */
   private worldBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
-    // Corner cells span the projected extent. With offsetX applied, min screenX is
-    // at the left corner (0, GRID_H-1); max at the right corner (GRID_W-1, 0).
+    const lo = -SURROUND_DEPTH;
+    const hiX = GRID_W - 1 + SURROUND_DEPTH;
+    const hiY = GRID_H - 1 + SURROUND_DEPTH;
+    // Cell corners span the projected extent. Diamonds add half a tile on each
+    // side (left/right) and the bottom diamond adds a full tile height.
     const corners = [
-      gridToScreen(0, 0),
-      gridToScreen(GRID_W - 1, 0),
-      gridToScreen(0, GRID_H - 1),
-      gridToScreen(GRID_W - 1, GRID_H - 1),
+      gridToScreen(lo, lo),
+      gridToScreen(hiX, lo),
+      gridToScreen(lo, hiY),
+      gridToScreen(hiX, hiY),
     ];
     const xs = corners.map((c) => c.x + this.offsetX);
     const ys = corners.map((c) => c.y);
-    const pad = TILE_W * 4;
     return {
-      minX: Math.min(...xs) - pad,
-      maxX: Math.max(...xs) + TILE_W + pad, // + tile width for the far diamond
-      minY: Math.min(...ys) - pad,
-      maxY: Math.max(...ys) + TILE_H + pad, // + tile height for the bottom diamond
+      minX: Math.min(...xs) - TILE_W / 2,
+      maxX: Math.max(...xs) + TILE_W / 2,
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys) + TILE_H,
     };
   }
 
@@ -347,6 +360,9 @@ export class GroundsScene extends Phaser.Scene {
     const { minX, minY, maxX, maxY } = this.worldBounds();
     this.camController = new CameraController(this, {
       world: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+      // Zoom floor = the viewport fit for the world, so zooming out can never
+      // reveal the edge of the scenery (re-applied on canvas resize).
+      fitView: true,
     });
     // Start centred on the grounds (bounds clamp this when zoomed out).
     const mid = this.cellToWorld(GRID_W / 2, GRID_H / 2);
@@ -354,7 +370,7 @@ export class GroundsScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(ROUGH.mid);
   }
 
-  /** Default Grass with a Path column (gate to front fence) and a Dirt patch. */
+  /** Default Grass with a single Path column from the entrance gate to the front walkway. */
   private buildTileArray(): Tile[][] {
     const tiles: Tile[][] = [];
     for (let gy = 0; gy < GRID_H; gy++) {
@@ -365,15 +381,10 @@ export class GroundsScene extends Phaser.Scene {
       tiles.push(row);
     }
     // A path running the full middle column — from the entrance gate on the back
-    // edge to the walkway on the front — with a dirt patch beside it.
+    // edge to the walkway on the front.
     const mid = entranceColumn(GRID_W);
     for (let gy = 0; gy < GRID_H; gy++) {
       tiles[gy]![mid] = Tile.Path;
-    }
-    for (let gy = 6; gy < 10; gy++) {
-      for (let gx = 4; gx < 7; gx++) {
-        tiles[gy]![gx] = Tile.Dirt;
-      }
     }
     return tiles;
   }
@@ -433,17 +444,15 @@ export class GroundsScene extends Phaser.Scene {
   }
 
   /**
-   * Cover everything the camera can show with the seamless rough-grass texture:
-   * the pannable world plus enough extra that a fully zoomed-out view (where
-   * the world is smaller than the viewport and pinned top-left) is still grass.
+   * Cover the pannable world with the seamless rough-grass texture, plus one
+   * tile of margin. The camera's fit-zoom floor keeps every view inside this box,
+   * so the fill never depends on the canvas size.
    */
   private renderSurroundFill(): void {
     const b = this.worldBounds();
     const size = SURROUND_SIZE;
-    const x1 = Math.max(b.maxX, b.minX + this.scale.width / MIN_ZOOM) + size;
-    const y1 = Math.max(b.maxY, b.minY + this.scale.height / MIN_ZOOM) + size;
-    for (let y = b.minY - size; y < y1; y += size) {
-      for (let x = b.minX - size; x < x1; x += size) {
+    for (let y = b.minY - size; y < b.maxY + size; y += size) {
+      for (let x = b.minX - size; x < b.maxX + size; x += size) {
         this.add.image(x, y, SURROUND_KEY).setOrigin(0, 0).setDepth(-1e6);
       }
     }

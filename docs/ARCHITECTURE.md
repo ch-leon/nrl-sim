@@ -303,6 +303,12 @@ announces them with the result toast at full-time.
   then pops in with a squash and stretch and a sparkle; an upgrade flashes scaffolding over the art
   swap. Presentation only (driven off the scene update event; state changes instantly, input is never
   blocked); `prefers-reduced-motion` skips the animations.
+- Grounds life (GitHub #23): `src/world/groundsLife.ts` (pure, seeded by season+week)
+  plans a capped cast (`MAX_AGENTS`) of squad players, staff and match-week fans
+  with looping itineraries; `src/scenes/groundsLife.ts` renders them as sprites that
+  A*-walk the scene's `WalkGrid` and sort at layer 2 like the manager. Looks are the
+  manager's frames palette-swapped (`src/art/grounds/people.ts`) from the player's
+  match look + club kit, one `life-*` strip atlas per distinct look. Presentation only.
 - Match textures (generated per match in MatchScene from `src/art/match/`, freed
   on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
   from club colours; away side switches to its alt strip on a clash), ball,
