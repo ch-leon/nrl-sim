@@ -23,6 +23,18 @@ export const SET_TACKLES = 5;
 export const STARTING_MONEY = 200_000;
 export const STAT_MAX = 100;
 
+// Training curve (GitHub #35). Each week's stat gain is multiplied by headroom:
+//   GAIN_RATE × (1 − stat / STAT_MAX) ^ HEADROOM_EXP
+// so gains are quick early and slow towards the ceiling, with no stored
+// potential. Tuned so a typical ~60-overall player on one Training Paddock gains
+// about 8–9 overall in season 1 and then slows sharply (projection test in
+// tests/systems/training.test.ts). Raise HEADROOM_EXP to flatten the top end;
+// raise GAIN_RATE to speed up every stat.
+export const TRAINING_CURVE = {
+  GAIN_RATE: 12,
+  HEADROOM_EXP: 2,
+} as const;
+
 // Economy tuning (BAK-188, WU-10). Weekly income/expense loop constants read by
 // src/systems/economy.ts. See the ticket spec for formula derivations.
 export const ECON = {
