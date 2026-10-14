@@ -49,6 +49,18 @@ export const ECON = {
   FORCED_SALE_MORALE_HIT: 10,     // squad-wide morale −10 per forced sale
 } as const;
 
+/** Weekly morale dynamics (systems/morale.ts). Morale is clamped to 1..100, neutral 50. */
+export const MORALE = {
+  NEUTRAL: 50,
+  WIN: 4,                // result swing for the player's match this week
+  LOSS: -4,
+  DRIFT: 0.2,            // fraction of the gap to NEUTRAL recovered per week
+  LOW_PAY_RATIO: 0.8,    // wage below this × the market wage for the player's overall = unhappy
+  LOW_PAY_PENALTY: -1,
+  EXPIRING_WEEKS: 8,     // contract with this many weeks or fewer left = unsettled
+  EXPIRING_PENALTY: -1,
+} as const;
+
 // Difficulty (GitHub #48). Multipliers applied at the existing call sites:
 // starting money (createNewGame), weekly wages (economy.weeklyWages), the
 // big-hit injury chance (engine opts.injuryRate via matchday) and rival strength

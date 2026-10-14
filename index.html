@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>NRL Sim</title>
     <!-- PWA (BAK-204): theme + iOS install/standalone hints. The manifest link
          and SW registration are auto-injected by vite-plugin-pwa. -->
@@ -15,9 +15,10 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <style>
-      html, body { margin: 0; height: 100%; background: #1a1a2e; }
+      html, body { margin: 0; height: 100%; background: #1a1a2e; overflow: hidden; overscroll-behavior: none; }
       * { image-rendering: pixelated; font-family: "Courier New", monospace; }
       #game-root, #ui-root { position: absolute; inset: 0; }
+      #game-root canvas { display: block; touch-action: none; }
       /* UI overlay must not steal world pointer input; children opt back in. */
       #ui-root { pointer-events: none; }
     </style>

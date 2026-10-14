@@ -755,11 +755,11 @@ function ensureAudioStyles(): void {
 .nrl-audio-launcher {
   pointer-events: none;
   position: fixed;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: calc(0.5rem + env(safe-area-inset-top, 0px));
+  right: calc(0.5rem + env(safe-area-inset-right, 0px));
   z-index: 20;
 }
-.nrl-hud { padding-right: 3.75rem; }
+.nrl-hud { padding-right: calc(3.75rem + env(safe-area-inset-right, 0px)); }
 .nrl-audio-gear { pointer-events: auto; font-size: 1.1rem; }
 .nrl-audio-settings { min-width: 220px; }
 .nrl-audio-title { margin: 0 0 0.5rem; }

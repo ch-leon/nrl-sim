@@ -15,10 +15,12 @@ import { overallRating } from '../data/player';
 import { ECON, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 
-/** Level of the built facility with `defId`, or 0 if none is built. */
+/**
+ * Level of the built facility with `defId`, or 0 if none is built. Placement
+ * blocks duplicates of these, but older saves may hold two: the best one counts.
+ */
 function facilityLevel(state: GameState, defId: 'sponsorBoard' | 'grandstand'): number {
-  const f = state.facilities.find((pf) => pf.defId === defId);
-  return f ? f.level : 0;
+  return state.facilities.reduce((m, pf) => (pf.defId === defId ? Math.max(m, pf.level) : m), 0);
 }
 
 /** Σ of every squad player's weekly wage, scaled by the difficulty's wage multiplier. */

@@ -11,12 +11,15 @@
 import { el, panel, button, openModal, closeModal, closeScreen, mount } from '../dom';
 import {
   FACILITY_CATALOG,
+  SPECIAL_MAGNITUDE,
   upgradeCost,
+  type FacilityDefId,
   type FacilityDef,
 } from '../../data/facility';
 import type { PlayerStats, PlacedFacility } from '../../core/state';
 import { getState, setState } from '../../core/state';
 import { spendMoney } from '../../data/club';
+import { ECON } from '../../config';
 import { bus } from '../../core/events';
 import { activeGroundsScene, type GroundsSceneLike } from '../../world/placement';
 
@@ -35,12 +38,17 @@ const STAT_LABEL: Record<keyof PlayerStats, string> = {
   footyIQ: 'Footy IQ',
 };
 
-const SPECIAL_COPY: Record<NonNullable<FacilityDef['special']>, string> = {
-  income: 'Boosts weekly income',
-  gate: 'Boosts match-day gate takings',
-  recruitQuality: 'Improves recruit quality',
-  injuryRecovery: 'Speeds injury recovery',
-  morale: 'Lifts squad morale',
+/** What each special actually does, matching the systems that read it. */
+const SPECIAL_COPY: Record<FacilityDefId, string> = {
+  sponsorBoard: `+$${ECON.SPONSOR_PER_LEVEL.toLocaleString('en-US')}/week per level. One only`,
+  grandstand: `+${ECON.GRANDSTAND_ATTEND_MULT * 100}% home attendance per level. One only`,
+  academy: 'Better free-agent quality (+0.1 per level)',
+  scoutOffice: 'Better free-agent quality (+0.12 per level)',
+  physioCentre: 'Injured players recover 1 week faster',
+  medicalBay: 'Injured players recover 1 week faster per level',
+  canteen: `+${SPECIAL_MAGNITUDE.morale} squad morale/week per level`,
+  coachsOffice: `+${SPECIAL_MAGNITUDE.morale} squad morale/week per level`,
+  trainingPaddock: '', weightsRoom: '', videoRoom: '', teamGym: '',
 };
 
 /** Human "what it trains / does" copy derived from a facility's trains + special. */
@@ -50,7 +58,7 @@ export function facilityBlurb(def: FacilityDef): string {
     .map(([stat, v]) => `+${v} ${STAT_LABEL[stat]}`);
   const parts: string[] = [];
   if (trains.length > 0) parts.push('Trains ' + trains.join(', ') + ' / week');
-  if (def.special) parts.push(SPECIAL_COPY[def.special]);
+  if (def.special) parts.push(SPECIAL_COPY[def.id]);
   return parts.length > 0 ? parts.join('. ') : 'A club facility.';
 }
 
@@ -66,7 +74,8 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
   const money = getState().money;
 
   const rows = Object.values(FACILITY_CATALOG).map((def) => {
-    const affordable = money >= def.cost;
+    const built = def.unique && getState().facilities.some((f) => f.defId === def.id);
+    const affordable = money >= def.cost && !built;
     const meta = el(
       'div',
       { class: 'nrl-build-meta' },
@@ -85,6 +94,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
       el('div', { class: 'nrl-build-title', text: def.name }),
       meta,
       el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def) }),
+      ...(built ? [el('div', { class: 'nrl-build-hint', text: 'Already built — upgrade it instead.' })] : []),
     );
     if (affordable) {
       row.addEventListener('click', () => {
@@ -226,6 +236,7 @@ const BUILD_CSS = `
 }
 .nrl-build-cost { font-weight: bold; }
 .nrl-build-blurb { font-size: 0.75rem; line-height: 1.2; }
+.nrl-build-hint { font-size: 0.75rem; font-weight: bold; opacity: 0.85; }
 .nrl-build-head {
   display: flex;
   align-items: center;

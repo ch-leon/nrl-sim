@@ -43,3 +43,13 @@ devices/browsers. Run these manually before shipping a build.
   game state persists via the localStorage save system, so an update+reload does
   not lose progress. Avoid forcing a reload during an active match.
 - Icons are generated at build time (no binaries in repo, per ARCHITECTURE §4).
+
+## Layout QA (#18)
+The canvas uses `Scale.RESIZE` and fills the viewport (no letterboxing). Check at
+390×844, 360×740, 768×1024 and 1280×800 (Chrome devtools device mode or a real phone):
+- Grounds, match and a menu screen fill the screen; nothing is dark-navy bands.
+- All seven nav items are visible/reachable at 360px; buttons are ≥44px tall.
+- Rotate mid-match: playback continues and the camera re-frames.
+- On a notched phone, HUD/nav/scoreboard clear the safe-area insets
+  (`viewport-fit=cover` + `env(safe-area-inset-*)`).
+Screenshots: `docs/screenshots/18/`.

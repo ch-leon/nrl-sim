@@ -217,12 +217,14 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const tackleLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Tackles 0 / 0' });
   const errorLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Errors 0 / 0' });
   const statsBody = el('div', { class: 'nrl-mo-stats-body' }, possLabel, possBar, tackleLabel, errorLabel);
-  let statsOpen = true;
-  const statsToggle = button('Stats ▾', () => {
+  // #18: stats start collapsed on phones so the pitch stays clear.
+  let statsOpen = typeof window === 'undefined' || window.innerWidth > 600;
+  const statsToggle = button(statsOpen ? 'Stats ▾' : 'Stats ▸', () => {
     statsOpen = !statsOpen;
     statsBody.style.display = statsOpen ? '' : 'none';
     statsToggle.textContent = statsOpen ? 'Stats ▾' : 'Stats ▸';
   }, { class: 'nrl-mo-stats-toggle' });
+  statsBody.style.display = statsOpen ? '' : 'none';
   const statsPanel = panel({ class: 'nrl-mo-stats' }, statsToggle, statsBody);
 
   // Commentary: a slim two-line ticker (previous line dimmed, latest bright);
@@ -356,11 +358,11 @@ const OVERLAY_CSS = `
    bar step aside; the sound button moves to the bottom-right corner. */
 body.nrl-match-active .nrl-hud,
 body.nrl-match-active .nrl-nav { display: none; }
-body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: 0.5rem; }
+body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
 /* Toasts: above the commentary feed (clear of the scoreboard and stats). */
-body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 6.5rem; }
+body.nrl-match-active .nrl-toast-stack { top: auto; bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px)); }
 .nrl-mo-scoreboard {
-  position: fixed; top: 0.5rem; left: 50%; transform: translateX(-50%);
+  position: fixed; top: calc(0.5rem + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 0.75rem; z-index: 15;
   padding: 0.4rem 0.75rem;
   max-width: calc(100vw - 1rem); box-sizing: border-box;
@@ -375,14 +377,14 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 6.5rem; }
 .nrl-mo-score { font-size: clamp(1rem, 4vw, 1.4rem); font-weight: bold; display: block; }
 .nrl-mo-meta { display: flex; gap: 0.4rem; justify-content: center; font-size: clamp(0.55rem, 2vw, 0.7rem); white-space: nowrap; }
 .nrl-mo-stats {
-  position: fixed; top: 4.5rem; right: 0.5rem; z-index: 15; min-width: 9.5rem;
+  position: fixed; top: calc(4.5rem + env(safe-area-inset-top, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); z-index: 15; min-width: 9.5rem;
 }
 .nrl-mo-stats-toggle { width: 100%; margin-bottom: 0.35rem; }
 .nrl-mo-stat-line { font-size: 0.7rem; margin: 0.15rem 0; }
 .nrl-mo-poss-bar { height: 0.6rem; border: 2px solid #000; background: #b34747; margin: 0.2rem 0; }
 .nrl-mo-poss-fill { display: block; height: 100%; background: #4779b3; width: 50%; }
 .nrl-mo-commentary {
-  position: fixed; left: 0.5rem; right: 0.5rem; bottom: 3.25rem; z-index: 14;
+  position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px)); z-index: 14;
   max-width: 34rem; margin: 0 auto; padding: 0.25rem 0.5rem;
   display: flex; align-items: center; gap: 0.5rem; box-sizing: border-box;
 }
@@ -392,7 +394,7 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 6.5rem; }
 .nrl-mo-log-toggle { flex: 0 0 auto; }
 /* Full log: opt-in, stacked just above the ticker. */
 .nrl-mo-log {
-  position: fixed; left: 0.5rem; right: 0.5rem; bottom: 6.25rem; z-index: 14;
+  position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); bottom: calc(7rem + env(safe-area-inset-bottom, 0px)); z-index: 14;
   max-width: 34rem; margin: 0 auto;
 }
 .nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: 8rem; overflow-y: auto; }
@@ -400,7 +402,7 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 6.5rem; }
 /* Playback controls (mounted by MatchScene): bottom-centre, where the nav bar
    sits outside a match; the commentary feed stacks above them. */
 .nrl-mo-controls {
-  position: fixed; left: 50%; bottom: 0.5rem; transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   z-index: 20; display: flex; gap: 0.35rem; pointer-events: auto;
 }
 .nrl-mo-controls .nrl-btn[data-active] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; }
