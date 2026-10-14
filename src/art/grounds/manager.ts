@@ -41,6 +41,20 @@ const PAL: Palette = {
   c: CLUB.navy, // collar / badge
 };
 
+/** Source colours of the manager sprite — the swap keys for people.ts (#23). */
+export const MANAGER_COLORS = {
+  hairDark: 0x5a3320,
+  hairMid: 0x7a4728,
+  hairLight: 0x9c6236,
+  skin: 0xf7cfa6,
+  skinShade: 0xe0a77f,
+  shirt: CLUB.gold,
+  shirtShade: CLUB.goldDark,
+  trim: CLUB.navy,
+  trousers: 0x3b4462,
+  trousersShade: 0x2b3249,
+} as const;
+
 const TROUSER = 0x3b4462;
 const TROUSER_SHADE = 0x2b3249;
 const SHOE = 0x4a2f22;
