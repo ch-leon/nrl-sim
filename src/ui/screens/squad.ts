@@ -8,6 +8,8 @@ import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import { releasePlayer, RELEASE_PAYOUT_WEEKS } from '../../systems/freeagency';
+import { PLAYER_ID } from '../../systems/fixtures';
+import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PlayerCard, ensureScreenStyles } from './recruit';
 
 const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
@@ -19,6 +21,15 @@ const POSITION_ORDER: readonly Position[] = [
 ];
 
 type SortKey = 'position' | 'rating';
+
+/**
+ * The kit the player's squad wears on the pitch: the same club colours the
+ * match uses (matchday.ts sheetFor), so portraits match the match kit.
+ */
+function squadKit(): Kit {
+  const colors = getState().league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? ['#f4d03f', '#1a1a2e'];
+  return kitFromColors(colors, PLAYER_ID);
+}
 
 /** Return a sorted copy of the squad by the given key. Stable within groups. */
 function sortSquad(squad: readonly Player[], key: SortKey): Player[] {
@@ -95,9 +106,11 @@ export function openSquadScreen(): void {
       body.appendChild(el('div', { class: 'nrl-screen-empty', text: 'Your squad is empty.' }));
       return;
     }
+    const kit = squadKit();
     for (const player of sortSquad(s.squad, sortKey)) {
       body.appendChild(PlayerCard(player, {
         showInjury: true,
+        kit,
         action: {
           label: 'RELEASE',
           danger: true,

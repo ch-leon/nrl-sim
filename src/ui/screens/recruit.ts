@@ -11,6 +11,8 @@ import {
   signPlayer, SIGNING_FEE_WEEKS, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
 import { SQUAD_CAP } from '../../config';
+import { TRAINING_KIT, PORTRAIT_W, PORTRAIT_H, PORTRAIT_SCALE, portraitDataUrl } from '../../art/portrait';
+import type { Kit } from '../../art/match/kit';
 
 // ── Shared screen styling ───────────────────────────────────────────────────
 // Injected once alongside the base kit CSS. Card/stat-bar/screen classes used by
@@ -73,6 +75,21 @@ const SCREEN_CSS = `
   text-align: center;
 }
 .nrl-card { padding: 0.5rem 0.6rem; }
+.nrl-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+/* Pixel portrait: integer CSS scale + pixelated so every source pixel stays hard-edged. */
+.nrl-portrait {
+  flex: 0 0 auto;
+  width: ${PORTRAIT_W * PORTRAIT_SCALE}px;
+  height: ${PORTRAIT_H * PORTRAIT_SCALE}px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.nrl-card-id { flex: 1 1 auto; min-width: 0; }
 .nrl-card-head {
   display: flex;
   align-items: baseline;
@@ -161,12 +178,14 @@ export interface PlayerCardOpts {
   action?: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean };
   /** Show injury "OUT xw" badge when injuredWeeks > 0 (squad screen). */
   showInjury?: boolean;
+  /** Kit the portrait wears: club kit on the squad, TRAINING_KIT by default. */
+  kit?: Kit;
 }
 
 /**
- * Shared pixel PlayerCard used by both the recruit and squad screens. Shows
- * name, position, age, overall rating, the 5 stat bars, weekly wage, and (via
- * opts) an action button and/or injury badge.
+ * Shared pixel PlayerCard used by both the recruit and squad screens. Shows a
+ * pixel portrait, name, position, age, overall rating, the 5 stat bars, weekly
+ * wage, and (via opts) an action button and/or injury badge.
  */
 export function PlayerCard(p: Player, opts: PlayerCardOpts = {}): HTMLElement {
   const ovr = overallRating(p);
@@ -206,7 +225,19 @@ export function PlayerCard(p: Player, opts: PlayerCardOpts = {}): HTMLElement {
 
   const cost = el('div', { class: 'nrl-card-cost', text: `Wage ${money(p.wage)}/wk` });
 
-  const children: HTMLElement[] = [head, meta, bars, cost];
+  // Keyed on the squad id, the same key MatchScene uses, so the face matches on the pitch.
+  const portrait = el('img', {
+    class: 'nrl-portrait',
+    attrs: {
+      src: portraitDataUrl(p.id, opts.kit ?? TRAINING_KIT),
+      alt: '',
+      width: String(PORTRAIT_W * PORTRAIT_SCALE),
+      height: String(PORTRAIT_H * PORTRAIT_SCALE),
+    },
+  });
+  const top = el('div', { class: 'nrl-card-top' }, portrait, el('div', { class: 'nrl-card-id' }, head, meta));
+
+  const children: HTMLElement[] = [top, bars, cost];
 
   if (opts.action) {
     const cls = opts.action.danger ? 'nrl-btn-danger' : undefined;
@@ -254,6 +285,7 @@ export function openRecruitScreen(): void {
       const disabled = full || broke;
       const label = full ? 'SQUAD FULL' : broke ? 'CANT AFFORD' : `SIGN ${money(fee)}`;
       const card = PlayerCard(agent, {
+        // Free agents wear a neutral training top (TRAINING_KIT, the default).
         action: {
           label,
           disabled,
