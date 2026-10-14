@@ -72,8 +72,12 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
+/** Current save-format version. Bump when GameState changes and add a step to
+ *  MIGRATIONS in save.ts (see the pattern comment there). */
+export const SAVE_VERSION = 2;
+
 export interface GameState {
-  version: 1;
+  version: typeof SAVE_VERSION;
   clubId: 'player';
   clubName: string;
   money: number;
@@ -143,7 +147,7 @@ export function createNewGame(clubName: string, seed: number = Date.now() >>> 0)
   const league: LeagueState = { clubs: [], fixtures: [], ladder: [] };
 
   const result: GameState = {
-    version: 1,
+    version: SAVE_VERSION,
     clubId: 'player',
     clubName,
     money: STARTING_MONEY,

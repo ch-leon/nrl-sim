@@ -15,6 +15,7 @@
 import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
 import { el, panel, button, mount, openModal, closeModal } from '../ui/dom';
+import { downloadSave, getActiveSlot, importIntoSlot, pickSaveFile } from '../core/save';
 import { startTutorial } from '../ui/tutorial';
 import { canInstall, promptInstall } from './pwa';
 
@@ -709,12 +710,24 @@ export function initAudioUi(): void {
     startTutorial(true);
   });
 
+  const exportBtn = button('Export save', () => downloadSave(getState()));
+  const importBtn = button('Import save', () => {
+    void pickSaveFile().then((text) => {
+      if (text === null) return;
+      // Replaces the active slot, then reload so the title screen picks it up.
+      if (importIntoSlot(text, getActiveSlot()) && typeof location !== 'undefined') {
+        setTimeout(() => location.reload(), 600);
+      }
+    });
+  });
+
   const content = panel(
     { class: 'nrl-audio-settings' },
     el('h3', { text: 'Settings', class: 'nrl-audio-title' }),
     el('label', { class: 'nrl-audio-row' }, el('span', { text: 'Volume' }), slider),
     el('label', { class: 'nrl-audio-row' }, muteBox, el('span', { text: 'Mute' })),
     el('div', { class: 'nrl-audio-row' }, replayBtn),
+    el('div', { class: 'nrl-audio-row' }, exportBtn, importBtn),
     el('div', { class: 'nrl-audio-row nrl-audio-install-row' }, installBtn),
     button('Close', () => closeModal()),
   );

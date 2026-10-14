@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  createNewGame, getState, setState, loadState, resetForNewSeason,
+  createNewGame, SAVE_VERSION, getState, setState, loadState, resetForNewSeason,
   type GameState,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
@@ -21,7 +21,7 @@ describe('createNewGame', () => {
     expect(s.week).toBe(1);
     expect(s.season).toBe(1);
     expect(s.facilities).toEqual([]);
-    expect(s.version).toBe(1);
+    expect(s.version).toBe(SAVE_VERSION);
     expect(s.clubId).toBe('player');
     expect(s.league).toEqual({ clubs: [], fixtures: [], ladder: [] });
     expect(s.settings).toEqual({ muted: false, volume: 0.8, tutorialDone: false });
