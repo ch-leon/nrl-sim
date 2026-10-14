@@ -19,6 +19,7 @@ import { bus } from '../core/events';
 import { spendMoney, addFacility } from '../data/club';
 import { FACILITY_CATALOG, type FacilityDef, type FacilityDefId } from '../data/facility';
 import type { WalkGrid } from './path';
+import { GhostPreview } from './ghostPreview';
 
 export interface PlaceValidation {
   ok: boolean;
@@ -141,6 +142,8 @@ export class PlacementController {
 
   private defId: FacilityDefId | null = null;
   private ghost: Phaser.GameObjects.Image[] = [];
+  // Textured facility preview + outline (GitHub #24), on top of the tile highlights.
+  private preview: GhostPreview | null = null;
   private gx = 0;
   private gy = 0;
 
@@ -191,6 +194,10 @@ export class PlacementController {
       // Sit just above the floor tile at that cell.
       img.setDepth(this.depthFn(t.x, t.y, 1));
     }
+
+    const top = this.cellToWorld(gx, gy);
+    const front = this.depthFn(gx + def.footprint.w - 1, gy + def.footprint.h - 1, 1.5);
+    this.preview?.update(top, v.ok, front);
   }
 
   /**
@@ -244,10 +251,13 @@ export class PlacementController {
       img.setOrigin(0.5, 0); // diamond top vertex anchors at the projected point
       this.ghost.push(img);
     }
+    this.preview = new GhostPreview(this.scene, this.defId, def);
   }
 
   private clearGhost(): void {
     for (const img of this.ghost) img.destroy();
     this.ghost = [];
+    this.preview?.destroy();
+    this.preview = null;
   }
 }

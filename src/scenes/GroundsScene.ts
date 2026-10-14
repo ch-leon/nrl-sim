@@ -13,6 +13,7 @@ import { getState, type PlacedFacility } from '../core/state';
 import { bus } from '../core/events';
 import { openFacilityPopup } from '../ui/screens/build';
 import { attachGroundsFx } from '../fx/particles';
+import { BuildFx } from '../world/buildFx';
 import {
   grassVariantKey,
   pathEdgeKey,
@@ -93,6 +94,9 @@ export class GroundsScene extends Phaser.Scene {
   private placement!: PlacementController;
   // Rendered facility sprites keyed by PlacedFacility instance id (for re-render).
   private facilitySprites = new Map<string, Phaser.GameObjects.Image>();
+  // Construction / upgrade animations (GitHub #24); created after the first render
+  // so facilities already in the save don't animate on load.
+  private buildFx?: BuildFx;
   private offFacilityPlaced: (() => void) | null = null;
   private offStateChanged: (() => void) | null = null;
   // Players, staff and fans using the facilities (#23).
@@ -113,6 +117,7 @@ export class GroundsScene extends Phaser.Scene {
 
     // Register with the DOM ↔ scene bridge so build.ts can start placement mode.
     setActiveGroundsScene(this);
+    this.buildFx = new BuildFx(this);
     attachGroundsFx(this); // BAK-201: pooled coin/dust/confetti particle FX (WU-14)
 
     // Re-render facilities whenever one is placed or state otherwise changes
@@ -244,16 +249,20 @@ export class GroundsScene extends Phaser.Scene {
 
       const key = facilityTextureKey(f.defId, f.level);
       let sprite = this.facilitySprites.get(f.id);
+      const isNew = !sprite;
       if (!sprite) {
         sprite = this.add.image(world.x, world.y, key);
         this.facilitySprites.set(f.id, sprite);
       }
       // Level art differs in height, so the swap re-derives the origin too.
+      const upgraded = !isNew && sprite.texture.key !== key;
       if (sprite.texture.key !== key) sprite.setTexture(key);
       const o = facilityOrigin(def.footprint, sprite.height);
       sprite.setOrigin(o.x, o.y);
       sprite.setPosition(world.x, world.y);
       sprite.setDepth(d);
+      if (isNew) this.buildFx?.construct(sprite, def, world);
+      else if (upgraded) this.buildFx?.upgrade(sprite, def, world);
 
       // Block the footprint for pathfinding (safe to repeat).
       for (const t of footprintTiles(def, f.x, f.y)) {
