@@ -11,6 +11,8 @@ import {
   buildPlayerAtlas,
   drawPlayerFrame,
   lookForSlot,
+  lookForPlayer,
+  headGrid,
   opaqueBounds,
   rotate90,
 } from '../../../src/art/match/players';
@@ -101,5 +103,43 @@ describe('buildPlayerAtlas', () => {
       expect(f.x + f.w).toBeLessThanOrEqual(buf.w);
       expect(f.y + f.h).toBeLessThanOrEqual(buf.h);
     }
+  });
+});
+
+describe('player looks (#21)', () => {
+  it('has a dozen looks mixing skin, hair, hairstyle and beards', () => {
+    expect(LOOKS.length).toBeGreaterThanOrEqual(12);
+    expect(new Set(LOOKS.map((l) => l.skin)).size).toBeGreaterThanOrEqual(4);
+    expect(new Set(LOOKS.map((l) => l.style)).size).toBeGreaterThanOrEqual(5);
+    expect(LOOKS.some((l) => l.beard)).toBe(true);
+    // Every look is visually distinct.
+    const frames = LOOKS.map((l) => Array.from(drawPlayerFrame(kit, l, 'idle', 0).data).join(','));
+    expect(new Set(frames).size).toBe(LOOKS.length);
+  });
+
+  it('head grids are 8×8 and a beard changes only the jaw', () => {
+    for (const l of LOOKS) {
+      const g = headGrid(l);
+      expect(g).toHaveLength(8);
+      for (const row of g) expect(row).toHaveLength(8);
+    }
+    const plain = headGrid({ ...LOOKS[0]!, beard: false });
+    const bearded = headGrid({ ...LOOKS[0]!, beard: true });
+    expect(plain.slice(0, 6)).toEqual(bearded.slice(0, 6));
+    expect(plain.slice(6)).not.toEqual(bearded.slice(6));
+  });
+
+  it('headgear takes the kit trim colour', () => {
+    const gear = LOOKS.find((l) => l.style === 'headgear')!;
+    const b = drawPlayerFrame(kit, gear, 'idle', 0);
+    expect(countColor(b, kit.trim)).toBeGreaterThan(countColor(drawPlayerFrame(kit, { ...gear, style: 'short' }, 'idle', 0), kit.trim));
+  });
+
+  it('lookForPlayer is stable per player and spreads a squad across looks', () => {
+    expect(lookForPlayer('p-123')).toBe(lookForPlayer('p-123'));
+    const ids = Array.from({ length: 60 }, (_, i) => `player-${i}`);
+    const used = new Set(ids.map(lookForPlayer));
+    expect(used.size).toBeGreaterThanOrEqual(10);
+    for (const id of ids) expect(lookForPlayer(id)).toBeLessThan(LOOKS.length);
   });
 });

@@ -23,7 +23,7 @@
 // Phaser import), so tests drive it with a fake scene.
 import type { KickKind, MatchEvent, MatchResult, RosterEntry } from '../sim/events';
 import type { Fixture } from '../core/state';
-import type { PlayerAnim } from '../art/match/players';
+import { CELEBRATIONS, type PlayerAnim } from '../art/match/players';
 import { bus } from '../core/events';
 import {
   FULLBACK_SLOT,
@@ -244,14 +244,24 @@ const ROLE_PACE: Readonly<Record<string, number>> = {
  * stat-less roster falls back to the role factor alone. Pure + deterministic.
  */
 export function slotSpeeds(roster?: readonly RosterEntry[]): number[] {
+  return slotRoster(roster).map((entry, i) => {
+    const role = ROLE_PACE[SLOTS[i]?.role ?? ''] ?? 1;
+    const stat = entry?.stats?.speed;
+    return stat === undefined ? role : role * (0.85 + (Math.max(1, Math.min(100, stat)) / 100) * 0.3);
+  });
+}
+
+/**
+ * Which roster entry plays each formation slot: the first unused entry with
+ * the slot's role, else any leftover; undefined when the roster runs out.
+ * Shared by pace (#20) and per-player looks (#21) so they agree.
+ */
+export function slotRoster(roster?: readonly RosterEntry[]): (RosterEntry | undefined)[] {
   const pool = [...(roster ?? [])];
   return SLOTS.map((slot) => {
     let i = pool.findIndex((r) => r.position === slot.role);
     if (i < 0) i = pool.length > 0 ? 0 : -1;
-    const entry = i >= 0 ? pool.splice(i, 1)[0] : undefined;
-    const role = ROLE_PACE[slot.role] ?? 1;
-    const stat = entry?.stats?.speed;
-    return stat === undefined ? role : role * (0.85 + (Math.max(1, Math.min(100, stat)) / 100) * 0.3);
+    return i >= 0 ? pool.splice(i, 1)[0] : undefined;
   });
 }
 
@@ -297,6 +307,8 @@ interface Actor {
   slide: { from: FieldPt; to: FieldPt; t0: number; dur: number } | null;
   /** Formation updates leave this actor alone until then (ruck/contact beats). */
   busyUntil: number;
+  /** Fixed facing while resting (e.g. squared up for a chest bump); null = auto. */
+  restFace: boolean | null;
 }
 
 type BallState =
@@ -375,6 +387,7 @@ export class PlaybackController {
           cadence: 1,
           slide: null,
           busyUntil: 0,
+          restFace: null,
         };
       });
     this.actors = { home: mk('home'), away: mk('away') };
@@ -818,22 +831,49 @@ export class PlaybackController {
     // Defenders trudge back under the posts.
     const t = formationTargets({ attacking: side, ball: spot, phase: 'goal-kick', seed: this.seed });
     this.actors[otherSide(side)].forEach((a, i) => this.moveTo(a, t[otherSide(side)][i] ?? a.to));
-    // Teammates swarm the scorer and celebrate.
-    this.actors[side].forEach((a, i) => {
-      if (a === scorer) return;
-      const near = {
-        fx: goal + dir * (1 + this.wobble(i * 3) * 6) - dir * 4,
-        fy: fy + (this.wobble(i * 3 + 1) - 0.5) * 22,
-      };
-      this.moveTo(a, near, [], 'celebrate');
+    // #21: the scorer gets his own celebration; teammates either mob him in a
+    // tight huddle or fan out celebrating — with a chest-bumping pair.
+    const huddle = this.wobble(41) < 0.4;
+    const mates = this.actors[side].filter((a) => a !== scorer);
+    mates.forEach((a, i) => {
+      const near = huddle
+        ? {
+            fx: spot.fx - dir * (1.5 + Math.cos(i * 0.9) * 1.6),
+            fy: fy + Math.sin(i * 0.9) * 3.2,
+          }
+        : {
+            fx: goal + dir * (1 + this.wobble(i * 3) * 6) - dir * 4,
+            fy: fy + (this.wobble(i * 3 + 1) - 0.5) * 22,
+          };
+      const rest = huddle ? (i % 2 === 0 ? 'celebrate' : 'fistPump') : this.pickCelebration(i * 5 + 2, ['kneeSlide']);
+      this.moveTo(a, near, [], rest);
     });
+    if (!huddle && mates.length >= 2) {
+      // Two of them square up for a chest bump.
+      const [a, b] = [mates[0]!, mates[1]!];
+      const mid = { ...a.to };
+      const pa = { fx: mid.fx - 0.9, fy: mid.fy };
+      const pb = { fx: mid.fx + 0.9, fy: mid.fy };
+      this.moveTo(a, pa, [], 'chestBump');
+      this.moveTo(b, pb, [], 'chestBump');
+      const wa = this.scene.fieldToWorld(pa.fx, pa.fy).x;
+      const wb = this.scene.fieldToWorld(pb.fx, pb.fy).x;
+      a.restFace = wb < wa;
+      b.restFace = wa < wb;
+    }
     if (scorer) {
       this.moveTo(scorer, spot, [
         { anim: 'dive', ms: 420 },
         { anim: 'down', ms: 320 },
-      ], 'celebrate');
+      ], this.pickCelebration(7, ['chestBump']));
       this.giveBall(scorer);
     }
+  }
+
+  /** Deterministic celebration pick for this event (#21). */
+  private pickCelebration(k: number, exclude: readonly PlayerAnim[] = []): PlayerAnim {
+    const pool = CELEBRATIONS.filter((c) => !exclude.includes(c));
+    return pool[Math.floor(this.wobble(k) * pool.length) % pool.length] ?? 'celebrate';
   }
 
   private onGoalKick(side: Side, at: FieldPt | null, missed: boolean): void {
@@ -885,10 +925,10 @@ export class PlaybackController {
     const { homeScore, awayScore } = this.result;
     const winner: Side | null = homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : null;
     for (const side of ['home', 'away'] as const) {
-      for (const a of this.actors[side]) {
-        a.rest = side === winner ? 'celebrate' : 'idle';
+      this.actors[side].forEach((a, i) => {
+        a.rest = side === winner ? this.pickCelebration(i * 7 + 3, ['kneeSlide', 'chestBump']) : 'idle';
         this.moveTo(a, a.pos, [], a.rest);
-      }
+      });
     }
   }
 
@@ -913,6 +953,7 @@ export class PlaybackController {
     if (Math.abs(wb.x - wa.x) > 0.5) a.faceLeft = wb.x < wa.x;
     a.queue = [...queue];
     a.rest = rest;
+    a.restFace = null;
   }
 
   /** Play beats in place right now (interrupting any move). */
@@ -994,7 +1035,7 @@ export class PlaybackController {
       a.slide = null;
       a.busyUntil = 0;
       a.anim = a.rest;
-      a.faceLeft = this.restFaceLeft(a.side);
+      a.faceLeft = a.restFace ?? this.restFaceLeft(a.side);
     }
     if (this.ballState.mode === 'flight') {
       const f = this.ballState;
@@ -1056,7 +1097,7 @@ export class PlaybackController {
       return;
     }
     if (a.anim !== a.rest) a.anim = a.rest;
-    a.faceLeft = a.rest === 'idle' ? this.idleFaceLeft(a) : this.restFaceLeft(a.side);
+    a.faceLeft = a.restFace ?? (a.rest === 'idle' ? this.idleFaceLeft(a) : this.restFaceLeft(a.side));
   }
 
   /** Idle players watch the ball (#20); with it roughly level they face upfield. */
