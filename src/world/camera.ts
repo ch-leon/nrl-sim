@@ -9,6 +9,19 @@ export function clampZoom(z: number, min = 0.5, max = 2.0): number {
   return Math.min(max, Math.max(min, z));
 }
 
+/**
+ * Smallest zoom at which the whole view still fits inside `world` on both axes.
+ * Below this the visible rect is bigger than the world, so Phaser's bounds clamp
+ * (and clampScroll) would pin the map and expose whatever lies past its edge.
+ * Derived from the viewport size, so it moves when the canvas resizes.
+ */
+export function fitZoom(
+  view: { width: number; height: number },
+  world: { width: number; height: number },
+): number {
+  return Math.max(view.width / world.width, view.height / world.height);
+}
+
 // Phaser's zoom model (3.60+): zoom scales around the VIEWPORT CENTRE, and
 // scroll is zoom-independent — the world point at the view centre is always
 // `scroll + view / 2`. A screen point s therefore sees world
@@ -86,6 +99,12 @@ export interface CameraOpts {
   minZoom?: number; // default 0.5
   maxZoom?: number; // default 2.0
   dragThreshold?: number; // default 8 (px, screen space)
+  /**
+   * When true, the minimum zoom is the viewport fit for `world` (see fitZoom)
+   * instead of `minZoom`, so the view can never be larger than the world. It is
+   * recomputed on every canvas resize. `minZoom` is ignored in this mode.
+   */
+  fitView?: boolean;
 }
 
 export class CameraController {
@@ -95,6 +114,7 @@ export class CameraController {
   private minZoom: number;
   private maxZoom: number;
   private threshold: number;
+  private fitView: boolean;
 
   // Single-pointer pan state.
   private pointerDown = false;
@@ -118,6 +138,7 @@ export class CameraController {
     dy: number,
     dz: number,
   ) => void;
+  private onResize: () => void;
 
   constructor(scene: Phaser.Scene, opts: CameraOpts) {
     this.scene = scene;
@@ -126,6 +147,7 @@ export class CameraController {
     this.minZoom = opts.minZoom ?? 0.5;
     this.maxZoom = opts.maxZoom ?? 2.0;
     this.threshold = opts.dragThreshold ?? 8;
+    this.fitView = opts.fitView ?? false;
 
     this.cam.setBounds(this.world.x, this.world.y, this.world.width, this.world.height);
     // Enable a second pointer so pinch works on touch devices.
@@ -135,15 +157,17 @@ export class CameraController {
     this.onPointerMove = (p) => this.handlePointerMove(p);
     this.onPointerUp = (p) => this.handlePointerUp(p);
     this.onWheel = (p, _over, _dx, dy) => this.handleWheel(p, dy);
+    this.onResize = () => this.handleResize();
 
     scene.input.on('pointerdown', this.onPointerDown);
     scene.input.on('pointermove', this.onPointerMove);
     scene.input.on('pointerup', this.onPointerUp);
     scene.input.on('pointerupoutside', this.onPointerUp);
     scene.input.on('wheel', this.onWheel);
+    scene.scale.on('resize', this.onResize);
 
     // Apply an initial clamp in case the world is smaller than the view.
-    this.applyScroll(this.cam.scrollX, this.cam.scrollY);
+    this.handleResize();
   }
 
   /** True if the just-ended interaction exceeded the drag threshold. */
@@ -157,6 +181,28 @@ export class CameraController {
     this.scene.input.off('pointerup', this.onPointerUp);
     this.scene.input.off('pointerupoutside', this.onPointerUp);
     this.scene.input.off('wheel', this.onWheel);
+    this.scene.scale.off('resize', this.onResize);
+  }
+
+  /** Lowest zoom the user can reach: the viewport fit in fitView mode, else minZoom. */
+  private zoomFloor(): number {
+    return this.fitView
+      ? fitZoom({ width: this.cam.width, height: this.cam.height }, this.world)
+      : this.minZoom;
+  }
+
+  /**
+   * Re-apply the zoom floor and scroll clamp for the current viewport. Runs on
+   * construction and on every canvas resize, so a bigger viewport (or a rotated
+   * phone) cannot leave the camera zoomed out past the world edge.
+   */
+  private handleResize(): void {
+    const floor = this.zoomFloor();
+    if (this.cam.zoom < floor) {
+      this.zoomToPoint(this.cam.width / 2, this.cam.height / 2, floor);
+    } else {
+      this.applyScroll(this.cam.scrollX, this.cam.scrollY);
+    }
   }
 
   private activePointers(): Phaser.Input.Pointer[] {
@@ -216,7 +262,7 @@ export class CameraController {
 
   private handleWheel(p: Phaser.Input.Pointer, deltaY: number): void {
     const oldZoom = this.cam.zoom;
-    const newZoom = clampZoom(oldZoom * (deltaY > 0 ? 0.9 : 1.1), this.minZoom, this.maxZoom);
+    const newZoom = clampZoom(oldZoom * (deltaY > 0 ? 0.9 : 1.1), this.zoomFloor(), this.maxZoom);
     if (newZoom === oldZoom) return;
     this.zoomToPoint(p.x, p.y, newZoom);
   }
@@ -228,7 +274,7 @@ export class CameraController {
       return;
     }
     const oldZoom = this.cam.zoom;
-    const newZoom = clampZoom((oldZoom * dist) / this.pinchPrevDist, this.minZoom, this.maxZoom);
+    const newZoom = clampZoom((oldZoom * dist) / this.pinchPrevDist, this.zoomFloor(), this.maxZoom);
     this.pinchPrevDist = dist;
     // Anchor to the midpoint between the two pointers (screen space).
     if (newZoom !== oldZoom) {

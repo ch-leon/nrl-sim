@@ -1,5 +1,85 @@
 import { describe, it, expect } from 'vitest';
-import { clampZoom, clampScroll, isDrag, screenToWorld, zoomAnchorScroll } from '../../src/world/camera';
+import {
+  clampZoom,
+  clampScroll,
+  fitZoom,
+  isDrag,
+  screenToWorld,
+  zoomAnchorScroll,
+} from '../../src/world/camera';
+
+// The Grounds scenery field in world px (GroundsScene.worldBounds: grid + 9 cells of decor).
+const GROUNDS_WORLD = { x: -576, y: -288, width: 2432, height: 1216 };
+const DESKTOP = { width: 1280, height: 720 }; // FIT-scaled game canvas
+const PHONE = { width: 390, height: 844 }; // portrait phone viewport
+
+describe('camera.fitZoom', () => {
+  it('is the zoom at which the view exactly fits the world on its tighter axis', () => {
+    const world = { width: 2000, height: 1000 };
+    // width-limited: 800/2000 = 0.4 vs 500/1000 = 0.5 -> 0.5 (height-limited)
+    expect(fitZoom({ width: 800, height: 500 }, world)).toBe(0.5);
+    // height-limited: 900/2000 = 0.45 vs 400/1000 = 0.4 -> 0.45 (width-limited)
+    expect(fitZoom({ width: 900, height: 400 }, world)).toBe(0.45);
+  });
+
+  it('grows with the viewport, so a canvas resize raises the floor', () => {
+    const small = fitZoom({ width: 800, height: 600 }, GROUNDS_WORLD);
+    const big = fitZoom({ width: 1600, height: 1200 }, GROUNDS_WORLD);
+    expect(big).toBeCloseTo(small * 2, 10);
+  });
+
+  it('gives the grounds floor for desktop and phone viewports', () => {
+    // desktop: max(1280/2432, 720/1216) = 720/1216
+    expect(fitZoom(DESKTOP, GROUNDS_WORLD)).toBeCloseTo(720 / 1216, 10);
+    // phone: max(390/2432, 844/1216) = 844/1216
+    expect(fitZoom(PHONE, GROUNDS_WORLD)).toBeCloseTo(844 / 1216, 10);
+  });
+});
+
+describe('camera zoom floor on the grounds world (fitView)', () => {
+  // Visible world size at a zoom is view / zoom; at the fit floor it must not
+  // exceed the world on either axis, and the clamp must pin to both edges.
+  for (const [name, view] of [
+    ['desktop', DESKTOP],
+    ['phone', PHONE],
+  ] as const) {
+    it(`never shows past the world edge at the ${name} floor`, () => {
+      const floor = fitZoom(view, GROUNDS_WORLD);
+      for (const zoom of [floor, floor * 1.25, 1, 2]) {
+        for (const s of [-1e6, 0, 1e6]) {
+          const c = clampScroll(s, s, view, zoom, GROUNDS_WORLD);
+          const tl = screenToWorld(0, 0, view, c, zoom);
+          const br = screenToWorld(view.width, view.height, view, c, zoom);
+          expect(tl.x).toBeGreaterThanOrEqual(GROUNDS_WORLD.x - 1e-6);
+          expect(tl.y).toBeGreaterThanOrEqual(GROUNDS_WORLD.y - 1e-6);
+          expect(br.x).toBeLessThanOrEqual(GROUNDS_WORLD.x + GROUNDS_WORLD.width + 1e-6);
+          expect(br.y).toBeLessThanOrEqual(GROUNDS_WORLD.y + GROUNDS_WORLD.height + 1e-6);
+        }
+      }
+    });
+
+    it(`does not pin at the ${name} floor (scroll range is real, not a single point)`, () => {
+      const floor = fitZoom(view, GROUNDS_WORLD);
+      // The constraining axis is exactly world-sized: both extremes land on the
+      // world edges, so the view is fully covered by the world with no slack.
+      const axis =
+        view.width / floor / GROUNDS_WORLD.width >= view.height / floor / GROUNDS_WORLD.height
+          ? 'x'
+          : 'y';
+      const lo = clampScroll(-1e6, -1e6, view, floor, GROUNDS_WORLD);
+      const hi = clampScroll(1e6, 1e6, view, floor, GROUNDS_WORLD);
+      const tl = screenToWorld(0, 0, view, lo, floor);
+      const br = screenToWorld(view.width, view.height, view, hi, floor);
+      if (axis === 'x') {
+        expect(tl.x).toBeCloseTo(GROUNDS_WORLD.x, 6);
+        expect(br.x).toBeCloseTo(GROUNDS_WORLD.x + GROUNDS_WORLD.width, 6);
+      } else {
+        expect(tl.y).toBeCloseTo(GROUNDS_WORLD.y, 6);
+        expect(br.y).toBeCloseTo(GROUNDS_WORLD.y + GROUNDS_WORLD.height, 6);
+      }
+    });
+  }
+});
 
 describe('camera.clampZoom', () => {
   it('clamps to the default 0.5..2.0 range', () => {
