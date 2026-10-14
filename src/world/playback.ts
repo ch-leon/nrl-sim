@@ -40,6 +40,7 @@ import {
   type Phase,
   type Side,
 } from './formation';
+import { carrierMarkerTarget, nameTagFor, type NameTag } from './readability';
 
 // ── Clock constants (spec) ────────────────────────────────────────────────────
 export const SIM_MINUTES = 80;
@@ -100,6 +101,17 @@ export interface PlaybackCamera {
   shake(duration: number, intensity: number): void;
 }
 
+/**
+ * Optional readability hooks (#17): which sprite a beat used, and who holds the
+ * ball. Presentation only — the controller never reads anything back.
+ */
+export interface PlaybackFocus {
+  /** Name tag over the sprite playback picked for this beat. */
+  tag(tag: NameTag): void;
+  /** Ring target under the ball carrier in world px; null when nobody holds it. */
+  carrier(target: { side: Side; x: number; y: number } | null): void;
+}
+
 export interface PlaybackScene {
   fieldToWorld(fx: number, fy: number): { x: number; y: number };
   readonly players: { readonly home: readonly PlaybackActor[]; readonly away: readonly PlaybackActor[] };
@@ -107,6 +119,7 @@ export interface PlaybackScene {
   readonly cameras: { main: PlaybackCamera };
   /** Home team id — decides which side an event's teamId refers to. */
   readonly homeId: string;
+  readonly focus?: PlaybackFocus;
 }
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
@@ -352,6 +365,8 @@ export class PlaybackController {
   private ballState: BallState;
   private pending: Pending[] = [];
   private seed = 0;
+  /** Sprite the current event's handler picked as its actor (for the name tag). */
+  private tagged: Actor | null = null;
   /** +1 when increasing fx moves right on screen (home faces right at rest). */
   private readonly screenDir: number;
 
@@ -510,6 +525,7 @@ export class PlaybackController {
     // 1. Emit on the bus FIRST so the overlay/score update in lockstep.
     bus.emit('match:event', ev);
     this.seed++;
+    this.tagged = null;
 
     // 2. Formation + beat for the event kind.
     const side = this.sideOf(ev.teamId);
@@ -569,6 +585,10 @@ export class PlaybackController {
         break;
       default:
         break;
+    }
+    if (!instant && this.tagged) {
+      const tag = nameTagFor(ev, this.tagged);
+      if (tag) this.scene.focus?.tag(tag);
     }
     if (instant) this.settle();
   }
@@ -635,6 +655,7 @@ export class PlaybackController {
     const defender = contact ? this.actors[defending][nearestIndex(t[defending], at, [HOOKER_SLOT])] : undefined;
     this.applyFormation(attacking, at, phase, [carrier, defender].filter((a): a is Actor => !!a));
     if (!carrier) return;
+    this.tagged = carrier;
     const dir = attackDir(attacking);
     if (contact) {
       // #19: straight-arm fend; the defender is shrugged off / dives and misses.
@@ -684,6 +705,7 @@ export class PlaybackController {
     const held = this.ballState.mode === 'held' && this.ballState.holder.side === side ? this.ballState.holder : null;
     const kicker = held ?? this.actors[side][KICKER_SLOT];
     if (!kicker) return 0;
+    this.tagged = kicker;
     const chaser = flight.touch ? undefined : this.actors[side][nearestIndex(t[side], land.p, [kicker.slot])];
     const defender = flight.touch
       ? this.actors[def][nearestIndex(t[def], { fx: land.p.fx, fy: Math.max(5, Math.min(95, land.p.fy)) })]
@@ -778,6 +800,7 @@ export class PlaybackController {
     const held = this.ballState.mode === 'held' && this.ballState.holder.side === attacking ? this.ballState.holder : null;
     const carrier = held ?? this.actors[attacking][nearestIndex(t[attacking], at)];
     const tackler = this.actors[defending][nearestIndex(t[defending], at, [HOOKER_SLOT])];
+    this.tagged = tackler ?? null; // the event names the hitter, not the carrier
     this.applyFormation(attacking, at, 'open', [carrier, tackler].filter((a): a is Actor => !!a));
     const dir = attackDir(attacking);
     // #19: a big-hit drives the carrier (and his tackler) back toward his line.
@@ -813,6 +836,7 @@ export class PlaybackController {
   }
 
   private onError(side: Side, at: FieldPt): void {
+    if (this.ballState.mode === 'held' && this.ballState.holder.side === side) this.tagged = this.ballState.holder;
     this.applyFormation(side, at, 'open');
     const from = this.ballPoint();
     const dir = attackDir(side);
@@ -828,6 +852,7 @@ export class PlaybackController {
     const held = this.ballState.mode === 'held' && this.ballState.holder.side === side ? this.ballState.holder : null;
     const others = this.actors[side].map((a) => a.pos);
     const scorer = held ?? this.actors[side][nearestIndex(others, spot)];
+    this.tagged = scorer ?? null;
     // Defenders trudge back under the posts.
     const t = formationTargets({ attacking: side, ball: spot, phase: 'goal-kick', seed: this.seed });
     this.actors[otherSide(side)].forEach((a, i) => this.moveTo(a, t[otherSide(side)][i] ?? a.to));
@@ -881,6 +906,7 @@ export class PlaybackController {
     const spot = at ?? { fx: (dir > 0 ? 100 : 0) - dir * 10, fy: 50 };
     this.applyFormation(side, spot, 'goal-kick');
     const kicker = this.actors[side][KICKER_SLOT];
+    this.tagged = kicker ?? null;
     // Ball is placed on the tee at the mark.
     const from = this.ballPoint();
     this.ballState = { mode: 'flight', from: from.p, fromLift: from.lift, to: spot, t0: this.vis, dur: 260, peak: 6, then: null };
@@ -894,6 +920,7 @@ export class PlaybackController {
     const held = this.ballState.mode === 'held' ? this.ballState.holder : null;
     const kicker = held && held.side === side ? held : this.actors[side][KICKER_SLOT];
     if (!kicker) return;
+    this.tagged = kicker;
     const from = { ...kicker.pos };
     this.beat(kicker, [{ anim: 'kick', ms: 520, fn: () => this.later(160, () => this.kickAtPosts(side, from, false)) }]);
   }
@@ -1142,6 +1169,13 @@ export class PlaybackController {
       }
     }
     const s = this.ballState;
+    const mark = carrierMarkerTarget(s);
+    if (mark) {
+      const m = this.scene.fieldToWorld(mark.fx, mark.fy);
+      this.scene.focus?.carrier({ side: mark.side, x: m.x, y: m.y });
+    } else {
+      this.scene.focus?.carrier(null);
+    }
     if (s.mode === 'held') {
       const h = s.holder;
       const w = this.scene.fieldToWorld(h.pos.fx, h.pos.fy);

@@ -22,6 +22,7 @@ import { el, panel, button, mount, ensureStyles } from '../dom';
 import { bus } from '../../core/events';
 import { makeRng } from '../../utils/rng';
 import { commentaryFor } from '../../sim/commentary';
+import { truncateTicker } from '../../world/readability';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 
 // ── Pure accumulator (unit-tested independent of the DOM) ─────────────────────
@@ -155,7 +156,8 @@ export function formatClock(minute: number): string {
 
 // ── DOM overlay ────────────────────────────────────────────────────────────────
 
-const MAX_COMMENTARY = 6;
+/** Lines kept in the full log behind the ticker's Log toggle. */
+const MAX_LOG = 40;
 
 export interface MatchOverlayHandle {
   /** Remove the overlay and unsubscribe all bus handlers. Idempotent. */
@@ -223,11 +225,27 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   }, { class: 'nrl-mo-stats-toggle' });
   const statsPanel = panel({ class: 'nrl-mo-stats' }, statsToggle, statsBody);
 
-  // Commentary feed.
-  const feed = el('div', { class: 'nrl-mo-feed' });
-  const commentaryPanel = panel({ class: 'nrl-mo-commentary' }, feed);
+  // Commentary: a slim two-line ticker (previous line dimmed, latest bright);
+  // the full log sits behind a toggle so it never covers play unasked (#17).
+  const tickerPrev = el('div', { class: 'nrl-mo-line nrl-mo-line-prev' });
+  const tickerLatest = el('div', { class: 'nrl-mo-line' });
+  const log = el('div', { class: 'nrl-mo-feed' });
+  const logPanel = panel({ class: 'nrl-mo-log' }, log);
+  logPanel.style.display = 'none';
+  let logOpen = false;
+  const logToggle = button('Log ▴', () => {
+    logOpen = !logOpen;
+    logPanel.style.display = logOpen ? '' : 'none';
+    logToggle.textContent = logOpen ? 'Log ▾' : 'Log ▴';
+    if (logOpen) log.scrollTop = log.scrollHeight;
+  }, { class: 'nrl-mo-log-toggle' });
+  const commentaryPanel = panel(
+    { class: 'nrl-mo-commentary' },
+    el('div', { class: 'nrl-mo-ticker' }, tickerPrev, tickerLatest),
+    logToggle,
+  );
 
-  root.append(scoreboard, statsPanel, commentaryPanel);
+  root.append(scoreboard, statsPanel, logPanel, commentaryPanel);
   mount(root);
   document.body?.classList.add(MATCH_ACTIVE_CLASS);
 
@@ -243,12 +261,16 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     if (fill) fill.style.width = `${ph}%`;
   };
 
+  let prevLine = '';
   const appendCommentary = (line: string): void => {
-    feed.append(el('div', { class: 'nrl-mo-line', text: line }));
-    while (feed.childElementCount > MAX_COMMENTARY) {
-      feed.firstElementChild?.remove();
+    tickerPrev.textContent = truncateTicker(prevLine);
+    tickerLatest.textContent = truncateTicker(line);
+    prevLine = line;
+    log.append(el('div', { class: 'nrl-mo-line', text: line }));
+    while (log.childElementCount > MAX_LOG) {
+      log.firstElementChild?.remove();
     }
-    feed.scrollTop = feed.scrollHeight;
+    if (logOpen) log.scrollTop = log.scrollHeight;
   };
 
   const onEvent = (ev: MatchEvent): void => {
@@ -336,7 +358,7 @@ body.nrl-match-active .nrl-hud,
 body.nrl-match-active .nrl-nav { display: none; }
 body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: 0.5rem; }
 /* Toasts: above the commentary feed (clear of the scoreboard and stats). */
-body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 13.25rem; }
+body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 6.5rem; }
 .nrl-mo-scoreboard {
   position: fixed; top: 0.5rem; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 0.75rem; z-index: 15;
@@ -361,6 +383,16 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 13.25rem; }
 .nrl-mo-poss-fill { display: block; height: 100%; background: #4779b3; width: 50%; }
 .nrl-mo-commentary {
   position: fixed; left: 0.5rem; right: 0.5rem; bottom: 3.25rem; z-index: 14;
+  max-width: 34rem; margin: 0 auto; padding: 0.25rem 0.5rem;
+  display: flex; align-items: center; gap: 0.5rem; box-sizing: border-box;
+}
+.nrl-mo-ticker { flex: 1 1 auto; min-width: 0; }
+.nrl-mo-ticker .nrl-mo-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1.25em; }
+.nrl-mo-line-prev { opacity: 0.55; }
+.nrl-mo-log-toggle { flex: 0 0 auto; }
+/* Full log: opt-in, stacked just above the ticker. */
+.nrl-mo-log {
+  position: fixed; left: 0.5rem; right: 0.5rem; bottom: 6.25rem; z-index: 14;
   max-width: 34rem; margin: 0 auto;
 }
 .nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: 8rem; overflow-y: auto; }
@@ -375,15 +407,15 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 13.25rem; }
 /* Full-time: scoreboard and stats stay put (HUD/nav are still hidden); the
    feed gives way to the Back-to-Club button (MatchScene, bottom-centre where
    the controls were) and the result toast sits just above it. */
-.nrl-mo-final .nrl-mo-commentary { display: none; }
+.nrl-mo-final .nrl-mo-commentary, .nrl-mo-final .nrl-mo-log { display: none; }
 body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
 /* Short (landscape phone) viewports: keep stats and commentary apart. */
 @media (max-height: 480px) {
   .nrl-mo-stats { top: 4rem; min-width: 8.5rem; padding: 0.3rem 0.5rem; }
   .nrl-mo-stat-line { font-size: 0.62rem; margin: 0.05rem 0; }
   .nrl-mo-feed { max-height: 3.4rem; }
-  .nrl-mo-commentary { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
-  body.nrl-match-active .nrl-toast-stack { bottom: 8.25rem; }
+  .nrl-mo-commentary, .nrl-mo-log { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
+  body.nrl-match-active .nrl-toast-stack { bottom: 5.5rem; }
   body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
 }
 `;
