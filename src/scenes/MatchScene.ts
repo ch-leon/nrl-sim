@@ -366,7 +366,8 @@ export class MatchScene extends Phaser.Scene {
   private mountPlaybackControls(): void {
     const wrap = document.createElement('div');
     // Positioned by the overlay stylesheet (bottom-centre; the nav bar is hidden
-    // while the match overlay is up, so nothing sits underneath).
+    // while the match overlay is up — including full-time — so nothing sits
+    // underneath).
     wrap.className = 'nrl-mo-controls';
 
     const speeds: PlaybackSpeed[] = [1, 2, 4];
@@ -397,10 +398,12 @@ export class MatchScene extends Phaser.Scene {
     // Hidden until full-time; before then, playback + Skip drive the flow.
     const btn = button('Back to Club', () => this.exitToGrounds());
     btn.style.position = 'fixed';
-    // Centred above the nav bar so it never overlaps the nav buttons.
+    // Bottom-centre, taking the playback controls' slot at full-time: the
+    // match overlay keeps the HUD/nav hidden until this is pressed (#14). The
+    // no-result fallback has no overlay, so it clears the visible nav instead.
     btn.style.left = '50%';
     btn.style.transform = 'translateX(-50%)';
-    btn.style.bottom = '3.25rem';
+    btn.style.bottom = this.result ? '0.5rem' : '3.25rem';
     btn.style.zIndex = '20';
     // If no result was provided (defensive), keep the classic fallback visible.
     btn.style.display = this.result ? 'none' : '';

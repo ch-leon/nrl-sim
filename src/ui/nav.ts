@@ -2,7 +2,7 @@
 // nav.ts imports NO screen modules: later WUs (squad/recruit/fixtures/build)
 // register themselves from main.ts via registerScreen(). No Phaser imports.
 
-import { button, mount, ensureStyles } from './dom';
+import { button, mount, ensureStyles, trackChromeInset, NAV_INSET_VAR } from './dom';
 
 /** A registered nav destination. */
 export interface NavScreen {
@@ -84,11 +84,14 @@ export function createNav(): Nav {
   }
 
   mount(root);
+  // Screens sit above the nav (GitHub #14): publish our live height.
+  const offInset = trackChromeInset(root, NAV_INSET_VAR);
 
   return {
     el: root,
     registerScreen,
     destroy() {
+      offInset();
       root.remove();
     },
   };

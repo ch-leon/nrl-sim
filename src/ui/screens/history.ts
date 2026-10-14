@@ -4,7 +4,7 @@
 
 import { bus } from '../../core/events';
 import { getState, type GameState } from '../../core/state';
-import { el, panel, button, openModal, closeModal } from '../dom';
+import { el, panel, button, openModal, closeScreen } from '../dom';
 
 export interface SeasonHistoryEntry {
   season: number;
@@ -83,8 +83,8 @@ export function openHistoryScreen(): HTMLElement {
     content.append(list);
   }
 
-  content.append(button('Close', () => closeModal()));
-  return openModal(content, { class: 'nrl-history-modal' });
+  content.append(button('Close', () => closeScreen()));
+  return openModal(content, { class: 'nrl-history-modal', screen: true });
 }
 
 /**

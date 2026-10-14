@@ -12,8 +12,12 @@
 // Layout: while mounted the overlay puts `nrl-match-active` on <body>, which
 // hides the HUD strip and bottom nav (no Advance Week / screen hopping
 // mid-match, and nothing for the scoreboard or the ×1/×2/×4/Skip controls to
-// collide with) and moves the sound button to the bottom-right corner. Removed
-// again at full-time (the scoreboard stays, frozen on the result) and on destroy.
+// collide with), moves the sound button to the bottom-right corner and
+// re-anchors toasts above the commentary feed. It stays on through full-time
+// (GitHub #14: the match view stays clean until "Back to Club"), when
+// `nrl-match-final` is added too: the feed gives way to the Back-to-Club button
+// and the result toast sits just above it. Both are removed on destroy (the
+// scene's teardown when leaving), which hands the HUD/nav back.
 import { el, panel, button, mount, ensureStyles } from '../dom';
 import { bus } from '../../core/events';
 import { makeRng } from '../../utils/rng';
@@ -262,17 +266,17 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       offEvent();
       offFinished();
       root.remove();
-      document.body?.classList.remove(MATCH_ACTIVE_CLASS);
+      document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
       if (active === handle) active = null;
     },
   };
-  // Full-time: freeze on the final score (the result toast is transient) and
-  // hand the HUD/nav back; MatchScene destroys the overlay when leaving.
+  // Full-time: freeze on the final score (the result toast is transient). The
+  // HUD/nav stay hidden until MatchScene destroys the overlay on Back-to-Club.
   offFinished = bus.on('match:finished', () => {
     offEvent();
     halfEl.textContent = 'Full-time';
     root.classList.add('nrl-mo-final');
-    document.body?.classList.remove(MATCH_ACTIVE_CLASS);
+    document.body?.classList.add(MATCH_FINAL_CLASS);
   });
 
   active = handle;
@@ -312,6 +316,8 @@ function deriveSeed(result: MatchResult): number {
 const OVERLAY_STYLE_ID = 'nrl-match-overlay-styles';
 /** Body class set while a match overlay is mounted (see header). */
 export const MATCH_ACTIVE_CLASS = 'nrl-match-active';
+/** Body class added at full-time (alongside MATCH_ACTIVE_CLASS) until exit. */
+export const MATCH_FINAL_CLASS = 'nrl-match-final';
 
 function injectOverlayStyles(): void {
   if (typeof document === 'undefined') return;
@@ -324,10 +330,13 @@ function injectOverlayStyles(): void {
 
 const OVERLAY_CSS = `
 .nrl-match-overlay { font-family: 'Courier New', monospace; }
-/* Match mode: the HUD strip and nav bar step aside; sound button moves down. */
+/* Match mode (live AND full-time, until Back to Club): the HUD strip and nav
+   bar step aside; the sound button moves to the bottom-right corner. */
 body.nrl-match-active .nrl-hud,
 body.nrl-match-active .nrl-nav { display: none; }
 body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: 0.5rem; }
+/* Toasts: above the commentary feed (clear of the scoreboard and stats). */
+body.nrl-match-active .nrl-toast-stack { top: auto; bottom: 13.25rem; }
 .nrl-mo-scoreboard {
   position: fixed; top: 0.5rem; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 0.75rem; z-index: 15;
@@ -363,17 +372,18 @@ body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: 0.5rem; }
   z-index: 20; display: flex; gap: 0.35rem; pointer-events: auto;
 }
 .nrl-mo-controls .nrl-btn[data-active] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; }
-/* Full-time: HUD is back, so the scoreboard drops below it and the toast row;
-   the feed gives way to the Back-to-Club button. */
-.nrl-mo-final .nrl-mo-scoreboard { top: 5.5rem; }
+/* Full-time: scoreboard and stats stay put (HUD/nav are still hidden); the
+   feed gives way to the Back-to-Club button (MatchScene, bottom-centre where
+   the controls were) and the result toast sits just above it. */
 .nrl-mo-final .nrl-mo-commentary { display: none; }
+body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
 /* Short (landscape phone) viewports: keep stats and commentary apart. */
 @media (max-height: 480px) {
   .nrl-mo-stats { top: 4rem; min-width: 8.5rem; padding: 0.3rem 0.5rem; }
   .nrl-mo-stat-line { font-size: 0.62rem; margin: 0.05rem 0; }
   .nrl-mo-feed { max-height: 3.4rem; }
   .nrl-mo-commentary { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
-  /* No room for both beside the returning HUD: the final score wins. */
-  .nrl-mo-final .nrl-mo-stats { display: none; }
+  body.nrl-match-active .nrl-toast-stack { bottom: 8.25rem; }
+  body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
 }
 `;
