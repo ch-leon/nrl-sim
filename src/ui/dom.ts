@@ -286,6 +286,8 @@ const CSS = `
   box-shadow: 3px 3px 0 #000;
   padding: 0.4rem 0.7rem;
   margin: 0;
+  min-height: 44px; /* #18: phone tap target */
+  min-width: 44px;
   line-height: 1.1;
   white-space: nowrap;
   image-rendering: pixelated;
@@ -311,7 +313,8 @@ const CSS = `
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  padding: 0.5rem;
+  /* #18: keep clear of notches / rounded corners. */
+  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
   z-index: 10;
 }
 .nrl-hud-readouts {
@@ -351,10 +354,25 @@ const CSS = `
   right: 0;
   display: flex;
   gap: 0.4rem;
-  padding: 0.5rem;
+  /* #18: home-bar / side insets; the row scrolls sideways when it overflows. */
+  padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) calc(0.5rem + env(safe-area-inset-bottom, 0px)) calc(0.5rem + env(safe-area-inset-left, 0px));
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   white-space: nowrap;
   z-index: 10;
+}
+/* Narrow phones: tighter buttons so most of the nav fits without scrolling. */
+@media (max-width: 480px) {
+  .nrl-nav { gap: 0.15rem; }
+  /* All seven items fit at 360px; the row still scrolls if a font is wider. */
+  .nrl-nav .nrl-btn {
+    padding: 0.4rem 0.1rem;
+    font-size: 0.58rem;
+    border-width: 2px;
+    box-shadow: 2px 2px 0 #000;
+  }
+  .nrl-hud .nrl-btn { padding: 0.4rem 0.5rem; }
 }
 .nrl-nav .nrl-btn { flex: 0 0 auto; }
 
@@ -393,7 +411,9 @@ const CSS = `
   z-index: 50;
   box-sizing: border-box;
 }
-.nrl-screen-backdrop { padding: 0.5rem; }
+.nrl-screen-backdrop {
+  padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
+}
 .nrl-screen-backdrop .nrl-modal {
   /* Fit inside the region (drop-shadow included) rather than the viewport. */
   max-height: calc(100% - 6px);
