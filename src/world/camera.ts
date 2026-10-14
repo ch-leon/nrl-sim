@@ -9,10 +9,18 @@ export function clampZoom(z: number, min = 0.5, max = 2.0): number {
   return Math.min(max, Math.max(min, z));
 }
 
+// Phaser's zoom model (3.60+): zoom scales around the VIEWPORT CENTRE, and
+// scroll is zoom-independent — the world point at the view centre is always
+// `scroll + view / 2`. A screen point s therefore sees world
+// `scroll + view/2 + (s - view/2) / zoom`. Every helper below uses that model so
+// it agrees with Phaser's own bounds clamp (BaseCamera.clampX/Y).
+
 /**
  * Clamp scroll so the camera view stays within world bounds at the given zoom.
- * When the world is smaller than the view, `Math.max(world.x, ...)` keeps
- * maxX >= minX so the map stays pinned instead of jittering.
+ * Mirrors Phaser's BaseCamera.clampX/Y: the visible world rect is centred on
+ * `scroll + view/2`, so the scroll range shifts by `(view/zoom - view) / 2`.
+ * When the world is smaller than the visible rect, `Math.max(min, ...)` keeps
+ * max >= min so the map stays pinned instead of jittering.
  */
 export function clampScroll(
   scrollX: number,
@@ -23,11 +31,48 @@ export function clampScroll(
 ): { x: number; y: number } {
   const vw = view.width / zoom;
   const vh = view.height / zoom;
-  const maxX = Math.max(world.x, world.x + world.width - vw);
-  const maxY = Math.max(world.y, world.y + world.height - vh);
+  const minX = world.x + (vw - view.width) / 2;
+  const minY = world.y + (vh - view.height) / 2;
+  const maxX = Math.max(minX, minX + world.width - vw);
+  const maxY = Math.max(minY, minY + world.height - vh);
   return {
-    x: Math.min(maxX, Math.max(world.x, scrollX)),
-    y: Math.min(maxY, Math.max(world.y, scrollY)),
+    x: Math.min(maxX, Math.max(minX, scrollX)),
+    y: Math.min(maxY, Math.max(minY, scrollY)),
+  };
+}
+
+/** World point under screen point (sx, sy) for a camera at `scroll` / `zoom`. */
+export function screenToWorld(
+  sx: number,
+  sy: number,
+  view: { width: number; height: number },
+  scroll: { x: number; y: number },
+  zoom: number,
+): { x: number; y: number } {
+  return {
+    x: scroll.x + view.width / 2 + (sx - view.width / 2) / zoom,
+    y: scroll.y + view.height / 2 + (sy - view.height / 2) / zoom,
+  };
+}
+
+/**
+ * Scroll that keeps the world point under screen point (sx, sy) fixed while the
+ * zoom changes from `oldZoom` to `newZoom` (zoom-to-cursor / pinch midpoint).
+ * Works from screen coordinates so it never depends on a pointer's cached
+ * worldX/worldY, which Phaser only refreshes when the pointer moves.
+ */
+export function zoomAnchorScroll(
+  sx: number,
+  sy: number,
+  view: { width: number; height: number },
+  scroll: { x: number; y: number },
+  oldZoom: number,
+  newZoom: number,
+): { x: number; y: number } {
+  const w = screenToWorld(sx, sy, view, scroll, oldZoom);
+  return {
+    x: w.x - view.width / 2 - (sx - view.width / 2) / newZoom,
+    y: w.y - view.height / 2 - (sy - view.height / 2) / newZoom,
   };
 }
 
@@ -173,7 +218,7 @@ export class CameraController {
     const oldZoom = this.cam.zoom;
     const newZoom = clampZoom(oldZoom * (deltaY > 0 ? 0.9 : 1.1), this.minZoom, this.maxZoom);
     if (newZoom === oldZoom) return;
-    this.zoomToPoint(p.worldX, p.worldY, newZoom);
+    this.zoomToPoint(p.x, p.y, newZoom);
   }
 
   private handlePinch(p0: Phaser.Input.Pointer, p1: Phaser.Input.Pointer): void {
@@ -185,29 +230,26 @@ export class CameraController {
     const oldZoom = this.cam.zoom;
     const newZoom = clampZoom((oldZoom * dist) / this.pinchPrevDist, this.minZoom, this.maxZoom);
     this.pinchPrevDist = dist;
-    // Anchor to the midpoint between the two pointers (in world space).
-    const midWorldX = (p0.worldX + p1.worldX) / 2;
-    const midWorldY = (p0.worldY + p1.worldY) / 2;
+    // Anchor to the midpoint between the two pointers (screen space).
     if (newZoom !== oldZoom) {
-      this.zoomToPoint(midWorldX, midWorldY, newZoom);
+      this.zoomToPoint((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, newZoom);
     }
     // Any two-finger gesture counts as a drag so it never triggers a tap.
     this.dragging = true;
   }
 
-  /** Set zoom while keeping the given world point fixed under the cursor/midpoint. */
-  private zoomToPoint(worldX: number, worldY: number, newZoom: number): void {
-    // Screen offset of the anchor point relative to the camera view centre.
-    const dxScreen = (worldX - this.cam.midPoint.x) * this.cam.zoom;
-    const dyScreen = (worldY - this.cam.midPoint.y) * this.cam.zoom;
+  /** Set zoom while keeping the world point under screen (sx, sy) fixed. */
+  private zoomToPoint(sx: number, sy: number, newZoom: number): void {
+    const next = zoomAnchorScroll(
+      sx,
+      sy,
+      { width: this.cam.width, height: this.cam.height },
+      { x: this.cam.scrollX, y: this.cam.scrollY },
+      this.cam.zoom,
+      newZoom,
+    );
     this.cam.setZoom(newZoom);
-    // After zoom, recompute the world point that should sit at the same screen
-    // offset and scroll so the anchor stays put.
-    const newMidX = worldX - dxScreen / newZoom;
-    const newMidY = worldY - dyScreen / newZoom;
-    const scrollX = newMidX - this.cam.width / 2 / newZoom;
-    const scrollY = newMidY - this.cam.height / 2 / newZoom;
-    this.applyScroll(scrollX, scrollY);
+    this.applyScroll(next.x, next.y);
   }
 
   private applyScroll(x: number, y: number): void {
