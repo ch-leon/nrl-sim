@@ -21,7 +21,7 @@
 //
 // The class depends only on the structural PlaybackScene interface below (no
 // Phaser import), so tests drive it with a fake scene.
-import type { MatchEvent, MatchResult } from '../sim/events';
+import type { KickKind, MatchEvent, MatchResult } from '../sim/events';
 import type { Fixture } from '../core/state';
 import type { PlayerAnim } from '../art/match/players';
 import { bus } from '../core/events';
@@ -121,6 +121,55 @@ const HALF_TIME_PAUSE_MS = 1500;
 const TRY_PAUSE_MS = 1800;
 const GOAL_PAUSE_MS = 1100;
 
+/** Kicker wind-up beat, and when in it the boot meets the ball. */
+const KICK_BEAT_MS = 420;
+const KICK_CONTACT_MS = 150;
+/** Leap / gather beat for whoever claims a contested kick. */
+const CATCH_BEAT_MS = 360;
+/** Longest a single kick may hold the event clock (ms at ×1). */
+const MAX_KICK_HOLD_MS = 2600;
+/**
+ * Slack after the ball lands before the next event may fire: beats and timers
+ * start on the frame after they fall due, plus a beat of rest on the ground.
+ */
+const KICK_SETTLE_MS = 140;
+
+/** Ball flight shape per general-play kick type (#15). */
+interface KickFlight {
+  dur: number;
+  peak: number;
+  /** Ground bounces (grubbers) — lift follows decaying |sin| hops. */
+  bounces?: number;
+  /** Lands over the touchline (dead ball) instead of being claimed. */
+  touch?: boolean;
+  /** Chaser and defender converge and contest the catch. */
+  contest?: boolean;
+}
+
+export const KICK_FLIGHTS: Readonly<Record<KickKind, KickFlight>> = {
+  bomb: { dur: 1450, peak: 110, contest: true },
+  chip: { dur: 750, peak: 38, contest: true },
+  grubber: { dur: 900, peak: 9, bounces: 3 },
+  'find-touch': { dur: 1250, peak: 62, touch: true },
+  '40-20': { dur: 1400, peak: 72, touch: true },
+};
+
+/** Fallback flight for an unknown/missing kick detail. */
+const DEFAULT_KICK: KickKind = 'find-touch';
+
+export function kickFlight(detail: string | undefined): KickFlight {
+  return KICK_FLIGHTS[(detail ?? DEFAULT_KICK) as KickKind] ?? KICK_FLIGHTS[DEFAULT_KICK];
+}
+
+/** Lift (px) of a flight at progress u ∈ [0,1] — a parabola or decaying hops. */
+export function flightLift(fromLift: number, peak: number, u: number, bounces = 0): number {
+  if (bounces > 0) {
+    const hop = Math.abs(Math.sin(Math.PI * bounces * u));
+    return fromLift * Math.max(0, 1 - u * bounces) + peak * hop * (1 - u);
+  }
+  return fromLift * (1 - u) + 4 * peak * u * (1 - u);
+}
+
 const LYING: ReadonlySet<PlayerAnim> = new Set<PlayerAnim>(['dive', 'down', 'tackled']);
 
 interface Beat {
@@ -162,6 +211,7 @@ type BallState =
       dur: number;
       peak: number;
       then: Actor | null;
+      bounces?: number;
     };
 
 interface Pending {
@@ -365,7 +415,10 @@ export class PlaybackController {
         }
         break;
       case 'kick':
-        if (at) this.onPlay(side, at, 'open', KICKER_SLOT);
+        if (at) {
+          const hold = this.onKick(side, at, ev, instant);
+          if (!instant && hold > 0) this.beginPause(hold);
+        }
         break;
       case 'tackle':
       case 'big-hit':
@@ -450,6 +503,111 @@ export class PlaybackController {
     if (!carrier) return;
     this.moveTo(carrier, at);
     this.giveBall(carrier);
+  }
+
+  /**
+   * General-play kick (#15). The kicker winds up and the ball flies by type: a
+   * high bomb or short chip that chaser and defender converge on and contest, a
+   * bouncing grubber, or a long find-touch / 40-20 that lands over the
+   * touchline. Landing spot and who claims it come from the next positioned
+   * event (the receiving set-start or a try), so the picture matches the sim.
+   * Returns how long (ms at ×1) the event clock must hold so the flight lands
+   * before the next event fires.
+   */
+  private onKick(side: Side, at: FieldPt, ev: MatchEvent, instant: boolean): number {
+    const flight = kickFlight(ev.detail);
+    const def = otherSide(side);
+    const land = this.kickLanding(side, at, flight, ev.teamId);
+    const t = formationTargets({ attacking: side, ball: at, phase: 'open', seed: this.seed });
+    const held = this.ballState.mode === 'held' && this.ballState.holder.side === side ? this.ballState.holder : null;
+    const kicker = held ?? this.actors[side][KICKER_SLOT];
+    if (!kicker) return 0;
+    const chaser = flight.touch ? undefined : this.actors[side][nearestIndex(t[side], land.p, [kicker.slot])];
+    const defender = flight.touch
+      ? this.actors[def][nearestIndex(t[def], { fx: land.p.fx, fy: Math.max(5, Math.min(95, land.p.fy)) })]
+      : flight.contest && ev.detail === 'bomb'
+        ? this.actors[def][FULLBACK_SLOT]
+        : this.actors[def][nearestIndex(t[def], land.p)];
+    const claimer = land.claim === 'attack' ? chaser : land.claim === 'defence' ? defender : undefined;
+
+    this.applyFormation(side, at, 'open', [kicker, chaser, defender].filter((a): a is Actor => !!a));
+    this.moveTo(kicker, at);
+    this.giveBall(kicker);
+
+    const launch = (): void => {
+      const from = this.ballPoint();
+      this.ballState = {
+        mode: 'flight',
+        from: from.p,
+        fromLift: from.lift,
+        to: { ...land.p },
+        t0: this.vis,
+        dur: flight.dur,
+        peak: flight.peak,
+        bounces: flight.bounces ?? 0,
+        then: claimer ?? null,
+      };
+      const dir = attackDir(side);
+      const leap: Beat[] = flight.contest ? [{ anim: 'celebrate', ms: CATCH_BEAT_MS }] : [];
+      const contesters: [Actor | undefined, FieldPt][] = [
+        [chaser, { fx: land.p.fx - dir * 1.2, fy: land.p.fy + 1.5 }],
+        [defender, flight.touch ? { fx: land.p.fx, fy: land.p.fy < 50 ? 4 : 96 } : { ...land.p }],
+      ];
+      for (const [a, spot] of contesters) {
+        if (!a) continue;
+        // The claimer meets the ball exactly where and when it comes down.
+        this.moveTo(a, a === claimer ? land.p : spot, leap);
+        if (a === claimer) {
+          a.t0 = this.vis;
+          a.dur = Math.max(MIN_MOVE_MS, flight.dur - 40);
+        }
+      }
+    };
+
+    if (instant) {
+      launch();
+      return 0;
+    }
+    kicker.queue = [{ anim: 'kick', ms: KICK_BEAT_MS, fn: () => this.later(KICK_CONTACT_MS, launch) }];
+
+    // Hold the clock until the kicker has arrived, kicked, and the ball is down.
+    const lead = kicker.moving ? Math.max(0, kicker.t0 - this.vis) + kicker.dur : 0;
+    const total = lead + KICK_CONTACT_MS + flight.dur + (flight.contest ? CATCH_BEAT_MS : 0) + KICK_SETTLE_MS;
+    const nextDue = this.due[this.cursor];
+    const thisDue = this.due[this.cursor - 1] ?? this.clockMs;
+    const gap = nextDue !== undefined ? nextDue - thisDue : 0;
+    return Math.max(0, Math.min(MAX_KICK_HOLD_MS, total - gap));
+  }
+
+  /**
+   * Where a kick comes down and who claims it, read from the next positioned
+   * event: a set-start (that team has the ball) or a try (the chaser regathers
+   * and scores). Touch kicks land just over the nearer touchline, unclaimed.
+   */
+  private kickLanding(
+    side: Side,
+    at: FieldPt,
+    flight: KickFlight,
+    teamId: string,
+  ): { p: FieldPt; claim: 'attack' | 'defence' | null } {
+    const dir = attackDir(side);
+    let next: MatchEvent | undefined;
+    for (let i = this.cursor; i < Math.min(this.events.length, this.cursor + 3); i++) {
+      const e = this.events[i] as MatchEvent;
+      if ((e.kind === 'set-start' || e.kind === 'try') && e.x !== undefined) {
+        next = e;
+        break;
+      }
+    }
+    const reach = flight.touch ? 35 : flight.bounces ? 18 : 25;
+    let fx = next?.x !== undefined ? next.x - (next.kind === 'try' ? dir * 3 : 0) : at.fx + dir * reach;
+    // Always land downfield of the kicker, and never beyond the dead-ball line.
+    fx = dir > 0 ? Math.max(fx, at.fx + 8) : Math.min(fx, at.fx - 8);
+    fx = Math.max(-8, Math.min(108, fx));
+    const laneY = next?.y ?? at.fy;
+    if (flight.touch) return { p: { fx, fy: laneY < 50 ? -5 : 105 }, claim: null };
+    const claim = next && next.teamId === teamId ? 'attack' : 'defence';
+    return { p: { fx, fy: laneY }, claim };
   }
 
   private onTackle(attacking: Side, at: FieldPt, big: boolean, instant: boolean): void {
@@ -702,7 +860,7 @@ export class PlaybackController {
     const u = Math.max(0, Math.min(1, (this.vis - s.t0) / s.dur));
     return {
       p: { fx: s.from.fx + (s.to.fx - s.from.fx) * u, fy: s.from.fy + (s.to.fy - s.from.fy) * u },
-      lift: s.fromLift * (1 - u) + 4 * s.peak * u * (1 - u),
+      lift: flightLift(s.fromLift, s.peak, u, s.bounces),
     };
   }
 
