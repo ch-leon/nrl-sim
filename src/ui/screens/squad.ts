@@ -9,6 +9,7 @@ import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import { releasePlayer, RELEASE_PAYOUT_WEEKS } from '../../systems/freeagency';
 import { PLAYER_ID } from '../../systems/fixtures';
+import { DEFAULT_PLAYER_COLORS } from '../../config';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PlayerCard, ensureScreenStyles } from './recruit';
 
@@ -27,7 +28,7 @@ type SortKey = 'position' | 'rating';
  * match uses (matchday.ts sheetFor), so portraits match the match kit.
  */
 function squadKit(): Kit {
-  const colors = getState().league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? ['#f4d03f', '#1a1a2e'];
+  const colors = getState().league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? DEFAULT_PLAYER_COLORS;
   return kitFromColors(colors, PLAYER_ID);
 }
 

@@ -228,7 +228,7 @@ type ContestOutcome =
 export function simulateMatch(
   home: TeamSheet,
   away: TeamSheet,
-  opts: { seed: number; weather?: WeatherKind },
+  opts: { seed: number; weather?: WeatherKind; injuryRate?: number },
 ): MatchResult {
   const rng = makeRng(opts.seed);
   const weather: WeatherKind = opts.weather ?? rollWeather(rng.next);
@@ -359,7 +359,7 @@ export function simulateMatch(
         const carrier = pickActor(possessing.roster, rng, () => true, 'skill');
         const loss = 2 + Math.floor(rng.next() * 11); // 2-12m driven back
         fieldX = clampField(fieldX - loss);
-        const inj = rollBigHitInjury(possessing.roster, carrier, atk.clubId, rng);
+        const inj = rollBigHitInjury(possessing.roster, carrier, atk.clubId, rng, opts.injuryRate ?? 1);
         const detail = inj ? 'driven|injured' : 'driven';
         if (inj) injuries.push(inj);
         events.push(
@@ -710,17 +710,18 @@ function rollContest(
  * Small deterministic injury chance on a big-hit vs carrier injuryRisk (GitHub #7).
  * Returns null when the carrier walks away; weeks ∈ {1,2,3} when hurt.
  */
-function rollBigHitInjury(
+export function rollBigHitInjury(
   roster: readonly RosterEntry[],
   carrierName: string | undefined,
   teamId: string,
   rng: Rng,
+  injuryRate = 1,
 ): MatchInjury | null {
   if (!carrierName) return null;
   const entry = roster.find((p) => p.name === carrierName);
   const risk = entry?.injuryRisk ?? 20;
   // ~3.5% at risk 20, ~5.5% at 40, ~11.5% at 100 — rare but meaningful.
-  const chance = 0.015 + (risk / 100) * 0.1;
+  const chance = (0.015 + (risk / 100) * 0.1) * injuryRate;
   if (rng.next() >= chance) return null;
   const weeks = 1 + Math.floor(rng.next() * 3);
   const injury: MatchInjury = { teamId, playerName: carrierName, weeks };

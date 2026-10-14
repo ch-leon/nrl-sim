@@ -13,6 +13,10 @@
 import type { GameState } from './state';
 import { getState, SAVE_VERSION } from './state';
 import { bus } from './events';
+import {
+  DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
+  PLAYER_SECONDARY_COLORS, isValidColorPair, type Difficulty,
+} from '../config';
 
 /** Legacy single-save key (pre-slots). Kept until its data is safely in slot 1. */
 export const SAVE_KEY = 'nrl-sim-save-v1';
@@ -76,6 +80,15 @@ interface MigrationStep {
 export const MIGRATIONS: readonly MigrationStep[] = [
   // v1 → v2: storage moved to save slots; the state shape itself is unchanged.
   { from: 1, to: 2, run: (old) => ({ ...old }) },
+  // v2 → v3: settings.difficulty (GitHub #48). Existing saves play as Normal.
+  {
+    from: 2,
+    to: 3,
+    run: (old) => ({
+      ...old,
+      settings: { ...((old.settings as RawState | undefined) ?? {}), difficulty: 'normal' },
+    }),
+  },
 ];
 
 export type MigrateResult =
@@ -419,6 +432,8 @@ export function enableAutosave(): () => void {
 export interface TitleChoice {
   mode: 'continue' | 'new';
   clubName?: string;
+  difficulty?: Difficulty;
+  colors?: [string, string];
 }
 
 const DEFAULT_CLUB_NAME = 'Cavehole Crushers';
@@ -471,13 +486,75 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       input.setAttribute('data-nrl-clubname', '');
       input.style.cssText = 'padding:8px;font-family:inherit;text-align:center;';
 
+      let primary = DEFAULT_PLAYER_COLORS[0];
+      let secondary = DEFAULT_PLAYER_COLORS[1];
+      let difficulty: Difficulty = DEFAULT_DIFFICULTY;
+
       const start = mkButton('Start', 'data-nrl-start');
       start.addEventListener('click', () => {
         const name = input.value.trim() || DEFAULT_CLUB_NAME;
-        finish(slot, { mode: 'new', clubName: name });
+        finish(slot, { mode: 'new', clubName: name, difficulty, colors: [primary, secondary] });
       });
 
+      // Curated swatches only; a secondary too close to the primary is disabled.
+      const swatchRow = (label: string, attr: string, palette: readonly string[], pick: (c: string) => void) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;gap:6px;align-items:center;font-size:13px;';
+        row.appendChild(mkLabel(label));
+        const buttons: HTMLButtonElement[] = [];
+        for (const c of palette) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.setAttribute(attr, c);
+          b.setAttribute('aria-label', `${label} ${c}`);
+          b.style.cssText = `width:26px;height:26px;background:${c};border:2px solid #555;cursor:pointer;`;
+          b.addEventListener('click', () => { pick(c); refresh(); });
+          buttons.push(b);
+          row.appendChild(b);
+        }
+        return { row, buttons, palette };
+      };
+      const prim = swatchRow('Primary', 'data-nrl-primary', PLAYER_PRIMARY_COLORS, (c) => {
+        primary = c;
+        if (!isValidColorPair(primary, secondary)) {
+          secondary = PLAYER_SECONDARY_COLORS.find((s) => isValidColorPair(primary, s)) ?? secondary;
+        }
+      });
+      const sec = swatchRow('Secondary', 'data-nrl-secondary', PLAYER_SECONDARY_COLORS, (c) => { secondary = c; });
+      const refresh = (): void => {
+        prim.buttons.forEach((b, i) => {
+          const c = prim.palette[i]!;
+          b.disabled = !PLAYER_SECONDARY_COLORS.some((s) => isValidColorPair(c, s));
+          b.style.borderColor = c === primary ? '#fff' : '#555';
+        });
+        sec.buttons.forEach((b, i) => {
+          const c = sec.palette[i]!;
+          b.disabled = !isValidColorPair(primary, c);
+          b.style.opacity = b.disabled ? '0.25' : '1';
+          b.style.borderColor = c === secondary ? '#fff' : '#555';
+        });
+      };
+
+      const diffRow = document.createElement('div');
+      diffRow.style.cssText = 'display:flex;gap:6px;align-items:center;font-size:13px;';
+      diffRow.appendChild(mkLabel('Difficulty'));
+      const diffButtons = new Map<Difficulty, HTMLButtonElement>();
+      for (const d of DIFFICULTIES) {
+        const b = mkButton(d[0]!.toUpperCase() + d.slice(1), `data-nrl-difficulty-${d}`);
+        b.addEventListener('click', () => {
+          difficulty = d;
+          for (const [k, btn] of diffButtons) btn.style.outline = k === d ? '2px solid #fff' : 'none';
+        });
+        diffButtons.set(d, b);
+        diffRow.appendChild(b);
+      }
+      diffButtons.get(difficulty)!.style.outline = '2px solid #fff';
+
       host.appendChild(input);
+      host.appendChild(prim.row);
+      host.appendChild(sec.row);
+      host.appendChild(diffRow);
+      refresh();
       host.appendChild(start);
       input.focus();
     };
@@ -587,6 +664,13 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
 }
 
 /** Minimal pixel-ish button. TODO(WU-5): swap for dom.ts button(). */
+function mkLabel(text: string): HTMLSpanElement {
+  const l = document.createElement('span');
+  l.textContent = text;
+  l.style.cssText = 'min-width:78px;text-align:right;';
+  return l;
+}
+
 function mkButton(label: string, dataAttr: string): HTMLButtonElement {
   const b = document.createElement('button');
   b.textContent = label;

@@ -48,3 +48,70 @@ export const ECON = {
   FORCED_SALE_FLOOR: -50_000,     // balance < this → forced sales
   FORCED_SALE_MORALE_HIT: 10,     // squad-wide morale −10 per forced sale
 } as const;
+
+// Difficulty (GitHub #48). Multipliers applied at the existing call sites:
+// starting money (createNewGame), weekly wages (economy.weeklyWages), the
+// big-hit injury chance (engine opts.injuryRate via matchday) and rival strength
+// when building the opponent's team sheet (matchday.sheetFor). Normal is 1.0
+// everywhere so it plays exactly as before; old saves load as Normal.
+export type Difficulty = 'easy' | 'normal' | 'hard';
+export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
+export const DEFAULT_DIFFICULTY: Difficulty = 'normal';
+
+export interface DifficultyMultipliers {
+  startingMoney: number;
+  wages: number;
+  injuryRate: number;
+  rivalStrength: number;
+}
+
+export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
+  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalStrength: 0.92 },
+  normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1 },
+  hard: { startingMoney: 0.7, wages: 1.15, injuryRate: 1.4, rivalStrength: 1.08 },
+};
+
+/** Multipliers for a difficulty; unknown/missing values fall back to Normal. */
+export function difficultyMultipliers(d: Difficulty | undefined): DifficultyMultipliers {
+  return DIFFICULTY[d ?? DEFAULT_DIFFICULTY] ?? DIFFICULTY[DEFAULT_DIFFICULTY];
+}
+
+// Club colours (GitHub #48). A curated palette only, so the picker can never
+// produce an unreadable kit: no greens (they vanish on the pitch) and every
+// primary/secondary pairing the form allows is far enough apart to read. The
+// stored value is still the plain hex pair on league.clubs[player].colors.
+export const PLAYER_PRIMARY_COLORS: readonly string[] = [
+  '#f4d03f', // gold
+  '#c0392b', // crimson
+  '#2e6fd8', // royal blue
+  '#e67e22', // orange
+  '#8e44ad', // purple
+  '#16a0b8', // teal
+  '#ecf0f1', // white
+  '#1a1a2e', // navy-black
+];
+export const PLAYER_SECONDARY_COLORS: readonly string[] = [
+  '#1a1a2e', // navy-black
+  '#ffffff', // white
+  '#f4d03f', // gold
+  '#c0392b', // crimson
+  '#2e6fd8', // royal blue
+  '#e67e22', // orange
+];
+export const DEFAULT_PLAYER_COLORS: [string, string] = ['#f4d03f', '#1a1a2e'];
+/** Minimum RGB distance between a club's two colours for the picker to accept them. */
+export const MIN_COLOR_PAIR_DISTANCE = 120;
+
+function hexDistance(a: string, b: string): number {
+  const p = (h: string, i: number): number => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  return Math.hypot(p(a, 0) - p(b, 0), p(a, 1) - p(b, 1), p(a, 2) - p(b, 2));
+}
+
+/** True when both colours are palette members and contrast enough with each other. */
+export function isValidColorPair(primary: string, secondary: string): boolean {
+  return (
+    PLAYER_PRIMARY_COLORS.includes(primary) &&
+    PLAYER_SECONDARY_COLORS.includes(secondary) &&
+    hexDistance(primary, secondary) >= MIN_COLOR_PAIR_DISTANCE
+  );
+}

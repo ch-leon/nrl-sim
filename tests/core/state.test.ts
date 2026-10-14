@@ -24,7 +24,7 @@ describe('createNewGame', () => {
     expect(s.version).toBe(SAVE_VERSION);
     expect(s.clubId).toBe('player');
     expect(s.league).toEqual({ clubs: [], fixtures: [], ladder: [] });
-    expect(s.settings).toEqual({ muted: false, volume: 0.8, tutorialDone: false });
+    expect(s.settings).toEqual({ muted: false, volume: 0.8, tutorialDone: false, difficulty: 'normal' });
     expect(s.history).toEqual([]);
   });
 
@@ -79,8 +79,8 @@ describe('setState', () => {
 
   it('replaces nested objects wholesale (no deep merge)', () => {
     createNewGame('SS2', 3);
-    setState({ settings: { muted: true, volume: 0.5, tutorialDone: true } });
-    expect(getState().settings).toEqual({ muted: true, volume: 0.5, tutorialDone: true });
+    setState({ settings: { muted: true, volume: 0.5, tutorialDone: true, difficulty: 'normal' } });
+    expect(getState().settings).toEqual({ muted: true, volume: 0.5, tutorialDone: true, difficulty: 'normal' });
   });
 });
 

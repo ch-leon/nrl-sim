@@ -6,7 +6,7 @@ import { bus } from './events';
 import { makeRng } from '../utils/rng';
 import { generatePlayer, type Quality } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
-import { STARTING_MONEY } from '../config';
+import { STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
 
 // ── §4 domain types (canonical definitions live here) ──────────────────────
 
@@ -74,7 +74,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface GameState {
   version: typeof SAVE_VERSION;
@@ -89,7 +89,7 @@ export interface GameState {
   freeAgents: Player[];
   league: LeagueState;
   weather?: WeatherKind; // set for current round by fixtures system
-  settings: { muted: boolean; volume: number; tutorialDone: boolean };
+  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty };
   history: { season: number; ladderPosition: number; premiership: boolean }[];
   rngSeed: number; // advanced state of the seeded RNG
 }
@@ -129,7 +129,12 @@ export function loadState(next: GameState): void {
  * average, ~7 rookie), 12 free agents, empty facilities/league. Persists via
  * loadState and returns the new state.
  */
-export function createNewGame(clubName: string, seed: number = Date.now() >>> 0): GameState {
+export function createNewGame(
+  clubName: string,
+  seed: number = Date.now() >>> 0,
+  options: { difficulty?: Difficulty | undefined } = {},
+): GameState {
+  const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
   const rng = makeRng(seed);
 
   // Quality mix for the 20 starting players: 3 star, 10 average, 7 rookie.
@@ -150,7 +155,7 @@ export function createNewGame(clubName: string, seed: number = Date.now() >>> 0)
     version: SAVE_VERSION,
     clubId: 'player',
     clubName,
-    money: STARTING_MONEY,
+    money: Math.round(STARTING_MONEY * difficultyMultipliers(difficulty).startingMoney),
     reputation: 30,
     week: 1,
     season: 1,
@@ -158,7 +163,7 @@ export function createNewGame(clubName: string, seed: number = Date.now() >>> 0)
     facilities: [],
     freeAgents,
     league,
-    settings: { muted: false, volume: 0.8, tutorialDone: false },
+    settings: { muted: false, volume: 0.8, tutorialDone: false, difficulty },
     history: [],
     rngSeed: rng.state(),
   };

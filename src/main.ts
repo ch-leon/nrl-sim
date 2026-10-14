@@ -67,11 +67,11 @@ async function boot(): Promise<void> {
   if (choice.mode === 'continue') {
     const saved = load();
     if (saved) loadState(saved);
-    else createNewGame(choice.clubName ?? 'Cavehole Crushers');
+    else createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
   } else {
-    createNewGame(choice.clubName ?? 'Cavehole Crushers');
+    createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
   }
-  if (getState().league.clubs.length === 0) initLeague(getState());
+  if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
   enableAutosave();
 
   // Week-tick pipeline (ARCHITECTURE §5): training/injuries → economy →

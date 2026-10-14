@@ -23,7 +23,7 @@ import {
 import { makeRng, type Rng } from '../utils/rng';
 import { rollWeather } from '../sim/weather';
 import { registerTickHook, registerSeasonHook, TICK_ORDER, type TickContext } from '../core/time';
-import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON } from '../config';
+import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, DEFAULT_PLAYER_COLORS } from '../config';
 import { RIVAL_CLUBS } from '../data/league';
 import { bus } from '../core/events';
 import { driftRivalStrengths, strengthChanges, applySeasonReputation } from './league';
@@ -497,11 +497,14 @@ export function runFinals(state: GameState, rng: Rng): GameState {
  * commit it to the store. The built LeagueState is also returned. Uses and
  * advances the state RNG seed for determinism (same pattern as data/club.ts).
  */
-export function initLeague(state: GameState): LeagueState {
+export function initLeague(
+  state: GameState,
+  colors: [string, string] = DEFAULT_PLAYER_COLORS,
+): LeagueState {
   const playerClub: RivalClub = {
     id: PLAYER_ID,
     name: state.clubName,
-    colors: ['#f4d03f', '#1a1a2e'],
+    colors: [colors[0], colors[1]],
     strength: 55, // baseline used only if the player is ever cheap-simmed
   };
   const clubs: RivalClub[] = [playerClub, ...RIVAL_CLUBS.map((c) => ({ ...c }))];
