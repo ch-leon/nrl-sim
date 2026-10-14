@@ -23,7 +23,7 @@ import {
   type Side,
 } from '../art/grounds/tiles';
 import { CHAR_H, CHAR_FOOT_Y } from '../art/grounds/manager';
-import { facilityOrigin } from '../art/grounds/facilities';
+import { facilityOrigin, facilityTextureKey } from '../art/grounds/facilities';
 import { decorLayout, surroundPaths, entranceColumn } from '../art/grounds/decor';
 import { ROUGH } from '../art/grounds/palette';
 
@@ -211,7 +211,7 @@ export class GroundsScene extends Phaser.Scene {
   }
 
   /**
-   * Render every placed facility from state as a `facility-<defId>` sprite and
+   * Render every placed facility from state as a `facility-<defId>-<level>` sprite and
    * block its footprint tiles for pathing. Idempotent: existing sprites are
    * reused/updated (levels can change on upgrade); removed facilities are culled.
    */
@@ -233,13 +233,16 @@ export class GroundsScene extends Phaser.Scene {
       const frontGy = f.y + def.footprint.h - 1;
       const d = depth(frontGx, frontGy, 1);
 
+      const key = facilityTextureKey(f.defId, f.level);
       let sprite = this.facilitySprites.get(f.id);
       if (!sprite) {
-        sprite = this.add.image(world.x, world.y, `facility-${f.defId}`);
-        const o = facilityOrigin(def.footprint, sprite.height);
-        sprite.setOrigin(o.x, o.y);
+        sprite = this.add.image(world.x, world.y, key);
         this.facilitySprites.set(f.id, sprite);
       }
+      // Level art differs in height, so the swap re-derives the origin too.
+      if (sprite.texture.key !== key) sprite.setTexture(key);
+      const o = facilityOrigin(def.footprint, sprite.height);
+      sprite.setOrigin(o.x, o.y);
       sprite.setPosition(world.x, world.y);
       sprite.setDepth(d);
 

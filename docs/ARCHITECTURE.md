@@ -296,7 +296,7 @@ announces them with the result toast at full-time.
   `tile-grass`, `tile-grass-1`, `tile-grass-2`, `tile-dirt`, `tile-path`,
   `tile-highlight-ok`, `tile-highlight-bad`, path/dirt edge overlays, the
   surround, `char-idle-<dir>`, `char-walk-<dir>-<frame>` (dirs n/e/s/w; anims
-  `walk-<dir>`), `facility-<defId>` (anchored via `facilityOrigin`), and decor.
+  `walk-<dir>`), `facility-<defId>-<level>` for levels 1-3 (anchored via `facilityOrigin`; L2 adds awning/annex/props, L3 an extra storey or lit sign, floodlights and flags; gold pips show the level), and decor.
 - Match textures (generated per match in MatchScene from `src/art/match/`, freed
   on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
   from club colours; away side switches to its alt strip on a clash), ball,
