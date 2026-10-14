@@ -20,6 +20,7 @@ import { openSquadScreen } from './ui/screens/squad';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
+import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { startTutorial } from './ui/tutorial';
@@ -63,6 +64,7 @@ function initToasts(): void {
 async function boot(): Promise<void> {
   initToasts();
   initSeasonEndFeedback();
+  initFinanceLedger();
   const choice = await showTitleFlow(uiRoot);
   if (choice.mode === 'continue') {
     const saved = load();
@@ -105,6 +107,7 @@ async function boot(): Promise<void> {
   nav.registerScreen('fixtures', 'Fixtures', () => openFixturesScreen());
   nav.registerScreen('ladder', 'Ladder', () => openLadderScreen());
   nav.registerScreen('history', 'History', () => openHistoryScreen());
+  nav.registerScreen('finance', 'Finance', () => openFinanceScreen());
   nav.registerScreen('help', '?', () => startTutorial(true));
 
   initAudio();

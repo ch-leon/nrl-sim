@@ -449,4 +449,42 @@ const CSS = `
 .nrl-history-premiers {
   background: #f4d03f;
 }
+
+/* ── Finance (GitHub #39) ────────────────────────────────────────────── */
+.nrl-finance { font-size: 0.85rem; }
+.nrl-finance h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.1rem;
+}
+.nrl-finance h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+.nrl-finance-panel { margin-bottom: 0.6rem; }
+.nrl-finance-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+.nrl-finance-label { min-width: 0; }
+.nrl-finance-value { font-weight: bold; text-align: right; white-space: nowrap; }
+.nrl-finance-neg { color: #b00020; }
+.nrl-finance-contract { padding: 0.1rem 0; font-weight: bold; }
+.nrl-finance-scroll { overflow-x: auto; }
+.nrl-finance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.nrl-finance-table th,
+.nrl-finance-table td {
+  padding: 0.2rem 0.3rem;
+  text-align: right;
+  border-bottom: 1px solid #b8ae92;
+}
+.nrl-finance-table th:first-child,
+.nrl-finance-table td:first-child { text-align: left; }
+.nrl-finance-table td.nrl-finance-neg { color: #b00020; }
 `;
