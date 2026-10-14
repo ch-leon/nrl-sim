@@ -91,9 +91,27 @@ export function depthAtWorldY(worldY: number, layer = 1): number {
 }
 
 /**
- * One easing step of the auto-pan toward a target scroll (spec: factor 0.02).
- * Linear interpolation, matching Phaser.Math.Linear but Phaser-free.
+ * Auto-pan easing rate (per second). 1 - e^(-k/60) ≈ 0.03, so at 60fps this
+ * matches the original 3%-per-frame follow — now independent of frame rate.
  */
-export function panTowards(current: number, target: number, factor = 0.02): number {
-  return current + (target - current) * factor;
+export const PAN_RATE_PER_S = 1.83;
+/** Cap on auto-pan speed (world px per ms at ×1) so long kicks don't whip the view. */
+export const PAN_MAX_PX_PER_MS = 0.4;
+
+/**
+ * One frame of the auto-pan toward a target scroll: exponential smoothing over
+ * `deltaMs` (so 2×16ms steps land where 1×32ms does), with the step clamped to
+ * `maxPxPerMs × deltaMs`. Pass a higher max at faster playback speeds.
+ */
+export function panTowards(
+  current: number,
+  target: number,
+  deltaMs: number,
+  ratePerS = PAN_RATE_PER_S,
+  maxPxPerMs = PAN_MAX_PX_PER_MS,
+): number {
+  const alpha = 1 - Math.exp((-ratePerS * deltaMs) / 1000);
+  const step = (target - current) * alpha;
+  const cap = maxPxPerMs * deltaMs;
+  return current + Math.max(-cap, Math.min(cap, step));
 }

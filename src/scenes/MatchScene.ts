@@ -56,7 +56,13 @@ import {
 } from '../art/match/crowd';
 import { isoProject } from '../art/match/iso3d';
 import { MatchArtRegistry, playerAnimKey } from './matchArt';
-import { fieldToWorldPoint, fieldOffsetX, panTowards } from './matchField';
+import {
+  fieldToWorldPoint,
+  fieldOffsetX,
+  panTowards,
+  PAN_MAX_PX_PER_MS,
+  PAN_RATE_PER_S,
+} from './matchField';
 
 // Re-export the pure helpers so tests and playback have a single import site.
 export {
@@ -263,7 +269,12 @@ export class MatchScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const tx = this.ball.gx - cam.width / 2;
     const ty = this.ball.gy - cam.height / 2;
-    cam.setScroll(panTowards(cam.scrollX, tx, 0.03), panTowards(cam.scrollY, ty, 0.03));
+    // Frame-rate independent; the speed cap scales with ×2/×4 playback.
+    const maxPx = PAN_MAX_PX_PER_MS * (this.playback?.getSpeed() ?? 1);
+    cam.setScroll(
+      panTowards(cam.scrollX, tx, delta, PAN_RATE_PER_S, maxPx),
+      panTowards(cam.scrollY, ty, delta, PAN_RATE_PER_S, maxPx),
+    );
   }
 
   // ── Stadium pieces ─────────────────────────────────────────────────────────
