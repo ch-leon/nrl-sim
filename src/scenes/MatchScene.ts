@@ -24,6 +24,7 @@ import type { TeamSheet, MatchResult, MatchEvent } from '../sim/events';
 import type { Fixture } from '../core/state';
 import {
   PlaybackController,
+  slotSpeeds,
   type PlaybackActor,
   type PlaybackBall,
   type PlaybackSpeed,
@@ -244,7 +245,10 @@ export class MatchScene extends Phaser.Scene {
   private startPlayback(): void {
     if (this.result) {
       this.overlay = mountMatchOverlay({ home: this.home, away: this.away, result: this.result });
-      this.playback = new PlaybackController(this, this.result, this.fixture);
+      // #20: each slot runs at its player's pace (team-sheet speed stats).
+      this.playback = new PlaybackController(this, this.result, this.fixture, {
+        speeds: { home: slotSpeeds(this.home.roster), away: slotSpeeds(this.away.roster) },
+      });
       this.mountPlaybackControls();
       // 'match:finished' (fired by playback at full-time or on skip) reveals the
       // Back-to-Club button and swaps the controls out.
