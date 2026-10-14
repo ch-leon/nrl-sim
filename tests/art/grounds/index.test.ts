@@ -15,7 +15,7 @@ describe('grounds art registration', () => {
       'tile-highlight-bad',
       'char-idle-s',
       'char-walk-n-3',
-      ...Object.keys(FACILITY_CATALOG).map((id) => `facility-${id}`),
+      ...Object.keys(FACILITY_CATALOG).flatMap((id) => [1, 2, 3].map((l) => `facility-${id}-${l}`)),
     ];
     for (const k of required) expect(keys).toContain(k);
   });
