@@ -18,6 +18,7 @@
 // Pure geometry lives in ./matchField and src/art/match (Phaser-free, tested).
 import Phaser from 'phaser';
 import { CameraController } from '../world/camera';
+import { zoomForViewport } from '../world/viewport';
 import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
 import type { TeamSheet, MatchResult, MatchEvent } from '../sim/events';
@@ -229,6 +230,12 @@ export class MatchScene extends Phaser.Scene {
   private marker: Phaser.GameObjects.Ellipse | null = null;
   private markerColors: Record<TeamSide, number> = { home: 0xffffff, away: 0xffffff };
   private zoomTarget = MATCH_ZOOM;
+  /** Authored (desktop) zoom for the current beat; zoomTarget is this scaled for the viewport. */
+  private beatZoom = MATCH_ZOOM;
+  private onResize = (): void => {
+    this.zoomTarget = this.viewZoom(this.beatZoom);
+    if (this.autoZoom !== null) this.autoZoom = this.cameras.main.zoom;
+  };
   /** Zoom this scene last set; a mismatch means the player zoomed by hand. */
   private autoZoom: number | null = MATCH_ZOOM;
 
@@ -314,8 +321,12 @@ export class MatchScene extends Phaser.Scene {
     // clock. Both are presentation-only (never mutate GameState).
     this.startPlayback();
     this.offZoom = bus.on('match:event', (ev) => {
-      this.zoomTarget = zoomForEvent(ev.kind);
+      this.beatZoom = zoomForEvent(ev.kind);
+      this.zoomTarget = this.viewZoom(this.beatZoom);
     });
+    // #18: rotating / resizing re-derives the zoom for the new viewport; the
+    // CameraController re-clamps scroll on the same event.
+    this.scale.on('resize', this.onResize);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
   }
@@ -500,9 +511,10 @@ export class MatchScene extends Phaser.Scene {
   private setupCamera(): void {
     this.camController = new CameraController(this, { world: cameraWorldBounds(this.offsetX), minZoom: 0.75, maxZoom: 2.5 });
     const cam = this.cameras.main;
-    cam.setZoom(MATCH_ZOOM);
-    this.zoomTarget = MATCH_ZOOM;
-    this.autoZoom = MATCH_ZOOM;
+    this.beatZoom = MATCH_ZOOM;
+    this.zoomTarget = this.viewZoom(MATCH_ZOOM);
+    cam.setZoom(this.zoomTarget);
+    this.autoZoom = this.zoomTarget;
     const c = this.fieldToWorld(50, 50);
     cam.centerOn(c.x, c.y);
   }
@@ -576,7 +588,12 @@ export class MatchScene extends Phaser.Scene {
     this.scene.start('Grounds');
   }
 
+  private viewZoom(base: number): number {
+    return zoomForViewport(base, { width: this.cameras.main.width, height: this.cameras.main.height });
+  }
+
   private teardown(): void {
+    this.scale.off('resize', this.onResize);
     this.camController.destroy();
     bus.off('match:finished', this.onFinished);
     this.offCrowd?.();

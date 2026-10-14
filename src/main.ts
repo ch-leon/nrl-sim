@@ -32,10 +32,11 @@ const config: Phaser.Types.Core.GameConfig = {
   pixelArt: true,
   roundPixels: true,
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: 1280,
-    height: 720,
+    // #18: the canvas fills the viewport (no letterboxing); scenes re-clamp
+    // their cameras on the 'resize' event.
+    mode: Phaser.Scale.RESIZE,
+    width: '100%',
+    height: '100%',
   },
   scene: [BootScene, GroundsScene, MatchScene],
 };
