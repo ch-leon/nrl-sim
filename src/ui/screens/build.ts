@@ -8,7 +8,7 @@
 // openFacilityPopup() renders the tap-a-placed-facility upgrade/info popup, priced
 // via upgradeCost, capped at L3, disabled when unaffordable.
 
-import { el, panel, button, openModal, closeModal, mount } from '../dom';
+import { el, panel, button, openModal, closeModal, closeScreen, mount } from '../dom';
 import {
   FACILITY_CATALOG,
   upgradeCost,
@@ -88,21 +88,27 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
     );
     if (affordable) {
       row.addEventListener('click', () => {
-        closeModal();
+        closeScreen();
         scene?.enterPlacementMode(def.id);
       });
     }
     return row;
   });
 
+  // Close lives in the header (like the other screens) so it is reachable
+  // without scrolling the facility list on short viewports.
   const content = panel(
     { class: 'nrl-build-menu' },
-    el('h2', { class: 'nrl-build-heading', text: 'Build Facility' }),
+    el(
+      'div',
+      { class: 'nrl-build-head' },
+      el('h2', { class: 'nrl-build-heading', text: 'Build Facility' }),
+      button('Close', () => closeScreen(), { class: 'nrl-build-close' }),
+    ),
     el('div', { class: 'nrl-build-list' }, ...rows),
-    button('Close', () => closeModal(), { class: 'nrl-build-close' }),
   );
   ensureBuildStyles();
-  openModal(content, { class: 'nrl-build-modal' });
+  openModal(content, { class: 'nrl-build-modal', screen: true });
 }
 
 /**
@@ -190,7 +196,7 @@ const BUILD_CSS = `
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.25rem;
 }
 .nrl-build-row {
   pointer-events: auto;
@@ -220,7 +226,15 @@ const BUILD_CSS = `
 }
 .nrl-build-cost { font-weight: bold; }
 .nrl-build-blurb { font-size: 0.75rem; line-height: 1.2; }
-.nrl-build-close, .nrl-facility-close { margin-top: 0.25rem; }
+.nrl-build-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.nrl-build-head .nrl-build-heading { margin: 0; }
+.nrl-facility-close { margin-top: 0.25rem; }
 .nrl-facility-body { display: flex; flex-direction: column; gap: 0.5rem; }
 .nrl-facility-level { font-weight: bold; }
 .nrl-facility-blurb { font-size: 0.85rem; line-height: 1.3; margin: 0; }

@@ -10,7 +10,7 @@
 // No nav registration here — the orchestrator wires openFixturesScreen /
 // openLadderScreen into the nav bar (main.ts).
 
-import { el, panel, button, openModal, closeModal } from '../dom';
+import { el, panel, button, openModal, closeScreen } from '../dom';
 import { getState, type GameState, type Fixture, type LadderRow, type RivalClub } from '../../core/state';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
 import { SEASON_ROUNDS } from '../../config';
@@ -115,13 +115,13 @@ function openLeagueScreen(initialTab: Tab): HTMLElement {
   fixturesBtn.setAttribute('data-tab', 'fixtures');
   const ladderBtn = button('Ladder', () => render('ladder'));
   ladderBtn.setAttribute('data-tab', 'ladder');
-  const closeBtn = button('Close', () => closeModal(), { class: 'nrl-league-close' });
+  const closeBtn = button('Close', () => closeScreen(), { class: 'nrl-league-close' });
 
   tabBar.append(fixturesBtn, ladderBtn, closeBtn);
   content.append(tabBar, body);
   render(initialTab);
 
-  return openModal(content, { class: 'nrl-league-modal' });
+  return openModal(content, { class: 'nrl-league-modal', screen: true });
 }
 
 /** Open the League screen on the Fixtures tab. */

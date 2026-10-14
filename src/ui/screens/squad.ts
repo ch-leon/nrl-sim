@@ -3,7 +3,7 @@
 // overall rating, showing injured status and the total weekly wage bill, with a
 // Release action gated behind a confirm modal. DOM UI kit only; no Phaser.
 
-import { el, button, mount, openModal, closeModal } from '../dom';
+import { el, button, openModal, closeModal, openScreen, closeScreen } from '../dom';
 import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
@@ -39,13 +39,12 @@ const failureText = (reason?: string): string => {
   }
 };
 
-let squadRoot: HTMLElement | null = null;
 let unsub: (() => void) | null = null;
 let sortKey: SortKey = 'position';
 
-function closeSquadScreen(): void {
+/** Teardown run by the shared screen slot whenever this screen closes. */
+function onSquadClosed(): void {
   if (unsub) { unsub(); unsub = null; }
-  if (squadRoot) { squadRoot.remove(); squadRoot = null; }
 }
 
 /**
@@ -77,11 +76,11 @@ function confirmRelease(player: Player): void {
  * Open the squad screen. Lists the current squad via the shared PlayerCard with
  * injury badges and per-player Release buttons (each opens confirmRelease). A
  * sort toggle switches between position and rating order, and the header shows
- * the total weekly wage bill. Re-renders on 'state:changed'. Idempotent.
+ * the total weekly wage bill. Re-renders on 'state:changed'. Idempotent; shown
+ * in the shared screen region (between HUD and nav, see ui/dom.ts openScreen).
  */
 export function openSquadScreen(): void {
   ensureScreenStyles();
-  closeSquadScreen();
 
   const body = el('div', { class: 'nrl-screen-body' });
   const sub = el('div', { class: 'nrl-screen-sub' });
@@ -124,12 +123,12 @@ export function openSquadScreen(): void {
     el('span', { text: 'Sort:', attrs: { style: 'color:#e8e0c8;font-size:0.75rem;' } }),
     sortPos,
     sortRating,
-    button('CLOSE', closeSquadScreen),
+    button('CLOSE', closeScreen),
   );
 
   const screen = el('div', { class: 'nrl-screen' }, head, sub, body);
-  squadRoot = screen;
+  // openScreen closes any other open screen (running its teardown) first.
+  openScreen(screen, onSquadClosed);
   render();
   unsub = bus.on('state:changed', render);
-  mount(screen);
 }
