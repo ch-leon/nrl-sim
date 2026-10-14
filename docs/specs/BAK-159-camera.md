@@ -66,6 +66,7 @@ Behaviour:
 ## Edge cases & risks
 - Zoom clamp bounds are fixed at 0.5–2.0 per ticket; expose as opts but default to those.
 - When zoomed out far enough that the world is smaller than the view, `clampScroll`'s `Math.max(world.x, ...)` keeps `maxX >= minX` so the map stays pinned (centered-ish) instead of jittering.
+- **Update (#13):** Phaser zooms around the viewport centre (`midPoint = scroll + view/2` at any zoom), so `clampScroll` mirrors `BaseCamera.clampX/Y` and zoom anchoring goes through `zoomAnchorScroll` from screen coordinates (a pointer's cached `worldX/worldY` is stale until it moves). The original top-left model drifted the view on every wheel/pinch step and hid part of the world when zoomed in.
 - Pinch start must record the initial distance on the second `pointerdown`, not on move, to avoid a zoom jump.
 - Touch-drag momentum/inertia is not required; 1:1 drag is acceptable for the POC.
 - `wasDragging()` must reset on the next `pointerdown` so a genuine subsequent tap is not falsely suppressed.

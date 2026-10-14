@@ -487,6 +487,43 @@ function paintCornerBlocks(cv: Canvas3D, home: Kit): void {
   );
 }
 
+/** The floodlight towers (ground position + pole height in px). */
+export const FLOODLIGHT_TOWERS: readonly { gx: number; gy: number; h: number }[] = [
+  { gx: HILL_FAR + 1.6, gy: BACK_FAR - 0.4, h: 150 },
+  { gx: X1 + 1.3, gy: BACK_FAR - 0.4, h: 150 },
+  { gx: HILL_FAR + 0.4, gy: Y1 + 3.4, h: 150 },
+];
+
+/**
+ * World-space centre of each tower's light bank (see paintTower: a 19×13 frame
+ * whose top-left sits 12px above the pole top). Used by the dusk/night lighting
+ * pass to hang glows exactly on the painted lamps.
+ */
+export function floodlightLamps(offsetX: number): { x: number; y: number }[] {
+  return FLOODLIGHT_TOWERS.map((t) => {
+    const b = isoProject(t.gx, t.gy, 0, offsetX);
+    return { x: Math.floor(b.x) + 0.5, y: Math.floor(b.y) - t.h - 5.5 };
+  });
+}
+
+/**
+ * The back grandstand's corporate-box window band as a world-space segment
+ * (left end → right end, at mid-band height). The lighting pass lays its
+ * "lit stand" glow along it.
+ */
+export function backStandWindowBand(offsetX: number): { a: { x: number; y: number }; b: { x: number; y: number } } {
+  const zTop = TIER_BASE + (BACK_TIERS - 1) * TIER_RISE;
+  const z = zTop + (BACK_WALL_H - 3) / 2 + 2;
+  return { a: isoProject(X0, BACK_FAR, z, offsetX), b: isoProject(X1, BACK_FAR, z, offsetX) };
+}
+
+/** The back grandstand's tiers (seat rows) as a world-space segment at mid-rake. */
+export function backStandTiers(offsetX: number): { a: { x: number; y: number }; b: { x: number; y: number } } {
+  const gy = Y0 - (BACK_TIERS * TIER_D) / 2;
+  const z = TIER_BASE + ((BACK_TIERS - 1) * TIER_RISE) / 2;
+  return { a: isoProject(X0, gy, z, offsetX), b: isoProject(X1, gy, z, offsetX) };
+}
+
 function paintTower(cv: Canvas3D, gx: number, gy: number, h: number): void {
   const b = cv.at(gx, gy, 0);
   // Lattice pole.
@@ -581,9 +618,7 @@ export function paintBackground(offsetX: number, home: Kit, away: Kit): Canvas3D
   // Back hoardings: along the top-right touchline, then the top-left end.
   blitBoard(cv, { gx: -HOARD, gy: -HOARD }, FIELD_LONG + 2 * HOARD, 1, panels, 0);
   blitBoard(cv, { gx: -HOARD, gy: FIELD_WIDE + HOARD }, FIELD_WIDE + 2 * HOARD, -1, panels, 3);
-  paintTower(cv, HILL_FAR + 1.6, BACK_FAR - 0.4, 150);
-  paintTower(cv, X1 + 1.3, BACK_FAR - 0.4, 150);
-  paintTower(cv, HILL_FAR + 0.4, Y1 + 3.4, 150);
+  for (const t of FLOODLIGHT_TOWERS) paintTower(cv, t.gx, t.gy, t.h);
   return cv;
 }
 

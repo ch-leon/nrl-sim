@@ -87,6 +87,111 @@ export function mount(node: HTMLElement): HTMLElement {
   return node;
 }
 
+// ── Layering rule (GitHub #14) ──────────────────────────────────────────────
+// One rule for every nav screen (Squad, Recruit, Build, Fixtures, Ladder,
+// History): a screen occupies the *screen region* — the band between the
+// bottom edge of the HUD strip and the top edge of the nav bar — so it never
+// sits under/over the HUD readouts, Advance Week, the ♪ button or the nav, and
+// those stay clickable while a screen is open. Only one screen is open at a
+// time (opening another, e.g. from the nav, replaces it).
+//
+// The HUD and nav publish their live heights as CSS custom properties
+// (--nrl-hud-h / --nrl-nav-h, see trackChromeInset) which `.nrl-screen-region`
+// uses for its top/bottom insets, so it follows wrapping on narrow screens and
+// collapses to the full viewport when the chrome is hidden (match mode).
+//
+// True dialogs (confirmations, the facility popup, settings) still use
+// openModal() without `screen`, which covers everything at z-index 100.
+//
+// z-order: HUD/nav 10 · ♪ 20 · screens 50 · toasts 60 · modals 100 · tutorial 200.
+
+/** CSS custom property holding the HUD strip's current height. */
+export const HUD_INSET_VAR = '--nrl-hud-h';
+/** CSS custom property holding the nav bar's current height. */
+export const NAV_INSET_VAR = '--nrl-nav-h';
+
+/**
+ * Pure single-slot registry for "the open screen". Opening a new entry runs the
+ * previous entry's closer first; close() is idempotent and re-entrancy safe (a
+ * closer that itself calls close() is a no-op). DOM-free for unit testing.
+ */
+export class ScreenSlot<T = unknown> {
+  private current: { key: T; close: () => void } | null = null;
+
+  /** Close whatever is open, then make `key` the open screen. */
+  open(key: T, close: () => void): void {
+    this.close();
+    this.current = { key, close };
+  }
+
+  /** Close the open screen (if any). Returns true if something was closed. */
+  close(): boolean {
+    const cur = this.current;
+    if (!cur) return false;
+    this.current = null;
+    cur.close();
+    return true;
+  }
+
+  /** The open screen's key, or null. */
+  get active(): T | null {
+    return this.current?.key ?? null;
+  }
+}
+
+const screenSlot = new ScreenSlot<HTMLElement>();
+
+/**
+ * Show `node` as THE open screen in the screen region (between HUD and nav).
+ * Any previously open screen and any open dialog are closed first. `onClose`
+ * runs when the screen is closed by any route (its own Close button calling
+ * closeScreen(), another screen opening, or a match starting). Returns `node`.
+ */
+export function openScreen(node: HTMLElement, onClose?: () => void): HTMLElement {
+  ensureStyles();
+  closeModal();
+  node.classList.add('nrl-screen-region');
+  screenSlot.open(node, () => {
+    node.remove();
+    onClose?.();
+  });
+  getRoot().appendChild(node);
+  return node;
+}
+
+/** Close the open screen, if any. */
+export function closeScreen(): void {
+  screenSlot.close();
+}
+
+/** The currently open screen element, if any. */
+export function activeScreen(): HTMLElement | null {
+  return screenSlot.active;
+}
+
+/**
+ * Publish `node`'s rendered height into the CSS custom property `cssVar` on
+ * <html>, kept live with a ResizeObserver (wrapping, font scaling, and
+ * display:none → 0). Returns a disposer that stops observing and resets the
+ * property to 0px. No-ops gracefully where ResizeObserver is unavailable.
+ */
+export function trackChromeInset(node: HTMLElement, cssVar: string): () => void {
+  const rootStyle = document.documentElement.style;
+  const publish = (): void => {
+    rootStyle.setProperty(cssVar, `${node.offsetHeight}px`);
+  };
+  publish();
+  if (typeof ResizeObserver === 'undefined') {
+    return () => rootStyle.setProperty(cssVar, '0px');
+  }
+  const ro = new ResizeObserver(publish);
+  ro.observe(node);
+  return () => {
+    ro.disconnect();
+    rootStyle.setProperty(cssVar, '0px');
+  };
+}
+
 /** Currently open modal overlay, if any (guards against stacking). */
 let openModalEl: HTMLElement | null = null;
 
@@ -94,28 +199,45 @@ let openModalEl: HTMLElement | null = null;
  * Open a centred modal containing `content`. Clicking the dimmed backdrop closes
  * it. Returns the backdrop element. Only one modal is open at a time — opening a
  * second closes the first.
+ *
+ * With `screen: true` the modal is a nav *screen* instead of a dialog: it is
+ * confined to the screen region (HUD and nav stay visible and usable), it
+ * replaces any other open screen, and it is closed with closeScreen().
  */
-export function openModal(content: HTMLElement, opts: { class?: string } = {}): HTMLElement {
+export function openModal(
+  content: HTMLElement,
+  opts: { class?: string; screen?: boolean } = {},
+): HTMLElement {
   ensureStyles();
-  closeModal();
   const box = el(
     'div',
     { class: opts.class ? `nrl-modal ${opts.class}` : 'nrl-modal' },
     content,
   );
+  // Clicks inside the modal box must not bubble to the backdrop's close handler.
+  box.addEventListener('click', (e) => e.stopPropagation());
+
+  if (opts.screen) {
+    const backdrop = el(
+      'div',
+      { class: 'nrl-modal-backdrop nrl-screen-backdrop', onClick: () => closeScreen() },
+      box,
+    );
+    return openScreen(backdrop);
+  }
+
+  closeModal();
   const backdrop = el(
     'div',
     { class: 'nrl-modal-backdrop', onClick: () => closeModal() },
     box,
   );
-  // Clicks inside the modal box must not bubble to the backdrop's close handler.
-  box.addEventListener('click', (e) => e.stopPropagation());
   openModalEl = backdrop;
   getRoot().appendChild(backdrop);
   return backdrop;
 }
 
-/** Close the currently open modal, if any. */
+/** Close the currently open (dialog) modal, if any. Screens use closeScreen(). */
 export function closeModal(): void {
   if (openModalEl) {
     openModalEl.remove();
@@ -258,6 +380,53 @@ const CSS = `
   max-height: 85vh;
   overflow: auto;
 }
+
+/* ── Screen region (see the layering rule above openScreen in dom.ts) ── */
+:root { --nrl-hud-h: 0px; --nrl-nav-h: 0px; }
+.nrl-screen-region {
+  pointer-events: auto;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--nrl-hud-h, 0px);
+  bottom: var(--nrl-nav-h, 0px);
+  z-index: 50;
+  box-sizing: border-box;
+}
+.nrl-screen-backdrop { padding: 0.5rem; }
+.nrl-screen-backdrop .nrl-modal {
+  /* Fit inside the region (drop-shadow included) rather than the viewport. */
+  max-height: calc(100% - 6px);
+}
+
+/* ── Toasts (ui:notify) — below the HUD, above screens, under dialogs ─── */
+.nrl-toast-stack {
+  pointer-events: none;
+  position: fixed;
+  top: calc(var(--nrl-hud-h, 0px) + 0.25rem);
+  left: 0;
+  right: 0;
+  padding: 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  z-index: 60;
+}
+.nrl-toast {
+  color: #fff;
+  border: 3px solid #000;
+  padding: 6px 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  box-shadow: 3px 3px 0 #000;
+  max-width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+}
+.nrl-toast-info { background: #3a6ea5; }
+.nrl-toast-success { background: #2e7d32; }
+.nrl-toast-danger { background: #b03a2e; }
 
 /* ── History (season-end / past seasons) ─────────────────────────────── */
 .nrl-history h2 {

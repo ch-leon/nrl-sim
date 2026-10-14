@@ -33,6 +33,7 @@ import {
 import { PLAYERS } from '../world/formation';
 import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
 import { attachMatchFx } from '../fx/particles';
+import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { resolveKits } from '../art/match/kit';
 import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForPlayer, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
@@ -58,7 +59,13 @@ import {
 } from '../art/match/crowd';
 import { isoProject } from '../art/match/iso3d';
 import { MatchArtRegistry, playerAnimKey } from './matchArt';
-import { fieldToWorldPoint, fieldOffsetX, panTowards } from './matchField';
+import {
+  fieldToWorldPoint,
+  fieldOffsetX,
+  panTowards,
+  PAN_MAX_PX_PER_MS,
+  PAN_RATE_PER_S,
+} from './matchField';
 
 // Re-export the pure helpers so tests and playback have a single import site.
 export {
@@ -233,6 +240,8 @@ export class MatchScene extends Phaser.Scene {
     this.data.set('home', this.home);
     this.data.set('away', this.away);
     attachMatchFx(this); // BAK-201: pooled try/big-hit/crowd particle FX (WU-14)
+    // GitHub #16: rain/wind, dusk/night lighting (per fixture), stand reactions.
+    attachMatchAtmosphere(this, { weather: this.result?.weather, fixture: this.fixture });
 
     // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then
     // the playback controller which re-emits the event stream on a compressed
@@ -276,7 +285,12 @@ export class MatchScene extends Phaser.Scene {
     const cam = this.cameras.main;
     const tx = this.ball.gx - cam.width / 2;
     const ty = this.ball.gy - cam.height / 2;
-    cam.setScroll(panTowards(cam.scrollX, tx, 0.03), panTowards(cam.scrollY, ty, 0.03));
+    // Frame-rate independent; the speed cap scales with ×2/×4 playback.
+    const maxPx = PAN_MAX_PX_PER_MS * (this.playback?.getSpeed() ?? 1);
+    cam.setScroll(
+      panTowards(cam.scrollX, tx, delta, PAN_RATE_PER_S, maxPx),
+      panTowards(cam.scrollY, ty, delta, PAN_RATE_PER_S, maxPx),
+    );
   }
 
   // ── Stadium pieces ─────────────────────────────────────────────────────────
@@ -379,7 +393,8 @@ export class MatchScene extends Phaser.Scene {
   private mountPlaybackControls(): void {
     const wrap = document.createElement('div');
     // Positioned by the overlay stylesheet (bottom-centre; the nav bar is hidden
-    // while the match overlay is up, so nothing sits underneath).
+    // while the match overlay is up — including full-time — so nothing sits
+    // underneath).
     wrap.className = 'nrl-mo-controls';
 
     const speeds: PlaybackSpeed[] = [1, 2, 4];
@@ -410,10 +425,12 @@ export class MatchScene extends Phaser.Scene {
     // Hidden until full-time; before then, playback + Skip drive the flow.
     const btn = button('Back to Club', () => this.exitToGrounds());
     btn.style.position = 'fixed';
-    // Centred above the nav bar so it never overlaps the nav buttons.
+    // Bottom-centre, taking the playback controls' slot at full-time: the
+    // match overlay keeps the HUD/nav hidden until this is pressed (#14). The
+    // no-result fallback has no overlay, so it clears the visible nav instead.
     btn.style.left = '50%';
     btn.style.transform = 'translateX(-50%)';
-    btn.style.bottom = '3.25rem';
+    btn.style.bottom = this.result ? '0.5rem' : '3.25rem';
     btn.style.zIndex = '20';
     // If no result was provided (defensive), keep the classic fallback visible.
     btn.style.display = this.result ? 'none' : '';

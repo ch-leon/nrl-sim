@@ -12,6 +12,8 @@ import {
   fieldOffsetX,
   fieldWorldBounds,
   panTowards,
+  PAN_MAX_PX_PER_MS,
+  PAN_RATE_PER_S,
 } from '../../src/scenes/matchField';
 import { gridToScreen } from '../../src/world/iso';
 import { TILE_W } from '../../src/config';
@@ -116,20 +118,31 @@ describe('matchField.depthAtWorldY', () => {
 });
 
 describe('matchField.panTowards', () => {
-  it('eases from current toward target by the factor', () => {
-    expect(panTowards(0, 100, 0.02)).toBeCloseTo(2);
-    expect(panTowards(0, 100, 0.5)).toBeCloseTo(50);
-    expect(panTowards(100, 100, 0.02)).toBe(100); // no movement at the target
+  const run = (fps: number, ms: number, target: number, maxPxPerMs = Infinity): number => {
+    let x = 0;
+    const dt = 1000 / fps;
+    for (let t = 0; t < ms - 1e-9; t += dt) x = panTowards(x, target, dt, PAN_RATE_PER_S, maxPxPerMs);
+    return x;
+  };
+
+  it('keeps the original ~3%-per-frame feel at 60fps', () => {
+    expect(panTowards(0, 100, 1000 / 60, PAN_RATE_PER_S, Infinity)).toBeCloseTo(3, 1);
+    expect(panTowards(100, 100, 16)).toBe(100); // no movement at the target
   });
 
-  it('defaults to the spec 0.02 factor and converges monotonically', () => {
-    let x = 0;
-    const target = 500;
-    const first = panTowards(x, target);
-    x = first;
-    const second = panTowards(x, target);
-    expect(first).toBeGreaterThan(0);
-    expect(second).toBeGreaterThan(first);
-    expect(second).toBeLessThan(target);
+  it('is frame-rate independent (#13)', () => {
+    const at30 = run(30, 1000, 500);
+    const at120 = run(120, 1000, 500);
+    expect(Math.abs(at30 - at120)).toBeLessThan(0.5);
+    expect(at30).toBeGreaterThan(0);
+    expect(at30).toBeLessThan(500);
+  });
+
+  it('caps the pan speed so a long kick cannot whip the view', () => {
+    const x = panTowards(0, 10_000, 100, PAN_RATE_PER_S, PAN_MAX_PX_PER_MS);
+    expect(x).toBeCloseTo(PAN_MAX_PX_PER_MS * 100);
+    expect(panTowards(0, -10_000, 100, PAN_RATE_PER_S, PAN_MAX_PX_PER_MS)).toBeCloseTo(-PAN_MAX_PX_PER_MS * 100);
+    // Capped motion is also frame-rate independent.
+    expect(Math.abs(run(30, 500, 10_000, 0.4) - run(120, 500, 10_000, 0.4))).toBeLessThan(1);
   });
 });
