@@ -31,6 +31,7 @@ import {
 import { PLAYERS } from '../world/formation';
 import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
 import { attachMatchFx } from '../fx/particles';
+import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { resolveKits } from '../art/match/kit';
 import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
@@ -229,6 +230,8 @@ export class MatchScene extends Phaser.Scene {
     this.data.set('home', this.home);
     this.data.set('away', this.away);
     attachMatchFx(this); // BAK-201: pooled try/big-hit/crowd particle FX (WU-14)
+    // GitHub #16: rain/wind, dusk/night lighting (per fixture), stand reactions.
+    attachMatchAtmosphere(this, { weather: this.result?.weather, fixture: this.fixture });
 
     // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then
     // the playback controller which re-emits the event stream on a compressed

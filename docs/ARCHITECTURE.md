@@ -302,6 +302,13 @@ announces them with the result toast at full-time.
   from club colours; away side switches to its alt strip on a clash), ball,
   shadows, goalpost parts, the stadium background/foreground layers and crowd.
   `particle-square` comes from `src/fx/particles.ts`.
+- Match atmosphere (GitHub #16, `src/fx/atmosphere.ts` + pure
+  `src/art/match/atmosphere.ts`): per-fixture lighting (`day`/`dusk`/`night`,
+  hashed from season/round/clubs; finals are night) and the MatchResult's
+  weather drive a MULTIPLY light map (depth 70 000), rain haze (70 500),
+  additive floodlight/stand glows (71 000), crowd streamers/flashes (72 000) and
+  screen-space rain/wind emitters (80 000; splashes on the ground at 9 000).
+  Shared `atm-*` textures persist; the per-fixture light map is freed on shutdown.
 - Scene keys: `'Boot'`, `'Grounds'`, `'Match'`. Only one world scene active at a time;
   switch via `this.scene.start(...)`. UI overlay is DOM and persists across scenes.
 
