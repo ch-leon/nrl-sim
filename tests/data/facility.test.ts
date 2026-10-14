@@ -80,7 +80,7 @@ describe('FACILITY_CATALOG', () => {
 describe('SPECIAL_MAGNITUDE', () => {
   it('exports the documented base magnitudes', () => {
     expect(SPECIAL_MAGNITUDE).toEqual({
-      income: 1500, gate: 4000, recruitQuality: 0.1, injuryRecovery: -0.5, morale: 2,
+      income: 1500, gate: 4000, recruitQuality: 0.1, injuryRecovery: -0.5, morale: 1,
     });
   });
 });

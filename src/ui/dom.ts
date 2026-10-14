@@ -286,6 +286,8 @@ const CSS = `
   box-shadow: 3px 3px 0 #000;
   padding: 0.4rem 0.7rem;
   margin: 0;
+  min-height: 44px; /* #18: phone tap target */
+  min-width: 44px;
   line-height: 1.1;
   white-space: nowrap;
   image-rendering: pixelated;
@@ -311,7 +313,8 @@ const CSS = `
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  padding: 0.5rem;
+  /* #18: keep clear of notches / rounded corners. */
+  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
   z-index: 10;
 }
 .nrl-hud-readouts {
@@ -351,10 +354,25 @@ const CSS = `
   right: 0;
   display: flex;
   gap: 0.4rem;
-  padding: 0.5rem;
+  /* #18: home-bar / side insets; the row scrolls sideways when it overflows. */
+  padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) calc(0.5rem + env(safe-area-inset-bottom, 0px)) calc(0.5rem + env(safe-area-inset-left, 0px));
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   white-space: nowrap;
   z-index: 10;
+}
+/* Narrow phones: tighter buttons so most of the nav fits without scrolling. */
+@media (max-width: 480px) {
+  .nrl-nav { gap: 0.15rem; }
+  /* All seven items fit at 360px; the row still scrolls if a font is wider. */
+  .nrl-nav .nrl-btn {
+    padding: 0.4rem 0.1rem;
+    font-size: 0.58rem;
+    border-width: 2px;
+    box-shadow: 2px 2px 0 #000;
+  }
+  .nrl-hud .nrl-btn { padding: 0.4rem 0.5rem; }
 }
 .nrl-nav .nrl-btn { flex: 0 0 auto; }
 
@@ -393,7 +411,9 @@ const CSS = `
   z-index: 50;
   box-sizing: border-box;
 }
-.nrl-screen-backdrop { padding: 0.5rem; }
+.nrl-screen-backdrop {
+  padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
+}
 .nrl-screen-backdrop .nrl-modal {
   /* Fit inside the region (drop-shadow included) rather than the viewport. */
   max-height: calc(100% - 6px);
@@ -449,4 +469,42 @@ const CSS = `
 .nrl-history-premiers {
   background: #f4d03f;
 }
+
+/* ── Finance (GitHub #39) ────────────────────────────────────────────── */
+.nrl-finance { font-size: 0.85rem; }
+.nrl-finance h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.1rem;
+}
+.nrl-finance h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+.nrl-finance-panel { margin-bottom: 0.6rem; }
+.nrl-finance-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+.nrl-finance-label { min-width: 0; }
+.nrl-finance-value { font-weight: bold; text-align: right; white-space: nowrap; }
+.nrl-finance-neg { color: #b00020; }
+.nrl-finance-contract { padding: 0.1rem 0; font-weight: bold; }
+.nrl-finance-scroll { overflow-x: auto; }
+.nrl-finance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.nrl-finance-table th,
+.nrl-finance-table td {
+  padding: 0.2rem 0.3rem;
+  text-align: right;
+  border-bottom: 1px solid #b8ae92;
+}
+.nrl-finance-table th:first-child,
+.nrl-finance-table td:first-child { text-align: left; }
+.nrl-finance-table td.nrl-finance-neg { color: #b00020; }
 `;

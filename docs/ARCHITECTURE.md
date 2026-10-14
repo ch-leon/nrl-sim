@@ -297,6 +297,12 @@ announces them with the result toast at full-time.
   `tile-highlight-ok`, `tile-highlight-bad`, path/dirt edge overlays, the
   surround, `char-idle-<dir>`, `char-walk-<dir>-<frame>` (dirs n/e/s/w; anims
   `walk-<dir>`), `facility-<defId>-<level>` for levels 1-3 (anchored via `facilityOrigin`; L2 adds awning/annex/props, L3 an extra storey or lit sign, floodlights and flags; gold pips show the level), and decor.
+- Build feedback (GitHub #24, `src/world/buildFeedback.ts` pure + `ghostPreview.ts` / `buildFx.ts`
+  glue): the placement ghost is the real `facility-<defId>-1` texture, tinted green (valid, solid
+  outline) or red (invalid, dashed outline + ✕); a new facility shows ~1.5s of scaffolding + dust,
+  then pops in with a squash and stretch and a sparkle; an upgrade flashes scaffolding over the art
+  swap. Presentation only (driven off the scene update event; state changes instantly, input is never
+  blocked); `prefers-reduced-motion` skips the animations.
 - Grounds life (GitHub #23): `src/world/groundsLife.ts` (pure, seeded by season+week)
   plans a capped cast (`MAX_AGENTS`) of squad players, staff and match-week fans
   with looping itineraries; `src/scenes/groundsLife.ts` renders them as sprites that

@@ -15,12 +15,14 @@ import { registerEconomySystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
 import { registerPlayerMatchSystem } from './systems/matchday';
 import { registerAgingSystem } from './systems/aging';
+import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
 import { openBuildScreen } from './ui/screens/build';
 import { openSquadScreen } from './ui/screens/squad';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
+import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { startTutorial } from './ui/tutorial';
@@ -33,10 +35,11 @@ const config: Phaser.Types.Core.GameConfig = {
   pixelArt: true,
   roundPixels: true,
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: 1280,
-    height: 720,
+    // #18: the canvas fills the viewport (no letterboxing); scenes re-clamp
+    // their cameras on the 'resize' event.
+    mode: Phaser.Scale.RESIZE,
+    width: '100%',
+    height: '100%',
   },
   scene: [BootScene, GroundsScene, MatchScene],
 };
@@ -64,6 +67,7 @@ function initToasts(): void {
 async function boot(): Promise<void> {
   initToasts();
   initSeasonEndFeedback();
+  initFinanceLedger();
   const choice = await showTitleFlow(uiRoot);
   if (choice.mode === 'continue') {
     const saved = load();
@@ -82,6 +86,7 @@ async function boot(): Promise<void> {
   registerFixturesSystem();
   registerPlayerMatchSystem();
   registerFreeAgencySystem();
+  registerMoraleSystem();
   registerAgingSystem();
   registerYouthSystem();
 
@@ -107,6 +112,7 @@ async function boot(): Promise<void> {
   nav.registerScreen('fixtures', 'Fixtures', () => openFixturesScreen());
   nav.registerScreen('ladder', 'Ladder', () => openLadderScreen());
   nav.registerScreen('history', 'History', () => openHistoryScreen());
+  nav.registerScreen('finance', 'Finance', () => openFinanceScreen());
   nav.registerScreen('help', '?', () => startTutorial(true));
 
   initAudio();

@@ -340,3 +340,13 @@ describe('registerEconomySystem — hook installation', () => {
     expect(getState().money).toBe(100_000 - 3000 + 1000); // single application
   });
 });
+
+describe('legacy duplicate facilities', () => {
+  it('counts only the best Sponsor Board, not a sum', () => {
+    setup({ facilities: [
+      { id: 'a', defId: 'sponsorBoard', level: 1, x: 0, y: 0 },
+      { id: 'b', defId: 'sponsorBoard', level: 2, x: 5, y: 5 },
+    ], reputation: 0 });
+    expect(weeklyIncome(getState())).toBe(ECON.SPONSOR_PER_LEVEL * 2);
+  });
+});
