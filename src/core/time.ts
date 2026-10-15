@@ -201,12 +201,23 @@ function readSeasonOutcome(): { ladderPosition: number; premiership: boolean } {
  */
 export function advanceWeeks(n: number): void {
   if (n <= 0) return;
-  const prev = fastForwardFlag;
-  fastForwardFlag = true;
-  try {
+  withFastForward(() => {
     for (let i = 0; i < n; i++) {
       advanceWeek();
     }
+  });
+}
+
+/**
+ * Run fn with fastForward set, restoring the previous value afterwards (even on
+ * throw). Lets callers that need per-week checks (see ./advance.ts) auto-sim
+ * matches exactly like advanceWeeks does.
+ */
+export function withFastForward<T>(fn: () => T): T {
+  const prev = fastForwardFlag;
+  fastForwardFlag = true;
+  try {
+    return fn();
   } finally {
     fastForwardFlag = prev;
   }
