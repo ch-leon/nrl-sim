@@ -68,7 +68,8 @@ function rollQuality(rng: Rng, bias: number): Quality {
  */
 export function refreshFreeAgents(state: GameState, rng: Rng): GameState {
   const bias = scoutBias(state);
-  const pool: Player[] = [];
+  // Academy prospects (#42) survive re-rolls; the next season's intake clears them.
+  const pool: Player[] = state.freeAgents.filter((p) => p.junior);
   for (let i = 0; i < FREE_AGENT_POOL_SIZE; i++) {
     const quality = rollQuality(rng, bias);
     pool.push(generatePlayer(rng, { quality }));
@@ -102,7 +103,8 @@ export function signPlayer(state: GameState, playerId: string): SignResult {
   // which emits money:changed. Then move the player between lists atomically.
   spendMoney(fee, `sign:${playerId}`);
 
-  const signed: Player = { ...agent, contractWeeks: NEW_CONTRACT_WEEKS };
+  const { junior: _junior, ...rest } = agent;
+  const signed: Player = { ...rest, contractWeeks: NEW_CONTRACT_WEEKS };
   const after = getState();
   setState({
     freeAgents: after.freeAgents.filter((p) => p.id !== playerId),

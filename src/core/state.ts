@@ -35,6 +35,7 @@ export interface Player {
   traits: Trait[];
   wage: number; // per week
   contractWeeks: number; // remaining
+  junior?: boolean; // Academy prospect awaiting signing (default false) — #42
 }
 
 export interface PlacedFacility {
