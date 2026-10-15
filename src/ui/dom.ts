@@ -373,8 +373,16 @@ const CSS = `
     box-shadow: 2px 2px 0 #000;
   }
   .nrl-hud .nrl-btn { padding: 0.4rem 0.5rem; }
+  /* #45: nine items (News added) don't fit one row at 360px. Wrap to rows of
+     five so every item, badge included, is on screen without sideways scroll. */
 }
 .nrl-nav .nrl-btn { flex: 0 0 auto; }
+/* #45: nine items (News added) don't fit one row at 360px. Wrap to rows of
+   five so every item, badge included, is on screen without sideways scroll. */
+@media (max-width: 480px) {
+  .nrl-nav { flex-wrap: wrap; justify-content: center; overflow-x: visible; }
+  .nrl-nav .nrl-btn { flex: 0 0 calc(20% - 0.15rem); min-width: 0; }
+}
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .nrl-modal-backdrop {

@@ -167,7 +167,7 @@ export function groupByWeek(items: NewsItem[]): NewsWeekGroup[] {
 const FILTER_LABELS: Record<NewsFilter, string> = {
   all: 'All',
   info: 'Info',
-  success: 'Won',
+  success: 'Good',
   danger: 'Alert',
 };
 
