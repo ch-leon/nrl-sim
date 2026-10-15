@@ -68,8 +68,8 @@ function rollQuality(rng: Rng, bias: number): Quality {
  */
 export function refreshFreeAgents(state: GameState, rng: Rng): GameState {
   const bias = scoutBias(state);
-  // Academy prospects (#42) survive re-rolls; the next season's intake clears them.
-  const pool: Player[] = state.freeAgents.filter((p) => p.junior);
+  // Academy prospects (#42) and players who just left the club (#40) survive re-rolls; the next season's intake clears them.
+  const pool: Player[] = state.freeAgents.filter((p) => p.junior || p.departed);
   for (let i = 0; i < FREE_AGENT_POOL_SIZE; i++) {
     const quality = rollQuality(rng, bias);
     pool.push(generatePlayer(rng, { quality }));
@@ -103,7 +103,7 @@ export function signPlayer(state: GameState, playerId: string): SignResult {
   // which emits money:changed. Then move the player between lists atomically.
   spendMoney(fee, `sign:${playerId}`);
 
-  const { junior: _junior, ...rest } = agent;
+  const { junior: _junior, departed: _departed, ...rest } = agent;
   const signed: Player = { ...rest, contractWeeks: NEW_CONTRACT_WEEKS };
   const after = getState();
   setState({
@@ -138,7 +138,7 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
   // release payout is allowed to take the balance negative (economy handles
   // bankruptcy), so write money via the store and emit money:changed ourselves.
   const balance = s.money - payout;
-  const released: Player = { ...player, contractWeeks: 0 };
+  const released: Player = { ...player, contractWeeks: 0, departed: true };
   setState({
     money: balance,
     squad: s.squad.filter((p) => p.id !== playerId),

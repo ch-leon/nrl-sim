@@ -39,6 +39,7 @@ export interface Player {
   wage: number; // per week
   contractWeeks: number; // remaining
   junior?: boolean; // Academy prospect awaiting signing (default false) — #42
+  departed?: boolean; // left the club (contract expired / released): survives free-agent re-rolls — #40
   career?: StatTally; // folded from match events — #46
   seasonStats?: StatTally & { season: number }; // current season only; stale when season differs
   joinedSeason?: number; // first season at the club (drives clubLegend)

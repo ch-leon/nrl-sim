@@ -80,6 +80,15 @@ export const MORALE = {
   EXPIRING_PENALTY: -1,
 } as const;
 
+/** Contracts screen (GitHub #40). */
+export const CONTRACTS = {
+  WARN_WEEKS: [8, 4, 1] as readonly number[], // toast when this many weeks remain
+  RENEW_FEE_WEEKS: 2,       // early-renewal fee = this × new weekly wage
+  RENEW_MORALE_SWING: 0.15, // wage ask ±15% across the morale range (low morale = dearer)
+  NEW_CONTRACT_WEEKS: 52,
+  SELL_PER_OVERALL_SQ: 10,  // base transfer fee = overall² × this
+} as const;
+
 // Difficulty (GitHub #48). Multipliers applied at the existing call sites:
 // starting money (createNewGame), weekly wages (economy.weeklyWages), the
 // big-hit injury chance (engine opts.injuryRate via matchday) and rival strength
