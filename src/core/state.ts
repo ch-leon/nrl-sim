@@ -23,6 +23,9 @@ export interface PlayerStats {
   skill: number; footyIQ: number; // 1-100
 }
 
+/** Event-derived individual tallies (GitHub #46). */
+export interface StatTally { games: number; tries: number; tackles: number; lineBreaks: number }
+
 export interface Player {
   id: string; // seeded deterministic id (no crypto)
   name: string;
@@ -36,6 +39,9 @@ export interface Player {
   wage: number; // per week
   contractWeeks: number; // remaining
   junior?: boolean; // Academy prospect awaiting signing (default false) — #42
+  career?: StatTally; // folded from match events — #46
+  seasonStats?: StatTally & { season: number }; // current season only; stale when season differs
+  joinedSeason?: number; // first season at the club (drives clubLegend)
 }
 
 export interface PlacedFacility {
@@ -75,7 +81,15 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
+
+/** One completed season. The extended fields are optional for pre-v4 entries. */
+export interface SeasonRecord {
+  season: number; ladderPosition: number; premiership: boolean;
+  wins?: number; losses?: number; draws?: number;
+  pointsFor?: number; pointsAgainst?: number;
+  topScorer?: { name: string; tries: number };
+}
 
 export interface GameState {
   version: typeof SAVE_VERSION;
@@ -91,7 +105,7 @@ export interface GameState {
   league: LeagueState;
   weather?: WeatherKind; // set for current round by fixtures system
   settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty };
-  history: { season: number; ladderPosition: number; premiership: boolean }[];
+  history: SeasonRecord[];
   rngSeed: number; // advanced state of the seeded RNG
 }
 
@@ -146,9 +160,17 @@ export function createNewGame(
     ...Array<Quality>(7).fill('rookie'),
   ];
   const squadQualities = rng.shuffle(qualities);
-  const squad: Player[] = squadQualities.map((quality) => generatePlayer(rng, { quality }));
+  const squad: Player[] = squadQualities.map((quality) => ({
+    ...generatePlayer(rng, { quality }),
+    career: { games: 0, tries: 0, tackles: 0, lineBreaks: 0 },
+    joinedSeason: 1,
+  }));
 
-  const freeAgents: Player[] = Array.from({ length: 12 }, () => generatePlayer(rng));
+  const freeAgents: Player[] = Array.from({ length: 12 }, () => ({
+    ...generatePlayer(rng),
+    career: { games: 0, tries: 0, tackles: 0, lineBreaks: 0 },
+    joinedSeason: 1,
+  }));
 
   const league: LeagueState = { clubs: [], fixtures: [], ladder: [] };
 
