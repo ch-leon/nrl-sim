@@ -23,6 +23,7 @@ import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
+import { openContractsScreen } from './ui/screens/contracts';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { startTutorial } from './ui/tutorial';
@@ -113,6 +114,7 @@ async function boot(): Promise<void> {
   nav.registerScreen('ladder', 'Ladder', () => openLadderScreen());
   nav.registerScreen('history', 'History', () => openHistoryScreen());
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen());
+  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen());
   nav.registerScreen('help', '?', () => startTutorial(true));
 
   initAudio();

@@ -36,6 +36,7 @@ export interface Player {
   wage: number; // per week
   contractWeeks: number; // remaining
   junior?: boolean; // Academy prospect awaiting signing (default false) — #42
+  departed?: boolean; // left the club (contract expired / released): survives free-agent re-rolls — #40
 }
 
 export interface PlacedFacility {

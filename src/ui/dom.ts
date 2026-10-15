@@ -492,6 +492,7 @@ const CSS = `
 .nrl-finance-neg { color: #b00020; }
 .nrl-finance-contract { padding: 0.1rem 0; font-weight: bold; }
 .nrl-finance-scroll { overflow-x: auto; }
+.nrl-contract-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; }
 .nrl-finance-table {
   width: 100%;
   border-collapse: collapse;
