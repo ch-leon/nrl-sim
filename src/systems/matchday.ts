@@ -3,9 +3,9 @@
 // presentation layer (MatchScene playback, wave 4) can replay the result; state
 // is already fully applied before the event fires — playback is view-only.
 import { bus } from '../core/events';
-import { getState, setState } from '../core/state';
+import { getState, setState, type RivalClub } from '../core/state';
 import { registerTickHook, TICK_ORDER } from '../core/time';
-import { FORFEIT_SCORE, SQUAD_MIN } from '../config';
+import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, type Difficulty, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
 import type { MatchInjury, TeamSheet } from '../sim/events';
@@ -38,6 +38,13 @@ function applyMatchInjuries(injuries: readonly MatchInjury[]): string[] {
   return toasts;
 }
 
+/** Difficulty scales the strength of the rivals the player faces (clamped to the league bounds). */
+export function scaleRivalStrength(rival: RivalClub, difficulty: Difficulty | undefined): RivalClub {
+  const mult = difficultyMultipliers(difficulty).rivalStrength;
+  if (mult === 1) return rival;
+  return { ...rival, strength: Math.round(Math.min(100, Math.max(1, rival.strength * mult))) };
+}
+
 function sheetFor(clubId: string): TeamSheet {
   const state = getState();
   if (clubId === PLAYER_ID) {
@@ -46,12 +53,12 @@ function sheetFor(clubId: string): TeamSheet {
       state.squad,
       PLAYER_ID,
       state.clubName,
-      entry?.colors ?? ['#f4d03f', '#1a1a2e'],
+      entry?.colors ?? DEFAULT_PLAYER_COLORS,
     );
   }
   const rival = state.league.clubs.find((c) => c.id === clubId);
   if (!rival) throw new Error(`unknown club ${clubId}`);
-  return teamSheetFromRival(rival);
+  return teamSheetFromRival(scaleRivalStrength(rival, state.settings.difficulty));
 }
 
 /** Fit (non-injured) squad size. */
@@ -110,7 +117,11 @@ export function registerPlayerMatchSystem(): void {
     const sim = simulateMatch(
       home,
       away,
-      state.weather ? { seed, weather: state.weather } : { seed },
+      {
+        seed,
+        injuryRate: difficultyMultipliers(state.settings.difficulty).injuryRate,
+        ...(state.weather ? { weather: state.weather } : {}),
+      },
     );
     // Finals draws still stamp as-is; knockoutWinner favours home (higher seed).
     const applied = applyResult(getState(), fixture, {

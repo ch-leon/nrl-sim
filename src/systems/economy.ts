@@ -12,7 +12,7 @@ import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
 import { overallRating } from '../data/player';
-import { ECON, SQUAD_MIN } from '../config';
+import { ECON, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 
 /**
@@ -23,9 +23,10 @@ function facilityLevel(state: GameState, defId: 'sponsorBoard' | 'grandstand'): 
   return state.facilities.reduce((m, pf) => (pf.defId === defId ? Math.max(m, pf.level) : m), 0);
 }
 
-/** Σ of every squad player's weekly wage. */
+/** Σ of every squad player's weekly wage, scaled by the difficulty's wage multiplier. */
 export function weeklyWages(state: GameState): number {
-  return state.squad.reduce((sum, p) => sum + p.wage, 0);
+  const base = state.squad.reduce((sum, p) => sum + p.wage, 0);
+  return Math.round(base * difficultyMultipliers(state.settings.difficulty).wages);
 }
 
 /**

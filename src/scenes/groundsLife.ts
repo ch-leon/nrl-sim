@@ -8,7 +8,7 @@
 // it after the facilities render; it rebuilds itself when the week, facilities or
 // the squad's injury/morale bands change.
 import Phaser from 'phaser';
-import { TILE_H } from '../config';
+import { DEFAULT_PLAYER_COLORS, TILE_H } from '../config';
 import { depth } from '../world/iso';
 import { findPath, type PathNode, type WalkGrid } from '../world/path';
 import { bus } from '../core/events';
@@ -33,7 +33,7 @@ const CHAR_LAYER = 2;
 const WALK_SPEED = 80; // px/s — an amble; the manager's tap-to-move is 120
 const DRILL_MUL = 1.7;
 const FRAME_MS = 125; // 8fps walk, as the manager
-const FALLBACK_COLORS: [string, string] = ['#f4d03f', '#1a1a2e'];
+const FALLBACK_COLORS = DEFAULT_PLAYER_COLORS;
 
 interface Hooks {
   scene: Phaser.Scene;
