@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtMoney } from '../../src/ui/hud';
+import { fmtMoney, ADVANCE_MENU } from '../../src/ui/hud';
 
 // DOM tests (createHud rendering / flash / bus wiring) are skipped: jsdom is not
 // installed and the vitest environment is 'node' (see vite.config.ts). The
@@ -21,5 +21,16 @@ describe('fmtMoney', () => {
   it('rounds fractional balances', () => {
     expect(fmtMoney(1_234.6)).toBe('$1,235');
     expect(fmtMoney(-1_234.6)).toBe('-$1,235');
+  });
+});
+
+describe('ADVANCE_MENU (#44)', () => {
+  it('offers ×4 weeks, to finals and to season end, in that order', () => {
+    expect(ADVANCE_MENU.map((m) => m.target)).toEqual([
+      { kind: 'weeks', weeks: 4 },
+      { kind: 'finals' },
+      { kind: 'seasonEnd' },
+    ]);
+    expect(ADVANCE_MENU.map((m) => m.label)).toEqual(['×4 weeks', 'To finals', 'To season end']);
   });
 });

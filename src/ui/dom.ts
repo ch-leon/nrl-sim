@@ -339,7 +339,31 @@ const CSS = `
 .nrl-hud-stat.nrl-flash-down { background: #e06666; color: #2a0000; }
 .nrl-hud-stat.nrl-money-negative { color: #b00020; }
 .nrl-hud-spacer { flex: 1 1 auto; }
-.nrl-hud-actions { pointer-events: auto; }
+.nrl-hud-actions {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  gap: 0.25rem;
+  align-items: stretch;
+}
+/* #44: "Advance Week" menu. Tap targets stay ≥44px (.nrl-btn min-height). */
+.nrl-hud-menu-toggle { min-width: 44px; padding: 0.4rem 0.5rem; }
+.nrl-hud-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 10rem;
+  padding: 0.35rem;
+  background: #e8e0c8;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+}
+.nrl-hud-menu[hidden] { display: none; }
+.nrl-hud-menu-item { width: 100%; text-align: left; }
 /* Hide the "/total" week suffix on narrow screens. */
 @media (max-width: 480px) {
   .nrl-hud-week-total { display: none; }

@@ -6,6 +6,7 @@ import { bus } from './core/events';
 import { createNewGame, getState, loadState } from './core/state';
 import { enableAutosave, load, showTitleFlow } from './core/save';
 import { advanceWeek } from './core/time';
+import { advanceUntil } from './core/advance';
 import { createHud } from './ui/hud';
 import { createNav } from './ui/nav';
 import { closeModal, closeScreen, ensureStyles } from './ui/dom';
@@ -91,7 +92,7 @@ async function boot(): Promise<void> {
   registerYouthSystem();
 
   const game = new Phaser.Game(config);
-  createHud({ onAdvanceWeek: () => advanceWeek() });
+  createHud({ onAdvanceWeek: () => advanceWeek(), onAdvanceUntil: (t) => advanceUntil(t) });
 
   // Grounds → Match handoff: state/ladder are already applied by the matchday
   // tick hook before this fires; the Match scene is pure playback. The scene's

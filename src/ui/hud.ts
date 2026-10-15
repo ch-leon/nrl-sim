@@ -5,6 +5,7 @@
 
 import { bus } from '../core/events';
 import { getState, type GameState } from '../core/state';
+import type { AdvanceTarget } from '../core/advanceRules';
 import { WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
 
@@ -12,7 +13,16 @@ import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from
 export interface HudOpts {
   /** Called when the "Advance Week" button is clicked. Absent => button disabled. */
   onAdvanceWeek?: () => void;
+  /** Called from the "Advance Week" menu (#44). Absent => menu disabled. */
+  onAdvanceUntil?: (target: AdvanceTarget) => void;
 }
+
+/** Entries in the "Advance Week" menu, in display order. */
+export const ADVANCE_MENU: readonly { label: string; target: AdvanceTarget }[] = [
+  { label: '×4 weeks', target: { kind: 'weeks', weeks: 4 } },
+  { label: 'To finals', target: { kind: 'finals' } },
+  { label: 'To season end', target: { kind: 'seasonEnd' } },
+];
 
 /** Handle to a mounted HUD. */
 export interface Hud {
@@ -51,7 +61,46 @@ export function createHud(opts: HudOpts = {}): Hud {
 
   const advanceBtn = button('Advance Week', () => opts.onAdvanceWeek?.());
   if (!opts.onAdvanceWeek) advanceBtn.disabled = true;
-  const actions = el('div', { class: 'nrl-hud-actions' }, advanceBtn);
+
+  // #44: split-button menu. The toggle is a 44px square beside Advance Week; the
+  // menu drops below the HUD and is closed by a pick, Escape or an outside tap.
+  const menuToggle = button('▾', () => setMenuOpen(menu.hidden), { class: 'nrl-hud-menu-toggle' });
+  menuToggle.setAttribute('aria-label', 'More advance options');
+  menuToggle.setAttribute('aria-haspopup', 'menu');
+  menuToggle.setAttribute('aria-expanded', 'false');
+  if (!opts.onAdvanceUntil) menuToggle.disabled = true;
+
+  const menu = el('div', { class: 'nrl-hud-menu', attrs: { role: 'menu', hidden: '' } },
+    ...ADVANCE_MENU.map(({ label, target }) => {
+      const item = button(label, () => {
+        setMenuOpen(false);
+        opts.onAdvanceUntil?.(target);
+      }, { class: 'nrl-hud-menu-item' });
+      item.setAttribute('role', 'menuitem');
+      if (!opts.onAdvanceUntil) item.disabled = true;
+      return item;
+    }),
+  );
+
+  function setMenuOpen(open: boolean): void {
+    menu.hidden = !open;
+    menuToggle.setAttribute('aria-expanded', String(open));
+    if (open) {
+      document.addEventListener('pointerdown', onOutsidePointer, true);
+      document.addEventListener('keydown', onMenuKey, true);
+    } else {
+      document.removeEventListener('pointerdown', onOutsidePointer, true);
+      document.removeEventListener('keydown', onMenuKey, true);
+    }
+  }
+  function onOutsidePointer(e: Event): void {
+    if (!actions.contains(e.target as Node)) setMenuOpen(false);
+  }
+  function onMenuKey(e: KeyboardEvent): void {
+    if (e.key === 'Escape') setMenuOpen(false);
+  }
+
+  const actions = el('div', { class: 'nrl-hud-actions' }, advanceBtn, menuToggle, menu);
 
   const root = el('div', { class: 'nrl-hud' }, readouts, spacer, actions);
 
@@ -103,6 +152,7 @@ export function createHud(opts: HudOpts = {}): Hud {
       offState();
       offMoney();
       offInset();
+      setMenuOpen(false);
       if (flashTimer) clearTimeout(flashTimer);
       root.remove();
     },
