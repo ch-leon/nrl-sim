@@ -6,7 +6,7 @@ import { bus } from './events';
 import { makeRng } from '../utils/rng';
 import { generatePlayer, type Quality } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
-import { STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
+import { BOARD, STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
 
 // ── §4 domain types (canonical definitions live here) ──────────────────────
 
@@ -82,7 +82,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 /** One completed season. The extended fields are optional for pre-v4 entries. */
 export interface SeasonRecord {
@@ -91,6 +91,21 @@ export interface SeasonRecord {
   pointsFor?: number; pointsAgainst?: number;
   topScorer?: { name: string; tries: number };
 }
+
+/** A season goal set by the board (GitHub #47). `target`'s meaning depends on `kind`. */
+export type ObjectiveKind = 'finals' | 'solvent' | 'beatRival' | 'build';
+export interface Objective {
+  id: string;
+  kind: ObjectiveKind;
+  text: string;
+  /** finals: ladder position to reach; solvent: minimum cash; build: facility count; beatRival: unused (0). */
+  target: number;
+  rivalId?: string;
+  status: 'pending' | 'met' | 'missed';
+}
+
+/** Set once the board sacks the player; the save is kept so it can be reviewed. */
+export interface SackedInfo { season: number; reason: string }
 
 export interface GameState {
   version: typeof SAVE_VERSION;
@@ -107,6 +122,9 @@ export interface GameState {
   weather?: WeatherKind; // set for current round by fixtures system
   settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty };
   history: SeasonRecord[];
+  boardPatience: number; // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
+  objectives: Objective[]; // this season's board objectives (#47)
+  sacked?: SackedInfo;
   rngSeed: number; // advanced state of the seeded RNG
 }
 
@@ -189,6 +207,8 @@ export function createNewGame(
     league,
     settings: { muted: false, volume: 0.8, tutorialDone: false, difficulty },
     history: [],
+    boardPatience: BOARD.START_PATIENCE,
+    objectives: [],
     rngSeed: rng.state(),
   };
 

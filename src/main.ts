@@ -19,6 +19,8 @@ import { registerAgingSystem } from './systems/aging';
 import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
 import { registerStatsSystem } from './systems/stats';
+import { registerBoardSystem } from './systems/board';
+import { initBoardUi } from './ui/screens/board';
 import { initPlayerOfMatch } from './ui/screens/potm';
 import { openBuildScreen } from './ui/screens/build';
 import { openSquadScreen } from './ui/screens/squad';
@@ -98,7 +100,9 @@ async function boot(): Promise<void> {
   registerAgingSystem();
   registerYouthSystem();
   registerStatsSystem();
+  registerBoardSystem();
   initPlayerOfMatch();
+  initBoardUi();
 
   const game = new Phaser.Game(config);
   createHud({ onAdvanceWeek: () => advanceWeek(), onAdvanceUntil: (t) => advanceUntil(t) });

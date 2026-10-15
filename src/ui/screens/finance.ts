@@ -7,6 +7,7 @@
 import { bus } from '../../core/events';
 import { getState, type GameState } from '../../core/state';
 import { weeklyWages, weeklyIncome, gateReceipts } from '../../systems/economy';
+import { buildObjectivesSection } from './board';
 import { el, panel, button, openModal, closeScreen } from '../dom';
 
 /** Contracts whose remaining weeks are at most this are listed as expiring. */
@@ -215,6 +216,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
     ),
   );
   nodes.push(panel({ class: 'nrl-finance-panel' }, weekly));
+  nodes.push(buildObjectivesSection(state));
 
   const expiring = el('div', { class: 'nrl-finance-expiring' });
   expiring.append(el('h3', { text: `Contracts ending in ${EXPIRY_WINDOW_WEEKS} wks` }));
