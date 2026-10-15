@@ -23,6 +23,7 @@ import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
+import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { startTutorial } from './ui/tutorial';
@@ -54,6 +55,8 @@ function initToasts(): void {
   ensureStyles();
   const stack = document.createElement('div');
   stack.className = 'nrl-toast-stack';
+  // #45: announce toasts to screen readers without stealing focus.
+  stack.setAttribute('aria-live', 'polite');
   uiRoot.appendChild(stack);
   bus.on('ui:notify', ({ text, kind }) => {
     const toast = document.createElement('div');
@@ -68,6 +71,7 @@ async function boot(): Promise<void> {
   initToasts();
   initSeasonEndFeedback();
   initFinanceLedger();
+  initNewsInbox();
   const choice = await showTitleFlow(uiRoot);
   if (choice.mode === 'continue') {
     const saved = load();
@@ -113,6 +117,8 @@ async function boot(): Promise<void> {
   nav.registerScreen('ladder', 'Ladder', () => openLadderScreen());
   nav.registerScreen('history', 'History', () => openHistoryScreen());
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen());
+  nav.registerScreen('news', 'News', () => openInboxScreen());
+  newsInbox.onChange((unread) => nav.setBadge('news', unread));
   nav.registerScreen('help', '?', () => startTutorial(true));
 
   initAudio();

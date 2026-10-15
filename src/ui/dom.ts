@@ -507,4 +507,39 @@ const CSS = `
 .nrl-finance-table th:first-child,
 .nrl-finance-table td:first-child { text-align: left; }
 .nrl-finance-table td.nrl-finance-neg { color: #b00020; }
+
+/* ── News inbox (#45) ─────────────────────────────────────────────────── */
+.nrl-nav-badge {
+  display: inline-block;
+  margin-left: 0.25rem;
+  min-width: 1.1em;
+  padding: 0 0.2em;
+  background: #b03a2e;
+  color: #fff;
+  border: 2px solid #000;
+  font-size: 0.85em;
+  line-height: 1.2;
+  text-align: center;
+}
+.nrl-news { font-size: 0.85rem; }
+.nrl-news h2 { margin: 0 0 0.4rem; font-size: 1.05rem; }
+.nrl-news h3 { margin: 0.6rem 0 0.2rem; font-size: 0.9rem; }
+.nrl-news-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+.nrl-news-filter { flex: 0 0 auto; }
+.nrl-news-filter.nrl-news-active { background: #3a6ea5; color: #fff; }
+.nrl-news-list { max-height: 55vh; overflow-y: auto; }
+.nrl-news-item {
+  padding: 0.2rem 0.4rem;
+  margin-bottom: 0.25rem;
+  border-left: 4px solid #3a6ea5;
+  overflow-wrap: anywhere;
+}
+.nrl-news-item.nrl-news-success { border-left-color: #2e7d32; }
+.nrl-news-item.nrl-news-danger { border-left-color: #b03a2e; }
+.nrl-news-empty { margin: 0.4rem 0; }
 `;
