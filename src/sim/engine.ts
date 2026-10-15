@@ -6,7 +6,7 @@
 import { makeRng, type Rng } from '../utils/rng';
 import { overallRating } from '../data/player';
 import { ON_FIELD, SET_TACKLES, STAT_MAX } from '../config';
-import type { Player, Position, RivalClub, WeatherKind } from '../core/state';
+import type { Player, Position, RivalClub, Trait, WeatherKind } from '../core/state';
 import type {
   KickKind,
   MatchEvent,
@@ -56,6 +56,7 @@ function toRosterEntry(p: Player): RosterEntry {
     stats: { ...p.stats },
     id: p.id,
     injuryRisk: p.injuryRisk,
+    ...(p.traits.length > 0 ? { traits: [...p.traits] } : {}),
   };
 }
 
@@ -162,17 +163,36 @@ const HALVES: ReadonlySet<Position> = new Set(['five-eighth', 'halfback']);
 
 type StatKey = 'speed' | 'strength' | 'stamina' | 'skill' | 'footyIQ';
 
+// Trait effects (#43). Deliberately small so team strength still dominates, and
+// they only re-weight rolls the engine already makes (no extra rng draws), so a
+// roster with no traits plays out exactly as before.
+/** Weight multiplier on a `finisher` when a try scorer is picked. */
+const FINISHER_SCORER_MULT = 1.5;
+/** Weight multiplier on a `hardMan` when the big-hit maker is picked. */
+const HARDMAN_HIT_MULT = 1.6;
+/** Per-hardMan on-field bump to the defending side's big-hit weight. */
+const HARDMAN_BIGHIT_WEIGHT = 0.03;
+/** Kicking-success bonus (probability points) for a `playmaker` kicker. */
+const PLAYMAKER_KICK_BONUS = 0.04;
+/** Injury-chance multiplier for an `injuryProne` carrier (on top of opts.injuryRate). */
+const INJURY_PRONE_MULT = 1.4;
+
+const hasTrait = (p: RosterEntry | undefined, t: Trait): boolean =>
+  p?.traits?.includes(t) ?? false;
+
 function pickActor(
   roster: readonly RosterEntry[],
   rng: Rng,
   prefer: (p: Position) => boolean,
   stat: StatKey,
+  boost?: { trait: Trait; mult: number },
 ): string | undefined {
   if (roster.length === 0) return undefined;
   const weights = roster.map((p) => {
     const base = prefer(p.position) ? 3 : 1;
     const s = p.stats?.[stat] ?? 50;
-    return base * (0.35 + s / 100);
+    const traitMult = boost && hasTrait(p, boost.trait) ? boost.mult : 1;
+    return base * (0.35 + s / 100) * traitMult;
   });
   let r = rng.next() * weights.reduce((a, b) => a + b, 0);
   for (let i = 0; i < roster.length; i++) {
@@ -182,14 +202,28 @@ function pickActor(
   return roster[roster.length - 1]?.name;
 }
 
-function kickerName(roster: readonly RosterEntry[]): string | undefined {
+const HARDMAN = { trait: 'hardMan', mult: HARDMAN_HIT_MULT } as const;
+const FINISHER = { trait: 'finisher', mult: FINISHER_SCORER_MULT } as const;
+
+function kickerEntry(roster: readonly RosterEntry[]): RosterEntry | undefined {
   const ranked = [...roster].sort((a, b) => {
     const rank = (p: RosterEntry): number =>
       p.position === 'halfback' ? 3 : p.position === 'five-eighth' ? 2 : 1;
-    const sk = (p: RosterEntry): number => p.stats?.skill ?? 50;
+    // A playmaker wins the kicking duties among equals-ish (+5 effective skill).
+    const sk = (p: RosterEntry): number =>
+      (p.stats?.skill ?? 50) + (hasTrait(p, 'playmaker') ? 5 : 0);
     return rank(b) - rank(a) || sk(b) - sk(a);
   });
-  return ranked[0]?.name;
+  return ranked[0];
+}
+
+function kickerName(roster: readonly RosterEntry[]): string | undefined {
+  return kickerEntry(roster)?.name;
+}
+
+/** Goal-kick success multiplier: a playmaker kicker is slightly more reliable. */
+function kickerBonus(roster: readonly RosterEntry[]): number {
+  return hasTrait(kickerEntry(roster), 'playmaker') ? PLAYMAKER_KICK_BONUS : 0;
 }
 
 // ── Match simulation ─────────────────────────────────────────────────────────
@@ -315,6 +349,7 @@ export function simulateMatch(
         rng,
         possessing.sheet.fitness,
         t,
+        defending.roster.filter((p) => hasTrait(p, 'hardMan')).length,
       );
 
       if (outcome === 'error') {
@@ -334,7 +369,7 @@ export function simulateMatch(
         events.push(mkEvent(t, 'penalty', atk.clubId, { x: Math.round(fieldX), y: 50 }));
         if (fieldX >= 60) {
           const kicker = kickerName(possessing.roster);
-          const prob = kickProb(atk.kicking, 0.62) * wmods.kickSuccessMult;
+          const prob = (kickProb(atk.kicking, 0.62) + kickerBonus(possessing.roster)) * wmods.kickSuccessMult;
           const good = rng.next() < prob;
           if (good) possessing.score += 2;
           events.push(
@@ -355,7 +390,7 @@ export function simulateMatch(
       }
 
       if (outcome === 'big-hit') {
-        const hitter = pickActor(defending.roster, rng, (p) => FORWARDS.has(p), 'strength');
+        const hitter = pickActor(defending.roster, rng, (p) => FORWARDS.has(p), 'strength', HARDMAN);
         const carrier = pickActor(possessing.roster, rng, () => true, 'skill');
         const loss = 2 + Math.floor(rng.next() * 11); // 2-12m driven back
         fieldX = clampField(fieldX - loss);
@@ -386,6 +421,7 @@ export function simulateMatch(
           rng,
           (p) => BACKS.has(p) || HALVES.has(p),
           'speed',
+          FINISHER,
         );
         const gain = 20 + Math.floor(rng.next() * 21);
         fieldX = clampField(fieldX + gain);
@@ -413,6 +449,7 @@ export function simulateMatch(
           rng,
           (p) => FORWARDS.has(p) || HALVES.has(p),
           'strength',
+          FINISHER,
         );
         const gain = 12 + Math.floor(rng.next() * 14);
         fieldX = clampField(fieldX + gain);
@@ -455,7 +492,7 @@ export function simulateMatch(
           mkEvent(t, 'tackle', def.clubId, evExtra({ x: Math.round(fieldX), y: 50, detail: 'held' }, tackler)),
         );
         if (fieldX >= 95 && rng.next() < 0.15 + atk.attack / 500) {
-          const scorer = pickActor(possessing.roster, rng, (p) => BACKS.has(p), 'speed');
+          const scorer = pickActor(possessing.roster, rng, (p) => BACKS.has(p), 'speed', FINISHER);
           scoreTry(possessing, t, events, scorer);
           momentum = applyMomentumEvent(momentum, 'try', possessing.isHome);
           attemptConversion(possessing, t, events, wmods, rng);
@@ -481,7 +518,7 @@ export function simulateMatch(
       const margin = possessing.score - defending.score;
       if (margin <= 0 && margin >= -2 && possessing.sheet.attack >= 55) {
         const kicker = kickerName(possessing.roster);
-        const prob = kickProb(possessing.sheet.kicking, 0.4) * wmods.kickSuccessMult;
+        const prob = (kickProb(possessing.sheet.kicking, 0.4) + kickerBonus(possessing.roster)) * wmods.kickSuccessMult;
         const good = rng.next() < prob;
         if (good) possessing.score += 1;
         events.push(
@@ -544,24 +581,28 @@ interface KickResolve {
   scoredTry: boolean;
 }
 
-function chooseKickKind(fieldX: number, early: boolean, rng: Rng): KickKind {
+/**
+ * A playmaker kicker (#43) leans on the creative kicks — more grubbers near the
+ * line, more 40-20 attempts, fewer safe find-touch. Same draw count either way.
+ */
+function chooseKickKind(fieldX: number, early: boolean, rng: Rng, playmaker = false): KickKind {
   if (early) {
-    if (rng.next() < 0.25) return '40-20';
+    if (rng.next() < (playmaker ? 0.33 : 0.25)) return '40-20';
     return rng.next() < 0.55 ? 'bomb' : 'chip';
   }
   if (fieldX >= 72) {
     const r = rng.next();
-    if (r < 0.45) return 'grubber';
-    if (r < 0.75) return 'bomb';
+    if (r < (playmaker ? 0.55 : 0.45)) return 'grubber';
+    if (r < (playmaker ? 0.8 : 0.75)) return 'bomb';
     return 'chip';
   }
   if (fieldX >= 40) {
     const r = rng.next();
-    if (r < 0.4) return 'bomb';
-    if (r < 0.75) return 'find-touch';
+    if (r < (playmaker ? 0.3 : 0.4)) return 'bomb';
+    if (r < (playmaker ? 0.6 : 0.75)) return 'find-touch';
     return 'grubber';
   }
-  return rng.next() < 0.15 ? '40-20' : 'find-touch';
+  return rng.next() < (playmaker ? 0.24 : 0.15) ? '40-20' : 'find-touch';
 }
 
 function resolveKickInner(
@@ -574,8 +615,9 @@ function resolveKickInner(
   rng: Rng,
   early: boolean,
 ): KickResolve {
-  const kind = chooseKickKind(fieldX, early, rng);
-  const kicker = kickerName(possessing.roster);
+  const kickerE = kickerEntry(possessing.roster);
+  const kind = chooseKickKind(fieldX, early, rng, hasTrait(kickerE, 'playmaker'));
+  const kicker = kickerE?.name;
   const dist = kickDistance(possessing.sheet.kicking, wmods, rng);
 
   events.push(
@@ -588,7 +630,7 @@ function resolveKickInner(
   );
 
   if (kind === '40-20') {
-    const success = rng.next() < 0.1 + possessing.sheet.kicking / 500;
+    const success = rng.next() < 0.1 + possessing.sheet.kicking / 500 + kickerBonus(possessing.roster);
     if (success) {
       return { fieldX: clampField(78 + rng.next() * 10), flip: false, scoredTry: false };
     }
@@ -601,6 +643,7 @@ function resolveKickInner(
       rng,
       (p) => p === 'winger' || p === 'fullback' || p === 'centre',
       'speed',
+      FINISHER,
     );
     const fullback = pickActor(
       defending.roster,
@@ -633,6 +676,7 @@ function resolveKickInner(
         rng,
         (p) => BACKS.has(p) || HALVES.has(p),
         'speed',
+        FINISHER,
       );
       scoreTry(possessing, t, events, scorer);
       attemptConversion(possessing, t, events, wmods, rng);
@@ -675,6 +719,7 @@ function rollContest(
   rng: Rng,
   fitness: number,
   t: number,
+  defHardMen = 0,
 ): ContestOutcome {
   const diffShift = atkDiff * 0.12;
   const momMod = momentumWeightMod(momentum, possIsHome);
@@ -686,7 +731,7 @@ function rollContest(
   let tackleW = (BASE_TACKLE - diffShift * 0.3) / momMod;
   let errorW = (BASE_ERROR - diffShift) * wmods.errorMult * fit.errorMult;
   const penaltyW = BASE_PENALTY;
-  let bigHitW = BASE_BIGHIT - diffShift * 0.3;
+  let bigHitW = (BASE_BIGHIT - diffShift * 0.3) * (1 + HARDMAN_BIGHIT_WEIGHT * defHardMen);
 
   breakW = Math.max(0.02, breakW);
   breakTackleW = Math.max(0.02, breakTackleW);
@@ -721,7 +766,8 @@ export function rollBigHitInjury(
   const entry = roster.find((p) => p.name === carrierName);
   const risk = entry?.injuryRisk ?? 20;
   // ~3.5% at risk 20, ~5.5% at 40, ~11.5% at 100 — rare but meaningful.
-  const chance = (0.015 + (risk / 100) * 0.1) * injuryRate;
+  const proneMult = hasTrait(entry, 'injuryProne') ? INJURY_PRONE_MULT : 1;
+  const chance = (0.015 + (risk / 100) * 0.1) * injuryRate * proneMult;
   if (rng.next() >= chance) return null;
   const weeks = 1 + Math.floor(rng.next() * 3);
   const injury: MatchInjury = { teamId, playerName: carrierName, weeks };
@@ -747,7 +793,7 @@ function attemptConversion(
   wmods: WeatherMods,
   rng: Rng,
 ): void {
-  const prob = kickProb(side.sheet.kicking, 0.75) * wmods.kickSuccessMult;
+  const prob = (kickProb(side.sheet.kicking, 0.75) + kickerBonus(side.roster)) * wmods.kickSuccessMult;
   const good = rng.next() < prob;
   if (good) side.score += 2;
   events.push(
