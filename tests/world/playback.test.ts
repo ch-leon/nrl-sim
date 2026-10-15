@@ -235,11 +235,11 @@ describe('PlaybackController scheduling', () => {
     bus.on('match:event', (e) => seen.push(e.kind));
     // The try is due at E(60); the 1.5s half-time hold pushes it 1.5s later in
     // real time. The conversion shares minute 60, so it's due half a minute
-    // after the try — and the 1.8s try hold is added on top of that gap.
+    // after the try — and the 2.6s try hold is added on top of that gap.
     ctrl.update(E(60) + 1_500 + 100);
     expect(seen).toContain('try');
     const gap = MINUTE / 2;
-    run(ctrl, gap + 1_800 - 300);
+    run(ctrl, gap + 2_600 - 300);
     expect(seen).not.toContain('conversion');
     run(ctrl, 600);
     expect(seen).toContain('conversion');
@@ -545,8 +545,18 @@ describe('PlaybackController kick flights (#15)', () => {
   });
 
   it('a grubber stays low and bounces along the ground', () => {
-    const { ctrl, lifts } = kickScenario('grubber', { t: 10, kind: 'set-start', teamId: 'A', x: 70, y: 40 });
-    run(ctrl, eventTimeMs(10, 1) + 3_000);
+    const { scene, ctrl, seen } = kickScenario('grubber', { t: 10, kind: 'set-start', teamId: 'A', x: 70, y: 40 });
+    // Only the grubber itself: from the kicker's boot until the receiving set.
+    const lifts: number[] = [];
+    const kicker = scene.players.home[KICKER_SLOT]!;
+    const place = scene.ball.place.bind(scene.ball);
+    scene.ball.place = (x, y, lift, depth) => {
+      const kicked = kicker.played.filter((a) => a === 'kick').length >= 2; // past the kickoff's
+      if (kicked && seen.filter((k) => k === 'set-start').length < 2) lifts.push(lift);
+      place(x, y, lift, depth);
+    };
+    // The dummy-half passes to the kicker, who runs onto it before kicking.
+    run(ctrl, eventTimeMs(10, 1) + 5_000);
     const flight = lifts.slice(lifts.findIndex((l) => l < 2)); // after it leaves the boot
     expect(Math.max(...flight)).toBeLessThan(12);
     // Several touch-downs (near-zero lift) separated by hops.
@@ -625,6 +635,82 @@ describe('PlaybackController ruck and contact beats (#19)', () => {
     expect(dh.played).toContain('dummyHalf');
     // The next carry goes through the dummy-half's hands.
     expect(dhHeld).toBe(true);
+  });
+
+  it('holds the next play until the ball is in the dummy-half’s hands', () => {
+    const scene = makeFakeScene('H', true);
+    // The next carry is due almost at once: the ruck must still play out first.
+    const evs: MatchEvent[] = [
+      { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+      { t: 3, kind: 'run', teamId: 'H', x: 55, y: 50 },
+      { t: 4, kind: 'tackle', teamId: 'A', x: 56, y: 50 },
+      { t: 4, kind: 'run', teamId: 'H', x: 60, y: 46 },
+      { t: 80, kind: 'full-time', teamId: 'H' },
+    ];
+    const ctrl = new PlaybackController(scene, mkResult(evs), FIX);
+    const dh = scene.players.home[HOOKER_SLOT]!;
+    const order: string[] = [];
+    let dhHeldAtRun = false;
+    bus.on('match:event', (e) => {
+      order.push(e.kind);
+      // Ball placed in the dummy-half's hands as the next carry fires.
+      if (order.filter((k) => k === 'run').length === 2) dhHeldAtRun = Math.hypot(scene.ball.x - dh.x, scene.ball.y - dh.y) < 9;
+    });
+    run(ctrl, eventTimeMs(4, 1) + 4_000);
+    expect(order.filter((k) => k === 'run')).toHaveLength(2);
+    const carrier = scene.players.home.find((a) => a.played.includes('ptb'))!;
+    expect(carrier).toBeDefined();
+    expect(carrier).not.toBe(dh);
+    // tackled → down → up to play the ball, in that order.
+    const seq = carrier.played.filter((a) => a === 'tackled' || a === 'down' || a === 'ptb');
+    expect(seq.slice(0, 3)).toEqual(['tackled', 'down', 'ptb']);
+    expect(dh.played).toContain('dummyHalf');
+    expect(dhHeldAtRun).toBe(true);
+    // And he passes it out of the stoop.
+    expect(dh.played.slice(dh.played.indexOf('dummyHalf'))).toContain('pass');
+  });
+
+  it('the tackler gets up as marker, square opposite the play-the-ball', () => {
+    const scene = makeFakeScene('H', true);
+    const ctrl = new PlaybackController(scene, mkResult(tackleThenRun('tackle').slice(0, 3)), FIX);
+    run(ctrl, eventTimeMs(4, 1) + 2_400);
+    const carrier = scene.players.home.find((a) => a.played.includes('ptb'))!;
+    const marker = scene.players.away.find((a) => a.played.includes('tackle'))!;
+    const ruck = fieldToWorldPoint(58, 52, fieldOffsetX());
+    const mark = fieldToWorldPoint(59.5, 52, fieldOffsetX());
+    expect(marker.played.slice(marker.played.indexOf('tackle'))).toContain('down');
+    expect(Math.hypot(marker.x - mark.x, marker.y - mark.y)).toBeLessThan(4);
+    // On the defending side of the ruck (home attacks +x / screen-right).
+    expect(marker.x).toBeGreaterThan(carrier.x);
+    expect(Math.hypot(carrier.x - ruck.x, carrier.y - ruck.y)).toBeLessThan(4);
+  });
+
+  it('back-to-back tackles: the dummy-half passes rather than taking the hit himself', () => {
+    const scene = makeFakeScene('H', true);
+    const evs: MatchEvent[] = [
+      { t: 0, kind: 'kickoff', teamId: 'H', x: 50, y: 50 },
+      { t: 3, kind: 'set-start', teamId: 'H', x: 50, y: 50 },
+      { t: 4, kind: 'tackle', teamId: 'A', x: 55, y: 50 },
+      { t: 5, kind: 'tackle', teamId: 'A', x: 60, y: 44 },
+      { t: 80, kind: 'full-time', teamId: 'H' },
+    ];
+    const ctrl = new PlaybackController(scene, mkResult(evs), FIX);
+    run(ctrl, eventTimeMs(5, 1) + 4_000);
+    const dh = scene.players.home[HOOKER_SLOT]!;
+    expect(dh.played).not.toContain('tackled');
+    expect(scene.players.home.filter((a) => a.played.includes('ptb')).length).toBeGreaterThanOrEqual(1);
+    expect(dh.played.filter((a) => a === 'dummyHalf').length).toBe(2);
+  });
+
+  it('skip mid-ruck leaves the ball with the dummy-half and still finishes once', () => {
+    const scene = makeFakeScene('H', true);
+    const ctrl = new PlaybackController(scene, mkResult(tackleThenRun('big-hit').slice(0, 3).concat({ t: 80, kind: 'full-time', teamId: 'H' })), FIX);
+    let finished = 0;
+    bus.on('match:finished', () => finished++);
+    run(ctrl, eventTimeMs(4, 1) + 400);
+    ctrl.skip();
+    expect(ctrl.finished).toBe(true);
+    expect(finished).toBe(1);
   });
 
   it('a big-hit drives the carrier back toward his own line', () => {
