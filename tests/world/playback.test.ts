@@ -182,11 +182,17 @@ describe('PlaybackController scheduling', () => {
   });
   afterEach(() => bus.clear());
 
+  // Timings derive from the clock constants so a pace change (REAL_SECONDS_AT_1X)
+  // doesn't need every number re-done. E(t) = real ms at ×1 for sim-minute t.
+  const E = (t: number): number => eventTimeMs(t, 1);
+  const WHOLE_MATCH = E(SIM_MINUTES) + 15_000; // + try/half-time holds
+  const MINUTE = E(1);
+
   it('fires every event in t order, re-emitted as match:event', () => {
     const ctrl = new PlaybackController(makeFakeScene(), mkResult(events), FIX);
     const seen: string[] = [];
     bus.on('match:event', (e) => seen.push(`${e.kind}@${e.t}`));
-    ctrl.update(200_000);
+    ctrl.update(WHOLE_MATCH);
     expect(seen).toEqual(['kickoff@0', 'run@10', 'half-time@40', 'try@60', 'conversion@60', 'full-time@80']);
   });
 
@@ -194,10 +200,10 @@ describe('PlaybackController scheduling', () => {
     const ctrl = new PlaybackController(makeFakeScene(), mkResult(events), FIX);
     const seen: string[] = [];
     bus.on('match:event', (e) => seen.push(e.kind));
-    // eventTimeMs(10,1) = 11250ms. Advance 5s: only kickoff.
-    ctrl.update(5_000);
+    // Just short of the run's due time: only kickoff.
+    ctrl.update(E(10) - 1_000);
     expect(seen).toEqual(['kickoff']);
-    ctrl.update(7_000);
+    ctrl.update(2_000);
     expect(seen).toEqual(['kickoff', 'run']);
   });
 
@@ -206,7 +212,7 @@ describe('PlaybackController scheduling', () => {
     const seen: string[] = [];
     bus.on('match:event', (e) => seen.push(e.kind));
     ctrl.setSpeed(4 as PlaybackSpeed);
-    ctrl.update(5_000); // 20000ms clock ≥ run(11250)
+    ctrl.update(E(10) / 4 + 100); // ×4: a quarter of the real time reaches the run
     expect(seen).toEqual(['kickoff', 'run']);
   });
 
@@ -214,12 +220,12 @@ describe('PlaybackController scheduling', () => {
     const ctrl = new PlaybackController(makeFakeScene(), mkResult(events), FIX);
     const seen: string[] = [];
     bus.on('match:event', (e) => seen.push(e.kind));
-    ctrl.update(46_000);
+    ctrl.update(E(40) + 500);
     expect(seen).toContain('half-time');
     expect(seen).not.toContain('try');
     ctrl.update(1_000);
     expect(seen).not.toContain('try');
-    ctrl.update(60_000);
+    ctrl.update(E(60) - E(40) + 2_000); // + the 1.5s half-time hold
     expect(seen).toContain('try');
   });
 
@@ -227,14 +233,15 @@ describe('PlaybackController scheduling', () => {
     const ctrl = new PlaybackController(makeFakeScene(), mkResult(events), FIX);
     const seen: string[] = [];
     bus.on('match:event', (e) => seen.push(e.kind));
-    // The try is due at clock 67500ms; the 1.5s half-time pause pushes that to
-    // 69000ms real. The conversion (half a minute later, clock 68062ms) would
-    // fire ~560ms after the try without the try hold.
-    ctrl.update(69_100);
+    // The try is due at E(60); the 1.5s half-time hold pushes it 1.5s later in
+    // real time. The conversion shares minute 60, so it's due half a minute
+    // after the try — and the 1.8s try hold is added on top of that gap.
+    ctrl.update(E(60) + 1_500 + 100);
     expect(seen).toContain('try');
-    run(ctrl, 1_500);
+    const gap = MINUTE / 2;
+    run(ctrl, gap + 1_800 - 300);
     expect(seen).not.toContain('conversion');
-    run(ctrl, 1_000);
+    run(ctrl, 600);
     expect(seen).toContain('conversion');
   });
 
@@ -244,7 +251,7 @@ describe('PlaybackController scheduling', () => {
     let finishes = 0;
     bus.on('match:event', (e) => seen.push(e.kind));
     bus.on('match:finished', () => finishes++);
-    ctrl.update(6_000);
+    ctrl.update(E(10) - 1_000);
     expect(seen).toEqual(['kickoff']);
     ctrl.skip();
     expect(seen).toEqual(['kickoff', 'run', 'half-time', 'try', 'conversion', 'full-time']);
@@ -256,7 +263,7 @@ describe('PlaybackController scheduling', () => {
     const ctrl = new PlaybackController(makeFakeScene(), mkResult(events), FIX);
     let finishes = 0;
     bus.on('match:finished', () => finishes++);
-    ctrl.update(200_000);
+    ctrl.update(WHOLE_MATCH);
     ctrl.update(50_000);
     ctrl.skip();
     expect(finishes).toBe(1);
@@ -266,7 +273,7 @@ describe('PlaybackController scheduling', () => {
     const ctrl = new PlaybackController(makeFakeScene(), mkResult(events));
     let finishes = 0;
     bus.on('match:finished', () => finishes++);
-    ctrl.update(200_000);
+    ctrl.update(WHOLE_MATCH);
     expect(finishes).toBe(0);
     expect(ctrl.finished).toBe(true);
   });
@@ -278,9 +285,9 @@ describe('PlaybackController scheduling', () => {
     bus.on('match:event', (e) => {
       if (e.kind === 'run') ballAtEmit = { x: scene.ball.x, y: scene.ball.y };
     });
-    ctrl.update(5_000);
+    ctrl.update(E(10) - 1_000);
     const settled = { x: scene.ball.x, y: scene.ball.y };
-    ctrl.update(7_000);
+    ctrl.update(2_000);
     expect(ballAtEmit).toEqual(settled);
   });
 
@@ -288,7 +295,7 @@ describe('PlaybackController scheduling', () => {
     const ctrl = new PlaybackController(makeFakeScene(), mkResult(events), FIX);
     let stateChanges = 0;
     bus.on('state:changed', () => stateChanges++);
-    ctrl.update(200_000);
+    ctrl.update(WHOLE_MATCH);
     ctrl.skip();
     expect(stateChanges).toBe(0);
   });
@@ -512,7 +519,7 @@ describe('PlaybackController kick flights (#15)', () => {
 
   it('a bomb goes up high and slow, the kicker kicks, and the receivers claim it', () => {
     const { scene, ctrl, lifts, seen } = kickScenario('bomb', { t: 10, kind: 'set-start', teamId: 'A', x: 75, y: 30 });
-    run(ctrl, eventTimeMs(10, 1) + 450); // set-start, kick share minute 10 with the next set
+    run(ctrl, eventTimeMs(10 + 1 / 3, 1) + 100); // set-start, kick, next set share minute 10: kick is 1/3 in
     expect(seen).toContain('kick');
     // The next event is held back until the bomb has come down.
     expect(seen.filter((k) => k === 'set-start')).toHaveLength(1);
@@ -526,7 +533,7 @@ describe('PlaybackController kick flights (#15)', () => {
 
   it('a bomb that leads to a set for the kicking side is regathered by the chaser', () => {
     const { scene, ctrl } = kickScenario('bomb', { t: 10, kind: 'set-start', teamId: 'H', x: 72, y: 30 });
-    run(ctrl, eventTimeMs(10, 1) + 450);
+    run(ctrl, eventTimeMs(10 + 1 / 3, 1) + 100);
     // Stop just after landing, before the next set reshuffles possession.
     let landed = false;
     for (let i = 0; i < 400 && !landed; i++) {
@@ -584,7 +591,7 @@ describe('PlaybackController kick flights (#15)', () => {
     const { ctrl } = kickScenario('bomb', { t: 10, kind: 'set-start', teamId: 'A', x: 75, y: 30 });
     let finished = 0;
     bus.on('match:finished', () => finished++);
-    run(ctrl, eventTimeMs(10, 1) + 600); // mid wind-up / flight
+    run(ctrl, eventTimeMs(10 + 1 / 3, 1) + 300); // mid wind-up / flight
     ctrl.skip();
     expect(ctrl.finished).toBe(true);
     expect(finished).toBe(1);

@@ -25,6 +25,7 @@ import type { TeamSheet, MatchResult, MatchEvent } from '../sim/events';
 import type { Fixture } from '../core/state';
 import {
   PlaybackController,
+  PLAYBACK_SPEEDS,
   slotRoster,
   slotSpeeds,
   type PlaybackActor,
@@ -519,7 +520,7 @@ export class MatchScene extends Phaser.Scene {
     cam.centerOn(c.x, c.y);
   }
 
-  // ── DOM playback controls (speed ×1/×2/×4 + Skip) ────────────────────────────
+  // ── DOM playback controls (speed ×1/×2/×4/×8 + Skip) ────────────────────────────
   private mountPlaybackControls(): void {
     const wrap = document.createElement('div');
     // Positioned by the overlay stylesheet (bottom-centre; the nav bar is hidden
@@ -527,8 +528,7 @@ export class MatchScene extends Phaser.Scene {
     // underneath).
     wrap.className = 'nrl-mo-controls';
 
-    const speeds: PlaybackSpeed[] = [1, 2, 4];
-    this.speedButtons = speeds.map((s) => {
+    this.speedButtons = PLAYBACK_SPEEDS.map((s) => {
       const b = button(`×${s}`, () => this.setSpeed(s));
       if (s === 1) b.setAttribute('data-active', 'true');
       wrap.append(b);
@@ -544,9 +544,8 @@ export class MatchScene extends Phaser.Scene {
 
   private setSpeed(speed: PlaybackSpeed): void {
     this.playback?.setSpeed(speed);
-    const labels: Record<number, string> = { 1: '×1', 2: '×2', 4: '×4' };
     for (const b of this.speedButtons) {
-      b.toggleAttribute('data-active', b.textContent === labels[speed]);
+      b.toggleAttribute('data-active', b.textContent === `×${speed}`);
     }
   }
 

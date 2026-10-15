@@ -15,7 +15,7 @@ import {
   truncateTicker,
   zoomForEvent,
 } from '../../src/world/readability';
-import { PlaybackController, type PlaybackActor, type PlaybackScene } from '../../src/world/playback';
+import { PlaybackController, eventTimeMs, type PlaybackActor, type PlaybackScene } from '../../src/world/playback';
 import { KICKER_SLOT } from '../../src/world/formation';
 import type { MatchEvent, MatchResult } from '../../src/sim/events';
 import type { NameTag } from '../../src/world/readability';
@@ -141,8 +141,8 @@ describe('playback readability hooks', () => {
       { t: 30, kind: 'tackle', teamId: 'A', player: 'Levi Leilua', x: 60, y: 50, detail: 'held' },
     ];
     const ctrl = new PlaybackController(scene, result(events));
-    // Run the clock past both events.
-    for (let i = 0; i < 6000; i++) ctrl.update(16);
+    // Run the clock past both events (+ the kick's flight hold).
+    for (let ms = 0; ms < eventTimeMs(30, 1) + 3_000; ms += 16) ctrl.update(16);
     expect(scene.tags[0]).toEqual({ side: 'home', slot: KICKER_SLOT, text: 'Radbourne' });
     const tackle = scene.tags.find((t) => t.text === 'Leilua');
     expect(tackle?.side).toBe('away');
@@ -159,7 +159,7 @@ describe('playback readability hooks', () => {
   it('puts the carrier ring under the holder and clears it in flight', () => {
     const scene = fakeScene();
     const ctrl = new PlaybackController(scene, result([{ t: 1, kind: 'run', teamId: 'H', player: 'A B', x: 30, y: 40 }]));
-    for (let i = 0; i < 400; i++) ctrl.update(16);
+    for (let ms = 0; ms < eventTimeMs(1, 1) + 1_000; ms += 16) ctrl.update(16);
     const last = scene.marks[scene.marks.length - 1];
     expect(last?.side).toBe('home');
     expect(scene.marks.some((m) => m === null)).toBe(true); // ball was in the air during the pass
