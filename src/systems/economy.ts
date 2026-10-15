@@ -14,6 +14,7 @@ import { earnMoney } from '../data/club';
 import { overallRating } from '../data/player';
 import { ECON, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { registerTickHook, TICK_ORDER } from '../core/time';
+import { warnForWeeks } from './contracts';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -90,6 +91,8 @@ export function tickContracts(state: GameState): GameState {
     const weeks = p.contractWeeks - 1;
     if (weeks > 0) {
       keep.push({ ...p, contractWeeks: weeks });
+      const warning = warnForWeeks(p.name, weeks);
+      if (warning) bus.emit('ui:notify', { text: warning, kind: 'info' });
       continue;
     }
 
@@ -101,7 +104,7 @@ export function tickContracts(state: GameState): GameState {
     if (money >= newWage * 4) {
       keep.push({ ...p, wage: newWage, contractWeeks: 52 });
     } else {
-      departed.push({ ...p, contractWeeks: 0 });
+      departed.push({ ...p, contractWeeks: 0, departed: true });
       bus.emit('ui:notify', {
         text: `${p.name} left the club as a free agent (contract expired).`,
         kind: 'info',
