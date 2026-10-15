@@ -115,6 +115,23 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       };
     },
   },
+  // v4 → v5: board patience + objectives for the current season (GitHub #47).
+  // Old saves get sensible defaults; the board sets fresh goals next season.
+  {
+    from: 4,
+    to: 5,
+    run: (old) => {
+      const season = typeof old.season === 'number' ? old.season : 1;
+      return {
+        ...old,
+        boardPatience: old.boardPatience ?? 5,
+        objectives: old.objectives ?? [
+          { id: `s${season}-finals`, kind: 'finals', text: 'Finish in the top 8', target: 8, status: 'pending' },
+          { id: `s${season}-solvent`, kind: 'solvent', text: 'Finish the season with cash in the bank', target: 0, status: 'pending' },
+        ],
+      };
+    },
+  },
 ];
 
 export type MigrateResult =

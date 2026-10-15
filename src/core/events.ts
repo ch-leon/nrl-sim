@@ -22,6 +22,7 @@ export interface Events {
   'match:started': { fixture: Fixture; sim: MatchResult; home: TeamSheet; away: TeamSheet };
   'match:event': MatchEvent; // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
+  'board:sacked': { season: number; reason: string };
   'bankruptcy:warning': { balance: number };
   'ui:notify': { text: string; kind: 'info' | 'success' | 'danger' };
 }

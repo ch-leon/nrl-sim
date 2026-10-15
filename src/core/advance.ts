@@ -32,6 +32,7 @@ function playerFixturePending(): boolean {
  * outcome. Synchronous, like advanceWeek; no hook can observe a half-run tick.
  */
 export function advanceUntil(target: AdvanceTarget): AdvanceRun {
+  if (getState().sacked) return { weeksPlayed: 0, stop: { kind: 'target', text: 'The board has sacked you.' } };
   const run = runUntil(target);
   if (run.stop.kind === 'target') {
     bus.emit('ui:notify', { text: `Advanced ${targetLabel(target)}.`, kind: 'info' });
@@ -73,6 +74,7 @@ function runUntil(target: AdvanceTarget): AdvanceRun {
         weeksPlayed++;
 
         const after = getState();
+        if (after.sacked) return { weeksPlayed, stop: { kind: 'target', text: 'The board has sacked you.' } };
         const post = postWeekStop({
           injuredStarters: newlyInjuredStarters(before.squad, after.squad, overallRating),
           contractAlerts: contractAlerts(before.squad, after.squad),

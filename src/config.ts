@@ -49,6 +49,25 @@ export const ECON = {
   FORCED_SALE_MORALE_HIT: 10,     // squad-wide morale −10 per forced sale
 } as const;
 
+// Board objectives, finals prize money and the sacking state (GitHub #47).
+// Patience is the board's tolerance: each missed objective costs one point, a
+// clean sweep earns one back, and zero means the player is sacked.
+export const BOARD = {
+  MAX_PATIENCE: 5,
+  START_PATIENCE: 5,
+  REP_PER_MET: 2,            // reputation for each objective met
+  GRANT_PER_MET: 15_000,     // one-off cash grant for each objective met
+  BUILD_TARGET_EXTRA: 2,     // 'build' objective: facilities beyond the current count
+  SOLVENT_FLOOR: { easy: -10_000, normal: 0, hard: 20_000 },
+} as const;
+
+/** Finals prize money, paid at season rollover (per round played, plus bonuses). */
+export const PRIZE = {
+  PER_FINALS_WEEK: 15_000,   // each finals match the club played in
+  GRAND_FINAL: 25_000,       // extra for reaching the grand final
+  PREMIERSHIP: 75_000,       // extra for winning it
+} as const;
+
 /** Weekly morale dynamics (systems/morale.ts). Morale is clamped to 1..100, neutral 50. */
 export const MORALE = {
   NEUTRAL: 50,

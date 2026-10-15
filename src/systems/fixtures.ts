@@ -24,6 +24,7 @@ import { makeRng, type Rng } from '../utils/rng';
 import { rollWeather } from '../sim/weather';
 import { topTryScorer } from './stats';
 import { registerTickHook, registerSeasonHook, TICK_ORDER, type TickContext } from '../core/time';
+import { applyBoardReview } from './board';
 import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, DEFAULT_PLAYER_COLORS } from '../config';
 import { RIVAL_CLUBS } from '../data/league';
 import { bus } from '../core/events';
@@ -636,6 +637,19 @@ export function registerFixturesSystem(): void {
       history: afterFinals.history,
       reputation: rep.reputation,
       rngSeed: gfDone ? s.rngSeed : rngFinals.state(),
+    });
+
+    // Board review (#47): prize money, objectives, patience — needs the final
+    // ladder, so it runs before the ladder is regenerated below.
+    const finalPositions = Object.fromEntries(
+      sortLadder(s.league.ladder).map((r, i) => [r.clubId, i + 1] as const),
+    );
+    applyBoardReview({
+      ladderPosition: lastEntry ? lastEntry.ladderPosition : 0,
+      positions: finalPositions,
+      finalsPlayed: playerFinals.length,
+      playedGrandFinal: !!grandFinal,
+      premiership: !!lastEntry && lastEntry.premiership,
     });
 
     // Regenerate a fresh fixture list + zeroed ladder for the new season, and

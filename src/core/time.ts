@@ -140,6 +140,7 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
  *    subscribers read fully-settled state.
  */
 export function advanceWeek(): void {
+  if (getState().sacked) return; // game over (#47): the save stays, time stops
   const { week, season } = getState();
   const ctx: TickContext = { week, season, fastForward: fastForwardFlag };
 
