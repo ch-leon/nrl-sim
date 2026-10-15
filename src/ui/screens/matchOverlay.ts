@@ -154,6 +154,69 @@ export function formatClock(minute: number): string {
   return `${String(m).padStart(2, '0')}:00`;
 }
 
+// ── Score banner (pure) ────────────────────────────────────────────────────────
+
+/** What the big centre-screen pop-up says for a scoring event. */
+export interface ScoreBanner {
+  /** 0 = home, 1 = away (the side that kicked / scored). */
+  side: 0 | 1;
+  /** TRY!, CONVERTED, PENALTY GOAL, FIELD GOAL! — or the miss. */
+  headline: string;
+  /** Who did it (falls back to the team when the event has no name). */
+  scorer: string;
+  team: string;
+  /** Points added: 4 / 2 / 1, or 0 for a miss. */
+  points: number;
+  /** A conversion: folds into the try banner if that is still showing. */
+  conversion: boolean;
+}
+
+/** Banner for any points-scoring attempt (try, conversion, penalty goal, field goal); null otherwise. */
+export function scoreBanner(ev: MatchEvent, homeId: string, teamNames: readonly [string, string]): ScoreBanner | null {
+  const side: 0 | 1 = ev.teamId === homeId ? 0 : 1;
+  const missed = ev.detail === 'missed';
+  let headline: string;
+  let points: number;
+  switch (ev.kind) {
+    case 'try':
+      headline = 'TRY!';
+      points = 4;
+      break;
+    case 'conversion':
+      headline = missed ? 'CONVERSION MISSED' : 'CONVERTED';
+      points = missed ? 0 : 2;
+      break;
+    case 'penalty-goal':
+      headline = missed ? 'PENALTY GOAL MISSED' : 'PENALTY GOAL';
+      points = missed ? 0 : 2;
+      break;
+    case 'field-goal':
+      headline = missed ? 'FIELD GOAL MISSED' : 'FIELD GOAL!';
+      points = missed ? 0 : 1;
+      break;
+    default:
+      return null;
+  }
+  const team = teamNames[side];
+  const scorer = ev.player?.trim() || team;
+  return { side, headline, scorer, team, points, conversion: ev.kind === 'conversion' };
+}
+
+/** Readable text colour (black or white) on a team colour background. */
+export function inkFor(hex: string): '#000' | '#fff' {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return '#fff';
+  let h = m[1]!;
+  if (h.length === 3) h = h.replace(/./g, (c) => c + c);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255) as [number, number, number];
+  const lin = (c: number): number => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return lum > 0.4 ? '#000' : '#fff';
+}
+
+/** How long a banner stays up (real ms): tries longest, a conversion extends it. */
+export const BANNER_MS = { try: 3200, kick: 2400 } as const;
+
 // ── DOM overlay ────────────────────────────────────────────────────────────────
 
 /** Lines kept in the full log behind the ticker's Log toggle. */
@@ -247,7 +310,11 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     logToggle,
   );
 
-  root.append(scoreboard, statsPanel, logPanel, commentaryPanel);
+  // Big centre-screen pop-up for every scoring attempt (who, what, points).
+  const banner = el('div', { class: 'nrl-mo-banner', attrs: { role: 'status', 'aria-live': 'polite' } });
+  banner.hidden = true;
+
+  root.append(scoreboard, statsPanel, logPanel, commentaryPanel, banner);
   mount(root);
   document.body?.classList.add(MATCH_ACTIVE_CLASS);
 
@@ -275,11 +342,82 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     if (logOpen) log.scrollTop = log.scrollHeight;
   };
 
+  // ── Score banner ──
+  let bannerTimer: ReturnType<typeof setTimeout> | null = null;
+  let bannerWasTry = false;
+  /** Built during a burst of events (Skip) and shown once the burst ends. */
+  let queued: { b: ScoreBanner; score: string } | null = null;
+  let flushScheduled = false;
+
+  const hideBanner = (): void => {
+    banner.hidden = true;
+    banner.classList.remove('nrl-mo-banner-in');
+    bannerWasTry = false;
+  };
+
+  const showBanner = (b: ScoreBanner, score: string): void => {
+    const sheet = b.side === 0 ? home : away;
+    const pts = b.points > 0 ? `+${b.points}` : '';
+    const scoreLine = el('div', { class: 'nrl-mo-banner-score', text: score });
+    if (b.conversion && bannerWasTry && !banner.hidden) {
+      // Conversion straight after the try: add it to the try banner.
+      banner.querySelector('.nrl-mo-banner-score')?.remove();
+      banner.append(
+        el('div', { class: 'nrl-mo-banner-extra', text: `${b.headline}${pts ? ` ${pts}` : ''} · ${surnameOf(b.scorer)}` }),
+        scoreLine,
+      );
+    } else {
+      banner.replaceChildren(
+        el('div', { class: 'nrl-mo-banner-head', text: b.headline }),
+        el('div', { class: 'nrl-mo-banner-who', text: b.scorer }),
+        el('div', { class: 'nrl-mo-banner-sub', text: `${b.team}${pts ? `  ${pts}` : ''}` }),
+        scoreLine,
+      );
+      banner.style.background = sheet.colors[0];
+      banner.style.color = inkFor(sheet.colors[0]);
+      banner.style.borderColor = sheet.colors[1];
+      banner.classList.toggle('nrl-mo-banner-miss', b.points === 0);
+      // Restart the pop-in animation.
+      banner.classList.remove('nrl-mo-banner-in');
+      void banner.offsetWidth;
+      banner.classList.add('nrl-mo-banner-in');
+      bannerWasTry = b.headline === 'TRY!';
+    }
+    banner.hidden = false;
+    if (bannerTimer) clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(hideBanner, b.headline === 'TRY!' ? BANNER_MS.try : BANNER_MS.kick);
+
+    if (b.points > 0) {
+      // Pulse the score and light up the scoring team's chip.
+      const chip = b.side === 0 ? homeChip : awayChip;
+      for (const node of [scoreEl, chip]) {
+        node.classList.remove('nrl-mo-scored');
+        void node.offsetWidth;
+        node.classList.add('nrl-mo-scored');
+      }
+    }
+  };
+
+  /** Events received since the last task tick — more than one means Skip. */
+  let burst = 0;
   const onEvent = (ev: MatchEvent): void => {
+    if (burst++ === 0) setTimeout(() => (burst = 0), 0);
     state = reduceEvent(state, ev, homeId);
     render();
     const line = commentaryFor(ev, home.name, away.name, rng.next, homeId);
     if (line) appendCommentary(line);
+    const b = scoreBanner(ev, homeId, [home.name, away.name]);
+    if (b) {
+      queued = { b, score: `${state.homeScore} – ${state.awayScore}` };
+      if (!flushScheduled) {
+        flushScheduled = true;
+        setTimeout(() => {
+          flushScheduled = false;
+          if (queued) showBanner(queued.b, queued.score);
+          queued = null;
+        }, 0);
+      }
+    }
   };
 
   const offEvent = bus.on('match:event', onEvent);
@@ -289,6 +427,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     destroy(): void {
       offEvent();
       offFinished();
+      if (bannerTimer) clearTimeout(bannerTimer);
+      queued = null;
       root.remove();
       document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
       if (active === handle) active = null;
@@ -298,6 +438,13 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   // HUD/nav stay hidden until MatchScene destroys the overlay on Back-to-Club.
   offFinished = bus.on('match:finished', () => {
     offEvent();
+    // Skip fires the whole log in one go: don't pop (or leave up) a stale
+    // banner over the result. A natural finish keeps the last score's banner.
+    queued = null;
+    if (burst > 1) {
+      if (bannerTimer) clearTimeout(bannerTimer);
+      hideBanner();
+    }
     halfEl.textContent = 'Full-time';
     root.classList.add('nrl-mo-final');
     document.body?.classList.add(MATCH_FINAL_CLASS);
@@ -314,6 +461,11 @@ export function unmountMatchOverlay(): void {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+function surnameOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? name;
+}
 
 function teamChip(sheet: TeamSheet): HTMLElement {
   const swatch = el('span', { class: 'nrl-mo-swatch' });
@@ -411,12 +563,52 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: calc(7.5rem + env(sa
    the controls were) and the result toast sits just above it. */
 .nrl-mo-final .nrl-mo-commentary, .nrl-mo-final .nrl-mo-log { display: none; }
 body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
+/* Score banner: big, team-coloured, centre-top over the pitch; never blocks taps. */
+.nrl-mo-banner {
+  position: fixed; left: 50%; top: 22%; transform: translateX(-50%);
+  z-index: 16; pointer-events: none; text-align: center;
+  min-width: min(18rem, 80vw); max-width: 90vw; box-sizing: border-box;
+  padding: 0.5rem 1.25rem 0.6rem; border: 4px solid #000;
+  box-shadow: 0 0 0 3px #000, 6px 6px 0 #000;
+  font-family: 'Courier New', monospace; text-shadow: none;
+}
+.nrl-mo-banner[hidden] { display: none; }
+.nrl-mo-banner-head { font-size: clamp(1.4rem, min(7vw, 10vh), 3rem); font-weight: bold; letter-spacing: 0.08em; line-height: 1.05; }
+.nrl-mo-banner-who { font-size: clamp(0.9rem, min(3.6vw, 5vh), 1.5rem); font-weight: bold; margin-top: 0.15rem; }
+.nrl-mo-banner-sub { font-size: clamp(0.75rem, 2.6vw, 1rem); opacity: 0.9; }
+.nrl-mo-banner-extra { font-size: clamp(0.8rem, 2.8vw, 1.05rem); font-weight: bold; margin-top: 0.3rem; padding-top: 0.25rem; border-top: 2px dashed currentColor; animation: nrl-mo-extra-in 260ms ease-out; }
+.nrl-mo-banner-score {
+  display: inline-block; margin-top: 0.35rem; padding: 0.1rem 0.5rem;
+  background: #1a1a2e; color: #f4ecd8; border: 2px solid #000;
+  font-size: clamp(0.9rem, min(3vw, 4.5vh), 1.2rem); font-weight: bold; letter-spacing: 0.05em;
+}
+.nrl-mo-banner-miss .nrl-mo-banner-head { font-size: clamp(1.2rem, 4.5vw, 1.9rem); }
+.nrl-mo-banner-miss { filter: saturate(0.55); }
+.nrl-mo-banner-in { animation: nrl-mo-banner-pop 420ms cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes nrl-mo-banner-pop {
+  0% { transform: translateX(-50%) scale(0.3); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+@keyframes nrl-mo-extra-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Scoreboard flash on points. */
+.nrl-mo-scored { animation: nrl-mo-scored 1.2s ease-out; }
+@keyframes nrl-mo-scored {
+  0%, 30% { transform: scale(1.35); color: #f4d03f; text-shadow: 2px 2px 0 #000; }
+  100% { transform: scale(1); }
+}
+.nrl-mo-chip.nrl-mo-scored { animation: nrl-mo-chip-scored 1.2s ease-out; }
+@keyframes nrl-mo-chip-scored { 0%, 40% { background: #f4d03f; } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .nrl-mo-banner-in, .nrl-mo-scored, .nrl-mo-chip.nrl-mo-scored, .nrl-mo-banner-extra { animation: none; }
+}
 /* Short (landscape phone) viewports: keep stats and commentary apart. */
 @media (max-height: 480px) {
   .nrl-mo-stats { top: 4rem; min-width: 8.5rem; padding: 0.3rem 0.5rem; }
   .nrl-mo-stat-line { font-size: 0.62rem; margin: 0.05rem 0; }
   .nrl-mo-feed { max-height: 3.4rem; }
   .nrl-mo-commentary, .nrl-mo-log { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
+  .nrl-mo-banner { top: 19%; min-width: 14rem; padding: 0.25rem 0.9rem 0.35rem; border-width: 3px; }
+  .nrl-mo-banner-score { margin-top: 0.2rem; }
   body.nrl-match-active .nrl-toast-stack { bottom: 5.5rem; }
   body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
 }

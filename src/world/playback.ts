@@ -141,7 +141,8 @@ const MAX_MOVE_MS = 2600;
 const CARRY_LIFT = 10;
 /** Real pauses (ms at ×1, drained by the speed-scaled clock). */
 const HALF_TIME_PAUSE_MS = 1500;
-const TRY_PAUSE_MS = 1800;
+/** Long enough for the dive, the celebration and the score banner to read. */
+const TRY_PAUSE_MS = 2600;
 const GOAL_PAUSE_MS = 1100;
 
 /** Kicker wind-up beat, and when in it the boot meets the ball. */
@@ -196,13 +197,23 @@ export function flightLift(fromLift: number, peak: number, u: number, bounces = 
 const LYING: ReadonlySet<PlayerAnim> = new Set<PlayerAnim>(['dive', 'down', 'tackled']);
 
 // ── Ruck + contact beats (#19) ────────────────────────────────────────────────
-const PTB_MS = 420;
-const DUMMY_HALF_MS = 380;
+/** Carrier held on the ground before he gets up to play the ball. */
+const DOWN_MS = 420;
+const BIG_DOWN_MS = 520;
+const PTB_MS = 560;
+/** Into the play-the-ball, when the heel sends the ball back. */
+const PTB_HEEL_MS = 300;
+/** Roll from the play-the-ball to the dummy-half's hands. */
+const PTB_ROLL_MS = 220;
+/** Dummy-half stooped over the ball before his pass goes out. */
+const DUMMY_HALF_MS = 520;
+/** How much of the stoop must show before the next event may fire. */
+const DUMMY_HALF_SHOW_MS = 360;
+/** Longest a single ruck may hold the event clock (ms at ×1). */
+const MAX_RUCK_HOLD_MS = 1500;
 const FEND_MS = 300;
 /** Metres a big-hit drives the carrier back toward his own line. */
 const DRIVE_BACK = 2.5;
-/** Roll from the play-the-ball to the dummy-half before his pass goes out. */
-const PTB_ROLL_MS = 170;
 /** A line break covers ground this much faster than a normal carry. */
 const BREAK_BURST = 1.6;
 
@@ -566,7 +577,10 @@ export class PlaybackController {
       case 'tackle':
       case 'big-hit':
         // teamId is the DEFENDING side that made the hit.
-        if (at) this.onTackle(otherSide(side), at, ev.kind === 'big-hit', instant);
+        if (at) {
+          const hold = this.onTackle(otherSide(side), at, ev.kind === 'big-hit', instant);
+          if (!instant && hold > 0) this.beginPause(hold);
+        }
         break;
       case 'error':
         if (at) this.onError(side, at);
@@ -711,8 +725,7 @@ export class PlaybackController {
     const def = otherSide(side);
     const land = this.kickLanding(side, at, flight, ev.teamId);
     const t = formationTargets({ attacking: side, ball: at, phase: 'open', seed: this.seed });
-    const held = this.ballState.mode === 'held' && this.ballState.holder.side === side ? this.ballState.holder : null;
-    const kicker = held ?? this.actors[side][KICKER_SLOT];
+    const kicker = this.carrierOf(side) ?? this.actors[side][KICKER_SLOT];
     if (!kicker) return 0;
     this.tagged = kicker;
     const chaser = flight.touch ? undefined : this.actors[side][nearestIndex(t[side], land.p, [kicker.slot])];
@@ -803,45 +816,94 @@ export class PlaybackController {
     return { p: { fx, fy: laneY }, claim };
   }
 
-  private onTackle(attacking: Side, at: FieldPt, big: boolean, instant: boolean): void {
+  /**
+   * Tackle → play-the-ball (#19). The carrier is brought down, held, gets up
+   * and heels the ball back; it rolls to the dummy-half (hooker), who stoops
+   * over it and passes on the next event. The tackler gets up as marker
+   * opposite while the line retreats. Returns how long (ms at ×1) the event
+   * clock must hold so the whole ruck reads before the next play fires.
+   */
+  private onTackle(attacking: Side, at: FieldPt, big: boolean, instant: boolean): number {
     const defending = otherSide(attacking);
     const t = formationTargets({ attacking, ball: at, phase: 'open', seed: this.seed });
-    const held = this.ballState.mode === 'held' && this.ballState.holder.side === attacking ? this.ballState.holder : null;
-    const carrier = held ?? this.actors[attacking][nearestIndex(t[attacking], at)];
+    const carrier = this.carrierOf(attacking) ?? this.actors[attacking][nearestIndex(t[attacking], at, [HOOKER_SLOT])];
     const tackler = this.actors[defending][nearestIndex(t[defending], at, [HOOKER_SLOT])];
+    const dummyHalf = this.actors[attacking][HOOKER_SLOT];
     this.tagged = tackler ?? null; // the event names the hitter, not the carrier
-    this.applyFormation(attacking, at, 'open', [carrier, tackler].filter((a): a is Actor => !!a));
+    this.applyFormation(attacking, at, 'open', [carrier, tackler, dummyHalf].filter((a): a is Actor => !!a));
+    if (!instant) this.scene.cameras.main.shake(120, big ? 0.006 : 0.003);
+    if (!carrier) return 0;
+
     const dir = attackDir(attacking);
     // #19: a big-hit drives the carrier (and his tackler) back toward his line.
     const back = big ? -dir * DRIVE_BACK : 0;
     const groundAt = { fx: at.fx + back, fy: at.fy };
-    if (carrier) {
-      const beats: Beat[] = [
-        { anim: 'tackled', ms: big ? 520 : 380, ...(big ? { slide: groundAt } : {}) },
-        { anim: 'down', ms: big ? 380 : 220 },
-        // Up, step over it and heel it back to the dummy-half.
-        { anim: 'ptb', ms: PTB_MS },
-      ];
-      this.moveTo(carrier, at, beats);
-      this.markBusy(carrier, beats);
-      this.giveBall(carrier);
-    }
+    const dhSpot = { fx: groundAt.fx - dir * 1.8, fy: groundAt.fy + 0.5 };
+    const tackledMs = big ? 520 : 380;
+    const downMs = big ? BIG_DOWN_MS : DOWN_MS;
+
+    const roll = (): void => {
+      // Only if nothing has moved the ball on since (a capped hold, a skip).
+      if (!dummyHalf || this.ballState.mode !== 'held' || this.ballState.holder !== carrier) return;
+      const p = this.ballPoint();
+      this.ballState = { mode: 'flight', from: p.p, fromLift: p.lift, to: { ...dhSpot }, t0: this.vis, dur: PTB_ROLL_MS, peak: 1, then: dummyHalf };
+      this.later(PTB_ROLL_MS, () => {
+        const b = this.ballState;
+        const his = (b.mode === 'held' && b.holder === dummyHalf) || (b.mode === 'flight' && b.then === dummyHalf);
+        if (!his) return;
+        const stoop: Beat[] = [{ anim: 'dummyHalf', ms: DUMMY_HALF_MS }];
+        if (dummyHalf.moving) dummyHalf.queue = stoop;
+        else this.beat(dummyHalf, stoop);
+      });
+    };
+    const beats: Beat[] = [
+      { anim: 'tackled', ms: tackledMs, ...(big ? { slide: groundAt } : {}) },
+      { anim: 'down', ms: downMs },
+      // Up, step over it and heel it back to the dummy-half.
+      { anim: 'ptb', ms: PTB_MS, fn: () => this.later(PTB_HEEL_MS, roll) },
+    ];
+    this.moveTo(carrier, at, beats);
+    this.markBusy(carrier, beats);
+    this.giveBall(carrier);
+    const lead = carrier.moving ? Math.max(0, carrier.t0 - this.vis) + carrier.dur : 0;
+    const total = lead + tackledMs + downMs + PTB_HEEL_MS + PTB_ROLL_MS + DUMMY_HALF_SHOW_MS;
+
     if (tackler) {
       const tAt = { fx: at.fx + dir * 1.4, fy: at.fy + 1 };
-      const beats: Beat[] = [
+      const mark = { fx: groundAt.fx + dir * 1.5, fy: groundAt.fy };
+      const tb: Beat[] = [
         { anim: 'tackle', ms: 360, ...(big ? { slide: { fx: tAt.fx + back, fy: tAt.fy } } : {}) },
         { anim: 'down', ms: big ? 360 : 200 },
+        // Up and square at marker, opposite the play-the-ball.
+        { anim: 'run', ms: 260, slide: mark },
       ];
-      this.moveTo(tackler, tAt, beats);
+      this.moveTo(tackler, tAt, tb);
+      tackler.busyUntil = this.vis + total;
     }
-    // Dummy-half gets in behind the ruck and stoops over the ball.
-    const dummyHalf = this.actors[attacking][HOOKER_SLOT];
-    if (dummyHalf && dummyHalf !== carrier) {
-      const beats: Beat[] = [{ anim: 'dummyHalf', ms: DUMMY_HALF_MS }];
-      this.moveTo(dummyHalf, { fx: groundAt.fx - dir * 1.6, fy: groundAt.fy + 0.6 }, beats);
-      this.markBusy(dummyHalf, beats);
+    if (dummyHalf) {
+      // Gets in behind the ruck and waits for the ball.
+      this.moveTo(dummyHalf, dhSpot);
+      dummyHalf.busyUntil = this.vis + total + DUMMY_HALF_MS;
     }
-    if (!instant) this.scene.cameras.main.shake(120, big ? 0.006 : 0.003);
+
+    if (instant) {
+      if (dummyHalf) this.ballState = { mode: 'held', holder: dummyHalf };
+      return 0;
+    }
+    const nextDue = this.due[this.cursor];
+    const thisDue = this.due[this.cursor - 1] ?? this.clockMs;
+    const gap = nextDue !== undefined ? nextDue - thisDue : 0;
+    return Math.max(0, Math.min(MAX_RUCK_HOLD_MS, total - gap));
+  }
+
+  /**
+   * The attacking ball-carrier, if `side` has the ball in hand and it isn't the
+   * dummy-half — he passes it on rather than carrying/kicking every play.
+   */
+  private carrierOf(side: Side): Actor | null {
+    const s = this.ballState;
+    if (s.mode !== 'held' || s.holder.side !== side || s.holder.slot === HOOKER_SLOT) return null;
+    return s.holder;
   }
 
   private onError(side: Side, at: FieldPt): void {
@@ -1024,7 +1086,10 @@ export class PlaybackController {
     }
     const from = this.ballPoint();
     const passer = this.ballState.mode === 'held' ? this.ballState.holder : null;
-    if (passer && passer.side === to.side && passer.queue.length === 0 && passer.lockUntil <= this.vis) {
+    if (passer && passer.side === to.side && passer.anim === 'dummyHalf') {
+      // Dummy-half passes straight out of his stoop.
+      this.beat(passer, [{ anim: 'pass', ms: 220 }]);
+    } else if (passer && passer.side === to.side && passer.queue.length === 0 && passer.lockUntil <= this.vis) {
       passer.queue = [{ anim: 'pass', ms: 220 }, ...passer.queue];
     }
     this.ballState = {
