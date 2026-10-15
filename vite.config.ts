@@ -5,7 +5,12 @@ import { VitePWA } from 'vite-plugin-pwa';
 // BAK-204 (WU-16): installable, offline-capable PWA via generateSW.
 // The Phaser chunk is large, so the Workbox precache size cap is raised to ~6MB.
 // devOptions stays disabled so `vite`/`vitest` never register a SW or cache churn.
+// GitHub Pages serves the site from /<repo>/ (GitHub #76): CI sets BASE_PATH
+// for that build only, so `npm run dev`, tests and the root build stay at '/'.
+const base = process.env.BASE_PATH ?? '/';
+
 export default defineConfig({
+  base,
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
