@@ -32,6 +32,7 @@ import { openContractsScreen } from './ui/screens/contracts';
 import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
+import { initLandscapeGuard } from './ui/orientation';
 import { startTutorial } from './ui/tutorial';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
@@ -73,7 +74,22 @@ function initToasts(): void {
   });
 }
 
+// Landscape only: on a phone held upright the rotate card covers the game and
+// the Phaser loop sleeps (pausing match playback) until it's turned sideways.
+let game: Phaser.Game | null = null;
+let portraitBlocked = false;
+
 async function boot(): Promise<void> {
+  initLandscapeGuard({
+    onBlock: () => {
+      portraitBlocked = true;
+      game?.loop.sleep();
+    },
+    onUnblock: () => {
+      portraitBlocked = false;
+      game?.loop.wake();
+    },
+  });
   initToasts();
   initSeasonEndFeedback();
   initFinanceLedger();
@@ -104,7 +120,11 @@ async function boot(): Promise<void> {
   initPlayerOfMatch();
   initBoardUi();
 
-  const game = new Phaser.Game(config);
+  const g = new Phaser.Game(config);
+  game = g;
+  g.events.once(Phaser.Core.Events.READY, () => {
+    if (portraitBlocked) g.loop.sleep();
+  });
   createHud({ onAdvanceWeek: () => advanceWeek(), onAdvanceUntil: (t) => advanceUntil(t) });
 
   // Grounds → Match handoff: state/ladder are already applied by the matchday
@@ -115,8 +135,8 @@ async function boot(): Promise<void> {
     // open), so clear any screen/dialog before the match takes over the view.
     closeScreen();
     closeModal();
-    game.scene.stop('Grounds');
-    game.scene.start('Match', { home, away, result: sim, fixture });
+    g.scene.stop('Grounds');
+    g.scene.start('Match', { home, away, result: sim, fixture });
   });
 
   const nav = createNav();

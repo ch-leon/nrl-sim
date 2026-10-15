@@ -2,7 +2,7 @@
 //
 // PlaybackController consumes a MatchResult's timed event log and drives the
 // MatchScene's 18 player sprites (Nines), the ball and the camera on a COMPRESSED
-// real-time clock (80 sim-minutes → ~90 real seconds at ×1). It re-emits each
+// real-time clock (80 sim-minutes → ~5 real minutes at ×1). It re-emits each
 // MatchEvent on the bus as 'match:event' BEFORE moving any sprite, so the overlay
 // (BAK-196), audio and particles stay in lockstep with the visual. It emits
 // 'match:finished' exactly once at full-time (or when skip() completes).
@@ -44,13 +44,22 @@ import { carrierMarkerTarget, nameTagFor, type NameTag } from './readability';
 
 // ── Clock constants (spec) ────────────────────────────────────────────────────
 export const SIM_MINUTES = 80;
-export const REAL_SECONDS_AT_1X = 90;
+/**
+ * Real seconds a full match takes at ×1, before try/kick holds. Was 90 (an
+ * event every ~0.4s) which played too fast to follow; 300 gives an event
+ * roughly every 1.25s so each carry, tackle and play-the-ball reads. The old
+ * pace now sits between ×2 and ×4, and ×8 is there for a quick watch.
+ */
+export const REAL_SECONDS_AT_1X = 300;
 
-export type PlaybackSpeed = 1 | 2 | 4;
+export type PlaybackSpeed = 1 | 2 | 4 | 8;
+
+/** The speeds offered on the match controls, slowest first. */
+export const PLAYBACK_SPEEDS: readonly PlaybackSpeed[] = [1, 2, 4, 8];
 
 /**
  * Real-ms offset from kickoff for an event at sim-minute `t`, at the given speed.
- * Pure. The full clock is ~90s at ×1 (t=80 → 90000ms), halving at ×2, etc.
+ * Pure. The full clock is REAL_SECONDS_AT_1X at ×1 (t=80 → 300000ms), halving at ×2, etc.
  */
 export function eventTimeMs(t: number, speed: PlaybackSpeed): number {
   return ((t / SIM_MINUTES) * REAL_SECONDS_AT_1X * 1000) / speed;
