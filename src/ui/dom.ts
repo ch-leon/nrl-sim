@@ -339,7 +339,31 @@ const CSS = `
 .nrl-hud-stat.nrl-flash-down { background: #e06666; color: #2a0000; }
 .nrl-hud-stat.nrl-money-negative { color: #b00020; }
 .nrl-hud-spacer { flex: 1 1 auto; }
-.nrl-hud-actions { pointer-events: auto; }
+.nrl-hud-actions {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  gap: 0.25rem;
+  align-items: stretch;
+}
+/* #44: "Advance Week" menu. Tap targets stay ≥44px (.nrl-btn min-height). */
+.nrl-hud-menu-toggle { min-width: 44px; padding: 0.4rem 0.5rem; }
+.nrl-hud-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 10rem;
+  padding: 0.35rem;
+  background: #e8e0c8;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+}
+.nrl-hud-menu[hidden] { display: none; }
+.nrl-hud-menu-item { width: 100%; text-align: left; }
 /* Hide the "/total" week suffix on narrow screens. */
 @media (max-width: 480px) {
   .nrl-hud-week-total { display: none; }
@@ -373,8 +397,16 @@ const CSS = `
     box-shadow: 2px 2px 0 #000;
   }
   .nrl-hud .nrl-btn { padding: 0.4rem 0.5rem; }
+  /* #45: nine items (News added) don't fit one row at 360px. Wrap to rows of
+     five so every item, badge included, is on screen without sideways scroll. */
 }
 .nrl-nav .nrl-btn { flex: 0 0 auto; }
+/* #45: nine items (News added) don't fit one row at 360px. Wrap to rows of
+   five so every item, badge included, is on screen without sideways scroll. */
+@media (max-width: 480px) {
+  .nrl-nav { flex-wrap: wrap; justify-content: center; overflow-x: visible; }
+  .nrl-nav .nrl-btn { flex: 0 0 calc(20% - 0.15rem); min-width: 0; }
+}
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .nrl-modal-backdrop {
@@ -508,4 +540,39 @@ const CSS = `
 .nrl-finance-table th:first-child,
 .nrl-finance-table td:first-child { text-align: left; }
 .nrl-finance-table td.nrl-finance-neg { color: #b00020; }
+
+/* ── News inbox (#45) ─────────────────────────────────────────────────── */
+.nrl-nav-badge {
+  display: inline-block;
+  margin-left: 0.25rem;
+  min-width: 1.1em;
+  padding: 0 0.2em;
+  background: #b03a2e;
+  color: #fff;
+  border: 2px solid #000;
+  font-size: 0.85em;
+  line-height: 1.2;
+  text-align: center;
+}
+.nrl-news { font-size: 0.85rem; }
+.nrl-news h2 { margin: 0 0 0.4rem; font-size: 1.05rem; }
+.nrl-news h3 { margin: 0.6rem 0 0.2rem; font-size: 0.9rem; }
+.nrl-news-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+.nrl-news-filter { flex: 0 0 auto; }
+.nrl-news-filter.nrl-news-active { background: #3a6ea5; color: #fff; }
+.nrl-news-list { max-height: 55vh; overflow-y: auto; }
+.nrl-news-item {
+  padding: 0.2rem 0.4rem;
+  margin-bottom: 0.25rem;
+  border-left: 4px solid #3a6ea5;
+  overflow-wrap: anywhere;
+}
+.nrl-news-item.nrl-news-success { border-left-color: #2e7d32; }
+.nrl-news-item.nrl-news-danger { border-left-color: #b03a2e; }
+.nrl-news-empty { margin: 0.4rem 0; }
 `;

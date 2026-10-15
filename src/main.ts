@@ -6,6 +6,7 @@ import { bus } from './core/events';
 import { createNewGame, getState, loadState } from './core/state';
 import { enableAutosave, load, showTitleFlow } from './core/save';
 import { advanceWeek } from './core/time';
+import { advanceUntil } from './core/advance';
 import { createHud } from './ui/hud';
 import { createNav } from './ui/nav';
 import { closeModal, closeScreen, ensureStyles } from './ui/dom';
@@ -17,6 +18,8 @@ import { registerPlayerMatchSystem } from './systems/matchday';
 import { registerAgingSystem } from './systems/aging';
 import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
+import { registerStatsSystem } from './systems/stats';
+import { initPlayerOfMatch } from './ui/screens/potm';
 import { openBuildScreen } from './ui/screens/build';
 import { openSquadScreen } from './ui/screens/squad';
 import { openRecruitScreen } from './ui/screens/recruit';
@@ -24,6 +27,7 @@ import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
 import { openContractsScreen } from './ui/screens/contracts';
+import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { startTutorial } from './ui/tutorial';
@@ -55,6 +59,8 @@ function initToasts(): void {
   ensureStyles();
   const stack = document.createElement('div');
   stack.className = 'nrl-toast-stack';
+  // #45: announce toasts to screen readers without stealing focus.
+  stack.setAttribute('aria-live', 'polite');
   uiRoot.appendChild(stack);
   bus.on('ui:notify', ({ text, kind }) => {
     const toast = document.createElement('div');
@@ -69,6 +75,7 @@ async function boot(): Promise<void> {
   initToasts();
   initSeasonEndFeedback();
   initFinanceLedger();
+  initNewsInbox();
   const choice = await showTitleFlow(uiRoot);
   if (choice.mode === 'continue') {
     const saved = load();
@@ -90,9 +97,11 @@ async function boot(): Promise<void> {
   registerMoraleSystem();
   registerAgingSystem();
   registerYouthSystem();
+  registerStatsSystem();
+  initPlayerOfMatch();
 
   const game = new Phaser.Game(config);
-  createHud({ onAdvanceWeek: () => advanceWeek() });
+  createHud({ onAdvanceWeek: () => advanceWeek(), onAdvanceUntil: (t) => advanceUntil(t) });
 
   // Grounds → Match handoff: state/ladder are already applied by the matchday
   // tick hook before this fires; the Match scene is pure playback. The scene's
@@ -115,6 +124,8 @@ async function boot(): Promise<void> {
   nav.registerScreen('history', 'History', () => openHistoryScreen());
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen());
   nav.registerScreen('contracts', 'Contracts', () => openContractsScreen());
+  nav.registerScreen('news', 'News', () => openInboxScreen());
+  newsInbox.onChange((unread) => nav.setBadge('news', unread));
   nav.registerScreen('help', '?', () => startTutorial(true));
 
   initAudio();

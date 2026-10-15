@@ -89,6 +89,32 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       settings: { ...((old.settings as RawState | undefined) ?? {}), difficulty: 'normal' },
     }),
   },
+  // v3 → v4: player career tallies, join season and extended history (GitHub #46).
+  {
+    from: 3,
+    to: 4,
+    run: (old) => {
+      const season = typeof old.season === 'number' ? old.season : 1;
+      const fillPlayers = (list: unknown): unknown =>
+        Array.isArray(list)
+          ? list.map((p: RawState) => ({
+              ...p,
+              career: p.career ?? { games: 0, tries: 0, tackles: 0, lineBreaks: 0 },
+              joinedSeason: p.joinedSeason ?? season,
+            }))
+          : list;
+      return {
+        ...old,
+        squad: fillPlayers(old.squad),
+        freeAgents: fillPlayers(old.freeAgents),
+        history: Array.isArray(old.history)
+          ? old.history.map((h: RawState) => ({
+              wins: 0, losses: 0, draws: 0, pointsFor: 0, pointsAgainst: 0, ...h,
+            }))
+          : old.history,
+      };
+    },
+  },
 ];
 
 export type MigrateResult =

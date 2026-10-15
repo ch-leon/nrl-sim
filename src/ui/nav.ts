@@ -15,6 +15,8 @@ export interface NavScreen {
 export interface Nav {
   el: HTMLElement;
   registerScreen(id: string, label: string, open: () => void): void;
+  /** Show a count badge on a registered screen's button; 0 hides it. */
+  setBadge(id: string, count: number): void;
   destroy(): void;
 }
 
@@ -83,6 +85,24 @@ export function createNav(): Nav {
     buttons.set(id, btn);
   }
 
+  function setBadge(id: string, count: number): void {
+    const btn = buttons.get(id);
+    if (!btn) return;
+    let badge = btn.querySelector<HTMLElement>('.nrl-nav-badge');
+    if (count <= 0) {
+      badge?.remove();
+      btn.removeAttribute('aria-label');
+      return;
+    }
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nrl-nav-badge';
+      btn.appendChild(badge);
+    }
+    badge.textContent = count > 99 ? '99+' : String(count);
+    btn.setAttribute('aria-label', `${registry.get(id)?.label ?? id}, ${count} unread`);
+  }
+
   mount(root);
   // Screens sit above the nav (GitHub #14): publish our live height.
   const offInset = trackChromeInset(root, NAV_INSET_VAR);
@@ -90,6 +110,7 @@ export function createNav(): Nav {
   return {
     el: root,
     registerScreen,
+    setBadge,
     destroy() {
       offInset();
       root.remove();

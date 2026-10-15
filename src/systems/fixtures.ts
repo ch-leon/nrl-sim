@@ -22,6 +22,7 @@ import {
 } from '../core/state';
 import { makeRng, type Rng } from '../utils/rng';
 import { rollWeather } from '../sim/weather';
+import { topTryScorer } from './stats';
 import { registerTickHook, registerSeasonHook, TICK_ORDER, type TickContext } from '../core/time';
 import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, DEFAULT_PLAYER_COLORS } from '../config';
 import { RIVAL_CLUBS } from '../data/league';
@@ -444,9 +445,18 @@ export function recordPremiership(state: GameState): GameState {
   const playerPos = ladderPosition(state, PLAYER_ID);
   const playerPremiership = premier === PLAYER_ID;
 
+  const row = state.league.ladder.find((r) => r.clubId === PLAYER_ID);
+  const top = topTryScorer(state.squad, state.season - 1);
   const history = [
     ...state.history,
-    { season: state.season - 1, ladderPosition: playerPos, premiership: playerPremiership },
+    {
+      season: state.season - 1, ladderPosition: playerPos, premiership: playerPremiership,
+      ...(row ? {
+        wins: row.wins, losses: row.losses, draws: row.draws,
+        pointsFor: row.pointsFor, pointsAgainst: row.pointsAgainst,
+      } : {}),
+      ...(top ? { topScorer: top } : {}),
+    },
   ];
   const reputation = playerPremiership
     ? Math.min(100, state.reputation + PREMIERSHIP_REP_BONUS)
