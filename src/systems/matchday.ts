@@ -10,6 +10,7 @@ import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixt
 import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
 import type { MatchInjury, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
+import { applyMatchStats } from './stats';
 
 /**
  * Apply sim-emitted injuries onto the player squad (by id, then name) and
@@ -124,11 +125,16 @@ export function registerPlayerMatchSystem(): void {
       },
     );
     // Finals draws still stamp as-is; knockoutWinner favours home (higher seed).
+    const ownSheet = fixture.homeId === PLAYER_ID ? home : away;
+    const playedIds = (ownSheet.roster ?? []).flatMap((r) => (r.id ? [r.id] : []));
     const applied = applyResult(getState(), fixture, {
       homeScore: sim.homeScore,
       awayScore: sim.awayScore,
     });
-    setState({ league: applied.league });
+    setState({
+      league: applied.league,
+      squad: applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
+    });
 
     // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
     const injuryToasts = applyMatchInjuries(sim.injuries);
