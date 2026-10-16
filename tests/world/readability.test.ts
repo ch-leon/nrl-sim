@@ -74,8 +74,9 @@ describe('carrierMarkerTarget', () => {
 
 describe('situational zoom', () => {
   it('is tighter at contact, wider for kicks and breaks', () => {
-    expect(zoomForEvent('tackle')).toBe(ZOOM_CLOSE);
+    expect(zoomForEvent('tackle')).toBe(ZOOM_DEFAULT); // every few seconds live: no close-up
     expect(zoomForEvent('big-hit')).toBe(ZOOM_CLOSE);
+    expect(zoomForEvent('try')).toBe(ZOOM_CLOSE);
     expect(zoomForEvent('kick')).toBe(ZOOM_WIDE);
     expect(zoomForEvent('break')).toBe(ZOOM_WIDE);
     expect(zoomForEvent('run')).toBe(ZOOM_DEFAULT);

@@ -70,6 +70,8 @@ export function bootLab(): void {
       game.scene.stop(SCENE_KEY);
       game.scene.start(SCENE_KEY, data);
     }
+    // Dev hook for lab automation and Flag debugging (the lab is a dev page).
+    (window as unknown as { __lab?: unknown }).__lab = { game, ctrl };
   };
 
   start(parseLabHash(location.hash, { home: DEFAULT_HOME, away: DEFAULT_AWAY }));

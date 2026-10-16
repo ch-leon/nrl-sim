@@ -31,9 +31,12 @@ export interface BallSnap {
 export interface SimEvent {
   tick: number;
   kind: string;
+  /** Commentary line. */
   text: string;
+  /** The player the event is about (the tackler for a tackle, the carrier for a bust). */
   side?: Side;
   slot?: number;
+  player?: string;
 }
 
 export interface Snapshot {

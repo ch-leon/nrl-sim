@@ -6,6 +6,7 @@ import { RUN_SPEEDS, type RunSpeed } from '../core/engine';
 import { decodeFlag } from '../core/flag';
 import type { LabController, LabParams } from './controller';
 import type { LabClub } from './sheets';
+import { statsLine, statsWindow } from './stats';
 
 export interface LabPanelHooks {
   /** Rebuild the lab on new teams / seed / tick (new sprites need a new scene). */
@@ -22,9 +23,11 @@ export class LabPanel {
   private readonly label: HTMLElement;
   private readonly scrub: HTMLInputElement;
   private readonly log: HTMLElement;
+  private readonly stats: HTMLElement;
   private readonly speedBtns: HTMLButtonElement[];
   private scrubbing = false;
-  private lastLogged = 0;
+  private lastLogged = -1;
+  private lastStatsTick = -1;
 
   constructor(
     private readonly ctrl: LabController,
@@ -92,7 +95,10 @@ export class LabPanel {
       hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note });
     });
 
+    // Event feed: the last few things that happened; tap one to jump back to it.
     this.log = el('div', { class: 'nrl-lab-log' });
+    // Stats strip: what the last five minutes produced, so balance is seen.
+    this.stats = el('div', { class: 'nrl-lab-stats' });
 
     const collapse = button('–', () => {
       const on = this.root.toggleAttribute('data-collapsed');
@@ -105,6 +111,7 @@ export class LabPanel {
       el('div', { class: 'nrl-lab-row' }, this.playBtn, step, ...this.speedBtns, this.readout),
       this.scrub,
       this.label,
+      this.stats,
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, flag, codeIn, load),
       this.log,
       el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : 'Nines set: carries, tackles, play-the-ball, last-tackle kick. ⚑ Flag anything that looks wrong.' }),
@@ -125,11 +132,26 @@ export class LabPanel {
       this.scrub.max = String(Math.max(1, r.maxTick));
       this.scrub.value = String(r.tick);
     }
-    if (r.recent.length && r.recent[r.recent.length - 1]!.tick !== this.lastLogged) {
-      this.lastLogged = r.recent[r.recent.length - 1]!.tick;
+    const lastTick = r.history.length ? r.history[r.history.length - 1]!.tick : -1;
+    if (lastTick !== this.lastLogged || r.history.length === 0) {
+      this.lastLogged = lastTick;
       this.log.replaceChildren(
-        ...r.recent.slice(-5).map((e) => el('div', { class: 'nrl-lab-line', text: `${e.tick} · ${e.text}` })),
+        ...r.history.slice(-8).reverse().map((e) =>
+          el('button', {
+            class: 'nrl-lab-line',
+            text: `${(e.tick / 20).toFixed(1)}s · ${e.text}`,
+            attrs: { type: 'button', title: 'Jump to just before this' },
+            onClick: () => {
+              this.ctrl.seek(Math.max(0, e.tick - 30));
+              this.sync();
+            },
+          }),
+        ),
       );
+    }
+    if (r.tick !== this.lastStatsTick && r.tick % 20 === 0) {
+      this.lastStatsTick = r.tick;
+      this.stats.textContent = statsLine(statsWindow(r.history, r.tick));
     }
   }
 
@@ -179,12 +201,17 @@ function ensureLabStyles(): void {
 .nrl-lab-readout { margin-left: auto; font-variant-numeric: tabular-nums; }
 .nrl-lab-scrub { width: 100%; margin: 0; accent-color: #f4d03f; }
 .nrl-lab-label { opacity: 0.85; }
-.nrl-lab-log { display: flex; flex-direction: column; gap: 0.05rem; min-height: 1.2em; }
-.nrl-lab-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-lab-log { display: flex; flex-direction: column; gap: 0.1rem; min-height: 1.2em; max-height: 7.5em; overflow-y: auto; }
+.nrl-lab-line {
+  font: inherit; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: transparent; border: 0; border-left: 3px solid #f4d03f; padding: 0 0.3rem; color: inherit; cursor: pointer;
+}
+.nrl-lab-line:hover { background: #fff6c2; }
+.nrl-lab-stats { font-variant-numeric: tabular-nums; opacity: 0.85; }
 .nrl-lab-hint { opacity: 0.65; font-size: 0.66rem; }
 @media (max-height: 480px) {
   .nrl-lab { width: min(19rem, calc(100vw - 1rem)); padding: 0.3rem 0.4rem; gap: 0.2rem; font-size: 0.66rem; }
-  .nrl-lab-log { display: none; }
+  .nrl-lab-log { max-height: 3.8em; }
 }`;
   document.head.appendChild(style);
 }

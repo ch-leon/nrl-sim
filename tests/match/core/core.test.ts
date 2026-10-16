@@ -274,6 +274,40 @@ describe('Runner', () => {
     expect(r.cur.ball.x).toBe(9);
   });
 
+  it('keeps a full history, reports events as they happen, and replays silently on seek', () => {
+    const r = new Runner(counter, 1);
+    const seen: number[] = [];
+    r.onEvents = (evs) => seen.push(...evs.map((e) => e.tick));
+    r.play();
+    r.update(2000); // 40 ticks → events at 10, 20, 30, 40
+    expect(seen).toEqual([10, 20, 30, 40]);
+    expect(r.history.map((e) => e.tick)).toEqual([10, 20, 30, 40]);
+    r.seek(25);
+    expect(seen).toEqual([10, 20, 30, 40]); // nothing re-fired
+    expect(r.history.map((e) => e.tick)).toEqual([10, 20]); // but the record matches the new position
+    r.step();
+    r.play();
+    r.update(250); // to tick 31
+    expect(seen).toEqual([10, 20, 30, 40, 30]);
+  });
+
+  it('a slow-motion beat spends its real ms at the factor, then resumes full rate', () => {
+    const r = new Runner(counter, 1);
+    r.play();
+    r.slowMo(300, 0.5);
+    r.update(300); // 300 real ms at half speed = 150 sim ms = 3 ticks
+    expect(r.tick).toBe(3);
+    r.update(300); // back to full: 6 more
+    expect(r.tick).toBe(9);
+    r.slowMo(100, 0.25);
+    r.update(400); // 100 ms × 0.25 + 300 ms = 325 sim ms → 6 ticks (+25 ms banked)
+    expect(r.tick).toBe(15);
+    r.setSpeed(2);
+    r.slowMo(200, 0.5);
+    r.update(200); // 200 × 0.5 × ×2 = 200 sim ms + 25 banked → 4 ticks
+    expect(r.tick).toBe(19);
+  });
+
   it('stops at the end of a finished sim and caps a huge catch-up', () => {
     const r = new Runner(counter, 1);
     r.play();

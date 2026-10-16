@@ -238,9 +238,9 @@ export class MatchScene extends Phaser.Scene {
   private tagUntil = 0;
   private marker: Phaser.GameObjects.Ellipse | null = null;
   private markerColors: Record<TeamSide, number> = { home: 0xffffff, away: 0xffffff };
-  private zoomTarget = MATCH_ZOOM;
+  protected zoomTarget = MATCH_ZOOM;
   /** Authored (desktop) zoom for the current beat; zoomTarget is this scaled for the viewport. */
-  private beatZoom = MATCH_ZOOM;
+  protected beatZoom = MATCH_ZOOM;
   private onResize = (): void => {
     this.zoomTarget = this.viewZoom(this.beatZoom);
     if (this.autoZoom !== null) this.autoZoom = this.cameras.main.zoom;
@@ -596,7 +596,7 @@ export class MatchScene extends Phaser.Scene {
     this.scene.start('Grounds');
   }
 
-  private viewZoom(base: number): number {
+  protected viewZoom(base: number): number {
     return zoomForViewport(base, { width: this.cameras.main.width, height: this.cameras.main.height });
   }
 
