@@ -147,6 +147,12 @@ describe('tactics', () => {
     ]);
     expect(r).toBe(1);
     expect(pickReceiver(passer, 1, [{ idx: 3, pos: { x: 53, y: 36 }, busy: false }])).toBeNull();
+    // Role preference breaks ties: the half gets the ball over an equally placed forward.
+    const half = pickReceiver(passer, 1, [
+      { idx: 7, pos: { x: 47, y: 36 }, busy: false, prefer: 0 },
+      { idx: 5, pos: { x: 47, y: 24 }, busy: false, prefer: 1.5 },
+    ]);
+    expect(half).toBe(5);
   });
   it('intercept meets a moving carrier where he will be, and never aims behind a still one', () => {
     // Carrier at (50,30) running +x at 8 m/s; a slightly quicker defender 6 m to the side.
@@ -304,8 +310,8 @@ describe('LiveSim', () => {
 
   it('steps, strips and intercepts all happen across seeds, and are announced', () => {
     const kinds = new Set<string>();
-    for (let seed = 40; seed < 52; seed++) {
-      const { kinds: k } = collect(factory(seed), 180);
+    for (let seed = 40; seed < 80; seed++) {
+      const { kinds: k } = collect(factory(seed), 240);
       for (const x of k) kinds.add(x);
       if (kinds.has('step') && kinds.has('strip') && kinds.has('intercept')) break;
     }
@@ -332,6 +338,50 @@ describe('LiveSim', () => {
       });
     }
     expect(checked).toBeGreaterThan(0);
+  });
+
+  it('the try scorer stays where he grounded it until the restart (no dragging along the ground)', () => {
+    let checked = 0;
+    for (let seed = 1; seed < 30 && checked < 2; seed++) {
+      const sim = factory(seed);
+      let scorer: { side: 'home' | 'away'; slot: number; x: number; y: number } | null = null;
+      let tryTick = 0;
+      run(sim, 240, (s) => {
+        const e = s.events.find((x) => x.kind === 'try');
+        if (e && !scorer) {
+          const p = s.players.find((q) => q.side === e.side && q.slot === e.slot)!;
+          scorer = { side: e.side!, slot: e.slot!, x: p.x, y: p.y };
+          tryTick = s.tick;
+        }
+        if (scorer && s.tick > tryTick && s.tick < tryTick + 50 && s.label.includes('try')) {
+          const p = s.players.find((q) => q.side === scorer!.side && q.slot === scorer!.slot)!;
+          expect(Math.hypot(p.x - scorer.x, p.y - scorer.y)).toBeLessThan(3);
+          expect(['dive', 'celebrate', 'down']).toContain(p.pose);
+          checked++;
+        }
+      });
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('the hooker does not make the tackles from marker: the line does (middles lead, as in league)', () => {
+    let total = 0;
+    let byHooker = 0;
+    let byMiddles = 0; // hooker + prop: the two who stand over the mark most rucks
+    for (const seed of [1, 2, 3]) {
+      const { snaps } = collect(factory(seed), 180);
+      for (const s of snaps) {
+        for (const e of s.events) {
+          if (e.kind !== 'tackle' && e.kind !== 'big-hit') continue;
+          total++;
+          if (e.slot === 6) byHooker++;
+          if (e.slot === 6 || e.slot === 7) byMiddles++;
+        }
+      }
+    }
+    expect(total).toBeGreaterThan(40);
+    expect(byHooker / total).toBeLessThan(0.35); // was 36%+ when markers pounced on the first receiver
+    expect(byMiddles / total).toBeLessThan(0.6);
   });
 
   it('the stronger side scores more over many seeds', () => {

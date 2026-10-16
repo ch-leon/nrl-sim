@@ -17,18 +17,26 @@ export interface Role {
   def: number;
   /** How strongly the lane slides toward the ball's side (0..1). */
   pull: number;
+  /** Defensive pull when it differs (the hooker tracks the ball in attack, not in the line). */
+  defPull?: number;
 }
 
+/**
+ * Seven in the line spaced evenly across 68 m (the fullback sweeps behind, the
+ * hooker lives at the ruck): a left edge (winger, centre), a left half, the
+ * middle (prop), a right half, and a right edge (second-row, winger). Pull
+ * grows toward the middle so the edges stay wide and the middles track the ball.
+ */
 export const ROLES: readonly Role[] = [
   { name: 'fullback', lane: 34, atk: 14, def: 26, pull: 0.45 },
   { name: 'winger', lane: 5, atk: 8, def: 11, pull: 0.1 },
   { name: 'winger', lane: 63, atk: 8, def: 11, pull: 0.1 },
-  { name: 'centre', lane: 19, atk: 6, def: 10, pull: 0.25 },
-  { name: 'five-eighth', lane: 27, atk: 5, def: 10, pull: 0.35 },
-  { name: 'halfback', lane: 41, atk: 4, def: 10, pull: 0.35 },
-  { name: 'hooker', lane: 34, atk: 1.5, def: 1.5, pull: 0.9 },
-  { name: 'prop', lane: 30, atk: 3, def: 2, pull: 0.55 },
-  { name: 'second-row', lane: 48, atk: 4, def: 10, pull: 0.4 },
+  { name: 'centre', lane: 15, atk: 6, def: 10, pull: 0.2 },
+  { name: 'five-eighth', lane: 25, atk: 5, def: 10, pull: 0.35 },
+  { name: 'halfback', lane: 43, atk: 4, def: 10, pull: 0.35 },
+  { name: 'hooker', lane: 38, atk: 1.5, def: 1.5, pull: 0.9, defPull: 0.4 },
+  { name: 'prop', lane: 31, atk: 3, def: 2, pull: 0.5 },
+  { name: 'second-row', lane: 53, atk: 4, def: 10, pull: 0.3 },
 ];
 
 export const PLAYERS = ROLES.length;

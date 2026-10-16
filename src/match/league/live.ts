@@ -17,7 +17,7 @@ import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { FIELD_LENGTH, MID_Y, clampToGround, inGoal } from '../core/field';
 import { arrive, integrate, makeBody, maxSpeedFor, separate, speedOf, type Body } from '../core/body';
-import { CARRY_LIFT, flightAt, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
+import { CARRY_LIFT, bounceFlight, flightAt, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
 import type { PlayerSnap, Side, SimEvent, Snapshot } from '../core/snapshot';
 import { add, clamp, dist, dot, norm, scale, sub, type Vec } from '../core/vec';
 import { AVERAGE, angleFrom, interceptChance, knockOnChance, resolveContest, stepChance, type ContestStats, type Situation } from './contest';
@@ -33,7 +33,7 @@ const DH_HOLD_TICKS = 6;
 const TRY_TICKS = 50;
 /** A kick-off waits for everyone to be set, at least this long and at most RESTART_MAX. */
 const RESTART_TICKS = 40;
-const RESTART_MAX_TICKS = 120;
+const RESTART_MAX_TICKS = 280;
 /** A receiver must be this close to where a pass / kick comes down to take it. */
 const CATCH_REACH = 1.8;
 /** After a pass or catch, no new pass for this long. */
@@ -61,7 +61,7 @@ const TACKLE_REACH = 1.2;
 /** The defensive line stands this far off the ruck. */
 const ONSIDE_M = 10;
 /** Line rush-up speed, m/s. */
-const LINE_SPEED = 3.5;
+const LINE_SPEED = 5;
 /** A big hit drives the carrier back this far. */
 const DRIVE_BACK = 2.5;
 /** A support runner this close can take an offload. */
@@ -78,6 +78,8 @@ const STEP_RANGE = 2.6;
 const SECOND_MAN_M = 3.5;
 /** A defender this close to the pass line can pick it off. */
 const LANE_M = 1.5;
+/** Markers may not leave the ruck to tackle until this long after the ball is played. */
+const MARKER_RELEASE_TICKS = 14;
 /** A step jinks the carrier this far sideways, over this many ticks. */
 const STEP_JINK_M = 1.6;
 const STEP_JINK_TICKS = 4;
@@ -159,6 +161,9 @@ export class LiveSim implements MatchSim {
   private pendingKick: PendingKick | null = null;
   /** A loose ball only this side may take (after a knock-on); null = anyone's. */
   private looseFor: Side | null = null;
+  /** The last ruck's markers and the tick its ball was played (they hold until released). */
+  private markers: number[] = [];
+  private ruckPlayedAt = -1000;
   private events: SimEvent[] = [];
   readonly tries: Record<Side, number> = { home: 0, away: 0 };
 
@@ -291,9 +296,15 @@ export class LiveSim implements MatchSim {
     if (b.kind === 'flight') {
       if (!landed(b, this.tick)) return;
       const r = b.receiver !== null ? this.players[b.receiver] : undefined;
-      if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > CATCH_REACH)) {
-        // Nobody under it: it comes down loose and whoever gets there takes it.
+      if (b.via === 'bounce') {
+        // Hops done: it lies there for whoever gets to it.
         this.ball = { kind: 'loose', pos: { ...b.to }, vel: { x: 0, y: 0 } };
+        return;
+      }
+      if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > CATCH_REACH)) {
+        // Nobody under it: it comes down and bounces on in the direction it was going.
+        const dir = sub(b.to, b.from);
+        this.ball = bounceFlight(b.to, dir, this.tick, b.via === 'kick' ? 4 + this.rng.next() * 4 : 2);
         this.looseFor = null;
         return;
       }
@@ -301,7 +312,7 @@ export class LiveSim implements MatchSim {
       if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.skill, pressured)) {
         // Spilled: the ball squirts forward and the defence takes over.
         this.emit('error', `${r.name} spills it — knock-on`, r);
-        this.ball = { kind: 'loose', pos: add(b.to, scale({ x: this.dir, y: 0 }, 1.5)), vel: { x: 0, y: 0 } };
+        this.ball = bounceFlight(b.to, { x: this.dir, y: (this.rng.next() - 0.5) * 0.6 }, this.tick, 2.5, 12, 2);
         this.turnover();
         this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
         return;
@@ -521,6 +532,8 @@ export class LiveSim implements MatchSim {
       // still a way off, to the mark and he collects it there.
       const dhSpot = dist(dh.body.pos, spot) < 3 ? { ...dh.body.pos } : spot;
       this.ball = rollFlight(c.body.pos, dhSpot, this.tick, this.indexOf(dh), ROLL_TICKS);
+      this.markers = this.currentMarkers().map((m) => this.indexOf(m));
+      this.ruckPlayedAt = this.tick;
       c.busyUntil = this.tick + BUSY_AFTER_PTB;
       c.pose = 'idle';
       c.poseUntil = 0;
@@ -665,6 +678,7 @@ export class LiveSim implements MatchSim {
   private score(scorer: Player): void {
     this.tries[scorer.side]++;
     this.emit('try', `TRY! ${scorer.name} dives over for ${this.names[scorer.side]}`, scorer);
+    // Dive and slide, then up to celebrate on the spot — he stays put until the restart.
     this.lock(scorer, 'dive', 10, add(scorer.body.pos, scale({ x: this.dir, y: 0 }, 1.5)));
     scorer.poseUntil = this.tick + TRY_TICKS;
     for (const p of this.side(scorer.side)) {
@@ -677,11 +691,15 @@ export class LiveSim implements MatchSim {
 
   // ── Who goes where ────────────────────────────────────────────────────────
   private committed(h: Player, defenders: readonly Player[]): Player[] {
-    const free = defenders.filter((d) => !this.locked(d) && this.tick >= d.cooldownUntil);
+    // Markers stay square at the ruck until the ball is well clear of it; they
+    // may only pounce early on a dummy-half dart. Otherwise the first receiver
+    // runs at the line, not at the two men standing over the mark.
+    const held = this.tick < this.ruckPlayedAt + MARKER_RELEASE_TICKS && h.slot !== HOOKER;
+    const free = defenders.filter((d) => !this.locked(d) && this.tick >= d.cooldownUntil && !(held && this.markers.includes(this.indexOf(d))));
     // A defender already behind the carrier can only chase; the ones in front
     // of him are the tackle, so they rank first.
     const behind = (d: Player): boolean => (d.body.pos.x - h.body.pos.x) * this.dir < 0;
-    const cost = (d: Player): number => dist(d.body.pos, h.body.pos) + (behind(d) ? 60 : 0);
+    const cost = (d: Player): number => dist(d.body.pos, h.body.pos) + (behind(d) ? 60 : 0) + (this.markers.includes(this.indexOf(d)) ? 8 : 0);
     free.sort((a, b) => cost(a) - cost(b));
     const ahead = free.filter((d) => !behind(d)).length;
     // A broken line (two or fewer still in front) sends everyone in range after him.
@@ -692,7 +710,33 @@ export class LiveSim implements MatchSim {
   private candidates(passer: Player): Candidate[] {
     return this.side(passer.side)
       .filter((p) => p !== passer)
-      .map((p) => ({ idx: this.indexOf(p), pos: p.body.pos, busy: this.locked(p) || this.tick < p.busyUntil || (p.slot === HOOKER && this.phase.kind === 'ruck') }));
+      .map((p) => ({
+        idx: this.indexOf(p),
+        pos: p.body.pos,
+        busy: this.locked(p) || this.tick < p.busyUntil || (p.slot === HOOKER && this.phase.kind === 'ruck'),
+        prefer: this.rolePreference(p, passer),
+      }));
+  }
+
+  /** Who the ball should go to by role: halves as first receiver; forwards for the early hit-ups. */
+  private rolePreference(p: Player, passer: Player): number {
+    const name = ROLES[p.slot]!.name;
+    const fromRuck = passer.slot === HOOKER;
+    if (name === 'halfback' || name === 'five-eighth') return fromRuck ? 1.5 : 0.5;
+    if (name === 'prop' || name === 'second-row') return fromRuck && this.tackles <= 2 ? 1.2 : 0;
+    if (name === 'fullback') return -0.5;
+    return 0;
+  }
+
+  /** The two defenders standing over the current mark. */
+  private currentMarkers(): Player[] {
+    const ph = this.phase;
+    if (ph.kind !== 'tackle' && ph.kind !== 'ruck') return [];
+    const t = this.players[ph.tackler]!;
+    const second = this.side(t.side)
+      .filter((d) => d !== t && d.slot !== FULLBACK)
+      .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[0];
+    return second ? [t, second] : [t];
   }
 
   private dummyHalfSpot(): Vec {
@@ -724,8 +768,11 @@ export class LiveSim implements MatchSim {
         p.through = false;
       }
       if (ph.kind === 'try') {
-        // Teammates mob the scorer for a moment.
+        // The scorer stays where he grounded it (up and celebrating once the
+        // dive is done); teammates mob him for the moment.
         const s = this.players[ph.scorer]!;
+        s.target = { ...s.body.pos };
+        if (!this.locked(s) && s.pose === 'dive') s.pose = 'celebrate';
         for (const p of this.side(s.side)) {
           if (p === s) continue;
           p.target = { x: s.body.pos.x - this.dir * (1.5 + (p.slot % 3)), y: clamp(s.body.pos.y + (p.slot - 4) * 1.4, 1, 67) };
@@ -736,10 +783,12 @@ export class LiveSim implements MatchSim {
 
     // Loose ball: the two nearest of each side go for it, everyone else holds shape.
     const chasers = new Set<Player>();
-    if (this.ball.kind === 'loose') {
+    const bouncing = flight && flight.via === 'bounce' ? flight : null;
+    const looseAt = this.ball.kind === 'loose' ? bp : bouncing ? bouncing.to : null;
+    if (looseAt) {
       for (const s of ['home', 'away'] as const) {
         if (this.looseFor && s !== this.looseFor) continue;
-        const near = this.side(s).filter((p) => !this.locked(p)).sort((a, b) => dist(a.body.pos, bp) - dist(b.body.pos, bp));
+        const near = this.side(s).filter((p) => !this.locked(p)).sort((a, b) => dist(a.body.pos, looseAt) - dist(b.body.pos, looseAt));
         for (const p of near.slice(0, 2)) chasers.add(p);
       }
     }
@@ -759,8 +808,8 @@ export class LiveSim implements MatchSim {
     for (const p of attackers) {
       const role = ROLES[p.slot]!;
       p.through = false;
-      if (chasers.has(p)) {
-        p.target = { ...bp };
+      if (chasers.has(p) && looseAt) {
+        p.target = { ...looseAt };
       } else if (p === carrier) {
         if (ph.kind === 'play') {
           const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
@@ -792,20 +841,17 @@ export class LiveSim implements MatchSim {
       else this.lineX = Math.min(want, this.lineX + stepM);
     }
     const committed = ph.kind === 'play' && carrier ? this.committed(carrier, defenders) : [];
-    const markers: Player[] = [];
-    if (inRuck) {
-      const t = this.players[(ph as Extract<Phase, { kind: 'tackle' | 'ruck' }>).tackler]!;
-      markers.push(t);
-      const second = defenders
-        .filter((d) => d !== t && d.slot !== FULLBACK)
-        .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[0];
-      if (second) markers.push(second);
-    }
+    // Markers stand over the mark through the ruck and hold there until released.
+    const markers: Player[] = inRuck
+      ? this.currentMarkers()
+      : this.tick < this.ruckPlayedAt + MARKER_RELEASE_TICKS
+        ? this.markers.map((i) => this.players[i]!).filter((d) => d.side === def && !committed.includes(d))
+        : [];
     for (const p of defenders) {
       const role = ROLES[p.slot]!;
       p.through = false;
-      if (chasers.has(p)) {
-        p.target = { ...bp };
+      if (chasers.has(p) && looseAt) {
+        p.target = { ...looseAt };
       } else if (p === receiver) {
         p.target = { ...flight!.to };
       } else if (committed.includes(p) && carrier) {
@@ -818,7 +864,7 @@ export class LiveSim implements MatchSim {
       } else if (p.slot === FULLBACK) {
         p.target = { x: clamp(this.lineX + this.dir * 16, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
       } else {
-        const y = clamp(role.lane + (anchor.y - MID_Y) * role.pull, 1.5, 66.5);
+        const y = clamp(role.lane + (anchor.y - MID_Y) * (role.defPull ?? role.pull), 1.5, 66.5);
         p.target = { x: clamp(this.lineX, -8, FIELD_LENGTH + 8), y };
       }
     }
