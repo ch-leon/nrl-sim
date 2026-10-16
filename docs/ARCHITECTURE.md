@@ -57,7 +57,7 @@ src/
     aging.ts                 # season-rollover ageing + age retirement (GitHub #5)
   match/                     # LIVE match sim (BAK-207) — replaces sim/engine + world/playback
     core/                    # sport-neutral: fixed-step clock, bodies, ball, snapshots, flag codes
-    league/                  # rugby league (Nines) rules and roles; Phase 0 ships a movement drill
+    league/                  # rugby league (Nines) rules, roles, tackle contest, tactics
     view/                    # draws snapshots on MatchScene's sprites (interpolated)
     lab/                     # /#lab dev page: teams/seed, play/pause/step/scrub, Flag
   sim/
