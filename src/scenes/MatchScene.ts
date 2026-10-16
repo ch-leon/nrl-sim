@@ -105,8 +105,10 @@ const DEPTH_CROWD_FRONT = 60_000;
 const MATCH_ZOOM = ZOOM_DEFAULT;
 /** Name tag sits this many world px above a player's feet (just over his head). */
 const TAG_LIFT = 26;
-/** Ghost balls trailing a flying ball. */
+/** Ghost balls trailing a kicked ball. */
 const TRAIL_LEN = 5;
+/** A flight must rise this high (world px) before it counts as a kick and gets a trail. */
+const TRAIL_MIN_LIFT = 30;
 /** Crowd animation tick (real ms). */
 const CROWD_TICK_MS = 220;
 
@@ -156,6 +158,8 @@ export class MatchBall implements PlaybackBall {
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly trail: Phaser.GameObjects.Image[] = [];
   private readonly recent: { x: number; y: number }[] = [];
+  /** This flight has gone high enough to be a kick (trail shown). */
+  private highFlight = false;
   /** Ground position — what the camera follows. */
   gx = 0;
   gy = 0;
@@ -174,8 +178,11 @@ export class MatchBall implements PlaybackBall {
     const sy = y - lift + 2;
     this.sprite.setPosition(x, sy).setDepth(depth);
     this.shadow.setPosition(x, y).setVisible(lift > 3);
-    // Short trail while the ball is in the air: fading ghosts of its last spots.
-    const flying = lift > 3;
+    // Short trail while a KICK is in the air: fading ghosts of its last spots.
+    // Passes stay low and short; a trail on them just reads as blur (BAK-207).
+    if (lift <= 3) this.highFlight = false;
+    else if (lift > TRAIL_MIN_LIFT) this.highFlight = true;
+    const flying = lift > 3 && this.highFlight;
     const last = this.recent[this.recent.length - 1];
     if (!flying || (last && Math.hypot(x - last.x, sy - last.y) > 400)) this.recent.length = 0;
     if (flying && (!last || Math.hypot(x - last.x, sy - last.y) >= 4)) {

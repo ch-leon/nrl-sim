@@ -80,7 +80,9 @@ describe('situational zoom', () => {
     expect(zoomForEvent('break')).toBe(ZOOM_WIDE);
     expect(zoomForEvent('run')).toBe(ZOOM_DEFAULT);
     expect(ZOOM_CLOSE).toBeGreaterThan(ZOOM_DEFAULT);
-    expect(ZOOM_WIDE).toBeLessThan(ZOOM_DEFAULT);
+    expect(ZOOM_WIDE).toBeLessThanOrEqual(ZOOM_DEFAULT);
+    // Whole-number zooms only: fractional zooms make moving pixel art shimmer.
+    for (const z of [ZOOM_DEFAULT, ZOOM_CLOSE, ZOOM_WIDE]) expect(Number.isInteger(z)).toBe(true);
   });
   it('eases toward the target independent of frame rate and then snaps', () => {
     let a = ZOOM_DEFAULT;

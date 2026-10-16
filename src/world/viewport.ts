@@ -27,11 +27,14 @@ export function viewScale(view: { width: number; height: number }): number {
 
 /**
  * Zoom for a match beat on a given viewport: the authored zoom scaled for the
- * viewport, floored so a player is never smaller than MIN_PLAYER_PX tall.
+ * viewport, floored so a player is never smaller than MIN_PLAYER_PX tall, then
+ * snapped to a whole number. Pixel art only stays crisp at integer zooms: at
+ * 1.75× some art pixels draw double-width and some single, and with players
+ * moving every frame that pattern crawls, which reads as blur (BAK-207).
  */
 export function zoomForViewport(baseZoom: number, view: { width: number; height: number }): number {
   const floor = MIN_PLAYER_PX / PLAYER_WORLD_PX;
-  return Math.max(floor, baseZoom * viewScale(view));
+  return Math.max(1, Math.round(Math.max(floor, baseZoom * viewScale(view))));
 }
 
 /** Rendered height (CSS px) of a player at `zoom`. */
