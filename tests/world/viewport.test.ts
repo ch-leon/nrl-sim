@@ -46,6 +46,21 @@ describe('viewport maths', () => {
   });
 
   it('enforces the player-size floor for tiny zooms', () => {
-    expect(playerPx(zoomForViewport(0.1, { width: 360, height: 740 }))).toBeCloseTo(MIN_PLAYER_PX);
+    expect(playerPx(zoomForViewport(0.1, { width: 360, height: 740 }))).toBeGreaterThanOrEqual(MIN_PLAYER_PX);
+  });
+
+  it('always lands on a whole-number zoom (crisp pixel art while moving)', () => {
+    for (const v of [
+      { width: 1280, height: 800 },
+      { width: 844, height: 390 },
+      { width: 360, height: 740 },
+      { width: 3840, height: 2160 },
+    ]) {
+      for (const z of [ZOOM_DEFAULT, ZOOM_CLOSE, ZOOM_WIDE, 1.75, 0.1]) {
+        const out = zoomForViewport(z, v);
+        expect(Number.isInteger(out)).toBe(true);
+        expect(out).toBeGreaterThanOrEqual(1);
+      }
+    }
   });
 });

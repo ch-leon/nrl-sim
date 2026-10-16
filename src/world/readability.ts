@@ -74,12 +74,15 @@ export function carrierMarkerTarget(
 
 // ── Situational zoom ──────────────────────────────────────────────────────────
 
-/** Default match zoom: a player stands ~36px tall at 1280×800. */
-export const ZOOM_DEFAULT = 1.75;
+/**
+ * Default match zoom: a player stands ~42px tall. Whole numbers only — pixel
+ * art shimmers at fractional zooms once everything is moving (see viewport).
+ */
+export const ZOOM_DEFAULT = 2;
 /** Tighter at rucks and tackles. */
-export const ZOOM_CLOSE = 2.0;
-/** Wider for kicks and breaks, so the ball's destination stays in view. */
-export const ZOOM_WIDE = 1.5;
+export const ZOOM_CLOSE = 3;
+/** Kicks and breaks: no tighter than default, so the ball's destination stays in view. */
+export const ZOOM_WIDE = 2;
 /** Exponential ease rate (per second) toward the target zoom. */
 export const ZOOM_RATE_PER_S = 2.2;
 

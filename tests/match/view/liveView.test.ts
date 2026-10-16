@@ -66,12 +66,14 @@ describe('LiveView', () => {
     view.draw(prev, cur, 0.5, 1);
     const w = fieldToWorldPoint(42, 50, fieldOffsetX());
     const a = s.players.home[0]!;
-    expect(a.x).toBeCloseTo(w.x);
-    expect(a.y).toBeCloseTo(w.y);
-    expect(a.depth).toBeCloseTo(w.y + 1, 2);
+    // Snapped to whole world pixels so moving sprites don't shimmer.
+    expect(a.x).toBe(Math.round(w.x));
+    expect(a.y).toBe(Math.round(w.y));
+    expect(Number.isInteger(a.x) && Number.isInteger(a.y)).toBe(true);
+    expect(a.depth).toBeCloseTo(Math.round(w.y) + 1, 2);
     expect(a.anim).toBe('run');
     expect(a.scale).toBeCloseTo(1); // 7 m/s is cadence 1
-    expect(Math.abs(s.ball.x - w.x)).toBe(4);
+    expect(Math.abs(s.ball.x - Math.round(w.x))).toBe(4);
     expect(s.ball.lift).toBe(LIFT_PX_PER_M);
     expect(s.marks[s.marks.length - 1]).toMatchObject({ side: 'home' });
   });
@@ -94,9 +96,9 @@ describe('LiveView', () => {
     const cur = snap(1, [], { x: 60, y: 34, lift: 4, holder: null });
     view.draw(prev, cur, 0.25, 2);
     const w = fieldToWorldPoint(52.5, 50, fieldOffsetX());
-    expect(s.ball.x).toBeCloseTo(w.x);
-    expect(s.ball.lift).toBeCloseTo(LIFT_PX_PER_M);
-    expect(s.ball.depth).toBeCloseTo(w.y + 2);
+    expect(s.ball.x).toBe(Math.round(w.x));
+    expect(s.ball.lift).toBe(LIFT_PX_PER_M);
+    expect(s.ball.depth).toBe(Math.round(w.y) + 2);
   });
 
   it('run cadence scales with ground speed and playback speed, within bounds', () => {
