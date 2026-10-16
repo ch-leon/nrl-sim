@@ -110,8 +110,16 @@ Resolved when a committed defender reaches the carrier. Order of checks:
 | Offload (to a support inside 5 m) | 9% | carrier Skill, Offload King, Wall − |
 | Strip (turnover) | 2% one-on-one | Ball Stripper, carrier Skill − |
 
-Two defenders: bust −6%, fend −4%, offload −3%, big hit +4%. Tackle number: on the
-last tackle the defence is set (big hit +3%). Fatigue (§8) lowers the tired side's odds.
+Two defenders: bust −6%, fend −4%, offload −3%, big hit +4%; three: −9 / −6 / −5 / +6.
+Angle (from the tackler's closing direction vs the carrier's heading): **side** fend +5%,
+big hit −4%; **behind** bust +4%, fend +3%, big hit −6%. Momentum: ±1% bust per m/s of
+speed difference, capped ±4%. Last tackle: big hit +3%. Fatigue (§8): a spent carrier
+−10% bust/fend/offload; a spent tackler −10% big hit, +6% bust. Stats shift the baseline
+by up to ±8% bust, ±4.5% fend, ±5% offload, ∓7% big hit, ∓1% strip (edge 0…1).
+
+Step modifiers: side +5%, behind −5%, carrier fatigue −8%, tackler fatigue +4%; capped
+at 60%. A step is tried at most once per defender per possession, when he is inside
+2.6 m and no second defender is within 3.5 m. *Implemented in B (#96).*
 
 ### 4.2 Pass
 Completion by passer Skill and pressure (defender inside 2 m when thrown): base 96%,
