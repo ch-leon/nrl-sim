@@ -19,3 +19,12 @@ npm run build    # typecheck + production build into dist/
 CI runs the typecheck, tests and build on every PR. Merges to `main` deploy to
 GitHub Pages automatically. Architecture notes live in `docs/ARCHITECTURE.md`
 and feature specs in `docs/specs/`.
+
+## Match lab
+
+The live match simulation (`docs/specs/BAK-207-live-match-sim.md`) is being
+built in the open at **https://ch-leon.github.io/nrl-sim/#lab**. Pick two
+teams and a seed, then play, pause, step one tick, slow down or scrub back.
+**⚑ Flag** copies a code like `nrl1:7:1240:crushers~larrikins:…` that pins the
+exact moment on screen with your note — paste it into an issue or chat and the
+same frame can be rebuilt. `#lab?flag=<code>` (or the Load button) reopens it.

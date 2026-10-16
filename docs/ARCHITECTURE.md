@@ -55,6 +55,11 @@ src/
     freeagency.ts            # free agent pool gen/refresh, signing   (WU-9 / BAK-179)
     matchday.ts              # player match of the round; SQUAD_MIN forfeit (GitHub #4)
     aging.ts                 # season-rollover ageing + age retirement (GitHub #5)
+  match/                     # LIVE match sim (BAK-207) — replaces sim/engine + world/playback
+    core/                    # sport-neutral: fixed-step clock, bodies, ball, snapshots, flag codes
+    league/                  # rugby league (Nines) rules and roles; Phase 0 ships a movement drill
+    view/                    # draws snapshots on MatchScene's sprites (interpolated)
+    lab/                     # /#lab dev page: teams/seed, play/pause/step/scrub, Flag
   sim/
     engine.ts                # simulateMatch() core                   (WU-6 / BAK-191)
     events.ts                # MatchEvent types + MatchResult         (WU-6)
