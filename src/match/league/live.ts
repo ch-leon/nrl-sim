@@ -214,7 +214,7 @@ export class LiveSim implements MatchSim {
     return this.tick < p.lockUntil;
   }
   private emit(kind: string, text: string, p?: Player): void {
-    this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot } : {}) });
+    this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot, player: p.name } : {}) });
   }
   private lock(p: Player, pose: string, ticks: number, slideTo?: Vec): void {
     p.pose = pose;

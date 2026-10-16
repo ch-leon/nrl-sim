@@ -88,10 +88,9 @@ export const ZOOM_RATE_PER_S = 2.2;
 
 export function zoomForEvent(kind: MatchEventKind): number {
   switch (kind) {
-    case 'tackle':
+    // Only the big moments pull in: a close-up on every tackle is jumpy at
+    // whole-number zooms (BAK-207) and happens every few seconds live.
     case 'big-hit':
-    case 'fend':
-    case 'break-tackle':
     case 'try':
       return ZOOM_CLOSE;
     case 'kick':

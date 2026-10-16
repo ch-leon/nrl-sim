@@ -42,7 +42,15 @@ export class Runner {
   private _speed: RunSpeed = 1;
   private _playing = false;
   private _maxTick = 0;
+  /** Slow-motion beat: real ms left and the time factor while it lasts. */
+  private slowMs = 0;
+  private slowFactor = 1;
+  /** Last few events, for a live log. */
   readonly recent: SimEvent[] = [];
+  /** Every event since tick 0 on this seed (rebuilt by seek), for feeds and stats. */
+  readonly history: SimEvent[] = [];
+  /** Called with each tick's events as they happen (pop-ups, FX). */
+  onEvents: ((events: SimEvent[]) => void) | null = null;
 
   constructor(factory: SimFactory, seed: number) {
     this.factory = factory;
@@ -94,10 +102,22 @@ export class Runner {
     this._speed = s;
   }
 
+  /** Run at `factor` speed for the next `ms` of real time (a beat of slow-motion). */
+  slowMo(ms: number, factor: number): void {
+    this.slowMs = Math.max(this.slowMs, ms);
+    this.slowFactor = Math.max(0.05, Math.min(1, factor));
+  }
+
   /** Feed real elapsed time; steps every tick that has fallen due. */
   update(realMs: number): void {
     if (!this._playing || this.sim.finished) return;
-    this.acc += Math.max(0, realMs) * this._speed;
+    const ms = Math.max(0, realMs);
+    if (this.slowMs > 0) {
+      // Spend the slow beat first at its factor, the remainder at full rate.
+      const slow = Math.min(ms, this.slowMs);
+      this.slowMs -= slow;
+      this.acc += (slow * this.slowFactor + (ms - slow)) * this._speed;
+    } else this.acc += ms * this._speed;
     let n = 0;
     while (this.acc >= TICK_MS && n < MAX_TICKS_PER_UPDATE) {
       this.stepOnce();
@@ -120,10 +140,15 @@ export class Runner {
     const target = Math.max(0, Math.floor(tick));
     this._playing = false;
     this.acc = 0;
+    const cb = this.onEvents;
+    this.onEvents = null; // re-simulating: don't replay pop-ups and FX
     this.sim = this.factory(this._seed);
     this.recent.length = 0;
+    this.history.length = 0;
+    this.slowMs = 0;
     this._prev = this._cur = this.sim.snapshot();
     for (let i = 0; i < target && !this.sim.finished; i++) this.stepOnce();
+    this.onEvents = cb;
   }
 
   /** Start over on a new seed (tick 0, paused). */
@@ -141,6 +166,8 @@ export class Runner {
     if (this._cur.events.length) {
       this.recent.push(...this._cur.events);
       if (this.recent.length > RECENT_EVENTS) this.recent.splice(0, this.recent.length - RECENT_EVENTS);
+      this.history.push(...this._cur.events);
+      this.onEvents?.(this._cur.events);
     }
   }
 }
