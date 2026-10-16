@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { add, clampLen, dist, len, lerp, norm, scale, sub } from '../../../src/match/core/vec';
 import { ACCEL, BODY_RADIUS, MAX_SPEED, MIN_SPEED, arrive, brake, integrate, makeBody, maxSpeedFor, separate, speedOf } from '../../../src/match/core/body';
-import { CARRY_LIFT, flightAt, flightLift, landed, passFlight } from '../../../src/match/core/ball';
+import { CARRY_LIFT, bounceFlight, flightAt, flightLift, landed, passFlight } from '../../../src/match/core/ball';
 import { decodeFlag, encodeFlag } from '../../../src/match/core/flag';
 import { RUN_SPEEDS, Runner, TICK_MS, TICK_S, replayTo, type MatchSim } from '../../../src/match/core/engine';
 import { FIELD_WIDTH, IN_GOAL, clampToGround, fromFieldPt, inGoal, inPlay, outOfBounds, toFieldPt } from '../../../src/match/core/field';
@@ -147,6 +147,28 @@ describe('ball flights', () => {
     expect(landed(f, 120)).toBe(true);
     expect(flightAt(f, 110).lift).toBeGreaterThan(CARRY_LIFT / 2);
   });
+  it('a loose ball bounces on in the direction it was travelling, low, then lies there', () => {
+    const b = bounceFlight({ x: 50, y: 30 }, { x: -3, y: 0 }, 200, 6, 16, 3);
+    expect(b.kind).toBe('flight');
+    if (b.kind !== 'flight') return;
+    expect(b.via).toBe('bounce');
+    expect(b.receiver).toBeNull();
+    expect(b.to).toEqual({ x: 44, y: 30 });
+    expect(landed(b, 216)).toBe(true);
+    let touches = 0;
+    let peak = 0;
+    let prev = 1;
+    for (let t = 200; t <= 216; t++) {
+      const { lift } = flightAt(b, t);
+      peak = Math.max(peak, lift);
+      if (prev >= 0.3 && lift < 0.3) touches++;
+      prev = lift;
+    }
+    expect(peak).toBeLessThan(1.5);
+    expect(touches).toBeGreaterThanOrEqual(2);
+    expect(flightAt(b, 216).lift).toBe(0);
+  });
+
   it('lift is a parabola, or decaying hops for a bouncing ball', () => {
     expect(flightLift(0, 10, 0.5)).toBeCloseTo(10);
     expect(flightLift(0, 10, 1)).toBe(0);

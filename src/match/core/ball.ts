@@ -22,8 +22,8 @@ export type BallState =
       receiver: number | null;
       /** Ground bounces (grubbers): decaying hops instead of one arc. */
       bounces: number;
-      /** How it got airborne (a kick changes possession on landing). */
-      via: 'pass' | 'kick' | 'roll';
+      /** How it got airborne (a kick changes possession on landing; a bounce ends loose). */
+      via: 'pass' | 'kick' | 'roll' | 'bounce';
     }
   | { kind: 'loose'; pos: Vec; vel: Vec };
 
@@ -60,6 +60,16 @@ export function passFlight(from: Vec, to: Vec, t0: number, receiver: number | nu
 export function kickFlight(from: Vec, to: Vec, t0: number, receiver: number | null, peak = 12): BallState {
   const ticks = Math.max(4, Math.round(dist(from, to) / KICK_SPEED / TICK_S));
   return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak, fromLift: 0.4, receiver, bounces: 0, via: 'kick' };
+}
+
+/**
+ * A ball that has come down with nobody under it: two or three decaying hops
+ * along the ground in the direction it was travelling, then it lies there.
+ */
+export function bounceFlight(from: Vec, dir: Vec, t0: number, metres = 5, ticks = 16, hops = 3): BallState {
+  const l = Math.hypot(dir.x, dir.y) || 1;
+  const to = { x: from.x + (dir.x / l) * metres, y: from.y + (dir.y / l) * metres };
+  return { kind: 'flight', from: { ...from }, to, t0, ticks, peak: 1.2, fromLift: 0, receiver: null, bounces: hops, via: 'bounce' };
 }
 
 /** The play-the-ball: heeled along the ground to the dummy-half. */

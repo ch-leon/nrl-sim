@@ -37,6 +37,8 @@ export interface Candidate {
   pos: Vec;
   /** Can't take a pass right now (getting up, locked in a tackle). */
   busy: boolean;
+  /** Role preference added to the score (halves as first receiver, forwards for hit-ups). */
+  prefer?: number;
 }
 
 /** Best pass option: behind the passer, 2–12 m to the side, not too deep. */
@@ -49,7 +51,7 @@ export function pickReceiver(passer: Vec, dir: 1 | -1, candidates: readonly Cand
     const lat = Math.abs(c.pos.y - passer.y);
     if (depth < 0.3 || depth > 8 || lat < 2 || lat > 12) continue;
     // Flat and wide beats deep: a deep receiver gives ground back.
-    const score = -Math.abs(lat - 6) - 0.7 * depth;
+    const score = -Math.abs(lat - 6) - 0.7 * depth + (c.prefer ?? 0);
     if (score > bestScore) {
       bestScore = score;
       best = c.idx;
