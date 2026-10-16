@@ -34,6 +34,8 @@ import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard } from './ui/orientation';
 import { startTutorial } from './ui/tutorial';
+import { isLabHash } from './match/lab/controller';
+import { bootLab } from './match/lab/boot';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
@@ -80,6 +82,11 @@ let game: Phaser.Game | null = null;
 let portraitBlocked = false;
 
 async function boot(): Promise<void> {
+  // BAK-207: `/#lab` opens the live match sim lab instead of the club game.
+  if (isLabHash(location.hash)) {
+    bootLab();
+    return;
+  }
   initLandscapeGuard({
     onBlock: () => {
       portraitBlocked = true;

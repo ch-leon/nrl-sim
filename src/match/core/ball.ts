@@ -1,0 +1,57 @@
+// src/match/core/ball.ts — the ball always has a state (BAK-207 §3.2): in a
+// player's hands, in flight (pass or kick) toward a point, or loose on the
+// ground. Flight paths are fixed when launched so they replay identically.
+import { TICK_S } from './engine';
+import { dist, lerp, type Vec } from './vec';
+
+export type BallState =
+  | { kind: 'held'; by: number }
+  | {
+      kind: 'flight';
+      from: Vec;
+      to: Vec;
+      /** Tick the flight started on. */
+      t0: number;
+      /** Ticks in the air. */
+      ticks: number;
+      /** Peak height in metres (a flat pass ~0.8, a bomb ~25). */
+      peak: number;
+      /** Lift at launch (hand height when thrown, 0 off the ground). */
+      fromLift: number;
+      /** Who gathers it on landing; null = it lands loose. */
+      receiver: number | null;
+      /** Ground bounces (grubbers): decaying hops instead of one arc. */
+      bounces: number;
+    }
+  | { kind: 'loose'; pos: Vec; vel: Vec };
+
+/** Height of a carried ball, metres. */
+export const CARRY_LIFT = 1.0;
+/** A flat pass travels about this fast, m/s. */
+export const PASS_SPEED = 16;
+
+/** Lift at progress u ∈ [0,1]: a parabola from `fromLift` to the ground, or decaying hops. */
+export function flightLift(fromLift: number, peak: number, u: number, bounces = 0): number {
+  if (bounces > 0) {
+    const hop = Math.abs(Math.sin(Math.PI * bounces * u));
+    return fromLift * Math.max(0, 1 - u * bounces) + peak * hop * (1 - u);
+  }
+  return fromLift * (1 - u) + 4 * peak * u * (1 - u);
+}
+
+/** Where a flight is at `tick` (u clamped to [0,1]). */
+export function flightAt(f: Extract<BallState, { kind: 'flight' }>, tick: number): { pos: Vec; lift: number; u: number } {
+  const u = Math.max(0, Math.min(1, (tick - f.t0) / f.ticks));
+  return { pos: lerp(f.from, f.to, u), lift: flightLift(f.fromLift, f.peak, u, f.bounces), u };
+}
+
+/** A pass from `from` to `to` launched at `t0`, timed by distance. */
+export function passFlight(from: Vec, to: Vec, t0: number, receiver: number | null, speed = PASS_SPEED, peak = 0.8): BallState {
+  const ticks = Math.max(2, Math.round(dist(from, to) / speed / TICK_S));
+  return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak, fromLift: CARRY_LIFT, receiver, bounces: 0 };
+}
+
+/** A flight has reached its landing point. */
+export function landed(f: Extract<BallState, { kind: 'flight' }>, tick: number): boolean {
+  return tick >= f.t0 + f.ticks;
+}

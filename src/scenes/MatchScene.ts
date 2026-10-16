@@ -113,12 +113,13 @@ const CROWD_TICK_MS = 220;
 export interface MatchSceneData {
   home: TeamSheet;
   away: TeamSheet;
-  result: MatchResult;
+  /** Absent in the match lab (BAK-207), which drives the sprites itself. */
+  result?: MatchResult;
   fixture?: Fixture; // carried through so `match:finished` can echo it (BAK-194)
 }
 
 /** A player sprite + ground shadow, driven through PlaybackActor. */
-class MatchActor implements PlaybackActor {
+export class MatchActor implements PlaybackActor {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly atlas: string;
@@ -150,7 +151,7 @@ class MatchActor implements PlaybackActor {
 }
 
 /** The ball sprite + its ground shadow (shown while in the air) + flight trail. */
-class MatchBall implements PlaybackBall {
+export class MatchBall implements PlaybackBall {
   readonly sprite: Phaser.GameObjects.Image;
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly trail: Phaser.GameObjects.Image[] = [];
@@ -208,13 +209,13 @@ export class MatchScene extends Phaser.Scene {
 
   private home!: TeamSheet;
   private away!: TeamSheet;
-  private result!: MatchResult;
+  private result: MatchResult | undefined;
   private fixture: Fixture | undefined;
 
   private readonly offsetX = fieldOffsetX();
   private art!: MatchArtRegistry;
   private camController!: CameraController;
-  private backBtn: HTMLButtonElement | null = null;
+  protected backBtn: HTMLButtonElement | null = null;
 
   // Crowd.
   private crowdBobs: { bob: Phaser.GameObjects.Bob; seat: CrowdSeat; shirt: number; look: number; side: 'home' | 'away' | null }[] = [];
@@ -247,8 +248,8 @@ export class MatchScene extends Phaser.Scene {
   private speedButtons: HTMLButtonElement[] = [];
   private finished = false;
 
-  constructor() {
-    super('Match'); // scene key per ARCHITECTURE.md §7
+  constructor(key = 'Match') {
+    super(key); // scene key per ARCHITECTURE.md §7; the lab subclasses with its own
   }
 
   init(data: MatchSceneData): void {
@@ -488,6 +489,7 @@ export class MatchScene extends Phaser.Scene {
         this.hype(side, 0.3, 900);
         break;
       case 'full-time': {
+        if (!this.result) break;
         const { homeScore, awayScore } = this.result;
         if (homeScore !== awayScore) this.hype(homeScore > awayScore ? 'home' : 'away', 0.9, 60_000);
         break;
@@ -581,7 +583,7 @@ export class MatchScene extends Phaser.Scene {
   private exitToGrounds(): void {
     // Playback owns the single 'match:finished' emission; if it never fired
     // (e.g. no result / early exit before full-time), emit the fallback here.
-    if (!this.finished && this.fixture) {
+    if (!this.finished && this.fixture && this.result) {
       bus.emit('match:finished', { fixture: this.fixture, result: this.result });
     }
     this.scene.start('Grounds');
