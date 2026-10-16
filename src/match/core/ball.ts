@@ -22,8 +22,13 @@ export type BallState =
       receiver: number | null;
       /** Ground bounces (grubbers): decaying hops instead of one arc. */
       bounces: number;
+      /** How it got airborne (a kick changes possession on landing). */
+      via: 'pass' | 'kick' | 'roll';
     }
   | { kind: 'loose'; pos: Vec; vel: Vec };
+
+/** A kick travels about this fast, m/s. */
+export const KICK_SPEED = 20;
 
 /** Height of a carried ball, metres. */
 export const CARRY_LIFT = 1.0;
@@ -48,7 +53,18 @@ export function flightAt(f: Extract<BallState, { kind: 'flight' }>, tick: number
 /** A pass from `from` to `to` launched at `t0`, timed by distance. */
 export function passFlight(from: Vec, to: Vec, t0: number, receiver: number | null, speed = PASS_SPEED, peak = 0.8): BallState {
   const ticks = Math.max(2, Math.round(dist(from, to) / speed / TICK_S));
-  return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak, fromLift: CARRY_LIFT, receiver, bounces: 0 };
+  return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak, fromLift: CARRY_LIFT, receiver, bounces: 0, via: 'pass' };
+}
+
+/** A kick from the boot: high and long, timed by distance. */
+export function kickFlight(from: Vec, to: Vec, t0: number, receiver: number | null, peak = 12): BallState {
+  const ticks = Math.max(4, Math.round(dist(from, to) / KICK_SPEED / TICK_S));
+  return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak, fromLift: 0.4, receiver, bounces: 0, via: 'kick' };
+}
+
+/** The play-the-ball: heeled along the ground to the dummy-half. */
+export function rollFlight(from: Vec, to: Vec, t0: number, receiver: number, ticks: number): BallState {
+  return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks: Math.max(1, ticks), peak: 0.15, fromLift: 0, receiver, bounces: 0, via: 'roll' };
 }
 
 /** A flight has reached its landing point. */

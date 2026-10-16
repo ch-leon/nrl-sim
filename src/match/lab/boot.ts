@@ -6,7 +6,7 @@ import Phaser from 'phaser';
 import { bus } from '../../core/events';
 import { initLandscapeGuard } from '../../ui/orientation';
 import { ensureStyles } from '../../ui/dom';
-import { DrillSim } from '../league/drill';
+import { LiveSim } from '../league/live';
 import { LabController, labHash, parseLabHash, type LabParams } from './controller';
 import { LabPanel } from './panel';
 import { LabScene, type LabSceneData } from './scene';
@@ -46,7 +46,7 @@ export function bootLab(): void {
   const start = (params: LabParams): void => {
     const home = labSheet(params.home);
     const away = labSheet(params.away);
-    const ctrl = new LabController((h, a, seed) => new DrillSim(labSheet(h), labSheet(a), seed), params);
+    const ctrl = new LabController((h, a, seed) => new LiveSim(labSheet(h), labSheet(a), seed), params);
     const data: LabSceneData = { home, away, controller: ctrl };
     panel?.destroy();
     panel = new LabPanel(ctrl, LAB_CLUBS, { restart: start, notify });
