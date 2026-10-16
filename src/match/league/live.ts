@@ -19,8 +19,8 @@ import { FIELD_LENGTH, MID_Y, clampToGround, inGoal } from '../core/field';
 import { arrive, integrate, makeBody, maxSpeedFor, separate, speedOf, type Body } from '../core/body';
 import { CARRY_LIFT, flightAt, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
 import type { PlayerSnap, Side, SimEvent, Snapshot } from '../core/snapshot';
-import { add, clamp, dist, scale, type Vec } from '../core/vec';
-import { AVERAGE, resolveContest, type ContestStats } from './contest';
+import { add, clamp, dist, dot, norm, scale, sub, type Vec } from '../core/vec';
+import { AVERAGE, angleFrom, interceptChance, knockOnChance, resolveContest, stepChance, type ContestStats, type Situation } from './contest';
 import { FULLBACK, HOOKER, KICKER, PLAYERS, ROLES, formationTarget } from './roles';
 import { gapTarget, intercept, kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate } from './tactics';
 
@@ -70,8 +70,17 @@ const OFFLOAD_M = 5;
 const RUN_IT_M = 22;
 /** Loose ball picked up within this reach. */
 const PICKUP_M = 0.9;
-/** Base chance a pass is spilled (skill lowers it). */
-const ERROR_RATE = 0.045;
+/** A defender this close to a receiver makes the catch a pressured one. */
+const PRESSURE_M = 2;
+/** A lone defender this close can be stepped (checked once per defender). */
+const STEP_RANGE = 2.6;
+/** Another defender within this of the carrier makes it a two-man tackle. */
+const SECOND_MAN_M = 3.5;
+/** A defender this close to the pass line can pick it off. */
+const LANE_M = 1.5;
+/** A step jinks the carrier this far sideways, over this many ticks. */
+const STEP_JINK_M = 1.6;
+const STEP_JINK_TICKS = 4;
 
 interface Stats extends ContestStats {}
 
@@ -99,6 +108,10 @@ interface Player {
   catchTick: number;
   /** Already chose pass-or-carry for this possession (decided once, at engagement). */
   decided: boolean;
+  /** Defender index this carrier has already tried to step this possession. */
+  steppedOn: number;
+  /** A sidestep in progress: lateral metres still to cover, over this many ticks. */
+  jink: { dy: number; ticks: number } | null;
   target: Vec;
   through: boolean;
 }
@@ -186,6 +199,8 @@ export class LiveSim implements MatchSim {
         burstUntil: 0,
         catchTick: 0,
         decided: false,
+        steppedOn: -1,
+        jink: null,
         target: { x: 50, y: MID_Y },
         through: false,
       };
@@ -282,7 +297,8 @@ export class LiveSim implements MatchSim {
         this.looseFor = null;
         return;
       }
-      if (b.via === 'pass' && this.rng.next() < ERROR_RATE * (1.3 - r.stats.skill / 100)) {
+      const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < PRESSURE_M);
+      if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.skill, pressured)) {
         // Spilled: the ball squirts forward and the defence takes over.
         this.emit('error', `${r.name} spills it — knock-on`, r);
         this.ball = { kind: 'loose', pos: add(b.to, scale({ x: this.dir, y: 0 }, 1.5)), vel: { x: 0, y: 0 } };
@@ -293,6 +309,13 @@ export class LiveSim implements MatchSim {
       this.ball = { kind: 'held', by: b.receiver as number };
       r.catchTick = this.tick;
       r.decided = false;
+      r.steppedOn = -1;
+      if (b.via === 'pass' && r.side !== this.attacking) {
+        this.emit('intercept', `${r.name} picks it off!`, r);
+        this.turnover();
+        r.burstUntil = this.tick + BURST_TICKS;
+        return;
+      }
       if (b.via === 'kick') {
         this.lock(r, 'catch', 4);
         this.mark = { ...r.body.pos };
@@ -403,15 +426,60 @@ export class LiveSim implements MatchSim {
       }
     }
 
-    // Contact: a committed defender has reached him.
-    if (this.tick >= h.immuneUntil) {
-      for (const d of committed) {
-        if (dist(d.body.pos, h.body.pos) <= TACKLE_REACH) {
-          this.contest(h, d);
+    if (this.tick < h.immuneUntil) return;
+
+    // One-on-one and the defender is almost on him: try to step (once per defender).
+    if (nearest && nearD <= STEP_RANGE && this.steppedOn(h) !== this.indexOf(nearest)) {
+      const sit = this.situation(h, nearest, committed);
+      if (sit.defenders === 1) {
+        h.steppedOn = this.indexOf(nearest);
+        if (this.rng.next() < stepChance(h.stats, nearest.stats, sit)) {
+          this.sidestep(h, nearest);
           return;
         }
       }
     }
+
+    // Contact: a committed defender has reached him.
+    for (const d of committed) {
+      if (dist(d.body.pos, h.body.pos) <= TACKLE_REACH) {
+        this.contest(h, d, committed);
+        return;
+      }
+    }
+  }
+
+  private steppedOn(h: Player): number {
+    return h.steppedOn;
+  }
+
+  /** The geometry of a contact: numbers, angle, momentum, tackle count, support. */
+  private situation(c: Player, t: Player, committed: readonly Player[]): Situation {
+    const others = committed.filter((d) => d !== t && dist(d.body.pos, c.body.pos) < SECOND_MAN_M).length;
+    const defenders = others >= 2 ? 3 : others === 1 ? 2 : 1;
+    const approach = norm(sub(c.body.pos, t.body.pos)); // the way the tackler is closing
+    const angle = angleFrom(-dot(approach, c.body.heading)); // square when he comes at the carrier's face
+    const support = this.side(c.side).some((p) => p !== c && p.slot !== HOOKER && !this.locked(p) && dist(p.body.pos, c.body.pos) < OFFLOAD_M);
+    return {
+      defenders,
+      angle,
+      speedDiff: speedOf(c.body) - speedOf(t.body),
+      lastTackle: this.lastPlay,
+      carrierFatigue: 0,
+      tacklerFatigue: 0,
+      support,
+    };
+  }
+
+  /** A clean step: the defender grasps air, the carrier jinks past with a burst. */
+  private sidestep(c: Player, t: Player): void {
+    this.emit('step', `${c.name} steps ${t.name}!`, c);
+    const sideways = c.body.pos.y >= t.body.pos.y ? 1 : -1;
+    c.jink = { dy: sideways * STEP_JINK_M, ticks: STEP_JINK_TICKS };
+    this.lock(t, 'tackled', 12, add(t.body.pos, { x: this.dir * 0.8, y: -sideways * 0.6 }));
+    t.cooldownUntil = this.tick + BEATEN_COOLDOWN;
+    c.immuneUntil = this.tick + IMMUNE_TICKS;
+    c.burstUntil = this.tick + BURST_TICKS;
   }
 
   private stepTackle(ph: Extract<Phase, { kind: 'tackle' }>): void {
@@ -505,17 +573,56 @@ export class LiveSim implements MatchSim {
   private pass(from: Player, to: Player): void {
     const flightS = dist(from.body.pos, to.body.pos) / 16;
     const lead = clampToGround(add(to.body.pos, scale(to.body.vel, flightS * 0.8)), 1);
-    this.ball = passFlight(from.body.pos, lead, this.tick, this.indexOf(to));
+    // A defender sitting in the lane may pick it off: the ball then flies to him.
+    const thief = this.laneDefender(from.body.pos, lead, from.side);
+    const cutOut = dist(from.body.pos, lead) > 12;
+    if (thief && this.rng.next() < interceptChance(thief.stats.footyIQ, cutOut)) {
+      this.ball = passFlight(from.body.pos, { ...thief.body.pos }, this.tick, this.indexOf(thief));
+    } else {
+      this.ball = passFlight(from.body.pos, lead, this.tick, this.indexOf(to));
+    }
     from.pose = 'pass';
     from.poseUntil = this.tick + PASS_POSE_TICKS;
     from.catchTick = this.tick;
   }
 
-  private contest(c: Player, t: Player): void {
-    const support = this.side(c.side).some((p) => p !== c && p.slot !== HOOKER && !this.locked(p) && dist(p.body.pos, c.body.pos) < OFFLOAD_M);
-    const outcome = resolveContest(c.stats, t.stats, this.rng.next(), support);
+  /** The defender nearest the pass line and within LANE_M of it, if any. */
+  private laneDefender(from: Vec, to: Vec, side: Side): Player | null {
+    const seg = sub(to, from);
+    const len2 = seg.x * seg.x + seg.y * seg.y;
+    if (len2 < 1) return null;
+    let best: Player | null = null;
+    let bd = LANE_M;
+    for (const d of this.side(other(side))) {
+      if (this.locked(d)) continue;
+      const u = clamp(dot(sub(d.body.pos, from), seg) / len2, 0.15, 0.95);
+      const onLine = add(from, scale(seg, u));
+      const off = dist(d.body.pos, onLine);
+      if (off < bd) {
+        bd = off;
+        best = d;
+      }
+    }
+    return best;
+  }
+
+  private contest(c: Player, t: Player, committed: readonly Player[]): void {
+    const sit = this.situation(c, t, committed);
+    const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit);
     const back = scale({ x: -this.dir, y: 0 }, 1);
     switch (outcome) {
+      case 'strip': {
+        // One-on-one, he rips it free: the tackler is the new carrier.
+        this.emit('strip', `${t.name} strips the ball from ${c.name}!`, t);
+        this.lock(c, 'tackled', 14);
+        this.lock(t, 'tackle', 6);
+        this.ball = { kind: 'held', by: this.indexOf(t) };
+        t.catchTick = this.tick;
+        t.decided = false;
+        t.steppedOn = -1;
+        this.turnover();
+        return;
+      }
       case 'broken':
         this.emit('break-tackle', `${c.name} busts through ${t.name}`, c);
         this.lock(t, 'down', 16, add(t.body.pos, scale(back, -1.2)));
@@ -735,6 +842,11 @@ export class LiveSim implements MatchSim {
       const max = this.tick < p.burstUntil ? p.body.maxSpeed * BURST : p.body.maxSpeed;
       arrive(p.body, p.target, dt, { through: p.through, maxSpeed: max });
       integrate(p.body, dt);
+      if (p.jink) {
+        // The sidestep: a sharp lateral shift spread over a few ticks.
+        p.body.pos = clampToGround(add(p.body.pos, { x: 0, y: p.jink.dy / STEP_JINK_TICKS }), 0.5);
+        if (--p.jink.ticks <= 0) p.jink = null;
+      }
     }
     const bodies = this.players.map((p) => p.body);
     for (let i = 0; i < 2; i++) {

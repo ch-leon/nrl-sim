@@ -3,7 +3,7 @@
 // out in order, the set is five tackles, and it all replays from a seed.
 import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
-import { AVERAGE, carrierEdge, contestOdds, resolveContest } from '../../../src/match/league/contest';
+import { AVERAGE, OPEN, angleFrom, carrierEdge, contestOdds, interceptChance, knockOnChance, resolveContest, stepChance } from '../../../src/match/league/contest';
 import { gapTarget, intercept, kickTarget, kickoffTarget, pickReceiver, supportSpots } from '../../../src/match/league/tactics';
 import { MAX_SPEED, BODY_RADIUS } from '../../../src/match/core/body';
 import { TICK_S, replayTo } from '../../../src/match/core/engine';
@@ -59,24 +59,71 @@ describe('contest', () => {
     expect(carrierEdge({ ...AVERAGE, strength: 90 }, AVERAGE)).toBeGreaterThan(0.7);
     expect(carrierEdge(AVERAGE, { ...AVERAGE, strength: 90, footyIQ: 80 })).toBeLessThan(0.3);
   });
-  it('odds sum to one, most carries are held, no offload without a support', () => {
+  it('odds sum to one, most carries are held, no offload without a support, no strip against two', () => {
     for (const e of [0, 0.3, 0.5, 0.8, 1]) {
-      for (const opt of [true, false]) {
-        const o = contestOdds(e, opt);
-        expect(o.held + o['big-hit'] + o.broken + o.fend + o.offload).toBeCloseTo(1);
-        expect(o.held).toBeGreaterThan(0.45);
-        if (!opt) expect(o.offload).toBe(0);
+      for (const support of [true, false]) {
+        for (const defenders of [1, 2, 3] as const) {
+          const o = contestOdds(e, { ...OPEN, support, defenders });
+          expect(o.held + o['big-hit'] + o.broken + o.fend + o.offload + o.strip).toBeCloseTo(1);
+          expect(o.held).toBeGreaterThan(0.4);
+          if (!support) expect(o.offload).toBe(0);
+          if (defenders > 1) expect(o.strip).toBe(0);
+        }
       }
     }
-    expect(contestOdds(0.9, false).broken).toBeGreaterThan(contestOdds(0.1, false).broken);
-    expect(contestOdds(0.1, false)['big-hit']).toBeGreaterThan(contestOdds(0.9, false)['big-hit']);
+    expect(contestOdds(0.9, OPEN).broken).toBeGreaterThan(contestOdds(0.1, OPEN).broken);
+    expect(contestOdds(0.1, OPEN)['big-hit']).toBeGreaterThan(contestOdds(0.9, OPEN)['big-hit']);
+    // Design-doc baseline at even stats, one-on-one, square.
+    expect(contestOdds(0.5, { ...OPEN, support: true })).toMatchObject({ 'big-hit': 0.1, broken: 0.12, fend: 0.07, offload: 0.09, strip: 0.02 });
+  });
+  it('the situation moves the odds the way the design doc says', () => {
+    const one = contestOdds(0.5, OPEN);
+    const two = contestOdds(0.5, { ...OPEN, defenders: 2 });
+    expect(two.broken).toBeLessThan(one.broken);
+    expect(two['big-hit']).toBeGreaterThan(one['big-hit']);
+    const side = contestOdds(0.5, { ...OPEN, angle: 'side' });
+    expect(side.fend).toBeGreaterThan(one.fend);
+    expect(side['big-hit']).toBeLessThan(one['big-hit']);
+    const behind = contestOdds(0.5, { ...OPEN, angle: 'behind' });
+    expect(behind.broken).toBeGreaterThan(one.broken);
+    expect(behind['big-hit']).toBeLessThan(side['big-hit']);
+    expect(contestOdds(0.5, { ...OPEN, speedDiff: 3 }).broken).toBeCloseTo(one.broken + 0.03);
+    expect(contestOdds(0.5, { ...OPEN, speedDiff: 9 }).broken).toBeCloseTo(one.broken + 0.04); // capped
+    expect(contestOdds(0.5, { ...OPEN, lastTackle: true })['big-hit']).toBeCloseTo(one['big-hit'] + 0.03);
+    const tired = contestOdds(0.5, { ...OPEN, carrierFatigue: 1 });
+    expect(tired.broken).toBeLessThan(one.broken);
+    expect(tired.fend).toBeLessThan(one.fend);
+    const tiredTackler = contestOdds(0.5, { ...OPEN, tacklerFatigue: 1 });
+    expect(tiredTackler['big-hit']).toBeLessThan(one['big-hit']);
+    expect(tiredTackler.broken).toBeGreaterThan(one.broken);
   });
   it('resolves every outcome from the roll, deterministically', () => {
     const seen = new Set<string>();
-    for (let r = 0; r < 1; r += 0.001) seen.add(resolveContest(AVERAGE, AVERAGE, r, true));
-    expect([...seen].sort()).toEqual(['big-hit', 'broken', 'fend', 'held', 'offload']);
-    expect(resolveContest(AVERAGE, AVERAGE, 0.99, true)).toBe('held');
-    expect(resolveContest(AVERAGE, AVERAGE, 0.0, true)).toBe('broken');
+    for (let r = 0; r < 1; r += 0.0005) seen.add(resolveContest(AVERAGE, AVERAGE, r, { ...OPEN, support: true }));
+    expect([...seen].sort()).toEqual(['big-hit', 'broken', 'fend', 'held', 'offload', 'strip']);
+    expect(resolveContest(AVERAGE, AVERAGE, 0.99, OPEN)).toBe('held');
+    expect(resolveContest(AVERAGE, AVERAGE, 0.0, OPEN)).toBe('broken');
+  });
+  it('a step: 10% one-on-one at even stats, more for footwork and from the side, never against two', () => {
+    expect(stepChance(AVERAGE, AVERAGE, OPEN)).toBeCloseTo(0.1);
+    expect(stepChance({ ...AVERAGE, speed: 90, skill: 90 }, AVERAGE, OPEN)).toBeCloseTo(0.3);
+    expect(stepChance(AVERAGE, { ...AVERAGE, strength: 80, footyIQ: 80 }, OPEN)).toBeLessThan(0.1);
+    expect(stepChance(AVERAGE, AVERAGE, { ...OPEN, angle: 'side' })).toBeCloseTo(0.15);
+    expect(stepChance(AVERAGE, AVERAGE, { ...OPEN, angle: 'behind' })).toBeCloseTo(0.05);
+    expect(stepChance(AVERAGE, AVERAGE, { ...OPEN, defenders: 2 })).toBe(0);
+    expect(stepChance(AVERAGE, AVERAGE, { ...OPEN, carrierFatigue: 1 })).toBeCloseTo(0.02);
+    expect(angleFrom(1)).toBe('square');
+    expect(angleFrom(0)).toBe('side');
+    expect(angleFrom(-1)).toBe('behind');
+  });
+  it('passes: knock-ons rise under pressure and in rain; intercepts double for cut-outs', () => {
+    expect(knockOnChance(50, false)).toBeCloseTo(0.04);
+    expect(knockOnChance(50, true)).toBeCloseTo(0.08);
+    expect(knockOnChance(90, false)).toBeLessThan(knockOnChance(30, false));
+    expect(knockOnChance(50, true, true)).toBeCloseTo(0.14);
+    expect(interceptChance(50, false)).toBeCloseTo(0.06);
+    expect(interceptChance(50, true)).toBeCloseTo(0.12);
+    expect(interceptChance(90, false)).toBeGreaterThan(interceptChance(30, false));
   });
 });
 
@@ -210,7 +257,7 @@ describe('LiveSim', () => {
       expect(s.ball.lift).toBeGreaterThanOrEqual(0);
       expect(Number.isFinite(s.ball.x) && Number.isFinite(s.ball.y)).toBe(true);
     });
-    expect(maxLoose).toBeLessThan(3 / TICK_S); // the longest flight is a kick-off
+    expect(maxLoose).toBeLessThan(5 / TICK_S); // a long kick nobody is under + the run to it
   });
 
   it('nobody teleports, overlaps or leaves the ground; speeds stay human', () => {
@@ -253,6 +300,38 @@ describe('LiveSim', () => {
     }
     expect(tries).toBeGreaterThan(0);
     expect(restarted).toBe(true);
+  });
+
+  it('steps, strips and intercepts all happen across seeds, and are announced', () => {
+    const kinds = new Set<string>();
+    for (let seed = 40; seed < 52; seed++) {
+      const { kinds: k } = collect(factory(seed), 180);
+      for (const x of k) kinds.add(x);
+      if (kinds.has('step') && kinds.has('strip') && kinds.has('intercept')) break;
+    }
+    expect(kinds.has('step')).toBe(true);
+    expect(kinds.has('strip')).toBe(true);
+    expect(kinds.has('intercept')).toBe(true);
+  });
+
+  it('a strip or intercept hands the ball over where it happened', () => {
+    let checked = 0;
+    for (let seed = 40; seed < 60 && checked < 2; seed++) {
+      const sim = factory(seed);
+      let prevLabel = '';
+      run(sim, 180, (s) => {
+        const e = s.events.find((x) => x.kind === 'strip' || x.kind === 'intercept');
+        if (e) {
+          // The side that took it now has the ball and the label says so.
+          expect(s.ball.holder?.side).toBe(e.side);
+          expect(s.label.startsWith(e.side === 'home' ? 'H ball' : 'A ball')).toBe(true);
+          expect(prevLabel.startsWith(e.side === 'home' ? 'A ball' : 'H ball')).toBe(true);
+          checked++;
+        }
+        prevLabel = s.label;
+      });
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it('the stronger side scores more over many seeds', () => {
