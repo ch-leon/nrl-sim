@@ -17,7 +17,7 @@ import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { FIELD_LENGTH, MID_Y, clampToGround, inGoal } from '../core/field';
 import { arrive, integrate, makeBody, maxSpeedFor, separate, speedOf, type Body } from '../core/body';
-import { CARRY_LIFT, bounceFlight, flightAt, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
+import { CARRY_LIFT, PASS_SPEED, bounceFlight, flightAt, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
 import type { PlayerSnap, Side, SimEvent, Snapshot } from '../core/snapshot';
 import { add, clamp, dist, dot, norm, scale, sub, type Vec } from '../core/vec';
 import { AVERAGE, angleFrom, interceptChance, knockOnChance, resolveContest, stepChance, type ContestStats, type Situation } from './contest';
@@ -91,6 +91,12 @@ const MARKER_RELEASE_TICKS = 14;
 /** A step jinks the carrier this far sideways, over this many ticks. */
 const STEP_JINK_M = 1.6;
 const STEP_JINK_TICKS = 4;
+/** Carrying the ball costs a little pace: nobody sprints as fast with a footy under the arm. */
+const CARRY_SPEED = 0.95;
+/** A receiver runs through the catch point by this much, not to it, so he takes the ball at pace. */
+const RUN_ON_M = 3;
+/** As the ball is heeled the backline comes up, aiming this far ahead of their standing spots so they are moving when the pass arrives. */
+const RUCK_ADVANCE_M = 3;
 
 interface Stats extends ContestStats {}
 
@@ -148,6 +154,22 @@ interface PendingKick {
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const dirOf = (s: Side): 1 | -1 => (s === 'home' ? 1 : -1);
+
+/**
+ * Forward metres a runner covers in `t` seconds when he steers flat out
+ * downfield from forward speed `v0` (negative: still backing up, so he stops
+ * first), accelerating at `a` up to `vMax`.
+ */
+export function runOn(v0: number, a: number, vMax: number, t: number): number {
+  if (t <= 0) return 0;
+  if (v0 < 0) {
+    const ts = Math.min(t, -v0 / a);
+    return v0 * ts + 0.5 * a * ts * ts + runOn(0, a, vMax, t - ts);
+  }
+  const vEnd = Math.min(vMax, v0 + a * t);
+  const tAcc = Math.max(0, (vEnd - v0) / a);
+  return v0 * tAcc + 0.5 * a * tAcc * tAcc + vEnd * (t - tAcc);
+}
 
 function statsOf(entry: RosterEntry | undefined): Stats {
   const s = entry?.stats;
@@ -329,6 +351,7 @@ export class LiveSim implements MatchSim {
       }
       if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > CATCH_REACH)) {
         // Nobody under it: it comes down and bounces on in the direction it was going.
+        if (b.via === 'pass') this.emit('loose', r ? `${r.name} can't get to the pass — loose ball` : 'The pass goes to ground — loose ball', r);
         const dir = sub(b.to, b.from);
         this.ball = bounceFlight(b.to, dir, this.tick, b.via === 'kick' ? 4 + this.rng.next() * 4 : 2);
         this.looseFor = null;
@@ -623,8 +646,8 @@ export class LiveSim implements MatchSim {
 
   // ── Actions ───────────────────────────────────────────────────────────────
   private pass(from: Player, to: Player, spillExtra = 0): void {
-    const flightS = dist(from.body.pos, to.body.pos) / 16;
-    const lead = clampToGround(add(to.body.pos, scale(to.body.vel, flightS * 0.8)), 1);
+    const flightS = dist(from.body.pos, to.body.pos) / PASS_SPEED;
+    const lead = this.leadPoint(from, to, flightS);
     this.spillExtra = spillExtra;
     this.interceptTrait = undefined;
     // A defender sitting in the lane may pick it off: the ball then flies to him.
@@ -646,6 +669,30 @@ export class LiveSim implements MatchSim {
     from.pose = 'pass';
     from.poseUntil = this.tick + PASS_POSE_TICKS;
     from.catchTick = this.tick;
+  }
+
+  /**
+   * Where to throw it so the receiver takes it on the run: he will accelerate
+   * forward through the catch, so lead him by what he covers in the flight
+   * (current forward speed plus acceleration, capped at his top speed) and
+   * keep his drift. The ball still leaves the hands backward.
+   */
+  private leadPoint(from: Player, to: Player, flightS: number): Vec {
+    const fwd = { x: this.dir, y: 0 };
+    const v0 = dot(to.body.vel, fwd);
+    const vMax = to.body.maxSpeed * CARRY_SPEED;
+    // The lead lengthens the flight, so settle the flight time once more.
+    let t = flightS;
+    let lead = to.body.pos;
+    for (let i = 0; i < 2; i++) {
+      const ahead = runOn(v0, to.body.accel, vMax, t);
+      lead = { x: to.body.pos.x + this.dir * ahead, y: to.body.pos.y + to.body.vel.y * t * 0.8 };
+      t = dist(from.body.pos, lead) / PASS_SPEED;
+    }
+    // Never a forward pass: the catch point stays at least half a metre behind the passer.
+    const behind = from.body.pos.x - this.dir * 0.5;
+    lead.x = this.dir > 0 ? Math.min(lead.x, behind) : Math.max(lead.x, behind);
+    return clampToGround(lead, 1);
   }
 
   /** The defender nearest the pass line and within LANE_M of it, if any. */
@@ -872,9 +919,20 @@ export class LiveSim implements MatchSim {
           p.through = true;
         } else p.target = { ...p.body.pos };
       } else if (p === receiver) {
-        p.target = { ...flight!.to };
+        // A pass thrown in front of him is run onto, through the catch point;
+        // one at or behind him (or a kick) he checks and gets under.
+        const onto = flight!.via === 'pass' && (flight!.to.x - p.body.pos.x) * this.dir > 0.5;
+        p.target = onto ? clampToGround(add(flight!.to, { x: this.dir * RUN_ON_M, y: 0 }), 1) : { ...flight!.to };
+        p.through = onto;
       } else if (p.slot === HOOKER && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
+      } else if (ph.kind === 'ruck' && ph.stage === 'dh' && !this.locked(p)) {
+        // The ball is heeled: the backline comes onto it, so the first receiver
+        // hits the pass at pace instead of standing flat-footed. The forwards
+        // standing close to the ruck keep enough depth to stay a pass option.
+        const spot = formationTarget(role, anchor, this.dir, true);
+        const advance = Math.max(0, Math.min(RUCK_ADVANCE_M, role.atk - 3));
+        p.target = clampToGround({ x: spot.x + this.dir * advance, y: spot.y }, 1);
       } else if (supports.includes(p)) {
         const s = spots[supports.indexOf(p) as 0 | 1];
         // Take the side he's already on.
@@ -946,6 +1004,7 @@ export class LiveSim implements MatchSim {
       }
       p.slide = null;
       let max = this.tick < p.burstUntil ? p.body.maxSpeed * BURST : p.body.maxSpeed;
+      if (p === h) max *= CARRY_SPEED;
       if (kickChase && p.side !== this.attacking) max *= speedMult(p.traits, 'jets');
       if (lineBroken && p.side !== this.attacking) max *= speedMult(p.traits, 'lastLine');
       arrive(p.body, p.target, dt, { through: p.through, maxSpeed: max });

@@ -147,6 +147,14 @@ Completion by passer Skill and pressure (defender inside 2 m when thrown): base 
 within 1.5 m of the pass line has 6% (+trait) to pick it off — shown and often a try.
 Cut-out passes (Playmaker) skip a receiver: higher reward, 2× intercept exposure.
 
+**On the move** (lab feedback round 2). A pass is thrown to where the receiver will be,
+allowing for his run-up (current forward speed, then acceleration to top speed, over
+the flight), never ahead of the passer; he runs *through* the catch point rather than
+stopping under it, and checks back only when the ball is at or behind him. As the ball
+is heeled at a ruck the backline comes up onto it (3 m ahead of their standing spots,
+less for the forwards close to the ruck) so the first receiver takes it at ~2.5 m/s,
+not standing. Carrying the ball costs 5% of top speed.
+
 ### 4.3 Catch (kicks)
 Catcher under a bomb: Skill vs the chasers' pressure. Clean take 85% unpressured, 65%
 with a chaser inside 2 m, −10% rain. A drop is a scramble for the loose ball.
