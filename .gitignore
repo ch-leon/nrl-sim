@@ -6,3 +6,6 @@ dist
 # per ARCHITECTURE §4 no binary assets are committed. (BAK-204)
 public/icons/
 .claude/*.lock
+# Balance experiment runs (balance/README.md) live on the balance-log branch, not main.
+balance/runs/
+.balance-log/

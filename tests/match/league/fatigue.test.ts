@@ -5,10 +5,10 @@
 import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import {
-  LEGS_ENERGY, RECOVER_STOP, RECOVER_WALK, RUN_COST, SPENT_SPEED, TIRED_SPEED, afterRun, drainRate, isLegs, legsSpeed, tiredness,
+  FATIGUE, LEGS_ENERGY, afterRun, drainRate, isLegs, legsSpeed, tiredness,
 } from '../../../src/match/league/fatigue';
 import {
-  GRIP_BASE, JOIN_GRIP, RUCK_QUICK_TICKS, RUCK_SLOW_TICKS, WRESTLE_MAX_S, drainOf, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState,
+  WRESTLE, drainOf, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState,
 } from '../../../src/match/league/wrestle';
 import { AVERAGE, OPEN, contestOdds, stepChance } from '../../../src/match/league/contest';
 import type { TeamSheet } from '../../../src/sim/events';
@@ -55,8 +55,8 @@ describe('legs (pure)', () => {
     expect(tiredness(0.39)).toBe(0.5);
     expect(tiredness(0.19)).toBe(1);
     expect(legsSpeed(0.8)).toBe(1);
-    expect(legsSpeed(0.3)).toBe(TIRED_SPEED);
-    expect(legsSpeed(0.1)).toBe(SPENT_SPEED);
+    expect(legsSpeed(0.3)).toBe(FATIGUE.tiredSpeed);
+    expect(legsSpeed(0.1)).toBe(FATIGUE.spentSpeed);
     const fresh = contestOdds(0.5, { ...OPEN, support: true });
     const tired = contestOdds(0.5, { ...OPEN, support: true, carrierFatigue: tiredness(0.3) });
     const spent = contestOdds(0.5, { ...OPEN, support: true, carrierFatigue: tiredness(0.1) });
@@ -67,10 +67,10 @@ describe('legs (pure)', () => {
     expect(stepChance(AVERAGE, AVERAGE, { ...OPEN, carrierFatigue: 1 })).toBeLessThan(stepChance(AVERAGE, AVERAGE, OPEN));
   });
   it('running drains, standing and stoppages bring a little back, always within 0..1', () => {
-    expect(afterRun(1, 100, 1, 0.05, 'no')).toBeCloseTo(1 - 100 * RUN_COST);
-    expect(afterRun(0.5, 0, 1, 1, 'walk')).toBeCloseTo(0.5 + RECOVER_WALK);
-    expect(afterRun(0.5, 0, 1, 1, 'stop')).toBeCloseTo(0.5 + RECOVER_STOP);
-    expect(RECOVER_STOP).toBeGreaterThan(RECOVER_WALK);
+    expect(afterRun(1, 100, 1, 0.05, 'no')).toBeCloseTo(1 - 100 * FATIGUE.runCost);
+    expect(afterRun(0.5, 0, 1, 1, 'walk')).toBeCloseTo(0.5 + FATIGUE.recoverWalk);
+    expect(afterRun(0.5, 0, 1, 1, 'stop')).toBeCloseTo(0.5 + FATIGUE.recoverStop);
+    expect(FATIGUE.recoverStop).toBeGreaterThan(FATIGUE.recoverWalk);
     expect(afterRun(0.001, 1000, 1, 0.05, 'no')).toBe(0);
     expect(afterRun(1, 0, 1, 10, 'stop')).toBe(1);
   });
@@ -89,7 +89,7 @@ describe('the wrestle (pure)', () => {
     expect(fightOf({ ...AVG, stamina: 85 }, 1, 0.5)).toBeGreaterThan(fightOf(AVG, 1, 0.5));
     expect(fightOf(AVG, 0.2, 0.5)).toBeLessThan(fightOf(AVG, 1, 0.5));
     expect(fightOf(AVG, 1, 0.99)).toBeGreaterThan(fightOf(AVG, 1, 0));
-    expect(fightOf(AVG, 1, 0.5)).toBeLessThan(GRIP_BASE); // an even, fresh one-on-one is usually held
+    expect(fightOf(AVG, 1, 0.5)).toBeLessThan(WRESTLE.gripBase); // an even, fresh one-on-one is usually held
   });
   it('a second and third man drain it much faster; a tired tackler holds and grips less', () => {
     expect(drainOf([1, 1])).toBeGreaterThan(2 * drainOf([1]));
@@ -97,9 +97,9 @@ describe('the wrestle (pure)', () => {
     expect(drainOf([])).toBe(0);
     expect(holdOf(AVERAGE, 0.2)).toBeLessThan(holdOf(AVERAGE, 1));
     expect(holdOf({ ...AVERAGE, strength: 85 }, 1)).toBeGreaterThan(holdOf(AVERAGE, 1));
-    expect(gripOf(AVERAGE, 1, true)).toBeCloseTo(GRIP_BASE);
-    expect(gripOf(AVERAGE, 1, false)).toBeCloseTo(JOIN_GRIP);
-    expect(gripOf(AVERAGE, 0.1, true)).toBeLessThan(GRIP_BASE);
+    expect(gripOf(AVERAGE, 1, true)).toBeCloseTo(WRESTLE.gripBase);
+    expect(gripOf(AVERAGE, 1, false)).toBeCloseTo(WRESTLE.joinGrip);
+    expect(gripOf(AVERAGE, 0.1, true)).toBeLessThan(WRESTLE.gripBase);
   });
   it('he drives on while the fight lasts, less with more men on him', () => {
     expect(driveSpeed(1, 1)).toBeGreaterThan(driveSpeed(0.3, 1));
@@ -117,11 +117,11 @@ describe('the wrestle (pure)', () => {
     for (let i = 0; i < 40 && !end; i++) end = wrestleTick(free, [1], 0.05, i * 0.05);
     expect(end).toBe('free');
     expect(free.fight).toBeGreaterThan(0);
-    expect(wrestleTick(w(99, 99), [0.3], 0.05, WRESTLE_MAX_S)).toBe('held');
+    expect(wrestleTick(w(99, 99), [0.3], 0.05, WRESTLE.wrestleMaxS)).toBe('held');
   });
   it('the wrestle sets the ruck: quick wrestle, quick play-the-ball; long one, the defence sets', () => {
-    expect(ruckTicks(0.1)).toBe(RUCK_QUICK_TICKS);
-    expect(ruckTicks(5)).toBe(RUCK_SLOW_TICKS);
+    expect(ruckTicks(0.1)).toBe(WRESTLE.ruckQuickTicks);
+    expect(ruckTicks(5)).toBe(WRESTLE.ruckSlowTicks);
     expect(ruckTicks(0.8)).toBeGreaterThan(ruckTicks(0.4));
     expect(ruckTicks(1.1)).toBeGreaterThan(ruckTicks(0.8));
   });

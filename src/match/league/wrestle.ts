@@ -7,69 +7,72 @@
 // live.ts runs the clock and moves the bodies.
 import type { ContestStats } from './contest';
 
-/** Seconds an average fresh carrier lasts against one average fresh tackler (before the roll). */
-export const FIGHT_BASE = 1.1;
-/** The opening roll scales his fight by 0.75 … 1.25. */
-export const FIGHT_SPREAD = 0.5;
-/** A spent carrier has half the fight of a fresh one. */
-export const FIGHT_LEGS = 0.5;
-/** Seconds the first tackler can hang on; each joiner adds this much more. */
-export const GRIP_BASE = 1.3;
-export const JOIN_GRIP = 0.35;
-/** A tired tackler drains less: 40% less when spent. */
-export const HOLD_LEGS = 0.4;
-/** Summed drain × this for one, two, three men in the tackle. */
-export const GANG = [1, 1.5, 2] as const;
-/** At most this many in a tackle. */
-export const MAX_MEN = 3;
-/** Metres per second the carrier drives forward at full fight against one man (÷ men). */
-export const DRIVE_SPEED = 1.5;
-/** No wrestle runs longer than this (seconds): he is held. */
-export const WRESTLE_MAX_S = 3;
-/** Play-the-ball: the "down" beat runs from QUICK ticks (wrestle ≤ QUICK_S) to SLOW ticks (≥ SLOW_S). */
-export const RUCK_QUICK_TICKS = 5;
-export const RUCK_SLOW_TICKS = 18;
-export const QUICK_S = 0.35;
-export const SLOW_S = 1.2;
-/** A Wrecking Ball's fight per level multiplier (the DRIVE! in the tackle). */
-export const WRECK_FIGHT = 0.3;
+/** The wrestle knobs (BAK-208 §8.1; tuning reference §11). Overridable by name in balance experiments (tuning.ts). */
+export const WRESTLE = {
+  /** Seconds an average fresh carrier lasts against one average fresh tackler (before the roll). */
+  fightBase: 1.1,
+  /** The opening roll scales his fight by 0.75 … 1.25. */
+  fightSpread: 0.5,
+  /** A spent carrier has half the fight of a fresh one. */
+  fightLegs: 0.5,
+  /** Seconds the first tackler can hang on; each joiner adds this much more. */
+  gripBase: 1.3,
+  joinGrip: 0.35,
+  /** A tired tackler drains less: 40% less when spent. */
+  holdLegs: 0.4,
+  /** Summed drain × this for one, two, three men in the tackle. */
+  gang: [1, 1.5, 2],
+  /** At most this many in a tackle. */
+  maxMen: 3,
+  /** Metres per second the carrier drives forward at full fight against one man (÷ men). */
+  driveSpeed: 1.5,
+  /** No wrestle runs longer than this (seconds): he is held. */
+  wrestleMaxS: 3,
+  /** Play-the-ball: the "down" beat runs from QUICK ticks (wrestle ≤ QUICK_S) to SLOW ticks (≥ SLOW_S). */
+  ruckQuickTicks: 5,
+  ruckSlowTicks: 18,
+  quickS: 0.35,
+  slowS: 1.2,
+  /** A Wrecking Ball's fight per level multiplier (the DRIVE! in the tackle). */
+  wreckFight: 0.3,
+};
 
 /** The carrier's fight in seconds-against-one-man: stats, legs, and the opening roll in [0, 1). */
 export function fightOf(s: ContestStats & { stamina: number }, energy: number, roll: number): number {
   const stat = 1 + (s.strength - 50) / 120 + (s.stamina - 50) / 240;
-  const legs = 1 - FIGHT_LEGS * (1 - Math.max(0, Math.min(1, energy)));
-  return Math.max(0.2, FIGHT_BASE * stat * legs * (1 - FIGHT_SPREAD / 2 + FIGHT_SPREAD * roll));
+  const legs = 1 - WRESTLE.fightLegs * (1 - Math.max(0, Math.min(1, energy)));
+  return Math.max(0.2, WRESTLE.fightBase * stat * legs * (1 - WRESTLE.fightSpread / 2 + WRESTLE.fightSpread * roll));
 }
 
 /** How hard one tackler drains the fight per second (1 = average, fresh). */
 export function holdOf(s: ContestStats, energy: number): number {
   const stat = 1 + (s.strength - 50) / 120;
-  return Math.max(0.3, stat * (1 - HOLD_LEGS * (1 - Math.max(0, Math.min(1, energy)))));
+  return Math.max(0.3, stat * (1 - WRESTLE.holdLegs * (1 - Math.max(0, Math.min(1, energy)))));
 }
 
-/** Seconds of grip a tackler brings: the first man GRIP_BASE, a joiner JOIN_GRIP, by Strength and IQ. */
+/** Seconds of grip a tackler brings: the first man WRESTLE.gripBase, a joiner WRESTLE.joinGrip, by Strength and IQ. */
 export function gripOf(s: ContestStats, energy: number, first: boolean): number {
   const stat = 1 + (s.strength - 50) / 150 + (s.footyIQ - 50) / 300;
-  const legs = 1 - HOLD_LEGS * (1 - Math.max(0, Math.min(1, energy)));
-  return Math.max(0.2, (first ? GRIP_BASE : JOIN_GRIP) * stat * legs);
+  const legs = 1 - WRESTLE.holdLegs * (1 - Math.max(0, Math.min(1, energy)));
+  return Math.max(0.2, (first ? WRESTLE.gripBase : WRESTLE.joinGrip) * stat * legs);
 }
 
 /** Fight drained per second by the men in the tackle (their holds summed, × the gang factor). */
 export function drainOf(holds: readonly number[]): number {
   if (holds.length === 0) return 0;
   const sum = holds.reduce((a, b) => a + b, 0);
-  return sum * GANG[Math.min(MAX_MEN, holds.length) - 1]!;
+  return sum * WRESTLE.gang[Math.min(WRESTLE.maxMen, holds.length) - 1]!;
 }
 
 /** Metres per second he drives forward with `frac` of his fight left against `men` tacklers. */
 export function driveSpeed(frac: number, men: number): number {
-  return (DRIVE_SPEED * Math.max(0, Math.min(1, frac))) / Math.max(1, men);
+  return (WRESTLE.driveSpeed * Math.max(0, Math.min(1, frac))) / Math.max(1, men);
 }
 
 /** Ticks on the ground before the play-the-ball: a quick wrestle is a quick ruck, a long one lets the defence set. */
 export function ruckTicks(wrestleS: number): number {
-  const u = Math.max(0, Math.min(1, (wrestleS - QUICK_S) / (SLOW_S - QUICK_S)));
-  return Math.round(RUCK_QUICK_TICKS + (RUCK_SLOW_TICKS - RUCK_QUICK_TICKS) * u);
+  const u = Math.max(0, Math.min(1, (wrestleS - WRESTLE.quickS) / (WRESTLE.slowS - WRESTLE.quickS)));
+  return Math.round(WRESTLE.ruckQuickTicks + (WRESTLE.ruckSlowTicks - WRESTLE.ruckQuickTicks) * u);
 }
 
 export interface WrestleState {
@@ -95,7 +98,7 @@ export type WrestleEnd = 'held' | 'free' | null;
 export function wrestleTick(w: WrestleState, holds: readonly number[], dt: number, elapsedS: number): WrestleEnd {
   w.fight = Math.max(0, w.fight - drainOf(holds) * dt);
   w.grip -= dt;
-  if (w.fight <= 0 || elapsedS >= WRESTLE_MAX_S) return 'held';
+  if (w.fight <= 0 || elapsedS >= WRESTLE.wrestleMaxS) return 'held';
   if (w.grip <= 0) return 'free';
   return null;
 }

@@ -1,0 +1,211 @@
+// src/match/balance/measure.ts — play one cell of an experiment (a variant on
+// a scenario) over its seeds, headless, and count what happened per match.
+// Counts are normalised to a full 18-minute Nines match so they read against
+// the §7 balance targets whatever length the plan runs.
+import type { RosterEntry, TeamSheet } from '../../sim/events';
+import { TICK_S } from '../core/engine';
+import type { SimEvent } from '../core/snapshot';
+import { LEGS_ENERGY } from '../league/fatigue';
+import { LiveSim } from '../league/live';
+import { DEFAULT_TACTICS } from '../league/presets';
+import { applyTuning } from '../league/tuning';
+import { labSheet, starTraits } from '../lab/sheets';
+import type { Cell, SideSpec } from './plan';
+
+export const MATCH_MINUTES = 18;
+const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
+
+/** Count metrics, per 18-minute match. */
+export const COUNTS = [
+  'tackles', 'bigHits', 'busts', 'lateBusts', 'fends', 'steps', 'breaks', 'offloads', 'errors', 'kicks', 'tries',
+  'intercepts', 'strips', 'quickPtb', 'slowPtb', 'gassed', 'wrestles', 'held1', 'held2', 'held3',
+] as const;
+export type CountKey = (typeof COUNTS)[number];
+
+export interface Stat {
+  mean: number;
+  /** Standard error of the mean over the seeds (how much of a difference is just luck). */
+  se: number;
+}
+
+export interface CellResult {
+  variant: string;
+  scenario: string;
+  tuning: Record<string, number>;
+  seeds: number;
+  minutes: number;
+  counts: Record<CountKey, Stat>;
+  /** Mean wrestle length, seconds. */
+  wrestleSecs: number;
+  /** Home side's share of matches won / drawn on tries. */
+  homeWin: number;
+  draw: number;
+  /** Average legs (0..1) per side at each 3-minute mark the match reaches. */
+  legs: { minute: number; home: number; away: number }[];
+  /** Wall-clock seconds this cell took. */
+  ms: number;
+}
+
+/** A team sheet for one side of a scenario. */
+export function sideSheet(id: string, spec: SideSpec): TeamSheet {
+  const tactics = { ...DEFAULT_TACTICS, ...(spec.tactics ?? {}) };
+  if (spec.club) {
+    const s = labSheet(spec.club, spec.traits ?? 'gen', spec.tactics ?? {});
+    return { ...s, clubId: `${s.clubId}:${id}` };
+  }
+  const r = spec.rating ?? 60;
+  const roster: RosterEntry[] = POSITIONS.map((position, i) => {
+    const entry: RosterEntry = {
+      name: `${id} ${position} ${i}`,
+      position,
+      stats: { speed: r, strength: r, stamina: r, skill: r, footyIQ: r, ...(spec.stats ?? {}) },
+    };
+    if (spec.traits === 'stars') entry.traits = starTraits(position, `${id}:${i}`);
+    return entry;
+  });
+  return { clubId: id, name: id, attack: r, defense: r, kicking: r, fitness: r, colors: ['#111', '#eee'], roster, tactics };
+}
+
+const LATE = (e: SimEvent): boolean => e.kind === 'break-tackle' && e.detail === 'wrestle';
+
+/** Per-match counts from one match's events. */
+function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
+  const c = Object.fromEntries(COUNTS.map((k) => [k, 0])) as Record<CountKey, number>;
+  for (const e of es) {
+    switch (e.kind) {
+      case 'tackle':
+        c.tackles++;
+        break;
+      case 'big-hit':
+        c.tackles++;
+        c.bigHits++;
+        break;
+      case 'break-tackle':
+        if (LATE(e)) c.lateBusts++;
+        else c.busts++;
+        c.breaks++;
+        break;
+      case 'fend':
+        c.fends++;
+        c.breaks++;
+        break;
+      case 'step':
+        c.steps++;
+        c.breaks++;
+        break;
+      case 'offload':
+        c.offloads++;
+        break;
+      case 'error':
+      case 'drop':
+        c.errors++;
+        break;
+      case 'kick':
+        c.kicks++;
+        break;
+      case 'try':
+        c.tries++;
+        break;
+      case 'intercept':
+        c.intercepts++;
+        break;
+      case 'strip':
+        c.strips++;
+        break;
+      case 'quick-ptb':
+        c.quickPtb++;
+        break;
+      case 'slow-ptb':
+        c.slowPtb++;
+        break;
+      case 'gassed':
+        c.gassed++;
+        break;
+      default:
+        break;
+    }
+  }
+  return c;
+}
+
+function stat(xs: readonly number[]): Stat {
+  const n = xs.length;
+  const mean = xs.reduce((a, b) => a + b, 0) / n;
+  const varc = n > 1 ? xs.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1) : 0;
+  return { mean, se: Math.sqrt(varc / n) };
+}
+
+/** Play one cell: apply its tuning, run every seed, put the knobs back. A scenario's own `minutes` wins over the plan's. */
+export function measureCell(cell: Cell, seeds: number, planMinutes: number, seedStart = 1): CellResult {
+  const t0 = Date.now();
+  const minutes = cell.scenario.minutes ?? planMinutes;
+  const restore = applyTuning(cell.variant.tuning ?? {});
+  try {
+    const scale = MATCH_MINUTES / minutes;
+    const ticks = Math.round((minutes * 60) / TICK_S);
+    const perTick = Math.round(180 / TICK_S); // a legs reading every 3 minutes
+    const legsAt = cell.scenario.legs === undefined ? 1 : typeof cell.scenario.legs === 'number' ? cell.scenario.legs : LEGS_ENERGY[cell.scenario.legs];
+    const home = sideSheet('H', cell.scenario.home);
+    const away = sideSheet('A', cell.scenario.away);
+    const perSeed: Record<CountKey, number>[] = [];
+    let wrestleTicks = 0;
+    let wrestleCount = 0;
+    let wins = 0;
+    let draws = 0;
+    const legSum = new Map<number, { home: number; away: number }>();
+    for (let s = seedStart; s < seedStart + seeds; s++) {
+      const sim = new LiveSim(home, away, s, { energy: legsAt });
+      const events: SimEvent[] = [];
+      const held = [0, 0, 0, 0];
+      let inW = 0;
+      let lastMen = 0;
+      for (let i = 1; i <= ticks; i++) {
+        sim.step();
+        const snap = sim.snapshot();
+        if (snap.events.length) events.push(...snap.events);
+        if (snap.wrestle) {
+          inW++;
+          lastMen = snap.wrestle.men;
+        } else if (inW > 0) {
+          wrestleTicks += inW;
+          wrestleCount++;
+          if (snap.events.some((e) => e.kind === 'tackle')) held[Math.min(3, lastMen)]!++;
+          inW = 0;
+        }
+        if (i % perTick === 0) {
+          const m = (i * TICK_S) / 60;
+          const acc = legSum.get(m) ?? { home: 0, away: 0 };
+          acc.home += sim.energyOf('home');
+          acc.away += sim.energyOf('away');
+          legSum.set(m, acc);
+        }
+      }
+      const c = countEvents(events);
+      c.wrestles = wrestleCount;
+      c.held1 = held[1]!;
+      c.held2 = held[2]!;
+      c.held3 = held[3]!;
+      wrestleCount = 0;
+      perSeed.push(c);
+      if (sim.tries.home > sim.tries.away) wins++;
+      else if (sim.tries.home === sim.tries.away) draws++;
+    }
+    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * scale))])) as Record<CountKey, Stat>;
+    const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
+    return {
+      variant: cell.variant.name,
+      scenario: cell.scenario.name,
+      tuning: { ...(cell.variant.tuning ?? {}) },
+      seeds,
+      minutes,
+      counts,
+      wrestleSecs: totalWrestles ? (wrestleTicks * TICK_S) / totalWrestles : 0,
+      homeWin: wins / seeds,
+      draw: draws / seeds,
+      legs: [...legSum.entries()].map(([minute, v]) => ({ minute, home: v.home / seeds, away: v.away / seeds })),
+      ms: Date.now() - t0,
+    };
+  } finally {
+    restore();
+  }
+}

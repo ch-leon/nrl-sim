@@ -31,95 +31,106 @@ import {
 import { DEFAULT_TACTICS, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type TeamTactics } from './presets';
 import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
 import { traitBoost, type TraitInstance } from '../../data/traits';
-import { CONTACT_COST, GASSED_RESET, SPENT_AT, WALK_SPEED, WRESTLE_COST, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
-import { MAX_MEN, QUICK_S, SLOW_S, WRECK_FIGHT, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
+import { FATIGUE, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
+import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
 
-// ── Timing (ticks at 20 Hz) ──────────────────────────────────────────────────
-const CONTACT_TICKS = 9;
-const DOWN_TICKS = 10;
-const PTB_TICKS = 11;
-const ROLL_TICKS = 4;
-const DH_HOLD_TICKS = 6;
-const TRY_TICKS = 50;
-/** A kick-off waits for everyone to be set, at least this long and at most RESTART_MAX. */
-const RESTART_TICKS = 40;
-const RESTART_MAX_TICKS = 280;
-/** A receiver must be this close to where a pass comes down to take it; a high ball gives him a little longer to get under it. */
-const CATCH_REACH = 1.8;
-const KICK_CATCH_REACH = 2.5;
-/** On the last tackle the defending fullback drops this far behind his line, where the kick will land. */
-const FULLBACK_DEEP_M = 16;
-const FULLBACK_LAST_M = 24;
-/** After a pass or catch, no new pass for this long. */
-const PASS_COOLDOWN = 12;
-/** A tackled carrier can't be the next receiver for this long after his ptb. */
-const BUSY_AFTER_PTB = 24;
-/** Breaking a tackle gives a burst of pace (a Jets player keeps it for 3 s). */
-const BURST_TICKS = 16;
-const JETS_BURST_TICKS = 60;
-const BURST = 1.15;
-/** A Wrecking Ball held in the tackle keeps his legs pumping this often per level (more fight in the wrestle, wrestle.ts). */
-const WRECK_DRIVE_CHANCE = 0.3;
-/** A Playmaker's cut-out reach grows this much per level over the normal pass width, and he minds width less. */
-const CUT_OUT_PER_LEVEL_M = 4;
-const PLAYMAKER_WIDTH = 0.25;
-/** …and this often per level he throws the cut-out ball to the widest man he can reach. */
-const CUT_OUT_CHANCE = 0.15;
-/** After beating a tackler the carrier can't be hit again for this long. */
-const IMMUNE_TICKS = 8;
-/** A beaten tackler sits out this long before committing again. */
-const BEATEN_COOLDOWN = 30;
-/** The kicker runs this long with the ball before putting boot to it. */
-const KICK_RUN_TICKS = 14;
-const KICK_LOCK_TICKS = 8;
-const KICK_CONTACT_TICKS = 3;
-const PASS_POSE_TICKS = 5;
+// ── Tuning ─────────────────────────────────────────────────────────────────
+/**
+ * The live sim's knobs (tuning reference §2–§6). Ticks are 20 Hz, distances
+ * metres. Overridable by name in balance experiments (tuning.ts).
+ */
+export const LIVE = {
+  // Timing (ticks)
+  contactTicks: 9,
+  downTicks: 10,
+  ptbTicks: 11,
+  rollTicks: 4,
+  dhHoldTicks: 6,
+  tryTicks: 50,
+  /** A kick-off waits for everyone to be set, at least this long and at most RESTART_MAX. */
+  restartTicks: 40,
+  restartMaxTicks: 280,
+  /** A receiver must be this close to where a pass comes down to take it; a high ball gives him a little longer to get under it. */
+  catchReach: 1.8,
+  kickCatchReach: 2.5,
+  /** On the last tackle the defending fullback drops this far behind his line, where the kick will land. */
+  fullbackDeepM: 16,
+  fullbackLastM: 24,
+  /** After a pass or catch, no new pass for this long. */
+  passCooldown: 12,
+  /** A tackled carrier can't be the next receiver for this long after his ptb. */
+  busyAfterPtb: 24,
+  /** Breaking a tackle gives a burst of pace (a Jets player keeps it for 3 s). */
+  burstTicks: 16,
+  jetsBurstTicks: 60,
+  burst: 1.15,
+  /** A Wrecking Ball held in the tackle keeps his legs pumping this often per level (more fight in the wrestle, wrestle.ts). */
+  wreckDriveChance: 0.3,
+  /** A Playmaker's cut-out reach grows this much per level over the normal pass width, and he minds width less. */
+  cutOutPerLevelM: 4,
+  playmakerWidth: 0.25,
+  /** …and this often per level he throws the cut-out ball to the widest man he can reach. */
+  cutOutChance: 0.15,
+  /** After beating a tackler the carrier can't be hit again for this long. */
+  immuneTicks: 8,
+  /** A beaten tackler sits out this long before committing again. */
+  beatenCooldown: 30,
+  /** The kicker runs this long with the ball before putting boot to it. */
+  kickRunTicks: 14,
+  kickLockTicks: 8,
+  kickContactTicks: 3,
+  passPoseTicks: 5,
 
-// ── Distances (metres) ───────────────────────────────────────────────────────
-/** A free defender this close to a wrestle comes in to help (and joins it on reaching the carrier). */
-const JOIN_M = 6;
-/** Carrier starts deciding (pass / into contact) with a defender this close. */
-const ENGAGE_M = 4.5;
-/** A defender this close to the carrier makes the tackle. */
-const TACKLE_REACH = 1.2;
-/** The defensive line stands this far off the ruck. */
-const ONSIDE_M = 10;
-/** A big hit drives the carrier back this far. */
-const DRIVE_BACK = 2.5;
-/** A support runner this close can take an offload. */
-const OFFLOAD_M = 5;
-/** Chance a catcher spills a kick: alone, and with a chaser inside PRESSURE_M (less by Skill). */
-const DROP_CHANCE = 0.06;
-const DROP_PRESSURED = 0.18;
-/** Kick chasers this far from the landing point still run flat out at it. */
-const CHASE_THROUGH_M = 2;
-/** On the second-last tackle inside this, the kicker goes early this often (grubber or chip). */
-const EARLY_KICK_M = 25;
-/** Loose ball picked up within this reach. */
-const PICKUP_M = 0.9;
-/** A defender this close to a receiver makes the catch a pressured one. */
-const PRESSURE_M = 2;
-/** A lone defender this close can be stepped (checked once per defender). */
-const STEP_RANGE = 2.6;
-/** Another defender within this of the carrier makes it a two-man tackle. */
-const SECOND_MAN_M = 3.5;
-/** A defender this close to the pass line can pick it off. */
-const LANE_M = 1.5;
-/** Markers may not leave the ruck to tackle until this long after the ball is played. */
-const MARKER_RELEASE_TICKS = 14;
-/** A pass to the side with the overlap gets this much preference (scaled up by an expansive plan). */
-const OVERLAP_PREFER = 0.8;
-/** Players within this box either side of the passer count toward the overlap. */
-const SHIFT_M = 20;
-/** A step jinks the carrier this far sideways, over this many ticks. */
-const STEP_JINK_M = 1.6;
-const STEP_JINK_TICKS = 4;
-/** Carrying the ball costs a little pace: nobody sprints as fast with a footy under the arm. */
-const CARRY_SPEED = 0.95;
-/** A receiver runs through the catch point by this much, not to it, so he takes the ball at pace. */
-const RUN_ON_M = 3;
-/** As the ball is heeled the backline comes up, aiming this far ahead of their standing spots so they are moving when the pass arrives. */
-const RUCK_ADVANCE_M = 3;
+  // Distances (metres)
+  /** A free defender this close to a wrestle comes in to help (and joins it on reaching the carrier). */
+  joinM: 6,
+  /** Carrier starts deciding (pass / into contact) with a defender this close. */
+  engageM: 4.5,
+  /** A defender this close to the carrier makes the tackle. */
+  tackleReach: 1.2,
+  /** The defensive line stands this far off the ruck. */
+  onsideM: 10,
+  /** A big hit drives the carrier back this far. */
+  driveBack: 2.5,
+  /** A support runner this close can take an offload. */
+  offloadM: 5,
+  /** Chance a catcher spills a kick: alone, and with a chaser inside PRESSURE_M (less by Skill). */
+  dropChance: 0.06,
+  dropPressured: 0.18,
+  /** Kick chasers this far from the landing point still run flat out at it. */
+  chaseThroughM: 2,
+  /** On the second-last tackle inside this, the kicker goes early this often (grubber or chip). */
+  earlyKickM: 25,
+  /** Loose ball picked up within this reach. */
+  pickupM: 0.9,
+  /** A defender this close to a receiver makes the catch a pressured one. */
+  pressureM: 2,
+  /** A lone defender this close can be stepped (checked once per defender). */
+  stepRange: 2.6,
+  /** Another defender within this of the carrier makes it a two-man tackle. */
+  secondManM: 3.5,
+  /** A defender this close to the pass line can pick it off. */
+  laneM: 1.5,
+  /** Markers may not leave the ruck to tackle until this long after the ball is played. */
+  markerReleaseTicks: 14,
+  /** A pass to the side with the overlap gets this much preference (scaled up by an expansive plan). */
+  overlapPrefer: 0.8,
+  /** Players within this box either side of the passer count toward the overlap. */
+  shiftM: 20,
+  /** A step jinks the carrier this far sideways, over this many ticks. */
+  stepJinkM: 1.6,
+  stepJinkTicks: 4,
+  /** Carrying the ball costs a little pace: nobody sprints as fast with a footy under the arm. */
+  carrySpeed: 0.95,
+  /** A receiver runs through the catch point by this much, not to it, so he takes the ball at pace. */
+  runOnM: 3,
+  /** As the ball is heeled the backline comes up, aiming this far ahead of their standing spots so they are moving when the pass arrives. */
+  ruckAdvanceM: 3,
+  /** Chance the dummy-half darts instead of passing. */
+  dartChance: 0.08,
+  /** Engaged carrier's base chance to pass (+ Skill/300, + Playmaker, + preset). */
+  passBase: 0.3,
+};
 
 interface Stats extends ContestStats {}
 
@@ -264,7 +275,7 @@ export class LiveSim implements MatchSim {
     const energy = Math.max(0, Math.min(1, opts.energy ?? 1));
     for (const p of this.players) {
       p.energy = energy;
-      p.gassed = energy < SPENT_AT;
+      p.gassed = energy < FATIGUE.spentAt;
     }
     this.ball = { kind: 'held', by: this.idx('away', KICKER) };
     this.phase = { kind: 'restart', t0: 0, kicking: 'away' };
@@ -352,8 +363,8 @@ export class LiveSim implements MatchSim {
   }
   /** After a break the carrier bursts: longer for a Jets player. */
   private burst(c: Player): void {
-    c.immuneUntil = this.tick + IMMUNE_TICKS;
-    c.burstUntil = this.tick + (traitBoost(c.traits, 'jets') > 0 ? JETS_BURST_TICKS : BURST_TICKS);
+    c.immuneUntil = this.tick + LIVE.immuneTicks;
+    c.burstUntil = this.tick + (traitBoost(c.traits, 'jets') > 0 ? LIVE.jetsBurstTicks : LIVE.burstTicks);
   }
   private lock(p: Player, pose: string, ticks: number, slideTo?: Vec): void {
     p.pose = pose;
@@ -408,7 +419,7 @@ export class LiveSim implements MatchSim {
     this.dir = dirOf(receiving);
     this.tackles = 0;
     this.lastPlay = false;
-    this.lineX = k.to.x + this.dir * ONSIDE_M;
+    this.lineX = k.to.x + this.dir * LIVE.onsideM;
     if (k.kickoff) this.emit('kickoff', `${kicker.name} kicks off`, kicker);
     else {
       this.emit('kick', KICK_TEXT[k.kind](kicker.name), kicker, k.trait);
@@ -428,7 +439,7 @@ export class LiveSim implements MatchSim {
       }
       // A kick is anyone's: whoever is under it takes it, the nominated man on a tie.
       const r = b.via === 'kick' ? this.underKick(b.to, b.receiver) : b.receiver !== null ? this.players[b.receiver] : undefined;
-      if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > (b.via === 'kick' ? KICK_CATCH_REACH : CATCH_REACH))) {
+      if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > (b.via === 'kick' ? LIVE.kickCatchReach : LIVE.catchReach))) {
         // Nobody under it: it comes down and bounces on in the direction it was going.
         if (b.via === 'pass') this.emit('loose', r ? `${r.name} can't get to the pass — loose ball` : 'The pass goes to ground — loose ball', r);
         if (b.bounces > 0) {
@@ -443,8 +454,8 @@ export class LiveSim implements MatchSim {
         this.looseFor = null;
         return;
       }
-      const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < PRESSURE_M);
-      if (b.via === 'kick' && this.rng.next() < (pressured ? DROP_PRESSURED - (r.stats.skill - 50) / 300 : DROP_CHANCE)) {
+      const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < LIVE.pressureM);
+      if (b.via === 'kick' && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.skill - 50) / 300 : LIVE.dropChance)) {
         // Spilled under the high ball: a scramble for anyone.
         this.emit('drop', `${r.name} spills the kick under pressure!`, r);
         this.ball = bounceFlight(b.to, { x: (this.rng.next() - 0.5) * 2, y: (this.rng.next() - 0.5) * 2 }, this.tick, 2, 12, 2);
@@ -470,7 +481,7 @@ export class LiveSim implements MatchSim {
       if (b.via === 'pass' && r.side !== this.attacking) {
         this.emit('intercept', `${r.name} picks it off!`, r, picked);
         this.turnover();
-        r.burstUntil = this.tick + BURST_TICKS;
+        r.burstUntil = this.tick + LIVE.burstTicks;
         return;
       }
       if (b.via === 'kick' && r.side !== this.attacking) {
@@ -490,7 +501,7 @@ export class LiveSim implements MatchSim {
     if (b.kind === 'loose') {
       // Whoever gets there first picks it up (the chasers are steered at it).
       let best: Player | null = null;
-      let bd = PICKUP_M;
+      let bd = LIVE.pickupM;
       for (const p of this.players) {
         if (this.looseFor && p.side !== this.looseFor) continue;
         if (this.locked(p)) continue;
@@ -537,22 +548,22 @@ export class LiveSim implements MatchSim {
     this.lastPlay = false;
     const bp = this.ballPos();
     this.mark = { ...bp };
-    this.lineX = bp.x + this.dir * ONSIDE_M;
+    this.lineX = bp.x + this.dir * LIVE.onsideM;
     this.phase = { kind: 'play' };
   }
 
   // ── Phases ────────────────────────────────────────────────────────────────
   private stepRestart(ph: Extract<Phase, { kind: 'restart' }>): void {
-    if (this.tick < ph.t0 + RESTART_TICKS || this.pendingKick) return;
+    if (this.tick < ph.t0 + LIVE.restartTicks || this.pendingKick) return;
     const kicker = this.at(ph.kicking, KICKER);
     // Wait until the teams are set (the kicker on the spot, everyone near his).
     const ready = dist(kicker.body.pos, kicker.target) < 1 && this.players.every((p) => dist(p.body.pos, p.target) < 3);
-    if (!ready && this.tick < ph.t0 + RESTART_MAX_TICKS) return;
+    if (!ready && this.tick < ph.t0 + LIVE.restartMaxTicks) return;
     const receiving = other(ph.kicking);
     const rd = dirOf(receiving);
-    this.lock(kicker, 'kick', KICK_LOCK_TICKS);
+    this.lock(kicker, 'kick', LIVE.kickLockTicks);
     this.pendingKick = {
-      at: this.tick + KICK_CONTACT_TICKS,
+      at: this.tick + LIVE.kickContactTicks,
       kicker: this.indexOf(kicker),
       to: kickoffTarget(rd, this.rng.next()),
       receiver: this.idx(receiving, FULLBACK),
@@ -587,12 +598,12 @@ export class LiveSim implements MatchSim {
     const plan = this.atkPlan(h);
     const dplan = this.defPlan();
     const zone = zoneOf(toLine);
-    const early = this.tackles === SET_TACKLES - 2 && (toLine <= EARLY_KICK_M || zone === 'own20' || zone === 'ownHalf');
+    const early = this.tackles === SET_TACKLES - 2 && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
     if ((this.lastPlay || early) && h.slot === KICKER) {
       if (this.kickCall === null) this.kickCall = this.lastPlay ? this.callLastPlay(toLine, plan) : this.callEarlyKick(toLine, plan);
-      if (this.kickCall !== 'run' && (this.tick - h.catchTick >= KICK_RUN_TICKS || nearD < ENGAGE_M)) {
+      if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
         this.pendingKick = this.planKick(h, this.kickCall);
-        this.lock(h, 'kick', KICK_LOCK_TICKS);
+        this.lock(h, 'kick', LIVE.kickLockTicks);
         return;
       }
     }
@@ -600,21 +611,21 @@ export class LiveSim implements MatchSim {
     // Engaged: decide once — shift it to a better option out the back, or
     // take the line on. Re-deciding every tick would pass out of every contact.
     // A Playmaker passes more and can find a man beyond the normal width.
-    if (nearD < ENGAGE_M && !h.decided && this.tick - h.catchTick >= PASS_COOLDOWN) {
+    if (nearD < LIVE.engageM && !h.decided && this.tick - h.catchTick >= LIVE.passCooldown) {
       h.decided = true;
       const maker = traitBoost(h.traits, 'playmaker');
-      const reach = MAX_LAT_M + (maker > 0 ? CUT_OUT_PER_LEVEL_M * maker : 0) + (plan.width > 0 ? 3 : 0);
+      const reach = MAX_LAT_M + (maker > 0 ? LIVE.cutOutPerLevelM * maker : 0) + (plan.width > 0 ? 3 : 0);
       const cands = this.candidates(h, plan);
-      let receiver = pickReceiver(h.body.pos, this.dir, cands, reach, Math.min(0.6, PLAYMAKER_WIDTH * maker + plan.width));
+      let receiver = pickReceiver(h.body.pos, this.dir, cands, reach, Math.min(0.6, LIVE.playmakerWidth * maker + plan.width));
       // A Playmaker (or an expansive side) sees the overlap: now and then he skips the near man and throws to the widest one he can reach.
-      const cutOut = CUT_OUT_CHANCE * maker + plan.cutOut;
+      const cutOut = LIVE.cutOutChance * maker + plan.cutOut;
       if (cutOut > 0 && this.rng.next() < cutOut) {
         const widest = cands
           .filter((c) => !c.busy && (h.body.pos.x - c.pos.x) * this.dir >= 0.3 && (h.body.pos.x - c.pos.x) * this.dir <= 8 && Math.abs(c.pos.y - h.body.pos.y) <= reach)
           .sort((a, b) => Math.abs(b.pos.y - h.body.pos.y) - Math.abs(a.pos.y - h.body.pos.y))[0];
         if (widest && Math.abs(widest.pos.y - h.body.pos.y) > MAX_LAT_M) receiver = widest.idx;
       }
-      if (receiver !== null && this.rng.next() < 0.3 + h.stats.skill / 300 + TRAIT_PTS.playmakerPass * maker + plan.pass) {
+      if (receiver !== null && this.rng.next() < LIVE.passBase + h.stats.skill / 300 + TRAIT_PTS.playmakerPass * maker + plan.pass) {
         const to = this.players[receiver]!;
         if (Math.abs(to.body.pos.y - h.body.pos.y) > MAX_LAT_M) {
           this.emit('cut-out', `${h.name} throws the cut-out ball to ${to.name}`, h, announce(h.traits.find((t) => t.id === 'playmaker')));
@@ -628,7 +639,7 @@ export class LiveSim implements MatchSim {
 
     // One-on-one and the defender is almost on him: try to step (once per
     // defender) — unless the game plan says tuck it and carry in.
-    if (nearest && nearD <= STEP_RANGE && this.steppedOn(h) !== this.indexOf(nearest)) {
+    if (nearest && nearD <= LIVE.stepRange && this.steppedOn(h) !== this.indexOf(nearest)) {
       const sit = this.situation(h, nearest, committed);
       if (sit.defenders === 1) {
         h.steppedOn = this.indexOf(nearest);
@@ -643,7 +654,7 @@ export class LiveSim implements MatchSim {
 
     // Contact: a committed defender has reached him.
     for (const d of committed) {
-      if (dist(d.body.pos, h.body.pos) <= TACKLE_REACH) {
+      if (dist(d.body.pos, h.body.pos) <= LIVE.tackleReach) {
         this.contest(h, d, committed);
         return;
       }
@@ -660,7 +671,7 @@ export class LiveSim implements MatchSim {
    * side sometimes kicks early for territory.
    */
   private callEarlyKick(toLine: number, plan: AttackPlan): 'run' | KickChoice {
-    if (toLine <= EARLY_KICK_M) {
+    if (toLine <= LIVE.earlyKickM) {
       if (this.rng.next() >= plan.earlyKick) return 'run';
       return this.rng.next() < 0.6 ? 'grubber' : 'chip';
     }
@@ -680,7 +691,7 @@ export class LiveSim implements MatchSim {
     const def = other(this.attacking);
     const fb = this.at(def, FULLBACK);
     const boot = bootMult(h.traits);
-    const base = { at: this.tick + KICK_CONTACT_TICKS, kicker: this.indexOf(h), kickoff: false, kind };
+    const base = { at: this.tick + LIVE.kickContactTicks, kicker: this.indexOf(h), kickoff: false, kind };
     const trait = boot.dist > 1 ? { trait: announce(h.traits.find((t) => t.id === 'bigBoot')) ?? 'Big Boot' } : {};
     switch (kind) {
       case 'grubber':
@@ -702,11 +713,11 @@ export class LiveSim implements MatchSim {
 
   /** The geometry of a contact: numbers, angle, momentum, tackle count, support. */
   private situation(c: Player, t: Player, committed: readonly Player[]): Situation {
-    const others = committed.filter((d) => d !== t && dist(d.body.pos, c.body.pos) < SECOND_MAN_M).length;
+    const others = committed.filter((d) => d !== t && dist(d.body.pos, c.body.pos) < LIVE.secondManM).length;
     const defenders = others >= 2 ? 3 : others === 1 ? 2 : 1;
     const approach = norm(sub(c.body.pos, t.body.pos)); // the way the tackler is closing
     const angle = angleFrom(-dot(approach, c.body.heading)); // square when he comes at the carrier's face
-    const support = this.atkPlan(c).offload > 0 && this.side(c.side).some((p) => p !== c && p.slot !== HOOKER && !this.locked(p) && dist(p.body.pos, c.body.pos) < OFFLOAD_M);
+    const support = this.atkPlan(c).offload > 0 && this.side(c.side).some((p) => p !== c && p.slot !== HOOKER && !this.locked(p) && dist(p.body.pos, c.body.pos) < LIVE.offloadM);
     return {
       defenders,
       angle,
@@ -722,9 +733,9 @@ export class LiveSim implements MatchSim {
   private sidestep(c: Player, t: Player, trait?: string): void {
     this.emit('step', `${c.name} steps ${t.name}!`, c, trait);
     const sideways = c.body.pos.y >= t.body.pos.y ? 1 : -1;
-    c.jink = { dy: sideways * STEP_JINK_M, ticks: STEP_JINK_TICKS };
+    c.jink = { dy: sideways * LIVE.stepJinkM, ticks: LIVE.stepJinkTicks };
     this.lock(t, 'tackled', 12, add(t.body.pos, { x: this.dir * 0.8, y: -sideways * 0.6 }));
-    t.cooldownUntil = this.tick + BEATEN_COOLDOWN;
+    t.cooldownUntil = this.tick + LIVE.beatenCooldown;
     this.burst(c);
   }
 
@@ -732,17 +743,17 @@ export class LiveSim implements MatchSim {
     const w = ph.wrestle;
     if (w) {
       if (!this.stepWrestle(ph, w)) return;
-    } else if (this.tick < ph.t0 + CONTACT_TICKS) return;
+    } else if (this.tick < ph.t0 + LIVE.contactTicks) return;
     const c = this.players[ph.carrier]!;
     this.tackles++;
     this.kickCall = null;
     const handover = this.tackles >= SET_TACKLES;
     this.mark = { ...c.body.pos };
-    this.lineX = this.mark.x + this.dir * ONSIDE_M;
+    this.lineX = this.mark.x + this.dir * LIVE.onsideM;
     // How long he fought sets the ruck: a quick wrestle is a quick play-the-ball, a long one lets the defence set.
     const secs = w ? (this.tick - w.t0) * TICK_S : 0;
-    const down = w ? ruckTicks(secs) : DOWN_TICKS;
-    const pace = !w || handover ? null : secs <= QUICK_S ? 'quick' : secs >= SLOW_S ? 'slow' : null;
+    const down = w ? ruckTicks(secs) : LIVE.downTicks;
+    const pace = !w || handover ? null : secs <= WRESTLE.quickS ? 'quick' : secs >= WRESTLE.slowS ? 'slow' : null;
     this.lock(c, 'down', down);
     for (const i of w ? w.men : [ph.tackler]) this.lock(this.players[i]!, 'down', down);
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.carrier, tackler: ph.tackler, stage: 'down', handover, heldAt: 0, down, pace };
@@ -753,7 +764,7 @@ export class LiveSim implements MatchSim {
     if (ph.stage === 'down') {
       if (this.tick < ph.t0 + ph.down) return;
       // Up, step over it and heel it back.
-      this.lock(c, 'ptb', PTB_TICKS);
+      this.lock(c, 'ptb', LIVE.ptbTicks);
       if (ph.pace === 'quick') this.emit('quick-ptb', `${c.name} is up quickly — the line is short`, c);
       else if (ph.pace === 'slow') this.emit('slow-ptb', `Slow play-the-ball — the defence is set`, c);
       ph.stage = 'ptb';
@@ -761,28 +772,28 @@ export class LiveSim implements MatchSim {
       return;
     }
     if (ph.stage === 'ptb') {
-      if (this.tick < ph.t0 + PTB_TICKS) return;
+      if (this.tick < ph.t0 + LIVE.ptbTicks) return;
       if (ph.handover) {
         this.emit('handover', `Tackled on the last — handover to ${this.names[other(this.attacking)]}`, c);
         this.attacking = other(this.attacking);
         this.dir = dirOf(this.attacking);
         this.tackles = 0;
         this.lastPlay = false;
-        this.lineX = this.mark.x + this.dir * ONSIDE_M;
+        this.lineX = this.mark.x + this.dir * LIVE.onsideM;
       }
       const dh = this.at(this.attacking, HOOKER);
       const spot = this.dummyHalfSpot();
       // Heel it to where he actually is (he's been running to the mark); if he's
       // still a way off, to the mark and he collects it there.
       const dhSpot = dist(dh.body.pos, spot) < 3 ? { ...dh.body.pos } : spot;
-      this.ball = rollFlight(c.body.pos, dhSpot, this.tick, this.indexOf(dh), ROLL_TICKS);
+      this.ball = rollFlight(c.body.pos, dhSpot, this.tick, this.indexOf(dh), LIVE.rollTicks);
       this.markers = this.currentMarkers().map((m) => this.indexOf(m));
       this.ruckPlayedAt = this.tick;
-      c.busyUntil = this.tick + BUSY_AFTER_PTB;
+      c.busyUntil = this.tick + LIVE.busyAfterPtb;
       c.pose = 'idle';
       c.poseUntil = 0;
       dh.pose = 'dummyHalf';
-      dh.poseUntil = this.tick + ROLL_TICKS + DH_HOLD_TICKS + 2;
+      dh.poseUntil = this.tick + LIVE.rollTicks + LIVE.dhHoldTicks + 2;
       ph.stage = 'dh';
       ph.t0 = this.tick;
       return;
@@ -791,7 +802,7 @@ export class LiveSim implements MatchSim {
     const h = this.holder();
     if (!h || h.slot !== HOOKER || h.side !== this.attacking) return;
     if (ph.heldAt === 0) ph.heldAt = this.tick;
-    if (this.tick < ph.heldAt + DH_HOLD_TICKS) return;
+    if (this.tick < ph.heldAt + LIVE.dhHoldTicks) return;
     this.lastPlay = this.tackles === SET_TACKLES - 1;
     let receiver: number | null = null;
     if (this.lastPlay) {
@@ -799,7 +810,7 @@ export class LiveSim implements MatchSim {
       if (!this.locked(k) && this.tick >= k.busyUntil) receiver = this.indexOf(k);
     }
     if (receiver === null) receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h));
-    if (receiver === null || this.rng.next() < 0.08) {
+    if (receiver === null || this.rng.next() < LIVE.dartChance) {
       // Dummy-half dart.
       h.catchTick = this.tick;
       h.decided = false;
@@ -813,7 +824,7 @@ export class LiveSim implements MatchSim {
   }
 
   private stepTry(ph: Extract<Phase, { kind: 'try' }>): void {
-    if (this.tick < ph.t0 + TRY_TICKS) return;
+    if (this.tick < ph.t0 + LIVE.tryTicks) return;
     const scorer = this.players[ph.scorer]!;
     for (const p of this.players) {
       p.pose = 'idle';
@@ -845,11 +856,11 @@ export class LiveSim implements MatchSim {
         // The Gambler shot out of the line and missed the read: he's out of the play.
         this.emit('gamble', `${thief.name} gambles on the intercept and misses`, thief, announce(thief.traits.find((t) => t.id === 'gambler')));
         this.lock(thief, 'tackled', 12, add(thief.body.pos, scale({ x: -this.dir, y: 0 }, 1)));
-        thief.cooldownUntil = this.tick + BEATEN_COOLDOWN;
+        thief.cooldownUntil = this.tick + LIVE.beatenCooldown;
       }
     }
     from.pose = 'pass';
-    from.poseUntil = this.tick + PASS_POSE_TICKS;
+    from.poseUntil = this.tick + LIVE.passPoseTicks;
     from.catchTick = this.tick;
   }
 
@@ -862,7 +873,7 @@ export class LiveSim implements MatchSim {
   private leadPoint(from: Player, to: Player, flightS: number): Vec {
     const fwd = { x: this.dir, y: 0 };
     const v0 = dot(to.body.vel, fwd);
-    const vMax = to.body.maxSpeed * CARRY_SPEED;
+    const vMax = to.body.maxSpeed * LIVE.carrySpeed;
     // The lead lengthens the flight, so settle the flight time once more.
     let t = flightS;
     let lead = to.body.pos;
@@ -877,13 +888,13 @@ export class LiveSim implements MatchSim {
     return clampToGround(lead, 1);
   }
 
-  /** The defender nearest the pass line and within LANE_M of it, if any. */
+  /** The defender nearest the pass line and within LIVE.laneM of it, if any. */
   private laneDefender(from: Vec, to: Vec, side: Side): Player | null {
     const seg = sub(to, from);
     const len2 = seg.x * seg.x + seg.y * seg.y;
     if (len2 < 1) return null;
     let best: Player | null = null;
-    let bd = LANE_M;
+    let bd = LIVE.laneM;
     for (const d of this.side(other(side))) {
       if (this.locked(d)) continue;
       const u = clamp(dot(sub(d.body.pos, from), seg) / len2, 0.15, 0.95);
@@ -909,8 +920,8 @@ export class LiveSim implements MatchSim {
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
     // Contact costs both men legs, whatever happens.
-    this.tire(c, CONTACT_COST.carrier);
-    this.tire(t, CONTACT_COST.tackler);
+    this.tire(c, FATIGUE.contactCost.carrier);
+    this.tire(t, FATIGUE.contactCost.tackler);
     const back = scale({ x: -this.dir, y: 0 }, 1);
     switch (outcome) {
       case 'strip': {
@@ -928,7 +939,7 @@ export class LiveSim implements MatchSim {
       case 'broken':
         this.emit('break-tackle', `${c.name} busts through ${t.name}`, c, credit);
         this.lock(t, 'down', 16, add(t.body.pos, scale(back, -1.2)));
-        t.cooldownUntil = this.tick + BEATEN_COOLDOWN;
+        t.cooldownUntil = this.tick + LIVE.beatenCooldown;
         this.burst(c);
         return;
       case 'fend':
@@ -936,19 +947,19 @@ export class LiveSim implements MatchSim {
         c.pose = 'fend';
         c.poseUntil = this.tick + 6;
         this.lock(t, 'tackled', 14, add(t.body.pos, scale(back, -1.5)));
-        t.cooldownUntil = this.tick + BEATEN_COOLDOWN;
-        c.immuneUntil = this.tick + IMMUNE_TICKS;
+        t.cooldownUntil = this.tick + LIVE.beatenCooldown;
+        c.immuneUntil = this.tick + LIVE.immuneTicks;
         return;
       case 'offload': {
-        const cands = this.candidates(c).filter((k) => dist(this.players[k.idx]!.body.pos, c.body.pos) < OFFLOAD_M + 2);
+        const cands = this.candidates(c).filter((k) => dist(this.players[k.idx]!.body.pos, c.body.pos) < LIVE.offloadM + 2);
         const r = pickReceiver(c.body.pos, this.dir, cands) ?? cands.find((k) => !k.busy)?.idx ?? null;
         if (r !== null) {
           this.emit('offload', `${c.name} gets the offload away to ${this.players[r]!.name}`, c, credit);
           // A Razzle Dazzle offload is the miracle ball — and the one that gets spilled.
           this.pass(c, this.players[r]!, tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0);
-          this.lock(c, 'tackled', CONTACT_TICKS + DOWN_TICKS);
-          this.lock(t, 'tackle', CONTACT_TICKS + DOWN_TICKS);
-          c.busyUntil = this.tick + CONTACT_TICKS + DOWN_TICKS + 10;
+          this.lock(c, 'tackled', LIVE.contactTicks + LIVE.downTicks);
+          this.lock(t, 'tackle', LIVE.contactTicks + LIVE.downTicks);
+          c.busyUntil = this.tick + LIVE.contactTicks + LIVE.downTicks + 10;
           return;
         }
         break; // nobody there after all: a plain tackle
@@ -959,16 +970,16 @@ export class LiveSim implements MatchSim {
     if (outcome === 'big-hit') {
       // Smashed backwards at contact: no wrestle, he is down.
       this.emit('big-hit', `${t.name} smashes ${c.name} backwards!`, t, credit);
-      const drive = scale(back, DRIVE_BACK);
-      this.lock(c, 'tackled', CONTACT_TICKS, add(c.body.pos, drive));
-      this.lock(t, 'tackle', CONTACT_TICKS, add(t.body.pos, drive));
+      const drive = scale(back, LIVE.driveBack);
+      this.lock(c, 'tackled', LIVE.contactTicks, add(c.body.pos, drive));
+      this.lock(t, 'tackle', LIVE.contactTicks, add(t.body.pos, drive));
       this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big: true, wrestle: null, wreck: 0 };
       return;
     }
     // Held: the wrestle (§8.1). A Wrecking Ball sometimes keeps his legs pumping — more fight, more ground.
     const wb = traitBoost(c.traits, 'wreckingBall');
-    const wreck = wb > 0 && this.rng.next() < WRECK_DRIVE_CHANCE * wb ? wb : 0;
-    const fight = fightOf({ ...c.stats, stamina: c.stamina }, c.energy, this.rng.next()) * (1 + WRECK_FIGHT * wreck);
+    const wreck = wb > 0 && this.rng.next() < LIVE.wreckDriveChance * wb ? wb : 0;
+    const fight = fightOf({ ...c.stats, stamina: c.stamina }, c.energy, this.rng.next()) * (1 + WRESTLE.wreckFight * wreck);
     const wrestle: WrestleState = { men: [this.indexOf(t)], fight, fight0: fight, grip: gripOf(t.stats, t.energy, true), t0: this.tick, metres: 0 };
     this.hold(c, 'tackled');
     this.hold(t, 'tackle');
@@ -991,10 +1002,10 @@ export class LiveSim implements MatchSim {
   }
 
   private checkLegs(p: Player): void {
-    if (!p.gassed && p.energy < SPENT_AT) {
+    if (!p.gassed && p.energy < FATIGUE.spentAt) {
       p.gassed = true;
       this.emit('gassed', `${p.name} is out on his feet`, p);
-    } else if (p.gassed && p.energy > GASSED_RESET) p.gassed = false;
+    } else if (p.gassed && p.energy > FATIGUE.gassedReset) p.gassed = false;
   }
 
   /**
@@ -1005,18 +1016,18 @@ export class LiveSim implements MatchSim {
   private stepWrestle(ph: Extract<Phase, { kind: 'tackle' }>, w: WrestleState): boolean {
     const c = this.players[ph.carrier]!;
     for (const d of this.side(other(c.side))) {
-      if (w.men.length >= MAX_MEN) break;
+      if (w.men.length >= WRESTLE.maxMen) break;
       const i = this.indexOf(d);
-      if (w.men.includes(i) || this.locked(d) || this.tick < d.cooldownUntil || dist(d.body.pos, c.body.pos) > TACKLE_REACH + 0.3) continue;
+      if (w.men.includes(i) || this.locked(d) || this.tick < d.cooldownUntil || dist(d.body.pos, c.body.pos) > LIVE.tackleReach + 0.3) continue;
       w.men.push(i);
       w.grip += gripOf(d.stats, d.energy, false);
-      this.tire(d, CONTACT_COST.tackler);
+      this.tire(d, FATIGUE.contactCost.tackler);
     }
     const men = w.men.map((i) => this.players[i]!);
     const dt = TICK_S;
     const end = wrestleTick(w, men.map((d) => holdOf(d.stats, d.energy)), dt, (this.tick - w.t0) * dt);
-    this.tire(c, WRESTLE_COST.carrierPerMan * men.length * dt);
-    for (const d of men) this.tire(d, WRESTLE_COST.tackler * dt);
+    this.tire(c, FATIGUE.wrestleCost.carrierPerMan * men.length * dt);
+    for (const d of men) this.tire(d, FATIGUE.wrestleCost.tackler * dt);
     // He keeps driving while there is fight in him; they go with him.
     const step = driveSpeed(w.fight / w.fight0, men.length) * dt;
     w.metres += step;
@@ -1025,7 +1036,7 @@ export class LiveSim implements MatchSim {
     for (const d of men) d.body.pos = clampToGround(add(d.body.pos, shift), 0.5);
     if (inGoal(c.body.pos, this.dir)) {
       // Driven over the line in the tackle.
-      for (const d of men) this.lock(d, 'down', DOWN_TICKS);
+      for (const d of men) this.lock(d, 'down', LIVE.downTicks);
       this.score(c);
       return false;
     }
@@ -1035,7 +1046,7 @@ export class LiveSim implements MatchSim {
       this.events[this.events.length - 1]!.detail = 'wrestle';
       for (const d of men) {
         this.lock(d, 'down', 16, add(d.body.pos, { x: -this.dir * 0.8, y: 0 }));
-        d.cooldownUntil = this.tick + BEATEN_COOLDOWN;
+        d.cooldownUntil = this.tick + LIVE.beatenCooldown;
       }
       c.lockUntil = this.tick;
       c.pose = 'run';
@@ -1061,11 +1072,11 @@ export class LiveSim implements MatchSim {
     this.emit('try', `TRY! ${scorer.name} dives over for ${this.names[scorer.side]}`, scorer);
     // Dive and slide, then up to celebrate on the spot — he stays put until the restart.
     this.lock(scorer, 'dive', 10, add(scorer.body.pos, scale({ x: this.dir, y: 0 }, 1.5)));
-    scorer.poseUntil = this.tick + TRY_TICKS;
+    scorer.poseUntil = this.tick + LIVE.tryTicks;
     for (const p of this.side(scorer.side)) {
       if (p === scorer) continue;
       p.pose = 'celebrate';
-      p.poseUntil = this.tick + TRY_TICKS;
+      p.poseUntil = this.tick + LIVE.tryTicks;
     }
     this.phase = { kind: 'try', t0: this.tick, scorer: this.indexOf(scorer) };
   }
@@ -1076,7 +1087,7 @@ export class LiveSim implements MatchSim {
     // may only pounce early on a dummy-half dart. Otherwise the first receiver
     // runs at the line, not at the two men standing over the mark.
     const dplan = this.defPlan();
-    const held = this.tick < this.ruckPlayedAt + MARKER_RELEASE_TICKS * dplan.markerHold && h.slot !== HOOKER;
+    const held = this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * dplan.markerHold && h.slot !== HOOKER;
     const free = defenders.filter((d) => !this.locked(d) && this.tick >= d.cooldownUntil && !(held && this.markers.includes(this.indexOf(d))));
     // A defender already behind the carrier can only chase; the ones in front
     // of him are the tackle, so they rank first.
@@ -1097,17 +1108,17 @@ export class LiveSim implements MatchSim {
         idx: this.indexOf(p),
         pos: p.body.pos,
         busy: this.locked(p) || this.tick < p.busyUntil || (p.slot === HOOKER && this.phase.kind === 'ruck'),
-        prefer: this.rolePreference(p, passer, plan) + (overlap !== 0 && Math.sign(p.body.pos.y - passer.body.pos.y) === overlap ? OVERLAP_PREFER * (1 + plan.width) : 0),
+        prefer: this.rolePreference(p, passer, plan) + (overlap !== 0 && Math.sign(p.body.pos.y - passer.body.pos.y) === overlap ? LIVE.overlapPrefer * (1 + plan.width) : 0),
       }));
   }
 
   /**
    * Which side of the passer has the overlap: +1 / −1 when his side has more
-   * players than the defence within SHIFT_M of him on that side, else 0.
+   * players than the defence within LIVE.shiftM of him on that side, else 0.
    */
   private overlapSide(passer: Player): 0 | 1 | -1 {
     const count = (ps: readonly Player[], sign: number): number =>
-      ps.filter((p) => p !== passer && !this.locked(p) && Math.sign(p.body.pos.y - passer.body.pos.y) === sign && Math.abs(p.body.pos.x - passer.body.pos.x) < SHIFT_M && Math.abs(p.body.pos.y - passer.body.pos.y) < SHIFT_M).length;
+      ps.filter((p) => p !== passer && !this.locked(p) && Math.sign(p.body.pos.y - passer.body.pos.y) === sign && Math.abs(p.body.pos.x - passer.body.pos.x) < LIVE.shiftM && Math.abs(p.body.pos.y - passer.body.pos.y) < LIVE.shiftM).length;
     const atk = this.side(passer.side);
     const def = this.side(other(passer.side));
     const left = count(atk, -1) - count(def, -1);
@@ -1225,7 +1236,7 @@ export class LiveSim implements MatchSim {
         p.target = { ...looseAt };
       } else if (kickUp && kickChasers.has(p)) {
         p.target = { ...kickUp.to };
-        p.through = dist(p.body.pos, kickUp.to) > CHASE_THROUGH_M;
+        p.through = dist(p.body.pos, kickUp.to) > LIVE.chaseThroughM;
       } else if (p === carrier) {
         if (ph.kind === 'play') {
           const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
@@ -1236,7 +1247,7 @@ export class LiveSim implements MatchSim {
         // A pass thrown in front of him is run onto, through the catch point;
         // one at or behind him (or a kick) he checks and gets under.
         const onto = flight!.via === 'pass' && (flight!.to.x - p.body.pos.x) * this.dir > 0.5;
-        p.target = onto ? clampToGround(add(flight!.to, { x: this.dir * RUN_ON_M, y: 0 }), 1) : { ...flight!.to };
+        p.target = onto ? clampToGround(add(flight!.to, { x: this.dir * LIVE.runOnM, y: 0 }), 1) : { ...flight!.to };
         p.through = onto;
       } else if (p.slot === HOOKER && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
@@ -1245,7 +1256,7 @@ export class LiveSim implements MatchSim {
         // hits the pass at pace instead of standing flat-footed. The forwards
         // standing close to the ruck keep enough depth to stay a pass option.
         const spot = formationTarget(role, anchor, this.dir, true);
-        const advance = Math.max(0, Math.min(RUCK_ADVANCE_M, role.atk - 3));
+        const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, role.atk - 3));
         p.target = clampToGround({ x: spot.x + this.dir * advance, y: spot.y }, 1);
       } else if (supports.includes(p)) {
         const s = spots[supports.indexOf(p) as 0 | 1];
@@ -1274,13 +1285,13 @@ export class LiveSim implements MatchSim {
     const committed = ph.kind === 'play' && carrier
       ? this.committed(carrier, defenders)
       : w && wrestling
-        ? this.committed(wrestling, defenders).filter((d) => dist(d.body.pos, wrestling.body.pos) < JOIN_M).slice(0, MAX_MEN - w.men.length)
+        ? this.committed(wrestling, defenders).filter((d) => dist(d.body.pos, wrestling.body.pos) < LIVE.joinM).slice(0, WRESTLE.maxMen - w.men.length)
         : [];
     const target = carrier ?? wrestling;
     // Markers stand over the mark through the ruck and hold there until released.
     const markers: Player[] = inRuck
       ? this.currentMarkers()
-      : this.tick < this.ruckPlayedAt + MARKER_RELEASE_TICKS * dplan.markerHold
+      : this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * dplan.markerHold
         ? this.markers.map((i) => this.players[i]!).filter((d) => d.side === def && !committed.includes(d))
         : [];
     for (const p of defenders) {
@@ -1290,7 +1301,7 @@ export class LiveSim implements MatchSim {
         p.target = { ...looseAt };
       } else if (kickUp && kickChasers.has(p)) {
         p.target = { ...kickUp.to };
-        p.through = dist(p.body.pos, kickUp.to) > CHASE_THROUGH_M;
+        p.through = dist(p.body.pos, kickUp.to) > LIVE.chaseThroughM;
       } else if (p === receiver) {
         p.target = { ...flight!.to };
       } else if (committed.includes(p) && target) {
@@ -1306,7 +1317,7 @@ export class LiveSim implements MatchSim {
         const pk = this.pendingKick;
         if (pk && this.players[pk.kicker]!.side === atk && !pk.kickoff) p.target = { ...pk.to };
         else {
-          const deep = this.lastPlay ? FULLBACK_LAST_M : FULLBACK_DEEP_M;
+          const deep = this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM;
           p.target = { x: clamp(this.lineX + this.dir * deep, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
         }
       } else {
@@ -1338,18 +1349,18 @@ export class LiveSim implements MatchSim {
         continue;
       }
       p.slide = null;
-      let max = this.tick < p.burstUntil ? p.body.maxSpeed * BURST : p.body.maxSpeed;
-      if (p === h) max *= CARRY_SPEED;
+      let max = this.tick < p.burstUntil ? p.body.maxSpeed * LIVE.burst : p.body.maxSpeed;
+      if (p === h) max *= LIVE.carrySpeed;
       if (kickChase && p.side !== this.attacking) max *= speedMult(p.traits, 'jets');
       if (lineBroken && p.side !== this.attacking) max *= speedMult(p.traits, 'lastLine');
       max *= legsSpeed(p.energy);
       arrive(p.body, p.target, dt, { through: p.through, maxSpeed: max });
       const from = p.body.pos;
       integrate(p.body, dt);
-      this.legs(p, dist(from, p.body.pos), stopped ? 'stop' : speedOf(p.body) < WALK_SPEED ? 'walk' : 'no');
+      this.legs(p, dist(from, p.body.pos), stopped ? 'stop' : speedOf(p.body) < FATIGUE.walkSpeed ? 'walk' : 'no');
       if (p.jink) {
         // The sidestep: a sharp lateral shift spread over a few ticks.
-        p.body.pos = clampToGround(add(p.body.pos, { x: 0, y: p.jink.dy / STEP_JINK_TICKS }), 0.5);
+        p.body.pos = clampToGround(add(p.body.pos, { x: 0, y: p.jink.dy / LIVE.stepJinkTicks }), 0.5);
         if (--p.jink.ticks <= 0) p.jink = null;
       }
     }

@@ -126,6 +126,11 @@ export function defencePlan(preset: DefencePreset): DefencePlan {
   return DEFENCE[preset];
 }
 
+/** The preset tables as data, for balance experiments (tuning.ts): the default attack plan, each attack preset's base and zone overrides, and the defence plans. */
+export const PRESET_TABLES = { attackDefault: BASE_PLAN, attack: ATTACK, defence: DEFENCE };
+/** Attack-plan fields an experiment may set on a preset that doesn't list them yet. */
+export const ATTACK_PLAN_KEYS: readonly string[] = Object.keys(BASE_PLAN).filter((k) => k !== 'kickBias');
+
 // ── Rivals: a style from club identity ───────────────────────────────────────
 
 function hash(s: string): number {
