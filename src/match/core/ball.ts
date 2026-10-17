@@ -56,10 +56,25 @@ export function passFlight(from: Vec, to: Vec, t0: number, receiver: number | nu
   return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak, fromLift: CARRY_LIFT, receiver, bounces: 0, via: 'pass' };
 }
 
-/** A kick from the boot: high and long, timed by distance. */
+/** Seconds a ball kicked to `peak` metres hangs in the air (up and down under gravity). */
+export function hangTime(peak: number): number {
+  return 2 * Math.sqrt((2 * Math.max(0, peak)) / 9.81);
+}
+
+/** A kick from the boot: high and long. It is in the air for its hang time, or longer if the distance needs it. */
 export function kickFlight(from: Vec, to: Vec, t0: number, receiver: number | null, peak = 12): BallState {
-  const ticks = Math.max(4, Math.round(dist(from, to) / KICK_SPEED / TICK_S));
+  const seconds = Math.max(dist(from, to) / KICK_SPEED, hangTime(peak));
+  const ticks = Math.max(4, Math.round(seconds / TICK_S));
   return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak, fromLift: 0.4, receiver, bounces: 0, via: 'kick' };
+}
+
+/** A grubber travels about this fast, m/s. */
+export const GRUBBER_SPEED = 13;
+
+/** A grubber: stabbed along the ground, skidding and hopping to its spot; nobody is nominated to take it. */
+export function grubberFlight(from: Vec, to: Vec, t0: number): BallState {
+  const ticks = Math.max(4, Math.round(dist(from, to) / GRUBBER_SPEED / TICK_S));
+  return { kind: 'flight', from: { ...from }, to: { ...to }, t0, ticks, peak: 0.9, fromLift: 0.3, receiver: null, bounces: 4, via: 'kick' };
 }
 
 /**

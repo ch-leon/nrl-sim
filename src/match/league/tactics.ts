@@ -44,8 +44,12 @@ export interface Candidate {
 /** A pass wider than this is a cut-out ball (only a Playmaker throws one). */
 export const MAX_LAT_M = 12;
 
-/** Best pass option: behind the passer, 2–`maxLat` m to the side, not too deep. */
-export function pickReceiver(passer: Vec, dir: 1 | -1, candidates: readonly Candidate[], maxLat = MAX_LAT_M): number | null {
+/**
+ * Best pass option: behind the passer, 2–`maxLat` m to the side, not too deep.
+ * `widthBias` (0..1) softens the preference for the 6 m pass, so a Playmaker
+ * happily finds the wider man.
+ */
+export function pickReceiver(passer: Vec, dir: 1 | -1, candidates: readonly Candidate[], maxLat = MAX_LAT_M, widthBias = 0): number | null {
   let best: number | null = null;
   let bestScore = -Infinity;
   for (const c of candidates) {
@@ -54,7 +58,7 @@ export function pickReceiver(passer: Vec, dir: 1 | -1, candidates: readonly Cand
     const lat = Math.abs(c.pos.y - passer.y);
     if (depth < 0.3 || depth > 8 || lat < 2 || lat > maxLat) continue;
     // Flat and wide beats deep: a deep receiver gives ground back.
-    const score = -Math.abs(lat - 6) - 0.7 * depth + (c.prefer ?? 0);
+    const score = -Math.abs(lat - 6) * (1 - widthBias) - 0.7 * depth + (c.prefer ?? 0);
     if (score > bestScore) {
       bestScore = score;
       best = c.idx;
@@ -112,6 +116,72 @@ export function kickTarget(kicker: Vec, dir: 1 | -1, fullback: Vec, jitter01: nu
   const x = clamp(kicker.x + dir * 32 * boot.dist, Math.min(goal - 4, kicker.x + dir * 8), Math.max(goal - 4, kicker.x + dir * 8));
   const y = clamp(fullback.y * 0.6 + MID_Y * 0.4 + (jitter01 - 0.5) * 16 * boot.acc, 6, FIELD_WIDTH - 6);
   return { x: dir > 0 ? Math.min(x, goal - 4) : Math.max(x, goal + 4), y };
+}
+
+// ── Attacking kicks (BAK-208 §4.4, first slice) ──────────────────────────────
+
+export type KickChoice = 'long' | 'bomb' | 'grubber' | 'chip' | 'cross-field';
+
+/** Inside this many metres of the line the last tackle is run, never kicked. */
+export const RUN_CLOSE_M = 6;
+/** Inside this, this often the kicker runs the last instead of kicking. */
+export const RUN_IT_ZONE_M = 40;
+export const RUN_IT_CHANCE = 0.2;
+/** Beyond this the last-tackle kick is for territory. */
+export const ATTACK_KICK_M = 50;
+
+/**
+ * Which kick on the last tackle, by distance to the line: territory (with the
+ * odd bomb) from deep; around halfway a bomb or a cross-field kick; inside 40 m
+ * an attacking kick, a grubber the closer he gets. Pure: `roll` is one draw in [0, 1).
+ */
+export function chooseKick(toLine: number, roll: number): KickChoice {
+  if (toLine > ATTACK_KICK_M) return roll < 0.15 ? 'bomb' : 'long';
+  if (toLine > RUN_IT_ZONE_M) {
+    if (roll < 0.5) return 'bomb';
+    if (roll < 0.8) return 'cross-field';
+    return 'long';
+  }
+  if (toLine > 22) {
+    if (roll < 0.35) return 'cross-field';
+    if (roll < 0.65) return 'bomb';
+    if (roll < 0.85) return 'grubber';
+    return 'chip';
+  }
+  if (roll < 0.5) return 'grubber';
+  if (roll < 0.8) return 'cross-field';
+  return 'chip';
+}
+
+const goalLine = (dir: 1 | -1): number => (dir > 0 ? FIELD_LENGTH : 0);
+const towardGoal = (dir: 1 | -1, x: number, limit: number): number => (dir > 0 ? Math.min(x, limit) : Math.max(x, limit));
+
+/** Grubber: stabbed through for the in-goal, a few metres over the line, angled off the kicker's line. */
+export function grubberTarget(kicker: Vec, dir: 1 | -1, jitter01: number): Vec {
+  const goal = goalLine(dir);
+  const x = towardGoal(dir, kicker.x + dir * 30, goal + dir * 3);
+  return { x, y: clamp(kicker.y + (jitter01 - 0.5) * 12, 4, FIELD_WIDTH - 4) };
+}
+
+/** Chip: just over the rushing line for the kicker to run onto, never past the dead-ball line. */
+export function chipTarget(kicker: Vec, dir: 1 | -1, jitter01: number): Vec {
+  const goal = goalLine(dir);
+  const x = towardGoal(dir, kicker.x + dir * (10 + jitter01 * 3), goal + dir * 2);
+  return { x, y: clamp(kicker.y + (jitter01 - 0.5) * 4, 2, FIELD_WIDTH - 2) };
+}
+
+/** Cross-field: high to the far winger, landing a couple of metres short of the line (or 28 m out from deep). */
+export function crossFieldTarget(kicker: Vec, dir: 1 | -1, winger: Vec, jitter01: number): Vec {
+  const goal = goalLine(dir);
+  const x = towardGoal(dir, kicker.x + dir * 28, goal - dir * 2);
+  return { x, y: clamp(winger.y + (jitter01 - 0.5) * 4, 2, FIELD_WIDTH - 2) };
+}
+
+/** Bomb: high and short, onto the fullback's patch, never into the in-goal. */
+export function bombTarget(kicker: Vec, dir: 1 | -1, fullback: Vec, jitter01: number): Vec {
+  const goal = goalLine(dir);
+  const x = towardGoal(dir, kicker.x + dir * (22 + jitter01 * 6), goal - dir * 3);
+  return { x, y: clamp(fullback.y * 0.5 + MID_Y * 0.5 + (jitter01 - 0.5) * 10, 5, FIELD_WIDTH - 5) };
 }
 
 /** Kick-off: into the receiving side's quarter. */

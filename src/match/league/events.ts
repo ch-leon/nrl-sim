@@ -5,7 +5,7 @@
 import { TICK_S } from '../core/engine';
 import { toFieldPt } from '../core/field';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
-import type { MatchEvent, MatchEventKind } from '../../sim/events';
+import type { KickKind, MatchEvent, MatchEventKind } from '../../sim/events';
 
 /** Sim event kinds that have a contract counterpart; the rest stay lab-only for now. */
 const KIND: Readonly<Record<string, MatchEventKind>> = {
@@ -18,7 +18,18 @@ const KIND: Readonly<Record<string, MatchEventKind>> = {
   kick: 'kick',
   try: 'try',
   error: 'error',
+  drop: 'error',
   dart: 'run',
+  regather: 'run',
+};
+
+/** Sim kick detail → contract KickKind (a cross-field kick is a bomb to the contract). */
+const KICK_DETAIL: Readonly<Record<string, KickKind>> = {
+  long: 'find-touch',
+  bomb: 'bomb',
+  grubber: 'grubber',
+  chip: 'chip',
+  'cross-field': 'bomb',
 };
 
 /** Match minute for a tick (Phase 1 has no scaled clock yet: sim seconds / 60). */
@@ -37,6 +48,6 @@ export function toMatchEvent(e: SimEvent, snap: Snapshot, ids: Record<Side, stri
   const f = toFieldPt({ x: snap.ball.x, y: snap.ball.y });
   const ev: MatchEvent = { t: minuteOf(e.tick), kind, teamId: ids[e.side], x: Math.round(f.fx), y: Math.round(f.fy) };
   if (e.player) ev.player = e.player;
-  if (e.kind === 'kick') ev.detail = 'find-touch';
+  if (e.kind === 'kick') ev.detail = KICK_DETAIL[e.detail ?? 'long'] ?? 'find-touch';
   return ev;
 }

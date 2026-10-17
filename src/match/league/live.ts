@@ -17,12 +17,15 @@ import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { FIELD_LENGTH, MID_Y, clampToGround, inGoal } from '../core/field';
 import { arrive, integrate, makeBody, maxSpeedFor, separate, speedOf, type Body } from '../core/body';
-import { CARRY_LIFT, PASS_SPEED, bounceFlight, flightAt, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
+import { CARRY_LIFT, PASS_SPEED, bounceFlight, flightAt, grubberFlight, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
 import type { PlayerSnap, Side, SimEvent, Snapshot } from '../core/snapshot';
 import { add, clamp, dist, dot, norm, scale, sub, type Vec } from '../core/vec';
 import { AVERAGE, angleFrom, interceptChance, knockOnChance, resolveContest, stepChance, type ContestStats, type Situation } from './contest';
 import { FULLBACK, HOOKER, KICKER, PLAYERS, ROLES, formationTarget } from './roles';
-import { MAX_LAT_M, gapTarget, intercept, kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate } from './tactics';
+import {
+  MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, gapTarget, grubberTarget, intercept,
+  kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate, type KickChoice,
+} from './tactics';
 import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
 import { traitBoost, type TraitInstance } from '../../data/traits';
 
@@ -36,8 +39,12 @@ const TRY_TICKS = 50;
 /** A kick-off waits for everyone to be set, at least this long and at most RESTART_MAX. */
 const RESTART_TICKS = 40;
 const RESTART_MAX_TICKS = 280;
-/** A receiver must be this close to where a pass / kick comes down to take it. */
+/** A receiver must be this close to where a pass comes down to take it; a high ball gives him a little longer to get under it. */
 const CATCH_REACH = 1.8;
+const KICK_CATCH_REACH = 2.5;
+/** On the last tackle the defending fullback drops this far behind his line, where the kick will land. */
+const FULLBACK_DEEP_M = 16;
+const FULLBACK_LAST_M = 24;
 /** After a pass or catch, no new pass for this long. */
 const PASS_COOLDOWN = 12;
 /** A tackled carrier can't be the next receiver for this long after his ptb. */
@@ -49,8 +56,11 @@ const BURST = 1.15;
 /** A Wrecking Ball held in the tackle wins the collision this often per level, driving this far forward per level. */
 const WRECK_DRIVE_CHANCE = 0.3;
 const WRECK_DRIVE_M = 0.6;
-/** A Playmaker's cut-out reach grows this much per level over the normal pass width. */
-const CUT_OUT_PER_LEVEL_M = 3;
+/** A Playmaker's cut-out reach grows this much per level over the normal pass width, and he minds width less. */
+const CUT_OUT_PER_LEVEL_M = 4;
+const PLAYMAKER_WIDTH = 0.25;
+/** …and this often per level he throws the cut-out ball to the widest man he can reach. */
+const CUT_OUT_CHANCE = 0.15;
 /** After beating a tackler the carrier can't be hit again for this long. */
 const IMMUNE_TICKS = 8;
 /** A beaten tackler sits out this long before committing again. */
@@ -74,8 +84,14 @@ const LINE_SPEED = 5;
 const DRIVE_BACK = 2.5;
 /** A support runner this close can take an offload. */
 const OFFLOAD_M = 5;
-/** Inside this many metres of the line the last play is run, not kicked. */
-const RUN_IT_M = 22;
+/** Chance a catcher spills a kick: alone, and with a chaser inside PRESSURE_M (less by Skill). */
+const DROP_CHANCE = 0.06;
+const DROP_PRESSURED = 0.18;
+/** Kick chasers this far from the landing point still run flat out at it. */
+const CHASE_THROUGH_M = 2;
+/** On the second-last tackle inside this, the kicker goes early this often (grubber or chip). */
+const EARLY_KICK_M = 25;
+const EARLY_KICK_CHANCE = 0.35;
 /** Loose ball picked up within this reach. */
 const PICKUP_M = 0.9;
 /** A defender this close to a receiver makes the catch a pressured one. */
@@ -148,12 +164,21 @@ interface PendingKick {
   receiver: number | null;
   peak: number;
   kickoff: boolean;
+  kind: KickChoice;
   /** The trait behind the kick, if one shaped it. */
   trait?: string;
 }
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const dirOf = (s: Side): 1 | -1 => (s === 'home' ? 1 : -1);
+
+const KICK_TEXT: Readonly<Record<KickChoice, (name: string) => string>> = {
+  long: (n) => `${n} kicks long on the last`,
+  bomb: (n) => `${n} puts up a bomb`,
+  grubber: (n) => `${n} grubbers it through for the in-goal`,
+  chip: (n) => `${n} chips over the top and chases`,
+  'cross-field': (n) => `${n} goes cross-field for the winger`,
+};
 
 /**
  * Forward metres a runner covers in `t` seconds when he steers flat out
@@ -193,6 +218,12 @@ export class LiveSim implements MatchSim {
   /** The defensive line's x. */
   private lineX = 60;
   private pendingKick: PendingKick | null = null;
+  /** Who kicked the ball now in the air (he leads the chase). */
+  private lastKicker = -1;
+  /** The kick in the air is a kick-off (chased as a line, not for a regather). */
+  private kickoffUp = false;
+  /** The kicker's call for this last tackle (rolled once): run it, or which kick. */
+  private kickCall: 'run' | KickChoice | null = null;
   /** A loose ball only this side may take (after a knock-on); null = anyone's. */
   private looseFor: Side | null = null;
   /** The last ruck's markers and the tick its ball was played (they hold until released). */
@@ -328,14 +359,21 @@ export class LiveSim implements MatchSim {
     if (!k || this.tick < k.at) return;
     this.pendingKick = null;
     const kicker = this.players[k.kicker]!;
-    this.ball = kickFlight(kicker.body.pos, k.to, this.tick, k.receiver, k.peak);
+    this.ball = k.kind === 'grubber' ? grubberFlight(kicker.body.pos, k.to, this.tick) : kickFlight(kicker.body.pos, k.to, this.tick, k.receiver, k.peak);
+    this.lastKicker = k.kicker;
+    this.kickoffUp = k.kickoff;
+    this.kickCall = null;
     const receiving = other(kicker.side);
     this.attacking = receiving;
     this.dir = dirOf(receiving);
     this.tackles = 0;
     this.lastPlay = false;
     this.lineX = k.to.x + this.dir * ONSIDE_M;
-    this.emit(k.kickoff ? 'kickoff' : 'kick', k.kickoff ? `${kicker.name} kicks off` : `${kicker.name} kicks long on the last`, kicker, k.trait);
+    if (k.kickoff) this.emit('kickoff', `${kicker.name} kicks off`, kicker);
+    else {
+      this.emit('kick', KICK_TEXT[k.kind](kicker.name), kicker, k.trait);
+      this.events[this.events.length - 1]!.detail = k.kind;
+    }
     if (this.phase.kind !== 'play') this.phase = { kind: 'play' };
   }
 
@@ -343,21 +381,36 @@ export class LiveSim implements MatchSim {
     const b = this.ball;
     if (b.kind === 'flight') {
       if (!landed(b, this.tick)) return;
-      const r = b.receiver !== null ? this.players[b.receiver] : undefined;
       if (b.via === 'bounce') {
         // Hops done: it lies there for whoever gets to it.
         this.ball = { kind: 'loose', pos: { ...b.to }, vel: { x: 0, y: 0 } };
         return;
       }
-      if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > CATCH_REACH)) {
+      // A kick is anyone's: whoever is under it takes it, the nominated man on a tie.
+      const r = b.via === 'kick' ? this.underKick(b.to, b.receiver) : b.receiver !== null ? this.players[b.receiver] : undefined;
+      if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > (b.via === 'kick' ? KICK_CATCH_REACH : CATCH_REACH))) {
         // Nobody under it: it comes down and bounces on in the direction it was going.
         if (b.via === 'pass') this.emit('loose', r ? `${r.name} can't get to the pass — loose ball` : 'The pass goes to ground — loose ball', r);
-        const dir = sub(b.to, b.from);
-        this.ball = bounceFlight(b.to, dir, this.tick, b.via === 'kick' ? 4 + this.rng.next() * 4 : 2);
+        if (b.bounces > 0) {
+          // A grubber has done its hopping: it lies where it stopped.
+          this.ball = { kind: 'loose', pos: { ...b.to }, vel: { x: 0, y: 0 } };
+        } else {
+          const dir = sub(b.to, b.from);
+          const bf = bounceFlight(b.to, dir, this.tick, b.via === 'kick' ? 4 + this.rng.next() * 4 : 2) as Extract<BallState, { kind: 'flight' }>;
+          bf.to = clampToGround(bf.to, 0.5); // never over the dead-ball line
+          this.ball = bf;
+        }
         this.looseFor = null;
         return;
       }
       const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < PRESSURE_M);
+      if (b.via === 'kick' && this.rng.next() < (pressured ? DROP_PRESSURED - (r.stats.skill - 50) / 300 : DROP_CHANCE)) {
+        // Spilled under the high ball: a scramble for anyone.
+        this.emit('drop', `${r.name} spills the kick under pressure!`, r);
+        this.ball = bounceFlight(b.to, { x: (this.rng.next() - 0.5) * 2, y: (this.rng.next() - 0.5) * 2 }, this.tick, 2, 12, 2);
+        this.looseFor = null;
+        return;
+      }
       const spillExtra = this.spillExtra;
       const picked = this.interceptTrait;
       this.spillExtra = 0;
@@ -370,7 +423,7 @@ export class LiveSim implements MatchSim {
         this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
         return;
       }
-      this.ball = { kind: 'held', by: b.receiver as number };
+      this.ball = { kind: 'held', by: this.indexOf(r) };
       r.catchTick = this.tick;
       r.decided = false;
       r.steppedOn = -1;
@@ -378,6 +431,13 @@ export class LiveSim implements MatchSim {
         this.emit('intercept', `${r.name} picks it off!`, r, picked);
         this.turnover();
         r.burstUntil = this.tick + BURST_TICKS;
+        return;
+      }
+      if (b.via === 'kick' && r.side !== this.attacking) {
+        // The kicking side got there first: their ball, a fresh set (or a try, next tick, if he is over the line).
+        this.lock(r, 'catch', 3);
+        this.emit('regather', `${r.name} regathers the kick!`, r);
+        this.turnover();
         return;
       }
       if (b.via === 'kick') {
@@ -412,8 +472,25 @@ export class LiveSim implements MatchSim {
     }
   }
 
+  /** Who takes a kick coming down at `at`: the nearest free player within reach, the nominated man on a near-tie. */
+  private underKick(at: Vec, nominated: number | null): Player | undefined {
+    let best: Player | undefined;
+    let bd = Infinity;
+    for (const p of this.players) {
+      if (this.locked(p)) continue;
+      let d = dist(p.body.pos, at);
+      if (this.indexOf(p) === nominated) d -= 0.3;
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
   /** Possession changes hands where the ball is; a fresh set for the other side. */
   private turnover(): void {
+    this.kickCall = null;
     this.attacking = other(this.attacking);
     this.dir = dirOf(this.attacking);
     this.tackles = 0;
@@ -441,6 +518,7 @@ export class LiveSim implements MatchSim {
       receiver: this.idx(receiving, FULLBACK),
       peak: 16,
       kickoff: true,
+      kind: 'long',
     };
   }
 
@@ -462,23 +540,18 @@ export class LiveSim implements MatchSim {
     const nearest = committed[0];
     const nearD = nearest ? dist(nearest.body.pos, h.body.pos) : Infinity;
 
-    // Last-tackle kick: the kicker runs a few steps then puts boot to ball,
-    // unless the line is close enough to have a crack.
+    // Last tackle: the kicker makes one call for the play — run it when he's
+    // on the line (or fancies it inside 40), else a kick for the zone — then
+    // runs a few steps and puts boot to ball.
     const toLine = this.toLine(h);
-    if (this.lastPlay && h.slot === KICKER && toLine > RUN_IT_M && (this.tick - h.catchTick >= KICK_RUN_TICKS || nearD < ENGAGE_M)) {
-      const fb = this.at(other(this.attacking), FULLBACK);
-      const boot = bootMult(h.traits);
-      this.lock(h, 'kick', KICK_LOCK_TICKS);
-      this.pendingKick = {
-        at: this.tick + KICK_CONTACT_TICKS,
-        kicker: this.indexOf(h),
-        to: kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot),
-        receiver: this.indexOf(fb),
-        peak: 12,
-        kickoff: false,
-        ...(boot.dist > 1 ? { trait: announce(h.traits.find((t) => t.id === 'bigBoot')) ?? 'Big Boot' } : {}),
-      };
-      return;
+    const early = this.tackles === SET_TACKLES - 2 && toLine <= EARLY_KICK_M;
+    if ((this.lastPlay || early) && h.slot === KICKER) {
+      if (this.kickCall === null) this.kickCall = this.lastPlay ? this.callLastPlay(toLine) : this.callEarlyKick();
+      if (this.kickCall !== 'run' && (this.tick - h.catchTick >= KICK_RUN_TICKS || nearD < ENGAGE_M)) {
+        this.pendingKick = this.planKick(h, this.kickCall);
+        this.lock(h, 'kick', KICK_LOCK_TICKS);
+        return;
+      }
     }
 
     // Engaged: decide once — shift it to a better option out the back, or
@@ -488,7 +561,15 @@ export class LiveSim implements MatchSim {
       h.decided = true;
       const maker = traitBoost(h.traits, 'playmaker');
       const reach = MAX_LAT_M + (maker > 0 ? CUT_OUT_PER_LEVEL_M * maker : 0);
-      const receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h), reach);
+      const cands = this.candidates(h);
+      let receiver = pickReceiver(h.body.pos, this.dir, cands, reach, Math.min(0.6, PLAYMAKER_WIDTH * maker));
+      // A Playmaker sees the overlap: now and then he skips the near man and throws to the widest one he can reach.
+      if (maker > 0 && this.rng.next() < CUT_OUT_CHANCE * maker) {
+        const widest = cands
+          .filter((c) => !c.busy && (h.body.pos.x - c.pos.x) * this.dir >= 0.3 && (h.body.pos.x - c.pos.x) * this.dir <= 8 && Math.abs(c.pos.y - h.body.pos.y) <= reach)
+          .sort((a, b) => Math.abs(b.pos.y - h.body.pos.y) - Math.abs(a.pos.y - h.body.pos.y))[0];
+        if (widest && Math.abs(widest.pos.y - h.body.pos.y) > MAX_LAT_M) receiver = widest.idx;
+      }
       if (receiver !== null && this.rng.next() < 0.3 + h.stats.skill / 300 + TRAIT_PTS.playmakerPass * maker) {
         const to = this.players[receiver]!;
         if (Math.abs(to.body.pos.y - h.body.pos.y) > MAX_LAT_M) {
@@ -527,6 +608,44 @@ export class LiveSim implements MatchSim {
     return h.steppedOn;
   }
 
+  /** In the red zone with a tackle to spare, the kicker sometimes goes early: a grubber or a chip for the chasers. */
+  private callEarlyKick(): 'run' | KickChoice {
+    if (this.rng.next() >= EARLY_KICK_CHANCE) return 'run';
+    return this.rng.next() < 0.6 ? 'grubber' : 'chip';
+  }
+
+  /** The kicker's call on the last: run it close in or one time in five inside 40, else the kick for the zone. */
+  private callLastPlay(toLine: number): 'run' | KickChoice {
+    if (toLine <= RUN_CLOSE_M) return 'run';
+    if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
+    return chooseKick(toLine, this.rng.next());
+  }
+
+  /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */
+  private planKick(h: Player, kind: KickChoice): PendingKick {
+    const def = other(this.attacking);
+    const fb = this.at(def, FULLBACK);
+    const boot = bootMult(h.traits);
+    const base = { at: this.tick + KICK_CONTACT_TICKS, kicker: this.indexOf(h), kickoff: false, kind };
+    const trait = boot.dist > 1 ? { trait: announce(h.traits.find((t) => t.id === 'bigBoot')) ?? 'Big Boot' } : {};
+    switch (kind) {
+      case 'grubber':
+        return { ...base, to: grubberTarget(h.body.pos, this.dir, this.rng.next()), receiver: null, peak: 0.9 };
+      case 'chip':
+        return { ...base, to: chipTarget(h.body.pos, this.dir, this.rng.next()), receiver: this.indexOf(h), peak: 5 };
+      case 'cross-field': {
+        // The winger on the far side of the field from the ball has the space.
+        const wingers = this.side(this.attacking).filter((p) => ROLES[p.slot]!.name === 'winger');
+        const far = wingers.sort((a, b) => Math.abs(b.body.pos.y - h.body.pos.y) - Math.abs(a.body.pos.y - h.body.pos.y))[0] ?? h;
+        return { ...base, to: crossFieldTarget(h.body.pos, this.dir, far.body.pos, this.rng.next()), receiver: this.indexOf(far), peak: 13 };
+      }
+      case 'bomb':
+        return { ...base, to: bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), receiver: this.indexOf(fb), peak: 20, ...trait };
+      default:
+        return { ...base, to: kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot), receiver: this.indexOf(fb), peak: 12, ...trait };
+    }
+  }
+
   /** The geometry of a contact: numbers, angle, momentum, tackle count, support. */
   private situation(c: Player, t: Player, committed: readonly Player[]): Situation {
     const others = committed.filter((d) => d !== t && dist(d.body.pos, c.body.pos) < SECOND_MAN_M).length;
@@ -560,6 +679,7 @@ export class LiveSim implements MatchSim {
     const c = this.players[ph.carrier]!;
     const t = this.players[ph.tackler]!;
     this.tackles++;
+    this.kickCall = null;
     const handover = this.tackles >= SET_TACKLES;
     this.mark = { ...c.body.pos };
     this.lineX = this.mark.x + this.dir * ONSIDE_M;
@@ -894,6 +1014,19 @@ export class LiveSim implements MatchSim {
         for (const p of near.slice(0, 2)) chasers.add(p);
       }
     }
+    // A kick in the air: the kicker and his two nearest chase it; the receiving
+    // side gets a second man under it beside the nominated catcher.
+    const kickUp = flight && flight.via === 'kick' && !looseAt && !this.kickoffUp ? flight : null;
+    const kickChasers = new Set<Player>();
+    if (kickUp) {
+      const kicker = this.players[this.lastKicker];
+      const kickingSide = kicker ? kicker.side : def;
+      const chase = this.side(kickingSide).filter((p) => !this.locked(p)).sort((a, b) => dist(a.body.pos, kickUp.to) - dist(b.body.pos, kickUp.to));
+      for (const p of chase.slice(0, 2)) kickChasers.add(p);
+      if (kicker && !this.locked(kicker)) kickChasers.add(kicker);
+      const cover = this.side(other(kickingSide)).filter((p) => p !== receiver && !this.locked(p)).sort((a, b) => dist(a.body.pos, kickUp.to) - dist(b.body.pos, kickUp.to))[0];
+      if (cover) kickChasers.add(cover);
+    }
 
     // Attack.
     const attackers = this.side(atk);
@@ -912,6 +1045,9 @@ export class LiveSim implements MatchSim {
       p.through = false;
       if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
+      } else if (kickUp && kickChasers.has(p)) {
+        p.target = { ...kickUp.to };
+        p.through = dist(p.body.pos, kickUp.to) > CHASE_THROUGH_M;
       } else if (p === carrier) {
         if (ph.kind === 'play') {
           const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
@@ -965,6 +1101,9 @@ export class LiveSim implements MatchSim {
       p.through = false;
       if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
+      } else if (kickUp && kickChasers.has(p)) {
+        p.target = { ...kickUp.to };
+        p.through = dist(p.body.pos, kickUp.to) > CHASE_THROUGH_M;
       } else if (p === receiver) {
         p.target = { ...flight!.to };
       } else if (committed.includes(p) && carrier) {
@@ -975,7 +1114,14 @@ export class LiveSim implements MatchSim {
         const k = markers.indexOf(p);
         p.target = clampToGround({ x: this.mark.x + this.dir * 0.8, y: this.mark.y + (k === 0 ? -0.9 : 0.9) }, 0.5);
       } else if (p.slot === FULLBACK) {
-        p.target = { x: clamp(this.lineX + this.dir * 16, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
+        // The last line: deeper still on the last tackle, and once the kicker
+        // shapes to kick he reads it and goes to where it will land.
+        const pk = this.pendingKick;
+        if (pk && this.players[pk.kicker]!.side === atk && !pk.kickoff) p.target = { ...pk.to };
+        else {
+          const deep = this.lastPlay ? FULLBACK_LAST_M : FULLBACK_DEEP_M;
+          p.target = { x: clamp(this.lineX + this.dir * deep, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
+        }
       } else {
         const y = clamp(role.lane + (anchor.y - MID_Y) * (role.defPull ?? role.pull), 1.5, 66.5);
         p.target = { x: clamp(this.lineX, -8, FIELD_LENGTH + 8), y };
