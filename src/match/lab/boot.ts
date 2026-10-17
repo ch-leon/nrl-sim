@@ -12,6 +12,7 @@ import { LabPanel } from './panel';
 import { LabScene, type LabSceneData } from './scene';
 import { DEFAULT_AWAY, DEFAULT_HOME, LAB_CLUBS, labSheet } from './sheets';
 import { DEFAULT_TACTICS, tacticsLabel } from '../league/presets';
+import { LEGS_ENERGY } from '../league/fatigue';
 
 const SCENE_KEY = 'Lab';
 
@@ -47,12 +48,15 @@ export function bootLab(): void {
   const start = (params: LabParams): void => {
     const home = labSheet(params.home, params.traits, params.tactics.home);
     const away = labSheet(params.away, params.traits, params.tactics.away);
-    const ctrl = new LabController((h, a, seed, traits, tactics) => new LiveSim(labSheet(h, traits, tactics.home), labSheet(a, traits, tactics.away), seed), params);
+    const ctrl = new LabController(
+      (h, a, seed, traits, tactics, legs) => new LiveSim(labSheet(h, traits, tactics.home), labSheet(a, traits, tactics.away), seed, { energy: LEGS_ENERGY[legs] }),
+      params,
+    );
     const data: LabSceneData = { home, away, controller: ctrl };
     panel?.destroy();
     const styles = `${home.name}: ${tacticsLabel(home.tactics ?? DEFAULT_TACTICS)} · ${away.name}: ${tacticsLabel(away.tactics ?? DEFAULT_TACTICS)}`;
     panel = new LabPanel(ctrl, LAB_CLUBS, { restart: start, notify }, styles);
-    history.replaceState(null, '', labHash({ seed: params.seed, home: params.home, away: params.away, tick: params.tick, traits: params.traits, tactics: params.tactics }));
+    history.replaceState(null, '', labHash({ seed: params.seed, home: params.home, away: params.away, tick: params.tick, traits: params.traits, tactics: params.tactics, legs: params.legs }));
     if (!game) {
       game = new Phaser.Game({
         type: Phaser.AUTO,

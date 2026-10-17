@@ -51,4 +51,13 @@ export interface Snapshot {
   label: string;
   /** Events emitted on this tick. */
   events: SimEvent[];
+  /** A wrestle in progress (BAK-208 §8.1): the carrier, the fight left in him (1 → 0) and how many men are on him. */
+  wrestle?: WrestleSnap;
+}
+
+export interface WrestleSnap {
+  side: Side;
+  slot: number;
+  fight: number;
+  men: number;
 }

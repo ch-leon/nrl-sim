@@ -120,8 +120,9 @@ describe('tactics in the live sim', () => {
     expect(count(allOut, 'offload', 'home')).toBeGreaterThan(count(bal, 'offload', 'home') * 1.5);
   });
   it('a Rush defence makes more big hits but concedes more busts and steps than Slide', () => {
-    const slide = events(sheet('H'), sheet('A', 'balanced', 'slide'), SEEDS, SECS);
-    const rush = events(sheet('H'), sheet('A', 'balanced', 'rush'), SEEDS, SECS);
+    // Twice the seeds: busts and steps are rarer than big hits, and 12 seeds is within the noise.
+    const slide = events(sheet('H'), sheet('A', 'balanced', 'slide'), SEEDS * 2, SECS);
+    const rush = events(sheet('H'), sheet('A', 'balanced', 'rush'), SEEDS * 2, SECS);
     expect(count(rush, 'big-hit', 'away')).toBeGreaterThan(count(slide, 'big-hit', 'away') * 1.15);
     expect(count(rush, 'break-tackle', 'home') + count(rush, 'step', 'home')).toBeGreaterThan(count(slide, 'break-tackle', 'home') + count(slide, 'step', 'home'));
   });

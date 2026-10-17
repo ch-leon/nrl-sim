@@ -222,11 +222,10 @@ describe('LiveSim', () => {
     let seen = false;
     run(sim, 120, (s) => {
       if (seen) return;
-      const t = s.events.find((e) => e.kind === 'tackle');
-      if (t && carrier === null) {
-        // The event names the tackler; the carrier is whoever holds the ball.
-        const h = s.ball.holder!;
-        carrier = s.players.findIndex((p) => p.side === h.side && p.slot === h.slot);
+      if (s.wrestle && carrier === null) {
+        // Contact: the wrestle names the carrier (the tackle event comes when he is held).
+        const w = s.wrestle;
+        carrier = s.players.findIndex((p) => p.side === w.side && p.slot === w.slot);
       }
       if (carrier !== null) {
         const p = s.players[carrier]!;
