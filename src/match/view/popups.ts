@@ -41,7 +41,17 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   error: { word: 'KNOCK-ON!', tone: 'bad' },
   handover: { word: 'HANDOVER', tone: 'neutral' },
   kick: { word: 'KICK!', tone: 'neutral' },
+  regather: { word: 'REGATHER!', tone: 'attack', big: true },
+  drop: { word: 'DROPPED!', tone: 'bad' },
   try: { word: 'TRY!', tone: 'attack', big: true },
+};
+
+/** A kick's pop-up names its type (BAK-208 §4.4). */
+const KICK_WORDS: Readonly<Record<string, string>> = {
+  bomb: 'BOMB!',
+  grubber: 'GRUBBER!',
+  chip: 'CHIP!',
+  'cross-field': 'CROSS-FIELD!',
 };
 
 export function surnameOf(name: string | undefined): string {
@@ -59,7 +69,8 @@ export function popupFor(e: SimEvent): Popup | null {
   const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
   const big = w.big ?? false;
-  const p: Popup = { word: w.word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
+  const word = e.kind === 'kick' && e.detail && KICK_WORDS[e.detail] ? KICK_WORDS[e.detail]! : w.word;
+  const p: Popup = { word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;
 }

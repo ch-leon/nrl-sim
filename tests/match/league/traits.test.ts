@@ -163,7 +163,7 @@ describe('traits in the live sim', () => {
     expect(razz.some((e) => e.kind === 'error' && e.text.includes('wild offload'))).toBe(true);
   });
   it('a Playmaker throws cut-out balls; a Big Boot is named on the kick', () => {
-    const pm = events(sheet('H', (i) => (i === 5 || i === 4 ? T('playmaker', 3) : undefined)), sheet('A'), SEEDS * 2, SECS);
+    const pm = events(sheet('H', (i) => (i === 5 || i === 4 ? T('playmaker', 3) : undefined)), sheet('A'), SEEDS * 3, SECS);
     expect(count(pm, 'cut-out', 'home')).toBeGreaterThan(0);
     expect(count(control, 'cut-out')).toBe(0);
     const boot = events(sheet('H', (i) => (i === 5 ? T('bigBoot', 2) : undefined)), sheet('A'), 4, SECS);

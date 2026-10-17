@@ -39,6 +39,8 @@ export interface SimEvent {
   player?: string;
   /** A special skill that made the difference, named for the pop-up ("Dancing Feet II"). */
   trait?: string;
+  /** Flavour of the kind (a kick's type: long, bomb, grubber, chip, cross-field). */
+  detail?: string;
 }
 
 export interface Snapshot {

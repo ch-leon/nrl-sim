@@ -155,21 +155,36 @@ is heeled at a ruck the backline comes up onto it (3 m ahead of their standing s
 less for the forwards close to the ruck) so the first receiver takes it at ~2.5 m/s,
 not standing. Carrying the ball costs 5% of top speed.
 
-### 4.3 Catch (kicks)
-Catcher under a bomb: Skill vs the chasers' pressure. Clean take 85% unpressured, 65%
-with a chaser inside 2 m, −10% rain. A drop is a scramble for the loose ball.
+### 4.3 Catch (kicks) — *first slice implemented (lab feedback round 2)*
+A kick hangs for its flight time (2√(2·peak/g): a 12 m kick ≈ 3.1 s, a bomb ≈ 4 s), so
+chasers and catchers can get under it. **Whoever is nearest the landing point within
+2.5 m takes it** (the nominated man on a near tie): the kicking side's kicker and two
+nearest chase it flat out, the receiving side has a second man under it beside the
+catcher, and the defending fullback drops to 24 m behind his line on the last tackle
+and goes to the landing spot the moment the kicker shapes to kick. Drop: 6% alone,
+18% with a chaser inside 2 m (−/+ by Skill); a drop is a scramble for anyone. The kicking
+side getting there first is a **regather** (fresh set, or a try next tick if he is over
+the line). Rain and the Skill-vs-pressure table above wait for E.
 
-### 4.4 Kicks
+### 4.4 Kicks — *first slice implemented: long, bomb, grubber, chip, cross-field*
+The kicker makes **one call** for the last tackle: inside 6 m he runs it; inside 40 m he
+runs it one time in five; otherwise a kick by zone, each announced by type. On the
+second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip 40):
+
 | Kick | When the AI chooses it | Resolution |
 |---|---|---|
-| **Territory** (long) | Last tackle in own half | Distance from Boot; lands in front of the fullback; chase sets the line |
-| **Bomb** | Last tackle, 25–45 m out | High and short; catch contest (§4.3); Boot accuracy puts it on the catcher or 5 m off |
-| **Grubber** | Last tackle inside 20 m, or Playmaker earlier | Bounces into the in-goal; attacker vs defender race; try or 20 m restart |
-| **Chip** | Red zone, one-on-one with a defender rushing | Over the top, regather chance from Speed |
-| **40/20** | Inside own 40, Boot trait or Playmaker, last tackle | Finds touch inside the 20 → fresh set to the kicking team |
-| **Field goal** | Last 3 minutes, scores level or within 1, inside 30 m | Boot accuracy, defensive charge-down 8% |
+| **Territory** (long) | Beyond 50 m (85%), or 40–50 m (20%) | Distance from Boot; lands in front of the fullback; chase sets the line |
+| **Bomb** | Beyond 50 m (15%), 40–50 m (50%), 22–40 m (30%) | Peak 20 m, 22–28 m long, onto the fullback's patch; catch contest (§4.3) |
+| **Cross-field** | 40–50 m (30%), 22–40 m (35%), inside 22 m (30%) | Peak 13 m, to the far winger, 2 m short of the line; winger vs winger under it |
+| **Grubber** | 22–40 m (20%), inside 22 m (50%) | Skids and hops 3 m into the in-goal; race for the loose ball: try, or the defender runs it out |
+| **Chip** | 22–40 m (15%), inside 22 m (20%) | 10–13 m over the rushing line, the kicker chases his own |
+| **40/20** | Inside own 40, Boot trait or Playmaker, last tackle | *E:* Finds touch inside the 20 → fresh set to the kicking team |
+| **Field goal** | Last 3 minutes, scores level or within 1, inside 30 m | *Phase 2:* Boot accuracy, defensive charge-down 8% |
 
-Every kick pop-ups its type; the camera goes wide.
+Every kick pop-ups its type (BOMB!, GRUBBER!, CHIP!, CROSS-FIELD!, plain KICK! for
+territory); REGATHER! and DROPPED! follow. The camera going wide waits for E. Goal-line
+dropouts and dead balls are not modelled yet: a grubber never crosses the dead-ball
+line and a defender who gathers it in-goal simply runs it out.
 
 ## 5. Tactics by zone
 
