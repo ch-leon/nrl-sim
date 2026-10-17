@@ -106,27 +106,29 @@ describe('generatePlayer — shape & bounds', () => {
   });
 });
 
+const ids = (p: { traits: { id: string }[] }): string[] => p.traits.map((t) => t.id);
+
 describe('generatePlayer — auto traits', () => {
   it('young high-potential players carry youngGun and not veteran', () => {
     const rng = makeRng(3);
     const p = generatePlayer(rng, { age: 19, quality: 'star' });
     expect(overallRating(p)).toBeGreaterThanOrEqual(60);
-    expect(p.traits).toContain('youngGun');
-    expect(p.traits).not.toContain('veteran');
+    expect(ids(p)).toContain('youngGun');
+    expect(ids(p)).not.toContain('veteran');
   });
 
   it('age>=31 players carry veteran and not youngGun', () => {
     const rng = makeRng(3);
     const p = generatePlayer(rng, { age: 33, quality: 'average' });
-    expect(p.traits).toContain('veteran');
-    expect(p.traits).not.toContain('youngGun');
+    expect(ids(p)).toContain('veteran');
+    expect(ids(p)).not.toContain('youngGun');
   });
 
   it('never assigns clubLegend at generation', () => {
     const rng = makeRng(77);
     for (let i = 0; i < 500; i++) {
       const p = generatePlayer(rng);
-      expect(p.traits).not.toContain('clubLegend');
+      expect(ids(p)).not.toContain('clubLegend');
     }
   });
 
@@ -134,7 +136,7 @@ describe('generatePlayer — auto traits', () => {
     const rng = makeRng(4);
     for (let i = 0; i < 500; i++) {
       const p = generatePlayer(rng);
-      expect(new Set(p.traits).size).toBe(p.traits.length);
+      expect(new Set(ids(p)).size).toBe(p.traits.length);
     }
   });
 });

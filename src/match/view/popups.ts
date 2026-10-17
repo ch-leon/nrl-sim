@@ -14,7 +14,12 @@ export interface Popup {
   big: boolean;
   /** How long it stays up, real ms. */
   ms: number;
+  /** Third line: the special skill that fired ("DANCING FEET II"), in the trait colour. */
+  trait?: string;
 }
+
+/** Trait line colour: the one colour no tone uses, so a firing trait always reads. */
+export const TRAIT_COLOR = '#d9a5ff';
 
 export const POPUP_MS = 1200;
 export const POPUP_BIG_MS = 1700;
@@ -31,6 +36,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   'big-hit': { word: 'BIG HIT!', tone: 'defence', big: true },
   strip: { word: 'STRIP!', tone: 'defence', big: true },
   intercept: { word: 'INTERCEPT!', tone: 'defence', big: true },
+  'cut-out': { word: 'CUT-OUT!', tone: 'attack' },
+  gamble: { word: 'GAMBLED!', tone: 'bad' },
   error: { word: 'KNOCK-ON!', tone: 'bad' },
   handover: { word: 'HANDOVER', tone: 'neutral' },
   kick: { word: 'KICK!', tone: 'neutral' },
@@ -43,12 +50,18 @@ export function surnameOf(name: string | undefined): string {
   return parts[parts.length - 1] ?? '';
 }
 
-/** The pop-up for an event, or null for routine events (tackles, set starts). */
+/**
+ * The pop-up for an event, or null for routine events (tackles, set starts).
+ * A tackle that a trait shaped (a Wrecking Ball driving through it) does get
+ * one, so every firing trait is seen.
+ */
 export function popupFor(e: SimEvent): Popup | null {
-  const w = WORDS[e.kind];
+  const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
   const big = w.big ?? false;
-  return { word: w.word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
+  const p: Popup = { word: w.word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
+  if (e.trait) p.trait = e.trait.toUpperCase();
+  return p;
 }
 
 /** Text colour per tone (team colour is applied by the layer for attack/defence when known). */

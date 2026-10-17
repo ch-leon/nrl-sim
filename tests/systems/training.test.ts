@@ -15,6 +15,9 @@ import {
 } from '../../src/core/time';
 import { generatePlayer } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
+import type { TraitId, TraitInstance } from '../../src/core/state';
+
+const T = (...ids: TraitId[]): TraitInstance[] => ids.map((id) => ({ id, level: 1 as const }));
 
 const flatStats = (v: number): PlayerStats => ({
   speed: v, strength: v, stamina: v, skill: v, footyIQ: v,
@@ -79,16 +82,16 @@ describe('ageMod', () => {
 
 describe('traitMult', () => {
   it('workhorse ×1.2', () => {
-    expect(traitMult(mkPlayer({ traits: ['workhorse'] }))).toBeCloseTo(1.2, 10);
+    expect(traitMult(mkPlayer({ traits: T('workhorse') }))).toBeCloseTo(1.2, 10);
   });
   it('youngGun ×1.3', () => {
-    expect(traitMult(mkPlayer({ traits: ['youngGun'] }))).toBeCloseTo(1.3, 10);
+    expect(traitMult(mkPlayer({ traits: T('youngGun') }))).toBeCloseTo(1.3, 10);
   });
   it('workhorse + youngGun stack to ×1.56', () => {
-    expect(traitMult(mkPlayer({ traits: ['workhorse', 'youngGun'] }))).toBeCloseTo(1.56, 10);
+    expect(traitMult(mkPlayer({ traits: T('workhorse', 'youngGun') }))).toBeCloseTo(1.56, 10);
   });
   it('irrelevant traits ×1.0', () => {
-    expect(traitMult(mkPlayer({ traits: ['finisher', 'veteran', 'hardMan'] }))).toBe(1);
+    expect(traitMult(mkPlayer({ traits: T('finisher', 'veteran', 'hitman') }))).toBe(1);
   });
 });
 
@@ -198,7 +201,7 @@ describe('trainPlayer — exact deterministic maths', () => {
   });
 
   it('trait stacking: workhorse+youngGun scales gains ×1.56', () => {
-    const p = mkPlayer({ age: 25, traits: ['workhorse', 'youngGun'], stats: flatStats(50) });
+    const p = mkPlayer({ age: 25, traits: T('workhorse', 'youngGun'), stats: flatStats(50) });
     const out = trainPlayer(p, [pf({ defId: 'weightsRoom' })]);
     // 2.0 × 1.56 × 12 × 0.25 = 9.36
     expect(out.strength).toBeCloseTo(59.36, 10);
@@ -389,8 +392,8 @@ describe('headroom — gains shrink as a stat rises (GitHub #35)', () => {
 
   it('workhorse ×1.2 and youngGun ×1.3 still give a bonus at the same stat', () => {
     const plain = gainAt(70);
-    expect(gainAt(70, { traits: ['workhorse'] })).toBeCloseTo(plain * 1.2, 10);
-    expect(gainAt(70, { traits: ['youngGun'] })).toBeCloseTo(plain * 1.3, 10);
+    expect(gainAt(70, { traits: T('workhorse') })).toBeCloseTo(plain * 1.2, 10);
+    expect(gainAt(70, { traits: T('youngGun') })).toBeCloseTo(plain * 1.3, 10);
   });
 });
 

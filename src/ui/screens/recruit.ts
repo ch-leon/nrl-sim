@@ -4,7 +4,8 @@
 // PlayerCard used by the squad screen.
 
 import { el, panel, button, ensureStyles, openScreen, closeScreen } from '../dom';
-import { getState, type Player, type PlayerStats, type Trait } from '../../core/state';
+import { getState, type Player, type PlayerStats, type TraitInstance } from '../../core/state';
+import { ROMAN, TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import {
@@ -173,17 +174,11 @@ const STAT_LABELS: readonly [keyof PlayerStats, string][] = [
   ['footyIQ', 'IQ'],
 ];
 
-/** Short badge label + tooltip per trait (#43). `bad` traits render in a warning tint. */
-const TRAIT_BADGES: Record<Trait, { label: string; tip: string; bad?: boolean }> = {
-  workhorse: { label: 'WORK', tip: 'Workhorse: trains harder' },
-  finisher: { label: 'FIN', tip: 'Finisher: more likely to score tries' },
-  hardMan: { label: 'HARD', tip: 'Hard man: makes more big hits' },
-  playmaker: { label: 'PLAY', tip: 'Playmaker: smarter kicking, better goal-kicking' },
-  injuryProne: { label: 'INJ', tip: 'Injury prone: more likely to be hurt', bad: true },
-  clubLegend: { label: 'LEG', tip: 'Club legend' },
-  youngGun: { label: 'YNG', tip: 'Young gun: develops quickly' },
-  veteran: { label: 'VET', tip: 'Veteran' },
-};
+/** Badge label + tooltip for a levelled trait (BAK-208 §3). Traits with a downside render in a warning tint. */
+export function traitBadge(t: TraitInstance): { label: string; tip: string; bad: boolean } {
+  const def = TRAITS[t.id];
+  return { label: `${def.short} ${ROMAN[t.level]}`, tip: `${traitLabel(t)}: ${def.blurb}`, bad: def.bad ?? false };
+}
 
 // ── Shared PlayerCard ───────────────────────────────────────────────────────
 
@@ -219,8 +214,8 @@ export function PlayerCard(p: Player, opts: PlayerCardOpts = {}): HTMLElement {
     metaChildren.push(el('span', { class: 'nrl-badge nrl-badge-out', text: `OUT ${p.injuredWeeks}w` }));
   }
   for (const t of p.traits) {
-    const b = TRAIT_BADGES[t];
-    if (!b) continue;
+    if (!(t.id in TRAITS)) continue;
+    const b = traitBadge(t);
     metaChildren.push(
       el('span', {
         class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`,

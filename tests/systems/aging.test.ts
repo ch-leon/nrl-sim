@@ -21,18 +21,18 @@ describe('agePlayer', () => {
   });
 
   it('drops youngGun once past the young-gun age', () => {
-    const p = { ...generatePlayer(makeRng(2), { age: 20 }), traits: ['youngGun' as const] };
-    expect(agePlayer(p).traits).not.toContain('youngGun');
+    const p = { ...generatePlayer(makeRng(2), { age: 20 }), traits: [{ id: 'youngGun' as const, level: 1 as const }] };
+    expect(agePlayer(p).traits.map((t) => t.id)).not.toContain('youngGun');
   });
 
   it('adds veteran at 31', () => {
     const p = { ...generatePlayer(makeRng(3), { age: 30 }), traits: [] };
-    expect(agePlayer(p).traits).toContain('veteran');
+    expect(agePlayer(p).traits.map((t) => t.id)).toContain('veteran');
   });
 
   it('does not duplicate veteran', () => {
-    const p = { ...generatePlayer(makeRng(4), { age: 32 }), traits: ['veteran' as const] };
-    expect(agePlayer(p).traits.filter((t) => t === 'veteran')).toHaveLength(1);
+    const p = { ...generatePlayer(makeRng(4), { age: 32 }), traits: [{ id: 'veteran' as const, level: 1 as const }] };
+    expect(agePlayer(p).traits.filter((t) => t.id === 'veteran')).toHaveLength(1);
   });
 });
 

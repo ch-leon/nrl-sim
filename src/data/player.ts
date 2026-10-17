@@ -2,10 +2,11 @@
 // The Player/PlayerStats/Position/Trait TYPES live in ../core/state (ARCHITECTURE
 // §4) — imported here, never redefined. Pure TypeScript, no Phaser.
 
-import type { Player, Position, PlayerStats, Trait } from '../core/state';
+import type { Player, Position, PlayerStats } from '../core/state';
 import type { Rng } from '../utils/rng';
 import { WEEKS_PER_SEASON, STAT_MAX } from '../config';
 import { randomName } from './names';
+import { rollTraits, withTrait } from './traits';
 
 /** The 9 positions from ARCHITECTURE §4. */
 export const POSITIONS: readonly Position[] = [
@@ -78,15 +79,11 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
   const wage = Math.round(overall * 15 + 100); // tuned: squad of 20 ≈ $18k/wk vs BAK-188 income scales
   const contractWeeks = rng.int(1, 3) * WEEKS_PER_SEASON;
 
-  // Base traits: each independent 15% roll.
-  const traitSet = new Set<Trait>();
-  const baseTraits: Trait[] = ['workhorse', 'finisher', 'hardMan', 'playmaker', 'injuryProne'];
-  for (const t of baseTraits) {
-    if (rng.next() < 0.15) traitSet.add(t);
-  }
+  // Special skills: rare, levelled, weighted to the position (BAK-208 §3).
+  let traits = rollTraits(rng, position, quality);
   // Auto-traits by age (mutually exclusive by construction).
-  if (age <= 20 && overall >= 60) traitSet.add('youngGun');
-  if (age >= 31) traitSet.add('veteran');
+  if (age <= 20 && overall >= 60) traits = withTrait(traits, 'youngGun');
+  if (age >= 31) traits = withTrait(traits, 'veteran');
   // clubLegend is never assigned at generation (tenure-driven, later ticket).
 
   return {
@@ -98,7 +95,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
     morale,
     injuryRisk,
     injuredWeeks: 0,
-    traits: [...traitSet],
+    traits,
     wage,
     contractWeeks,
   };

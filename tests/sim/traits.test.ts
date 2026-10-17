@@ -3,14 +3,16 @@
 import { describe, it, expect } from 'vitest';
 import { rollBigHitInjury, simulateMatch, teamSheetFromSquad } from '../../src/sim/engine';
 import type { MatchResult, RosterEntry, TeamSheet } from '../../src/sim/events';
-import type { Player, Position, Trait } from '../../src/core/state';
+import type { Player, Position, TraitId, TraitInstance } from '../../src/core/state';
+
+const T = (...ids: TraitId[]): TraitInstance[] => ids.map((id) => ({ id, level: 1 as const }));
 import { makeRng } from '../../src/utils/rng';
 
 const POSITIONS: Position[] = [
   'fullback', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row', 'lock',
 ];
 
-function roster(prefix: string, traits: Record<string, Trait[]> = {}): RosterEntry[] {
+function roster(prefix: string, traits: Record<string, TraitInstance[]> = {}): RosterEntry[] {
   return POSITIONS.map((position, i) => {
     const name = `${prefix}${i}`;
     const t = traits[name];
@@ -51,7 +53,7 @@ const count = (rs: MatchResult[], f: (e: MatchResult['events'][number]) => boole
 
 describe('traits — finisher', () => {
   const winger = 'H1';
-  const withT = runSeeds(sheet('H', roster('H', { [winger]: ['finisher'] })), AWAY);
+  const withT = runSeeds(sheet('H', roster('H', { [winger]: T('finisher') })), AWAY);
   const control = runSeeds(sheet('H', roster('H')), AWAY);
   const share = (rs: MatchResult[]): number => {
     const mine = count(rs, (e) => e.kind === 'try' && e.teamId === 'H' && e.player === winger);
@@ -68,9 +70,9 @@ describe('traits — finisher', () => {
   });
 });
 
-describe('traits — hardMan', () => {
+describe('traits — hitman', () => {
   const prop = 'A6'; // defending side in these runs is the away team
-  const withT = runSeeds(sheet('H', roster('H')), sheet('A', roster('A', { [prop]: ['hardMan'] })));
+  const withT = runSeeds(sheet('H', roster('H')), sheet('A', roster('A', { [prop]: T('hitman') })));
   const control = runSeeds(sheet('H', roster('H')), sheet('A', roster('A')));
   const hits = (rs: MatchResult[], who?: string): number =>
     count(rs, (e) => e.kind === 'big-hit' && e.teamId === 'A' && (who === undefined || e.player === who));
@@ -85,7 +87,7 @@ describe('traits — hardMan', () => {
 
 describe('traits — playmaker', () => {
   const halfback = 'H4';
-  const withT = runSeeds(sheet('H', roster('H', { [halfback]: ['playmaker'] })), AWAY);
+  const withT = runSeeds(sheet('H', roster('H', { [halfback]: T('playmaker') })), AWAY);
   const control = runSeeds(sheet('H', roster('H')), AWAY);
   const kicks = (rs: MatchResult[]) => rs.flatMap((r) => r.events).filter((e) => e.kind === 'kick' && e.teamId === 'H');
   const goalKicks = (rs: MatchResult[]) =>
@@ -106,7 +108,7 @@ describe('traits — playmaker', () => {
 });
 
 describe('traits — injuryProne', () => {
-  const entry = (traits?: Trait[]): RosterEntry[] => [
+  const entry = (traits?: TraitInstance[]): RosterEntry[] => [
     { name: 'X', position: 'prop', injuryRisk: 40, id: 'x', ...(traits ? { traits } : {}) },
   ];
   const rate = (r: RosterEntry[], injuryRate: number): number => {
@@ -118,16 +120,16 @@ describe('traits — injuryProne', () => {
   };
 
   it('raises the injury chance per big hit', () => {
-    expect(rate(entry(['injuryProne']), 1)).toBeGreaterThan(rate(entry(), 1) * 1.25);
+    expect(rate(entry(T('injuryProne')), 1)).toBeGreaterThan(rate(entry(), 1) * 1.25);
   });
   it('stacks with the difficulty injuryRate rather than replacing it', () => {
-    const prone = entry(['injuryProne']);
+    const prone = entry(T('injuryProne'));
     expect(rate(prone, 2)).toBeGreaterThan(rate(prone, 1) * 1.7);
     expect(rate(prone, 2)).toBeGreaterThan(rate(entry(), 2) * 1.25);
   });
   it('shows up in full matches: the prone carrier is hurt more often', () => {
     const name = 'H2';
-    const injured = (traits?: Trait[]): number => {
+    const injured = (traits?: TraitInstance[]): number => {
       const home = sheet('H', roster('H', traits ? { [name]: traits } : {}));
       let n = 0;
       for (let s = 0; s < INJURY_SEEDS; s++) {
@@ -136,25 +138,25 @@ describe('traits — injuryProne', () => {
       }
       return n;
     };
-    expect(injured(['injuryProne'])).toBeGreaterThan(injured() * 1.1);
+    expect(injured(T('injuryProne'))).toBeGreaterThan(injured() * 1.1);
   });
 });
 
 describe('traits — plumbing and determinism', () => {
   it('teamSheetFromSquad carries traits onto roster entries', () => {
-    const mk = (i: number, traits: Trait[]): Player => ({
+    const mk = (i: number, traits: TraitInstance[]): Player => ({
       id: `p${i}`, name: `P${i}`, age: 25, position: POSITIONS[i % 9]!,
       stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 },
       morale: 60, injuryRisk: 20, injuredWeeks: 0, traits, wage: 1000, contractWeeks: 10,
     });
-    const squad = [mk(0, ['finisher', 'hardMan']), mk(1, [])];
+    const squad = [mk(0, T('finisher', 'hitman')), mk(1, [])];
     const s = teamSheetFromSquad(squad, 'P', 'P', ['#000', '#fff']);
-    expect(s.roster!.find((r) => r.name === 'P0')!.traits).toEqual(['finisher', 'hardMan']);
+    expect(s.roster!.find((r) => r.name === 'P0')!.traits).toEqual(T('finisher', 'hitman'));
     expect(s.roster!.find((r) => r.name === 'P1')!.traits).toBeUndefined();
   });
 
   it('same seed + same traited input → identical match', () => {
-    const traits = { H1: ['finisher'], H2: ['injuryProne'], H4: ['playmaker'], H6: ['hardMan'] } as Record<string, Trait[]>;
+    const traits: Record<string, TraitInstance[]> = { H1: T('finisher'), H2: T('injuryProne'), H4: T('playmaker'), H6: T('hitman') };
     const h = sheet('H', roster('H', traits));
     const a = simulateMatch(h, AWAY, { seed: 123, weather: 'clear' });
     const b = simulateMatch(h, AWAY, { seed: 123, weather: 'clear' });

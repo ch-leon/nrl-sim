@@ -9,6 +9,7 @@ import { getState, setState } from '../core/state';
 import type { Player } from '../core/state';
 import { registerSeasonHook } from '../core/time';
 import { RETIRE_HARD_AGE, RETIRE_SOFT_AGE, SQUAD_MIN } from '../config';
+import { hasTrait, withTrait, withoutTrait } from '../data/traits';
 import { makeRng, type Rng } from '../utils/rng';
 
 export const VETERAN_AGE = 31;
@@ -18,12 +19,8 @@ export const YOUNG_GUN_MAX_AGE = 20;
 export function agePlayer(p: Player): Player {
   const age = p.age + 1;
   let traits = p.traits;
-  if (age > YOUNG_GUN_MAX_AGE && traits.includes('youngGun')) {
-    traits = traits.filter((t) => t !== 'youngGun');
-  }
-  if (age >= VETERAN_AGE && !traits.includes('veteran')) {
-    traits = [...traits, 'veteran'];
-  }
+  if (age > YOUNG_GUN_MAX_AGE && hasTrait(traits, 'youngGun')) traits = withoutTrait(traits, 'youngGun');
+  if (age >= VETERAN_AGE && !hasTrait(traits, 'veteran')) traits = withTrait(traits, 'veteran');
   return { ...p, age, traits };
 }
 

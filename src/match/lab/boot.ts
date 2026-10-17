@@ -44,13 +44,13 @@ export function bootLab(): void {
 
   let panel: LabPanel | null = null;
   const start = (params: LabParams): void => {
-    const home = labSheet(params.home);
-    const away = labSheet(params.away);
-    const ctrl = new LabController((h, a, seed) => new LiveSim(labSheet(h), labSheet(a), seed), params);
+    const home = labSheet(params.home, params.traits);
+    const away = labSheet(params.away, params.traits);
+    const ctrl = new LabController((h, a, seed, traits) => new LiveSim(labSheet(h, traits), labSheet(a, traits), seed), params);
     const data: LabSceneData = { home, away, controller: ctrl };
     panel?.destroy();
     panel = new LabPanel(ctrl, LAB_CLUBS, { restart: start, notify });
-    history.replaceState(null, '', labHash({ seed: params.seed, home: params.home, away: params.away, tick: params.tick }));
+    history.replaceState(null, '', labHash({ seed: params.seed, home: params.home, away: params.away, tick: params.tick, traits: params.traits }));
     if (!game) {
       game = new Phaser.Game({
         type: Phaser.AUTO,

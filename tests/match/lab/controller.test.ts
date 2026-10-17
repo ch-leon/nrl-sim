@@ -32,25 +32,29 @@ describe('lab hash', () => {
     expect(isLabHash('')).toBe(false);
   });
   it('parses defaults, explicit params and a flag', () => {
-    expect(parseLabHash('#lab', DEF)).toEqual({ seed: 1, home: 'crushers', away: 'larrikins', tick: 0, note: '' });
-    expect(parseLabHash('#lab?seed=77&home=a&away=b&tick=120', DEF)).toEqual({ seed: 77, home: 'a', away: 'b', tick: 120, note: '' });
+    expect(parseLabHash('#lab', DEF)).toEqual({ seed: 1, home: 'crushers', away: 'larrikins', tick: 0, note: '', traits: 'gen' });
+    expect(parseLabHash('#lab?seed=77&home=a&away=b&tick=120', DEF)).toEqual({ seed: 77, home: 'a', away: 'b', tick: 120, note: '', traits: 'gen' });
     expect(parseLabHash('#lab?seed=-4&tick=x', DEF)).toMatchObject({ seed: 1, tick: 0 });
-    const ctrl = new LabController(fake, { seed: 5, home: 'a', away: 'b', tick: 0, note: '' });
+    const ctrl = new LabController(fake, { seed: 5, home: 'a', away: 'b', tick: 0, note: '', traits: 'gen' });
     ctrl.seek(42);
     const code = ctrl.flag('late tackle');
-    expect(parseLabHash(`#lab?flag=${encodeURIComponent(code)}`, DEF)).toEqual({ seed: 5, home: 'a', away: 'b', tick: 42, note: 'late tackle' });
+    expect(parseLabHash(`#lab?flag=${encodeURIComponent(code)}`, DEF)).toEqual({ seed: 5, home: 'a', away: 'b', tick: 42, note: 'late tackle', traits: 'gen' });
   });
   it('round-trips through labHash', () => {
     const h = labHash({ seed: 9, home: 'a', away: 'b', tick: 30 });
     expect(h.startsWith('#lab?')).toBe(true);
     expect(parseLabHash(h, DEF)).toMatchObject({ seed: 9, home: 'a', away: 'b', tick: 30 });
     expect(labHash({ seed: 9, home: 'a', away: 'b' })).not.toContain('tick');
+    // The trait sandbox rides the hash only when it is not the default.
+    expect(labHash({ seed: 9, home: 'a', away: 'b', traits: 'gen' })).not.toContain('traits');
+    expect(parseLabHash(labHash({ seed: 9, home: 'a', away: 'b', traits: 'stars' }), DEF)).toMatchObject({ traits: 'stars' });
+    expect(parseLabHash('#lab?traits=bogus', DEF).traits).toBe('gen');
   });
 });
 
 describe('LabController', () => {
   it('seeks to a loaded tick, then plays, steps, scrubs and reseeds', () => {
-    const c = new LabController(fake, { seed: 3, home: 'a', away: 'b', tick: 25, note: '' });
+    const c = new LabController(fake, { seed: 3, home: 'a', away: 'b', tick: 25, note: '', traits: 'gen' });
     expect(c.tick).toBe(25);
     expect(c.runner.playing).toBe(false);
     c.play();
@@ -73,7 +77,7 @@ describe('LabController', () => {
   });
 
   it('a Flag code pins the current moment and the hash reopens the same lab', () => {
-    const c = new LabController(fake, { seed: 11, home: 'a', away: 'b', tick: 0, note: '' });
+    const c = new LabController(fake, { seed: 11, home: 'a', away: 'b', tick: 0, note: '', traits: 'gen' });
     c.play();
     c.update(2000);
     const code = c.flag('ball not grounded');
@@ -82,7 +86,7 @@ describe('LabController', () => {
     expect(c.hash(true)).toBe('#lab?seed=11&home=a&away=b&tick=40');
     // Someone else loading the code sees exactly what the flagger saw.
     const f = decodeFlag(code)!;
-    const other = new LabController(fake, { ...f });
+    const other = new LabController(fake, { ...f, traits: 'gen' });
     expect(other.runner.cur).toEqual(c.runner.cur);
   });
 });

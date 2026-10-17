@@ -10,6 +10,7 @@ import { getState, setState, type GameState, type Player, type PlacedFacility, t
 import { FACILITY_CATALOG, levelMult, type FacilityDef, type FacilityDefId } from '../data/facility';
 import { STAT_MAX, TRAINING_CURVE } from '../config';
 import { registerTickHook, TICK_ORDER } from '../core/time';
+import { hasTrait, traitBoost } from '../data/traits';
 
 /** Stats floor. Stats are clamped to [STAT_FLOOR, STAT_MAX] after each tick. */
 export const STAT_FLOOR = 1;
@@ -71,13 +72,14 @@ export function adjacencyMult(f: PlacedFacility, all: PlacedFacility[]): number 
 }
 
 /**
- * Trait multiplier: workhorse ×1.2 and youngGun ×1.3 stack multiplicatively;
- * all other traits ×1.0.
+ * Trait multiplier: workhorse ×1.2 at level I (×1.32 II, ×1.44 III) and
+ * youngGun ×1.3 stack multiplicatively; all other traits ×1.0.
  */
 export function traitMult(player: Player): number {
   let m = 1;
-  if (player.traits.includes('workhorse')) m *= 1.2;
-  if (player.traits.includes('youngGun')) m *= 1.3;
+  const work = traitBoost(player.traits, 'workhorse');
+  if (work > 0) m *= 1 + 0.2 * work;
+  if (hasTrait(player.traits, 'youngGun')) m *= 1.3;
   return m;
 }
 

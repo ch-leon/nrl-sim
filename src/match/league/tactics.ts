@@ -41,15 +41,18 @@ export interface Candidate {
   prefer?: number;
 }
 
-/** Best pass option: behind the passer, 2–12 m to the side, not too deep. */
-export function pickReceiver(passer: Vec, dir: 1 | -1, candidates: readonly Candidate[]): number | null {
+/** A pass wider than this is a cut-out ball (only a Playmaker throws one). */
+export const MAX_LAT_M = 12;
+
+/** Best pass option: behind the passer, 2–`maxLat` m to the side, not too deep. */
+export function pickReceiver(passer: Vec, dir: 1 | -1, candidates: readonly Candidate[], maxLat = MAX_LAT_M): number | null {
   let best: number | null = null;
   let bestScore = -Infinity;
   for (const c of candidates) {
     if (c.busy) continue;
     const depth = (passer.x - c.pos.x) * dir;
     const lat = Math.abs(c.pos.y - passer.y);
-    if (depth < 0.3 || depth > 8 || lat < 2 || lat > 12) continue;
+    if (depth < 0.3 || depth > 8 || lat < 2 || lat > maxLat) continue;
     // Flat and wide beats deep: a deep receiver gives ground back.
     const score = -Math.abs(lat - 6) - 0.7 * depth + (c.prefer ?? 0);
     if (score > bestScore) {
@@ -100,11 +103,14 @@ export function intercept(from: Vec, speed: number, pos: Vec, vel: Vec, maxT = 1
   return { x: pos.x + vel.x * t, y: pos.y + vel.y * t };
 }
 
-/** Last-tackle kick: long, down the middle-ish toward the fullback, never dead. */
-export function kickTarget(kicker: Vec, dir: 1 | -1, fullback: Vec, jitter01: number): Vec {
+/**
+ * Last-tackle kick: long, down the middle-ish toward the fullback, never dead.
+ * `boot` scales the distance and shrinks the scatter (Big Boot, §3).
+ */
+export function kickTarget(kicker: Vec, dir: 1 | -1, fullback: Vec, jitter01: number, boot = { dist: 1, acc: 1 }): Vec {
   const goal = dir > 0 ? FIELD_LENGTH : 0;
-  const x = clamp(kicker.x + dir * 32, Math.min(goal - 4, kicker.x + dir * 8), Math.max(goal - 4, kicker.x + dir * 8));
-  const y = clamp(fullback.y * 0.6 + MID_Y * 0.4 + (jitter01 - 0.5) * 16, 6, FIELD_WIDTH - 6);
+  const x = clamp(kicker.x + dir * 32 * boot.dist, Math.min(goal - 4, kicker.x + dir * 8), Math.max(goal - 4, kicker.x + dir * 8));
+  const y = clamp(fullback.y * 0.6 + MID_Y * 0.4 + (jitter01 - 0.5) * 16 * boot.acc, 6, FIELD_WIDTH - 6);
   return { x: dir > 0 ? Math.min(x, goal - 4) : Math.max(x, goal + 4), y };
 }
 

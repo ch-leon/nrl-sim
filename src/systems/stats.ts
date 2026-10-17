@@ -4,6 +4,7 @@
 import { getState, setState, type Player, type StatTally } from '../core/state';
 import { registerSeasonHook } from '../core/time';
 import type { MatchEvent, MatchResult } from '../sim/events';
+import { hasTrait, withTrait } from '../data/traits';
 
 export const LEGEND_SEASONS = 3;
 
@@ -103,9 +104,9 @@ export function topTryScorer(squad: readonly Player[], season: number): { name: 
 export function applyTenure(squad: readonly Player[], endedSeason: number, season: number): Player[] {
   return squad.map((p) => {
     const joined = p.joinedSeason ?? endedSeason;
-    const legend = season - joined >= LEGEND_SEASONS && !p.traits.includes('clubLegend');
+    const legend = season - joined >= LEGEND_SEASONS && !hasTrait(p.traits, 'clubLegend');
     if (p.joinedSeason === joined && !legend) return p;
-    return { ...p, joinedSeason: joined, traits: legend ? [...p.traits, 'clubLegend'] : p.traits };
+    return { ...p, joinedSeason: joined, traits: legend ? withTrait(p.traits, 'clubLegend') : p.traits };
   });
 }
 

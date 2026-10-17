@@ -37,6 +37,8 @@ export interface SimEvent {
   side?: Side;
   slot?: number;
   player?: string;
+  /** A special skill that made the difference, named for the pop-up ("Dancing Feet II"). */
+  trait?: string;
 }
 
 export interface Snapshot {

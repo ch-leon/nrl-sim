@@ -2,7 +2,7 @@
 // Phaser scene: pooled texts that follow the player, drift up and fade.
 import Phaser from 'phaser';
 import type { Side } from '../core/snapshot';
-import { TONE_COLOR, type Popup } from './popups';
+import { TONE_COLOR, TRAIT_COLOR, type Popup } from './popups';
 
 interface Live {
   text: Phaser.GameObjects.Text;
@@ -49,11 +49,23 @@ export class PopupLayer {
     const text = this.pool.find((t) => !t.visible) ?? this.recycleOldest();
     if (!text) return;
     const stacked = this.live.filter((l) => l.side === side && l.slot === slot).length;
-    text.setText(p.sub ? `${p.word}\n${p.sub}` : p.word);
+    const lines = [p.word, ...(p.sub ? [p.sub] : []), ...(p.trait ? [p.trait] : [])];
+    text.setText(lines);
     text.setFontSize(p.big ? 22 : 16);
     text.setColor(TONE_COLOR[p.tone]);
     text.setAlpha(1).setVisible(true);
     this.live.push({ text, side, slot, born: this.now, ms: p.ms, lift: BASE_LIFT + stacked * 18 });
+    // The trait line is a second text so it can carry its own colour.
+    let traitText: Phaser.GameObjects.Text | null = null;
+    if (p.trait) {
+      traitText = this.pool.find((t) => !t.visible) ?? null;
+      if (traitText) {
+        text.setText(lines.slice(0, -1));
+        traitText.setText(p.trait).setFontSize(p.big ? 14 : 11).setColor(TRAIT_COLOR).setAlpha(1).setVisible(true);
+        // Tucked directly under the word and name (both texts hang from their bottom edge).
+        this.live.push({ text: traitText, side, slot, born: this.now, ms: p.ms, lift: BASE_LIFT + stacked * 18 - (p.big ? 16 : 13) });
+      }
+    }
   }
 
   /** Call every frame with the real delta and where each player's feet are. */
