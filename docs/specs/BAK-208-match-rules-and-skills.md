@@ -1,5 +1,5 @@
 # BAK-208 — Match design: contests, traits, tactics, kicks, readability
-**GitHub:** https://github.com/ch-leon/nrl-sim/issues/94 (Phase 1.5 under #83) | **Priority:** Highest | **Status:** DRAFT for review (2026-10-16)
+**GitHub:** https://github.com/ch-leon/nrl-sim/issues/94 (Phase 1.5 under #83) | **Priority:** Highest | **Status:** LIVING — A, B, C, D and the first slice of E shipped (2026-10-17); numbers in each section are the shipped ones. Every knob with its file and value: `BAK-208-tuning.md`.
 
 > **Purpose.** The live sim (BAK-207) now plays a real set: tackles, play-the-ball,
 > passes, kicks. It works and it is still a bit boring. This document is the single
@@ -254,10 +254,24 @@ Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams:
 tackles 90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 ·
 tries 5–9 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
 
-## 8. Fatigue
+## 8. Fatigue — *F, next; design updated 2026-10-17*
+
 Stamina drains with metres run and tackles made; recovers slowly in stoppages. Below
 40% stamina: top speed −10%, contest odds −5%; below 20%: −20% / −10%. Interchanges
 (#70) answer it later; until then it shapes the last minutes.
+
+### 8.1 The wrestle (Leon, 2026-10-17)
+Tackles should sometimes need more than one man, and that is where fatigue shows. Model
+contact as a **struggle**, Kairosoft-soccer style: on contact a small bar over the pair
+is the carrier's fight left in him (from Strength + Stamina, less the fatigue he carries).
+Each tackler in the tackle drains it; a second and third man drain it much faster. While
+it lasts the carrier keeps driving (metres after contact), and if it is not empty when
+the defenders' own effort runs out he is through (a late bust, announced). When it empties
+he is held; **how long the wrestle lasted sets the play-the-ball speed** (a long wrestle
+= slow ruck, the defence gets set; a quick one = quick play-the-ball, the line is short).
+Everyone involved loses fatigue, the carrier most, more per defender. Numbers to come
+with F; the current instant `contest()` becomes the opening roll of the wrestle, with the
+step and the big hit still resolving at contact.
 
 ## 9. Delivery (each a PR with lab sign-off; order fixed, numbers negotiable)
 
@@ -279,3 +293,14 @@ Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
   only on migrated saves.
 - Presets: **separate attack and defence** presets (D, §5 — to be reshaped accordingly).
 - Slow-motion on big moments: **keep it**.
+
+## 11. Brainstorm backlog (not scheduled)
+- **Coach calls during play** (Leon, 2026-10-17; extends #73). Presets are set at the
+  breaks (kick-off, half-time, after a try); *during* play a small bar of chips lets the
+  player influence the **next play only**: e.g. *Hit-up* · *Shift left* / *Shift right* ·
+  *Kick early* · *Chip & chase* · *Rush* / *Hold* on defence. One call per set (or a
+  cooldown) keeps it a nudge, not a joystick; the call shows as a pop-up when it happens
+  and the stats strip could count calls that paid off. Needs the Phase 2 match screen.
+- **The wrestle** → §8.1.
+- **Refinement pass** on everything shipped in A–D once Phase 2 gives full matches to
+  measure against §7 (Leon: "we may need to refine it still, come back to it later").

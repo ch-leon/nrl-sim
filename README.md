@@ -32,3 +32,5 @@ same frame can be rebuilt. `#lab?flag=<code>` (or the Load button) reopens it.
 §3): as rolled, none, or every player a superstar (`#lab?traits=stars`). The **H / A**
 pickers set each side's attack and defence preset (§5: Grind, Balanced, Expansive,
 Kick-chase, All-out · Slide, Rush, Compressed), e.g. `#lab?hatk=expansive&adef=rush`.
+Every tunable number, with its file and current value, is listed in
+`docs/specs/BAK-208-tuning.md`.
