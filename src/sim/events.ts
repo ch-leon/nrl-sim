@@ -5,7 +5,7 @@
 // code imports match types from one place.
 
 export type { WeatherKind } from '../core/state';
-import type { Position, Trait } from '../core/state';
+import type { Position, TraitInstance } from '../core/state';
 
 /** Per-player stats carried on a sheet roster for outcome-tied actor picks. */
 export interface RosterStats {
@@ -26,8 +26,8 @@ export interface RosterEntry {
   id?: string;
   /** 1–100; used for big-hit injury rolls when present (GitHub #7). */
   injuryRisk?: number;
-  /** Player traits (#43): finisher / hardMan / playmaker / injuryProne nudge the sim. */
-  traits?: Trait[];
+  /** Levelled traits (BAK-208 §3): the live sim fires them; the event-log engine nudges on a few. */
+  traits?: TraitInstance[];
 }
 
 /** Injury rolled in-sim; matchday applies `weeks` onto GameState.squad. */

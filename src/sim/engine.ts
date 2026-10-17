@@ -17,6 +17,7 @@ import type {
 } from './events';
 import { mkEvent } from './events';
 import { generatedRoster, stageEvents } from './staging';
+import { hasTrait as hasTraitId, rollTraits, type TraitQuality } from '../data/traits';
 import {
   rollWeather,
   weatherMods,
@@ -133,16 +134,19 @@ export function teamSheetFromRival(club: RivalClub): TeamSheet {
   const defense = jitter();
   const kicking = jitter();
   const fitness = jitter();
-  const roster = generatedRoster(club.id).map((p) => ({
-    ...p,
-    stats: {
+  const quality: TraitQuality = club.strength >= 70 ? 'star' : club.strength >= 50 ? 'average' : 'rookie';
+  const roster = generatedRoster(club.id).map((p) => {
+    const stats = {
       speed: clampStat(attack + rng.int(-8, 8)),
       strength: clampStat(defense + rng.int(-8, 8)),
       stamina: clampStat(fitness + rng.int(-8, 8)),
       skill: clampStat(kicking + rng.int(-8, 8)),
       footyIQ: clampStat(attack + rng.int(-8, 8)),
-    },
-  }));
+    };
+    // Rivals carry traits too, so their stars are memorable (BAK-208 §3).
+    const traits = rollTraits(rng, p.position, quality);
+    return { ...p, stats, ...(traits.length > 0 ? { traits } : {}) };
+  });
   return {
     clubId: club.id,
     name: club.name,
@@ -168,17 +172,16 @@ type StatKey = 'speed' | 'strength' | 'stamina' | 'skill' | 'footyIQ';
 // roster with no traits plays out exactly as before.
 /** Weight multiplier on a `finisher` when a try scorer is picked. */
 const FINISHER_SCORER_MULT = 1.5;
-/** Weight multiplier on a `hardMan` when the big-hit maker is picked. */
+/** Weight multiplier on a `hitman` when the big-hit maker is picked. */
 const HARDMAN_HIT_MULT = 1.6;
-/** Per-hardMan on-field bump to the defending side's big-hit weight. */
+/** Per-hitman on-field bump to the defending side's big-hit weight. */
 const HARDMAN_BIGHIT_WEIGHT = 0.03;
 /** Kicking-success bonus (probability points) for a `playmaker` kicker. */
 const PLAYMAKER_KICK_BONUS = 0.04;
 /** Injury-chance multiplier for an `injuryProne` carrier (on top of opts.injuryRate). */
 const INJURY_PRONE_MULT = 1.4;
 
-const hasTrait = (p: RosterEntry | undefined, t: Trait): boolean =>
-  p?.traits?.includes(t) ?? false;
+const hasTrait = (p: RosterEntry | undefined, t: Trait): boolean => hasTraitId(p?.traits, t);
 
 function pickActor(
   roster: readonly RosterEntry[],
@@ -202,7 +205,7 @@ function pickActor(
   return roster[roster.length - 1]?.name;
 }
 
-const HARDMAN = { trait: 'hardMan', mult: HARDMAN_HIT_MULT } as const;
+const HARDMAN = { trait: 'hitman', mult: HARDMAN_HIT_MULT } as const;
 const FINISHER = { trait: 'finisher', mult: FINISHER_SCORER_MULT } as const;
 
 function kickerEntry(roster: readonly RosterEntry[]): RosterEntry | undefined {
@@ -349,7 +352,7 @@ export function simulateMatch(
         rng,
         possessing.sheet.fitness,
         t,
-        defending.roster.filter((p) => hasTrait(p, 'hardMan')).length,
+        defending.roster.filter((p) => hasTrait(p, 'hitman')).length,
       );
 
       if (outcome === 'error') {

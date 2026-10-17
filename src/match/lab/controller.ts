@@ -3,6 +3,7 @@
 // that reproduces all of it. Tested in node; panel.ts is the thin DOM on top.
 import { Runner, type MatchSim, type RunSpeed } from '../core/engine';
 import { decodeFlag, encodeFlag } from '../core/flag';
+import { isTraitMode, type TraitMode } from './sheets';
 
 export interface LabParams {
   seed: number;
@@ -12,9 +13,11 @@ export interface LabParams {
   tick: number;
   /** Note carried by a loaded Flag code. */
   note: string;
+  /** Trait sandbox (BAK-208 §3): as rolled, none, or everyone a superstar. */
+  traits: TraitMode;
 }
 
-export type LabSimFactory = (home: string, away: string, seed: number) => MatchSim;
+export type LabSimFactory = (home: string, away: string, seed: number, traits: TraitMode) => MatchSim;
 
 export const LAB_HASH = '#lab';
 export const DEFAULT_SEED = 1;
@@ -24,7 +27,8 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
   const q = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : '';
   const sp = new URLSearchParams(q);
   const flag = sp.get('flag') ? decodeFlag(sp.get('flag')!) : null;
-  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note };
+  const traits: TraitMode = isTraitMode(sp.get('traits')) ? (sp.get('traits') as TraitMode) : 'gen';
+  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits };
   const seed = Number(sp.get('seed'));
   const tick = Number(sp.get('tick'));
   return {
@@ -33,12 +37,14 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
     away: sp.get('away') || defaults.away,
     tick: Number.isInteger(tick) && tick > 0 ? tick : 0,
     note: '',
+    traits,
   };
 }
 
-export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number }): string {
+export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode }): string {
   const sp = new URLSearchParams({ seed: String(p.seed), home: p.home, away: p.away });
   if (p.tick) sp.set('tick', String(p.tick));
+  if (p.traits && p.traits !== 'gen') sp.set('traits', p.traits);
   return `${LAB_HASH}?${sp.toString()}`;
 }
 
@@ -52,7 +58,7 @@ export class LabController {
 
   constructor(factory: LabSimFactory, params: LabParams) {
     this.params = { ...params };
-    this.runner = new Runner((seed) => factory(params.home, params.away, seed), params.seed);
+    this.runner = new Runner((seed) => factory(params.home, params.away, seed, params.traits), params.seed);
     if (params.tick > 0) this.runner.seek(params.tick);
   }
 
@@ -96,6 +102,6 @@ export class LabController {
 
   /** The URL hash that reopens the lab on these teams and seed (and this tick). */
   hash(withTick = false): string {
-    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, ...(withTick ? { tick: this.runner.tick } : {}) });
+    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, ...(withTick ? { tick: this.runner.tick } : {}) });
   }
 }

@@ -28,3 +28,5 @@ teams and a seed, then play, pause, step one tick, slow down or scrub back.
 **⚑ Flag** copies a code like `nrl1:7:1240:crushers~larrikins:…` that pins the
 exact moment on screen with your note — paste it into an issue or chat and the
 same frame can be rebuilt. `#lab?flag=<code>` (or the Load button) reopens it.
+**Skills** switches the special-skill sandbox (`docs/specs/BAK-208-match-rules-and-skills.md`
+§3): as rolled, none, or every player a superstar (`#lab?traits=stars`).

@@ -47,7 +47,7 @@ describe('applyMatchStats / tenure', () => {
     expect(topTryScorer(out, 2)).toBeUndefined();
     const stamped = applyTenure(out, 1, 2);
     expect(stamped[0]!.joinedSeason).toBe(1);
-    expect(stamped[0]!.traits).not.toContain('clubLegend');
-    expect(applyTenure(stamped, 3, 4)[0]!.traits).toContain('clubLegend');
+    expect(stamped[0]!.traits.map((t) => t.id)).not.toContain('clubLegend');
+    expect(applyTenure(stamped, 3, 4)[0]!.traits.map((t) => t.id)).toContain('clubLegend');
   });
 });

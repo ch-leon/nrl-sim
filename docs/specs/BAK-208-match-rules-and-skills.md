@@ -37,8 +37,9 @@ baseline(situation) → ± attributes → ± traits (announced when they fire) �
 
 A worked example (tackle, §4.1): one-on-one, carrier running square at a defender of
 equal stats → baseline 10% step, 12% bust, 7% fend, 9% offload (if a support is close),
-10% big hit, rest held. Carrier has *Sidestep II* → step becomes 10% + 25% = 35%. Roll
-0.22 → **STEP!** — the defender grasps air, the carrier is through, the crowd lifts.
+10% big hit, rest held. Carrier has *Dancing Feet II* → step becomes 10% + 24% = 34%. Roll
+0.22 → **STEP!** with *DANCING FEET II* under it — the defender grasps air, the carrier is
+through, the crowd lifts.
 
 ## 2. Base stats (every player)
 
@@ -53,43 +54,62 @@ equal stats → baseline 10% step, 12% bust, 7% fend, 9% offload (if a support i
 Derived (not stored): **Footwork** = (Speed + Skill) / 2 for steps; **Defence** =
 (Strength + Footy IQ) / 2 for tackles; **Boot** = (Skill + Footy IQ) / 2 for kicks.
 
-## 3. Traits (special skills) — rare, levelled
+## 3. Traits (special skills) — rare, levelled — *implemented in C (#97)*
 
-A trait is a special skill with a level **I, II or III**. Traits are rare: roughly 55% of
-generated players have none, 30% have one, 12% two, 3% three or four (superstars).
-Levels train up through facilities and coaches (later ticket); generation gives I or II.
+A trait is a special skill with a level **I, II or III**. Traits are rare: of generated
+*average* players 55% have none, 30% one, 12% two, 3% three or four; rookies fewer
+(70 / 25 / 5), stars more (30 / 35 / 23 / 12 — the superstars). Which trait is rolled is
+weighted ×3 to the position (a prop is a Wrecking Ball, a winger has Dancing Feet).
+Generation gives level I (75%) or II; **III is only ever trained** (facilities and
+coaches, later ticket). Rival clubs roll theirs the same way from the club seed.
 
-Level scales the trait's effect: **I ×1.0 · II ×1.6 · III ×2.2** of the base bonus.
+Level scales the trait's upside: **I ×1.0 · II ×1.6 · III ×2.2** of the base bonus.
+Names are footy slang (decision 2026-10-17). Every firing is announced: the pop-up word
+gets the trait under it in its own colour (*STEP!* / *KAVANAGH* / *DANCING FEET II*),
+the commentary line names it, and the lab stats strip counts them (`Skill n`).
 
 ### 3.1 Attacking traits
 | Trait | Fires when | Effect (level I) | Shown as |
 |---|---|---|---|
-| **Sidestep** | One-on-one, carrier not yet in contact | +15% step | STEP! |
-| **Bulldozer** | In contact | +12% bust, +8% drive forward on held | BUST! |
-| **Fend** | One defender arriving from the side | +12% palm-off | FEND! |
-| **Offload King** | Held in a tackle with a support runner inside 5 m | +12% offload | OFFLOAD! |
-| **Finisher** | Carry starts inside the opposition 10 m, or chasing a kick into the in-goal | +15% to win that contest; dives for the corner | TRY! (name) |
-| **Speedster** | After a break or on a kick chase | +8% top speed for 3 s | burst lines |
-| **Playmaker** | First receiver with two or more supports | Picks the better option more often; may throw a cut-out pass to the winger | CUT-OUT! |
-| **Boot** | Any kick | +10% distance, +15% accuracy, unlocks 40/20 attempts | 40/20! / BOMB! |
+| **Dancing Feet** | One-on-one, before contact | +15% step | STEP! |
+| **Wrecking Ball** | In contact | +12% bust; held → 30% to drive 0.6 m forward in the tackle | BUST! / DRIVE! |
+| **Don't Argue** | Tackler not arriving from behind | +12% fend | FEND! |
+| **Offload King** | Held with a support runner inside 5 m | +12% offload | OFFLOAD! |
+| **Finisher** | Inside the opposition 20 m | +10% bust, +5% fend, +10% step | BUST! / STEP! |
+| **Jets** | After a break; on the kick chase | Burst lasts 3 s (not 0.8); +8% speed chasing a kick | longer burst |
+| **Playmaker** | Engaged with the ball | +10% to pass rather than carry; reach 12 + 3 m/level → the cut-out ball | CUT-OUT! |
+| **Big Boot** | Last-tackle kick | +10% distance, scatter ×0.85 (40/20s arrive with E) | KICK! |
 
 ### 3.2 Defensive traits
 | Trait | Fires when | Effect (level I) | Shown as |
 |---|---|---|---|
-| **Hitman** | Square one-on-one tackle | +12% big hit | BIG HIT! |
-| **Cover Defender** | Last line / chasing a break | Better intercept angle (+10% speed on the chase), +10% to make the tackle | COVER! |
-| **Ball Stripper** | One-on-one tackle completed | +8% strip → turnover | STRIP! |
-| **Wall** | Two-defender tackle | Carrier's bust/offload odds −10% each | — |
-| **Intercept** | Defender in the lane of a wide pass | +10% intercept | INTERCEPT! |
+| **Hitman** | Square tackle | +12% big hit | BIG HIT! |
+| **Last Line** | Lone tackler; the line is broken | Carrier −10% bust / −10% fend; +10% speed covering a break | — |
+| **Pickpocket** | One-on-one tackle | +8% strip | STRIP! |
+| **Brick Wall** | Two or three in the tackle | Carrier −10% bust, −10% offload | — |
+| **Poacher** | In the lane of a pass | +10% intercept | INTERCEPT! |
 
-### 3.3 Mental / meta traits (existing, kept)
-Workhorse (training ×1.2, slower fatigue), Young Gun (training ×1.3), Veteran (IQ +5,
-slower), Club Legend (morale), Injury Prone (×1.5 injury rolls), **Hothead** (new:
-+penalties conceded, +big hits), **Clutch** (new: last 3 minutes, +10% every contest).
+### 3.3 Double-edged traits (decision: no straight negatives on generated players)
+The upside scales with level; the cost is fixed, so training one is always a net gain.
 
-### 3.4 Data model
-`Player.traits: Trait[]` becomes `TraitInstance[] = { id: TraitId; level: 1 | 2 | 3 }`
-with a save migration (old names → level I). Team sheets carry them to the sim.
+| Trait | Upside (level I) | Cost |
+|---|---|---|
+| **Hothead** | +12% big hit from any angle | flies out of the line: busted +8%, stepped +8% |
+| **Razzle Dazzle** | +20% offload | his offloads are spilled 10% more often ("wild offload") |
+| **Gambler** | +15% intercept | a missed read leaves him beaten and out of the play (GAMBLED!) |
+
+### 3.4 Meta traits (existing, kept)
+Workhorse (training ×1.2 at I, ×1.32 II, ×1.44 III; slower fatigue in F), Young Gun
+(training ×1.3; age ≤ 20 and rated 60+), Veteran (age 31+), Club Legend (tenure),
+Injury Prone (legacy saves only; ×1.4 injury rolls — no longer generated). *Clutch*
+(last 3 minutes) waits for the match clock in Phase 2.
+
+### 3.5 Data model
+`Player.traits: TraitInstance[] = { id: TraitId; level: 1 | 2 | 3 }` (`src/data/traits.ts`
+is the catalogue). Save v6 migrates old names to level I (`hardMan` → `hitman`). Team
+sheets carry them to both engines; `src/match/league/traits.ts` turns them into the
+probability points the contest adds (§4.1). Lab: **Skills** = as rolled / none / all
+superstars (two level-III position traits each), `#lab?traits=stars`.
 
 ## 4. Contests
 
@@ -104,11 +124,11 @@ Resolved when a committed defender reaches the carrier. Order of checks:
 | Outcome | Even baseline | Main modifiers |
 |---|---|---|
 | Held | remainder | — |
-| Big hit (driven back 2.5 m) | 10% | tackler Strength, square angle, Hitman; carrier speed ↓ |
-| Bust (broken, carrier continues with burst) | 12% | carrier Strength, speed differential, Bulldozer, Wall − |
-| Fend (palm-off, defender stumbles) | 7% | carrier Strength/Skill, side angle, Fend trait |
-| Offload (to a support inside 5 m) | 9% | carrier Skill, Offload King, Wall − |
-| Strip (turnover) | 2% one-on-one | Ball Stripper, carrier Skill − |
+| Big hit (driven back 2.5 m) | 10% | tackler Strength, square angle, Hitman / Hothead; carrier speed ↓ |
+| Bust (broken, carrier continues with burst) | 12% | carrier Strength, speed differential, Wrecking Ball, Finisher; Brick Wall −, Last Line − |
+| Fend (palm-off, defender stumbles) | 7% | carrier Strength/Skill, side angle, Don't Argue |
+| Offload (to a support inside 5 m) | 9% | carrier Skill, Offload King, Razzle Dazzle; Brick Wall − |
+| Strip (turnover) | 2% one-on-one | Pickpocket, carrier Skill − |
 
 Two defenders: bust −6%, fend −4%, offload −3%, big hit +4%; three: −9 / −6 / −5 / +6.
 Angle (from the tackler's closing direction vs the carrier's heading): **side** fend +5%,
@@ -200,8 +220,10 @@ Stamina drains with metres run and tackles made; recovers slowly in stoppages. B
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 
-## 10. Open questions (for Leon)
-- Trait **names**: happy with these, or want them more "footy" (e.g. *Dancing Feet*, *Wrecking Ball*, *Hands of Glue*)?
-- Should **negative traits** (Hothead, Injury Prone, Butterfingers) exist on generated players, or only arrive through events?
-- Presets per **attack and defence** separately, or one combined style?
-- Slow-motion on big moments: yes/no on a phone?
+## 10. Decisions (Leon, 2026-10-17)
+- Trait **names**: footy slang (§3).
+- **Negative traits**: not straight negatives on generated players — **double-edged** ones
+  that make a player brilliant some days and costly on others (§3.3). Injury Prone stays
+  only on migrated saves.
+- Presets: **separate attack and defence** presets (D, §5 — to be reshaped accordingly).
+- Slow-motion on big moments: **keep it**.

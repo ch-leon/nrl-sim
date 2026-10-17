@@ -10,6 +10,8 @@ export interface WindowStats {
   errors: number;
   kicks: number;
   tries: number;
+  /** Events a special skill shaped (BAK-208 §3). */
+  traits: number;
   /** Seconds of sim time the window actually covers. */
   seconds: number;
 }
@@ -20,9 +22,10 @@ export const WINDOW_TICKS = Math.round(300 / TICK_S);
 /** Counts for events with `tick` in (now − window, now]. */
 export function statsWindow(history: readonly SimEvent[], nowTick: number, windowTicks = WINDOW_TICKS): WindowStats {
   const from = Math.max(0, nowTick - windowTicks);
-  const s: WindowStats = { tackles: 0, breaks: 0, offloads: 0, errors: 0, kicks: 0, tries: 0, seconds: (nowTick - from) * TICK_S };
+  const s: WindowStats = { tackles: 0, breaks: 0, offloads: 0, errors: 0, kicks: 0, tries: 0, traits: 0, seconds: (nowTick - from) * TICK_S };
   for (const e of history) {
     if (e.tick <= from || e.tick > nowTick) continue;
+    if (e.trait) s.traits++;
     switch (e.kind) {
       case 'tackle':
       case 'big-hit':
@@ -52,9 +55,9 @@ export function statsWindow(history: readonly SimEvent[], nowTick: number, windo
   return s;
 }
 
-/** One-line readout, e.g. "last 4:12 · T 31 · Brk 7 · Off 2 · Err 3 · K 4 · Try 1". */
+/** One-line readout, e.g. "last 4:12 · T 31 · Brk 7 · Off 2 · Err 3 · K 4 · Try 1 · Skill 5". */
 export function statsLine(s: WindowStats): string {
   const m = Math.floor(s.seconds / 60);
   const sec = Math.round(s.seconds % 60);
-  return `last ${m}:${String(sec).padStart(2, '0')} · T ${s.tackles} · Brk ${s.breaks} · Off ${s.offloads} · Err ${s.errors} · K ${s.kicks} · Try ${s.tries}`;
+  return `last ${m}:${String(sec).padStart(2, '0')} · T ${s.tackles} · Brk ${s.breaks} · Off ${s.offloads} · Err ${s.errors} · K ${s.kicks} · Try ${s.tries} · Skill ${s.traits}`;
 }

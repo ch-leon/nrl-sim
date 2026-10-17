@@ -22,7 +22,9 @@ import type { PlayerSnap, Side, SimEvent, Snapshot } from '../core/snapshot';
 import { add, clamp, dist, dot, norm, scale, sub, type Vec } from '../core/vec';
 import { AVERAGE, angleFrom, interceptChance, knockOnChance, resolveContest, stepChance, type ContestStats, type Situation } from './contest';
 import { FULLBACK, HOOKER, KICKER, PLAYERS, ROLES, formationTarget } from './roles';
-import { gapTarget, intercept, kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate } from './tactics';
+import { MAX_LAT_M, gapTarget, intercept, kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate } from './tactics';
+import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
+import { traitBoost, type TraitInstance } from '../../data/traits';
 
 // ── Timing (ticks at 20 Hz) ──────────────────────────────────────────────────
 const CONTACT_TICKS = 9;
@@ -40,9 +42,15 @@ const CATCH_REACH = 1.8;
 const PASS_COOLDOWN = 12;
 /** A tackled carrier can't be the next receiver for this long after his ptb. */
 const BUSY_AFTER_PTB = 24;
-/** Breaking a tackle gives a burst of pace. */
+/** Breaking a tackle gives a burst of pace (a Jets player keeps it for 3 s). */
 const BURST_TICKS = 16;
+const JETS_BURST_TICKS = 60;
 const BURST = 1.15;
+/** A Wrecking Ball held in the tackle wins the collision this often per level, driving this far forward per level. */
+const WRECK_DRIVE_CHANCE = 0.3;
+const WRECK_DRIVE_M = 0.6;
+/** A Playmaker's cut-out reach grows this much per level over the normal pass width. */
+const CUT_OUT_PER_LEVEL_M = 3;
 /** After beating a tackler the carrier can't be hit again for this long. */
 const IMMUNE_TICKS = 8;
 /** A beaten tackler sits out this long before committing again. */
@@ -91,6 +99,8 @@ interface Player {
   slot: number;
   name: string;
   stats: Stats;
+  /** Special skills (BAK-208 §3); empty for most players. */
+  traits: TraitInstance[];
   body: Body;
   pose: string;
   /** Hold `pose` until then (overrides run/idle). */
@@ -132,6 +142,8 @@ interface PendingKick {
   receiver: number | null;
   peak: number;
   kickoff: boolean;
+  /** The trait behind the kick, if one shaped it. */
+  trait?: string;
 }
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -164,6 +176,10 @@ export class LiveSim implements MatchSim {
   /** The last ruck's markers and the tick its ball was played (they hold until released). */
   private markers: number[] = [];
   private ruckPlayedAt = -1000;
+  /** Extra spill chance on the pass in the air (a Razzle Dazzle offload). */
+  private spillExtra = 0;
+  /** The trait to credit when the pass in the air is picked off. */
+  private interceptTrait: string | undefined;
   private events: SimEvent[] = [];
   readonly tries: Record<Side, number> = { home: 0, away: 0 };
 
@@ -193,6 +209,7 @@ export class LiveSim implements MatchSim {
         slot,
         name: entry?.name ?? `${sheet.name} #${slot + 1}`,
         stats,
+        traits: entry?.traits ? [...entry.traits] : [],
         body: makeBody({ x: 50, y: MID_Y }, maxSpeedFor(stats.speed), { x: dirOf(side), y: 0 }),
         pose: 'idle',
         poseUntil: 0,
@@ -233,8 +250,17 @@ export class LiveSim implements MatchSim {
   private locked(p: Player): boolean {
     return this.tick < p.lockUntil;
   }
-  private emit(kind: string, text: string, p?: Player): void {
-    this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot, player: p.name } : {}) });
+  private emit(kind: string, text: string, p?: Player, trait?: string): void {
+    this.events.push({ tick: this.tick, kind, text, ...(p ? { side: p.side, slot: p.slot, player: p.name } : {}), ...(trait ? { trait } : {}) });
+  }
+  /** Metres from the carrier to the line he is attacking. */
+  private toLine(p: Player): number {
+    return this.dir > 0 ? FIELD_LENGTH - p.body.pos.x : p.body.pos.x;
+  }
+  /** After a break the carrier bursts: longer for a Jets player. */
+  private burst(c: Player): void {
+    c.immuneUntil = this.tick + IMMUNE_TICKS;
+    c.burstUntil = this.tick + (traitBoost(c.traits, 'jets') > 0 ? JETS_BURST_TICKS : BURST_TICKS);
   }
   private lock(p: Player, pose: string, ticks: number, slideTo?: Vec): void {
     p.pose = pose;
@@ -287,7 +313,7 @@ export class LiveSim implements MatchSim {
     this.tackles = 0;
     this.lastPlay = false;
     this.lineX = k.to.x + this.dir * ONSIDE_M;
-    this.emit(k.kickoff ? 'kickoff' : 'kick', k.kickoff ? `${kicker.name} kicks off` : `${kicker.name} kicks long on the last`, kicker);
+    this.emit(k.kickoff ? 'kickoff' : 'kick', k.kickoff ? `${kicker.name} kicks off` : `${kicker.name} kicks long on the last`, kicker, k.trait);
     if (this.phase.kind !== 'play') this.phase = { kind: 'play' };
   }
 
@@ -309,9 +335,13 @@ export class LiveSim implements MatchSim {
         return;
       }
       const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < PRESSURE_M);
-      if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.skill, pressured)) {
+      const spillExtra = this.spillExtra;
+      const picked = this.interceptTrait;
+      this.spillExtra = 0;
+      this.interceptTrait = undefined;
+      if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.skill, pressured, false, spillExtra)) {
         // Spilled: the ball squirts forward and the defence takes over.
-        this.emit('error', `${r.name} spills it — knock-on`, r);
+        this.emit('error', spillExtra > 0 ? `${r.name} can't hold the wild offload — knock-on` : `${r.name} spills it — knock-on`, r);
         this.ball = bounceFlight(b.to, { x: this.dir, y: (this.rng.next() - 0.5) * 0.6 }, this.tick, 2.5, 12, 2);
         this.turnover();
         this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
@@ -322,7 +352,7 @@ export class LiveSim implements MatchSim {
       r.decided = false;
       r.steppedOn = -1;
       if (b.via === 'pass' && r.side !== this.attacking) {
-        this.emit('intercept', `${r.name} picks it off!`, r);
+        this.emit('intercept', `${r.name} picks it off!`, r, picked);
         this.turnover();
         r.burstUntil = this.tick + BURST_TICKS;
         return;
@@ -411,28 +441,37 @@ export class LiveSim implements MatchSim {
 
     // Last-tackle kick: the kicker runs a few steps then puts boot to ball,
     // unless the line is close enough to have a crack.
-    const toLine = this.dir > 0 ? FIELD_LENGTH - h.body.pos.x : h.body.pos.x;
+    const toLine = this.toLine(h);
     if (this.lastPlay && h.slot === KICKER && toLine > RUN_IT_M && (this.tick - h.catchTick >= KICK_RUN_TICKS || nearD < ENGAGE_M)) {
       const fb = this.at(other(this.attacking), FULLBACK);
+      const boot = bootMult(h.traits);
       this.lock(h, 'kick', KICK_LOCK_TICKS);
       this.pendingKick = {
         at: this.tick + KICK_CONTACT_TICKS,
         kicker: this.indexOf(h),
-        to: kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()),
+        to: kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot),
         receiver: this.indexOf(fb),
         peak: 12,
         kickoff: false,
+        ...(boot.dist > 1 ? { trait: announce(h.traits.find((t) => t.id === 'bigBoot')) ?? 'Big Boot' } : {}),
       };
       return;
     }
 
     // Engaged: decide once — shift it to a better option out the back, or
     // take the line on. Re-deciding every tick would pass out of every contact.
+    // A Playmaker passes more and can find a man beyond the normal width.
     if (nearD < ENGAGE_M && !h.decided && this.tick - h.catchTick >= PASS_COOLDOWN) {
       h.decided = true;
-      const receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h));
-      if (receiver !== null && this.rng.next() < 0.3 + h.stats.skill / 300) {
-        this.pass(h, this.players[receiver]!);
+      const maker = traitBoost(h.traits, 'playmaker');
+      const reach = MAX_LAT_M + (maker > 0 ? CUT_OUT_PER_LEVEL_M * maker : 0);
+      const receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h), reach);
+      if (receiver !== null && this.rng.next() < 0.3 + h.stats.skill / 300 + TRAIT_PTS.playmakerPass * maker) {
+        const to = this.players[receiver]!;
+        if (Math.abs(to.body.pos.y - h.body.pos.y) > MAX_LAT_M) {
+          this.emit('cut-out', `${h.name} throws the cut-out ball to ${to.name}`, h, announce(h.traits.find((t) => t.id === 'playmaker')));
+        }
+        this.pass(h, to);
         return;
       }
     }
@@ -444,8 +483,9 @@ export class LiveSim implements MatchSim {
       const sit = this.situation(h, nearest, committed);
       if (sit.defenders === 1) {
         h.steppedOn = this.indexOf(nearest);
-        if (this.rng.next() < stepChance(h.stats, nearest.stats, sit)) {
-          this.sidestep(h, nearest);
+        const st = stepTraits(h.traits, nearest.traits, toLine <= FINISHER_M);
+        if (this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus)) {
+          this.sidestep(h, nearest, announce(st.credit));
           return;
         }
       }
@@ -483,14 +523,13 @@ export class LiveSim implements MatchSim {
   }
 
   /** A clean step: the defender grasps air, the carrier jinks past with a burst. */
-  private sidestep(c: Player, t: Player): void {
-    this.emit('step', `${c.name} steps ${t.name}!`, c);
+  private sidestep(c: Player, t: Player, trait?: string): void {
+    this.emit('step', `${c.name} steps ${t.name}!`, c, trait);
     const sideways = c.body.pos.y >= t.body.pos.y ? 1 : -1;
     c.jink = { dy: sideways * STEP_JINK_M, ticks: STEP_JINK_TICKS };
     this.lock(t, 'tackled', 12, add(t.body.pos, { x: this.dir * 0.8, y: -sideways * 0.6 }));
     t.cooldownUntil = this.tick + BEATEN_COOLDOWN;
-    c.immuneUntil = this.tick + IMMUNE_TICKS;
-    c.burstUntil = this.tick + BURST_TICKS;
+    this.burst(c);
   }
 
   private stepTackle(ph: Extract<Phase, { kind: 'tackle' }>): void {
@@ -583,16 +622,26 @@ export class LiveSim implements MatchSim {
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
-  private pass(from: Player, to: Player): void {
+  private pass(from: Player, to: Player, spillExtra = 0): void {
     const flightS = dist(from.body.pos, to.body.pos) / 16;
     const lead = clampToGround(add(to.body.pos, scale(to.body.vel, flightS * 0.8)), 1);
+    this.spillExtra = spillExtra;
+    this.interceptTrait = undefined;
     // A defender sitting in the lane may pick it off: the ball then flies to him.
     const thief = this.laneDefender(from.body.pos, lead, from.side);
     const cutOut = dist(from.body.pos, lead) > 12;
-    if (thief && this.rng.next() < interceptChance(thief.stats.footyIQ, cutOut)) {
+    const it = thief ? interceptTraits(thief.traits) : null;
+    if (thief && it && this.rng.next() < interceptChance(thief.stats.footyIQ, cutOut, it.bonus)) {
       this.ball = passFlight(from.body.pos, { ...thief.body.pos }, this.tick, this.indexOf(thief));
+      this.interceptTrait = announce(it.credit);
     } else {
       this.ball = passFlight(from.body.pos, lead, this.tick, this.indexOf(to));
+      if (thief && it?.gamble) {
+        // The Gambler shot out of the line and missed the read: he's out of the play.
+        this.emit('gamble', `${thief.name} gambles on the intercept and misses`, thief, announce(thief.traits.find((t) => t.id === 'gambler')));
+        this.lock(thief, 'tackled', 12, add(thief.body.pos, scale({ x: -this.dir, y: 0 }, 1)));
+        thief.cooldownUntil = this.tick + BEATEN_COOLDOWN;
+      }
     }
     from.pose = 'pass';
     from.poseUntil = this.tick + PASS_POSE_TICKS;
@@ -621,12 +670,14 @@ export class LiveSim implements MatchSim {
 
   private contest(c: Player, t: Player, committed: readonly Player[]): void {
     const sit = this.situation(c, t, committed);
-    const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit);
+    const tr = contestTraits(c.traits, t.traits, sit, this.toLine(c) <= FINISHER_M);
+    const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
+    const credit = announce(tr.credit[outcome]);
     const back = scale({ x: -this.dir, y: 0 }, 1);
     switch (outcome) {
       case 'strip': {
         // One-on-one, he rips it free: the tackler is the new carrier.
-        this.emit('strip', `${t.name} strips the ball from ${c.name}!`, t);
+        this.emit('strip', `${t.name} strips the ball from ${c.name}!`, t, credit);
         this.lock(c, 'tackled', 14);
         this.lock(t, 'tackle', 6);
         this.ball = { kind: 'held', by: this.indexOf(t) };
@@ -637,14 +688,13 @@ export class LiveSim implements MatchSim {
         return;
       }
       case 'broken':
-        this.emit('break-tackle', `${c.name} busts through ${t.name}`, c);
+        this.emit('break-tackle', `${c.name} busts through ${t.name}`, c, credit);
         this.lock(t, 'down', 16, add(t.body.pos, scale(back, -1.2)));
         t.cooldownUntil = this.tick + BEATEN_COOLDOWN;
-        c.immuneUntil = this.tick + IMMUNE_TICKS;
-        c.burstUntil = this.tick + BURST_TICKS;
+        this.burst(c);
         return;
       case 'fend':
-        this.emit('fend', `${c.name} palms off ${t.name}`, c);
+        this.emit('fend', `${c.name} palms off ${t.name}`, c, credit);
         c.pose = 'fend';
         c.poseUntil = this.tick + 6;
         this.lock(t, 'tackled', 14, add(t.body.pos, scale(back, -1.5)));
@@ -655,8 +705,9 @@ export class LiveSim implements MatchSim {
         const cands = this.candidates(c).filter((k) => dist(this.players[k.idx]!.body.pos, c.body.pos) < OFFLOAD_M + 2);
         const r = pickReceiver(c.body.pos, this.dir, cands) ?? cands.find((k) => !k.busy)?.idx ?? null;
         if (r !== null) {
-          this.emit('offload', `${c.name} gets the offload away to ${this.players[r]!.name}`, c);
-          this.pass(c, this.players[r]!);
+          this.emit('offload', `${c.name} gets the offload away to ${this.players[r]!.name}`, c, credit);
+          // A Razzle Dazzle offload is the miracle ball — and the one that gets spilled.
+          this.pass(c, this.players[r]!, tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0);
           this.lock(c, 'tackled', CONTACT_TICKS + DOWN_TICKS);
           this.lock(t, 'tackle', CONTACT_TICKS + DOWN_TICKS);
           c.busyUntil = this.tick + CONTACT_TICKS + DOWN_TICKS + 10;
@@ -668,10 +719,14 @@ export class LiveSim implements MatchSim {
         break;
     }
     const big = outcome === 'big-hit';
-    this.emit(big ? 'big-hit' : 'tackle', big ? `${t.name} smashes ${c.name} backwards!` : `${t.name} wraps up ${c.name}`, t);
-    const drive = big ? scale(back, DRIVE_BACK) : { x: 0, y: 0 };
-    this.lock(c, 'tackled', CONTACT_TICKS, big ? add(c.body.pos, drive) : undefined);
-    this.lock(t, 'tackle', CONTACT_TICKS, big ? add(t.body.pos, drive) : undefined);
+    // Held, but a Wrecking Ball sometimes keeps his legs pumping and makes ground in the tackle.
+    const wb = big ? 0 : traitBoost(c.traits, 'wreckingBall');
+    const wreck = wb > 0 && this.rng.next() < WRECK_DRIVE_CHANCE * wb ? wb : 0;
+    this.emit(big ? 'big-hit' : 'tackle', big ? `${t.name} smashes ${c.name} backwards!` : wreck > 0 ? `${t.name} hangs on as ${c.name} drives through the tackle` : `${t.name} wraps up ${c.name}`, t, big ? credit : wreck > 0 ? announce(c.traits.find((x) => x.id === 'wreckingBall')) : undefined);
+    const drive = big ? scale(back, DRIVE_BACK) : wreck > 0 ? scale(back, -WRECK_DRIVE_M * wreck) : { x: 0, y: 0 };
+    const moved = big || wreck > 0;
+    this.lock(c, 'tackled', CONTACT_TICKS, moved ? add(c.body.pos, drive) : undefined);
+    this.lock(t, 'tackle', CONTACT_TICKS, moved ? add(t.body.pos, drive) : undefined);
     this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big };
   }
 
@@ -874,6 +929,11 @@ export class LiveSim implements MatchSim {
   private move(): void {
     const dt = TICK_S;
     const held = new Set<Body>();
+    // Moments that quicken a player with the trait for it: the kick chase
+    // (Jets) and covering a broken line (Last Line).
+    const kickChase = this.ball.kind === 'flight' && this.ball.via === 'kick';
+    const h = this.holder();
+    const lineBroken = h !== null && h.side === this.attacking && (h.body.pos.x - this.lineX) * this.dir > 0;
     for (const p of this.players) {
       if (this.locked(p)) {
         held.add(p.body);
@@ -885,7 +945,9 @@ export class LiveSim implements MatchSim {
         continue;
       }
       p.slide = null;
-      const max = this.tick < p.burstUntil ? p.body.maxSpeed * BURST : p.body.maxSpeed;
+      let max = this.tick < p.burstUntil ? p.body.maxSpeed * BURST : p.body.maxSpeed;
+      if (kickChase && p.side !== this.attacking) max *= speedMult(p.traits, 'jets');
+      if (lineBroken && p.side !== this.attacking) max *= speedMult(p.traits, 'lastLine');
       arrive(p.body, p.target, dt, { through: p.through, maxSpeed: max });
       integrate(p.body, dt);
       if (p.jink) {

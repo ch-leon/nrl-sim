@@ -12,6 +12,7 @@
 
 import type { GameState } from './state';
 import { getState, SAVE_VERSION } from './state';
+import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { bus } from './events';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -132,7 +133,28 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       };
     },
   },
+  // v5 → v6: traits become levelled instances { id, level } (BAK-208 §3). Old
+  // names map to level I; hardMan was renamed hitman; unknown names are dropped.
+  {
+    from: 5,
+    to: 6,
+    run: (old) => {
+      const fillPlayers = (list: unknown): unknown =>
+        Array.isArray(list)
+          ? list.map((p: RawState) => ({ ...p, traits: migrateTraits(p.traits) }))
+          : list;
+      return { ...old, squad: fillPlayers(old.squad), freeAgents: fillPlayers(old.freeAgents) };
+    },
+  },
 ];
+
+/** Old string traits → instances; instances already in the new shape pass through. */
+function migrateTraits(traits: unknown): TraitInstance[] {
+  if (!Array.isArray(traits)) return [];
+  const legacy = traits.filter((t): t is string => typeof t === 'string');
+  const kept = traits.filter((t): t is TraitInstance => !!t && typeof t === 'object' && isTraitId(String((t as TraitInstance).id)));
+  return [...kept.map((t) => ({ id: t.id, level: ([1, 2, 3] as const).includes(t.level) ? t.level : 1 })), ...fromLegacy(legacy)];
+}
 
 export type MigrateResult =
   | { ok: true; state: GameState }

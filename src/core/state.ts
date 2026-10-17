@@ -14,9 +14,10 @@ export type Position =
   | 'fullback' | 'winger' | 'centre' | 'five-eighth' | 'halfback'
   | 'hooker' | 'prop' | 'second-row' | 'lock';
 
-export type Trait =
-  | 'workhorse' | 'finisher' | 'hardMan' | 'playmaker'
-  | 'injuryProne' | 'clubLegend' | 'youngGun' | 'veteran';
+/** Traits are levelled special skills (BAK-208 §3); the catalogue lives in data/traits.ts. */
+export type { TraitId, TraitInstance, TraitLevel } from '../data/traits';
+/** @deprecated alias kept for older call sites: a trait's id. */
+export type Trait = import('../data/traits').TraitId;
 
 export interface PlayerStats {
   speed: number; strength: number; stamina: number;
@@ -35,7 +36,7 @@ export interface Player {
   morale: number; // 1-100
   injuryRisk: number; // 1-100
   injuredWeeks: number; // 0 = fit
-  traits: Trait[];
+  traits: import('../data/traits').TraitInstance[];
   wage: number; // per week
   contractWeeks: number; // remaining
   junior?: boolean; // Academy prospect awaiting signing (default false) — #42
@@ -82,7 +83,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 /** One completed season. The extended fields are optional for pre-v4 entries. */
 export interface SeasonRecord {

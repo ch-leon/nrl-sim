@@ -5,8 +5,10 @@ import { button, el, mount, panel } from '../../ui/dom';
 import { RUN_SPEEDS, type RunSpeed } from '../core/engine';
 import { decodeFlag } from '../core/flag';
 import type { LabController, LabParams } from './controller';
-import type { LabClub } from './sheets';
+import { TRAIT_MODES, isTraitMode, type LabClub, type TraitMode } from './sheets';
 import { statsLine, statsWindow } from './stats';
+
+const TRAIT_MODE_LABEL: Readonly<Record<TraitMode, string>> = { gen: 'as rolled', none: 'none', stars: 'all superstars' };
 
 export interface LabPanelHooks {
   /** Rebuild the lab on new teams / seed / tick (new sprites need a new scene). */
@@ -49,9 +51,17 @@ export class LabPanel {
     const home = select(p.home, 'Home team');
     const away = select(p.away, 'Away team');
     const seed = el('input', { class: 'nrl-lab-seed', attrs: { type: 'number', min: '1', step: '1', value: String(p.seed), title: 'Seed' } });
+    // Trait sandbox: watch a mechanic with the skills as rolled, with none, or with everyone a star.
+    const traits = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Special skills: as rolled / none / everyone a superstar' } });
+    for (const m of TRAIT_MODES) {
+      const o = el('option', { text: TRAIT_MODE_LABEL[m], attrs: { value: m } });
+      if (m === p.traits) o.selected = true;
+      traits.append(o);
+    }
     const go = button('Go', () => {
       const s = Math.max(1, Math.floor(Number(seed.value) || 1));
-      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '' });
+      const mode = isTraitMode(traits.value) ? traits.value : 'gen';
+      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode });
     });
     const shuffle = button('🎲', () => {
       seed.value = String(1 + Math.floor(Math.random() * 999_999));
@@ -92,7 +102,7 @@ export class LabPanel {
     const load = button('Load', () => {
       const f = decodeFlag(codeIn.value);
       if (!f) return hooks.notify('Not a valid Flag code');
-      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note });
+      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen' });
     });
 
     // Event feed: the last few things that happened; tap one to jump back to it.
@@ -108,6 +118,7 @@ export class LabPanel {
       { class: 'nrl-lab' },
       el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: 'Match Lab · Phase 1 set prototype' }), collapse),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, home, el('span', { text: 'v' }), away, seed, go, shuffle),
+      el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits),
       el('div', { class: 'nrl-lab-row' }, this.playBtn, step, ...this.speedBtns, this.readout),
       this.scrub,
       this.label,
@@ -139,7 +150,7 @@ export class LabPanel {
         ...r.history.slice(-8).reverse().map((e) =>
           el('button', {
             class: 'nrl-lab-line',
-            text: `${(e.tick / 20).toFixed(1)}s · ${e.text}`,
+            text: `${(e.tick / 20).toFixed(1)}s · ${e.text}${e.trait ? ` (${e.trait})` : ''}`,
             attrs: { type: 'button', title: 'Jump to just before this' },
             onClick: () => {
               this.ctrl.seek(Math.max(0, e.tick - 30));
@@ -193,6 +204,7 @@ function ensureLabStyles(): void {
   font: inherit; border: 2px solid #000; background: #fff6c2; color: #1a1a2e; padding: 0.15rem 0.25rem; min-width: 0;
 }
 .nrl-lab-select { flex: 1 1 5rem; max-width: 8rem; }
+.nrl-lab-traits { flex: 0 1 auto; }
 .nrl-lab-seed { width: 4.5rem; }
 .nrl-lab-code { flex: 1 1 6rem; }
 .nrl-lab .nrl-btn { padding: 0.2rem 0.45rem; font-size: 0.72rem; }

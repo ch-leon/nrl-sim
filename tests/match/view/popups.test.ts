@@ -19,6 +19,14 @@ describe('popupFor', () => {
   it('stays quiet for routine events', () => {
     for (const k of ['tackle', 'set-start', 'kickoff', 'pass', 'turnover']) expect(popupFor(ev(k))).toBeNull();
   });
+  it('names a firing trait on a third line, and shouts a tackle only when a trait shaped it', () => {
+    const step = popupFor({ ...ev('step'), trait: 'Dancing Feet II' });
+    expect(step).toMatchObject({ word: 'STEP!', sub: 'KAVANAGH', trait: 'DANCING FEET II' });
+    expect(popupFor(ev('step'))?.trait).toBeUndefined();
+    expect(popupFor({ ...ev('tackle'), trait: 'Wrecking Ball I' })).toMatchObject({ word: 'DRIVE!', tone: 'attack', trait: 'WRECKING BALL I' });
+    expect(popupFor(ev('cut-out'))).toMatchObject({ word: 'CUT-OUT!', tone: 'attack' });
+    expect(popupFor(ev('gamble'))).toMatchObject({ word: 'GAMBLED!', tone: 'bad' });
+  });
   it('copes with a missing name and knows the future kinds', () => {
     expect(popupFor({ tick: 1, kind: 'fend', text: '', side: 'home', slot: 1 })?.sub).toBe('');
     expect(surnameOf('  Lachie   Tuilagi ')).toBe('Tuilagi');

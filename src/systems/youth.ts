@@ -5,7 +5,8 @@
 // training boost. Last season's unsigned prospects are cleared first.
 import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
-import type { Player, Trait } from '../core/state';
+import type { Player } from '../core/state';
+import { withTrait, withoutTrait } from '../data/traits';
 import { registerSeasonHook } from '../core/time';
 import { STAT_MAX } from '../config';
 import { overallRating, generatePlayer, POSITIONS } from '../data/player';
@@ -44,8 +45,8 @@ export function generateProspects(rng: Rng, level: number): Player[] {
       speed: roll(), strength: roll(), stamina: roll(), skill: roll(), footyIQ: roll(),
     };
     const overall = overallRating({ stats });
-    const traits: Trait[] = base.traits.filter((t) => t !== 'youngGun' && t !== 'veteran');
-    if (level >= 2) traits.push('youngGun');
+    let traits = withoutTrait(withoutTrait(base.traits, 'youngGun'), 'veteran');
+    if (level >= 2) traits = withTrait(traits, 'youngGun');
     out.push({
       ...base,
       stats,
