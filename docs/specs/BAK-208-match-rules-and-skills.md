@@ -186,23 +186,52 @@ territory); REGATHER! and DROPPED! follow. The camera going wide waits for E. Go
 dropouts and dead balls are not modelled yet: a grubber never crosses the dead-ball
 line and a defender who gathers it in-goal simply runs it out.
 
-## 5. Tactics by zone
+## 5. Tactics by zone — *implemented in D (#98)*
 
-The field is five zones from the attacking side's view: **own 20 · own half ·
-midfield · attacking half · red zone (inside 20)**. A team's **preset** sets, per zone:
-pass appetite, offload permission, kick choice weights, carrier risk (step attempts vs
-carrying into contact), and the defensive line style (rush / slide / compressed).
+The field is five zones from the attacking side's view, by metres to the line it is
+attacking: **own 20** (>80) · **own half** (60–80) · **midfield** (40–60) · **attacking
+half** (20–40) · **red zone** (≤20). A side carries **two presets** (decision
+2026-10-17): an **attack** preset read per zone every time the carrier decides, and a
+**defence** preset for how the line is set. Numbers are deltas and multipliers on the
+sim's defaults (`src/match/league/presets.ts`).
 
-| Preset | Character | Own 20 | Midfield | Red zone |
-|---|---|---|---|---|
-| **Grind** | one-out, safe, kick for territory | no offloads, early territory kick | hit-ups, kick on last | second-phase only via trait |
-| **Balanced** (default) | sensible | low risk | shifts when numbers | offloads allowed, grubber/chip |
-| **Expansive** | wide, second phase | shift once | offloads allowed, cut-outs | everything |
-| **Kick-chase** | territory and pressure | kick tackle 3–4 | bombs | grubbers |
-| **All-out** | risk everywhere | offloads | offloads, steps | chips, cut-outs, dives |
+### 5.1 Attack presets
+| Preset | Pass | Offloads | Step | Width / cut-out | Prefers | Early kicks | Kick bias |
+|---|---|---|---|---|---|---|---|
+| **Grind** | −15% (−25% own 20) | never (½ in the attacking half, 0.7 red zone) | tries 60% | — | hit-ups +1.0 | territory 25% from deep (40% own 20); red zone 20% | long ×1.6, bomb ×0.7, chip/cross ×0.5 |
+| **Balanced** (default) | 0 | normal (0.6 own 20) | always | — | halves first, forwards early | red zone 35% | — |
+| **Expansive** | +15% | ×1.3 (0.8 own 20) | always | width 0.35, cut-out 8%, reach +3 m | edges +0.8 | red zone 30% | cross-field ×1.5, long ×0.8 |
+| **Kick-chase** | −5% | ×0.6 | tries 90% | — | — | territory 35% from deep (bomb 40% of those); red zone 55% | bomb ×1.8, grubber ×1.3, long ×1.2 |
+| **All-out** | +20% | ×1.6 (1.2 own 20) | always | width 0.45, cut-out 12% | edges +0.5 | red zone 45% | chip ×1.6, cross ×1.3, grubber ×1.2, long ×0.6 |
 
-Presets are unlocked via coaching staff / facilities (later); rivals get one by club
-identity. Mid-match coach calls (#73) override the preset for a set.
+*Pass* adds to the engaged carrier's chance of passing (base 30% + Skill/300). *Offloads*
+multiplies the offload odds (§4.1); 0 means support is ignored. *Step* is the chance he
+tries the step one-on-one rather than tucking it. *Width* softens the preference for the
+6 m pass; *cut-out* is the chance per engagement of throwing to the widest man in reach.
+*Prefers* adds to the receiver choice (forwards' hit-ups on tackles 1–3; centres and
+wingers). **Overlap** (all presets): when a side has more players than the defence within
+20 m on one side of the passer, receivers that way get +0.8 (×1 + width).
+
+### 5.2 Defence presets
+| Preset | Line speed | Commits | Lanes | Markers hold | Every tackle | Stepped |
+|---|---|---|---|---|---|---|
+| **Slide** (default) | 5 m/s | 2 (3–4 when the line is broken) | normal | ×1.0 | — | — |
+| **Rush** | 6.5 m/s | +1 | normal | ×0.6 | big hit +4%, bust +5% | +4% |
+| **Compressed** | 4.5 m/s | — | pull ×1.4 toward the ball (edges open) | ×1.2 | bust −4%, offload −3% | −2% |
+
+### 5.3 Who plays what
+Rivals get a fixed style from club identity: contenders (65+) Expansive / All-out /
+Balanced, mid-table Balanced / Kick-chase / Expansive, strugglers Grind / Kick-chase /
+Balanced, with the defence from a second roll. The player's club plays Balanced / Slide
+until coaching staff and facilities unlock presets (later ticket). Mid-match coach calls
+(#73) will override the preset for a set. Lab: **H / A** pickers per side for attack and
+defence ("club" keeps the club's own), `#lab?hatk=grind&hdef=rush&aatk=…&adef=…`, and the
+hint line names what each side is playing.
+
+Measured (12 seeds × 2½ min, 60-rated sheets, v Balanced / Slide): Expansive throws
+more than twice Grind's offloads and more cut-outs, Grind kicks long more often and steps
+less; Kick-chase kicks more and bombs more; All-out offloads 1.5× Balanced; Rush makes
+15%+ more big hits but concedes more busts and steps than Slide.
 
 ## 6. Readability (how it is shown)
 

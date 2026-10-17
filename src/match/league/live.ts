@@ -20,12 +20,13 @@ import { arrive, integrate, makeBody, maxSpeedFor, separate, speedOf, type Body 
 import { CARRY_LIFT, PASS_SPEED, bounceFlight, flightAt, grubberFlight, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
 import type { PlayerSnap, Side, SimEvent, Snapshot } from '../core/snapshot';
 import { add, clamp, dist, dot, norm, scale, sub, type Vec } from '../core/vec';
-import { AVERAGE, angleFrom, interceptChance, knockOnChance, resolveContest, stepChance, type ContestStats, type Situation } from './contest';
+import { AVERAGE, BASE, angleFrom, interceptChance, knockOnChance, resolveContest, stepChance, type ContestStats, type Situation } from './contest';
 import { FULLBACK, HOOKER, KICKER, PLAYERS, ROLES, formationTarget } from './roles';
 import {
   MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, gapTarget, grubberTarget, intercept,
   kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate, type KickChoice,
 } from './tactics';
+import { DEFAULT_TACTICS, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type TeamTactics } from './presets';
 import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
 import { traitBoost, type TraitInstance } from '../../data/traits';
 
@@ -78,8 +79,6 @@ const ENGAGE_M = 4.5;
 const TACKLE_REACH = 1.2;
 /** The defensive line stands this far off the ruck. */
 const ONSIDE_M = 10;
-/** Line rush-up speed, m/s. */
-const LINE_SPEED = 5;
 /** A big hit drives the carrier back this far. */
 const DRIVE_BACK = 2.5;
 /** A support runner this close can take an offload. */
@@ -91,7 +90,6 @@ const DROP_PRESSURED = 0.18;
 const CHASE_THROUGH_M = 2;
 /** On the second-last tackle inside this, the kicker goes early this often (grubber or chip). */
 const EARLY_KICK_M = 25;
-const EARLY_KICK_CHANCE = 0.35;
 /** Loose ball picked up within this reach. */
 const PICKUP_M = 0.9;
 /** A defender this close to a receiver makes the catch a pressured one. */
@@ -104,6 +102,10 @@ const SECOND_MAN_M = 3.5;
 const LANE_M = 1.5;
 /** Markers may not leave the ruck to tackle until this long after the ball is played. */
 const MARKER_RELEASE_TICKS = 14;
+/** A pass to the side with the overlap gets this much preference (scaled up by an expansive plan). */
+const OVERLAP_PREFER = 0.8;
+/** Players within this box either side of the passer count toward the overlap. */
+const SHIFT_M = 20;
 /** A step jinks the carrier this far sideways, over this many ticks. */
 const STEP_JINK_M = 1.6;
 const STEP_JINK_TICKS = 4;
@@ -207,6 +209,8 @@ export class LiveSim implements MatchSim {
   private readonly rng: Rng;
   private readonly players: Player[];
   private readonly names: Record<Side, string>;
+  /** How each side plays (BAK-208 §5). */
+  readonly tactics: Record<Side, TeamTactics>;
   private ball: BallState;
   private phase: Phase;
   private attacking: Side = 'home';
@@ -239,6 +243,7 @@ export class LiveSim implements MatchSim {
   constructor(home: TeamSheet, away: TeamSheet, seed: number) {
     this.rng = makeRng(seed);
     this.names = { home: home.name, away: away.name };
+    this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
     this.ball = { kind: 'held', by: this.idx('away', KICKER) };
     this.phase = { kind: 'restart', t0: 0, kicking: 'away' };
@@ -309,6 +314,14 @@ export class LiveSim implements MatchSim {
   /** Metres from the carrier to the line he is attacking. */
   private toLine(p: Player): number {
     return this.dir > 0 ? FIELD_LENGTH - p.body.pos.x : p.body.pos.x;
+  }
+  /** The attacking side's plan for the zone the carrier is in. */
+  private atkPlan(h: Player): AttackPlan {
+    return attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h)));
+  }
+  /** How the defending side's line is set. */
+  private defPlan(): DefencePlan {
+    return defencePlan(this.tactics[other(this.attacking)].defence);
   }
   /** After a break the carrier bursts: longer for a Jets player. */
   private burst(c: Player): void {
@@ -544,9 +557,12 @@ export class LiveSim implements MatchSim {
     // on the line (or fancies it inside 40), else a kick for the zone — then
     // runs a few steps and puts boot to ball.
     const toLine = this.toLine(h);
-    const early = this.tackles === SET_TACKLES - 2 && toLine <= EARLY_KICK_M;
+    const plan = this.atkPlan(h);
+    const dplan = this.defPlan();
+    const zone = zoneOf(toLine);
+    const early = this.tackles === SET_TACKLES - 2 && (toLine <= EARLY_KICK_M || zone === 'own20' || zone === 'ownHalf');
     if ((this.lastPlay || early) && h.slot === KICKER) {
-      if (this.kickCall === null) this.kickCall = this.lastPlay ? this.callLastPlay(toLine) : this.callEarlyKick();
+      if (this.kickCall === null) this.kickCall = this.lastPlay ? this.callLastPlay(toLine, plan) : this.callEarlyKick(toLine, plan);
       if (this.kickCall !== 'run' && (this.tick - h.catchTick >= KICK_RUN_TICKS || nearD < ENGAGE_M)) {
         this.pendingKick = this.planKick(h, this.kickCall);
         this.lock(h, 'kick', KICK_LOCK_TICKS);
@@ -560,17 +576,18 @@ export class LiveSim implements MatchSim {
     if (nearD < ENGAGE_M && !h.decided && this.tick - h.catchTick >= PASS_COOLDOWN) {
       h.decided = true;
       const maker = traitBoost(h.traits, 'playmaker');
-      const reach = MAX_LAT_M + (maker > 0 ? CUT_OUT_PER_LEVEL_M * maker : 0);
-      const cands = this.candidates(h);
-      let receiver = pickReceiver(h.body.pos, this.dir, cands, reach, Math.min(0.6, PLAYMAKER_WIDTH * maker));
-      // A Playmaker sees the overlap: now and then he skips the near man and throws to the widest one he can reach.
-      if (maker > 0 && this.rng.next() < CUT_OUT_CHANCE * maker) {
+      const reach = MAX_LAT_M + (maker > 0 ? CUT_OUT_PER_LEVEL_M * maker : 0) + (plan.width > 0 ? 3 : 0);
+      const cands = this.candidates(h, plan);
+      let receiver = pickReceiver(h.body.pos, this.dir, cands, reach, Math.min(0.6, PLAYMAKER_WIDTH * maker + plan.width));
+      // A Playmaker (or an expansive side) sees the overlap: now and then he skips the near man and throws to the widest one he can reach.
+      const cutOut = CUT_OUT_CHANCE * maker + plan.cutOut;
+      if (cutOut > 0 && this.rng.next() < cutOut) {
         const widest = cands
           .filter((c) => !c.busy && (h.body.pos.x - c.pos.x) * this.dir >= 0.3 && (h.body.pos.x - c.pos.x) * this.dir <= 8 && Math.abs(c.pos.y - h.body.pos.y) <= reach)
           .sort((a, b) => Math.abs(b.pos.y - h.body.pos.y) - Math.abs(a.pos.y - h.body.pos.y))[0];
         if (widest && Math.abs(widest.pos.y - h.body.pos.y) > MAX_LAT_M) receiver = widest.idx;
       }
-      if (receiver !== null && this.rng.next() < 0.3 + h.stats.skill / 300 + TRAIT_PTS.playmakerPass * maker) {
+      if (receiver !== null && this.rng.next() < 0.3 + h.stats.skill / 300 + TRAIT_PTS.playmakerPass * maker + plan.pass) {
         const to = this.players[receiver]!;
         if (Math.abs(to.body.pos.y - h.body.pos.y) > MAX_LAT_M) {
           this.emit('cut-out', `${h.name} throws the cut-out ball to ${to.name}`, h, announce(h.traits.find((t) => t.id === 'playmaker')));
@@ -582,13 +599,15 @@ export class LiveSim implements MatchSim {
 
     if (this.tick < h.immuneUntil) return;
 
-    // One-on-one and the defender is almost on him: try to step (once per defender).
+    // One-on-one and the defender is almost on him: try to step (once per
+    // defender) — unless the game plan says tuck it and carry in.
     if (nearest && nearD <= STEP_RANGE && this.steppedOn(h) !== this.indexOf(nearest)) {
       const sit = this.situation(h, nearest, committed);
       if (sit.defenders === 1) {
         h.steppedOn = this.indexOf(nearest);
         const st = stepTraits(h.traits, nearest.traits, toLine <= FINISHER_M);
-        if (this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus)) {
+        const tries = plan.step >= 1 || this.rng.next() < plan.step;
+        if (tries && this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus + dplan.stepAgainst)) {
           this.sidestep(h, nearest, announce(st.credit));
           return;
         }
@@ -608,17 +627,25 @@ export class LiveSim implements MatchSim {
     return h.steppedOn;
   }
 
-  /** In the red zone with a tackle to spare, the kicker sometimes goes early: a grubber or a chip for the chasers. */
-  private callEarlyKick(): 'run' | KickChoice {
-    if (this.rng.next() >= EARLY_KICK_CHANCE) return 'run';
-    return this.rng.next() < 0.6 ? 'grubber' : 'chip';
+  /**
+   * With a tackle to spare: in the red zone the kicker sometimes goes early
+   * (a grubber or a chip for the chasers); from deep a grinding or kick-chase
+   * side sometimes kicks early for territory.
+   */
+  private callEarlyKick(toLine: number, plan: AttackPlan): 'run' | KickChoice {
+    if (toLine <= EARLY_KICK_M) {
+      if (this.rng.next() >= plan.earlyKick) return 'run';
+      return this.rng.next() < 0.6 ? 'grubber' : 'chip';
+    }
+    if (plan.earlyTerritory <= 0 || this.rng.next() >= plan.earlyTerritory) return 'run';
+    return (plan.kickBias.bomb ?? 1) > 1 && this.rng.next() < 0.4 ? 'bomb' : 'long';
   }
 
-  /** The kicker's call on the last: run it close in or one time in five inside 40, else the kick for the zone. */
-  private callLastPlay(toLine: number): 'run' | KickChoice {
+  /** The kicker's call on the last: run it close in or one time in five inside 40, else the kick for the zone in the side's style. */
+  private callLastPlay(toLine: number, plan: AttackPlan): 'run' | KickChoice {
     if (toLine <= RUN_CLOSE_M) return 'run';
     if (toLine <= RUN_IT_ZONE_M && this.rng.next() < RUN_IT_CHANCE) return 'run';
-    return chooseKick(toLine, this.rng.next());
+    return chooseKick(toLine, this.rng.next(), plan.kickBias);
   }
 
   /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */
@@ -652,7 +679,7 @@ export class LiveSim implements MatchSim {
     const defenders = others >= 2 ? 3 : others === 1 ? 2 : 1;
     const approach = norm(sub(c.body.pos, t.body.pos)); // the way the tackler is closing
     const angle = angleFrom(-dot(approach, c.body.heading)); // square when he comes at the carrier's face
-    const support = this.side(c.side).some((p) => p !== c && p.slot !== HOOKER && !this.locked(p) && dist(p.body.pos, c.body.pos) < OFFLOAD_M);
+    const support = this.atkPlan(c).offload > 0 && this.side(c.side).some((p) => p !== c && p.slot !== HOOKER && !this.locked(p) && dist(p.body.pos, c.body.pos) < OFFLOAD_M);
     return {
       defenders,
       angle,
@@ -838,6 +865,12 @@ export class LiveSim implements MatchSim {
   private contest(c: Player, t: Player, committed: readonly Player[]): void {
     const sit = this.situation(c, t, committed);
     const tr = contestTraits(c.traits, t.traits, sit, this.toLine(c) <= FINISHER_M);
+    // The game plans weigh in: how much the attack wants the offload, how the line tackles.
+    const plan = this.atkPlan(c);
+    const dplan = this.defPlan();
+    if (sit.support) tr.mods.offload = (tr.mods.offload ?? 0) + (plan.offload - 1) * BASE.offload + dplan.offload;
+    tr.mods.bigHit = (tr.mods.bigHit ?? 0) + dplan.bigHit;
+    tr.mods.broken = (tr.mods.broken ?? 0) + dplan.broken;
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
     const back = scale({ x: -this.dir, y: 0 }, 1);
@@ -916,7 +949,8 @@ export class LiveSim implements MatchSim {
     // Markers stay square at the ruck until the ball is well clear of it; they
     // may only pounce early on a dummy-half dart. Otherwise the first receiver
     // runs at the line, not at the two men standing over the mark.
-    const held = this.tick < this.ruckPlayedAt + MARKER_RELEASE_TICKS && h.slot !== HOOKER;
+    const dplan = this.defPlan();
+    const held = this.tick < this.ruckPlayedAt + MARKER_RELEASE_TICKS * dplan.markerHold && h.slot !== HOOKER;
     const free = defenders.filter((d) => !this.locked(d) && this.tick >= d.cooldownUntil && !(held && this.markers.includes(this.indexOf(d))));
     // A defender already behind the carrier can only chase; the ones in front
     // of him are the tackle, so they rank first.
@@ -926,27 +960,45 @@ export class LiveSim implements MatchSim {
     const ahead = free.filter((d) => !behind(d)).length;
     // A broken line (two or fewer still in front) sends everyone in range after him.
     const n = ahead <= 2 ? 4 : free[2] && dist(free[2].body.pos, h.body.pos) < 5 ? 3 : 2;
-    return free.slice(0, n);
+    return free.slice(0, Math.min(4, n + dplan.commit));
   }
 
-  private candidates(passer: Player): Candidate[] {
+  private candidates(passer: Player, plan: AttackPlan = this.atkPlan(passer)): Candidate[] {
+    const overlap = this.overlapSide(passer);
     return this.side(passer.side)
       .filter((p) => p !== passer)
       .map((p) => ({
         idx: this.indexOf(p),
         pos: p.body.pos,
         busy: this.locked(p) || this.tick < p.busyUntil || (p.slot === HOOKER && this.phase.kind === 'ruck'),
-        prefer: this.rolePreference(p, passer),
+        prefer: this.rolePreference(p, passer, plan) + (overlap !== 0 && Math.sign(p.body.pos.y - passer.body.pos.y) === overlap ? OVERLAP_PREFER * (1 + plan.width) : 0),
       }));
   }
 
-  /** Who the ball should go to by role: halves as first receiver; forwards for the early hit-ups. */
-  private rolePreference(p: Player, passer: Player): number {
+  /**
+   * Which side of the passer has the overlap: +1 / −1 when his side has more
+   * players than the defence within SHIFT_M of him on that side, else 0.
+   */
+  private overlapSide(passer: Player): 0 | 1 | -1 {
+    const count = (ps: readonly Player[], sign: number): number =>
+      ps.filter((p) => p !== passer && !this.locked(p) && Math.sign(p.body.pos.y - passer.body.pos.y) === sign && Math.abs(p.body.pos.x - passer.body.pos.x) < SHIFT_M && Math.abs(p.body.pos.y - passer.body.pos.y) < SHIFT_M).length;
+    const atk = this.side(passer.side);
+    const def = this.side(other(passer.side));
+    const left = count(atk, -1) - count(def, -1);
+    const right = count(atk, 1) - count(def, 1);
+    if (left >= 1 && left > right) return -1;
+    if (right >= 1 && right > left) return 1;
+    return 0;
+  }
+
+  /** Who the ball should go to by role: halves as first receiver; forwards for the early hit-ups; the edges when the plan wants width. */
+  private rolePreference(p: Player, passer: Player, plan: AttackPlan): number {
     const name = ROLES[p.slot]!.name;
     const fromRuck = passer.slot === HOOKER;
     if (name === 'halfback' || name === 'five-eighth') return fromRuck ? 1.5 : 0.5;
-    if (name === 'prop' || name === 'second-row') return fromRuck && this.tackles <= 2 ? 1.2 : 0;
-    if (name === 'fullback') return -0.5;
+    if (name === 'prop' || name === 'second-row') return fromRuck && this.tackles <= 2 ? 1.2 + plan.hitUps : plan.hitUps * 0.3;
+    if (name === 'centre' || name === 'winger') return plan.edges;
+    if (name === 'fullback') return -0.5 + plan.edges * 0.5;
     return 0;
   }
 
@@ -1082,9 +1134,10 @@ export class LiveSim implements MatchSim {
     // Defence.
     const defenders = this.side(def);
     const inRuck = ph.kind === 'tackle' || ph.kind === 'ruck';
+    const dplan = this.defPlan();
     if (ph.kind === 'play' && carrier) {
       const want = carrier.body.pos.x + this.dir * 2.5;
-      const stepM = LINE_SPEED * TICK_S;
+      const stepM = dplan.lineSpeed * TICK_S;
       // Rush up toward the carrier, never past him.
       if (this.dir > 0) this.lineX = Math.max(want, this.lineX - stepM);
       else this.lineX = Math.min(want, this.lineX + stepM);
@@ -1093,7 +1146,7 @@ export class LiveSim implements MatchSim {
     // Markers stand over the mark through the ruck and hold there until released.
     const markers: Player[] = inRuck
       ? this.currentMarkers()
-      : this.tick < this.ruckPlayedAt + MARKER_RELEASE_TICKS
+      : this.tick < this.ruckPlayedAt + MARKER_RELEASE_TICKS * dplan.markerHold
         ? this.markers.map((i) => this.players[i]!).filter((d) => d.side === def && !committed.includes(d))
         : [];
     for (const p of defenders) {
@@ -1123,7 +1176,7 @@ export class LiveSim implements MatchSim {
           p.target = { x: clamp(this.lineX + this.dir * deep, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
         }
       } else {
-        const y = clamp(role.lane + (anchor.y - MID_Y) * (role.defPull ?? role.pull), 1.5, 66.5);
+        const y = clamp(role.lane + (anchor.y - MID_Y) * Math.min(1, (role.defPull ?? role.pull) * dplan.pull), 1.5, 66.5);
         p.target = { x: clamp(this.lineX, -8, FIELD_LENGTH + 8), y };
       }
     }

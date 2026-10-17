@@ -18,6 +18,7 @@ import type {
 import { mkEvent } from './events';
 import { generatedRoster, stageEvents } from './staging';
 import { hasTrait as hasTraitId, rollTraits, type TraitQuality } from '../data/traits';
+import { rivalTactics } from '../match/league/presets';
 import {
   rollWeather,
   weatherMods,
@@ -156,6 +157,7 @@ export function teamSheetFromRival(club: RivalClub): TeamSheet {
     fitness,
     colors: club.colors,
     roster,
+    tactics: rivalTactics(club),
   };
 }
 

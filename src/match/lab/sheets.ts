@@ -7,6 +7,7 @@ import { POOL_IDS, TRAITS, type TraitInstance } from '../../data/traits';
 import { teamSheetFromRival } from '../../sim/engine';
 import { makeRng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
+import type { TeamTactics } from '../league/presets';
 
 export interface LabClub {
   id: string;
@@ -23,13 +24,24 @@ export type TraitMode = 'gen' | 'none' | 'stars';
 export const TRAIT_MODES: readonly TraitMode[] = ['gen', 'none', 'stars'];
 export const isTraitMode = (s: string | null | undefined): s is TraitMode => TRAIT_MODES.includes(s as TraitMode);
 
-/** Sheet for a club id; unknown ids fall back to the first club. */
-export function labSheet(clubId: string, traits: TraitMode = 'gen'): TeamSheet {
+/**
+ * Sheet for a club id; unknown ids fall back to the first club. `tactics`
+ * overrides the club's own style per preset (BAK-208 §5) for the lab's picker.
+ */
+export function labSheet(clubId: string, traits: TraitMode = 'gen', tactics: Partial<TeamTactics> = {}): TeamSheet {
   const club = RIVAL_CLUBS.find((c) => c.id === clubId) ?? RIVAL_CLUBS[0];
   if (!club) throw new Error('no clubs defined');
-  const sheet = teamSheetFromRival(club);
+  const base = teamSheetFromRival(club);
+  const sheet: TeamSheet = { ...base, tactics: { ...(base.tactics ?? { attack: 'balanced', defence: 'slide' }), ...stripUndefined(tactics) } };
   if (traits === 'gen' || !sheet.roster) return sheet;
   return { ...sheet, roster: sheet.roster.map((r, i) => withMode(r, traits, `${club.id}:${i}`)) };
+}
+
+function stripUndefined(t: Partial<TeamTactics>): Partial<TeamTactics> {
+  const out: Partial<TeamTactics> = {};
+  if (t.attack) out.attack = t.attack;
+  if (t.defence) out.defence = t.defence;
+  return out;
 }
 
 function withMode(r: RosterEntry, mode: TraitMode, key: string): RosterEntry {

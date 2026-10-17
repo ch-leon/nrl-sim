@@ -4,6 +4,14 @@
 import { Runner, type MatchSim, type RunSpeed } from '../core/engine';
 import { decodeFlag, encodeFlag } from '../core/flag';
 import { isTraitMode, type TraitMode } from './sheets';
+import { isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
+
+/** Per-side preset overrides for the lab; a missing field keeps the club's own style. */
+export interface LabTactics {
+  home: Partial<TeamTactics>;
+  away: Partial<TeamTactics>;
+}
+const NO_TACTICS: LabTactics = { home: {}, away: {} };
 
 export interface LabParams {
   seed: number;
@@ -15,9 +23,11 @@ export interface LabParams {
   note: string;
   /** Trait sandbox (BAK-208 §3): as rolled, none, or everyone a superstar. */
   traits: TraitMode;
+  /** Tactics picker (BAK-208 §5): preset overrides per side. */
+  tactics: LabTactics;
 }
 
-export type LabSimFactory = (home: string, away: string, seed: number, traits: TraitMode) => MatchSim;
+export type LabSimFactory = (home: string, away: string, seed: number, traits: TraitMode, tactics: LabTactics) => MatchSim;
 
 export const LAB_HASH = '#lab';
 export const DEFAULT_SEED = 1;
@@ -28,7 +38,8 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
   const sp = new URLSearchParams(q);
   const flag = sp.get('flag') ? decodeFlag(sp.get('flag')!) : null;
   const traits: TraitMode = isTraitMode(sp.get('traits')) ? (sp.get('traits') as TraitMode) : 'gen';
-  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits };
+  const tactics = parseTactics(sp);
+  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics };
   const seed = Number(sp.get('seed'));
   const tick = Number(sp.get('tick'));
   return {
@@ -38,13 +49,32 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
     tick: Number.isInteger(tick) && tick > 0 ? tick : 0,
     note: '',
     traits,
+    tactics,
   };
 }
 
-export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode }): string {
+/** `hatk=grind&hdef=rush&aatk=…&adef=…` → per-side overrides (unknown values ignored). */
+function parseTactics(sp: URLSearchParams): LabTactics {
+  const side = (a: string, d: string): Partial<TeamTactics> => {
+    const out: Partial<TeamTactics> = {};
+    const atk = sp.get(a);
+    const def = sp.get(d);
+    if (isAttackPreset(atk)) out.attack = atk;
+    if (isDefencePreset(def)) out.defence = def;
+    return out;
+  };
+  return { home: side('hatk', 'hdef'), away: side('aatk', 'adef') };
+}
+
+export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics }): string {
   const sp = new URLSearchParams({ seed: String(p.seed), home: p.home, away: p.away });
   if (p.tick) sp.set('tick', String(p.tick));
   if (p.traits && p.traits !== 'gen') sp.set('traits', p.traits);
+  const t = p.tactics ?? NO_TACTICS;
+  if (t.home.attack) sp.set('hatk', t.home.attack);
+  if (t.home.defence) sp.set('hdef', t.home.defence);
+  if (t.away.attack) sp.set('aatk', t.away.attack);
+  if (t.away.defence) sp.set('adef', t.away.defence);
   return `${LAB_HASH}?${sp.toString()}`;
 }
 
@@ -58,7 +88,7 @@ export class LabController {
 
   constructor(factory: LabSimFactory, params: LabParams) {
     this.params = { ...params };
-    this.runner = new Runner((seed) => factory(params.home, params.away, seed, params.traits), params.seed);
+    this.runner = new Runner((seed) => factory(params.home, params.away, seed, params.traits, params.tactics), params.seed);
     if (params.tick > 0) this.runner.seek(params.tick);
   }
 
@@ -102,6 +132,6 @@ export class LabController {
 
   /** The URL hash that reopens the lab on these teams and seed (and this tick). */
   hash(withTick = false): string {
-    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, ...(withTick ? { tick: this.runner.tick } : {}) });
+    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, ...(withTick ? { tick: this.runner.tick } : {}) });
   }
 }

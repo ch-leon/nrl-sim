@@ -50,6 +50,8 @@ export interface TeamSheet {
   colors: [string, string];
   /** The ON_FIELD players, if known (rivals get a generated roster). */
   roster?: RosterEntry[];
+  /** How the side plays (BAK-208 §5); the live sim defaults to Balanced / Slide when absent. */
+  tactics?: import('../match/league/presets').TeamTactics;
 }
 
 /** Attacking / territorial kick flavour (stored on MatchEvent.detail). */

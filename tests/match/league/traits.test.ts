@@ -167,7 +167,8 @@ describe('traits in the live sim', () => {
     expect(count(pm, 'cut-out', 'home')).toBeGreaterThan(0);
     expect(count(control, 'cut-out')).toBe(0);
     const boot = events(sheet('H', (i) => (i === 5 ? T('bigBoot', 2) : undefined)), sheet('A'), 4, SECS);
-    const kicks = boot.filter((e) => e.kind === 'kick' && e.side === 'home');
+    // Big Boot shapes the long kicks and bombs (distance and accuracy); grubbers and chips are placement, not power.
+    const kicks = boot.filter((e) => e.kind === 'kick' && e.side === 'home' && (e.detail === 'long' || e.detail === 'bomb'));
     expect(kicks.length).toBeGreaterThan(0);
     expect(kicks.every((e) => e.trait === 'Big Boot II')).toBe(true);
   });
