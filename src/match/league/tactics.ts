@@ -130,27 +130,32 @@ export const RUN_IT_CHANCE = 0.2;
 /** Beyond this the last-tackle kick is for territory. */
 export const ATTACK_KICK_M = 50;
 
+const KICK_ORDER: readonly KickChoice[] = ['long', 'bomb', 'cross-field', 'grubber', 'chip'];
+
+/** Weights of each kick on the last tackle, by distance to the line (BAK-208 §4.4). */
+export function kickWeights(toLine: number): Record<KickChoice, number> {
+  if (toLine > ATTACK_KICK_M) return { long: 0.85, bomb: 0.15, 'cross-field': 0, grubber: 0, chip: 0 };
+  if (toLine > RUN_IT_ZONE_M) return { long: 0.2, bomb: 0.5, 'cross-field': 0.3, grubber: 0, chip: 0 };
+  if (toLine > 22) return { long: 0, bomb: 0.3, 'cross-field': 0.35, grubber: 0.2, chip: 0.15 };
+  return { long: 0, bomb: 0, 'cross-field': 0.3, grubber: 0.5, chip: 0.2 };
+}
+
 /**
- * Which kick on the last tackle, by distance to the line: territory (with the
- * odd bomb) from deep; around halfway a bomb or a cross-field kick; inside 40 m
- * an attacking kick, a grubber the closer he gets. Pure: `roll` is one draw in [0, 1).
+ * Which kick on the last tackle: territory (with the odd bomb) from deep;
+ * around halfway a bomb or a cross-field kick; inside 40 m an attacking kick,
+ * a grubber the closer he gets. A team's style scales the weights (`bias`).
+ * Pure: `roll` is one draw in [0, 1).
  */
-export function chooseKick(toLine: number, roll: number): KickChoice {
-  if (toLine > ATTACK_KICK_M) return roll < 0.15 ? 'bomb' : 'long';
-  if (toLine > RUN_IT_ZONE_M) {
-    if (roll < 0.5) return 'bomb';
-    if (roll < 0.8) return 'cross-field';
-    return 'long';
+export function chooseKick(toLine: number, roll: number, bias: Partial<Record<KickChoice, number>> = {}): KickChoice {
+  const w = kickWeights(toLine);
+  let total = 0;
+  for (const k of KICK_ORDER) total += w[k] * (bias[k] ?? 1);
+  let r = roll * total;
+  for (const k of KICK_ORDER) {
+    r -= w[k] * (bias[k] ?? 1);
+    if (r < 0) return k;
   }
-  if (toLine > 22) {
-    if (roll < 0.35) return 'cross-field';
-    if (roll < 0.65) return 'bomb';
-    if (roll < 0.85) return 'grubber';
-    return 'chip';
-  }
-  if (roll < 0.5) return 'grubber';
-  if (roll < 0.8) return 'cross-field';
-  return 'chip';
+  return 'long';
 }
 
 const goalLine = (dir: 1 | -1): number => (dir > 0 ? FIELD_LENGTH : 0);

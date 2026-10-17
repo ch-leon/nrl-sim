@@ -6,6 +6,8 @@ import { RUN_SPEEDS, type RunSpeed } from '../core/engine';
 import { decodeFlag } from '../core/flag';
 import type { LabController, LabParams } from './controller';
 import { TRAIT_MODES, isTraitMode, type LabClub, type TraitMode } from './sheets';
+import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
+import type { LabTactics } from './controller';
 import { statsLine, statsWindow } from './stats';
 
 const TRAIT_MODE_LABEL: Readonly<Record<TraitMode, string>> = { gen: 'as rolled', none: 'none', stars: 'all superstars' };
@@ -35,6 +37,8 @@ export class LabPanel {
     private readonly ctrl: LabController,
     clubs: readonly LabClub[],
     hooks: LabPanelHooks,
+    /** One line naming each side's style as the sim is actually playing it. */
+    styles = '',
   ) {
     ensureLabStyles();
     const p = ctrl.params;
@@ -58,10 +62,32 @@ export class LabPanel {
       if (m === p.traits) o.selected = true;
       traits.append(o);
     }
+    // Tactics picker: a preset per side for attack and defence; "club" keeps the club's own style.
+    const presetSelect = (kind: 'attack' | 'defence', value: string | undefined, title: string): HTMLSelectElement => {
+      const sel = el('select', { class: 'nrl-lab-select nrl-lab-preset', attrs: { title } });
+      sel.append(el('option', { text: kind === 'attack' ? 'club atk' : 'club def', attrs: { value: '' } }));
+      for (const k of kind === 'attack' ? ATTACK_PRESETS : DEFENCE_PRESETS) {
+        const o = el('option', { text: PRESET_LABEL[k], attrs: { value: k } });
+        if (k === value) o.selected = true;
+        sel.append(o);
+      }
+      return sel;
+    };
+    const hAtk = presetSelect('attack', p.tactics.home.attack, 'Home attack preset');
+    const hDef = presetSelect('defence', p.tactics.home.defence, 'Home defence preset');
+    const aAtk = presetSelect('attack', p.tactics.away.attack, 'Away attack preset');
+    const aDef = presetSelect('defence', p.tactics.away.defence, 'Away defence preset');
+    const tactics = (): LabTactics => {
+      const side = (atk: HTMLSelectElement, def: HTMLSelectElement): Partial<TeamTactics> => ({
+        ...(isAttackPreset(atk.value) ? { attack: atk.value } : {}),
+        ...(isDefencePreset(def.value) ? { defence: def.value } : {}),
+      });
+      return { home: side(hAtk, hDef), away: side(aAtk, aDef) };
+    };
     const go = button('Go', () => {
       const s = Math.max(1, Math.floor(Number(seed.value) || 1));
       const mode = isTraitMode(traits.value) ? traits.value : 'gen';
-      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode });
+      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics() });
     });
     const shuffle = button('🎲', () => {
       seed.value = String(1 + Math.floor(Math.random() * 999_999));
@@ -102,7 +128,7 @@ export class LabPanel {
     const load = button('Load', () => {
       const f = decodeFlag(codeIn.value);
       if (!f) return hooks.notify('Not a valid Flag code');
-      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen' });
+      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics() });
     });
 
     // Event feed: the last few things that happened; tap one to jump back to it.
@@ -119,6 +145,8 @@ export class LabPanel {
       el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: 'Match Lab · Phase 1 set prototype' }), collapse),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, home, el('span', { text: 'v' }), away, seed, go, shuffle),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits),
+      el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'H' }), hAtk, hDef, el('span', { text: 'A' }), aAtk, aDef),
+      ...(styles ? [el('div', { class: 'nrl-lab-hint nrl-lab-more', text: styles })] : []),
       el('div', { class: 'nrl-lab-row' }, this.playBtn, step, ...this.speedBtns, this.readout),
       this.scrub,
       this.label,
@@ -205,6 +233,7 @@ function ensureLabStyles(): void {
 }
 .nrl-lab-select { flex: 1 1 5rem; max-width: 8rem; }
 .nrl-lab-traits { flex: 0 1 auto; }
+.nrl-lab-preset { flex: 1 1 4rem; max-width: 6.5rem; }
 .nrl-lab-seed { width: 4.5rem; }
 .nrl-lab-code { flex: 1 1 6rem; }
 .nrl-lab .nrl-btn { padding: 0.2rem 0.45rem; font-size: 0.72rem; }

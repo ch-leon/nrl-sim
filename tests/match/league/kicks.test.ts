@@ -42,17 +42,21 @@ function events(seeds: number, seconds: number): { es: SimEvent[]; snaps: Snapsh
 describe('the last-tackle call (pure)', () => {
   it('is territory from deep, attacking inside 40, a grubber most often close in', () => {
     expect(chooseKick(60, 0.5)).toBe('long');
-    expect(chooseKick(60, 0.1)).toBe('bomb');
-    expect(chooseKick(45, 0.3)).toBe('bomb');
-    expect(chooseKick(45, 0.6)).toBe('cross-field');
-    expect(chooseKick(45, 0.9)).toBe('long');
-    expect(chooseKick(30, 0.2)).toBe('cross-field');
-    expect(chooseKick(30, 0.6)).toBe('bomb');
+    expect(chooseKick(60, 0.9)).toBe('bomb');
+    expect(chooseKick(45, 0.1)).toBe('long');
+    expect(chooseKick(45, 0.5)).toBe('bomb');
+    expect(chooseKick(45, 0.9)).toBe('cross-field');
+    expect(chooseKick(30, 0.2)).toBe('bomb');
+    expect(chooseKick(30, 0.5)).toBe('cross-field');
     expect(chooseKick(30, 0.75)).toBe('grubber');
-    expect(chooseKick(30, 0.9)).toBe('chip');
-    expect(chooseKick(15, 0.3)).toBe('grubber');
-    expect(chooseKick(15, 0.7)).toBe('cross-field');
+    expect(chooseKick(30, 0.95)).toBe('chip');
+    expect(chooseKick(15, 0.2)).toBe('cross-field');
+    expect(chooseKick(15, 0.5)).toBe('grubber');
     expect(chooseKick(15, 0.9)).toBe('chip');
+    // A side's style scales the weights: a grinding side kicks long from halfway, a kick-chase side bombs.
+    expect(chooseKick(45, 0.4, { long: 4 })).toBe('long');
+    expect(chooseKick(60, 0.5, { bomb: 10 })).toBe('bomb');
+    for (const t of [10, 30, 45, 70]) for (const r of [0, 0.3, 0.6, 0.999]) expect(['long', 'bomb', 'cross-field', 'grubber', 'chip']).toContain(chooseKick(t, r));
     expect(RUN_CLOSE_M).toBeLessThan(RUN_IT_ZONE_M);
     expect(RUN_IT_ZONE_M).toBeLessThan(ATTACK_KICK_M);
   });
