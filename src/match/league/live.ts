@@ -9,8 +9,10 @@
 // implied: every transition is something a player physically does on the
 // field, and every carry ends in exactly one of tackle / break / error / kick.
 //
-// Phase 1 scope: no scoring beyond tries, no stamina, no weather — those come
-// with the full match (Phase 2, #86).
+// Legs (BAK-208 §8, F): every player's energy drains with metres run and
+// contact and costs him pace and contest odds when low; a held tackle is a
+// wrestle whose length sets the play-the-ball speed. Phase 1 scope: no scoring
+// beyond tries, no weather — those come with the full match (Phase 2, #86).
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
@@ -29,6 +31,8 @@ import {
 import { DEFAULT_TACTICS, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type TeamTactics } from './presets';
 import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
 import { traitBoost, type TraitInstance } from '../../data/traits';
+import { CONTACT_COST, GASSED_RESET, SPENT_AT, WALK_SPEED, WRESTLE_COST, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
+import { MAX_MEN, QUICK_S, SLOW_S, WRECK_FIGHT, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
 
 // ── Timing (ticks at 20 Hz) ──────────────────────────────────────────────────
 const CONTACT_TICKS = 9;
@@ -54,9 +58,8 @@ const BUSY_AFTER_PTB = 24;
 const BURST_TICKS = 16;
 const JETS_BURST_TICKS = 60;
 const BURST = 1.15;
-/** A Wrecking Ball held in the tackle wins the collision this often per level, driving this far forward per level. */
+/** A Wrecking Ball held in the tackle keeps his legs pumping this often per level (more fight in the wrestle, wrestle.ts). */
 const WRECK_DRIVE_CHANCE = 0.3;
-const WRECK_DRIVE_M = 0.6;
 /** A Playmaker's cut-out reach grows this much per level over the normal pass width, and he minds width less. */
 const CUT_OUT_PER_LEVEL_M = 4;
 const PLAYMAKER_WIDTH = 0.25;
@@ -73,6 +76,8 @@ const KICK_CONTACT_TICKS = 3;
 const PASS_POSE_TICKS = 5;
 
 // ── Distances (metres) ───────────────────────────────────────────────────────
+/** A free defender this close to a wrestle comes in to help (and joins it on reaching the carrier). */
+const JOIN_M = 6;
 /** Carrier starts deciding (pass / into contact) with a defender this close. */
 const ENGAGE_M = 4.5;
 /** A defender this close to the carrier makes the tackle. */
@@ -125,6 +130,12 @@ interface Player {
   stats: Stats;
   /** Special skills (BAK-208 §3); empty for most players. */
   traits: TraitInstance[];
+  stamina: number;
+  /** Legs (§8): 1 fresh … 0 spent, and how fast he drains (Stamina, Workhorse). */
+  energy: number;
+  drain: number;
+  /** Already announced as out on his feet (until he recovers some). */
+  gassed: boolean;
   body: Body;
   pose: string;
   /** Hold `pose` until then (overrides run/idle). */
@@ -155,8 +166,8 @@ interface Player {
 type Phase =
   | { kind: 'restart'; t0: number; kicking: Side }
   | { kind: 'play' }
-  | { kind: 'tackle'; t0: number; carrier: number; tackler: number; big: boolean }
-  | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number }
+  | { kind: 'tackle'; t0: number; carrier: number; tackler: number; big: boolean; wrestle: WrestleState | null; wreck: number }
+  | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null }
   | { kind: 'try'; t0: number; scorer: number };
 
 interface PendingKick {
@@ -196,6 +207,11 @@ export function runOn(v0: number, a: number, vMax: number, t: number): number {
   const vEnd = Math.min(vMax, v0 + a * t);
   const tAcc = Math.max(0, (vEnd - v0) / a);
   return v0 * tAcc + 0.5 * a * tAcc * tAcc + vEnd * (t - tAcc);
+}
+
+/** Lab and tests: start everyone on these legs (1 = a kick-off). */
+export interface LiveOptions {
+  energy?: number;
 }
 
 function statsOf(entry: RosterEntry | undefined): Stats {
@@ -240,11 +256,16 @@ export class LiveSim implements MatchSim {
   private events: SimEvent[] = [];
   readonly tries: Record<Side, number> = { home: 0, away: 0 };
 
-  constructor(home: TeamSheet, away: TeamSheet, seed: number) {
+  constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
     this.rng = makeRng(seed);
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
+    const energy = Math.max(0, Math.min(1, opts.energy ?? 1));
+    for (const p of this.players) {
+      p.energy = energy;
+      p.gassed = energy < SPENT_AT;
+    }
     this.ball = { kind: 'held', by: this.idx('away', KICKER) };
     this.phase = { kind: 'restart', t0: 0, kicking: 'away' };
     this.attacking = 'home';
@@ -262,12 +283,18 @@ export class LiveSim implements MatchSim {
       if (i >= 0) used.add(i);
       const entry = roster[i];
       const stats = statsOf(entry);
+      const traits = entry?.traits ? [...entry.traits] : [];
+      const stamina = entry?.stats?.stamina ?? 50;
       return {
         side,
         slot,
         name: entry?.name ?? `${sheet.name} #${slot + 1}`,
         stats,
-        traits: entry?.traits ? [...entry.traits] : [],
+        traits,
+        stamina,
+        energy: 1,
+        drain: drainRate(stamina, traits),
+        gassed: false,
         body: makeBody({ x: 50, y: MID_Y }, maxSpeedFor(stats.speed), { x: dirOf(side), y: 0 }),
         pose: 'idle',
         poseUntil: 0,
@@ -685,8 +712,8 @@ export class LiveSim implements MatchSim {
       angle,
       speedDiff: speedOf(c.body) - speedOf(t.body),
       lastTackle: this.lastPlay,
-      carrierFatigue: 0,
-      tacklerFatigue: 0,
+      carrierFatigue: tiredness(c.energy),
+      tacklerFatigue: tiredness(t.energy),
       support,
     };
   }
@@ -702,25 +729,33 @@ export class LiveSim implements MatchSim {
   }
 
   private stepTackle(ph: Extract<Phase, { kind: 'tackle' }>): void {
-    if (this.tick < ph.t0 + CONTACT_TICKS) return;
+    const w = ph.wrestle;
+    if (w) {
+      if (!this.stepWrestle(ph, w)) return;
+    } else if (this.tick < ph.t0 + CONTACT_TICKS) return;
     const c = this.players[ph.carrier]!;
-    const t = this.players[ph.tackler]!;
     this.tackles++;
     this.kickCall = null;
     const handover = this.tackles >= SET_TACKLES;
     this.mark = { ...c.body.pos };
     this.lineX = this.mark.x + this.dir * ONSIDE_M;
-    this.lock(c, 'down', DOWN_TICKS);
-    this.lock(t, 'down', DOWN_TICKS);
-    this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.carrier, tackler: ph.tackler, stage: 'down', handover, heldAt: 0 };
+    // How long he fought sets the ruck: a quick wrestle is a quick play-the-ball, a long one lets the defence set.
+    const secs = w ? (this.tick - w.t0) * TICK_S : 0;
+    const down = w ? ruckTicks(secs) : DOWN_TICKS;
+    const pace = !w || handover ? null : secs <= QUICK_S ? 'quick' : secs >= SLOW_S ? 'slow' : null;
+    this.lock(c, 'down', down);
+    for (const i of w ? w.men : [ph.tackler]) this.lock(this.players[i]!, 'down', down);
+    this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.carrier, tackler: ph.tackler, stage: 'down', handover, heldAt: 0, down, pace };
   }
 
   private stepRuck(ph: Extract<Phase, { kind: 'ruck' }>): void {
     const c = this.players[ph.carrier]!;
     if (ph.stage === 'down') {
-      if (this.tick < ph.t0 + DOWN_TICKS) return;
+      if (this.tick < ph.t0 + ph.down) return;
       // Up, step over it and heel it back.
       this.lock(c, 'ptb', PTB_TICKS);
+      if (ph.pace === 'quick') this.emit('quick-ptb', `${c.name} is up quickly — the line is short`, c);
+      else if (ph.pace === 'slow') this.emit('slow-ptb', `Slow play-the-ball — the defence is set`, c);
       ph.stage = 'ptb';
       ph.t0 = this.tick;
       return;
@@ -873,6 +908,9 @@ export class LiveSim implements MatchSim {
     tr.mods.broken = (tr.mods.broken ?? 0) + dplan.broken;
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
+    // Contact costs both men legs, whatever happens.
+    this.tire(c, CONTACT_COST.carrier);
+    this.tire(t, CONTACT_COST.tackler);
     const back = scale({ x: -this.dir, y: 0 }, 1);
     switch (outcome) {
       case 'strip': {
@@ -918,16 +956,104 @@ export class LiveSim implements MatchSim {
       default:
         break;
     }
-    const big = outcome === 'big-hit';
-    // Held, but a Wrecking Ball sometimes keeps his legs pumping and makes ground in the tackle.
-    const wb = big ? 0 : traitBoost(c.traits, 'wreckingBall');
+    if (outcome === 'big-hit') {
+      // Smashed backwards at contact: no wrestle, he is down.
+      this.emit('big-hit', `${t.name} smashes ${c.name} backwards!`, t, credit);
+      const drive = scale(back, DRIVE_BACK);
+      this.lock(c, 'tackled', CONTACT_TICKS, add(c.body.pos, drive));
+      this.lock(t, 'tackle', CONTACT_TICKS, add(t.body.pos, drive));
+      this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big: true, wrestle: null, wreck: 0 };
+      return;
+    }
+    // Held: the wrestle (§8.1). A Wrecking Ball sometimes keeps his legs pumping — more fight, more ground.
+    const wb = traitBoost(c.traits, 'wreckingBall');
     const wreck = wb > 0 && this.rng.next() < WRECK_DRIVE_CHANCE * wb ? wb : 0;
-    this.emit(big ? 'big-hit' : 'tackle', big ? `${t.name} smashes ${c.name} backwards!` : wreck > 0 ? `${t.name} hangs on as ${c.name} drives through the tackle` : `${t.name} wraps up ${c.name}`, t, big ? credit : wreck > 0 ? announce(c.traits.find((x) => x.id === 'wreckingBall')) : undefined);
-    const drive = big ? scale(back, DRIVE_BACK) : wreck > 0 ? scale(back, -WRECK_DRIVE_M * wreck) : { x: 0, y: 0 };
-    const moved = big || wreck > 0;
-    this.lock(c, 'tackled', CONTACT_TICKS, moved ? add(c.body.pos, drive) : undefined);
-    this.lock(t, 'tackle', CONTACT_TICKS, moved ? add(t.body.pos, drive) : undefined);
-    this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big };
+    const fight = fightOf({ ...c.stats, stamina: c.stamina }, c.energy, this.rng.next()) * (1 + WRECK_FIGHT * wreck);
+    const wrestle: WrestleState = { men: [this.indexOf(t)], fight, fight0: fight, grip: gripOf(t.stats, t.energy, true), t0: this.tick, metres: 0 };
+    this.hold(c, 'tackled');
+    this.hold(t, 'tackle');
+    this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big: false, wrestle, wreck };
+  }
+
+  /** Keep a man in the wrestle: locked where he stands, for another tick or two. */
+  private hold(p: Player, pose: string): void {
+    p.pose = pose;
+    p.poseUntil = this.tick + 2;
+    p.lockUntil = this.tick + 2;
+    p.body.vel = { x: 0, y: 0 };
+    p.slide = null;
+  }
+
+  /** Spend some of a player's legs (× his drain rate); announce him once when he is out on his feet. */
+  private tire(p: Player, amount: number): void {
+    p.energy = Math.max(0, p.energy - amount * p.drain);
+    this.checkLegs(p);
+  }
+
+  private checkLegs(p: Player): void {
+    if (!p.gassed && p.energy < SPENT_AT) {
+      p.gassed = true;
+      this.emit('gassed', `${p.name} is out on his feet`, p);
+    } else if (p.gassed && p.energy > GASSED_RESET) p.gassed = false;
+  }
+
+  /**
+   * One tick of the wrestle: free defenders arriving join it (up to three),
+   * the carrier drives on while his fight lasts, everyone in it pays legs.
+   * Returns true when he is held (go to ground); a late bust or a try ends it here.
+   */
+  private stepWrestle(ph: Extract<Phase, { kind: 'tackle' }>, w: WrestleState): boolean {
+    const c = this.players[ph.carrier]!;
+    for (const d of this.side(other(c.side))) {
+      if (w.men.length >= MAX_MEN) break;
+      const i = this.indexOf(d);
+      if (w.men.includes(i) || this.locked(d) || this.tick < d.cooldownUntil || dist(d.body.pos, c.body.pos) > TACKLE_REACH + 0.3) continue;
+      w.men.push(i);
+      w.grip += gripOf(d.stats, d.energy, false);
+      this.tire(d, CONTACT_COST.tackler);
+    }
+    const men = w.men.map((i) => this.players[i]!);
+    const dt = TICK_S;
+    const end = wrestleTick(w, men.map((d) => holdOf(d.stats, d.energy)), dt, (this.tick - w.t0) * dt);
+    this.tire(c, WRESTLE_COST.carrierPerMan * men.length * dt);
+    for (const d of men) this.tire(d, WRESTLE_COST.tackler * dt);
+    // He keeps driving while there is fight in him; they go with him.
+    const step = driveSpeed(w.fight / w.fight0, men.length) * dt;
+    w.metres += step;
+    const shift = { x: this.dir * step, y: 0 };
+    c.body.pos = clampToGround(add(c.body.pos, shift), 0.5);
+    for (const d of men) d.body.pos = clampToGround(add(d.body.pos, shift), 0.5);
+    if (inGoal(c.body.pos, this.dir)) {
+      // Driven over the line in the tackle.
+      for (const d of men) this.lock(d, 'down', DOWN_TICKS);
+      this.score(c);
+      return false;
+    }
+    if (end === 'free') {
+      // The defenders' grip went before his fight: he is through.
+      this.emit('break-tackle', `${c.name} fights out of the tackle!`, c);
+      this.events[this.events.length - 1]!.detail = 'wrestle';
+      for (const d of men) {
+        this.lock(d, 'down', 16, add(d.body.pos, { x: -this.dir * 0.8, y: 0 }));
+        d.cooldownUntil = this.tick + BEATEN_COOLDOWN;
+      }
+      c.lockUntil = this.tick;
+      c.pose = 'run';
+      c.poseUntil = 0;
+      this.burst(c);
+      this.phase = { kind: 'play' };
+      return false;
+    }
+    if (end === null) {
+      this.hold(c, 'tackled');
+      for (const d of men) this.hold(d, 'tackle');
+      return false;
+    }
+    const t = this.players[ph.tackler]!;
+    const help = men.length > 1 ? ` (${men.length} men)` : '';
+    const after = w.metres >= 1 ? ` after ${w.metres.toFixed(1)} m` : '';
+    this.emit('tackle', ph.wreck > 0 ? `${t.name} hangs on as ${c.name} drives through the tackle${after}` : `${t.name} wraps up ${c.name}${after}${help}`, t, ph.wreck > 0 ? announce(c.traits.find((x) => x.id === 'wreckingBall')) : undefined);
+    return true;
   }
 
   private score(scorer: Player): void {
@@ -1142,7 +1268,15 @@ export class LiveSim implements MatchSim {
       if (this.dir > 0) this.lineX = Math.max(want, this.lineX - stepM);
       else this.lineX = Math.min(want, this.lineX + stepM);
     }
-    const committed = ph.kind === 'play' && carrier ? this.committed(carrier, defenders) : [];
+    // A wrestle on: the free defenders close by come in to help finish it.
+    const w = ph.kind === 'tackle' ? ph.wrestle : null;
+    const wrestling = w && ph.kind === 'tackle' ? this.players[ph.carrier]! : null;
+    const committed = ph.kind === 'play' && carrier
+      ? this.committed(carrier, defenders)
+      : w && wrestling
+        ? this.committed(wrestling, defenders).filter((d) => dist(d.body.pos, wrestling.body.pos) < JOIN_M).slice(0, MAX_MEN - w.men.length)
+        : [];
+    const target = carrier ?? wrestling;
     // Markers stand over the mark through the ruck and hold there until released.
     const markers: Player[] = inRuck
       ? this.currentMarkers()
@@ -1159,9 +1293,9 @@ export class LiveSim implements MatchSim {
         p.through = dist(p.body.pos, kickUp.to) > CHASE_THROUGH_M;
       } else if (p === receiver) {
         p.target = { ...flight!.to };
-      } else if (committed.includes(p) && carrier) {
-        // Cut the angle: meet him where he's going, not where he is.
-        p.target = clampToGround(intercept(p.body.pos, p.body.maxSpeed, carrier.body.pos, carrier.body.vel), 0.5);
+      } else if (committed.includes(p) && target) {
+        // Cut the angle: meet him where he's going, not where he is (in a wrestle, straight in to help).
+        p.target = clampToGround(intercept(p.body.pos, p.body.maxSpeed, target.body.pos, target.body.vel), 0.5);
         p.through = true;
       } else if (markers.includes(p)) {
         const k = markers.indexOf(p);
@@ -1191,8 +1325,10 @@ export class LiveSim implements MatchSim {
     const kickChase = this.ball.kind === 'flight' && this.ball.via === 'kick';
     const h = this.holder();
     const lineBroken = h !== null && h.side === this.attacking && (h.body.pos.x - this.lineX) * this.dir > 0;
+    const stopped = this.phase.kind === 'try' || this.phase.kind === 'restart';
     for (const p of this.players) {
       if (this.locked(p)) {
+        if (stopped) this.legs(p, 0, 'stop');
         held.add(p.body);
         if (p.slide) {
           const u = Math.min(1, (this.tick - p.slide.t0) / Math.max(1, p.slide.t1 - p.slide.t0));
@@ -1206,8 +1342,11 @@ export class LiveSim implements MatchSim {
       if (p === h) max *= CARRY_SPEED;
       if (kickChase && p.side !== this.attacking) max *= speedMult(p.traits, 'jets');
       if (lineBroken && p.side !== this.attacking) max *= speedMult(p.traits, 'lastLine');
+      max *= legsSpeed(p.energy);
       arrive(p.body, p.target, dt, { through: p.through, maxSpeed: max });
+      const from = p.body.pos;
       integrate(p.body, dt);
+      this.legs(p, dist(from, p.body.pos), stopped ? 'stop' : speedOf(p.body) < WALK_SPEED ? 'walk' : 'no');
       if (p.jink) {
         // The sidestep: a sharp lateral shift spread over a few ticks.
         p.body.pos = clampToGround(add(p.body.pos, { x: 0, y: p.jink.dy / STEP_JINK_TICKS }), 0.5);
@@ -1223,6 +1362,18 @@ export class LiveSim implements MatchSim {
       if (this.locked(p) || this.tick < p.poseUntil) continue;
       p.pose = speedOf(p.body) > 0.6 ? 'run' : 'idle';
     }
+  }
+
+  /** Legs for this tick: metres run drain them, standing and stoppages bring a little back. */
+  private legs(p: Player, metres: number, resting: 'no' | 'walk' | 'stop'): void {
+    p.energy = afterRun(p.energy, metres, p.drain, TICK_S, resting);
+    this.checkLegs(p);
+  }
+
+  /** Average legs of a side, 0..1. */
+  energyOf(side: Side): number {
+    const ps = this.side(side);
+    return ps.reduce((a, p) => a + p.energy, 0) / ps.length;
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
@@ -1248,14 +1399,22 @@ export class LiveSim implements MatchSim {
     } else {
       ball = { x: b.pos.x, y: b.pos.y, lift: 0, holder: null };
     }
-    const ph = this.phase.kind;
-    const state = ph === 'play' ? `tackle ${Math.min(this.tackles, SET_TACKLES)}/${SET_TACKLES}${this.lastPlay ? ' · last' : ''}` : ph;
-    return {
+    const kind = this.phase.kind;
+    const state = kind === 'play' ? `tackle ${Math.min(this.tackles, SET_TACKLES)}/${SET_TACKLES}${this.lastPlay ? ' · last' : ''}` : kind;
+    const legs = `legs ${Math.round(this.energyOf('home') * 100)}/${Math.round(this.energyOf('away') * 100)}%`;
+    const snap: Snapshot = {
       tick: this.tick,
       players,
       ball,
-      label: `${this.names[this.attacking]} ball · ${state} · ${this.tries.home}–${this.tries.away} · ${(this.tick * TICK_S).toFixed(1)}s`,
+      label: `${this.names[this.attacking]} ball · ${state} · ${this.tries.home}–${this.tries.away} · ${legs} · ${(this.tick * TICK_S).toFixed(1)}s`,
       events: this.events,
     };
+    const ph = this.phase;
+    const w = ph.kind === 'tackle' ? ph.wrestle : null;
+    if (w && ph.kind === 'tackle') {
+      const c = this.players[ph.carrier]!;
+      snap.wrestle = { side: c.side, slot: c.slot, fight: w.fight0 > 0 ? w.fight / w.fight0 : 0, men: w.men.length };
+    }
+    return snap;
   }
 }

@@ -33,6 +33,12 @@ describe('popupFor', () => {
     expect(surnameOf(undefined)).toBe('');
     for (const k of ['step', 'strip', 'intercept']) expect(popupFor(ev(k))).not.toBeNull();
   });
+  it('the wrestle and legs: a late bust breaks free, a quick play-the-ball and a gassed player are shouted, a slow ruck is not', () => {
+    expect(popupFor({ ...ev('break-tackle'), detail: 'wrestle' })).toMatchObject({ word: 'BROKE FREE!', tone: 'attack', big: true });
+    expect(popupFor(ev('quick-ptb'))).toMatchObject({ word: 'QUICK PTB!', tone: 'attack', big: false });
+    expect(popupFor(ev('gassed'))).toMatchObject({ word: 'GASSED!', tone: 'bad' });
+    expect(popupFor(ev('slow-ptb'))).toBeNull();
+  });
   it('big moments last longer and get a short slow-motion beat', () => {
     expect(POPUP_BIG_MS).toBeGreaterThan(POPUP_MS);
     expect(SLOWMO_MS).toBeGreaterThan(200);

@@ -1,5 +1,5 @@
 # BAK-208 — Match design: contests, traits, tactics, kicks, readability
-**GitHub:** https://github.com/ch-leon/nrl-sim/issues/94 (Phase 1.5 under #83) | **Priority:** Highest | **Status:** LIVING — A, B, C, D and the first slice of E shipped (2026-10-17); numbers in each section are the shipped ones. Every knob with its file and value: `BAK-208-tuning.md`.
+**GitHub:** https://github.com/ch-leon/nrl-sim/issues/94 (Phase 1.5 under #83) | **Priority:** Highest | **Status:** LIVING — A, B, C, D, F and the first slice of E shipped (2026-10-17); numbers in each section are the shipped ones. Every knob with its file and value: `BAK-208-tuning.md`.
 
 > **Purpose.** The live sim (BAK-207) now plays a real set: tackles, play-the-ball,
 > passes, kicks. It works and it is still a bit boring. This document is the single
@@ -72,7 +72,7 @@ the commentary line names it, and the lab stats strip counts them (`Skill n`).
 | Trait | Fires when | Effect (level I) | Shown as |
 |---|---|---|---|
 | **Dancing Feet** | One-on-one, before contact | +15% step | STEP! |
-| **Wrecking Ball** | In contact | +12% bust; held → 30% to drive 0.6 m forward in the tackle | BUST! / DRIVE! |
+| **Wrecking Ball** | In contact | +12% bust; held → 30% to keep driving: +30% fight in the wrestle (§8.1) | BUST! / DRIVE! |
 | **Don't Argue** | Tackler not arriving from behind | +12% fend | FEND! |
 | **Offload King** | Held with a support runner inside 5 m | +12% offload | OFFLOAD! |
 | **Finisher** | Inside the opposition 20 m | +10% bust, +5% fend, +10% step | BUST! / STEP! |
@@ -99,7 +99,7 @@ The upside scales with level; the cost is fixed, so training one is always a net
 | **Gambler** | +15% intercept | a missed read leaves him beaten and out of the play (GAMBLED!) |
 
 ### 3.4 Meta traits (existing, kept)
-Workhorse (training ×1.2 at I, ×1.32 II, ×1.44 III; slower fatigue in F), Young Gun
+Workhorse (training ×1.2 at I, ×1.32 II, ×1.44 III; legs drain ×0.9 at I, ×0.84 II, ×0.78 III — §8), Young Gun
 (training ×1.3; age ≤ 20 and rated 60+), Veteran (age 31+), Club Legend (tenure),
 Injury Prone (legacy saves only; ×1.4 injury rolls — no longer generated). *Clutch*
 (last 3 minutes) waits for the match clock in Phase 2.
@@ -133,8 +133,10 @@ Resolved when a committed defender reaches the carrier. Order of checks:
 Two defenders: bust −6%, fend −4%, offload −3%, big hit +4%; three: −9 / −6 / −5 / +6.
 Angle (from the tackler's closing direction vs the carrier's heading): **side** fend +5%,
 big hit −4%; **behind** bust +4%, fend +3%, big hit −6%. Momentum: ±1% bust per m/s of
-speed difference, capped ±4%. Last tackle: big hit +3%. Fatigue (§8): a spent carrier
-−10% bust/fend/offload; a spent tackler −10% big hit, +6% bust. Stats shift the baseline
+speed difference, capped ±4%. Last tackle: big hit +3%. Fatigue (§8): a tired carrier
+−5% bust/fend/offload, a spent one −10%; a tired tackler −5% big hit and +3% bust, spent
+−10% / +6%. This table is the **opening roll**: a *held* result becomes the wrestle
+(§8.1); the big hit, bust, fend, offload and strip resolve at contact as before. Stats shift the baseline
 by up to ±8% bust, ±4.5% fend, ±5% offload, ∓7% big hit, ∓1% strip (edge 0…1).
 
 Step modifiers: side +5%, behind −5%, carrier fatigue −8%, tackler fatigue +4%; capped
@@ -243,6 +245,8 @@ less; Kick-chase kicks more and bombs more; All-out offloads 1.5× Balanced; Rus
 | Trait firing | "SIDESTEP II!" in the trait colour under the word | commentary names the trait |
 | Kick | type (BOMB!, 40/20!) | wide camera, trail |
 | Try | existing banner (#82) | scorer's traits listed |
+| Wrestle (§8.1) | bar over the carrier: fight left, green → yellow → red, a pip per man on him | BROKE FREE! on a late bust |
+| Quick play-the-ball / legs gone | QUICK PTB! · GASSED! | slow rucks are commentary only |
 
 The commentary ticker gets a line for every pop-up, naming players. The lab shows an
 **event feed** and a **per-5-minute stats strip** (tackles, breaks, offloads, errors,
@@ -254,24 +258,60 @@ Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams:
 tackles 90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 ·
 tries 5–9 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
 
-## 8. Fatigue — *F, next; design updated 2026-10-17*
+## 8. Fatigue — *implemented in F*
 
-Stamina drains with metres run and tackles made; recovers slowly in stoppages. Below
-40% stamina: top speed −10%, contest odds −5%; below 20%: −20% / −10%. Interchanges
-(#70) answer it later; until then it shapes the last minutes.
+Every player has **legs**, an energy tank from 1 (fresh) to 0 (spent)
+(`src/match/league/fatigue.ts`). It drains **0.015% per metre run** (≈ 240 m a minute,
+so ~0.65 over a match for running alone), **0.6% / 0.4%** per contact for carrier /
+tackler and the wrestle's cost (§8.1); it comes back **0.02% a second** standing or
+walking (under 1.5 m/s) and **0.2% a second** in a stoppage (after a try, before the
+restart). Everything he spends is × his **drain rate**: 1.5 − Stamina/100, clamped 0.6…1.4
+(Stamina 50 ×1, 80 ×0.7, 20 ×1.3), × 0.9 / 0.84 / 0.78 for Workhorse I / II / III.
 
-### 8.1 The wrestle (Leon, 2026-10-17)
-Tackles should sometimes need more than one man, and that is where fatigue shows. Model
-contact as a **struggle**, Kairosoft-soccer style: on contact a small bar over the pair
-is the carrier's fight left in him (from Strength + Stamina, less the fatigue he carries).
-Each tackler in the tackle drains it; a second and third man drain it much faster. While
-it lasts the carrier keeps driving (metres after contact), and if it is not empty when
-the defenders' own effort runs out he is through (a late bust, announced). When it empties
-he is held; **how long the wrestle lasted sets the play-the-ball speed** (a long wrestle
-= slow ruck, the defence gets set; a quick one = quick play-the-ball, the line is short).
-Everyone involved loses fatigue, the carrier most, more per defender. Numbers to come
-with F; the current instant `contest()` becomes the opening roll of the wrestle, with the
-step and the big hit still resolving at contact.
+| Legs | Top speed | Contest (§4.1) | Step |
+|---|---|---|---|
+| ≥ 40% | — | — | — |
+| **Tired** < 40% | −10% | carrier −5% bust / fend / offload · tackler −5% big hit, +3% bust conceded | carrier −4%, tackler +2% |
+| **Spent** < 20% | −20% | −10% / −10% · +6% | −8% / +4% |
+
+A player going under 20% is announced once (**GASSED!**, "… is out on his feet") until he
+is back over 30%. Interchanges (#70) answer it later; until then it shapes the last minutes.
+
+Measured (8 seeds × 18 min, 60-rated sheets): at Stamina 50 a side's average legs are
+88 / 78 / 67 / 55 / 44 / 32% at 3 / 6 / 9 / 12 / 15 / 18 min — tired for the last two or
+three minutes. Stamina 30 is tired from ~12 min and down to 20% at full time; Stamina 80
+finishes on 61%.
+
+### 8.1 The wrestle (Leon, 2026-10-17) — *implemented in F*
+Contact is a **struggle**, Kairosoft-soccer style (`src/match/league/wrestle.ts`). The
+contest (§4.1) is the opening roll; a *held* result starts the wrestle. A bar over the
+carrier is the **fight** left in him, in seconds against one average man:
+1.1 s × (1 + (Str − 50)/120 + (Sta − 50)/240) × (1 − 0.5 × legs lost), × 0.75…1.25 from
+one roll (a Wrecking Ball who keeps driving: × 1 + 0.3/level). Each man in the tackle
+drains it by his **hold** (1 + (Str − 50)/120, −40% when spent), summed and × **1 / 1.5 / 2**
+for one / two / three men. The defenders have **grip**: the first man 1.3 s, each joiner
+0.35 s more (× 1 + (Str − 50)/150 + (IQ − 50)/300, −40% when spent). Free defenders within
+6 m come in to help; one reaching the carrier joins (three at most).
+
+- **Fight gone → held.** The tackle is counted then ("… wraps up …", "(2 men)").
+- **Grip gone first → BROKE FREE!** A late bust: the tacklers go down and sit out, the
+  carrier bursts away. Rare between fresh, even sides; it is where strength mismatches
+  and tired tacklers show.
+- **Driven over the line** in the tackle → try.
+- **Metres after contact**: he drives forward at 1.5 m/s × fight left ÷ men on him.
+- **Ruck speed** from how long it lasted: 5 ticks down at ≤ 0.35 s to 18 at ≥ 1.2 s (the
+  old fixed 10 sits at ~0.65 s, the average). **QUICK PTB!** at ≤ 0.35 s, a "slow
+  play-the-ball" line at ≥ 1.2 s. The big hit still resolves at contact (no wrestle, the
+  old 10 ticks down).
+- **Legs**: carrier 0.8% per second per man on him, each tackler 0.6% a second.
+- Never longer than 3 s.
+
+Measured (8 seeds × 18 min, Stamina 50): ~160 wrestles a match averaging 0.63 s; 20 held
+by one man, 123 by two, 14 by three; 6.5 late busts, 10 quick and 4 slow play-the-balls.
+Stamina 30 v 80: ~10 late busts a match.
+
+Lab: **Legs** = fresh / last 10 min (38%, tired) / out on their feet (18%, spent),
+`#lab?legs=late`; the label reads `legs 74/71%` (home / away average).
 
 ## 9. Delivery (each a PR with lab sign-off; order fixed, numbers negotiable)
 
@@ -282,7 +322,7 @@ step and the big hit still resolving at contact.
 | C | Traits with levels in the data model and the sim, shown when they fire | §3 |
 | D | Zone tactics and presets | §5 |
 | E | Kick types, catches, scrambles | §4.3–4.4 |
-| F | Fatigue | §8 |
+| F | Fatigue and the wrestle — *shipped* | §8 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 
@@ -301,6 +341,5 @@ Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
   *Kick early* · *Chip & chase* · *Rush* / *Hold* on defence. One call per set (or a
   cooldown) keeps it a nudge, not a joystick; the call shows as a pop-up when it happens
   and the stats strip could count calls that paid off. Needs the Phase 2 match screen.
-- **The wrestle** → §8.1.
 - **Refinement pass** on everything shipped in A–D once Phase 2 gives full matches to
   measure against §7 (Leon: "we may need to refine it still, come back to it later").
