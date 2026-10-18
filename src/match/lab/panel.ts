@@ -21,6 +21,8 @@ export interface LabPanelHooks {
 }
 
 const STYLE_ID = 'nrl-lab-styles';
+/** At or below this viewport height (a phone on its side) the lab panel goes compact and starts collapsed. */
+const SHORT_SCREEN_PX = 480;
 
 export class LabPanel {
   private readonly root: HTMLElement;
@@ -171,6 +173,11 @@ export class LabPanel {
       el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : 'Nines match: two 9:00 halves, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.' }),
     );
     this.log.classList.add('nrl-lab-more');
+    // A short screen (a phone on its side) starts with just the play controls; + opens the rest.
+    if (window.matchMedia?.(`(max-height: ${SHORT_SCREEN_PX}px)`).matches) {
+      this.root.setAttribute('data-collapsed', '');
+      collapse.textContent = '+';
+    }
     mount(this.root);
     this.sync();
   }
@@ -236,6 +243,10 @@ function ensureLabStyles(): void {
   position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); top: calc(0.5rem + env(safe-area-inset-top, 0px));
   z-index: 30; width: min(22rem, calc(100vw - 1rem)); box-sizing: border-box; padding: 0.4rem 0.5rem;
   font-size: 0.72rem; display: flex; flex-direction: column; gap: 0.3rem; pointer-events: auto;
+  /* Never taller than the screen: scroll inside it (a phone on its side is short). */
+  max-height: calc(100vh - 1rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - 1rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; overscroll-behavior: contain;
 }
 .nrl-lab-title { font-weight: bold; font-size: 0.78rem; flex: 1 1 auto; }
 .nrl-lab-head { flex-wrap: nowrap; }
@@ -265,9 +276,14 @@ function ensureLabStyles(): void {
 .nrl-lab-line:hover { background: #fff6c2; }
 .nrl-lab-stats { font-variant-numeric: tabular-nums; opacity: 0.85; }
 .nrl-lab-hint { opacity: 0.65; font-size: 0.66rem; }
-@media (max-height: 480px) {
+@media (max-height: ${SHORT_SCREEN_PX}px) {
   .nrl-lab { width: min(19rem, calc(100vw - 1rem)); padding: 0.3rem 0.4rem; gap: 0.2rem; font-size: 0.66rem; }
   .nrl-lab-log { max-height: 3.8em; }
+  /* The game's 44px tap targets don't fit the lab on a short screen; 30px still taps. */
+  .nrl-lab .nrl-btn { min-height: 30px; padding: 0.1rem 0.35rem; font-size: 0.66rem; }
+  .nrl-lab .nrl-lab-mini { padding: 0.1rem 0.3rem; }
+  .nrl-lab-select, .nrl-lab-seed, .nrl-lab-code { padding: 0.05rem 0.2rem; }
+  .nrl-lab-title { font-size: 0.7rem; }
 }`;
   document.head.appendChild(style);
 }
