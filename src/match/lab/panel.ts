@@ -101,6 +101,8 @@ export class LabPanel {
       const mode = isTraitMode(traits.value) ? traits.value : 'gen';
       hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf() });
     });
+    // Any setup change applies at once: the match restarts from the kick-off on the same seed.
+    for (const s of [home, away, seed, traits, legs, hAtk, hDef, aAtk, aDef]) s.addEventListener('change', () => go.click());
     const shuffle = button('🎲', () => {
       seed.value = String(1 + Math.floor(Math.random() * 999_999));
       go.click();

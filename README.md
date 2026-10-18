@@ -31,7 +31,9 @@ same frame can be rebuilt. `#lab?flag=<code>` (or the Load button) reopens it.
 **Skills** switches the special-skill sandbox (`docs/specs/BAK-208-match-rules-and-skills.md`
 §3): as rolled, none, or every player a superstar (`#lab?traits=stars`). The **H / A**
 pickers set each side's attack and defence preset (§5: Grind, Balanced, Expansive,
-Kick-chase, All-out · Slide, Rush, Compressed), e.g. `#lab?hatk=expansive&adef=rush`.
+Kick-chase, All-out · Slide, Rush, Compressed), e.g. `#lab?hatk=expansive&adef=rush`;
+the line under them names the style each side is playing. Changing any picker restarts
+the match from the kick-off on the same seed.
 **Legs** starts everyone fresh, on last-ten-minute legs or cooked (§8,
 `#lab?legs=late`, `legs=spent`); a bar over a tackled carrier shows the wrestle (§8.1).
 The lab plays a whole Nines match: two 9:00 halves with the clock and score in the
