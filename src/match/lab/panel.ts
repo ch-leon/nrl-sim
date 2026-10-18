@@ -112,6 +112,11 @@ export class LabPanel {
       ctrl.step();
       this.sync();
     }, { class: 'nrl-lab-mini' });
+    const whistle = button('⏩', () => {
+      ctrl.skipToWhistle();
+      this.sync();
+    }, { class: 'nrl-lab-mini' });
+    whistle.title = 'Skip to the next half-time or full time';
     this.speedBtns = RUN_SPEEDS.map((s) =>
       button(speedLabel(s), () => {
         ctrl.setSpeed(s);
@@ -152,18 +157,18 @@ export class LabPanel {
     }, { class: 'nrl-lab-mini nrl-lab-collapse' });
     this.root = panel(
       { class: 'nrl-lab' },
-      el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: 'Match Lab · Phase 1 set prototype' }), collapse),
+      el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: 'Match Lab · live match' }), collapse),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, home, el('span', { text: 'v' }), away, seed, go, shuffle),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits, el('span', { text: 'Legs' }), legs),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'H' }), hAtk, hDef, el('span', { text: 'A' }), aAtk, aDef),
       ...(styles ? [el('div', { class: 'nrl-lab-hint nrl-lab-more', text: styles })] : []),
-      el('div', { class: 'nrl-lab-row' }, this.playBtn, step, ...this.speedBtns, this.readout),
+      el('div', { class: 'nrl-lab-row' }, this.playBtn, step, whistle, ...this.speedBtns, this.readout),
       this.scrub,
       this.label,
       this.stats,
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, flag, codeIn, load),
       this.log,
-      el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : 'Nines set: carries, tackles, play-the-ball, last-tackle kick. ⚑ Flag anything that looks wrong.' }),
+      el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : 'Nines match: two 9:00 halves, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.' }),
     );
     this.log.classList.add('nrl-lab-more');
     mount(this.root);

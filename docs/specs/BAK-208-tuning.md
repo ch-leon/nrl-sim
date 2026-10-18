@@ -219,7 +219,32 @@ Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams: tac
 90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 · tries 5–9 ·
 completion 70–80%; stronger team wins ~70% at a 20-point rating gap. Measure with the
 balance harness (`balance/README.md`, the `balance-experiments` skill): `npm run balance`
-plays 18-minute matches over many seeds and marks every count against these bands
+plays whole matches (§13) over many seeds and marks every count against these bands
 (completion is not counted yet). The Balance workflow re-runs `balance/plans/standard.json`
 on every match-code change to `main`; the Balanced-v-Balanced test in `presets.test.ts`
 still pins the coarse bands so a tuning change that breaks them fails CI.
+
+## 13. The match: clock, halves, points (BAK-207 §5.1, 2a)
+
+Two 9:00 halves of real sim time. The clock runs while the ball is in play (play, tackle,
+ruck) and stops from a try to the restart kick. At time up the siren sounds and play goes
+on until the ball is dead: a tackle completed, a try (after its celebration), a knock-on,
+or a man still down from the tackle when the siren goes. Half-time swaps the ends and the
+side that received the opening kick-off kicks off the second half.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `rules.halfMinutes` | `src/match/league/rules.ts` | 9 | Length of each half (minutes of sim time). |
+| `rules.tryPoints` | `rules.ts` | 4 | Points for a try. Conversions, penalty goals and field goals come later in Phase 2. |
+| `rules.halfTimeTicks` | `rules.ts` | 60 (3 s) | The break on screen before the second-half kick-off. |
+| `rules.halfTimeLegsBack` | `rules.ts` | 0.5 | At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2); his gas tank is filled to his legs. |
+| `rules.playOnMaxS` | `rules.ts` | 60 s | After the siren, the half ends at the next dead ball or after this long, whichever is first. |
+
+Measured over the standard plan, 20 whole matches a row (against single 18-minute
+stretches with no half-time): even sides end on 52% legs (35%); stamina 30 v 80 ends
+36% / 69% (23% / 63%) and fliers v stayers 34% / 69% (19% / 59%), with the fliers
+winning 10% instead of none; COOKED! goes from about 5.6 a match to almost none between
+even sides. Tries, breaks, tackles and kicks barely move. With four-point tries only,
+30% of even matches are drawn; conversions (2c) will split most of them.
+
+Tests: `tests/match/league/match.test.ts`.

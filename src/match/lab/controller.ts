@@ -120,6 +120,10 @@ export class LabController {
   setSpeed(s: RunSpeed): void {
     this.runner.setSpeed(s);
   }
+  /** Jump ahead to the next half-time or full time. */
+  skipToWhistle(): void {
+    this.runner.skipUntil((s) => s.events.some((e) => e.kind === 'half-time' || e.kind === 'full-time'));
+  }
   seek(tick: number): void {
     this.runner.seek(tick);
   }

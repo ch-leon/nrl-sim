@@ -52,7 +52,7 @@ const errs = checkPlan(plan);
 if (errs.length) die(`Plan has problems:\n  ${errs.join('\n  ')}`);
 const cells = cellsOf(plan);
 if (flag('check')) {
-  console.log(`OK: ${cells.length} cells (${cells.length / plan.scenarios.length} variants × ${plan.scenarios.length} scenarios) × ${plan.seeds} seeds × ${plan.minutes} min`);
+  console.log(`OK: ${cells.length} cells (${cells.length / plan.scenarios.length} variants × ${plan.scenarios.length} scenarios) × ${plan.seeds} seeds × ${plan.minutes ? `${plan.minutes} min` : 'whole matches'}`);
   process.exit(0);
 }
 

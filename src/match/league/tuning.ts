@@ -10,6 +10,7 @@ import { FATIGUE } from './fatigue';
 import { GAS } from './gas';
 import { LIVE } from './live';
 import { ATTACK_PLAN_KEYS, PRESET_TABLES } from './presets';
+import { NINES } from './rules';
 import { EDGE_COST, TRAIT_PTS } from './traits';
 import { WRESTLE } from './wrestle';
 
@@ -23,6 +24,7 @@ export const KNOBS = {
   traits: TRAIT_PTS,
   edge: EDGE_COST,
   presets: PRESET_TABLES,
+  rules: NINES,
 } as const;
 
 export type Overrides = Readonly<Record<string, number>>;

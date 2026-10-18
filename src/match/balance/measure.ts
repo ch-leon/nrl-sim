@@ -1,12 +1,14 @@
 // src/match/balance/measure.ts — play one cell of an experiment (a variant on
 // a scenario) over its seeds, headless, and count what happened per match.
-// Counts are normalised to a full 18-minute Nines match so they read against
-// the §7 balance targets whatever length the plan runs.
+// By default each seed is a whole match (two 9:00 halves to full time); a plan
+// or scenario can ask for a single stretch of N minutes instead, whose counts
+// are scaled to an 18-minute match so they still read against the §7 targets.
 import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { TICK_S } from '../core/engine';
 import type { SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
 import { LiveSim } from '../league/live';
+import { fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
@@ -15,7 +17,7 @@ import type { Cell, SideSpec } from './plan';
 export const MATCH_MINUTES = 18;
 const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
 
-/** Count metrics, per 18-minute match. */
+/** Count metrics, per match (or per 18 minutes of a shorter stretch). */
 export const COUNTS = [
   'tackles', 'bigHits', 'busts', 'lateBusts', 'fends', 'steps', 'breaks', 'offloads', 'errors', 'kicks', 'tries',
   'intercepts', 'strips', 'quickPtb', 'slowPtb', 'gassed', 'wrestles', 'held1', 'held2', 'held3',
@@ -38,10 +40,10 @@ export interface CellResult {
   counts: Record<CountKey, Stat>;
   /** Mean wrestle length, seconds. */
   wrestleSecs: number;
-  /** Home side's share of matches won / drawn on tries. */
+  /** Home side's share of matches won / drawn on points. */
   homeWin: number;
   draw: number;
-  /** Average legs (0..1) per side at each 3-minute mark the match reaches. */
+  /** Average legs (0..1) per side at each 3-minute mark of the match clock. */
   legs: { minute: number; home: number; away: number }[];
   /** Wall-clock seconds this cell took. */
   ms: number;
@@ -142,15 +144,22 @@ function stat(xs: readonly number[]): Stat {
   return { mean, se: Math.sqrt(varc / n) };
 }
 
-/** Play one cell: apply its tuning, run every seed, put the knobs back. A scenario's own `minutes` wins over the plan's. */
-export function measureCell(cell: Cell, seeds: number, planMinutes: number, seedStart = 1): CellResult {
+/** No match comes near this many ticks; it only guards against one that never finishes. */
+const MAX_TICKS = 100_000;
+
+/**
+ * Play one cell: apply its tuning, run every seed, put the knobs back. Whole
+ * matches unless the scenario (or else the plan) gives `minutes`: then one
+ * stretch of that long from a kick-off.
+ */
+export function measureCell(cell: Cell, seeds: number, planMinutes?: number, seedStart = 1): CellResult {
   const t0 = Date.now();
-  const minutes = cell.scenario.minutes ?? planMinutes;
+  const stretch = cell.scenario.minutes ?? planMinutes;
   const restore = applyTuning(cell.variant.tuning ?? {});
   try {
+    const length: MatchLength = stretch ? { halves: 1, halfMinutes: stretch } : fullMatch();
+    const minutes = length.halves * length.halfMinutes;
     const scale = MATCH_MINUTES / minutes;
-    const ticks = Math.round((minutes * 60) / TICK_S);
-    const perTick = Math.round(180 / TICK_S); // a legs reading every 3 minutes
     const legsAt = cell.scenario.legs === undefined ? 1 : typeof cell.scenario.legs === 'number' ? cell.scenario.legs : LEGS_ENERGY[cell.scenario.legs];
     const home = sideSheet('H', cell.scenario.home);
     const away = sideSheet('A', cell.scenario.away);
@@ -161,12 +170,13 @@ export function measureCell(cell: Cell, seeds: number, planMinutes: number, seed
     let draws = 0;
     const legSum = new Map<number, { home: number; away: number }>();
     for (let s = seedStart; s < seedStart + seeds; s++) {
-      const sim = new LiveSim(home, away, s, { energy: legsAt });
+      const sim = new LiveSim(home, away, s, { energy: legsAt, length });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       let inW = 0;
       let lastMen = 0;
-      for (let i = 1; i <= ticks; i++) {
+      let nextLegs = 3;
+      while (!sim.finished && sim.tick < MAX_TICKS) {
         sim.step();
         const snap = sim.snapshot();
         if (snap.events.length) events.push(...snap.events);
@@ -179,12 +189,13 @@ export function measureCell(cell: Cell, seeds: number, planMinutes: number, seed
           if (snap.events.some((e) => e.kind === 'tackle')) held[Math.min(3, lastMen)]!++;
           inW = 0;
         }
-        if (i % perTick === 0) {
-          const m = (i * TICK_S) / 60;
-          const acc = legSum.get(m) ?? { home: 0, away: 0 };
+        if (sim.matchSeconds >= nextLegs * 60) {
+          // A legs reading every 3 minutes of the match clock.
+          const acc = legSum.get(nextLegs) ?? { home: 0, away: 0 };
           acc.home += sim.energyOf('home');
           acc.away += sim.energyOf('away');
-          legSum.set(m, acc);
+          legSum.set(nextLegs, acc);
+          nextLegs += 3;
         }
       }
       const c = countEvents(events);
@@ -194,8 +205,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes: number, seed
       c.held3 = held[3]!;
       wrestleCount = 0;
       perSeed.push(c);
-      if (sim.tries.home > sim.tries.away) wins++;
-      else if (sim.tries.home === sim.tries.away) draws++;
+      if (sim.points.home > sim.points.away) wins++;
+      else if (sim.points.home === sim.points.away) draws++;
     }
     const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * scale))])) as Record<CountKey, Stat>;
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);

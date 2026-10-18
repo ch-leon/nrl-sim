@@ -48,7 +48,8 @@ include a neutral one (`even 60 v 60`) so effects can be told from matchup quirk
 - **Traits**: `none` (flat default), `gen` (club default), `stars` (two level-III
   traits each: a stress test).
 - **Legs**: `"legs": "fresh|late|spent"` or 0..1, with `"minutes"` for that scenario
-  (late legs over a full 18 minutes run dry; use about 8).
+  (a single stretch instead of a whole match; late legs over 18 minutes run dry, so
+  use about 8).
 - Names are what the report shows. Make them say the matchup ("rush v slide",
   "70 v 50"), unique within the plan.
 
@@ -66,8 +67,10 @@ include a neutral one (`even 60 v 60`) so effects can be told from matchup quirk
 ## 4. Size it
 
 - **seeds**: 20 for a general measurement, 40+ for rare events (late busts, strips,
-  intercepts, home win %). **minutes**: 18 is a full Nines match.
-- Time ≈ cells × seeds × minutes ÷ 28 seconds on one core, where cells = variants ×
+  intercepts, home win %). Each seed is a **whole match** (two 9:00 halves, half-time,
+  full time, won on points) unless the plan or scenario gives **minutes** for a single
+  stretch.
+- Time ≈ cells × seeds × 0.75 seconds on one core, where cells = variants ×
   scenarios. Divide by `--jobs` (use `nproc`). Over about 2 hours, split it into
   several plans or say so before starting.
 

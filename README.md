@@ -34,8 +34,10 @@ pickers set each side's attack and defence preset (§5: Grind, Balanced, Expansi
 Kick-chase, All-out · Slide, Rush, Compressed), e.g. `#lab?hatk=expansive&adef=rush`.
 **Legs** starts everyone fresh, on last-ten-minute legs or cooked (§8,
 `#lab?legs=late`, `legs=spent`); a bar over a tackled carrier shows the wrestle (§8.1).
-Speed streaks mark anyone sprinting, and a thin gas bar sits under the carrier and
-whoever is sprinting at him (§8.2); **COOKED!** means a player's legs are spent,
+The lab plays a whole Nines match: two 9:00 halves with the clock and score in the
+label, half-time and full time; **⏩** skips to the next break. Speed streaks mark
+anyone sprinting, and a thin gas bar sits under the carrier and whoever is sprinting
+at him (§8.2); **COOKED!** means a player's legs are spent,
 **RUN DOWN!** that a carrier was caught from behind after a break.
 Balance experiments (many seeds, knobs overridden by name) run headless with
 `npm run balance` — see `balance/README.md`.
