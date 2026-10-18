@@ -12,7 +12,7 @@ import { statsLine, statsWindow } from './stats';
 import { LEGS, isLegs, type Legs } from '../league/fatigue';
 
 const TRAIT_MODE_LABEL: Readonly<Record<TraitMode, string>> = { gen: 'as rolled', none: 'none', stars: 'all superstars' };
-const LEGS_LABEL: Readonly<Record<Legs, string>> = { fresh: 'fresh', late: 'last 10 min', spent: 'out on their feet' };
+const LEGS_LABEL: Readonly<Record<Legs, string>> = { fresh: 'fresh', late: 'last 10 min', spent: 'cooked' };
 
 export interface LabPanelHooks {
   /** Rebuild the lab on new teams / seed / tick (new sprites need a new scene). */
@@ -64,8 +64,8 @@ export class LabPanel {
       if (m === p.traits) o.selected = true;
       traits.append(o);
     }
-    // Legs (§8): start fresh, as the last ten minutes, or out on their feet — fatigue without waiting for it.
-    const legs = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Legs: fresh / the last ten minutes / out on their feet' } });
+    // Legs (§8): start fresh, as the last ten minutes, or cooked — fatigue without waiting for it.
+    const legs = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Legs: fresh / the last ten minutes / cooked' } });
     for (const m of LEGS) {
       const o = el('option', { text: LEGS_LABEL[m], attrs: { value: m } });
       if (m === p.legs) o.selected = true;

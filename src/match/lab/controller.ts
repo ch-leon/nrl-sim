@@ -26,7 +26,7 @@ export interface LabParams {
   traits: TraitMode;
   /** Tactics picker (BAK-208 §5): preset overrides per side. */
   tactics: LabTactics;
-  /** Legs (BAK-208 §8): start fresh, as in the last ten minutes, or out on their feet. */
+  /** Legs (BAK-208 §8): start fresh, as in the last ten minutes, or cooked. */
   legs: Legs;
 }
 

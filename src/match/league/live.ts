@@ -152,7 +152,7 @@ interface Player {
   /** Legs (§8): 1 fresh … 0 spent, and how fast he drains (Stamina, Workhorse). */
   energy: number;
   drain: number;
-  /** Already announced as out on his feet (until he recovers some). */
+  /** Already announced as cooked, COOKED! (until he recovers some). */
   gassed: boolean;
   body: Body;
   pose: string;
@@ -1037,7 +1037,7 @@ export class LiveSim implements MatchSim {
     p.slide = null;
   }
 
-  /** Spend some of a player's legs (× his drain rate); announce him once when he is out on his feet. */
+  /** Spend some of a player's legs (× his drain rate); announce him once when he is cooked. */
   private tire(p: Player, amount: number): void {
     p.energy = Math.max(0, p.energy - amount * p.drain);
     this.checkLegs(p);

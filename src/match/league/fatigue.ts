@@ -23,7 +23,7 @@ export const FATIGUE = {
   /** The thresholds (§8): tired below 40%, spent below 20%. */
   tiredAt: 0.4,
   spentAt: 0.2,
-  /** "Out on his feet" is announced once below SPENT_AT, again only after he gets back above this. */
+  /** COOKED! ("… is cooked") is announced once below SPENT_AT, again only after he gets back above this. */
   gassedReset: 0.3,
   /** Top speed: −10% tired, −20% spent. */
   tiredSpeed: 0.9,
@@ -63,7 +63,7 @@ export function afterRun(energy: number, metres: number, rate: number, dt: numbe
   return Math.max(0, Math.min(1, e));
 }
 
-/** Lab: how fresh everyone starts — a kick-off, the last ten minutes, or out on their feet. */
+/** Lab: how fresh everyone starts — a kick-off, the last ten minutes, or cooked. */
 export type Legs = 'fresh' | 'late' | 'spent';
 export const LEGS: readonly Legs[] = ['fresh', 'late', 'spent'];
 export const LEGS_ENERGY: Readonly<Record<Legs, number>> = { fresh: 1, late: 0.38, spent: 0.18 };

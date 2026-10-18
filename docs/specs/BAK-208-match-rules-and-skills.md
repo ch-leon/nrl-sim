@@ -312,7 +312,7 @@ Measured (8 seeds × 18 min, Stamina 50): ~160 wrestles a match averaging 0.63 s
 by one man, 123 by two, 14 by three; 6.5 late busts, 10 quick and 4 slow play-the-balls.
 Stamina 30 v 80: ~10 late busts a match.
 
-Lab: **Legs** = fresh / last 10 min (38%, tired) / out on their feet (18%, spent),
+Lab: **Legs** = fresh / last 10 min (38%, tired) / cooked (18%, spent),
 `#lab?legs=late`; the label reads `legs 74/71%` (home / away average).
 
 ### 8.2 Sprint, gas and getting legs back (Leon, 2026-10-18) — *implemented in F2*
@@ -431,3 +431,15 @@ Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
   and the stats strip could count calls that paid off. Needs the Phase 2 match screen.
 - **Refinement pass** on everything shipped in A–D once Phase 2 gives full matches to
   measure against §7 (Leon: "we may need to refine it still, come back to it later").
+- **Sprint follow-ups** (raised with F2, 2026-10-18; waiting on lab notes):
+  - Territory kicks chased at cruise; only attacking kicks (bomb, grubber, chip,
+    cross-field) sent at a sprint, the winger running onto it.
+  - Defensive line speed scaled by `gas.cruise`, so cruise can come down (more
+    sprint/cruise contrast) without costing tries (§8.2 "The cost").
+  - A per-player legs indicator in the lab (today only the side's average, in the label).
+- **Stamina knobs not yet overridable by name** in the balance harness: the drain-rate
+  slope in `fatigue.ts` `drainRate` (1.5 − Stamina/100, clamped 0.6–1.4) and the
+  fatigue weights inside the contest recipe (§1). Worth adding before a stamina sweep.
+- **§7 outliers for the Phase 3 pass**, measured with the standard plan: line breaks
+  ~50 a match (target 8–14), offloads ~2 (8–14), tackles ~175 (90–120), and 70 v 50
+  winning every match (target ~70%). Structural, not one knob; good harness work.

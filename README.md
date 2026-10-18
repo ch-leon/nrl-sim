@@ -32,7 +32,12 @@ same frame can be rebuilt. `#lab?flag=<code>` (or the Load button) reopens it.
 §3): as rolled, none, or every player a superstar (`#lab?traits=stars`). The **H / A**
 pickers set each side's attack and defence preset (§5: Grind, Balanced, Expansive,
 Kick-chase, All-out · Slide, Rush, Compressed), e.g. `#lab?hatk=expansive&adef=rush`.
-**Legs** starts everyone fresh, on last-ten-minute legs or out on their feet (§8,
-`#lab?legs=late`); a bar over a tackled carrier shows the wrestle (§8.1).
+**Legs** starts everyone fresh, on last-ten-minute legs or cooked (§8,
+`#lab?legs=late`, `legs=spent`); a bar over a tackled carrier shows the wrestle (§8.1).
+Speed streaks mark anyone sprinting, and a thin gas bar sits under the carrier and
+whoever is sprinting at him (§8.2); **COOKED!** means a player's legs are spent,
+**RUN DOWN!** that a carrier was caught from behind after a break.
+Balance experiments (many seeds, knobs overridden by name) run headless with
+`npm run balance` — see `balance/README.md`.
 Every tunable number, with its file and current value, is listed in
 `docs/specs/BAK-208-tuning.md`.
