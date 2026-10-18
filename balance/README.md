@@ -13,6 +13,9 @@ from the reports.
   (which knobs to change). The runner plays every variant on every scenario.
 - **Runs** land in `balance/runs/<date>-<plan>/` (git-ignored on main) and are kept
   on the **`balance-log`** branch, whose `INDEX.md` lists every run.
+- **Agents**: the `balance-experiments` skill (`.claude/skills/balance-experiments/`)
+  is the procedure for writing scenarios and running plans. Ad-hoc plans go in
+  `balance/plans/experiments/` (git-ignored; each run keeps a copy of its plan).
 
 ## Running one (step by step)
 

@@ -8,4 +8,5 @@ public/icons/
 .claude/*.lock
 # Balance experiment runs (balance/README.md) live on the balance-log branch, not main.
 balance/runs/
+balance/plans/experiments/
 .balance-log/

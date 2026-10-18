@@ -198,8 +198,9 @@ Tests: `tests/match/league/fatigue.test.ts`.
 
 Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams: tackles
 90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 · tries 5–9 ·
-completion 70–80%; stronger team wins ~70% at a 20-point rating gap. Until Phase 2 adds
-the clock, measure per 3 minutes with a throwaway vitest file that steps `LiveSim` over
-10–20 seeds and tallies `snapshot().events` by kind (see the "Measured" blocks in PRs
-#105–#108 for the pattern); the Balanced-v-Balanced test in `presets.test.ts` pins the
-coarse bands so a tuning change that breaks them fails CI.
+completion 70–80%; stronger team wins ~70% at a 20-point rating gap. Measure with the
+balance harness (`balance/README.md`, the `balance-experiments` skill): `npm run balance`
+plays 18-minute matches over many seeds and marks every count against these bands
+(completion is not counted yet). The Balance workflow re-runs `balance/plans/standard.json`
+on every match-code change to `main`; the Balanced-v-Balanced test in `presets.test.ts`
+still pins the coarse bands so a tuning change that breaks them fails CI.

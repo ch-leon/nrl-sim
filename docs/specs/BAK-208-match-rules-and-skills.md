@@ -257,6 +257,8 @@ kicks, tries) so balance is seen, not guessed.
 Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams:
 tackles 90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 ·
 tries 5–9 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
+Measured by the balance harness (`balance/README.md`): every report marks these bands,
+and the standard plan re-runs on each match-code change to `main`.
 
 ## 8. Fatigue — *implemented in F*
 
