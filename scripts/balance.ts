@@ -63,9 +63,15 @@ const git = (cmd: string): string => {
     return '?';
   }
 };
-const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
+const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
 const slug = plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-const dir = resume ?? join(opt('out') ?? 'balance/runs', `${stamp}-${slug}`);
+/** A fresh run never lands in an existing folder (that would silently reuse its results): add -2, -3… if it must. */
+const freshDir = (base: string): string => {
+  let d = base;
+  for (let i = 2; existsSync(d); i++) d = `${base}-${i}`;
+  return d;
+};
+const dir = resume ?? freshDir(join(opt('out') ?? 'balance/runs', `${stamp}-${slug}`));
 mkdirSync(dir, { recursive: true });
 const shardIdx = shard ? Number(shard.split('/')[0]) : -1;
 const shardN = shard ? Number(shard.split('/')[1]) : 1;

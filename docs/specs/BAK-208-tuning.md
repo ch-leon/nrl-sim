@@ -36,8 +36,7 @@ result. Keep it in step with the code: when a constant changes, change the row.
 | `ACCEL` | `body.ts` | 9 m/s² | Acceleration and braking cap. Drives the run-on lead (§5 below). |
 | `BODY_RADIUS` | `body.ts` | 0.9 m | Separation radius (nobody stands inside anyone). |
 | `live.carrySpeed` | `src/match/league/live.ts` | 0.95 | Carrier's top speed multiplier. 0.92 halved the tries; keep ≥ 0.94. |
-| `live.burst` / `live.burstTicks` | `live.ts` | ×1.15 / 16 | Speed burst after a break, step or fend. |
-| `live.jetsBurstTicks` | `live.ts` | 60 | Burst length for a Jets player (3 s). |
+| `live.burstTicks` | `live.ts` | 16 | After a break, step or fend the carrier sprints (gas permitting) at least this long. The old ×1.15 burst is retired (F2, §10a); `gas.breakBurst` brings it back for experiments. |
 | `live.immuneTicks` | `live.ts` | 8 | Can't be tackled this long after beating a man. |
 | `live.beatenCooldown` | `live.ts` | 30 | A beaten tackler sits out before committing again. |
 | `ROLES` (lane / atk / def / pull / defPull) | `src/match/league/roles.ts` | table | Where each of the nine stands in attack and defence; `pull` is how far the lane slides toward the ball. Hooker `defPull` 0.4 keeps him in the line. |
@@ -175,6 +174,26 @@ All in `src/match/league/fatigue.ts`; the tank lives on each player in `live.ts`
 | `fatigue.tiredSpeed` / `fatigue.spentSpeed` | ×0.9 / ×0.8 | Top speed. |
 | `fatigue.gassedReset` | 30% | GASSED! is announced again only after he gets back above this. |
 | `LEGS_ENERGY` | fresh 1 · late 0.38 · spent 0.18 | Lab Legs picker (`#lab?legs=`). |
+
+## 10a. Sprint and gas (§8.2)
+
+`src/match/league/gas.ts` (`gas.*`) and the who-sprints rules in `live.ts` `assignTargets` (`live.*`).
+
+| Knob | Value | Effect |
+|---|---|---|
+| `gas.cruise` | 0.94 | Pace when not sprinting. **The main lever on tries**: 0.88 gave 3.9 a match between even sides, 0.94 gives 5.0–5.5, 1.0 restores pre-F2 (7.2). |
+| `gas.blown` / `gas.recoverAt` | 0.75 / 25% | Pace with the tank empty, until a quarter is back. |
+| `gas.tankBase` / `gas.tankPerStamina` | 0.5 + Stamina/18 s | Seconds of sprint: 2.2 / 3.3 / 4.9 at Stamina 30 / 50 / 80. |
+| `gas.refillBase` / `gas.refillPerStamina` / `gas.standRefill` | 12 − Stamina/25 s, ×1.5 standing | Empty to full while cruising (× 0.5 + 0.5 × legs). |
+| `gas.jetsTank` | 0.4 × level mult | Jets: a bigger tank (I ×1.4, II ×1.64, III ×1.88). |
+| `gas.sprintRunCost` / `gas.cruiseRunCost` | ×1.5 / ×0.9 | Legs cost per metre × `fatigue.runCost`. ×0.9 keeps F's drain (39% at full time, F had 40%). |
+| `gas.breakBurst` | 1 (off) | Sprint × this right after a break. Measured: no effect on tries. |
+| `live.sprintLaneM` / `live.sprintLaneW` | 15 / 3 m | The carrier goes when nobody is this far ahead in his lane. At 6 m he sprinted off every play-the-ball and ran dry on a third of carries. |
+| `live.sprintCloseM` | 8 m | A committed defender sprints the last stretch (all of them when the line is broken). |
+| `live.supportSprintM` | 10 m | Support within this of the carrier sprints when he does. |
+| `live.runDownTicks` | 120 (6 s) | Caught from behind by a sprinting man this soon after breaking: RUN DOWN!. |
+
+Tests: `tests/match/league/gas.test.ts` (the chase: Speed 90 / Stamina 30 caught inside 35 m by Speed 70 / Stamina 80; with Stamina 70 he gets away), `tests/match/view/sprintLayer.test.ts`.
 
 ## 11. The wrestle (§8.1)
 

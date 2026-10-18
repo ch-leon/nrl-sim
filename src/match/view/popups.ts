@@ -47,6 +47,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   // Legs and the wrestle (§8): a quick play-the-ball off a short wrestle, a player out on his feet.
   'quick-ptb': { word: 'QUICK PTB!', tone: 'attack' },
   gassed: { word: 'GASSED!', tone: 'bad' },
+  // Sprint and gas (§8.2): caught from behind after a break.
+  'run-down': { word: 'RUN DOWN!', tone: 'defence', big: true },
 };
 
 /** A bust out of a wrestle (the defenders' grip went first) reads differently from one at contact. */

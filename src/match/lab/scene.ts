@@ -14,6 +14,7 @@ import { LiveView } from '../view/liveView';
 import { PopupLayer } from '../view/popupLayer';
 import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from '../view/popups';
 import { WrestleBar } from '../view/wrestleBar';
+import { SprintLayer } from '../view/sprintLayer';
 import type { LabController } from './controller';
 
 export interface LabSceneData {
@@ -32,6 +33,7 @@ export class LabScene extends MatchScene {
   private view: LiveView | null = null;
   private popups: PopupLayer | null = null;
   private wrestleBar: WrestleBar | null = null;
+  private sprintLayer: SprintLayer | null = null;
   private ids!: Record<Side, string>;
   private closeupUntil = 0;
 
@@ -53,6 +55,7 @@ export class LabScene extends MatchScene {
     this.view = new LiveView(this);
     this.popups = new PopupLayer(this, DEPTH_POPUP);
     this.wrestleBar = new WrestleBar(this, DEPTH_POPUP);
+    this.sprintLayer = new SprintLayer(this, DEPTH_POPUP - 1);
     const r = this.controller.runner;
     r.onEvents = (events) => this.onSimEvents(events);
     this.view.draw(r.prev, r.cur, 0, 1);
@@ -62,6 +65,8 @@ export class LabScene extends MatchScene {
       this.popups = null;
       this.wrestleBar?.destroy();
       this.wrestleBar = null;
+      this.sprintLayer?.destroy();
+      this.sprintLayer = null;
     });
   }
 
@@ -101,5 +106,10 @@ export class LabScene extends MatchScene {
     this.popups?.update(delta, this.cameras.main.zoom, feet);
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
     this.wrestleBar?.update(r.cur.wrestle, this.cameras.main.zoom, (w) => feet(w.side, w.slot));
+    // Sprint and gas (§8.2): streaks behind anyone flat out, gas bars on the carrier and his chasers.
+    this.sprintLayer?.update(r.cur, this.cameras.main.zoom, (side, slot) => {
+      const a = this.players[side][slot];
+      return a ? { x: a.sprite.x, y: a.sprite.y, faceLeft: a.sprite.flipX } : null;
+    });
   }
 }

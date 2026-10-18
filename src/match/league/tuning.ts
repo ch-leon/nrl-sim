@@ -7,6 +7,7 @@
 // — one experiment at a time, never in the game.
 import { BASE } from './contest';
 import { FATIGUE } from './fatigue';
+import { GAS } from './gas';
 import { LIVE } from './live';
 import { ATTACK_PLAN_KEYS, PRESET_TABLES } from './presets';
 import { EDGE_COST, TRAIT_PTS } from './traits';
@@ -17,6 +18,7 @@ export const KNOBS = {
   live: LIVE,
   contest: BASE,
   fatigue: FATIGUE,
+  gas: GAS,
   wrestle: WRESTLE,
   traits: TRAIT_PTS,
   edge: EDGE_COST,

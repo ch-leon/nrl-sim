@@ -38,6 +38,8 @@ describe('popupFor', () => {
     expect(popupFor(ev('quick-ptb'))).toMatchObject({ word: 'QUICK PTB!', tone: 'attack', big: false });
     expect(popupFor(ev('gassed'))).toMatchObject({ word: 'GASSED!', tone: 'bad' });
     expect(popupFor(ev('slow-ptb'))).toBeNull();
+    expect(popupFor(ev('run-down'))).toMatchObject({ word: 'RUN DOWN!', tone: 'defence', big: true });
+    expect(popupFor(ev('blown'))).toBeNull(); // out of gas is commentary, not a shout
   });
   it('big moments last longer and get a short slow-motion beat', () => {
     expect(POPUP_BIG_MS).toBeGreaterThan(POPUP_MS);

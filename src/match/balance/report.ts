@@ -15,7 +15,7 @@ export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
 };
 
 /** The columns of the summary table. */
-const COLUMNS: readonly CountKey[] = ['tackles', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bigHits', 'gassed'];
+const COLUMNS: readonly CountKey[] = ['tackles', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bigHits', 'runDowns', 'gassed'];
 
 /** ✓ inside the §7 band, ↑ above, ↓ below, '' when the metric has no band. */
 export function bandMark(key: CountKey, v: number): string {
@@ -89,8 +89,11 @@ export function reportMarkdown(r: ReportInput): string {
         const p = prev.find((x) => x.variant === row.variant);
         if (!p) continue;
         for (const k of COLUMNS) {
-          const d = delta(row.counts[k], p.counts[k], Math.min(row.seeds, p.seeds) >= MIN_SEEDS_TO_FLAG);
-          if (d.endsWith('*')) moved.push(`${row.variant}: ${k} ${p.counts[k].mean.toFixed(1)} → ${row.counts[k].mean.toFixed(1)} (${d})`);
+          // A run from before a metric existed has nothing to compare it with.
+          const before = p.counts[k];
+          if (!before) continue;
+          const d = delta(row.counts[k], before, Math.min(row.seeds, p.seeds) >= MIN_SEEDS_TO_FLAG);
+          if (d.endsWith('*')) moved.push(`${row.variant}: ${k} ${before.mean.toFixed(1)} → ${row.counts[k].mean.toFixed(1)} (${d})`);
         }
       }
       out.push(moved.length ? `**Changed since the previous run:** ${moved.join('; ')}` : '**Changed since the previous run:** nothing beyond noise.', '');

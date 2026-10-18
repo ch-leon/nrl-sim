@@ -1,5 +1,5 @@
 # BAK-208 — Match design: contests, traits, tactics, kicks, readability
-**GitHub:** https://github.com/ch-leon/nrl-sim/issues/94 (Phase 1.5 under #83) | **Priority:** Highest | **Status:** LIVING — A, B, C, D, F and the first slice of E shipped (2026-10-17); numbers in each section are the shipped ones. Every knob with its file and value: `BAK-208-tuning.md`.
+**GitHub:** https://github.com/ch-leon/nrl-sim/issues/94 (Phase 1.5 under #83) | **Priority:** Highest | **Status:** LIVING — A, B, C, D, F, F2 and the first slice of E shipped (2026-10-17); numbers in each section are the shipped ones. Every knob with its file and value: `BAK-208-tuning.md`.
 
 > **Purpose.** The live sim (BAK-207) now plays a real set: tackles, play-the-ball,
 > passes, kicks. It works and it is still a bit boring. This document is the single
@@ -76,7 +76,7 @@ the commentary line names it, and the lab stats strip counts them (`Skill n`).
 | **Don't Argue** | Tackler not arriving from behind | +12% fend | FEND! |
 | **Offload King** | Held with a support runner inside 5 m | +12% offload | OFFLOAD! |
 | **Finisher** | Inside the opposition 20 m | +10% bust, +5% fend, +10% step | BUST! / STEP! |
-| **Jets** | After a break; on the kick chase | Burst lasts 3 s (not 0.8); +8% speed chasing a kick. *F2: a bigger gas tank instead (§8.2)* | longer burst |
+| **Jets** | After a break; on the kick chase | A bigger gas tank: ×1.4 at I (§8.2); +8% speed chasing a kick | longer sprint |
 | **Playmaker** | Engaged with the ball | +10% to pass rather than carry; reach 12 + 3 m/level → the cut-out ball | CUT-OUT! |
 | **Big Boot** | Last-tackle kick | +10% distance, scatter ×0.85 (40/20s arrive with E) | KICK! |
 
@@ -315,55 +315,74 @@ Stamina 30 v 80: ~10 late busts a match.
 Lab: **Legs** = fresh / last 10 min (38%, tired) / out on their feet (18%, spent),
 `#lab?legs=late`; the label reads `legs 74/71%` (home / away average).
 
-### 8.2 Sprint, gas and getting legs back (Leon, 2026-10-18) — *design, F2*
+### 8.2 Sprint, gas and getting legs back (Leon, 2026-10-18) — *implemented in F2*
 
 F gave every player one bar, **legs**: full at kick-off, spent by running, contact and
-wrestling, coming back only a little. Everyone also runs flat out all the time. F2 splits
-effort into two bars so that pace is something a player *spends*:
+wrestling, coming back only a little. Everyone also ran flat out all the time. F2 splits
+effort into two bars so that pace is something a player *spends* (`src/match/league/gas.ts`):
 
 - **Gas** (short-term): a small sprint tank. Sprinting empties it in seconds; jogging
   or standing refills it in seconds.
 - **Legs** (long-term, F's bar): drains over the match and is the **ceiling** on gas.
   At 60% legs the gas tank only fills to 60%, and refills more slowly.
 
-**Pace.** A player runs at **cruise**, 88% of his top speed, unless he is sprinting.
+**Pace.** A player runs at **cruise**, 94% of his top speed, unless he is sprinting.
 **Sprinting** is top speed (the Speed stat, 6–9 m/s) and burns gas. With the gas gone he
 is **blown**: 75% of top speed until gas is back to a quarter, then cruise again. The
-break burst (×1.15 for 0.8 s today) becomes simply going from cruise to sprint, so
-`live.burst` and `live.burstTicks` retire.
+old break burst (×1.15 for 0.8 s) is retired: after beating a man the carrier simply
+sprints (`gas.breakBurst` keeps the old burst for experiments; it made no difference).
 
 **Who sprints.** Only when it matters, so the burst reads on screen:
-- the carrier with space ahead (no defender in his lane within 6 m) or after a break,
-  step or fend;
-- a committed defender closing the last 8 m, and every defender covering a broken line;
-- kick chasers, and the catcher getting under a kick;
-- a receiver running onto a pass, and a support runner within 10 m of a break.
+- the carrier with space (nobody in his lane for 15 m), after a break, step or fend, or
+  through the line;
+- a committed defender closing the last 8 m, and every defender covering a broken line
+  (the fullback included);
+- kick and loose-ball chasers, and the catcher getting under a kick;
+- support runners within 10 m of the carrier when he goes.
 
-Everyone else cruises or holds position.
+Everyone else cruises or holds position. A receiver runs onto an ordinary pass at
+cruise and keeps his gas for the line.
 
-**Starting numbers** (all knobs, tuned with the balance harness):
-
-| | Value | At Stamina 30 / 50 / 80 |
+| | Shipped | At Stamina 30 / 50 / 80 |
 |---|---|---|
-| Cruise | 88% of top speed | — |
+| Cruise | 94% of top speed | — |
 | Gas tank | 0.5 + Stamina/18 seconds of sprint | 2.2 / 3.3 / 4.9 s |
 | Gas refill (cruising; ×1.5 standing) | full in 12 − Stamina/25 seconds | 10.8 / 10 / 8.8 s |
 | Blown | 75% of top speed until gas is back to 25% | — |
 | Legs as ceiling | gas max = legs; refill × (0.5 + 0.5 × legs) | — |
-| Legs cost of running | per metre ×1.5 sprinting, ×0.8 cruising (re-measured so a match drains as F does now) | — |
+| Legs cost of running | per metre ×1.5 sprinting, ×0.9 cruising | — |
 | Jets (replaces its burst) | gas tank × (1 + 0.4 × level multiplier) | I ×1.4, II ×1.64, III ×1.88 |
 
-**What it should produce** (the F2 tests and lab check):
-- A **Speed 90 / Stamina 30** winger who breaks with a defender 2 m behind him is run
-  down inside about 35 m by a **Speed 70 / Stamina 80** fullback: he blows after
-  ~2 s (~19 m), the fullback keeps sprinting.
-- The same winger with **Stamina 70** (4.4 s of gas) gets away.
-- Sides tire later in a match when nobody sprints needlessly; the balance harness
-  re-measures the §7 bands, which may move.
+**Changed from the design, by measurement** (balance harness, 20–30 matches a row):
+- Cruise **94%, not 88%.** Tries track cruise pace: the whole attack slows while the
+  defensive line still rushes up at its preset speed. 88% gave 3.9 tries a match between
+  even sides, 94% gives 5.0–5.5, 100% restores the pre-F2 7.2.
+- The carrier needs **15 m of clear lane, not 6 m**, and receivers no longer sprint onto
+  ordinary passes. At 6 m he sprinted off every play-the-ball (the line is 10 m away) and
+  a third of all carries ran dry before contact.
+- Support runners sprint **whenever the carrier does**, not only on a break, so they stay
+  in reach for the offload.
+- Cruising costs legs ×0.9 (not ×0.8) so a match drains as F did.
 
-**Shown as:** a speed streak behind a sprinting player; a thin gas bar under the
-carrier and under anyone chasing him while a break is on; **RUN DOWN!** when a sprinting
-carrier is caught from behind; commentary for "out of gas".
+**What it produces** (tests and lab check):
+- A **Speed 90 / Stamina 30** winger who breaks with a defender 2 m behind is run down
+  inside 35 m by a **Speed 70 / Stamina 80** fullback; with **Stamina 70** he gets away
+  (`tests/match/league/gas.test.ts`, the sim's own movement and gas).
+- Measured over 30 full matches (standard plan): legs at full time 39% between even sides
+  (F: 40%); about 16 carriers run dry a match, 36 when Speed 85 / Stamina 30 fliers play
+  Speed 65 / Stamina 80 stayers; 1–2.6 run-downs a match.
+- **The cost:** about two fewer tries a match than before F2 in every matchup (even sides
+  7.2 → 5.0, still inside §7; Rush and Expansive matchups 4.5–4.7, just under it). Cruise
+  pace is the lever (`gas.cruise`); left at 94% pending the Phase 3 balance pass.
+- Fliers v stayers: the fliers break more (63 a match against 50 between even sides) but
+  win 7% of matches, on 23% legs at full time to the stayers' 62%. Stamina stays decisive
+  until half-time and interchanges give legs back.
+
+**Shown as:** a speed streak behind anyone sprinting; a thin gas bar under the carrier
+when he is sprinting or blown and under anyone sprinting at him (blue, yellow when low,
+red when blown); **RUN DOWN!** when a carrier is caught from behind by a sprinting man
+within 6 s of breaking; "has nothing left in the tank" in the commentary when a carrier
+runs dry.
 
 **Getting legs back** (rides with the features it belongs to):
 - **Half-time** (BAK-207 Phase 2, the first PR, with the clock and halves): every
@@ -387,7 +406,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | D | Zone tactics and presets | §5 |
 | E | Kick types, catches, scrambles | §4.3–4.4 |
 | F | Fatigue and the wrestle — *shipped* | §8 |
-| F2 | Sprint and gas; legs as their ceiling (half-time with Phase 2, the bench with #70) | §8.2 |
+| F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time with Phase 2, the bench with #70) | §8.2 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 

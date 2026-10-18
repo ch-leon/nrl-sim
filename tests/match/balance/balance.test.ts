@@ -53,7 +53,7 @@ describe('knobs by name', () => {
     expect(checkTuning({ 'presets.attack.balanced.base.pasz': 1 })).toHaveLength(1);
     expect(checkTuning({ 'fatigue.contactCost': 1 })).toHaveLength(1); // a group, not a number
     expect(checkTuning({ 'wrestle.gripBase': Number.NaN })).toHaveLength(1);
-    expect(checkTuning({ 'wrestle.gripBase': 1.2, 'live.burst': 1.3 })).toEqual([]);
+    expect(checkTuning({ 'wrestle.gripBase': 1.2, 'live.carrySpeed': 1.3 })).toEqual([]);
     expect(() => applyTuning({ 'wrestle.gripBase': 9, nope: 1 })).toThrow(/nope/);
     expect(WRESTLE.gripBase).toBe(1.3);
   });
@@ -69,10 +69,10 @@ describe('plans', () => {
       'wrestle.gripBase=1.2, fatigue.runCost=0.0001',
       'wrestle.gripBase=1.2, fatigue.runCost=0.0002',
     ]);
-    const crossed = expandVariants(plan({ base: { 'live.burst': 1.2 }, variants: [{ name: 'rush on', tuning: { 'presets.defence.rush.commit': 2 } }], sweep: { 'wrestle.gripBase': [1, 2] } }));
+    const crossed = expandVariants(plan({ base: { 'live.carrySpeed': 1.2 }, variants: [{ name: 'rush on', tuning: { 'presets.defence.rush.commit': 2 } }], sweep: { 'wrestle.gripBase': [1, 2] } }));
     expect(crossed.map((v) => v.name)).toEqual(['baseline', 'rush on · wrestle.gripBase=1', 'rush on · wrestle.gripBase=2']);
-    expect(crossed[0]!.tuning).toEqual({ 'live.burst': 1.2 });
-    expect(crossed[2]!.tuning).toEqual({ 'live.burst': 1.2, 'presets.defence.rush.commit': 2, 'wrestle.gripBase': 2 });
+    expect(crossed[0]!.tuning).toEqual({ 'live.carrySpeed': 1.2 });
+    expect(crossed[2]!.tuning).toEqual({ 'live.carrySpeed': 1.2, 'presets.defence.rush.commit': 2, 'wrestle.gripBase': 2 });
     expect(cellsOf(plan({ scenarios: [EVEN, { ...EVEN, name: 'b' }], sweep: { 'wrestle.gripBase': [1, 2] } }))).toHaveLength(6);
   });
   it('fails fast on a bad plan, naming each problem', () => {
@@ -124,5 +124,8 @@ describe('measuring and reporting', () => {
     expect(md).toContain('| baseline |');
     expect(md).toContain('| wrestle.gripBase=0.6 |');
     expect(md).toContain('nothing beyond noise');
+    // A previous run from before a metric existed is compared on the metrics it has.
+    const older = results.map((r) => ({ ...r, counts: Object.fromEntries(Object.entries(r.counts).filter(([k]) => k !== 'runDowns')) })) as typeof results;
+    expect(reportMarkdown({ plan: plan(), meta: {}, results, previous: older })).toContain('nothing beyond noise');
   });
 });
