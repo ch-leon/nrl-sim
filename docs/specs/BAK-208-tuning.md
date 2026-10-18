@@ -172,7 +172,7 @@ All in `src/match/league/fatigue.ts`; the tank lives on each player in `live.ts`
 | `fatigue.workhorseSave` | 0.1 × level mult | Workhorse I ×0.9, II ×0.84, III ×0.78. |
 | `fatigue.tiredAt` / `fatigue.spentAt` | 40% / 20% | Tiers; `tiredness` feeds the contest 0 / 0.5 / 1. |
 | `fatigue.tiredSpeed` / `fatigue.spentSpeed` | ×0.9 / ×0.8 | Top speed. |
-| `fatigue.gassedReset` | 30% | GASSED! is announced again only after he gets back above this. |
+| `fatigue.gassedReset` | 30% | COOKED! (legs under 20%) is announced again only after he gets back above this. |
 | `LEGS_ENERGY` | fresh 1 · late 0.38 · spent 0.18 | Lab Legs picker (`#lab?legs=`). |
 
 ## 10a. Sprint and gas (§8.2)

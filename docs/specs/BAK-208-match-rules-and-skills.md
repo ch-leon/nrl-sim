@@ -246,7 +246,7 @@ less; Kick-chase kicks more and bombs more; All-out offloads 1.5× Balanced; Rus
 | Kick | type (BOMB!, 40/20!) | wide camera, trail |
 | Try | existing banner (#82) | scorer's traits listed |
 | Wrestle (§8.1) | bar over the carrier: fight left, green → yellow → red, a pip per man on him | BROKE FREE! on a late bust |
-| Quick play-the-ball / legs gone | QUICK PTB! · GASSED! | slow rucks are commentary only |
+| Quick play-the-ball / legs gone | QUICK PTB! · COOKED! | slow rucks are commentary only |
 
 The commentary ticker gets a line for every pop-up, naming players. The lab shows an
 **event feed** and a **per-5-minute stats strip** (tackles, breaks, offloads, errors,
@@ -276,7 +276,7 @@ restart). Everything he spends is × his **drain rate**: 1.5 − Stamina/100, cl
 | **Tired** < 40% | −10% | carrier −5% bust / fend / offload · tackler −5% big hit, +3% bust conceded | carrier −4%, tackler +2% |
 | **Spent** < 20% | −20% | −10% / −10% · +6% | −8% / +4% |
 
-A player going under 20% is announced once (**GASSED!**, "… is out on his feet") until he
+A player going under 20% is announced once (**COOKED!**, "… is cooked"; renamed from GASSED! with F2, where gas is the sprint tank) until he
 is back over 30%. Interchanges (#70) answer it later; until then it shapes the last minutes.
 
 Measured (8 seeds × 18 min, 60-rated sheets): at Stamina 50 a side's average legs are

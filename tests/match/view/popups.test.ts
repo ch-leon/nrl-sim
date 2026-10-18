@@ -36,7 +36,7 @@ describe('popupFor', () => {
   it('the wrestle and legs: a late bust breaks free, a quick play-the-ball and a gassed player are shouted, a slow ruck is not', () => {
     expect(popupFor({ ...ev('break-tackle'), detail: 'wrestle' })).toMatchObject({ word: 'BROKE FREE!', tone: 'attack', big: true });
     expect(popupFor(ev('quick-ptb'))).toMatchObject({ word: 'QUICK PTB!', tone: 'attack', big: false });
-    expect(popupFor(ev('gassed'))).toMatchObject({ word: 'GASSED!', tone: 'bad' });
+    expect(popupFor(ev('gassed'))).toMatchObject({ word: 'COOKED!', tone: 'bad' });
     expect(popupFor(ev('slow-ptb'))).toBeNull();
     expect(popupFor(ev('run-down'))).toMatchObject({ word: 'RUN DOWN!', tone: 'defence', big: true });
     expect(popupFor(ev('blown'))).toBeNull(); // out of gas is commentary, not a shout

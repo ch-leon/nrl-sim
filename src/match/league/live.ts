@@ -1046,7 +1046,7 @@ export class LiveSim implements MatchSim {
   private checkLegs(p: Player): void {
     if (!p.gassed && p.energy < FATIGUE.spentAt) {
       p.gassed = true;
-      this.emit('gassed', `${p.name} is out on his feet`, p);
+      this.emit('gassed', `${p.name} is cooked`, p);
     } else if (p.gassed && p.energy > FATIGUE.gassedReset) p.gassed = false;
   }
 

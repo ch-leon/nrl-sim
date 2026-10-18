@@ -44,9 +44,9 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   regather: { word: 'REGATHER!', tone: 'attack', big: true },
   drop: { word: 'DROPPED!', tone: 'bad' },
   try: { word: 'TRY!', tone: 'attack', big: true },
-  // Legs and the wrestle (§8): a quick play-the-ball off a short wrestle, a player out on his feet.
+  // Legs and the wrestle (§8): a quick play-the-ball off a short wrestle, a player whose legs are gone (COOKED!, not to be confused with running out of gas).
   'quick-ptb': { word: 'QUICK PTB!', tone: 'attack' },
-  gassed: { word: 'GASSED!', tone: 'bad' },
+  gassed: { word: 'COOKED!', tone: 'bad' },
   // Sprint and gas (§8.2): caught from behind after a break.
   'run-down': { word: 'RUN DOWN!', tone: 'defence', big: true },
 };
