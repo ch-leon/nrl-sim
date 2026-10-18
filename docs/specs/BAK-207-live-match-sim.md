@@ -59,7 +59,7 @@ and behaviours are the asset, not the framework.
   view interpolates between the last two ticks, so rendering frame rate never changes
   outcomes.
 - Physics time is human-scale (a winger runs ~8 m/s). ~~The match clock is scaled: a 9:00
-  Nines half elapses in `HALF_REAL_SECONDS` of sim time.~~ *Proposed in §5.1 (decision 1):*
+  Nines half elapses in `HALF_REAL_SECONDS` of sim time.~~ *Decided (§5.1, decision 1):*
   the clock is real sim time, two 9:00 halves, which is what BAK-208's §7 targets and fatigue
   tuning already assume. Clock stops for tries, conversions and restarts. ×1/×2/×4/×8
   only change how much sim time passes per real frame.
@@ -131,7 +131,12 @@ Every transition is a thing that physically happens on the field; nothing is imp
 
 Phases 0–1 are the point: if the prototype isn't fun to watch, nothing after it matters.
 
-### 5.1 Phase 2 breakdown (#86) — *proposed 2026-10-18, for Leon's approval*
+### 5.1 Phase 2 breakdown (#86) — *agreed 2026-10-18*
+
+> **Decided (Leon, 2026-10-18): "go with the recommendations".** Real 9:00 halves, the live
+> match screen defaulting to ×4; Nines drop-kick conversions in 2c, the bonus zone left for
+> Phase 5 (#77) unless asked for; no scrums; the order below with 2g last; headless speed
+> checked on a phone in 2g and made faster in Phase 3.
 
 **Where the live sim is today** (after BAK-208 A–F2): kick-offs, sets of five, tackles and
 the wrestle, rucks, handovers, passes and knock-ons, five kick types, catches and loose
@@ -156,7 +161,7 @@ the report linked in the PR. The match is **Nines** (#77: one ruleset, no Classi
 
 After Phase 2: Phase 3 (balance, with the harness on whole matches) and the lineup screen (#69).
 
-**Decisions for Leon:**
+**Decisions (as proposed; all taken as recommended, see above):**
 1. **Match length.** Two 9:00 halves of real sim time (recommended): §7, the harness and the
    fatigue tuning already assume it; at ×1 a match takes 18 minutes to watch, about 4½ at ×4.
    The old playback took 5 minutes at ×1. The other way is a scaled clock (shorter halves of sim
