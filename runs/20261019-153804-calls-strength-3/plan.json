@@ -1,0 +1,112 @@
+{
+  "name": "calls strength 3",
+  "description": "Coach calls (#73) are on by default: is any call a free win? (Rush now pays in offside penalties as the preset does) One side makes the same call whenever it may, 60 whole matches, even sides.",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "no calls",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "home hold",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "hold"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home rush",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "rush"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home kick-early",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "kick-early"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home hit-up",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "hit-up"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home shift-left",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "shift-left"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home bomb",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "bomb"
+          }
+        ]
+      }
+    }
+  ]
+}
