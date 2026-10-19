@@ -56,3 +56,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-173649-standard | standard | 26936a3 (uncommitted changes) | fix/tempo-bands | [report](runs/20261019-173649-standard/report.md) |
 | 20261019-174119-standard | standard | cfb4223 (uncommitted changes) | feat/completion-rate | [report](runs/20261019-174119-standard/report.md) |
 | 20261019-174508-standard | standard | 41b92a6 | main | [report](runs/20261019-174508-standard/report.md) |
+| 20261019-174925-standard | standard | 7c31055 | main | [report](runs/20261019-174925-standard/report.md) |
