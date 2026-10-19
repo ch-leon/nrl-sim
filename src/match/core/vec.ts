@@ -11,8 +11,13 @@ export const add = (a: Vec, b: Vec): Vec => ({ x: a.x + b.x, y: a.y + b.y });
 export const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y });
 export const scale = (a: Vec, k: number): Vec => ({ x: a.x * k, y: a.y * k });
 export const dot = (a: Vec, b: Vec): number => a.x * b.x + a.y * b.y;
-export const len = (a: Vec): number => Math.hypot(a.x, a.y);
-export const dist = (a: Vec, b: Vec): number => Math.hypot(a.x - b.x, a.y - b.y);
+// sqrt of the sum of squares, not Math.hypot: several times faster and exact enough for metres.
+export const len = (a: Vec): number => Math.sqrt(a.x * a.x + a.y * a.y);
+export const dist = (a: Vec, b: Vec): number => {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+};
 export const lerp = (a: Vec, b: Vec, t: number): Vec => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
 /** Unit vector in the direction of `a`; the zero vector stays zero. */

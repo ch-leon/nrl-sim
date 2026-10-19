@@ -160,9 +160,12 @@ describe('coach calls in the live sim', () => {
     expect(rush.some((e) => e.kind === 'coach-call' && e.detail === 'rush' && e.side === 'home')).toBe(true);
     expect(count(rush, 'big-hit', 'home')).toBeGreaterThan(count(none, 'big-hit', 'home'));
     expect(count(rush, 'break-tackle', 'away')).toBeGreaterThan(count(none, 'break-tackle', 'away'));
-    expect(count(runs('home', 'run-it'), 'kick', 'home')).toBeLessThan(count(none, 'kick', 'home') * 0.7);
-    expect(count(runs('home', 'kick-early'), 'kick', 'home')).toBeGreaterThan(count(none, 'kick', 'home') * 1.3);
-  }, 120_000);
+    // Kicks over twelve stretches: six left about twenty kicks a row, within the noise of a reshuffle.
+    const runs12 = (side: 'home' | null, call: CoachCall | null): SimEvent[] => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].flatMap((s) => play(s, side, call).events);
+    const none12 = runs12(null, null);
+    expect(count(runs12('home', 'run-it'), 'kick', 'home')).toBeLessThan(count(none12, 'kick', 'home') * 0.7);
+    expect(count(runs12('home', 'kick-early'), 'kick', 'home')).toBeGreaterThan(count(none12, 'kick', 'home') * 1.3);
+  }, 180_000);
 
   it('judges every call it makes, and some pay off', () => {
     for (const call of ['hit-up', 'shift-right', 'kick-early', 'rush', 'hold'] as const) {
