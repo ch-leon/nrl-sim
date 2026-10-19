@@ -49,3 +49,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-165954-all-out-sweep | all-out sweep | d814aaf | main | [report](runs/20261019-165954-all-out-sweep/report.md) |
 | 20261019-170217-all-out-confirm | all-out confirm | d814aaf | main | [report](runs/20261019-170217-all-out-confirm/report.md) |
 | 20261019-170618-all-out-sweep-2 | all-out sweep 2 | d814aaf | main | [report](runs/20261019-170618-all-out-sweep-2/report.md) |
+| 20261019-171752-standard | standard | bae88cb | main | [report](runs/20261019-171752-standard/report.md) |
