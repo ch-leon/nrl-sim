@@ -56,7 +56,7 @@ import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from 
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
 import { PENALTY, choosePenalty, offsideChance } from './penalties';
 import { spreadSheets } from './spread';
-import { CALLS, CALL_LABEL, callDefence, callIsDefence, callIsPlay, withAttackCall, type CallInput, type CoachCall } from './calls';
+import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsDefence, callIsPlay, paidOffText, withAttackCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
@@ -382,6 +382,8 @@ export class LiveSim implements MatchSim {
   };
   /** Who had the ball and on what tackle at the end of the last tick: a new set or a tackle ends a call's scope. */
   private callAtk: Side | null = null;
+  /** Which calls paid off (spec §3's last column). */
+  private readonly judge = new CallJudge();
   private callTackles = 0;
   /** Touch and dead ball (2d): the side that touched the ball last, the kick in play (where from and what for), and a bounce on its way out. */
   private lastTouch: Side = 'home';
@@ -714,13 +716,30 @@ export class LiveSim implements MatchSim {
     const by = h && h.side === side ? h : this.at(side, KICKER);
     this.emit('coach-call', `${this.names[side]} coach calls: ${CALL_LABEL[call].toLowerCase()}`, by);
     this.events[this.events.length - 1]!.detail = call;
+    this.judge.make(side, call, this.attacking, this.dirOf(this.attacking), this.ballPos().x);
     return null;
+  }
+
+  /** Calls each side has made, and how many paid off. */
+  get callsMade(): Readonly<Record<Side, number>> {
+    return this.judge.made;
+  }
+  get callsPaid(): Readonly<Record<Side, number>> {
+    return this.judge.paid;
+  }
+
+  /** A call that paid off goes in the commentary (no player: the coach's). */
+  private announcePaid(vs: readonly CallVerdict[]): void {
+    for (const v of vs) {
+      if (v.paid) this.events.push({ tick: this.tick, kind: 'call-paid', text: paidOffText(this.names[v.side], v.call), side: v.side, detail: v.call });
+    }
   }
 
   /** A tackle ends a play call; a new set (the ball changes hands or the count goes back) ends them all. */
   private expireCalls(): void {
     const newSet = this.attacking !== this.callAtk || this.tackles < this.callTackles;
     const tackled = this.tackles !== this.callTackles;
+    this.announcePaid(this.judge.observe([...this.events], this.ballPos().x, !newSet && this.tackles > this.callTackles, newSet));
     if (newSet) {
       for (const st of [this.callState.home, this.callState.away]) {
         st.attack = st.defence = null;
@@ -1594,6 +1613,7 @@ export class LiveSim implements MatchSim {
     if (side === kf.side) return;
     this.kickMetres[kf.side] += (at.x - kf.x) * this.dirOf(kf.side);
     this.kicksMeasured[kf.side]++;
+    this.announcePaid(this.judge.kicked(kf.side, (at.x - kf.x) * this.dirOf(kf.side)));
   }
 
   /**

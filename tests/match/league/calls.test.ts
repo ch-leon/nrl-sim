@@ -6,7 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
-import { CALLS, chipState, withAttackCall, type CallInput, type CoachCall } from '../../../src/match/league/calls';
+import { CALLS, CallJudge, chipState, withAttackCall, type CallInput, type CoachCall } from '../../../src/match/league/calls';
+import { callsLine } from '../../../src/ui/screens/matchOverlay';
 import { attackPlan } from '../../../src/match/league/presets';
 import type { SimEvent } from '../../../src/match/core/snapshot';
 import type { MatchLength } from '../../../src/match/league/rules';
@@ -60,6 +61,60 @@ describe('the coach’s chips (#73 §4)', () => {
   });
 });
 
+describe('calls that paid off (spec §3, last column)', () => {
+  const ev = (kind: string, side: 'home' | 'away', detail?: string): SimEvent => ({ tick: 1, kind, text: '', side, ...(detail ? { detail } : {}) });
+
+  it('a hit-up pays off on a carry that makes its metres; a shift on a line break', () => {
+    const j = new CallJudge();
+    j.make('home', 'hit-up', 'home', 1, 40);
+    expect(j.observe([], 42, true, false)).toEqual([{ side: 'home', call: 'hit-up', paid: false }]);
+    j.make('home', 'hit-up', 'home', 1, 43);
+    expect(j.observe([], 43 + CALLS.paid.hitUpM, true, false)[0]!.paid).toBe(true);
+    j.make('home', 'shift-left', 'home', 1, 50);
+    expect(j.observe([ev('line-break', 'home')], 55, false, false)[0]!.paid).toBe(true);
+    expect([j.made.home, j.paid.home]).toEqual([3, 2]);
+  });
+
+  it('measures the other way for a side attacking the other end', () => {
+    const j = new CallJudge();
+    j.make('away', 'hit-up', 'away', -1, 60);
+    expect(j.observe([], 60 - CALLS.paid.hitUpM - 1, true, false)[0]!.paid).toBe(true);
+  });
+
+  it('rush pays off on a turnover; hold on a set kept short; both fail on a try', () => {
+    const j = new CallJudge();
+    j.make('away', 'rush', 'home', 1, 30);
+    expect(j.observe([ev('error', 'home')], 32, false, false)[0]!.paid).toBe(true);
+    j.make('away', 'hold', 'home', 1, 30);
+    j.observe([], 40, true, false);
+    expect(j.observe([], 80, false, true)[0]!.paid).toBe(true); // the kick downfield isn't the set's ground
+    j.make('away', 'hold', 'home', 1, 30);
+    expect(j.observe([ev('try', 'home')], 100, false, false)[0]!.paid).toBe(false);
+    j.make('away', 'rush', 'home', 1, 30);
+    expect(j.observe([], 30, false, true)[0]!.paid).toBe(false); // called as the set ended: it lapses
+  });
+
+  it('a kick call pays off once kicked: regathered, a drop-out forced, or 30 m gained', () => {
+    const j = new CallJudge();
+    j.make('home', 'kick-early', 'home', 1, 50);
+    expect(j.observe([ev('regather', 'home')], 60, false, false)).toEqual([]); // not kicked yet
+    expect(j.observe([ev('kick', 'home')], 60, false, false)).toEqual([]);
+    expect(j.kicked('home', CALLS.paid.kickM + 1)[0]!.paid).toBe(true);
+    j.make('home', 'bomb', 'home', 1, 70);
+    j.observe([ev('kick', 'home')], 70, false, false);
+    expect(j.observe([], 95, false, true)).toEqual([]); // dead ball: the drop-out still to come
+    expect(j.observe([ev('drop-out', 'away')], 80, false, false)[0]!.paid).toBe(true);
+    j.make('home', 'run-it', 'home', 1, 80);
+    expect(j.observe([], 85, false, true)[0]!.paid).toBe(false);
+    j.make('home', 'field-goal', 'home', 1, 70);
+    expect(j.observe([ev('field-goal', 'home', 'good')], 70, false, false)[0]!.paid).toBe(true);
+  });
+
+  it('the stats line: paid of made each side, a dash for a side that made none', () => {
+    expect(callsLine({ home: 5, away: 0 }, { home: 2, away: 0 })).toBe('Calls paid off 2/5 / –');
+  });
+});
+
 describe('coach calls in the live sim', () => {
   it('no calls plays exactly as runMatch; the same seed and calls give the same match', () => {
     const r = runMatch(H, A, { seed: 3, length: SHORT });
@@ -107,5 +162,22 @@ describe('coach calls in the live sim', () => {
     expect(count(rush, 'break-tackle', 'away')).toBeGreaterThan(count(none, 'break-tackle', 'away'));
     expect(count(runs('home', 'run-it'), 'kick', 'home')).toBeLessThan(count(none, 'kick', 'home') * 0.7);
     expect(count(runs('home', 'kick-early'), 'kick', 'home')).toBeGreaterThan(count(none, 'kick', 'home') * 1.3);
+  }, 120_000);
+
+  it('judges every call it makes, and some pay off', () => {
+    for (const call of ['hit-up', 'shift-right', 'kick-early', 'rush', 'hold'] as const) {
+      const side = call === 'rush' || call === 'hold' ? 'away' : 'home';
+      let made = 0;
+      let paid = 0;
+      for (const seed of [1, 2, 3, 4]) {
+        const { sim, events } = play(seed, side, call);
+        expect(sim.callsMade[side], call).toBe(events.filter((e) => e.kind === 'coach-call').length);
+        expect(sim.callsPaid[side], call).toBe(events.filter((e) => e.kind === 'call-paid' && e.side === side && e.detail === call).length);
+        made += sim.callsMade[side];
+        paid += sim.callsPaid[side];
+      }
+      expect(paid, call).toBeGreaterThan(0);
+      expect(paid, call).toBeLessThan(made);
+    }
   }, 120_000);
 });

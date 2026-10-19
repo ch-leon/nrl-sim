@@ -517,9 +517,19 @@ say why ("not your ball", "one call a set", "tackles 3–4", "late in the set", 
 | `calls.shift.width` / `.cutOut` / `.edges` / `.sidePrefer` | `calls.ts` | +0.4 / +0.25 / +1 / +2 | Shift left / right: width and the edges, receivers on the called side preferred (left is +y going +x). |
 | `calls.kickEarlyFrom` | `calls.ts` | 2 | Kick early from this many tackles (3–4): grubber or chip inside 25 m, a long kick beyond. |
 | `calls.lastFrom` | `calls.ts` | 3 | Run it / Bomb from this many tackles: the last-tackle call is run or bomb. |
+| `calls.paid.hitUpM` / `.shiftM` / `.kickM` / `.rushM` / `.holdM` | `calls.ts` | 3 / 8 / 30 / 8 / 15 m | When a call paid off (the stats line, the commentary): a hit-up's play gains 3 m; a shift's 8 m (or breaks the line, or scores); a kick early or bomb gains 30 m (or is regathered, dropped, forces a drop-out, finds a 40/20, or scores); a rushed set's furthest tackle under 8 m, a held set's under 15 m (or the attack turns it over). Run it pays off on a try or a penalty to them, Field goal when it's over. Display only: the match is the same. |
 
 Rush and Hold set the defence to Rush or Compressed for the set; Field goal is offered only
 when the 2c field-goal rule is on, and then the kicker drops for goal.
+
+**Calls that paid off** (`CallJudge` in `calls.ts`, spec §3's last column; run
+`20261019-164411-calls-paid-off`, 12 whole matches a row, one side making the same call
+whenever it may): Kick early 65%, Rush 65%, Hold 74%, Hit-up 29%, Shift 23%, Bomb 10%, Run it
+6%. The spec's 25 m for Hold paid off 88% of the time (run `20261019-163753-calls-paid-off`;
+sets in this sim gain little: the tempo question in the sprint log), so it is 15 m; Rush and
+Shift had no metres in the spec. A rushed or held set the other side never ran (called as it
+ended) lapses unpaid. The judging rolls no dice: in that run every count but `callsPaid` was
+identical across the threshold variants.
 
 **Is a call a free win?** (run `20261019-153804-calls-strength-3`, 100 whole matches a row, even
 sides, one side making the same call whenever it may; no calls: home 51%): Rush 53%, Hold 55%,
