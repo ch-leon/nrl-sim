@@ -596,4 +596,26 @@ const CSS = `
 }
 .nrl-event-choice-label { font-weight: bold; }
 .nrl-event-choice-hint { font-size: 0.72rem; opacity: 0.85; white-space: normal; font-weight: normal; }
+.nrl-placebar {
+  pointer-events: auto;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(var(--nrl-hud-h, 0px) + 0.4rem);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: min(94vw, 560px);
+  background: #e8e0c8;
+  color: #1a1a2e;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+  padding: 0.3rem 0.4rem 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+.nrl-placebar[hidden] { display: none; }
+.nrl-placebar-text { flex: 1 1 auto; }
+.nrl-placebar-cancel { flex: 0 0 auto; }
 `;

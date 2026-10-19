@@ -316,6 +316,13 @@ announces them with the result toast at full-time.
   then pops in with a squash and stretch and a sparkle; an upgrade flashes scaffolding over the art
   swap. Presentation only (driven off the scene update event; state changes instantly, input is never
   blocked); `prefers-reduced-motion` skips the animations.
+- Move and demolish (GitHub #78): the facility popup offers Move (placement mode with that
+  facility's ghost at its level; `GROUNDS.MOVE_FEE_RATE` of the build cost, its own spot is a free
+  cancel) and Demolish (two taps; `GROUNDS.DEMOLISH_REFUND_RATE` of build + upgrades back). Rules and
+  money live in `src/world/placement.ts` (`moveFacility` / `demolishFacility`, ledger reasons
+  `move:<id>` / `demolish:<id>`). Demolition plays the construction backwards. GroundsScene re-blocks
+  the walk grid from state on every render, steps the manager out of a footprint, and grounds life
+  re-plans. A placement bar (`src/ui/placementBar.ts`) explains build/move mode and has Cancel.
 - Grounds life (GitHub #23): `src/world/groundsLife.ts` (pure, seeded by season+week)
   plans a capped cast (`MAX_AGENTS`) of squad players, staff and match-week fans
   with looping itineraries; `src/scenes/groundsLife.ts` renders them as sprites that

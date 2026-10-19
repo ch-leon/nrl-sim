@@ -10,6 +10,7 @@ import { footprintCentre, strokeFootprint } from './ghostPreview';
 import {
   constructionDuration,
   constructionFrame,
+  demolishFrame,
   footprintCorners,
   prefersReducedMotion,
   scaleAbout,
@@ -23,7 +24,7 @@ const SCAFFOLD_COLOR = 0xd9a441;
 type Pt = { x: number; y: number };
 
 interface Job {
-  kind: 'build' | 'upgrade';
+  kind: 'build' | 'upgrade' | 'demolish';
   sprite: Phaser.GameObjects.Image;
   def: FacilityDef;
   top: Pt;
@@ -53,6 +54,18 @@ export class BuildFx {
     if (constructionDuration(prefersReducedMotion()) === 0) return;
     this.start({ kind: 'build', sprite, def, top });
     sprite.setAlpha(0);
+  }
+
+  /**
+   * Construction in reverse (#78), then the sprite is destroyed. The caller hands
+   * over a sprite it no longer tracks; with reduced motion it goes at once.
+   */
+  demolish(sprite: Phaser.GameObjects.Image, def: FacilityDef, top: Pt): void {
+    if (prefersReducedMotion()) {
+      sprite.destroy();
+      return;
+    }
+    this.start({ kind: 'demolish', sprite, def, top });
   }
 
   /** Short scaffold flash and sparkle over the swap to the next level's art. */
@@ -113,7 +126,9 @@ export class BuildFx {
         return false;
       }
       j.elapsed += delta;
-      const done = j.kind === 'build' ? this.stepBuild(j, reduced) : this.stepUpgrade(j, reduced);
+      const done = j.kind === 'build' ? this.stepBuild(j, reduced)
+        : j.kind === 'demolish' ? this.stepDemolish(j, reduced)
+          : this.stepUpgrade(j, reduced);
       if (done) j.gfx.destroy();
       return !done;
     });
@@ -149,6 +164,24 @@ export class BuildFx {
       this.sparkleAt(centre);
       return true;
     }
+    this.drawScaffold(j, f.scaffoldAlpha);
+    if (f.phase === 'scaffold' && j.elapsed >= j.nextDust && this.emitters()) {
+      j.nextDust = j.elapsed + 220;
+      this.dust!.explode(4, centre.x + (Math.random() - 0.5) * TILE_W, centre.y);
+    }
+    return false;
+  }
+
+  private stepDemolish(j: Job, reduced: boolean): boolean {
+    const f = demolishFrame(j.elapsed, reduced);
+    const centre = footprintCentre(j.top, j.def);
+    if (f.phase === 'done') {
+      j.sprite.destroy();
+      return true;
+    }
+    j.sprite.setAlpha(f.buildingAlpha);
+    const p = scaleAbout(j.top, centre, f.scaleX, f.scaleY);
+    j.sprite.setScale(f.scaleX, f.scaleY).setPosition(p.x, p.y);
     this.drawScaffold(j, f.scaffoldAlpha);
     if (f.phase === 'scaffold' && j.elapsed >= j.nextDust && this.emitters()) {
       j.nextDust = j.elapsed + 220;

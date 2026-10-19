@@ -2,10 +2,11 @@ import Phaser from 'phaser';
 import { GRID_W, GRID_H, TILE_W, TILE_H } from '../config';
 import { gridToScreen, screenToGrid, depth, inBounds } from '../world/iso';
 import { CameraController } from '../world/camera';
-import { WalkGrid, findPath, type PathNode } from '../world/path';
+import { WalkGrid, findPath, nearestWalkable, type PathNode } from '../world/path';
 import {
   PlacementController,
   footprintTiles,
+  onPlacementMode,
   setActiveGroundsScene,
 } from '../world/placement';
 import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
@@ -94,6 +95,11 @@ export class GroundsScene extends Phaser.Scene {
   private placement!: PlacementController;
   // Rendered facility sprites keyed by PlacedFacility instance id (for re-render).
   private facilitySprites = new Map<string, Phaser.GameObjects.Image>();
+  // Last rendered grid origin per facility, to spot moves and removals (#78).
+  private facilitySpots = new Map<string, { x: number; y: number; defId: FacilityDefId }>();
+  // The facility picked up in move mode, drawn faded until it lands (#78).
+  private dimmedId: string | null = null;
+  private offPlacementMode: (() => void) | null = null;
   // Construction / upgrade animations (GitHub #24); created after the first render
   // so facilities already in the save don't animate on load.
   private buildFx?: BuildFx;
@@ -125,12 +131,17 @@ export class GroundsScene extends Phaser.Scene {
     this.offFacilityPlaced = bus.on('facility:placed', () => this.renderFacilities());
     this.offStateChanged = bus.on('state:changed', () => this.renderFacilities());
     this.life = new GroundsLife({ scene: this, walkGrid: () => this.walkGrid, cellToWorld: (gx, gy) => this.cellToWorld(gx, gy) });
+    // Leaving move mode (placed or cancelled) restores the picked-up facility.
+    this.offPlacementMode = onPlacementMode((mode) => { if (!mode) this.undim(); });
+    this.input.keyboard?.on('keydown-ESC', () => this.cancelPlacement());
 
     // Detach camera listeners + bus subs when the scene shuts down (Grounds -> Match).
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.camController.destroy();
       this.offFacilityPlaced?.();
       this.offStateChanged?.();
+      this.offPlacementMode?.();
+      this.placement.cancel();
       this.life?.destroy();
       this.life = null;
       setActiveGroundsScene(null);
@@ -146,7 +157,29 @@ export class GroundsScene extends Phaser.Scene {
 
   /** Enter facility placement mode (called from the DOM build menu via the registry). */
   enterPlacementMode(defId: FacilityDefId): void {
+    this.undim();
     this.placement.enterPlacementMode(defId);
+  }
+
+  /** Pick up a placed facility to move it (#78): the original fades until it lands. */
+  enterMoveMode(facilityId: string): void {
+    const f = getState().facilities.find((x) => x.id === facilityId);
+    if (!f) return;
+    this.undim();
+    this.placement.enterMoveMode(f);
+    this.dimmedId = f.id;
+    this.facilitySprites.get(f.id)?.setAlpha(0.35);
+  }
+
+  /** Leave build/move mode without changing anything. */
+  cancelPlacement(): void {
+    this.placement.cancel();
+  }
+
+  private undim(): void {
+    if (this.dimmedId === null) return;
+    this.facilitySprites.get(this.dimmedId)?.setAlpha(1);
+    this.dimmedId = null;
   }
 
   /** Grid -> world (screen) point with the centering offset baked in. */
@@ -250,6 +283,17 @@ export class GroundsScene extends Phaser.Scene {
       const key = facilityTextureKey(f.defId, f.level);
       let sprite = this.facilitySprites.get(f.id);
       const isNew = !sprite;
+      const was = this.facilitySpots.get(f.id);
+      const moved = !isNew && !!was && (was.x !== f.x || was.y !== f.y);
+      this.facilitySpots.set(f.id, { x: f.x, y: f.y, defId: f.defId });
+      if (moved) {
+        // Knock down a copy at the old spot while the real one goes up at the new one.
+        const old = this.cellToWorld(was.x, was.y);
+        const ghost = this.add.image(old.x, old.y, key).setOrigin(sprite!.originX, sprite!.originY).setDepth(sprite!.depth);
+        this.buildFx?.demolish(ghost, def, old);
+        if (this.dimmedId === f.id) this.dimmedId = null;
+        sprite!.setAlpha(1);
+      }
       if (!sprite) {
         sprite = this.add.image(world.x, world.y, key);
         this.facilitySprites.set(f.id, sprite);
@@ -261,21 +305,52 @@ export class GroundsScene extends Phaser.Scene {
       sprite.setOrigin(o.x, o.y);
       sprite.setPosition(world.x, world.y);
       sprite.setDepth(d);
-      if (isNew) this.buildFx?.construct(sprite, def, world);
+      if (isNew || moved) this.buildFx?.construct(sprite, def, world);
       else if (upgraded) this.buildFx?.upgrade(sprite, def, world);
-
-      // Block the footprint for pathfinding (safe to repeat).
-      for (const t of footprintTiles(def, f.x, f.y)) {
-        this.walkGrid.setBlocked(t.x, t.y, true);
-      }
     }
 
-    // Cull sprites for facilities no longer in state (defensive; no removal yet).
+    // Facilities no longer in state were demolished (#78): play it in reverse.
     for (const [id, sprite] of this.facilitySprites) {
-      if (!seen.has(id)) {
-        sprite.destroy();
-        this.facilitySprites.delete(id);
+      if (seen.has(id)) continue;
+      this.facilitySprites.delete(id);
+      const spot = this.facilitySpots.get(id);
+      this.facilitySpots.delete(id);
+      if (spot) this.buildFx?.demolish(sprite, FACILITY_CATALOG[spot.defId], this.cellToWorld(spot.x, spot.y));
+      else sprite.destroy();
+    }
+    if (this.dimmedId !== null && !this.facilitySprites.has(this.dimmedId)) this.dimmedId = null;
+
+    this.syncWalkGrid(facilities);
+  }
+
+  /**
+   * Block exactly the tiles under facilities (moves and demolitions free tiles),
+   * then step the manager out of any footprint and re-route a path that now
+   * crosses one. Grounds life re-plans on the same state change (#78).
+   */
+  private syncWalkGrid(facilities: readonly PlacedFacility[]): void {
+    const blocked = new Set<string>();
+    for (const f of facilities) {
+      for (const t of footprintTiles(FACILITY_CATALOG[f.defId], f.x, f.y)) blocked.add(`${t.x},${t.y}`);
+    }
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) this.walkGrid.setBlocked(x, y, blocked.has(`${x},${y}`));
+    }
+    if (!this.char) return;
+    const here = { x: this.charCell.gx, y: this.charCell.gy };
+    if (!this.walkGrid.isWalkable(here.x, here.y)) {
+      const out = nearestWalkable(this.walkGrid, here);
+      if (out) {
+        this.charCell = { gx: out.x, gy: out.y };
+        const w = this.cellToWorld(out.x, out.y);
+        this.char.setPosition(w.x, w.y + CHAR_FOOT_DY).setDepth(depth(out.x, out.y, CHAR_LAYER));
       }
+      this.path = [];
+      return;
+    }
+    if (this.path.some((n) => !this.walkGrid.isWalkable(n.x, n.y))) {
+      const goal = this.path[this.path.length - 1]!;
+      this.path = this.walkGrid.isWalkable(goal.x, goal.y) ? findPath(this.walkGrid, here, goal) : [];
     }
   }
 
