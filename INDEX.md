@@ -52,3 +52,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-171752-standard | standard | bae88cb | main | [report](runs/20261019-171752-standard/report.md) |
 | 20261019-172010-traits-whole-match | traits whole match | 5137c6c | fix/all-out-preset | [report](runs/20261019-172010-traits-whole-match/report.md) |
 | 20261019-172234-club-traits-whole-match | club traits whole match | 5137c6c | fix/all-out-preset | [report](runs/20261019-172234-club-traits-whole-match/report.md) |
+| 20261019-172508-standard | standard | ff8a5cb | main | [report](runs/20261019-172508-standard/report.md) |
