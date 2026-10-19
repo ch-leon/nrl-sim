@@ -110,7 +110,8 @@ describe('measuring and reporting', () => {
   it('marks the §7 bands and flags only changes beyond luck', () => {
     expect(bandMark('tries', 7)).toBe('✓');
     expect(bandMark('tries', 3)).toBe('↓');
-    expect(bandMark('tackles', 150)).toBe('↑');
+    expect(bandMark('tackles', 150)).toBe('✓');
+    expect(bandMark('tackles', 250)).toBe('↑');
     expect(bandMark('gassed', 4)).toBe('');
     expect(delta({ mean: 10, se: 0.5 }, { mean: 7, se: 0.5 })).toBe('+3.0*');
     expect(delta({ mean: 10, se: 2 }, { mean: 7, se: 2 })).toBe('+3.0');
