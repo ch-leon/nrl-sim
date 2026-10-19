@@ -8,6 +8,7 @@ import { bus } from '../core/events';
 import { earnMoney, spendMoney } from '../data/club';
 import { marketWage, overallRating } from '../data/player';
 import { CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { REP_BASELINE, REP_MAX } from './league';
 import type { SignResult } from './freeagency';
 
 /** Warning text when `weeks` is a warning threshold, else null. */
@@ -19,20 +20,37 @@ export function warnForWeeks(name: string, weeks: number): string | null {
 /** Market wage for a player's overall: data/player.ts owns it (#146); kept here for existing imports. */
 export { marketWage };
 
+/** The club a renewal is priced for (N6, #167): its reputation and the season. */
+export type RenewalClub = Pick<GameState, 'reputation' | 'season'>;
+
+/**
+ * What a club's standing adds to a renewal ask: +RENEW_REP_PREMIUM at reputation
+ * REP_MAX, nothing at REP_BASELINE and below, and RENEW_SEASON_INFLATION for
+ * every season after the first. A famous club's players know what they are
+ * worth to it, and wages creep up as the seasons pass.
+ */
+export function clubWageFactor(club: RenewalClub): number {
+  const standing = Math.max(0, Math.min(1, (club.reputation - REP_BASELINE) / (REP_MAX - REP_BASELINE)));
+  const seasons = Math.max(0, club.season - 1);
+  return (1 + standing * CONTRACTS.RENEW_REP_PREMIUM) * (1 + seasons * CONTRACTS.RENEW_SEASON_INFLATION);
+}
+
 /**
  * Base weekly wage a player asks for to renew: market wage for their overall,
- * moved ±RENEW_MORALE_SWING by morale (neutral morale = market, unhappy = dearer).
- * This is the stored (un-scaled) wage; the difficulty multiplier applies on top
- * wherever wages are paid or shown, exactly as in economy.weeklyWages.
+ * moved ±RENEW_MORALE_SWING by morale (neutral morale = market, unhappy = dearer),
+ * times the club's clubWageFactor. This is the stored (un-scaled) wage; the
+ * difficulty multiplier applies on top wherever wages are paid or shown, exactly
+ * as in economy.weeklyWages. The economy's automatic renewal at contract end asks
+ * the same.
  */
-export function renewalWage(p: Player): number {
+export function renewalWage(p: Player, club: RenewalClub): number {
   const t = Math.max(-1, Math.min(1, (MORALE.NEUTRAL - p.morale) / MORALE.NEUTRAL));
-  return Math.round(marketWage(p) * (1 + t * CONTRACTS.RENEW_MORALE_SWING));
+  return Math.round(marketWage(p) * (1 + t * CONTRACTS.RENEW_MORALE_SWING) * clubWageFactor(club));
 }
 
 /** What the player asks, as paid per week (difficulty-scaled). */
 export function renewalWeeklyCost(state: GameState, p: Player): number {
-  return Math.round(renewalWage(p) * difficultyMultipliers(state.settings.difficulty).wages);
+  return Math.round(renewalWage(p, state) * difficultyMultipliers(state.settings.difficulty).wages);
 }
 
 /** Upfront fee for renewing early: RENEW_FEE_WEEKS × the (scaled) new weekly wage. */
@@ -57,7 +75,7 @@ export function renewEarly(state: GameState, playerId: string): SignResult {
 
   spendMoney(fee, `renew:${playerId}`);
   const after = getState();
-  const wage = renewalWage(p);
+  const wage = renewalWage(p, state);
   setState({
     squad: after.squad.map((x) =>
       x.id === playerId ? { ...x, wage, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS } : x),
