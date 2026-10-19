@@ -95,7 +95,9 @@ export class GroundsLife {
     const s = getState();
     const facs = s.facilities.map((f) => `${f.id}:${f.defId}@${f.x},${f.y}`).join('|');
     const squad = s.squad.map((p) => `${p.id}${p.injuredWeeks > 0 ? '!' : p.morale < 40 ? 'l' : p.morale >= 75 ? 'h' : ''}`).join(',');
-    return `${s.season}/${s.week}/${this.matchWeek() ? 1 : 0}/${facs}/${squad}`;
+    // The kit design (#79) re-dresses the cast when it changes.
+    const kit = s.kit ? `${s.kit.pattern}${s.kit.trim}` : '';
+    return `${s.season}/${s.week}/${this.matchWeek() ? 1 : 0}/${facs}/${squad}/${kit}`;
   }
 
   private matchWeek(): boolean {

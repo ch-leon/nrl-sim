@@ -118,6 +118,23 @@ describe('adjacencyMult', () => {
     expect(adjacencyMult(b, all)).toBeCloseTo(1.1, 10);
   });
 
+  it('moving a facility breaks or creates the bonus (#78)', async () => {
+    const { moveFacility } = await import('../../src/world/placement');
+    const { setState } = await import('../../src/core/state');
+    createNewGame('Move FC', 3);
+    setState({
+      money: 100_000,
+      facilities: [pf({ id: 'a', defId: 'weightsRoom', x: 0, y: 0 }), pf({ id: 'b', defId: 'trainingPaddock', x: 2, y: 0 })],
+    });
+    const mult = () => adjacencyMult(getState().facilities[0]!, getState().facilities);
+    expect(mult()).toBeCloseTo(1.1, 10);
+    expect(moveFacility('b', 8, 8).ok).toBe(true); // breaks it
+    expect(mult()).toBe(1);
+    expect(moveFacility('b', 0, 2).ok).toBe(true); // creates it again, below
+    expect(mult()).toBeCloseTo(1.1, 10);
+    expect(getState().facilities[1]!.level).toBe(1);
+  });
+
   it('diagonal (corner-only) touch is NOT adjacent', () => {
     // 2x2 at (0,0) and 2x2 at (2,2) share only the corner point (2,2).
     const a = pf({ defId: 'weightsRoom', x: 0, y: 0 });

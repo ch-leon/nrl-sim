@@ -56,6 +56,7 @@ src/
     matchday.ts              # player match of the round; SQUAD_MIN forfeit (GitHub #4)
     aging.ts                 # season-rollover ageing + age retirement (GitHub #5)
     events.ts                # random events deck: draw, choices, modifiers (GitHub #75; cards in data/events.ts)
+    rivals.ts                # rival squads: generation, signings, ageing/development, strength (GitHub #74)
   match/                     # LIVE match sim (BAK-207) — replaces sim/engine + world/playback
     core/                    # sport-neutral: fixed-step clock, bodies, ball, snapshots, flag codes
     league/                  # rugby league (Nines) rules, roles, tackle contest, tactics
@@ -179,7 +180,8 @@ export interface LeagueState {
 
 export interface RivalClub {
   id: string; name: string; colors: [string, string]; // hex kit colours
-  strength: number;           // 1-100 baseline used to derive rival squads
+  strength: number;           // 1-100; for rivals, derived from `squad` (best 9 overall)
+  squad?: Player[];           // the rival's own players (#74); absent on the player's club entry
 }
 
 export interface GameState {
@@ -201,6 +203,14 @@ export interface GameState {
   rngSeed: number;            // advanced state of the seeded RNG
 }
 ```
+
+Rival squads (GitHub #74): every rival keeps a persistent `squad` (generated to match its
+strength at new game / v7→v8 migration, seeded per club so `rngSeed` is untouched). Weekly
+(tick order 59, before the free-agent refresh) rivals heal and may sign from `freeAgents`
+(weakest position first, under a salary cap). At rollover they age and retire through
+`aging.ts`, develop by age with a pull toward the league mean, and take on juniors; this
+replaced the old strength drift. Matchday builds a rival's sheet from its fit squad with
+`teamSheetFromSquad` (the strength sheet is the fallback), so the match API is unchanged.
 
 Random events (GitHub #75): the deck draws at most one card a week (tick order 58,
 after morale) from its own seeded stream `eventDeck.rng`, so it never moves `rngSeed`.
@@ -316,12 +326,25 @@ announces them with the result toast at full-time.
   then pops in with a squash and stretch and a sparkle; an upgrade flashes scaffolding over the art
   swap. Presentation only (driven off the scene update event; state changes instantly, input is never
   blocked); `prefers-reduced-motion` skips the animations.
+- Move and demolish (GitHub #78): the facility popup offers Move (placement mode with that
+  facility's ghost at its level; `GROUNDS.MOVE_FEE_RATE` of the build cost, its own spot is a free
+  cancel) and Demolish (two taps; `GROUNDS.DEMOLISH_REFUND_RATE` of build + upgrades back). Rules and
+  money live in `src/world/placement.ts` (`moveFacility` / `demolishFacility`, ledger reasons
+  `move:<id>` / `demolish:<id>`). Demolition plays the construction backwards. GroundsScene re-blocks
+  the walk grid from state on every render, steps the manager out of a footprint, and grounds life
+  re-plans. A placement bar (`src/ui/placementBar.ts`) explains build/move mode and has Cancel.
 - Grounds life (GitHub #23): `src/world/groundsLife.ts` (pure, seeded by season+week)
   plans a capped cast (`MAX_AGENTS`) of squad players, staff and match-week fans
   with looping itineraries; `src/scenes/groundsLife.ts` renders them as sprites that
   A*-walk the scene's `WalkGrid` and sort at layer 2 like the manager. Looks are the
   manager's frames palette-swapped (`src/art/grounds/people.ts`) from the player's
   match look + club kit, one `life-*` strip atlas per distinct look. Presentation only.
+- Kit designs (GitHub #79): `GameState.kit` (optional) holds the player's pattern, trim
+  and alternate strip. `main.ts` registers it with `setKitDesign` in `src/art/match/kit.ts`,
+  and `kitFromColors` consults that registry, so matches (including the away clash
+  switch in `resolveKits`), the crowd, grounds characters and card portraits all wear it
+  without knowing about designs. No design = the look derived from the club colours.
+  Patterns: plain / v / hoops / sleeves / stripes. Behind `FEATURES.cosmeticKits`.
 - Match textures (generated per match in MatchScene from `src/art/match/`, freed
   on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
   from club colours; away side switches to its alt strip on a clash), ball,

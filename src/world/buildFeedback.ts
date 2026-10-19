@@ -80,6 +80,17 @@ export function constructionFrame(elapsed: number, reduced: boolean): BuildFrame
   };
 }
 
+/**
+ * Demolition frame (GitHub #78): the construction played backwards. The building
+ * wobbles, vanishes behind scaffolding that then fades away; once done the
+ * building is fully transparent and the sprite can go.
+ */
+export function demolishFrame(elapsed: number, reduced: boolean): BuildFrame {
+  const total = SCAFFOLD_MS + POP_MS;
+  if (reduced || elapsed >= total) return { ...DONE, buildingAlpha: 0 };
+  return constructionFrame(total - Math.max(0, elapsed), false);
+}
+
 export interface UpgradeFrame {
   /** Scaffold flash opacity: full as the new art swaps in, then fading out. */
   flashAlpha: number;

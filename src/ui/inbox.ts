@@ -13,6 +13,7 @@ import { bus, type Events } from '../core/events';
 import { getState, type GameState } from '../core/state';
 import { cardById } from '../data/events';
 import { absWeek, chooseEvent, describeEffects, fillText } from '../systems/events';
+import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
 import { el, button, openModal, closeScreen } from './dom';
 
 /** How many messages the ring buffer holds before the oldest is overwritten. */
@@ -195,7 +196,7 @@ export function decisionViews(state: GameState): DecisionView[] {
   for (const ev of state.eventDeck.pending) {
     const card = cardById(ev.cardId);
     if (!card) continue;
-    const ctx = { subjectName: ev.subjectName, clubName: state.clubName };
+    const ctx = { subjectName: ev.subjectName, clubName: state.clubName, vars: ev.vars };
     out.push({
       id: ev.id,
       title: card.title,
@@ -203,7 +204,8 @@ export function decisionViews(state: GameState): DecisionView[] {
       stamp: `S${ev.season} · Week ${ev.week}`,
       weeksLeft: Math.max(1, ev.expiresAt - now),
       choices: card.choices.map((c, index) => ({
-        index, label: c.label, hint: describeEffects(c.effects), isDefault: index === card.defaultChoice,
+        index, label: c.label, isDefault: index === card.defaultChoice,
+        hint: ev.fee && c.effects.some((e) => e.kind === 'signSubject') ? `−$${ev.fee.toLocaleString('en-US')} fee, ${NEW_CONTRACT_WEEKS}-week deal` : describeEffects(c.effects),
       })),
     });
   }

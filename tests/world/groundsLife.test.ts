@@ -193,3 +193,26 @@ describe('moodFor', () => {
     expect(high.speedMul).toBeGreaterThan(mid.speedMul);
   });
 });
+
+describe('after a facility moves (#78)', () => {
+  it('re-plans around the new footprint and can use the freed tiles', () => {
+    const base = input();
+    const moved = base.facilities.map((f) => (f.id === 'f01' ? { ...f, x: 12, y: 14 } : f));
+    // Same rule as GroundsScene.syncWalkGrid: exactly the tiles under facilities are blocked.
+    const grid = new WalkGrid(W, H);
+    for (const f of moved) {
+      const { w, h } = FACILITY_CATALOG[f.defId].footprint;
+      for (let x = f.x; x < f.x + w; x++) for (let y = f.y; y < f.y + h; y++) grid.setBlocked(x, y, true);
+    }
+    const old = base.facilities.find((f) => f.id === 'f01')!;
+    expect(grid.isWalkable(old.x, old.y)).toBe(true);
+    const { w, h } = FACILITY_CATALOG[old.defId].footprint;
+    for (const a of planLife({ ...base, grid, facilities: moved })) {
+      for (const s of a.stops) {
+        expect(grid.isWalkable(s.cell.x, s.cell.y)).toBe(true);
+        const inside = s.cell.x >= 12 && s.cell.x < 12 + w && s.cell.y >= 14 && s.cell.y < 14 + h;
+        expect(inside).toBe(false);
+      }
+    }
+  });
+});

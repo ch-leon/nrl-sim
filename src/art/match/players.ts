@@ -192,6 +192,16 @@ const TORSO = [
   'jjjjjjj',
 ];
 
+// Vertical stripes (#79): T resolves to the trim.
+const TORSO_STRIPES = [
+  'lJJCCCJ',
+  'lTJTJTj',
+  'lTJTJTj',
+  'JTJTJTj',
+  'JTJTJTJ',
+  'jjjjjjj',
+];
+
 const SHORTS = ['PPPPPPP', 'pPPPPPp'];
 
 // ── Pose model ───────────────────────────────────────────────────────────────
@@ -445,6 +455,7 @@ function torsoPalette(kit: Kit): Palette {
     C: kit.trim,
     V: v,
     O: o,
+    T: kit.trim,
   };
 }
 
@@ -476,9 +487,10 @@ function paintUpright(kit: Kit, look: Look, pose: Pose): PixelBuffer {
   buf.sprite(SHORTS, shortsPal, cx - 3, shortsY);
 
   const tPal = torsoPalette(kit);
-  TORSO.forEach((row, r) => {
+  const torso = kit.pattern === 'stripes' ? TORSO_STRIPES : TORSO;
+  torso.forEach((row, r) => {
     // Lean shears the torso: top rows shift most.
-    const shift = Math.round((lean * (TORSO.length - 1 - r)) / (TORSO.length - 1));
+    const shift = Math.round((lean * (torso.length - 1 - r)) / (torso.length - 1));
     buf.sprite([row], tPal, cx - 3 + shift, torsoY + r);
   });
 

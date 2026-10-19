@@ -98,3 +98,16 @@ describe('scaleAbout', () => {
     expect(scaleAbout({ x: 0, y: 0 }, { x: 0, y: 100 }, 1, 0.8).y).toBeCloseTo(20);
   });
 });
+
+import { demolishFrame } from '../../src/world/buildFeedback';
+
+describe('demolishFrame (#78)', () => {
+  it('is the construction played backwards, ending with the building gone', () => {
+    const total = SCAFFOLD_MS + POP_MS;
+    expect(demolishFrame(0, false).buildingAlpha).toBe(1);
+    expect(demolishFrame(100, false)).toEqual(constructionFrame(total - 100, false));
+    expect(demolishFrame(total - 50, false).phase).toBe('scaffold');
+    expect(demolishFrame(total, false)).toMatchObject({ phase: 'done', buildingAlpha: 0 });
+    expect(demolishFrame(0, true)).toMatchObject({ phase: 'done', buildingAlpha: 0 });
+  });
+});

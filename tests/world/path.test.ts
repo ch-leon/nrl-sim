@@ -100,3 +100,22 @@ describe('findPath', () => {
     expect(a).toEqual(b);
   });
 });
+
+import { nearestWalkable } from '../../src/world/path';
+
+describe('nearestWalkable (#78)', () => {
+  it('returns the cell itself when walkable, else the closest free cell', () => {
+    const g = new WalkGrid(6, 6);
+    expect(nearestWalkable(g, { x: 2, y: 2 })).toEqual({ x: 2, y: 2 });
+    for (let y = 1; y <= 3; y++) for (let x = 1; x <= 3; x++) g.setBlocked(x, y, true);
+    const out = nearestWalkable(g, { x: 2, y: 2 })!;
+    expect(g.isWalkable(out.x, out.y)).toBe(true);
+    expect(Math.abs(out.x - 2) + Math.abs(out.y - 2)).toBe(2);
+  });
+
+  it('returns null on a fully blocked grid', () => {
+    const g = new WalkGrid(2, 2);
+    for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) g.setBlocked(x, y, true);
+    expect(nearestWalkable(g, { x: 0, y: 0 })).toBeNull();
+  });
+});

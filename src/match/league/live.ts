@@ -291,6 +291,9 @@ export class LiveSim implements MatchSim {
   finished = false;
   private readonly rng: Rng;
   private readonly players: Player[];
+  /** Each side's nine, kept once (side() is called many times a tick). */
+  private readonly homeNine: readonly Player[];
+  private readonly awayNine: readonly Player[];
   private readonly names: Record<Side, string>;
   /** How each side plays (BAK-208 §5). */
   readonly tactics: Record<Side, TeamTactics>;
@@ -348,6 +351,8 @@ export class LiveSim implements MatchSim {
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
+    this.homeNine = this.players.slice(0, PLAYERS);
+    this.awayNine = this.players.slice(PLAYERS);
     this.bench = { home: benchOf(home), away: benchOf(away) };
     this.rotation = { home: home.rotation ?? DEFAULT_ROTATION, away: away.rotation ?? DEFAULT_ROTATION };
     const energy = Math.max(0, Math.min(1, opts.energy ?? 1));
@@ -504,8 +509,9 @@ export class LiveSim implements MatchSim {
     p.body.vel = { x: 0, y: 0 };
     p.slide = slideTo ? { from: { ...p.body.pos }, to: clampToGround(slideTo, 0.5), t0: this.tick, t1: this.tick + ticks } : null;
   }
-  private side(s: Side): Player[] {
-    return s === 'home' ? this.players.slice(0, PLAYERS) : this.players.slice(PLAYERS);
+  /** A side's nine (the same array every call: copy before sorting or changing it). */
+  private side(s: Side): readonly Player[] {
+    return s === 'home' ? this.homeNine : this.awayNine;
   }
 
   // ── Tick ──────────────────────────────────────────────────────────────────
@@ -683,6 +689,12 @@ export class LiveSim implements MatchSim {
   /** Seconds of match time gone since the kick-off (the clock, both halves). */
   get matchSeconds(): number {
     return (this.half - 1) * this.length.halfMinutes * 60 + this.clockTicks * TICK_S;
+  }
+
+  /** Men on the carrier in the wrestle now, 0 when there is none (headless runs; the snapshot has the rest). */
+  get wrestleMen(): number {
+    const ph = this.phase;
+    return ph.kind === 'tackle' && ph.wrestle ? ph.wrestle.men.length : 0;
   }
 
   /** This tick's events without building a snapshot (headless runs). */
@@ -1517,8 +1529,8 @@ export class LiveSim implements MatchSim {
     // A defender already behind the carrier can only chase; the ones in front
     // of him are the tackle, so they rank first.
     const behind = (d: Player): boolean => (d.body.pos.x - h.body.pos.x) * this.dir < 0;
-    const cost = (d: Player): number => dist(d.body.pos, h.body.pos) + (behind(d) ? 60 : 0) + (this.markers.includes(this.indexOf(d)) ? 8 : 0);
-    free.sort((a, b) => cost(a) - cost(b));
+    const costs = new Map(free.map((d) => [d, dist(d.body.pos, h.body.pos) + (behind(d) ? 60 : 0) + (this.markers.includes(this.indexOf(d)) ? 8 : 0)]));
+    free.sort((a, b) => costs.get(a)! - costs.get(b)!);
     const ahead = free.filter((d) => !behind(d)).length;
     // A broken line (two or fewer still in front) sends everyone in range after him.
     const n = ahead <= 2 ? 4 : free[2] && dist(free[2].body.pos, h.body.pos) < 5 ? 3 : 2;

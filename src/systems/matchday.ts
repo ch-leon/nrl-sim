@@ -11,6 +11,8 @@ import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/en
 import type { MatchInjury, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { applyMatchStats } from './stats';
+import { injureRivalPlayers } from './rivals';
+import { ON_FIELD } from '../config';
 
 /**
  * Apply sim-emitted injuries onto the player squad (by id, then name) and
@@ -59,7 +61,25 @@ function sheetFor(clubId: string): TeamSheet {
   }
   const rival = state.league.clubs.find((c) => c.id === clubId);
   if (!rival) throw new Error(`unknown club ${clubId}`);
+  // Rivals with a squad (#74) field their own players through the same sheet
+  // builder as the player's club; difficulty scales the aggregates. Too few fit
+  // players (or an old rival with none) falls back to the strength-based sheet.
+  const fit = (rival.squad ?? []).filter((p) => p.injuredWeeks <= 0);
+  if (fit.length >= ON_FIELD) {
+    return scaleSheet(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors), state.settings.difficulty);
+  }
   return teamSheetFromRival(scaleRivalStrength(rival, state.settings.difficulty));
+}
+
+/** Scale a squad-built rival sheet's aggregates by the difficulty's rival multiplier. */
+export function scaleSheet(sheet: TeamSheet, difficulty: Difficulty | undefined): TeamSheet {
+  const mult = difficultyMultipliers(difficulty).rivalStrength;
+  if (mult === 1) return sheet;
+  const scale = (n: number): number => Math.round(Math.min(100, Math.max(1, n * mult)));
+  return {
+    ...sheet,
+    attack: scale(sheet.attack), defense: scale(sheet.defense), kicking: scale(sheet.kicking), fitness: scale(sheet.fitness),
+  };
 }
 
 /** Fit (non-injured) squad size. */
@@ -138,6 +158,12 @@ export function registerPlayerMatchSystem(): void {
 
     // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
     const injuryToasts = applyMatchInjuries(sim.injuries);
+    // The rival's injuries land on its own squad (#74), silently.
+    const rivalHurt = sim.injuries.filter((i) => i.teamId !== PLAYER_ID && i.playerId);
+    if (rivalHurt.length > 0) {
+      const lg = getState().league;
+      setState({ league: { ...lg, clubs: injureRivalPlayers(lg.clubs, rivalHurt) } });
+    }
 
     const playerHome = fixture.homeId === PLAYER_ID;
     const [us, them] = playerHome

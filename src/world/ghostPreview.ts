@@ -41,8 +41,9 @@ export class GhostPreview {
     scene: Phaser.Scene,
     defId: FacilityDefId,
     private def: FacilityDef,
+    level: 1 | 2 | 3 = 1, // a moved facility keeps its level art (#78)
   ) {
-    this.sprite = scene.add.image(0, 0, facilityTextureKey(defId, 1));
+    this.sprite = scene.add.image(0, 0, facilityTextureKey(defId, level));
     const o = facilityOrigin(def.footprint, this.sprite.height);
     this.sprite.setOrigin(o.x, o.y);
     this.gfx = scene.add.graphics();
