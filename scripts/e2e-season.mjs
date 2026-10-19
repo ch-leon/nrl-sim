@@ -353,7 +353,9 @@ async function play() {
   await step('live-toggle', async (rec) => {
     await tap('.nrl-nav .nrl-btn:has-text("Fixtures")');
     await page.waitForSelector('.nrl-league');
-    const box = page.locator('.nrl-live-toggle input[type="checkbox"]');
+    // Two toggles share the class and both mention a live match (hasText is a case-insensitive
+    // substring match), so pick the "Live match (beta)" label by a case-sensitive regex.
+    const box = page.locator('.nrl-live-toggle', { hasText: /Live match \(beta\)/ }).first().locator('input[type="checkbox"]');
     if (!(await box.count())) return 'no live-match setting on the Fixtures screen';
     await press(box);
     liveOn = await page.evaluate(() => window.__nrlState?.().settings.liveMatch === true);
@@ -371,14 +373,27 @@ async function play() {
     if (!clock || clock === '00:00') throw new Error(`the live match clock did not move (${clock})`);
     rec.notes.push(`×8, clock ${clock}`);
   });
+  // Coach calls (#73): the chips under the scoreboard in a live match. Tap the first
+  // one on offer and see it lit for the set; skipped when there are no chips.
+  await step('coach-call', async (rec) => {
+    if (!liveOn) return 'skipped';
+    const chips = page.locator('.nrl-mo-calls .nrl-btn:not([disabled])');
+    if (!(await chips.count())) return 'no coach-call chips on the match screen';
+    const chip = chips.first();
+    const call = await chip.getAttribute('data-call');
+    await press(chip);
+    await page.waitForSelector(`.nrl-mo-calls .nrl-btn[data-call="${call}"][data-made]`, { timeout: 5000 });
+    rec.notes.push(`called ${call}`);
+  });
   await step('live-fulltime', async (rec) => {
     if (!liveOn) return 'skipped';
     await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 20000 });
     await wait(500);
     const shown = (await page.locator('.nrl-mo-score').textContent())?.trim();
-    const s = await save();
-    const f = s.league.fixtures.find((x) => x.round === s.week - 1 && (x.homeId === 'player' || x.awayId === 'player'));
+    // A live match holds the week until full time (#73), so read the live state, not the slot.
+    const s = (await page.evaluate(() => window.__nrlState?.() ?? null)) ?? (await save());
+    const f = [...s.league.fixtures].reverse().find((x) => x.result && (x.homeId === 'player' || x.awayId === 'player'));
     const saved = f?.result ? `${f.result.homeScore} – ${f.result.awayScore}` : '(no result saved)';
     rec.notes.push(`overlay ${shown}, saved ${saved}`);
     if (shown !== saved) throw new Error(`the overlay shows ${shown} but the saved result is ${saved}`);
