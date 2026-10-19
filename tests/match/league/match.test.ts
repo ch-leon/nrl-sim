@@ -75,7 +75,7 @@ describe('the match clock, halves and full time', () => {
     for (const g of games) {
       const kinds = g.events.map((x) => x.e.kind);
       expect(kinds[0]).toBe('kickoff');
-      expect(g.events[0]!.e.side).toBe('away');
+      expect(['home', 'away']).toContain(g.events[0]!.e.side); // a coin toss (Phase 3)
       expect(kinds.filter((k) => k === 'siren')).toHaveLength(2);
       expect(kinds.filter((k) => k === 'half-time')).toHaveLength(1);
       expect(kinds[kinds.length - 1]).toBe('full-time');
@@ -97,10 +97,12 @@ describe('the match clock, halves and full time', () => {
 
   it('the side that received first kicks off the second half, and the ends swap', () => {
     const tryX: Record<string, number[]> = { 'home-1': [], 'away-1': [], 'home-2': [], 'away-2': [] };
+    const openers = new Set<string>();
     for (const g of games) {
       const ht = g.events.findIndex((x) => x.e.kind === 'half-time');
       const next = g.events.slice(ht).find((x) => x.e.kind === 'kickoff')!;
-      expect(next.e.side).toBe('home');
+      expect(next.e.side).not.toBe(g.events[0]!.e.side); // whoever received the opening kick-off
+      openers.add(g.events[0]!.e.side!);
       expect(next.snap.clock!.half).toBe(2);
       for (const { e, snap } of g.events.filter((x) => x.e.kind === 'try')) tryX[`${e.side}-${snap.clock!.half}`]!.push(snap.ball.x);
     }
@@ -110,6 +112,13 @@ describe('the match clock, halves and full time', () => {
     for (const x of tryX['home-2']!) expect(x).toBeLessThan(50);
     for (const x of tryX['away-2']!) expect(x).toBeGreaterThan(50);
     expect(Object.values(tryX).flat().length).toBeGreaterThan(4);
+    // The toss goes both ways across seeds.
+    for (let seed = 4; openers.size < 2 && seed < 40; seed++) {
+      const sim = new LiveSim(sheet('H', 60), sheet('A', 60), seed);
+      while (!sim.tickEvents.some((e) => e.kind === 'kickoff')) sim.step();
+      openers.add(sim.tickEvents.find((e) => e.kind === 'kickoff')!.side!);
+    }
+    expect(openers.size).toBe(2);
   });
 
   it('the clock stops from a try to the restart', () => {

@@ -158,8 +158,9 @@ describe('traits in the live sim', () => {
     expect(count(gamb, 'intercept', 'away')).toBeGreaterThan(count(ctl2, 'intercept', 'away'));
     expect(count(gamb, 'gamble', 'away')).toBeGreaterThan(0);
     expect(count(ctl2, 'gamble')).toBe(0);
-    const razz = events(sheet('H', () => T('razzleDazzle', 3)), sheet('A'), SEEDS, SECS);
-    expect(count(razz, 'offload', 'home')).toBeGreaterThan(count(control, 'offload', 'home') * 1.5);
+    // Twice the seeds: a wild offload spilled is rare enough that one sample of short matches can miss it.
+    const razz = events(sheet('H', () => T('razzleDazzle', 3)), sheet('A'), SEEDS * 2, SECS);
+    expect(count(razz, 'offload', 'home')).toBeGreaterThan(count(ctl2, 'offload', 'home') * 1.5);
     expect(razz.some((e) => e.kind === 'error' && e.text.includes('wild offload'))).toBe(true);
   });
   it('a Playmaker throws cut-out balls; a Big Boot is named on the kick', () => {

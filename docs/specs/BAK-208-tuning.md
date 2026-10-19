@@ -437,3 +437,37 @@ standard plan 0.1–0.55 by scenario). The standard plan (run `20261019-131950-s
 up about 2 a match (the ball lost in contact), still inside §7; nothing else beyond luck.
 
 Tests: `tests/match/league/weather.test.ts`.
+
+## 19. How much a rating gap counts (BAK-207 Phase 3, #87)
+
+Every contact, sprint, step and pass leans to the better player, and over a match's two
+hundred contacts the leans compound: with the sheets as written a 10-point gap won 97% and a
+20-point gap every match, 70 v 35 by about 19 tries (the §7 target is about 70% at 20).
+Before a match each side's stats are moved together toward the match average, keeping
+`spread` of the gap between the sides: a 20-point gap plays as 4. Every player keeps his
+edge over his teammates (a side's star still beats its weakest man by as much), and two
+weak sides still play like weak sides (the move is toward the two sides' own average).
+
+The opening kick-off is now a seeded coin toss: home always received it before, and between
+even sides home then won only a third of matches (80 matches with away receiving: 50%).
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `rating.spread` | `src/match/league/spread.ts` | 0.2 | Share of the gap between the sides' average stats that is kept (1: as written). |
+
+Measured (run `20261019-135855-spread-confirm`, 80 whole matches a row; before: `20261019-134245-gaps`):
+
+| Matchup | Stronger side wins, before → after | Tries, before → after |
+|---|---|---|
+| 60 v 60 | home 33% → 54% (the coin toss) | 5.5 → 5.6 |
+| 70 v 50 / 50 v 70 | 100% → 74% / 81% | 11.3 → 5.7 |
+| 70 v 35 | 100% → 93% | 18.5 → 5.9 |
+| Stingrays (68) v Larrikins (35) | 100% → 90% | 18.2 → 6.3 |
+| Wolves (71) v Crocs (60) | — → 60% | — → 5.4 |
+
+The sweep (`20261019-135126-spread-2`, 40 a row): 0.3 gave 95% at a 20-point gap, 0.25 84%,
+0.2 72%, 0.15 69%. Team-wide stat gaps all count for less, by design: in the standard plan
+stamina 30 v 80 now goes 40% to the low-stamina side (was 10%), fliers v stayers 30% (was
+35%), and 70 v 50 lost 6 tries a match. The legs mechanic test plays its sheets as written.
+
+Tests: `tests/match/league/spread.test.ts`; kick-off tests in `live.test.ts`, `match.test.ts`.
