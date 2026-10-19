@@ -32,3 +32,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-143714-standard | standard | b4cd286 | main | [report](runs/20261019-143714-standard/report.md) |
 | 20261019-145023-coach-calls | coach calls | 87d5c63 (uncommitted changes) | feat/coach-calls | [report](runs/20261019-145023-coach-calls/report.md) |
 | 20261019-145713-standard | standard | 0a9fd0b | main | [report](runs/20261019-145713-standard/report.md) |
+| 20261019-151241-standard | standard | 2a3f74c | main | [report](runs/20261019-151241-standard/report.md) |
