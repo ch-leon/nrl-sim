@@ -396,13 +396,14 @@ export class LiveSim implements MatchSim {
   private sirenAt = 0;
   /** 1 in the first half (home attacks +x), -1 after the ends swap. */
   private ends: 1 | -1 = 1;
-  /** The side that received the opening kick-off kicks off the second half. */
-  private readonly firstReceiver: Side = 'home';
+  /** The side that received the opening kick-off kicks off the second half: a coin toss (Phase 3; always home before, and home then won a third of even matches). */
+  private readonly firstReceiver: Side;
 
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
     // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average.
     [home, away] = spreadSheets(home, away);
     this.rng = makeRng(seed);
+    this.firstReceiver = this.rng.next() < 0.5 ? 'home' : 'away';
     this.weather = opts.weather ?? 'clear';
     this.wx = weatherEffect(this.weather);
     this.injuryRate = opts.injuryRate ?? 1;

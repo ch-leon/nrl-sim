@@ -199,9 +199,12 @@ describe('LiveSim', () => {
     const { kinds, snaps } = collect(factory(1), 8);
     expect(kinds[0]).toBe('kickoff');
     expect(kinds).toContain('set-start');
+    // The coin toss decides who kicks off (Phase 3); the other side's fullback takes it.
+    const kicker = snaps.flatMap((s) => s.events).find((e) => e.kind === 'kickoff')!.side!;
+    const receiver = kicker === 'home' ? 'away' : 'home';
     const catchTick = snaps.findIndex((s) => s.events.some((e) => e.kind === 'set-start'));
-    expect(snaps[catchTick]!.ball.holder).toEqual({ side: 'home', slot: 0 });
-    expect(snaps[catchTick]!.label).toMatch(/^H ball/);
+    expect(snaps[catchTick]!.ball.holder).toEqual({ side: receiver, slot: 0 });
+    expect(snaps[catchTick]!.label).toMatch(receiver === 'home' ? /^H ball/ : /^A ball/);
   });
 
   it('every carry ends in a tackle, a break, an error or a kick — and a tackle always plays the ball', () => {
