@@ -27,3 +27,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-142127-offloads | offloads | 4895f01 | feat/offloads | [report](runs/20261019-142127-offloads/report.md) |
 | 20261019-142316-standard | standard | 4895f01 (uncommitted changes) | feat/offloads | [report](runs/20261019-142316-standard/report.md) |
 | 20261019-141554-tempo-2 | tempo 2 | 4895f01 | feat/line-breaks | [report](runs/20261019-141554-tempo-2/report.md) |
+| 20261019-143118-standard | standard | 29e40a3 | main | [report](runs/20261019-143118-standard/report.md) |
