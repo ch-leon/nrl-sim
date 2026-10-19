@@ -130,6 +130,12 @@ Tests: `tests/match/league/kicks.test.ts`.
 | `live.cutOutPerLevelM` / `live.playmakerWidth` / `live.cutOutChance` | `live.ts` | 4 m / 0.25 / 15% per level | Playmaker reach, width bias and deliberate cut-out. |
 | Lab `stars` mode | `src/match/lab/sheets.ts` | two level-III fit traits each | Stress test; `#lab?traits=stars`. |
 
+**Whole matches, Phase 3** (no change made): a club's own generated traits against the same
+club with none, 160 matches each both ways round (`20261019-172234-club-traits-whole-match`):
+the traited side wins 54% (Reapers, 70), 61% (Mariners, 52), 47% (Larrikins, 42) — an edge,
+with team strength still deciding. Every man with two level-3 traits ("stars", the lab's
+showcase) wins 84% (`20261019-172010-traits-whole-match`).
+
 Tests: `tests/data/traits.test.ts`, `tests/match/league/traits.test.ts`.
 
 ## 8. Tactics (§5)
