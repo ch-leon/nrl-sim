@@ -6,7 +6,11 @@
 //   advance (the hand-off to the match scene, then Skip to full time and Back to
 //   Club); ×4 advances (the tick pipeline, per week); "to finals" and "to season
 //   end" (the rollover); the frame rate on the grounds; and the bundle size.
-// Writes e2e-output/perf/perf.json and prints a markdown table (the budget rows in
+// Clicks are dispatched from inside the page and timed with performance.now(), so
+// a synchronous handler (the week tick, the multi-week advance) is measured on its
+// own, without the test driver's overhead; the async moments (scene hand-offs,
+// the first paint) are timed from the click to the condition. Writes
+// e2e-output/perf/perf.json and prints a markdown table (the budget rows in
 // docs/status/2026-10-qa.md come from it). Exit 1 only if the game broke on the way.
 //
 //   npm run e2e:perf
@@ -71,22 +75,39 @@ function bundleSize() {
 }
 
 // ── Measurements ───────────────────────────────────────────────────────────────
-const result = { throttle: THROTTLE, size: `${W}x${H}`, timings: {}, errors: [], bundle: bundleSize() };
+const result = { throttle: THROTTLE, size: `${W}x${H}`, timings: {}, errors: [], bundle: null };
 let page;
 const state = () => page.evaluate(() => window.__nrlState?.() ?? null);
 const wait = (ms) => page.waitForTimeout(ms);
 const toastsGone = () => page.waitForFunction(() => document.querySelectorAll('.nrl-toast').length === 0, null, { timeout: 8000 }).catch(() => {});
 
-/** Time `fn` (ms, wall clock); record it under `name` with any notes. */
+/** Time `fn` (ms, wall clock); record it under `name` with any notes. A number returned by `fn` replaces the wall clock. */
 async function timed(name, fn) {
   const t0 = Date.now();
-  let notes;
-  try { notes = await fn(); } catch (err) { result.errors.push(`${name}: ${err.message.split('\n')[0]}`); notes = 'FAILED'; }
-  const ms = Date.now() - t0;
+  let notes, inPage;
+  try {
+    const r = await fn();
+    if (typeof r === 'number') inPage = r; else if (r && typeof r === 'object') { inPage = r.ms; notes = r.notes; } else notes = r;
+  } catch (err) { result.errors.push(`${name}: ${err.message.split('\n')[0]}`); notes = 'FAILED'; }
+  const ms = inPage ?? Date.now() - t0;
   result.timings[name] = { ms, ...(notes ? { notes } : {}) };
   log(`${String(ms).padStart(6)} ms  ${name}${notes ? `  (${notes})` : ''}`);
   return ms;
 }
+
+/**
+ * Click the nth element matching `selector` (optionally the one whose text is `text`)
+ * from inside the page and return how long its handlers ran, in ms: the cost of a
+ * synchronous handler such as the week tick, without the driver's own overhead.
+ */
+const clickTimed = (selector, { nth = 0, text } = {}) => page.evaluate(({ selector, nth, text }) => {
+  const all = [...document.querySelectorAll(selector)].filter((e) => !text || e.textContent?.trim() === text);
+  const el = all[nth];
+  if (!el) throw new Error(`no ${selector}${text ? ` "${text}"` : ''}`);
+  const t0 = performance.now();
+  el.click();
+  return Math.round(performance.now() - t0);
+}, { selector, nth, text });
 
 /** Answer every waiting decision card (choice 0) so a multi-week advance can run. */
 async function answerCards() {
@@ -105,14 +126,17 @@ async function answerCards() {
   return n;
 }
 
-/** One multi-week advance (menu index 0 = ×4, 1 = to finals, 2 = to season end); returns weeks covered. */
+/**
+ * One multi-week advance (menu index 0 = ×4, 1 = to finals, 2 = to season end):
+ * the menu item's handler runs every week synchronously, so its click time is the
+ * cost of those ticks. Returns { ms, weeks }.
+ */
 async function advance(index) {
   const before = await state();
-  await page.locator('.nrl-hud-menu-toggle').tap();
-  await page.locator(`.nrl-hud-menu-item >> nth=${index}`).tap();
-  await page.waitForFunction(({ w, s }) => { const n = window.__nrlState?.(); return n && (n.week !== w || n.season !== s); }, { w: before.week, s: before.season });
+  await clickTimed('.nrl-hud-menu-toggle');
+  const ms = await clickTimed('.nrl-hud-menu-item', { nth: index });
   const after = await state();
-  return (after.season - before.season) * 27 + (after.week - before.week);
+  return { ms, weeks: (after.season - before.season) * 27 + (after.week - before.week) };
 }
 
 async function run() {
@@ -133,7 +157,7 @@ async function run() {
   });
   await timed('Start → grounds (textures painted, HUD up)', async () => {
     await page.fill('[data-nrl-clubname]', 'Budget FC');
-    await page.locator('[data-nrl-start]').tap();
+    await clickTimed('[data-nrl-start]');
     await page.waitForFunction(() => document.querySelector('.nrl-hud') && window.__nrlGame?.scene.isActive('Grounds'));
   });
   if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
@@ -150,42 +174,49 @@ async function run() {
   await page.screenshot({ path: join(OUT, 'grounds.png') });
 
   // A week advance: the match week hands over to the match scene.
+  let tickMs = 0;
   await timed('Advance Week → match scene (hand-off)', async () => {
-    await page.locator('.nrl-hud .nrl-btn:has-text("Advance Week")').tap();
+    tickMs = await clickTimed('.nrl-hud .nrl-btn', { text: 'Advance Week' });
     await page.waitForSelector('.nrl-mo-controls');
+    return `of which the tick itself ${tickMs} ms`;
   });
   await page.screenshot({ path: join(OUT, 'match.png') });
   await timed('Skip → full time', async () => {
-    await page.locator('.nrl-mo-controls .nrl-btn:has-text("Skip")').tap();
+    await clickTimed('.nrl-mo-controls .nrl-btn', { text: 'Skip' });
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")');
   });
   await timed('Back to Club → grounds', async () => {
     const potm = page.locator('.nrl-modal .nrl-btn:has-text("Close")');
     if (await potm.count()) await potm.first().tap();
-    await page.locator('.nrl-btn:has-text("Back to Club")').tap();
+    await clickTimed('.nrl-btn', { text: 'Back to Club' });
     await page.waitForFunction(() => document.querySelector('.nrl-hud .nrl-btn') && window.__nrlGame?.scene.isActive('Grounds'));
   });
   await toastsGone();
 
   // ×4 advances: the tick pipeline per week (stops early on cards and injuries, so
   // the weeks covered are counted and a per-week figure reported).
-  const weeks = [];
+  let msSum = 0, weekSum = 0;
   for (let i = 0; i < 3; i++) {
     await answerCards();
-    const ms = await timed(`×4 advance #${i + 1}`, async () => `${await advance(0)} weeks`);
-    const n = Number(result.timings[`×4 advance #${i + 1}`].notes?.split(' ')[0] ?? 0);
-    if (n > 0) weeks.push(ms / n);
+    await timed(`×4 advance #${i + 1}`, async () => {
+      const a = await advance(0);
+      msSum += a.ms; weekSum += a.weeks;
+      return { ms: a.ms, notes: `${a.weeks} week${a.weeks === 1 ? '' : 's'}` };
+    });
     await toastsGone();
   }
-  const perWeek = weeks.length ? Math.round(weeks.reduce((t, x) => t + x, 0) / weeks.length) : null;
-  result.timings['tick per week (×4 advances)'] = { ms: perWeek };
+  const perWeek = weekSum ? Math.round(msSum / weekSum) : null;
+  result.timings['tick per week (×4 advances)'] = { ms: perWeek, notes: `${weekSum} weeks in ${msSum} ms` };
   log(`${String(perWeek).padStart(6)} ms  tick per week (×4 advances)`);
 
   // To the finals, then to the season end: the last call carries the rollover.
   let guard = 0;
   while ((await state()).week < 25 && guard++ < 30) {
     await answerCards();
-    await timed(`to finals (call ${guard})`, async () => `${await advance(1)} weeks, now week ${(await state()).week}`);
+    await timed(`to finals (call ${guard})`, async () => {
+      const a = await advance(1);
+      return { ms: a.ms, notes: `${a.weeks} weeks, now week ${(await state()).week}` };
+    });
     await toastsGone();
   }
   guard = 0;
@@ -194,7 +225,10 @@ async function run() {
     await answerCards();
     const name = `to season end (call ${guard})`;
     const before = await state();
-    const ms = await timed(name, async () => `${await advance(2)} weeks`);
+    const ms = await timed(name, async () => {
+      const a = await advance(2);
+      return { ms: a.ms, notes: `${a.weeks} weeks` };
+    });
     const after = await state();
     if (after.season > before.season) rolloverCall = { ms, weeks: 27 - before.week + 1 };
     await toastsGone();
@@ -212,6 +246,7 @@ async function run() {
 
 try {
   await startServer();
+  result.bundle = bundleSize(); // after the build
   await run();
 } catch (err) {
   result.errors.push(`script: ${err.message}`);
