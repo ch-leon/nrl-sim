@@ -2,6 +2,7 @@
 //
 //   npm run soak                         5 seasons × 20 seeds, idle + managed + idle Hard, plus old saves
 //   npm run soak -- --seasons 3 --seeds 5
+//   npm run soak -- --difficulties easy,normal,hard   idle + managed on each difficulty (#148)
 //   npm run soak -- --json out.json      also write every run's samples to a file
 //
 // Prints one row per run, then the per-season averages by mode (the player's
@@ -10,6 +11,7 @@
 // problem found; exits 1 if there were any. The checks live in src/qa/soak.ts.
 import { writeFileSync } from 'node:fs';
 import { runSoak, summariseSeasons, OLD_VERSIONS, type SoakResult } from '../src/qa/soak';
+import { DIFFICULTIES, type Difficulty } from '../src/config';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const opt = (name: string, dflt: number): number => {
@@ -18,13 +20,24 @@ const opt = (name: string, dflt: number): number => {
 };
 const seasons = opt('seasons', 5);
 const seeds = opt('seeds', 20);
-const jsonIdx = args.indexOf('--json');
-const jsonOut = jsonIdx >= 0 ? args[jsonIdx + 1] : undefined;
+const str = (name: string): string | undefined => {
+  const i = args.indexOf(`--${name}`);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+const jsonOut = str('json');
+// Without --difficulties: idle and managed on Normal plus idle on Hard (the original soak).
+const difficulties = str('difficulties')?.split(',').filter((d): d is Difficulty => DIFFICULTIES.includes(d as Difficulty));
 
 const results: SoakResult[] = [];
 for (let seed = 1; seed <= seeds; seed++) {
-  for (const mode of ['idle', 'managed'] as const) results.push(runSoak({ seed: seed * 7919, seasons, mode }));
-  results.push(runSoak({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard' }));
+  if (difficulties) {
+    for (const difficulty of difficulties) {
+      for (const mode of ['idle', 'managed'] as const) results.push(runSoak({ seed: seed * 7919, seasons, mode, difficulty }));
+    }
+  } else {
+    for (const mode of ['idle', 'managed'] as const) results.push(runSoak({ seed: seed * 7919, seasons, mode }));
+    results.push(runSoak({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard' }));
+  }
 }
 for (const v of OLD_VERSIONS) results.push(runSoak({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v }));
 

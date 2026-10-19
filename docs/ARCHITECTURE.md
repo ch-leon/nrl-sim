@@ -222,8 +222,8 @@ Parity (N5, GitHub #140): `LEAGUE` in `config.ts` holds the league's rating cent
 `data/league.ts` are spread 42–70 around it, and `createNewGame` builds the player's
 squad the way rival squads are built (`generatePlayerAround`): one star for a hero, a
 first-grader per position around `START_FIRST_GRADE` plus the difficulty's `startRating`
-(Easy +4, Hard −4), and depth players `START_DEPTH_GAP` below, so the best nine starts
-about two points above the rival mean rather than thirteen. New games only; a save's
+(Easy +4, Hard −4), and depth players `START_DEPTH_GAP` below, so on Normal the best nine
+starts level with the rival mean rather than thirteen above it (#148). New games only; a save's
 rivals keep the strength their squads give them. `npm run soak` reports the gap, the
 player's record and ladder finish per season (`docs/status/2026-10-league.md`).
 

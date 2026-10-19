@@ -54,7 +54,7 @@ describe('createNewGame', () => {
     expect(Math.abs(depth.reduce((t, o) => t + o, 0) / depth.length - (LEAGUE.START_FIRST_GRADE - LEAGUE.START_DEPTH_GAP))).toBeLessThan(4);
   });
 
-  it('the best nine starts a couple of points above the rival mean, averaged over seeds (#140)', () => {
+  it('the best nine starts level with the rival mean (within a point or so), averaged over seeds (#140, #148)', () => {
     let gap = 0;
     const n = 30;
     for (let seed = 1; seed <= n; seed++) {
@@ -64,8 +64,8 @@ describe('createNewGame', () => {
       expect(g.bestNine).toBe(bestNineMean(s.squad, ON_FIELD));
       gap += g.bestNine - g.rivalMean;
     }
-    expect(gap / n).toBeGreaterThan(0);
-    expect(gap / n).toBeLessThan(4);
+    expect(gap / n).toBeGreaterThan(-1.5);
+    expect(gap / n).toBeLessThan(2);
     setState({});
   });
 
