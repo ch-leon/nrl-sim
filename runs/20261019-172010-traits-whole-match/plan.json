@@ -1,0 +1,56 @@
+{
+  "name": "traits whole match",
+  "description": "A–D refinement (C, traits): at equal ratings, how much do a side's traits (generated, or stars) swing a whole match? Each both ways round.",
+  "seeds": 80,
+  "scenarios": [
+    {
+      "name": "none v none",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "gen v none",
+      "home": {
+        "rating": 60,
+        "traits": "gen"
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "none v gen",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "traits": "gen"
+      }
+    },
+    {
+      "name": "stars v none",
+      "home": {
+        "rating": 60,
+        "traits": "stars"
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "none v stars",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "traits": "stars"
+      }
+    }
+  ]
+}
