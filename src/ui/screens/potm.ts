@@ -1,9 +1,10 @@
 // GitHub #46: full-time Player of the Match modal (separate from matchOverlay).
 import { bus } from '../../core/events';
-import { getState } from '../../core/state';
+import { getState, setState } from '../../core/state';
 import type { MatchResult } from '../../sim/events';
 import { playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
 import { el, button, openModal, closeModal } from '../dom';
+import { addPotm } from './seasonReview';
 
 /** One-line stat summary, e.g. "2 tries · 14 tackles · 1 line break". */
 export function fmtPotmLine(p: PlayerOfMatch): string {
@@ -22,11 +23,13 @@ export function openPlayerOfMatchModal(p: PlayerOfMatch, clubName: string, own: 
   return openModal(content, { class: 'nrl-potm-modal' });
 }
 
-/** Show the modal on every full-time. Returns unsubscribe. */
+/** Show the modal on every full-time, and count the club's awards for the season review (#190). Returns unsubscribe. */
 export function initPlayerOfMatch(): () => void {
   return bus.on('match:finished', ({ fixture, result }: { fixture: { homeId: string; awayId: string }; result: MatchResult }) => {
     const p = playerOfTheMatch(result, fixture.homeId, fixture.awayId);
     if (!p) return;
-    openPlayerOfMatchModal(p, getState().clubName, p.teamId === 'player');
+    const s = getState();
+    if (p.teamId === 'player') setState({ potmTally: addPotm(s.potmTally, s.season, p.name) });
+    openPlayerOfMatchModal(p, s.clubName, p.teamId === 'player');
   });
 }

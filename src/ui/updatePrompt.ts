@@ -47,8 +47,8 @@ export function scheduleUpdatePrompt(h: UpdatePromptHooks): 'shown' | 'deferred'
   return 'deferred';
 }
 
-/** The real hooks: <body>'s class list watched with a MutationObserver. */
-export function domUpdateHooks(onReload: () => void): UpdatePromptHooks {
+/** The real hooks for `show`: <body>'s class list watched with a MutationObserver. */
+export function domMatchHooks(show: () => void): UpdatePromptHooks {
   return {
     matchActive: () => document.body.classList.contains(MATCH_ACTIVE_CLASS),
     onMatchFlagChange: (cb) => {
@@ -57,10 +57,18 @@ export function domUpdateHooks(onReload: () => void): UpdatePromptHooks {
       mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
       return () => mo.disconnect();
     },
-    show: () => {
-      showUpdateToast(onReload);
-    },
+    show,
   };
+}
+
+/** The hooks that put up the update bar. */
+export function domUpdateHooks(onReload: () => void): UpdatePromptHooks {
+  return domMatchHooks(() => { showUpdateToast(onReload); });
+}
+
+/** Run `show` now, or once the match on screen has ended (the season review, #190, uses it too). */
+export function whenNoMatch(show: () => void): 'shown' | 'deferred' {
+  return scheduleUpdatePrompt(domMatchHooks(show));
 }
 
 /**
