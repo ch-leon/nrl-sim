@@ -2,7 +2,7 @@
 // scenarios (who plays whom, on what legs) × variants (knob overrides, by
 // hand or as a sweep) × seeds. Pure: parse, check and expand; the runner
 // (scripts/balance.ts) plays the cells and report.ts writes them up.
-import type { RosterStats } from '../../sim/events';
+import type { RosterStats, WeatherKind } from '../../sim/events';
 import { isRotation, type Rotation } from '../league/bench';
 import { isLegs, type Legs } from '../league/fatigue';
 import { isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
@@ -32,6 +32,8 @@ export interface ScenarioSpec {
   legs?: Legs | number;
   /** Play a single stretch of this many minutes instead of a whole match (e.g. just the closing stretch on tired legs). */
   minutes?: number;
+  /** Rain or wind (2f); clear unless given. */
+  weather?: WeatherKind;
 }
 
 export interface VariantSpec {
@@ -77,6 +79,7 @@ export function checkPlan(p: Plan): string[] {
     if (names.has(s.name)) errs.push(`scenario "${s.name}" is listed twice`);
     names.add(s.name);
     if (s.minutes !== undefined && !(s.minutes > 0)) errs.push(`${s.name}: minutes must be > 0`);
+    if (s.weather !== undefined && !['clear', 'rain', 'wind'].includes(s.weather)) errs.push(`${s.name}: weather must be clear / rain / wind`);
     if (s.legs !== undefined && !(typeof s.legs === 'number' ? s.legs >= 0 && s.legs <= 1 : isLegs(s.legs))) errs.push(`${s.name}: legs must be fresh / late / spent or 0..1`);
     for (const [side, spec] of [['home', s.home], ['away', s.away]] as const) {
       if (!spec) {

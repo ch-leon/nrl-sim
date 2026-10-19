@@ -6,7 +6,7 @@
 import Phaser from 'phaser';
 import { MatchScene } from '../../scenes/MatchScene';
 import { bus } from '../../core/events';
-import type { TeamSheet } from '../../sim/events';
+import type { TeamSheet, WeatherKind } from '../../sim/events';
 import { ZOOM_DEFAULT } from '../../world/readability';
 import type { Side, SimEvent } from '../core/snapshot';
 import { toMatchEvent } from '../league/events';
@@ -21,6 +21,8 @@ export interface LabSceneData {
   home: TeamSheet;
   away: TeamSheet;
   controller: LabController;
+  /** Rain or wind on the stadium (2f), as the sim plays it. */
+  weather?: WeatherKind;
 }
 
 /** Pop-ups sit above the name tag (73k) and below the weather (80k). */
@@ -42,7 +44,7 @@ export class LabScene extends MatchScene {
   }
 
   override init(data: LabSceneData): void {
-    super.init({ home: data.home, away: data.away });
+    super.init({ home: data.home, away: data.away, ...(data.weather ? { weather: data.weather } : {}) });
     this.controller = data.controller;
     this.ids = { home: data.home.clubId, away: data.away.clubId };
   }

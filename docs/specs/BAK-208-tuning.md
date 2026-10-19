@@ -400,3 +400,40 @@ rush 3.0 penalties, the Rush side conceding 1.85 to Slide's 1.15. Calls: mostly 
 sides 5.55. The extra dice reshuffle every seed; nothing else moves beyond luck.
 
 Tests: `tests/match/league/penalties.test.ts`.
+
+## 18. Weather, injuries and the ball lost in contact (BAK-207 §5.1, 2f)
+
+The match's weather (`MatchResult.weather`, rolled by matchday as today: 60% clear, 25% rain,
+15% wind) now changes the play. **Rain**: every pass knock-on, every spilled kick and every
+ball lost in the tackle is ×1.6. **Wind**: territory kicks carry 12% further, give or take 15%
+a kick, and goal kicks (conversions, field goals, penalty goals) spread 1.4× as wide. **Ball
+lost in contact**: a held tackle or a big hit can jar the ball loose, a knock-on (SPILLED!;
+the other side's ball), less for a skilful carrier. **Injuries**: a big hit can hurt the
+carrier (the old engine's roll on injury risk and Injury Prone, × the difficulty's rate,
+scaled to the live sim's 3½× big hits); he plays on at 85% pace (HURT!) until the next
+stoppage, when the coach takes him off first for the freshest man on the bench, whatever the
+rotation; with nobody left he plays on hampered. Injured men never come back on. `runMatch`
+returns the injuries (1–3 weeks, by squad id), which matchday applies as it does today.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `weather.rainHandling` | `src/match/league/weather.ts` | 1.6 | Rain: knock-ons, spilled kicks, ball lost in contact ×. |
+| `weather.windKick` / `weather.windJitter` | `weather.ts` | 1.12 / 0.15 | Wind: territory kicks (and penalty kicks for touch) carry ×, ± a share per kick. |
+| `weather.windGoalSpread` | `weather.ts` | 1.4 | Wind: goal kicks' aim error ×. |
+| `weather.lostHeld` / `weather.lostBigHit` | `weather.ts` | 0.006 / 0.03 | Ball lost in a made tackle / a big hit. |
+| `weather.lostSkill` | `weather.ts` | 0.0001 a point | Less for each point of the carrier's Skill over 50. |
+| `weather.injuryBase` / `weather.injuryPerRisk` | `weather.ts` | 0.005 / 0.036 | Injury on a big hit: base + risk/100 × perRisk (the old engine's 0.015 / 0.1, scaled). |
+| `weather.injuryProne` | `weather.ts` | 1.4 | × for an Injury Prone carrier. |
+| `weather.hurtSpeed` | `weather.ts` | 0.85 | A hurt man's top speed × until he comes off. |
+
+Rain's break penalty in the old engine (breaks ×0.8) is not carried over: rain shows in the
+handling instead.
+
+Measured (weather plan, 60 whole matches a row, run `20261019-132027-weather`), even 60 v 60
+per match: errors 13.6 clear, **20.9 rain**, 12.3 wind; balls lost in contact 1.65 / 2.8 /
+1.5; conversions 55% clear, 50% rain, **44% wind**; kick metres 574 clear, **621 wind**
+(rain 509: fewer long kicks get away). Injuries 0.15–0.33 a match (the old engine 0.31; the
+standard plan 0.1–0.55 by scenario). The standard plan (run `20261019-131950-standard`): errors
+up about 2 a match (the ball lost in contact), still inside §7; nothing else beyond luck.
+
+Tests: `tests/match/league/weather.test.ts`.

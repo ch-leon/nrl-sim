@@ -118,7 +118,7 @@ describe('penalties and six-again in the live sim', () => {
   it('Rush pays for its line speed: it concedes more offside penalties than Slide', () => {
     let rush = 0;
     let slide = 0;
-    for (let seed = 1; seed <= 10; seed++) {
+    for (let seed = 1; seed <= 30; seed++) {
       for (const { e } of play(seed, { rating: 60, tactics: { defence: 'slide' } }, { rating: 60, tactics: { defence: 'rush' } })) {
         if (e.kind !== 'penalty' || e.detail !== 'offside') continue;
         if (e.side === 'away') rush++;
@@ -126,5 +126,5 @@ describe('penalties and six-again in the live sim', () => {
       }
     }
     expect(rush).toBeGreaterThan(slide * 1.5);
-  }, 60_000);
+  }, 120_000);
 });

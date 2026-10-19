@@ -11,8 +11,10 @@ import type { MatchLength } from './rules';
 
 export interface RunMatchOptions {
   seed: number;
-  /** Carried through to the result; the live sim plays no weather yet (Phase 2, 2f). */
+  /** Rain and wind change handling and kicking (2f); clear unless told. */
   weather?: WeatherKind;
+  /** Multiplier on big-hit injury chance (the difficulty's, as the old engine takes it). */
+  injuryRate?: number;
   /** Two Nines halves unless told otherwise. */
   length?: MatchLength;
 }
@@ -22,7 +24,11 @@ const MAX_TICKS = 100_000;
 
 /** Play a match to full time and report it. Same sheets and seed, same result. */
 export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions): MatchResult {
-  const sim = new LiveSim(home, away, opts.seed, opts.length ? { length: opts.length } : {});
+  const sim = new LiveSim(home, away, opts.seed, {
+    ...(opts.length ? { length: opts.length } : {}),
+    ...(opts.weather ? { weather: opts.weather } : {}),
+    ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}),
+  });
   const ids: Record<Side, string> = { home: home.clubId, away: away.clubId };
   const events: MatchEvent[] = [];
   let momentum = 0;
@@ -53,9 +59,9 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     awayScore: sim.points.away,
     events,
     stats: tallyStats(events, ids.home),
-    weather: opts.weather ?? 'clear',
+    weather: sim.weather,
     momentumTimeline,
-    injuries: [],
+    injuries: [...sim.injuries],
   };
 }
 

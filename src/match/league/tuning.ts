@@ -16,6 +16,7 @@ import { NINES } from './rules';
 import { BENCH } from './bench';
 import { GOALS } from './goals';
 import { EDGE_COST, TRAIT_PTS } from './traits';
+import { WEATHER } from './weather';
 import { WRESTLE } from './wrestle';
 
 /** The knob groups, by the first segment of a path. */
@@ -32,6 +33,7 @@ export const KNOBS = {
   bench: BENCH,
   touch: TOUCH,
   penalty: PENALTY,
+  weather: WEATHER,
   goals: GOALS,
 } as const;
 

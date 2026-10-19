@@ -25,6 +25,7 @@ export const COUNTS = [
   'runDowns', 'blown', 'subs', 'goals', 'goalMisses', 'fieldGoals', 'fgMisses', 'chargeDowns', 'bonusTries',
   'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
+  'lostInContact', 'injuries',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -105,6 +106,10 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
       case 'error':
       case 'drop':
         c.errors++;
+        if (e.detail === 'contact') c.lostInContact++;
+        break;
+      case 'injury':
+        c.injuries++;
         break;
       case 'kick':
         c.kicks++;
@@ -224,7 +229,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     let draws = 0;
     const legSum = new Map<number, { home: number; away: number }>();
     for (let s = seedStart; s < seedStart + seeds; s++) {
-      const sim = new LiveSim(home, away, s, { energy: legsAt, length });
+      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       let inW = 0;

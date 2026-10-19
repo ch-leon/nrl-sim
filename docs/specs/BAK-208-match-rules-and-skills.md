@@ -145,7 +145,7 @@ at 60%. A step is tried at most once per defender per possession, when he is ins
 
 ### 4.2 Pass
 Completion by passer Skill and pressure (defender inside 2 m when thrown): base 96%,
-−4% under pressure, −6% in rain. Failure = knock-on (turnover). **Intercept**: a defender
+−4% under pressure; in rain the knock-on chance is ×1.6 (BAK-207 2f, tuning §18). Failure = knock-on (turnover). **Intercept**: a defender
 within 1.5 m of the pass line has 6% (+trait) to pick it off — shown and often a try.
 Cut-out passes (Playmaker) skip a receiver: higher reward, 2× intercept exposure.
 
