@@ -2,7 +2,6 @@
   "name": "wrestle grip and running cost",
   "description": "Example sweep: how the defenders' grip and the running cost of legs move late busts, tackles and how tired sides get. 4 × 3 = 12 variants plus the baseline, on two scenarios.",
   "seeds": 20,
-  "minutes": 18,
   "scenarios": [
     { "name": "even 60 v 60", "home": { "rating": 60 }, "away": { "rating": 60 } },
     { "name": "strong pack v weak", "home": { "rating": 60, "stats": { "strength": 80 } }, "away": { "rating": 60, "stats": { "strength": 45 } } }

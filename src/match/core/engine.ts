@@ -151,6 +151,19 @@ export class Runner {
     this.onEvents = cb;
   }
 
+  /** Run ahead, paused and without pop-ups, until a tick's snapshot satisfies `until` or the match ends (at least one tick). */
+  skipUntil(until: (s: Snapshot) => boolean, maxTicks = 100_000): void {
+    this._playing = false;
+    this.acc = 0;
+    const cb = this.onEvents;
+    this.onEvents = null;
+    for (let i = 0; i < maxTicks && !this.sim.finished; i++) {
+      this.stepOnce();
+      if (until(this._cur)) break;
+    }
+    this.onEvents = cb;
+  }
+
   /** Start over on a new seed (tick 0, paused). */
   reseed(seed: number): void {
     this._seed = seed;

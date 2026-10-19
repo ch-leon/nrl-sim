@@ -12,8 +12,12 @@
 // Legs (BAK-208 §8, F): every player's energy drains with metres run and
 // contact and costs him pace and contest odds when low; a held tackle is a
 // wrestle whose length sets the play-the-ball speed. Players cruise and sprint
-// only when it matters, spending gas (BAK-208 §8.2, F2). Phase 1 scope: no scoring
-// beyond tries, no weather — those come with the full match (Phase 2, #86).
+// only when it matters, spending gas (BAK-208 §8.2, F2).
+//
+// The match (BAK-207 §5.1, 2a): a clock that runs while the ball is in play,
+// two halves with the ends swapped and legs part-restored at half-time, the
+// siren and play on to the next dead ball, full time, points. Conversions,
+// touch, penalties and weather come later in Phase 2 (#86).
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
@@ -35,6 +39,7 @@ import { traitBoost, type TraitInstance } from '../../data/traits';
 import { FATIGUE, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
 import { GAS, canSprint, paceMult, refillSeconds, runCostMult, stepGas, tankSeconds, type GasState } from './gas';
 import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
+import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
 /**
@@ -194,7 +199,9 @@ type Phase =
   | { kind: 'play' }
   | { kind: 'tackle'; t0: number; carrier: number; tackler: number; big: boolean; wrestle: WrestleState | null; wreck: number }
   | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null }
-  | { kind: 'try'; t0: number; scorer: number };
+  | { kind: 'try'; t0: number; scorer: number }
+  | { kind: 'half-time'; t0: number }
+  | { kind: 'full-time' };
 
 interface PendingKick {
   at: number;
@@ -209,7 +216,6 @@ interface PendingKick {
 }
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
-const dirOf = (s: Side): 1 | -1 => (s === 'home' ? 1 : -1);
 
 const KICK_TEXT: Readonly<Record<KickChoice, (name: string) => string>> = {
   long: (n) => `${n} kicks long on the last`,
@@ -235,9 +241,11 @@ export function runOn(v0: number, a: number, vMax: number, t: number): number {
   return v0 * tAcc + 0.5 * a * tAcc * tAcc + vEnd * (t - tAcc);
 }
 
-/** Lab and tests: start everyone on these legs (1 = a kick-off). */
 export interface LiveOptions {
+  /** Lab and tests: start everyone on these legs (1 = a kick-off). */
   energy?: number;
+  /** Two Nines halves unless told otherwise (the balance harness plays single stretches). */
+  length?: MatchLength;
 }
 
 function statsOf(entry: RosterEntry | undefined): Stats {
@@ -247,14 +255,14 @@ function statsOf(entry: RosterEntry | undefined): Stats {
 
 export class LiveSim implements MatchSim {
   tick = 0;
-  readonly finished = false;
+  finished = false;
   private readonly rng: Rng;
   private readonly players: Player[];
   private readonly names: Record<Side, string>;
   /** How each side plays (BAK-208 §5). */
   readonly tactics: Record<Side, TeamTactics>;
-  private ball: BallState;
-  private phase: Phase;
+  private ball!: BallState;
+  private phase!: Phase;
   private attacking: Side = 'home';
   private dir: 1 | -1 = 1;
   private tackles = 0;
@@ -281,9 +289,21 @@ export class LiveSim implements MatchSim {
   private interceptTrait: string | undefined;
   private events: SimEvent[] = [];
   readonly tries: Record<Side, number> = { home: 0, away: 0 };
+  readonly points: Record<Side, number> = { home: 0, away: 0 };
+  /** The clock (BAK-207 §5.1, 2a): which half, ticks of play gone in it, time up. */
+  private readonly length: MatchLength;
+  private half = 1;
+  private clockTicks = 0;
+  private siren = false;
+  private sirenAt = 0;
+  /** 1 in the first half (home attacks +x), -1 after the ends swap. */
+  private ends: 1 | -1 = 1;
+  /** The side that received the opening kick-off kicks off the second half. */
+  private readonly firstReceiver: Side = 'home';
 
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
     this.rng = makeRng(seed);
+    this.length = opts.length ?? fullMatch();
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
@@ -293,12 +313,32 @@ export class LiveSim implements MatchSim {
       p.gassed = energy < FATIGUE.spentAt;
       p.gas.gas = energy;
     }
-    this.ball = { kind: 'held', by: this.idx('away', KICKER) };
-    this.phase = { kind: 'restart', t0: 0, kicking: 'away' };
-    this.attacking = 'home';
-    this.dir = 1;
+    this.setForKickoff(other(this.firstReceiver));
+  }
+
+  /** Ball to the kicking side's kicker and everyone on his kick-off spot (the start of each half). */
+  private setForKickoff(kicking: Side): void {
+    this.ball = { kind: 'held', by: this.idx(kicking, KICKER) };
+    this.phase = { kind: 'restart', t0: this.tick, kicking };
+    this.attacking = other(kicking);
+    this.dir = this.dirOf(this.attacking);
+    this.tackles = 0;
+    this.lastPlay = false;
+    this.kickCall = null;
+    this.looseFor = null;
+    this.pendingKick = null;
+    this.markers = [];
     this.assignTargets();
-    for (const p of this.players) p.body.pos = { ...p.target };
+    for (const p of this.players) {
+      p.body.pos = { ...p.target };
+      p.body.vel = { x: 0, y: 0 };
+      p.body.heading = { x: this.dirOf(p.side), y: 0 };
+    }
+  }
+
+  /** The way a side attacks this half. */
+  private dirOf(s: Side): 1 | -1 {
+    return s === 'home' ? this.ends : this.ends === 1 ? -1 : 1;
   }
 
   private buildSide(sheet: TeamSheet, side: Side): Player[] {
@@ -322,7 +362,7 @@ export class LiveSim implements MatchSim {
         energy: 1,
         drain: drainRate(stamina, traits),
         gassed: false,
-        body: makeBody({ x: 50, y: MID_Y }, maxSpeedFor(stats.speed), { x: dirOf(side), y: 0 }),
+        body: makeBody({ x: 50, y: MID_Y }, maxSpeedFor(stats.speed), { x: this.dirOf(side), y: 0 }),
         pose: 'idle',
         poseUntil: 0,
         lockUntil: 0,
@@ -420,10 +460,14 @@ export class LiveSim implements MatchSim {
 
   // ── Tick ──────────────────────────────────────────────────────────────────
   step(): void {
+    if (this.finished) return;
     this.tick++;
     this.events = [];
-    this.launchPendingKick();
-    this.landings();
+    if (this.phase.kind === 'half-time') this.stepHalfTime(this.phase);
+    else {
+      this.launchPendingKick();
+      this.landings();
+    }
     switch (this.phase.kind) {
       case 'restart':
         this.stepRestart(this.phase);
@@ -440,9 +484,80 @@ export class LiveSim implements MatchSim {
       case 'try':
         this.stepTry(this.phase);
         break;
+      default:
+        break;
     }
     this.assignTargets();
     this.move();
+    this.runClock();
+  }
+
+  // ── Clock ─────────────────────────────────────────────────────────────────
+  /** The clock runs while the ball is in play; at time up the siren goes and play carries on to the next dead ball. */
+  private runClock(): void {
+    const k = this.phase.kind;
+    if (k !== 'play' && k !== 'tackle' && k !== 'ruck') return;
+    const halfTicks = Math.round((this.length.halfMinutes * 60) / TICK_S);
+    if (this.clockTicks < halfTicks) this.clockTicks++;
+    if (!this.siren && this.clockTicks >= halfTicks) {
+      this.siren = true;
+      this.sirenAt = this.tick;
+      this.emit('siren', this.half < this.length.halves ? 'The half-time siren — play on until the ball is dead' : 'The full-time siren — play on until the ball is dead');
+      // Time up with a man still down from the tackle: the ball is already dead.
+      const ph = this.phase;
+      if (ph.kind === 'ruck' && ph.stage === 'down') {
+        this.endHalf();
+        return;
+      }
+    }
+    // Belt and braces: a passage that never goes dead still ends.
+    if (this.siren && this.tick - this.sirenAt >= Math.round(NINES.playOnMaxS / TICK_S)) this.endHalf();
+  }
+
+  /** The ball is dead after the siren: half-time, or full time. */
+  private endHalf(): void {
+    const score = `${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`;
+    this.pendingKick = null;
+    if (this.half < this.length.halves) {
+      this.emit('half-time', `Half-time: ${score}`);
+      this.phase = { kind: 'half-time', t0: this.tick };
+    } else {
+      this.emit('full-time', `Full time: ${score}`);
+      this.phase = { kind: 'full-time' };
+      this.finished = true;
+    }
+  }
+
+  /** The break: then legs part-restored, a full tank, ends swapped, and the side that received first kicks off. */
+  private stepHalfTime(ph: Extract<Phase, { kind: 'half-time' }>): void {
+    if (this.tick < ph.t0 + NINES.halfTimeTicks) return;
+    for (const p of this.players) {
+      p.energy += (1 - p.energy) * NINES.halfTimeLegsBack;
+      p.gas = { gas: p.energy, blown: false };
+      p.gassed = p.energy < FATIGUE.spentAt;
+      p.pose = 'idle';
+      p.poseUntil = p.lockUntil = p.busyUntil = p.cooldownUntil = p.immuneUntil = p.burstUntil = 0;
+      p.brokeAt = -1000;
+      p.slide = null;
+      p.jink = null;
+      p.decided = false;
+      p.steppedOn = -1;
+    }
+    this.half++;
+    this.ends = this.ends === 1 ? -1 : 1;
+    this.clockTicks = 0;
+    this.siren = false;
+    this.setForKickoff(this.firstReceiver);
+  }
+
+  /** Seconds of match time gone since the kick-off (the clock, both halves). */
+  get matchSeconds(): number {
+    return (this.half - 1) * this.length.halfMinutes * 60 + this.clockTicks * TICK_S;
+  }
+
+  /** This tick's events without building a snapshot (headless runs). */
+  get tickEvents(): readonly SimEvent[] {
+    return this.events;
   }
 
   // ── Ball resolution ───────────────────────────────────────────────────────
@@ -457,7 +572,7 @@ export class LiveSim implements MatchSim {
     this.kickCall = null;
     const receiving = other(kicker.side);
     this.attacking = receiving;
-    this.dir = dirOf(receiving);
+    this.dir = this.dirOf(receiving);
     this.tackles = 0;
     this.lastPlay = false;
     this.lineX = k.to.x + this.dir * LIVE.onsideM;
@@ -513,6 +628,7 @@ export class LiveSim implements MatchSim {
         this.ball = bounceFlight(b.to, { x: this.dir, y: (this.rng.next() - 0.5) * 0.6 }, this.tick, 2.5, 12, 2);
         this.turnover();
         this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
+        if (this.siren) this.endHalf(); // a knock-on kills the ball
         return;
       }
       this.ball = { kind: 'held', by: this.indexOf(r) };
@@ -584,7 +700,7 @@ export class LiveSim implements MatchSim {
   private turnover(): void {
     this.kickCall = null;
     this.attacking = other(this.attacking);
-    this.dir = dirOf(this.attacking);
+    this.dir = this.dirOf(this.attacking);
     this.tackles = 0;
     this.lastPlay = false;
     const bp = this.ballPos();
@@ -601,7 +717,7 @@ export class LiveSim implements MatchSim {
     const ready = dist(kicker.body.pos, kicker.target) < 1 && this.players.every((p) => dist(p.body.pos, p.target) < 3);
     if (!ready && this.tick < ph.t0 + LIVE.restartMaxTicks) return;
     const receiving = other(ph.kicking);
-    const rd = dirOf(receiving);
+    const rd = this.dirOf(receiving);
     this.lock(kicker, 'kick', LIVE.kickLockTicks);
     this.pendingKick = {
       at: this.tick + LIVE.kickContactTicks,
@@ -798,6 +914,7 @@ export class LiveSim implements MatchSim {
     this.lock(c, 'down', down);
     for (const i of w ? w.men : [ph.tackler]) this.lock(this.players[i]!, 'down', down);
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.carrier, tackler: ph.tackler, stage: 'down', handover, heldAt: 0, down, pace };
+    if (this.siren) this.endHalf(); // the tackle is made: the ball is dead
   }
 
   private stepRuck(ph: Extract<Phase, { kind: 'ruck' }>): void {
@@ -817,7 +934,7 @@ export class LiveSim implements MatchSim {
       if (ph.handover) {
         this.emit('handover', `Tackled on the last — handover to ${this.names[other(this.attacking)]}`, c);
         this.attacking = other(this.attacking);
-        this.dir = dirOf(this.attacking);
+        this.dir = this.dirOf(this.attacking);
         this.tackles = 0;
         this.lastPlay = false;
         this.lineX = this.mark.x + this.dir * LIVE.onsideM;
@@ -871,10 +988,14 @@ export class LiveSim implements MatchSim {
       p.pose = 'idle';
       p.poseUntil = 0;
     }
+    if (this.siren) {
+      this.endHalf(); // a try after the siren is the last play of the half
+      return;
+    }
     const kicking = other(scorer.side);
     this.ball = { kind: 'held', by: this.idx(kicking, KICKER) };
     this.attacking = other(kicking);
-    this.dir = dirOf(this.attacking);
+    this.dir = this.dirOf(this.attacking);
     this.phase = { kind: 'restart', t0: this.tick, kicking };
   }
 
@@ -1111,6 +1232,7 @@ export class LiveSim implements MatchSim {
 
   private score(scorer: Player): void {
     this.tries[scorer.side]++;
+    this.points[scorer.side] += NINES.tryPoints;
     this.emit('try', `TRY! ${scorer.name} dives over for ${this.names[scorer.side]}`, scorer);
     // Dive and slide, then up to celebrate on the spot — he stays put until the restart.
     this.lock(scorer, 'dive', 10, add(scorer.body.pos, scale({ x: this.dir, y: 0 }, 1.5)));
@@ -1207,11 +1329,19 @@ export class LiveSim implements MatchSim {
     // Everyone cruises unless the moment calls for the foot down (§8.2), set below.
     for (const p of this.players) p.wantsSprint = false;
 
+    if (ph.kind === 'half-time' || ph.kind === 'full-time') {
+      // The whistle has gone: everyone stops where he is.
+      for (const p of this.players) {
+        p.target = { ...p.body.pos };
+        p.through = false;
+      }
+      return;
+    }
     if (ph.kind === 'restart' || ph.kind === 'try') {
       // Everyone to their kick-off spots (defenders trudge back after a try).
       const kicking = ph.kind === 'restart' ? ph.kicking : other(this.players[ph.scorer]!.side);
       const receiving = other(kicking);
-      const rd = dirOf(receiving);
+      const rd = this.dirOf(receiving);
       for (const p of this.players) {
         const role = ROLES[p.slot]!;
         if (p.side === kicking) {
@@ -1397,7 +1527,7 @@ export class LiveSim implements MatchSim {
     const kickChase = this.ball.kind === 'flight' && this.ball.via === 'kick';
     const h = this.holder();
     const lineBroken = this.lineBroken();
-    const stopped = this.phase.kind === 'try' || this.phase.kind === 'restart';
+    const stopped = this.phase.kind !== 'play' && this.phase.kind !== 'tackle' && this.phase.kind !== 'ruck';
     for (const p of this.players) {
       if (this.locked(p)) {
         if (stopped) this.legs(p, 0, 'stop');
@@ -1493,8 +1623,10 @@ export class LiveSim implements MatchSim {
       tick: this.tick,
       players,
       ball,
-      label: `${this.names[this.attacking]} ball · ${state} · ${this.tries.home}–${this.tries.away} · ${legs} · ${(this.tick * TICK_S).toFixed(1)}s`,
+      label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}`,
       events: this.events,
+      clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
+      score: { ...this.points },
     };
     const ph = this.phase;
     const w = ph.kind === 'tackle' ? ph.wrestle : null;

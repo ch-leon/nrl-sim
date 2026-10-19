@@ -385,8 +385,10 @@ within 6 s of breaking; "has nothing left in the tank" in the commentary when a 
 runs dry.
 
 **Getting legs back** (rides with the features it belongs to):
-- **Half-time** (BAK-207 Phase 2, the first PR, with the clock and halves): every
-  player gets back **half of what he has lost** (40% → 70%), gas full.
+- **Half-time** — *implemented in BAK-207 2a*: every player gets back **half of what
+  he has lost** (40% → 70%), gas full (to his legs). Over whole matches even sides now
+  end on about 52% legs instead of 35%, and stamina 30 v 80 on 36% / 69% instead of
+  23% / 63% (tuning reference §13).
 - **Interchange** (#70): a benched player recovers **5% a minute, up to 90%**, never
   back to fresh within a match. Taken off at 40% and back on after 4 minutes, he
   returns at 60%.
@@ -406,7 +408,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | D | Zone tactics and presets | §5 |
 | E | Kick types, catches, scrambles | §4.3–4.4 |
 | F | Fatigue and the wrestle — *shipped* | §8 |
-| F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time with Phase 2, the bench with #70) | §8.2 |
+| F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with #70) | §8.2 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 

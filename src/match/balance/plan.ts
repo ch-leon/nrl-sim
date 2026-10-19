@@ -25,7 +25,7 @@ export interface ScenarioSpec {
   away: SideSpec;
   /** Starting legs: a lab preset or a number 0..1 (default fresh). */
   legs?: Legs | number;
-  /** Sim minutes for this scenario, if not the plan's (e.g. just the closing stretch on tired legs). */
+  /** Play a single stretch of this many minutes instead of a whole match (e.g. just the closing stretch on tired legs). */
   minutes?: number;
 }
 
@@ -39,8 +39,8 @@ export interface Plan {
   description?: string;
   /** Matches per cell (seeds seedStart … seedStart + seeds − 1). */
   seeds: number;
-  /** Sim minutes per match (a full Nines match is 18). */
-  minutes: number;
+  /** Leave out for whole matches (two 9:00 halves, half-time, full time). A number plays one stretch of that many minutes instead, counts scaled to 18. */
+  minutes?: number;
   seedStart?: number;
   /** Overrides under every variant (the experiment's fixed ground). */
   base?: Overrides;
@@ -64,7 +64,7 @@ export function checkPlan(p: Plan): string[] {
   const errs: string[] = [];
   if (!p.name) errs.push('plan needs a name');
   if (!Number.isInteger(p.seeds) || p.seeds < 1) errs.push('seeds must be a whole number ≥ 1');
-  if (!(p.minutes > 0)) errs.push('minutes must be > 0');
+  if (p.minutes !== undefined && !(p.minutes > 0)) errs.push('minutes must be > 0 (or left out for whole matches)');
   if (!Array.isArray(p.scenarios) || p.scenarios.length === 0) errs.push('at least one scenario');
   const names = new Set<string>();
   for (const s of p.scenarios ?? []) {

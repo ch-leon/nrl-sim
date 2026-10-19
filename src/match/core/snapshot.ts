@@ -57,6 +57,22 @@ export interface Snapshot {
   events: SimEvent[];
   /** A wrestle in progress (BAK-208 §8.1): the carrier, the fight left in him (1 → 0) and how many men are on him. */
   wrestle?: WrestleSnap;
+  /** The match clock, when the sim keeps one. */
+  clock?: ClockSnap;
+  /** Points, when the sim keeps score. */
+  score?: Record<Side, number>;
+}
+
+export interface ClockSnap {
+  half: number;
+  /** Seconds gone in this half. */
+  seconds: number;
+  /** Match minute from the kick-off (the second half carries on from the first). */
+  minute: number;
+  /** Time is up: play on until the ball is dead. */
+  siren: boolean;
+  /** The match is over. */
+  finished: boolean;
 }
 
 export interface WrestleSnap {

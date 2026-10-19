@@ -26,8 +26,8 @@ These are the exact commands. They need nothing but `npm ci`.
    (a misspelt knob, an unknown preset) without running anything.
 2. Run it: `npm run balance -- --plan balance/plans/<plan>.json --jobs 4`.
    `--jobs` is how many CPU cores to use (`nproc` tells you). It prints a line per
-   finished cell with the time left. A 20-seed, 18-minute cell takes about 13 s on
-   one core.
+   finished cell with the time left. A 20-seed cell of whole matches takes about
+   15 s on one core.
 3. If it stops (timeout, crash, closed session), carry on where it left off:
    `npm run balance -- --resume balance/runs/<that run's folder> --jobs 4`.
    Finished cells are never run twice.
@@ -40,8 +40,9 @@ These are the exact commands. They need nothing but `npm ci`.
    line), and the report's tables as they are. Don't round or reinterpret the
    numbers; the `*` marks already say which changes are beyond luck.
 
-Other options: `--seeds N` and `--minutes M` override the plan (more seeds, less
-luck); `--out <dir>` puts the run somewhere else.
+Other options: `--seeds N` overrides the plan (more seeds, less luck); `--minutes M`
+plays an M-minute stretch instead of whole matches; `--out <dir>` puts the run
+somewhere else.
 
 ## Writing a plan
 
@@ -50,7 +51,6 @@ luck); `--out <dir>` puts the run somewhere else.
   "name": "grip and legs",
   "description": "What question this run answers.",
   "seeds": 20,
-  "minutes": 18,
   "base": { "live.burst": 1.15 },
   "scenarios": [
     { "name": "even 60 v 60", "home": { "rating": 60 }, "away": { "rating": 60 } },
@@ -69,12 +69,16 @@ luck); `--out <dir>` puts the run somewhere else.
 ```
 
 - **seeds**: matches per cell. 20 is a fair measurement; 40+ for rare events (late
-  busts, strips, intercepts). **minutes**: per match; 18 is a full Nines match.
+  busts, strips, intercepts). Each seed is a **whole match**: two 9:00 halves,
+  half-time (legs part-restored), the siren and full time, won on points. **minutes**
+  (optional) plays one stretch of that many minutes from a kick-off instead, with no
+  half-time; its counts are scaled to 18 minutes.
 - **Sides**: either a flat squad (`rating` for every stat, `stats` to override some)
   or a league `club`'s generated roster. `tactics` takes `attack` (grind, balanced,
   expansive, kick-chase, all-out) and `defence` (slide, rush, compressed). `traits`:
   `none` (flat squads' default), `gen` (clubs' default), `stars`.
-- **Scenario extras**: `legs` (`fresh`, `late`, `spent` or 0..1) and its own `minutes`.
+- **Scenario extras**: `legs` (`fresh`, `late`, `spent` or 0..1) and its own `minutes`
+  (a stretch instead of a whole match, e.g. the last 8 minutes on tired legs).
 - **base**: overrides under every variant, baseline included.
 - **variants**: hand-written sets of overrides. A `baseline` with no overrides is
   always run first so every row has something to compare with.
@@ -85,16 +89,16 @@ luck); `--out <dir>` puts the run somewhere else.
   `presets.attack.balanced.base.pass`, `presets.attack.grind.zones.redZone.offload`,
   `presets.attack.expansive.base.kickBias.bomb`.
 
-Sizing: cells = variants × scenarios; one core plays about 28 match-minutes a second,
-so time ≈ cells × seeds × minutes ÷ 28 seconds, divided by the jobs. A 13-variant sweep
-on 2 scenarios at 20 × 18 is about 6 minutes on one core, 2 on four; 100 variants on 6
-scenarios is about 2 hours on one core, 35–45 minutes on four. There is no limit;
-resume makes long runs safe.
+Sizing: cells = variants × scenarios; one core plays a whole match in about 0.75 s,
+so time ≈ cells × seeds × 0.75 seconds, divided by the jobs (a stretch of M minutes
+costs about M/24 of that). A 13-variant sweep on 2 scenarios at 20 seeds is about
+6–7 minutes on one core, 2 on four; 100 variants on 6 scenarios is about 2½ hours on
+one core, 40–50 minutes on four. There is no limit; resume makes long runs safe.
 
 ## Reading a report
 
-One table per scenario, one row per variant. Counts are per 18-minute match, both
-sides together, so they read against the §7 targets: **✓** inside, **↑** above,
+One table per scenario, one row per variant. Counts are per match (a stretch is
+scaled to 18 minutes), both sides together, so they read against the §7 targets: **✓** inside, **↑** above,
 **↓** below. In brackets, the change from the baseline row; a **\*** means the change
 is bigger than luck explains (more than two standard errors, only judged with 8+
 matches a row). No star means it may be noise: run more seeds before deciding.

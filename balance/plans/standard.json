@@ -2,7 +2,6 @@
   "name": "standard",
   "description": "The always-on suite: run on every change to the match code. Even sides, a stamina gap, the defence presets, attacking styles, a 20-point rating gap, fast low-stamina fliers against slower stayers (sprint and gas), and late-game legs, all at the current knobs.",
   "seeds": 20,
-  "minutes": 18,
   "scenarios": [
     { "name": "even 60 v 60", "home": { "rating": 60 }, "away": { "rating": 60 } },
     { "name": "stamina 30 v 80", "home": { "rating": 60, "stats": { "stamina": 30 } }, "away": { "rating": 60, "stats": { "stamina": 80 } } },

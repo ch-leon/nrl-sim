@@ -2,7 +2,7 @@
 // per variant with the headline numbers, the §7 target bands marked, and the
 // change against the baseline (or a previous run) flagged when it is bigger
 // than luck would explain. Pure: results in, Markdown out.
-import type { CellResult, CountKey } from './measure';
+import { MATCH_MINUTES, type CellResult, type CountKey } from './measure';
 
 /** §7 balance targets per full Nines match, both sides combined. */
 export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
@@ -46,7 +46,7 @@ const legsEnd = (r: CellResult): string => {
 };
 
 export interface ReportInput {
-  plan: { name: string; description?: string; seeds: number; minutes: number };
+  plan: { name: string; description?: string; seeds: number; minutes?: number };
   /** Commit, branch and date the run was made on. */
   meta: Record<string, string>;
   results: readonly CellResult[];
@@ -60,7 +60,7 @@ export function reportMarkdown(r: ReportInput): string {
   if (r.plan.description) out.push(r.plan.description, '');
   out.push(Object.entries(r.meta).map(([k, v]) => `**${k}** ${v}`).join(' · '), '');
   out.push(
-    `${r.plan.seeds} matches per row, ${r.plan.minutes} min each; counts are per 18-min match, both sides. ` +
+    `${r.plan.seeds} matches per row, ${r.plan.minutes ? `${r.plan.minutes}-minute stretches, counts scaled to an 18-minute match` : 'whole matches (two 9:00 halves)'}; counts are both sides. Wins are on points. ` +
       `✓ inside the §7 target, ↑ above, ↓ below. A change marked * is bigger than luck explains (over 2 standard errors, flagged only with ${MIN_SEEDS_TO_FLAG}+ matches a row); unmarked ones may be noise.`,
     '',
   );
@@ -69,7 +69,7 @@ export function reportMarkdown(r: ReportInput): string {
     const rows = r.results.filter((x) => x.scenario === sc);
     const base = rows.find((x) => x.variant === 'baseline') ?? rows[0]!;
     out.push(`## ${sc}`, '');
-    if (base.minutes !== r.plan.minutes) out.push(`_${base.minutes} min per match, scaled to 18._`, '');
+    if (base.minutes !== (r.plan.minutes ?? MATCH_MINUTES)) out.push(`_${base.minutes}-minute stretch, counts scaled to 18._`, '');
     out.push(`| Variant | ${COLUMNS.join(' | ')} | Home win | Wrestle s | Legs end H/A |`);
     out.push(`|---|${COLUMNS.map(() => '---:').join('|')}|---:|---:|---:|`);
     for (const row of rows) {
