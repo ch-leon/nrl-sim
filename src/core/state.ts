@@ -7,6 +7,7 @@ import { makeRng } from '../utils/rng';
 import { generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
 import { BOARD, LEAGUE, STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
+import { autoPick } from '../systems/lineup';
 
 // ── §4 domain types (canonical definitions live here) ──────────────────────
 
@@ -86,7 +87,20 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
+
+/**
+ * The coach's team selection (GitHub #69, systems/lineup.ts): nine starters by
+ * formation slot (LINEUP_SLOTS order; null = nobody picked), the interchange
+ * bench (up to BENCH.size squad ids, in order) and how hard it is rotated
+ * (BAK-207 2b). Matchday resolves it against the squad on the day: an injured
+ * starter is covered for the match, a man who has left the club is replaced.
+ */
+export interface Lineup {
+  starters: (string | null)[];
+  bench: string[];
+  rotation: import('../match/league/bench').Rotation;
+}
 
 /**
  * The lines of the club's books (N6, #172): where the money comes from and
@@ -196,6 +210,8 @@ export interface GameState {
    * just played.
    */
   finance: SeasonFinance[];
+  /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
+  lineup: Lineup;
   rngSeed: number; // advanced state of the seeded RNG
 }
 
@@ -291,6 +307,8 @@ export function createNewGame(
     objectives: [],
     eventDeck: newEventDeck(seed),
     finance: [emptyFinance(1)],
+    // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
+    lineup: autoPick(squad),
     rngSeed: rng.state(),
   };
 

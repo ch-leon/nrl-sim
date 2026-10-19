@@ -54,6 +54,7 @@ src/
     training.ts              # weekly stat gains, adjacency           (WU-10 / BAK-180)
     freeagency.ts            # free agent pool gen/refresh, signing   (WU-9 / BAK-179)
     matchday.ts              # player match of the round; SQUAD_MIN forfeit (GitHub #4)
+    lineup.ts                # the coach's nine, bench and rotation; positional fit; auto pick (GitHub #69)
     aging.ts                 # season-rollover ageing + age retirement (GitHub #5)
     events.ts                # random events deck: draw, choices, modifiers (GitHub #75; cards in data/events.ts)
     rivals.ts                # rival squads: generation, signings, ageing/development, strength (GitHub #74)
@@ -83,6 +84,7 @@ src/
     nav.ts                   # bottom nav bar; screens register here via main.ts (WU-5)
     screens/
       squad.ts               # squad list screen                      (WU-9)
+      lineup.ts              # pick the nine and the bench            (GitHub #69)
       recruit.ts             # free agency screen                     (WU-9 / BAK-179)
       fixtures.ts            # fixtures + ladder screens              (WU-7 / BAK-184)
       history.ts             # past-seasons screen + season-end toast (GitHub #3)
@@ -200,9 +202,23 @@ export interface GameState {
   settings: { muted: boolean; volume: number; tutorialDone: boolean };
   history: { season: number; ladderPosition: number; premiership: boolean }[];
   eventDeck: EventDeckState;  // random events: pending cards, cooldowns, modifiers, own RNG stream (#75)
+  lineup: Lineup;             // the coach's nine by slot, bench and rotation (#69)
   rngSeed: number;            // advanced state of the seeded RNG
 }
 ```
+
+The lineup (GitHub #69, `systems/lineup.ts`): `{ starters: (playerId | null)[9]; bench:
+playerId[]; rotation: 'off' | 'standard' | 'heavy' }`, the starters in the formation's
+slot order (fullback, two wingers, centre, five-eighth, halfback, hooker, prop,
+second-row: the live sim's roles and the classic `SLOTS` agree). A man out of position
+plays below his rating (same ×1, related ×0.92, unrelated ×0.8; tuning reference §21).
+Matchday resolves the saved lineup against the squad on the day: an injured starter is
+covered for that match by the best man for the slot (bench first, then the rest of the
+squad) with a line in the news, a man who has left the club is replaced in the saved
+lineup too. The sheet's roster is then the nine in slot order, each entry's `position`
+the slot he plays and his stats scaled by his fit, so the classic engine's actor picks,
+the live sim's slots and the match-screen looks all see the man the coach picked. Rival
+coaches auto-pick by slot with the same fit. Old saves (v10 → v11) get today's auto pick.
 
 Rival squads (GitHub #74): every rival keeps a persistent `squad` (generated to match its
 strength at new game / v7→v8 migration, seeded per club so `rngSeed` is untouched). Weekly

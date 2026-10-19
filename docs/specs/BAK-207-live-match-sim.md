@@ -272,7 +272,9 @@ After Phase 2: Phase 3 (balance, with the harness on whole matches) and the line
    the live sim is Phase 3 work.
 
 ## 6. Non-goals (for now)
-Mid-match coach calls (#73) ride on this architecture later. Lineups (#69) wait for Phase 2's
-sheet; interchanges (#70) are part of Phase 2 (§5.1, 2b), with the rotation policy set by the
-coach rule until the lineup screen exists. No new art beyond what a phase needs on the field
-(a sideline swap, goalposts in flight).
+Mid-match coach calls (#73) ride on this architecture later (shipped 2026-10-19,
+`docs/specs/coach-calls.md`). Lineups (#69) waited for Phase 2's sheet and shipped after it
+(2026-10-19): `GameState.lineup` holds the nine by slot, the bench and the 2b rotation policy,
+and `teamSheetFromSquad` builds the sheet from it with positional fit (ARCHITECTURE §4,
+tuning reference §21). Interchanges (#70) are part of Phase 2 (§5.1, 2b). No new art beyond
+what a phase needs on the field (a sideline swap, goalposts in flight).

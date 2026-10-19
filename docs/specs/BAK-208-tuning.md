@@ -568,3 +568,29 @@ and offloads and line breaks 19.8 → 17.3; Field goal is rarely available (0.1 
 The harness takes calls per scenario (`"calls": { "home": [{ "call": "rush" }] }`, optionally
 `"tackle": 2`) and counts `coachCalls`; the lab shows chips for either coach with `#lab?calls=1`.
 Tests: `tests/match/league/calls.test.ts`.
+
+## 21. Positional fit and the lineup (#69)
+
+The coach picks nine starters by formation slot and a bench of four (`GameState.lineup`,
+the Lineup screen); the rotation policy of §14 is part of it. A man out of position plays
+below his rating: every stat on his roster entry is scaled by his fit for the slot, so the
+sim sees the lesser player he is there, and the screen shows that rating. Related positions
+(the small cost): fullback, winger and centre with each other; the two halves; five-eighth
+and fullback; halfback and hooker; prop, second-row and lock with each other; hooker and
+lock. Auto pick tries every fit man in every slot and takes the pairings best rating first,
+so a natural keeps his slot ahead of a better man moved there unless the gap is wide
+(a 65 lock, with no slot of his own in Nines, beats a 50 natural winger at 52). Rival
+coaches auto-pick the same way, so both sides pay for a man out of position. These are
+not harness knobs (`sideSheet` builds flat sheets with a natural in every slot).
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `FIT.same` | `src/systems/lineup.ts` | 1 | A man in his own position keeps his rating. |
+| `FIT.related` | `lineup.ts` | 0.92 | A related position (centre ↔ winger, the two halves, prop ↔ second-row…). |
+| `FIT.unrelated` | `lineup.ts` | 0.8 | Anything else (a prop at halfback). |
+
+Measured: the standard plan is unchanged by construction (flat sheets); run
+`20261019-190113-standard` on this branch matched the previous run within luck.
+
+Tests: `tests/systems/lineup.test.ts`, `tests/systems/matchday.test.ts` (the lineup is the
+side that runs out), `tests/core/save.test.ts` (v10 → v11).

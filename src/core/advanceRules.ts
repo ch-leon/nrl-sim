@@ -79,8 +79,10 @@ export function newlyInjuredStarters<T extends SquadMember>(
   before: readonly T[],
   after: readonly T[],
   rating: (p: T) => number,
+  /** The coach's picked starters (#69); the best nine by rating when absent. */
+  picked?: ReadonlySet<string>,
 ): string[] {
-  const starters = regularStarterIds(before, rating);
+  const starters = picked ?? regularStarterIds(before, rating);
   const nowById = new Map(after.map((p) => [p.id, p]));
   const out: string[] = [];
   for (const p of before) {

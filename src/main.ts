@@ -28,6 +28,7 @@ import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
 import { syncKitDesign } from './ui/screens/kit';
 import { openSquadScreen } from './ui/screens/squad';
+import { openLineupScreen } from './ui/screens/lineup';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
@@ -177,6 +178,7 @@ async function boot(): Promise<void> {
 
   const nav = createNav();
   nav.registerScreen('squad', 'Squad', () => openSquadScreen());
+  nav.registerScreen('lineup', 'Lineup', () => openLineupScreen()); // the coach's nine (#69)
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen());
   nav.registerScreen('build', 'Build', () => openBuildScreen());
   nav.registerScreen('fixtures', 'Fixtures', () => openFixturesScreen());

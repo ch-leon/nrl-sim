@@ -26,6 +26,7 @@ import { registerBoardSystem } from '../systems/board';
 import { chooseEvent, registerEventsSystem } from '../systems/events';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
+import { BENCH } from '../match/league/bench';
 import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDefId } from '../data/facility';
@@ -199,6 +200,13 @@ export function checkState(s: GameState): string[] {
   if (s.eventDeck.pending.length > EVENTS.MAX_PENDING) out.push(`too many pending cards: ${s.eventDeck.pending.length}`);
   if (s.eventDeck.modifiers.some((m) => m.weeksLeft <= 0)) out.push('expired modifier kept');
   if (s.reputation < 1 || s.reputation > 100) out.push(`reputation out of range: ${s.reputation}`);
+  // The lineup (#69): nine slots, nobody listed twice (men who have left are cleaned on match day, so they may linger a week).
+  if (!s.lineup || s.lineup.starters.length !== ON_FIELD) out.push(`lineup has ${s.lineup?.starters.length ?? 'no'} slots`);
+  else {
+    const ids = [...s.lineup.starters.filter((id): id is string => id !== null), ...s.lineup.bench];
+    if (new Set(ids).size !== ids.length) out.push('lineup lists a player twice');
+    if (s.lineup.bench.length > BENCH.size) out.push(`lineup bench of ${s.lineup.bench.length}`);
+  }
   return out;
 }
 
@@ -209,6 +217,7 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  if (version < 11) delete out.lineup;
   if (version < 10) delete out.finance;
   if (version < 9) delete out.kit;
   if (version < 8) raw.league = { ...raw.league, clubs: raw.league.clubs.map(({ squad: _s, ...c }) => c) };
