@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   financeSummary, FinanceLedger, initFinanceLedger, fmtMoney, fmtMoneyCompact,
-  fmtRunway, fmtCrowd, EXPIRY_WINDOW_WEEKS,
+  fmtRunway, fmtCrowd, seasonPnl, FINANCE_LINE_LABELS, EXPIRY_WINDOW_WEEKS,
 } from '../../../src/ui/screens/finance';
 import {
-  createNewGame, getState, loadState,
+  createNewGame, getState, loadState, emptyFinance, FINANCE_LINES,
   type Player, type PlacedFacility, type GameState, type Fixture,
 } from '../../../src/core/state';
 import { bus, type Events } from '../../../src/core/events';
@@ -229,7 +229,8 @@ describe('FinanceLedger', () => {
     const l = new FinanceLedger(6);
     l.record({ delta: -3000, reason: 'wages', season: 1, week: 2 });
     l.record({ delta: -250, reason: 'upkeep', season: 1, week: 2 });
-    l.record({ delta: 1500, reason: 'sponsor+grant', season: 1, week: 2 });
+    l.record({ delta: 1000, reason: 'sponsor', season: 1, week: 2 });
+    l.record({ delta: 500, reason: 'grant', season: 1, week: 2 });
     l.record({ delta: 34000, reason: 'gate', season: 1, week: 2 });
     l.record({ delta: -800, reason: 'build', season: 1, week: 2 });
     expect(l.rows()).toEqual([
@@ -298,7 +299,7 @@ describe('initFinanceLedger', () => {
     offRecord();
     offSpy();
 
-    expect(seen.map((e) => e.reason)).toEqual(['wages', 'upkeep', 'sponsor+grant', 'gate']);
+    expect(seen.map((e) => e.reason)).toEqual(['wages', 'upkeep', 'sponsor', 'grant', 'gate']);
     expect(l.rows()).toEqual([{
       season: 1,
       week: 3,
@@ -342,5 +343,42 @@ describe('financeSummary — average home gate in the run-rate (QA)', () => {
   it('no home games left means no gate in the average', () => {
     const s = setup({ week: 24, facilities: [], league: { clubs: [], fixtures: [homeFixture(23), awayFixture(24)], ladder: [] } });
     expect(financeSummary(s).gateWeekly).toBe(0);
+  });
+});
+
+describe('seasonPnl (N6, #172)', () => {
+  const s1 = { ...emptyFinance(1), wages: -400_000, gate: 300_000, grant: 40_000 };
+  const s2 = { ...emptyFinance(2), wages: -450_000, gate: 320_000, grant: 45_000, facilities: -8000 };
+
+  it('shows this season against last, biggest lines first, with the net', () => {
+    const p = seasonPnl(setup({ season: 2, finance: [s1, s2] }));
+    expect(p.season).toBe(2);
+    expect(p.lastSeason).toBe(1);
+    expect(p.rows.map((r) => r.line)).toEqual(['wages', 'gate', 'grant', 'facilities']);
+    expect(p.rows[0]).toEqual({ line: 'wages', label: 'Wages', thisSeason: -450_000, lastSeason: -400_000 });
+    expect(p.rows[3]).toEqual({ line: 'facilities', label: 'Facilities', thisSeason: -8000, lastSeason: 0 });
+    expect(p.net).toBe(-93_000);
+    expect(p.lastNet).toBe(-60_000);
+  });
+
+  it('a first season has no last column; nothing booked gives no rows', () => {
+    const p = seasonPnl(setup({ season: 1, finance: [s1] }));
+    expect(p.lastSeason).toBeNull();
+    expect(p.lastNet).toBeNull();
+    expect(p.rows.every((r) => r.lastSeason === null)).toBe(true);
+    expect(seasonPnl(setup({ season: 1, finance: [emptyFinance(1)] })).rows).toEqual([]);
+    expect(seasonPnl(setup({ season: 1, finance: [] })).rows).toEqual([]);
+  });
+
+  it('a line with money only last season still shows, and every line has a label', () => {
+    const p = seasonPnl(setup({ season: 2, finance: [{ ...s1, prize: 25_000 }, s2] }));
+    expect(p.rows.find((r) => r.line === 'prize')).toEqual({ line: 'prize', label: 'Prize money', thisSeason: 0, lastSeason: 25_000 });
+    for (const l of FINANCE_LINES) expect(FINANCE_LINE_LABELS[l].length).toBeGreaterThan(0);
+  });
+
+  it('until the new season books its first movement it shows the season just closed', () => {
+    const p = seasonPnl(setup({ season: 2, finance: [s1] }));
+    expect(p.season).toBe(1);
+    expect(p.net).toBe(-60_000);
   });
 });

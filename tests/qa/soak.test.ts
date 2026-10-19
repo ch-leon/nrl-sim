@@ -37,7 +37,9 @@ describe('soak checks', () => {
 describe('soak P&L (#161)', () => {
   it('maps every ledger reason the game uses to a line, and the unknown to other', () => {
     expect(classifyReason('wages')).toBe('wages');
-    expect(classifyReason('sponsor+grant')).toBe('sponsorGrant');
+    expect(classifyReason('sponsor')).toBe('sponsor');
+    expect(classifyReason('grant')).toBe('grant');
+    expect(classifyReason('sponsor+grant')).toBe('grant'); // the pre-#172 combined reason
     expect(classifyReason('gate')).toBe('gate');
     expect(classifyReason('upkeep')).toBe('upkeep');
     expect(classifyReason('finals prize money')).toBe('prize');
@@ -79,7 +81,8 @@ describe('soak', () => {
         else expect(s.signingFees).toBeGreaterThanOrEqual(0);
         // The season's P&L adds up to the balance, line by line (#161).
         expect(s.finance.wages).toBeLessThan(0);
-        expect(s.finance.sponsorGrant).toBeGreaterThan(0);
+        expect(s.finance.grant).toBeGreaterThan(0);
+        expect(s.finance.sponsor).toBe(0); // the soak manager never builds a Sponsor Board
         expect(s.finance.gate).toBeGreaterThan(0);
         expect(s.finance.other).toBe(0);
         if (mode === 'idle') {
@@ -96,6 +99,7 @@ describe('soak', () => {
       runs.push(r);
     }
     expect(runs[0]!.start).toEqual(runs[1]!.start);
+    // The game's own books (#172) agree with the soak's tally: the soak reports any line that differs as a problem (none above).
     // The managed manager builds and signs; its club should be at least as strong as the idle one.
     expect(runs[1]!.seasons[1]!.bestNine).toBeGreaterThanOrEqual(runs[0]!.seasons[1]!.bestNine);
     const summary = summariseSeasons(runs);

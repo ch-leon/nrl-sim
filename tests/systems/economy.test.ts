@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, homeGate, recentForm, tickContracts,
-  handleBankruptcy, applyEconomy, registerEconomySystem,
+  handleBankruptcy, applyEconomy, registerEconomySystem, registerFinanceSystem, financeNet, classifyReason,
 } from '../../src/systems/economy';
+import { emptyFinance, setState } from '../../src/core/state';
+import { earnMoney, spendMoney } from '../../src/data/club';
 import { FACILITY_CATALOG, facilityUpkeep } from '../../src/data/facility';
 import { renewalWage } from '../../src/systems/contracts';
 import {
@@ -318,9 +320,9 @@ describe('applyEconomy — full weekly loop', () => {
       league: { clubs: [], fixtures: [], ladder: [] },
     });
     applyEconomy(getState());
-    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; income = 3000 + 1500 = +4500 ; no gate (empty league)
+    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; sponsor 3000 + grant 1500 ; no gate (empty league)
     expect(getState().money).toBe(100_000 - 5000 - 100 + 4500);
-    expect(reasons).toEqual(['wages', 'upkeep', 'sponsor+grant']);
+    expect(reasons).toEqual(['wages', 'upkeep', 'sponsor', 'grant']);
   });
 
   it('pays upkeep after wages, at the facilities\' levels, and skips it with nothing built (#164)', () => {
@@ -380,6 +382,99 @@ describe('applyEconomy — full weekly loop', () => {
     // enormous wages drive deep below floor → forced sales down to SQUAD_MIN.
     expect(() => applyEconomy(getState())).not.toThrow();
     expect(getState().squad.length).toBe(SQUAD_MIN);
+  });
+});
+
+describe('the club\'s books (N6, #172)', () => {
+  it('books every money movement on its line for the open season', () => {
+    setup({ season: 2, week: 5, money: 100_000, finance: [emptyFinance(1), emptyFinance(2)] });
+    const off = registerFinanceSystem();
+    earnMoney(-5000, 'wages');
+    earnMoney(30_000, 'gate');
+    earnMoney(-800, 'upkeep');
+    earnMoney(15_000, 'board grant');
+    spendMoney(9000, 'build:canteen');
+    earnMoney(2000, 'something new');
+    earnMoney(-1200, 'Merch royalties');
+    off();
+    earnMoney(999, 'gate'); // unsubscribed: not booked
+    const f = getState().finance;
+    expect(f).toHaveLength(2);
+    expect(f[1]).toEqual({ ...emptyFinance(2), wages: -5000, gate: 30_000, upkeep: -800, boardGrant: 15_000, facilities: -9000, other: 2000, events: -1200 });
+    expect(f[0]).toEqual(emptyFinance(1));
+    expect(financeNet(f[1]!)).toBe(-5000 + 30_000 - 800 + 15_000 - 9000 + 2000 - 1200 + 2); // + the season number
+  });
+
+  it('the rollover\'s prize and grant close the season just played; week 1\'s wages open the new one', () => {
+    setup({ season: 1, week: 27, finance: [{ ...emptyFinance(1), wages: -100 }] });
+    const off = registerFinanceSystem();
+    setState({ season: 2, week: 1 }); // the counters bump before the season hooks run…
+    earnMoney(45_000, 'finals prize money'); // …which pay the season just played
+    earnMoney(15_000, 'board grant');
+    earnMoney(-6000, 'wages'); // week 1 of the new season
+    earnMoney(20_000, 'gate');
+    setState({ week: 2 });
+    earnMoney(-6000, 'wages');
+    off();
+    const f = getState().finance;
+    expect(f.map((e) => e.season)).toEqual([1, 2]);
+    expect(f[0]).toEqual({ ...emptyFinance(1), wages: -100, prize: 45_000, boardGrant: 15_000 });
+    expect(f[1]).toEqual({ ...emptyFinance(2), wages: -12_000, gate: 20_000 });
+  });
+
+  it('a save written before the new season was booked loads right: week 1 goes to the new season', () => {
+    // An autosave at the rollover can carry season 2 with only season 1's entry.
+    setup({ season: 2, week: 1, finance: [{ ...emptyFinance(1), gate: 300_000, prize: 15_000 }] });
+    const off = registerFinanceSystem();
+    earnMoney(-6000, 'wages');
+    earnMoney(15_000, 'board grant'); // a grant at week 1 with a previous season on the books closes it…
+    off();
+    const f = getState().finance;
+    expect(f.map((e) => e.season)).toEqual([1, 2]);
+    expect(f[0]!.boardGrant).toBe(15_000);
+    expect(f[1]).toEqual({ ...emptyFinance(2), wages: -6000 });
+    // …but with no previous season on the books it stays in the current one.
+    setup({ season: 1, week: 1, finance: [] });
+    const off2 = registerFinanceSystem();
+    earnMoney(15_000, 'board grant');
+    off2();
+    expect(getState().finance).toEqual([{ ...emptyFinance(1), boardGrant: 15_000 }]);
+  });
+
+  it('a save with no books starts them for its season, and entries stay in season order', () => {
+    setup({ season: 3, finance: [] });
+    const off = registerFinanceSystem();
+    earnMoney(1, 'gate');
+    off();
+    expect(getState().finance).toEqual([{ ...emptyFinance(3), gate: 1 }]);
+    setup({ season: 2, week: 5, finance: [emptyFinance(3)] }); // a stray later entry never moves ahead of the current one
+    const off2 = registerFinanceSystem();
+    earnMoney(1, 'gate');
+    off2();
+    expect(getState().finance.map((e) => e.season)).toEqual([2, 3]);
+  });
+
+  it('through a real week tick the books say what the ledger says', () => {
+    setup({
+      week: 3, money: 100_000, reputation: 30, facilities: [pf('sponsorBoard', 1)],
+      squad: [mkPlayer({ wage: 1000, contractWeeks: 30 })],
+      league: { clubs: [], fixtures: [{ round: 3, homeId: 'player', awayId: 'r' }], ladder: [] },
+      finance: [emptyFinance(1)],
+    });
+    const seen: Record<string, number> = {};
+    bus.on('money:changed', ({ delta, reason }) => { seen[classifyReason(reason)] = (seen[classifyReason(reason)] ?? 0) + delta; });
+    registerEconomySystem();
+    const off = registerFinanceSystem();
+    advanceWeek();
+    off();
+    const books = getState().finance[0]!;
+    expect(books.season).toBe(1);
+    for (const [line, delta] of Object.entries(seen)) expect(books[line as keyof typeof books], line).toBe(delta);
+    expect(books.wages).toBe(-1000);
+    expect(books.upkeep).toBe(-100);
+    expect(books.sponsor).toBe(3000);
+    expect(books.grant).toBe(1500);
+    expect(books.gate).toBe(24_000);
   });
 });
 
