@@ -30,6 +30,9 @@
 // Weather, injuries and the ball lost in contact (2f): rain makes the ball
 // slippery, wind carries kicks and blows goal kicks off line; a big hit can
 // injure, and the hurt man comes off at the next stoppage.
+// Sin bins (#71): a penalty can send the offender to the touchline for five
+// minutes of match clock; his side plays a man short and stand-ins take his
+// duties until he is back.
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
@@ -60,6 +63,7 @@ import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsDefence, callIsPlay, p
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
+import { BIN, binReason, binReasonText, sinBinChance } from './sinbin';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
 /**
@@ -225,6 +229,9 @@ interface Player {
   subFor: number | null;
   subAt: number;
   subSpot: Vec;
+  /** In the sin bin (#71): back when the match clock reaches this many seconds (−1 on the field); he stands at `binSpot` on the touchline meanwhile. */
+  binUntilS: number;
+  binSpot: Vec;
 }
 
 /** A player on the bench: who he is and the legs he has. */
@@ -271,6 +278,13 @@ interface PendingKick {
 }
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
+
+/** Who takes a role's duties when its man is in the sin bin (#71), in order: the five-eighth kicks, the prop plays dummy-half, a winger drops back. */
+const STAND_INS: Readonly<Record<number, readonly number[]>> = {
+  [KICKER]: [4, 0, 6, 3],
+  [HOOKER]: [7, 8, 5, 4],
+  [FULLBACK]: [1, 2, 3, 4],
+};
 
 /** What a territory kick is going for, said when it leaves the boot. */
 const AIM_TEXT: Readonly<Record<'touch' | '40-20', (name: string) => string>> = {
@@ -333,9 +347,9 @@ export class LiveSim implements MatchSim {
   finished = false;
   private readonly rng: Rng;
   private readonly players: Player[];
-  /** Each side's nine, kept once (side() is called many times a tick). */
-  private readonly homeNine: readonly Player[];
-  private readonly awayNine: readonly Player[];
+  /** Each side's men on the field, kept once (side() is called many times a tick) and rebuilt when a man goes to or comes back from the sin bin (#71). */
+  private homeOn: Player[];
+  private awayOn: Player[];
   private readonly names: Record<Side, string>;
   /** How each side plays (BAK-208 §5). */
   readonly tactics: Record<Side, TeamTactics>;
@@ -369,6 +383,8 @@ export class LiveSim implements MatchSim {
   private readonly injuryRate: number;
   private readonly clubIds: Record<Side, string>;
   readonly injuries: MatchInjury[] = [];
+  /** Penalties each side has conceded in its own 20 (#71: repeated infringements bring the sin bin closer). */
+  private readonly ownTwentyPens: Record<Side, number> = { home: 0, away: 0 };
   /** Tick the carrier crossed the line while going round for the bonus zone; -1 when he isn't. */
   private overLineAt = -1;
   /** The side that has broken the line in this stretch of open play (one line break until the next tackle or stoppage). */
@@ -436,8 +452,8 @@ export class LiveSim implements MatchSim {
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
-    this.homeNine = this.players.slice(0, PLAYERS);
-    this.awayNine = this.players.slice(PLAYERS);
+    this.homeOn = this.players.slice(0, PLAYERS);
+    this.awayOn = this.players.slice(PLAYERS);
     this.bench = { home: benchOf(home), away: benchOf(away) };
     this.rotation = { home: home.rotation ?? DEFAULT_ROTATION, away: away.rotation ?? DEFAULT_ROTATION };
     const energy = Math.max(0, Math.min(1, opts.energy ?? 1));
@@ -453,7 +469,7 @@ export class LiveSim implements MatchSim {
 
   /** Ball to the kicking side's kicker and everyone on his kick-off spot (the start of each half). */
   private setForKickoff(kicking: Side): void {
-    this.ball = { kind: 'held', by: this.idx(kicking, KICKER) };
+    this.ball = { kind: 'held', by: this.indexOf(this.kicker(kicking)) };
     this.phase = { kind: 'restart', t0: this.tick, kicking };
     this.attacking = other(kicking);
     this.dir = this.dirOf(this.attacking);
@@ -528,6 +544,8 @@ export class LiveSim implements MatchSim {
         subFor: null,
         subAt: 0,
         subSpot: { x: 50, y: 1 },
+        binUntilS: -1,
+        binSpot: { x: 50, y: 1 },
       };
     });
   }
@@ -604,9 +622,40 @@ export class LiveSim implements MatchSim {
     p.body.vel = { x: 0, y: 0 };
     p.slide = slideTo ? { from: { ...p.body.pos }, to: clampToGround(slideTo, 0.5), t0: this.tick, t1: this.tick + ticks } : null;
   }
-  /** A side's nine (the same array every call: copy before sorting or changing it). */
+  /** A side's men on the field (the same array every call: copy before sorting or changing it); a man in the sin bin is not among them. */
   private side(s: Side): readonly Player[] {
-    return s === 'home' ? this.homeNine : this.awayNine;
+    return s === 'home' ? this.homeOn : this.awayOn;
+  }
+  /** On the field, not in the sin bin (#71). */
+  private onField(p: Player): boolean {
+    return p.binUntilS < 0;
+  }
+  private refreshOnField(): void {
+    this.homeOn = this.players.slice(0, PLAYERS).filter((p) => this.onField(p));
+    this.awayOn = this.players.slice(PLAYERS).filter((p) => this.onField(p));
+  }
+  /**
+   * A side's man for a role: the slot's player, or, with him in the sin bin, the
+   * nearest stand-in on the field (STAND_INS). With nobody binned this is the
+   * slot's man, so a match with no bins plays exactly as it did.
+   */
+  private roleMan(side: Side, slot: number): Player {
+    const p = this.at(side, slot);
+    if (this.onField(p)) return p;
+    for (const s of STAND_INS[slot] ?? []) {
+      const q = this.at(side, s);
+      if (this.onField(q)) return q;
+    }
+    return this.side(side)[0] ?? p;
+  }
+  private kicker(side: Side): Player {
+    return this.roleMan(side, KICKER);
+  }
+  private dummyHalf(side: Side): Player {
+    return this.roleMan(side, HOOKER);
+  }
+  private fullback(side: Side): Player {
+    return this.roleMan(side, FULLBACK);
   }
 
   // ── Tick ──────────────────────────────────────────────────────────────────
@@ -660,6 +709,7 @@ export class LiveSim implements MatchSim {
     this.move();
     this.restBench();
     this.runClock();
+    this.binClock();
     // Whoever has it touched it last (2d: who loses it when it goes out), and the kick in play is over.
     const h = this.holder();
     if (h) {
@@ -699,7 +749,7 @@ export class LiveSim implements MatchSim {
     if ((call === 'run-it' || call === 'bomb') && this.tackles < CALLS.lastFrom) return 'late in the set';
     if (call === 'field-goal') {
       const h = this.holder();
-      if (!this.fieldGoalOn(h && h.side === side ? h : this.at(side, KICKER))) return 'not in range';
+      if (!this.fieldGoalOn(h && h.side === side ? h : this.kicker(side))) return 'not in range';
     }
     return null;
   }
@@ -717,7 +767,7 @@ export class LiveSim implements MatchSim {
       st.usedAttack = true;
     }
     const h = this.holder();
-    const by = h && h.side === side ? h : this.at(side, KICKER);
+    const by = h && h.side === side ? h : this.kicker(side);
     this.emit('coach-call', `${this.names[side]} coach calls: ${CALL_LABEL[call].toLowerCase()}`, by);
     this.events[this.events.length - 1]!.detail = call;
     this.judge.make(side, call, this.attacking, this.dirOf(this.attacking), this.ballPos().x);
@@ -1107,7 +1157,7 @@ export class LiveSim implements MatchSim {
       let bd = LIVE.pickupM;
       for (const p of this.players) {
         if (this.looseFor && p.side !== this.looseFor) continue;
-        if (this.locked(p)) continue;
+        if (this.locked(p) || !this.onField(p)) continue;
         const d = dist(p.body.pos, b.pos);
         if (d < bd) {
           bd = d;
@@ -1133,7 +1183,7 @@ export class LiveSim implements MatchSim {
     let best: Player | undefined;
     let bd = Infinity;
     for (const p of this.players) {
-      if (this.locked(p)) continue;
+      if (this.locked(p) || !this.onField(p)) continue;
       let d = dist(p.body.pos, at);
       if (this.indexOf(p) === nominated) d -= 0.3;
       if (d < bd) {
@@ -1162,7 +1212,7 @@ export class LiveSim implements MatchSim {
     this.runSwaps();
     if (this.tick < ph.t0 + LIVE.restartTicks || this.pendingKick) return;
     if (this.players.some((p) => p.subFor !== null)) return; // the interchange first
-    const kicker = this.at(ph.kicking, KICKER);
+    const kicker = this.kicker(ph.kicking);
     // Wait until the teams are set (the kicker on the spot, everyone near his).
     const ready = dist(kicker.body.pos, kicker.target) < 1 && this.players.every((p) => dist(p.body.pos, p.target) < 3);
     if (!ready && this.tick < ph.t0 + LIVE.restartMaxTicks) return;
@@ -1178,7 +1228,7 @@ export class LiveSim implements MatchSim {
       at: this.tick + LIVE.kickContactTicks,
       kicker: this.indexOf(kicker),
       to,
-      receiver: this.idx(receiving, FULLBACK),
+      receiver: this.indexOf(this.fullback(receiving)),
       peak: 16,
       kickoff: true,
       kind: 'long',
@@ -1220,7 +1270,8 @@ export class LiveSim implements MatchSim {
     // A field goal late on with the scores close: the kicker's call, once a set.
     // The coach's kick call for the set (#73) comes before the kicker's own.
     const called = this.callState[this.attacking].attack;
-    if (h.slot === KICKER && this.fieldGoalOn(h)) {
+    const isKicker = h === this.kicker(h.side);
+    if (isKicker && this.fieldGoalOn(h)) {
       if (this.fgCall === null) this.fgCall = called === 'field-goal' || this.rng.next() < GOALS.fieldGoalChance;
       if (this.fgCall && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
         this.lock(h, 'kick', LIVE.kickLockTicks);
@@ -1230,7 +1281,7 @@ export class LiveSim implements MatchSim {
     }
     const early = this.tackles === SET_TACKLES - 2 && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
     const kickEarly = called === 'kick-early' && !this.lastPlay;
-    if ((this.lastPlay || early || kickEarly) && h.slot === KICKER) {
+    if ((this.lastPlay || early || kickEarly) && isKicker) {
       if (this.kickCall === null) {
         if (kickEarly) this.kickCall = toLine <= LIVE.earlyKickM ? (this.rng.next() < 0.6 ? 'grubber' : 'chip') : 'long';
         else if (this.lastPlay && called === 'run-it') this.kickCall = 'run';
@@ -1281,7 +1332,7 @@ export class LiveSim implements MatchSim {
         h.steppedOn = this.indexOf(nearest);
         const st = stepTraits(h.traits, nearest.traits, toLine <= FINISHER_M);
         const tries = plan.step >= 1 || this.rng.next() < plan.step;
-        if (tries && this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus + dplan.stepAgainst)) {
+        if (tries && this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus + dplan.stepAgainst + (defenders.length < PLAYERS ? BIN.shortStep : 0))) {
           this.sidestep(h, nearest, announce(st.credit));
           return;
         }
@@ -1325,7 +1376,7 @@ export class LiveSim implements MatchSim {
   /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */
   private planKick(h: Player, kind: KickChoice): PendingKick {
     const def = other(this.attacking);
-    const fb = this.at(def, FULLBACK);
+    const fb = this.fullback(def);
     const boot0 = bootMult(h.traits);
     // Wind carries a territory kick further and less predictably (2f).
     const boot = kind === 'long' && this.wx.kickDistance !== 1 ? { dist: boot0.dist * this.wx.kickDistance * (1 + (this.rng.next() - 0.5) * 2 * this.wx.jitter), acc: boot0.acc } : boot0;
@@ -1378,7 +1429,7 @@ export class LiveSim implements MatchSim {
     const defenders = others >= 2 ? 3 : others === 1 ? 2 : 1;
     const approach = norm(sub(c.body.pos, t.body.pos)); // the way the tackler is closing
     const angle = angleFrom(-dot(approach, c.body.heading)); // square when he comes at the carrier's face
-    const support = this.atkPlan(c).offload > 0 && this.side(c.side).some((p) => p !== c && p.slot !== HOOKER && !this.locked(p) && dist(p.body.pos, c.body.pos) < LIVE.offloadM);
+    const support = this.atkPlan(c).offload > 0 && this.side(c.side).some((p) => p !== c && p !== this.dummyHalf(c.side) && !this.locked(p) && dist(p.body.pos, c.body.pos) < LIVE.offloadM);
     return {
       defenders,
       angle,
@@ -1466,7 +1517,7 @@ export class LiveSim implements MatchSim {
         this.penalize(defSide, { ...this.mark }, `${culprit.name} is offside`, culprit, 'offside');
         return;
       }
-      const dh = this.at(this.attacking, HOOKER);
+      const dh = this.dummyHalf(this.attacking);
       const spot = this.dummyHalfSpot();
       // Heel it to where he actually is (he's been running to the mark); if he's
       // still a way off, to the mark and he collects it there.
@@ -1485,13 +1536,13 @@ export class LiveSim implements MatchSim {
     }
     // 'dh': wait for the heel to arrive, a beat, then move it.
     const h = this.holder();
-    if (!h || h.slot !== HOOKER || h.side !== this.attacking) return;
+    if (!h || h !== this.dummyHalf(this.attacking)) return;
     if (ph.heldAt === 0) ph.heldAt = this.tick;
     if (this.tick < ph.heldAt + LIVE.dhHoldTicks) return;
     this.lastPlay = this.tackles === SET_TACKLES - 1;
     let receiver: number | null = null;
     if (this.lastPlay) {
-      const k = this.at(this.attacking, KICKER);
+      const k = this.kicker(this.attacking);
       if (!this.locked(k) && this.tick >= k.busyUntil) receiver = this.indexOf(k);
     }
     if (receiver === null) receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h));
@@ -1517,7 +1568,7 @@ export class LiveSim implements MatchSim {
     }
     // The conversion: a drop kick in line with where he grounded it (taken even after the siren).
     const side = scorer.side;
-    const kicker = this.at(side, KICKER);
+    const kicker = this.kicker(side);
     const posts = postsFor(this.dirOf(side), FIELD_LENGTH, MID_Y);
     const spot = clampToGround(conversionSpot(scorer.body.pos.y, posts, this.dirOf(side)), 1);
     this.ball = { kind: 'held', by: this.indexOf(kicker) };
@@ -1533,7 +1584,7 @@ export class LiveSim implements MatchSim {
       return;
     }
     const kicking = other(scoringSide);
-    this.ball = { kind: 'held', by: this.idx(kicking, KICKER) };
+    this.ball = { kind: 'held', by: this.indexOf(this.kicker(kicking)) };
     this.attacking = other(kicking);
     this.dir = this.dirOf(this.attacking);
     this.phase = { kind: 'restart', t0: this.tick, kicking };
@@ -1665,8 +1716,8 @@ export class LiveSim implements MatchSim {
    */
   private startSetPiece(side: Side, spot: Vec, how: 'ptb' | 'tap', prefer?: number): void {
     this.callSwaps();
-    const free = this.side(side).filter((p) => p.subFor === null && p.slot !== HOOKER);
-    const pick = (prefer !== undefined ? free.find((p) => p.slot === prefer) : undefined) ?? [...free].sort((a, b) => dist(a.body.pos, spot) - dist(b.body.pos, spot))[0] ?? this.at(side, FULLBACK);
+    const free = this.side(side).filter((p) => p.subFor === null && p !== this.dummyHalf(side));
+    const pick = (prefer !== undefined ? free.find((p) => p.slot === prefer) : undefined) ?? [...free].sort((a, b) => dist(a.body.pos, spot) - dist(b.body.pos, spot))[0] ?? this.fullback(side);
     this.ball = { kind: 'held', by: this.indexOf(pick) };
     this.attacking = side;
     this.dir = this.dirOf(side);
@@ -1717,7 +1768,7 @@ export class LiveSim implements MatchSim {
   /** A goal-line drop-out by `side`, from the middle of its own try line. */
   private startDropOut(side: Side): void {
     const kicking = side;
-    this.ball = { kind: 'held', by: this.idx(kicking, KICKER) };
+    this.ball = { kind: 'held', by: this.indexOf(this.kicker(kicking)) };
     this.attacking = other(kicking);
     this.dir = this.dirOf(this.attacking);
     this.tackles = 0;
@@ -1773,13 +1824,14 @@ export class LiveSim implements MatchSim {
     const dir = this.dirOf(award);
     this.emit('penalty', `Penalty to ${this.names[award]} — ${why}`, culprit, trait);
     this.events[this.events.length - 1]!.detail = kind;
+    this.maybeBin(offender, culprit, spot, kind);
     this.pendingKick = null;
     this.kickFrom = null;
     this.outPending = null;
     this.overLineAt = -1;
     const line = dir > 0 ? FIELD_LENGTH : 0;
     const mark = clampToGround({ x: dir > 0 ? Math.min(spot.x, line - 10) : Math.max(spot.x, line + 10), y: spot.y }, 1);
-    const kicker = this.at(award, KICKER);
+    const kicker = this.kicker(award);
     const halfS = this.length.halfMinutes * 60;
     const halfLeftS = Math.max(0, halfS - this.clockTicks * TICK_S);
     const choice = choosePenalty({
@@ -1830,6 +1882,48 @@ export class LiveSim implements MatchSim {
     this.ball = kickFlight(k.body.pos, { x, y }, this.tick, null, 10);
     this.lastKicker = ph.kicker;
     this.penaltyKickUp = { side: ph.side };
+  }
+
+  // ── Sin bins (#71) ────────────────────────────────────────────────────────
+  /**
+   * A penalty may send the offender to the sin bin for BIN.minutes of match
+   * clock: more likely for a high shot, in his own 20 (a professional foul),
+   * again after repeated infringements there, and for a Hitman or Hothead. One
+   * roll on every penalty whatever the chance, so turning bins off with the
+   * knobs leaves a match the same until a bin would have happened.
+   */
+  private maybeBin(offender: Side, culprit: Player, spot: Vec, kind: string): void {
+    const award = other(offender);
+    const own20 = this.toLineFor(award, spot) <= BIN.redZoneM;
+    const prior = this.ownTwentyPens[offender];
+    if (own20) this.ownTwentyPens[offender]++;
+    const r = this.rng.next();
+    const out = PLAYERS - this.side(offender).length;
+    const sit = { high: kind === 'high', own20, prior, hitman: traitBoost(culprit.traits, 'hitman'), hothead: traitBoost(culprit.traits, 'hothead') };
+    if (out >= BIN.maxOut || r >= sinBinChance(sit)) return;
+    const reason = binReason(sit);
+    culprit.binUntilS = this.matchSeconds + BIN.minutes * 60;
+    culprit.binSpot = this.interchangeSpot(culprit);
+    culprit.subFor = null;
+    culprit.cooldownUntil = culprit.immuneUntil = culprit.burstUntil = 0;
+    this.refreshOnField();
+    this.emit('sin-bin', `${culprit.name} is sent to the sin bin — ${binReasonText(reason)}`, culprit);
+    this.events[this.events.length - 1]!.detail = reason;
+  }
+
+  /** Time served: back on from the touchline. */
+  private binClock(): void {
+    for (const p of this.players) {
+      if (p.binUntilS < 0 || this.matchSeconds < p.binUntilS) continue;
+      p.binUntilS = -1;
+      this.refreshOnField();
+      this.emit('sin-bin-return', `${p.name} is back from the sin bin`, p);
+    }
+  }
+
+  /** Men each side has in the sin bin now. */
+  binnedOf(side: Side): number {
+    return PLAYERS - this.side(side).length;
   }
 
   /** A kicker's goal accuracy (spread: lower is truer): Big Boot, and the wind blowing it off line (2f). */
@@ -1983,7 +2077,8 @@ export class LiveSim implements MatchSim {
     const dplan = this.defPlan();
     if (sit.support) tr.mods.offload = (tr.mods.offload ?? 0) + (plan.offload - 1) * BASE.offload + dplan.offload;
     tr.mods.bigHit = (tr.mods.bigHit ?? 0) + dplan.bigHit;
-    tr.mods.broken = (tr.mods.broken ?? 0) + dplan.broken;
+    // A defence a man short (#71) is stretched: easier to bust.
+    tr.mods.broken = (tr.mods.broken ?? 0) + dplan.broken + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
     // Contact costs both men legs, whatever happens.
@@ -2213,7 +2308,7 @@ export class LiveSim implements MatchSim {
     // may only pounce early on a dummy-half dart. Otherwise the first receiver
     // runs at the line, not at the two men standing over the mark.
     const dplan = this.defPlan();
-    const held = this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * dplan.markerHold && h.slot !== HOOKER;
+    const held = this.tick < this.ruckPlayedAt + LIVE.markerReleaseTicks * dplan.markerHold && h !== this.dummyHalf(h.side);
     const free = defenders.filter((d) => !this.locked(d) && this.tick >= d.cooldownUntil && !(held && this.markers.includes(this.indexOf(d))));
     // A defender already behind the carrier can only chase; the ones in front
     // of him are the tackle, so they rank first.
@@ -2236,7 +2331,7 @@ export class LiveSim implements MatchSim {
       .map((p) => ({
         idx: this.indexOf(p),
         pos: p.body.pos,
-        busy: this.locked(p) || this.tick < p.busyUntil || (p.slot === HOOKER && this.phase.kind === 'ruck'),
+        busy: this.locked(p) || this.tick < p.busyUntil || (p === this.dummyHalf(passer.side) && this.phase.kind === 'ruck'),
         prefer:
           this.rolePreference(p, passer, plan) +
           (overlap !== 0 && Math.sign(p.body.pos.y - passer.body.pos.y) === overlap ? LIVE.overlapPrefer * (1 + plan.width) : 0) +
@@ -2263,7 +2358,7 @@ export class LiveSim implements MatchSim {
   /** Who the ball should go to by role: halves as first receiver; forwards for the early hit-ups; the edges when the plan wants width. */
   private rolePreference(p: Player, passer: Player, plan: AttackPlan): number {
     const name = ROLES[p.slot]!.name;
-    const fromRuck = passer.slot === HOOKER;
+    const fromRuck = passer === this.dummyHalf(passer.side);
     if (name === 'halfback' || name === 'five-eighth') return fromRuck ? 1.5 : 0.5;
     if (name === 'prop' || name === 'second-row') return fromRuck && this.tackles <= 2 ? 1.2 + plan.hitUps : plan.hitUps * 0.3;
     if (name === 'centre' || name === 'winger') return plan.edges;
@@ -2277,7 +2372,7 @@ export class LiveSim implements MatchSim {
     if (ph.kind !== 'tackle' && ph.kind !== 'ruck') return [];
     const t = this.players[ph.tackler]!;
     const second = this.side(t.side)
-      .filter((d) => d !== t && d.slot !== FULLBACK)
+      .filter((d) => d !== t && d !== this.fullback(t.side))
       .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[0];
     return second ? [t, second] : [t];
   }
@@ -2296,12 +2391,19 @@ export class LiveSim implements MatchSim {
     const receiver = flight && flight.receiver !== null ? this.players[flight.receiver]! : null;
     // Everyone cruises unless the moment calls for the foot down (§8.2), set below.
     for (const p of this.players) p.wantsSprint = false;
+    // A man in the sin bin (#71) stands on the touchline, out of everything below.
+    for (const p of this.players) {
+      if (this.onField(p)) continue;
+      p.target = p.binSpot;
+      p.through = false;
+    }
 
     if (ph.kind === 'conversion') {
       // The kicker to his spot; his side behind him, the defence behind their try line.
       const dir = this.dirOf(ph.side);
       const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
       for (const p of this.players) {
+        if (!this.onField(p)) continue;
         p.through = false;
         if (this.indexOf(p) === ph.kicker) p.target = ph.spot;
         else if (p.side === ph.side) p.target = clampToGround({ x: ph.spot.x - dir * (4 + (p.slot % 3) * 2), y: ph.spot.y + (p.slot - 4) * 3 }, 1);
@@ -2327,6 +2429,7 @@ export class LiveSim implements MatchSim {
     if (ph.kind === 'penalty') {
       // A penalty kicked for touch: the kicker to the mark, his side behind it, the defence 10 m back.
       for (const p of this.players) {
+        if (!this.onField(p)) continue;
         const role = ROLES[p.slot]!;
         p.through = false;
         if (this.indexOf(p) === ph.kicker) p.target = { ...ph.spot };
@@ -2339,10 +2442,11 @@ export class LiveSim implements MatchSim {
       // A restart in play (2d): the man with the ball to the spot, his side set
       // behind it (the hooker at dummy-half for a play-the-ball), the defence 10 m back.
       for (const p of this.players) {
+        if (!this.onField(p)) continue;
         const role = ROLES[p.slot]!;
         p.through = false;
         if (this.indexOf(p) === ph.player) p.target = { ...ph.spot };
-        else if (p.side === ph.side) p.target = ph.how === 'ptb' && p.slot === HOOKER ? this.dummyHalfSpot() : formationTarget(role, ph.spot, this.dir, true);
+        else if (p.side === ph.side) p.target = ph.how === 'ptb' && p === this.dummyHalf(ph.side) ? this.dummyHalfSpot() : formationTarget(role, ph.spot, this.dir, true);
         else p.target = formationTarget(role, ph.spot, this.dir, false);
         if (p.subFor !== null) p.target = p.subSpot;
       }
@@ -2353,9 +2457,10 @@ export class LiveSim implements MatchSim {
       const kd = this.dirOf(ph.kicking);
       const line = ownLineX(kd);
       for (const p of this.players) {
+        if (!this.onField(p)) continue;
         const role = ROLES[p.slot]!;
         p.through = false;
-        if (p.side === ph.kicking) p.target = p.slot === KICKER ? { x: line + kd * 0.5, y: MID_Y } : { x: line + kd * 1.5, y: role.lane };
+        if (p.side === ph.kicking) p.target = p === this.kicker(ph.kicking) ? { x: line + kd * 0.5, y: MID_Y } : { x: line + kd * 1.5, y: role.lane };
         else p.target = { x: line + kd * (22 + role.atk), y: role.lane };
         if (p.subFor !== null) p.target = p.subSpot;
       }
@@ -2367,9 +2472,10 @@ export class LiveSim implements MatchSim {
       const receiving = other(kicking);
       const rd = this.dirOf(receiving);
       for (const p of this.players) {
+        if (!this.onField(p)) continue;
         const role = ROLES[p.slot]!;
         if (p.side === kicking) {
-          p.target = p.slot === KICKER ? { x: 50 - rd * 1, y: MID_Y } : { x: 50 - rd * (3 + role.def * 0.15), y: role.lane };
+          p.target = p === this.kicker(kicking) ? { x: 50 - rd * 1, y: MID_Y } : { x: 50 - rd * (3 + role.def * 0.15), y: role.lane };
         } else {
           p.target = formationTarget(role, { x: 50 + rd * -22, y: MID_Y }, rd, true);
           p.target = { x: p.target.x + rd * 6, y: p.target.y }; // deep but not on the line
@@ -2423,7 +2529,7 @@ export class LiveSim implements MatchSim {
     const supports: Player[] = [];
     if (carrier || (receiver && receiver.side === atk)) {
       const lead = carrier ?? receiver!;
-      const pool = attackers.filter((p) => p !== lead && p.slot !== HOOKER && !this.locked(p) && this.tick >= p.busyUntil);
+      const pool = attackers.filter((p) => p !== lead && p !== this.dummyHalf(atk) && !this.locked(p) && this.tick >= p.busyUntil);
       pool.sort((a, b) => dist(a.body.pos, lead.body.pos) - dist(b.body.pos, lead.body.pos));
       supports.push(...pool.slice(0, 2));
     }
@@ -2460,7 +2566,7 @@ export class LiveSim implements MatchSim {
         p.through = onto;
         // Under a kick he goes; onto a pass he runs at pace but keeps his gas for the line.
         p.wantsSprint = flight!.via === 'kick';
-      } else if (p.slot === HOOKER && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
+      } else if (p === this.dummyHalf(atk) && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
       } else if (ph.kind === 'ruck' && ph.stage === 'dh' && !this.locked(p)) {
         // The ball is heeled: the backline comes onto it, so the first receiver
@@ -2529,7 +2635,7 @@ export class LiveSim implements MatchSim {
       } else if (markers.includes(p)) {
         const k = markers.indexOf(p);
         p.target = clampToGround({ x: this.mark.x + this.dir * 0.8, y: this.mark.y + (k === 0 ? -0.9 : 0.9) }, 0.5);
-      } else if (p.slot === FULLBACK) {
+      } else if (p === this.fullback(def)) {
         // The last line: deeper still on the last tackle, and once the kicker
         // shapes to kick he reads it and goes to where it will land.
         const pk = this.pendingKick;
@@ -2635,6 +2741,7 @@ export class LiveSim implements MatchSim {
       ...(p.gas.blown ? { blown: true } : {}),
       gas: p.gas.gas,
       who: p.key,
+      ...(p.binUntilS >= 0 ? { binned: true } : {}),
     }));
     const b = this.ball;
     let ball: Snapshot['ball'];
@@ -2651,11 +2758,12 @@ export class LiveSim implements MatchSim {
     const kind = this.phase.kind;
     const state = kind === 'play' ? `tackle ${Math.min(this.tackles, SET_TACKLES)}/${SET_TACKLES}${this.lastPlay ? ' · last' : ''}` : kind;
     const legs = `legs ${Math.round(this.energyOf('home') * 100)}/${Math.round(this.energyOf('away') * 100)}%`;
+    const short = this.players.some((p) => !this.onField(p)) ? ` · ${this.side('home').length} v ${this.side('away').length}` : '';
     const snap: Snapshot = {
       tick: this.tick,
       players,
       ball,
-      label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}`,
+      label: `${this.names[this.attacking]} ball · ${state} · ${this.points.home}–${this.points.away} · ${clockText(this.half, this.clockTicks * TICK_S)}${this.siren && (kind === 'play' || kind === 'tackle' || kind === 'ruck') ? ' · siren' : ''} · ${legs}${short}`,
       events: this.events,
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
       score: { ...this.points },

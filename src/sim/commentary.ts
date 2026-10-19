@@ -111,6 +111,18 @@ const TEMPLATES: Record<MatchEventKind, string[]> = {
     'The hooter sounds — full-time.',
     'Full-time, the result is in.',
   ],
+  'sin-bin': [
+    'SIN BIN! {player} is marched — {team} down to eight.',
+    'The ref has had enough: {player} to the bin, {team} a man short.',
+    'Off you go! {player} is sent to the sin bin.',
+    '{team} lose {player} to the sin bin — eight men for a spell.',
+  ],
+  'sin-bin-return': [
+    '{player} is back from the sin bin — {team} up to nine.',
+    'Time served: {player} returns for {team}.',
+    '{player} jogs back on for {team}.',
+    'Back to full strength — {player} rejoins {team}.',
+  ],
 };
 
 // set-start is silent unless possession changed hands (staging tags the

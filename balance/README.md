@@ -108,7 +108,9 @@ is bigger than luck explains (more than two standard errors, only judged with 8+
 matches a row). No star means it may be noise: run more seeds before deciding.
 **Home win** is the share of matches the home side scored more tries in; **Wrestle s**
 the average wrestle; **Legs end** each side's average energy at the last 3-minute
-mark. Every other number (strips, intercepts, quick play-the-balls, wrestles held by
+mark. **sinBins** is men sent to the bin a match, **shortMin** the minutes of clock one
+side was alone a man short and **binSwing** the points the full side scored minus the
+short side's over them (so binSwing / shortMin × 5 is the swing per five-minute bin). Every other number (strips, intercepts, quick play-the-balls, wrestles held by
 1/2/3 men, legs at every mark, standard errors) is in `results*.jsonl`.
 
 ## Always on

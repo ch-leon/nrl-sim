@@ -27,6 +27,7 @@ export const COUNTS = [
   'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
+  'sinBins', 'shortMin', 'binSwing',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -188,6 +189,9 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
       case 'interchange':
         c.subs++;
         break;
+      case 'sin-bin':
+        c.sinBins++;
+        break;
       case 'conversion':
         if (e.detail === 'good') c.goals++;
         else c.goalMisses++;
@@ -204,6 +208,39 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
     }
   }
   return c;
+}
+
+/** Points a scoring event is worth, by the side named on it. */
+export function pointsOf(e: SimEvent): number {
+  if (e.kind === 'try') return e.detail === 'bonus' ? 5 : 4;
+  if (e.detail !== 'good') return 0;
+  if (e.kind === 'conversion' || e.kind === 'penalty-goal') return 2;
+  return e.kind === 'field-goal' ? 1 : 0;
+}
+
+/**
+ * The sin bins' swing (#71), taken a tick at a time while exactly one side is a
+ * man short: the minutes of match clock that lasted (`shortMin`) and the points
+ * the full side scored minus the short side's over them (`binSwing`). Spells
+ * with a man off on both sides count for neither. The swing per bin is
+ * binSwing / shortMin × BIN.minutes.
+ */
+export class BinSwing {
+  shortS = 0;
+  swing = 0;
+  private lastS = 0;
+  /** After a tick: `short` names the side alone a man short (null otherwise), `matchS` the clock, `es` the tick's events. */
+  tick(short: 'home' | 'away' | null, matchS: number, es: readonly SimEvent[]): void {
+    if (short) {
+      this.shortS += matchS - this.lastS;
+      for (const e of es) {
+        const pts = pointsOf(e);
+        if (pts === 0 || !e.side) continue;
+        this.swing += e.side === short ? -pts : pts;
+      }
+    }
+    this.lastS = matchS;
+  }
 }
 
 function stat(xs: readonly number[]): Stat {
@@ -245,6 +282,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
+      const bins = new BinSwing();
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
@@ -259,6 +297,9 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         // Read the tick straight off the sim: building a snapshot every tick cost a third of the run.
         const tickEvents = sim.tickEvents;
         if (tickEvents.length) events.push(...tickEvents);
+        const outH = sim.binnedOf('home') > 0;
+        const outA = sim.binnedOf('away') > 0;
+        bins.tick(outH !== outA ? (outH ? 'home' : 'away') : null, sim.matchSeconds, tickEvents);
         const men = sim.wrestleMen;
         if (men > 0) {
           inW++;
@@ -284,6 +325,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       c.held2 = held[2]!;
       c.held3 = held[3]!;
       c.kickMetres = sim.kickMetres.home + sim.kickMetres.away;
+      c.shortMin = bins.shortS / 60;
+      c.binSwing = bins.swing;
       // Completion is a share (%), not a count: not scaled to 18 minutes.
       const sets = sim.sets.home + sim.sets.away;
       c.completion = sets > 0 ? (100 * (sim.setsCompleted.home + sim.setsCompleted.away)) / sets : 0;

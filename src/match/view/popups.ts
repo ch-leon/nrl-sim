@@ -71,6 +71,9 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   injury: { word: 'HURT!', tone: 'bad' },
   // Coach calls (#73): the call, over the man it goes through.
   'coach-call': { word: 'CALL!', tone: 'neutral' },
+  // Sin bins (#71): over the man marched, and over him again when he is back.
+  'sin-bin': { word: 'SIN BIN!', tone: 'bad', big: true },
+  'sin-bin-return': { word: 'BACK ON', tone: 'neutral' },
 };
 
 /** The captain's call on a penalty (2e). */

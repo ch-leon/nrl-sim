@@ -13,7 +13,7 @@ export const emptyTally = (): StatTally => ({ games: 0, tries: 0, tackles: 0, li
 /** Player-of-the-match weight per event kind (error is negative). */
 const POTM_WEIGHT: Partial<Record<MatchEvent['kind'], number>> = {
   try: 5, break: 2, 'big-hit': 1.5, tackle: 0.3, fend: 0.5, 'break-tackle': 0.5,
-  conversion: 1, 'penalty-goal': 1, 'field-goal': 1.5, error: -1,
+  conversion: 1, 'penalty-goal': 1, 'field-goal': 1.5, error: -1, 'sin-bin': -2,
 };
 
 /** Per-name tallies for one team's events (games left at 0; callers add them). */
@@ -25,6 +25,7 @@ export function foldEvents(events: readonly MatchEvent[], teamId: string): Map<s
     if (e.kind === 'try') t.tries++;
     else if (e.kind === 'tackle' || e.kind === 'big-hit') t.tackles++;
     else if (e.kind === 'break') t.lineBreaks++;
+    else if (e.kind === 'sin-bin') t.sinBins = (t.sinBins ?? 0) + 1; // #71
     else continue;
     out.set(e.player, t);
   }
@@ -66,6 +67,8 @@ export function playerOfTheMatch(result: Pick<MatchResult, 'homeScore' | 'awaySc
 const add = (a: StatTally, b: StatTally): StatTally => ({
   games: a.games + b.games, tries: a.tries + b.tries,
   tackles: a.tackles + b.tackles, lineBreaks: a.lineBreaks + b.lineBreaks,
+  // Sin bins (#71) only once a player has one, so older tallies keep their shape.
+  ...(a.sinBins !== undefined || b.sinBins !== undefined ? { sinBins: (a.sinBins ?? 0) + (b.sinBins ?? 0) } : {}),
 });
 
 /**
@@ -79,7 +82,7 @@ export function applyMatchStats(squad: readonly Player[], events: readonly Match
   const played = new Set(playedIds);
   return squad.map((p) => {
     const delta = { ...(byName.get(p.name) ?? emptyTally()), games: played.has(p.id) ? 1 : 0 };
-    if (delta.games === 0 && delta.tries + delta.tackles + delta.lineBreaks === 0) return p;
+    if (delta.games === 0 && delta.tries + delta.tackles + delta.lineBreaks + (delta.sinBins ?? 0) === 0) return p;
     const cur = p.seasonStats && p.seasonStats.season === season ? p.seasonStats : { ...emptyTally(), season };
     return {
       ...p,

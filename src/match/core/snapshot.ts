@@ -22,6 +22,8 @@ export interface PlayerSnap {
   sprint?: boolean;
   blown?: boolean;
   gas?: number;
+  /** In the sin bin (#71): standing on the touchline, out of the play. */
+  binned?: boolean;
 }
 
 export interface BallSnap {

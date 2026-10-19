@@ -318,7 +318,8 @@ export type MatchEventKind =
   | 'kickoff' | 'set-start' | 'run' | 'break' | 'tackle' | 'big-hit'
   | 'fend' | 'break-tackle' | 'error' | 'penalty' | 'kick'
   | 'try' | 'conversion' | 'penalty-goal'
-  | 'field-goal' | 'half-time' | 'full-time';
+  | 'field-goal' | 'half-time' | 'full-time'
+  | 'sin-bin' | 'sin-bin-return';   // the live sim only (#71): named for the man binned
 // Kick flavour lives in MatchEvent.detail: find-touch | bomb | grubber | chip | 40-20.
 // Sets are SET_TACKLES (5) long; ON_FIELD is 9 per side (Nines trial, BAK-206).
 

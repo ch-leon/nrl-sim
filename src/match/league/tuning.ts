@@ -20,6 +20,7 @@ import { WEATHER } from './weather';
 import { RATING } from './spread';
 import { CALLS } from './calls';
 import { WRESTLE } from './wrestle';
+import { BIN } from './sinbin';
 
 /** The knob groups, by the first segment of a path. */
 export const KNOBS = {
@@ -39,6 +40,7 @@ export const KNOBS = {
   rating: RATING,
   calls: CALLS,
   goals: GOALS,
+  bin: BIN,
 } as const;
 
 export type Overrides = Readonly<Record<string, number>>;

@@ -20,7 +20,8 @@ One plan answers one question, written in its `description`, e.g. "Does a lower
 defenders' grip make late busts common between even sides?" A question names:
 
 - **what to measure**: a report column (tackles, breaks, lateBusts, offloads, errors,
-  kicks, tries, bigHits, gassed, home win, wrestle s, legs) or a field in
+  kicks, tries, bigHits, gassed, sinBins, shortMin and binSwing — the swing per bin is
+  binSwing / shortMin × 5 — home win, wrestle s, legs) or a field in
   `results*.jsonl` (strips, intercepts, quickPtb, slowPtb, held1/2/3, legs per 3 min);
 - **which knobs move it**: find them in the tuning reference or with
   `npm run balance -- --list | grep <word>`;
