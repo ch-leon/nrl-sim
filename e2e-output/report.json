@@ -1,0 +1,141 @@
+{
+  "steps": [
+    {
+      "n": 1,
+      "name": "title",
+      "file": "01-title.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 2,
+      "name": "new-game",
+      "file": "02-new-game.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: ?"
+      ]
+    },
+    {
+      "n": 3,
+      "name": "tutorial",
+      "file": "03-tutorial.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: ?"
+      ]
+    },
+    {
+      "n": 4,
+      "name": "tutorial-skipped",
+      "file": "04-tutorial-skipped.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: ?"
+      ]
+    },
+    {
+      "n": 5,
+      "name": "build-menu",
+      "file": "05-build-menu.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: ?"
+      ]
+    },
+    {
+      "n": 6,
+      "name": "build-placing",
+      "file": "06-build-placing.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: ?"
+      ]
+    },
+    {
+      "n": 7,
+      "name": "built-paddock",
+      "file": "07-built-paddock.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: News1, ?"
+      ]
+    },
+    {
+      "n": 8,
+      "name": "build-second",
+      "file": "08-build-second.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: News2, ?"
+      ]
+    },
+    {
+      "n": 9,
+      "name": "facility-popup",
+      "file": "09-facility-popup.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: News2, ?"
+      ]
+    },
+    {
+      "n": 10,
+      "name": "moving",
+      "file": "10-moving.png",
+      "ok": true,
+      "notes": [],
+      "layout": [
+        "nav buttons off-screen: News2, ?"
+      ]
+    },
+    {
+      "n": 11,
+      "name": "moved",
+      "file": "11-moved.png",
+      "ok": true,
+      "notes": [
+        "money (not saved yet)"
+      ]
+    },
+    {
+      "n": 12,
+      "name": "demolish-confirm",
+      "file": "12-demolish-confirm.png",
+      "ok": false,
+      "notes": [
+        "FAILED: page.waitForSelector: Timeout 10000ms exceeded."
+      ]
+    },
+    {
+      "n": 13,
+      "name": "demolished",
+      "file": "13-demolished.png",
+      "ok": false,
+      "notes": [
+        "FAILED: locator.scrollIntoViewIfNeeded: Timeout 10000ms exceeded."
+      ]
+    },
+    {
+      "n": 14,
+      "name": "recruit",
+      "file": "14-recruit.png",
+      "ok": false,
+      "notes": [
+        "FAILED: locator.scrollIntoViewIfNeeded: Timeout 10000ms exceeded."
+      ]
+    }
+  ],
+  "errors": [
+    "script: page.waitForTimeout: Target page, context or browser has been closed"
+  ],
+  "findings": []
+}
