@@ -1,0 +1,155 @@
+{
+  "name": "calls paid off",
+  "description": "Coach calls paid off (#73 §3, last column): the judge thresholds (hit-up / shift / hold / rush metres) as first set (baseline) and two candidates. Paid-off share = callsPaid / coachCalls; the match itself is unchanged.",
+  "seeds": 12,
+  "scenarios": [
+    {
+      "name": "home hit-up",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "hit-up"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home shift-left",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "shift-left"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home kick-early",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "kick-early"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home run-it",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "run-it"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home bomb",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "bomb"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home field-goal",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "field-goal"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home rush",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "rush"
+          }
+        ]
+      }
+    },
+    {
+      "name": "home hold",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "calls": {
+        "home": [
+          {
+            "call": "hold"
+          }
+        ]
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "A 3/8/15/8",
+      "tuning": {
+        "calls.paid.hitUpM": 3,
+        "calls.paid.shiftM": 8,
+        "calls.paid.holdM": 15,
+        "calls.paid.rushM": 8
+      }
+    },
+    {
+      "name": "B 3/6/12/6",
+      "tuning": {
+        "calls.paid.hitUpM": 3,
+        "calls.paid.shiftM": 6,
+        "calls.paid.holdM": 12,
+        "calls.paid.rushM": 6
+      }
+    }
+  ]
+}
