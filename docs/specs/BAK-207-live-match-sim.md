@@ -58,9 +58,10 @@ and behaviours are the asset, not the framework.
 - **Fixed timestep** `TICK_MS = 50` (20 Hz). All decisions and physics run per tick; the
   view interpolates between the last two ticks, so rendering frame rate never changes
   outcomes.
-- Physics time is human-scale (a winger runs ~8 m/s). The **match clock is scaled**:
-  a 9:00 Nines half elapses in `HALF_REAL_SECONDS` of sim time (start 180 s → ~6 min per
-  match at ×1 plus stoppages). Clock stops for tries, conversions and restarts. ×1/×2/×4/×8
+- Physics time is human-scale (a winger runs ~8 m/s). ~~The match clock is scaled: a 9:00
+  Nines half elapses in `HALF_REAL_SECONDS` of sim time.~~ *Decided (§5.1, decision 1):*
+  the clock is real sim time, two 9:00 halves, which is what BAK-208's §7 targets and fatigue
+  tuning already assume. Clock stops for tries, conversions and restarts. ×1/×2/×4/×8
   only change how much sim time passes per real frame.
 - **Deterministic:** own RNG (`makeRng`), no `Math.random`, no `Date`. Same seed + sheets
   ⇒ identical tick stream. This is what makes replay, flagging and balancing possible.
@@ -104,7 +105,8 @@ Every transition is a thing that physically happens on the field; nothing is imp
   overlay and score banners keep working unchanged. `MatchEvent`s are emitted from the
   sim as they happen (with real `x`/`y`).
 - **Headless mode:** the same sim run to completion without a view, for AI-vs-AI fixtures
-  and balancing. Target **< 100 ms per match** (≈ 7,000 ticks × 18 agents).
+  and balancing. Target **< 100 ms per match** (≈ 7,000 ticks × 18 agents). *A real
+  2 × 9:00 match is 21,600 ticks, about 650 ms today; see §5.1 decision 5.*
 - `src/sim/engine.ts` and `src/world/playback.ts`+`staging.ts` are deleted at switch-over
   (~2,500 lines); ARCHITECTURE §6 is rewritten to this contract.
 
@@ -122,13 +124,64 @@ Every transition is a thing that physically happens on the field; nothing is imp
 |---|---|---|
 | **0** | This spec; `core/` clock + rng + entities + steering + ball; lab page with play/pause/step/scrub; Flag code | Lab shows 18 players moving smoothly to targets at 20 Hz on a phone |
 | **1** | **Prototype set:** carries, support lines, defence line + markers, tackle contests, ruck → ptb → dummy-half, passing, last-tackle kick + chase; existing sprites | Player signs off the feel on frame strips + phone play |
-| **2** | **Full match:** scoring (try, conversion, penalty goal, field goal), kick types, errors/loose ball, penalties, restarts, halves, stamina; `MatchResult` output; headless mode; behind a setting | A season plays end-to-end on the new engine; all stats/overlay tests pass |
+| **2** | **Full match:** scoring (try, conversion, penalty goal, field goal), kick types, errors/loose ball, penalties, restarts, halves, stamina; `MatchResult` output; headless mode; behind a setting. Split into seven PRs in §5.1 | A season plays end-to-end on the new engine; all stats/overlay tests pass |
 | **3** | **Balance:** thousands of headless matches; score bands, try/error/penalty rates, home edge, weather effects; calibration tests | Rates within agreed bands; `< 100 ms` headless |
 | **4** | **Switch-over:** default on, delete old engine/playback, rewrite ARCHITECTURE §6 | Old code gone; Pages live |
 | **5** | Traits/skills as visible moves; Nines extras (#77); Capacitor store builds | Separate issues |
 
 Phases 0–1 are the point: if the prototype isn't fun to watch, nothing after it matters.
 
+### 5.1 Phase 2 breakdown (#86) — *agreed 2026-10-18*
+
+> **Decided (Leon, 2026-10-18): "go with the recommendations".** Real 9:00 halves, the live
+> match screen defaulting to ×4; Nines drop-kick conversions in 2c, the bonus zone left for
+> Phase 5 (#77) unless asked for; no scrums; the order below with 2g last; headless speed
+> checked on a phone in 2g and made faster in Phase 3.
+
+**Where the live sim is today** (after BAK-208 A–F2): kick-offs, sets of five, tackles and
+the wrestle, rucks, handovers, passes and knock-ons, five kick types, catches and loose
+balls, tries (counted, no points), legs and gas. It plays forever: no clock, no halves, no
+full time, no touch or dead ball, no penalties. It runs only in the lab; real matches still
+use the old engine and playback. Headless, an 18-minute match takes about 650 ms on one
+core.
+
+**Ground rules for every PR below:** one PR each, with lab sign-off like BAK-208; numbers go in
+`BAK-208-tuning.md` and become harness knobs; the standard balance plan is re-run on each and
+the report linked in the PR. The match is **Nines** (#77: one ruleset, no Classic toggle).
+
+| PR | What | Done when |
+|---|---|---|
+| **2a** | **Clock, halves, points, full time, `runMatch`.** Two 9:00 halves of real sim time (the length §7 and the fatigue tuning already assume; see Decisions). The clock stops from a try to the restart. **Half-time:** ends swap, everyone gets back half the legs he has lost and a full tank (BAK-208 §8.2), the side that received first kicks off. **Full time:** the siren goes, play runs on until the ball is next dead (tackle, try, turnover). Points: try 4 (conversions come in 2c). `runMatch(home, away, { seed, weather }) → MatchResult` with the **same shape as today**: score, events (mapped as the lab already does), possession, tackles, errors, tries; weather passed through; injuries empty and momentum from the score for now. One rules config (`NINES` in `league/`) holds the half length, points and set length. The harness measures **whole matches** (`minutes` gives way to halves) and judges wins on points. Lab: clock and score in the readout, a "skip to half-time" button. | A seeded match starts with a kick-off, has a half-time and ends at full time; the same seed gives the same `MatchResult`; the overlay accumulator test passes on `runMatch` output; standard plan re-run. |
+| **2b** | **Interchanges (#70), sim side.** The sheet carries a bench of 4 (the next best fit players from `teamSheetFromSquad`; rivals generate 13). Unlimited interchanges (Nines). A coach rule swaps the most tired player for the freshest bench player at a stoppage when his legs fall under a threshold; the bench recovers 5% a minute up to 90% (§8.2). On the field the two jog past each other at the sideline; "X on for Y" in the commentary. Rotation policy (Off, Standard, Heavy) as a sheet field, defaulting to Standard; the lineup screen (#69) sets it later. | With rotation on, a side's legs in the last 5 minutes beat the same side without it over many seeds; the swap is visible in the lab. |
+| **2c** | **Goal kicking: conversions and field goals.** Conversions are Nines **drop kicks**, taken from in front of where the try was grounded, quickly; accuracy from Boot and the kicking stat, distance and angle; a flight to the posts you can see. **Field goal** (BAK-208 §4.4): last 3 minutes, scores level or within 1, inside 30 m; charge-down 8%. **Bonus-zone tries** worth 5 if Leon wants them now (#77; zone per the current Nines rules). | Conversion % and field goals per match in the report; GOAL!/MISSED! pop-ups. |
+| **2d** | **Touch, dead ball and drop-outs** (closes most of BAK-208 E, #99). The ball and the carrier can go into touch; long kicks aim for touch; **40/20**; a kick dead in-goal or over the dead-ball line → 20 m restart; a defender tackled in-goal or forcing it dead → goal-line drop-out. Restarts are a play-the-ball **10 m in from touch** for the other side, no scrums. | A set can end every way BAK-208 §4.4 lists and each is readable; kick metres and 40/20s in the report. |
+| **2e** | **Penalties and six-again.** Ruck offences (holding down in a long wrestle, slow off the ruck) give **six again** (tackle count back to zero, SIX AGAIN! pop-up); offside (a defender up before the ball is played, more likely with Rush) and high shots (Hothead) give a **penalty**: tap and go, kick for touch (ball back, 10 m restart), or a shot at goal for 2 when in range and it makes sense on the clock and score. Sin bins later (BAK-206 B7). | Penalties and six-agains per match in the report; Rush pays for its line speed in penalties; the choice is shown. |
+| **2f** | **Weather, injuries, errors in contact.** Rain → handling (knock-ons, drops), wind → kick distance and goal accuracy; a big hit can injure (as the old engine does); an injured player comes off at the next stoppage through 2b, or plays on hampered with no bench left. Ball lost in contact (a knock-on in the tackle, not just strips). Momentum timeline from the play, as the old engine's. | Weather moves error and goal rates in the report; `MatchResult.injuries` is filled and the club game applies them. |
+| **2g** | **Live matches behind a setting.** A "Live match (beta)" setting. At kick-off matchday runs `runMatch` headless for the result, so ladder, stats and injuries are applied exactly as today; the match screen then plays **the same seed live** (deterministic, so what you watch is what was recorded). The overlay, score banners, pop-ups, speed controls and skip all work off the live sim; `match:finished` at full time. The overlay reads the half length from `NINES`. | A whole season plays end to end with the setting on; all stats/overlay parity tests pass against `runMatch`; works on a phone. |
+
+After Phase 2: Phase 3 (balance, with the harness on whole matches) and the lineup screen (#69).
+
+**Decisions (as proposed; all taken as recommended, see above):**
+1. **Match length.** Two 9:00 halves of real sim time (recommended): §7, the harness and the
+   fatigue tuning already assume it; at ×1 a match takes 18 minutes to watch, about 4½ at ×4.
+   The old playback took 5 minutes at ×1. The other way is a scaled clock (shorter halves of sim
+   time, the clock running fast), which would mean retuning legs and gas and rescaling every §7
+   target. Recommended: real halves, and the live match screen defaults to ×4 with ×1 a tap away.
+2. **Conversions as Nines drop kicks** and **bonus-zone tries worth 5** (#77) built into 2c now,
+   or plain conversions now and the Nines extras in Phase 5. Recommended: drop kicks now
+   (it is the same work either way); bonus zone your call.
+3. **No scrums:** touch, knock-ons and forward passes restart with a play-the-ball for the other
+   side. Recommended.
+4. **Order.** As listed: 2a then 2b (the rest of the legs story, while it is fresh), then the rules,
+   and 2g last. 2g can move up to right after 2c if you would rather play real matches on the live
+   sim sooner, with fewer rules.
+5. **Headless speed.** The §3.5 target (< 100 ms) assumed about 7,000 ticks; a real 2 × 9:00 match
+   is 21,600 ticks and takes about 650 ms today. That is fine for the player's own match (rivals
+   use the quick score), and 2g checks it on a phone; making it fast enough to play rival games on
+   the live sim is Phase 3 work.
+
 ## 6. Non-goals (for now)
-Mid-match coach calls (#73) ride on this architecture later. Interchanges (#70) and
-lineups (#69) wait until phase 2 defines the sheet the live sim consumes. No new art.
+Mid-match coach calls (#73) ride on this architecture later. Lineups (#69) wait for Phase 2's
+sheet; interchanges (#70) are part of Phase 2 (§5.1, 2b), with the rotation policy set by the
+coach rule until the lineup screen exists. No new art beyond what a phase needs on the field
+(a sideline swap, goalposts in flight).
