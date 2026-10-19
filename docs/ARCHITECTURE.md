@@ -208,14 +208,14 @@ export interface GameState {
 The lineup (GitHub #69, `systems/lineup.ts`): `{ starters: (playerId | null)[9]; bench:
 playerId[]; rotation: 'off' | 'standard' | 'heavy' }`, the starters in the formation's
 slot order (fullback, two wingers, centre, five-eighth, halfback, hooker, prop,
-second-row: the live sim's roles and the classic `SLOTS` agree). A man out of position
+second-row: the live sim's roles in `match/league/roles.ts`). A man out of position
 plays below his rating (same ×1, related ×0.92, unrelated ×0.8; tuning reference §21).
 Matchday resolves the saved lineup against the squad on the day: an injured starter is
 covered for that match by the best man for the slot (bench first, then the rest of the
 squad) with a line in the news, a man who has left the club is replaced in the saved
 lineup too. The sheet's roster is then the nine in slot order, each entry's `position`
-the slot he plays and his stats scaled by his fit, so the classic engine's actor picks,
-the live sim's slots and the match-screen looks all see the man the coach picked. Rival
+the slot he plays and his stats scaled by his fit, so the live sim's slots and the
+match-screen looks both see the man the coach picked. Rival
 coaches auto-pick by slot with the same fit. Old saves (v10 → v11) get today's auto pick.
 
 Rival squads (GitHub #74): every rival keeps a persistent `squad` (generated to match its
