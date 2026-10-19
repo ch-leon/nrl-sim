@@ -55,6 +55,7 @@ src/
     freeagency.ts            # free agent pool gen/refresh, signing   (WU-9 / BAK-179)
     matchday.ts              # player match of the round; SQUAD_MIN forfeit (GitHub #4)
     aging.ts                 # season-rollover ageing + age retirement (GitHub #5)
+    events.ts                # random events deck: draw, choices, modifiers (GitHub #75; cards in data/events.ts)
   match/                     # LIVE match sim (BAK-207) — replaces sim/engine + world/playback
     core/                    # sport-neutral: fixed-step clock, bodies, ball, snapshots, flag codes
     league/                  # rugby league (Nines) rules, roles, tackle contest, tactics
@@ -196,9 +197,16 @@ export interface GameState {
   weather?: WeatherKind;      // set for current round by fixtures system
   settings: { muted: boolean; volume: number; tutorialDone: boolean };
   history: { season: number; ladderPosition: number; premiership: boolean }[];
+  eventDeck: EventDeckState;  // random events: pending cards, cooldowns, modifiers, own RNG stream (#75)
   rngSeed: number;            // advanced state of the seeded RNG
 }
 ```
+
+Random events (GitHub #75): the deck draws at most one card a week (tick order 58,
+after morale) from its own seeded stream `eventDeck.rng`, so it never moves `rngSeed`.
+A card waits in the News screen for `EVENTS.ANSWER_WEEKS`, then takes its default
+choice. Money effects go through `earnMoney` (the finance ledger); the outcome of every
+choice is posted to the news. A new card stops a multi-week advance.
 
 Store API (WU-3): `getState(): GameState`, `setState(patch)`, `newGame(clubName, seed?)`,
 `resetForNewSeason()`. `setState` publishes `state:changed`.

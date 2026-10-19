@@ -146,6 +146,19 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       return { ...old, squad: fillPlayers(old.squad), freeAgents: fillPlayers(old.freeAgents) };
     },
   },
+  // v6 → v7: the random events deck (GitHub #75). Old saves start with an empty
+  // deck whose stream is derived from the save's rngSeed.
+  {
+    from: 6,
+    to: 7,
+    run: (old) => ({
+      ...old,
+      eventDeck: old.eventDeck ?? {
+        rng: ((typeof old.rngSeed === 'number' ? old.rngSeed : 1) ^ 0x9e3779b9) >>> 0,
+        pending: [], cooldowns: {}, lastDrawn: 0, modifiers: [],
+      },
+    }),
+  },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

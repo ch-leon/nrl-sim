@@ -20,6 +20,7 @@ import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
 import { registerStatsSystem } from './systems/stats';
 import { registerBoardSystem } from './systems/board';
+import { registerEventsSystem } from './systems/events';
 import { initBoardUi } from './ui/screens/board';
 import { initPlayerOfMatch } from './ui/screens/potm';
 import { openBuildScreen } from './ui/screens/build';
@@ -29,7 +30,7 @@ import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
 import { openContractsScreen } from './ui/screens/contracts';
-import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
+import { initNewsInbox, newsInbox, openInboxScreen, pendingDecisionCount } from './ui/inbox';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard } from './ui/orientation';
@@ -124,6 +125,7 @@ async function boot(): Promise<void> {
   registerYouthSystem();
   registerStatsSystem();
   registerBoardSystem();
+  registerEventsSystem();
   initPlayerOfMatch();
   initBoardUi();
 
@@ -156,7 +158,11 @@ async function boot(): Promise<void> {
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen());
   nav.registerScreen('contracts', 'Contracts', () => openContractsScreen());
   nav.registerScreen('news', 'News', () => openInboxScreen());
-  newsInbox.onChange((unread) => nav.setBadge('news', unread));
+  // News badge: unread messages plus event cards waiting for a choice (#75).
+  const refreshNewsBadge = (): void => nav.setBadge('news', newsInbox.unreadCount + pendingDecisionCount(getState()));
+  newsInbox.onChange(refreshNewsBadge);
+  bus.on('state:changed', refreshNewsBadge);
+  refreshNewsBadge();
   nav.registerScreen('help', '?', () => startTutorial(true));
 
   initAudio();

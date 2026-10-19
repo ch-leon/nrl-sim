@@ -16,7 +16,7 @@ export type AdvanceTarget =
  * Why a multi-advance halted. `target` means it finished normally; the others
  * are the "needs attention" stops.
  */
-export type StopKind = 'forfeit' | 'injury' | 'contract' | 'bankruptcy' | 'target';
+export type StopKind = 'forfeit' | 'injury' | 'contract' | 'bankruptcy' | 'decision' | 'target';
 
 export interface StopReason {
   kind: StopKind;
@@ -121,11 +121,14 @@ export interface WeekFacts {
   injuredStarters: readonly string[];
   contractAlerts: readonly string[];
   bankruptcyWarned: boolean;
+  /** Titles of event cards drawn this week (#75); optional for older callers. */
+  newDecisions?: readonly string[];
 }
 
 /**
  * First attention-needing stop after a tick, in priority order: bankruptcy, then
- * injury to a regular starter, then contract. Returns null when the run may go on.
+ * injury to a regular starter, then contract, then a new event card waiting for
+ * a choice. Returns null when the run may go on.
  */
 export function postWeekStop(facts: WeekFacts): StopReason | null {
   if (facts.bankruptcyWarned) {
@@ -137,6 +140,9 @@ export function postWeekStop(facts: WeekFacts): StopReason | null {
   }
   if (facts.contractAlerts.length > 0) {
     return { kind: 'contract', text: facts.contractAlerts[0]! };
+  }
+  if (facts.newDecisions && facts.newDecisions.length > 0) {
+    return { kind: 'decision', text: `Decision needed: ${facts.newDecisions[0]!}.` };
   }
   return null;
 }
