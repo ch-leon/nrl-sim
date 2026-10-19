@@ -239,7 +239,7 @@ Tests: `tests/match/league/fatigue.test.ts`.
 ## 12. Balance targets (§7) and how to measure
 
 Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams: tackles
-90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 · tries 5–9 ·
+150–210 · line breaks 13–24 · offloads 8–14 · errors 10–16 · kicks 20–32 · tries 5–9 ·
 completion 70–80%; stronger team wins ~70% at a 20-point rating gap. Measure with the
 balance harness (`balance/README.md`, the `balance-experiments` skill): `npm run balance`
 plays whole matches (§13) over many seeds and marks every count against these bands
@@ -266,8 +266,10 @@ minutes is 9–12 s a tackle, slower than the real game. The play-the-ball was q
 ball played about 2.2 s, NRL about 3 s). Slowed to 3 s, tackles come down to about 170 and
 kicks to 20 with tries in the band, but a slower game is less tiring and the legs tuning (§8,
 §10a) and the tactics tests were set on the old tempo; a 4.5 s ruck still gives 141 tackles
-and drops tries to 4 (tempo sweep `20261019-141554-tempo-2`). Not changed: a question for
-Leon (the band, or a slower game with legs re-tuned).
+and drops tries to 4 (tempo sweep `20261019-141554-tempo-2`). **Assumed (needs Leon), 2026-10-19:**
+the tempo stays and the bands move to it: tackles 150–210, line breaks 13–24, kicks 20–32
+(the old bands scaled ×1.67 low, ×1.75 high; per tackle the sim's line breaks and kicks were
+already in them). `BANDS` in `src/match/balance/report.ts` marks the new ones.
 
 ## 13. The match: clock, halves, points (BAK-207 §5.1, 2a)
 
