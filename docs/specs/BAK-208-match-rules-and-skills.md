@@ -225,7 +225,7 @@ wingers). **Overlap** (all presets): when a side has more players than the defen
 | Preset | Line speed | Commits | Lanes | Markers hold | Every tackle | Stepped |
 |---|---|---|---|---|---|---|
 | **Slide** (default) | 5 m/s | 2 (3–4 when the line is broken) | normal | ×1.0 | — | — |
-| **Rush** | 6.5 m/s | +1 | normal | ×0.6 | big hit +4%, bust +5% | +4% |
+| **Rush** | 6.5 m/s | +1 | normal | ×0.6 | big hit +4%, bust +11% (Phase 3: was +5%) | +4% |
 | **Compressed** | 4.5 m/s | — | pull ×1.4 toward the ball (edges open) | ×1.2 | bust −4%, offload −3% | −2% |
 
 ### 5.3 Who plays what

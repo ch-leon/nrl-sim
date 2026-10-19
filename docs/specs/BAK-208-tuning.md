@@ -140,6 +140,13 @@ are plain tables (experiments: `presets.attackDefault.*`, `presets.attack.<prese
 splits at 80 / 60 / 40 / 20 m. `rivalTactics(club)` fixes a rival's style from its id and
 strength. Lab: H / A pickers, `#lab?hatk=…&hdef=…&aatk=…&adef=…`.
 
+**Rush, Phase 3:** busts conceded `presets.defence.rush.broken` 0.05 → **0.11**. Rush beat
+Slide 59% over 160 matches (and a coach calling Rush every set won 66%); swept against busts
+conceded and the offside rate (`20261019-153211-rush-balance`), Rush now goes 49–50% both ways
+round over 240 (`20261019-153630-rush-confirm`): more big hits, many more busts conceded, more
+offside penalties. A coach's Rush or Hold call now also sets the offside rate, as the preset
+does (it had kept the side's own).
+
 Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands for Balanced).
 
 ## 9. Readability (§6)
@@ -513,6 +520,11 @@ say why ("not your ball", "one call a set", "tackles 3–4", "late in the set", 
 
 Rush and Hold set the defence to Rush or Compressed for the set; Field goal is offered only
 when the 2c field-goal rule is on, and then the kicker drops for goal.
+
+**Is a call a free win?** (run `20261019-153804-calls-strength-3`, 100 whole matches a row, even
+sides, one side making the same call whenever it may; no calls: home 51%): Rush 53%, Hold 55%,
+Kick early 52%, Bomb 47%, Shift left 46%, Hit-up every play **36%** (the forwards taking every
+carry costs). None wins much by being spammed; Hit-up is a call for the moment.
 
 Measured (run `20261019-145023-coach-calls`, 20 whole matches a row, one side making the same
 call whenever it may, even 60 v 60): Run it kicks 20.8 → 10.7 a match (and that side wins 25%:

@@ -45,7 +45,7 @@ import {
   MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, gapTarget, grubberTarget, intercept,
   kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate, type KickChoice,
 } from './tactics';
-import { DEFAULT_TACTICS, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type TeamTactics } from './presets';
+import { DEFAULT_TACTICS, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type DefencePreset, type TeamTactics } from './presets';
 import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
 import { traitBoost, type TraitInstance } from '../../data/traits';
 import { FATIGUE, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
@@ -560,9 +560,12 @@ export class LiveSim implements MatchSim {
   }
   /** How the defending side's line is set. */
   private defPlan(): DefencePlan {
-    const def = other(this.attacking);
-    const called = this.callState[def].defence;
-    return defencePlan((called && callDefence(called)) || this.tactics[def].defence);
+    return defencePlan(this.defencePreset(other(this.attacking)));
+  }
+  /** How a side defends now: its preset, or the coach's call for the set (#73) — Rush pays in offside penalties either way. */
+  private defencePreset(side: Side): DefencePreset {
+    const called = this.callState[side].defence;
+    return (called && callDefence(called)) || this.tactics[side].defence;
   }
   /** After a break the carrier goes: he sprints while his gas lasts (a Jets player has more of it). */
   private burst(c: Player): void {
@@ -1419,7 +1422,7 @@ export class LiveSim implements MatchSim {
       }
       // Offside as the ball is played (2e): more likely in a defence that rushes up.
       const defSide = other(this.attacking);
-      if (this.rng.next() < offsideChance(this.tactics[defSide].defence)) {
+      if (this.rng.next() < offsideChance(this.defencePreset(defSide))) {
         const culprit = [...this.side(defSide)].sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[1] ?? this.side(defSide)[0]!;
         this.penalize(defSide, { ...this.mark }, `${culprit.name} is offside`, culprit, 'offside');
         return;
