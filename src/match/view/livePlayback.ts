@@ -123,6 +123,11 @@ export class LivePlayback {
     return null;
   }
 
+  /** Who has the ball (the chips show attack or defence calls). */
+  get inPossession(): Side {
+    return this.sim.inPossession;
+  }
+
   /** The tick the match is at (for the resume record). */
   get tick(): number {
     return this.runner.tick;
@@ -198,6 +203,7 @@ export class LivePlayback {
   private onSimEvents(events: readonly SimEvent[]): void {
     const cur = this.runner.cur;
     for (const e of events) {
+      if (e.kind === 'coach-call' && !this.skipping) this.opts.overlay?.comment(e.text);
       const p = this.skipping ? null : popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups.show(p, e.side, e.slot);

@@ -235,6 +235,8 @@ export interface MatchOverlayHandle {
   destroy(): void;
   /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
   setClock(matchSeconds: number, half: 1 | 2): void;
+  /** A line in the commentary that is not a match event (a coach's call, #73). */
+  comment(line: string): void;
 }
 
 let active: MatchOverlayHandle | null = null;
@@ -453,6 +455,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
       if (active === handle) active = null;
     },
+    comment(line: string): void {
+      appendCommentary(line);
+    },
     setClock(matchSeconds: number, half: 1 | 2): void {
       if (root.classList.contains('nrl-mo-final')) return;
       liveClock = true;
@@ -583,6 +588,13 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: calc(7.5rem + env(sa
   position: fixed; left: 50%; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   z-index: 20; display: flex; gap: 0.35rem; pointer-events: auto;
 }
+.nrl-mo-calls {
+  position: fixed; right: 0.5rem; bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px));
+  z-index: 20; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; max-width: 17.5rem; pointer-events: auto;
+}
+.nrl-mo-calls .nrl-btn { min-height: 44px; min-width: 4.6rem; padding: 0.15rem 0.4rem; font-size: 0.78rem; }
+.nrl-mo-calls .nrl-btn[data-made] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; opacity: 1; }
+.nrl-mo-final .nrl-mo-calls, body.nrl-match-final .nrl-mo-calls { display: none; }
 .nrl-mo-controls .nrl-btn[data-active] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; }
 /* Full-time: scoreboard and stats stay put (HUD/nav are still hidden); the
    feed gives way to the Back-to-Club button (MatchScene, bottom-centre where
