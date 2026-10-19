@@ -82,12 +82,13 @@ describe('soak', () => {
         expect(s.finance.sponsorGrant).toBeGreaterThan(0);
         expect(s.finance.gate).toBeGreaterThan(0);
         expect(s.finance.other).toBe(0);
-        expect(s.finance.upkeep).toBe(0);
         if (mode === 'idle') {
           expect(s.finance.transfers).toBe(0);
           expect(s.finance.facilities).toBe(0);
+          expect(s.finance.upkeep).toBe(0);
         } else {
           expect(-s.finance.transfers).toBe(s.signingFees);
+          expect(s.finance.upkeep).toBeLessThanOrEqual(0);
         }
       }
       expect(tallyNet(r.seasons[0]!.finance)).toBeCloseTo(r.seasons[0]!.money - STARTING_MONEY, 0);
@@ -101,6 +102,8 @@ describe('soak', () => {
     expect(summary.map((s) => `${s.mode}:${s.season}`)).toEqual(['idle:1', 'idle:2', 'managed:1', 'managed:2']);
     // The managed manager built at least a Paddock over two seasons.
     expect(runs[1]!.seasons[0]!.finance.facilities + runs[1]!.seasons[1]!.finance.facilities).toBeLessThan(0);
+    // …and pays upkeep on it from then on (#164).
+    expect(runs[1]!.seasons[1]!.finance.upkeep).toBeLessThan(0);
     for (const row of summary) {
       expect(row.runs).toBe(1);
       expect(row.finance.wages).toBeLessThan(0);

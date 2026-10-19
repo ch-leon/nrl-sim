@@ -1,6 +1,7 @@
 // src/ui/screens/build.ts — DOM build menu + facility upgrade/info popup (BAK-178).
 //
-// The build menu lists FACILITY_CATALOG with cost / footprint / "what it trains".
+// The build menu lists FACILITY_CATALOG with cost / upkeep a week (N6) / footprint /
+// "what it trains".
 // Unaffordable rows render disabled. Selecting an affordable facility closes the
 // menu and hands off to the live GroundsScene's placement mode via the scene
 // registry in world/placement.ts (DOM never imports Phaser).
@@ -14,6 +15,7 @@ import { el, panel, button, openModal, closeModal, closeScreen, mount } from '..
 import {
   FACILITY_CATALOG,
   SPECIAL_MAGNITUDE,
+  facilityUpkeep,
   upgradeCost,
   type FacilityDefId,
   type FacilityDef,
@@ -84,6 +86,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
       'div',
       { class: 'nrl-build-meta' },
       el('span', { class: 'nrl-build-cost', text: fmtMoney(def.cost) }),
+      el('span', { class: 'nrl-build-upkeep', text: `${fmtMoney(facilityUpkeep(def, 1))}/wk upkeep` }),
       el('span', {
         class: 'nrl-build-fp',
         text: `${def.footprint.w}×${def.footprint.h}`,
@@ -147,9 +150,15 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
   const affordable = !atMax && money >= cost;
 
   const container = el('div', { class: 'nrl-facility-body' });
+  // Running cost now, and what the next level would cost to run (N6).
+  const upkeepNow = fmtMoney(facilityUpkeep(def, facility.level));
+  const upkeepText = atMax
+    ? `Upkeep ${upkeepNow}/wk`
+    : `Upkeep ${upkeepNow}/wk · L${nextLevel} ${fmtMoney(facilityUpkeep(def, nextLevel))}/wk`;
   container.append(
     el('h2', { class: 'nrl-facility-name', text: def.name }),
     el('div', { class: 'nrl-facility-level', text: `Level ${facility.level} / 3` }),
+    el('div', { class: 'nrl-facility-upkeep', text: upkeepText }),
     el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def) }),
   );
 
@@ -266,6 +275,8 @@ const BUILD_CSS = `
   margin: 0.15rem 0;
 }
 .nrl-build-cost { font-weight: bold; }
+.nrl-build-upkeep { opacity: 0.85; }
+.nrl-facility-upkeep { font-size: 0.85rem; }
 .nrl-build-blurb { font-size: 0.75rem; line-height: 1.2; }
 .nrl-build-hint { font-size: 0.75rem; font-weight: bold; opacity: 0.85; }
 .nrl-build-head {

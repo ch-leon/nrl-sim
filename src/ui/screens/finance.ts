@@ -6,7 +6,7 @@
 
 import { bus } from '../../core/events';
 import { getState, type GameState } from '../../core/state';
-import { weeklyWages, weeklyIncome, gateReceipts } from '../../systems/economy';
+import { weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts } from '../../systems/economy';
 import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { buildObjectivesSection } from './board';
 import { el, panel, button, openModal, closeScreen } from '../dom';
@@ -29,6 +29,8 @@ export interface FinanceSummary {
   money: number;
   /** Σ squad wages per week (weeklyWages). */
   wagesWeekly: number;
+  /** Σ facility upkeep per week (weeklyUpkeep, N6). */
+  upkeepWeekly: number;
   /** Sponsor Board part of weeklyIncome. */
   sponsorWeekly: number;
   /** Reputation grant part of weeklyIncome. */
@@ -42,9 +44,9 @@ export interface FinanceSummary {
    * games left, e.g. in the off-season stretch of the finals.
    */
   gateWeekly: number;
-  /** income + average gate − wages. */
+  /** income + average gate − wages − upkeep. */
   netWeekly: number;
-  /** max(0, wages − income − average gate): the weekly cash drain. */
+  /** max(0, wages + upkeep − income − average gate): the weekly cash drain. */
   burnWeekly: number;
   /** Weeks of cash left at the current burn; null when the club is not burning cash. */
   runwayWeeks: number | null;
@@ -61,6 +63,7 @@ export interface FinanceSummary {
  */
 export function financeSummary(state: GameState): FinanceSummary {
   const wagesWeekly = weeklyWages(state);
+  const upkeepWeekly = weeklyUpkeep(state);
   const incomeWeekly = weeklyIncome(state);
   // Sponsor is the only term that doesn't depend on reputation.
   const sponsorWeekly = weeklyIncome({ ...state, reputation: 0 });
@@ -80,7 +83,7 @@ export function financeSummary(state: GameState): FinanceSummary {
     : null;
 
   const gateWeekly = averageGateWeekly(state, nextHome?.projectedGate ?? 0);
-  const burnWeekly = Math.max(0, wagesWeekly - incomeWeekly - gateWeekly);
+  const burnWeekly = Math.max(0, wagesWeekly + upkeepWeekly - incomeWeekly - gateWeekly);
   const runwayWeeks = burnWeekly > 0 ? Math.max(0, state.money) / burnWeekly : null;
 
   const expiring = state.squad
@@ -91,11 +94,12 @@ export function financeSummary(state: GameState): FinanceSummary {
   return {
     money: state.money,
     wagesWeekly,
+    upkeepWeekly,
     sponsorWeekly,
     grantWeekly,
     incomeWeekly,
     gateWeekly,
-    netWeekly: incomeWeekly + gateWeekly - wagesWeekly,
+    netWeekly: incomeWeekly + gateWeekly - wagesWeekly - upkeepWeekly,
     burnWeekly,
     runwayWeeks,
     nextHome,
@@ -124,6 +128,8 @@ export interface LedgerWeek {
   week: number;
   /** Negative: the wage bill for the week. */
   wages: number;
+  /** Negative: facility upkeep for the week (N6). */
+  upkeep: number;
   /** Sponsor + grant income for the week. */
   income: number;
   /** Gate receipts for the week. */
@@ -137,7 +143,7 @@ export interface LedgerWeek {
 /**
  * Keeps the last `maxWeeks` weeks of money movements. Feed it money:changed
  * deltas with the season/week they happened in. Reasons match the labels that
- * applyEconomy passes to earnMoney ('wages', 'sponsor+grant', 'gate').
+ * applyEconomy passes to earnMoney ('wages', 'upkeep', 'sponsor+grant', 'gate').
  */
 export class FinanceLedger {
   private weeks: LedgerWeek[] = []; // oldest → newest
@@ -148,13 +154,14 @@ export class FinanceLedger {
     const { delta, reason, season, week } = entry;
     let row = this.weeks[this.weeks.length - 1];
     if (!row || row.season !== season || row.week !== week) {
-      row = { season, week, wages: 0, income: 0, gate: 0, other: 0, net: 0 };
+      row = { season, week, wages: 0, upkeep: 0, income: 0, gate: 0, other: 0, net: 0 };
       this.weeks.push(row);
       if (this.weeks.length > this.maxWeeks) {
         this.weeks.splice(0, this.weeks.length - this.maxWeeks);
       }
     }
     if (reason === 'wages') row.wages += delta;
+    else if (reason === 'upkeep') row.upkeep += delta;
     else if (reason === 'sponsor+grant') row.income += delta;
     else if (reason === 'gate') row.gate += delta;
     else row.other += delta;
@@ -230,6 +237,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
   const weekly = el('div', { class: 'nrl-finance-weekly' },
     statRow('Bank balance', fmtMoney(s.money), s.money < 0),
     statRow('Wage bill', fmtMoney(-s.wagesWeekly)),
+    statRow('Upkeep', fmtMoney(-s.upkeepWeekly)),
     statRow('Sponsor', fmtMoney(s.sponsorWeekly)),
     statRow('Grant', fmtMoney(s.grantWeekly)),
     statRow('Home gates (avg/wk)', fmtMoney(s.gateWeekly)),
@@ -264,13 +272,13 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
   } else {
     const table = el('table', { class: 'nrl-finance-table' });
     const head = el('tr');
-    for (const h of ['Wk', 'Wages', 'Income', 'Gate', 'Other', 'Net']) head.append(el('th', { text: h }));
+    for (const h of ['Wk', 'Wages', 'Upkeep', 'Income', 'Gate', 'Other', 'Net']) head.append(el('th', { text: h }));
     table.append(el('thead', {}, head));
     const tbody = el('tbody');
     for (const r of ledgerRows) {
       const tr = el('tr');
       tr.append(el('td', { text: `S${r.season} W${r.week}` }));
-      for (const v of [r.wages, r.income, r.gate, r.other, r.net]) {
+      for (const v of [r.wages, r.upkeep, r.income, r.gate, r.other, r.net]) {
         const td = el('td', { text: fmtMoneyCompact(v) });
         if (v < 0) td.classList.add('nrl-finance-neg');
         tr.append(td);

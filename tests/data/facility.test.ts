@@ -3,8 +3,10 @@ import {
   FACILITY_CATALOG,
   LEVEL_MULT,
   SPECIAL_MAGNITUDE,
+  UPKEEP_LEVEL_MULT,
   levelMult,
   upgradeCost,
+  facilityUpkeep,
   effectiveTrains,
   type FacilityDefId,
 } from '../../src/data/facility';
@@ -93,6 +95,28 @@ describe('levelMult / LEVEL_MULT', () => {
     expect(levelMult(1)).toBe(1);
     expect(levelMult(2)).toBe(1.6);
     expect(levelMult(3)).toBe(2.2);
+  });
+});
+
+describe('upkeep (N6, #164)', () => {
+  it('every facility has a weekly upkeep of about 1% of its build cost', () => {
+    for (const id of IDS) {
+      const def = FACILITY_CATALOG[id];
+      expect(def.upkeep, id).toBeGreaterThan(0);
+      expect(def.upkeep / def.cost, id).toBeGreaterThanOrEqual(0.0099);
+      expect(def.upkeep / def.cost, id).toBeLessThanOrEqual(0.0101);
+    }
+    expect(FACILITY_CATALOG.grandstand.upkeep).toBe(1200);
+    expect(FACILITY_CATALOG.trainingPaddock.upkeep).toBe(80);
+  });
+
+  it('scales ×1.5 at L2 and ×2 at L3', () => {
+    expect(UPKEEP_LEVEL_MULT).toEqual([1, 1.5, 2]);
+    const g = FACILITY_CATALOG.grandstand;
+    expect(facilityUpkeep(g, 1)).toBe(1200);
+    expect(facilityUpkeep(g, 2)).toBe(1800);
+    expect(facilityUpkeep(g, 3)).toBe(2400);
+    expect(facilityUpkeep(FACILITY_CATALOG.weightsRoom, 2)).toBe(225);
   });
 });
 
