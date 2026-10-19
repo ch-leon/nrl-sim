@@ -245,7 +245,7 @@ stretches with no half-time): even sides end on 52% legs (35%); stamina 30 v 80 
 36% / 69% (23% / 63%) and fliers v stayers 34% / 69% (19% / 59%), with the fliers
 winning 10% instead of none; COOKED! goes from about 5.6 a match to almost none between
 even sides. Tries, breaks, tackles and kicks barely move. With four-point tries only,
-30% of even matches are drawn; conversions (2c) will split most of them.
+30% of even matches are drawn; conversions (2c) bring that to about 10% (§15).
 
 Tests: `tests/match/league/match.test.ts`.
 
@@ -308,5 +308,11 @@ until 2d's dead-ball restarts).
 Odds from a conversion spot at Skill 60 (Skill 80 / Big Boot I): under the posts 99%;
 grounded 9 m off centre 81% (92 / 88); 14 m off 55% (68 / 63); 20 m off 36% (46 / 41);
 in the corner 19–25%. Field goal straight in front: 70% from 20 m, 56% from 25 m.
+
+Measured (standard plan, 20 whole matches a row): about 53% of conversions go over
+(3.5 of 6.6 tries between even sides; 7.4 of 11.1 for 70 v 50, whose tries come more
+central); field goals are rare, about one match in ten, as in real Nines. Draws between
+even sides fall from 30% with four-point tries only to about 10%. Nothing else moves
+beyond luck except where the extra stoppages give legs back (fewer swaps in 70 v 50).
 
 Tests: `tests/match/league/goals.test.ts`.

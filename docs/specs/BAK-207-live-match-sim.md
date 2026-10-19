@@ -184,6 +184,16 @@ the new man's own look on the sprite; an **ON!** pop-up and "X on for Y" mark th
 The lab has a **Bench** picker (off / standard / heavy, both sides; `#lab?bench=heavy`);
 balance plans take `bench` (0–4) and `rotation` per side. Measured: tuning reference §14.
 
+**2c as shipped:** `league/goals.ts`. The conversion is taken by the scoring side's kicker
+(slot 5) after the try celebration, in line with the grounding and as far back as makes
+the posts widest; the clock stays stopped, and one is taken even after the siren before
+the half ends. Odds come from the angle the uprights make, the distance, Skill and Big
+Boot (one roll); the flight shows over or wide. Field goals as BAK-208 §4.4: a miss is a
+tap restart for the defence on their 20 until 2d brings dead-ball restarts; a charge-down
+is a loose ball. The bonus zone stays with #77. GOAL!, MISSED!, FIELD GOAL! and CHARGED
+DOWN! pop-ups; `goals.*` knobs; `goals` and `fieldGoals` report columns. About 53% of
+conversions go over and draws between even sides fall to about 10% (tuning reference §15).
+
 After Phase 2: Phase 3 (balance, with the harness on whole matches) and the lineup screen (#69).
 
 **Decisions (as proposed; all taken as recommended, see above):**
