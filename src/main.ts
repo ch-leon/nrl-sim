@@ -12,7 +12,7 @@ import { createNav } from './ui/nav';
 import { closeModal, closeScreen, ensureStyles } from './ui/dom';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
 import { registerTrainingSystem } from './systems/training';
-import { registerEconomySystem } from './systems/economy';
+import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
 import { registerPlayerMatchSystem } from './systems/matchday';
 import { registerAgingSystem } from './systems/aging';
@@ -130,6 +130,7 @@ async function boot(): Promise<void> {
   // matches (player + rivals) → ladder → free agents → autosave.
   registerTrainingSystem();
   registerEconomySystem();
+  registerFinanceSystem(); // the club's books by season (#172)
   registerFixturesSystem();
   registerPlayerMatchSystem();
   registerFreeAgencySystem();

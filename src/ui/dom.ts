@@ -556,6 +556,8 @@ export const CSS = `
 .nrl-finance-table th:first-child,
 .nrl-finance-table td:first-child { text-align: left; }
 .nrl-finance-table td.nrl-finance-neg { color: #b00020; }
+.nrl-finance-pnl-table { width: 100%; }
+.nrl-finance-pnl-net td { font-weight: bold; border-top: 2px solid #000; }
 
 /* ── News inbox (#45) ─────────────────────────────────────────────────── */
 .nrl-nav-badge {

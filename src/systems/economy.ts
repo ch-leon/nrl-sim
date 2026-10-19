@@ -10,12 +10,13 @@
 // to push money negative — spendMoney's guard would block that, so we credit a
 // negative delta instead.
 
-import { getState, setState, type Fixture, type GameState, type Player } from '../core/state';
+import { emptyFinance, getState, setState, type FinanceLine, type Fixture, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
 import { ECON, SEASON_ROUNDS, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
+import { EVENT_CARDS } from '../data/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { renewalWage, warnForWeeks } from './contracts';
 
@@ -45,15 +46,19 @@ export function weeklyUpkeep(state: GameState): number {
   }, 0);
 }
 
-/**
- * Passive weekly income:
- *   SPONSOR_PER_LEVEL × sponsorBoardLevel (0 if unbuilt)
- * + REP_GRANT_PER_POINT × reputation.
- */
+/** Sponsor Board income: SPONSOR_PER_LEVEL × its level (0 if unbuilt). */
+export function sponsorIncome(state: GameState): number {
+  return ECON.SPONSOR_PER_LEVEL * facilityLevel(state, 'sponsorBoard');
+}
+
+/** The weekly reputation grant: REP_GRANT_PER_POINT × reputation. */
+export function reputationGrant(state: GameState): number {
+  return ECON.REP_GRANT_PER_POINT * state.reputation;
+}
+
+/** Passive weekly income: sponsorIncome + reputationGrant (booked as two lines, #172). */
 export function weeklyIncome(state: GameState): number {
-  const sponsorLevel = facilityLevel(state, 'sponsorBoard');
-  return ECON.SPONSOR_PER_LEVEL * sponsorLevel
-    + ECON.REP_GRANT_PER_POINT * state.reputation;
+  return sponsorIncome(state) + reputationGrant(state);
 }
 
 /**
@@ -236,8 +241,8 @@ export function handleBankruptcy(_state: GameState): GameState {
 
 /**
  * Tick hook order 30. Fixed order: wages (deduct, may go negative) → upkeep →
- * income → gate → contracts → bankruptcy. Emits money:changed per net movement
- * (via earnMoney; deductions credit a negative delta).
+ * sponsor → grant → gate → contracts → bankruptcy. Emits money:changed per net
+ * movement (via earnMoney; deductions credit a negative delta).
  */
 export function applyEconomy(state: GameState): GameState {
   // Compute wages from the entry snapshot; subsequent reads use getState() as the
@@ -248,8 +253,10 @@ export function applyEconomy(state: GameState): GameState {
   const upkeep = weeklyUpkeep(state);
   if (upkeep !== 0) earnMoney(-upkeep, 'upkeep');
 
-  const income = weeklyIncome(getState());
-  if (income !== 0) earnMoney(income, 'sponsor+grant');
+  const sponsor = sponsorIncome(getState());
+  if (sponsor !== 0) earnMoney(sponsor, 'sponsor');
+  const grant = reputationGrant(getState());
+  if (grant !== 0) earnMoney(grant, 'grant');
 
   const gate = gateReceipts(getState());
   if (gate !== 0) earnMoney(gate, 'gate');
@@ -267,5 +274,64 @@ export function applyEconomy(state: GameState): GameState {
 export function registerEconomySystem(): void {
   registerTickHook('economy', TICK_ORDER.economy, () => {
     applyEconomy(getState());
+  });
+}
+
+// ── The club's books (N6, #172) ───────────────────────────────────────────────
+
+/** Event modifiers that pay or cost money ('Merch royalties', …) use their label as the ledger reason. */
+const MODIFIER_LABELS = new Set(EVENT_CARDS.flatMap((c) => c.choices.flatMap((ch) => ch.effects.flatMap((e) =>
+  (e.kind === 'modifier' && e.effects.some((x) => x.kind === 'money') ? [e.label] : [])))));
+
+/**
+ * The line of the books a ledger reason belongs to. Reasons are the strings each
+ * system passes to earnMoney / spendMoney: this file's fixed words, the board's,
+ * `event: <title>` and modifier labels from the deck, and `<verb>:<id>` for
+ * signings, sales, renewals, releases and the grounds. Anything else is `other`.
+ */
+export function classifyReason(reason: string): FinanceLine {
+  if (reason === 'wages') return 'wages';
+  if (reason === 'upkeep') return 'upkeep';
+  if (reason === 'sponsor') return 'sponsor';
+  if (reason === 'grant' || reason === 'sponsor+grant') return 'grant';
+  if (reason === 'gate') return 'gate';
+  if (reason === 'finals prize money') return 'prize';
+  if (reason === 'board grant') return 'boardGrant';
+  if (reason.startsWith('event: ') || MODIFIER_LABELS.has(reason)) return 'events';
+  if (/^(sign|sell):/.test(reason)) return 'transfers';
+  if (/^(renew|release):/.test(reason)) return 'contracts';
+  if (/^(build|upgrade|move|demolish):/.test(reason)) return 'facilities';
+  return 'other';
+}
+
+/** Σ of a season's lines: its net money movement. */
+export function financeNet(f: Record<FinanceLine, number>): number {
+  let n = 0;
+  for (const l of Object.keys(f) as FinanceLine[]) n += f[l];
+  return n;
+}
+
+/** The lines the rollover pays for the season just played (fixtures-season hook → applyBoardReview). */
+const CLOSING_LINES: ReadonlySet<FinanceLine> = new Set(['prize', 'boardGrant']);
+
+/**
+ * Keep the club's books: every money:changed delta is added to its line in the
+ * entry for the current season (opened on the first movement, so a save written
+ * at any moment loads right). The rollover pays the finals prize money and the
+ * board grant after the season counter has moved to the next season but in week
+ * 1, so those two lines at week 1 close the season just played instead. Pure
+ * bookkeeping: nothing here depends on the order listeners fire in. Called once
+ * from main.ts (and the soak); returns the unsubscribe.
+ */
+export function registerFinanceSystem(): () => void {
+  return bus.on('money:changed', ({ delta, reason }) => {
+    const s = getState();
+    const line = classifyReason(reason);
+    const closing = s.week === 1 && CLOSING_LINES.has(line) && s.finance.some((e) => e.season === s.season - 1);
+    const season = closing ? s.season - 1 : s.season;
+    const books = s.finance.some((e) => e.season === season)
+      ? s.finance
+      : [...s.finance, emptyFinance(season)].sort((a, b) => a.season - b.season);
+    setState({ finance: books.map((e) => (e.season === season ? { ...e, [line]: e[line] + delta } : e)) });
   });
 }

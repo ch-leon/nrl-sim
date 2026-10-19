@@ -238,3 +238,41 @@ below.
   ticket price).
 - **Idle Hard is bust in season 1** (−$185k on wages × 1.3 from $100k): item 6 must
   soften Hard, not sharpen it.
+
+## #172 Season P&L on the Finance screen
+
+- PR #175, merged. **Save v9 → v10**: `GameState.finance`, the club's books by season.
+- `FINANCE_LINES` and `SeasonFinance` live in `core/state.ts`: twelve lines (wages,
+  upkeep, sponsor, grant, gates, prize money, board grants, events, transfers,
+  contracts, facilities, other), one entry per season, oldest first. `createNewGame`
+  opens season 1's; the v9 → v10 migration gives an old save an empty entry for the
+  season it is in (`emptyFinance`), with a test.
+- `registerFinanceSystem()` in `economy.ts` (registered from `main.ts`, additively, and
+  by the soak) books every `money:changed` delta on its line (`classifyReason`, moved
+  here from the soak) in the current season's entry, opening it on the first
+  movement. The rollover pays the finals prize money and the board grant after the
+  season counter has moved on but in week 1, so those two lines at week 1 close the
+  season just played. Nothing depends on the order listeners fire in: a first cut
+  opened the new entry on `week:advanced`, and the autosave, which subscribes first,
+  wrote a season-2 save with only season 1's entry, so week 1 was booked to the wrong
+  season (caught by the save corpus, which now holds three v10 saves from the phone
+  playthrough). The economy now
+  books the Sponsor Board and the reputation grant as two lines (`sponsor`, `grant`)
+  instead of one `sponsor+grant` movement; the weekly ledger on the screen still
+  shows them together as Income.
+- Finance: a "Season P&L · S2 v S1" panel under the weekly numbers: one row per line
+  with money on it in either season, biggest this season first, this season and last
+  in two columns, a bold Net row at the foot; "Nothing booked yet" before the first
+  week. `seasonPnl(state)` is the pure view-model.
+- The soak keeps its own tally from the bus and now checks the game's books against
+  it line by line at every rollover (less what a save loaded mid-season had already
+  booked): a difference is a problem. 100 seasons across the three modes, the
+  old-save runs (v1–v9) and the save corpus (v9 and v10) all agree.
+- Verified: tsc, vitest (the booking of each line, the season boundary with a prize paid
+  during the rollover, a save with no books, a real week tick against the ledger, the
+  migration, the view-model's ordering and nets), build, the full soak (no problems),
+  Playwright at 844×390 and 1280×800 (`docs/screenshots/172/`: Finance in season 2
+  with last season beside it).
+- Assumed (needs Leon): the twelve lines and their labels; every season is kept (twelve
+  numbers a season, so a save grows by about 200 bytes a season); Sponsor and Grant
+  booked apart; the panel sits under the weekly numbers, above the board's objectives.

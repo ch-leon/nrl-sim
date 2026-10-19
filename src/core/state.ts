@@ -86,7 +86,25 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
+
+/**
+ * The lines of the club's books (N6, #172): where the money comes from and
+ * where it goes. Every ledger reason maps to one (systems/economy.ts
+ * classifyReason); anything new lands in `other` so it shows rather than vanishes.
+ */
+export const FINANCE_LINES = [
+  'wages', 'upkeep', 'sponsor', 'grant', 'gate', 'prize', 'boardGrant', 'events', 'transfers', 'contracts', 'facilities', 'other',
+] as const;
+export type FinanceLine = (typeof FINANCE_LINES)[number];
+
+/** One season's money by line: Σ money:changed deltas, negative = spent (#172). */
+export type SeasonFinance = { season: number } & Record<FinanceLine, number>;
+
+/** A season's books with nothing booked yet. */
+export function emptyFinance(season: number): SeasonFinance {
+  return { season, ...(Object.fromEntries(FINANCE_LINES.map((l) => [l, 0])) as Record<FinanceLine, number>) };
+}
 
 /** One completed season. The extended fields are optional for pre-v4 entries. */
 export interface SeasonRecord {
@@ -171,6 +189,13 @@ export interface GameState {
   eventDeck: EventDeckState; // random events (#75)
   /** The player's kit design (#79). Absent = the look derived from the club colours. */
   kit?: import('../art/match/kit').KitDesign;
+  /**
+   * The club's books by season (#172), oldest first, kept by
+   * systems/economy.ts registerFinanceSystem: a season's entry opens on its first
+   * money movement, and the rollover's prize money and board grant close the season
+   * just played.
+   */
+  finance: SeasonFinance[];
   rngSeed: number; // advanced state of the seeded RNG
 }
 
@@ -265,6 +290,7 @@ export function createNewGame(
     boardPatience: BOARD.START_PATIENCE,
     objectives: [],
     eventDeck: newEventDeck(seed),
+    finance: [emptyFinance(1)],
     rngSeed: rng.state(),
   };
 

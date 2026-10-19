@@ -11,7 +11,7 @@
 // injectable abstraction so Node-env unit tests can pass a Map-backed fake.
 
 import type { GameState } from './state';
-import { getState, SAVE_VERSION } from './state';
+import { emptyFinance, getState, SAVE_VERSION } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
 import { bus } from './events';
@@ -176,6 +176,9 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v8 → v9: optional GameState.kit (GitHub #79). Old saves have no design, which
   // keeps the look derived from their club colours, so nothing is filled in.
   { from: 8, to: 9, run: (old) => ({ ...old }) },
+  // v9 → v10: GameState.finance, the club's books by season (N6, #172). An old
+  // save starts with nothing booked for the season it is in.
+  { from: 9, to: 10, run: (old) => ({ ...old, finance: [emptyFinance(typeof old.season === 'number' ? old.season : 1)] }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */
