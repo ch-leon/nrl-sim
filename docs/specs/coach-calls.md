@@ -1,10 +1,11 @@
-# Coach calls during the match (#73) — spec, for Leon's sign-off
-**GitHub:** #73 | **Status:** Draft for Leon (2026-10-19) | **Builds on:** BAK-207 (live sim),
-BAK-208 §5 (zone tactics) and §11 ("Coach calls during play")
+# Coach calls during the match (#73) — spec
+**GitHub:** #73 | **Status:** Agreed 2026-10-19 (all seven decisions in §9 as recommended) |
+**Builds on:** BAK-207 (live sim), BAK-208 §5 (zone tactics) and §11 ("Coach calls during play")
 
-> Written while Leon is away, from #73, BAK-206 §Backlog and BAK-208 §11. Nothing here is
-> built. The decisions marked **Leon** at the end need his call before any code; each has a
-> recommendation so the work can start the day he answers.
+> Written from #73, BAK-206 §Backlog and BAK-208 §11. **Decided (Leon, 2026-10-19): all seven
+> recommendations in §9 taken as written.** Built after BAK-207 2g (it needs the live match
+> screen), before or alongside Phase 3, behind a setting that is on by default if it reads
+> well on screen.
 
 ## 1. What the player gets
 
@@ -120,9 +121,9 @@ the golden test below; AI calls as a later balance lever.
 3. Match-screen chips, pop-ups, commentary, "calls that paid off" in the stats strip.
 4. (Later) AI coach calls; calls unlocked by coaching staff (#47 board / facilities).
 
-## 9. Decisions for Leon
+## 9. Decisions (Leon, 2026-10-19: all as recommended)
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 |---|---|---|
 | 1 | Scope of a call: the next play, or the whole set? | Per call, as in §3: plays for Hit-up / Shift, sets for kicks and defence |
 | 2 | Limit: one per set, a cooldown, or N per half? | One per set each way (simple, readable) |
