@@ -8,14 +8,14 @@
 // tests/fixtures/saves, tests/qa/corpus.test.ts). Used by scripts/soak.ts (npm run
 // soak) and, at a smaller size, by tests/qa/soak.test.ts. Never imported by the
 // game. No Phaser.
-import { createNewGame, getState, loadState, setState, type GameState, type Player } from '../core/state';
+import { createNewGame, getState, loadState, setState, type Fixture, type GameState, type Player } from '../core/state';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../core/time';
 import { bus } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
-import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, type Difficulty } from '../config';
+import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { initLeague, registerFixturesSystem } from '../systems/fixtures';
 import { registerTrainingSystem } from '../systems/training';
-import { registerEconomySystem } from '../systems/economy';
+import { homeGate, registerEconomySystem, weeklyIncome, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { registerPlayerMatchSystem } from '../systems/matchday';
 import { registerMoraleSystem } from '../systems/morale';
@@ -28,7 +28,7 @@ import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { overallRating } from '../data/player';
 import { cardById, EVENT_CARDS } from '../data/events';
-import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
+import { FACILITY_CATALOG, upgradeCost, type FacilityDefId } from '../data/facility';
 import { addFacility, spendMoney } from '../data/club';
 
 /** How the headless manager plays: hands-off, or a simple sensible manager. */
@@ -270,7 +270,40 @@ export const MANAGED = {
   /** Money kept back after a star's fee plus WAGE_WEEKS of their wage. */
   STAR_RESERVE: 50_000,
   WAGE_WEEKS: 8,
+  /** A star is signed only while the weekly net after their wage stays above −this (#169). */
+  BURN_ALLOWED: 3_000,
+  /** Build or upgrade the Grandstand when the next home gate is sold out and this much is left after paying (#169). */
+  STAND_RESERVE: 60_000,
 } as const;
+
+/** The club's next home fixture from this week, if any. */
+function nextHomeFixture(s: GameState): Fixture | undefined {
+  return s.league.fixtures.filter((f) => f.homeId === s.clubId && f.round >= s.week).sort((a, b) => a.round - b.round)[0];
+}
+
+/** The weekly net at `s` with a season's home gates spread over its weeks (economy functions only). */
+function weeklyNet(s: GameState): number {
+  const next = nextHomeFixture(s);
+  const gate = next ? (homeGate(s, next).receipts * (SEASON_ROUNDS / 2)) / WEEKS_PER_SEASON : 0;
+  return weeklyIncome(s) + gate - weeklyWages(s) - weeklyUpkeep(s);
+}
+
+/** Seats for a sold-out crowd (#169): a Grandstand, then its upgrades, while the money allows. */
+function seatTheCrowd(): void {
+  const s = getState();
+  const next = nextHomeFixture(s);
+  if (!next || !homeGate(s, next).soldOut) return;
+  const def = FACILITY_CATALOG.grandstand;
+  const stand = s.facilities.find((f) => f.defId === 'grandstand');
+  if (!stand) {
+    if (s.money - def.cost >= MANAGED.STAND_RESERVE) buildFirstFree('grandstand');
+  } else if (stand.level < 3) {
+    const level = (stand.level + 1) as 2 | 3;
+    const cost = upgradeCost(def, level);
+    if (s.money - cost < MANAGED.STAND_RESERVE || !spendMoney(cost, 'upgrade:grandstand')) return;
+    setState({ facilities: getState().facilities.map((f) => (f.id === stand.id ? { ...f, level } : f)) });
+  }
+}
 
 /** Build `defId` on the first free spot (top-left scan), paying its cost. */
 function buildFirstFree(defId: FacilityDefId): boolean {
@@ -306,11 +339,13 @@ function trySign(p: Player): number | null {
 
 /**
  * A plain, sensible manager: answers cards with choice 0; builds a Training
- * Paddock then a Team Gym once it can keep a reserve; keeps SQUAD_FLOOR players
- * (the best free agent it can pay for, fee plus WAGE_WEEKS of wages); and signs
- * one star a week — a free agent who would walk into the best nine — when the
- * fee plus wages still leaves STAR_RESERVE. Signing fees are read off the
- * balance, so the tally follows whatever the fee formula is.
+ * Paddock then a Team Gym once it can keep a reserve; seats a sold-out crowd
+ * with a Grandstand and its upgrades (#169); keeps SQUAD_FLOOR players (the
+ * best free agent it can pay for, fee plus WAGE_WEEKS of wages); and signs one
+ * star a week — a free agent who would walk into the best nine — when the fee
+ * plus wages still leaves STAR_RESERVE and the weekly net after their wage stays
+ * above −BURN_ALLOWED. Signing fees are read off the balance, so the tally
+ * follows whatever the fee formula is.
  */
 function manage(): Signed {
   const s = getState();
@@ -323,6 +358,7 @@ function manage(): Signed {
     if (st.money - FACILITY_CATALOG[defId].cost < MANAGED.BUILD_RESERVE) break;
     buildFirstFree(defId);
   }
+  seatTheCrowd();
   const out: Signed = { count: 0, fees: 0, overall: 0 };
   const record = (p: Player, fee: number): void => {
     out.count++;
@@ -347,7 +383,8 @@ function manage(): Signed {
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
     if (star) {
       const budget = st.money - MANAGED.STAR_RESERVE - star.wage * MANAGED.WAGE_WEEKS;
-      if (budget > 0 && signingFee(st, star) <= budget) {
+      const burn = weeklyNet(st) - star.wage * difficultyMultipliers(st.settings.difficulty).wages;
+      if (budget > 0 && signingFee(st, star) <= budget && burn >= -MANAGED.BURN_ALLOWED) {
         const fee = trySign(star);
         if (fee !== null) record(star, fee);
       }
