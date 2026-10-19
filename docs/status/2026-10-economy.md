@@ -77,3 +77,97 @@ What it says:
   −$68k, which is under the forced-sale floor.
 - Nothing costs more as the club grows: no upkeep, no wage curve, no gate ceiling. The
   next four items add each of those, and the last retunes the small lines by difficulty.
+
+## #164 Facility upkeep
+
+- PR #166, merged. No `GameState` change, no save bump.
+- Every catalog entry (`src/data/facility.ts`) has an `upkeep`: its weekly running cost
+  at level 1, 1% of the build cost (Paddock $80, Weights Room $150, Video Room $180,
+  Physio $220, Canteen $120, Sponsor Board $100, Grandstand $1,200, Academy $600,
+  Coach's Office $300, Scout Office $250, Medical Bay $350, Team Gym $400), ×1.5 at L2
+  and ×2 at L3 (`UPKEEP_LEVEL_MULT`, `facilityUpkeep`). A fully upgraded Grandstand runs
+  at $2,400 a week, about $65k a season.
+- `weeklyUpkeep(state)` in `economy.ts` sums it over the grounds; `applyEconomy` pays it
+  right after wages with ledger reason `upkeep` (wages → upkeep → income → gate →
+  contracts → bankruptcy). Not scaled by difficulty.
+- Finance: an Upkeep row under the wage bill, counted in the net and the burn, and an
+  Upkeep column in the six-week ledger. Build menu: "$80/wk upkeep" beside each cost.
+  Facility popup: "Upkeep $80/wk · L2 $120/wk" so an upgrade's running cost is known
+  before it is bought.
+- Verified: tsc, vitest (catalog rates, the level multipliers, `weeklyUpkeep`, the
+  tick's order and reasons, the Finance summary and ledger), build, the full soak (no
+  problems), Playwright at 844×390 and 1280×800 (`docs/screenshots/164/`: build menu,
+  facility popup, Finance).
+- Assumed (needs Leon): the 1% rate and the ×1.5 / ×2 level steps; upkeep is the same
+  on every difficulty; the popup shows the next level's upkeep rather than the upgrade
+  button carrying it.
+
+### Soak, upkeep line only (20 seeds; nothing else moved)
+
+The soak's managed manager builds a Paddock and a Gym (upkeep $480 a week together);
+the idle managers build nothing, so they are unchanged.
+
+| mode | season 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| managed: upkeep | −$13k | −$13k | −$13k | −$13k | −$13k |
+| managed: net before → after | +75 → +46 | +138 → +141 | +583 → +530 | +762 → +750 | +805 → +788 |
+| managed: money | $246k | $387k | $917k | $1,667k | $2,455k |
+
+Upkeep is the sink that scales with the grounds, not the fix for the runaway: two
+cheap training facilities cost $13k a season against gates of $0.5–1.3M. It bites a
+club that builds the expensive things (a Grandstand at L3 and an Academy together are
+about $100k a season), which is the point: from here a building has to earn its keep.
+
+## #167 Wages that climb with quality and success
+
+- PR #168, merged. No `GameState` change, no save bump: stored wages stay as they are
+  until the next renewal; new games and new signings are on the new curve at once.
+- `wageForOverall` in `data/player.ts` (the one `marketWage`, which contracts and rivals
+  still re-export): the old straight line (overall × 15 + 100) plus `WAGE_PREMIUM` (2)
+  × (points above `WAGE_PREMIUM_FROM`, 55)² a week. 55 $925, 60 $1,050, 70 $1,600,
+  80 $2,550, 85 $3,175, 90 $3,900: a squad of 70s costs 1.7× a squad of 55s, a squad of
+  85s 3.4×. Below 55 nothing changes, so depth players and juniors cost what they did.
+- Renewal asks (`contracts.renewalWage(p, club)`) are the market wage for the player's
+  overall today, moved by morale as before, times `clubWageFactor`: +25% at reputation
+  100 (nothing at the baseline, 30, and below; `CONTRACTS.RENEW_REP_PREMIUM`) and +3% for
+  every season after the first (`RENEW_SEASON_INFLATION`). The Contracts screen's Renew
+  button and the economy's automatic renewal at contract end both ask this (the
+  automatic one used to be the old wage ± a drift by overall, so the curve never reached
+  a player who stayed).
+- The rival salary cap (`RIVAL_WAGE_CAP`) is now what a 20-man squad of 62.5-overall
+  players costs on the curve, $23,000. Probed over 20 new games: the flat $21,000 under
+  the straight line left 240 of 300 rivals with room to sign a 65; $23,000 on the curve
+  leaves the same 240, and the soak's rival mean (56.0–57.1) and range (41–69) are
+  unchanged, so rivals sign as they did.
+- Verified: tsc, vitest (the curve's values and monotonicity, the club factor by
+  reputation and season, early and automatic renewals at the ask, one `marketWage`), build,
+  the full soak (no problems), Playwright at 844×390 and 1280×800
+  (`docs/screenshots/167/`: Contracts with the asks, Recruit with the wages).
+- Assumed (needs Leon): the curve (a premium from 55, squared); +25% at reputation 100
+  and +3% a season; 62.5 for the cap; renewals priced at today's overall rather than
+  the old wage; trained-up players on an old wage now fall under `MORALE.LOW_PAY_RATIO`
+  sooner (they want the pay rise), which is the existing morale rule doing its job.
+
+### Before → after (20 seeds; upkeep in, before this PR → after)
+
+| | before | after |
+|---|---|---|
+| A new game's wage bill | $16.8k a week | $18.1k a week (+8%; the hero star) |
+| Idle Normal: wages S1 / S5 | −$454k / −$331k | −$490k / −$391k |
+| Idle Normal: net S1, money S3 | +$74k, $662k | +$38k, $545k |
+| Managed: wages S1 / S3 / S5 | −$536k / −$737k / −$805k | −$581k / −$1,180k / −$1,275k |
+| Managed: net S1 / S3 / S5 | +$46k / +$530k / +$788k | +$2k / −$37k / +$24k |
+| Managed: money S1 → S5 | $246k → $2,455k | $202k → $280k |
+| Managed: best nine S5, premierships S5 | 88.6, 100% | 83.2, 70% |
+| Managed: signings S2 | 6.3 at 81 overall, $326k | 4.4 at 79, $209k |
+| Idle Hard: net S1, money S1, sacked by S2 | −$74k, $26k, 70% | −$130k, −$30k, 90% |
+
+- **The managed club now lives within its means.** By season 3 its squad of 80s costs
+  $1.2M a season, every dollar the gate brings in, and it stops hoarding: $200k →
+  $280k over five seasons, which is the plan's "grows slowly" already. It still wins
+  (the match margin for a 23-point gap is N1's Phase 3), but it can no longer buy six
+  stars a season on top of a Paddock and a Gym.
+- **Idle Normal still gains**: wages +$36k a season is not enough against $417k of
+  gates. Gates are the next PR.
+- **Idle Hard is now in the red at the end of season 1** on wages × 1.3: the fire-sale
+  floor is close, and item 6 will set where it should sit.

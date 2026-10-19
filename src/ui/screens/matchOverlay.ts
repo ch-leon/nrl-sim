@@ -237,6 +237,14 @@ export interface MatchOverlayHandle {
   setClock(matchSeconds: number, half: 1 | 2): void;
   /** A line in the commentary that is not a match event (a coach's call, #73). */
   comment(line: string): void;
+  /** Coach calls made and paid off, home and away (#73): a stats line once there is one. */
+  setCalls?(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): void;
+}
+
+/** "2/5" for a side's calls paid off of made, "–" when it made none. */
+export function callsLine(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): string {
+  const one = (s: 'home' | 'away'): string => (made[s] > 0 ? `${paid[s]}/${made[s]}` : '–');
+  return `Calls paid off ${one('home')} / ${one('away')}`;
 }
 
 let active: MatchOverlayHandle | null = null;
@@ -299,7 +307,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const possLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Possession 50% / 50%' });
   const tackleLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Tackles 0 / 0' });
   const errorLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Errors 0 / 0' });
-  const statsBody = el('div', { class: 'nrl-mo-stats-body' }, possLabel, possBar, tackleLabel, errorLabel);
+  const callsLabel = el('div', { class: 'nrl-mo-stat-line', text: '' });
+  callsLabel.style.display = 'none';
+  const statsBody = el('div', { class: 'nrl-mo-stats-body' }, possLabel, possBar, tackleLabel, errorLabel, callsLabel);
   // #18: stats start collapsed on phones so the pitch stays clear.
   let statsOpen = typeof window === 'undefined' || window.innerWidth > 600;
   const statsToggle = button(statsOpen ? 'Stats ▾' : 'Stats ▸', () => {
@@ -457,6 +467,10 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     },
     comment(line: string): void {
       appendCommentary(line);
+    },
+    setCalls(made, paid): void {
+      callsLabel.style.display = made.home + made.away > 0 ? '' : 'none';
+      callsLabel.textContent = callsLine(made, paid);
     },
     setClock(matchSeconds: number, half: 1 | 2): void {
       if (root.classList.contains('nrl-mo-final')) return;

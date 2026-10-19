@@ -1,7 +1,8 @@
 // src/systems/economy.ts — weekly income/expense loop. See BAK-188 (WU-10).
 // Pure TypeScript, no Phaser. Deterministic (no RNG). Runs as the economy tick
 // (ARCHITECTURE §5, order 30) after training/injuries, before the match — so a
-// home gate can rescue the club before forced sales trigger.
+// home gate can rescue the club before forced sales trigger. Facility upkeep
+// (N6, #164) is the running cost of the grounds, paid after wages.
 //
 // All money movement routes through club.earnMoney (credit; negative amount for a
 // deduction) so 'money:changed' fires for every net movement. Wages are allowed
@@ -11,10 +12,10 @@
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
-import { overallRating } from '../data/player';
 import { ECON, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { registerTickHook, TICK_ORDER } from '../core/time';
-import { warnForWeeks } from './contracts';
+import { renewalWage, warnForWeeks } from './contracts';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -28,6 +29,18 @@ function facilityLevel(state: GameState, defId: 'sponsorBoard' | 'grandstand'): 
 export function weeklyWages(state: GameState): number {
   const base = state.squad.reduce((sum, p) => sum + p.wage, 0);
   return Math.round(base * difficultyMultipliers(state.settings.difficulty).wages);
+}
+
+/**
+ * Σ weekly upkeep of every built facility at its level (N6, #164):
+ * the running cost that grows with the grounds. A defId the catalog no longer
+ * knows costs nothing rather than crashing an old save.
+ */
+export function weeklyUpkeep(state: GameState): number {
+  return state.facilities.reduce((sum, pf) => {
+    const def = FACILITY_CATALOG[pf.defId];
+    return sum + (def ? facilityUpkeep(def, pf.level) : 0);
+  }, 0);
 }
 
 /**
@@ -74,8 +87,9 @@ export function gateReceipts(state: GameState): number {
 
 /**
  * Decrement contractWeeks by 1 for all squad. On reaching 0 a player demands
- * renewal at newWage = round(wage × (1 + drift)), drift = (overall−60)/200
- * clamped to [−0.15, +0.25]. If affordable at that moment (money ≥ newWage × 4)
+ * renewal at contracts.renewalWage: the market wage for their overall today,
+ * moved by morale and the club's standing (N6, #167; before that it was the old
+ * wage ± a drift by overall). If affordable at that moment (money ≥ newWage × 4)
  * auto-renew (wage = newWage, contractWeeks = 52); else the player departs to
  * freeAgents (removed from squad), ui:notify info. Deterministic; squad-array
  * order (earlier renewals can consume funds, pushing later players to depart).
@@ -96,10 +110,8 @@ export function tickContracts(state: GameState): GameState {
       continue;
     }
 
-    // Contract expired this tick — renew if affordable, else depart.
-    const rawDrift = (overallRating(p) - 60) / 200;
-    const drift = Math.max(-0.15, Math.min(0.25, rawDrift));
-    const newWage = Math.round(p.wage * (1 + drift));
+    // Contract expired this tick — renew at the ask if affordable, else depart.
+    const newWage = renewalWage(p, state);
 
     if (money >= newWage * 4) {
       keep.push({ ...p, wage: newWage, contractWeeks: 52 });
@@ -162,15 +174,18 @@ export function handleBankruptcy(_state: GameState): GameState {
 }
 
 /**
- * Tick hook order 30. Fixed order: wages (deduct, may go negative) → income →
- * gate → contracts → bankruptcy. Emits money:changed per net movement (via
- * earnMoney; deductions credit a negative delta).
+ * Tick hook order 30. Fixed order: wages (deduct, may go negative) → upkeep →
+ * income → gate → contracts → bankruptcy. Emits money:changed per net movement
+ * (via earnMoney; deductions credit a negative delta).
  */
 export function applyEconomy(state: GameState): GameState {
   // Compute wages from the entry snapshot; subsequent reads use getState() as the
   // store is mutated between steps.
   const wages = weeklyWages(state);
   if (wages !== 0) earnMoney(-wages, 'wages');
+
+  const upkeep = weeklyUpkeep(state);
+  if (upkeep !== 0) earnMoney(-upkeep, 'upkeep');
 
   const income = weeklyIncome(getState());
   if (income !== 0) earnMoney(income, 'sponsor+grant');

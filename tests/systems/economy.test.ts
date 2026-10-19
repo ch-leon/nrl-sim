@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  weeklyWages, weeklyIncome, gateReceipts, tickContracts,
+  weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, tickContracts,
   handleBankruptcy, applyEconomy, registerEconomySystem,
 } from '../../src/systems/economy';
+import { FACILITY_CATALOG, facilityUpkeep } from '../../src/data/facility';
+import { renewalWage } from '../../src/systems/contracts';
 import {
   createNewGame, getState, loadState,
   type Player, type PlacedFacility, type GameState, type Fixture,
@@ -53,6 +55,26 @@ describe('weeklyWages', () => {
   it('empty squad → 0', () => {
     setup({ squad: [] });
     expect(weeklyWages(getState())).toBe(0);
+  });
+});
+
+describe('weeklyUpkeep (N6, #164)', () => {
+  it('sums each built facility\'s upkeep at its level', () => {
+    setup({ facilities: [pf('trainingPaddock', 1), pf('grandstand', 2), pf('teamGym', 3)] });
+    const want = facilityUpkeep(FACILITY_CATALOG.trainingPaddock, 1)
+      + facilityUpkeep(FACILITY_CATALOG.grandstand, 2)
+      + facilityUpkeep(FACILITY_CATALOG.teamGym, 3);
+    expect(weeklyUpkeep(getState())).toBe(want);
+    expect(want).toBe(80 + 1800 + 800);
+  });
+  it('nothing built → 0', () => {
+    setup({ facilities: [] });
+    expect(weeklyUpkeep(getState())).toBe(0);
+  });
+  it('is not scaled by difficulty', () => {
+    createNewGame('Hard Club', 1, { difficulty: 'hard' });
+    loadState({ ...getState(), facilities: [pf('grandstand', 1)] });
+    expect(weeklyUpkeep(getState())).toBe(1200);
   });
 });
 
@@ -138,30 +160,31 @@ describe('tickContracts', () => {
     expect(s.squad.find((p) => p.id === 'b')!.contractWeeks).toBe(2);
   });
 
-  it('auto-renews an expiring affordable player at drift-adjusted wage, 52 weeks', () => {
-    // overall 60 → drift 0 → newWage == wage. Big balance → affordable.
+  it('auto-renews an expiring affordable player at the renewal ask, 52 weeks (#167)', () => {
+    // overall 60, neutral morale, a new club at the baseline reputation → the market wage, $1,050.
     const p = mkPlayer({
-      id: 'renew', wage: 4000, contractWeeks: 1,
+      id: 'renew', wage: 4000, morale: 50, contractWeeks: 1,
       stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 }, // overall 60
     });
-    setup({ money: 1_000_000, squad: [p] });
+    setup({ money: 1_000_000, reputation: 30, season: 1, squad: [p] });
     tickContracts(getState());
     const out = getState().squad.find((x) => x.id === 'renew')!;
     expect(out.contractWeeks).toBe(52);
-    expect(out.wage).toBe(4000); // drift 0
+    expect(out.wage).toBe(1050);
+    expect(out.wage).toBe(renewalWage(p, { reputation: 30, season: 1 }));
     expect(getState().freeAgents.some((x) => x.id === 'renew')).toBe(false);
   });
 
-  it('drift clamps: elite player capped at +25% wage', () => {
-    // overall 100 → drift (100-60)/200 = 0.2 (within clamp) → +20%.
+  it('the ask follows the wage curve and the club, not the old wage (#167)', () => {
+    // overall 100 → $5,650 on the curve; reputation 100 in season 3 → ×1.25 × 1.06.
     const elite = mkPlayer({
-      id: 'elite', wage: 10000, contractWeeks: 1,
+      id: 'elite', wage: 10000, morale: 50, contractWeeks: 1,
       stats: { speed: 100, strength: 100, stamina: 100, skill: 100, footyIQ: 100 },
     });
-    setup({ money: 10_000_000, squad: [elite] });
+    setup({ money: 10_000_000, reputation: 100, season: 3, squad: [elite] });
     tickContracts(getState());
     const out = getState().squad.find((x) => x.id === 'elite')!;
-    expect(out.wage).toBe(12000); // 10000 × 1.2
+    expect(out.wage).toBe(Math.round(5650 * 1.25 * 1.06));
   });
 
   it('unaffordable expiring player departs to freeAgents with a notify', () => {
@@ -264,11 +287,27 @@ describe('applyEconomy — full weekly loop', () => {
       league: { clubs: [], fixtures: [], ladder: [] },
     });
     applyEconomy(getState());
-    // wages -5000 ; income = 3000 + 1500 = +4500 ; no gate (empty league)
-    expect(getState().money).toBe(100_000 - 5000 + 4500);
-    expect(reasons).toContain('wages');
-    expect(reasons).toContain('sponsor+grant');
-    expect(reasons).not.toContain('gate');
+    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; income = 3000 + 1500 = +4500 ; no gate (empty league)
+    expect(getState().money).toBe(100_000 - 5000 - 100 + 4500);
+    expect(reasons).toEqual(['wages', 'upkeep', 'sponsor+grant']);
+  });
+
+  it('pays upkeep after wages, at the facilities\' levels, and skips it with nothing built (#164)', () => {
+    const seen: { delta: number; reason: string }[] = [];
+    bus.on('money:changed', (m) => seen.push({ delta: m.delta, reason: m.reason }));
+    setup({
+      money: 50_000, reputation: 0, squad: [],
+      facilities: [pf('grandstand', 3), pf('trainingPaddock', 2)],
+      league: { clubs: [], fixtures: [], ladder: [] },
+    });
+    applyEconomy(getState());
+    expect(seen).toEqual([{ delta: -(2400 + 120), reason: 'upkeep' }]);
+    expect(getState().money).toBe(50_000 - 2520);
+
+    seen.length = 0;
+    setup({ money: 50_000, reputation: 0, squad: [], facilities: [], league: { clubs: [], fixtures: [], ladder: [] } });
+    applyEconomy(getState());
+    expect(seen).toEqual([]);
   });
 
   it('home gate is credited and can rescue the club before forced sales', () => {
