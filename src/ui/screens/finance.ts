@@ -7,6 +7,7 @@
 import { bus } from '../../core/events';
 import { getState, type GameState } from '../../core/state';
 import { weeklyWages, weeklyIncome, gateReceipts } from '../../systems/economy';
+import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { buildObjectivesSection } from './board';
 import { el, panel, button, openModal, closeScreen } from '../dom';
 
@@ -34,9 +35,16 @@ export interface FinanceSummary {
   grantWeekly: number;
   /** Passive weekly income (weeklyIncome = sponsor + grant). */
   incomeWeekly: number;
-  /** income − wages. Run-rate only: the gate is lumpy, so it is shown separately. */
+  /**
+   * Home gates averaged over the weeks left in the season: the projected gate ×
+   * home games left ÷ weeks left (QA: without it the run-rate showed a burn and
+   * a short runway for a club that was actually making money). 0 with no home
+   * games left, e.g. in the off-season stretch of the finals.
+   */
+  gateWeekly: number;
+  /** income + average gate − wages. */
   netWeekly: number;
-  /** max(0, wages − income): the weekly cash drain. */
+  /** max(0, wages − income − average gate): the weekly cash drain. */
   burnWeekly: number;
   /** Weeks of cash left at the current burn; null when the club is not burning cash. */
   runwayWeeks: number | null;
@@ -58,9 +66,6 @@ export function financeSummary(state: GameState): FinanceSummary {
   const sponsorWeekly = weeklyIncome({ ...state, reputation: 0 });
   const grantWeekly = incomeWeekly - sponsorWeekly;
 
-  const burnWeekly = Math.max(0, wagesWeekly - incomeWeekly);
-  const runwayWeeks = burnWeekly > 0 ? Math.max(0, state.money) / burnWeekly : null;
-
   const nextFixture = state.league.fixtures
     .filter((f) => f.homeId === state.clubId && f.round >= state.week)
     .reduce<typeof state.league.fixtures[number] | undefined>(
@@ -74,6 +79,10 @@ export function financeSummary(state: GameState): FinanceSummary {
     }
     : null;
 
+  const gateWeekly = averageGateWeekly(state, nextHome?.projectedGate ?? 0);
+  const burnWeekly = Math.max(0, wagesWeekly - incomeWeekly - gateWeekly);
+  const runwayWeeks = burnWeekly > 0 ? Math.max(0, state.money) / burnWeekly : null;
+
   const expiring = state.squad
     .filter((p) => p.contractWeeks <= EXPIRY_WINDOW_WEEKS)
     .map((p) => ({ id: p.id, name: p.name, contractWeeks: p.contractWeeks, wage: p.wage }))
@@ -85,12 +94,27 @@ export function financeSummary(state: GameState): FinanceSummary {
     sponsorWeekly,
     grantWeekly,
     incomeWeekly,
-    netWeekly: incomeWeekly - wagesWeekly,
+    gateWeekly,
+    netWeekly: incomeWeekly + gateWeekly - wagesWeekly,
     burnWeekly,
     runwayWeeks,
     nextHome,
     expiring,
   };
+}
+
+/**
+ * The season's remaining home gates spread over its remaining weeks. Counts the
+ * home fixtures from this week on (finals ties appear as they are drawn) and
+ * divides by the weeks left in the regular season, or in the finals once there.
+ */
+export function averageGateWeekly(state: GameState, projectedGate: number): number {
+  if (projectedGate <= 0) return 0;
+  const homeLeft = state.league.fixtures.filter((f) => f.homeId === state.clubId && f.round >= state.week).length;
+  if (homeLeft === 0) return 0;
+  const end = state.week <= SEASON_ROUNDS ? SEASON_ROUNDS : WEEKS_PER_SEASON;
+  const weeksLeft = Math.max(1, end - state.week + 1);
+  return Math.round((projectedGate * homeLeft) / weeksLeft);
 }
 
 // ── Ledger ─────────────────────────────────────────────────────────────────────
@@ -208,7 +232,8 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
     statRow('Wage bill', fmtMoney(-s.wagesWeekly)),
     statRow('Sponsor', fmtMoney(s.sponsorWeekly)),
     statRow('Grant', fmtMoney(s.grantWeekly)),
-    statRow('Net weekly (run-rate)', fmtMoney(s.netWeekly), s.netWeekly < 0),
+    statRow('Home gates (avg/wk)', fmtMoney(s.gateWeekly)),
+    statRow('Net weekly (avg)', fmtMoney(s.netWeekly), s.netWeekly < 0),
     statRow('Runway', fmtRunway(s.runwayWeeks), s.runwayWeeks === 0),
     statRow(
       'Next home gate',
