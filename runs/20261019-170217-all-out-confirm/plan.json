@@ -1,0 +1,47 @@
+{
+  "name": "all-out confirm",
+  "description": "All-out v Balanced over 150 matches: as is, and with red-zone early kicks 30% and passing +0.1 / +0.15 (Expansive's).",
+  "seeds": 150,
+  "scenarios": [
+    {
+      "name": "all-out v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "balanced v all-out",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "kick 0.3 pass 0.1",
+      "tuning": {
+        "presets.attack.all-out.base.earlyKick": 0.3,
+        "presets.attack.all-out.base.pass": 0.1
+      }
+    },
+    {
+      "name": "kick 0.3 pass 0.15",
+      "tuning": {
+        "presets.attack.all-out.base.earlyKick": 0.3,
+        "presets.attack.all-out.base.pass": 0.15
+      }
+    }
+  ]
+}
