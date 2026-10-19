@@ -1,0 +1,60 @@
+{
+  "name": "decide rate",
+  "description": "N9.1 speed: players re-pick targets at 10 Hz (baseline, live.decideEveryTicks 2) or 20 Hz (1, as before). What does the slower decision rate cost in play, and where?",
+  "seeds": 40,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v grind",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "20 Hz decisions",
+      "tuning": {
+        "live.decideEveryTicks": 1
+      }
+    }
+  ]
+}

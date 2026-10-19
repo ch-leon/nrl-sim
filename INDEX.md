@@ -62,3 +62,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-194128-sin-bins | sin bins | 279a7bc (uncommitted changes) | feat/sin-bins | [report](runs/20261019-194128-sin-bins/report.md) |
 | 20261019-195620-standard | standard | 43fed0d | main | [report](runs/20261019-195620-standard/report.md) |
 | 20261019-222319-standard | standard | 0600e45 | main | [report](runs/20261019-222319-standard/report.md) |
+| 20261019-225416-decide-rate | decide rate | 0bb243c (uncommitted changes) | perf/headless-100ms | [report](runs/20261019-225416-decide-rate/report.md) |
