@@ -1,0 +1,70 @@
+name: QA
+
+# The headless soak and the phone playthrough (docs/status/2026-10-qa.md), nightly
+# and on demand. Not on every PR: the playthrough takes minutes and drives a real
+# Chromium. The runner's preinstalled Google Chrome is used (no browser download,
+# never `playwright install`); the screenshots, report and save dumps are kept as
+# an artifact for a week, and the summary shows on the run's page.
+on:
+  schedule:
+    - cron: '20 16 * * *' # 02:20 AEST, after the day's merges
+  workflow_dispatch:
+    inputs:
+      sizes:
+        description: Playthrough sizes, space-separated (WxH)
+        default: 844x390 1280x800
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa
+  cancel-in-progress: false
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Soak (5 seasons × 20 seeds, idle, managed, Hard, old saves)
+        run: |
+          npm run soak 2>&1 | tee soak.log
+          {
+            echo '## Soak'
+            echo '```'
+            tail -n 12 soak.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Playthrough (phone and desktop)
+        if: ${{ !cancelled() }}
+        env:
+          CHROMIUM_PATH: /usr/bin/google-chrome
+          SIZES: ${{ inputs.sizes || '844x390 1280x800' }}
+        run: |
+          status=0
+          for size in $SIZES; do
+            npm run e2e:season -- --size "$size" 2>&1 | tee "e2e-$size.log" || status=1
+            {
+              echo "## Playthrough $size"
+              echo '```'
+              tail -n 12 "e2e-$size.log"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+          exit $status
+      - name: Keep the screenshots, reports and save dumps
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-output
+          path: |
+            e2e-output
+            !e2e-output/dist
+          retention-days: 7
+          if-no-files-found: warn
