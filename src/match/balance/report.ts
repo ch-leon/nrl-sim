@@ -7,7 +7,7 @@ import { MATCH_MINUTES, type CellResult, type CountKey } from './measure';
 /** §7 balance targets per full Nines match, both sides combined. */
 export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
   tackles: [90, 120],
-  breaks: [8, 14],
+  lineBreaks: [8, 14],
   offloads: [8, 14],
   errors: [10, 16],
   kicks: [12, 18],
@@ -15,7 +15,7 @@ export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
 };
 
 /** The columns of the summary table. */
-const COLUMNS: readonly CountKey[] = ['tackles', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'lostInContact', 'injuries'];
+const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'lostInContact', 'injuries'];
 
 /** ✓ inside the §7 band, ↑ above, ↓ below, '' when the metric has no band. */
 export function bandMark(key: CountKey, v: number): string {

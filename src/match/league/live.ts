@@ -90,6 +90,8 @@ export const LIVE = {
   burstTicks: 16,
   /** Caught from behind this soon after breaking is RUN DOWN! (6 s). */
   runDownTicks: 120,
+  /** A line break (Phase 3, measured for §7): the carrier this far goal-side of every defender but the last man. */
+  lineBreakM: 1,
   /** A Wrecking Ball held in the tackle keeps his legs pumping this often per level (more fight in the wrestle, wrestle.ts). */
   wreckDriveChance: 0.3,
   /** A Playmaker's cut-out reach grows this much per level over the normal pass width, and he minds width less. */
@@ -366,6 +368,8 @@ export class LiveSim implements MatchSim {
   readonly injuries: MatchInjury[] = [];
   /** Tick the carrier crossed the line while going round for the bonus zone; -1 when he isn't. */
   private overLineAt = -1;
+  /** The side that has broken the line in this stretch of open play (one line break until the next tackle or stoppage). */
+  private lineBrokenBy: Side | null = null;
   /** Touch and dead ball (2d): the side that touched the ball last, the kick in play (where from and what for), and a bounce on its way out. */
   private lastTouch: Side = 'home';
   private kickFrom: { side: Side; x: number; toLine: number; aim?: 'touch' | '40-20' } | null = null;
@@ -632,6 +636,21 @@ export class LiveSim implements MatchSim {
       this.lastTouch = h.side;
       if (this.kickFrom) this.endKick(h.side, h.body.pos);
     }
+    this.watchLineBreak(h);
+  }
+
+  /** A line break: in open play the carrier gets goal-side of every defender but the last man (the §7 count; a `break` to the contract). */
+  private watchLineBreak(h: Player | null): void {
+    if (this.phase.kind !== 'play') {
+      this.lineBrokenBy = null;
+      return;
+    }
+    if (!h || h.side !== this.attacking || this.lineBrokenBy === h.side) return;
+    const dir = this.dirOf(h.side);
+    const unbeaten = this.side(other(h.side)).filter((d) => (h.body.pos.x - d.body.pos.x) * dir < LIVE.lineBreakM).length;
+    if (unbeaten > 1) return;
+    this.lineBrokenBy = h.side;
+    this.emit('line-break', `${h.name} breaks the line!`, h);
   }
 
   // ── Clock ─────────────────────────────────────────────────────────────────

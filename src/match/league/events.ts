@@ -20,6 +20,8 @@ const KIND: Readonly<Record<string, MatchEventKind>> = {
   error: 'error',
   drop: 'error',
   dart: 'run',
+  // A line break (Phase 3): the contract's `break`, counted in season stats and Player of the Match.
+  'line-break': 'break',
   regather: 'run',
   'half-time': 'half-time',
   'full-time': 'full-time',
