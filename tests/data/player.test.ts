@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeRng } from '../../src/utils/rng';
 import {
-  generatePlayer,
-  overallRating,
-  POSITIONS,
-  type Quality,
+  generatePlayer, overallRating, POSITIONS, type Quality, wageForOverall,
 } from '../../src/data/player';
 import { STAT_MAX, WEEKS_PER_SEASON } from '../../src/config';
 import type { Player } from '../../src/core/state';
@@ -91,7 +88,7 @@ describe('generatePlayer — shape & bounds', () => {
   it('wage derives from overall rating', () => {
     const rng = makeRng(8);
     const p = generatePlayer(rng);
-    expect(p.wage).toBe(Math.round(overallRating(p) * 15 + 100));
+    expect(p.wage).toBe(wageForOverall(overallRating(p)));
   });
 
   it('contractWeeks is a multiple of WEEKS_PER_SEASON (1..3 seasons)', () => {
@@ -138,5 +135,21 @@ describe('generatePlayer — auto traits', () => {
       const p = generatePlayer(rng);
       expect(new Set(ids(p)).size).toBe(p.traits.length);
     }
+  });
+});
+
+describe('wageForOverall (N6, #167)', () => {
+  it('is the old straight line up to 55 and climbs with the square of the points above it', () => {
+    expect(wageForOverall(45)).toBe(775);
+    expect(wageForOverall(55)).toBe(925);
+    expect(wageForOverall(60)).toBe(1050);
+    expect(wageForOverall(70)).toBe(1600);
+    expect(wageForOverall(80)).toBe(2550);
+    expect(wageForOverall(85)).toBe(3175);
+    expect(wageForOverall(90)).toBe(3900);
+    // A squad of 70s costs 1.7× a squad of 55s; a squad of 85s 3.4×.
+    expect(wageForOverall(70) / wageForOverall(55)).toBeCloseTo(1.73, 1);
+    expect(wageForOverall(85) / wageForOverall(55)).toBeCloseTo(3.43, 1);
+    for (let o = 2; o <= 100; o++) expect(wageForOverall(o)).toBeGreaterThan(wageForOverall(o - 1));
   });
 });

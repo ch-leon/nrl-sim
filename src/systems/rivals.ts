@@ -17,7 +17,7 @@ import { getState, setState, type GameState, type Player, type Position, type Ri
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, STAT_MAX, WEEKS_PER_SEASON } from '../config';
-import { generatePlayerAround, marketWage, overallRating, POSITIONS } from '../data/player';
+import { generatePlayerAround, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
@@ -45,11 +45,16 @@ export const RIVAL_JUNIOR_GAP = 14;
  */
 export const RIVAL_LEAGUE_MEAN: number = LEAGUE.MEAN;
 /**
- * Salary cap on a rival's squad, in weekly market wages (overall × 15 + 100). A
+ * Salary cap on a rival's squad, in weekly market wages: what a 20-man squad of
+ * RIVAL_WAGE_CAP_OVERALL players costs on the wage curve (data/player.ts). A
  * signing that would break it is skipped, so the strongest clubs can't keep
- * buying the best free agents. ~20 players at 60 overall = $20,000.
+ * buying the best free agents. The cap follows the curve (N6, #167): it was a
+ * flat $21,000 under the old straight line, which 240 of 300 rivals at a new
+ * game could sign a 65 under; 62.5 on the super-linear curve ($23,000) keeps
+ * that same 240, so rivals sign exactly as they did.
  */
-export const RIVAL_WAGE_CAP = 21_000;
+export const RIVAL_WAGE_CAP_OVERALL = 62.5;
+export const RIVAL_WAGE_CAP = Math.round(20 * wageForOverall(RIVAL_WAGE_CAP_OVERALL));
 /**
  * Each season a rival player's development is nudged this fraction of the way
  * toward RIVAL_LEAGUE_MEAN (stars fade a little faster, battlers catch up), so

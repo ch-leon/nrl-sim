@@ -130,6 +130,12 @@ export const CONTRACTS = {
   RENEW_MORALE_SWING: 0.15, // wage ask ±15% across the morale range (low morale = dearer)
   NEW_CONTRACT_WEEKS: 52,
   SELL_PER_OVERALL_SQ: 10,  // base transfer fee = overall² × this
+  // A club's standing prices its renewals (N6, #167): the ask is +RENEW_REP_PREMIUM at
+  // reputation 100 (nothing at the baseline, 30, and below) and +RENEW_SEASON_INFLATION
+  // for every season after the first, so a premier pays more to keep its stars and
+  // wages creep up as the game goes on.
+  RENEW_REP_PREMIUM: 0.25,
+  RENEW_SEASON_INFLATION: 0.03,
 } as const;
 
 // Difficulty (GitHub #48). Multipliers applied at the existing call sites:

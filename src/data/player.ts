@@ -34,6 +34,20 @@ const clampStat = (n: number): number => Math.max(1, Math.min(STAT_MAX, n));
 /** Weekly market wage per point of overall, and the floor (tuned: a squad of 20 ≈ $18k/wk vs BAK-188 income scales). */
 export const WAGE_PER_OVERALL = 15;
 export const WAGE_BASE = 100;
+/**
+ * Above this overall the wage gains a premium of WAGE_PREMIUM × (points above)²
+ * a week (N6, #167), so a star costs far more than a first-grader: 55 $925,
+ * 60 $1,050, 70 $1,600, 80 $2,550, 85 $3,175, 90 $3,900. Below it the wage is
+ * the old straight line, so depth players and juniors cost what they did.
+ */
+export const WAGE_PREMIUM_FROM = 55;
+export const WAGE_PREMIUM = 2;
+
+/** The weekly market wage for an overall rating (the curve above). */
+export function wageForOverall(overall: number): number {
+  const above = Math.max(0, overall - WAGE_PREMIUM_FROM);
+  return Math.round(overall * WAGE_PER_OVERALL + WAGE_BASE + above * above * WAGE_PREMIUM);
+}
 
 /**
  * A player's weekly market wage for their overall: what they are generated on,
@@ -41,7 +55,7 @@ export const WAGE_BASE = 100;
  * contracts.ts and rivals.ts re-export it).
  */
 export function marketWage(p: Pick<Player, 'stats'>): number {
-  return Math.round(overallRating(p) * WAGE_PER_OVERALL + WAGE_BASE);
+  return wageForOverall(overallRating(p));
 }
 
 /**
