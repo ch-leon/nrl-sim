@@ -55,6 +55,12 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   conversion: { word: 'GOAL!', tone: 'attack' },
   'field-goal': { word: 'FIELD GOAL!', tone: 'attack', big: true },
   'charge-down': { word: 'CHARGED DOWN!', tone: 'defence', big: true },
+  // Touch and dead ball (2d).
+  touch: { word: 'TOUCH', tone: 'neutral' },
+  '40-20': { word: '40/20!', tone: 'attack', big: true },
+  'on-full': { word: 'ON THE FULL!', tone: 'bad' },
+  'dead-ball': { word: 'DEAD BALL', tone: 'neutral' },
+  'drop-out': { word: 'DROP-OUT', tone: 'neutral' },
 };
 
 /** A bust out of a wrestle (the defenders' grip went first) reads differently from one at contact. */
@@ -94,7 +100,9 @@ export function popupFor(e: SimEvent): Popup | null {
         ? LATE_BUST
         : e.kind === 'try' && e.detail === 'bonus'
           ? 'BONUS TRY!'
-          : w.word;
+          : e.kind === 'touch' && e.detail === 'bundled'
+            ? 'INTO TOUCH!'
+            : w.word;
   const p: Popup = { word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;

@@ -326,3 +326,42 @@ for the stronger side (1.9 a match); 7 m changes nothing. Overlay and banner cou
 (**BONUS TRY!**); `bonusTries` report column.
 
 Tests: `tests/match/league/goals.test.ts`.
+
+## 16. Touch, dead ball and restarts (BAK-207 §5.1, 2d; BAK-208 §4.4)
+
+The side that touched the ball last loses it when it leaves the field. **Touch** (a kick
+bouncing out, a loose ball, a carrier bundled out): a play-the-ball for the other side,
+level with where it went out, 10 m in from touch and at least 10 m off a try line.
+**On the full**: the same, level with where it was kicked. **40/20**: a kick from inside the
+kicker's own 40 that bounces out inside the other side's 20 — a tap for the kicking side
+instead. **Dead** (over the dead-ball line or into touch-in-goal) off the attack, or a kick
+grounded by the defender in his own in-goal: a tap on the defence's 20 m line. Dead off the
+defence, or a defender held in his own in-goal: a goal-line drop-out (kicked from the middle
+of his try line, 38 ± 6 m). A set piece is a stoppage: the clock stops and the coaches can
+interchange (§14). All of it is `src/match/league/touch.ts`, played out in `live.ts`.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `touch.findTouch.own20` / `.ownHalf` / `.midfield` / `.attackingHalf` / `.redZone` | `src/match/league/touch.ts` | 0.6 / 0.5 / 0.35 / 0.15 / 0 | How often a territory kick goes for touch, by the kicker's zone (else to the fullback as before). |
+| `touch.touchInsideM` / `touch.touchScatterM` | `touch.ts` | 4 / 5 m | A touch-finder aims to land 4 m in, ± 5 m (× Big Boot accuracy): past the line is out on the full (about one in ten). |
+| `touch.touchRollM` | `touch.ts` | 9 m | A touch-finder rolls on 9–13 m after it lands (other kicks 4–8 m). |
+| `touch.fortyTwenty` / `touch.fortyTwentyTrait` | `touch.ts` | 0.08 / 0.2 | On the last inside his own 40, the 40/20 attempt rate, plus this per level of Big Boot or Playmaker. |
+| `touch.fortyTwentyLandM` / `touch.fortyTwentyInsideM` | `touch.ts` | 26 / 3 m | Where a 40/20 attempt lands: 26 m from the line, 3 m in from touch. |
+| `touch.grubberLongM` | `touch.ts` | 9 m | A grubber runs on up to this far past its spot; past the dead-ball line it is dead. |
+| `touch.restartInM` / `touch.restartFromLineM` | `touch.ts` | 10 / 10 m | Restarts 10 m in from touch and at least 10 m off a try line. |
+| `touch.bundleNearM` / `touch.bundle` / `touch.bundleBigHit` | `touch.ts` | 1.2 m / 0.4 / 0.7 | A carrier held (smashed) this close to the touchline is bundled into touch this often. |
+| `touch.groundNearM` / `touch.groundDeepM` | `touch.ts` | 8 / 3 m | A defender with a kick in his own in-goal grounds it if an attacker is this close or he is this deep; else he runs it out. |
+| `touch.setMinTicks` / `touch.setMaxTicks` | `touch.ts` | 30 / 200 | A set piece waits 1.5–10 s for the players to set (and any interchange). |
+| `touch.dropOutM` / `touch.dropOutSpreadM` | `touch.ts` | 38 / 12 m | How far a goal-line drop-out goes. |
+
+Measured (standard plan, 20 whole matches a row, run `20261019-113030-standard`), per match
+between even sides: 3.0 kicks find touch, 0.45 go out on the full, 0.1 are 40/20s, 0.2
+carriers are bundled out, 2.7 dead balls (20 m restarts), 0.4 drop-outs; kicks win about
+640 m a match (about 26 m a kick that ends with the other side's ball). **The cost:** tries
+between even sides 5.7 → 4.8 a match over 40 seeds (2 standard errors; run
+`20261019-113119-2d-tries`), from grubbers that now roll dead and defenders grounding them
+in-goal (each about half a try) and territory kicks pinning sides back; left for the Phase 3
+balance pass (with #72, the grubber try rate). More stoppages mean more interchanges
+(5 → 7 a match).
+
+Tests: `tests/match/league/touch.test.ts`.

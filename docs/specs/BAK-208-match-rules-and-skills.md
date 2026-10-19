@@ -180,14 +180,20 @@ second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip 
 | **Cross-field** | 40–50 m (30%), 22–40 m (35%), inside 22 m (30%) | Peak 13 m, to the far winger, 2 m short of the line; winger vs winger under it |
 | **Grubber** | 22–40 m (20%), inside 22 m (50%) | Skids and hops 3 m into the in-goal; race for the loose ball: try, or the defender runs it out |
 | **Chip** | 22–40 m (15%), inside 22 m (20%) | 10–13 m over the rushing line, the kicker chases his own |
-| **40/20** | Inside own 40, Boot trait or Playmaker, last tackle | *E:* Finds touch inside the 20 → fresh set to the kicking team |
+| **40/20** | Inside own 40, last tackle: 8% of kickers, +20% a level of Big Boot or Playmaker | *Implemented in BAK-207 2d:* lands 26 m out, 3 m in from touch and rolls on; out inside their 20 after a bounce → **40/20!**, a tap restart for the kicking side 10 m in from touch |
+| **Touch-finder** | Territory kick from deep: own 20 60%, own half 50%, midfield 35%, attacking half 15% | *Implemented in BAK-207 2d:* aims to land 4 m in from the nearer touchline (± 5 m × Boot), rolls 9–13 m for the line; out on the full → the other side's play-the-ball level with the kick |
 | **Field goal** | Last 3 minutes, his side level or a point behind, inside 30 m, tackle 3 or later | *Implemented in BAK-207 2c:* a drop kick, odds by angle, distance, Skill and Boot; charge-down 8%; a miss is a 20 m restart |
 | **Conversion** | After every try | *Implemented in BAK-207 2c:* a Nines drop kick in line with the try, from where the posts look widest; GOAL! / MISSED! |
 
 Every kick pop-ups its type (BOMB!, GRUBBER!, CHIP!, CROSS-FIELD!, plain KICK! for
-territory); REGATHER! and DROPPED! follow. The camera going wide waits for E. Goal-line
-dropouts and dead balls are not modelled yet: a grubber never crosses the dead-ball
-line and a defender who gathers it in-goal simply runs it out.
+territory); REGATHER! and DROPPED! follow. The camera going wide waits for E.
+**Touch and dead ball** (BAK-207 2d): the side that touched the ball last loses it. Into
+touch → TOUCH, a play-the-ball 10 m in from touch for the other side (no scrums); a carrier
+held on the touchline can be bundled out (INTO TOUCH!). Dead in-goal or over the dead-ball
+line off the attack (a grubber can run on up to 9 m) → DEAD BALL, a 20 m tap restart for
+the defence; a defender who gathers a kick in his own in-goal grounds it for the same when
+pressed or deep, else runs it out; held in his own in-goal, or the ball dead off him →
+DROP-OUT from the middle of his try line (tuning reference §16).
 
 ## 5. Tactics by zone — *implemented in D (#98)*
 

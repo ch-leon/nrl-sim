@@ -25,6 +25,8 @@ const KIND: Readonly<Record<string, MatchEventKind>> = {
   'full-time': 'full-time',
   conversion: 'conversion',
   'field-goal': 'field-goal',
+  // A 40/20 is a kick event to the contract (KickKind '40-20').
+  '40-20': 'kick',
 };
 
 /** Whistle kinds that belong to no side; the contract files them under the home team. */
@@ -59,6 +61,7 @@ export function toMatchEvent(e: SimEvent, snap: Snapshot, ids: Record<Side, stri
   const ev: MatchEvent = { t, kind, teamId: ids[side], x: Math.round(f.fx), y: Math.round(f.fy) };
   if (e.player) ev.player = e.player;
   if (e.kind === 'kick') ev.detail = KICK_DETAIL[e.detail ?? 'long'] ?? 'find-touch';
+  if (e.kind === '40-20') ev.detail = '40-20';
   // Kicks at goal carry their result; the overlay scores only the good ones.
   if (e.kind === 'conversion' || e.kind === 'field-goal') ev.detail = e.detail === 'good' ? 'good' : 'missed';
   // A try in the bonus zone (Nines) is worth five; the overlay reads the mark.

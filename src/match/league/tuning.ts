@@ -6,6 +6,7 @@
 // overrides with a way back. Overrides are module state: apply, run, restore
 // — one experiment at a time, never in the game.
 import { BASE } from './contest';
+import { TOUCH } from './touch';
 import { FATIGUE } from './fatigue';
 import { GAS } from './gas';
 import { LIVE } from './live';
@@ -28,6 +29,7 @@ export const KNOBS = {
   presets: PRESET_TABLES,
   rules: NINES,
   bench: BENCH,
+  touch: TOUCH,
   goals: GOALS,
 } as const;
 
