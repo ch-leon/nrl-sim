@@ -224,6 +224,18 @@ plays whole matches (§13) over many seeds and marks every count against these b
 on every match-code change to `main`; the Balanced-v-Balanced test in `presets.test.ts`
 still pins the coarse bands so a tuning change that breaks them fails CI.
 
+**Line breaks** (Phase 3) are their own count: in open play the carrier gets
+`live.lineBreakM` (1 m) goal-side of every defender but the last man, once per stretch of
+play until the next tackle or stoppage. The sim emits `line-break` (the contract's `break`:
+season stats and Player of the Match count it). The harness column `lineBreaks` carries the
+§7 band; `breaks` counts every beaten tackler (busts, fends, steps) and has no band. Measured
+(standard plan, run `20261019-140935-standard`): about 19 a match between even sides
+(15–27 across the plan), above the band; the count adds no dice, so no match changed.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `live.lineBreakM` | `src/match/league/live.ts` | 1 m | How far goal-side of all but the last man counts as a line break (a measure, not play). |
+
 ## 13. The match: clock, halves, points (BAK-207 §5.1, 2a)
 
 Two 9:00 halves of real sim time. The clock runs while the ball is in play (play, tackle,
