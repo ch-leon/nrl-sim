@@ -11,7 +11,7 @@
 // openLadderScreen into the nav bar (main.ts).
 
 import { el, panel, button, openModal, closeScreen } from '../dom';
-import { getState, type GameState, type Fixture, type LadderRow, type RivalClub } from '../../core/state';
+import { getState, setState, type GameState, type Fixture, type LadderRow, type RivalClub } from '../../core/state';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
@@ -141,6 +141,8 @@ function buildFixturesTab(state: GameState): HTMLElement {
   const names = clubNameMap(state.league.clubs);
   const wrap = el('div', { class: 'nrl-fixtures' });
 
+  wrap.append(liveMatchToggle());
+
   if (state.league.fixtures.length === 0) {
     wrap.append(panel({}, el('p', { text: 'No fixtures yet — season not started.' })));
     return wrap;
@@ -166,6 +168,22 @@ function buildFixturesTab(state: GameState): HTMLElement {
     wrap.append(header, list);
   }
   return wrap;
+}
+
+/**
+ * The "Live match (beta)" setting (BAK-207 2g): your matches are played by the
+ * live match sim and watched as it plays them, instead of the classic replay.
+ */
+function liveMatchToggle(): HTMLElement {
+  const box = el('input', { attrs: { type: 'checkbox' } });
+  box.checked = getState().settings.liveMatch === true;
+  box.addEventListener('change', () => setState({ settings: { ...getState().settings, liveMatch: box.checked } }));
+  return el(
+    'label',
+    { class: 'nrl-live-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
+    box,
+    el('span', { text: ' Live match (beta) — watch your matches played out by the new match engine' }),
+  );
 }
 
 function buildLadderTab(state: GameState): HTMLElement {

@@ -10,6 +10,7 @@ import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixt
 import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
 import type { MatchInjury, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
+import { runMatch } from '../match/league/match';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { ON_FIELD } from '../config';
@@ -135,15 +136,15 @@ export function registerPlayerMatchSystem(): void {
 
     const home = sheetFor(fixture.homeId);
     const away = sheetFor(fixture.awayId);
-    const sim = simulateMatch(
-      home,
-      away,
-      {
-        seed,
-        injuryRate: difficultyMultipliers(state.settings.difficulty).injuryRate,
-        ...(state.weather ? { weather: state.weather } : {}),
-      },
-    );
+    const matchOpts = {
+      seed,
+      injuryRate: difficultyMultipliers(state.settings.difficulty).injuryRate,
+      ...(state.weather ? { weather: state.weather } : {}),
+    };
+    // Live match (beta, BAK-207 2g): the live sim plays the match headless for the
+    // result now; the Match scene plays the same seed again for the player to watch.
+    const live = state.settings.liveMatch === true;
+    const sim = live ? runMatch(home, away, matchOpts) : simulateMatch(home, away, matchOpts);
     // Finals draws still stamp as-is; knockoutWinner favours home (higher seed).
     const ownSheet = fixture.homeId === PLAYER_ID ? home : away;
     const playedIds = (ownSheet.roster ?? []).flatMap((r) => (r.id ? [r.id] : []));
@@ -194,6 +195,6 @@ export function registerPlayerMatchSystem(): void {
       off();
       notifyResult();
     });
-    bus.emit('match:started', { fixture, sim, home, away });
+    bus.emit('match:started', { fixture, sim, home, away, ...(live ? { live: { seed, injuryRate: matchOpts.injuryRate } } : {}) });
   });
 }

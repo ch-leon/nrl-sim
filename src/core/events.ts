@@ -19,7 +19,9 @@ export interface Events {
   'player:signed': Player;
   // home/away sheets ride along so the Match scene can render kits/names
   // without re-deriving them (wave-4 integration extension).
-  'match:started': { fixture: Fixture; sim: MatchResult; home: TeamSheet; away: TeamSheet };
+  // `live`: the result came from the live match sim on this seed (BAK-207 2g); the
+  // Match scene plays the same seed live instead of replaying the event log.
+  'match:started': { fixture: Fixture; sim: MatchResult; home: TeamSheet; away: TeamSheet; live?: { seed: number; injuryRate?: number } };
   'match:event': MatchEvent; // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
   'board:sacked': { season: number; reason: string };

@@ -34,6 +34,8 @@ import {
 } from '../world/playback';
 import { PLAYERS } from '../world/formation';
 import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
+import { LivePlayback, LIVE_DEFAULT_SPEED } from '../match/view/livePlayback';
+import { NINES } from '../match/league/rules';
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { resolveKits } from '../art/match/kit';
@@ -120,6 +122,8 @@ export interface MatchSceneData {
   fixture?: Fixture; // carried through so `match:finished` can echo it (BAK-194)
   /** The weather when there is no result to take it from (the match lab, 2f). */
   weather?: WeatherKind;
+  /** Live match (BAK-207 2g): the result came from the live sim on this seed; watch it played again. */
+  live?: { seed: number; injuryRate?: number };
 }
 
 /** A player sprite + ground shadow, driven through PlaybackActor. */
@@ -262,7 +266,8 @@ export class MatchScene extends Phaser.Scene {
   private autoZoom: number | null = MATCH_ZOOM;
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
-  private playback: PlaybackController | null = null;
+  private playback: PlaybackController | LivePlayback | null = null;
+  private live: { seed: number; injuryRate?: number } | undefined;
   private overlay: MatchOverlayHandle | null = null;
   private controlsEl: HTMLDivElement | null = null;
   private speedButtons: HTMLButtonElement[] = [];
@@ -278,6 +283,7 @@ export class MatchScene extends Phaser.Scene {
     this.result = data.result;
     this.fixture = data.fixture;
     this.weather = data.result?.weather ?? data.weather;
+    this.live = data.live;
     this.players.home = [];
     this.players.away = [];
     this.crowdBobs = [];
@@ -355,7 +361,25 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private startPlayback(): void {
-    if (this.result) {
+    if (this.result && this.live) {
+      // Live match (2g): the overlay reads Nines halves and the sim's running clock.
+      this.overlay = mountMatchOverlay({ home: this.home, away: this.away, result: this.result, halfMinutes: NINES.halfMinutes });
+      this.playback = new LivePlayback(this, {
+        home: this.home,
+        away: this.away,
+        seed: this.live.seed,
+        ...(this.live.injuryRate !== undefined ? { injuryRate: this.live.injuryRate } : {}),
+        result: this.result,
+        fixture: this.fixture,
+        overlay: this.overlay,
+        closeUpDone: () => {
+          this.beatZoom = ZOOM_DEFAULT;
+          this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
+        },
+      });
+      this.mountPlaybackControls(LIVE_DEFAULT_SPEED);
+      bus.on('match:finished', this.onFinished);
+    } else if (this.result) {
       this.overlay = mountMatchOverlay({ home: this.home, away: this.away, result: this.result });
       // #20: each slot runs at its player's pace (team-sheet speed stats).
       this.playback = new PlaybackController(this, this.result, this.fixture, {
@@ -396,6 +420,8 @@ export class MatchScene extends Phaser.Scene {
       panTowards(cam.scrollX, tx, delta, PAN_RATE_PER_S, maxPx),
       panTowards(cam.scrollY, ty, delta, PAN_RATE_PER_S, maxPx),
     );
+    // A live match's pop-ups and bars sit over the sprites where the camera now has them.
+    if (this.playback instanceof LivePlayback) this.playback.late(delta);
   }
 
   // ── Readability (#17): name tag, carrier ring, situational zoom ───────────
@@ -544,7 +570,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   // ── DOM playback controls (speed ×1/×2/×4/×8 + Skip) ────────────────────────────
-  private mountPlaybackControls(): void {
+  private mountPlaybackControls(start: PlaybackSpeed = 1): void {
     const wrap = document.createElement('div');
     // Positioned by the overlay stylesheet (bottom-centre; the nav bar is hidden
     // while the match overlay is up — including full-time — so nothing sits
@@ -553,7 +579,7 @@ export class MatchScene extends Phaser.Scene {
 
     this.speedButtons = PLAYBACK_SPEEDS.map((s) => {
       const b = button(`×${s}`, () => this.setSpeed(s));
-      if (s === 1) b.setAttribute('data-active', 'true');
+      if (s === start) b.setAttribute('data-active', 'true');
       wrap.append(b);
       return b;
     });
@@ -627,6 +653,7 @@ export class MatchScene extends Phaser.Scene {
     this.marker = null;
     this.overlay?.destroy();
     this.overlay = null;
+    if (this.playback instanceof LivePlayback) this.playback.destroy();
     this.playback = null;
     if (this.controlsEl) {
       this.controlsEl.remove();

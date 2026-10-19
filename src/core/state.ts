@@ -162,7 +162,8 @@ export interface GameState {
   freeAgents: Player[];
   league: LeagueState;
   weather?: WeatherKind; // set for current round by fixtures system
-  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty };
+  /** liveMatch: play your matches on the live match sim (BAK-207 2g, beta); off when absent. */
+  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; liveMatch?: boolean };
   history: SeasonRecord[];
   boardPatience: number; // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
   objectives: Objective[]; // this season's board objectives (#47)

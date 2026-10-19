@@ -67,9 +67,10 @@ export function initLiveState(): LiveState {
  * for the possessing (opposing) side; errors that are NOT the coughed-up ball
  * from a big-hit (same iteration). Last-tackle `kick` is not a new iteration
  * (the set already consumed SET_TACKLES contests). Possession ticks mirror tackles.
- * `half` flips on `half-time` and via `ev.t >= 40`.
+ * `half` flips on `half-time` and via `ev.t >= halfMinutes` (40 for the old
+ * engine's 80-minute log, NINES.halfMinutes for the live sim's).
  */
-export function reduceEvent(s: LiveState, ev: MatchEvent, homeId: string): LiveState {
+export function reduceEvent(s: LiveState, ev: MatchEvent, homeId: string, halfMinutes = 40): LiveState {
   const next: LiveState = {
     ...s,
     possessionTicks: [s.possessionTicks[0], s.possessionTicks[1]],
@@ -80,9 +81,9 @@ export function reduceEvent(s: LiveState, ev: MatchEvent, homeId: string): LiveS
   const i = ev.teamId === homeId ? 0 : 1;
 
   // Minute / half.
-  next.minute = Math.max(next.minute, Math.min(80, ev.t));
+  next.minute = Math.max(next.minute, Math.min(2 * halfMinutes, ev.t));
   if (ev.kind === 'half-time') next.half = 2;
-  else if (ev.t >= 40) next.half = 2;
+  else if (ev.t >= halfMinutes) next.half = 2;
 
   // Scoring + counters.
   switch (ev.kind) {
@@ -149,10 +150,16 @@ export function possessionPct(s: LiveState): [number, number] {
   return [home, 100 - home];
 }
 
-/** MM:SS clock from a sim minute (minute 40 → "40:00"), clamped to 80:00. */
-export function formatClock(minute: number): string {
-  const m = Math.max(0, Math.min(80, Math.floor(minute)));
+/** MM:SS clock from a sim minute (minute 40 → "40:00"), clamped to the full match (80:00 by default). */
+export function formatClock(minute: number, maxMinutes = 80): string {
+  const m = Math.max(0, Math.min(maxMinutes, Math.floor(minute)));
   return `${String(m).padStart(2, '0')}:00`;
+}
+
+/** MM:SS from match seconds (the live sim's running clock), clamped to the full match. */
+export function formatClockSeconds(seconds: number, maxMinutes: number): string {
+  const s = Math.max(0, Math.min(maxMinutes * 60, Math.floor(seconds)));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
 // ── Score banner (pure) ────────────────────────────────────────────────────────
@@ -226,6 +233,8 @@ const MAX_LOG = 40;
 export interface MatchOverlayHandle {
   /** Remove the overlay and unsubscribe all bus handlers. Idempotent. */
   destroy(): void;
+  /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
+  setClock(matchSeconds: number, half: 1 | 2): void;
 }
 
 let active: MatchOverlayHandle | null = null;
@@ -237,6 +246,8 @@ export interface MatchOverlayOptions {
   /** Seed for the commentary rng so replays read identically. Defaults derived
    *  from the result's final score + event count. */
   seed?: number;
+  /** Minutes in a half: 40 for the old engine's log (default), NINES.halfMinutes for a live match (BAK-207 2g). */
+  halfMinutes?: number;
 }
 
 /**
@@ -252,6 +263,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   const { home, away, result } = opts;
   const homeId = home.clubId;
+  const halfMinutes = opts.halfMinutes ?? 40;
+  /** Set once the live sim drives the clock: events then only move the score and stats. */
+  let liveClock = false;
   const seed = opts.seed ?? deriveSeed(result);
   const rng = makeRng(seed);
 
@@ -261,7 +275,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const root = el('div', { class: 'nrl-match-overlay' });
 
   const scoreEl = el('span', { class: 'nrl-mo-score', text: '0 – 0' });
-  const clockEl = el('span', { class: 'nrl-mo-clock', text: formatClock(0) });
+  const clockEl = el('span', { class: 'nrl-mo-clock', text: opts.halfMinutes ? formatClockSeconds(0, 2 * halfMinutes) : formatClock(0) });
   const halfEl = el('span', { class: 'nrl-mo-half', text: '1st' });
   const weatherEl = el('span', { class: 'nrl-mo-weather', text: weatherBadge(result.weather) });
 
@@ -321,8 +335,10 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   const render = (): void => {
     scoreEl.textContent = `${state.homeScore} – ${state.awayScore}`;
-    clockEl.textContent = formatClock(state.minute);
-    halfEl.textContent = state.half === 1 ? '1st' : '2nd';
+    if (!liveClock) {
+      clockEl.textContent = formatClock(state.minute, 2 * halfMinutes);
+      halfEl.textContent = state.half === 1 ? '1st' : '2nd';
+    }
     const [ph, pa] = possessionPct(state);
     possLabel.textContent = `Possession ${ph}% / ${pa}%`;
     tackleLabel.textContent = `Tackles ${state.tackles[0]} / ${state.tackles[1]}`;
@@ -403,7 +419,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   let burst = 0;
   const onEvent = (ev: MatchEvent): void => {
     if (burst++ === 0) setTimeout(() => (burst = 0), 0);
-    state = reduceEvent(state, ev, homeId);
+    state = reduceEvent(state, ev, homeId, halfMinutes);
     render();
     const line = commentaryFor(ev, home.name, away.name, rng.next, homeId);
     if (line) appendCommentary(line);
@@ -433,6 +449,12 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       root.remove();
       document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
       if (active === handle) active = null;
+    },
+    setClock(matchSeconds: number, half: 1 | 2): void {
+      if (root.classList.contains('nrl-mo-final')) return;
+      liveClock = true;
+      clockEl.textContent = formatClockSeconds(matchSeconds, 2 * halfMinutes);
+      halfEl.textContent = half === 1 ? '1st' : '2nd';
     },
   };
   // Full-time: freeze on the final score (the result toast is transient). The
