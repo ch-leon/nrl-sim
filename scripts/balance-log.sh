@@ -35,7 +35,8 @@ fetch() {
 latest() {
   local slug
   slug=$(echo "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')
-  ls -d "$LOG"/runs/*-"$slug" 2>/dev/null | sort | tail -1
+  # No earlier run of this plan (the first ever) is not an error: print nothing.
+  ls -d "$LOG"/runs/*-"$slug" 2>/dev/null | sort | tail -1 || true
 }
 
 publish() {
