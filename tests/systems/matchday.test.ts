@@ -25,7 +25,7 @@ function collect(): {
   const started: { fixture: Fixture; sim: MatchResult }[] = [];
   const offs = [
     bus.on('ui:notify', ({ text }) => toasts.push(text)),
-    bus.on('match:started', ({ fixture, sim }) => started.push({ fixture, sim })),
+    bus.on('match:started', ({ fixture, sim }) => started.push({ fixture, sim: sim! })),
   ];
   return { toasts, started, stop: () => offs.forEach((off) => off()) };
 }

@@ -23,6 +23,12 @@ export interface TickContext {
   season: number;
   /** true inside advanceWeeks() — hooks auto-sim and skip scene playback. */
   fastForward: boolean;
+  /**
+   * Hold the week here (a live match the player is watching decides its own
+   * result, coach calls #73): the hooks after this one, and the week's end,
+   * wait for resumeWeek(). Absent where a week can't be held.
+   */
+  hold?: () => void;
 }
 
 /** A season-rollover hook. Runs only at rollover, after counters are bumped. */
@@ -141,13 +147,45 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
  */
 export function advanceWeek(): void {
   if (getState().sacked) return; // game over (#47): the save stays, time stops
+  if (held) return; // a held week finishes first (resumeWeek)
   const { week, season } = getState();
-  const ctx: TickContext = { week, season, fastForward: fastForwardFlag };
+  let holding = false;
+  const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(fastForwardFlag ? {} : { hold: () => (holding = true) }) };
 
-  for (const entry of sortedEntries(tickHooks)) {
-    entry.fn(ctx);
+  const entries = sortedEntries(tickHooks);
+  for (let i = 0; i < entries.length; i++) {
+    entries[i]!.fn(ctx);
+    if (holding) {
+      held = { ctx: { week, season, fastForward: false }, rest: entries.slice(i + 1) };
+      return;
+    }
   }
+  finishWeek(week);
+}
 
+/** A week held at a live match (coach calls #73): the hooks still to run. */
+let held: { ctx: TickContext; rest: TickEntry[] } | null = null;
+
+/** True while a week is held, waiting for its live match to finish. */
+export function weekHeld(): boolean {
+  return held !== null;
+}
+
+/** Finish a held week: the hooks after the one that held it, then the week's end, as advanceWeek would have. */
+export function resumeWeek(): void {
+  const h = held;
+  if (!h) return;
+  held = null;
+  for (const entry of h.rest) entry.fn(h.ctx);
+  finishWeek(h.ctx.week);
+}
+
+/** Test helper: forget a held week. */
+export function clearHeldWeek(): void {
+  held = null;
+}
+
+function finishWeek(week: number): void {
   const nextWeek = week + 1;
   if (nextWeek > WEEKS_PER_SEASON) {
     rollSeasonOver();

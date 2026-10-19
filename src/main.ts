@@ -38,6 +38,7 @@ import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard } from './ui/orientation';
 import { startTutorial } from './ui/tutorial';
+import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
 import { bootLab } from './match/lab/boot';
 
@@ -157,16 +158,18 @@ async function boot(): Promise<void> {
   });
   createHud({ onAdvanceWeek: () => advanceWeek(), onAdvanceUntil: (t) => advanceUntil(t) });
 
-  // Grounds → Match handoff: state/ladder are already applied by the matchday
-  // tick hook before this fires; the Match scene is pure playback. The scene's
-  // own Back-to-Club button returns to Grounds at full-time.
+  // Grounds → Match handoff: for the classic engine state/ladder are already
+  // applied by the matchday tick hook before this fires and the Match scene is
+  // pure playback; a live match (coach calls #73) holds the week and its result
+  // comes back with 'match:finished'. The scene's own Back-to-Club button
+  // returns to Grounds at full-time.
   bus.on('match:started', ({ fixture, sim, home, away, live }) => {
     // Screens stay usable alongside the HUD (Advance Week is reachable with one
     // open), so clear any screen/dialog before the match takes over the view.
     closeScreen();
     closeModal();
     g.scene.stop('Grounds');
-    g.scene.start('Match', { home, away, result: sim, fixture, ...(live ? { live } : {}) });
+    g.scene.start('Match', { home, away, fixture, ...(sim ? { result: sim } : {}), ...(live ? { live } : {}) });
   });
 
   initPlacementBar(); // build/move instructions + Cancel (#78)
@@ -192,6 +195,16 @@ async function boot(): Promise<void> {
   initAudioUi();
   initPwa();
   startTutorial(); // self-guards on settings.tutorialDone
+
+  // A live match in progress when the app was closed (#73): the save is from the
+  // week before it, so advancing again rebuilds the same match, which picks up
+  // the record and plays on from where it was, calls and all.
+  const pending = readLiveMatch();
+  if (pending && pending.season === getState().season && pending.week === getState().week) {
+    const resume = (): void => void setTimeout(() => advanceWeek(), 0);
+    if (g.isBooted) resume();
+    else g.events.once(Phaser.Core.Events.READY, resume);
+  } else if (pending) clearLiveMatch();
 }
 
 void boot();

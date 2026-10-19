@@ -7,7 +7,20 @@ import type {
 
 // MatchResult / MatchEvent are the canonical match-sim contract types, exported
 // from src/sim/events.ts (WU-6, ARCHITECTURE §6).
-import type { MatchResult, MatchEvent, TeamSheet } from '../sim/events';
+import type { MatchResult, MatchEvent, TeamSheet, WeatherKind } from '../sim/events';
+import type { CallInput } from '../match/league/calls';
+
+/** A live match handed to the Match scene (BAK-207 2g, coach calls #73). */
+export interface LiveMatchData {
+  seed: number;
+  weather: WeatherKind;
+  injuryRate?: number;
+  /** Calls already made (a resumed match), and where it was. */
+  calls?: CallInput[];
+  resumeAt?: number;
+  /** Keep the resume record: on each call, and when the app goes to the background. */
+  onProgress?: (calls: readonly CallInput[], tick: number) => void;
+}
 
 /** Event name -> payload type map (verbatim from ARCHITECTURE §5). */
 export interface Events {
@@ -19,9 +32,10 @@ export interface Events {
   'player:signed': Player;
   // home/away sheets ride along so the Match scene can render kits/names
   // without re-deriving them (wave-4 integration extension).
-  // `live`: the result came from the live match sim on this seed (BAK-207 2g); the
-  // Match scene plays the same seed live instead of replaying the event log.
-  'match:started': { fixture: Fixture; sim: MatchResult; home: TeamSheet; away: TeamSheet; live?: { seed: number; injuryRate?: number } };
+  // `sim`: the classic engine's recorded match, replayed. `live` (BAK-207 2g, coach
+  // calls #73): no result yet — the Match scene plays the live sim on this seed and
+  // the result comes with 'match:finished'.
+  'match:started': { fixture: Fixture; sim?: MatchResult; home: TeamSheet; away: TeamSheet; live?: LiveMatchData };
   'match:event': MatchEvent; // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
   'board:sacked': { season: number; reason: string };

@@ -142,6 +142,14 @@ const GENERIC_PLAYER = 'the ball-runner';
  * `awayName`. `homeId` is optional (additive to the spec signature); when omitted
  * the acting team defaults to the home name (kept for pure-signature callers).
  */
+/** A kick at goal that misses (conversion, penalty goal, field goal: detail 'missed'). */
+const MISSED_TEMPLATES: readonly string[] = [
+  'Wide! The kick for {team} misses.',
+  'Off the upright — no points for {team}.',
+  'He pushes it wide. No extras for {team}.',
+  'Just short — the kick falls away.',
+];
+
 export function commentaryFor(
   ev: MatchEvent,
   homeName: string,
@@ -149,8 +157,9 @@ export function commentaryFor(
   rng: () => number,
   homeId?: string,
 ): string {
+  const missed = ev.detail === 'missed' && (ev.kind === 'conversion' || ev.kind === 'penalty-goal' || ev.kind === 'field-goal');
   const variants =
-    ev.kind === 'set-start' ? (POSSESSION_TEMPLATES[ev.detail ?? ''] ?? []) : TEMPLATES[ev.kind];
+    ev.kind === 'set-start' ? (POSSESSION_TEMPLATES[ev.detail ?? ''] ?? []) : missed ? MISSED_TEMPLATES : TEMPLATES[ev.kind];
   if (!variants || variants.length === 0) return '';
   const idx = Math.min(variants.length - 1, Math.floor(rng() * variants.length));
   const template = variants[idx] as string;

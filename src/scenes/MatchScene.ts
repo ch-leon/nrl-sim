@@ -36,6 +36,7 @@ import { PLAYERS } from '../world/formation';
 import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
 import { LivePlayback, LIVE_DEFAULT_SPEED } from '../match/view/livePlayback';
 import { NINES } from '../match/league/rules';
+import type { LiveMatchData } from '../core/events';
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { resolveKits } from '../art/match/kit';
@@ -122,8 +123,8 @@ export interface MatchSceneData {
   fixture?: Fixture; // carried through so `match:finished` can echo it (BAK-194)
   /** The weather when there is no result to take it from (the match lab, 2f). */
   weather?: WeatherKind;
-  /** Live match (BAK-207 2g): the result came from the live sim on this seed; watch it played again. */
-  live?: { seed: number; injuryRate?: number };
+  /** Live match (BAK-207 2g, coach calls #73): played on the live sim as the player watches; the result comes at full time. */
+  live?: LiveMatchData;
 }
 
 /** A player sprite + ground shadow, driven through PlaybackActor. */
@@ -267,7 +268,7 @@ export class MatchScene extends Phaser.Scene {
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
   private playback: PlaybackController | LivePlayback | null = null;
-  private live: { seed: number; injuryRate?: number } | undefined;
+  private live: LiveMatchData | undefined;
   private overlay: MatchOverlayHandle | null = null;
   private controlsEl: HTMLDivElement | null = null;
   private speedButtons: HTMLButtonElement[] = [];
@@ -361,15 +362,19 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private startPlayback(): void {
-    if (this.result && this.live) {
+    if (this.live) {
       // Live match (2g): the overlay reads Nines halves and the sim's running clock.
-      this.overlay = mountMatchOverlay({ home: this.home, away: this.away, result: this.result, halfMinutes: NINES.halfMinutes });
+      const live = this.live;
+      this.overlay = mountMatchOverlay({ home: this.home, away: this.away, weather: live.weather, seed: live.seed, halfMinutes: NINES.halfMinutes });
       this.playback = new LivePlayback(this, {
         home: this.home,
         away: this.away,
-        seed: this.live.seed,
-        ...(this.live.injuryRate !== undefined ? { injuryRate: this.live.injuryRate } : {}),
-        result: this.result,
+        seed: live.seed,
+        weather: live.weather,
+        ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}),
+        calls: live.calls ?? [],
+        ...(live.resumeAt ? { resumeAt: live.resumeAt } : {}),
+        ...(live.onProgress ? { onProgress: live.onProgress } : {}),
         fixture: this.fixture,
         overlay: this.overlay,
         closeUpDone: () => {
@@ -379,6 +384,9 @@ export class MatchScene extends Phaser.Scene {
       });
       this.mountPlaybackControls(LIVE_DEFAULT_SPEED);
       bus.on('match:finished', this.onFinished);
+      // A phone may kill the app in the background: keep where the match is (#73).
+      document.addEventListener('visibilitychange', this.onHidden);
+      window.addEventListener('pagehide', this.onHidden);
     } else if (this.result) {
       this.overlay = mountMatchOverlay({ home: this.home, away: this.away, result: this.result });
       // #20: each slot runs at its player's pace (team-sheet speed stats).
@@ -608,10 +616,11 @@ export class MatchScene extends Phaser.Scene {
     // no-result fallback has no overlay, so it clears the visible nav instead.
     btn.style.left = '50%';
     btn.style.transform = 'translateX(-50%)';
-    btn.style.bottom = this.result ? '0.5rem' : '3.25rem';
+    const playing = this.result !== undefined || this.live !== undefined;
+    btn.style.bottom = playing ? '0.5rem' : '3.25rem';
     btn.style.zIndex = '20';
     // If no result was provided (defensive), keep the classic fallback visible.
-    btn.style.display = this.result ? 'none' : '';
+    btn.style.display = playing ? 'none' : '';
     this.backBtn = btn;
     mount(btn);
   }
@@ -640,7 +649,14 @@ export class MatchScene extends Phaser.Scene {
     return zoomForViewport(base, { width: this.cameras.main.width, height: this.cameras.main.height });
   }
 
+  /** The app is going to the background: a live match records where it is (#73). */
+  private onHidden = (e: Event): void => {
+    if ((e.type === 'pagehide' || document.visibilityState === 'hidden') && this.playback instanceof LivePlayback) this.playback.saveProgress();
+  };
+
   private teardown(): void {
+    document.removeEventListener('visibilitychange', this.onHidden);
+    window.removeEventListener('pagehide', this.onHidden);
     this.scale.off('resize', this.onResize);
     this.camController.destroy();
     bus.off('match:finished', this.onFinished);

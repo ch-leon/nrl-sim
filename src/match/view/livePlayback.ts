@@ -1,21 +1,23 @@
-// src/match/view/livePlayback.ts — a real match watched on the live sim
-// (BAK-207 §5.1 2g). Matchday has already played the match headless with
-// runMatch for the result; this plays the same sheets on the same seed again,
-// tick by tick, so what the player watches is what was recorded. It stands in
-// the Match scene where the event-log replay (world/playback.ts) does for the
-// classic engine: the same overlay, score banners, crowd and FX (fed the same
-// 'match:event' stream runMatch reported), the lab's pop-ups, wrestle bar and
-// sprint streaks, speed buttons and Skip, and 'match:finished' at full time.
+// src/match/view/livePlayback.ts — a real match played on the live sim as the
+// player watches (BAK-207 §5.1 2g; coach calls #73: the match on screen is the
+// match). Matchday holds the week at kick-off; this plays the sheets on the
+// match seed tick by tick, records the MatchResult as it goes (MatchRecorder,
+// exactly as runMatch would), takes the coach's calls, and hands the result
+// over with 'match:finished' at full time. It stands in the Match scene where
+// the event-log replay (world/playback.ts) does for the classic engine: the
+// same overlay, score banners, crowd and FX, the lab's pop-ups, wrestle bar
+// and sprint streaks, speed buttons and Skip.
 import type Phaser from 'phaser';
 import { bus } from '../../core/events';
 import type { Fixture } from '../../core/state';
-import type { MatchResult, TeamSheet } from '../../sim/events';
+import type { TeamSheet, WeatherKind } from '../../sim/events';
 import type { PlaybackSpeed } from '../../world/playback';
 import type { MatchOverlayHandle } from '../../ui/screens/matchOverlay';
 import { Runner } from '../core/engine';
 import type { Side, SimEvent } from '../core/snapshot';
-import { toMatchEvent } from '../league/events';
 import { LiveSim } from '../league/live';
+import { MatchRecorder } from '../league/match';
+import type { CallInput, CoachCall } from '../league/calls';
 import { NINES } from '../league/rules';
 import { LiveView, type ViewSurface } from './liveView';
 import { PopupLayer } from './popupLayer';
@@ -45,10 +47,15 @@ export interface LivePlaybackScene extends ViewSurface {
 export interface LivePlaybackOptions {
   home: TeamSheet;
   away: TeamSheet;
-  /** The seed and injury rate matchday gave runMatch; the weather is the result's. */
+  /** The match: its seed, weather and injury rate from matchday, and the coach's calls so far (a resumed match brings its own). */
   seed: number;
+  weather: WeatherKind;
   injuryRate?: number;
-  result: MatchResult;
+  calls: CallInput[];
+  /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
+  resumeAt?: number;
+  /** A call was made, or the tick moved on a resumable match: keep the record (resume after the app is killed). */
+  onProgress?: (calls: readonly CallInput[], tick: number) => void;
   fixture: Fixture | undefined;
   overlay: MatchOverlayHandle | null;
   /** Ease the camera back out after a big moment's close-up. */
@@ -61,7 +68,7 @@ export class LivePlayback {
   private readonly popups: PopupLayer;
   private readonly wrestleBar: WrestleBar;
   private readonly sprintLayer: SprintLayer;
-  private readonly ids: Record<Side, string>;
+  private readonly recorder: MatchRecorder;
   private speed: PlaybackSpeed = LIVE_DEFAULT_SPEED;
   private finishEmitted = false;
   private skipping = false;
@@ -72,13 +79,20 @@ export class LivePlayback {
     private readonly scene: LivePlaybackScene & Phaser.Scene,
     private readonly opts: LivePlaybackOptions,
   ) {
-    const { home, away, result } = opts;
-    this.ids = { home: home.clubId, away: away.clubId };
-    // Exactly the sim runMatch played: same sheets, seed, weather and injury rate.
-    const simOpts = { weather: result.weather, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}) };
+    const { home, away } = opts;
+    this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
+    // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate and calls.
+    const simOpts = { weather: opts.weather, calls: opts.calls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}) };
     this.runner = new Runner((seed) => new LiveSim(home, away, seed, simOpts), opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
+    this.runner.onStep = () => this.recorder.clock(this.sim.matchSeconds);
     this.runner.setSpeed(this.speed);
+    // A resumed match plays on, silently, to where it was.
+    if (opts.resumeAt) {
+      this.skipping = true;
+      while (!this.runner.finished && this.runner.tick < opts.resumeAt) this.runner.step();
+      this.skipping = false;
+    }
     this.runner.play();
     this.view = new LiveView(scene);
     this.popups = new PopupLayer(scene, DEPTH_POPUP);
@@ -89,6 +103,34 @@ export class LivePlayback {
 
   get finished(): boolean {
     return this.finishEmitted;
+  }
+
+  private get sim(): LiveSim {
+    return this.runner.current as LiveSim;
+  }
+
+  /** Why `side`'s coach can't make `call` now, or null (#73). */
+  callRefusal(side: Side, call: CoachCall): string | null {
+    return this.finishEmitted ? 'full time' : this.sim.callRefusal(side, call);
+  }
+
+  /** The coach makes a call: it takes effect on the next tick. Returns why not, or null. */
+  call(side: Side, call: CoachCall): string | null {
+    const why = this.callRefusal(side, call);
+    if (why) return why;
+    this.opts.calls.push({ tick: this.runner.tick + 1, side, call });
+    this.opts.onProgress?.(this.opts.calls, this.runner.tick);
+    return null;
+  }
+
+  /** The tick the match is at (for the resume record). */
+  get tick(): number {
+    return this.runner.tick;
+  }
+
+  /** Keep the resume record up to date (the app is going to the background). */
+  saveProgress(): void {
+    if (!this.finishEmitted) this.opts.onProgress?.(this.opts.calls, this.runner.tick);
   }
 
   getSpeed(): PlaybackSpeed {
@@ -164,20 +206,15 @@ export class LivePlayback {
           this.closeupUntil = this.now + CLOSEUP_MS;
         }
       }
-      // The same conversion runMatch made, so the overlay counts what the result says.
-      const ev = toMatchEvent(e, cur, this.ids);
-      if (ev) bus.emit('match:event', ev);
     }
+    // The contract's events, recorded for the result and sent to the overlay and FX.
+    for (const ev of this.recorder.add(events, cur)) bus.emit('match:event', ev);
   }
 
   private finish(): void {
     if (this.finishEmitted) return;
     this.finishEmitted = true;
-    const pts = this.runner.cur.score;
-    const { result } = this.opts;
-    if (pts && (pts.home !== result.homeScore || pts.away !== result.awayScore)) {
-      console.warn(`live match: watched ${pts.home}–${pts.away}, recorded ${result.homeScore}–${result.awayScore} (seed ${this.opts.seed})`);
-    }
+    const result = this.recorder.result(this.sim);
     if (this.opts.fixture) bus.emit('match:finished', { fixture: this.opts.fixture, result });
   }
 }

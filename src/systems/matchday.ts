@@ -3,12 +3,13 @@
 // presentation layer (MatchScene playback, wave 4) can replay the result; state
 // is already fully applied before the event fires — playback is view-only.
 import { bus } from '../core/events';
-import { getState, setState, type RivalClub } from '../core/state';
-import { registerTickHook, TICK_ORDER } from '../core/time';
+import { getState, setState, type Fixture, type RivalClub } from '../core/state';
+import { registerTickHook, resumeWeek, TICK_ORDER } from '../core/time';
+import { clearLiveMatch, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, type Difficulty, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
-import type { MatchInjury, TeamSheet } from '../sim/events';
+import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
 import { applyMatchStats } from './stats';
@@ -109,6 +110,51 @@ function roundLabel(round: number): string {
   return `Round ${round}`;
 }
 
+/**
+ * Apply the player's match result: ladder, player stats, injuries (ours and the
+ * rival's). Returns the toast to show when the player sees the final score.
+ */
+function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, sim: MatchResult): () => void {
+  // Finals draws still stamp as-is; knockoutWinner favours home (higher seed).
+  const ownSheet = fixture.homeId === PLAYER_ID ? home : away;
+  const playedIds = (ownSheet.roster ?? []).flatMap((r) => (r.id ? [r.id] : []));
+  const applied = applyResult(getState(), fixture, {
+    homeScore: sim.homeScore,
+    awayScore: sim.awayScore,
+  });
+  setState({
+    league: applied.league,
+    squad: applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
+  });
+
+  // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
+  const injuryToasts = applyMatchInjuries(sim.injuries);
+  // The rival's injuries land on its own squad (#74), silently.
+  const rivalHurt = sim.injuries.filter((i) => i.teamId !== PLAYER_ID && i.playerId);
+  if (rivalHurt.length > 0) {
+    const lg = getState().league;
+    setState({ league: { ...lg, clubs: injureRivalPlayers(lg.clubs, rivalHurt) } });
+  }
+
+  const playerHome = fixture.homeId === PLAYER_ID;
+  const [us, them] = playerHome
+    ? [sim.homeScore, sim.awayScore]
+    : [sim.awayScore, sim.homeScore];
+  // A drawn final is decided on seeding (home = higher seed advances), so say
+  // which way it went rather than leaving the player guessing.
+  const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
+  const seedingNote = us === them && isFinalsRound(fixture.round)
+    ? (playerHome ? ' — through on seeding' : ' — out on seeding')
+    : '';
+  return (): void => {
+    bus.emit('ui:notify', {
+      text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
+      kind: us > them ? 'success' : us < them ? 'danger' : 'info',
+    });
+    for (const text of injuryToasts) bus.emit('ui:notify', { text, kind: 'danger' });
+  };
+}
+
 export function registerPlayerMatchSystem(): void {
   registerTickHook('matchday-player', TICK_ORDER.match, (ctx) => {
     const state = getState();
@@ -141,48 +187,42 @@ export function registerPlayerMatchSystem(): void {
       injuryRate: difficultyMultipliers(state.settings.difficulty).injuryRate,
       ...(state.weather ? { weather: state.weather } : {}),
     };
-    // Live match (beta, BAK-207 2g): the live sim plays the match headless for the
-    // result now; the Match scene plays the same seed again for the player to watch.
-    const live = state.settings.liveMatch === true;
-    const sim = live ? runMatch(home, away, matchOpts) : simulateMatch(home, away, matchOpts);
-    // Finals draws still stamp as-is; knockoutWinner favours home (higher seed).
-    const ownSheet = fixture.homeId === PLAYER_ID ? home : away;
-    const playedIds = (ownSheet.roster ?? []).flatMap((r) => (r.id ? [r.id] : []));
-    const applied = applyResult(getState(), fixture, {
-      homeScore: sim.homeScore,
-      awayScore: sim.awayScore,
-    });
-    setState({
-      league: applied.league,
-      squad: applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
-    });
-
-    // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
-    const injuryToasts = applyMatchInjuries(sim.injuries);
-    // The rival's injuries land on its own squad (#74), silently.
-    const rivalHurt = sim.injuries.filter((i) => i.teamId !== PLAYER_ID && i.playerId);
-    if (rivalHurt.length > 0) {
-      const lg = getState().league;
-      setState({ league: { ...lg, clubs: injureRivalPlayers(lg.clubs, rivalHurt) } });
-    }
-
-    const playerHome = fixture.homeId === PLAYER_ID;
-    const [us, them] = playerHome
-      ? [sim.homeScore, sim.awayScore]
-      : [sim.awayScore, sim.homeScore];
-    // A drawn final is decided on seeding (home = higher seed advances), so say
-    // which way it went rather than leaving the player guessing.
-    const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
-    const seedingNote = us === them && isFinalsRound(fixture.round)
-      ? (playerHome ? ' — through on seeding' : ' — out on seeding')
-      : '';
-    const notifyResult = (): void => {
-      bus.emit('ui:notify', {
-        text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
-        kind: us > them ? 'success' : us < them ? 'danger' : 'info',
+    // A live match the app was closed in the middle of (#73): this is the same match.
+    const prior = readLiveMatch();
+    const resumed =
+      prior && prior.season === state.season && prior.week === state.week && prior.round === fixture.round && prior.homeId === fixture.homeId && prior.seed === seed ? prior : null;
+    const live = state.settings.liveMatch === true || resumed !== null;
+    // Live match (beta, BAK-207 2g; coach calls #73): the match on screen is the
+    // match. The week holds here; the result and the rest of the week come at
+    // full time, from what the player watched (and called).
+    if (live && !ctx.fastForward && ctx.hold) {
+      ctx.hold();
+      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], tick: resumed?.tick ?? 0 };
+      writeLiveMatch(record);
+      const off = bus.on('match:finished', ({ fixture: done, result }) => {
+        if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
+        off();
+        clearLiveMatch();
+        applyPlayerResult(fixture, home, away, result)();
+        resumeWeek();
       });
-      for (const text of injuryToasts) bus.emit('ui:notify', { text, kind: 'danger' });
-    };
+      bus.emit('match:started', {
+        fixture,
+        home,
+        away,
+        live: {
+          seed,
+          weather: state.weather ?? 'clear',
+          injuryRate: matchOpts.injuryRate,
+          calls: record.calls,
+          ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
+          onProgress: (calls, tick) => writeLiveMatch({ ...record, calls: [...calls], tick }),
+        },
+      });
+      return;
+    }
+    const sim = live ? runMatch(home, away, matchOpts) : simulateMatch(home, away, matchOpts);
+    const notifyResult = applyPlayerResult(fixture, home, away, sim);
 
     if (ctx.fastForward) {
       notifyResult();
@@ -195,6 +235,6 @@ export function registerPlayerMatchSystem(): void {
       off();
       notifyResult();
     });
-    bus.emit('match:started', { fixture, sim, home, away, ...(live ? { live: { seed, injuryRate: matchOpts.injuryRate } } : {}) });
+    bus.emit('match:started', { fixture, sim, home, away });
   });
 }
