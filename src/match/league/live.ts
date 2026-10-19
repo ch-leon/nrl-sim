@@ -384,6 +384,10 @@ export class LiveSim implements MatchSim {
   private callAtk: Side | null = null;
   /** Which calls paid off (spec §3's last column). */
   private readonly judge = new CallJudge();
+  /** Sets each side has had and how many it completed (§7 completion: a set not ended by its own error, a turnover or a penalty against it). */
+  readonly sets: Record<Side, number> = { home: 0, away: 0 };
+  readonly setsCompleted: Record<Side, number> = { home: 0, away: 0 };
+  private setLost = false;
   private callTackles = 0;
   /** Touch and dead ball (2d): the side that touched the ball last, the kick in play (where from and what for), and a bounce on its way out. */
   private lastTouch: Side = 'home';
@@ -739,6 +743,7 @@ export class LiveSim implements MatchSim {
   private expireCalls(): void {
     const newSet = this.attacking !== this.callAtk || this.tackles < this.callTackles;
     const tackled = this.tackles !== this.callTackles;
+    this.countSet(newSet);
     this.announcePaid(this.judge.observe([...this.events], this.ballPos().x, !newSet && this.tackles > this.callTackles, newSet));
     if (newSet) {
       for (const st of [this.callState.home, this.callState.away]) {
@@ -751,6 +756,21 @@ export class LiveSim implements MatchSim {
     }
     this.callAtk = this.attacking;
     this.callTackles = this.tackles;
+  }
+
+  /** Completion (§7): a set is lost to its side's own error, an intercept or strip, or a penalty against it; any other end completes it. */
+  private countSet(newSet: boolean): void {
+    const atk = this.callAtk;
+    if (atk === null) return;
+    for (const e of this.events) {
+      if (e.side === undefined) continue;
+      const own = e.side === atk;
+      if ((own && (e.kind === 'error' || e.kind === 'drop' || e.kind === 'loose' || e.kind === 'penalty')) || (!own && (e.kind === 'intercept' || e.kind === 'strip'))) this.setLost = true;
+    }
+    if (!newSet) return;
+    this.sets[atk]++;
+    if (!this.setLost) this.setsCompleted[atk]++;
+    this.setLost = false;
   }
 
   /** The play call in force for the side with the ball, if any. */
