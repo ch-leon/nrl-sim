@@ -9,8 +9,10 @@ import { TRAIT_MODES, isTraitMode, type LabClub, type TraitMode } from './sheets
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
 import type { LabTactics } from './controller';
 import { statsLine, statsWindow } from './stats';
+import { LEGS, isLegs, type Legs } from '../league/fatigue';
 
 const TRAIT_MODE_LABEL: Readonly<Record<TraitMode, string>> = { gen: 'as rolled', none: 'none', stars: 'all superstars' };
+const LEGS_LABEL: Readonly<Record<Legs, string>> = { fresh: 'fresh', late: 'last 10 min', spent: 'out on their feet' };
 
 export interface LabPanelHooks {
   /** Rebuild the lab on new teams / seed / tick (new sprites need a new scene). */
@@ -62,6 +64,14 @@ export class LabPanel {
       if (m === p.traits) o.selected = true;
       traits.append(o);
     }
+    // Legs (§8): start fresh, as the last ten minutes, or out on their feet — fatigue without waiting for it.
+    const legs = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Legs: fresh / the last ten minutes / out on their feet' } });
+    for (const m of LEGS) {
+      const o = el('option', { text: LEGS_LABEL[m], attrs: { value: m } });
+      if (m === p.legs) o.selected = true;
+      legs.append(o);
+    }
+    const legsOf = (): Legs => (isLegs(legs.value) ? legs.value : 'fresh');
     // Tactics picker: a preset per side for attack and defence; "club" keeps the club's own style.
     const presetSelect = (kind: 'attack' | 'defence', value: string | undefined, title: string): HTMLSelectElement => {
       const sel = el('select', { class: 'nrl-lab-select nrl-lab-preset', attrs: { title } });
@@ -87,7 +97,7 @@ export class LabPanel {
     const go = button('Go', () => {
       const s = Math.max(1, Math.floor(Number(seed.value) || 1));
       const mode = isTraitMode(traits.value) ? traits.value : 'gen';
-      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics() });
+      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf() });
     });
     const shuffle = button('🎲', () => {
       seed.value = String(1 + Math.floor(Math.random() * 999_999));
@@ -128,7 +138,7 @@ export class LabPanel {
     const load = button('Load', () => {
       const f = decodeFlag(codeIn.value);
       if (!f) return hooks.notify('Not a valid Flag code');
-      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics() });
+      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf() });
     });
 
     // Event feed: the last few things that happened; tap one to jump back to it.
@@ -144,7 +154,7 @@ export class LabPanel {
       { class: 'nrl-lab' },
       el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: 'Match Lab · Phase 1 set prototype' }), collapse),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, home, el('span', { text: 'v' }), away, seed, go, shuffle),
-      el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits),
+      el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits, el('span', { text: 'Legs' }), legs),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'H' }), hAtk, hDef, el('span', { text: 'A' }), aAtk, aDef),
       ...(styles ? [el('div', { class: 'nrl-lab-hint nrl-lab-more', text: styles })] : []),
       el('div', { class: 'nrl-lab-row' }, this.playBtn, step, ...this.speedBtns, this.readout),

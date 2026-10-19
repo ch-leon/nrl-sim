@@ -44,7 +44,13 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   regather: { word: 'REGATHER!', tone: 'attack', big: true },
   drop: { word: 'DROPPED!', tone: 'bad' },
   try: { word: 'TRY!', tone: 'attack', big: true },
+  // Legs and the wrestle (§8): a quick play-the-ball off a short wrestle, a player out on his feet.
+  'quick-ptb': { word: 'QUICK PTB!', tone: 'attack' },
+  gassed: { word: 'GASSED!', tone: 'bad' },
 };
+
+/** A bust out of a wrestle (the defenders' grip went first) reads differently from one at contact. */
+const LATE_BUST = 'BROKE FREE!';
 
 /** A kick's pop-up names its type (BAK-208 §4.4). */
 const KICK_WORDS: Readonly<Record<string, string>> = {
@@ -69,7 +75,7 @@ export function popupFor(e: SimEvent): Popup | null {
   const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
   const big = w.big ?? false;
-  const word = e.kind === 'kick' && e.detail && KICK_WORDS[e.detail] ? KICK_WORDS[e.detail]! : w.word;
+  const word = e.kind === 'kick' && e.detail && KICK_WORDS[e.detail] ? KICK_WORDS[e.detail]! : e.kind === 'break-tackle' && e.detail === 'wrestle' ? LATE_BUST : w.word;
   const p: Popup = { word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;

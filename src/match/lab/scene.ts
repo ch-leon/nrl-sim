@@ -13,6 +13,7 @@ import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
 import { PopupLayer } from '../view/popupLayer';
 import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from '../view/popups';
+import { WrestleBar } from '../view/wrestleBar';
 import type { LabController } from './controller';
 
 export interface LabSceneData {
@@ -30,6 +31,7 @@ export class LabScene extends MatchScene {
   private controller!: LabController;
   private view: LiveView | null = null;
   private popups: PopupLayer | null = null;
+  private wrestleBar: WrestleBar | null = null;
   private ids!: Record<Side, string>;
   private closeupUntil = 0;
 
@@ -50,6 +52,7 @@ export class LabScene extends MatchScene {
     this.backBtn = null;
     this.view = new LiveView(this);
     this.popups = new PopupLayer(this, DEPTH_POPUP);
+    this.wrestleBar = new WrestleBar(this, DEPTH_POPUP);
     const r = this.controller.runner;
     r.onEvents = (events) => this.onSimEvents(events);
     this.view.draw(r.prev, r.cur, 0, 1);
@@ -57,6 +60,8 @@ export class LabScene extends MatchScene {
       r.onEvents = null;
       this.popups?.destroy();
       this.popups = null;
+      this.wrestleBar?.destroy();
+      this.wrestleBar = null;
     });
   }
 
@@ -89,9 +94,12 @@ export class LabScene extends MatchScene {
       this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
     }
     super.update(time, delta); // camera follows the ball the view just placed
-    this.popups?.update(delta, this.cameras.main.zoom, (side, slot) => {
+    const feet = (side: Side, slot: number): { x: number; y: number } | null => {
       const a = this.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
-    });
+    };
+    this.popups?.update(delta, this.cameras.main.zoom, feet);
+    // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
+    this.wrestleBar?.update(r.cur.wrestle, this.cameras.main.zoom, (w) => feet(w.side, w.slot));
   }
 }

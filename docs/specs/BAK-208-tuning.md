@@ -39,7 +39,7 @@ result. Keep it in step with the code: when a constant changes, change the row.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `CONTACT_TICKS` / `DOWN_TICKS` / `PTB_TICKS` / `ROLL_TICKS` / `DH_HOLD_TICKS` | `live.ts` | 9 / 10 / 11 / 4 / 6 | Tackle → down → play-the-ball → heel → dummy-half pause. Sum ≈ 2 s per ruck. |
+| `CONTACT_TICKS` / `DOWN_TICKS` / `PTB_TICKS` / `ROLL_TICKS` / `DH_HOLD_TICKS` | `live.ts` | 9 / 10 / 11 / 4 / 6 | Tackle → down → play-the-ball → heel → dummy-half pause. Sum ≈ 2 s per ruck. `CONTACT_TICKS` / `DOWN_TICKS` now apply to a big hit only; a held tackle is the wrestle and its length sets "down" (§11). |
 | `ONSIDE_M` | `live.ts` | 10 | The defensive line stands 10 m off the ruck. |
 | `MARKER_RELEASE_TICKS` | `live.ts` | 14 | Markers hold at the ruck this long after the heel (× defence preset `markerHold`). Dropped marker tackles from ~50% to ~25%. |
 | `BUSY_AFTER_PTB` | `live.ts` | 24 | The tackled man isn't a pass option this long. |
@@ -120,7 +120,7 @@ Tests: `tests/match/league/kicks.test.ts`.
 | `TRAIT_PTS` | `src/match/league/traits.ts` | Dancing Feet .15 · Wrecking Ball .12 · Don't Argue .12 · Offload King .12 · Razzle Dazzle .20 · Finisher .10/.05/.10 · Hitman .12 · Hothead .12 · Pickpocket .08 · Brick Wall .10 · Last Line .10 · Poacher .10 · Gambler .15 · Playmaker pass .10 · Jets speed .08 · Last Line speed .10 · Big Boot dist .10 / acc .15 | Probability points (or multipliers) at level I. |
 | `EDGE_COST` | `traits.ts` | Hothead +8% busted/stepped · Razzle Dazzle +10% spill | Fixed downsides of the double-edged traits. |
 | `FINISHER_M` | `traits.ts` | 20 m | Red zone where the Finisher fires. |
-| `WRECK_DRIVE_CHANCE` / `WRECK_DRIVE_M` | `live.ts` | 30% / 0.6 m per level | Wrecking Ball drives through a held tackle (DRIVE!). |
+| `WRECK_DRIVE_CHANCE` / `WRECK_FIGHT` | `live.ts` / `wrestle.ts` | 30% / +30% fight per level | Wrecking Ball keeps driving in a held tackle (DRIVE!): more fight in the wrestle. |
 | `CUT_OUT_PER_LEVEL_M` / `PLAYMAKER_WIDTH` / `CUT_OUT_CHANCE` | `live.ts` | 4 m / 0.25 / 15% per level | Playmaker reach, width bias and deliberate cut-out. |
 | Lab `stars` mode | `src/match/lab/sheets.ts` | two level-III fit traits each | Stress test; `#lab?traits=stars`. |
 
@@ -146,10 +146,47 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `CLOSEUP_MS` | `src/match/lab/scene.ts` | 1500 ms | Camera close-up on a big moment. |
 | `ZOOM_DEFAULT` / `ZOOM_CLOSE` / `ZOOM_WIDE` | `src/world/readability.ts` | 2 / 3 / 2 (integers) | Camera zooms; integers keep the pixels crisp. |
 | Stats strip window | `src/match/lab/stats.ts` `WINDOW_TICKS` | 5 min | `last m:ss · T · Brk · Off · Err · K · Try · Skill`. |
+| `BAR_W` / `BAR_H` / `BAR_LIFT` / `FIGHT_COLORS` | `src/match/view/wrestleBar.ts` | 30 / 5 screen px, 38 world px / green > 50% > yellow > 25% > red | The wrestle bar over the carrier, a pip per man on him. |
 
-Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`.
+Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`.
 
-## 10. Balance targets (§7) and how to measure
+## 10. Legs (§8)
+
+All in `src/match/league/fatigue.ts`; the tank lives on each player in `live.ts`.
+
+| Knob | Value | Effect |
+|---|---|---|
+| `RUN_COST` | 0.00015 per metre | Running drain (~240 m a minute per player). The main lever on when sides go tired. |
+| `CONTACT_COST` | carrier 0.006 · tackler 0.004 | Per contact, any outcome (and per joiner). |
+| `WRESTLE_COST` | carrier 0.008 per man per s · tackler 0.006 per s | The wrestle's price. |
+| `RECOVER_WALK` / `WALK_SPEED` | 0.0002 per s under 1.5 m/s | Getting a breather in play. 0.001 cancelled most of the drain. |
+| `RECOVER_STOP` | 0.002 per s | After a try / before a restart. |
+| `drainRate` | 1.5 − Stamina/100, clamp 0.6…1.4 | Stamina 50 ×1, 80 ×0.7, 20 ×1.3. |
+| `WORKHORSE_SAVE` | 0.1 × level mult | Workhorse I ×0.9, II ×0.84, III ×0.78. |
+| `TIRED_AT` / `SPENT_AT` | 40% / 20% | Tiers; `tiredness` feeds the contest 0 / 0.5 / 1. |
+| `TIRED_SPEED` / `SPENT_SPEED` | ×0.9 / ×0.8 | Top speed. |
+| `GASSED_RESET` | 30% | GASSED! is announced again only after he gets back above this. |
+| `LEGS_ENERGY` | fresh 1 · late 0.38 · spent 0.18 | Lab Legs picker (`#lab?legs=`). |
+
+## 11. The wrestle (§8.1)
+
+All in `src/match/league/wrestle.ts`; `live.ts` `stepWrestle` runs it (and `JOIN_M`).
+
+| Knob | Value | Effect |
+|---|---|---|
+| `FIGHT_BASE` / `FIGHT_SPREAD` / `FIGHT_LEGS` | 1.1 s / ±25% roll / −50% spent | Carrier's fight; Str /120 and Sta /240 tilt it. |
+| `GRIP_BASE` / `JOIN_GRIP` | 1.3 s / +0.35 s per joiner | Defenders' grip; Str /150, IQ /300. Lower → more late busts (1.25 gave ~8 a match). |
+| `HOLD_LEGS` | −40% spent | A tired tackler holds and grips less. |
+| `GANG` | ×1 / ×1.5 / ×2 | Drain for one / two / three men (summed holds × this). |
+| `MAX_MEN` / `JOIN_M` | 3 / 6 m | Most in a tackle; free defenders this close come in to help. |
+| `DRIVE_SPEED` | 1.5 m/s × fight left ÷ men | Metres after contact. |
+| `RUCK_QUICK_TICKS` / `RUCK_SLOW_TICKS` | 5 / 18 | Ticks down before the play-the-ball … |
+| `QUICK_S` / `SLOW_S` | 0.35 s / 1.2 s | … for a wrestle this short / long (linear between). QUICK PTB! / slow line at the ends. |
+| `WRESTLE_MAX_S` | 3 s | Held at the latest. |
+
+Tests: `tests/match/league/fatigue.test.ts`.
+
+## 12. Balance targets (§7) and how to measure
 
 Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams: tackles
 90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 · tries 5–9 ·
