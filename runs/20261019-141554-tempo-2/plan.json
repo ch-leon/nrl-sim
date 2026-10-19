@@ -1,0 +1,54 @@
+{
+  "name": "tempo 2",
+  "description": "Phase 3 (#87): the ruck after a wrestle is set by wrestle.ruckQuickTicks/ruckSlowTicks. Tackle to ball played is ~2.2 s (NRL ~3 s). What do 3 s and 3.5 s play-the-balls do to tackles (§7 90-120), line breaks, tries, quick/slow PTBs?",
+  "seeds": 30,
+  "scenarios": [
+    {
+      "name": "60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "ptb 3 s",
+      "tuning": {
+        "wrestle.ruckQuickTicks": 14,
+        "wrestle.ruckSlowTicks": 36,
+        "live.ptbTicks": 16,
+        "live.downTicks": 22
+      }
+    },
+    {
+      "name": "ptb 3.5 s",
+      "tuning": {
+        "wrestle.ruckQuickTicks": 20,
+        "wrestle.ruckSlowTicks": 44,
+        "live.ptbTicks": 18,
+        "live.downTicks": 30
+      }
+    },
+    {
+      "name": "ptb 4.5 s",
+      "tuning": {
+        "wrestle.ruckQuickTicks": 30,
+        "wrestle.ruckSlowTicks": 60,
+        "live.ptbTicks": 22,
+        "live.downTicks": 44
+      }
+    }
+  ]
+}
