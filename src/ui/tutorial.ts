@@ -278,13 +278,20 @@ function renderStep(): void {
   }
 }
 
-/** Look up an anchor within the UI overlay (falls back to whole document). */
+/**
+ * Look up an anchor within the UI overlay (falls back to whole document). An
+ * element that is in the DOM but not on screen (the nav is display:none during
+ * a match) does not count: a cutout drawn around a zero-size box lands in the
+ * corner, so the step keeps polling until the box is real.
+ */
 function findAnchor(selector: string): HTMLElement | null {
   const root: ParentNode = document.getElementById('ui-root') ?? document;
-  return (
+  const found =
     (root.querySelector(selector) as HTMLElement | null) ??
-    (document.querySelector(selector) as HTMLElement | null)
-  );
+    (document.querySelector(selector) as HTMLElement | null);
+  if (!found) return null;
+  const r = found.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 ? found : null;
 }
 
 /** Centre the anchor in view before highlighting (mobile-friendly). */
