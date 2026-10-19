@@ -59,3 +59,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-174925-standard | standard | 7c31055 | main | [report](runs/20261019-174925-standard/report.md) |
 | 20261019-180213-standard | standard | 979cbbe | main | [report](runs/20261019-180213-standard/report.md) |
 | 20261019-192451-standard | standard | 279a7bc | main | [report](runs/20261019-192451-standard/report.md) |
+| 20261019-194128-sin-bins | sin bins | 279a7bc (uncommitted changes) | feat/sin-bins | [report](runs/20261019-194128-sin-bins/report.md) |
