@@ -84,7 +84,8 @@ export function brake(b: Body, dt: number): void {
 /** Move by the current velocity; update heading while moving. */
 export function integrate(b: Body, dt: number): void {
   b.pos = add(b.pos, scale(b.vel, dt));
-  if (len(b.vel) > 0.15) b.heading = norm(b.vel);
+  // Squared, to skip the square root on every body every tick (0.15² m/s).
+  if (b.vel.x * b.vel.x + b.vel.y * b.vel.y > 0.0225) b.heading = norm(b.vel);
 }
 
 /**
@@ -93,10 +94,15 @@ export function integrate(b: Body, dt: number): void {
  * pair that is meant to be in contact).
  */
 export function separate(bodies: readonly Body[], radius = BODY_RADIUS, skip?: ReadonlySet<Body>): void {
+  const r2 = radius * radius;
   for (let i = 0; i < bodies.length; i++) {
     const a = bodies[i]!;
     for (let j = i + 1; j < bodies.length; j++) {
       const b = bodies[j]!;
+      // Most pairs are far apart: rule them out on the squared distance (no square root) first.
+      const dx = a.pos.x - b.pos.x;
+      const dy = a.pos.y - b.pos.y;
+      if (dx * dx + dy * dy >= r2) continue;
       const d = dist(a.pos, b.pos);
       if (d >= radius) continue;
       // Coincident bodies get a deterministic nudge along x.

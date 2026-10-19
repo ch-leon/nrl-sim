@@ -106,7 +106,13 @@ Every transition is a thing that physically happens on the field; nothing is imp
   sim as they happen (with real `x`/`y`).
 - **Headless mode:** the same sim run to completion without a view, for AI-vs-AI fixtures
   and balancing. Target **< 100 ms per match** (≈ 7,000 ticks × 18 agents). *A real
-  2 × 9:00 match is 21,600 ticks, about 650 ms today; see §5.1 decision 5.*
+  2 × 9:00 match is 21,600 ticks, about 650 ms today; see §5.1 decision 5.* *Phase 3, first
+  pass (2026-10-19), with every seed's match unchanged:* far body pairs ruled out on the
+  squared distance before the exact one, each side's nine kept once, sort keys worked out once:
+  834 → 614 ms a match in Node, 385 → 275 ms in desktop Chromium; the balance harness no longer
+  builds a snapshot every tick (1.7× faster per match). Thousands of matches are minutes on four
+  cores, so sweeps aren't blocked; the < 100 ms target needs allocation-free steering, a rewrite
+  that would change every seed's match, left for later.
 - `src/sim/engine.ts` and `src/world/playback.ts`+`staging.ts` are deleted at switch-over
   (~2,500 lines); ARCHITECTURE §6 is rewritten to this contract.
 
