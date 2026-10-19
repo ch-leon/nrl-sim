@@ -6,7 +6,7 @@
 
 import { bus } from '../../core/events';
 import { getState, type GameState } from '../../core/state';
-import { weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts } from '../../systems/economy';
+import { weeklyWages, weeklyUpkeep, weeklyIncome, groundCapacity, homeGate } from '../../systems/economy';
 import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { buildObjectivesSection } from './board';
 import { el, panel, button, openModal, closeScreen } from '../dom';
@@ -50,15 +50,18 @@ export interface FinanceSummary {
   burnWeekly: number;
   /** Weeks of cash left at the current burn; null when the club is not burning cash. */
   runwayWeeks: number | null;
-  /** The next home fixture (round ≥ current week) and its projected gate, if any. */
-  nextHome: { round: number; projectedGate: number } | null;
+  /**
+   * The next home fixture (round ≥ current week) and its projected gate, with the
+   * crowd against the seats (#169: sold out means a bigger stand would earn more).
+   */
+  nextHome: { round: number; projectedGate: number; attendance: number; capacity: number; soldOut: boolean } | null;
   /** Squad players whose contracts end within EXPIRY_WINDOW_WEEKS, soonest first. */
   expiring: ExpiringContract[];
 }
 
 /**
  * Project the finance numbers from the economy functions. Pure: reads `state`
- * only. The projected gate is gateReceipts evaluated at the next home round's
+ * only. The projected gate is homeGate evaluated at the next home round's
  * week, so it uses the same attendance formula as the weekly tick.
  */
 export function financeSummary(state: GameState): FinanceSummary {
@@ -75,10 +78,14 @@ export function financeSummary(state: GameState): FinanceSummary {
       (best, f) => (!best || f.round < best.round ? f : best),
       undefined,
     );
-  const nextHome = nextFixture
+  const projected = nextFixture ? homeGate({ ...state, week: nextFixture.round }, nextFixture) : null;
+  const nextHome = nextFixture && projected
     ? {
       round: nextFixture.round,
-      projectedGate: gateReceipts({ ...state, week: nextFixture.round }),
+      projectedGate: projected.receipts,
+      attendance: projected.attendance,
+      capacity: projected.capacity,
+      soldOut: projected.soldOut,
     }
     : null;
 
@@ -210,6 +217,12 @@ export function fmtMoneyCompact(n: number): string {
   return `${sign}$${(abs / 1000).toFixed(1)}k`;
 }
 
+/** The next home crowd against the seats: "1,450 of 2,000 seats" or "Sold out · 2,000 seats" (#169). */
+export function fmtCrowd(c: { attendance: number; capacity: number; soldOut: boolean }): string {
+  const seats = c.capacity.toLocaleString('en-US');
+  return c.soldOut ? `Sold out · ${seats} seats` : `${c.attendance.toLocaleString('en-US')} of ${seats} seats`;
+}
+
 /** Runway label: "12 weeks", "1 week", "0 weeks", or "No burn" when null. */
 export function fmtRunway(weeks: number | null): string {
   if (weeks === null) return 'No burn';
@@ -247,6 +260,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
       'Next home gate',
       s.nextHome ? `R${s.nextHome.round} · ${fmtMoney(s.nextHome.projectedGate)}` : 'None left',
     ),
+    statRow('Crowd', s.nextHome ? fmtCrowd(s.nextHome) : `${groundCapacity(state).toLocaleString('en-US')} seats`),
   );
   nodes.push(panel({ class: 'nrl-finance-panel' }, weekly));
   nodes.push(buildObjectivesSection(state));

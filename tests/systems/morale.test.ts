@@ -105,7 +105,7 @@ describe('facility effects', () => {
   it('every special facility blurb states a concrete effect', () => {
     expect(facilityBlurb(FACILITY_CATALOG.canteen)).toMatch(/morale/);
     expect(facilityBlurb(FACILITY_CATALOG.sponsorBoard)).toMatch(/\$3,000/);
-    expect(facilityBlurb(FACILITY_CATALOG.grandstand)).toMatch(/attendance/);
+    expect(facilityBlurb(FACILITY_CATALOG.grandstand)).toMatch(/[Ss]eats 3,500/); // #169: seats, not a % of attendance
     expect(facilityBlurb(FACILITY_CATALOG.academy)).toMatch(/free-agent/);
   });
 

@@ -47,7 +47,7 @@ const STAT_LABEL: Record<keyof PlayerStats, string> = {
 /** What each special actually does, matching the systems that read it. */
 const SPECIAL_COPY: Record<FacilityDefId, string> = {
   sponsorBoard: `+$${ECON.SPONSOR_PER_LEVEL.toLocaleString('en-US')}/week per level. One only`,
-  grandstand: `+${ECON.GRANDSTAND_ATTEND_MULT * 100}% home attendance per level. One only`,
+  grandstand: `Seats ${ECON.CAPACITY.slice(1).map((n) => n.toLocaleString('en-US')).join(' / ')} by level; the hill holds ${ECON.CAPACITY[0].toLocaleString('en-US')}. One only`,
   academy: 'Better free-agent quality (+0.1 per level)',
   scoutOffice: 'Better free-agent quality (+0.12 per level)',
   physioCentre: 'Injured players recover 1 week faster',

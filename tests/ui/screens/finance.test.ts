@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   financeSummary, FinanceLedger, initFinanceLedger, fmtMoney, fmtMoneyCompact,
-  fmtRunway, EXPIRY_WINDOW_WEEKS,
+  fmtRunway, fmtCrowd, EXPIRY_WINDOW_WEEKS,
 } from '../../../src/ui/screens/finance';
 import {
   createNewGame, getState, loadState,
@@ -136,8 +136,8 @@ describe('financeSummary — next home gate', () => {
       },
     });
     const f = financeSummary(s);
-    // round 2 is past; next home is round 5. Gate at that week = (500+30×40)×20 = 34000.
-    expect(f.nextHome).toEqual({ round: 5, projectedGate: 34000 });
+    // round 2 is past; next home is round 5. Gate at that week = (300+30×30)×20 = 24,000 on the hill (#169).
+    expect(f.nextHome).toEqual({ round: 5, projectedGate: 24_000, attendance: 1200, capacity: 2000, soldOut: false });
     expect(f.nextHome?.projectedGate).toBe(gateReceipts({ ...s, week: 5 }));
   });
 
@@ -149,13 +149,21 @@ describe('financeSummary — next home gate', () => {
     expect(financeSummary(s).nextHome?.round).toBe(4);
   });
 
-  it('projects a grandstand-boosted gate (same formula as gateReceipts)', () => {
-    const s = setup({
-      week: 2, reputation: 50, facilities: [pf('grandstand', 3)],
+  it('projects a sold-out hill and the roof a Grandstand lifts (same function as gateReceipts, #169)', () => {
+    const hill = setup({
+      week: 2, reputation: 100, facilities: [],
       league: { clubs: [], fixtures: [homeFixture(2)], ladder: [] },
     });
-    // (500 + 50×40) × (1 + 0.5×3) × 20 = 125000
-    expect(financeSummary(s).nextHome?.projectedGate).toBe(125000);
+    // demand 3,300 against 2,000 seats
+    expect(financeSummary(hill).nextHome).toEqual({ round: 2, projectedGate: 40_000, attendance: 2000, capacity: 2000, soldOut: true });
+    const stand = setup({
+      week: 2, reputation: 100, facilities: [pf('grandstand', 2)],
+      league: { clubs: [], fixtures: [homeFixture(2)], ladder: [] },
+    });
+    expect(financeSummary(stand).nextHome).toEqual({ round: 2, projectedGate: 66_000, attendance: 3300, capacity: 5000, soldOut: false });
+    expect(financeSummary(stand).nextHome?.projectedGate).toBe(gateReceipts({ ...stand, week: 2 }));
+    expect(fmtCrowd(financeSummary(hill).nextHome!)).toBe('Sold out · 2,000 seats');
+    expect(fmtCrowd(financeSummary(stand).nextHome!)).toBe('3,300 of 5,000 seats');
   });
 
   it('is null when no home game is left (only away / past fixtures)', () => {
@@ -323,10 +331,10 @@ describe('financeSummary — average home gate in the run-rate (QA)', () => {
 
   it('a club whose gates cover the wages has no burn and no runway warning', () => {
     const fixtures = Array.from({ length: 24 }, (_, i) => (i % 2 ? awayFixture(i + 1) : homeFixture(i + 1)));
-    const s = setup({ week: 1, money: 10_000, reputation: 30, facilities: [], squad: [mkPlayer({ wage: 15_000 })], league: { clubs: [], fixtures, ladder: [] } });
+    const s = setup({ week: 1, money: 10_000, reputation: 30, facilities: [], squad: [mkPlayer({ wage: 13_000 })], league: { clubs: [], fixtures, ladder: [] } });
     const f = financeSummary(s);
-    // gate at rep 30: (500 + 1200) × $20 = $34,000, every other week = $17,000/wk avg
-    expect(f.gateWeekly).toBe(17_000);
+    // gate at rep 30: (300 + 30×30) × $20 = $24,000, every other week = $12,000/wk avg; with the $1,500 grant it covers $13,000 of wages
+    expect(f.gateWeekly).toBe(12_000);
     expect(f.burnWeekly).toBe(0);
     expect(f.runwayWeeks).toBeNull();
   });

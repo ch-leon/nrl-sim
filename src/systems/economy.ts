@@ -2,17 +2,19 @@
 // Pure TypeScript, no Phaser. Deterministic (no RNG). Runs as the economy tick
 // (ARCHITECTURE §5, order 30) after training/injuries, before the match — so a
 // home gate can rescue the club before forced sales trigger. Facility upkeep
-// (N6, #164) is the running cost of the grounds, paid after wages.
+// (N6, #164) is the running cost of the grounds, paid after wages; the gate
+// (N6, #169) is min(seats, demand), so success on a bare hill has a roof.
 //
 // All money movement routes through club.earnMoney (credit; negative amount for a
 // deduction) so 'money:changed' fires for every net movement. Wages are allowed
 // to push money negative — spendMoney's guard would block that, so we credit a
 // negative delta instead.
 
-import { getState, setState, type GameState, type Player } from '../core/state';
+import { getState, setState, type Fixture, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
-import { ECON, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { ECON, SEASON_ROUNDS, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { renewalWage, warnForWeeks } from './contracts';
@@ -68,21 +70,80 @@ function currentFixture(state: GameState): GameState['league']['fixtures'][numbe
   );
 }
 
+// ── Gates with a roof (N6, #169) ──────────────────────────────────────────────
+
+/** Seats on the grounds: ECON.CAPACITY by Grandstand level (0 = the hill). */
+export function groundCapacity(state: GameState): number {
+  return ECON.CAPACITY[facilityLevel(state, 'grandstand')] ?? ECON.CAPACITY[0];
+}
+
 /**
- * Gate receipts, applied on a HOME-game week only. Returns 0 on away/bye weeks
- * and when the league is empty (graceful — WU-7 may not have populated fixtures).
- *   attendance = (ATTEND_BASE + reputation × ATTEND_PER_REP)
- *              × (1 + GRANDSTAND_ATTEND_MULT × grandstandLevel)
- *   gate       = attendance × TICKET_PRICE
+ * Form as the crowd sees it: (wins − losses) ÷ FORM_GAMES over the club's last
+ * FORM_GAMES results before `round` this season, so −1 (five losses) to +1
+ * (five wins); a side yet to play is 0.
+ */
+export function recentForm(state: GameState, round = state.week): number {
+  const mine = state.league.fixtures
+    .filter((f) => f.result && f.round < round && (f.homeId === state.clubId || f.awayId === state.clubId))
+    .sort((a, b) => b.round - a.round)
+    .slice(0, ECON.FORM_GAMES);
+  let score = 0;
+  for (const f of mine) {
+    const home = f.homeId === state.clubId;
+    const us = home ? f.result!.homeScore : f.result!.awayScore;
+    const them = home ? f.result!.awayScore : f.result!.homeScore;
+    score += us > them ? 1 : us < them ? -1 : 0;
+  }
+  return score / ECON.FORM_GAMES;
+}
+
+/** Is `clubId` in the top eight of the ladder, once it has played? */
+function topEight(state: GameState, clubId: string): boolean {
+  const rows = sortLadder(state.league.ladder);
+  const idx = rows.findIndex((r) => r.clubId === clubId);
+  return idx >= 0 && idx < 8 && rows[idx]!.played > 0;
+}
+
+export interface GateEstimate {
+  /** Seats: ECON.CAPACITY by Grandstand level. */
+  capacity: number;
+  /** Fans who would come: reputation, form and the occasion. */
+  demand: number;
+  /** min(capacity, demand). */
+  attendance: number;
+  receipts: number;
+  /** Demand exceeds the seats: a bigger stand would earn more. */
+  soldOut: boolean;
+}
+
+/**
+ * The crowd a home `fixture` would draw at `state`, and what it pays:
+ *   demand     = (ATTEND_BASE + reputation × ATTEND_PER_REP) × form × occasion
+ *   attendance = min(groundCapacity, demand)
+ *   receipts   = attendance × TICKET_PRICE
+ * Form is 1 ± FORM_SWING × recentForm before the fixture's round; the occasion
+ * is FINALS_MULT for a home final, BIG_MATCH_MULT for a top-eight opponent.
+ * The Finance screen projects the next home gate with this same function.
+ */
+export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
+  const base = ECON.ATTEND_BASE + state.reputation * ECON.ATTEND_PER_REP;
+  const form = 1 + ECON.FORM_SWING * recentForm(state, fixture.round);
+  const opponent = fixture.homeId === state.clubId ? fixture.awayId : fixture.homeId;
+  const occasion = fixture.round > SEASON_ROUNDS ? ECON.FINALS_MULT : topEight(state, opponent) ? ECON.BIG_MATCH_MULT : 1;
+  const demand = Math.round(base * form * occasion);
+  const capacity = groundCapacity(state);
+  const attendance = Math.min(capacity, demand);
+  return { capacity, demand, attendance, receipts: attendance * ECON.TICKET_PRICE, soldOut: demand > capacity };
+}
+
+/**
+ * Gate receipts, applied on a HOME-game week only (homeGate for the current
+ * fixture). Returns 0 on away/bye weeks and when the league is empty.
  */
 export function gateReceipts(state: GameState): number {
   const fixture = currentFixture(state);
   if (!fixture || fixture.homeId !== state.clubId) return 0;
-
-  const grandstandLevel = facilityLevel(state, 'grandstand');
-  const attendance = (ECON.ATTEND_BASE + state.reputation * ECON.ATTEND_PER_REP)
-    * (1 + ECON.GRANDSTAND_ATTEND_MULT * grandstandLevel);
-  return attendance * ECON.TICKET_PRICE;
+  return homeGate(state, fixture).receipts;
 }
 
 /**
