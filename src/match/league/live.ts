@@ -1217,7 +1217,7 @@ export class LiveSim implements MatchSim {
     const k = this.players[g.kicker]!;
     const dir = this.dirOf(k.side);
     if (this.rng.next() < GOALS.chargeDown) {
-      const d = this.side(other(k.side)).sort((a, b) => dist(a.body.pos, k.body.pos) - dist(b.body.pos, k.body.pos))[0]!;
+      const d = [...this.side(other(k.side))].sort((a, b) => dist(a.body.pos, k.body.pos) - dist(b.body.pos, k.body.pos))[0]!;
       this.emit('charge-down', `${d.name} charges down the field goal!`, d);
       this.ball = bounceFlight(k.body.pos, { x: -dir, y: (this.rng.next() - 0.5) * 1.2 }, this.tick, 4, 14, 2);
       this.looseFor = null;
