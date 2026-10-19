@@ -242,8 +242,13 @@ Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams: tac
 150–210 · line breaks 13–24 · offloads 8–14 · errors 10–16 · kicks 20–32 · tries 5–9 ·
 completion 70–80%; stronger team wins ~70% at a 20-point rating gap. Measure with the
 balance harness (`balance/README.md`, the `balance-experiments` skill): `npm run balance`
-plays whole matches (§13) over many seeds and marks every count against these bands
-(completion is not counted yet). The Balance workflow re-runs `balance/plans/standard.json`
+plays whole matches (§13) over many seeds and marks every count against these bands.
+**Completion** (`completion`, a share, not scaled for a stretch) is the side's sets not ended
+by its own error (knock-on, spilt kick, loose pass), an intercept or strip against it, or a
+penalty against it; a kick, a try or a handover on the last completes a set, and six-again
+starts a new one (`LiveSim.sets` / `setsCompleted`; counting rolls no dice). Measured
+(standard plan `20261019-174119-standard`): 66–70% across the scenarios, even sides 68.2%,
+a shade under the 70–80% band; left as is (errors are in their band at 12.7). The Balance workflow re-runs `balance/plans/standard.json`
 on every match-code change to `main`; the Balanced-v-Balanced test in `presets.test.ts`
 still pins the coarse bands so a tuning change that breaks them fails CI.
 
