@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  weeklyWages, weeklyIncome, gateReceipts, tickContracts,
+  weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, tickContracts,
   handleBankruptcy, applyEconomy, registerEconomySystem,
 } from '../../src/systems/economy';
+import { FACILITY_CATALOG, facilityUpkeep } from '../../src/data/facility';
 import {
   createNewGame, getState, loadState,
   type Player, type PlacedFacility, type GameState, type Fixture,
@@ -53,6 +54,26 @@ describe('weeklyWages', () => {
   it('empty squad → 0', () => {
     setup({ squad: [] });
     expect(weeklyWages(getState())).toBe(0);
+  });
+});
+
+describe('weeklyUpkeep (N6, #164)', () => {
+  it('sums each built facility\'s upkeep at its level', () => {
+    setup({ facilities: [pf('trainingPaddock', 1), pf('grandstand', 2), pf('teamGym', 3)] });
+    const want = facilityUpkeep(FACILITY_CATALOG.trainingPaddock, 1)
+      + facilityUpkeep(FACILITY_CATALOG.grandstand, 2)
+      + facilityUpkeep(FACILITY_CATALOG.teamGym, 3);
+    expect(weeklyUpkeep(getState())).toBe(want);
+    expect(want).toBe(80 + 1800 + 800);
+  });
+  it('nothing built → 0', () => {
+    setup({ facilities: [] });
+    expect(weeklyUpkeep(getState())).toBe(0);
+  });
+  it('is not scaled by difficulty', () => {
+    createNewGame('Hard Club', 1, { difficulty: 'hard' });
+    loadState({ ...getState(), facilities: [pf('grandstand', 1)] });
+    expect(weeklyUpkeep(getState())).toBe(1200);
   });
 });
 
@@ -264,11 +285,27 @@ describe('applyEconomy — full weekly loop', () => {
       league: { clubs: [], fixtures: [], ladder: [] },
     });
     applyEconomy(getState());
-    // wages -5000 ; income = 3000 + 1500 = +4500 ; no gate (empty league)
-    expect(getState().money).toBe(100_000 - 5000 + 4500);
-    expect(reasons).toContain('wages');
-    expect(reasons).toContain('sponsor+grant');
-    expect(reasons).not.toContain('gate');
+    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; income = 3000 + 1500 = +4500 ; no gate (empty league)
+    expect(getState().money).toBe(100_000 - 5000 - 100 + 4500);
+    expect(reasons).toEqual(['wages', 'upkeep', 'sponsor+grant']);
+  });
+
+  it('pays upkeep after wages, at the facilities\' levels, and skips it with nothing built (#164)', () => {
+    const seen: { delta: number; reason: string }[] = [];
+    bus.on('money:changed', (m) => seen.push({ delta: m.delta, reason: m.reason }));
+    setup({
+      money: 50_000, reputation: 0, squad: [],
+      facilities: [pf('grandstand', 3), pf('trainingPaddock', 2)],
+      league: { clubs: [], fixtures: [], ladder: [] },
+    });
+    applyEconomy(getState());
+    expect(seen).toEqual([{ delta: -(2400 + 120), reason: 'upkeep' }]);
+    expect(getState().money).toBe(50_000 - 2520);
+
+    seen.length = 0;
+    setup({ money: 50_000, reputation: 0, squad: [], facilities: [], league: { clubs: [], fixtures: [], ladder: [] } });
+    applyEconomy(getState());
+    expect(seen).toEqual([]);
   });
 
   it('home gate is credited and can rescue the club before forced sales', () => {

@@ -10,7 +10,7 @@ import {
 import { bus, type Events } from '../../../src/core/events';
 import { earnMoney } from '../../../src/data/club';
 import {
-  weeklyWages, weeklyIncome, gateReceipts, applyEconomy,
+  weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, applyEconomy,
 } from '../../../src/systems/economy';
 import { clearTickHooks } from '../../../src/core/time';
 
@@ -66,8 +66,24 @@ describe('financeSummary — weekly P&L', () => {
     expect(f.wagesWeekly).toBe(3500);
     expect(f.wagesWeekly).toBe(weeklyWages(s));
     expect(f.sponsorWeekly + f.grantWeekly).toBe(f.incomeWeekly);
-    expect(f.netWeekly).toBe(4000);
+    // upkeep: a Sponsor Board at L2 runs at 100 × 1.5 = 150 a week (#164)
+    expect(f.upkeepWeekly).toBe(150);
+    expect(f.netWeekly).toBe(4000 - 150);
     expect(f.burnWeekly).toBe(0);
+  });
+
+  it('upkeep counts against the net and the burn (#164)', () => {
+    const s = setup({
+      money: 60_000, reputation: 0, facilities: [pf('grandstand', 1), pf('teamGym', 2)],
+      squad: [mkPlayer({ wage: 1000 })],
+      league: { clubs: [], fixtures: [], ladder: [] },
+    });
+    const f = financeSummary(s);
+    // upkeep 1200 + 600 = 1800 ; wages 1000 ; income 0 ; burn 2800 ; runway 60000/2800
+    expect(f.upkeepWeekly).toBe(1800);
+    expect(f.netWeekly).toBe(-2800);
+    expect(f.burnWeekly).toBe(2800);
+    expect(f.runwayWeeks).toBeCloseTo(60_000 / 2800, 5);
   });
 
   it('sponsor part is 0 without a sponsor board; grant covers all income', () => {
@@ -204,11 +220,12 @@ describe('FinanceLedger', () => {
   it('groups movements by week and classifies by reason', () => {
     const l = new FinanceLedger(6);
     l.record({ delta: -3000, reason: 'wages', season: 1, week: 2 });
+    l.record({ delta: -250, reason: 'upkeep', season: 1, week: 2 });
     l.record({ delta: 1500, reason: 'sponsor+grant', season: 1, week: 2 });
     l.record({ delta: 34000, reason: 'gate', season: 1, week: 2 });
     l.record({ delta: -800, reason: 'build', season: 1, week: 2 });
     expect(l.rows()).toEqual([
-      { season: 1, week: 2, wages: -3000, income: 1500, gate: 34000, other: -800, net: 31700 },
+      { season: 1, week: 2, wages: -3000, upkeep: -250, income: 1500, gate: 34000, other: -800, net: 31450 },
     ]);
   });
 
@@ -239,7 +256,7 @@ describe('initFinanceLedger', () => {
     earnMoney(500, 'gate');
     off();
     expect(l.rows()).toEqual([
-      { season: 2, week: 7, wages: 0, income: 0, gate: 500, other: 0, net: 500 },
+      { season: 2, week: 7, wages: 0, upkeep: 0, income: 0, gate: 500, other: 0, net: 500 },
     ]);
   });
 
@@ -258,10 +275,11 @@ describe('initFinanceLedger', () => {
       league: { clubs: [], fixtures: [homeFixture(3)], ladder: [] },
     });
     const wages = weeklyWages(s);
+    const upkeep = weeklyUpkeep(s);
     const income = weeklyIncome(s);
     const gate = gateReceipts(s);
-    // Sanity: the scenario actually exercises all three movements.
-    expect([wages, income, gate].every((v) => v > 0)).toBe(true);
+    // Sanity: the scenario actually exercises all four movements.
+    expect([wages, upkeep, income, gate].every((v) => v > 0)).toBe(true);
 
     const l = new FinanceLedger(6);
     const seen: Events['money:changed'][] = [];
@@ -272,18 +290,19 @@ describe('initFinanceLedger', () => {
     offRecord();
     offSpy();
 
-    expect(seen.map((e) => e.reason)).toEqual(['wages', 'sponsor+grant', 'gate']);
+    expect(seen.map((e) => e.reason)).toEqual(['wages', 'upkeep', 'sponsor+grant', 'gate']);
     expect(l.rows()).toEqual([{
       season: 1,
       week: 3,
       wages: -wages,
+      upkeep: -upkeep,
       income,
       gate,
       other: 0,
-      net: -wages + income + gate,
+      net: -wages - upkeep + income + gate,
     }]);
     // The ledger's net equals the balance change the tick actually produced.
-    expect(getState().money).toBe(100_000 + (-wages + income + gate));
+    expect(getState().money).toBe(100_000 + (-wages - upkeep + income + gate));
   });
 });
 

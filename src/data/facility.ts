@@ -16,6 +16,11 @@ export interface FacilityDef {
   id: FacilityDefId;
   name: string;
   cost: number; // build cost at level 1
+  /**
+   * Weekly running cost at level 1 (N6, #164): about 1% of the build
+   * cost, paid by the economy tick; UPKEEP_LEVEL_MULT scales it per level.
+   */
+  upkeep: number;
   footprint: { w: number; h: number };
   trains: Partial<PlayerStats>; // per-week stat gain at level 1 (pre-scaling)
   special?: FacilitySpecial; // non-training effect (magnitude read by systems)
@@ -30,6 +35,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'trainingPaddock',
     name: 'Training Paddock',
     cost: 8000,
+    upkeep: 80,
     footprint: { w: 2, h: 2 },
     trains: { speed: 1.5, stamina: 1.0 },
   },
@@ -37,6 +43,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'weightsRoom',
     name: 'Weights Room',
     cost: 15000,
+    upkeep: 150,
     footprint: { w: 2, h: 2 },
     trains: { strength: 2.0 },
     adjacency: { near: 'trainingPaddock', bonusMult: 1.25 },
@@ -45,6 +52,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'videoRoom',
     name: 'Video Room',
     cost: 18000,
+    upkeep: 180,
     footprint: { w: 2, h: 2 },
     trains: { footyIQ: 2.0 },
     adjacency: { near: 'coachsOffice', bonusMult: 1.25 },
@@ -53,6 +61,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'physioCentre',
     name: 'Physio Centre',
     cost: 22000,
+    upkeep: 220,
     footprint: { w: 2, h: 2 },
     trains: { stamina: 1.5 },
     special: 'injuryRecovery',
@@ -62,6 +71,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'canteen',
     name: 'Canteen',
     cost: 12000,
+    upkeep: 120,
     footprint: { w: 2, h: 2 },
     trains: {},
     special: 'morale',
@@ -70,6 +80,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'sponsorBoard',
     name: 'Sponsor Board',
     cost: 10000,
+    upkeep: 100,
     footprint: { w: 2, h: 1 },
     trains: {},
     special: 'income',
@@ -79,6 +90,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'grandstand',
     name: 'Grandstand',
     cost: 120000,
+    upkeep: 1200,
     footprint: { w: 3, h: 3 },
     trains: {},
     special: 'gate',
@@ -88,6 +100,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'academy',
     name: 'Academy',
     cost: 60000,
+    upkeep: 600,
     footprint: { w: 3, h: 3 },
     trains: { skill: 1.0, footyIQ: 1.0 },
     special: 'recruitQuality',
@@ -97,6 +110,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'coachsOffice',
     name: "Coach's Office",
     cost: 30000,
+    upkeep: 300,
     footprint: { w: 2, h: 2 },
     trains: { footyIQ: 1.0, skill: 1.0 },
     special: 'morale',
@@ -105,6 +119,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'scoutOffice',
     name: 'Scout Office',
     cost: 25000,
+    upkeep: 250,
     footprint: { w: 2, h: 2 },
     trains: {},
     special: 'recruitQuality',
@@ -113,6 +128,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'medicalBay',
     name: 'Medical Bay',
     cost: 35000,
+    upkeep: 350,
     footprint: { w: 2, h: 2 },
     trains: {},
     special: 'injuryRecovery',
@@ -121,6 +137,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     id: 'teamGym',
     name: 'Team Gym',
     cost: 40000,
+    upkeep: 400,
     footprint: { w: 3, h: 3 },
     trains: { strength: 1.5, speed: 1.0, stamina: 1.5 },
     adjacency: { near: 'weightsRoom', bonusMult: 1.2 },
@@ -149,6 +166,14 @@ export function levelMult(level: 1 | 2 | 3): number {
 /** Cost to build/upgrade INTO `level`: def.cost * level. */
 export function upgradeCost(def: FacilityDef, level: 1 | 2 | 3): number {
   return def.cost * level;
+}
+
+/** Upkeep multiplier by level (N6, #164): a bigger building costs more to run. */
+export const UPKEEP_LEVEL_MULT: readonly [number, number, number] = [1, 1.5, 2];
+
+/** Weekly running cost of a facility at `level`: def.upkeep × UPKEEP_LEVEL_MULT. */
+export function facilityUpkeep(def: FacilityDef, level: 1 | 2 | 3): number {
+  return Math.round(def.upkeep * UPKEEP_LEVEL_MULT[level - 1]);
 }
 
 /** Round to 1 decimal place, avoiding negative-zero and float drift. */

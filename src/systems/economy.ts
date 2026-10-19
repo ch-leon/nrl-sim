@@ -1,7 +1,8 @@
 // src/systems/economy.ts — weekly income/expense loop. See BAK-188 (WU-10).
 // Pure TypeScript, no Phaser. Deterministic (no RNG). Runs as the economy tick
 // (ARCHITECTURE §5, order 30) after training/injuries, before the match — so a
-// home gate can rescue the club before forced sales trigger.
+// home gate can rescue the club before forced sales trigger. Facility upkeep
+// (N6, #164) is the running cost of the grounds, paid after wages.
 //
 // All money movement routes through club.earnMoney (credit; negative amount for a
 // deduction) so 'money:changed' fires for every net movement. Wages are allowed
@@ -13,6 +14,7 @@ import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
 import { overallRating } from '../data/player';
 import { ECON, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { warnForWeeks } from './contracts';
 
@@ -28,6 +30,18 @@ function facilityLevel(state: GameState, defId: 'sponsorBoard' | 'grandstand'): 
 export function weeklyWages(state: GameState): number {
   const base = state.squad.reduce((sum, p) => sum + p.wage, 0);
   return Math.round(base * difficultyMultipliers(state.settings.difficulty).wages);
+}
+
+/**
+ * Σ weekly upkeep of every built facility at its level (N6, #164):
+ * the running cost that grows with the grounds. A defId the catalog no longer
+ * knows costs nothing rather than crashing an old save.
+ */
+export function weeklyUpkeep(state: GameState): number {
+  return state.facilities.reduce((sum, pf) => {
+    const def = FACILITY_CATALOG[pf.defId];
+    return sum + (def ? facilityUpkeep(def, pf.level) : 0);
+  }, 0);
 }
 
 /**
@@ -162,15 +176,18 @@ export function handleBankruptcy(_state: GameState): GameState {
 }
 
 /**
- * Tick hook order 30. Fixed order: wages (deduct, may go negative) → income →
- * gate → contracts → bankruptcy. Emits money:changed per net movement (via
- * earnMoney; deductions credit a negative delta).
+ * Tick hook order 30. Fixed order: wages (deduct, may go negative) → upkeep →
+ * income → gate → contracts → bankruptcy. Emits money:changed per net movement
+ * (via earnMoney; deductions credit a negative delta).
  */
 export function applyEconomy(state: GameState): GameState {
   // Compute wages from the entry snapshot; subsequent reads use getState() as the
   // store is mutated between steps.
   const wages = weeklyWages(state);
   if (wages !== 0) earnMoney(-wages, 'wages');
+
+  const upkeep = weeklyUpkeep(state);
+  if (upkeep !== 0) earnMoney(-upkeep, 'upkeep');
 
   const income = weeklyIncome(getState());
   if (income !== 0) earnMoney(income, 'sponsor+grant');

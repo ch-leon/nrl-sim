@@ -77,3 +77,43 @@ What it says:
   −$68k, which is under the forced-sale floor.
 - Nothing costs more as the club grows: no upkeep, no wage curve, no gate ceiling. The
   next four items add each of those, and the last retunes the small lines by difficulty.
+
+## #164 Facility upkeep
+
+- PR #166, merged. No `GameState` change, no save bump.
+- Every catalog entry (`src/data/facility.ts`) has an `upkeep`: its weekly running cost
+  at level 1, 1% of the build cost (Paddock $80, Weights Room $150, Video Room $180,
+  Physio $220, Canteen $120, Sponsor Board $100, Grandstand $1,200, Academy $600,
+  Coach's Office $300, Scout Office $250, Medical Bay $350, Team Gym $400), ×1.5 at L2
+  and ×2 at L3 (`UPKEEP_LEVEL_MULT`, `facilityUpkeep`). A fully upgraded Grandstand runs
+  at $2,400 a week, about $65k a season.
+- `weeklyUpkeep(state)` in `economy.ts` sums it over the grounds; `applyEconomy` pays it
+  right after wages with ledger reason `upkeep` (wages → upkeep → income → gate →
+  contracts → bankruptcy). Not scaled by difficulty.
+- Finance: an Upkeep row under the wage bill, counted in the net and the burn, and an
+  Upkeep column in the six-week ledger. Build menu: "$80/wk upkeep" beside each cost.
+  Facility popup: "Upkeep $80/wk · L2 $120/wk" so an upgrade's running cost is known
+  before it is bought.
+- Verified: tsc, vitest (catalog rates, the level multipliers, `weeklyUpkeep`, the
+  tick's order and reasons, the Finance summary and ledger), build, the full soak (no
+  problems), Playwright at 844×390 and 1280×800 (`docs/screenshots/164/`: build menu,
+  facility popup, Finance).
+- Assumed (needs Leon): the 1% rate and the ×1.5 / ×2 level steps; upkeep is the same
+  on every difficulty; the popup shows the next level's upkeep rather than the upgrade
+  button carrying it.
+
+### Soak, upkeep line only (20 seeds; nothing else moved)
+
+The soak's managed manager builds a Paddock and a Gym (upkeep $480 a week together);
+the idle managers build nothing, so they are unchanged.
+
+| mode | season 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| managed: upkeep | −$13k | −$13k | −$13k | −$13k | −$13k |
+| managed: net before → after | +75 → +46 | +138 → +141 | +583 → +530 | +762 → +750 | +805 → +788 |
+| managed: money | $246k | $387k | $917k | $1,667k | $2,455k |
+
+Upkeep is the sink that scales with the grounds, not the fix for the runaway: two
+cheap training facilities cost $13k a season against gates of $0.5–1.3M. It bites a
+club that builds the expensive things (a Grandstand at L3 and an Academy together are
+about $100k a season), which is the point: from here a building has to earn its keep.
