@@ -8,6 +8,7 @@ import { TICK_S } from '../core/engine';
 import type { SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
 import { LiveSim } from '../league/live';
+import type { CallInput } from '../league/calls';
 import { fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
@@ -25,7 +26,7 @@ export const COUNTS = [
   'runDowns', 'blown', 'subs', 'goals', 'goalMisses', 'fieldGoals', 'fgMisses', 'chargeDowns', 'bonusTries',
   'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
-  'lostInContact', 'injuries', 'lineBreaks',
+  'lostInContact', 'injuries', 'lineBreaks', 'coachCalls',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -113,6 +114,9 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         break;
       case 'line-break':
         c.lineBreaks++;
+        break;
+      case 'coach-call':
+        c.coachCalls++;
         break;
       case 'kick':
         c.kicks++;
@@ -232,13 +236,22 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     let draws = 0;
     const legSum = new Map<number, { home: number; away: number }>();
     for (let s = seedStart; s < seedStart + seeds; s++) {
-      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}) });
+      // Coach calls (#73): each side makes the scenario's calls whenever it is allowed to.
+      const callList: CallInput[] = [];
+      const rules = cell.scenario.calls;
+      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
       while (!sim.finished && sim.tick < MAX_TICKS) {
+        if (rules) {
+          for (const side of ['home', 'away'] as const) {
+            const r = (rules[side] ?? []).find((x) => (x.tackle === undefined || x.tackle === sim.tackleCount) && sim.callRefusal(side, x.call) === null);
+            if (r) callList.push({ tick: sim.tick + 1, side, call: r.call });
+          }
+        }
         sim.step();
         // Read the tick straight off the sim: building a snapshot every tick cost a third of the run.
         const tickEvents = sim.tickEvents;

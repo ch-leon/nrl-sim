@@ -56,6 +56,7 @@ import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from 
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
 import { PENALTY, choosePenalty, offsideChance } from './penalties';
 import { spreadSheets } from './spread';
+import { CALLS, CALL_LABEL, callDefence, callIsDefence, callIsPlay, withAttackCall, type CallInput, type CoachCall } from './calls';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
@@ -310,6 +311,8 @@ export interface LiveOptions {
   weather?: WeatherKind;
   /** Injury chance multiplier (the difficulty's, as the old engine takes it). */
   injuryRate?: number;
+  /** Coach calls by tick (#73): read as the match plays, so a caller may add to the list as it runs (the lab's chips). */
+  calls?: CallInput[];
 }
 
 /** A sheet's bench, as many as the bench holds. */
@@ -370,6 +373,16 @@ export class LiveSim implements MatchSim {
   private overLineAt = -1;
   /** The side that has broken the line in this stretch of open play (one line break until the next tackle or stoppage). */
   private lineBrokenBy: Side | null = null;
+  /** Coach calls (#73): the list by tick, how far it has been read, each side's call in force and whether it has had its call this set each way. */
+  private readonly callList: CallInput[];
+  private callRead = 0;
+  private readonly callState: Record<Side, { attack: CoachCall | null; defence: CoachCall | null; usedAttack: boolean; usedDefence: boolean }> = {
+    home: { attack: null, defence: null, usedAttack: false, usedDefence: false },
+    away: { attack: null, defence: null, usedAttack: false, usedDefence: false },
+  };
+  /** Who had the ball and on what tackle at the end of the last tick: a new set or a tackle ends a call's scope. */
+  private callAtk: Side | null = null;
+  private callTackles = 0;
   /** Touch and dead ball (2d): the side that touched the ball last, the kick in play (where from and what for), and a bounce on its way out. */
   private lastTouch: Side = 'home';
   private kickFrom: { side: Side; x: number; toLine: number; aim?: 'touch' | '40-20' } | null = null;
@@ -408,6 +421,7 @@ export class LiveSim implements MatchSim {
     [home, away] = spreadSheets(home, away);
     this.rng = makeRng(seed);
     this.firstReceiver = this.rng.next() < 0.5 ? 'home' : 'away';
+    this.callList = opts.calls ?? [];
     this.weather = opts.weather ?? 'clear';
     this.wx = weatherEffect(this.weather);
     this.injuryRate = opts.injuryRate ?? 1;
@@ -542,11 +556,13 @@ export class LiveSim implements MatchSim {
   }
   /** The attacking side's plan for the zone the carrier is in. */
   private atkPlan(h: Player): AttackPlan {
-    return attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h)));
+    return withAttackCall(attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h))), this.playCall());
   }
   /** How the defending side's line is set. */
   private defPlan(): DefencePlan {
-    return defencePlan(this.tactics[other(this.attacking)].defence);
+    const def = other(this.attacking);
+    const called = this.callState[def].defence;
+    return defencePlan((called && callDefence(called)) || this.tactics[def].defence);
   }
   /** After a break the carrier goes: he sprints while his gas lasts (a Jets player has more of it). */
   private burst(c: Player): void {
@@ -589,6 +605,11 @@ export class LiveSim implements MatchSim {
     if (this.finished) return;
     this.tick++;
     this.events = [];
+    // Coach calls due this tick (#73).
+    while (this.callRead < this.callList.length && this.callList[this.callRead]!.tick <= this.tick) {
+      const c = this.callList[this.callRead++]!;
+      if (c.tick === this.tick) this.call(c.side, c.call);
+    }
     if (this.phase.kind === 'half-time') this.stepHalfTime(this.phase);
     else if (this.phase.kind !== 'conversion') {
       this.launchPendingKick();
@@ -637,6 +658,83 @@ export class LiveSim implements MatchSim {
       if (this.kickFrom) this.endKick(h.side, h.body.pos);
     }
     this.watchLineBreak(h);
+    this.expireCalls();
+  }
+
+  // ── Coach calls (#73) ─────────────────────────────────────────────────────
+  /** Tackles made in the set so far (a call's timing: "on tackle 2"). */
+  get tackleCount(): number {
+    return this.tackles;
+  }
+  /** Who has the ball. */
+  get inPossession(): Side {
+    return this.attacking;
+  }
+  /** What the match is doing (open play, a tackle, a ruck, a restart…). */
+  get phaseKind(): string {
+    return this.phase.kind;
+  }
+
+  /** Why a side can't make this call now, or null when it can. */
+  callRefusal(side: Side, call: CoachCall): string | null {
+    const k = this.phase.kind;
+    if (this.finished || k === 'half-time' || k === 'conversion' || k === 'goal' || k === 'try') return 'not now';
+    const st = this.callState[side];
+    if (callIsDefence(call)) {
+      if (this.attacking === side) return 'not while you have the ball';
+      return st.usedDefence ? 'one call a set' : null;
+    }
+    if (this.attacking !== side) return 'not your ball';
+    if (st.usedAttack) return 'one call a set';
+    if (call === 'kick-early' && (this.tackles < CALLS.kickEarlyFrom || this.tackles >= SET_TACKLES - 1)) return 'tackles 3–4';
+    if ((call === 'run-it' || call === 'bomb') && this.tackles < CALLS.lastFrom) return 'late in the set';
+    if (call === 'field-goal') {
+      const h = this.holder();
+      if (!this.fieldGoalOn(h && h.side === side ? h : this.at(side, KICKER))) return 'not in range';
+    }
+    return null;
+  }
+
+  /** The coach makes a call: in force from now for its scope (a play or the set). Returns why not, or null when it is made. */
+  call(side: Side, call: CoachCall): string | null {
+    const why = this.callRefusal(side, call);
+    if (why) return why;
+    const st = this.callState[side];
+    if (callIsDefence(call)) {
+      st.defence = call;
+      st.usedDefence = true;
+    } else {
+      st.attack = call;
+      st.usedAttack = true;
+    }
+    const h = this.holder();
+    const by = h && h.side === side ? h : this.at(side, KICKER);
+    this.emit('coach-call', `${this.names[side]} coach calls: ${CALL_LABEL[call].toLowerCase()}`, by);
+    this.events[this.events.length - 1]!.detail = call;
+    return null;
+  }
+
+  /** A tackle ends a play call; a new set (the ball changes hands or the count goes back) ends them all. */
+  private expireCalls(): void {
+    const newSet = this.attacking !== this.callAtk || this.tackles < this.callTackles;
+    const tackled = this.tackles !== this.callTackles;
+    if (newSet) {
+      for (const st of [this.callState.home, this.callState.away]) {
+        st.attack = st.defence = null;
+        st.usedAttack = st.usedDefence = false;
+      }
+    } else if (tackled) {
+      const st = this.callState[this.attacking];
+      if (st.attack && callIsPlay(st.attack)) st.attack = null;
+    }
+    this.callAtk = this.attacking;
+    this.callTackles = this.tackles;
+  }
+
+  /** The play call in force for the side with the ball, if any. */
+  private playCall(): CoachCall | null {
+    const c = this.callState[this.attacking].attack;
+    return c && callIsPlay(c) ? c : null;
   }
 
   /** A line break: in open play the carrier gets goal-side of every defender but the last man (the §7 count; a `break` to the contract). */
@@ -1078,8 +1176,10 @@ export class LiveSim implements MatchSim {
     const dplan = this.defPlan();
     const zone = zoneOf(toLine);
     // A field goal late on with the scores close: the kicker's call, once a set.
+    // The coach's kick call for the set (#73) comes before the kicker's own.
+    const called = this.callState[this.attacking].attack;
     if (h.slot === KICKER && this.fieldGoalOn(h)) {
-      if (this.fgCall === null) this.fgCall = this.rng.next() < GOALS.fieldGoalChance;
+      if (this.fgCall === null) this.fgCall = called === 'field-goal' || this.rng.next() < GOALS.fieldGoalChance;
       if (this.fgCall && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
         this.lock(h, 'kick', LIVE.kickLockTicks);
         this.pendingGoal = { at: this.tick + LIVE.kickContactTicks, kicker: this.indexOf(h) };
@@ -1087,8 +1187,14 @@ export class LiveSim implements MatchSim {
       }
     }
     const early = this.tackles === SET_TACKLES - 2 && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
-    if ((this.lastPlay || early) && h.slot === KICKER) {
-      if (this.kickCall === null) this.kickCall = this.lastPlay ? this.callLastPlay(toLine, plan) : this.callEarlyKick(toLine, plan);
+    const kickEarly = called === 'kick-early' && !this.lastPlay;
+    if ((this.lastPlay || early || kickEarly) && h.slot === KICKER) {
+      if (this.kickCall === null) {
+        if (kickEarly) this.kickCall = toLine <= LIVE.earlyKickM ? (this.rng.next() < 0.6 ? 'grubber' : 'chip') : 'long';
+        else if (this.lastPlay && called === 'run-it') this.kickCall = 'run';
+        else if (this.lastPlay && called === 'bomb') this.kickCall = 'bomb';
+        else this.kickCall = this.lastPlay ? this.callLastPlay(toLine, plan) : this.callEarlyKick(toLine, plan);
+      }
       if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
         this.pendingKick = this.planKick(h, this.kickCall);
         this.lock(h, 'kick', LIVE.kickLockTicks);
@@ -2079,13 +2185,19 @@ export class LiveSim implements MatchSim {
 
   private candidates(passer: Player, plan: AttackPlan = this.atkPlan(passer)): Candidate[] {
     const overlap = this.overlapSide(passer);
+    // A shift call (#73): receivers on the called side, as the attacker faces the line (left is +y going +x).
+    const c = this.playCall();
+    const shift = c === 'shift-left' ? this.dir : c === 'shift-right' ? -this.dir : 0;
     return this.side(passer.side)
       .filter((p) => p !== passer)
       .map((p) => ({
         idx: this.indexOf(p),
         pos: p.body.pos,
         busy: this.locked(p) || this.tick < p.busyUntil || (p.slot === HOOKER && this.phase.kind === 'ruck'),
-        prefer: this.rolePreference(p, passer, plan) + (overlap !== 0 && Math.sign(p.body.pos.y - passer.body.pos.y) === overlap ? LIVE.overlapPrefer * (1 + plan.width) : 0),
+        prefer:
+          this.rolePreference(p, passer, plan) +
+          (overlap !== 0 && Math.sign(p.body.pos.y - passer.body.pos.y) === overlap ? LIVE.overlapPrefer * (1 + plan.width) : 0) +
+          (shift !== 0 && Math.sign(p.body.pos.y - passer.body.pos.y) === shift ? CALLS.shift.sidePrefer : 0),
       }));
   }
 

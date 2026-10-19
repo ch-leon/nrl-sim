@@ -116,7 +116,7 @@ the golden test below; AI calls as a later balance lever.
 
 ## 8. Build order (after Phase 2)
 
-1. `league/calls.ts` + `LiveSim.call()`; harness `calls`; lab chips. Measured, no game UI.
+1. `league/calls.ts` + `LiveSim.call()`; harness `calls`; lab chips. Measured, no game UI. *Shipped (tuning reference §20).*
 2. Results at full time + resume from `{ seed, calls, tick }` (with 2g's live matches).
 3. Match-screen chips, pop-ups, commentary, "calls that paid off" in the stats strip.
 4. (Later) AI coach calls; calls unlocked by coaching staff (#47 board / facilities).

@@ -493,3 +493,33 @@ stamina 30 v 80 now goes 40% to the low-stamina side (was 10%), fliers v stayers
 35%), and 70 v 50 lost 6 tries a match. The legs mechanic test plays its sheets as written.
 
 Tests: `tests/match/league/spread.test.ts`; kick-off tests in `live.test.ts`, `match.test.ts`.
+
+## 20. Coach calls (#73, `docs/specs/coach-calls.md` step 1)
+
+A call is an input to the running sim at a tick (`LiveSim` option `calls`, or `call(side, c)`):
+the same seed and calls give the same match, and no calls plays exactly as before (same
+results, byte for byte). One call a set each way: one while the side has the ball, one while
+it defends; a new set (the ball changes hands, or the count goes back) frees both. Play calls
+(Hit-up, Shift) last until the next tackle; the rest last the set. Each call is announced
+(`coach-call`, the call's name as a pop-up over the man it goes through). Calls refused now
+say why ("not your ball", "one call a set", "tackles 3–4", "late in the set", "not in range").
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `calls.hitUp.hitUps` / `.pass` / `.step` / `.offload` | `src/match/league/calls.ts` | +2 / −0.3 / at most 0.3 / ×0.5 | Hit-up: the forwards take it on, fewer passes, steps and offloads. |
+| `calls.shift.width` / `.cutOut` / `.edges` / `.sidePrefer` | `calls.ts` | +0.4 / +0.25 / +1 / +2 | Shift left / right: width and the edges, receivers on the called side preferred (left is +y going +x). |
+| `calls.kickEarlyFrom` | `calls.ts` | 2 | Kick early from this many tackles (3–4): grubber or chip inside 25 m, a long kick beyond. |
+| `calls.lastFrom` | `calls.ts` | 3 | Run it / Bomb from this many tackles: the last-tackle call is run or bomb. |
+
+Rush and Hold set the defence to Rush or Compressed for the set; Field goal is offered only
+when the 2c field-goal rule is on, and then the kicker drops for goal.
+
+Measured (run `20261019-145023-coach-calls`, 20 whole matches a row, one side making the same
+call whenever it may, even 60 v 60): Run it kicks 20.8 → 10.7 a match (and that side wins 25%:
+never kicking costs); Kick early 20.8 → 32.4; Rush big hits 26 → 32.6 and busts conceded
+22.9 → 30.9; Hold busts conceded 22.9 → 17.4 and line breaks 19.8 → 16.5; Hit-up fewer steps
+and offloads and line breaks 19.8 → 17.3; Field goal is rarely available (0.1 a match).
+
+The harness takes calls per scenario (`"calls": { "home": [{ "call": "rush" }] }`, optionally
+`"tackle": 2`) and counts `coachCalls`; the lab shows chips for either coach with `#lab?calls=1`.
+Tests: `tests/match/league/calls.test.ts`.

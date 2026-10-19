@@ -1,6 +1,7 @@
 // src/match/view/popups.ts — what to shout about (BAK-208 §6). Pure: maps a
 // sim event to the pop-up word over the player's head, its tone and whether it
 // is a big moment (slow-motion beat). popupLayer.ts draws them.
+import { CALL_LABEL, isCoachCall } from '../league/calls';
 import type { SimEvent } from '../core/snapshot';
 
 export type PopupTone = 'attack' | 'defence' | 'neutral' | 'bad';
@@ -68,6 +69,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   'penalty-goal': { word: 'GOAL!', tone: 'attack' },
   // Injuries (2f): over the man hurt in the tackle.
   injury: { word: 'HURT!', tone: 'bad' },
+  // Coach calls (#73): the call, over the man it goes through.
+  'coach-call': { word: 'CALL!', tone: 'neutral' },
 };
 
 /** The captain's call on a penalty (2e). */
@@ -112,7 +115,9 @@ export function popupFor(e: SimEvent): Popup | null {
           ? 'BONUS TRY!'
           : e.kind === 'touch' && e.detail === 'bundled'
             ? 'INTO TOUCH!'
-            : e.kind === 'error' && e.detail === 'contact'
+            : e.kind === 'coach-call' && e.detail && isCoachCall(e.detail)
+              ? `${CALL_LABEL[e.detail].toUpperCase()}!`
+              : e.kind === 'error' && e.detail === 'contact'
               ? 'SPILLED!'
               : e.kind === 'penalty-choice'
               ? (CALL_WORDS[e.detail ?? 'tap'] ?? w.word)
