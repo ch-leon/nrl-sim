@@ -563,6 +563,21 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
     list.style.cssText = 'display:flex;flex-direction:column;gap:12px;min-width:320px;';
     overlay.appendChild(list);
 
+    // Which build this is (N7, #181): the date and short SHA stamped at build
+    // time, so a phone on the Pages deploy can say what it is testing. Pinned to
+    // the corner of the viewport: the overlay scrolls on a landscape phone and
+    // its footer sits below the fold. (The footer stays the overlay's last child:
+    // its auto margin centres short content.)
+    const build = document.createElement('div');
+    build.setAttribute('data-nrl-build', '');
+    build.textContent = `Build ${buildLabel()}`;
+    build.style.cssText = [
+      'position:fixed', 'right:calc(8px + env(safe-area-inset-right, 0px))',
+      'bottom:calc(6px + env(safe-area-inset-bottom, 0px))', 'pointer-events:none',
+      'color:#8a8aa0', 'font-size:12px',
+    ].join(';');
+    overlay.appendChild(build);
+
     const footer = document.createElement('div');
     footer.style.cssText = 'display:flex;flex-direction:column;gap:6px;align-items:center;margin-bottom:auto;';
     overlay.appendChild(footer);
@@ -762,20 +777,6 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       });
     });
     footer.appendChild(importBtn);
-
-    // Which build this is (N7, #181): the date and short SHA stamped at build
-    // time, so a phone on the Pages deploy can say what it is testing. Pinned to
-    // the corner of the viewport: the overlay scrolls on a landscape phone and
-    // its footer sits below the fold.
-    const build = document.createElement('div');
-    build.setAttribute('data-nrl-build', '');
-    build.textContent = `Build ${buildLabel()}`;
-    build.style.cssText = [
-      'position:fixed', 'right:calc(8px + env(safe-area-inset-right, 0px))',
-      'bottom:calc(6px + env(safe-area-inset-bottom, 0px))', 'pointer-events:none',
-      'color:#8a8aa0', 'font-size:12px',
-    ].join(';');
-    overlay.appendChild(build);
 
     root.appendChild(overlay);
   });
