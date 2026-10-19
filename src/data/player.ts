@@ -31,6 +31,19 @@ const QUALITY_BANDS: Record<Quality, readonly [number, number]> = {
 
 const clampStat = (n: number): number => Math.max(1, Math.min(STAT_MAX, n));
 
+/** Weekly market wage per point of overall, and the floor (tuned: a squad of 20 ≈ $18k/wk vs BAK-188 income scales). */
+export const WAGE_PER_OVERALL = 15;
+export const WAGE_BASE = 100;
+
+/**
+ * A player's weekly market wage for their overall: what they are generated on,
+ * what rivals' salary cap counts and what a renewal asks (#146: the one copy;
+ * contracts.ts and rivals.ts re-export it).
+ */
+export function marketWage(p: Pick<Player, 'stats'>): number {
+  return Math.round(overallRating(p) * WAGE_PER_OVERALL + WAGE_BASE);
+}
+
 /**
  * Weighted mean of the 5 PlayerStats (skill .25, footyIQ .25, speed .2,
  * strength .15, stamina .15). Returns 1..100, rounded.
@@ -76,7 +89,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
 
   const morale = rng.int(55, 85);
   const injuryRisk = rng.int(5, 40);
-  const wage = Math.round(overall * 15 + 100); // tuned: squad of 20 ≈ $18k/wk vs BAK-188 income scales
+  const wage = marketWage({ stats });
   const contractWeeks = rng.int(1, 3) * WEEKS_PER_SEASON;
 
   // Special skills: rare, levelled, weighted to the position (BAK-208 §3).
@@ -119,5 +132,5 @@ export function generatePlayerAround(rng: Rng, target: number, opts: Omit<GenPla
   const base = generatePlayer(rng, { ...opts, quality: qualityFor(target) });
   const roll = (): number => clampStat(target + rng.int(-AROUND_SPREAD, AROUND_SPREAD));
   const stats: PlayerStats = { speed: roll(), strength: roll(), stamina: roll(), skill: roll(), footyIQ: roll() };
-  return { ...base, stats, wage: Math.round(overallRating({ stats }) * 15 + 100) };
+  return { ...base, stats, wage: marketWage({ stats }) };
 }

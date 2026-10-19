@@ -16,7 +16,7 @@ import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_S
 import { initLeague, registerFixturesSystem } from '../systems/fixtures';
 import { registerTrainingSystem } from '../systems/training';
 import { registerEconomySystem } from '../systems/economy';
-import { registerFreeAgencySystem, signPlayer, SIGNING_FEE_WEEKS } from '../systems/freeagency';
+import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { registerPlayerMatchSystem } from '../systems/matchday';
 import { registerMoraleSystem } from '../systems/morale';
 import { registerAgingSystem } from '../systems/aging';
@@ -285,7 +285,7 @@ function manage(): Signed {
   let st = getState();
   while (st.squad.length < MANAGED.SQUAD_FLOOR) {
     const fits = st.freeAgents
-      .filter((p) => !p.junior && SIGNING_FEE_WEEKS * p.wage + p.wage * MANAGED.WAGE_WEEKS < st.money)
+      .filter((p) => !p.junior && signingFee(st, p) + p.wage * MANAGED.WAGE_WEEKS < st.money)
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
     if (!fits) break;
     const fee = trySign(fits);
@@ -300,8 +300,7 @@ function manage(): Signed {
       .sort((a, b) => overallRating(b) - overallRating(a))[0];
     if (star) {
       const budget = st.money - MANAGED.STAR_RESERVE - star.wage * MANAGED.WAGE_WEEKS;
-      // The fee is whatever signPlayer charges; trySign refuses if it is more than the balance.
-      if (budget > 0 && SIGNING_FEE_WEEKS * star.wage <= budget) {
+      if (budget > 0 && signingFee(st, star) <= budget) {
         const fee = trySign(star);
         if (fee !== null) record(star, fee);
       }

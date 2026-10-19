@@ -227,6 +227,14 @@ about two points above the rival mean rather than thirteen. New games only; a sa
 rivals keep the strength their squads give them. `npm run soak` reports the gap, the
 player's record and ladder finish per season (`docs/status/2026-10-league.md`).
 
+Signing fees (N5, GitHub #146): a free agent costs a transfer-style fee by overall and
+age (`signingFee` in `freeagency.ts`, built on `contracts.transferFee`: overall² × 10 ×
+an age factor, so an 80-overall in his prime is about $64k and a 55 about $30k), less a
+Scout Office discount per level; Academy prospects still cost `SIGNING_FEE_WEEKS` × wage.
+`marketWage` has one copy, in `data/player.ts` (contracts and rivals re-export it). Rivals
+compete for the pool as before: 94% of 65+ free agents an idle club leaves are signed by a
+rival before the next refresh, half of them the very next week.
+
 Random events (GitHub #75): the deck draws at most one card a week (tick order 58,
 after morale) from its own seeded stream `eventDeck.rng`, so it never moves `rngSeed`.
 A card waits in the News screen for `EVENTS.ANSWER_WEEKS`, then takes its default

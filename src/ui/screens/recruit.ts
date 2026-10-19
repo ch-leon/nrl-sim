@@ -9,7 +9,7 @@ import { ROMAN, TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import {
-  signPlayer, SIGNING_FEE_WEEKS, FREE_AGENT_POOL_SIZE,
+  signPlayer, signingFee, signingFeeBasis, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
 import { SQUAD_CAP } from '../../config';
 import { TRAINING_KIT, PORTRAIT_W, PORTRAIT_H, PORTRAIT_SCALE, portraitDataUrl } from '../../art/portrait';
@@ -299,7 +299,7 @@ export function openRecruitScreen(): void {
       return;
     }
     for (const agent of s.freeAgents) {
-      const fee = SIGNING_FEE_WEEKS * agent.wage;
+      const fee = signingFee(s, agent);
       const full = s.squad.length >= SQUAD_CAP;
       const broke = s.money < fee;
       const disabled = full || broke;
@@ -317,8 +317,8 @@ export function openRecruitScreen(): void {
           },
         },
       });
-      // Signing fee note under the wage line.
-      const feeNote = el('div', { class: 'nrl-card-cost', text: `Signing fee ${money(fee)} (${SIGNING_FEE_WEEKS}×wage)` });
+      // Signing fee note under the wage line: a transfer-style fee by rating and age (#146).
+      const feeNote = el('div', { class: 'nrl-card-cost', text: `Signing fee ${money(fee)} (${signingFeeBasis(s, agent)})` });
       card.insertBefore(feeNote, card.querySelector('.nrl-card-actions'));
       body.appendChild(card);
     }

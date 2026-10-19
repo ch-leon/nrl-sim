@@ -3,8 +3,11 @@ import {
   FREE_AGENT_POOL_SIZE,
   REFRESH_EVERY_WEEKS,
   SIGNING_FEE_WEEKS,
+  SCOUT_FEE_DISCOUNT_PER_LEVEL,
   RELEASE_PAYOUT_WEEKS,
   NEW_CONTRACT_WEEKS,
+  signingFee,
+  signingFeeBasis,
   refreshFreeAgents,
   signPlayer,
   releasePlayer,
@@ -16,6 +19,7 @@ import {
 } from '../../src/core/state';
 import { makeRng } from '../../src/utils/rng';
 import { overallRating } from '../../src/data/player';
+import { transferFee } from '../../src/systems/contracts';
 import { bus } from '../../src/core/events';
 import {
   clearTickHooks, advanceWeek, TICK_ORDER,
@@ -127,15 +131,49 @@ describe('refreshFreeAgents', () => {
   });
 });
 
+describe('signingFee (#146)', () => {
+  const at = (overall: number, over: Partial<Player> = {}): Player => ({
+    ...getState().freeAgents[0]!, id: `fa${overall}`, age: 25,
+    stats: { speed: overall, strength: overall, stamina: overall, skill: overall, footyIQ: overall }, ...over,
+  });
+
+  it('is a transfer-style fee that grows with overall and falls with age', () => {
+    const s = getState();
+    expect(signingFee(s, at(55))).toBe(transferFee(at(55)));
+    expect(signingFee(s, at(55))).toBe(55 * 55 * 10);
+    expect(signingFee(s, at(80))).toBeGreaterThan(signingFee(s, at(65)));
+    expect(signingFee(s, at(65))).toBeGreaterThan(signingFee(s, at(55)));
+    expect(signingFee(s, at(80, { age: 34 }))).toBeLessThan(signingFee(s, at(80)));
+    expect(signingFee(s, at(80))).toBeGreaterThan(10 * SIGNING_FEE_WEEKS * at(80).wage); // not four weeks' wages any more
+    expect(signingFeeBasis(s, at(55))).toBe('by rating and age');
+  });
+
+  it('Academy prospects still cost SIGNING_FEE_WEEKS × wage', () => {
+    const s = getState();
+    const junior = at(40, { junior: true, wage: 400 });
+    expect(signingFee(s, junior)).toBe(SIGNING_FEE_WEEKS * 400);
+    expect(signingFeeBasis(s, junior)).toContain('Academy');
+  });
+
+  it('a Scout Office takes SCOUT_FEE_DISCOUNT_PER_LEVEL off per level', () => {
+    const base = signingFee(getState(), at(70));
+    for (const level of [1, 2, 3] as const) {
+      setState({ facilities: [{ id: 'sc', defId: 'scoutOffice', level, x: 0, y: 0 }] });
+      expect(signingFee(getState(), at(70))).toBe(Math.round(base * (1 - SCOUT_FEE_DISCOUNT_PER_LEVEL * level)));
+      expect(signingFeeBasis(getState(), at(70))).toContain(`Scout Office −${Math.round(SCOUT_FEE_DISCOUNT_PER_LEVEL * level * 100)}%`);
+    }
+  });
+});
+
 describe('signPlayer', () => {
   const firstAgent = (): Player => getState().freeAgents[0]!;
 
-  it('moves player to squad, deducts 4×wage, sets contract, emits player:signed', () => {
+  it('moves player to squad, deducts the signing fee, sets contract, emits player:signed', () => {
     let signed: Player | null = null;
     bus.on('player:signed', (p) => { signed = p; });
 
     const agent = firstAgent();
-    const fee = SIGNING_FEE_WEEKS * agent.wage;
+    const fee = signingFee(getState(), agent);
     const moneyBefore = getState().money;
     const squadBefore = getState().squad.length;
 
@@ -196,7 +234,7 @@ describe('signPlayer', () => {
 
   it('rejects with insufficient-funds when broke without mutating', () => {
     const agent = firstAgent();
-    setState({ money: SIGNING_FEE_WEEKS * agent.wage - 1 });
+    setState({ money: signingFee(getState(), agent) - 1 });
     const squadBefore = getState().squad.length;
     const faBefore = getState().freeAgents.length;
     const moneyBefore = getState().money;
@@ -211,7 +249,7 @@ describe('signPlayer', () => {
 
   it('allows signing when funds exactly equal the fee', () => {
     const agent = firstAgent();
-    setState({ money: SIGNING_FEE_WEEKS * agent.wage });
+    setState({ money: signingFee(getState(), agent) });
     const res = signPlayer(getState(), agent.id);
     expect(res.ok).toBe(true);
     expect(getState().money).toBe(0);

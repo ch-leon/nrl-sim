@@ -17,7 +17,7 @@ import { getState, setState, type GameState, type Player, type Position, type Ri
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, STAT_MAX, WEEKS_PER_SEASON } from '../config';
-import { generatePlayerAround, overallRating, POSITIONS } from '../data/player';
+import { generatePlayerAround, marketWage, overallRating, POSITIONS } from '../data/player';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
@@ -155,10 +155,8 @@ export function withRivalSquads(clubs: readonly RivalClub[], rngSeed: number, pl
 
 // ── Weekly: signings and injuries ────────────────────────────────────────────
 
-/** A player's weekly market wage, the same formula players are generated with. */
-export function marketWage(p: Pick<Player, 'stats'>): number {
-  return Math.round(overallRating(p) * 15 + 100);
-}
+/** A player's weekly market wage: data/player.ts owns the formula (#146); re-exported for existing imports. */
+export { marketWage };
 
 /** Σ market wages of a squad (what the rival salary cap counts). */
 export function squadWages(squad: readonly Player[]): number {

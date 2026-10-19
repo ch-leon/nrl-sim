@@ -12,12 +12,16 @@ import { generatePlayer, type Quality } from '../data/player';
 import { registerTickHook, TICK_ORDER, type TickContext } from '../core/time';
 import { SPECIAL_MAGNITUDE } from '../data/facility';
 import { SQUAD_CAP, SQUAD_MIN } from '../config';
+import { transferFee } from './contracts';
 
 // ── Tuning constants (spec §Key interfaces) ─────────────────────────────────
 
 export const FREE_AGENT_POOL_SIZE = 12;
 export const REFRESH_EVERY_WEEKS = 4;
-export const SIGNING_FEE_WEEKS = 4; // upfront fee = 4 × weekly wage
+/** Upfront fee for an Academy prospect = this × weekly wage (everyone else pays a transfer-style fee, #146). */
+export const SIGNING_FEE_WEEKS = 4;
+/** A Scout Office takes this much off a free agent's fee per level (L3 = 30%). Assumed (needs Leon). */
+export const SCOUT_FEE_DISCOUNT_PER_LEVEL = 0.1;
 export const RELEASE_PAYOUT_WEEKS = 2; // upfront payout = 2 × weekly wage
 export const NEW_CONTRACT_WEEKS = 52;
 
@@ -80,11 +84,35 @@ export function refreshFreeAgents(state: GameState, rng: Rng): GameState {
 
 // ── Signing ─────────────────────────────────────────────────────────────────
 
+/** The Scout Office's discount on signing fees (0 without one). */
+export function scoutFeeDiscount(state: Pick<GameState, 'facilities'>): number {
+  return bestLevel(state as GameState, 'scoutOffice') * SCOUT_FEE_DISCOUNT_PER_LEVEL;
+}
+
 /**
- * Sign the free agent with `playerId` into the squad. Deducts an upfront fee of
- * SIGNING_FEE_WEEKS × the agent's current wage, sets contractWeeks =
- * NEW_CONTRACT_WEEKS, and moves the player from freeAgents to squad. Enforces
- * SQUAD_CAP and funds. Nothing mutates on failure.
+ * Upfront fee to sign a free agent (#146). An Academy prospect costs
+ * SIGNING_FEE_WEEKS × their wage; everyone else a transfer-style fee that grows
+ * with overall and falls with age (contracts.transferFee: overall² × 10 × age
+ * factor, so an 80-overall in his prime is about $64k and a 55 about $30k), less
+ * the Scout Office discount. Four weeks' wages made an 85-overall a $5k buy.
+ */
+export function signingFee(state: Pick<GameState, 'facilities'>, agent: Player): number {
+  if (agent.junior) return SIGNING_FEE_WEEKS * agent.wage;
+  return Math.round(transferFee(agent) * (1 - scoutFeeDiscount(state)));
+}
+
+/** How the fee was worked out, for the Recruit card: "4×wage, Academy prospect" or "by rating and age[, Scout Office −10%]". */
+export function signingFeeBasis(state: Pick<GameState, 'facilities'>, agent: Player): string {
+  if (agent.junior) return `${SIGNING_FEE_WEEKS}×wage, Academy prospect`;
+  const discount = scoutFeeDiscount(state);
+  return discount > 0 ? `by rating and age, Scout Office −${Math.round(discount * 100)}%` : 'by rating and age';
+}
+
+/**
+ * Sign the free agent with `playerId` into the squad. Deducts the upfront
+ * signingFee, sets contractWeeks = NEW_CONTRACT_WEEKS, and moves the player
+ * from freeAgents to squad. Enforces SQUAD_CAP and funds. Nothing mutates on
+ * failure.
  *
  * Reasons: 'not-found' (id absent), 'squad-full' (squad at SQUAD_CAP),
  * 'insufficient-funds' (money < fee). On success emits 'player:signed' and a
@@ -96,7 +124,7 @@ export function signPlayer(state: GameState, playerId: string): SignResult {
   if (!agent) return { ok: false, reason: 'not-found' };
   if (s.squad.length >= SQUAD_CAP) return { ok: false, reason: 'squad-full' };
 
-  const fee = SIGNING_FEE_WEEKS * agent.wage;
+  const fee = signingFee(s, agent);
   if (s.money < fee) return { ok: false, reason: 'insufficient-funds' };
 
   // Deduct the fee first (guaranteed to succeed given the funds check above),
