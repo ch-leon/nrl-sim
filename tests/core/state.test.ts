@@ -4,7 +4,10 @@ import {
   type GameState,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { STARTING_MONEY } from '../../src/config';
+import { LEAGUE, ON_FIELD, STARTING_MONEY } from '../../src/config';
+import { POSITIONS, overallRating } from '../../src/data/player';
+import { initLeague } from '../../src/systems/fixtures';
+import { bestNineMean, gapSample } from '../../src/qa/soak';
 
 beforeEach(() => {
   bus.clear();
@@ -36,11 +39,34 @@ describe('createNewGame', () => {
     expect(a.rngSeed).toBe(b.rngSeed);
   });
 
-  it('produces a roughly 3 star / 10 average / 7 rookie quality mix', () => {
-    // Star band is 68-92, rookie 30-55 — overall rating separates them.
+  it('starts with one star, a first-grader and a depth player per position (#140)', () => {
     const s = createNewGame('Q', 12345);
-    // Just assert the squad is populated with distinct ids and valid players.
     expect(new Set(s.squad.map((p) => p.id)).size).toBe(20);
+    for (const pos of POSITIONS) expect(s.squad.filter((p) => p.position === pos).length).toBeGreaterThanOrEqual(2);
+    const overalls = s.squad.map(overallRating).sort((a, b) => b - a);
+    // The hero: a star well clear of everyone else.
+    expect(overalls[0]).toBeGreaterThanOrEqual(68);
+    expect(overalls.filter((o) => o >= 68)).toHaveLength(LEAGUE.START_STARS);
+    // The rest sit around the first-grade and depth targets.
+    const firstGrade = overalls.slice(1, POSITIONS.length + 1);
+    const depth = overalls.slice(POSITIONS.length + 1);
+    expect(Math.abs(firstGrade.reduce((t, o) => t + o, 0) / firstGrade.length - LEAGUE.START_FIRST_GRADE)).toBeLessThan(4);
+    expect(Math.abs(depth.reduce((t, o) => t + o, 0) / depth.length - (LEAGUE.START_FIRST_GRADE - LEAGUE.START_DEPTH_GAP))).toBeLessThan(4);
+  });
+
+  it('the best nine starts a couple of points above the rival mean, averaged over seeds (#140)', () => {
+    let gap = 0;
+    const n = 30;
+    for (let seed = 1; seed <= n; seed++) {
+      const s = createNewGame('G', seed);
+      initLeague(s);
+      const g = gapSample(getState());
+      expect(g.bestNine).toBe(bestNineMean(s.squad, ON_FIELD));
+      gap += g.bestNine - g.rivalMean;
+    }
+    expect(gap / n).toBeGreaterThan(0);
+    expect(gap / n).toBeLessThan(4);
+    setState({});
   });
 
   it('round-trips via JSON with no data loss', () => {

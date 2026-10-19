@@ -5,6 +5,7 @@ import {
   PLAYER_PRIMARY_COLORS, PLAYER_SECONDARY_COLORS, DEFAULT_PLAYER_COLORS,
 } from '../../src/config';
 import { createNewGame, getState, setState } from '../../src/core/state';
+import { bestNineMean } from '../../src/qa/soak';
 import { weeklyWages } from '../../src/systems/economy';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { scaleRivalStrength } from '../../src/systems/matchday';
@@ -14,7 +15,22 @@ import type { RivalClub } from '../../src/core/state';
 
 describe('difficulty multipliers', () => {
   it('normal is the identity', () => {
-    expect(DIFFICULTY.normal).toEqual({ startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1 });
+    expect(DIFFICULTY.normal).toEqual({ startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0 });
+  });
+
+  it('startRating moves the starting squad: Easy starts stronger than Normal, Hard weaker (#140)', () => {
+    const nine = (d: 'easy' | 'normal' | 'hard'): number => {
+      let total = 0;
+      for (let seed = 1; seed <= 30; seed++) total += bestNineMean(createNewGame('T', seed, { difficulty: d }).squad);
+      return total / 30;
+    };
+    const easy = nine('easy');
+    const normal = nine('normal');
+    const hard = nine('hard');
+    expect(easy - normal).toBeGreaterThan(2);
+    expect(easy - normal).toBeLessThan(5);
+    expect(normal - hard).toBeGreaterThan(2);
+    expect(normal - hard).toBeLessThan(5);
   });
 
   it.each(DIFFICULTIES)('%s scales starting money', (d) => {

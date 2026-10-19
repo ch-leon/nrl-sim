@@ -23,6 +23,23 @@ export const SET_TACKLES = 5;
 export const STARTING_MONEY = 200_000;
 export const STAT_MAX = 100;
 
+/**
+ * The league's rating centre and where a new game starts against it (N5, #140).
+ * Rival strength is the mean overall of a club's best nine; the rivals in
+ * data/league.ts are spread around MEAN, and systems/rivals.ts pulls their
+ * development back toward it. The player's starting squad is generated like a
+ * rival's: START_STARS stars for a hero, one first-grader per position around
+ * START_FIRST_GRADE (moved by the difficulty's startRating), and depth players
+ * START_DEPTH_GAP below, so the best nine lands a couple of points above the
+ * rival mean instead of thirteen.
+ */
+export const LEAGUE = {
+  MEAN: 55,
+  START_STARS: 1,
+  START_FIRST_GRADE: 54,
+  START_DEPTH_GAP: 8,
+} as const;
+
 // Training curve (GitHub #35). Each week's stat gain is multiplied by headroom:
 //   GAIN_RATE × (1 − stat / STAT_MAX) ^ HEADROOM_EXP
 // so gains are quick early and slow towards the ceiling, with no stored
@@ -117,8 +134,10 @@ export const CONTRACTS = {
 // Difficulty (GitHub #48). Multipliers applied at the existing call sites:
 // starting money (createNewGame), weekly wages (economy.weeklyWages), the
 // big-hit injury chance (engine opts.injuryRate via matchday) and rival strength
-// when building the opponent's team sheet (matchday.sheetFor). Normal is 1.0
-// everywhere so it plays exactly as before; old saves load as Normal.
+// when building the opponent's team sheet (matchday.sheetFor). startRating
+// (#140) is added to the starting squad's first-grade and depth targets, in
+// rating points. Normal is 1.0 / 0 everywhere so it plays exactly as before;
+// old saves load as Normal.
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 export const DEFAULT_DIFFICULTY: Difficulty = 'normal';
@@ -128,12 +147,14 @@ export interface DifficultyMultipliers {
   wages: number;
   injuryRate: number;
   rivalStrength: number;
+  /** Rating points added to the starting squad's targets (new games only). */
+  startRating: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
-  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalStrength: 0.92 },
-  normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1 },
-  hard: { startingMoney: 0.7, wages: 1.15, injuryRate: 1.4, rivalStrength: 1.08 },
+  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalStrength: 0.92, startRating: 4 },
+  normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0 },
+  hard: { startingMoney: 0.7, wages: 1.15, injuryRate: 1.4, rivalStrength: 1.08, startRating: -4 },
 };
 
 /** Multipliers for a difficulty; unknown/missing values fall back to Normal. */

@@ -4,9 +4,9 @@
 
 import { bus } from './events';
 import { makeRng } from '../utils/rng';
-import { generatePlayer, type Quality } from '../data/player';
+import { generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
-import { BOARD, STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
+import { BOARD, LEAGUE, STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
 
 // ── §4 domain types (canonical definitions live here) ──────────────────────
 
@@ -205,9 +205,10 @@ export function loadState(next: GameState): void {
 }
 
 /**
- * Deterministically create a brand-new game. Squad = 20 players (~3 star, ~10
- * average, ~7 rookie), 12 free agents, empty facilities/league. Persists via
- * loadState and returns the new state.
+ * Deterministically create a brand-new game. Squad = 20 players shaped like a
+ * rival's at the league mean (#140: one star, one first-grader and one depth
+ * player per position, a spare depth player), 12 free agents, empty
+ * facilities/league. Persists via loadState and returns the new state.
  */
 export function createNewGame(
   clubName: string,
@@ -217,16 +218,24 @@ export function createNewGame(
   const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
   const rng = makeRng(seed);
 
-  // Quality mix for the 20 starting players: 3 star, 10 average, 7 rookie.
-  // Rolled/shuffled through rng so ordering is deterministic per seed.
-  const qualities: Quality[] = [
-    ...Array<Quality>(3).fill('star'),
-    ...Array<Quality>(10).fill('average'),
-    ...Array<Quality>(7).fill('rookie'),
+  // The 20 starting players (#140): LEAGUE.START_STARS stars for a hero, a
+  // first-grader per position around LEAGUE.START_FIRST_GRADE (plus the
+  // difficulty's startRating), a depth player per position START_DEPTH_GAP
+  // below, and depth spares to fill the squad. So the best nine lands a couple of
+  // points above the rival mean. Shuffled through rng so the order is
+  // deterministic per seed but not sorted by quality.
+  const firstGrade = LEAGUE.START_FIRST_GRADE + difficultyMultipliers(difficulty).startRating;
+  const depth = firstGrade - LEAGUE.START_DEPTH_GAP;
+  const plan: { target?: number; position?: Position }[] = [
+    ...Array.from({ length: LEAGUE.START_STARS }, () => ({})),
+    ...POSITIONS.map((position) => ({ target: firstGrade, position })),
+    ...POSITIONS.map((position) => ({ target: depth, position })),
   ];
-  const squadQualities = rng.shuffle(qualities);
-  const squad: Player[] = squadQualities.map((quality) => ({
-    ...generatePlayer(rng, { quality }),
+  while (plan.length < 20) plan.push({ target: depth });
+  const squad: Player[] = rng.shuffle(plan.slice(0, 20)).map((slot) => ({
+    ...(slot.target === undefined
+      ? generatePlayer(rng, { quality: 'star' })
+      : generatePlayerAround(rng, slot.target, slot.position ? { position: slot.position } : {})),
     career: { games: 0, tries: 0, tackles: 0, lineBreaks: 0 },
     joinedSeason: 1,
   }));
