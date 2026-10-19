@@ -1,0 +1,48 @@
+{
+  "name": "rush balance",
+  "description": "Phase 3 (#87): the Rush defence wins more than its share against Slide (and a coach calling Rush every set wins 66%). How much more must it pay in busts conceded or offside penalties to be a trade-off, not a free win?",
+  "seeds": 80,
+  "scenarios": [
+    {
+      "name": "slide v rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      }
+    },
+    {
+      "name": "rush v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    }
+  ],
+  "sweep": {
+    "presets.defence.rush.broken": [
+      0.05,
+      0.09,
+      0.13
+    ],
+    "penalty.offside.rush": [
+      0.02,
+      0.035
+    ]
+  }
+}
