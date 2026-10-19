@@ -184,6 +184,11 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v10 → v11: GameState.lineup, the coach's nine and bench (GitHub #69). An old
   // save gets today's auto pick: the side teamSheetFromSquad was already fielding.
   { from: 10, to: 11, run: (old) => ({ ...old, lineup: old.lineup ?? autoPick(Array.isArray(old.squad) ? (old.squad as GameState['squad']) : []) }) },
+  // v11 → v12: the season review (N7, #190): SeasonRecord.review and the
+  // player-of-the-match tally, GameState.potmTally. Both optional, so an old
+  // save's past seasons simply have no review to reopen and the tally starts
+  // with the next award; nothing is filled in.
+  { from: 11, to: 12, run: (old) => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

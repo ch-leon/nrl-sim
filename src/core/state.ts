@@ -87,7 +87,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 /**
  * The coach's team selection (GitHub #69, systems/lineup.ts): nine starters by
@@ -120,13 +120,41 @@ export function emptyFinance(season: number): SeasonFinance {
   return { season, ...(Object.fromEntries(FINANCE_LINES.map((l) => [l, 0])) as Record<FinanceLine, number>) };
 }
 
+/**
+ * What the season review shows (N7, #190): stamped on the SeasonRecord at the
+ * rollover by the review's season hook (ui/screens/seasonReview.ts) from what
+ * the other hooks left behind, so History can reopen it. Every part is optional:
+ * records from before v12 have none, and a part is left out when there was
+ * nothing to say.
+ */
+export interface SeasonReview {
+  /** Player-of-the-match awards to the club this season, and who took most. */
+  potm?: { total: number; best?: { name: string; count: number } };
+  /** The board's verdict as it stood before the new season's objectives were set. */
+  board?: { met: number; missed: number; patience: number; sacked: boolean; objectives: { text: string; met: boolean }[] };
+  /** The season's books: everything that came in and everything that went out. */
+  money?: { in: number; out: number };
+  /** The club's retirements at this rollover, at the age they went. */
+  retired?: { name: string; age: number }[];
+  /** Academy prospects put in the pool for the new season. */
+  juniors?: number;
+  /** The rivals whose strength moved most at the rollover. */
+  movers?: { name: string; from: number; to: number }[];
+  reputation?: { from: number; to: number };
+}
+
 /** One completed season. The extended fields are optional for pre-v4 entries. */
 export interface SeasonRecord {
   season: number; ladderPosition: number; premiership: boolean;
   wins?: number; losses?: number; draws?: number;
   pointsFor?: number; pointsAgainst?: number;
   topScorer?: { name: string; tries: number };
+  /** The season review (v12+, #190). */
+  review?: SeasonReview;
 }
+
+/** Player-of-the-match awards to the club's players this season, by name (#190). */
+export interface PotmTally { season: number; counts: Record<string, number> }
 
 /** A season goal set by the board (GitHub #47). `target`'s meaning depends on `kind`. */
 export type ObjectiveKind = 'finals' | 'solvent' | 'beatRival' | 'build';
@@ -212,6 +240,8 @@ export interface GameState {
   finance: SeasonFinance[];
   /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
   lineup: Lineup;
+  /** Player-of-the-match awards this season (#190), kept by the full-time card; absent until the first. */
+  potmTally?: PotmTally;
   rngSeed: number; // advanced state of the seeded RNG
 }
 

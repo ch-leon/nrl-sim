@@ -542,6 +542,28 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-history-premiers {
   background: #f4d03f;
 }
+.nrl-history-detail { font-weight: normal; font-size: 0.78rem; margin-top: 0.1rem; }
+.nrl-history-review { margin-top: 0.3rem; min-height: 36px; padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+
+/* ── Season review (N7, #190) ──────────────────────────────────────────── */
+.nrl-modal.nrl-review-modal { max-width: min(94vw, 560px); }
+.nrl-season-review { font-size: 0.85rem; }
+.nrl-season-review h2 { margin: 0 0 0.3rem; font-size: 1.1rem; }
+.nrl-review-finish {
+  font-weight: bold;
+  font-size: 1.05rem;
+  background: #f4efe0;
+  border: 2px solid #000;
+  padding: 0.3rem 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.nrl-review-premiers { background: #f4d03f; }
+.nrl-review-line { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.nrl-review-objectives { margin: 0 0 0.2rem 1.1rem; padding: 0; font-size: 0.8rem; }
+.nrl-review-good { color: #1f5f24; }
+.nrl-review-bad { color: #b00020; }
+.nrl-review-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.nrl-review-actions .nrl-btn { flex: 1 1 8rem; }
 
 /* ── Finance (GitHub #39) ────────────────────────────────────────────── */
 .nrl-finance { font-size: 0.85rem; }
