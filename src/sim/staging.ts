@@ -59,6 +59,24 @@ export function generatedRoster(clubId: string): RosterEntry[] {
   });
 }
 
+/** A generated bench's positions: two forwards, a back and a half (BAK-207 2b). */
+export const BENCH_POSITIONS: readonly Position[] = ['prop', 'second-row', 'centre', 'halfback'];
+
+/**
+ * A deterministic interchange bench for a club without real players, named
+ * apart from its starters. Its own rng stream, so the starters never change.
+ */
+export function generatedBench(clubId: string, starters: readonly RosterEntry[] = generatedRoster(clubId)): RosterEntry[] {
+  const rng = makeRng(hashString(`bench:${clubId}`));
+  const used = new Set(starters.map((r) => r.name));
+  return BENCH_POSITIONS.map((position) => {
+    let name = randomName(rng);
+    for (let guard = 0; used.has(name) && guard < 20; guard++) name = randomName(rng);
+    used.add(name);
+    return { name, position };
+  });
+}
+
 /** Roster for a sheet: its real one if present and non-empty, else generated. */
 export function rosterFor(sheet: TeamSheet): RosterEntry[] {
   return sheet.roster && sheet.roster.length > 0 ? sheet.roster : generatedRoster(sheet.clubId);

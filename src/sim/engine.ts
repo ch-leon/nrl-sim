@@ -16,9 +16,10 @@ import type {
   TeamSheet,
 } from './events';
 import { mkEvent } from './events';
-import { generatedRoster, stageEvents } from './staging';
+import { generatedBench, generatedRoster, stageEvents } from './staging';
 import { hasTrait as hasTraitId, rollTraits, type TraitQuality } from '../data/traits';
 import { rivalTactics } from '../match/league/presets';
+import { BENCH } from '../match/league/bench';
 import {
   rollWeather,
   weatherMods,
@@ -86,9 +87,10 @@ export function teamSheetFromSquad(
   const fit = players.filter((p) => p.injuredWeeks <= 0);
   if (fit.length === 0) throw new Error('no fit players');
 
-  const best = [...fit]
-    .sort((a, b) => overallRating(b) - overallRating(a))
-    .slice(0, ON_FIELD);
+  const ranked = [...fit].sort((a, b) => overallRating(b) - overallRating(a));
+  const best = ranked.slice(0, ON_FIELD);
+  // The next best fit players make the interchange bench (the live sim rotates them on).
+  const bench = ranked.slice(ON_FIELD, ON_FIELD + BENCH.size);
 
   const attackRaw = mean(best.map((p) => (p.stats.speed + p.stats.skill + p.stats.footyIQ) / 3));
   const defenseRaw = mean(best.map((p) => (p.stats.strength + p.stats.stamina) / 2));
@@ -112,6 +114,7 @@ export function teamSheetFromSquad(
     fitness,
     colors,
     roster: best.map(toRosterEntry),
+    ...(bench.length > 0 ? { bench: bench.map(toRosterEntry) } : {}),
   };
 }
 
@@ -136,7 +139,8 @@ export function teamSheetFromRival(club: RivalClub): TeamSheet {
   const kicking = jitter();
   const fitness = jitter();
   const quality: TraitQuality = club.strength >= 70 ? 'star' : club.strength >= 50 ? 'average' : 'rookie';
-  const roster = generatedRoster(club.id).map((p) => {
+  const starters = generatedRoster(club.id);
+  const roster = starters.map((p) => {
     const stats = {
       speed: clampStat(attack + rng.int(-8, 8)),
       strength: clampStat(defense + rng.int(-8, 8)),
@@ -148,6 +152,19 @@ export function teamSheetFromRival(club: RivalClub): TeamSheet {
     const traits = rollTraits(rng, p.position, quality);
     return { ...p, stats, ...(traits.length > 0 ? { traits } : {}) };
   });
+  // The bench rolls on its own stream so the starters stay exactly as they were.
+  const brng = makeRng(hashString(`bench:${club.id}`));
+  const bench = generatedBench(club.id, starters).map((p) => {
+    const stats = {
+      speed: clampStat(attack + brng.int(-8, 8) - 3),
+      strength: clampStat(defense + brng.int(-8, 8) - 3),
+      stamina: clampStat(fitness + brng.int(-8, 8) - 3),
+      skill: clampStat(kicking + brng.int(-8, 8) - 3),
+      footyIQ: clampStat(attack + brng.int(-8, 8) - 3),
+    };
+    const traits = rollTraits(brng, p.position, quality);
+    return { ...p, stats, ...(traits.length > 0 ? { traits } : {}) };
+  });
   return {
     clubId: club.id,
     name: club.name,
@@ -157,6 +174,7 @@ export function teamSheetFromRival(club: RivalClub): TeamSheet {
     fitness,
     colors: club.colors,
     roster,
+    bench,
     tactics: rivalTactics(club),
   };
 }

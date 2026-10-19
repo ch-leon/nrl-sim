@@ -3,6 +3,7 @@
 // hand or as a sweep) × seeds. Pure: parse, check and expand; the runner
 // (scripts/balance.ts) plays the cells and report.ts writes them up.
 import type { RosterStats } from '../../sim/events';
+import { isRotation, type Rotation } from '../league/bench';
 import { isLegs, type Legs } from '../league/fatigue';
 import { isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
 import { checkTuning, type Overrides } from '../league/tuning';
@@ -17,6 +18,10 @@ export interface SideSpec {
   tactics?: Partial<TeamTactics>;
   /** Special skills: none (default for a flat squad), as rolled (default for a club), all superstars. */
   traits?: 'none' | 'gen' | 'stars';
+  /** Interchange players, 0–4 (default 4; a flat squad's bench has the squad's stats). */
+  bench?: number;
+  /** How hard the coach rotates them: off / standard (default) / heavy. */
+  rotation?: Rotation;
 }
 
 export interface ScenarioSpec {
@@ -81,6 +86,8 @@ export function checkPlan(p: Plan): string[] {
       if (spec.tactics?.attack && !isAttackPreset(spec.tactics.attack)) errs.push(`${s.name} ${side}: unknown attack preset "${spec.tactics.attack}"`);
       if (spec.tactics?.defence && !isDefencePreset(spec.tactics.defence)) errs.push(`${s.name} ${side}: unknown defence preset "${spec.tactics.defence}"`);
       if (spec.traits && !['none', 'gen', 'stars'].includes(spec.traits)) errs.push(`${s.name} ${side}: traits must be none / gen / stars`);
+      if (spec.bench !== undefined && !(Number.isInteger(spec.bench) && spec.bench >= 0 && spec.bench <= 4)) errs.push(`${s.name} ${side}: bench must be 0–4`);
+      if (spec.rotation !== undefined && !isRotation(spec.rotation)) errs.push(`${s.name} ${side}: rotation must be off / standard / heavy`);
     }
   }
   if (p.base) errs.push(...checkTuning(p.base).map((e) => `base: ${e}`));

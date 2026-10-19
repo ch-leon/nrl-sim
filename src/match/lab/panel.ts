@@ -10,6 +10,7 @@ import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, isAttackPreset, isDefenc
 import type { LabTactics } from './controller';
 import { statsLine, statsWindow } from './stats';
 import { LEGS, isLegs, type Legs } from '../league/fatigue';
+import { DEFAULT_ROTATION, ROTATIONS, isRotation, type Rotation } from '../league/bench';
 
 const TRAIT_MODE_LABEL: Readonly<Record<TraitMode, string>> = { gen: 'as rolled', none: 'none', stars: 'all superstars' };
 const LEGS_LABEL: Readonly<Record<Legs, string>> = { fresh: 'fresh', late: 'last 10 min', spent: 'cooked' };
@@ -74,6 +75,14 @@ export class LabPanel {
       legs.append(o);
     }
     const legsOf = (): Legs => (isLegs(legs.value) ? legs.value : 'fresh');
+    // Bench (BAK-207 2b): how hard both coaches rotate their interchanges.
+    const bench = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Bench: how hard both coaches rotate (off / standard / heavy)' } });
+    for (const r of ROTATIONS) {
+      const o = el('option', { text: r, attrs: { value: r } });
+      if (r === (p.bench ?? DEFAULT_ROTATION)) o.selected = true;
+      bench.append(o);
+    }
+    const benchOf = (): Rotation => (isRotation(bench.value) ? bench.value : DEFAULT_ROTATION);
     // Tactics picker: a preset per side for attack and defence; "club" keeps the club's own style.
     const presetSelect = (kind: 'attack' | 'defence', value: string | undefined, title: string): HTMLSelectElement => {
       const sel = el('select', { class: 'nrl-lab-select nrl-lab-preset', attrs: { title } });
@@ -99,10 +108,10 @@ export class LabPanel {
     const go = button('Go', () => {
       const s = Math.max(1, Math.floor(Number(seed.value) || 1));
       const mode = isTraitMode(traits.value) ? traits.value : 'gen';
-      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf() });
+      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf(), bench: benchOf() });
     });
     // Any setup change applies at once: the match restarts from the kick-off on the same seed.
-    for (const s of [home, away, seed, traits, legs, hAtk, hDef, aAtk, aDef]) s.addEventListener('change', () => go.click());
+    for (const s of [home, away, seed, traits, legs, bench, hAtk, hDef, aAtk, aDef]) s.addEventListener('change', () => go.click());
     const shuffle = button('🎲', () => {
       seed.value = String(1 + Math.floor(Math.random() * 999_999));
       go.click();
@@ -147,7 +156,7 @@ export class LabPanel {
     const load = button('Load', () => {
       const f = decodeFlag(codeIn.value);
       if (!f) return hooks.notify('Not a valid Flag code');
-      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf() });
+      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf(), bench: benchOf() });
     });
 
     // Event feed: the last few things that happened; tap one to jump back to it.
@@ -163,7 +172,7 @@ export class LabPanel {
       { class: 'nrl-lab' },
       el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: 'Match Lab · live match' }), collapse),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, home, el('span', { text: 'v' }), away, seed, go, shuffle),
-      el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits, el('span', { text: 'Legs' }), legs),
+      el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits, el('span', { text: 'Legs' }), legs, el('span', { text: 'Bench' }), bench),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'H' }), hAtk, hDef, el('span', { text: 'A' }), aAtk, aDef),
       ...(styles ? [el('div', { class: 'nrl-lab-hint nrl-lab-more', text: styles })] : []),
       el('div', { class: 'nrl-lab-row' }, this.playBtn, step, whistle, ...this.speedBtns, this.readout),

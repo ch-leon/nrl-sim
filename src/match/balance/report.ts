@@ -15,7 +15,7 @@ export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
 };
 
 /** The columns of the summary table. */
-const COLUMNS: readonly CountKey[] = ['tackles', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bigHits', 'runDowns', 'gassed'];
+const COLUMNS: readonly CountKey[] = ['tackles', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bigHits', 'runDowns', 'gassed', 'subs'];
 
 /** ✓ inside the §7 band, ↑ above, ↓ below, '' when the metric has no band. */
 export function bandMark(key: CountKey, v: number): string {

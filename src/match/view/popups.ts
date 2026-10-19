@@ -49,6 +49,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   gassed: { word: 'COOKED!', tone: 'bad' },
   // Sprint and gas (§8.2): caught from behind after a break.
   'run-down': { word: 'RUN DOWN!', tone: 'defence', big: true },
+  // Interchanges (BAK-207 2b): over the man coming on.
+  interchange: { word: 'ON!', tone: 'neutral' },
 };
 
 /** A bust out of a wrestle (the defenders' grip went first) reads differently from one at contact. */

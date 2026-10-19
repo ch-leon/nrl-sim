@@ -16,13 +16,15 @@
 //
 // The match (BAK-207 §5.1, 2a): a clock that runs while the ball is in play,
 // two halves with the ends swapped and legs part-restored at half-time, the
-// siren and play on to the next dead ball, full time, points. Conversions,
-// touch, penalties and weather come later in Phase 2 (#86).
+// siren and play on to the next dead ball, full time, points. Interchanges
+// (2b): after a try the coach takes off his most tired men, who jog to the
+// sideline as the fresh ones jog on; at half-time they swap in the sheds.
+// Conversions, touch, penalties and weather come later in Phase 2 (#86).
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { TICK_S, type MatchSim } from '../core/engine';
-import { FIELD_LENGTH, MID_Y, clampToGround, inGoal } from '../core/field';
+import { FIELD_LENGTH, FIELD_WIDTH, MID_Y, clampToGround, inGoal } from '../core/field';
 import { arrive, integrate, makeBody, maxSpeedFor, separate, speedOf, type Body } from '../core/body';
 import { CARRY_LIFT, PASS_SPEED, bounceFlight, flightAt, grubberFlight, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
 import type { PlayerSnap, Side, SimEvent, Snapshot } from '../core/snapshot';
@@ -40,6 +42,7 @@ import { FATIGUE, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
 import { GAS, canSprint, paceMult, refillSeconds, runCostMult, stepGas, tankSeconds, type GasState } from './gas';
 import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
 import { NINES, clockText, fullMatch, type MatchLength } from './rules';
+import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
 /**
@@ -150,6 +153,8 @@ interface Player {
   side: Side;
   slot: number;
   name: string;
+  /** Squad id or name: the look he wears on screen. */
+  key: string;
   stats: Stats;
   /** Special skills (BAK-208 §3); empty for most players. */
   traits: TraitInstance[];
@@ -192,6 +197,20 @@ interface Player {
   jink: { dy: number; ticks: number } | null;
   target: Vec;
   through: boolean;
+  /** Coming off for this bench man (2b): he jogs to `subSpot` on the touchline first. */
+  subFor: number | null;
+  subAt: number;
+  subSpot: Vec;
+}
+
+/** A player on the bench: who he is and the legs he has. */
+interface BenchMan {
+  name: string;
+  key: string;
+  stats: Stats;
+  traits: TraitInstance[];
+  stamina: number;
+  energy: number;
 }
 
 type Phase =
@@ -248,6 +267,14 @@ export interface LiveOptions {
   length?: MatchLength;
 }
 
+/** A sheet's bench, as many as the bench holds. */
+function benchOf(sheet: TeamSheet): BenchMan[] {
+  return (sheet.bench ?? []).slice(0, BENCH.size).map((e) => {
+    const traits = e.traits ? [...e.traits] : [];
+    return { name: e.name, key: e.id ?? e.name, stats: statsOf(e), traits, stamina: e.stats?.stamina ?? 50, energy: 1 };
+  });
+}
+
 function statsOf(entry: RosterEntry | undefined): Stats {
   const s = entry?.stats;
   return s ? { strength: s.strength, speed: s.speed, skill: s.skill, footyIQ: s.footyIQ } : { ...AVERAGE };
@@ -290,6 +317,9 @@ export class LiveSim implements MatchSim {
   private events: SimEvent[] = [];
   readonly tries: Record<Side, number> = { home: 0, away: 0 };
   readonly points: Record<Side, number> = { home: 0, away: 0 };
+  /** Interchanges (2b): each side's bench and how hard its coach rotates it. */
+  private readonly bench: Record<Side, BenchMan[]>;
+  readonly rotation: Record<Side, Rotation>;
   /** The clock (BAK-207 §5.1, 2a): which half, ticks of play gone in it, time up. */
   private readonly length: MatchLength;
   private half = 1;
@@ -307,12 +337,16 @@ export class LiveSim implements MatchSim {
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
+    this.bench = { home: benchOf(home), away: benchOf(away) };
+    this.rotation = { home: home.rotation ?? DEFAULT_ROTATION, away: away.rotation ?? DEFAULT_ROTATION };
     const energy = Math.max(0, Math.min(1, opts.energy ?? 1));
     for (const p of this.players) {
       p.energy = energy;
       p.gassed = energy < FATIGUE.spentAt;
       p.gas.gas = energy;
     }
+    // A tired start (the lab's late legs, a closing stretch) finds the bench rested, as it would have been.
+    for (const b of [...this.bench.home, ...this.bench.away]) b.energy = energy < 1 ? Math.max(energy, BENCH.recoverCap) : 1;
     this.setForKickoff(other(this.firstReceiver));
   }
 
@@ -352,10 +386,12 @@ export class LiveSim implements MatchSim {
       const stats = statsOf(entry);
       const traits = entry?.traits ? [...entry.traits] : [];
       const stamina = entry?.stats?.stamina ?? 50;
+      const name = entry?.name ?? `${sheet.name} #${slot + 1}`;
       return {
         side,
         slot,
-        name: entry?.name ?? `${sheet.name} #${slot + 1}`,
+        name,
+        key: entry?.id ?? name,
         stats,
         traits,
         stamina,
@@ -383,6 +419,9 @@ export class LiveSim implements MatchSim {
         jink: null,
         target: { x: 50, y: MID_Y },
         through: false,
+        subFor: null,
+        subAt: 0,
+        subSpot: { x: 50, y: 1 },
       };
     });
   }
@@ -489,6 +528,7 @@ export class LiveSim implements MatchSim {
     }
     this.assignTargets();
     this.move();
+    this.restBench();
     this.runClock();
   }
 
@@ -543,11 +583,83 @@ export class LiveSim implements MatchSim {
       p.decided = false;
       p.steppedOn = -1;
     }
+    for (const b of [...this.bench.home, ...this.bench.away]) b.energy += (1 - b.energy) * NINES.halfTimeLegsBack;
+    // Swaps in the sheds: no jog needed.
+    for (const side of ['home', 'away'] as const) {
+      for (const sw of this.swapsFor(side)) this.swapIn(this.at(side, sw.slot), sw.bench);
+    }
     this.half++;
     this.ends = this.ends === 1 ? -1 : 1;
     this.clockTicks = 0;
     this.siren = false;
     this.setForKickoff(this.firstReceiver);
+  }
+
+  // ── Interchanges (2b) ─────────────────────────────────────────────────────
+  /** Who the coach takes off now, by his rotation policy. */
+  private swapsFor(side: Side): { slot: number; bench: number }[] {
+    return pickSwaps(this.side(side).map((p) => ({ slot: p.slot, energy: p.energy })), this.bench[side], this.rotation[side]);
+  }
+
+  /** After a try: the men coming off head for the interchange spot (the restart waits for them). */
+  private callSwaps(): void {
+    for (const side of ['home', 'away'] as const) {
+      for (const sw of this.swapsFor(side)) {
+        const p = this.at(side, sw.slot);
+        p.subFor = sw.bench;
+        p.subAt = this.tick;
+        p.subSpot = this.interchangeSpot(p);
+      }
+    }
+  }
+
+  /** Where a man comes off: the nearest touchline, level with where he is (in from the try lines). */
+  private interchangeSpot(p: Player): Vec {
+    return { x: clamp(p.body.pos.x, 10, FIELD_LENGTH - 10), y: p.body.pos.y < MID_Y ? 1 : FIELD_WIDTH - 1 };
+  }
+
+  /** Each man coming off swaps on reaching the spot (or when he has had long enough to get there). */
+  private runSwaps(): void {
+    for (const p of this.players) {
+      if (p.subFor === null) continue;
+      const there = dist(p.body.pos, p.subSpot) < 1.5;
+      if (there || this.tick - p.subAt >= Math.round(BENCH.jogOffS / TICK_S)) this.swapIn(p, p.subFor);
+    }
+  }
+
+  /** The bench man takes this player's place (slot, role, spot); the player takes his on the bench. */
+  private swapIn(p: Player, bi: number): void {
+    const b = this.bench[p.side][bi];
+    if (!b) return;
+    this.bench[p.side][bi] = { name: p.name, key: p.key, stats: p.stats, traits: p.traits, stamina: p.stamina, energy: p.energy };
+    const out = p.name;
+    p.name = b.name;
+    p.key = b.key;
+    p.stats = b.stats;
+    p.traits = [...b.traits];
+    p.stamina = b.stamina;
+    p.energy = b.energy;
+    p.drain = drainRate(b.stamina, b.traits);
+    p.gassed = b.energy < FATIGUE.spentAt;
+    p.gas = { gas: b.energy, blown: false };
+    p.tankS = tankSeconds(b.stamina, b.traits);
+    p.refillS = refillSeconds(b.stamina);
+    p.body.maxSpeed = maxSpeedFor(b.stats.speed);
+    p.busyUntil = p.cooldownUntil = p.immuneUntil = p.burstUntil = 0;
+    p.brokeAt = -1000;
+    p.subFor = null;
+    this.emit('interchange', `${p.name} on for ${out}`, p);
+  }
+
+  /** The bench's legs come back a little each tick. */
+  private restBench(): void {
+    for (const b of [...this.bench.home, ...this.bench.away]) b.energy = benchRecover(b.energy, TICK_S);
+  }
+
+  /** Average legs of a side's bench, 0..1 (null when it has none). */
+  benchEnergyOf(side: Side): number | null {
+    const bs = this.bench[side];
+    return bs.length ? bs.reduce((a, b) => a + b.energy, 0) / bs.length : null;
   }
 
   /** Seconds of match time gone since the kick-off (the clock, both halves). */
@@ -711,7 +823,9 @@ export class LiveSim implements MatchSim {
 
   // ── Phases ────────────────────────────────────────────────────────────────
   private stepRestart(ph: Extract<Phase, { kind: 'restart' }>): void {
+    this.runSwaps();
     if (this.tick < ph.t0 + LIVE.restartTicks || this.pendingKick) return;
+    if (this.players.some((p) => p.subFor !== null)) return; // the interchange first
     const kicker = this.at(ph.kicking, KICKER);
     // Wait until the teams are set (the kicker on the spot, everyone near his).
     const ready = dist(kicker.body.pos, kicker.target) < 1 && this.players.every((p) => dist(p.body.pos, p.target) < 3);
@@ -997,6 +1111,7 @@ export class LiveSim implements MatchSim {
     this.attacking = other(kicking);
     this.dir = this.dirOf(this.attacking);
     this.phase = { kind: 'restart', t0: this.tick, kicking };
+    this.callSwaps(); // a stoppage: the coach can freshen up
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -1351,6 +1466,7 @@ export class LiveSim implements MatchSim {
           p.target = { x: p.target.x + rd * 6, y: p.target.y }; // deep but not on the line
         }
         p.through = false;
+        if (p.subFor !== null) p.target = p.subSpot;
       }
       if (ph.kind === 'try') {
         // The scorer stays where he grounded it (up and celebrating once the
@@ -1603,6 +1719,7 @@ export class LiveSim implements MatchSim {
       ...(p.sprinting && !p.gas.blown ? { sprint: true } : {}),
       ...(p.gas.blown ? { blown: true } : {}),
       gas: p.gas.gas,
+      who: p.key,
     }));
     const b = this.ball;
     let ball: Snapshot['ball'];

@@ -152,7 +152,7 @@ the report linked in the PR. The match is **Nines** (#77: one ruleset, no Classi
 | PR | What | Done when |
 |---|---|---|
 | **2a** — *shipped* | **Clock, halves, points, full time, `runMatch`.** Two 9:00 halves of real sim time (the length §7 and the fatigue tuning already assume; see Decisions). The clock stops from a try to the restart. **Half-time:** ends swap, everyone gets back half the legs he has lost and a full tank (BAK-208 §8.2), the side that received first kicks off. **Full time:** the siren goes, play runs on until the ball is next dead (tackle, try, turnover). Points: try 4 (conversions come in 2c). `runMatch(home, away, { seed, weather }) → MatchResult` with the **same shape as today**: score, events (mapped as the lab already does), possession, tackles, errors, tries; weather passed through; injuries empty and momentum from the score for now. One rules config (`NINES` in `league/`) holds the half length, points and set length. The harness measures **whole matches** (`minutes` gives way to halves) and judges wins on points. Lab: clock and score in the readout, a "skip to half-time" button. | A seeded match starts with a kick-off, has a half-time and ends at full time; the same seed gives the same `MatchResult`; the overlay accumulator test passes on `runMatch` output; standard plan re-run. |
-| **2b** | **Interchanges (#70), sim side.** The sheet carries a bench of 4 (the next best fit players from `teamSheetFromSquad`; rivals generate 13). Unlimited interchanges (Nines). A coach rule swaps the most tired player for the freshest bench player at a stoppage when his legs fall under a threshold; the bench recovers 5% a minute up to 90% (§8.2). On the field the two jog past each other at the sideline; "X on for Y" in the commentary. Rotation policy (Off, Standard, Heavy) as a sheet field, defaulting to Standard; the lineup screen (#69) sets it later. | With rotation on, a side's legs in the last 5 minutes beat the same side without it over many seeds; the swap is visible in the lab. |
+| **2b** — *shipped* | **Interchanges (#70), sim side.** The sheet carries a bench of 4 (the next best fit players from `teamSheetFromSquad`; rivals generate 13). Unlimited interchanges (Nines). A coach rule swaps the most tired player for the freshest bench player at a stoppage when his legs fall under a threshold; the bench recovers 5% a minute up to 90% (§8.2). On the field the two jog past each other at the sideline; "X on for Y" in the commentary. Rotation policy (Off, Standard, Heavy) as a sheet field, defaulting to Standard; the lineup screen (#69) sets it later. | With rotation on, a side's legs in the last 5 minutes beat the same side without it over many seeds; the swap is visible in the lab. |
 | **2c** | **Goal kicking: conversions and field goals.** Conversions are Nines **drop kicks**, taken from in front of where the try was grounded, quickly; accuracy from Boot and the kicking stat, distance and angle; a flight to the posts you can see. **Field goal** (BAK-208 §4.4): last 3 minutes, scores level or within 1, inside 30 m; charge-down 8%. **Bonus-zone tries** worth 5 if Leon wants them now (#77; zone per the current Nines rules). | Conversion % and field goals per match in the report; GOAL!/MISSED! pop-ups. |
 | **2d** | **Touch, dead ball and drop-outs** (closes most of BAK-208 E, #99). The ball and the carrier can go into touch; long kicks aim for touch; **40/20**; a kick dead in-goal or over the dead-ball line → 20 m restart; a defender tackled in-goal or forcing it dead → goal-line drop-out. Restarts are a play-the-ball **10 m in from touch** for the other side, no scrums. | A set can end every way BAK-208 §4.4 lists and each is readable; kick metres and 40/20s in the report. |
 | **2e** | **Penalties and six-again.** Ruck offences (holding down in a long wrestle, slow off the ruck) give **six again** (tackle count back to zero, SIX AGAIN! pop-up); offside (a defender up before the ball is played, more likely with Rush) and high shots (Hothead) give a **penalty**: tap and go, kick for touch (ball back, 10 m restart), or a shot at goal for 2 when in range and it makes sense on the clock and score. Sin bins later (BAK-206 B7). | Penalties and six-agains per match in the report; Rush pays for its line speed in penalties; the choice is shown. |
@@ -168,6 +168,21 @@ which the old engine shares; `NINES` (`league/rules.ts`) holds the half length, 
 and the half-time numbers (tuning reference §13). Event minutes are Nines minutes (0–18).
 A balance plan without `minutes` plays whole matches; with it, one stretch of that length.
 The lab's ⏩ skips to the next half-time or full time. Measured: tuning reference §13.
+
+**2b as shipped:** the bench is `TeamSheet.bench` (up to 4) and the policy
+`TeamSheet.rotation` (`league/bench.ts`). Squads bench their next four fit players;
+rivals generate four (two forwards, a back, a half) on their own random stream, a little
+below the starters, so their starters are unchanged. After a try the coach takes off the
+men under his line (standard 55%, two at a time; heavy 70%, three) for bench men at least
+15% (heavy 10%) fresher; each jogs to the nearest touchline and the fresh man jogs on
+from there, and the restart waits for them (12 s at most for the jog off; after that the
+swap is made where he stands). At half-time swaps are made in the sheds, but after the break's recovery few men are
+still under the line, so in practice nearly all swaps follow tries (about 6.5 a match
+between even sides on standard). A tired start (the lab's late legs, a harness stretch) finds the
+bench rested at 90%. The snapshot carries who is in each slot (`who`) and the view puts
+the new man's own look on the sprite; an **ON!** pop-up and "X on for Y" mark the swap.
+The lab has a **Bench** picker (off / standard / heavy, both sides; `#lab?bench=heavy`);
+balance plans take `bench` (0–4) and `rotation` per side. Measured: tuning reference §14.
 
 After Phase 2: Phase 3 (balance, with the harness on whole matches) and the lineup screen (#69).
 

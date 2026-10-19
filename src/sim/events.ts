@@ -52,6 +52,10 @@ export interface TeamSheet {
   roster?: RosterEntry[];
   /** How the side plays (BAK-208 §5); the live sim defaults to Balanced / Slide when absent. */
   tactics?: import('../match/league/presets').TeamTactics;
+  /** Interchange players (up to 4). The live sim rotates them on (BAK-207 2b); the event-log engine ignores them. */
+  bench?: RosterEntry[];
+  /** How hard the coach rotates the bench; the live sim defaults to Standard. */
+  rotation?: import('../match/league/bench').Rotation;
 }
 
 /** Attacking / territorial kick flavour (stored on MatchEvent.detail). */

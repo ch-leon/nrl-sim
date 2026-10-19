@@ -36,6 +36,9 @@ the line under them names the style each side is playing. Changing any picker re
 the match from the kick-off on the same seed.
 **Legs** starts everyone fresh, on last-ten-minute legs or cooked (§8,
 `#lab?legs=late`, `legs=spent`); a bar over a tackled carrier shows the wrestle (§8.1).
+**Bench** sets how hard both coaches rotate their four interchange players (off,
+standard, heavy; `#lab?bench=heavy`): after a try the most tired men jog off and fresh
+ones jog on (**ON!**).
 The lab plays a whole Nines match: two 9:00 halves with the clock and score in the
 label, half-time and full time; **⏩** skips to the next break. Speed streaks mark
 anyone sprinting, and a thin gas bar sits under the carrier and whoever is sprinting
