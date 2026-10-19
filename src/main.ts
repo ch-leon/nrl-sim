@@ -99,6 +99,12 @@ async function boot(): Promise<void> {
     onUnblock: () => {
       portraitBlocked = false;
       game?.loop.wake();
+      // Turned back to landscape, the scale manager can refresh from the old
+      // bounds while the rotation is still settling and then read the new bounds
+      // as "no change", leaving the canvas at the portrait size with every tap
+      // landing beside the camera (found by the playthrough's portrait step).
+      // Refresh once the next frame has laid out.
+      requestAnimationFrame(() => game?.scale.refresh());
     },
   });
   initToasts();
