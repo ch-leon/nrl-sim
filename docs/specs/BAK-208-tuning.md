@@ -594,3 +594,44 @@ Measured: the standard plan is unchanged by construction (flat sheets); run
 
 Tests: `tests/systems/lineup.test.ts`, `tests/systems/matchday.test.ts` (the lineup is the
 side that runs out), `tests/core/save.test.ts` (v10 → v11).
+
+## 22. Sin bins and professional fouls (#71; BAK-206 B7)
+
+A penalty can send the offender to the sin bin for `bin.minutes` of match clock (five: the
+Nines bin, not the thirteen-a-side ten; the issue's "10 sim-minutes" was written for an
+80-minute match). The chance: a small one anywhere, more for a high shot, more inside the
+offender's own 20 (a professional foul, the infringement that stops a try) and more again
+for every earlier penalty his side conceded there (repeated infringements), plus a little
+per level of Hitman and Hothead; a side never has two men off at once. He jogs to the
+nearest touchline and stands there (**SIN BIN!** over him, "X is sent to the sin bin —
+…" in the commentary, the lab's label reads `8 v 9`); his side plays a man short, and a
+stand-in takes his duties (the five-eighth kicks for the halfback, the prop plays
+dummy-half for the hooker, a winger drops back for the fullback). A defence a man short
+is stretched: busts and steps against it are a little more likely on top of the gap in
+the line. When the clock says so he runs back on (**BACK ON**, "… is back from the sin
+bin"). The bin counts against him in the player stats (`sinBins`) and for Player of the
+Match. The roll is made on every penalty whatever the chance, so bins turned off with
+the knobs play the same match as the default until a bin would have happened.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `bin.minutes` | `src/match/league/sinbin.ts` | 5 | Match clock a binned man sits out (carries over half-time). |
+| `bin.base` | `sinbin.ts` | 0.05 | A penalty anywhere else is a bin this often… |
+| `bin.redZone` / `bin.redZoneM` | `sinbin.ts` | 0.25 / 20 m | …one inside the offender's own 20 this often… |
+| `bin.repeat` | `sinbin.ts` | 0.2 | …plus this per earlier penalty his side conceded in its own 20. |
+| `bin.highShot` | `sinbin.ts` | 0.3 | A high shot. |
+| `bin.hitman` / `bin.hothead` | `sinbin.ts` | 0.05 / 0.05 a level | More for a Hitman or a Hothead. |
+| `bin.maxOut` | `sinbin.ts` | 1 | Men a side can have in the bin at once. |
+| `bin.shortBroken` / `bin.shortStep` | `sinbin.ts` | 0.06 / 0.08 | Against a defence a man short: extra bust and step chance. |
+
+Measured (`balance/plans/sin-bins.json`, 40 whole matches a row, run `20261019-194128-sin-bins`):
+**0.2–0.3 bins a match** (even 60 v 60 0.3, slide v rush 0.3, 70 v 50 0.2, Stingrays v Crocs
+0.3), about one match in four. The swing, taken while exactly one side is a man short
+(`shortMin`, `binSwing`; spells with both sides short count for neither) on the
+every-penalty-a-bin variant (1.6–2.6 bins a match, 6–8 minutes short): **4.5 points a
+five-minute bin** between even sides, 4.9 slide v rush, 6.0 at 70 v 50, 5.5 Stingrays v
+Crocs; at the default rate the same ratio reads 2–7 on a few bins a match (noise). Bins off
+on the same dice: nothing else moves beyond luck (tries, line breaks, errors, home win
+within a point or two). Standard plan: see the PR.
+
+Tests: `tests/match/league/sinbin.test.ts`.

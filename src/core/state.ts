@@ -26,7 +26,7 @@ export interface PlayerStats {
 }
 
 /** Event-derived individual tallies (GitHub #46). */
-export interface StatTally { games: number; tries: number; tackles: number; lineBreaks: number }
+export interface StatTally { games: number; tries: number; tackles: number; lineBreaks: number; sinBins?: number }
 
 export interface Player {
   id: string; // seeded deterministic id (no crypto)

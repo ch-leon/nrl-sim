@@ -286,7 +286,7 @@ Capture so nothing from the 2026-10-11 thread (and prior gap review) gets lost.
 | B4 | **Home advantage** | Done — GitHub #8 (~52–58% home win band). |
 | B5 | **Rival `cheapSimScore` ≈ full engine** | Ladder credibility. |
 | B6 | **Bench / interchanges** | Even a simple 4-man rotation. |
-| B7 | **Sin-bin / professional foul** | From repeated big-hits or cynical penalties. |
+| B7 | **Sin-bin / professional foul** — *shipped in the live sim (#71, 2026-10-19; tuning reference §22)* | From repeated big-hits or cynical penalties. |
 | B8 | **True Nines rules pack** | Shorter halves, scoring variants — optional mode flag. |
 
 ### Mid-match coach influence (brainstorm — Leon)
