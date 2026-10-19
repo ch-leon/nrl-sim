@@ -33,8 +33,8 @@ import {
 const clampStat = (n: number): number => Math.max(1, Math.min(STAT_MAX, n));
 
 /** Small home-ground edge (GitHub #8). Equal sheets → ~52–58% home wins. */
-const HOME_ATTACK_NUDGE = 5;
-const HOME_DEFENSE_NUDGE = 4;
+const HOME_ATTACK_NUDGE = 4;
+const HOME_DEFENSE_NUDGE = 3;
 
 /** Late-match fitness window (GitHub #6): t ≥ this minute. */
 const FITNESS_LATE_T = 60;
@@ -198,6 +198,18 @@ const HARDMAN_HIT_MULT = 1.6;
 const HARDMAN_BIGHIT_WEIGHT = 0.03;
 /** Kicking-success bonus (probability points) for a `playmaker` kicker. */
 const PLAYMAKER_KICK_BONUS = 0.04;
+/**
+ * Grubbers (#72): a grubber into the in-goal is a decent attacking option, not a
+ * 1-in-3 try machine. When it reaches the in-goal the chaser scores on base +
+ * attack/divisor, less for a good fullback (as bombs: his skill over 50 /200);
+ * otherwise the defence sometimes has to ground it for a goal-line drop-out,
+ * which keeps the ball with the attack (a new set about 40 m out).
+ */
+const GRUBBER_TRY_BASE = 0.15;
+const GRUBBER_TRY_ATTACK = 600;
+const GRUBBER_DROPOUT = 0.35;
+const GRUBBER_DROPOUT_AT = 70;
+
 /** Injury-chance multiplier for an `injuryProne` carrier (on top of opts.injuryRate). */
 const INJURY_PRONE_MULT = 1.4;
 
@@ -693,17 +705,26 @@ function resolveKickInner(
 
   if (kind === 'grubber') {
     const tipAt = clampField(fieldX + 12 + rng.next() * 18);
-    if (tipAt >= 88 && rng.next() < 0.28 + possessing.sheet.attack / 350) {
-      const scorer = pickActor(
-        possessing.roster,
-        rng,
-        (p) => BACKS.has(p) || HALVES.has(p),
-        'speed',
-        FINISHER,
-      );
-      scoreTry(possessing, t, events, scorer);
-      attemptConversion(possessing, t, events, wmods, rng);
-      return { fieldX: 20, flip: true, scoredTry: true };
+    if (tipAt >= 88) {
+      // Into the in-goal: a race with the fullback (#72).
+      const fullback = pickActor(defending.roster, rng, (p) => p === 'fullback' || p === 'winger', 'skill');
+      const fbSkill = defending.roster.find((p) => p.name === fullback)?.stats?.skill ?? defending.sheet.defense;
+      const r = rng.next();
+      const tryChance = GRUBBER_TRY_BASE + possessing.sheet.attack / GRUBBER_TRY_ATTACK - (fbSkill - 50) / 200;
+      if (r < tryChance) {
+        const scorer = pickActor(
+          possessing.roster,
+          rng,
+          (p) => BACKS.has(p) || HALVES.has(p),
+          'speed',
+          FINISHER,
+        );
+        scoreTry(possessing, t, events, scorer);
+        attemptConversion(possessing, t, events, wmods, rng);
+        return { fieldX: 20, flip: true, scoredTry: true };
+      }
+      // Grounded in-goal by the defence: a goal-line drop-out, the attack's ball again.
+      if (r < tryChance + GRUBBER_DROPOUT) return { fieldX: GRUBBER_DROPOUT_AT, flip: false, scoredTry: false };
     }
     return { fieldX: clampField(22 + rng.next() * 10), flip: true, scoredTry: false };
   }
