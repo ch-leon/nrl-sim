@@ -1,0 +1,61 @@
+{
+  "name": "gaps",
+  "description": "Phase 3 (#87): how one-sided does the live sim get as the rating gap grows? Even, 10, 20, 30 and 35-point gaps (a new game's rivals run 35-78), plus two real clubs at the extremes.",
+  "seeds": 30,
+  "scenarios": [
+    {
+      "name": "60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "65 v 55",
+      "home": {
+        "rating": 65
+      },
+      "away": {
+        "rating": 55
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "70 v 40",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 40
+      }
+    },
+    {
+      "name": "70 v 35",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 35
+      }
+    },
+    {
+      "name": "stingrays v larrikins",
+      "home": {
+        "club": "rival-stingrays"
+      },
+      "away": {
+        "club": "rival-larrikins"
+      }
+    }
+  ]
+}

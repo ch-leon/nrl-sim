@@ -17,3 +17,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-132027-weather | weather | f1ddc5e (uncommitted changes) | feat/weather-injuries | [report](runs/20261019-132027-weather/report.md) |
 | 20261019-132509-standard | standard | 0562cd7 | main | [report](runs/20261019-132509-standard/report.md) |
 | 20261019-134242-standard | standard | 26b2d26 | main | [report](runs/20261019-134242-standard/report.md) |
+| 20261019-134245-gaps | gaps | 26b2d26 | feat/phase3-gaps | [report](runs/20261019-134245-gaps/report.md) |
