@@ -39,6 +39,7 @@ import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard } from './ui/orientation';
 import { startTutorial } from './ui/tutorial';
+import { openGuideScreen } from './ui/guide/guide';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
 import { bootLab } from './match/lab/boot';
@@ -192,7 +193,7 @@ async function boot(): Promise<void> {
   newsInbox.onChange(refreshNewsBadge);
   bus.on('state:changed', refreshNewsBadge);
   refreshNewsBadge();
-  nav.registerScreen('help', '?', () => startTutorial(true));
+  nav.registerScreen('help', '?', () => openGuideScreen()); // the Guide (#188); Replay tutorial is in its footer
 
   initAudio();
   initAudioUi();

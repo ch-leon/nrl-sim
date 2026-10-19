@@ -31,8 +31,9 @@ export interface TutorialStep {
 }
 
 /**
- * The 7 onboarding steps, in order (BAK-202 spec). Anchor selectors reference
- * elements that really exist in the shipped UI:
+ * The onboarding steps, in order (BAK-202 spec; News, Finance and Contracts
+ * added by N7, #188). Anchor selectors reference elements that really exist in
+ * the shipped UI:
  *   - nav buttons carry `data-screen="<id>"` (see ui/nav.ts registerScreen)
  *   - the HUD money tile carries `data-hud="money"` (see ui/hud.ts)
  *   - the Advance Week control is the button inside `.nrl-hud-actions` (ui/hud.ts)
@@ -80,10 +81,34 @@ export const STEPS: readonly TutorialStep[] = [
     advanceOn: 'match:finished',
   },
   {
+    id: 'news',
+    text:
+      'News keeps results, warnings and decision cards. A card waits two weeks ' +
+      'for your answer, then takes its default; the badge counts what needs you.',
+    anchor: '.nrl-nav .nrl-btn[data-screen="news"]',
+    advanceOn: 'next-button',
+  },
+  {
+    id: 'finance',
+    text:
+      'Finance shows where the money comes from and goes: gates, wages, upkeep, ' +
+      "the runway, and the board's goals for the season.",
+    anchor: '.nrl-nav .nrl-btn[data-screen="finance"]',
+    advanceOn: 'next-button',
+  },
+  {
+    id: 'contracts',
+    text:
+      'Contracts lists every deal by expiry. Renew early before a player walks, ' +
+      'or sell for a fee. Tap any player card for his page.',
+    anchor: '.nrl-nav .nrl-btn[data-screen="contracts"]',
+    advanceOn: 'next-button',
+  },
+  {
     id: 'wrap',
     text:
       "That's the loop! Keep an eye on your money up top and your position on " +
-      'the ladder. Good luck, coach.',
+      'the ladder. The ? button opens the Guide any time. Good luck, coach.',
     anchor: null,
     advanceOn: 'next-button',
   },
@@ -382,8 +407,8 @@ const TUTORIAL_CSS = `
 }
 `;
 
-// REPLAY (orchestrator wiring): the settings popup (fx/audio.ts, WU-13) adds a
-// "Replay tutorial" button whose onClick calls startTutorial(true). Import:
+// REPLAY (orchestrator wiring): the Guide's footer (ui/guide/guide.ts, under
+// "?") has a "Replay tutorial" button whose onClick calls startTutorial(true):
 //   import { startTutorial } from '../ui/tutorial';
 // Auto-start (main.ts, after createNewGame/loadState): call `startTutorial();`
 // (no force) — it self-guards on settings.tutorialDone.
