@@ -1,57 +1,22 @@
-// src/systems/league.ts — season-rollover league dynamics: seeded rival strength
-// drift and reputation movement from the player's results. Pure TypeScript, no
-// Phaser, no store access: fixtures.ts' season hook owns the wiring and the
-// notification. No new GameState fields — both effects write existing ones
-// (RivalClub.strength, GameState.reputation).
+// src/systems/league.ts — season-rollover league dynamics: the strength band,
+// the rival movers summary and reputation movement from the player's results.
+// Pure TypeScript, no Phaser, no store access: fixtures.ts' season hook owns the
+// wiring and the notification. Rival strength itself now follows each rival's
+// squad (systems/rivals.ts, #74) instead of a random walk.
 
 import type { RivalClub } from '../core/state';
-import type { Rng } from '../utils/rng';
 
-// ── Rival drift tuning ───────────────────────────────────────────────────────
+// ── Rival strength band ──────────────────────────────────────────────────────
 
-/** Long-run league average strength rivals are pulled back toward. */
-export const STRENGTH_MEAN = 55;
-/** Hard bounds on a rival's strength. */
+/** Hard bounds on a rival's strength (rivals derive it from their squads, #74). */
 export const STRENGTH_MIN = 30;
 export const STRENGTH_MAX = 90;
-/** Fraction of the gap to the mean closed each season. */
-export const STRENGTH_REVERSION = 0.2;
-/** Random-walk step is uniform in ±STRENGTH_STEP. */
-export const STRENGTH_STEP = 5;
-/** Chance per rival per season of a rise (breakout) or collapse. */
-export const STRENGTH_SHOCK_CHANCE = 0.08;
-/** Size of a breakout / collapse. */
-export const STRENGTH_SHOCK = 10;
 
 export interface StrengthChange {
   clubId: string;
   name: string;
   from: number;
   to: number;
-}
-
-/**
- * Seeded mean-reverting random walk over every rival's strength. The player's
- * club (id 'player') is left alone. Draws exactly 3 numbers per rival, in club
- * order, so the result is deterministic per rng state. Returns NEW club objects.
- */
-export function driftRivalStrengths(
-  clubs: readonly RivalClub[],
-  rng: Rng,
-  playerId = 'player',
-): RivalClub[] {
-  return clubs.map((club) => {
-    if (club.id === playerId) return club;
-    const step = (rng.next() * 2 - 1) * STRENGTH_STEP;
-    const shockRoll = rng.next();
-    const shockDir = rng.next() < 0.5 ? -1 : 1;
-    const shock = shockRoll < STRENGTH_SHOCK_CHANCE ? shockDir * STRENGTH_SHOCK : 0;
-    const pull = (STRENGTH_MEAN - club.strength) * STRENGTH_REVERSION;
-    const strength = Math.round(
-      Math.min(STRENGTH_MAX, Math.max(STRENGTH_MIN, club.strength + pull + step + shock)),
-    );
-    return { ...club, strength };
-  });
 }
 
 /** Clubs whose strength changed, biggest movers first (for the summary toast). */

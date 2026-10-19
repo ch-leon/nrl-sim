@@ -1,0 +1,64 @@
+// src/ui/screens/rivalSquad.ts — read-only view of a rival club's squad, opened
+// from the Ladder (GitHub #74). The rows come from a pure view-model that is
+// unit-tested without the DOM. No Phaser.
+import type { RivalClub } from '../../core/state';
+import { overallRating } from '../../data/player';
+import { ROMAN, TRAITS } from '../../data/traits';
+import { button, closeModal, el, openModal, panel } from '../dom';
+
+export interface RivalSquadRow {
+  id: string;
+  name: string;
+  position: string;
+  age: number;
+  overall: number;
+  traits: string; // e.g. "HIT II · FIN I"
+  injuredWeeks: number;
+}
+
+/** A rival's squad, best players first. Empty when the club has no squad. */
+export function rivalSquadRows(club: RivalClub): RivalSquadRow[] {
+  return (club.squad ?? [])
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      position: p.position,
+      age: p.age,
+      overall: overallRating(p),
+      traits: p.traits.map((t) => `${TRAITS[t.id].short} ${ROMAN[t.level]}`).join(' · '),
+      injuredWeeks: p.injuredWeeks,
+    }))
+    .sort((a, b) => b.overall - a.overall || a.name.localeCompare(b.name));
+}
+
+/** Open the squad dialog for `club` (over the League screen). */
+export function openRivalSquad(club: RivalClub): HTMLElement {
+  const rows = rivalSquadRows(club);
+  const table = el('table', { class: 'nrl-rival-table' });
+  const head = el('tr');
+  for (const h of ['Player', 'Pos', 'Age', 'Ovr', 'Skills']) head.append(el('th', { text: h }));
+  table.append(el('thead', {}, head));
+  const body = el('tbody');
+  for (const r of rows) {
+    const tr = el('tr');
+    tr.append(
+      el('td', { text: r.injuredWeeks > 0 ? `${r.name} (inj ${r.injuredWeeks}w)` : r.name }),
+      el('td', { text: r.position }),
+      el('td', { text: String(r.age) }),
+      el('td', { text: String(r.overall) }),
+      el('td', { class: 'nrl-rival-traits', text: r.traits }),
+    );
+    body.append(tr);
+  }
+  table.append(body);
+  const content = panel(
+    { class: 'nrl-rival-squad' },
+    el('h2', { text: club.name }),
+    el('p', { text: `Strength ${club.strength} · ${rows.length} players` }),
+    rows.length > 0
+      ? el('div', { class: 'nrl-rival-scroll' }, table)
+      : el('p', { text: 'No squad on record.' }),
+    button('Close', () => closeModal()),
+  );
+  return openModal(content, { class: 'nrl-rival-modal' });
+}

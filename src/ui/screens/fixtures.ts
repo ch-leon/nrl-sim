@@ -14,6 +14,7 @@ import { el, panel, button, openModal, closeScreen } from '../dom';
 import { getState, type GameState, type Fixture, type LadderRow, type RivalClub } from '../../core/state';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
 import { SEASON_ROUNDS } from '../../config';
+import { openRivalSquad } from './rivalSquad';
 
 // ── Pure view helpers (unit-tested) ───────────────────────────────────────────
 
@@ -194,14 +195,21 @@ function buildLadderTab(state: GameState): HTMLElement {
       String(r.pos), r.name, String(r.played), String(r.wins), String(r.draws),
       String(r.losses), String(r.pointsFor), String(r.pointsAgainst), diffStr, String(r.points),
     ];
-    for (const c of cells) tr.append(el('td', { text: c }));
+    cells.forEach((c, i) => {
+      const club = i === 1 && !r.isPlayer ? state.league.clubs.find((x) => x.id === r.clubId) : undefined;
+      // A rival's name opens its squad (#74).
+      const cell = club?.squad
+        ? el('td', {}, el('button', { class: 'nrl-ladder-club', text: c, attrs: { type: 'button' }, onClick: () => openRivalSquad(club) }))
+        : el('td', { text: c });
+      tr.append(cell);
+    });
     tbody.append(tr);
   }
   table.append(thead, tbody);
 
   const playerPos = ladderPosition(state, PLAYER_ID);
   if (playerPos > 0) {
-    wrap.append(el('p', { class: 'nrl-ladder-pos', text: `Your position: ${playerPos} of ${rows.length}` }));
+    wrap.append(el('p', { class: 'nrl-ladder-pos', text: `Your position: ${playerPos} of ${rows.length} · tap a club to see its squad` }));
   }
   wrap.append(table);
   return wrap;
