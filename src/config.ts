@@ -30,13 +30,14 @@ export const STAT_MAX = 100;
  * development back toward it. The player's starting squad is generated like a
  * rival's: START_STARS stars for a hero, one first-grader per position around
  * START_FIRST_GRADE (moved by the difficulty's startRating), and depth players
- * START_DEPTH_GAP below, so the best nine lands a couple of points above the
- * rival mean instead of thirteen.
+ * START_DEPTH_GAP below, so on Normal the best nine starts level with the rival
+ * mean (within a point) instead of thirteen above it; #148 moved it down from
+ * two above so an idle club is a mid-table side in its first season.
  */
 export const LEAGUE = {
   MEAN: 55,
   START_STARS: 1,
-  START_FIRST_GRADE: 54,
+  START_FIRST_GRADE: 52,
   START_DEPTH_GAP: 8,
 } as const;
 
@@ -137,7 +138,9 @@ export const CONTRACTS = {
 // when building the opponent's team sheet (matchday.sheetFor). startRating
 // (#140) is added to the starting squad's first-grade and depth targets, in
 // rating points. Normal is 1.0 / 0 everywhere so it plays exactly as before;
-// old saves load as Normal.
+// old saves load as Normal. Hard (#148): half the money, wages ×1.3 and rivals
+// ×1.1, so a managed club has to earn its signings; measured in
+// docs/status/2026-10-league.md.
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 export const DEFAULT_DIFFICULTY: Difficulty = 'normal';
@@ -154,7 +157,7 @@ export interface DifficultyMultipliers {
 export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
   easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalStrength: 0.92, startRating: 4 },
   normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0 },
-  hard: { startingMoney: 0.7, wages: 1.15, injuryRate: 1.4, rivalStrength: 1.08, startRating: -4 },
+  hard: { startingMoney: 0.5, wages: 1.3, injuryRate: 1.4, rivalStrength: 1.1, startRating: -4 },
 };
 
 /** Multipliers for a difficulty; unknown/missing values fall back to Normal. */
