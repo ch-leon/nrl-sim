@@ -45,7 +45,7 @@ export function carrierEdge(atk: ContestStats, def: ContestStats): number {
 }
 
 /** Even-stats, one-on-one, square baseline (design doc §4.1). */
-export const BASE = { bigHit: 0.1, broken: 0.12, fend: 0.07, offload: 0.09, strip: 0.02 };
+export const BASE = { bigHit: 0.1, broken: 0.12, fend: 0.07, offload: 0.12, strip: 0.02 };
 
 /** Probability points traits add to (or take from) each outcome, already scaled by level (§3). */
 export interface ContestMods {

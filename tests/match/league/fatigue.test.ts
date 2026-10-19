@@ -171,7 +171,8 @@ describe('legs and the wrestle in the live sim', () => {
   it('a held tackle is a wrestle: the bar runs down, more men end it sooner, and the tackle comes when he is held', () => {
     const lengths: Record<number, number[]> = { 1: [], 2: [], 3: [] };
     let bad = 0;
-    for (let s = 1; s <= 4; s++) {
+    // Six seeds: an offload ends some wrestles too (Phase 3), and the sample needs 80 plain tackles.
+    for (let s = 1; s <= 6; s++) {
       let start = -1;
       let last: Snapshot['wrestle'];
       play(new LiveSim(sheet('H'), sheet('A'), s), 150, (snap) => {

@@ -126,7 +126,7 @@ export const LIVE = {
   /** A big hit drives the carrier back this far. */
   driveBack: 2.5,
   /** A support runner this close can take an offload. */
-  offloadM: 5,
+  offloadM: 7,
   /** Chance a catcher spills a kick: alone, and with a chaser inside PRESSURE_M (less by Skill). */
   dropChance: 0.06,
   dropPressured: 0.18,
