@@ -153,5 +153,5 @@ export function openKitDesigner(): HTMLElement {
     el('div', { class: 'nrl-kit-actions' }, reset, save),
   );
   render();
-  return openModal(content, { class: 'nrl-kit-modal', screen: true });
+  return openModal(content, { class: 'nrl-kit-modal', screen: true, closeButton: false });
 }

@@ -206,7 +206,7 @@ let openModalEl: HTMLElement | null = null;
  */
 export function openModal(
   content: HTMLElement,
-  opts: { class?: string; screen?: boolean } = {},
+  opts: { class?: string; screen?: boolean; closeButton?: boolean } = {},
 ): HTMLElement {
   ensureStyles();
   const box = el(
@@ -218,6 +218,14 @@ export function openModal(
   box.addEventListener('click', (e) => e.stopPropagation());
 
   if (opts.screen) {
+    // A ✕ in the corner (#195): on a phone a screen's own Close is often below
+    // the fold. Screens with a Close in their header pass closeButton: false.
+    if (opts.closeButton !== false) {
+      const x = button('✕', () => closeScreen(), { class: 'nrl-screen-x' });
+      x.setAttribute('aria-label', 'Close');
+      box.classList.add('nrl-modal-has-x');
+      box.prepend(x);
+    }
     const backdrop = el(
       'div',
       { class: 'nrl-modal-backdrop nrl-screen-backdrop', onClick: () => closeScreen() },
@@ -416,8 +424,9 @@ export const CSS = `
   .nrl-nav .nrl-btn {
     flex: 1 1 0;
     min-width: 0;
-    padding: 0.4rem 0.1rem;
-    font-size: clamp(0.55rem, 1.35vw, 0.85rem);
+    padding: 0.4rem 0.05rem;
+    /* #195: eleven labels at 667px ("Contracts") without an ellipsis. */
+    font-size: clamp(0.5rem, 1.3vw, 0.85rem);
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -465,7 +474,24 @@ export const CSS = `
 .nrl-screen-backdrop .nrl-modal {
   /* Fit inside the region (drop-shadow included) rather than the viewport. */
   max-height: calc(100% - 6px);
+  /* #195: a landscape phone has width to spare and no height; use it. */
+  position: relative;
+  width: min(96vw, 640px);
+  max-width: none;
 }
+.nrl-screen-x {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.nrl-modal-has-x > :not(.nrl-screen-x) > h2:first-child { padding-right: 2.75rem; }
 
 /* ── Toasts (ui:notify) — below the HUD, above screens, under dialogs ─── */
 .nrl-toast-stack {
@@ -481,6 +507,8 @@ export const CSS = `
   align-items: center;
   z-index: 60;
 }
+/* #195: a rollover or a ×4 advance drops a stack of toasts over a phone screen; show the newest three. */
+.nrl-toast-stack .nrl-toast:nth-last-child(n+4) { display: none; }
 .nrl-toast {
   color: #fff;
   border: 3px solid #000;
@@ -495,6 +523,31 @@ export const CSS = `
 .nrl-toast-info { background: #3a6ea5; }
 .nrl-toast-success { background: #2e7d32; }
 .nrl-toast-danger { background: #b03a2e; }
+
+/* ── Update bar (N7, #181): a new build is waiting; never during a match ── */
+.nrl-update-toast {
+  pointer-events: auto;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--nrl-nav-h, 0px) + 0.5rem + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: min(94vw, 440px);
+  background: #e8e0c8;
+  color: #1a1a2e;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+  padding: 0.3rem 0.4rem 0.3rem 0.7rem;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.nrl-update-toast .nrl-btn { flex: 0 0 auto; }
+body.nrl-match-active .nrl-update-toast { display: none; }
 
 /* ── History (season-end / past seasons) ─────────────────────────────── */
 .nrl-history h2 {
@@ -517,6 +570,28 @@ export const CSS = `
 .nrl-history-premiers {
   background: #f4d03f;
 }
+.nrl-history-detail { font-weight: normal; font-size: 0.78rem; margin-top: 0.1rem; }
+.nrl-history-review { margin-top: 0.3rem; padding: 0.25rem 0.6rem; font-size: 0.75rem; } /* 44px min from .nrl-btn (#194) */
+
+/* ── Season review (N7, #190) ──────────────────────────────────────────── */
+.nrl-modal.nrl-review-modal { max-width: min(94vw, 560px); }
+.nrl-season-review { font-size: 0.85rem; }
+.nrl-season-review h2 { margin: 0 0 0.3rem; font-size: 1.1rem; }
+.nrl-review-finish {
+  font-weight: bold;
+  font-size: 1.05rem;
+  background: #f4efe0;
+  border: 2px solid #000;
+  padding: 0.3rem 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.nrl-review-premiers { background: #f4d03f; }
+.nrl-review-line { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.nrl-review-objectives { margin: 0 0 0.2rem 1.1rem; padding: 0; font-size: 0.8rem; }
+.nrl-review-good { color: #1f5f24; }
+.nrl-review-bad { color: #b00020; }
+.nrl-review-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.nrl-review-actions .nrl-btn { flex: 1 1 8rem; }
 
 /* ── Finance (GitHub #39) ────────────────────────────────────────────── */
 .nrl-finance { font-size: 0.85rem; }
@@ -556,6 +631,8 @@ export const CSS = `
 .nrl-finance-table th:first-child,
 .nrl-finance-table td:first-child { text-align: left; }
 .nrl-finance-table td.nrl-finance-neg { color: #b00020; }
+.nrl-finance-pnl-table { width: 100%; }
+.nrl-finance-pnl-net td { font-weight: bold; border-top: 2px solid #000; }
 
 /* ── News inbox (#45) ─────────────────────────────────────────────────── */
 .nrl-nav-badge {
@@ -647,12 +724,72 @@ export const CSS = `
 .nrl-kit-pattern[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
 .nrl-kit-swatch {
   pointer-events: auto;
-  width: 32px; height: 32px;
+  width: 44px; height: 44px; /* #194: a tap target */
   border: 3px solid #555;
   cursor: pointer;
 }
 .nrl-kit-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #000; }
 .nrl-kit-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+/* ── League screen: the next-match card and the form guide (N7, #183) ──── */
+/* A landscape phone has width to spare and no height: let the league use it. */
+.nrl-screen-backdrop .nrl-league-modal { width: min(96vw, 760px); max-width: none; }
+.nrl-league-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+.nrl-league-close { margin-left: auto; }
+.nrl-next-match {
+  background: #fff8e1;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+  padding: 0.4rem 0.6rem;
+  margin: 0 3px 0.6rem 0;
+  font-size: 0.85rem;
+}
+.nrl-next-head { font-weight: bold; margin-bottom: 0.3rem; }
+.nrl-next-label { background: #1a1a2e; color: #f4d03f; padding: 0 0.3rem; margin-right: 0.2rem; }
+.nrl-next-sides { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin-bottom: 0.3rem; }
+.nrl-next-side { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 16rem; min-width: 0; }
+.nrl-next-swatch { flex: 0 0 auto; width: 18px; height: 18px; border: 3px solid; box-sizing: border-box; }
+.nrl-next-side-text { flex: 1 1 auto; min-width: 0; }
+.nrl-next-name { font-weight: bold; }
+.nrl-next-meta { font-size: 0.75rem; color: #555; }
+.nrl-next-line { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.nrl-next-line b { margin-right: 0.3rem; }
+.nrl-form { display: inline-flex; gap: 2px; white-space: nowrap; vertical-align: middle; }
+.nrl-form i {
+  display: inline-block;
+  width: 1.15em;
+  line-height: 1.3;
+  text-align: center;
+  font-style: normal;
+  font-weight: bold;
+  font-size: 0.75rem;
+  color: #fff;
+  border: 1px solid #000;
+}
+.nrl-form-W { background: #2e7d32; }
+.nrl-form-D { background: #7a7a7a; }
+.nrl-form-L { background: #b03a2e; }
+.nrl-form-empty { color: #777; }
+.nrl-ladder-pos { margin: 0 0 0.4rem; font-size: 0.85rem; }
+.nrl-ladder-scroll { overflow-x: auto; }
+.nrl-ladder-table { border-collapse: collapse; font-size: 0.8rem; width: 100%; }
+.nrl-ladder-table th, .nrl-ladder-table td { padding: 0.15rem 0.3rem; text-align: right; white-space: nowrap; }
+.nrl-ladder-table th:nth-child(2), .nrl-ladder-table td:nth-child(2) { text-align: left; }
+.nrl-ladder-table td.nrl-ladder-form { text-align: left; }
+.nrl-ladder-table tr[data-player] { background: #f4d03f; }
+/* Phone polish (#194): on a touch screen a club's name is a 44px target that fills
+   its row; a mouse keeps the compact table. */
+@media (pointer: coarse) {
+  .nrl-ladder-table tbody tr { height: 44px; }
+  .nrl-ladder-table td.nrl-ladder-name { padding-top: 0; padding-bottom: 0; }
+  .nrl-ladder-name .nrl-ladder-club { display: flex; align-items: center; min-height: 44px; width: 100%; }
+}
+/* The next-match card's opponent: the same text link, with a 44px hit area (#194). */
+.nrl-next-side .nrl-ladder-club { padding: 0.9rem 0.25rem; margin: -0.9rem -0.25rem; }
+/* The Fixtures tab's two toggles: a box you can see and hit (#194). */
+.nrl-toggle-box { width: 24px; height: 24px; margin: 0 0.3rem 0 0; flex: 0 0 auto; accent-color: #3a6ea5; }
+.nrl-fixtures-round { margin: 0.6rem 0 0.2rem; font-size: 0.95rem; }
+.nrl-fixtures-round[data-current] { color: #b03a2e; }
+.nrl-fixture[data-player] { font-weight: bold; }
 .nrl-ladder-club {
   pointer-events: auto;
   font: inherit;
@@ -671,6 +808,64 @@ export const CSS = `
 .nrl-rival-table th, .nrl-rival-table td { padding: 0.15rem 0.3rem; text-align: left; white-space: nowrap; }
 .nrl-rival-table thead th { position: sticky; top: 0; background: #e8e0c8; }
 .nrl-rival-traits { font-size: 0.68rem; }
+/* Rows are tap targets for the player page (N7, #185). */
+.nrl-rival-table tbody tr.nrl-rival-row { height: 44px; cursor: pointer; }
+.nrl-rival-table tbody tr.nrl-rival-row:hover, .nrl-rival-table tbody tr.nrl-rival-row:focus-visible { background: #f4d03f; outline: none; }
+
+/* ── Player page (N7, #185) ──────────────────────────────────────────────── */
+.nrl-modal.nrl-player-modal { max-width: min(94vw, 680px); padding: 0.6rem; }
+.nrl-player-panel { padding: 0.5rem 0.7rem; }
+.nrl-player { font-size: 0.82rem; }
+.nrl-player-top { display: flex; gap: 0.6rem; align-items: flex-start; margin-bottom: 0.3rem; }
+.nrl-player-portrait {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 3px solid #000;
+  background: #cfc9b4;
+}
+.nrl-player-id { flex: 1 1 auto; min-width: 0; }
+.nrl-player-name { display: flex; gap: 0.4rem; align-items: baseline; font-weight: bold; font-size: 1.05rem; overflow-wrap: anywhere; }
+.nrl-player-where { font-size: 0.75rem; color: #555; }
+.nrl-player-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.2rem 1rem; }
+.nrl-player h3 { margin: 0.4rem 0 0.15rem; font-size: 0.82rem; border-bottom: 2px solid #b8ae92; }
+.nrl-player-stats .nrl-statrow { grid-template-columns: 4.6rem 1fr 1.8rem; }
+.nrl-player-trait { margin: 0.1rem 0; overflow-wrap: anywhere; }
+.nrl-player-trait b { margin-right: 0.3rem; }
+.nrl-player-trait-bad b { color: #8a3a00; }
+.nrl-player-line { margin: 0.1rem 0; overflow-wrap: anywhere; }
+.nrl-player-expiring { color: #b00020; }
+.nrl-player-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.nrl-player-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
+.nrl-player-actions .nrl-player-close { flex: 1 1 100%; }
+.nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
+/* ── Guide under "?" (N7, #188) ─────────────────────────────────────────── */
+.nrl-screen-backdrop .nrl-guide-modal { width: min(96vw, 760px); max-width: none; }
+.nrl-guide { font-size: 0.85rem; }
+.nrl-guide-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+.nrl-guide-tabs .nrl-btn { flex: 1 1 auto; font-size: clamp(0.6rem, 1.7vw, 0.85rem); padding: 0.4rem 0.45rem; }
+.nrl-guide-tabs .nrl-btn[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
+.nrl-guide h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+.nrl-guide h3 { margin: 0.5rem 0 0.15rem; font-size: 0.88rem; border-bottom: 2px solid #b8ae92; }
+.nrl-guide p { margin: 0.2rem 0; overflow-wrap: anywhere; }
+.nrl-guide ul { margin: 0.2rem 0 0.2rem 1.1rem; padding: 0; }
+.nrl-guide li { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.nrl-guide-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 2px solid #b8ae92;
+}
+.nrl-guide-build { flex: 1 1 auto; font-size: 0.75rem; color: #555; }
+.nrl-guide-update { background: #7ec850; }
+.nrl-card-open { cursor: pointer; }
+.nrl-card-open:focus-visible { outline: 3px solid #3a6ea5; }
+.nrl-card-more { color: #555; font-weight: bold; font-size: 1.1rem; line-height: 1; }
 .nrl-placebar-text { flex: 1 1 auto; }
 .nrl-placebar-cancel { flex: 0 0 auto; }
 `;

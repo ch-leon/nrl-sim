@@ -12,7 +12,7 @@ import { createNav } from './ui/nav';
 import { closeModal, closeScreen, ensureStyles } from './ui/dom';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
 import { registerTrainingSystem } from './systems/training';
-import { registerEconomySystem } from './systems/economy';
+import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
 import { registerPlayerMatchSystem } from './systems/matchday';
 import { registerAgingSystem } from './systems/aging';
@@ -28,6 +28,7 @@ import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
 import { syncKitDesign } from './ui/screens/kit';
 import { openSquadScreen } from './ui/screens/squad';
+import { openLineupScreen } from './ui/screens/lineup';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
@@ -38,6 +39,7 @@ import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard } from './ui/orientation';
 import { startTutorial } from './ui/tutorial';
+import { openGuideScreen } from './ui/guide/guide';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
 import { bootLab } from './match/lab/boot';
@@ -130,6 +132,7 @@ async function boot(): Promise<void> {
   // matches (player + rivals) → ladder → free agents → autosave.
   registerTrainingSystem();
   registerEconomySystem();
+  registerFinanceSystem(); // the club's books by season (#172)
   registerFixturesSystem();
   registerPlayerMatchSystem();
   registerFreeAgencySystem();
@@ -176,6 +179,7 @@ async function boot(): Promise<void> {
 
   const nav = createNav();
   nav.registerScreen('squad', 'Squad', () => openSquadScreen());
+  nav.registerScreen('lineup', 'Lineup', () => openLineupScreen()); // the coach's nine (#69)
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen());
   nav.registerScreen('build', 'Build', () => openBuildScreen());
   nav.registerScreen('fixtures', 'Fixtures', () => openFixturesScreen());
@@ -189,7 +193,7 @@ async function boot(): Promise<void> {
   newsInbox.onChange(refreshNewsBadge);
   bus.on('state:changed', refreshNewsBadge);
   refreshNewsBadge();
-  nav.registerScreen('help', '?', () => startTutorial(true));
+  nav.registerScreen('help', '?', () => openGuideScreen()); // the Guide (#188); Replay tutorial is in its footer
 
   initAudio();
   initAudioUi();

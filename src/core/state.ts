@@ -7,6 +7,7 @@ import { makeRng } from '../utils/rng';
 import { generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
 import { BOARD, LEAGUE, STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
+import { autoPick } from '../systems/lineup';
 
 // ── §4 domain types (canonical definitions live here) ──────────────────────
 
@@ -25,7 +26,7 @@ export interface PlayerStats {
 }
 
 /** Event-derived individual tallies (GitHub #46). */
-export interface StatTally { games: number; tries: number; tackles: number; lineBreaks: number }
+export interface StatTally { games: number; tries: number; tackles: number; lineBreaks: number; sinBins?: number }
 
 export interface Player {
   id: string; // seeded deterministic id (no crypto)
@@ -86,7 +87,61 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 12;
+
+/**
+ * The coach's team selection (GitHub #69, systems/lineup.ts): nine starters by
+ * formation slot (LINEUP_SLOTS order; null = nobody picked), the interchange
+ * bench (up to BENCH.size squad ids, in order) and how hard it is rotated
+ * (BAK-207 2b). Matchday resolves it against the squad on the day: an injured
+ * starter is covered for the match, a man who has left the club is replaced.
+ */
+export interface Lineup {
+  starters: (string | null)[];
+  bench: string[];
+  rotation: import('../match/league/bench').Rotation;
+}
+
+/**
+ * The lines of the club's books (N6, #172): where the money comes from and
+ * where it goes. Every ledger reason maps to one (systems/economy.ts
+ * classifyReason); anything new lands in `other` so it shows rather than vanishes.
+ */
+export const FINANCE_LINES = [
+  'wages', 'upkeep', 'sponsor', 'grant', 'gate', 'prize', 'boardGrant', 'events', 'transfers', 'contracts', 'facilities', 'other',
+] as const;
+export type FinanceLine = (typeof FINANCE_LINES)[number];
+
+/** One season's money by line: Σ money:changed deltas, negative = spent (#172). */
+export type SeasonFinance = { season: number } & Record<FinanceLine, number>;
+
+/** A season's books with nothing booked yet. */
+export function emptyFinance(season: number): SeasonFinance {
+  return { season, ...(Object.fromEntries(FINANCE_LINES.map((l) => [l, 0])) as Record<FinanceLine, number>) };
+}
+
+/**
+ * What the season review shows (N7, #190): stamped on the SeasonRecord at the
+ * rollover by the review's season hook (ui/screens/seasonReview.ts) from what
+ * the other hooks left behind, so History can reopen it. Every part is optional:
+ * records from before v12 have none, and a part is left out when there was
+ * nothing to say.
+ */
+export interface SeasonReview {
+  /** Player-of-the-match awards to the club this season, and who took most. */
+  potm?: { total: number; best?: { name: string; count: number } };
+  /** The board's verdict as it stood before the new season's objectives were set. */
+  board?: { met: number; missed: number; patience: number; sacked: boolean; objectives: { text: string; met: boolean }[] };
+  /** The season's books: everything that came in and everything that went out. */
+  money?: { in: number; out: number };
+  /** The club's retirements at this rollover, at the age they went. */
+  retired?: { name: string; age: number }[];
+  /** Academy prospects put in the pool for the new season. */
+  juniors?: number;
+  /** The rivals whose strength moved most at the rollover. */
+  movers?: { name: string; from: number; to: number }[];
+  reputation?: { from: number; to: number };
+}
 
 /** One completed season. The extended fields are optional for pre-v4 entries. */
 export interface SeasonRecord {
@@ -94,7 +149,12 @@ export interface SeasonRecord {
   wins?: number; losses?: number; draws?: number;
   pointsFor?: number; pointsAgainst?: number;
   topScorer?: { name: string; tries: number };
+  /** The season review (v12+, #190). */
+  review?: SeasonReview;
 }
+
+/** Player-of-the-match awards to the club's players this season, by name (#190). */
+export interface PotmTally { season: number; counts: Record<string, number> }
 
 /** A season goal set by the board (GitHub #47). `target`'s meaning depends on `kind`. */
 export type ObjectiveKind = 'finals' | 'solvent' | 'beatRival' | 'build';
@@ -171,6 +231,17 @@ export interface GameState {
   eventDeck: EventDeckState; // random events (#75)
   /** The player's kit design (#79). Absent = the look derived from the club colours. */
   kit?: import('../art/match/kit').KitDesign;
+  /**
+   * The club's books by season (#172), oldest first, kept by
+   * systems/economy.ts registerFinanceSystem: a season's entry opens on its first
+   * money movement, and the rollover's prize money and board grant close the season
+   * just played.
+   */
+  finance: SeasonFinance[];
+  /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
+  lineup: Lineup;
+  /** Player-of-the-match awards this season (#190), kept by the full-time card; absent until the first. */
+  potmTally?: PotmTally;
   rngSeed: number; // advanced state of the seeded RNG
 }
 
@@ -265,6 +336,9 @@ export function createNewGame(
     boardPatience: BOARD.START_PATIENCE,
     objectives: [],
     eventDeck: newEventDeck(seed),
+    finance: [emptyFinance(1)],
+    // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
+    lineup: autoPick(squad),
     rngSeed: rng.state(),
   };
 

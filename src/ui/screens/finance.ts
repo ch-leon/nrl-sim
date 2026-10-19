@@ -5,8 +5,8 @@
 // the DOM; the DOM part only renders it. No Phaser.
 
 import { bus } from '../../core/events';
-import { getState, type GameState } from '../../core/state';
-import { weeklyWages, weeklyUpkeep, weeklyIncome, groundCapacity, homeGate } from '../../systems/economy';
+import { getState, FINANCE_LINES, type FinanceLine, type GameState, type SeasonFinance } from '../../core/state';
+import { weeklyWages, weeklyUpkeep, weeklyIncome, sponsorIncome, groundCapacity, homeGate, financeNet } from '../../systems/economy';
 import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { buildObjectivesSection } from './board';
 import { el, panel, button, openModal, closeScreen } from '../dom';
@@ -68,8 +68,7 @@ export function financeSummary(state: GameState): FinanceSummary {
   const wagesWeekly = weeklyWages(state);
   const upkeepWeekly = weeklyUpkeep(state);
   const incomeWeekly = weeklyIncome(state);
-  // Sponsor is the only term that doesn't depend on reputation.
-  const sponsorWeekly = weeklyIncome({ ...state, reputation: 0 });
+  const sponsorWeekly = sponsorIncome(state);
   const grantWeekly = incomeWeekly - sponsorWeekly;
 
   const nextFixture = state.league.fixtures
@@ -150,7 +149,7 @@ export interface LedgerWeek {
 /**
  * Keeps the last `maxWeeks` weeks of money movements. Feed it money:changed
  * deltas with the season/week they happened in. Reasons match the labels that
- * applyEconomy passes to earnMoney ('wages', 'upkeep', 'sponsor+grant', 'gate').
+ * applyEconomy passes to earnMoney ('wages', 'upkeep', 'sponsor', 'grant', 'gate').
  */
 export class FinanceLedger {
   private weeks: LedgerWeek[] = []; // oldest → newest
@@ -169,7 +168,7 @@ export class FinanceLedger {
     }
     if (reason === 'wages') row.wages += delta;
     else if (reason === 'upkeep') row.upkeep += delta;
-    else if (reason === 'sponsor+grant') row.income += delta;
+    else if (reason === 'sponsor' || reason === 'grant' || reason === 'sponsor+grant') row.income += delta;
     else if (reason === 'gate') row.gate += delta;
     else row.other += delta;
     row.net += delta;
@@ -197,6 +196,59 @@ export function initFinanceLedger(ledger: FinanceLedger = financeLedger): () => 
     const { season, week } = getState();
     ledger.record({ delta, reason, season, week });
   });
+}
+
+// ── Season P&L (N6, #172) ───────────────────────────────────────────────────────
+
+/** What each line of the books is called on the screen. */
+export const FINANCE_LINE_LABELS: Record<FinanceLine, string> = {
+  wages: 'Wages', upkeep: 'Upkeep', sponsor: 'Sponsor', grant: 'Grant', gate: 'Gates', prize: 'Prize money',
+  boardGrant: 'Board grants', events: 'Events', transfers: 'Transfers', contracts: 'Contracts', facilities: 'Facilities', other: 'Other',
+};
+
+export interface PnlRow {
+  line: FinanceLine;
+  label: string;
+  thisSeason: number;
+  /** null when there is no last season on the books. */
+  lastSeason: number | null;
+}
+
+export interface SeasonPnl {
+  season: number;
+  lastSeason: number | null;
+  /** Lines with money on them in either season, biggest this season first. */
+  rows: PnlRow[];
+  net: number;
+  lastNet: number | null;
+}
+
+/**
+ * This season's books against last season's (state.finance), biggest lines
+ * first. "This season" is state.season's entry; before its first movement (the
+ * moment after a rollover) the latest entry stands in, so the season just closed
+ * shows until the new one is booked. Pure.
+ */
+export function seasonPnl(state: GameState): SeasonPnl {
+  const open: SeasonFinance | undefined = state.finance.find((e) => e.season === state.season) ?? state.finance[state.finance.length - 1];
+  const season = open?.season ?? state.season;
+  const last = state.finance.find((e) => e.season === season - 1);
+  const rows = FINANCE_LINES
+    .map((line): PnlRow => ({ line, label: FINANCE_LINE_LABELS[line], thisSeason: open?.[line] ?? 0, lastSeason: last ? last[line] : null }))
+    .filter((r) => r.thisSeason !== 0 || (r.lastSeason ?? 0) !== 0)
+    .sort((a, b) => Math.abs(b.thisSeason) - Math.abs(a.thisSeason) || Math.abs(b.lastSeason ?? 0) - Math.abs(a.lastSeason ?? 0));
+  return {
+    season,
+    lastSeason: last ? last.season : null,
+    rows,
+    net: open ? financeNet(stripSeason(open)) : 0,
+    lastNet: last ? financeNet(stripSeason(last)) : null,
+  };
+}
+
+function stripSeason(f: SeasonFinance): Record<FinanceLine, number> {
+  const { season: _s, ...lines } = f;
+  return lines;
 }
 
 // ── Formatting ─────────────────────────────────────────────────────────────────
@@ -242,6 +294,35 @@ function statRow(label: string, value: string, neg = false): HTMLElement {
   );
 }
 
+/** The season P&L panel: this season v last, biggest lines first, a net row at the foot (#172). */
+function buildSeasonPnl(state: GameState): HTMLElement {
+  const pnl = seasonPnl(state);
+  const box = el('div', { class: 'nrl-finance-pnl' });
+  box.append(el('h3', { text: `Season P&L · S${pnl.season}${pnl.lastSeason !== null ? ` v S${pnl.lastSeason}` : ''}` }));
+  if (pnl.rows.length === 0) {
+    box.append(el('p', { text: 'Nothing booked yet this season. Advance a week to see the books.' }));
+    return box;
+  }
+  const table = el('table', { class: 'nrl-finance-table nrl-finance-pnl-table' });
+  const head = el('tr');
+  for (const h of ['', `S${pnl.season}`, pnl.lastSeason !== null ? `S${pnl.lastSeason}` : 'Last']) head.append(el('th', { text: h }));
+  table.append(el('thead', {}, head));
+  const tbody = el('tbody');
+  const cell = (v: number | null): HTMLElement => {
+    const td = el('td', { text: v === null ? '—' : fmtMoneyCompact(v) });
+    if (v !== null && v < 0) td.classList.add('nrl-finance-neg');
+    return td;
+  };
+  for (const r of pnl.rows) {
+    tbody.append(el('tr', {}, el('td', { text: r.label }), cell(r.thisSeason), cell(r.lastSeason)));
+  }
+  const net = el('tr', { class: 'nrl-finance-pnl-net' }, el('td', { text: 'Net' }), cell(pnl.net), cell(pnl.lastNet));
+  tbody.append(net);
+  table.append(tbody);
+  box.append(el('div', { class: 'nrl-finance-scroll' }, table));
+  return box;
+}
+
 /** Build the screen body from the current state and ledger rows. */
 function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLElement[] {
   const s = financeSummary(state);
@@ -263,6 +344,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
     statRow('Crowd', s.nextHome ? fmtCrowd(s.nextHome) : `${groundCapacity(state).toLocaleString('en-US')} seats`),
   );
   nodes.push(panel({ class: 'nrl-finance-panel' }, weekly));
+  nodes.push(panel({ class: 'nrl-finance-panel' }, buildSeasonPnl(state)));
   nodes.push(buildObjectivesSection(state));
 
   const expiring = el('div', { class: 'nrl-finance-expiring' });

@@ -16,6 +16,7 @@ import { runMatch } from '../match/league/match';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { ON_FIELD } from '../config';
+import { autoPick, describeFills, resolveLineup } from './lineup';
 
 /**
  * Apply sim-emitted injuries onto the player squad (by id, then name) and
@@ -55,21 +56,30 @@ function sheetFor(clubId: string): TeamSheet {
   const state = getState();
   if (clubId === PLAYER_ID) {
     const entry = state.league.clubs.find((c) => c.id === PLAYER_ID);
+    // The coach's lineup (#69), resolved for today: an injured starter is covered
+    // for this match and the news says by whom; a man who has left the club is
+    // replaced in the saved lineup as well.
+    const picked = resolveLineup(state.lineup ?? autoPick(state.squad), state.squad);
+    if (picked.changed) setState({ lineup: picked.lineup });
+    if (picked.fills.length > 0) bus.emit('ui:notify', { text: describeFills(picked.fills), kind: 'info' });
     return teamSheetFromSquad(
       state.squad,
       PLAYER_ID,
       state.clubName,
       entry?.colors ?? DEFAULT_PLAYER_COLORS,
+      picked,
     );
   }
   const rival = state.league.clubs.find((c) => c.id === clubId);
   if (!rival) throw new Error(`unknown club ${clubId}`);
   // Rivals with a squad (#74) field their own players through the same sheet
-  // builder as the player's club; difficulty scales the aggregates. Too few fit
-  // players (or an old rival with none) falls back to the strength-based sheet.
+  // builder as the player's club: their coach auto-picks his nine by slot with
+  // the same positional fit (#69), so both sides pay for a man out of position.
+  // Difficulty scales the aggregates. Too few fit players (or an old rival with
+  // none) falls back to the strength-based sheet.
   const fit = (rival.squad ?? []).filter((p) => p.injuredWeeks <= 0);
   if (fit.length >= ON_FIELD) {
-    return scaleSheet(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors), state.settings.difficulty);
+    return scaleSheet(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), state.settings.difficulty);
   }
   return teamSheetFromRival(scaleRivalStrength(rival, state.settings.difficulty));
 }

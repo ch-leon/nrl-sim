@@ -87,10 +87,10 @@ if (summary.length) {
 if (summary.length) {
   const ks = (n: number): string => (Math.abs(n) < 500 ? '0' : `${n < 0 ? '-' : '+'}${Math.round(Math.abs(n) / 1000)}k`);
   const cols: readonly [FinanceLine, string][] = [
-    ['wages', 'wages'], ['sponsorGrant', 'spons+gr'], ['gate', 'gates'], ['prize', 'prize'], ['boardGrant', 'board'],
-    ['events', 'events'], ['transfers', 'transfers'], ['contracts', 'contracts'], ['facilities', 'facilities'], ['upkeep', 'upkeep'], ['other', 'other'],
+    ['wages', 'wages'], ['upkeep', 'upkeep'], ['sponsor', 'sponsor'], ['grant', 'grant'], ['gate', 'gates'], ['prize', 'prize'], ['boardGrant', 'board'],
+    ['events', 'events'], ['transfers', 'transfers'], ['contracts', 'contracts'], ['facilities', 'facilities'], ['other', 'other'],
   ];
-  console.log(`\nSeason P&L, averaged over ${seeds} seeds ($k a season; negative = spent). spons+gr = Sponsor Board + reputation grant, board = objective grants, transfers = signing fees and sales, contracts = renewals and releases, facilities = build / upgrade / move / demolish. Net = Σ lines; money = the balance at the rollover.`);
+  console.log(`\nSeason P&L, averaged over ${seeds} seeds ($k a season; negative = spent). sponsor = Sponsor Board, grant = the reputation grant, board = objective grants, transfers = signing fees and sales, contracts = renewals and releases, facilities = build / upgrade / move / demolish. Net = Σ lines; money = the balance at the rollover.`);
   console.log(`${pad('mode', 9)} ${pad('season', 6)} ${cols.map(([, h]) => pad(h, 10)).join(' ')} ${pad('net', 7)} ${pad('money', 7)}`);
   for (const s of summary) {
     console.log([

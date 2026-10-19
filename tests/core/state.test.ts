@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createNewGame, SAVE_VERSION, getState, setState, loadState, resetForNewSeason,
-  type GameState,
+  type GameState, emptyFinance,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { LEAGUE, ON_FIELD, STARTING_MONEY } from '../../src/config';
@@ -25,6 +25,7 @@ describe('createNewGame', () => {
     expect(s.season).toBe(1);
     expect(s.facilities).toEqual([]);
     expect(s.version).toBe(SAVE_VERSION);
+    expect(s.finance).toEqual([emptyFinance(1)]); // the books open on season 1 (#172)
     expect(s.clubId).toBe('player');
     expect(s.league).toEqual({ clubs: [], fixtures: [], ladder: [] });
     expect(s.settings).toEqual({ muted: false, volume: 0.8, tutorialDone: false, difficulty: 'normal' });

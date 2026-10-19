@@ -11,10 +11,12 @@
 // injectable abstraction so Node-env unit tests can pass a Map-backed fake.
 
 import type { GameState } from './state';
-import { getState, SAVE_VERSION } from './state';
+import { emptyFinance, getState, SAVE_VERSION } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
+import { autoPick } from '../systems/lineup';
 import { bus } from './events';
+import { buildLabel } from '../ui/buildInfo';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
   PLAYER_SECONDARY_COLORS, isValidColorPair, type Difficulty,
@@ -176,6 +178,17 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v8 → v9: optional GameState.kit (GitHub #79). Old saves have no design, which
   // keeps the look derived from their club colours, so nothing is filled in.
   { from: 8, to: 9, run: (old) => ({ ...old }) },
+  // v9 → v10: GameState.finance, the club's books by season (N6, #172). An old
+  // save starts with nothing booked for the season it is in.
+  { from: 9, to: 10, run: (old) => ({ ...old, finance: [emptyFinance(typeof old.season === 'number' ? old.season : 1)] }) },
+  // v10 → v11: GameState.lineup, the coach's nine and bench (GitHub #69). An old
+  // save gets today's auto pick: the side teamSheetFromSquad was already fielding.
+  { from: 10, to: 11, run: (old) => ({ ...old, lineup: old.lineup ?? autoPick(Array.isArray(old.squad) ? (old.squad as GameState['squad']) : []) }) },
+  // v11 → v12: the season review (N7, #190): SeasonRecord.review and the
+  // player-of-the-match tally, GameState.potmTally. Both optional, so an old
+  // save's past seasons simply have no review to reopen and the tally starts
+  // with the next award; nothing is filled in.
+  { from: 11, to: 12, run: (old) => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */
@@ -558,6 +571,21 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
     const list = document.createElement('div');
     list.style.cssText = 'display:flex;flex-direction:column;gap:12px;min-width:320px;';
     overlay.appendChild(list);
+
+    // Which build this is (N7, #181): the date and short SHA stamped at build
+    // time, so a phone on the Pages deploy can say what it is testing. Pinned to
+    // the corner of the viewport: the overlay scrolls on a landscape phone and
+    // its footer sits below the fold. (The footer stays the overlay's last child:
+    // its auto margin centres short content.)
+    const build = document.createElement('div');
+    build.setAttribute('data-nrl-build', '');
+    build.textContent = `Build ${buildLabel()}`;
+    build.style.cssText = [
+      'position:fixed', 'right:calc(8px + env(safe-area-inset-right, 0px))',
+      'bottom:calc(6px + env(safe-area-inset-bottom, 0px))', 'pointer-events:none',
+      'color:#8a8aa0', 'font-size:12px',
+    ].join(';');
+    overlay.appendChild(build);
 
     const footer = document.createElement('div');
     footer.style.cssText = 'display:flex;flex-direction:column;gap:6px;align-items:center;margin-bottom:auto;';

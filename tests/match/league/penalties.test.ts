@@ -62,7 +62,8 @@ describe('penalties and six-again in the live sim', () => {
       seen.forEach(({ e, snap }, i) => {
         if (e.kind !== 'penalty' || snap.clock!.siren) return;
         expect(e.text).toMatch(/^Penalty to /);
-        const call = seen[i + 1]!.e;
+        // A sin bin (#71) can come between the penalty and the call.
+        const call = seen.slice(i + 1).find((x) => x.e.kind !== 'sin-bin')!.e;
         expect(call.kind).toBe('penalty-choice');
         calls.add(call.detail!);
         // What comes next follows the call.

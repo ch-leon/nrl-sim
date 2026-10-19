@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, homeGate, recentForm, tickContracts,
-  handleBankruptcy, applyEconomy, registerEconomySystem,
+  handleBankruptcy, applyEconomy, registerEconomySystem, registerFinanceSystem, financeNet, classifyReason,
 } from '../../src/systems/economy';
+import { emptyFinance, setState } from '../../src/core/state';
+import { earnMoney, spendMoney } from '../../src/data/club';
 import { FACILITY_CATALOG, facilityUpkeep } from '../../src/data/facility';
 import { renewalWage } from '../../src/systems/contracts';
 import {
@@ -10,7 +12,7 @@ import {
   type Player, type PlacedFacility, type GameState, type Fixture,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { ECON, SQUAD_MIN } from '../../src/config';
+import { CONTRACTS, ECON, SQUAD_MIN } from '../../src/config';
 import { clearTickHooks, advanceWeek, TICK_ORDER } from '../../src/core/time';
 
 // A player with fully controlled economic fields.
@@ -81,18 +83,19 @@ describe('weeklyUpkeep (N6, #164)', () => {
 describe('weeklyIncome', () => {
   it('rep grant only when no sponsor board', () => {
     setup({ reputation: 30, facilities: [] });
-    // 50 × 30 = 1500
-    expect(weeklyIncome(getState())).toBe(1500);
+    // 40 × 30 = 1200 (#176)
+    expect(weeklyIncome(getState())).toBe(30 * ECON.REP_GRANT_PER_POINT);
+    expect(ECON.REP_GRANT_PER_POINT).toBe(40);
   });
   it('sponsor board adds 3000 × level', () => {
     setup({ reputation: 30, facilities: [pf('sponsorBoard', 2)] });
-    // 3000×2 + 50×30 = 6000 + 1500 = 7500
-    expect(weeklyIncome(getState())).toBe(7500);
+    // 3000×2 + 40×30 = 6000 + 1200 = 7200
+    expect(weeklyIncome(getState())).toBe(6000 + 30 * ECON.REP_GRANT_PER_POINT);
   });
   it('sponsor income is 0 without a board (only rep grant)', () => {
     setup({ reputation: 10, facilities: [pf('grandstand', 3)] });
-    // grandstand is not a sponsor board → sponsor part 0; 50×10 = 500
-    expect(weeklyIncome(getState())).toBe(500);
+    // grandstand is not a sponsor board → sponsor part 0; 40×10 = 400
+    expect(weeklyIncome(getState())).toBe(10 * ECON.REP_GRANT_PER_POINT);
   });
 });
 
@@ -128,10 +131,11 @@ describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
       week: 3, reputation: 30, facilities: [],
       league: { clubs: [], fixtures: [homeFixture(3)], ladder: [] },
     });
-    // demand = 300 + 30×30 = 1,200 (under the hill's 2,000) ; gate = 1,200 × 20 = 24,000
-    expect(gateReceipts(getState())).toBe(24_000);
+    // demand = 300 + 30×30 = 1,200 (under the hill's 2,000) ; gate = 1,200 × $18 = 21,600
+    expect(gateReceipts(getState())).toBe(1200 * ECON.TICKET_PRICE);
+    expect(ECON.TICKET_PRICE).toBe(18);
     const g = homeGate(getState(), homeFixture(3));
-    expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 24_000, soldOut: false });
+    expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 21_600, soldOut: false });
   });
 
   it('the hill holds 2,000: a famous club sells out, and a Grandstand lifts the roof', () => {
@@ -140,11 +144,11 @@ describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
       return homeGate(getState(), homeFixture(3));
     };
     // demand = 300 + 100×30 = 3,300
-    expect(at([])).toEqual({ capacity: 2000, demand: 3300, attendance: 2000, receipts: 40_000, soldOut: true });
-    expect(at([pf('grandstand', 1)])).toEqual({ capacity: 3500, demand: 3300, attendance: 3300, receipts: 66_000, soldOut: false });
+    expect(at([])).toEqual({ capacity: 2000, demand: 3300, attendance: 2000, receipts: 2000 * ECON.TICKET_PRICE, soldOut: true });
+    expect(at([pf('grandstand', 1)])).toEqual({ capacity: 3500, demand: 3300, attendance: 3300, receipts: 3300 * ECON.TICKET_PRICE, soldOut: false });
     expect(at([pf('grandstand', 2)]).capacity).toBe(5000);
     expect(at([pf('grandstand', 3)]).capacity).toBe(6500);
-    expect(gateReceipts(getState())).toBe(66_000);
+    expect(gateReceipts(getState())).toBe(3300 * ECON.TICKET_PRICE);
   });
 
   it('form moves demand ±25% over the last five results, from the matches before the round', () => {
@@ -175,10 +179,10 @@ describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
     // A home final (round 25).
     setup({ week: 25, reputation: 30, facilities: [], league: { clubs: [], fixtures: [homeFixture(25)], ladder: [] } });
     expect(homeGate(getState(), homeFixture(25)).demand).toBe(1800);
-    expect(gateReceipts(getState())).toBe(36_000);
+    expect(gateReceipts(getState())).toBe(1800 * ECON.TICKET_PRICE);
     // A famous club's home final overflows the hill: the roof is why a finals side wants a stand.
     setup({ week: 25, reputation: 60, facilities: [], league: { clubs: [], fixtures: [homeFixture(25)], ladder: [] } });
-    expect(homeGate(getState(), homeFixture(25))).toEqual({ capacity: 2000, demand: 3150, attendance: 2000, receipts: 40_000, soldOut: true });
+    expect(homeGate(getState(), homeFixture(25))).toEqual({ capacity: 2000, demand: 3150, attendance: 2000, receipts: 2000 * ECON.TICKET_PRICE, soldOut: true });
   });
 });
 
@@ -207,7 +211,7 @@ describe('tickContracts', () => {
   });
 
   it('the ask follows the wage curve and the club, not the old wage (#167)', () => {
-    // overall 100 → $5,650 on the curve; reputation 100 in season 3 → ×1.25 × 1.06.
+    // overall 100 → $5,650 on the curve; reputation 100 in season 3 → ×1.25 × (1 + 2 × the season inflation).
     const elite = mkPlayer({
       id: 'elite', wage: 10000, morale: 50, contractWeeks: 1,
       stats: { speed: 100, strength: 100, stamina: 100, skill: 100, footyIQ: 100 },
@@ -215,7 +219,7 @@ describe('tickContracts', () => {
     setup({ money: 10_000_000, reputation: 100, season: 3, squad: [elite] });
     tickContracts(getState());
     const out = getState().squad.find((x) => x.id === 'elite')!;
-    expect(out.wage).toBe(Math.round(5650 * 1.25 * 1.06));
+    expect(out.wage).toBe(Math.round(5650 * 1.25 * (1 + 2 * CONTRACTS.RENEW_SEASON_INFLATION)));
   });
 
   it('unaffordable expiring player departs to freeAgents with a notify', () => {
@@ -262,7 +266,7 @@ describe('handleBankruptcy', () => {
     const pricey = mkPlayer({ id: 'pricey', wage: 20000 });
     // Squad above SQUAD_MIN so a sale is allowed.
     const filler = Array.from({ length: SQUAD_MIN }, (_, i) => mkPlayer({ id: `f${i}`, wage: 500 }));
-    setup({ money: -60_000, squad: [cheap, pricey, ...filler] });
+    setup({ money: ECON.FORCED_SALE_FLOOR - 10_000, squad: [cheap, pricey, ...filler] });
     const balanceBefore = getState().money;
     handleBankruptcy(getState());
     const s = getState();
@@ -279,7 +283,7 @@ describe('handleBankruptcy', () => {
     const pricey = mkPlayer({ id: 'pricey', wage: 30000, morale: 60 });
     const lowMorale = mkPlayer({ id: 'low', wage: 100, morale: 5 });
     const filler = Array.from({ length: SQUAD_MIN - 1 }, (_, i) => mkPlayer({ id: `f${i}`, wage: 100, morale: 50 }));
-    setup({ money: -60_000, squad: [pricey, lowMorale, ...filler] });
+    setup({ money: ECON.FORCED_SALE_FLOOR - 10_000, squad: [pricey, lowMorale, ...filler] });
     handleBankruptcy(getState());
     const s = getState();
     expect(s.squad.length).toBe(SQUAD_MIN);
@@ -318,9 +322,9 @@ describe('applyEconomy — full weekly loop', () => {
       league: { clubs: [], fixtures: [], ladder: [] },
     });
     applyEconomy(getState());
-    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; income = 3000 + 1500 = +4500 ; no gate (empty league)
-    expect(getState().money).toBe(100_000 - 5000 - 100 + 4500);
-    expect(reasons).toEqual(['wages', 'upkeep', 'sponsor+grant']);
+    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; sponsor 3000 + grant 40×30 = 1200 ; no gate (empty league)
+    expect(getState().money).toBe(100_000 - 5000 - 100 + 3000 + 30 * ECON.REP_GRANT_PER_POINT);
+    expect(reasons).toEqual(['wages', 'upkeep', 'sponsor', 'grant']);
   });
 
   it('pays upkeep after wages, at the facilities\' levels, and skips it with nothing built (#164)', () => {
@@ -351,7 +355,7 @@ describe('applyEconomy — full weekly loop', () => {
       week: 1,
     });
     applyEconomy(getState());
-    // gate = 1,800 × $20 = $36,000 (rep 50; the L3 stand is not needed), wages small, income = rep grant.
+    // gate = 1,800 × $18 = $32,400 (rep 50; the L3 stand is not needed), wages small, income = rep grant.
     // Net well above the floor → no forced sales.
     expect(getState().squad.length).toBe(SQUAD_MIN + 2);
     expect(getState().money).toBeGreaterThan(ECON.FORCED_SALE_FLOOR);
@@ -383,6 +387,99 @@ describe('applyEconomy — full weekly loop', () => {
   });
 });
 
+describe('the club\'s books (N6, #172)', () => {
+  it('books every money movement on its line for the open season', () => {
+    setup({ season: 2, week: 5, money: 100_000, finance: [emptyFinance(1), emptyFinance(2)] });
+    const off = registerFinanceSystem();
+    earnMoney(-5000, 'wages');
+    earnMoney(30_000, 'gate');
+    earnMoney(-800, 'upkeep');
+    earnMoney(15_000, 'board grant');
+    spendMoney(9000, 'build:canteen');
+    earnMoney(2000, 'something new');
+    earnMoney(-1200, 'Merch royalties');
+    off();
+    earnMoney(999, 'gate'); // unsubscribed: not booked
+    const f = getState().finance;
+    expect(f).toHaveLength(2);
+    expect(f[1]).toEqual({ ...emptyFinance(2), wages: -5000, gate: 30_000, upkeep: -800, boardGrant: 15_000, facilities: -9000, other: 2000, events: -1200 });
+    expect(f[0]).toEqual(emptyFinance(1));
+    expect(financeNet(f[1]!)).toBe(-5000 + 30_000 - 800 + 15_000 - 9000 + 2000 - 1200 + 2); // + the season number
+  });
+
+  it('the rollover\'s prize and grant close the season just played; week 1\'s wages open the new one', () => {
+    setup({ season: 1, week: 27, finance: [{ ...emptyFinance(1), wages: -100 }] });
+    const off = registerFinanceSystem();
+    setState({ season: 2, week: 1 }); // the counters bump before the season hooks run…
+    earnMoney(45_000, 'finals prize money'); // …which pay the season just played
+    earnMoney(15_000, 'board grant');
+    earnMoney(-6000, 'wages'); // week 1 of the new season
+    earnMoney(20_000, 'gate');
+    setState({ week: 2 });
+    earnMoney(-6000, 'wages');
+    off();
+    const f = getState().finance;
+    expect(f.map((e) => e.season)).toEqual([1, 2]);
+    expect(f[0]).toEqual({ ...emptyFinance(1), wages: -100, prize: 45_000, boardGrant: 15_000 });
+    expect(f[1]).toEqual({ ...emptyFinance(2), wages: -12_000, gate: 20_000 });
+  });
+
+  it('a save written before the new season was booked loads right: week 1 goes to the new season', () => {
+    // An autosave at the rollover can carry season 2 with only season 1's entry.
+    setup({ season: 2, week: 1, finance: [{ ...emptyFinance(1), gate: 300_000, prize: 15_000 }] });
+    const off = registerFinanceSystem();
+    earnMoney(-6000, 'wages');
+    earnMoney(15_000, 'board grant'); // a grant at week 1 with a previous season on the books closes it…
+    off();
+    const f = getState().finance;
+    expect(f.map((e) => e.season)).toEqual([1, 2]);
+    expect(f[0]!.boardGrant).toBe(15_000);
+    expect(f[1]).toEqual({ ...emptyFinance(2), wages: -6000 });
+    // …but with no previous season on the books it stays in the current one.
+    setup({ season: 1, week: 1, finance: [] });
+    const off2 = registerFinanceSystem();
+    earnMoney(15_000, 'board grant');
+    off2();
+    expect(getState().finance).toEqual([{ ...emptyFinance(1), boardGrant: 15_000 }]);
+  });
+
+  it('a save with no books starts them for its season, and entries stay in season order', () => {
+    setup({ season: 3, finance: [] });
+    const off = registerFinanceSystem();
+    earnMoney(1, 'gate');
+    off();
+    expect(getState().finance).toEqual([{ ...emptyFinance(3), gate: 1 }]);
+    setup({ season: 2, week: 5, finance: [emptyFinance(3)] }); // a stray later entry never moves ahead of the current one
+    const off2 = registerFinanceSystem();
+    earnMoney(1, 'gate');
+    off2();
+    expect(getState().finance.map((e) => e.season)).toEqual([2, 3]);
+  });
+
+  it('through a real week tick the books say what the ledger says', () => {
+    setup({
+      week: 3, money: 100_000, reputation: 30, facilities: [pf('sponsorBoard', 1)],
+      squad: [mkPlayer({ wage: 1000, contractWeeks: 30 })],
+      league: { clubs: [], fixtures: [{ round: 3, homeId: 'player', awayId: 'r' }], ladder: [] },
+      finance: [emptyFinance(1)],
+    });
+    const seen: Record<string, number> = {};
+    bus.on('money:changed', ({ delta, reason }) => { seen[classifyReason(reason)] = (seen[classifyReason(reason)] ?? 0) + delta; });
+    registerEconomySystem();
+    const off = registerFinanceSystem();
+    advanceWeek();
+    off();
+    const books = getState().finance[0]!;
+    expect(books.season).toBe(1);
+    for (const [line, delta] of Object.entries(seen)) expect(books[line as keyof typeof books], line).toBe(delta);
+    expect(books.wages).toBe(-1000);
+    expect(books.upkeep).toBe(-100);
+    expect(books.sponsor).toBe(3000);
+    expect(books.grant).toBe(30 * ECON.REP_GRANT_PER_POINT);
+    expect(books.gate).toBe(1200 * ECON.TICKET_PRICE);
+  });
+});
+
 describe('registerEconomySystem — hook installation', () => {
   it('installs the economy hook at TICK_ORDER.economy (30) and runs on advanceWeek', () => {
     setup({
@@ -394,8 +491,8 @@ describe('registerEconomySystem — hook installation', () => {
     registerEconomySystem();
     expect(TICK_ORDER.economy).toBe(30);
     advanceWeek();
-    // wages -3000 ; income 50×20 = +1000 → 98000
-    expect(getState().money).toBe(100_000 - 3000 + 1000);
+    // wages -3000 ; income 40×20 = +800 → 97800
+    expect(getState().money).toBe(100_000 - 3000 + 20 * ECON.REP_GRANT_PER_POINT);
   });
 
   it('re-registering does not double-apply', () => {
@@ -407,7 +504,7 @@ describe('registerEconomySystem — hook installation', () => {
     registerEconomySystem();
     registerEconomySystem();
     advanceWeek();
-    expect(getState().money).toBe(100_000 - 3000 + 1000); // single application
+    expect(getState().money).toBe(100_000 - 3000 + 20 * ECON.REP_GRANT_PER_POINT); // single application
   });
 });
 

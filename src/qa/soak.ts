@@ -8,14 +8,14 @@
 // tests/fixtures/saves, tests/qa/corpus.test.ts). Used by scripts/soak.ts (npm run
 // soak) and, at a smaller size, by tests/qa/soak.test.ts. Never imported by the
 // game. No Phaser.
-import { createNewGame, getState, loadState, setState, type Fixture, type GameState, type Player } from '../core/state';
+import { createNewGame, FINANCE_LINES, getState, loadState, setState, type FinanceLine, type Fixture, type GameState, type Player } from '../core/state';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../core/time';
 import { bus } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { initLeague, registerFixturesSystem } from '../systems/fixtures';
 import { registerTrainingSystem } from '../systems/training';
-import { homeGate, registerEconomySystem, weeklyIncome, weeklyUpkeep, weeklyWages } from '../systems/economy';
+import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { registerPlayerMatchSystem } from '../systems/matchday';
 import { registerMoraleSystem } from '../systems/morale';
@@ -26,8 +26,9 @@ import { registerBoardSystem } from '../systems/board';
 import { chooseEvent, registerEventsSystem } from '../systems/events';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
+import { BENCH } from '../match/league/bench';
 import { overallRating } from '../data/player';
-import { cardById, EVENT_CARDS } from '../data/events';
+import { cardById } from '../data/events';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDefId } from '../data/facility';
 import { addFacility, spendMoney } from '../data/club';
 
@@ -63,43 +64,18 @@ export interface GapSample {
 }
 
 /**
- * Where the money comes from and goes (N6, #161): every `money:changed` reason
- * the game uses maps to one line. Anything new lands in `other`, so it shows in
- * the P&L instead of vanishing. Negative = spent.
+ * Where the money comes from and goes (N6, #161): the game's own lines
+ * (FINANCE_LINES in core/state.ts, classified by economy.classifyReason), tallied
+ * here independently from money:changed and checked against the books the game
+ * keeps in state.finance (#172). Negative = spent.
  */
-export const FINANCE_LINES = [
-  'wages', 'sponsorGrant', 'gate', 'prize', 'boardGrant', 'events', 'transfers', 'contracts', 'facilities', 'upkeep', 'other',
-] as const;
-export type FinanceLine = (typeof FINANCE_LINES)[number];
+export { FINANCE_LINES, classifyReason };
+export type { FinanceLine };
 /** Σ of the season's money:changed deltas per line. */
 export type FinanceTally = Record<FinanceLine, number>;
 
 export function emptyTally(): FinanceTally {
   return Object.fromEntries(FINANCE_LINES.map((l) => [l, 0])) as FinanceTally;
-}
-
-/** Event modifiers that pay or cost money ('Merch royalties', …) use their label as the ledger reason. */
-const MODIFIER_LABELS = new Set(EVENT_CARDS.flatMap((c) => c.choices.flatMap((ch) => ch.effects.flatMap((e) =>
-  (e.kind === 'modifier' && e.effects.some((x) => x.kind === 'money') ? [e.label] : [])))));
-
-/**
- * The P&L line a ledger reason belongs to. Reasons are the strings each system
- * passes to earnMoney / spendMoney: the economy's fixed words, the board's,
- * `event: <title>` and modifier labels from the deck, and `<verb>:<id>` for
- * signings, sales, renewals, releases and the grounds.
- */
-export function classifyReason(reason: string): FinanceLine {
-  if (reason === 'wages') return 'wages';
-  if (reason === 'sponsor+grant') return 'sponsorGrant';
-  if (reason === 'gate') return 'gate';
-  if (reason === 'upkeep') return 'upkeep';
-  if (reason === 'finals prize money') return 'prize';
-  if (reason === 'board grant') return 'boardGrant';
-  if (reason.startsWith('event: ') || MODIFIER_LABELS.has(reason)) return 'events';
-  if (/^(sign|sell):/.test(reason)) return 'transfers';
-  if (/^(renew|release):/.test(reason)) return 'contracts';
-  if (/^(build|upgrade|move|demolish):/.test(reason)) return 'facilities';
-  return 'other';
 }
 
 /** Σ of every line: the season's net money movement. */
@@ -157,6 +133,7 @@ export function registerAllSystems(): void {
   clearSeasonHooks();
   registerTrainingSystem();
   registerEconomySystem();
+  registerFinanceSystem();
   registerFixturesSystem();
   registerPlayerMatchSystem();
   registerFreeAgencySystem();
@@ -223,6 +200,13 @@ export function checkState(s: GameState): string[] {
   if (s.eventDeck.pending.length > EVENTS.MAX_PENDING) out.push(`too many pending cards: ${s.eventDeck.pending.length}`);
   if (s.eventDeck.modifiers.some((m) => m.weeksLeft <= 0)) out.push('expired modifier kept');
   if (s.reputation < 1 || s.reputation > 100) out.push(`reputation out of range: ${s.reputation}`);
+  // The lineup (#69): nine slots, nobody listed twice (men who have left are cleaned on match day, so they may linger a week).
+  if (!s.lineup || s.lineup.starters.length !== ON_FIELD) out.push(`lineup has ${s.lineup?.starters.length ?? 'no'} slots`);
+  else {
+    const ids = [...s.lineup.starters.filter((id): id is string => id !== null), ...s.lineup.bench];
+    if (new Set(ids).size !== ids.length) out.push('lineup lists a player twice');
+    if (s.lineup.bench.length > BENCH.size) out.push(`lineup bench of ${s.lineup.bench.length}`);
+  }
   return out;
 }
 
@@ -233,6 +217,8 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  if (version < 11) delete out.lineup;
+  if (version < 10) delete out.finance;
   if (version < 9) delete out.kit;
   if (version < 8) raw.league = { ...raw.league, clubs: raw.league.clubs.map(({ squad: _s, ...c }) => c) };
   if (version < 7) delete out.eventDeck;
@@ -418,6 +404,14 @@ export function runSoak(opts: SoakOptions): SoakResult {
   // balance at the rollover so a write that skips the ledger shows up.
   let tally = emptyTally();
   let seasonStartMoney = getState().money;
+  // A save loaded mid-season already has this season's earlier weeks on its books;
+  // the tally starts here, so the check subtracts what was booked before the load.
+  let opening: FinanceTally = emptyTally();
+  {
+    const s0 = getState();
+    const open = s0.finance.find((e) => e.season === s0.season);
+    if (open) for (const l of FINANCE_LINES) opening[l] = open[l];
+  }
   bus.on('money:changed', ({ delta, reason }) => { tally[classifyReason(reason)] += delta; });
   const start = gapSample(getState());
   // The gap at the end of the regular season (after round SEASON_ROUNDS), kept
@@ -459,6 +453,11 @@ export function runSoak(opts: SoakOptions): SoakResult {
         const played = (rec?.wins ?? 0) + (rec?.draws ?? 0) + (rec?.losses ?? 0);
         const moved = s.money - seasonStartMoney;
         if (Math.abs(tallyNet(tally) - moved) > 1) note(`ledger off: tallied ${Math.round(tallyNet(tally))}, balance moved ${Math.round(moved)}`);
+        // The books the game keeps (#172) must say what the tally says, line by line.
+        const books = s.finance.find((e) => e.season === before);
+        if (!books) note(`no books for season ${before}`);
+        else for (const l of FINANCE_LINES) if (Math.abs(books[l] - opening[l] - tally[l]) > 1) note(`books differ from the ledger: ${l} ${Math.round(books[l] - opening[l])} v ${Math.round(tally[l])}`);
+        opening = emptyTally();
         seasons.push({
           season: before,
           money: s.money,

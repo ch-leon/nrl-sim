@@ -118,3 +118,52 @@ Behaviour:
 - Free-agent pool refresh and signing (BAK-179) — this ticket only *pushes*
   departed/sold players into `freeAgents`.
 - UI screen for finances (HUD money display is WU-5 / BAK-163).
+
+## 2026-10 retune (N6: money that matters)
+
+Measured with `npm run soak` and logged in `docs/status/2026-10-economy.md`. The
+spec above is the original loop; this is what changed and why. Every number is
+**Assumed (needs Leon)**.
+
+**Why.** With nothing costing more as the club grew, an idle club went from $200k to
+$1–3M in five seasons: gates rose with reputation, wages were linear in rating and
+fell as the squad aged, and every other line was upside.
+
+**The club's books (#161, #172).** `GameState.finance` keeps one entry a season with
+twelve lines (`FINANCE_LINES` in `core/state.ts`): wages, upkeep, sponsor, grant,
+gate, prize, boardGrant, events, transfers, contracts, facilities, other. Every
+`money:changed` reason maps to a line (`economy.classifyReason`); the Finance screen
+shows this season against last, biggest lines first; the soak checks the books against
+its own tally at every rollover. Save v10.
+
+**Upkeep (#164).** Each facility has an `upkeep` a week at level 1 (1% of its build
+cost; a Grandstand $1,200), ×1.5 at L2 and ×2 at L3, paid after wages with reason
+`upkeep`.
+
+**Wages (#167).** `wageForOverall` in `data/player.ts`: overall × 15 + 100 plus 2 ×
+(points above 55)². 55 $925, 70 $1,600, 85 $3,175. Renewal asks, early and at
+contract end, are the market wage for the player's overall today × morale ×
+`clubWageFactor` (+25% at reputation 100, +4% for every season after the first). The
+rival salary cap is a 20-man squad of 62.5s on the curve ($23,000).
+
+**Gates (#169).** attendance = min(seats, demand); receipts = attendance × $18.
+Seats: the hill 2,000, a Grandstand 3,500 / 5,000 / 6,500. Demand = (300 +
+reputation × 30) × form (last five results, ±25%) × occasion (a top-eight opponent
+×1.2, a home final ×1.5). `homeGate` is the one function the tick and the Finance
+projection share.
+
+**The small lines (#176).** Ticket $18 (was $20); reputation grant $40 a point a week
+(was $50); board grant $10k an objective met (was $15k); the cards' cash offers
+trimmed by about 40% (billboard $5k, merch $7k or $900 a week, clinics $3k, pizza
+$2k a win, food truck $250 a week, the fine $600); prize money unchanged (a finals
+side has earned it); the forced-sale floor −$100k (was −$50k), so the red is a
+warning before a fire sale. Hard: three-quarters of the starting money and wages
+×1.15 (was half and ×1.3; with the roof on gates that went bust in season 1).
+
+**Where it lands (20 seeds, five seasons, the soak's idle and managed managers).**
+Idle Normal is in the red for about four runs in ten by seasons 2–3 and the board
+has sacked half by season 3; the survivors recover as the squad ages into cheaper
+players. Managed Normal grows from about $190k to $370k and ends around $330k with a
+squad of 80s costing $1.2M a season against $1.1M of gates. Idle Hard is bust in
+season 1 and sacked by season 2; managed Hard is a fight for the board's patience,
+in the red half the time. Easy stays comfortable.

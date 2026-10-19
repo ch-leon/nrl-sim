@@ -78,7 +78,10 @@ export type MatchEventKind =
   | 'penalty-goal'
   | 'field-goal'
   | 'half-time'
-  | 'full-time';
+  | 'full-time'
+  // A man sent to the sin bin and his return (#71, the live sim).
+  | 'sin-bin'
+  | 'sin-bin-return';
 
 export interface MatchEvent {
   t: number; // match minute 0-80

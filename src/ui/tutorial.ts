@@ -31,8 +31,9 @@ export interface TutorialStep {
 }
 
 /**
- * The 7 onboarding steps, in order (BAK-202 spec). Anchor selectors reference
- * elements that really exist in the shipped UI:
+ * The onboarding steps, in order (BAK-202 spec; News, Finance and Contracts
+ * added by N7, #188). Anchor selectors reference elements that really exist in
+ * the shipped UI:
  *   - nav buttons carry `data-screen="<id>"` (see ui/nav.ts registerScreen)
  *   - the HUD money tile carries `data-hud="money"` (see ui/hud.ts)
  *   - the Advance Week control is the button inside `.nrl-hud-actions` (ui/hud.ts)
@@ -74,16 +75,40 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'match',
     text:
-      'On match day your team plays out the round. Watch it back, or hit ' +
-      'Next to skip ahead.',
+      'On match day your team plays out the round. Watch it, or tap the ' +
+      "match's Skip to jump to full time.",
     anchor: null,
     advanceOn: 'match:finished',
+  },
+  {
+    id: 'news',
+    text:
+      'News keeps results, warnings and decision cards. A card waits two weeks ' +
+      'for your answer, then takes its default; the badge counts what needs you.',
+    anchor: '.nrl-nav .nrl-btn[data-screen="news"]',
+    advanceOn: 'next-button',
+  },
+  {
+    id: 'finance',
+    text:
+      'Finance shows where the money comes from and goes: gates, wages, upkeep, ' +
+      "the runway, and the board's goals for the season.",
+    anchor: '.nrl-nav .nrl-btn[data-screen="finance"]',
+    advanceOn: 'next-button',
+  },
+  {
+    id: 'contracts',
+    text:
+      'Contracts lists every deal by expiry. Renew early before a player walks, ' +
+      'or sell for a fee. Tap any player card for his page.',
+    anchor: '.nrl-nav .nrl-btn[data-screen="contracts"]',
+    advanceOn: 'next-button',
   },
   {
     id: 'wrap',
     text:
       "That's the loop! Keep an eye on your money up top and your position on " +
-      'the ladder. Good luck, coach.',
+      'the ladder. The ? button opens the Guide any time. Good luck, coach.',
     anchor: null,
     advanceOn: 'next-button',
   },
@@ -110,7 +135,7 @@ export function isEventStep(
   return step.advanceOn !== 'next-button';
 }
 
-/** Milliseconds to wait for a not-yet-mounted anchor before falling back. */
+/** Milliseconds between looks for a step's anchor while it is not on screen. */
 export const ANCHOR_RETRY_MS = 500;
 
 // ── Runtime state (module singleton) ───────────────────────────────────────
@@ -121,7 +146,7 @@ interface ActiveTutorial {
   overlay: HTMLElement;
   /** Unsubscribe for the current step's bus listener, if any. */
   offEvent: (() => void) | null;
-  /** Pending anchor-retry timer, if any. */
+  /** The anchor poll (an interval), while the step's anchor is not on screen. */
   retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -186,7 +211,7 @@ function clearStepBindings(a: ActiveTutorial): void {
     a.offEvent = null;
   }
   if (a.retryTimer !== null) {
-    clearTimeout(a.retryTimer);
+    clearInterval(a.retryTimer as ReturnType<typeof setInterval>);
     a.retryTimer = null;
   }
 }
@@ -225,20 +250,21 @@ function renderStep(): void {
   const anchorEl = step.anchor ? findAnchor(step.anchor) : null;
 
   if (step.anchor && !anchorEl) {
-    // Anchor not in the DOM yet (screen not open). Render centered for now with
-    // a Next escape hatch, then retry once; if it appears, re-render anchored.
+    // Anchor not in the DOM yet (screen not open, or the nav hidden by a match).
+    // Render centered for now with a Next escape hatch and keep looking every
+    // ANCHOR_RETRY_MS; once it appears (Back to Club after a match, #188),
+    // re-render anchored. The poll stops with the step.
     renderBubble(a, step, { centered: true, forceNext: true });
-    a.retryTimer = setTimeout(() => {
+    a.retryTimer = setInterval(() => {
       if (active !== a || STEPS[a.index] !== step) return;
-      a.retryTimer = null;
       const retryEl = findAnchor(step.anchor!);
-      if (retryEl) {
-        a.overlay.replaceChildren();
-        scrollAnchorIntoView(retryEl);
-        renderCutout(a, retryEl);
-        renderBubble(a, step, { centered: false, forceNext: false });
-      }
-      // else: leave the centered + forced-Next fallback in place.
+      if (!retryEl) return;
+      clearInterval(a.retryTimer as ReturnType<typeof setInterval>);
+      a.retryTimer = null;
+      a.overlay.replaceChildren();
+      scrollAnchorIntoView(retryEl);
+      renderCutout(a, retryEl);
+      renderBubble(a, step, { centered: false, forceNext: false });
     }, ANCHOR_RETRY_MS);
     return;
   }
@@ -252,13 +278,20 @@ function renderStep(): void {
   }
 }
 
-/** Look up an anchor within the UI overlay (falls back to whole document). */
+/**
+ * Look up an anchor within the UI overlay (falls back to whole document). An
+ * element that is in the DOM but not on screen (the nav is display:none during
+ * a match) does not count: a cutout drawn around a zero-size box lands in the
+ * corner, so the step keeps polling until the box is real.
+ */
 function findAnchor(selector: string): HTMLElement | null {
   const root: ParentNode = document.getElementById('ui-root') ?? document;
-  return (
+  const found =
     (root.querySelector(selector) as HTMLElement | null) ??
-    (document.querySelector(selector) as HTMLElement | null)
-  );
+    (document.querySelector(selector) as HTMLElement | null);
+  if (!found) return null;
+  const r = found.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 ? found : null;
 }
 
 /** Centre the anchor in view before highlighting (mobile-friendly). */
@@ -355,7 +388,7 @@ const TUTORIAL_CSS = `
   pointer-events: auto;
   position: fixed;
   left: 50%;
-  bottom: 5rem;              /* clear of the bottom nav bar */
+  bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); /* clear of the nav and the home bar */
   transform: translateX(-50%);
   max-width: min(90vw, 320px);
   background: #e8e0c8;
@@ -380,10 +413,22 @@ const TUTORIAL_CSS = `
   justify-content: flex-end;
   gap: 0.5rem;
 }
+/* A landscape phone (#195): the bubble docks bottom-left, clear of the tile the
+   player has to tap, the match's speed buttons and the home bar. */
+@media (max-height: 500px) {
+  .nrl-tutorial-bubble, .nrl-tutorial-centered {
+    top: auto;
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    left: calc(0.75rem + env(safe-area-inset-left, 0px));
+    right: auto;
+    transform: none;
+    max-width: min(60vw, 240px);
+  }
+}
 `;
 
-// REPLAY (orchestrator wiring): the settings popup (fx/audio.ts, WU-13) adds a
-// "Replay tutorial" button whose onClick calls startTutorial(true). Import:
+// REPLAY (orchestrator wiring): the Guide's footer (ui/guide/guide.ts, under
+// "?") has a "Replay tutorial" button whose onClick calls startTutorial(true):
 //   import { startTutorial } from '../ui/tutorial';
 // Auto-start (main.ts, after createNewGame/loadState): call `startTutorial();`
 // (no force) — it self-guards on settings.tutorialDone.

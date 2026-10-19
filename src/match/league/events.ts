@@ -30,6 +30,9 @@ const KIND: Readonly<Record<string, MatchEventKind>> = {
   'penalty-goal': 'penalty-goal',
   // A 40/20 is a kick event to the contract (KickKind '40-20').
   '40-20': 'kick',
+  // Sin bins (#71): the man sent off and his return, named for him.
+  'sin-bin': 'sin-bin',
+  'sin-bin-return': 'sin-bin-return',
 };
 
 /** Whistle kinds that belong to no side; the contract files them under the home team. */

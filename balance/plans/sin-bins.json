@@ -1,0 +1,15 @@
+{
+  "name": "sin bins",
+  "description": "Sin bins and professional fouls (#71): how often a man is binned at the current knobs, and how many points a bin swings. Bins off consumes the same dice, so that row is the same matches without the bins; every penalty a bin measures the swing on many samples.",
+  "seeds": 40,
+  "scenarios": [
+    { "name": "even 60 v 60", "home": { "rating": 60 }, "away": { "rating": 60 } },
+    { "name": "slide v rush", "home": { "rating": 60 }, "away": { "rating": 60, "tactics": { "defence": "rush" } } },
+    { "name": "70 v 50", "home": { "rating": 70 }, "away": { "rating": 50 } },
+    { "name": "stingrays v crocs (traits)", "home": { "club": "rival-stingrays" }, "away": { "club": "rival-crocs" } }
+  ],
+  "variants": [
+    { "name": "bins off", "tuning": { "bin.base": 0, "bin.redZone": 0, "bin.repeat": 0, "bin.highShot": 0, "bin.hitman": 0, "bin.hothead": 0 } },
+    { "name": "every penalty a bin", "tuning": { "bin.base": 1, "bin.redZone": 1, "bin.highShot": 1 } }
+  ]
+}

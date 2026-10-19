@@ -38,10 +38,33 @@ devices/browsers. Run these manually before shipping a build.
 1. Open in Chrome/Edge desktop; the install icon appears in the address bar or via
    the in-app Install button → install → launches in its own window.
 
+### Build label and the update bar (N7, #181)
+`main` deploys to Pages after every merge, so the build on the phone says which one
+it is and asks before swapping itself.
+
+1. The title screen's last line reads `Build <date> <sha>` (`[data-nrl-build]`), e.g.
+   `Build 2026-10-19 979cbbe`: the UTC build date and the short SHA of the commit
+   `vite build` ran on (from `git rev-parse`, else `GITHUB_SHA`, else `local`; a bundle
+   without the define says `dev`). Compare the SHA with the merge list in the status
+   logs to know what is being tested.
+2. Open the installed app on build A, then merge build B. Within 15 minutes, or at
+   once when the app comes back to the foreground, a bar appears above the nav:
+   **New version ready · Reload · Later** (`.nrl-update-toast`). Nothing reloads by
+   itself (`registerType: 'prompt'`).
+3. **Reload** swaps to build B and reloads the page; the save is in localStorage, so
+   the game continues where it was. **Later** removes the bar until the next launch
+   (the waiting build takes over on its own once every tab of the game is closed).
+4. During a match the bar never shows: the overlay puts `nrl-match-active` on `<body>`,
+   the prompt waits for the class to go, and the stylesheet hides the bar should a match
+   start while it is up. Check: start a live match, have a new build deploy, see no bar
+   until Back to Club.
+   Headless check: with `?e2e` in the URL, `window.__nrlUpdateReady()` raises the bar
+   as a new build would (the playthrough can call it mid-match and after full time).
+
 ## Notes
-- `registerType: 'autoUpdate'` may swap the service worker mid-session. Safe here:
-  game state persists via the localStorage save system, so an update+reload does
-  not lose progress. Avoid forcing a reload during an active match.
+- `registerType: 'prompt'` (was `autoUpdate` until #181): the service worker never
+  swaps itself in mid-session; the update bar above asks first and waits for any
+  match to end. The save is in localStorage, so a reload loses nothing.
 - Icons are generated at build time (no binaries in repo, per ARCHITECTURE §4).
 
 ## Layout QA (#18)

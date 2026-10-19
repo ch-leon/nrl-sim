@@ -85,7 +85,7 @@ function runUntil(target: AdvanceTarget): AdvanceRun {
         const after = getState();
         if (after.sacked) return { weeksPlayed, stop: { kind: 'target', text: 'The board has sacked you.' } };
         const post = postWeekStop({
-          injuredStarters: newlyInjuredStarters(before.squad, after.squad, overallRating),
+          injuredStarters: newlyInjuredStarters(before.squad, after.squad, overallRating, new Set(before.lineup.starters.filter((id): id is string => id !== null))),
           contractAlerts: contractAlerts(before.squad, after.squad),
           bankruptcyWarned,
           newDecisions: newCards(before, after),

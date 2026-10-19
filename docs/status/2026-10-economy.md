@@ -174,7 +174,7 @@ about $100k a season), which is the point: from here a building has to earn its 
 
 ## #169 Gates with a roof
 
-- PR #170, merged. No `GameState` change, no save bump.
+- PR #171, merged. No `GameState` change, no save bump.
 - `homeGate(state, fixture)` in `economy.ts`: attendance = min(capacity, demand), receipts
   = attendance × $20. Capacity is `ECON.CAPACITY` by Grandstand level: the hill holds
   2,000, a stand 3,500 / 5,000 / 6,500. Demand = (300 + reputation × 30) × form ×
@@ -238,3 +238,216 @@ below.
   ticket price).
 - **Idle Hard is bust in season 1** (−$185k on wages × 1.3 from $100k): item 6 must
   soften Hard, not sharpen it.
+
+## #172 Season P&L on the Finance screen
+
+- PR #175, merged. **Save v9 → v10**: `GameState.finance`, the club's books by season.
+- `FINANCE_LINES` and `SeasonFinance` live in `core/state.ts`: twelve lines (wages,
+  upkeep, sponsor, grant, gates, prize money, board grants, events, transfers,
+  contracts, facilities, other), one entry per season, oldest first. `createNewGame`
+  opens season 1's; the v9 → v10 migration gives an old save an empty entry for the
+  season it is in (`emptyFinance`), with a test.
+- `registerFinanceSystem()` in `economy.ts` (registered from `main.ts`, additively, and
+  by the soak) books every `money:changed` delta on its line (`classifyReason`, moved
+  here from the soak) in the current season's entry, opening it on the first
+  movement. The rollover pays the finals prize money and the board grant after the
+  season counter has moved on but in week 1, so those two lines at week 1 close the
+  season just played. Nothing depends on the order listeners fire in: a first cut
+  opened the new entry on `week:advanced`, and the autosave, which subscribes first,
+  wrote a season-2 save with only season 1's entry, so week 1 was booked to the wrong
+  season (caught by the save corpus, which now holds three v10 saves from the phone
+  playthrough). The economy now
+  books the Sponsor Board and the reputation grant as two lines (`sponsor`, `grant`)
+  instead of one `sponsor+grant` movement; the weekly ledger on the screen still
+  shows them together as Income.
+- Finance: a "Season P&L · S2 v S1" panel under the weekly numbers: one row per line
+  with money on it in either season, biggest this season first, this season and last
+  in two columns, a bold Net row at the foot; "Nothing booked yet" before the first
+  week. `seasonPnl(state)` is the pure view-model.
+- The soak keeps its own tally from the bus and now checks the game's books against
+  it line by line at every rollover (less what a save loaded mid-season had already
+  booked): a difference is a problem. 100 seasons across the three modes, the
+  old-save runs (v1–v9) and the save corpus (v9 and v10) all agree.
+- Verified: tsc, vitest (the booking of each line, the season boundary with a prize paid
+  during the rollover, a save with no books, a real week tick against the ledger, the
+  migration, the view-model's ordering and nets), build, the full soak (no problems),
+  Playwright at 844×390 and 1280×800 (`docs/screenshots/172/`: Finance in season 2
+  with last season beside it).
+- Assumed (needs Leon): the twelve lines and their labels; every season is kept (twelve
+  numbers a season, so a save grows by about 200 bytes a season); Sponsor and Grant
+  booked apart; the panel sits under the weekly numbers, above the board's objectives.
+
+## #176 Money targets by difficulty
+
+- PR #180, merged. No `GameState` change, no save bump. The spec gains a "2026-10
+  retune" section (`docs/specs/BAK-188-economy.md`) with every number in one place.
+- A probe (in memory, not committed) swept eleven candidate tunings through the soak
+  at 12 seeds × 5 seasons × idle and managed × every difficulty, printing per row the
+  share of runs in the red, under the forced-sale floor, and sacked. The ticket price
+  alone could not do it: a cut that puts an idle club into the red takes three times
+  as much from a managed club (its gates are three times bigger) and sinks it too;
+  the managed club's edge is prize money, the reputation grant and seats, so those
+  were kept or trimmed lightly and the pressure spread over several small lines.
+- What changed (`config.ts`, `data/events.ts`):
+  - `ECON.TICKET_PRICE` $20 → $18; `REP_GRANT_PER_POINT` $50 → $40 a point a week;
+    `FORCED_SALE_FLOOR` −$50k → −$100k, so the red is a warning before a fire sale.
+  - `BOARD.GRANT_PER_MET` $15k → $10k. `PRIZE` unchanged: a finals side has earned it.
+  - The cards' cash offers trimmed by about 40%: billboard $8k → $5k, merch $12k → $7k
+    or $1.5k → $900 a week, clinics $5k → $3k, pizza $3k → $2k a win, food truck $400 →
+    $250 a week, the fine $1k → $600. Costs unchanged.
+  - `CONTRACTS.RENEW_SEASON_INFLATION` 3% → 4% a season.
+  - `DIFFICULTY.hard`: starting money ×0.5 → ×0.75 ($150k), wages ×1.3 → ×1.15.
+    Rivals ×1.1, injuries ×1.4 and the −4 start are unchanged; Easy and Normal are
+    untouched (Normal stays the identity).
+- Verified: tsc, vitest (the tests that encoded the old grant, ticket, floor and
+  billboard amounts now read the constants), build, the full soak on every
+  difficulty (no problems), Playwright at 844×390 and 1280×800
+  (`docs/screenshots/176/`: a new Hard game at $150,000 and its Finance screen).
+- Assumed (needs Leon): all of the above, and the targets as read below.
+
+### After (20 seeds, five seasons; `npm run soak -- --difficulties easy,normal,hard`)
+
+Money is the balance at each rollover, averaged over the runs that reached the season
+(a sacked club's run ends). "red" and "bust" are from the 12-seed probe on the same
+settings: the share of runs below zero at the rollover, and the share that touched
+the −$100k floor during the season.
+
+| mode | S1 | S2 | S3 | S4 | S5 | sacked by S3 / S5 |
+|---|---|---|---|---|---|---|
+| idle Easy | $296k | $395k | $560k | $751k | $927k | 0% / 20% |
+| managed Easy | $287k | $364k | $403k | $405k | $335k | 0% / 0% |
+| idle Normal | $84k | $30k (42% red) | $53k (36% red, 10% bust) | $146k | $264k | 40% / 100% |
+| managed Normal | $211k | $318k | $352k | $361k | $347k | 0% / 10% |
+| idle Hard | −$79k (100% red) | −$122k (bust) | – | – | – | 100% by S2 |
+| managed Hard | $33k (50% red) | $72k | $85k | $84k | $81k | 40% / 40% |
+
+Season P&L, idle and managed Normal ($k; before = #172 in, after = this PR):
+
+| | wages | grant | gates | prize | board | events | transfers | facilities | upkeep | net |
+|---|---|---|---|---|---|---|---|---|---|---|
+| idle S1 before → after | −490 → −490 | +41 → +33 | +321 → +289 | +21 → +21 | +37 → +25 | +13 → +8 | 0 | 0 | 0 | −58 → **−116** |
+| idle S2 | −436 → −436 | +50 → +40 | +354 → +318 | +6 → +6 | +20 → +10 | +11 → +7 | 0 | 0 | 0 | +5 → **−55** |
+| idle S3 | −409 → −354 | +53 → +42 | +357 → +300 | +4 → +3 | +21 → +11 | +11 → +8 | 0 | 0 | 0 | +38 → **+11** |
+| managed S1 | −509 → −502 | +43 → +35 | +443 → +400 | +110 → +116 | +45 → +30 | +5 → −3 | −14 → −4 | −48 → −48 | −13 → −13 | +63 → **+11** |
+| managed S3 | −947 → −857 | +105 → +87 | +1,002 → +935 | +121 → +133 | +44 → +30 | +4 → −3 | −102 → −82 | −144 → −156 | −50 → −52 | +33 → **+35** |
+| managed S5 | −1,380 → −1,201 | +132 → +106 | +1,260 → +1,089 | +139 → +106 | +30 → +18 | +5 → −3 | −63 → −31 | −54 → −36 | −60 → −61 | +9 → **−14** |
+
+Against the plan's targets:
+
+- **Idle Normal drifts into the red by season 3–4 (a warning, not a fire sale): about
+  met, a season early.** From $200k it loses $116k in season 1 and $55k in season 2;
+  four runs in ten are below zero at the end of season 2, a third at the end of
+  season 3, and one in ten touches the −$100k floor. The board sacks 40% by season 3
+  (the solvent objective is missed in the red) and all by season 5. The survivors
+  recover from season 3, because a broke club's players walk at contract end and the
+  juniors who replace them are cheap: the money problem turns into a football problem,
+  which is what the board is for. No setting of these lines keeps an idle club sinking
+  through season 4 without also sinking the managed one.
+- **Managed Normal grows slowly ($200k → $400k): met.** $211k → $361k by season 4,
+  $347k at five, with a squad of 80s that costs $1.2M a season against $1.1M of gates:
+  it builds and upgrades its stand, signs two stars a season, and ends about where it
+  started plus a stand.
+- **Hard can go bust: met.** An idle Hard club is under water at the end of season 1
+  and through the floor in season 2; a managed Hard club is in the red half the time,
+  banks $30–85k, makes the eight six seasons in ten and loses 40% of its managers by
+  season 3. With the old half-money, ×1.3 Hard both went bust in season 1.
+- **Easy is comfortable: met.** An idle Easy club banks $100–190k a season and is a
+  top-six side for four seasons; the managed one wins everything on $290–400k.
+
+## Summary
+
+All six items merged in order: #163 (the soak's P&L, #161), #166 (facility upkeep,
+#164), #168 (wages that climb, #167), #171 (gates with a roof, #169), #175 (the
+season P&L on Finance, #172) and #180 (money targets by difficulty, #176). `GameState`
+changed once (v9 → v10: `finance`, the club's books), with a migration, a test and
+three v10 saves in the corpus. Each PR carried tsc, vitest, build, the full soak and
+Playwright screenshots at 844×390 and 1280×800 under `docs/screenshots/<issue>/`.
+Every "Assumed (needs Leon)" item is listed above, in its PR body, and below.
+
+### Before → after, 20 seeds, five seasons (main at #159 → main with all six)
+
+Money at the rollover, averaged over the runs that reached the season. "Before" Easy
+rows are from the league log's #148 table (same seeds, main at #153).
+
+| mode | before: S1 / S3 / S5 | after: S1 / S3 / S5 | sacked by S5 before → after |
+|---|---|---|---|
+| idle Easy | $479k / – / $2,400k | $296k / $560k / $927k | 20% → 20% |
+| managed Easy | $320k / – / $2,900k | $287k / $403k / $335k | 0% → 0% |
+| idle Normal | $274k / $662k / $1,344k | $84k / $53k / $264k | 100% → 100% (40% by S3, was 30%) |
+| managed Normal | $275k / $996k / $2,564k | $211k / $352k / $347k | 0% → 10% |
+| idle Hard | $26k / $235k / $483k (S4) | −$79k / bust in S2 / – | 90% by S3 → 100% by S2 |
+| managed Hard | $97k / $446k / $1,500k | $33k / $85k / $81k | 10% by S2 → 40% by S3 |
+
+The season P&L ($k), idle Normal in season 1 and the managed club in season 5:
+
+| | wages | upkeep | sponsor + grant | gates | prize | board | events | transfers | facilities | net |
+|---|---|---|---|---|---|---|---|---|---|---|
+| idle S1 before | −454 | 0 | +41 | +417 | +21 | +37 | +13 | 0 | 0 | **+74** |
+| idle S1 after | −490 | 0 | +33 | +289 | +21 | +25 | +8 | 0 | 0 | **−116** |
+| managed S5 before | −802 | 0 | +133 | +1,335 | +141 | +30 | +9 | −41 | 0 | **+805** |
+| managed S5 after | −1,201 | −61 | +106 | +1,089 | +106 | +18 | −3 | −31 | −36 | **−14** |
+
+What changed, in one line each: a squad of 85s costs 3.4× a squad of 55s instead of
+1.8×, and renewals ask today's price; every building has a running cost; a crowd has
+to fit in the ground, and only a stand (which costs money to build and run) lifts
+the roof; the small lines and Hard are retuned; and the player can read a season's
+books against last season's.
+
+### Every assumption (needs Leon)
+
+- #161: the lines of the books and which ledger reasons land in each (signing fees
+  and sales together as transfers; early renewals and releases together as contracts).
+- #164: upkeep 1% of the build cost a week at L1, ×1.5 at L2, ×2 at L3; the same on
+  every difficulty; the popup shows the next level's upkeep on its own line.
+- #167: the wage curve (a premium of 2 × (points above 55)²); +25% on renewal asks at
+  reputation 100 and +4% a season (3% at #167, 4% since #176); the rival cap at a
+  20-man squad of 62.5s; automatic renewals priced at today's overall; trained-up
+  players on an old wage fall under `MORALE.LOW_PAY_RATIO` sooner.
+- #169: seats 2,000 / 3,500 / 5,000 / 6,500; demand 300 + 30 × reputation, ±25% on
+  form, ×1.2 for a top-eight opponent, ×1.5 for a home final; no derbies; the soak
+  manager's $60k stand reserve and $3k-a-week burn allowance.
+- #172: the twelve lines and labels; Sponsor and Grant booked apart; every season
+  kept; the panel's place on the screen.
+- #176: ticket $18, reputation grant $40 a point, board grant $10k, the cards' cash
+  trimmed by about 40%, prize money unchanged, the floor −$100k, Hard on three-quarters
+  of the money and wages ×1.15; the targets as read in that section.
+
+### Needs Leon
+
+- **Idle Normal is in the red a season early and recovers from season 3**, because a
+  broke club's players walk at contract end and juniors on rookie wages replace them.
+  No setting of the small lines keeps an idle club sinking through season 4 without
+  sinking the managed one too; the one sink that would (a flat club overhead: staff,
+  travel, insurance, the same for every club) is outside the plan's list.
+- **The managed club still wins 90–100% of premierships** on every difficulty with a
+  best nine in the high 70s to low 80s; the margin for that gap is N1's Phase 3.
+- **The Sponsor Board** returns $3,000 a week for $10,000 and $100 a week of upkeep:
+  it pays for itself in four weeks and nothing in the soak builds it. It is the best
+  investment in the game by a mile; a reputation-scaled or capped return would fit the
+  rest of this economy.
+- **Easy** still banks about $150k a season idle ($927k by season 5). Comfortable as
+  asked; Easy wages ×0.9 would keep it comfortable without the pile.
+- The weekly ledger on the Finance screen stamps the rollover's prize money and board
+  grant as "S2 W1 · Other" (it records by the clock at the time), while the season
+  books put them in season 1. A display nit for whoever next touches Finance.
+- `docs/ARCHITECTURE.md` §4's `GameState` listing does not show `finance` (the file
+  was outside this plan's list).
+- The "Unsettled at a rival" card still quotes four weeks' wages for a rival's star
+  (N5's note); on the new curve that is $13k for an 85-overall who would cost $64k from
+  the pool.
+- The phone playthrough's new `coach-call` step (#165) timed out once waiting for a
+  call chip on the live match in a run here; everything else passed. Match side.
+
+### What I would do next
+
+1. Re-run `npm run soak -- --difficulties easy,normal,hard` after Phase 3 moves the
+   margins: prize money and finals gates are a third of a top club's income, so a
+   league where the managed club loses now and then changes its books.
+2. A flat club overhead (about $1,500 a week, scaled by difficulty) as the sink that
+   makes an idle club keep sinking; then ease the ticket price back toward $20.
+3. Hand the season books to N7's season review (`state.finance` is the hook) and the
+   history screen.
+4. Cap or scale the Sponsor Board's return, and let the Finance screen say what a
+   stand would earn before it is built (the Crowd row already says "sold out").
+5. If Leon wants training slowed (N5's question), re-measure here first: slower
+   training means lower renewal asks, which is the managed club's biggest line.

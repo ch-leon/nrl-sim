@@ -14,6 +14,7 @@ import {
 import { SQUAD_CAP } from '../../config';
 import { TRAINING_KIT, PORTRAIT_W, PORTRAIT_H, PORTRAIT_SCALE, portraitDataUrl } from '../../art/portrait';
 import type { Kit } from '../../art/match/kit';
+import { openPlayerPage } from './player';
 
 // ── Shared screen styling ───────────────────────────────────────────────────
 // Injected once alongside the base kit CSS. Card/stat-bar/screen classes used by
@@ -100,10 +101,12 @@ const SCREEN_CSS = `
 .nrl-card-name {
   font-weight: bold;
   font-size: clamp(0.8rem, 3vw, 1rem);
+  line-height: 1.1;
   flex: 1 1 auto;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  /* #195: a long name wraps to a second line instead of clipping to "Ezra Kellaw…". */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .nrl-card-ovr {
   font-weight: bold;
@@ -189,6 +192,8 @@ export interface PlayerCardOpts {
   showInjury?: boolean;
   /** Kit the portrait wears: club kit on the squad, TRAINING_KIT by default. */
   kit?: Kit;
+  /** Tapping the portrait / name row opens the player's page (N7, #185). */
+  onOpen?: () => void;
 }
 
 /**
@@ -256,6 +261,20 @@ export function PlayerCard(p: Player, opts: PlayerCardOpts = {}): HTMLElement {
     },
   });
   const top = el('div', { class: 'nrl-card-top' }, portrait, el('div', { class: 'nrl-card-id' }, head, meta));
+  if (opts.onOpen) {
+    // The whole top row (portrait, name, badges) is the tap target: 48px tall.
+    const open = opts.onOpen;
+    top.classList.add('nrl-card-open');
+    top.setAttribute('role', 'button');
+    top.setAttribute('tabindex', '0');
+    top.setAttribute('aria-label', `${p.name}: player page`);
+    top.setAttribute('data-player-open', p.id);
+    head.append(el('span', { class: 'nrl-card-more', text: '›', attrs: { 'aria-hidden': 'true' } }));
+    top.addEventListener('click', open);
+    top.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
+  }
 
   const children: HTMLElement[] = [top, bars, cost];
 
@@ -306,6 +325,7 @@ export function openRecruitScreen(): void {
       const label = full ? 'SQUAD FULL' : broke ? 'CANT AFFORD' : `SIGN ${money(fee)}`;
       const card = PlayerCard(agent, {
         // Free agents wear a neutral training top (TRAINING_KIT, the default).
+        onOpen: () => openPlayerPage(agent, { kind: 'freeAgent' }),
         action: {
           label,
           disabled,

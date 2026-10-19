@@ -12,6 +12,7 @@ import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { rollTraits, type TraitQuality } from '../../data/traits';
 import { rivalTactics } from './presets';
 import { BENCH } from './bench';
+import { LINEUP_SLOTS, statsAt, type Selection } from '../../systems/lineup';
 
 const clampStat = (n: number): number => Math.max(1, Math.min(STAT_MAX, n));
 
@@ -89,20 +90,27 @@ function toRosterEntry(p: Player): RosterEntry {
  * uses the best ON_FIELD by overall rating, and applies a morale modifier. If
  * fewer than ON_FIELD fit players are available, uses all fit players; throws
  * if zero.
+ *
+ * With a `selection` (the coach's lineup resolved for the day, #69) the roster
+ * is his nine in slot order: each man plays the slot's position, at the stats
+ * his positional fit there leaves him (systems/lineup.ts), and the bench and
+ * rotation are the lineup's. The aggregates come from those stats.
  */
 export function teamSheetFromSquad(
   players: Player[],
   clubId: string,
   name: string,
   colors: [string, string],
+  selection?: Selection,
 ): TeamSheet {
   const fit = players.filter((p) => p.injuredWeeks <= 0);
   if (fit.length === 0) throw new Error('no fit players');
 
   const ranked = [...fit].sort((a, b) => overallRating(b) - overallRating(a));
-  const best = ranked.slice(0, ON_FIELD);
+  const picked = selection ? selection.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : [])) : [];
+  const best = picked.length > 0 ? picked : ranked.slice(0, ON_FIELD);
   // The next best fit players make the interchange bench (the live sim rotates them on).
-  const bench = ranked.slice(ON_FIELD, ON_FIELD + BENCH.size);
+  const bench = selection && picked.length > 0 ? selection.bench : ranked.slice(ON_FIELD, ON_FIELD + BENCH.size);
 
   const attackRaw = mean(best.map((p) => (p.stats.speed + p.stats.skill + p.stats.footyIQ) / 3));
   const defenseRaw = mean(best.map((p) => (p.stats.strength + p.stats.stamina) / 2));
@@ -127,6 +135,7 @@ export function teamSheetFromSquad(
     colors,
     roster: best.map(toRosterEntry),
     ...(bench.length > 0 ? { bench: bench.map(toRosterEntry) } : {}),
+    ...(selection && picked.length > 0 ? { rotation: selection.rotation } : {}),
   };
 }
 

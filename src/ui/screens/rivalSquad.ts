@@ -5,6 +5,7 @@ import type { RivalClub } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { ROMAN, TRAITS } from '../../data/traits';
 import { button, closeModal, el, openModal, panel } from '../dom';
+import { openPlayerPage } from './player';
 
 export interface RivalSquadRow {
   id: string;
@@ -41,6 +42,17 @@ export function openRivalSquad(club: RivalClub): HTMLElement {
   const body = el('tbody');
   for (const r of rows) {
     const tr = el('tr');
+    // A row opens the player's page (N7, #185); Close brings this squad back.
+    const player = club.squad?.find((p) => p.id === r.id);
+    if (player) {
+      tr.className = 'nrl-rival-row';
+      tr.setAttribute('role', 'button');
+      tr.setAttribute('tabindex', '0');
+      tr.setAttribute('data-player-open', r.id);
+      const open = (): void => { openPlayerPage(player, { kind: 'rival', club }, { onClose: () => openRivalSquad(club) }); };
+      tr.addEventListener('click', open);
+      tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    }
     tr.append(
       el('td', { text: r.injuredWeeks > 0 ? `${r.name} (inj ${r.injuredWeeks}w)` : r.name }),
       el('td', { text: r.position }),
@@ -54,7 +66,7 @@ export function openRivalSquad(club: RivalClub): HTMLElement {
   const content = panel(
     { class: 'nrl-rival-squad' },
     el('h2', { text: club.name }),
-    el('p', { text: `Strength ${club.strength} · ${rows.length} players` }),
+    el('p', { text: `Strength ${club.strength} · ${rows.length} players · tap a player for his page` }),
     rows.length > 0
       ? el('div', { class: 'nrl-rival-scroll' }, table)
       : el('p', { text: 'No squad on record.' }),

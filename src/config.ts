@@ -57,8 +57,8 @@ export const TRAINING_CURVE = {
 // src/systems/economy.ts. See the ticket spec for formula derivations.
 export const ECON = {
   SPONSOR_PER_LEVEL: 3_000,       // × Sponsor Board level, if built
-  REP_GRANT_PER_POINT: 50,        // × reputation, weekly base grant
-  TICKET_PRICE: 20,               // $ per attendee
+  REP_GRANT_PER_POINT: 40,        // × reputation, weekly base grant (#176: was 50)
+  TICKET_PRICE: 18,               // $ per attendee (#176: was 20)
   // Gates with a roof (N6, #169): attendance = min(capacity, demand), where
   // demand = (ATTEND_BASE + reputation × ATTEND_PER_REP) × form × occasion. Form
   // runs 1 ∓ FORM_SWING across the last FORM_GAMES results (all wins +25%, all
@@ -76,7 +76,7 @@ export const ECON = {
   /** Seats by Grandstand level; [0] is the hill with no stand built. */
   CAPACITY: [2_000, 3_500, 5_000, 6_500],
   BANKRUPTCY_WARN: 0,             // balance < 0 → warning
-  FORCED_SALE_FLOOR: -50_000,     // balance < this → forced sales
+  FORCED_SALE_FLOOR: -100_000,    // balance < this → forced sales (#176: was −50k, so the red is a warning first)
   FORCED_SALE_MORALE_HIT: 10,     // squad-wide morale −10 per forced sale
 } as const;
 
@@ -87,7 +87,7 @@ export const BOARD = {
   MAX_PATIENCE: 5,
   START_PATIENCE: 5,
   REP_PER_MET: 2,            // reputation for each objective met
-  GRANT_PER_MET: 15_000,     // one-off cash grant for each objective met
+  GRANT_PER_MET: 10_000,     // one-off cash grant for each objective met (#176: was 15k)
   BUILD_TARGET_EXTRA: 2,     // 'build' objective: facilities beyond the current count
   SOLVENT_FLOOR: { easy: -10_000, normal: 0, hard: 20_000 },
 } as const;
@@ -148,7 +148,7 @@ export const CONTRACTS = {
   // for every season after the first, so a premier pays more to keep its stars and
   // wages creep up as the game goes on.
   RENEW_REP_PREMIUM: 0.25,
-  RENEW_SEASON_INFLATION: 0.03,
+  RENEW_SEASON_INFLATION: 0.04, // #176: was 0.03
 } as const;
 
 // Difficulty (GitHub #48). Multipliers applied at the existing call sites:
@@ -157,9 +157,10 @@ export const CONTRACTS = {
 // when building the opponent's team sheet (matchday.sheetFor). startRating
 // (#140) is added to the starting squad's first-grade and depth targets, in
 // rating points. Normal is 1.0 / 0 everywhere so it plays exactly as before;
-// old saves load as Normal. Hard (#148): half the money, wages ×1.3 and rivals
-// ×1.1, so a managed club has to earn its signings; measured in
-// docs/status/2026-10-league.md.
+// old saves load as Normal. Hard (#148): rivals ×1.1 and, since the economy's
+// retune (#176, docs/status/2026-10-economy.md), three-quarters of the money and
+// wages ×1.15 (half and ×1.3 went bust in the first season once gates had a roof);
+// a managed club has to earn its signings and an idle one goes under.
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 export const DEFAULT_DIFFICULTY: Difficulty = 'normal';
@@ -176,7 +177,7 @@ export interface DifficultyMultipliers {
 export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
   easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalStrength: 0.92, startRating: 4 },
   normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0 },
-  hard: { startingMoney: 0.5, wages: 1.3, injuryRate: 1.4, rivalStrength: 1.1, startRating: -4 },
+  hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalStrength: 1.1, startRating: -4 },
 };
 
 /** Multipliers for a difficulty; unknown/missing values fall back to Normal. */

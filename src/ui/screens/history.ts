@@ -2,9 +2,9 @@
 // (GitHub #3 / BAK-206 backlog S2). Pure helpers are exported for node tests;
 // DOM open/init follow the fixtures.ts / hud.ts conventions (no Phaser).
 
-import { bus } from '../../core/events';
 import { getState, type GameState, type SeasonRecord, type Player } from '../../core/state';
 import { el, panel, button, openModal, closeScreen } from '../dom';
+import { initSeasonReview, openSeasonReview } from './seasonReview';
 
 export type SeasonHistoryEntry = SeasonRecord;
 
@@ -125,6 +125,10 @@ export function openHistoryScreen(): HTMLElement {
       });
       const detail = fmtSeasonDetail(entry);
       if (detail) line.append(el('div', { class: 'nrl-history-detail', text: detail }));
+      // The season review (#190), for seasons that have one (v12+).
+      if (entry.review) {
+        line.append(button('Review', () => openSeasonReview(entry, { back: () => { openHistoryScreen(); } }), { class: 'nrl-history-review' }));
+      }
       list.append(line);
     }
     content.append(list);
@@ -150,17 +154,12 @@ export function openHistoryScreen(): HTMLElement {
 }
 
 /**
- * Subscribe to season:ended and surface a clear toast with ladder position /
- * premiership. Idempotent if called once from main.ts. Returns unsubscribe.
+ * Season's end: the review modal (#190) in a browser, after any match on
+ * screen; the toast with ladder position / premiership where there is no
+ * document (headless). Called once from main.ts. Returns unsubscribe.
  */
 export function initSeasonEndFeedback(): () => void {
-  return bus.on('season:ended', ({ season, ladderPosition, premiership }) => {
-    const entry = { season, ladderPosition, premiership };
-    bus.emit('ui:notify', {
-      text: fmtSeasonEndToast(entry),
-      kind: seasonEndToastKind(entry),
-    });
-  });
+  return initSeasonReview();
 }
 
 /** Latest history entry from state, if any. */

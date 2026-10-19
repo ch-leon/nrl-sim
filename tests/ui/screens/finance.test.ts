@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   financeSummary, FinanceLedger, initFinanceLedger, fmtMoney, fmtMoneyCompact,
-  fmtRunway, fmtCrowd, EXPIRY_WINDOW_WEEKS,
+  fmtRunway, fmtCrowd, seasonPnl, FINANCE_LINE_LABELS, EXPIRY_WINDOW_WEEKS,
 } from '../../../src/ui/screens/finance';
 import {
-  createNewGame, getState, loadState,
+  createNewGame, getState, loadState, emptyFinance, FINANCE_LINES,
   type Player, type PlacedFacility, type GameState, type Fixture,
 } from '../../../src/core/state';
 import { bus, type Events } from '../../../src/core/events';
@@ -13,6 +13,7 @@ import {
   weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, applyEconomy,
 } from '../../../src/systems/economy';
 import { clearTickHooks } from '../../../src/core/time';
+import { ECON } from '../../../src/config';
 
 function mkPlayer(over: Partial<Player> = {}): Player {
   const base: Player = {
@@ -58,17 +59,17 @@ describe('financeSummary — weekly P&L', () => {
       squad: [mkPlayer({ wage: 1000 }), mkPlayer({ wage: 2500 })],
     });
     const f = financeSummary(s);
-    // sponsor 3000×2 = 6000 ; grant 50×30 = 1500 ; income 7500 ; wages 3500
+    // sponsor 3000×2 = 6000 ; grant 40×30 = 1200 ; income 7200 ; wages 3500
     expect(f.sponsorWeekly).toBe(6000);
-    expect(f.grantWeekly).toBe(1500);
-    expect(f.incomeWeekly).toBe(7500);
+    expect(f.grantWeekly).toBe(1200);
+    expect(f.incomeWeekly).toBe(7200);
     expect(f.incomeWeekly).toBe(weeklyIncome(s));
     expect(f.wagesWeekly).toBe(3500);
     expect(f.wagesWeekly).toBe(weeklyWages(s));
     expect(f.sponsorWeekly + f.grantWeekly).toBe(f.incomeWeekly);
     // upkeep: a Sponsor Board at L2 runs at 100 × 1.5 = 150 a week (#164)
     expect(f.upkeepWeekly).toBe(150);
-    expect(f.netWeekly).toBe(4000 - 150);
+    expect(f.netWeekly).toBe(7200 - 3500 - 150);
     expect(f.burnWeekly).toBe(0);
   });
 
@@ -90,18 +91,18 @@ describe('financeSummary — weekly P&L', () => {
     const s = setup({ reputation: 10, facilities: [pf('grandstand', 3)] });
     const f = financeSummary(s);
     expect(f.sponsorWeekly).toBe(0);
-    expect(f.grantWeekly).toBe(500);
+    expect(f.grantWeekly).toBe(400);
   });
 
   it('net is income − wages and burn is the shortfall, with runway = money ÷ burn', () => {
     const s = setup({
-      money: 85_000, reputation: 30, facilities: [],
+      money: 88_000, reputation: 30, facilities: [],
       squad: [mkPlayer({ wage: 10_000 })],
     });
     const f = financeSummary(s);
-    // income 1500 ; wages 10000 ; net −8500 ; burn 8500 ; runway 85000/8500 = 10
-    expect(f.netWeekly).toBe(-8500);
-    expect(f.burnWeekly).toBe(8500);
+    // income 1200 ; wages 10000 ; net −8800 ; burn 8800 ; runway 88000/8800 = 10
+    expect(f.netWeekly).toBe(-8800);
+    expect(f.burnWeekly).toBe(8800);
     expect(f.runwayWeeks).toBe(10);
   });
 
@@ -136,8 +137,8 @@ describe('financeSummary — next home gate', () => {
       },
     });
     const f = financeSummary(s);
-    // round 2 is past; next home is round 5. Gate at that week = (300+30×30)×20 = 24,000 on the hill (#169).
-    expect(f.nextHome).toEqual({ round: 5, projectedGate: 24_000, attendance: 1200, capacity: 2000, soldOut: false });
+    // round 2 is past; next home is round 5. Gate at that week = (300+30×30)×$18 = 21,600 on the hill (#169, #176).
+    expect(f.nextHome).toEqual({ round: 5, projectedGate: 1200 * ECON.TICKET_PRICE, attendance: 1200, capacity: 2000, soldOut: false });
     expect(f.nextHome?.projectedGate).toBe(gateReceipts({ ...s, week: 5 }));
   });
 
@@ -155,12 +156,12 @@ describe('financeSummary — next home gate', () => {
       league: { clubs: [], fixtures: [homeFixture(2)], ladder: [] },
     });
     // demand 3,300 against 2,000 seats
-    expect(financeSummary(hill).nextHome).toEqual({ round: 2, projectedGate: 40_000, attendance: 2000, capacity: 2000, soldOut: true });
+    expect(financeSummary(hill).nextHome).toEqual({ round: 2, projectedGate: 2000 * ECON.TICKET_PRICE, attendance: 2000, capacity: 2000, soldOut: true });
     const stand = setup({
       week: 2, reputation: 100, facilities: [pf('grandstand', 2)],
       league: { clubs: [], fixtures: [homeFixture(2)], ladder: [] },
     });
-    expect(financeSummary(stand).nextHome).toEqual({ round: 2, projectedGate: 66_000, attendance: 3300, capacity: 5000, soldOut: false });
+    expect(financeSummary(stand).nextHome).toEqual({ round: 2, projectedGate: 3300 * ECON.TICKET_PRICE, attendance: 3300, capacity: 5000, soldOut: false });
     expect(financeSummary(stand).nextHome?.projectedGate).toBe(gateReceipts({ ...stand, week: 2 }));
     expect(fmtCrowd(financeSummary(hill).nextHome!)).toBe('Sold out · 2,000 seats');
     expect(fmtCrowd(financeSummary(stand).nextHome!)).toBe('3,300 of 5,000 seats');
@@ -229,7 +230,8 @@ describe('FinanceLedger', () => {
     const l = new FinanceLedger(6);
     l.record({ delta: -3000, reason: 'wages', season: 1, week: 2 });
     l.record({ delta: -250, reason: 'upkeep', season: 1, week: 2 });
-    l.record({ delta: 1500, reason: 'sponsor+grant', season: 1, week: 2 });
+    l.record({ delta: 1000, reason: 'sponsor', season: 1, week: 2 });
+    l.record({ delta: 500, reason: 'grant', season: 1, week: 2 });
     l.record({ delta: 34000, reason: 'gate', season: 1, week: 2 });
     l.record({ delta: -800, reason: 'build', season: 1, week: 2 });
     expect(l.rows()).toEqual([
@@ -298,7 +300,7 @@ describe('initFinanceLedger', () => {
     offRecord();
     offSpy();
 
-    expect(seen.map((e) => e.reason)).toEqual(['wages', 'upkeep', 'sponsor+grant', 'gate']);
+    expect(seen.map((e) => e.reason)).toEqual(['wages', 'upkeep', 'sponsor', 'grant', 'gate']);
     expect(l.rows()).toEqual([{
       season: 1,
       week: 3,
@@ -331,10 +333,10 @@ describe('financeSummary — average home gate in the run-rate (QA)', () => {
 
   it('a club whose gates cover the wages has no burn and no runway warning', () => {
     const fixtures = Array.from({ length: 24 }, (_, i) => (i % 2 ? awayFixture(i + 1) : homeFixture(i + 1)));
-    const s = setup({ week: 1, money: 10_000, reputation: 30, facilities: [], squad: [mkPlayer({ wage: 13_000 })], league: { clubs: [], fixtures, ladder: [] } });
+    const s = setup({ week: 1, money: 10_000, reputation: 30, facilities: [], squad: [mkPlayer({ wage: 11_000 })], league: { clubs: [], fixtures, ladder: [] } });
     const f = financeSummary(s);
-    // gate at rep 30: (300 + 30×30) × $20 = $24,000, every other week = $12,000/wk avg; with the $1,500 grant it covers $13,000 of wages
-    expect(f.gateWeekly).toBe(12_000);
+    // gate at rep 30: (300 + 30×30) × $18 = $21,600, every other week = $10,800/wk avg; with the $1,200 grant it covers $11,000 of wages
+    expect(f.gateWeekly).toBe(10_800);
     expect(f.burnWeekly).toBe(0);
     expect(f.runwayWeeks).toBeNull();
   });
@@ -342,5 +344,42 @@ describe('financeSummary — average home gate in the run-rate (QA)', () => {
   it('no home games left means no gate in the average', () => {
     const s = setup({ week: 24, facilities: [], league: { clubs: [], fixtures: [homeFixture(23), awayFixture(24)], ladder: [] } });
     expect(financeSummary(s).gateWeekly).toBe(0);
+  });
+});
+
+describe('seasonPnl (N6, #172)', () => {
+  const s1 = { ...emptyFinance(1), wages: -400_000, gate: 300_000, grant: 40_000 };
+  const s2 = { ...emptyFinance(2), wages: -450_000, gate: 320_000, grant: 45_000, facilities: -8000 };
+
+  it('shows this season against last, biggest lines first, with the net', () => {
+    const p = seasonPnl(setup({ season: 2, finance: [s1, s2] }));
+    expect(p.season).toBe(2);
+    expect(p.lastSeason).toBe(1);
+    expect(p.rows.map((r) => r.line)).toEqual(['wages', 'gate', 'grant', 'facilities']);
+    expect(p.rows[0]).toEqual({ line: 'wages', label: 'Wages', thisSeason: -450_000, lastSeason: -400_000 });
+    expect(p.rows[3]).toEqual({ line: 'facilities', label: 'Facilities', thisSeason: -8000, lastSeason: 0 });
+    expect(p.net).toBe(-93_000);
+    expect(p.lastNet).toBe(-60_000);
+  });
+
+  it('a first season has no last column; nothing booked gives no rows', () => {
+    const p = seasonPnl(setup({ season: 1, finance: [s1] }));
+    expect(p.lastSeason).toBeNull();
+    expect(p.lastNet).toBeNull();
+    expect(p.rows.every((r) => r.lastSeason === null)).toBe(true);
+    expect(seasonPnl(setup({ season: 1, finance: [emptyFinance(1)] })).rows).toEqual([]);
+    expect(seasonPnl(setup({ season: 1, finance: [] })).rows).toEqual([]);
+  });
+
+  it('a line with money only last season still shows, and every line has a label', () => {
+    const p = seasonPnl(setup({ season: 2, finance: [{ ...s1, prize: 25_000 }, s2] }));
+    expect(p.rows.find((r) => r.line === 'prize')).toEqual({ line: 'prize', label: 'Prize money', thisSeason: 0, lastSeason: 25_000 });
+    for (const l of FINANCE_LINES) expect(FINANCE_LINE_LABELS[l].length).toBeGreaterThan(0);
+  });
+
+  it('until the new season books its first movement it shows the season just closed', () => {
+    const p = seasonPnl(setup({ season: 2, finance: [s1] }));
+    expect(p.season).toBe(1);
+    expect(p.net).toBe(-60_000);
   });
 });
