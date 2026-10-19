@@ -206,7 +206,7 @@ let openModalEl: HTMLElement | null = null;
  */
 export function openModal(
   content: HTMLElement,
-  opts: { class?: string; screen?: boolean } = {},
+  opts: { class?: string; screen?: boolean; closeButton?: boolean } = {},
 ): HTMLElement {
   ensureStyles();
   const box = el(
@@ -218,6 +218,14 @@ export function openModal(
   box.addEventListener('click', (e) => e.stopPropagation());
 
   if (opts.screen) {
+    // A ✕ in the corner (#195): on a phone a screen's own Close is often below
+    // the fold. Screens with a Close in their header pass closeButton: false.
+    if (opts.closeButton !== false) {
+      const x = button('✕', () => closeScreen(), { class: 'nrl-screen-x' });
+      x.setAttribute('aria-label', 'Close');
+      box.classList.add('nrl-modal-has-x');
+      box.prepend(x);
+    }
     const backdrop = el(
       'div',
       { class: 'nrl-modal-backdrop nrl-screen-backdrop', onClick: () => closeScreen() },
@@ -416,8 +424,9 @@ export const CSS = `
   .nrl-nav .nrl-btn {
     flex: 1 1 0;
     min-width: 0;
-    padding: 0.4rem 0.1rem;
-    font-size: clamp(0.55rem, 1.35vw, 0.85rem);
+    padding: 0.4rem 0.05rem;
+    /* #195: eleven labels at 667px ("Contracts") without an ellipsis. */
+    font-size: clamp(0.5rem, 1.3vw, 0.85rem);
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -465,7 +474,24 @@ export const CSS = `
 .nrl-screen-backdrop .nrl-modal {
   /* Fit inside the region (drop-shadow included) rather than the viewport. */
   max-height: calc(100% - 6px);
+  /* #195: a landscape phone has width to spare and no height; use it. */
+  position: relative;
+  width: min(96vw, 640px);
+  max-width: none;
 }
+.nrl-screen-x {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.nrl-modal-has-x > :not(.nrl-screen-x) > h2:first-child { padding-right: 2.75rem; }
 
 /* ── Toasts (ui:notify) — below the HUD, above screens, under dialogs ─── */
 .nrl-toast-stack {
@@ -481,6 +507,8 @@ export const CSS = `
   align-items: center;
   z-index: 60;
 }
+/* #195: a rollover or a ×4 advance drops a stack of toasts over a phone screen; show the newest three. */
+.nrl-toast-stack .nrl-toast:nth-last-child(n+4) { display: none; }
 .nrl-toast {
   color: #fff;
   border: 3px solid #000;

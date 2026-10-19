@@ -77,5 +77,5 @@ export function openGuideScreen(pageId?: string): HTMLElement {
 
   content.append(tabs, body, foot);
   show(pageId ?? lastPageId ?? GUIDE_PAGES[0]!.id);
-  return openModal(content, { class: 'nrl-guide-modal', screen: true });
+  return openModal(content, { class: 'nrl-guide-modal', screen: true, closeButton: false });
 }

@@ -388,7 +388,7 @@ const TUTORIAL_CSS = `
   pointer-events: auto;
   position: fixed;
   left: 50%;
-  bottom: 5rem;              /* clear of the bottom nav bar */
+  bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); /* clear of the nav and the home bar */
   transform: translateX(-50%);
   max-width: min(90vw, 320px);
   background: #e8e0c8;
@@ -412,6 +412,18 @@ const TUTORIAL_CSS = `
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
+}
+/* A landscape phone (#195): the bubble docks bottom-left, clear of the tile the
+   player has to tap, the match's speed buttons and the home bar. */
+@media (max-height: 500px) {
+  .nrl-tutorial-bubble, .nrl-tutorial-centered {
+    top: auto;
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    left: calc(0.75rem + env(safe-area-inset-left, 0px));
+    right: auto;
+    transform: none;
+    max-width: min(60vw, 240px);
+  }
 }
 `;
 
