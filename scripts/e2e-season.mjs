@@ -1,18 +1,20 @@
 // scripts/e2e-season.mjs — end-to-end playthrough of a full season on a phone
 // (QA pass). Builds the game and serves it with `vite preview`, then in
-// Chromium at 844×390 (touch):
+// Chromium at 844×390 (touch) or 1280×800 (a desktop window, mouse):
 //   new game → build two facilities → move one → demolish one → sign a free
-//   agent → play a live match → answer event cards → renew a contract → change
-//   the kit → watch rivals sign from the pool → save, reload and continue →
-//   play to the season rollover → into season 2.
+//   agent → change the kit → play a match on the classic engine → turn on Live match (beta)
+//   and watch one on the live sim through the overlay to Back to Club →
+//   answer event cards → renew a contract → watch rivals sign from the pool →
+//   save, reload and continue → play to the season rollover → into season 2.
 // Every step takes a screenshot and runs layout checks (nothing off-screen, no
-// sideways page scroll); page errors and console errors are collected. Writes
-// e2e-output/report.json and exits 1 if anything failed. Slot 1 is dumped to
-// e2e-output/saves/v<version>-<point>.json at four points (after the tutorial,
-// mid-season, after the rollover, season 2) for the save corpus in
+// sideways page scroll); a page or console error during a step fails it. Writes
+// e2e-output/<WxH>/report.json and exits 1 if anything failed. Slot 1 is dumped
+// to e2e-output/<WxH>/saves/v<version>-<point>.json at four points (after the
+// tutorial, mid-season, after the rollover, season 2) for the save corpus in
 // tests/fixtures/saves (see the README there).
 //
 //   npm run e2e:season
+//   npm run e2e:season -- --size 1280x800                 (or E2E_SIZE=1280x800)
 //   CHROMIUM_PATH=/path/to/chrome npm run e2e:season
 //   E2E_URL=http://localhost:5173/ npm run e2e:season   (against a server you started)
 //
@@ -22,29 +24,38 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 
-const OUT = process.env.E2E_OUT ?? 'e2e-output';
+// --size WxH (or E2E_SIZE): 844×390 is a landscape phone with touch (the default);
+// anything 1000px or wider is a desktop window driven by the mouse.
+const argv = process.argv.slice(2);
+const sizeArg = argv.includes('--size') ? argv[argv.indexOf('--size') + 1] : process.env.E2E_SIZE;
+const [W, H] = (sizeArg ?? '844x390').split('x').map(Number);
+if (!(W > 0 && H > 0)) {
+  console.error(`bad --size "${sizeArg}": want WxH, e.g. 844x390 or 1280x800`);
+  process.exit(2);
+}
+const PHONE = W < 1000;
+const OUT_ROOT = process.env.E2E_OUT ?? 'e2e-output';
+const OUT = join(OUT_ROOT, `${W}x${H}`);
 const PORT = Number(process.env.E2E_PORT ?? 4199);
 const EXTERNAL = process.env.E2E_URL;
 // `?e2e` makes the game expose itself so the grounds can be checked (main.ts).
 const BASE = `${EXTERNAL ?? `http://localhost:${PORT}/`}?e2e`;
 const CHROMIUM = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium';
 const SLOT = 'nrl-sim-save-slot-1';
-const W = 844;
-const H = 390;
 
 const SAVES = join(OUT, 'saves');
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(SAVES, { recursive: true });
 
-const report = { steps: [], errors: [], findings: [] };
+const report = { size: `${W}x${H}`, phone: PHONE, steps: [], errors: [], findings: [] };
 const log = (...a) => console.log(...a);
 
 // ── Server: a production build served by `vite preview` (no hot reload mid-run) ──
 let server = null;
 async function startServer() {
   if (EXTERNAL) return;
-  const dist = join(OUT, 'dist');
+  const dist = join(OUT_ROOT, 'dist');
   log('building…');
   await new Promise((res, rej) => {
     const b = spawn('npx', ['vite', 'build', '--outDir', dist, '--emptyOutDir', '--logLevel', 'warn'], { stdio: 'inherit' });
@@ -68,12 +79,14 @@ function stopServer() {
 let page;
 let stepNo = 0;
 const save = () => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? 'null'), SLOT);
+/** Tap (phone) or click (desktop) a locator. */
+const press = (loc) => (PHONE ? loc.tap() : loc.click());
 const tap = async (selector) => {
   const el = page.locator(selector).first();
   await el.scrollIntoViewIfNeeded();
-  await el.tap();
+  await press(el);
 };
-const tapAt = (x, y) => page.touchscreen.tap(x, y);
+const tapAt = (x, y) => (PHONE ? page.touchscreen.tap(x, y) : page.mouse.click(x, y));
 const wait = (ms) => page.waitForTimeout(ms);
 const toastsGone = () => page.waitForFunction(() => document.querySelectorAll('.nrl-toast').length === 0, null, { timeout: 8000 }).catch(() => {});
 const closeAny = async () => {
@@ -88,7 +101,8 @@ const closeAny = async () => {
 
 /** Layout checks on the current view: problems as strings. */
 async function layoutProblems() {
-  return page.evaluate(({ W, H }) => {
+  return page.evaluate(() => {
+    const W = window.innerWidth, H = window.innerHeight;
     const out = [];
     if (document.documentElement.scrollWidth > W + 1) out.push(`page scrolls sideways (${document.documentElement.scrollWidth}px wide)`);
     for (const m of document.querySelectorAll('.nrl-modal')) {
@@ -109,12 +123,13 @@ async function layoutProblems() {
     }).map((b) => b.textContent?.trim());
     if (hidden.length) out.push(`nav buttons off-screen: ${hidden.join(', ')}`);
     return out;
-  }, { W, H });
+  });
 }
 
 /** Run a step: do it, screenshot it, check the layout, record the outcome. */
 async function step(name, fn, { settle = 300, quietToasts = false } = {}) {
   stepNo++;
+  const errorsBefore = report.errors.length;
   const file = `${String(stepNo).padStart(2, '0')}-${name}.png`;
   const rec = { n: stepNo, name, file, ok: true, notes: [] };
   try {
@@ -129,6 +144,13 @@ async function step(name, fn, { settle = 300, quietToasts = false } = {}) {
   await page.screenshot({ path: join(OUT, file) });
   const lay = await layoutProblems();
   if (lay.length) rec.layout = lay;
+  // Zero console errors: anything the page logged as an error during the step fails it.
+  const errs = report.errors.slice(errorsBefore);
+  if (errs.length) {
+    rec.ok = false;
+    rec.errors = errs;
+    rec.notes.push(`${errs.length} page/console error(s): ${errs[0].slice(0, 120)}`);
+  }
   report.steps.push(rec);
   log(`${rec.ok ? 'ok ' : 'ERR'} ${file}${rec.notes.length ? ` — ${rec.notes.join('; ')}` : ''}${lay.length ? ` [layout: ${lay.join(' | ')}]` : ''}`);
   return rec;
@@ -165,7 +187,7 @@ async function facilitiesDrawn(rec) {
 /** At full time: close the Player of the Match card if it's up, then go back to the club. */
 async function leaveMatch() {
   const potm = page.locator('.nrl-modal .nrl-btn:has-text("Close")');
-  if (await potm.count()) { await potm.first().tap(); await wait(200); }
+  if (await potm.count()) { await press(potm.first()); await wait(200); }
   await tap('.nrl-btn:has-text("Back to Club")');
   await page.waitForSelector('.nrl-hud .nrl-btn:has-text("Advance Week")');
 }
@@ -188,7 +210,7 @@ async function answerCards(rec) {
   while (await page.locator('.nrl-event-card').count()) {
     const title = await page.locator('.nrl-event-title').first().textContent();
     const choice = n % 2;
-    await page.locator(`.nrl-event-card >> nth=0 >> [data-event-choice="${choice}"]`).tap();
+    await press(page.locator(`.nrl-event-card >> nth=0 >> [data-event-choice="${choice}"]`));
     rec?.notes.push(`answered "${title}" with choice ${choice}`);
     n++;
     await wait(150);
@@ -200,7 +222,7 @@ async function answerCards(rec) {
 // ── The playthrough ───────────────────────────────────────────────────────────
 async function play() {
   const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-gl=swiftshader'] });
-  const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: true, isMobile: true });
+  const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: PHONE, isMobile: PHONE });
   page = await ctx.newPage();
   page.setDefaultTimeout(10000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
@@ -224,13 +246,13 @@ async function play() {
   const spotB = [cx - 130, cy + 20], spotMove = [cx + 120, cy + 30];
   await step('build-menu', async () => { await tap('.nrl-nav .nrl-btn:has-text("Build")'); await page.waitForSelector('.nrl-build-row'); });
   await step('build-placing', async () => {
-    await page.locator('.nrl-build-row:not(.nrl-build-row-disabled)', { hasText: 'Training Paddock' }).tap();
+    await press(page.locator('.nrl-build-row:not(.nrl-build-row-disabled)', { hasText: 'Training Paddock' }));
     await page.waitForSelector('.nrl-placebar:not([hidden])');
   });
   await step('built-paddock', async () => { await tapAt(cx, cy); await wait(2200); }, { quietToasts: true });
   await step('build-second', async () => {
     await tap('.nrl-nav .nrl-btn:has-text("Build")');
-    await page.locator('.nrl-build-row:not(.nrl-build-row-disabled)', { hasText: 'Canteen' }).tap();
+    await press(page.locator('.nrl-build-row:not(.nrl-build-row-disabled)', { hasText: 'Canteen' }));
     await tapAt(...spotB);
     await wait(2200);
   }, { quietToasts: true });
@@ -257,7 +279,7 @@ async function play() {
   await step('signed', async (rec) => {
     const btn = page.locator('.nrl-card .nrl-card-actions .nrl-btn:not([disabled])').first();
     const name = await page.locator('.nrl-card:has(.nrl-card-actions .nrl-btn:not([disabled])) .nrl-card-name').first().textContent();
-    await btn.tap();
+    await press(btn);
     await wait(300);
     rec.notes.push(`signed ${name}`);
   });
@@ -271,8 +293,8 @@ async function play() {
     await tap('.nrl-kit-save');
   }, { quietToasts: true });
 
-  // A live match: Advance Week hands over to the match scene.
-  await step('match-live', async () => {
+  // A match on the classic engine: Advance Week hands over to the match scene.
+  await step('match-classic', async () => {
     await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
     await wait(3000);
@@ -283,6 +305,51 @@ async function play() {
     await wait(500);
   });
   await step('back-to-club', async (rec) => { await leaveMatch(); await facilitiesDrawn(rec); }, { quietToasts: true });
+
+  // Live match (BAK-207 2g): the setting lives on the Fixtures screen. With it on,
+  // the next match plays on the live sim and is watched through the overlay at ×8,
+  // skipped to full time, and left by Back to Club; the overlay's score must be the
+  // saved result. The setting stays on, so the rest of the season's matches run
+  // the live sim headless. Skipped when the setting isn't there.
+  let liveOn = false;
+  await step('live-toggle', async (rec) => {
+    await tap('.nrl-nav .nrl-btn:has-text("Fixtures")');
+    await page.waitForSelector('.nrl-league');
+    const box = page.locator('.nrl-live-toggle input[type="checkbox"]');
+    if (!(await box.count())) return 'no live-match setting on the Fixtures screen';
+    await press(box);
+    liveOn = await page.evaluate(() => window.__nrlState?.().settings.liveMatch === true);
+    if (!liveOn) throw new Error('the live-match setting did not turn on');
+    rec.notes.push('Live match (beta) on');
+  });
+  await step('live-match', async (rec) => {
+    await tap('.nrl-league-close');
+    if (!liveOn) return 'skipped: no live-match setting';
+    await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+    await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
+    await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×8' }));
+    await wait(6000);
+    const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    if (!clock || clock === '00:00') throw new Error(`the live match clock did not move (${clock})`);
+    rec.notes.push(`×8, clock ${clock}`);
+  });
+  await step('live-fulltime', async (rec) => {
+    if (!liveOn) return 'skipped';
+    await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 20000 });
+    await wait(500);
+    const shown = (await page.locator('.nrl-mo-score').textContent())?.trim();
+    const s = await save();
+    const f = s.league.fixtures.find((x) => x.round === s.week - 1 && (x.homeId === 'player' || x.awayId === 'player'));
+    const saved = f?.result ? `${f.result.homeScore} – ${f.result.awayScore}` : '(no result saved)';
+    rec.notes.push(`overlay ${shown}, saved ${saved}`);
+    if (shown !== saved) throw new Error(`the overlay shows ${shown} but the saved result is ${saved}`);
+  });
+  await step('live-back-to-club', async (rec) => {
+    if (!liveOn) return 'skipped';
+    await leaveMatch();
+    await facilitiesDrawn(rec);
+  }, { quietToasts: true });
 
   // Rivals and the free-agent pool: note who is in the pool, play on, see who rivals took.
   const before = await save();
@@ -309,7 +376,7 @@ async function play() {
 
   // Contracts: renew someone.
   await step('contracts', async () => {
-    await page.locator('.nrl-rival-squad .nrl-btn:has-text("Close")').tap();
+    await press(page.locator('.nrl-rival-squad .nrl-btn:has-text("Close")'));
     await closeAny();
     await tap('.nrl-nav .nrl-btn:has-text("Contracts")');
     await wait(300);
@@ -318,7 +385,7 @@ async function play() {
     const renew = page.locator('.nrl-contract-actions .nrl-btn:has-text("Renew")').first();
     if (!(await renew.count())) return 'no contract to renew';
     const label = await renew.textContent();
-    await renew.tap();
+    await press(renew);
     rec.notes.push(`tapped ${label}`);
   });
   await step('finance', async () => { await closeAny(); await tap('.nrl-nav .nrl-btn:has-text("Finance")'); await wait(300); });
@@ -387,7 +454,8 @@ try {
 const failed = report.steps.filter((s) => !s.ok);
 const layout = report.steps.filter((s) => s.layout);
 writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
-log(`\n${report.steps.length} steps, ${failed.length} failed, ${layout.length} with layout problems, ${report.errors.length} errors`);
+log(`\n${report.size}${PHONE ? ' (phone)' : ' (desktop)'}: ${report.steps.length} steps, ${failed.length} failed, ${layout.length} with layout problems, ${report.errors.length} errors`);
+for (const s of failed) log(`  failed: ${s.file} — ${s.notes.join('; ')}`);
 for (const e of report.errors) log(`  ${e}`);
 for (const f of report.findings) log(`  finding: ${f}`);
 process.exit(failed.length || report.errors.length ? 1 : 0);
