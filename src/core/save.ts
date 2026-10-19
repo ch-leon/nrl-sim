@@ -14,6 +14,7 @@ import type { GameState } from './state';
 import { emptyFinance, getState, SAVE_VERSION } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
+import { autoPick } from '../systems/lineup';
 import { bus } from './events';
 import { buildLabel } from '../ui/buildInfo';
 import {
@@ -180,6 +181,9 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v9 → v10: GameState.finance, the club's books by season (N6, #172). An old
   // save starts with nothing booked for the season it is in.
   { from: 9, to: 10, run: (old) => ({ ...old, finance: [emptyFinance(typeof old.season === 'number' ? old.season : 1)] }) },
+  // v10 → v11: GameState.lineup, the coach's nine and bench (GitHub #69). An old
+  // save gets today's auto pick: the side teamSheetFromSquad was already fielding.
+  { from: 10, to: 11, run: (old) => ({ ...old, lineup: old.lineup ?? autoPick(Array.isArray(old.squad) ? (old.squad as GameState['squad']) : []) }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

@@ -14,7 +14,8 @@ import { FORFEIT_SCORE, SQUAD_MIN } from '../../src/config';
 import { generatePlayer } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
 import type { Fixture, Player } from '../../src/core/state';
-import type { MatchResult } from '../../src/sim/events';
+import type { MatchResult, TeamSheet } from '../../src/sim/events';
+import { LINEUP_SLOTS, placeAt, swapSpots } from '../../src/systems/lineup';
 
 function collect(): {
   toasts: string[];
@@ -233,5 +234,86 @@ describe('rival rosters come from the rival squad (#74)', () => {
     const second = sheets[1]!;
     const rival2 = second.home.clubId === PLAYER_ID ? second.away : second.home;
     expect(rival2.roster!.every((r) => r.id === undefined)).toBe(true);
+  });
+});
+
+describe('the coach’s lineup is the side that runs out (#69)', () => {
+  beforeEach(() => {
+    bus.clear();
+    clearTickHooks();
+    clearSeasonHooks();
+    createNewGame('Lineup FC', 69);
+    initLeague(getState());
+    registerPlayerMatchSystem();
+  });
+
+  function playerSheet(c: ReturnType<typeof collectSheets>): TeamSheet {
+    const first = c.sheets[0]!;
+    return first.home.clubId === PLAYER_ID ? first.home : first.away;
+  }
+  function collectSheets(): { sheets: { home: TeamSheet; away: TeamSheet; fixture: Fixture; sim?: MatchResult }[]; toasts: string[]; stop: () => void } {
+    const sheets: { home: TeamSheet; away: TeamSheet; fixture: Fixture; sim?: MatchResult }[] = [];
+    const toasts: string[] = [];
+    const offs = [
+      bus.on('match:started', ({ home, away, fixture, sim }) => sheets.push({ home, away, fixture, ...(sim ? { sim } : {}) })),
+      bus.on('ui:notify', ({ text }) => toasts.push(text)),
+    ];
+    return { sheets, toasts, stop: () => offs.forEach((off) => off()) };
+  }
+
+  it('fields the nine picked, in their slots, with the bench and rotation; the result credits them a game', () => {
+    const s = getState();
+    // Swap two starters' slots and put a bench man in at prop: the sheet must follow.
+    let lineup = swapSpots(s.lineup, { kind: 'starter', slot: 1 }, { kind: 'starter', slot: 3 });
+    lineup = placeAt(lineup, { kind: 'starter', slot: 7 }, lineup.bench[0]!);
+    lineup = { ...lineup, rotation: 'heavy' };
+    setState({ lineup });
+    const c = collectSheets();
+    advanceWeek();
+    const mine = playerSheet(c);
+    expect(mine.roster!.map((r) => r.id)).toEqual(lineup.starters);
+    expect(mine.roster!.map((r) => r.position)).toEqual([...LINEUP_SLOTS]);
+    expect(mine.bench!.map((b) => b.id)).toEqual(lineup.bench);
+    expect(mine.rotation).toBe('heavy');
+    // The rival's coach picks by slot too.
+    const theirs = c.sheets[0]!.home.clubId === PLAYER_ID ? c.sheets[0]!.away : c.sheets[0]!.home;
+    expect(theirs.roster!.map((r) => r.position)).toEqual([...LINEUP_SLOTS]);
+    expect(c.toasts.some((t) => t.startsWith('Lineup:'))).toBe(false); // everyone fit: nothing to say
+    bus.emit('match:finished', { fixture: c.sheets[0]!.fixture, result: c.sheets[0]!.sim! });
+    const games = new Map(getState().squad.map((p) => [p.id, p.career?.games ?? 0]));
+    for (const id of lineup.starters) expect(games.get(id!)).toBe(1);
+    for (const p of getState().squad) if (!lineup.starters.includes(p.id)) expect(games.get(p.id)).toBe(0);
+    c.stop();
+  });
+
+  it('an injured starter is covered for the match and the news says by whom; his slot is kept', () => {
+    const s = getState();
+    const fbId = s.lineup.starters[0]!;
+    setState({ squad: s.squad.map((p) => (p.id === fbId ? { ...p, injuredWeeks: 2 } : p)) });
+    const c = collectSheets();
+    advanceWeek();
+    const mine = playerSheet(c);
+    expect(mine.roster![0]!.id).not.toBe(fbId);
+    expect(mine.roster![0]!.position).toBe('fullback');
+    expect(mine.roster!.map((r) => r.id)).not.toContain(fbId);
+    const fb = getState().squad.find((p) => p.id === fbId)!;
+    expect(c.toasts.some((t) => t === `Lineup: ${mine.roster![0]!.name} fills in at fullback for the injured ${fb.name}.`)).toBe(true);
+    expect(getState().lineup.starters[0]).toBe(fbId);
+    c.stop();
+  });
+
+  it('a starter who has left the club is replaced in the saved lineup', () => {
+    const s = getState();
+    const hkId = s.lineup.starters[6]!;
+    setState({ squad: s.squad.filter((p) => p.id !== hkId) });
+    const c = collectSheets();
+    advanceWeek();
+    const mine = playerSheet(c);
+    expect(mine.roster![6]!.position).toBe('hooker');
+    expect(getState().lineup.starters[6]).toBe(mine.roster![6]!.id);
+    expect(getState().lineup.starters).not.toContain(hkId);
+    expect(getState().lineup.bench).not.toContain(mine.roster![6]!.id);
+    expect(c.toasts.some((t) => t.startsWith('Lineup:') && t.includes('comes in at hooker'))).toBe(true);
+    c.stop();
   });
 });

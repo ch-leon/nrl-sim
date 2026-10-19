@@ -29,7 +29,7 @@ type SortKey = 'position' | 'rating';
  * The kit the player's squad wears on the pitch: the same club colours the
  * match uses (matchday.ts sheetFor), so portraits match the match kit.
  */
-function squadKit(): Kit {
+export function squadKit(): Kit {
   const colors = getState().league.clubs.find((c) => c.id === PLAYER_ID)?.colors ?? DEFAULT_PLAYER_COLORS;
   return kitFromColors(colors, PLAYER_ID);
 }
