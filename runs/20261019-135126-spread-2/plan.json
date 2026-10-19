@@ -1,0 +1,69 @@
+{
+  "name": "spread 2",
+  "description": "Phase 3 (#87): with the opening kick-off a coin toss, which rating.spread gives about 70% at a 20-point gap (both ways round), even sides at 50%?",
+  "seeds": 40,
+  "scenarios": [
+    {
+      "name": "60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "65 v 55",
+      "home": {
+        "rating": 65
+      },
+      "away": {
+        "rating": 55
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "50 v 70",
+      "home": {
+        "rating": 50
+      },
+      "away": {
+        "rating": 70
+      }
+    },
+    {
+      "name": "70 v 35",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 35
+      }
+    },
+    {
+      "name": "stingrays v larrikins",
+      "home": {
+        "club": "rival-stingrays"
+      },
+      "away": {
+        "club": "rival-larrikins"
+      }
+    }
+  ],
+  "sweep": {
+    "rating.spread": [
+      0.15,
+      0.2,
+      0.25,
+      0.3
+    ]
+  }
+}
