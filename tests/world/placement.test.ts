@@ -142,3 +142,81 @@ describe('validatePlacement — unique facilities', () => {
     expect(reasonText('duplicate')).not.toBe(reasonText('???'));
   });
 });
+
+// ── Move and demolish (GitHub #78) ───────────────────────────────────────────
+import {
+  moveFee, facilitySpend, demolishRefund, validateMove, moveFacility, demolishFacility,
+} from '../../src/world/placement';
+import type { PlacedFacility } from '../../src/core/state';
+
+const placed = (over: Partial<PlacedFacility> & Pick<PlacedFacility, 'id' | 'defId'>): PlacedFacility =>
+  ({ level: 1, x: 0, y: 0, ...over });
+
+describe('move and demolish prices', () => {
+  it('move fee is 10% of the build cost; refund is 30% of build plus upgrades', () => {
+    const def = FACILITY_CATALOG.weightsRoom; // $15,000
+    expect(moveFee(def)).toBe(1_500);
+    expect(facilitySpend(def, 1)).toBe(15_000);
+    expect(facilitySpend(def, 3)).toBe(15_000 + 30_000 + 45_000);
+    expect(demolishRefund(def, 1)).toBe(4_500);
+    expect(demolishRefund(def, 3)).toBe(27_000);
+  });
+});
+
+describe('validateMove', () => {
+  it('ignores its own footprint and its own uniqueness, but not others', () => {
+    const gym = placed({ id: 'a', defId: 'weightsRoom', x: 2, y: 2 });
+    const board = placed({ id: 'b', defId: 'sponsorBoard', x: 10, y: 10 });
+    setState({ facilities: [gym, board], money: 100_000 });
+    expect(validateMove(getState(), gym, 3, 2)).toEqual({ ok: true }); // overlaps only itself
+    expect(validateMove(getState(), board, 12, 10)).toEqual({ ok: true }); // unique, but it's the same one
+    expect(validateMove(getState(), gym, 9, 9)).toEqual({ ok: false, reason: 'overlap' });
+    expect(validateMove(getState(), gym, GRID_W - 1, 0)).toEqual({ ok: false, reason: 'out-of-bounds' });
+  });
+
+  it('needs the move fee, not the build cost', () => {
+    const gym = placed({ id: 'a', defId: 'weightsRoom', x: 2, y: 2 });
+    setState({ facilities: [gym], money: 1_500 });
+    expect(validateMove(getState(), gym, 8, 8)).toEqual({ ok: true });
+    setState({ money: 1_499 });
+    expect(validateMove(getState(), gym, 8, 8)).toEqual({ ok: false, reason: 'insufficient-funds' });
+  });
+});
+
+describe('moveFacility', () => {
+  it('keeps the id and level, moves it and charges the fee through the ledger', () => {
+    setState({ facilities: [placed({ id: 'a', defId: 'weightsRoom', level: 3, x: 2, y: 2 })], money: 10_000 });
+    const moves: { delta: number; reason: string }[] = [];
+    bus.on('money:changed', ({ delta, reason }) => moves.push({ delta, reason }));
+    expect(moveFacility('a', 8, 9)).toEqual({ ok: true, fee: 1_500 });
+    expect(getState().facilities).toEqual([{ id: 'a', defId: 'weightsRoom', level: 3, x: 8, y: 9 }]);
+    expect(getState().money).toBe(8_500);
+    expect(moves).toEqual([{ delta: -1_500, reason: 'move:weightsRoom' }]);
+  });
+
+  it('putting it back on its own spot is free; an invalid move changes nothing', () => {
+    const gym = placed({ id: 'a', defId: 'weightsRoom', x: 2, y: 2 });
+    const other = placed({ id: 'b', defId: 'canteen', x: 6, y: 6 });
+    setState({ facilities: [gym, other], money: 10_000 });
+    expect(moveFacility('a', 2, 2)).toEqual({ ok: true, fee: 0 });
+    expect(moveFacility('a', 6, 6)).toEqual({ ok: false, reason: 'overlap' });
+    expect(moveFacility('zzz', 1, 1)).toEqual({ ok: false, reason: 'missing' });
+    expect(getState().facilities).toEqual([gym, other]);
+    expect(getState().money).toBe(10_000);
+  });
+});
+
+describe('demolishFacility', () => {
+  it('removes it, frees its tiles and refunds 30% through the ledger', () => {
+    setState({ facilities: [placed({ id: 'a', defId: 'weightsRoom', level: 2, x: 2, y: 2 })], money: 0 });
+    const moves: { delta: number; reason: string }[] = [];
+    bus.on('money:changed', ({ delta, reason }) => moves.push({ delta, reason }));
+    expect(demolishFacility('a')).toBe(13_500); // 30% of 15k + 30k
+    expect(getState().facilities).toEqual([]);
+    expect(getState().money).toBe(13_500);
+    expect(moves).toEqual([{ delta: 13_500, reason: 'demolish:weightsRoom' }]);
+    setState({ money: 50_000 });
+    expect(validatePlacement(getState(), 'weightsRoom', 2, 2)).toEqual({ ok: true });
+    expect(demolishFacility('a')).toBeNull();
+  });
+});

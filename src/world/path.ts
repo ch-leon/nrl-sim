@@ -144,3 +144,22 @@ function reconstruct(cameFrom: Map<number, number>, endKey: number, width: numbe
   path.shift(); // exclude the start cell
   return path;
 }
+
+/**
+ * The walkable cell nearest to `from` (Manhattan rings, row-major within a ring),
+ * or null if nothing is walkable. Used to step someone out of a footprint that a
+ * facility has just been built or moved onto (#78).
+ */
+export function nearestWalkable(grid: WalkGrid, from: PathNode): PathNode | null {
+  if (grid.isWalkable(from.x, from.y)) return { x: from.x, y: from.y };
+  const maxR = grid.width + grid.height;
+  for (let r = 1; r <= maxR; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      const rest = r - Math.abs(dy);
+      for (const dx of rest === 0 ? [0] : [-rest, rest]) {
+        if (grid.isWalkable(from.x + dx, from.y + dy)) return { x: from.x + dx, y: from.y + dy };
+      }
+    }
+  }
+  return null;
+}

@@ -6,7 +6,9 @@
 // registry in world/placement.ts (DOM never imports Phaser).
 //
 // openFacilityPopup() renders the tap-a-placed-facility upgrade/info popup, priced
-// via upgradeCost, capped at L3, disabled when unaffordable.
+// via upgradeCost, capped at L3, disabled when unaffordable. It also offers Move
+// (placement mode with that facility's ghost, for a fee) and Demolish (two taps,
+// part refund) — GitHub #78.
 
 import { el, panel, button, openModal, closeModal, closeScreen, mount } from '../dom';
 import {
@@ -21,7 +23,9 @@ import { getState, setState } from '../../core/state';
 import { spendMoney } from '../../data/club';
 import { ECON } from '../../config';
 import { bus } from '../../core/events';
-import { activeGroundsScene, type GroundsSceneLike } from '../../world/placement';
+import {
+  activeGroundsScene, demolishFacility, demolishRefund, moveFee, type GroundsSceneLike,
+} from '../../world/placement';
 
 /** Format a money value for display (local; mirrors hud.fmtMoney conventions). */
 function fmtMoney(n: number): string {
@@ -178,7 +182,34 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
     container.append(upBtn);
   }
 
-  container.append(button('Close', () => closeModal(), { class: 'nrl-facility-close' }));
+  // Move / Demolish (#78).
+  const fee = moveFee(def);
+  const refund = demolishRefund(def, facility.level);
+  const moveBtn = button(`Move — ${fmtMoney(fee)}`, () => {
+    if (getState().money < fee) return;
+    closeModal();
+    activeGroundsScene()?.enterMoveMode(facility.id);
+  }, { class: 'nrl-facility-move' });
+  if (money < fee || !activeGroundsScene()) moveBtn.disabled = true;
+
+  // Two taps so a stray one never knocks a building down.
+  let armed = false;
+  const demoBtn = button(`Demolish (+${fmtMoney(refund)})`, () => {
+    if (!armed) {
+      armed = true;
+      demoBtn.textContent = `Really demolish? +${fmtMoney(refund)} back`;
+      demoBtn.classList.add('nrl-facility-armed');
+      return;
+    }
+    const got = demolishFacility(facility.id);
+    closeModal();
+    if (got !== null) bus.emit('ui:notify', { text: `${def.name} demolished. ${fmtMoney(got)} refunded.`, kind: 'info' });
+  }, { class: 'nrl-facility-demolish' });
+
+  container.append(
+    el('div', { class: 'nrl-facility-actions' }, moveBtn, demoBtn),
+    button('Close', () => closeModal(), { class: 'nrl-facility-close' }),
+  );
   return container;
 }
 
@@ -250,4 +281,9 @@ const BUILD_CSS = `
 .nrl-facility-level { font-weight: bold; }
 .nrl-facility-blurb { font-size: 0.85rem; line-height: 1.3; margin: 0; }
 .nrl-facility-max { font-weight: bold; color: #357a38; }
+.nrl-facility-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.nrl-facility-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
+.nrl-btn.nrl-facility-demolish, .nrl-btn.nrl-facility-demolish:hover { background: #e8a598; }
+.nrl-btn.nrl-facility-demolish.nrl-facility-armed,
+.nrl-btn.nrl-facility-demolish.nrl-facility-armed:hover { background: #b03a2e; color: #fff; }
 `;

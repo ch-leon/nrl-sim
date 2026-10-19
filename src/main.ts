@@ -24,6 +24,7 @@ import { registerEventsSystem } from './systems/events';
 import { initBoardUi } from './ui/screens/board';
 import { initPlayerOfMatch } from './ui/screens/potm';
 import { openBuildScreen } from './ui/screens/build';
+import { initPlacementBar } from './ui/placementBar';
 import { openSquadScreen } from './ui/screens/squad';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
@@ -147,6 +148,8 @@ async function boot(): Promise<void> {
     g.scene.stop('Grounds');
     g.scene.start('Match', { home, away, result: sim, fixture });
   });
+
+  initPlacementBar(); // build/move instructions + Cancel (#78)
 
   const nav = createNav();
   nav.registerScreen('squad', 'Squad', () => openSquadScreen());

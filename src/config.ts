@@ -89,6 +89,12 @@ export const EVENTS = {
   ANSWER_WEEKS: 2,    // weeks to answer before the default choice is taken
 } as const;
 
+/** Moving and demolishing facilities on the grounds (GitHub #78). */
+export const GROUNDS = {
+  MOVE_FEE_RATE: 0.1,         // move fee = 10% of the build cost
+  DEMOLISH_REFUND_RATE: 0.3,  // demolish refund = 30% of build + upgrades
+} as const;
+
 /** Contracts screen (GitHub #40). */
 export const CONTRACTS = {
   WARN_WEEKS: [8, 4, 1] as readonly number[], // toast when this many weeks remain
