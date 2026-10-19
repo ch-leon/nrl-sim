@@ -12,11 +12,10 @@
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
-import { overallRating } from '../data/player';
 import { ECON, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { registerTickHook, TICK_ORDER } from '../core/time';
-import { warnForWeeks } from './contracts';
+import { renewalWage, warnForWeeks } from './contracts';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -88,8 +87,9 @@ export function gateReceipts(state: GameState): number {
 
 /**
  * Decrement contractWeeks by 1 for all squad. On reaching 0 a player demands
- * renewal at newWage = round(wage × (1 + drift)), drift = (overall−60)/200
- * clamped to [−0.15, +0.25]. If affordable at that moment (money ≥ newWage × 4)
+ * renewal at contracts.renewalWage: the market wage for their overall today,
+ * moved by morale and the club's standing (N6, #167; before that it was the old
+ * wage ± a drift by overall). If affordable at that moment (money ≥ newWage × 4)
  * auto-renew (wage = newWage, contractWeeks = 52); else the player departs to
  * freeAgents (removed from squad), ui:notify info. Deterministic; squad-array
  * order (earlier renewals can consume funds, pushing later players to depart).
@@ -110,10 +110,8 @@ export function tickContracts(state: GameState): GameState {
       continue;
     }
 
-    // Contract expired this tick — renew if affordable, else depart.
-    const rawDrift = (overallRating(p) - 60) / 200;
-    const drift = Math.max(-0.15, Math.min(0.25, rawDrift));
-    const newWage = Math.round(p.wage * (1 + drift));
+    // Contract expired this tick — renew at the ask if affordable, else depart.
+    const newWage = renewalWage(p, state);
 
     if (money >= newWage * 4) {
       keep.push({ ...p, wage: newWage, contractWeeks: 52 });

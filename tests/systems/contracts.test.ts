@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createNewGame, getState, loadState, type Player } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { tickContracts } from '../../src/systems/economy';
-import { renewEarly, renewalFee, renewalWage, sellPlayer, transferFee, marketWage } from '../../src/systems/contracts';
-import { marketWage as playerMarketWage, WAGE_PER_OVERALL, WAGE_BASE } from '../../src/data/player';
+import { clubWageFactor, renewEarly, renewalFee, renewalWage, renewalWeeklyCost, sellPlayer, transferFee, marketWage } from '../../src/systems/contracts';
+import { marketWage as playerMarketWage, wageForOverall } from '../../src/data/player';
+import { CONTRACTS } from '../../src/config';
 import { marketWage as rivalMarketWage } from '../../src/systems/rivals';
 import { refreshFreeAgents } from '../../src/systems/freeagency';
 import { makeRng } from '../../src/utils/rng';
@@ -51,7 +52,34 @@ describe('marketWage', () => {
     const p = mk('w');
     expect(marketWage).toBe(playerMarketWage);
     expect(rivalMarketWage).toBe(playerMarketWage);
-    expect(marketWage(p)).toBe(Math.round(overallRating(p) * WAGE_PER_OVERALL + WAGE_BASE));
+    expect(marketWage(p)).toBe(wageForOverall(overallRating(p)));
+  });
+});
+
+describe('renewal asks track the club (N6, #167)', () => {
+  const NEW_CLUB = { reputation: 30, season: 1 };
+  it('a new club at the baseline reputation pays the market wage at neutral morale', () => {
+    expect(clubWageFactor(NEW_CLUB)).toBe(1);
+    expect(clubWageFactor({ reputation: 10, season: 1 })).toBe(1);
+    expect(renewalWage(mk('a'), NEW_CLUB)).toBe(marketWage(mk('a')));
+  });
+  it('reputation adds up to RENEW_REP_PREMIUM at 100', () => {
+    expect(clubWageFactor({ reputation: 100, season: 1 })).toBeCloseTo(1 + CONTRACTS.RENEW_REP_PREMIUM, 6);
+    expect(clubWageFactor({ reputation: 65, season: 1 })).toBeCloseTo(1 + CONTRACTS.RENEW_REP_PREMIUM / 2, 6);
+  });
+  it('every season after the first adds RENEW_SEASON_INFLATION', () => {
+    expect(clubWageFactor({ reputation: 30, season: 5 })).toBeCloseTo(1 + 4 * CONTRACTS.RENEW_SEASON_INFLATION, 6);
+    expect(clubWageFactor({ reputation: 100, season: 5 })).toBeCloseTo((1 + CONTRACTS.RENEW_REP_PREMIUM) * (1 + 4 * CONTRACTS.RENEW_SEASON_INFLATION), 6);
+  });
+  it('the ask, the weekly cost and an early renewal all use the club factor', () => {
+    const p = mk('a');
+    setup([p]);
+    loadState({ ...getState(), reputation: 100, season: 3 });
+    const factor = clubWageFactor(getState());
+    expect(renewalWage(p, getState())).toBe(Math.round(marketWage(p) * factor));
+    expect(renewalWeeklyCost(getState(), p)).toBe(renewalWage(p, getState()));
+    expect(renewEarly(getState(), 'a').ok).toBe(true);
+    expect(getState().squad[0]!.wage).toBe(Math.round(marketWage(p) * factor));
   });
 });
 
@@ -59,8 +87,8 @@ describe('early renewal', () => {
   it('charges 2 × new weekly wage and sets 52 weeks', () => {
     setup([mk('a')]);
     const p = getState().squad[0];
-    const wage = renewalWage(p);
-    expect(wage).toBe(marketWage(p)); // neutral morale
+    const wage = renewalWage(p, getState());
+    expect(wage).toBe(marketWage(p)); // neutral morale, a new club at the baseline reputation
     expect(renewalFee(getState(), p)).toBe(2 * wage);
     expect(renewEarly(getState(), 'a').ok).toBe(true);
     expect(getState().money).toBe(1_000_000 - 2 * wage);
@@ -69,7 +97,7 @@ describe('early renewal', () => {
   it('unhappy players ask more; difficulty scales the fee', () => {
     setup([mk('a', { morale: 1 }), mk('b', { morale: 100 })]);
     const [a, b] = getState().squad;
-    expect(renewalWage(a)).toBeGreaterThan(renewalWage(b));
+    expect(renewalWage(a, getState())).toBeGreaterThan(renewalWage(b, getState()));
     const normal = renewalFee(getState(), a);
     loadState({ ...getState(), settings: { ...getState().settings, difficulty: 'hard' } });
     expect(renewalFee(getState(), a)).toBeGreaterThan(normal);
