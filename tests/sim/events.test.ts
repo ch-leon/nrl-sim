@@ -1,11 +1,11 @@
 // tests/sim/events.test.ts — mkEvent shape + teamSheet builder aggregation.
 import { describe, it, expect } from 'vitest';
 import { mkEvent } from '../../src/sim/events';
-import { teamSheetFromSquad, teamSheetFromRival } from '../../src/sim/engine';
+import { teamSheetFromSquad, teamSheetFromRival } from '../../src/match/league/sheets';
 import { makeRng } from '../../src/utils/rng';
 import { generatePlayer } from '../../src/data/player';
 import { ON_FIELD, STAT_MAX } from '../../src/config';
-import type { Player, RivalClub } from '../../src/core/state';
+import type { Player, RivalClub, TraitInstance } from '../../src/core/state';
 
 const COLORS: [string, string] = ['#001122', '#334455'];
 
@@ -124,6 +124,18 @@ describe('teamSheetFromSquad', () => {
     const sheet = teamSheetFromSquad(five, 'player', 'A', COLORS);
     expect(sheet.roster).toHaveLength(5);
     expect(sheet.attack).toBe(70);
+  });
+
+  it('teamSheetFromSquad carries traits onto roster entries', () => {
+    const mk = (i: number, traits: TraitInstance[]): Player => ({
+      id: `p${i}`, name: `P${i}`, age: 25, position: (['halfback', 'prop'] as const)[i % 2]!,
+      stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 },
+      morale: 60, injuryRisk: 20, injuredWeeks: 0, traits, wage: 1000, contractWeeks: 10,
+    });
+    const squad = [mk(0, [{ id: 'finisher', level: 1 }, { id: 'hitman', level: 1 }]), mk(1, [])];
+    const s = teamSheetFromSquad(squad, 'P', 'P', ['#000', '#fff']);
+    expect(s.roster!.find((r) => r.name === 'P0')!.traits).toEqual([{ id: 'finisher', level: 1 }, { id: 'hitman', level: 1 }]);
+    expect(s.roster!.find((r) => r.name === 'P1')!.traits).toBeUndefined();
   });
 });
 

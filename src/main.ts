@@ -163,13 +163,13 @@ async function boot(): Promise<void> {
   // pure playback; a live match (coach calls #73) holds the week and its result
   // comes back with 'match:finished'. The scene's own Back-to-Club button
   // returns to Grounds at full-time.
-  bus.on('match:started', ({ fixture, sim, home, away, live }) => {
+  bus.on('match:started', ({ fixture, home, away, live }) => {
     // Screens stay usable alongside the HUD (Advance Week is reachable with one
     // open), so clear any screen/dialog before the match takes over the view.
     closeScreen();
     closeModal();
     g.scene.stop('Grounds');
-    g.scene.start('Match', { home, away, fixture, ...(sim ? { result: sim } : {}), ...(live ? { live } : {}) });
+    g.scene.start('Match', { home, away, fixture, live });
   });
 
   initPlacementBar(); // build/move instructions + Cancel (#78)

@@ -3,15 +3,14 @@
 // match). Matchday holds the week at kick-off; this plays the sheets on the
 // match seed tick by tick, records the MatchResult as it goes (MatchRecorder,
 // exactly as runMatch would), takes the coach's calls, and hands the result
-// over with 'match:finished' at full time. It stands in the Match scene where
-// the event-log replay (world/playback.ts) does for the classic engine: the
-// same overlay, score banners, crowd and FX, the lab's pop-ups, wrestle bar
-// and sprint streaks, speed buttons and Skip.
+// over with 'match:finished' at full time. In the Match scene it drives the
+// overlay, score banners, crowd and FX, the lab's pop-ups, wrestle bar and
+// sprint streaks, speed buttons and Skip.
 import type Phaser from 'phaser';
 import { bus } from '../../core/events';
 import type { Fixture } from '../../core/state';
 import type { TeamSheet, WeatherKind } from '../../sim/events';
-import type { PlaybackSpeed } from '../../world/playback';
+import type { PlayerAnim } from '../../art/match/players';
 import type { MatchOverlayHandle } from '../../ui/screens/matchOverlay';
 import { Runner } from '../core/engine';
 import type { Side, SimEvent } from '../core/snapshot';
@@ -24,6 +23,23 @@ import { PopupLayer } from './popupLayer';
 import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from './popups';
 import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
+
+export type PlaybackSpeed = 1 | 2 | 4 | 8;
+
+/** The speeds offered on the match controls, slowest first. */
+export const PLAYBACK_SPEEDS: readonly PlaybackSpeed[] = [1, 2, 4, 8];
+
+/** One player sprite (+ its shadow), positioned by its feet. */
+export interface PlaybackActor {
+  place(x: number, y: number, depth: number): void;
+  /** Play a player animation; no-op when it's already playing. */
+  play(anim: PlayerAnim, faceLeft: boolean, timeScale: number): void;
+}
+
+/** The ball sprite: ground position + height above it (for passes/kicks). */
+export interface PlaybackBall {
+  place(x: number, y: number, lift: number, depth: number): void;
+}
 
 /** A live match starts at ×4: at ×1 a Nines match takes its full 18 minutes to watch (§5.1 decision 1). */
 export const LIVE_DEFAULT_SPEED: PlaybackSpeed = 4;

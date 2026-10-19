@@ -2,7 +2,7 @@
 // Invented Aussie rugby-league flavour ONLY: no real NRL club names or
 // trademarks. Each club carries two hex kit colours (cosmetic) and a `strength`
 // baseline (42–70, spread around LEAGUE.MEAN) that seeds each rival's squad at a
-// new game (systems/rivals.ts), rival team sheets (src/sim/engine.ts
+// new game (systems/rivals.ts), rival team sheets (src/match/league/sheets.ts
 // teamSheetFromRival) and the cheap round sim. Pure data, no Phaser, no store.
 //
 // The player's club is the 16th league entry, added at runtime by

@@ -114,7 +114,10 @@ Every transition is a thing that physically happens on the field; nothing is imp
   cores, so sweeps aren't blocked; the < 100 ms target needs allocation-free steering, a rewrite
   that would change every seed's match, left for later.
 - `src/sim/engine.ts` and `src/world/playback.ts`+`staging.ts` are deleted at switch-over
-  (~2,500 lines); ARCHITECTURE §6 is rewritten to this contract.
+  (~2,500 lines); ARCHITECTURE §6 is rewritten to this contract. *Phase 4 draft (#88,
+  2026-10-19, not merged without Leon):* those three and `world/formation.ts` go; the sheet
+  builders move to `src/match/league/sheets.ts` unchanged; every match is live (the beta
+  setting goes) and fast-forward plays `runMatch` headless.
 
 ## 4. Feedback tooling (built first, used throughout)
 - **Lab page** (`/#lab`): pick home/away/seed, play, pause, **step one tick**, slow-mo,

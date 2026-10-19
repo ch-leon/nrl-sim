@@ -142,7 +142,7 @@ function buildFixturesTab(state: GameState): HTMLElement {
   const names = clubNameMap(state.league.clubs);
   const wrap = el('div', { class: 'nrl-fixtures' });
 
-  wrap.append(liveMatchToggle(), coachCallsToggle());
+  wrap.append(coachCallsToggle());
 
   if (state.league.fixtures.length === 0) {
     wrap.append(panel({}, el('p', { text: 'No fixtures yet — season not started.' })));
@@ -171,26 +171,7 @@ function buildFixturesTab(state: GameState): HTMLElement {
   return wrap;
 }
 
-/**
- * The "Live match (beta)" setting (BAK-207 2g): your matches are played by the
- * live match sim and watched as it plays them, instead of the classic replay.
- */
-function liveMatchToggle(): HTMLElement {
-  const box = el('input', { attrs: { type: 'checkbox' } });
-  box.checked = getState().settings.liveMatch === true;
-  box.addEventListener('change', () => {
-    setState({ settings: { ...getState().settings, liveMatch: box.checked } });
-    save(getState()); // kept now, not only when the week ends
-  });
-  return el(
-    'label',
-    { class: 'nrl-live-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
-    box,
-    el('span', { text: ' Live match (beta) — watch your matches played out by the new match engine' }),
-  );
-}
-
-/** The coach-call chips in a live match (#73): on unless turned off. */
+/** The coach-call chips during your matches (#73): on unless turned off. */
 function coachCallsToggle(): HTMLElement {
   const box = el('input', { attrs: { type: 'checkbox' } });
   box.checked = getState().settings.coachCalls !== false;
@@ -202,7 +183,7 @@ function coachCallsToggle(): HTMLElement {
     'label',
     { class: 'nrl-live-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
     box,
-    el('span', { text: ' Coach calls — nudge your side during a live match (hit-up, shift, kick early, rush…)' }),
+    el('span', { text: ' Coach calls — nudge your side during a match (hit-up, shift, kick early, rush…)' }),
   );
 }
 

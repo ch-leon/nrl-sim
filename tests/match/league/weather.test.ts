@@ -8,7 +8,7 @@ import { LiveSim } from '../../../src/match/league/live';
 import { runMatch } from '../../../src/match/league/match';
 import { applyTuning } from '../../../src/match/league/tuning';
 import { sideSheet } from '../../../src/match/balance/measure';
-import { teamSheetFromSquad } from '../../../src/sim/engine';
+import { teamSheetFromSquad } from '../../../src/match/league/sheets';
 import { generatePlayer } from '../../../src/data/player';
 import { makeRng } from '../../../src/utils/rng';
 import type { SimEvent } from '../../../src/match/core/snapshot';

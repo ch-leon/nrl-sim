@@ -1,11 +1,11 @@
-// tests/systems/liveMatch.test.ts — live matches (BAK-207 §5.1 2g) with the
-// result at full time (coach calls #73, docs/specs/coach-calls.md §5): with
-// "Live match (beta)" on, matchday holds the week at kick-off and hands the
+// tests/systems/liveMatch.test.ts — live matches (BAK-207; every match since the
+// Phase 4 switch-over) with the result at full time (coach calls #73,
+// docs/specs/coach-calls.md §5): matchday holds the week at kick-off and hands the
 // Match scene the seed; the match the scene plays (a Runner on the LiveSim and
 // a MatchRecorder, as LivePlayback builds it) is the result, applied with the
 // rest of the week at 'match:finished'. With no calls it equals runMatch on
 // that seed. A killed app resumes the same match with its calls. Fast-forward
-// still plays headless, and a whole season plays with the setting on.
+// still plays headless, and a whole season plays end to end.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { bus, type LiveMatchData } from '../../src/core/events';
 import { createNewGame, getState, setState, type Fixture } from '../../src/core/state';
@@ -30,14 +30,13 @@ interface Started {
   live?: LiveMatchData;
 }
 
-function newGame(seed: number, live: boolean): void {
+function newGame(seed: number): void {
   clearTickHooks();
   clearSeasonHooks();
   clearHeldWeek();
   createNewGame('Tester', seed);
   initLeague(getState());
   registerPlayerMatchSystem();
-  setState({ settings: { ...getState().settings, liveMatch: live } });
 }
 
 /**
@@ -89,17 +88,8 @@ describe('live match (beta): the match on screen is the match', () => {
     delete (globalThis as { localStorage?: unknown }).localStorage;
   });
 
-  it('off (the default): the classic engine, the result at kick-off, no seed handed over', () => {
-    newGame(42, false);
-    advanceWeek();
-    expect(started).toHaveLength(1);
-    expect(started[0]!.live).toBeUndefined();
-    expect(started[0]!.sim).toBeDefined();
-    expect(weekHeld()).toBe(false);
-  });
-
-  it('on: the week holds at kick-off; the watched match is the result, applied with the rest of the week at full time', () => {
-    newGame(42, true);
+  it('the week holds at kick-off; the watched match is the result, applied with the rest of the week at full time', () => {
+    newGame(42);
     const week = getState().week;
     advanceWeek();
     expect(started).toHaveLength(1);
@@ -125,7 +115,7 @@ describe('live match (beta): the match on screen is the match', () => {
   }, 30_000);
 
   it('the coach’s calls change the match, and the match with its calls is what counts', () => {
-    newGame(42, true);
+    newGame(42);
     advanceWeek();
     const s = started[0]!;
     const side = s.fixture.homeId === PLAYER_ID ? 'home' : 'away';
@@ -141,7 +131,7 @@ describe('live match (beta): the match on screen is the match', () => {
 
   it('a killed app resumes the same match where it was, with the calls already made', () => {
     fakeStorage();
-    newGame(42, true);
+    newGame(42);
     const saved = JSON.stringify(getState()); // the game saves only at a week's end
     advanceWeek();
     const first = started[0]!;
@@ -167,8 +157,8 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(readLiveMatch()).toBeNull();
   }, 60_000);
 
-  it('fast-forward plays headless with the setting on, and a whole season plays end to end', () => {
-    newGame(7, true);
+  it('fast-forward plays headless, and a whole season plays end to end', () => {
+    newGame(7);
     const season = getState().season;
     for (let i = 0; i < SEASON_ROUNDS + 8 && getState().season === season; i++) advanceWeeks(1);
     expect(started).toHaveLength(0);

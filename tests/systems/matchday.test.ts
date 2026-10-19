@@ -1,9 +1,10 @@
-// tests/systems/matchday.test.ts — player match tick: result toast timing,
+// tests/systems/matchday.test.ts — player match tick: result toast timing (the
+// result comes at full time from the match played on screen, BAK-207),
 // SQUAD_MIN forfeit (GitHub #4), big-hit injuries applied to squad (GitHub #7).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bus } from '../../src/core/events';
 import { createNewGame, getState, setState } from '../../src/core/state';
-import { advanceWeek, advanceWeeks, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
+import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import {
   registerPlayerMatchSystem,
@@ -15,6 +16,7 @@ import { generatePlayer } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
 import type { Fixture, Player } from '../../src/core/state';
 import type { MatchResult } from '../../src/sim/events';
+import { runMatch } from '../../src/match/league/match';
 
 function collect(): {
   toasts: string[];
@@ -25,7 +27,9 @@ function collect(): {
   const started: { fixture: Fixture; sim: MatchResult }[] = [];
   const offs = [
     bus.on('ui:notify', ({ text }) => toasts.push(text)),
-    bus.on('match:started', ({ fixture, sim }) => started.push({ fixture, sim: sim! })),
+    // The match the Match scene would play: with no coach calls, runMatch on the seed.
+    bus.on('match:started', ({ fixture, home, away, live }) =>
+      started.push({ fixture, sim: runMatch(home, away, { seed: live.seed, weather: live.weather, ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}) }) })),
   ];
   return { toasts, started, stop: () => offs.forEach((off) => off()) };
 }
@@ -34,6 +38,7 @@ describe('player matchday result toast', () => {
   beforeEach(() => {
     clearTickHooks();
     clearSeasonHooks();
+    clearHeldWeek();
     createNewGame('Tester', 42);
     initLeague(getState());
     registerPlayerMatchSystem();
@@ -68,6 +73,7 @@ describe('player matchday injuries (GitHub #7)', () => {
   beforeEach(() => {
     clearTickHooks();
     clearSeasonHooks();
+    clearHeldWeek();
     createNewGame('Tester', 7);
     initLeague(getState());
     registerPlayerMatchSystem();
@@ -82,6 +88,7 @@ describe('player matchday injuries (GitHub #7)', () => {
     for (let attempt = 0; attempt < 40 && !applied; attempt++) {
       clearTickHooks();
       clearSeasonHooks();
+      clearHeldWeek();
       createNewGame('Tester', 1000 + attempt);
       initLeague(getState());
       setState({
@@ -110,6 +117,7 @@ describe('player matchday injuries (GitHub #7)', () => {
     for (let attempt = 0; attempt < 40 && !checked; attempt++) {
       clearTickHooks();
       clearSeasonHooks();
+      clearHeldWeek();
       createNewGame('Tester', 1000 + attempt);
       initLeague(getState());
       setState({
@@ -118,12 +126,14 @@ describe('player matchday injuries (GitHub #7)', () => {
       registerPlayerMatchSystem();
 
       const c = collect();
-      advanceWeek(); // interactive: hands off to playback
-      if (getState().squad.some((p) => p.injuredWeeks > 0)) {
-        // Squad is already updated, but nothing is announced at kick-off.
+      advanceWeek(); // interactive: the match plays on screen
+      const { fixture, sim } = c.started[0]!;
+      if (sim.injuries.some((i) => i.teamId === PLAYER_ID)) {
+        // Nothing is applied or announced at kick-off.
+        expect(getState().squad.some((p) => p.injuredWeeks > 0)).toBe(false);
         expect(c.toasts.some((t) => t.includes('injured — out'))).toBe(false);
-        const { fixture, sim } = c.started[0]!;
         bus.emit('match:finished', { fixture, result: sim });
+        expect(getState().squad.some((p) => p.injuredWeeks > 0)).toBe(true);
         expect(c.toasts.some((t) => t.includes('injured — out'))).toBe(true);
         checked = true;
       }
@@ -148,6 +158,7 @@ describe('forfeit when fit < SQUAD_MIN', () => {
   beforeEach(() => {
     clearTickHooks();
     clearSeasonHooks();
+    clearHeldWeek();
     bus.clear();
     createNewGame('Tester', 42);
     initLeague(getState());
@@ -208,6 +219,7 @@ describe('rival rosters come from the rival squad (#74)', () => {
     bus.clear();
     clearTickHooks();
     clearSeasonHooks();
+    clearHeldWeek();
   });
 
   it('fields the rival\'s own fit players, the same names week to week, and falls back when short', () => {
@@ -223,6 +235,8 @@ describe('rival rosters come from the rival squad (#74)', () => {
     const ids = new Set(rival.squad!.map((p) => p.id));
     expect(rivalSheet.roster!.length).toBe(9);
     for (const r of rivalSheet.roster!) expect(ids.has(r.id!)).toBe(true);
+    // The week holds until full time (BAK-207): finish the match, then the next week.
+    clearHeldWeek();
 
     // With fewer than nine fit, the strength-based sheet steps in (no squad ids).
     const lg = getState().league;

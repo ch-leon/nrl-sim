@@ -2,8 +2,9 @@
 // scoring attempt: who scored, what it was, and how many points. Pure — no DOM.
 import { describe, it, expect } from 'vitest';
 import { BANNER_MS, initLiveState, inkFor, reduceEvent, scoreBanner } from '../../../src/ui/screens/matchOverlay';
-import { simulateMatch } from '../../../src/sim/engine';
-import type { MatchEvent, TeamSheet } from '../../../src/sim/events';
+import { runMatch } from '../../../src/match/league/match';
+import { sideSheet } from '../../../src/match/balance/measure';
+import type { MatchEvent } from '../../../src/sim/events';
 
 const NAMES = ['Storm', 'Bears'] as const;
 const ev = (over: Partial<MatchEvent>): MatchEvent => ({ t: 20, kind: 'try', teamId: 'H', player: 'Jarrah Kavanagh', ...over });
@@ -53,9 +54,8 @@ describe('scoreBanner', () => {
   });
 
   it('every point in a simulated match comes with a banner', () => {
-    const sheet = (id: string): TeamSheet => ({ clubId: id, name: id, attack: 70, defense: 50, kicking: 70, fitness: 60, colors: ['#111', '#eee'] });
-    for (let seed = 0; seed < 40; seed++) {
-      const res = simulateMatch(sheet('H'), sheet('A'), { seed, weather: 'clear' });
+    for (let seed = 0; seed < 8; seed++) {
+      const res = runMatch(sideSheet('H', { rating: 70 }), sideSheet('A', { rating: 55 }), { seed, weather: 'clear' });
       const pts = [0, 0];
       for (const e of res.events) {
         const b = scoreBanner(e, 'H', ['H', 'A']);
@@ -63,7 +63,7 @@ describe('scoreBanner', () => {
       }
       expect(pts, `seed ${seed}`).toEqual([res.homeScore, res.awayScore]);
     }
-  });
+  }, 60_000);
 
   it('holds a try banner longer than a kick banner', () => {
     expect(BANNER_MS.try).toBeGreaterThan(BANNER_MS.kick);

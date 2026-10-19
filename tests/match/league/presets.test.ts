@@ -6,7 +6,7 @@ import { LiveSim } from '../../../src/match/league/live';
 import {
   ATTACK_PRESETS, DEFAULT_TACTICS, DEFENCE_PRESETS, attackPlan, defencePlan, rivalTactics, tacticsLabel, zoneOf, type AttackPreset, type DefencePreset,
 } from '../../../src/match/league/presets';
-import { teamSheetFromRival } from '../../../src/sim/engine';
+import { teamSheetFromRival } from '../../../src/match/league/sheets';
 import type { TeamSheet } from '../../../src/sim/events';
 import type { SimEvent } from '../../../src/match/core/snapshot';
 

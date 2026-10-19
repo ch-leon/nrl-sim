@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { RATING, spreadSheets } from '../../../src/match/league/spread';
 import { sideSheet } from '../../../src/match/balance/measure';
-import { teamSheetFromRival } from '../../../src/sim/engine';
+import { teamSheetFromRival } from '../../../src/match/league/sheets';
 
 describe('rating spread (pure)', () => {
   it('draws both sides toward the match average: a 20-point gap at k = 0.5 plays as 10', () => {

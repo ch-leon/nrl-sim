@@ -9,8 +9,7 @@ import { bestNineMean } from '../../src/qa/soak';
 import { weeklyWages } from '../../src/systems/economy';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { scaleRivalStrength } from '../../src/systems/matchday';
-import { rollBigHitInjury } from '../../src/sim/engine';
-import { makeRng } from '../../src/utils/rng';
+import { injuryChance } from '../../src/match/league/weather';
 import type { RivalClub } from '../../src/core/state';
 
 describe('difficulty multipliers', () => {
@@ -61,13 +60,7 @@ describe('difficulty multipliers', () => {
   });
 
   it('injury chance scales with the injury rate', () => {
-    const roster = [{ name: 'A', injuryRisk: 100 }] as never;
-    const count = (rate: number): number => {
-      const rng = makeRng(42);
-      let n = 0;
-      for (let i = 0; i < 4000; i++) if (rollBigHitInjury(roster, 'A', 'player', rng, rate)) n++;
-      return n;
-    };
+    const count = (rate: number): number => injuryChance({ injuryRisk: 100 }, rate);
     const easy = count(DIFFICULTY.easy.injuryRate);
     const normal = count(DIFFICULTY.normal.injuryRate);
     const hard = count(DIFFICULTY.hard.injuryRate);

@@ -10,7 +10,7 @@ import type {
 import type { MatchResult, MatchEvent, TeamSheet, WeatherKind } from '../sim/events';
 import type { CallInput } from '../match/league/calls';
 
-/** A live match handed to the Match scene (BAK-207 2g, coach calls #73). */
+/** The match handed to the Match scene (BAK-207, coach calls #73). */
 export interface LiveMatchData {
   seed: number;
   weather: WeatherKind;
@@ -34,10 +34,9 @@ export interface Events {
   'player:signed': Player;
   // home/away sheets ride along so the Match scene can render kits/names
   // without re-deriving them (wave-4 integration extension).
-  // `sim`: the classic engine's recorded match, replayed. `live` (BAK-207 2g, coach
-  // calls #73): no result yet — the Match scene plays the live sim on this seed and
-  // the result comes with 'match:finished'.
-  'match:started': { fixture: Fixture; sim?: MatchResult; home: TeamSheet; away: TeamSheet; live?: LiveMatchData };
+  // `live` (BAK-207, coach calls #73): no result yet — the Match scene plays the
+  // live sim on this seed and the result comes with 'match:finished'.
+  'match:started': { fixture: Fixture; home: TeamSheet; away: TeamSheet; live: LiveMatchData };
   'match:event': MatchEvent; // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
   'board:sacked': { season: number; reason: string };

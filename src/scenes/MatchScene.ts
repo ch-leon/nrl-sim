@@ -4,9 +4,9 @@
 // Presentation only. Builds a generated pixel-art stadium (src/art/match/*):
 // a mown field with full markings, H goalposts, hoardings, a grandstand, a hill
 // and near terraces full of bobbing spectators in both teams' colours; 26
-// palette-swapped animated players with ground shadows; and a ball. The
-// PlaybackController (src/world/playback.ts) drives the players from the
-// MatchResult event log; this scene only provides sprites through the
+// palette-swapped animated players with ground shadows; and a ball.
+// LivePlayback (src/match/view/livePlayback.ts) plays the match on the live sim
+// (BAK-207) and drives the players; this scene only provides sprites through the
 // structural PlaybackActor/PlaybackBall interfaces and keeps the camera on the
 // ball.
 //
@@ -21,21 +21,19 @@ import { CameraController } from '../world/camera';
 import { zoomForViewport } from '../world/viewport';
 import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
-import type { TeamSheet, MatchResult, MatchEvent, WeatherKind } from '../sim/events';
+import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import type { Fixture } from '../core/state';
+import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
 import {
-  PlaybackController,
+  LivePlayback,
+  LIVE_DEFAULT_SPEED,
   PLAYBACK_SPEEDS,
-  slotRoster,
-  slotSpeeds,
   type PlaybackActor,
   type PlaybackBall,
   type PlaybackSpeed,
-} from '../world/playback';
-import { PLAYERS } from '../world/formation';
-import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
-import { LivePlayback, LIVE_DEFAULT_SPEED } from '../match/view/livePlayback';
+} from '../match/view/livePlayback';
 import { NINES } from '../match/league/rules';
+import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
 import { CALL_LABEL, COACH_CALLS, chipState, type CoachCall } from '../match/league/calls';
 
@@ -132,12 +130,10 @@ const CROWD_TICK_MS = 220;
 export interface MatchSceneData {
   home: TeamSheet;
   away: TeamSheet;
-  /** Absent in the match lab (BAK-207), which drives the sprites itself. */
-  result?: MatchResult;
   fixture?: Fixture; // carried through so `match:finished` can echo it (BAK-194)
-  /** The weather when there is no result to take it from (the match lab, 2f). */
+  /** The match lab's weather (2f); a real match takes it from `live`. */
   weather?: WeatherKind;
-  /** Live match (BAK-207 2g, coach calls #73): played on the live sim as the player watches; the result comes at full time. */
+  /** The match (BAK-207, coach calls #73): played on the live sim as the player watches; the result comes at full time. Absent in the match lab, which drives the sprites itself. */
   live?: LiveMatchData;
 }
 
@@ -230,7 +226,7 @@ export class MatchBall implements PlaybackBall {
 
 /**
  * MatchScene renders the stadium and exposes the PlaybackScene surface
- * (fieldToWorld, players, ball, cameras, homeId) to the PlaybackController.
+ * (fieldToWorld, players, ball, cameras, homeId) to LivePlayback.
  */
 export class MatchScene extends Phaser.Scene {
   // ── Public surface consumed by playback (structural PlaybackScene) ─────────
@@ -247,7 +243,6 @@ export class MatchScene extends Phaser.Scene {
 
   private home!: TeamSheet;
   private away!: TeamSheet;
-  private result: MatchResult | undefined;
   private fixture: Fixture | undefined;
   private weather: WeatherKind | undefined;
 
@@ -281,7 +276,7 @@ export class MatchScene extends Phaser.Scene {
   private autoZoom: number | null = MATCH_ZOOM;
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
-  private playback: PlaybackController | LivePlayback | null = null;
+  private playback: LivePlayback | null = null;
   private live: LiveMatchData | undefined;
   private overlay: MatchOverlayHandle | null = null;
   private controlsEl: HTMLDivElement | null = null;
@@ -295,9 +290,8 @@ export class MatchScene extends Phaser.Scene {
   init(data: MatchSceneData): void {
     this.home = data.home;
     this.away = data.away;
-    this.result = data.result;
     this.fixture = data.fixture;
-    this.weather = data.result?.weather ?? data.weather;
+    this.weather = data.live?.weather ?? data.weather;
     this.live = data.live;
     this.players.home = [];
     this.players.away = [];
@@ -319,13 +313,12 @@ export class MatchScene extends Phaser.Scene {
     // Players + ball.
     const homeAtlas = this.art.players(`pl-${this.home.clubId}`, kits.home);
     const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayAlt ? '-alt' : ''}`, kits.away);
-    const homeSlots = slotRoster(this.home.roster);
-    const awaySlots = slotRoster(this.away.roster);
-    for (let i = 0; i < PLAYERS; i++) {
+    for (let i = 0; i < ON_FIELD; i++) {
       // #21: each slot wears its player's own look (stable across matches);
-      // a slot with no named player falls back to the slot cycle.
-      const h = homeSlots[i];
-      const a = awaySlots[i];
+      // a slot with no named player falls back to the slot cycle. The live view
+      // re-dresses a slot when an interchange puts someone new in it.
+      const h = this.home.roster?.[i];
+      const a = this.away.roster?.[i];
       const homeLook = h ? lookForPlayer(h.id ?? h.name) : lookForSlot(i);
       const awayLook = a ? lookForPlayer(a.id ?? a.name) : lookForSlot(i + 5);
       this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow));
@@ -361,8 +354,7 @@ export class MatchScene extends Phaser.Scene {
     attachMatchAtmosphere(this, { weather: this.weather, fixture: this.fixture });
 
     // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then
-    // the playback controller which re-emits the event stream on a compressed
-    // clock. Both are presentation-only (never mutate GameState).
+    // the live playback, which plays the match and emits its events as they happen.
     this.startPlayback();
     this.offZoom = bus.on('match:event', (ev) => {
       this.beatZoom = zoomForEvent(ev.kind);
@@ -377,7 +369,7 @@ export class MatchScene extends Phaser.Scene {
 
   private startPlayback(): void {
     if (this.live) {
-      // Live match (2g): the overlay reads Nines halves and the sim's running clock.
+      // The overlay reads Nines halves and the sim's running clock.
       const live = this.live;
       this.overlay = mountMatchOverlay({ home: this.home, away: this.away, weather: live.weather, seed: live.seed, halfMinutes: NINES.halfMinutes });
       this.playback = new LivePlayback(this, {
@@ -402,16 +394,6 @@ export class MatchScene extends Phaser.Scene {
       // A phone may kill the app in the background: keep where the match is (#73).
       document.addEventListener('visibilitychange', this.onHidden);
       window.addEventListener('pagehide', this.onHidden);
-    } else if (this.result) {
-      this.overlay = mountMatchOverlay({ home: this.home, away: this.away, result: this.result });
-      // #20: each slot runs at its player's pace (team-sheet speed stats).
-      this.playback = new PlaybackController(this, this.result, this.fixture, {
-        speeds: { home: slotSpeeds(this.home.roster), away: slotSpeeds(this.away.roster) },
-      });
-      this.mountPlaybackControls();
-      // 'match:finished' (fired by playback at full-time or on skip) reveals the
-      // Back-to-Club button and swaps the controls out.
-      bus.on('match:finished', this.onFinished);
     }
   }
 
@@ -563,12 +545,6 @@ export class MatchScene extends Phaser.Scene {
       case 'big-hit':
         this.hype(side, 0.3, 900);
         break;
-      case 'full-time': {
-        if (!this.result) break;
-        const { homeScore, awayScore } = this.result;
-        if (homeScore !== awayScore) this.hype(homeScore > awayScore ? 'home' : 'away', 0.9, 60_000);
-        break;
-      }
       default:
         break;
     }
@@ -684,23 +660,24 @@ export class MatchScene extends Phaser.Scene {
     const btn = button('Back to Club', () => this.exitToGrounds());
     btn.style.position = 'fixed';
     // Bottom-centre, taking the playback controls' slot at full-time: the
-    // match overlay keeps the HUD/nav hidden until this is pressed (#14). The
-    // no-result fallback has no overlay, so it clears the visible nav instead.
+    // match overlay keeps the HUD/nav hidden until this is pressed (#14). With
+    // no match (defensive) there is no overlay, so it clears the visible nav instead.
     btn.style.left = '50%';
     btn.style.transform = 'translateX(-50%)';
-    const playing = this.result !== undefined || this.live !== undefined;
+    const playing = this.live !== undefined;
     btn.style.bottom = playing ? '0.5rem' : '3.25rem';
     btn.style.zIndex = '20';
-    // If no result was provided (defensive), keep the classic fallback visible.
+    // With no match (defensive), keep it visible.
     btn.style.display = playing ? 'none' : '';
     this.backBtn = btn;
     mount(btn);
   }
 
-  /** On full-time: reveal Back-to-Club, remove the playback controls. */
-  private onFinished = (): void => {
+  /** On full-time: the winners' end goes up, Back-to-Club shows, the playback controls go. */
+  private onFinished = ({ result }: { result: { homeScore: number; awayScore: number } }): void => {
     if (this.finished) return;
     this.finished = true;
+    if (result.homeScore !== result.awayScore) this.hype(result.homeScore > result.awayScore ? 'home' : 'away', 0.9, 60_000);
     this.callsEl?.remove();
     this.callsEl = null;
     if (this.backBtn) this.backBtn.style.display = '';
@@ -711,11 +688,7 @@ export class MatchScene extends Phaser.Scene {
   };
 
   private exitToGrounds(): void {
-    // Playback owns the single 'match:finished' emission; if it never fired
-    // (e.g. no result / early exit before full-time), emit the fallback here.
-    if (!this.finished && this.fixture && this.result) {
-      bus.emit('match:finished', { fixture: this.fixture, result: this.result });
-    }
+    // Playback owns the single 'match:finished' emission (full time or Skip).
     this.scene.start('Grounds');
   }
 
@@ -769,7 +742,7 @@ export class MatchScene extends Phaser.Scene {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC SURFACE FOR PLAYBACK (structural PlaybackScene, src/world/playback.ts):
+// PUBLIC SURFACE FOR PLAYBACK (structural, src/match/view/livePlayback.ts):
 //   scene.fieldToWorld(fx, fy): { x, y }   — sim field coords -> Phaser world.
 //   scene.players.home / .away: PlaybackActor[ON_FIELD] — animated player sprites.
 //   scene.ball: PlaybackBall              — ball sprite + shadow.

@@ -1,7 +1,7 @@
 // src/match/league/roles.ts — the nine on-field roles and where each stands
 // relative to the ball (BAK-207 §3.4). Lanes are metres across the 68 m field;
 // depths are metres behind the ball in attack and in front of it in defence
-// (the line stands 10 m back from the ruck). Supersedes world/formation's SLOTS
+// (the line stands 10 m back from the ruck). Supersedes the classic playback's formation slots
 // for the live sim.
 import { FIELD_WIDTH, FIELD_LENGTH, IN_GOAL, MID_Y } from '../core/field';
 import { clamp, type Vec } from '../core/vec';

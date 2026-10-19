@@ -4,7 +4,7 @@
 // traits at all, or with every player a superstar.
 import { RIVAL_CLUBS } from '../../data/league';
 import { POOL_IDS, TRAITS, type TraitInstance } from '../../data/traits';
-import { teamSheetFromRival } from '../../sim/engine';
+import { teamSheetFromRival } from '../league/sheets';
 import { makeRng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
 import type { TeamTactics } from '../league/presets';

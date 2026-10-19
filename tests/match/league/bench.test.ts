@@ -5,8 +5,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { BENCH, benchRecover, pickSwaps } from '../../../src/match/league/bench';
 import { LiveSim } from '../../../src/match/league/live';
-import { teamSheetFromRival, teamSheetFromSquad } from '../../../src/sim/engine';
-import { generatedRoster } from '../../../src/sim/staging';
+import { teamSheetFromRival, teamSheetFromSquad } from '../../../src/match/league/sheets';
+import { generatedRoster } from '../../../src/match/league/sheets';
 import { RIVAL_CLUBS } from '../../../src/data/league';
 import { generatePlayer } from '../../../src/data/player';
 import { makeRng } from '../../../src/utils/rng';

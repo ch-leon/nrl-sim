@@ -39,7 +39,7 @@ export interface MatchInjury {
   weeks: number;
 }
 
-/** Aggregate team profile fed into simulateMatch (built from squad or rival). */
+/** Aggregate team profile a match is played from (built from squad or rival, src/match/league/sheets.ts). */
 export interface TeamSheet {
   clubId: string;
   name: string;
