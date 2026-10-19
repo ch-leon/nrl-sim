@@ -780,6 +780,28 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-player-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
 .nrl-player-actions .nrl-player-close { flex: 1 1 100%; }
 .nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
+/* ── Guide under "?" (N7, #188) ─────────────────────────────────────────── */
+.nrl-screen-backdrop .nrl-guide-modal { width: min(96vw, 760px); max-width: none; }
+.nrl-guide { font-size: 0.85rem; }
+.nrl-guide-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+.nrl-guide-tabs .nrl-btn { flex: 1 1 auto; font-size: clamp(0.6rem, 1.7vw, 0.85rem); padding: 0.4rem 0.45rem; }
+.nrl-guide-tabs .nrl-btn[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
+.nrl-guide h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+.nrl-guide h3 { margin: 0.5rem 0 0.15rem; font-size: 0.88rem; border-bottom: 2px solid #b8ae92; }
+.nrl-guide p { margin: 0.2rem 0; overflow-wrap: anywhere; }
+.nrl-guide ul { margin: 0.2rem 0 0.2rem 1.1rem; padding: 0; }
+.nrl-guide li { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.nrl-guide-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 2px solid #b8ae92;
+}
+.nrl-guide-build { flex: 1 1 auto; font-size: 0.75rem; color: #555; }
+.nrl-guide-update { background: #7ec850; }
 .nrl-card-open { cursor: pointer; }
 .nrl-card-open:focus-visible { outline: 3px solid #3a6ea5; }
 .nrl-card-more { color: #555; font-weight: bold; font-size: 1.1rem; line-height: 1; }
