@@ -66,3 +66,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-230040-standard | standard | 0bb243c | perf/headless-100ms | [report](runs/20261019-230040-standard/report.md) |
 | 20261019-230121-standard | standard | 0bb243c (uncommitted changes) | perf/headless-100ms | [report](runs/20261019-230121-standard/report.md) |
 | 20261019-230203-offloads-check | offloads check | 0bb243c | perf/headless-100ms | [report](runs/20261019-230203-offloads-check/report.md) |
+| 20261019-230253-offloads-check | offloads check | 0bb243c (uncommitted changes) | perf/headless-100ms | [report](runs/20261019-230253-offloads-check/report.md) |
