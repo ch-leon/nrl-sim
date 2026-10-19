@@ -115,7 +115,7 @@ describe('soak', () => {
       expect(row.gap).toBeCloseTo(row.bestNine - row.rivalMean, 0);
       expect(row.finals).toBe(row.ladderPosition <= 8 ? 1 : 0);
     }
-  }, 60_000);
+  }, 180_000);
 
   it('gapSample reads the player\'s best nine against the rivals', () => {
     createNewGame('Gap', 5);
@@ -134,5 +134,5 @@ describe('soak', () => {
       const r = runSoak({ seed: 202, seasons: 1, mode: 'managed', fromVersion: v });
       expect(r.problems, `v${v}`).toEqual([]);
     }
-  }, 60_000);
+  }, 180_000);
 });

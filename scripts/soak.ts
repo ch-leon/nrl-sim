@@ -4,13 +4,21 @@
 //   npm run soak -- --seasons 3 --seeds 5
 //   npm run soak -- --difficulties easy,normal,hard   idle + managed on each difficulty (#148)
 //   npm run soak -- --json out.json      also write every run's samples to a file
+//   npm run soak -- --jobs 4             split the runs over 4 processes (same results, in order)
+//
+// Since the switch-over to the live match sim (BAK-207 Phase 4) every match the
+// player's club plays is a whole live match, about 15 s a season headless, so the
+// default size is over an hour on one core: use --jobs, or a smaller size.
 //
 // Prints one row per run, then the per-season averages by mode (the player's
 // record, ladder finish, the rating gap between the player's best nine and the
 // rival mean, and the managed manager's signings — GitHub #138), then every
 // problem found; exits 1 if there were any. The checks live in src/qa/soak.ts.
-import { writeFileSync } from 'node:fs';
-import { runSoak, summariseSeasons, tallyNet, OLD_VERSIONS, type FinanceLine, type SoakResult } from '../src/qa/soak';
+import { spawn } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { runSoak, summariseSeasons, tallyNet, OLD_VERSIONS, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -28,18 +36,53 @@ const jsonOut = str('json');
 // Without --difficulties: idle and managed on Normal plus idle on Hard (the original soak).
 const difficulties = str('difficulties')?.split(',').filter((d): d is Difficulty => DIFFICULTIES.includes(d as Difficulty));
 
-const results: SoakResult[] = [];
+// Child of a --jobs run: play the runs in the given file, write the results, stop.
+const childIn = str('child');
+if (childIn) {
+  const out = str('out')!;
+  const specs = JSON.parse(readFileSync(childIn, 'utf8')) as SoakOptions[];
+  writeFileSync(out, JSON.stringify(specs.map((o) => runSoak(o))));
+  process.exit(0);
+}
+
+// Every run, in the order they print.
+const specs: SoakOptions[] = [];
 for (let seed = 1; seed <= seeds; seed++) {
   if (difficulties) {
     for (const difficulty of difficulties) {
-      for (const mode of ['idle', 'managed'] as const) results.push(runSoak({ seed: seed * 7919, seasons, mode, difficulty }));
+      for (const mode of ['idle', 'managed'] as const) specs.push({ seed: seed * 7919, seasons, mode, difficulty });
     }
   } else {
-    for (const mode of ['idle', 'managed'] as const) results.push(runSoak({ seed: seed * 7919, seasons, mode }));
-    results.push(runSoak({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard' }));
+    for (const mode of ['idle', 'managed'] as const) specs.push({ seed: seed * 7919, seasons, mode });
+    specs.push({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard' });
   }
 }
-for (const v of OLD_VERSIONS) results.push(runSoak({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v }));
+for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
+
+/** Play the runs over `jobs` child processes (round-robin), and return the results in run order. */
+async function runInJobs(all: SoakOptions[], jobs: number): Promise<SoakResult[]> {
+  const dir = mkdtempSync(join(tmpdir(), 'soak-'));
+  try {
+    const chunks = Array.from({ length: jobs }, (_, j) => all.map((o, i) => ({ o, i })).filter(({ i }) => i % jobs === j));
+    const outs = await Promise.all(chunks.map((chunk, j) => new Promise<{ i: number; r: SoakResult }[]>((resolve, reject) => {
+      const inFile = join(dir, `in-${j}.json`);
+      const outFile = join(dir, `out-${j}.json`);
+      writeFileSync(inFile, JSON.stringify(chunk.map(({ o }) => o)));
+      const child = spawn('npx', ['vite-node', 'scripts/soak.ts', '--', '--child', inFile, '--out', outFile], { stdio: ['ignore', 'ignore', 'inherit'] });
+      child.on('exit', (code) => {
+        if (code !== 0) return reject(new Error(`soak job ${j + 1} exited ${code}`));
+        const rs = JSON.parse(readFileSync(outFile, 'utf8')) as SoakResult[];
+        resolve(rs.map((r, k) => ({ i: chunk[k]!.i, r })));
+      });
+    })));
+    return outs.flat().sort((a, b) => a.i - b.i).map(({ r }) => r);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const jobs = Math.max(1, Math.min(opt('jobs', 1), specs.length));
+const results: SoakResult[] = jobs > 1 ? await runInJobs(specs, jobs) : specs.map((o) => runSoak(o));
 
 const pad = (s: string | number, n: number): string => String(s).padStart(n);
 const signed = (n: number, digits = 1): string => `${n >= 0 ? '+' : ''}${n.toFixed(digits)}`;

@@ -24,7 +24,7 @@ concurrency:
 jobs:
   qa:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,9 +32,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Soak (5 seasons × 20 seeds, idle, managed, Hard, old saves)
+      # Every player match is a whole live match since BAK-207 Phase 4 (about 15 s a
+      # season headless), so the nightly soak is 3 seasons × 10 seeds over every core.
+      - name: Soak (3 seasons × 10 seeds, idle, managed, Hard, old saves)
         run: |
-          npm run soak 2>&1 | tee soak.log
+          npm run soak -- --seasons 3 --seeds 10 --jobs "$(nproc)" 2>&1 | tee soak.log
           {
             echo '## Soak'
             echo '```'

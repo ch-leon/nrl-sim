@@ -42,7 +42,7 @@ describe('save corpus', () => {
         const r = runSoak({ seed: 1, seasons: 1, mode: 'managed', fromSave: raw });
         expect(r.problems).toEqual([]);
         expect(r.seasons.length, 'reached the next season').toBe(1);
-      }, 60_000);
+      }, 120_000);
     });
   }
 });
