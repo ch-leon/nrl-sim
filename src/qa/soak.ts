@@ -27,7 +27,7 @@ import { chooseEvent, registerEventsSystem } from '../systems/events';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { overallRating } from '../data/player';
-import { cardById } from '../data/events';
+import { cardById, EVENT_CARDS } from '../data/events';
 import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
 import { addFacility, spendMoney } from '../data/club';
 
@@ -62,6 +62,51 @@ export interface GapSample {
   rivalRange: [number, number];
 }
 
+/**
+ * Where the money comes from and goes (N6, #161): every `money:changed` reason
+ * the game uses maps to one line. Anything new lands in `other`, so it shows in
+ * the P&L instead of vanishing. Negative = spent.
+ */
+export const FINANCE_LINES = [
+  'wages', 'sponsorGrant', 'gate', 'prize', 'boardGrant', 'events', 'transfers', 'contracts', 'facilities', 'upkeep', 'other',
+] as const;
+export type FinanceLine = (typeof FINANCE_LINES)[number];
+/** Σ of the season's money:changed deltas per line. */
+export type FinanceTally = Record<FinanceLine, number>;
+
+export function emptyTally(): FinanceTally {
+  return Object.fromEntries(FINANCE_LINES.map((l) => [l, 0])) as FinanceTally;
+}
+
+/** Event modifiers that pay or cost money ('Merch royalties', …) use their label as the ledger reason. */
+const MODIFIER_LABELS = new Set(EVENT_CARDS.flatMap((c) => c.choices.flatMap((ch) => ch.effects.flatMap((e) =>
+  (e.kind === 'modifier' && e.effects.some((x) => x.kind === 'money') ? [e.label] : [])))));
+
+/**
+ * The P&L line a ledger reason belongs to. Reasons are the strings each system
+ * passes to earnMoney / spendMoney: the economy's fixed words, the board's,
+ * `event: <title>` and modifier labels from the deck, and `<verb>:<id>` for
+ * signings, sales, renewals, releases and the grounds.
+ */
+export function classifyReason(reason: string): FinanceLine {
+  if (reason === 'wages') return 'wages';
+  if (reason === 'sponsor+grant') return 'sponsorGrant';
+  if (reason === 'gate') return 'gate';
+  if (reason === 'upkeep') return 'upkeep';
+  if (reason === 'finals prize money') return 'prize';
+  if (reason === 'board grant') return 'boardGrant';
+  if (reason.startsWith('event: ') || MODIFIER_LABELS.has(reason)) return 'events';
+  if (/^(sign|sell):/.test(reason)) return 'transfers';
+  if (/^(renew|release):/.test(reason)) return 'contracts';
+  if (/^(build|upgrade|move|demolish):/.test(reason)) return 'facilities';
+  return 'other';
+}
+
+/** Σ of every line: the season's net money movement. */
+export function tallyNet(t: FinanceTally): number {
+  return FINANCE_LINES.reduce((n, l) => n + t[l], 0);
+}
+
 export interface SeasonSample extends GapSample {
   season: number;
   money: number;
@@ -90,6 +135,8 @@ export interface SeasonSample extends GapSample {
   signingFees: number;
   /** Mean overall of the players signed (0 when none). */
   signedOverall: number;
+  /** The season's money by source (#161): the rollover's prize and grants count for the season they close. */
+  finance: FinanceTally;
 }
 
 export interface SoakResult {
@@ -330,6 +377,11 @@ export function runSoak(opts: SoakOptions): SoakResult {
   registerAllSystems();
   const seasons: SeasonSample[] = [];
   let minMoney = getState().money;
+  // The season's P&L (#161): every money movement, by line, checked against the
+  // balance at the rollover so a write that skips the ledger shows up.
+  let tally = emptyTally();
+  let seasonStartMoney = getState().money;
+  bus.on('money:changed', ({ delta, reason }) => { tally[classifyReason(reason)] += delta; });
   const start = gapSample(getState());
   // The gap at the end of the regular season (after round SEASON_ROUNDS), kept
   // until the rollover sample; the start gap stands in if the season never got there.
@@ -368,6 +420,8 @@ export function runSoak(opts: SoakOptions): SoakResult {
         // The season's record was pushed onto history by the rollover (fixtures season hook).
         const rec = s.history.find((h) => h.season === before);
         const played = (rec?.wins ?? 0) + (rec?.draws ?? 0) + (rec?.losses ?? 0);
+        const moved = s.money - seasonStartMoney;
+        if (Math.abs(tallyNet(tally) - moved) > 1) note(`ledger off: tallied ${Math.round(tallyNet(tally))}, balance moved ${Math.round(moved)}`);
         seasons.push({
           season: before,
           money: s.money,
@@ -388,7 +442,10 @@ export function runSoak(opts: SoakOptions): SoakResult {
           signings: signed.count,
           signingFees: signed.fees,
           signedOverall: signed.count ? Math.round((signed.overall / signed.count) * 10) / 10 : 0,
+          finance: tally,
         });
+        tally = emptyTally();
+        seasonStartMoney = s.money;
         minMoney = s.money;
         gap = gapSample(s);
         signed = { count: 0, fees: 0, overall: 0 };
@@ -435,6 +492,8 @@ export interface SeasonSummary {
   signedOverall: number;
   /** The start-of-game gap, averaged over the same runs (the same for every season row). */
   startGap: number;
+  /** Mean money by line over the runs (#161). */
+  finance: FinanceTally;
 }
 
 const mean = (xs: readonly number[]): number => (xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : 0);
@@ -475,6 +534,7 @@ export function summariseSeasons(results: readonly SoakResult[]): SeasonSummary[
         signingFees: Math.round(mean(rows.map((s) => s.signingFees))),
         signedOverall: r1(mean(signedRows.map((s) => s.signedOverall))),
         startGap: r1(mean(runs.map((r) => r.start.bestNine - r.start.rivalMean))),
+        finance: Object.fromEntries(FINANCE_LINES.map((l) => [l, Math.round(mean(rows.map((s) => s.finance[l])))])) as FinanceTally,
       });
     }
   }
