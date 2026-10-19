@@ -12,6 +12,7 @@ import { LIVE } from './live';
 import { ATTACK_PLAN_KEYS, PRESET_TABLES } from './presets';
 import { NINES } from './rules';
 import { BENCH } from './bench';
+import { GOALS } from './goals';
 import { EDGE_COST, TRAIT_PTS } from './traits';
 import { WRESTLE } from './wrestle';
 
@@ -27,6 +28,7 @@ export const KNOBS = {
   presets: PRESET_TABLES,
   rules: NINES,
   bench: BENCH,
+  goals: GOALS,
 } as const;
 
 export type Overrides = Readonly<Record<string, number>>;

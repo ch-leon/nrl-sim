@@ -19,7 +19,10 @@
 // siren and play on to the next dead ball, full time, points. Interchanges
 // (2b): after a try the coach takes off his most tired men, who jog to the
 // sideline as the fresh ones jog on; at half-time they swap in the sheds.
-// Conversions, touch, penalties and weather come later in Phase 2 (#86).
+// Goal kicking (2c): every try is followed by a drop-kick conversion from in
+// line with it, and late on a kicker in range with the scores close drops for
+// a field goal.
+// Touch, penalties and weather come later in Phase 2 (#86).
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
@@ -43,6 +46,7 @@ import { GAS, canSprint, paceMult, refillSeconds, runCostMult, stepGas, tankSeco
 import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
 import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
+import { GOALS, conversionSpot, goalChance, postsFor } from './goals';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
 /**
@@ -220,7 +224,9 @@ type Phase =
   | { kind: 'ruck'; t0: number; carrier: number; tackler: number; stage: 'down' | 'ptb' | 'dh'; handover: boolean; heldAt: number; down: number; pace: 'quick' | 'slow' | null }
   | { kind: 'try'; t0: number; scorer: number }
   | { kind: 'half-time'; t0: number }
-  | { kind: 'full-time' };
+  | { kind: 'full-time' }
+  | { kind: 'conversion'; t0: number; side: Side; kicker: number; spot: Vec; readyAt: number; good: boolean | null }
+  | { kind: 'goal'; t0: number; side: Side };
 
 interface PendingKick {
   at: number;
@@ -305,6 +311,11 @@ export class LiveSim implements MatchSim {
   private kickoffUp = false;
   /** The kicker's call for this last tackle (rolled once): run it, or which kick. */
   private kickCall: 'run' | KickChoice | null = null;
+  /** The kicker's field-goal call for this set (rolled once, only when one is on). */
+  private fgCall: boolean | null = null;
+  /** A field goal about to leave the boot, and one in the air (with how it will end). */
+  private pendingGoal: { at: number; kicker: number } | null = null;
+  private goalUp: { side: Side; kicker: number; good: boolean } | null = null;
   /** A loose ball only this side may take (after a knock-on); null = anyone's. */
   private looseFor: Side | null = null;
   /** The last ruck's markers and the tick its ball was played (they hold until released). */
@@ -358,7 +369,7 @@ export class LiveSim implements MatchSim {
     this.dir = this.dirOf(this.attacking);
     this.tackles = 0;
     this.lastPlay = false;
-    this.kickCall = null;
+    this.kickCall = this.fgCall = null;
     this.looseFor = null;
     this.pendingKick = null;
     this.markers = [];
@@ -503,8 +514,9 @@ export class LiveSim implements MatchSim {
     this.tick++;
     this.events = [];
     if (this.phase.kind === 'half-time') this.stepHalfTime(this.phase);
-    else {
+    else if (this.phase.kind !== 'conversion') {
       this.launchPendingKick();
+      this.launchGoal();
       this.landings();
     }
     switch (this.phase.kind) {
@@ -522,6 +534,12 @@ export class LiveSim implements MatchSim {
         break;
       case 'try':
         this.stepTry(this.phase);
+        break;
+      case 'conversion':
+        this.stepConversion(this.phase);
+        break;
+      case 'goal':
+        this.stepGoal(this.phase);
         break;
       default:
         break;
@@ -681,7 +699,7 @@ export class LiveSim implements MatchSim {
     this.ball = k.kind === 'grubber' ? grubberFlight(kicker.body.pos, k.to, this.tick) : kickFlight(kicker.body.pos, k.to, this.tick, k.receiver, k.peak);
     this.lastKicker = k.kicker;
     this.kickoffUp = k.kickoff;
-    this.kickCall = null;
+    this.kickCall = this.fgCall = null;
     const receiving = other(kicker.side);
     this.attacking = receiving;
     this.dir = this.dirOf(receiving);
@@ -698,6 +716,10 @@ export class LiveSim implements MatchSim {
 
   private landings(): void {
     const b = this.ball;
+    if (this.goalUp) {
+      if (b.kind === 'flight' && landed(b, this.tick)) this.resolveGoal();
+      return;
+    }
     if (b.kind === 'flight') {
       if (!landed(b, this.tick)) return;
       if (b.via === 'bounce') {
@@ -810,7 +832,7 @@ export class LiveSim implements MatchSim {
 
   /** Possession changes hands where the ball is; a fresh set for the other side. */
   private turnover(): void {
-    this.kickCall = null;
+    this.kickCall = this.fgCall = null;
     this.attacking = other(this.attacking);
     this.dir = this.dirOf(this.attacking);
     this.tackles = 0;
@@ -869,6 +891,15 @@ export class LiveSim implements MatchSim {
     const plan = this.atkPlan(h);
     const dplan = this.defPlan();
     const zone = zoneOf(toLine);
+    // A field goal late on with the scores close: the kicker's call, once a set.
+    if (h.slot === KICKER && this.fieldGoalOn(h)) {
+      if (this.fgCall === null) this.fgCall = this.rng.next() < GOALS.fieldGoalChance;
+      if (this.fgCall && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
+        this.lock(h, 'kick', LIVE.kickLockTicks);
+        this.pendingGoal = { at: this.tick + LIVE.kickContactTicks, kicker: this.indexOf(h) };
+        return;
+      }
+    }
     const early = this.tackles === SET_TACKLES - 2 && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
     if ((this.lastPlay || early) && h.slot === KICKER) {
       if (this.kickCall === null) this.kickCall = this.lastPlay ? this.callLastPlay(toLine, plan) : this.callEarlyKick(toLine, plan);
@@ -1017,7 +1048,7 @@ export class LiveSim implements MatchSim {
     } else if (this.tick < ph.t0 + LIVE.contactTicks) return;
     const c = this.players[ph.carrier]!;
     this.tackles++;
-    this.kickCall = null;
+    this.kickCall = this.fgCall = null;
     const handover = this.tackles >= SET_TACKLES;
     this.mark = { ...c.body.pos };
     this.lineX = this.mark.x + this.dir * LIVE.onsideM;
@@ -1102,16 +1133,131 @@ export class LiveSim implements MatchSim {
       p.pose = 'idle';
       p.poseUntil = 0;
     }
+    // The conversion: a drop kick in line with where he grounded it (taken even after the siren).
+    const side = scorer.side;
+    const kicker = this.at(side, KICKER);
+    const posts = postsFor(this.dirOf(side), FIELD_LENGTH, MID_Y);
+    const spot = clampToGround(conversionSpot(scorer.body.pos.y, posts, this.dirOf(side)), 1);
+    this.ball = { kind: 'held', by: this.indexOf(kicker) };
+    this.attacking = side;
+    this.dir = this.dirOf(side);
+    this.phase = { kind: 'conversion', t0: this.tick, side, kicker: this.indexOf(kicker), spot, readyAt: 0, good: null };
+  }
+
+  /** After a try, a conversion or a field goal: half-time or full time if the siren has gone, else the kick-off by the side that conceded. */
+  private afterScore(scoringSide: Side): void {
     if (this.siren) {
-      this.endHalf(); // a try after the siren is the last play of the half
+      this.endHalf(); // the last play of the half
       return;
     }
-    const kicking = other(scorer.side);
+    const kicking = other(scoringSide);
     this.ball = { kind: 'held', by: this.idx(kicking, KICKER) };
     this.attacking = other(kicking);
     this.dir = this.dirOf(this.attacking);
     this.phase = { kind: 'restart', t0: this.tick, kicking };
     this.callSwaps(); // a stoppage: the coach can freshen up
+  }
+
+  // ── Goal kicking (2c) ─────────────────────────────────────────────────────
+  /** The kicker walks to his spot, lines it up, drops it; the flight shows over or wide, then the restart. */
+  private stepConversion(ph: Extract<Phase, { kind: 'conversion' }>): void {
+    const k = this.players[ph.kicker]!;
+    const posts = postsFor(this.dirOf(ph.side), FIELD_LENGTH, MID_Y);
+    if (ph.good === null) {
+      if (ph.readyAt === 0 && dist(k.body.pos, ph.spot) < 1) ph.readyAt = this.tick;
+      const ready = ph.readyAt > 0 && this.tick >= ph.readyAt + GOALS.conversionTicks;
+      if (!ready && this.tick < ph.t0 + GOALS.conversionMaxTicks) return;
+      ph.good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.skill, bootMult(k.traits).acc);
+      this.lock(k, 'kick', LIVE.kickLockTicks);
+      this.ball = kickFlight(k.body.pos, this.goalAim(posts, this.dirOf(ph.side), ph.good), this.tick, null, 7);
+      return;
+    }
+    if (this.ball.kind !== 'flight' || !landed(this.ball, this.tick)) return;
+    if (ph.good) this.points[ph.side] += NINES.conversionPoints;
+    const score = `${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`;
+    this.emit('conversion', ph.good ? `${k.name} converts — ${score}` : `${k.name} misses the conversion`, k);
+    this.events[this.events.length - 1]!.detail = ph.good ? 'good' : 'missed';
+    this.afterScore(ph.side);
+  }
+
+  /** Where a kick at goal comes down: just over the bar between the uprights, or wide of one. */
+  private goalAim(posts: Vec, dir: 1 | -1, good: boolean): Vec {
+    const r = this.rng.next();
+    const y = good ? posts.y + (r - 0.5) * 1.6 * GOALS.halfPosts : posts.y + (r < 0.5 ? -1 : 1) * (GOALS.halfPosts + 0.5 + Math.abs(r - 0.5) * 6);
+    return { x: posts.x + dir * 6, y };
+  }
+
+  /** A field goal is on: the last minutes, the scores close, in range, late in the set. */
+  private fieldGoalOn(h: Player): boolean {
+    if (this.half < this.length.halves || this.siren) return false;
+    const left = this.length.halfMinutes * 60 - this.clockTicks * TICK_S;
+    if (left > GOALS.fieldGoalLastS || this.tackles < GOALS.fieldGoalFromTackle) return false;
+    const margin = this.points[h.side] - this.points[other(h.side)];
+    if (margin < GOALS.fieldGoalMargin[0] || margin > GOALS.fieldGoalMargin[1]) return false;
+    return dist(h.body.pos, postsFor(this.dirOf(h.side), FIELD_LENGTH, MID_Y)) <= GOALS.fieldGoalRangeM;
+  }
+
+  /** Off the boot: charged down, or in the air to the posts. */
+  private launchGoal(): void {
+    const g = this.pendingGoal;
+    if (!g || this.tick < g.at) return;
+    this.pendingGoal = null;
+    const k = this.players[g.kicker]!;
+    const dir = this.dirOf(k.side);
+    if (this.rng.next() < GOALS.chargeDown) {
+      const d = this.side(other(k.side)).sort((a, b) => dist(a.body.pos, k.body.pos) - dist(b.body.pos, k.body.pos))[0]!;
+      this.emit('charge-down', `${d.name} charges down the field goal!`, d);
+      this.ball = bounceFlight(k.body.pos, { x: -dir, y: (this.rng.next() - 0.5) * 1.2 }, this.tick, 4, 14, 2);
+      this.looseFor = null;
+      return;
+    }
+    const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
+    const good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.skill, bootMult(k.traits).acc);
+    this.ball = kickFlight(k.body.pos, this.goalAim(posts, dir, good), this.tick, null, 8);
+    this.goalUp = { side: k.side, kicker: g.kicker, good };
+    this.emit('drop-goal', `${k.name} drops for the field goal…`, k);
+  }
+
+  /** A field goal comes down: a point and the restart, or a miss and the ball back to the defence on their 20. */
+  private resolveGoal(): void {
+    const g = this.goalUp!;
+    this.goalUp = null;
+    const k = this.players[g.kicker]!;
+    if (g.good) this.points[g.side] += NINES.fieldGoalPoints;
+    this.emit('field-goal', g.good ? `FIELD GOAL! ${k.name} — ${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}` : `${k.name}'s field goal goes wide`, k);
+    this.events[this.events.length - 1]!.detail = g.good ? 'good' : 'missed';
+    if (g.good) {
+      this.ball = { kind: 'held', by: g.kicker };
+      this.phase = { kind: 'goal', t0: this.tick, side: g.side };
+      return;
+    }
+    if (this.siren) {
+      this.endHalf(); // a miss after the siren is dead
+      return;
+    }
+    // Dead ball: a tap restart for the defence on their own 20 (proper dead-ball restarts come with 2d).
+    const def = other(g.side);
+    const fb = this.at(def, FULLBACK);
+    const ddir = this.dirOf(def);
+    fb.body.pos = { x: ddir > 0 ? 20 : FIELD_LENGTH - 20, y: MID_Y };
+    fb.body.vel = { x: 0, y: 0 };
+    this.ball = { kind: 'held', by: this.indexOf(fb) };
+    fb.catchTick = this.tick;
+    fb.decided = false;
+    this.attacking = def;
+    this.dir = ddir;
+    this.tackles = 0;
+    this.lastPlay = false;
+    this.kickCall = this.fgCall = null;
+    this.mark = { ...fb.body.pos };
+    this.lineX = fb.body.pos.x + ddir * LIVE.onsideM;
+    this.phase = { kind: 'play' };
+    this.emit('set-start', `20-metre restart — ${this.names[def]} ball`, fb);
+  }
+
+  private stepGoal(ph: Extract<Phase, { kind: 'goal' }>): void {
+    if (this.tick < ph.t0 + GOALS.goalTicks) return;
+    this.afterScore(ph.side);
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -1444,6 +1590,25 @@ export class LiveSim implements MatchSim {
     // Everyone cruises unless the moment calls for the foot down (§8.2), set below.
     for (const p of this.players) p.wantsSprint = false;
 
+    if (ph.kind === 'conversion') {
+      // The kicker to his spot; his side behind him, the defence behind their try line.
+      const dir = this.dirOf(ph.side);
+      const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
+      for (const p of this.players) {
+        p.through = false;
+        if (this.indexOf(p) === ph.kicker) p.target = ph.spot;
+        else if (p.side === ph.side) p.target = clampToGround({ x: ph.spot.x - dir * (4 + (p.slot % 3) * 2), y: ph.spot.y + (p.slot - 4) * 3 }, 1);
+        else p.target = clampToGround({ x: posts.x + dir * 3, y: MID_Y + (p.slot - 4) * 4 }, 0.5);
+      }
+      return;
+    }
+    if (ph.kind === 'goal') {
+      for (const p of this.players) {
+        p.target = { ...p.body.pos };
+        p.through = false;
+      }
+      return;
+    }
     if (ph.kind === 'half-time' || ph.kind === 'full-time') {
       // The whistle has gone: everyone stops where he is.
       for (const p of this.players) {
