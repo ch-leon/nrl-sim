@@ -102,7 +102,8 @@ describe('interchanges in the live sim', () => {
   it('a side that rotates finishes on better legs than the same side without a bench', () => {
     const mean = (gs: Game[]): number => gs.reduce((a, g) => a + g.lateLegs, 0) / gs.length;
     expect(mean(on)).toBeGreaterThan(mean(off) + 0.08);
-    for (const g of off) expect(g.events.some((x) => x.e.kind === 'interchange' && x.e.side === 'home')).toBe(false);
+    // Without a rotation the coach only takes off a man hurt in a big hit (2f).
+    for (const g of off) expect(g.events.some((x) => x.e.kind === 'interchange' && x.e.side === 'home' && !x.e.text.includes('the injured'))).toBe(false);
   });
 
   it('swaps are announced "X on for Y", put the new man in the slot, and happen at stoppages only', () => {
@@ -120,14 +121,21 @@ describe('interchanges in the live sim', () => {
 
   it('at half-time tired men are swapped in the sheds, after the break gives everyone legs back', () => {
     // A short match from cooked legs: the break brings them to 60%, still under Heavy's line; the rested bench comes on.
-    const sim = new LiveSim(sideSheet('H', { rating: 60, rotation: 'heavy' }), sideSheet('A', { rating: 60, rotation: 'off' }), 7, { energy: 0.2, length: { halves: 2, halfMinutes: 1 } });
-    const subs: { e: SimEvent; label: string }[] = [];
-    while (!sim.finished && sim.tick < 20_000) {
-      sim.step();
-      for (const e of sim.tickEvents) if (e.kind === 'interchange') subs.push({ e, label: sim.snapshot().label });
+    // A seed whose first half has no other stoppage (a touch or a try would bring the bench on first).
+    let checked = 0;
+    for (let seed = 1; seed <= 12 && checked < 2; seed++) {
+      const sim = new LiveSim(sideSheet('H', { rating: 60, rotation: 'heavy' }), sideSheet('A', { rating: 60, rotation: 'off' }), seed, { energy: 0.2, length: { halves: 2, halfMinutes: 1 } });
+      const subs: { e: SimEvent; label: string }[] = [];
+      while (!sim.finished && sim.tick < 20_000) {
+        sim.step();
+        for (const e of sim.tickEvents) if (e.kind === 'interchange') subs.push({ e, label: sim.snapshot().label });
+      }
+      if (subs.some((s) => s.label.includes('1st '))) continue;
+      const atBreak = subs.filter((s) => s.label.includes('2nd 0:00'));
+      expect(atBreak.length).toBe(BENCH.heavy.perStoppage);
+      expect(atBreak.every((s) => s.e.side === 'home')).toBe(true);
+      checked++;
     }
-    const atBreak = subs.filter((s) => s.label.includes('2nd 0:00'));
-    expect(atBreak.length).toBe(BENCH.heavy.perStoppage);
-    expect(atBreak.every((s) => s.e.side === 'home')).toBe(true);
+    expect(checked).toBeGreaterThan(0);
   });
 });

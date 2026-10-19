@@ -168,7 +168,12 @@ describe('runMatch', () => {
       for (let i = 1; i < r.events.length; i++) expect(r.events[i]!.t).toBeGreaterThanOrEqual(r.events[i - 1]!.t);
       expect(r.events[r.events.length - 1]!.t).toBe(2 * NINES.halfMinutes);
       expect(r.weather).toBe('rain');
-      expect(r.injuries).toEqual([]);
+      // Big hits can hurt (2f): each injury names a side's player, out 1–3 weeks.
+      for (const i of r.injuries) {
+        expect(['H', 'A']).toContain(i.teamId);
+        expect(i.weeks).toBeGreaterThanOrEqual(1);
+        expect(i.weeks).toBeLessThanOrEqual(3);
+      }
       expect(r.momentumTimeline.length).toBeGreaterThan(10);
       let s = initLiveState();
       for (const ev of r.events) s = reduceEvent(s, ev, 'H');

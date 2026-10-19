@@ -27,7 +27,9 @@
 // tap on the 20 or for a 40/20, or a goal-line drop-out.
 // Penalties (2e): ruck offences give six again; offside and high shots give a
 // penalty, and the captain takes the shot, taps or kicks for touch.
-// Weather comes later in Phase 2 (#86).
+// Weather, injuries and the ball lost in contact (2f): rain makes the ball
+// slippery, wind carries kicks and blows goal kicks off line; a big hit can
+// injure, and the hurt man comes off at the next stoppage.
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
@@ -53,6 +55,8 @@ import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
 import { PENALTY, choosePenalty, offsideChance } from './penalties';
+import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
+import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
@@ -166,6 +170,11 @@ interface Player {
   name: string;
   /** Squad id or name: the look he wears on screen. */
   key: string;
+  /** Squad id (when the sheet came from a real squad) and injury risk 1–100 (2f). */
+  id?: string;
+  injuryRisk: number;
+  /** Hurt in a big hit (2f): slower until he comes off at the next stoppage. */
+  hurt: boolean;
   stats: Stats;
   /** Special skills (BAK-208 §3); empty for most players. */
   traits: TraitInstance[];
@@ -218,6 +227,10 @@ interface Player {
 interface BenchMan {
   name: string;
   key: string;
+  id?: string;
+  injuryRisk: number;
+  /** Came off hurt (2f): never goes back on. */
+  injured: boolean;
   stats: Stats;
   traits: TraitInstance[];
   stamina: number;
@@ -290,13 +303,17 @@ export interface LiveOptions {
   energy?: number;
   /** Two Nines halves unless told otherwise (the balance harness plays single stretches). */
   length?: MatchLength;
+  /** The weather (2f): clear unless told. */
+  weather?: WeatherKind;
+  /** Injury chance multiplier (the difficulty's, as the old engine takes it). */
+  injuryRate?: number;
 }
 
 /** A sheet's bench, as many as the bench holds. */
 function benchOf(sheet: TeamSheet): BenchMan[] {
   return (sheet.bench ?? []).slice(0, BENCH.size).map((e) => {
     const traits = e.traits ? [...e.traits] : [];
-    return { name: e.name, key: e.id ?? e.name, stats: statsOf(e), traits, stamina: e.stats?.stamina ?? 50, energy: 1 };
+    return { name: e.name, key: e.id ?? e.name, ...(e.id ? { id: e.id } : {}), injuryRisk: e.injuryRisk ?? 20, injured: false, stats: statsOf(e), traits, stamina: e.stats?.stamina ?? 50, energy: 1 };
   });
 }
 
@@ -340,6 +357,12 @@ export class LiveSim implements MatchSim {
   private goalUp: { side: Side; kicker: number; good: boolean } | null = null;
   /** A penalty kicked for touch, in the air (2e). */
   private penaltyKickUp: { side: Side } | null = null;
+  /** The weather and what it does (2f), the injury rate, and the injuries so far (for MatchResult). */
+  readonly weather: WeatherKind;
+  private readonly wx: WeatherEffect;
+  private readonly injuryRate: number;
+  private readonly clubIds: Record<Side, string>;
+  readonly injuries: MatchInjury[] = [];
   /** Tick the carrier crossed the line while going round for the bonus zone; -1 when he isn't. */
   private overLineAt = -1;
   /** Touch and dead ball (2d): the side that touched the ball last, the kick in play (where from and what for), and a bounce on its way out. */
@@ -377,6 +400,10 @@ export class LiveSim implements MatchSim {
 
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
     this.rng = makeRng(seed);
+    this.weather = opts.weather ?? 'clear';
+    this.wx = weatherEffect(this.weather);
+    this.injuryRate = opts.injuryRate ?? 1;
+    this.clubIds = { home: home.clubId, away: away.clubId };
     this.length = opts.length ?? fullMatch();
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
@@ -440,6 +467,9 @@ export class LiveSim implements MatchSim {
         slot,
         name,
         key: entry?.id ?? name,
+        ...(entry?.id ? { id: entry.id } : {}),
+        injuryRisk: entry?.injuryRisk ?? 20,
+        hurt: false,
         stats,
         traits,
         stamina,
@@ -668,7 +698,26 @@ export class LiveSim implements MatchSim {
   // ── Interchanges (2b) ─────────────────────────────────────────────────────
   /** Who the coach takes off now, by his rotation policy. */
   private swapsFor(side: Side): { slot: number; bench: number }[] {
-    return pickSwaps(this.side(side).map((p) => ({ slot: p.slot, energy: p.energy })), this.bench[side], this.rotation[side]);
+    // A hurt man comes off first, whatever the rotation, for the freshest man left (2f).
+    const bench = this.bench[side];
+    const out: { slot: number; bench: number }[] = [];
+    const used = new Set<number>();
+    for (const p of this.side(side)) {
+      if (!p.hurt || p.subFor !== null) continue;
+      let best = -1;
+      bench.forEach((b, i) => {
+        if (!b.injured && !used.has(i) && (best < 0 || b.energy > bench[best]!.energy)) best = i;
+      });
+      if (best < 0) continue; // nobody left: he plays on hampered
+      used.add(best);
+      out.push({ slot: p.slot, bench: best });
+    }
+    const rest = pickSwaps(
+      this.side(side).filter((p) => !out.some((o) => o.slot === p.slot)).map((p) => ({ slot: p.slot, energy: p.energy })),
+      bench.map((b, i) => (b.injured || used.has(i) ? { energy: -Infinity } : b)),
+      this.rotation[side],
+    );
+    return [...out, ...rest];
   }
 
   /** After a try: the men coming off head for the interchange spot (the restart waits for them). */
@@ -701,10 +750,15 @@ export class LiveSim implements MatchSim {
   private swapIn(p: Player, bi: number): void {
     const b = this.bench[p.side][bi];
     if (!b) return;
-    this.bench[p.side][bi] = { name: p.name, key: p.key, stats: p.stats, traits: p.traits, stamina: p.stamina, energy: p.energy };
+    this.bench[p.side][bi] = { name: p.name, key: p.key, ...(p.id ? { id: p.id } : {}), injuryRisk: p.injuryRisk, injured: p.hurt, stats: p.stats, traits: p.traits, stamina: p.stamina, energy: p.energy };
     const out = p.name;
+    const wasHurt = p.hurt;
     p.name = b.name;
     p.key = b.key;
+    if (b.id) p.id = b.id;
+    else delete p.id;
+    p.injuryRisk = b.injuryRisk;
+    p.hurt = false;
     p.stats = b.stats;
     p.traits = [...b.traits];
     p.stamina = b.stamina;
@@ -718,7 +772,7 @@ export class LiveSim implements MatchSim {
     p.busyUntil = p.cooldownUntil = p.immuneUntil = p.burstUntil = 0;
     p.brokeAt = -1000;
     p.subFor = null;
-    this.emit('interchange', `${p.name} on for ${out}`, p);
+    this.emit('interchange', wasHurt ? `${p.name} on for the injured ${out}` : `${p.name} on for ${out}`, p);
   }
 
   /** The bench's legs come back a little each tick. */
@@ -836,7 +890,7 @@ export class LiveSim implements MatchSim {
         return;
       }
       const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < LIVE.pressureM);
-      if (b.via === 'kick' && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.skill - 50) / 300 : LIVE.dropChance)) {
+      if (b.via === 'kick' && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.skill - 50) / 300 : LIVE.dropChance) * this.wx.handling) {
         // Spilled under the high ball: a scramble for anyone.
         this.emit('drop', `${r.name} spills the kick under pressure!`, r);
         this.lastTouch = r.side;
@@ -848,7 +902,7 @@ export class LiveSim implements MatchSim {
       const picked = this.interceptTrait;
       this.spillExtra = 0;
       this.interceptTrait = undefined;
-      if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.skill, pressured, false, spillExtra)) {
+      if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.skill, pressured, false, spillExtra) * this.wx.handling) {
         // Spilled: the ball squirts forward and the defence takes over.
         this.emit('error', spillExtra > 0 ? `${r.name} can't hold the wild offload — knock-on` : `${r.name} spills it — knock-on`, r);
         this.lastTouch = r.side;
@@ -1101,9 +1155,11 @@ export class LiveSim implements MatchSim {
   private planKick(h: Player, kind: KickChoice): PendingKick {
     const def = other(this.attacking);
     const fb = this.at(def, FULLBACK);
-    const boot = bootMult(h.traits);
+    const boot0 = bootMult(h.traits);
+    // Wind carries a territory kick further and less predictably (2f).
+    const boot = kind === 'long' && this.wx.kickDistance !== 1 ? { dist: boot0.dist * this.wx.kickDistance * (1 + (this.rng.next() - 0.5) * 2 * this.wx.jitter), acc: boot0.acc } : boot0;
     const base = { at: this.tick + LIVE.kickContactTicks, kicker: this.indexOf(h), kickoff: false, kind };
-    const trait = boot.dist > 1 ? { trait: announce(h.traits.find((t) => t.id === 'bigBoot')) ?? 'Big Boot' } : {};
+    const trait = boot0.dist > 1 ? { trait: announce(h.traits.find((t) => t.id === 'bigBoot')) ?? 'Big Boot' } : {};
     switch (kind) {
       case 'grubber': {
         // Some run on too far and go dead (2d).
@@ -1512,7 +1568,7 @@ export class LiveSim implements MatchSim {
       if (ph.readyAt === 0 && dist(k.body.pos, ph.spot) < 1) ph.readyAt = this.tick;
       const ready = ph.readyAt > 0 && this.tick >= ph.readyAt + GOALS.conversionTicks;
       if (!ready && this.tick < ph.t0 + GOALS.conversionMaxTicks) return;
-      ph.good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.skill, bootMult(k.traits).acc);
+      ph.good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.skill, this.goalAcc(k));
       this.lock(k, 'kick', LIVE.kickLockTicks);
       this.ball = kickFlight(k.body.pos, this.goalAim(posts, this.dirOf(ph.side), ph.good), this.tick, null, 7);
       return;
@@ -1555,7 +1611,7 @@ export class LiveSim implements MatchSim {
     const halfS = this.length.halfMinutes * 60;
     const halfLeftS = Math.max(0, halfS - this.clockTicks * TICK_S);
     const choice = choosePenalty({
-      shotChance: goalChance(mark, postsFor(dir, FIELD_LENGTH, MID_Y), kicker.stats.skill, bootMult(kicker.traits).acc),
+      shotChance: goalChance(mark, postsFor(dir, FIELD_LENGTH, MID_Y), kicker.stats.skill, this.goalAcc(kicker)),
       toLine: this.toLineFor(award, mark),
       matchLeftS: (this.length.halves - this.half) * halfS + halfLeftS,
       halfLeftS,
@@ -1595,13 +1651,18 @@ export class LiveSim implements MatchSim {
     ph.kicked = true;
     const dir = this.dirOf(ph.side);
     const line = dir > 0 ? FIELD_LENGTH : 0;
-    const gain = PENALTY.touchGainM * bootMult(k.traits).dist;
+    const gain = PENALTY.touchGainM * bootMult(k.traits).dist * this.wx.kickDistance;
     const x = dir > 0 ? Math.min(k.body.pos.x + gain, line - 10) : Math.max(k.body.pos.x - gain, line + 10);
     const y = k.body.pos.y < MID_Y ? -2 : FIELD_WIDTH + 2;
     this.lock(k, 'kick', LIVE.kickLockTicks);
     this.ball = kickFlight(k.body.pos, { x, y }, this.tick, null, 10);
     this.lastKicker = ph.kicker;
     this.penaltyKickUp = { side: ph.side };
+  }
+
+  /** A kicker's goal accuracy (spread: lower is truer): Big Boot, and the wind blowing it off line (2f). */
+  private goalAcc(k: Player): number {
+    return bootMult(k.traits).acc * this.wx.goalSpread;
   }
 
   /** Where a kick at goal comes down: just over the bar between the uprights, or wide of one. */
@@ -1636,7 +1697,7 @@ export class LiveSim implements MatchSim {
       return;
     }
     const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
-    const good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.skill, bootMult(k.traits).acc);
+    const good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.skill, this.goalAcc(k));
     this.ball = kickFlight(k.body.pos, this.goalAim(posts, dir, good), this.tick, null, 8);
     this.goalUp = { side: k.side, kicker: g.kicker, good };
     this.emit('drop-goal', `${k.name} drops for the field goal…`, k);
@@ -1808,6 +1869,26 @@ export class LiveSim implements MatchSim {
       this.lock(t, 'tackle', LIVE.contactTicks);
       this.penalize(t.side, { ...c.body.pos }, `${t.name} — high shot`, t, 'high', hot > 0 ? announce(t.traits.find((x) => x.id === 'hothead')) : undefined);
       return;
+    }
+    // Ball lost in the tackle (2f): a knock-on, more on a big hit and in the rain.
+    if (this.rng.next() < lostInContactChance(outcome === 'big-hit', c.stats.skill, this.wx.handling)) {
+      this.emit('error', `${c.name} loses the ball in the tackle — knock-on`, c);
+      this.events[this.events.length - 1]!.detail = 'contact';
+      this.lock(c, 'tackled', LIVE.contactTicks);
+      this.lock(t, 'tackle', LIVE.contactTicks);
+      this.lastTouch = c.side;
+      this.bounce(c.body.pos, { x: this.dir, y: (this.rng.next() - 0.5) * 0.6 }, 2.5, 12, 2);
+      this.turnover();
+      this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
+      if (this.siren) this.endHalf();
+      return;
+    }
+    // A big hit can injure the carrier (2f; the old engine's roll): hampered until he comes off.
+    if (outcome === 'big-hit' && !c.hurt && this.rng.next() < injuryChance({ injuryRisk: c.injuryRisk, traits: c.traits }, this.injuryRate)) {
+      const weeks = 1 + Math.floor(this.rng.next() * 3);
+      c.hurt = true;
+      this.injuries.push({ teamId: this.clubIds[c.side], playerName: c.name, ...(c.id ? { playerId: c.id } : {}), weeks });
+      this.emit('injury', `${c.name} is hurt in the tackle (${weeks} week${weeks > 1 ? 's' : ''})`, c);
     }
     // Held or smashed on the touchline: bundled into touch (2d).
     const nearTouch = Math.min(c.body.pos.y, FIELD_WIDTH - c.body.pos.y) < TOUCH.bundleNearM;
@@ -2322,6 +2403,7 @@ export class LiveSim implements MatchSim {
       if (kickChase && p.side !== this.attacking) max *= speedMult(p.traits, 'jets');
       if (lineBroken && p.side !== this.attacking) max *= speedMult(p.traits, 'lastLine');
       max *= legsSpeed(p.energy);
+      if (p.hurt) max *= WEATHER.hurtSpeed;
       arrive(p.body, p.target, dt, { through: p.through, maxSpeed: max });
       const from = p.body.pos;
       integrate(p.body, dt);

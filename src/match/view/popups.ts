@@ -66,6 +66,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   'six-again': { word: 'SIX AGAIN!', tone: 'attack' },
   'penalty-choice': { word: 'TAP AND GO', tone: 'neutral' },
   'penalty-goal': { word: 'GOAL!', tone: 'attack' },
+  // Injuries (2f): over the man hurt in the tackle.
+  injury: { word: 'HURT!', tone: 'bad' },
 };
 
 /** The captain's call on a penalty (2e). */
@@ -110,7 +112,9 @@ export function popupFor(e: SimEvent): Popup | null {
           ? 'BONUS TRY!'
           : e.kind === 'touch' && e.detail === 'bundled'
             ? 'INTO TOUCH!'
-            : e.kind === 'penalty-choice'
+            : e.kind === 'error' && e.detail === 'contact'
+              ? 'SPILLED!'
+              : e.kind === 'penalty-choice'
               ? (CALL_WORDS[e.detail ?? 'tap'] ?? w.word)
               : w.word;
   const p: Popup = { word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };

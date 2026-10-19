@@ -21,7 +21,7 @@ import { CameraController } from '../world/camera';
 import { zoomForViewport } from '../world/viewport';
 import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
-import type { TeamSheet, MatchResult, MatchEvent } from '../sim/events';
+import type { TeamSheet, MatchResult, MatchEvent, WeatherKind } from '../sim/events';
 import type { Fixture } from '../core/state';
 import {
   PlaybackController,
@@ -118,6 +118,8 @@ export interface MatchSceneData {
   /** Absent in the match lab (BAK-207), which drives the sprites itself. */
   result?: MatchResult;
   fixture?: Fixture; // carried through so `match:finished` can echo it (BAK-194)
+  /** The weather when there is no result to take it from (the match lab, 2f). */
+  weather?: WeatherKind;
 }
 
 /** A player sprite + ground shadow, driven through PlaybackActor. */
@@ -228,6 +230,7 @@ export class MatchScene extends Phaser.Scene {
   private away!: TeamSheet;
   private result: MatchResult | undefined;
   private fixture: Fixture | undefined;
+  private weather: WeatherKind | undefined;
 
   private readonly offsetX = fieldOffsetX();
   private art!: MatchArtRegistry;
@@ -274,6 +277,7 @@ export class MatchScene extends Phaser.Scene {
     this.away = data.away;
     this.result = data.result;
     this.fixture = data.fixture;
+    this.weather = data.result?.weather ?? data.weather;
     this.players.home = [];
     this.players.away = [];
     this.crowdBobs = [];
@@ -333,7 +337,7 @@ export class MatchScene extends Phaser.Scene {
     this.data.set('away', this.away);
     attachMatchFx(this); // BAK-201: pooled try/big-hit/crowd particle FX (WU-14)
     // GitHub #16: rain/wind, dusk/night lighting (per fixture), stand reactions.
-    attachMatchAtmosphere(this, { weather: this.result?.weather, fixture: this.fixture });
+    attachMatchAtmosphere(this, { weather: this.weather, fixture: this.fixture });
 
     // WU-12: overlay first (subscribes to 'match:event'/'match:finished'), then
     // the playback controller which re-emits the event stream on a compressed

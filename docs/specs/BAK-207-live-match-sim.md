@@ -162,7 +162,7 @@ the report linked in the PR. The match is **Nines** (#77: one ruleset, no Classi
 | **2c** — *shipped* | **Goal kicking: conversions and field goals.** Conversions are Nines **drop kicks**, taken from in front of where the try was grounded, quickly; accuracy from Boot and the kicking stat, distance and angle; a flight to the posts you can see. **Field goal** (BAK-208 §4.4): last 3 minutes, scores level or within 1, inside 30 m; charge-down 8%. **Bonus-zone tries** worth 5 (Leon, 2026-10-19; the in-goal between the posts, as the current Nines rules). | Conversion % and field goals per match in the report; GOAL!/MISSED! pop-ups. |
 | **2d** — *shipped* | **Touch, dead ball and drop-outs** (closes most of BAK-208 E, #99). The ball and the carrier can go into touch; long kicks aim for touch; **40/20**; a kick dead in-goal or over the dead-ball line → 20 m restart; a defender tackled in-goal or forcing it dead → goal-line drop-out. Restarts are a play-the-ball **10 m in from touch** for the other side, no scrums. | A set can end every way BAK-208 §4.4 lists and each is readable; kick metres and 40/20s in the report. |
 | **2e** — *shipped* | **Penalties and six-again.** Ruck offences (holding down in a long wrestle, slow off the ruck) give **six again** (tackle count back to zero, SIX AGAIN! pop-up); offside (a defender up before the ball is played, more likely with Rush) and high shots (Hothead) give a **penalty**: tap and go, kick for touch (ball back, 10 m restart), or a shot at goal for 2 when in range and it makes sense on the clock and score. Sin bins later (BAK-206 B7). | Penalties and six-agains per match in the report; Rush pays for its line speed in penalties; the choice is shown. |
-| **2f** | **Weather, injuries, errors in contact.** Rain → handling (knock-ons, drops), wind → kick distance and goal accuracy; a big hit can injure (as the old engine does); an injured player comes off at the next stoppage through 2b, or plays on hampered with no bench left. Ball lost in contact (a knock-on in the tackle, not just strips). Momentum timeline from the play, as the old engine's. | Weather moves error and goal rates in the report; `MatchResult.injuries` is filled and the club game applies them. |
+| **2f** — *shipped* | **Weather, injuries, errors in contact.** Rain → handling (knock-ons, drops), wind → kick distance and goal accuracy; a big hit can injure (as the old engine does); an injured player comes off at the next stoppage through 2b, or plays on hampered with no bench left. Ball lost in contact (a knock-on in the tackle, not just strips). Momentum timeline from the play, as the old engine's. | Weather moves error and goal rates in the report; `MatchResult.injuries` is filled and the club game applies them. |
 | **2g** | **Live matches behind a setting.** A "Live match (beta)" setting. At kick-off matchday runs `runMatch` headless for the result, so ladder, stats and injuries are applied exactly as today; the match screen then plays **the same seed live** (deterministic, so what you watch is what was recorded). The overlay, score banners, pop-ups, speed controls and skip all work off the live sim; `match:finished` at full time. The overlay reads the half length from `NINES`. | A whole season plays end to end with the setting on; all stats/overlay parity tests pass against `runMatch`; works on a phone. |
 
 **2a as shipped** (where it differs from the row above): the ball is dead after the siren on
@@ -224,6 +224,17 @@ half is ending; else taps inside 25 m or kicks for touch and taps 10 m in. Pop-u
 over neighbouring players now stack instead of overlapping. The MatchResult carries penalty
 goals (`penalty-goal`, good / missed), which the overlay already scores. Measured: tuning
 reference §17 (about 2.4 penalties and 2.3 six-agains a match; Rush concedes the most).
+
+**2f as shipped:** `league/weather.ts`. Rain makes every knock-on, spilled kick and ball lost
+in contact ×1.6; wind carries territory kicks 12% further (±15% a kick) and spreads goal kicks
+1.4× as wide. A held tackle (0.6%) or a big hit (3%) can jar the ball loose, less for a
+skilful carrier: a knock-on (SPILLED!). A big hit can hurt the carrier, the old engine's roll
+scaled to the live sim's 3½× big hits so a season's injuries stay as they are; he runs at 85%
+until the next stoppage, when he comes off first for the freshest bench man (HURT!, "on for
+the injured …"), or plays on hampered with nobody left. `runMatch` takes `weather` and
+`injuryRate` and returns the injuries by squad id, 1–3 weeks. The lab has a weather picker
+(`wx=rain`) and shows the rain or wind on the stadium. The momentum timeline from the play
+shipped with 2a. Measured: tuning reference §18.
 
 After Phase 2: Phase 3 (balance, with the harness on whole matches) and the lineup screen (#69).
 

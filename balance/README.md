@@ -79,8 +79,9 @@ somewhere else.
   `none` (flat squads' default), `gen` (clubs' default), `stars`. `bench` is how many
   interchange players (0–4, default 4; a flat squad's bench has its stats) and
   `rotation` how hard the coach uses them: `off`, `standard` (default), `heavy`.
-- **Scenario extras**: `legs` (`fresh`, `late`, `spent` or 0..1) and its own `minutes`
-  (a stretch instead of a whole match, e.g. the last 8 minutes on tired legs).
+- **Scenario extras**: `legs` (`fresh`, `late`, `spent` or 0..1), its own `minutes`
+  (a stretch instead of a whole match, e.g. the last 8 minutes on tired legs) and
+  `weather` (`clear`, `rain` or `wind`; clear unless given).
 - **base**: overrides under every variant, baseline included.
 - **variants**: hand-written sets of overrides. A `baseline` with no overrides is
   always run first so every row has something to compare with.

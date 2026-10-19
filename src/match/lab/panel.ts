@@ -4,7 +4,8 @@
 import { button, el, mount, panel } from '../../ui/dom';
 import { RUN_SPEEDS, type RunSpeed } from '../core/engine';
 import { decodeFlag } from '../core/flag';
-import type { LabController, LabParams } from './controller';
+import { isWeather, type LabController, type LabParams } from './controller';
+import type { WeatherKind } from '../../sim/events';
 import { TRAIT_MODES, isTraitMode, type LabClub, type TraitMode } from './sheets';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
 import type { LabTactics } from './controller';
@@ -83,6 +84,14 @@ export class LabPanel {
       bench.append(o);
     }
     const benchOf = (): Rotation => (isRotation(bench.value) ? bench.value : DEFAULT_ROTATION);
+    // Weather (BAK-207 2f): rain makes the ball slippery; wind carries kicks and blows goal kicks off line.
+    const wx = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Weather: clear / rain (slippery ball) / wind (kicks carry, goals drift)' } });
+    for (const w of ['clear', 'rain', 'wind'] as const) {
+      const o = el('option', { text: w, attrs: { value: w } });
+      if (w === (p.weather ?? 'clear')) o.selected = true;
+      wx.append(o);
+    }
+    const wxOf = (): WeatherKind => (isWeather(wx.value) ? wx.value : 'clear');
     // Tactics picker: a preset per side for attack and defence; "club" keeps the club's own style.
     const presetSelect = (kind: 'attack' | 'defence', value: string | undefined, title: string): HTMLSelectElement => {
       const sel = el('select', { class: 'nrl-lab-select nrl-lab-preset', attrs: { title } });
@@ -108,10 +117,10 @@ export class LabPanel {
     const go = button('Go', () => {
       const s = Math.max(1, Math.floor(Number(seed.value) || 1));
       const mode = isTraitMode(traits.value) ? traits.value : 'gen';
-      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf(), bench: benchOf() });
+      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf() });
     });
     // Any setup change applies at once: the match restarts from the kick-off on the same seed.
-    for (const s of [home, away, seed, traits, legs, bench, hAtk, hDef, aAtk, aDef]) s.addEventListener('change', () => go.click());
+    for (const s of [home, away, seed, traits, legs, bench, wx, hAtk, hDef, aAtk, aDef]) s.addEventListener('change', () => go.click());
     const shuffle = button('🎲', () => {
       seed.value = String(1 + Math.floor(Math.random() * 999_999));
       go.click();
@@ -156,7 +165,7 @@ export class LabPanel {
     const load = button('Load', () => {
       const f = decodeFlag(codeIn.value);
       if (!f) return hooks.notify('Not a valid Flag code');
-      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf(), bench: benchOf() });
+      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf() });
     });
 
     // Event feed: the last few things that happened; tap one to jump back to it.
@@ -172,7 +181,7 @@ export class LabPanel {
       { class: 'nrl-lab' },
       el('div', { class: 'nrl-lab-row nrl-lab-head' }, el('div', { class: 'nrl-lab-title', text: 'Match Lab · live match' }), collapse),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, home, el('span', { text: 'v' }), away, seed, go, shuffle),
-      el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits, el('span', { text: 'Legs' }), legs, el('span', { text: 'Bench' }), bench),
+      el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'Skills' }), traits, el('span', { text: 'Legs' }), legs, el('span', { text: 'Bench' }), bench, el('span', { text: 'Wx' }), wx),
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'H' }), hAtk, hDef, el('span', { text: 'A' }), aAtk, aDef),
       ...(styles ? [el('div', { class: 'nrl-lab-hint nrl-lab-more', text: styles })] : []),
       el('div', { class: 'nrl-lab-row' }, this.playBtn, step, whistle, ...this.speedBtns, this.readout),
