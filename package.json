@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "balance": "vite-node scripts/balance.ts --",
     "soak": "vite-node scripts/soak.ts --",
-    "e2e:season": "node scripts/e2e-season.mjs"
+    "e2e:season": "node scripts/e2e-season.mjs",
+    "e2e:perf": "node scripts/e2e-perf.mjs"
   },
   "dependencies": {
     "phaser": "^3.80.0"
