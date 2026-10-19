@@ -61,5 +61,7 @@ export function toMatchEvent(e: SimEvent, snap: Snapshot, ids: Record<Side, stri
   if (e.kind === 'kick') ev.detail = KICK_DETAIL[e.detail ?? 'long'] ?? 'find-touch';
   // Kicks at goal carry their result; the overlay scores only the good ones.
   if (e.kind === 'conversion' || e.kind === 'field-goal') ev.detail = e.detail === 'good' ? 'good' : 'missed';
+  // A try in the bonus zone (Nines) is worth five; the overlay reads the mark.
+  if (e.kind === 'try' && e.detail === 'bonus') ev.detail = 'bonus';
   return ev;
 }

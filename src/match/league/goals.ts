@@ -37,11 +37,24 @@ export const GOALS = {
   chargeDown: 0.08,
   /** Ticks of celebration after a field goal before the restart (1.5 s). */
   goalTicks: 30,
+  /**
+   * Bonus zone (Nines): a carrier over the line goes round under the posts for
+   * the five-pointer while no defender is within this many metres of him…
+   */
+  bonusClearM: 5,
+  /** …for at most this long (ticks, 2.5 s), and grounds it before he is this close to the dead-ball line. */
+  bonusMaxTicks: 50,
+  bonusDeadM: 2,
 };
 
 /** The posts a side kicks at: the middle of the try line it attacks. */
 export function postsFor(dir: 1 | -1, fieldLength: number, midY: number): Vec {
   return { x: dir > 0 ? fieldLength : 0, y: midY };
+}
+
+/** In the bonus zone: over the try line and between the uprights (the line counts). A try grounded here is worth five. */
+export function inBonusZone(p: Vec, posts: Vec, dir: 1 | -1): boolean {
+  return (p.x - posts.x) * dir >= 0 && Math.abs(p.y - posts.y) <= GOALS.halfPosts;
 }
 
 /**

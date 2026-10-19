@@ -2,7 +2,7 @@
 // conversion is taken from, the odds by angle, distance, Skill and Big Boot,
 // a conversion after every try, and field goals late with the scores close.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { GOALS, conversionSpot, goalChance, postsAngleDeg, postsFor } from '../../../src/match/league/goals';
+import { GOALS, conversionSpot, goalChance, inBonusZone, postsAngleDeg, postsFor } from '../../../src/match/league/goals';
 import { LiveSim } from '../../../src/match/league/live';
 import { NINES } from '../../../src/match/league/rules';
 import { applyTuning } from '../../../src/match/league/tuning';
@@ -72,7 +72,8 @@ describe('conversions in the live sim', () => {
       all += convs.length;
       for (const side of ['home', 'away'] as const) {
         const made = convs.filter((x) => x.e.side === side && x.e.detail === 'good').length;
-        expect(sim.points[side]).toBe(sim.tries[side] * NINES.tryPoints + made * NINES.conversionPoints);
+        const bonus = tries.filter((x) => x.e.side === side && x.e.detail === 'bonus').length;
+        expect(sim.points[side]).toBe(sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made * NINES.conversionPoints);
       }
     }
     expect(all).toBeGreaterThan(4);
@@ -102,7 +103,8 @@ describe('field goals in the live sim', () => {
       after = after.concat(fgs.filter((x) => x.e.detail === 'missed').map((x) => events[events.indexOf(x) + 1]!).filter(Boolean));
       for (const side of ['home', 'away'] as const) {
         const made = (k: string): number => events.filter((x) => x.e.kind === k && x.e.side === side && x.e.detail === 'good').length;
-        expect(sim.points[side]).toBe(sim.tries[side] * NINES.tryPoints + made('conversion') * NINES.conversionPoints + made('field-goal') * NINES.fieldGoalPoints);
+        const bonus = events.filter((x) => x.e.kind === 'try' && x.e.side === side && x.e.detail === 'bonus').length;
+        expect(sim.points[side]).toBe(sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made('conversion') * NINES.conversionPoints + made('field-goal') * NINES.fieldGoalPoints);
       }
     }
     expect(drops.length).toBeGreaterThan(3);
@@ -126,4 +128,36 @@ describe('field goals in the live sim', () => {
     }
     restore = applyTuning({});
   });
+});
+
+describe('bonus-zone tries (Nines)', () => {
+  it('the bonus zone is the in-goal between the posts, the line counting', () => {
+    expect(inBonusZone({ x: 100, y: 34 }, posts, 1)).toBe(true);
+    expect(inBonusZone({ x: 104, y: 34 + GOALS.halfPosts }, posts, 1)).toBe(true);
+    expect(inBonusZone({ x: 104, y: 34 + GOALS.halfPosts + 0.1 }, posts, 1)).toBe(false);
+    expect(inBonusZone({ x: 99.9, y: 34 }, posts, 1)).toBe(false); // short of the line
+    expect(inBonusZone({ x: -3, y: 33 }, postsFor(-1, 100, 34), -1)).toBe(true);
+    expect(inBonusZone({ x: 3, y: 33 }, postsFor(-1, 100, 34), -1)).toBe(false);
+  });
+
+  it('a carrier clear over the line goes round under the posts: a five-point try, grounded in the zone', () => {
+    let bonus = 0;
+    let plain = 0;
+    for (const seed of [1, 2, 3]) {
+      const { events } = play(seed);
+      for (const t of events.filter((x) => x.e.kind === 'try')) {
+        const scorer = t.snap.players.find((p) => p.side === t.e.side && p.slot === t.e.slot)!;
+        const dir = scorer.x > 50 ? 1 : -1;
+        if (t.e.detail === 'bonus') {
+          bonus++;
+          expect(t.e.text).toMatch(/under the posts/);
+          expect(Math.abs(scorer.y - 34)).toBeLessThanOrEqual(GOALS.halfPosts + 0.01);
+          expect(inBonusZone({ x: scorer.x, y: scorer.y }, postsFor(dir, 100, 34), dir)).toBe(true);
+        } else plain++;
+      }
+    }
+    // Some tries are scored with a man on the carrier (four), and some clear (five).
+    expect(bonus).toBeGreaterThan(0);
+    expect(plain).toBeGreaterThan(0);
+  }, 30_000);
 });

@@ -10,6 +10,8 @@ export const NINES = {
   halfMinutes: 9,
   /** Points for a try, a conversion (a drop kick in Nines) and a field goal (penalty goals come with 2e). */
   tryPoints: 4,
+  /** A try grounded in the bonus zone, the in-goal between the posts (Nines; goals.ts). */
+  bonusTryPoints: 5,
   conversionPoints: 2,
   fieldGoalPoints: 1,
   /** The half-time break on screen, ticks (3 s), before the second-half kick-off. */

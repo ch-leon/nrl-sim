@@ -87,7 +87,8 @@ export function reduceEvent(s: LiveState, ev: MatchEvent, homeId: string): LiveS
   // Scoring + counters.
   switch (ev.kind) {
     case 'try':
-      addScore(next, i, 4);
+      // A Nines bonus-zone try (grounded between the posts) is worth five.
+      addScore(next, i, ev.detail === 'bonus' ? 5 : 4);
       next.tries[i]++;
       break;
     case 'conversion':
@@ -179,8 +180,8 @@ export function scoreBanner(ev: MatchEvent, homeId: string, teamNames: readonly 
   let points: number;
   switch (ev.kind) {
     case 'try':
-      headline = 'TRY!';
-      points = 4;
+      headline = ev.detail === 'bonus' ? 'BONUS TRY!' : 'TRY!';
+      points = ev.detail === 'bonus' ? 5 : 4;
       break;
     case 'conversion':
       headline = missed ? 'CONVERSION MISSED' : 'CONVERTED';

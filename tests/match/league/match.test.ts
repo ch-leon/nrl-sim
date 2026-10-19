@@ -129,7 +129,8 @@ describe('the match clock, halves and full time', () => {
     for (const g of games) {
       for (const side of ['home', 'away'] as const) {
         const made = (kind: string): number => g.events.filter((x) => x.e.kind === kind && x.e.side === side && x.e.detail === 'good').length;
-        expect(g.sim.points[side]).toBe(g.sim.tries[side] * NINES.tryPoints + made('conversion') * NINES.conversionPoints + made('field-goal') * NINES.fieldGoalPoints);
+        const bonus = g.events.filter((x) => x.e.kind === 'try' && x.e.side === side && x.e.detail === 'bonus').length;
+        expect(g.sim.points[side]).toBe(g.sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made('conversion') * NINES.conversionPoints + made('field-goal') * NINES.fieldGoalPoints);
       }
       const last = g.events[g.events.length - 1]!.snap;
       expect(last.score).toEqual(g.sim.points);

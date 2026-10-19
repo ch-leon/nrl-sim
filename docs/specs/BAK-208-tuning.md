@@ -304,6 +304,9 @@ until 2d's dead-ball restarts).
 | `goals.fieldGoalChance` | `goals.ts` | 0.7 | How often he goes for it when it is on (once a set). |
 | `goals.chargeDown` | `goals.ts` | 8% | A field goal charged down: a loose ball. |
 | `goals.goalTicks` | `goals.ts` | 30 | The celebration after a field goal before the restart. |
+| `rules.bonusTryPoints` | `rules.ts` | 5 | A try grounded in the **bonus zone**, the in-goal between the posts (Nines; the line counts). |
+| `goals.bonusClearM` | `goals.ts` | 5 m | Over the line, the carrier goes round under the posts while no defender is this close; with one closer he grounds it where he is. |
+| `goals.bonusMaxTicks` / `goals.bonusDeadM` | `goals.ts` | 50 (2.5 s) / 2 m | …for at most this long, and grounds it before he is this close to the dead-ball line. |
 
 Odds from a conversion spot at Skill 60 (Skill 80 / Big Boot I): under the posts 99%;
 grounded 9 m off centre 81% (92 / 88); 14 m off 55% (68 / 63); 20 m off 36% (46 / 41);
@@ -314,5 +317,12 @@ Measured (standard plan, 20 whole matches a row): about 53% of conversions go ov
 central); field goals are rare, about one match in ten, as in real Nines. Draws between
 even sides fall from 30% with four-point tries only to about 10%. Nothing else moves
 beyond luck except where the extra stoppages give legs back (fewer swaps in 70 v 50).
+
+**Bonus zone** (Leon, 2026-10-19: in with 2c; current Nines rule). Measured (standard plan,
+20 whole matches a row, run `20261019-111110-standard`): 0.3 bonus tries a match between
+even sides (of 6.5), 1.0 for 70 v 50 (of 11.3), 0.5–0.8 elsewhere; nothing else moves
+beyond luck. Sweep of `goals.bonusClearM` (run `20261019-111152-bonus`): 3 m doubles them
+for the stronger side (1.9 a match); 7 m changes nothing. Overlay and banner count five
+(**BONUS TRY!**); `bonusTries` report column.
 
 Tests: `tests/match/league/goals.test.ts`.
