@@ -1,0 +1,70 @@
+{
+  "name": "spread confirm",
+  "description": "Phase 3 (#87): rating.spread 0.2 (each side moved toward the match average) with the coin-toss kick-off, 80 matches: the 20-point gap both ways, even sides, real clubs far apart.",
+  "seeds": 80,
+  "scenarios": [
+    {
+      "name": "60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "50 v 70",
+      "home": {
+        "rating": 50
+      },
+      "away": {
+        "rating": 70
+      }
+    },
+    {
+      "name": "65 v 55",
+      "home": {
+        "rating": 65
+      },
+      "away": {
+        "rating": 55
+      }
+    },
+    {
+      "name": "70 v 35",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 35
+      }
+    },
+    {
+      "name": "stingrays v larrikins",
+      "home": {
+        "club": "rival-stingrays"
+      },
+      "away": {
+        "club": "rival-larrikins"
+      }
+    },
+    {
+      "name": "wolves v crocs",
+      "home": {
+        "club": "rival-wolves"
+      },
+      "away": {
+        "club": "rival-crocs"
+      }
+    }
+  ]
+}
