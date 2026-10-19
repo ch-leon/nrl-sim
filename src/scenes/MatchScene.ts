@@ -37,6 +37,20 @@ import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchO
 import { LivePlayback, LIVE_DEFAULT_SPEED } from '../match/view/livePlayback';
 import { NINES } from '../match/league/rules';
 import type { LiveMatchData } from '../core/events';
+import { CALL_LABEL, COACH_CALLS, chipState, type CoachCall } from '../match/league/calls';
+
+/** Chip words: short enough for six 44 px chips on a phone on its side. Left and right are the attacker's as he faces the line (arrows would flip on screen with the ends). */
+const CHIP_LABEL: Readonly<Record<CoachCall, string>> = {
+  'hit-up': 'Hit-up',
+  'shift-left': 'Shift left',
+  'shift-right': 'Shift right',
+  'kick-early': 'Kick early',
+  'run-it': 'Run it',
+  bomb: 'Bomb',
+  'field-goal': 'Field goal',
+  rush: 'Rush',
+  hold: 'Hold',
+};
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { resolveKits } from '../art/match/kit';
@@ -383,6 +397,7 @@ export class MatchScene extends Phaser.Scene {
         },
       });
       this.mountPlaybackControls(LIVE_DEFAULT_SPEED);
+      if (live.coachSide) this.mountCallChips(live.coachSide);
       bus.on('match:finished', this.onFinished);
       // A phone may kill the app in the background: keep where the match is (#73).
       document.addEventListener('visibilitychange', this.onHidden);
@@ -409,10 +424,15 @@ export class MatchScene extends Phaser.Scene {
     return fieldToWorldPoint(fx, fy, this.offsetX);
   }
 
-  update(_time: number, delta: number): void {
+  update(time: number, delta: number): void {
     // Advance playback (fires due events, steps sprites) before panning so the
     // camera follows the freshly-moved ball this frame.
     if (this.playback) this.playback.update(delta);
+    // The coach's chips follow the play a few times a second (#73).
+    if (this.callsEl && time - this.chipsAt > 150) {
+      this.chipsAt = time;
+      this.refreshCallChips();
+    }
 
     this.updateReadability(delta);
 
@@ -599,6 +619,58 @@ export class MatchScene extends Phaser.Scene {
     mount(wrap);
   }
 
+  // ── Coach calls (#73): chips for the player's coach in a live match ─────────
+  private callsEl: HTMLDivElement | null = null;
+  private callChips: { call: CoachCall; btn: HTMLButtonElement }[] = [];
+  private callSide: 'home' | 'away' = 'home';
+  /** The call made this set (its chip stays lit until the set ends). */
+  private madeCall: CoachCall | null = null;
+  /** The tick the call was made on (it takes effect on the next). */
+  private madeAt = 0;
+  private chipsAt = 0;
+
+  private mountCallChips(side: 'home' | 'away'): void {
+    this.callSide = side;
+    const wrap = document.createElement('div');
+    wrap.className = 'nrl-mo-calls';
+    this.callChips = COACH_CALLS.map((call) => {
+      const btn = button(CHIP_LABEL[call], () => {
+        if (!(this.playback instanceof LivePlayback)) return;
+        const why = this.playback.call(side, call);
+        if (why) bus.emit('ui:notify', { text: `${CALL_LABEL[call]}: ${why}`, kind: 'info' });
+        else {
+          this.madeCall = call;
+          this.madeAt = this.playback.tick;
+        }
+        this.refreshCallChips();
+      });
+      btn.setAttribute('data-call', call);
+      wrap.append(btn);
+      return { call, btn };
+    });
+    this.callsEl = wrap;
+    mount(wrap);
+    this.refreshCallChips();
+  }
+
+  /** The chips follow the play (calls.ts chipState): what makes sense now, or the call made this set. */
+  private refreshCallChips(): void {
+    if (!this.callsEl || !(this.playback instanceof LivePlayback)) return;
+    const pb = this.playback;
+    const attacking = pb.inPossession === this.callSide;
+    const why = new Map(this.callChips.map(({ call }) => [call, pb.callRefusal(this.callSide, call)]));
+    // The set is over once the call has landed and the side may call again.
+    const used = [...why.values()].includes('one call a set');
+    if (!used && pb.tick > this.madeAt + 1) this.madeCall = null;
+    for (const { call, btn } of this.callChips) {
+      const st = chipState(call, why.get(call) ?? null, attacking, this.madeCall);
+      btn.hidden = !st.show;
+      btn.disabled = !st.enabled;
+      btn.toggleAttribute('data-made', st.lit);
+      btn.title = why.get(call) ?? CALL_LABEL[call];
+    }
+  }
+
   private setSpeed(speed: PlaybackSpeed): void {
     this.playback?.setSpeed(speed);
     for (const b of this.speedButtons) {
@@ -629,6 +701,8 @@ export class MatchScene extends Phaser.Scene {
   private onFinished = (): void => {
     if (this.finished) return;
     this.finished = true;
+    this.callsEl?.remove();
+    this.callsEl = null;
     if (this.backBtn) this.backBtn.style.display = '';
     if (this.controlsEl) {
       this.controlsEl.remove();
@@ -675,6 +749,9 @@ export class MatchScene extends Phaser.Scene {
       this.controlsEl.remove();
       this.controlsEl = null;
     }
+    this.callsEl?.remove();
+    this.callsEl = null;
+    this.callChips = [];
     this.speedButtons = [];
     if (this.backBtn) {
       this.backBtn.remove(); // DOM overlay persists across scenes (§7) — clean it up.

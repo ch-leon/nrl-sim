@@ -217,6 +217,7 @@ export function registerPlayerMatchSystem(): void {
           calls: record.calls,
           ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
           onProgress: (calls, tick) => writeLiveMatch({ ...record, calls: [...calls], tick }),
+          ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const) } : {}),
         },
       });
       return;

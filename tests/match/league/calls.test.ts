@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
-import { CALLS, withAttackCall, type CallInput, type CoachCall } from '../../../src/match/league/calls';
+import { CALLS, chipState, withAttackCall, type CallInput, type CoachCall } from '../../../src/match/league/calls';
 import { attackPlan } from '../../../src/match/league/presets';
 import type { SimEvent } from '../../../src/match/core/snapshot';
 import type { MatchLength } from '../../../src/match/league/rules';
@@ -39,6 +39,24 @@ describe('coach calls (pure)', () => {
     expect(wide.width).toBeGreaterThan(plan.width);
     expect(wide.edges).toBeGreaterThan(plan.edges);
     expect(withAttackCall(plan, null)).toEqual(plan);
+  });
+});
+
+describe('the coach’s chips (#73 §4)', () => {
+  it('only the calls that make sense now; once one is made, only it, lit, for the rest of the set', () => {
+    // With the ball: the attack calls; Rush and Hold hidden.
+    expect(chipState('hit-up', null, true, null)).toEqual({ show: true, enabled: true, lit: false });
+    expect(chipState('rush', 'not while you have the ball', true, null).show).toBe(false);
+    // A late-set kick shows only once it is allowed.
+    expect(chipState('bomb', 'late in the set', true, null).show).toBe(false);
+    expect(chipState('bomb', null, true, null).show).toBe(true);
+    expect(chipState('field-goal', 'not in range', true, null).show).toBe(false);
+    // Defending: Rush and Hold.
+    expect(chipState('hold', null, false, null)).toEqual({ show: true, enabled: true, lit: false });
+    expect(chipState('shift-left', 'not your ball', false, null).show).toBe(false);
+    // Made this set.
+    expect(chipState('shift-left', 'one call a set', true, 'shift-left')).toEqual({ show: true, enabled: false, lit: true });
+    expect(chipState('hit-up', 'one call a set', true, 'shift-left').show).toBe(false);
   });
 });
 

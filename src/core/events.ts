@@ -20,6 +20,8 @@ export interface LiveMatchData {
   resumeAt?: number;
   /** Keep the resume record: on each call, and when the app goes to the background. */
   onProgress?: (calls: readonly CallInput[], tick: number) => void;
+  /** The player's side, when he has the coach-call chips (#73; the Coach calls setting). */
+  coachSide?: 'home' | 'away';
 }
 
 /** Event name -> payload type map (verbatim from ARCHITECTURE §5). */

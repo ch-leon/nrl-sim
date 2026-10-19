@@ -61,6 +61,19 @@ export function withAttackCall(plan: AttackPlan, c: CoachCall | null): AttackPla
   return plan;
 }
 
+/**
+ * How a coach's chip shows on the match screen (#73 §4): only the calls that make
+ * sense now — attack calls while his side has the ball (a late-set kick once it is
+ * allowed), Rush and Hold while it defends; once a call is made this set, only its
+ * chip, lit, until the set ends. `why` is the sim's refusal for the call now.
+ */
+export function chipState(call: CoachCall, why: string | null, attacking: boolean, made: CoachCall | null): { show: boolean; enabled: boolean; lit: boolean } {
+  if (made) return { show: call === made, enabled: false, lit: call === made };
+  const role = callIsDefence(call) ? !attacking : attacking;
+  const notYet = why === 'tackles 3–4' || why === 'late in the set' || why === 'not in range';
+  return { show: role && !notYet, enabled: why === null, lit: false };
+}
+
 /** What the call is called on screen and in the commentary. */
 export const CALL_LABEL: Readonly<Record<CoachCall, string>> = {
   'hit-up': 'Hit-up',
