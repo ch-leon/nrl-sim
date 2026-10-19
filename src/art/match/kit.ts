@@ -9,8 +9,22 @@ import { hexToInt, mix, shade } from '../pixel';
 /** Shared dark outline for every match sprite (warm near-black, not pure #000). */
 export const OUTLINE = 0x1c1424;
 
-/** Jersey decoration drawn in the trim colour. Picked per club from its id. */
-export type KitPattern = 'v' | 'hoops' | 'sleeves';
+/** Jersey decoration drawn in the trim colour. Picked per club from its id, or chosen in the kit designer (#79). */
+export type KitPattern = 'plain' | 'v' | 'hoops' | 'sleeves' | 'stripes';
+
+/** Every pattern, in designer order. */
+export const KIT_PATTERNS: readonly KitPattern[] = ['plain', 'v', 'hoops', 'sleeves', 'stripes'];
+
+/**
+ * A club's own kit design (GitHub #79): the home jersey stays the club's primary
+ * colour; the trim and pattern are chosen, and the alternate strip is chosen
+ * outright. Hex colours, like RivalClub.colors.
+ */
+export interface KitDesign {
+  pattern: KitPattern;
+  trim: string;
+  alt: { jersey: string; trim: string; pattern: KitPattern };
+}
 
 export interface Kit {
   jersey: number;
@@ -48,7 +62,36 @@ export function hashString(s: string): number {
   return h >>> 0;
 }
 
+/** Patterns a club is assigned from its id when it has no design (the pre-#79 set). */
 const PATTERNS: readonly KitPattern[] = ['v', 'hoops', 'sleeves'];
+
+/** The pattern a club wears without a design. */
+export function defaultPattern(clubId: string): KitPattern {
+  return PATTERNS[hashString(clubId) % PATTERNS.length] ?? 'v';
+}
+
+/** The design that reproduces a club's current look: so the designer starts from it. */
+export function defaultKitDesign(colors: readonly [string, string], clubId: string): KitDesign {
+  const pattern = defaultPattern(clubId);
+  return { pattern, trim: colors[1], alt: { jersey: colors[1], trim: colors[0], pattern } };
+}
+
+// Club id → design. Only clubs with a design are listed; everyone else keeps the
+// derived look. main.ts keeps the player's entry in step with GameState.kit, so
+// matches, the crowd, grounds characters and portraits all pick it up through
+// kitFromColors without knowing about designs.
+const designs = new Map<string, KitDesign>();
+
+/** Set (or with null, clear) a club's kit design. */
+export function setKitDesign(clubId: string, design: KitDesign | null | undefined): void {
+  if (design) designs.set(clubId, design);
+  else designs.delete(clubId);
+}
+
+/** A club's registered design, if any. */
+export function kitDesignFor(clubId: string): KitDesign | undefined {
+  return designs.get(clubId);
+}
 
 /** Shade that still reads on very dark colours (lift instead of darken). */
 function shadeFor(c: number): number {
@@ -65,10 +108,21 @@ function lightFor(c: number): number {
  * "away strip" used when both teams' jerseys would read as the same colour.
  */
 export function kitFromColors(colors: readonly [string, string], clubId: string, alt = false): Kit {
+  const design = designs.get(clubId);
+  if (design) return kitFromDesign(colors[0], design, alt);
   const a = hexToInt(colors[0]);
   const b = hexToInt(colors[1]);
-  const jersey = alt ? b : a;
-  const trim = alt ? a : b;
+  return buildKit(alt ? b : a, alt ? a : b, defaultPattern(clubId));
+}
+
+/** A designed kit: home = the club primary with the chosen trim and pattern; alt = the chosen strip. */
+export function kitFromDesign(primary: string, design: KitDesign, alt = false): Kit {
+  return alt
+    ? buildKit(hexToInt(design.alt.jersey), hexToInt(design.alt.trim), design.alt.pattern)
+    : buildKit(hexToInt(primary), hexToInt(design.trim), design.pattern);
+}
+
+function buildKit(jersey: number, trim: number, pattern: KitPattern): Kit {
   // Shorts: league sides mostly wear dark shorts. Use the trim when it is dark,
   // the trim (lightly shaded) for near-black jerseys so legs don't vanish, and a
   // navy-black otherwise.
@@ -84,7 +138,7 @@ export function kitFromColors(colors: readonly [string, string], clubId: string,
     shortsShade: mix(shorts, 0x000000, 0.4),
     sock: jersey,
     sockHoop: trim,
-    pattern: PATTERNS[hashString(clubId) % PATTERNS.length] ?? 'v',
+    pattern,
   };
 }
 

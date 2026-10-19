@@ -89,6 +89,16 @@ export const EVENTS = {
   ANSWER_WEEKS: 2,    // weeks to answer before the default choice is taken
 } as const;
 
+/**
+ * Feature flags. `cosmeticKits` (GitHub #79) turns on the kit designer; it is on
+ * and everything in it is free. It exists only so a future monetisation decision
+ * (BAK-205: cosmetics only, never pay-to-win) could gate extra patterns without
+ * code changes. Kits never touch gameplay.
+ */
+export const FEATURES = {
+  cosmeticKits: true,
+} as const;
+
 /** Moving and demolishing facilities on the grounds (GitHub #78). */
 export const GROUNDS = {
   MOVE_FEE_RATE: 0.1,         // move fee = 10% of the build cost
@@ -169,4 +179,9 @@ export function isValidColorPair(primary: string, secondary: string): boolean {
     PLAYER_SECONDARY_COLORS.includes(secondary) &&
     hexDistance(primary, secondary) >= MIN_COLOR_PAIR_DISTANCE
   );
+}
+
+/** True when two hex colours are far enough apart to read as different (palette not enforced). */
+export function colorsContrast(a: string, b: string, min = MIN_COLOR_PAIR_DISTANCE): boolean {
+  return hexDistance(a, b) >= min;
 }

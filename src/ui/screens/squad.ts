@@ -9,7 +9,8 @@ import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import { releasePlayer, RELEASE_PAYOUT_WEEKS } from '../../systems/freeagency';
 import { PLAYER_ID } from '../../systems/fixtures';
-import { DEFAULT_PLAYER_COLORS } from '../../config';
+import { DEFAULT_PLAYER_COLORS, FEATURES } from '../../config';
+import { openKitDesigner } from './kit';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PlayerCard, ensureScreenStyles } from './recruit';
 
@@ -137,6 +138,8 @@ export function openSquadScreen(): void {
     el('span', { text: 'Sort:', attrs: { style: 'color:#e8e0c8;font-size:0.75rem;' } }),
     sortPos,
     sortRating,
+    // Kit designer (#79), behind the cosmetic-kits flag.
+    ...(FEATURES.cosmeticKits ? [button('KIT', () => openKitDesigner(), { class: 'nrl-squad-kit' })] : []),
     button('CLOSE', closeScreen),
   );
 
