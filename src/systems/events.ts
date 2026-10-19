@@ -7,7 +7,7 @@
 // drawing cards never moves the main rngSeed and never reshuffles a match.
 // Money moves go through earnMoney so they reach the finance ledger; everything
 // else is announced in the news with the outcome line.
-import { getState, setState, type ActiveModifier, type GameState, type PendingEvent, type Player } from '../core/state';
+import { getState, setState, type ActiveModifier, type GameState, type PendingEvent, type Player, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { earnMoney } from '../data/club';
@@ -16,7 +16,9 @@ import { TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
 import {
   cardById, EVENT_CARDS, type EventCardDef, type EventEffect, type SubjectRule,
 } from '../data/events';
-import { EVENTS, WEEKS_PER_SEASON } from '../config';
+import { EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON } from '../config';
+import { marketWage, withDerivedStrength } from './rivals';
+import { NEW_CONTRACT_WEEKS, SIGNING_FEE_WEEKS } from './freeagency';
 import { makeRng, type Rng } from '../utils/rng';
 import { clampMorale } from './morale';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
@@ -32,8 +34,13 @@ export function absWeek(season: number, week: number): number {
 // ── Text ─────────────────────────────────────────────────────────────────────
 
 /** Fill {player} and {club} in a card's text. */
-export function fillText(text: string, ctx: { subjectName?: string | undefined; clubName: string }): string {
-  return text.replace(/\{player\}/g, ctx.subjectName ?? 'A player').replace(/\{club\}/g, ctx.clubName);
+export function fillText(
+  text: string,
+  ctx: { subjectName?: string | undefined; clubName: string; vars?: Record<string, string> | undefined },
+): string {
+  let out = text.replace(/\{player\}/g, ctx.subjectName ?? 'A player').replace(/\{club\}/g, ctx.clubName);
+  for (const [k, v] of Object.entries(ctx.vars ?? {})) out = out.split(`{${k}}`).join(v);
+  return out;
 }
 
 const signed = (n: number): string => (n >= 0 ? `+${n}` : `${n}`);
@@ -49,6 +56,7 @@ export function describeEffects(effects: readonly EventEffect[]): string {
       case 'playerMorale': return `morale ${signed(e.amount)}`;
       case 'playerWage': return `wage ${signed(Math.round(e.pct * 100))}%`;
       case 'playerTrait': return `${TRAITS[e.trait].name} trait`;
+      case 'signSubject': return 'sign them for the fee';
       case 'modifier': {
         const what = describeEffects(e.effects);
         if (e.trigger === 'weekly') return `${what} a week for ${e.weeks} weeks`;
@@ -77,7 +85,28 @@ export function subjectCandidates(state: GameState, rule: SubjectRule): Player[]
     case 'veteran': return fit.filter((p) => p.age >= 30).sort((a, b) => b.age - a.age || byId(a, b)).slice(0, 1);
     case 'unhappy': return fit.filter((p) => p.morale < 45).sort((a, b) => a.morale - b.morale || byId(a, b)).slice(0, 1);
     case 'any': return fit;
+    case 'rivalStar': return rivalStars(state).map((r) => r.player);
   }
+}
+
+/**
+ * Each rival's best fit player who would walk into the player's starting side
+ * (beats its ON_FIELD-th best), and whom the club could afford and fit (#74).
+ */
+export function rivalStars(state: GameState): { club: RivalClub; player: Player; fee: number }[] {
+  if (state.squad.length >= SQUAD_CAP) return [];
+  const own = state.squad.map(overallRating).sort((a, b) => b - a);
+  const cut = own[Math.min(ON_FIELD, own.length) - 1] ?? 0;
+  const out: { club: RivalClub; player: Player; fee: number }[] = [];
+  for (const club of state.league.clubs) {
+    if (club.id === PLAYER_ID || !club.squad) continue;
+    const best = club.squad.filter((p) => p.injuredWeeks <= 0)
+      .sort((a, b) => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id))[0];
+    if (!best || overallRating(best) <= cut) continue;
+    const fee = SIGNING_FEE_WEEKS * marketWage(best);
+    if (fee <= state.money) out.push({ club, player: best, fee });
+  }
+  return out;
 }
 
 /** The player club's fixture in `round`, if any. */
@@ -135,7 +164,17 @@ export function drawEvent(state: GameState, now: number, rng: Rng): PendingEvent
     week: state.week,
     expiresAt: now + EVENTS.ANSWER_WEEKS,
   };
-  if (card.subject) {
+  if (card.subject === 'rivalStar') {
+    const pick = rng.pick(rivalStars(state));
+    ev.subjectId = pick.player.id;
+    ev.subjectName = pick.player.name;
+    ev.rivalId = pick.club.id;
+    ev.fee = pick.fee;
+    ev.vars = {
+      rival: pick.club.name, ovr: String(overallRating(pick.player)), position: pick.player.position,
+      fee: `$${pick.fee.toLocaleString('en-US')}`,
+    };
+  } else if (card.subject) {
     const who = rng.pick(subjectCandidates(state, card.subject));
     ev.subjectId = who.id;
     ev.subjectName = who.name;
@@ -151,6 +190,8 @@ export interface Applied {
   state: GameState;
   money: { amount: number; reason: string }[];
   news: { text: string; kind: 'info' | 'success' | 'danger' }[];
+  /** Why the choice couldn't go ahead (replaces its outcome line), e.g. a signing that fell through. */
+  failed?: string;
 }
 
 interface EffectCtx {
@@ -158,6 +199,8 @@ interface EffectCtx {
   reason: string; // ledger reason for money
   subjectId?: string | undefined;
   subjectName?: string | undefined;
+  rivalId?: string | undefined;
+  fee?: number | undefined;
   now: number;
 }
 
@@ -167,6 +210,7 @@ const clampRep = (n: number): number => Math.max(1, Math.min(100, n));
 export function applyEffects(state: GameState, effects: readonly EventEffect[], ctx: EffectCtx): Applied {
   let s = state;
   const money: Applied['money'] = [];
+  let failed: string | undefined;
   const updateSubject = (fn: (p: Player) => Player): void => {
     if (!ctx.subjectId) return;
     s = { ...s, squad: s.squad.map((p) => (p.id === ctx.subjectId ? fn(p) : p)) };
@@ -185,6 +229,15 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
           ...p, traits: withTrait(p.traits, e.trait, Math.min(3, traitLevel(p.traits, e.trait) + 1) as TraitLevel),
         }));
         break;
+      case 'signSubject': {
+        const r = signRivalPlayer(s, ctx.rivalId, ctx.subjectId, ctx.fee ?? 0);
+        if (typeof r === 'string') failed = r;
+        else {
+          s = r;
+          if (ctx.fee) money.push({ amount: -ctx.fee, reason: ctx.reason });
+        }
+        break;
+      }
       case 'modifier': {
         const mod: ActiveModifier = {
           id: `${ctx.cardId}-${ctx.now}-${i}`, cardId: ctx.cardId, label: e.label,
@@ -197,7 +250,26 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
       }
     }
   });
-  return { state: s, money, news: [] };
+  return { state: s, money, news: [], ...(failed ? { failed } : {}) };
+}
+
+/**
+ * Move a rival's player into the squad on a new contract (pure). Returns the new
+ * state, or why it fell through: the player has gone, the squad is full, or the
+ * club can't pay the fee.
+ */
+export function signRivalPlayer(state: GameState, rivalId: string | undefined, playerId: string | undefined, fee: number): GameState | string {
+  const club = state.league.clubs.find((c) => c.id === rivalId);
+  const player = club?.squad?.find((p) => p.id === playerId);
+  if (!club || !player) return 'the player is no longer available';
+  if (state.squad.length >= SQUAD_CAP) return 'the squad is full';
+  if (state.money < fee) return "the club couldn't afford the fee";
+  const signed: Player = {
+    ...player, wage: marketWage(player), contractWeeks: NEW_CONTRACT_WEEKS, morale: 70, joinedSeason: state.season,
+  };
+  const clubs = state.league.clubs.map((c) =>
+    (c.id === club.id ? withDerivedStrength({ ...c, squad: c.squad!.filter((p) => p.id !== player.id) }) : c));
+  return { ...state, squad: [...state.squad, signed], league: { ...state.league, clubs } };
 }
 
 /**
@@ -217,12 +289,19 @@ export function resolveEvent(state: GameState, eventId: string, index: number, n
   const choice = card.choices[index];
   if (!choice) return null;
   const applied = applyEffects(without, choice.effects, {
-    cardId: card.id, reason: `event: ${card.title}`, subjectId: ev.subjectId, subjectName: ev.subjectName, now,
+    cardId: card.id, reason: `event: ${card.title}`, subjectId: ev.subjectId, subjectName: ev.subjectName,
+    rivalId: ev.rivalId, fee: ev.fee, now,
   });
-  const text = fillText(choice.outcome, { subjectName: ev.subjectName, clubName: state.clubName });
+  const ctx = { subjectName: ev.subjectName, clubName: state.clubName, vars: ev.vars };
+  if (applied.failed) {
+    applied.news.push({ text: `${card.title}: no deal, ${applied.failed}.`, kind: 'danger' });
+    return applied;
+  }
+  const text = fillText(choice.outcome, ctx);
   const summary = describeEffects(choice.effects);
+  const fee = ev.fee && choice.effects.some((e) => e.kind === 'signSubject') ? ` (−$${ev.fee.toLocaleString('en-US')})` : '';
   applied.news.push({
-    text: `${auto ? 'No answer, so: ' : ''}${text}${choice.effects.length > 0 ? ` (${summary})` : ''}`,
+    text: `${auto ? 'No answer, so: ' : ''}${text}${fee || (choice.effects.length > 0 ? ` (${summary})` : '')}`,
     kind: 'info',
   });
   return applied;
@@ -308,7 +387,7 @@ export function eventsTick(state: GameState): EventsTick {
 
 /** Write an Applied result to the store: state first, then money (ledger) and news. */
 function commit(a: Applied): void {
-  setState({ squad: a.state.squad, reputation: a.state.reputation, eventDeck: a.state.eventDeck });
+  setState({ squad: a.state.squad, reputation: a.state.reputation, eventDeck: a.state.eventDeck, league: a.state.league });
   for (const m of a.money) earnMoney(m.amount, m.reason);
   for (const n of a.news) bus.emit('ui:notify', n);
 }

@@ -3,8 +3,10 @@
 // that draw, resolve and expire cards live in src/systems/events.ts. No Phaser,
 // no store.
 //
-// Text placeholders: {player} = the card's subject (a squad player), {club} =
-// the player's club name. Money is in dollars; morale and reputation in points.
+// Text placeholders: {player} = the card's subject (a squad player, or a rival's
+// player for 'rivalStar'), {club} = the player's club name; rival-player cards
+// also have {rival}, {ovr}, {position} and {fee}. Money is in dollars; morale and
+// reputation in points.
 import type { TraitId } from './traits';
 
 /** One thing a choice does. Effects on "the player" target the card's subject. */
@@ -17,6 +19,8 @@ export type EventEffect =
   | { kind: 'playerWage'; pct: number }
   /** Adds the trait at level I, or raises it one level (never above III). */
   | { kind: 'playerTrait'; trait: TraitId }
+  /** Sign the card's rival-player subject for the fee quoted on the card (#74). */
+  | { kind: 'signSubject' }
   /** A temporary modifier: `effects` fire on each matching week for `weeks` weeks. */
   | { kind: 'modifier'; label: string; trigger: ModifierTrigger; weeks: number; effects: ImmediateEffect[] };
 
@@ -39,7 +43,8 @@ export type SubjectRule =
   | 'youngster'  // the youngest fit player aged 21 or under
   | 'veteran'    // the oldest fit player aged 30 or over
   | 'unhappy'    // the lowest-morale fit player, if under 45
-  | 'any';       // any fit player (seeded pick)
+  | 'any'        // any fit player (seeded pick)
+  | 'rivalStar'; // a rival club's best player, if they'd walk into your side (#74)
 
 /** Conditions for a card to be drawn. Every listed condition must hold. */
 export interface EventConditions {
@@ -252,6 +257,17 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
       { label: 'Club canteen only', effects: [{ kind: 'squadMorale', amount: 1 }], outcome: 'The canteen staff are pleased to keep the trade.' },
     ],
     defaultChoice: 0,
+  },
+  {
+    id: 'rivalUnsettled',
+    title: 'Unsettled at a rival',
+    text: '{player}, a {ovr}-rated {position}, wants out of {rival} and would join {club} for a {fee} signing fee.',
+    weight: 6, cooldown: 30, subject: 'rivalStar', when: { weeks: [1, 24] },
+    choices: [
+      { label: 'Sign them', effects: [{ kind: 'signSubject' }], outcome: '{player} has crossed from {rival} to {club}!' },
+      { label: 'Not interested', effects: [], outcome: '{player} stays at {rival} for now.' },
+    ],
+    defaultChoice: 1,
   },
 ];
 

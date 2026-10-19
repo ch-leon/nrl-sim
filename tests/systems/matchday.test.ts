@@ -202,3 +202,36 @@ describe('forfeit when fit < SQUAD_MIN', () => {
     c.stop();
   });
 });
+
+describe('rival rosters come from the rival squad (#74)', () => {
+  beforeEach(() => {
+    bus.clear();
+    clearTickHooks();
+    clearSeasonHooks();
+  });
+
+  it('fields the rival\'s own fit players, the same names week to week, and falls back when short', () => {
+    createNewGame('Roster FC', 31);
+    initLeague(getState());
+    registerPlayerMatchSystem();
+    const sheets: { home: { clubId: string; roster?: { name: string; id?: string }[] }; away: { clubId: string; roster?: { name: string; id?: string }[] } }[] = [];
+    bus.on('match:started', ({ home, away }) => sheets.push({ home, away }));
+    advanceWeek();
+    const first = sheets[0]!;
+    const rivalSheet = first.home.clubId === PLAYER_ID ? first.away : first.home;
+    const rival = getState().league.clubs.find((c) => c.id === rivalSheet.clubId)!;
+    const ids = new Set(rival.squad!.map((p) => p.id));
+    expect(rivalSheet.roster!.length).toBe(9);
+    for (const r of rivalSheet.roster!) expect(ids.has(r.id!)).toBe(true);
+
+    // With fewer than nine fit, the strength-based sheet steps in (no squad ids).
+    const lg = getState().league;
+    setState({
+      league: { ...lg, clubs: lg.clubs.map((c) => ({ ...c, ...(c.squad ? { squad: c.squad.map((p) => ({ ...p, injuredWeeks: 5 })) } : {}) })) },
+    });
+    advanceWeek();
+    const second = sheets[1]!;
+    const rival2 = second.home.clubId === PLAYER_ID ? second.away : second.home;
+    expect(rival2.roster!.every((r) => r.id === undefined)).toBe(true);
+  });
+});

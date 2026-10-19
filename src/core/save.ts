@@ -13,6 +13,7 @@
 import type { GameState } from './state';
 import { getState, SAVE_VERSION } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
+import { withRivalSquads } from '../systems/rivals';
 import { bus } from './events';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -158,6 +159,19 @@ export const MIGRATIONS: readonly MigrationStep[] = [
         pending: [], cooldowns: {}, lastDrawn: 0, modifiers: [],
       },
     }),
+  },
+  // v7 → v8: rival clubs get real squads (GitHub #74), generated to match each
+  // club's current strength and seeded per club from the save's rngSeed.
+  // (Uses the live generator: a later Player change must keep its own step.)
+  {
+    from: 7,
+    to: 8,
+    run: (old) => {
+      const league = old.league as RawState | undefined;
+      if (!league || !Array.isArray(league.clubs)) return { ...old };
+      const seed = typeof old.rngSeed === 'number' ? old.rngSeed : 1;
+      return { ...old, league: { ...league, clubs: withRivalSquads(league.clubs as GameState['league']['clubs'], seed) } };
+    },
   },
 ];
 

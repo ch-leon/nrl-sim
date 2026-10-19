@@ -132,7 +132,11 @@ describe('drawEvent', () => {
       const ev = drawEvent(s, 10, makeRng(i));
       if (!ev) continue;
       expect(ev.expiresAt).toBe(10 + EVENTS.ANSWER_WEEKS);
-      if (card(ev.cardId).subject) {
+      const rule = card(ev.cardId).subject;
+      if (rule === 'rivalStar') {
+        const club = s.league.clubs.find((c) => c.id === ev.rivalId)!;
+        expect(club.squad!.some((p) => p.id === ev.subjectId && p.name === ev.subjectName)).toBe(true);
+      } else if (rule) {
         expect(s.squad.some((p) => p.id === ev.subjectId && p.name === ev.subjectName)).toBe(true);
       }
     }
@@ -319,5 +323,55 @@ describe('two-season headless run', () => {
 
   it('is deterministic: same seed, same cards', () => {
     expect(run(11)).toEqual(run(11));
+  });
+});
+
+describe('rival player cards (#74)', () => {
+  const setup = () => {
+    const s = fresh(21);
+    // Make one rival's best player clearly better than anyone at the club.
+    const rival = s.league.clubs.find((c) => c.id === 'rival-reapers')!;
+    const star = { ...rival.squad![0]!, stats: { speed: 95, strength: 95, stamina: 95, skill: 95, footyIQ: 95 }, injuredWeeks: 0 };
+    const clubs = s.league.clubs.map((c) => (c.id === rival.id ? { ...c, squad: [star, ...c.squad!.slice(1)] } : c));
+    return { s: { ...s, money: 500_000, league: { ...s.league, clubs } }, star, rivalId: rival.id };
+  };
+
+  it('rivalStars offers only players who would start for you, that you can afford and fit', async () => {
+    const { rivalStars } = await import('../../src/systems/events');
+    const { s, star } = setup();
+    expect(rivalStars(s).some((r) => r.player.id === star.id)).toBe(true);
+    expect(rivalStars({ ...s, money: 0 })).toEqual([]);
+    const full = { ...s, squad: Array.from({ length: 30 }, (_, i) => ({ ...s.squad[i % s.squad.length]!, id: `x${i}` })) };
+    expect(rivalStars(full)).toEqual([]);
+  });
+
+  it('a drawn card quotes the rival, rating and fee, and signing moves the player across', () => {
+    const { s, star, rivalId } = setup();
+    let ev: PendingEvent | null = null;
+    for (let seed = 0; !ev || ev.cardId !== 'rivalUnsettled'; seed++) {
+      const only = { ...s, eventDeck: { ...s.eventDeck, cooldowns: Object.fromEntries(EVENT_CARDS.filter((c) => c.id !== 'rivalUnsettled').map((c) => [c.id, 999])) } };
+      ev = drawEvent(only, 10, makeRng(seed));
+    }
+    expect(ev.rivalId).toBeDefined();
+    expect(ev.vars?.rival).toBeDefined();
+    const picked = s.league.clubs.find((c) => c.id === ev!.rivalId)!.squad!.find((p) => p.id === ev!.subjectId)!;
+    const st = { ...s, eventDeck: { ...s.eventDeck, pending: [ev] } };
+    const r = resolveEvent(st, ev.id, 0, 10)!;
+    expect(r.state.squad.some((p) => p.id === picked.id && p.contractWeeks === 52)).toBe(true);
+    expect(r.state.league.clubs.find((c) => c.id === ev!.rivalId)!.squad!.some((p) => p.id === picked.id)).toBe(false);
+    expect(r.money).toEqual([{ amount: -ev.fee!, reason: 'event: Unsettled at a rival' }]);
+    expect(r.news[0]!.text).toContain(ev.vars!.rival!);
+    void star; void rivalId;
+  });
+
+  it('falls through cleanly when the player has gone or the money has run out', () => {
+    const { s, star, rivalId } = setup();
+    const ev: PendingEvent = { id: 'ru', cardId: 'rivalUnsettled', season: 1, week: 1, expiresAt: 3, subjectId: star.id, subjectName: star.name, rivalId, fee: 50_000, vars: { rival: 'Reapers' } };
+    const broke = resolveEvent({ ...s, money: 10, eventDeck: { ...s.eventDeck, pending: [ev] } }, 'ru', 0, 1)!;
+    expect(broke.money).toEqual([]);
+    expect(broke.state.squad).toEqual(s.squad);
+    expect(broke.news[0]!.text).toContain("couldn't afford");
+    const gone = resolveEvent({ ...s, eventDeck: { ...s.eventDeck, pending: [{ ...ev, subjectId: 'nobody' }] } }, 'ru', 0, 1)!;
+    expect(gone.news[0]!.text).toContain('no longer available');
   });
 });

@@ -66,7 +66,10 @@ export interface Fixture {
 
 export interface RivalClub {
   id: string; name: string; colors: [string, string]; // hex kit colours
-  strength: number; // 1-100 baseline used to derive rival squads
+  /** 1-100. For rivals with a squad it is derived from it (systems/rivals.ts squadStrength). */
+  strength: number;
+  /** The rival's own players (#74); absent on the player's club entry and in RIVAL_CLUBS. */
+  squad?: Player[];
 }
 
 export interface LeagueState {
@@ -83,7 +86,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 /** One completed season. The extended fields are optional for pre-v4 entries. */
 export interface SeasonRecord {
@@ -114,6 +117,12 @@ export interface PendingEvent {
   expiresAt: number;
   subjectId?: string; // squad player the card is about
   subjectName?: string; // kept so text still reads if the player leaves
+  /** Rival club the subject plays for, for rival-player cards (#74). */
+  rivalId?: string;
+  /** Signing fee quoted when the card was drawn (rival-player cards). */
+  fee?: number;
+  /** Extra text placeholders frozen at draw time, e.g. { rival, ovr, position }. */
+  vars?: Record<string, string>;
 }
 
 /** A temporary effect left behind by a choice (GitHub #75). */

@@ -21,6 +21,7 @@ import { registerYouthSystem } from './systems/youth';
 import { registerStatsSystem } from './systems/stats';
 import { registerBoardSystem } from './systems/board';
 import { registerEventsSystem } from './systems/events';
+import { registerRivalsSystem } from './systems/rivals';
 import { initBoardUi } from './ui/screens/board';
 import { initPlayerOfMatch } from './ui/screens/potm';
 import { openBuildScreen } from './ui/screens/build';
@@ -127,6 +128,7 @@ async function boot(): Promise<void> {
   registerStatsSystem();
   registerBoardSystem();
   registerEventsSystem();
+  registerRivalsSystem();
   initPlayerOfMatch();
   initBoardUi();
 

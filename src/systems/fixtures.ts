@@ -28,7 +28,8 @@ import { applyBoardReview } from './board';
 import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, DEFAULT_PLAYER_COLORS } from '../config';
 import { RIVAL_CLUBS } from '../data/league';
 import { bus } from '../core/events';
-import { driftRivalStrengths, strengthChanges, applySeasonReputation } from './league';
+import { strengthChanges, applySeasonReputation } from './league';
+import { rolloverRivals, withRivalSquads } from './rivals';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -518,7 +519,8 @@ export function initLeague(
     colors: [colors[0], colors[1]],
     strength: 55, // baseline used only if the player is ever cheap-simmed
   };
-  const clubs: RivalClub[] = [playerClub, ...RIVAL_CLUBS.map((c) => ({ ...c }))];
+  // Rivals get real squads (#74), seeded per club so the main RNG is untouched.
+  const clubs: RivalClub[] = withRivalSquads([playerClub, ...RIVAL_CLUBS.map((c) => ({ ...c }))], state.rngSeed, PLAYER_ID);
   const clubIds = clubs.map((c) => c.id);
 
   const rng = makeRng(state.rngSeed);
@@ -652,13 +654,14 @@ export function registerFixturesSystem(): void {
       premiership: !!lastEntry && lastEntry.premiership,
     });
 
-    // Regenerate a fresh fixture list + zeroed ladder for the new season, and
-    // drift the rivals' strength (seeded, mean-reverting, bounded).
+    // Regenerate a fresh fixture list + zeroed ladder for the new season. Rival
+    // squads age, retire, develop and take on juniors (#74); their strength
+    // follows from the squad.
     const s2 = getState();
     const clubIds = s2.league.clubs.map((c) => c.id);
     const rng = makeRng(s2.rngSeed);
     const fixtures = generateFixtures(clubIds, rng);
-    const clubs = driftRivalStrengths(s2.league.clubs, rng, PLAYER_ID);
+    const clubs = rolloverRivals(withRivalSquads(s2.league.clubs, s2.rngSeed, PLAYER_ID), rng, PLAYER_ID).clubs;
     setState({
       league: { ...s2.league, clubs, fixtures, ladder: emptyLadder(clubIds) },
       rngSeed: rng.state(),

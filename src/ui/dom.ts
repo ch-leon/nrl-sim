@@ -616,6 +616,24 @@ const CSS = `
   font-size: 0.8rem;
 }
 .nrl-placebar[hidden] { display: none; }
+.nrl-ladder-club {
+  pointer-events: auto;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+.nrl-rival-squad h2 { margin: 0 0 0.2rem; font-size: 1.05rem; }
+.nrl-rival-squad p { margin: 0 0 0.4rem; font-size: 0.85rem; }
+.nrl-rival-scroll { max-height: 55vh; overflow: auto; margin-bottom: 0.5rem; }
+.nrl-rival-table { border-collapse: collapse; font-size: 0.75rem; width: 100%; }
+.nrl-rival-table th, .nrl-rival-table td { padding: 0.15rem 0.3rem; text-align: left; white-space: nowrap; }
+.nrl-rival-table thead th { position: sticky; top: 0; background: #e8e0c8; }
+.nrl-rival-traits { font-size: 0.68rem; }
 .nrl-placebar-text { flex: 1 1 auto; }
 .nrl-placebar-cancel { flex: 0 0 auto; }
 `;

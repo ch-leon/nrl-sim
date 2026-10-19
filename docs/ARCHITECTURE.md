@@ -56,6 +56,7 @@ src/
     matchday.ts              # player match of the round; SQUAD_MIN forfeit (GitHub #4)
     aging.ts                 # season-rollover ageing + age retirement (GitHub #5)
     events.ts                # random events deck: draw, choices, modifiers (GitHub #75; cards in data/events.ts)
+    rivals.ts                # rival squads: generation, signings, ageing/development, strength (GitHub #74)
   match/                     # LIVE match sim (BAK-207) — replaces sim/engine + world/playback
     core/                    # sport-neutral: fixed-step clock, bodies, ball, snapshots, flag codes
     league/                  # rugby league (Nines) rules, roles, tackle contest, tactics
@@ -179,7 +180,8 @@ export interface LeagueState {
 
 export interface RivalClub {
   id: string; name: string; colors: [string, string]; // hex kit colours
-  strength: number;           // 1-100 baseline used to derive rival squads
+  strength: number;           // 1-100; for rivals, derived from `squad` (best 9 overall)
+  squad?: Player[];           // the rival's own players (#74); absent on the player's club entry
 }
 
 export interface GameState {
@@ -201,6 +203,14 @@ export interface GameState {
   rngSeed: number;            // advanced state of the seeded RNG
 }
 ```
+
+Rival squads (GitHub #74): every rival keeps a persistent `squad` (generated to match its
+strength at new game / v7→v8 migration, seeded per club so `rngSeed` is untouched). Weekly
+(tick order 59, before the free-agent refresh) rivals heal and may sign from `freeAgents`
+(weakest position first, under a salary cap). At rollover they age and retire through
+`aging.ts`, develop by age with a pull toward the league mean, and take on juniors; this
+replaced the old strength drift. Matchday builds a rival's sheet from its fit squad with
+`teamSheetFromSquad` (the strength sheet is the fallback), so the match API is unchanged.
 
 Random events (GitHub #75): the deck draws at most one card a week (tick order 58,
 after morale) from its own seeded stream `eventDeck.rng`, so it never moves `rngSeed`.
