@@ -40,3 +40,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-153804-calls-strength-3 | calls strength 3 | 27c4a8d (uncommitted changes) | fix/rush-call-offside | [report](runs/20261019-153804-calls-strength-3/report.md) |
 | 20261019-154243-standard | standard | 27c4a8d (uncommitted changes) | fix/rush-call-offside | [report](runs/20261019-154243-standard/report.md) |
 | 20261019-160343-standard | standard | 5191481 | main | [report](runs/20261019-160343-standard/report.md) |
+| 20261019-163206-standard | standard | 6d812ab | main | [report](runs/20261019-163206-standard/report.md) |
