@@ -8,6 +8,7 @@ import {
   reduceEvent,
   possessionPct,
   formatClock,
+  formatClockSeconds,
   type LiveState,
 } from '../../../src/ui/screens/matchOverlay';
 import { simulateMatch } from '../../../src/sim/engine';
@@ -114,5 +115,24 @@ describe('formatClock', () => {
 describe('possessionPct', () => {
   it('0/0 → 50/50', () => {
     expect(possessionPct(initLiveState())).toEqual([50, 50]);
+  });
+});
+
+describe('a live match (BAK-207 2g): Nines halves', () => {
+  it('the half turns at the Nines half length, and the clock stops at full time', () => {
+    let s = initLiveState();
+    s = reduceEvent(s, { t: 8, kind: 'tackle', teamId: 'A' }, 'H', 9);
+    expect(s.half).toBe(1);
+    s = reduceEvent(s, { t: 9, kind: 'tackle', teamId: 'A' }, 'H', 9);
+    expect(s.half).toBe(2);
+    s = reduceEvent(s, { t: 25, kind: 'tackle', teamId: 'A' }, 'H', 9);
+    expect(s.minute).toBe(18);
+    expect(formatClock(s.minute, 18)).toBe('18:00');
+  });
+  it('the running clock in minutes and seconds, clamped to the match', () => {
+    expect(formatClockSeconds(0, 18)).toBe('00:00');
+    expect(formatClockSeconds(65.7, 18)).toBe('01:05');
+    expect(formatClockSeconds(600, 18)).toBe('10:00');
+    expect(formatClockSeconds(1200, 18)).toBe('18:00');
   });
 });

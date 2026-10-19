@@ -24,7 +24,8 @@ export interface MatchSim {
 export type SimFactory = (seed: number) => MatchSim;
 
 /** Playback speeds the lab and match offer. */
-export type RunSpeed = 0.25 | 0.5 | 1 | 2 | 4;
+/** ×8 is the live match screen's fastest (BAK-207 2g); the lab offers up to ×4. */
+export type RunSpeed = 0.25 | 0.5 | 1 | 2 | 4 | 8;
 export const RUN_SPEEDS: readonly RunSpeed[] = [0.25, 0.5, 1, 2, 4];
 
 /** Longest a single update may fast-forward (a background tab coming back). */

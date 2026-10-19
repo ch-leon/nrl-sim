@@ -163,7 +163,7 @@ the report linked in the PR. The match is **Nines** (#77: one ruleset, no Classi
 | **2d** — *shipped* | **Touch, dead ball and drop-outs** (closes most of BAK-208 E, #99). The ball and the carrier can go into touch; long kicks aim for touch; **40/20**; a kick dead in-goal or over the dead-ball line → 20 m restart; a defender tackled in-goal or forcing it dead → goal-line drop-out. Restarts are a play-the-ball **10 m in from touch** for the other side, no scrums. | A set can end every way BAK-208 §4.4 lists and each is readable; kick metres and 40/20s in the report. |
 | **2e** — *shipped* | **Penalties and six-again.** Ruck offences (holding down in a long wrestle, slow off the ruck) give **six again** (tackle count back to zero, SIX AGAIN! pop-up); offside (a defender up before the ball is played, more likely with Rush) and high shots (Hothead) give a **penalty**: tap and go, kick for touch (ball back, 10 m restart), or a shot at goal for 2 when in range and it makes sense on the clock and score. Sin bins later (BAK-206 B7). | Penalties and six-agains per match in the report; Rush pays for its line speed in penalties; the choice is shown. |
 | **2f** — *shipped* | **Weather, injuries, errors in contact.** Rain → handling (knock-ons, drops), wind → kick distance and goal accuracy; a big hit can injure (as the old engine does); an injured player comes off at the next stoppage through 2b, or plays on hampered with no bench left. Ball lost in contact (a knock-on in the tackle, not just strips). Momentum timeline from the play, as the old engine's. | Weather moves error and goal rates in the report; `MatchResult.injuries` is filled and the club game applies them. |
-| **2g** | **Live matches behind a setting.** A "Live match (beta)" setting. At kick-off matchday runs `runMatch` headless for the result, so ladder, stats and injuries are applied exactly as today; the match screen then plays **the same seed live** (deterministic, so what you watch is what was recorded). The overlay, score banners, pop-ups, speed controls and skip all work off the live sim; `match:finished` at full time. The overlay reads the half length from `NINES`. | A whole season plays end to end with the setting on; all stats/overlay parity tests pass against `runMatch`; works on a phone. |
+| **2g** — *shipped* | **Live matches behind a setting.** A "Live match (beta)" setting. At kick-off matchday runs `runMatch` headless for the result, so ladder, stats and injuries are applied exactly as today; the match screen then plays **the same seed live** (deterministic, so what you watch is what was recorded). The overlay, score banners, pop-ups, speed controls and skip all work off the live sim; `match:finished` at full time. The overlay reads the half length from `NINES`. | A whole season plays end to end with the setting on; all stats/overlay parity tests pass against `runMatch`; works on a phone. |
 
 **2a as shipped** (where it differs from the row above): the ball is dead after the siren on
 a completed tackle, a try (after its celebration), a knock-on, or when time runs out with a
@@ -235,6 +235,20 @@ the injured …"), or plays on hampered with nobody left. `runMatch` takes `weat
 `injuryRate` and returns the injuries by squad id, 1–3 weeks. The lab has a weather picker
 (`wx=rain`) and shows the rain or wind on the stadium. The momentum timeline from the play
 shipped with 2a. Measured: tuning reference §18.
+
+**2g as shipped:** the setting is a "Live match (beta)" tick box at the top of the Fixtures
+screen (`settings.liveMatch`, off unless ticked; old saves read it as off). With it on,
+matchday plays the player's match with `runMatch` (same seed, weather and injury rate as the
+classic engine would get) and applies ladder, stats and injuries from that result as today;
+`match:started` carries the seed, and the Match scene plays the same sheets on the same seed
+with `view/livePlayback.ts` in place of the event-log replay: the lab's pop-ups, wrestle bar
+and sprint streaks on the stadium's sprites, the overlay, score banners, crowd and FX fed the
+same `match:event` stream `runMatch` recorded (a test checks the watched stream equals the
+result's events), the overlay's clock off the sim (MM:SS, Nines halves), ×1/×2/×4/×8 starting
+at ×4, Skip (plays the rest at once, no pop-ups) and `match:finished` at full time. Rival v
+rival matches stay on the classic engine. On this container's software GL the handoff takes
+about 0.8 s longer than classic and Skip 1.3–2.2 s. **Found:** big rating gaps (rivals in a new
+game range from 34 to 69) give blowouts of 100+ (classic: about 50–0); the first Phase 3 item.
 
 After Phase 2: Phase 3 (balance, with the harness on whole matches) and the lineup screen (#69).
 
