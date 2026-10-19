@@ -182,15 +182,17 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       let nextLegs = 3;
       while (!sim.finished && sim.tick < MAX_TICKS) {
         sim.step();
-        const snap = sim.snapshot();
-        if (snap.events.length) events.push(...snap.events);
-        if (snap.wrestle) {
+        // Read the tick straight off the sim: building a snapshot every tick cost a third of the run.
+        const tickEvents = sim.tickEvents;
+        if (tickEvents.length) events.push(...tickEvents);
+        const men = sim.wrestleMen;
+        if (men > 0) {
           inW++;
-          lastMen = snap.wrestle.men;
+          lastMen = men;
         } else if (inW > 0) {
           wrestleTicks += inW;
           wrestleCount++;
-          if (snap.events.some((e) => e.kind === 'tackle')) held[Math.min(3, lastMen)]!++;
+          if (tickEvents.some((e) => e.kind === 'tackle')) held[Math.min(3, lastMen)]!++;
           inW = 0;
         }
         if (sim.matchSeconds >= nextLegs * 60) {

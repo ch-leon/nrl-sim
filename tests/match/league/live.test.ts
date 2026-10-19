@@ -401,3 +401,19 @@ describe('LiveSim', () => {
     expect(s.players).toHaveLength(18);
   });
 });
+
+describe('headless reads (Phase 3 speed)', () => {
+  it('wrestleMen and tickEvents agree with the snapshot every tick', () => {
+    const sim = factory(4);
+    let wrestles = 0;
+    for (let i = 0; i < Math.round(120 / TICK_S); i++) {
+      sim.step();
+      const men = sim.wrestleMen;
+      const snap = sim.snapshot();
+      expect(men).toBe(snap.wrestle?.men ?? 0);
+      expect(sim.tickEvents).toEqual(snap.events);
+      if (men > 0) wrestles++;
+    }
+    expect(wrestles).toBeGreaterThan(0);
+  });
+});
