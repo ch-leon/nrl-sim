@@ -142,7 +142,7 @@ function buildFixturesTab(state: GameState): HTMLElement {
   const names = clubNameMap(state.league.clubs);
   const wrap = el('div', { class: 'nrl-fixtures' });
 
-  wrap.append(liveMatchToggle());
+  wrap.append(liveMatchToggle(), coachCallsToggle());
 
   if (state.league.fixtures.length === 0) {
     wrap.append(panel({}, el('p', { text: 'No fixtures yet — season not started.' })));
@@ -187,6 +187,22 @@ function liveMatchToggle(): HTMLElement {
     { class: 'nrl-live-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
     box,
     el('span', { text: ' Live match (beta) — watch your matches played out by the new match engine' }),
+  );
+}
+
+/** The coach-call chips in a live match (#73): on unless turned off. */
+function coachCallsToggle(): HTMLElement {
+  const box = el('input', { attrs: { type: 'checkbox' } });
+  box.checked = getState().settings.coachCalls !== false;
+  box.addEventListener('change', () => {
+    setState({ settings: { ...getState().settings, coachCalls: box.checked } });
+    save(getState());
+  });
+  return el(
+    'label',
+    { class: 'nrl-live-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
+    box,
+    el('span', { text: ' Coach calls — nudge your side during a live match (hit-up, shift, kick early, rush…)' }),
   );
 }
 
