@@ -80,6 +80,15 @@ export const MORALE = {
   EXPIRING_PENALTY: -1,
 } as const;
 
+/** Random events deck (GitHub #75, systems/events.ts). With a 2-week gap and a
+ *  40% weekly chance after it, a card turns up about every 3.5 weeks. */
+export const EVENTS = {
+  MIN_GAP_WEEKS: 2,   // weeks after a card before another can be drawn
+  WEEKLY_CHANCE: 0.4, // chance per eligible week
+  MAX_PENDING: 2,     // no new card while this many are unanswered
+  ANSWER_WEEKS: 2,    // weeks to answer before the default choice is taken
+} as const;
+
 /** Contracts screen (GitHub #40). */
 export const CONTRACTS = {
   WARN_WEEKS: [8, 4, 1] as readonly number[], // toast when this many weeks remain

@@ -575,4 +575,25 @@ const CSS = `
 .nrl-news-item.nrl-news-success { border-left-color: #2e7d32; }
 .nrl-news-item.nrl-news-danger { border-left-color: #b03a2e; }
 .nrl-news-empty { margin: 0.4rem 0; }
+.nrl-news-decisions h3 { margin-top: 0; }
+.nrl-event-card {
+  background: #fff8e1;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+  padding: 0.4rem 0.5rem;
+  margin: 0 3px 0.6rem 0;
+}
+.nrl-event-title { font-weight: bold; font-size: 0.95rem; }
+.nrl-event-meta { font-size: 0.72rem; color: #555; }
+.nrl-event-text { margin: 0.3rem 0; overflow-wrap: anywhere; }
+.nrl-event-choices { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.nrl-event-choice {
+  flex: 1 1 10rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+.nrl-event-choice-label { font-weight: bold; }
+.nrl-event-choice-hint { font-size: 0.72rem; opacity: 0.85; white-space: normal; font-weight: normal; }
 `;

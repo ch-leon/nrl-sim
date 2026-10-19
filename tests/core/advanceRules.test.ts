@@ -121,6 +121,12 @@ describe('postWeekStop', () => {
     expect(postWeekStop(quiet)).toBeNull();
   });
 
+  it('stops for a new event card, after every other reason (#75)', () => {
+    expect(postWeekStop({ ...quiet, newDecisions: ['Fan day'] })).toEqual({ kind: 'decision', text: 'Decision needed: Fan day.' });
+    expect(postWeekStop({ ...quiet, newDecisions: ['Fan day'], contractAlerts: ['x'] })?.kind).toBe('contract');
+    expect(postWeekStop({ ...quiet, newDecisions: [] })).toBeNull();
+  });
+
   it('stops on a bankruptcy warning', () => {
     expect(postWeekStop({ ...quiet, bankruptcyWarned: true })?.kind).toBe('bankruptcy');
   });

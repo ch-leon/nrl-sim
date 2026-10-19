@@ -5,11 +5,12 @@
 // whether to keep going. Stop-early reasons are reported as a ui:notify toast.
 
 import { bus } from './events';
-import { getState } from './state';
+import { getState, type GameState } from './state';
 import { advanceWeek, withFastForward } from './time';
 import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
 import { fitSquadCount } from '../systems/matchday';
 import { overallRating } from '../data/player';
+import { cardById } from '../data/events';
 import {
   type AdvanceTarget, type StopReason, MAX_RUN_WEEKS,
   contractAlerts, forfeitRisk, newlyInjuredStarters, postWeekStop,
@@ -25,6 +26,14 @@ export interface AdvanceRun {
 function playerFixturePending(): boolean {
   const fixture = getCurrentFixture(getState(), PLAYER_ID);
   return fixture !== undefined && !fixture.result;
+}
+
+/** Titles of event cards that appeared during the week (#75). */
+function newCards(before: GameState, after: GameState): string[] {
+  const had = new Set(before.eventDeck.pending.map((e) => e.id));
+  return after.eventDeck.pending
+    .filter((e) => !had.has(e.id))
+    .map((e) => cardById(e.cardId)?.title ?? 'club event');
 }
 
 /**
@@ -79,6 +88,7 @@ function runUntil(target: AdvanceTarget): AdvanceRun {
           injuredStarters: newlyInjuredStarters(before.squad, after.squad, overallRating),
           contractAlerts: contractAlerts(before.squad, after.squad),
           bankruptcyWarned,
+          newDecisions: newCards(before, after),
         });
         if (post) return { weeksPlayed, stop: post };
 

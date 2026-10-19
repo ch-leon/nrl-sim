@@ -83,7 +83,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 /** One completed season. The extended fields are optional for pre-v4 entries. */
 export interface SeasonRecord {
@@ -103,6 +103,38 @@ export interface Objective {
   target: number;
   rivalId?: string;
   status: 'pending' | 'met' | 'missed';
+}
+
+/** A drawn event card awaiting the player's choice (GitHub #75). */
+export interface PendingEvent {
+  id: string; // unique instance id, e.g. 'fanDay-s1w5'
+  cardId: string; // key into EVENT_CARDS (data/events.ts)
+  season: number; week: number; // when it was drawn
+  /** Absolute week (see systems/events.ts absWeek) at which the default choice is taken. */
+  expiresAt: number;
+  subjectId?: string; // squad player the card is about
+  subjectName?: string; // kept so text still reads if the player leaves
+}
+
+/** A temporary effect left behind by a choice (GitHub #75). */
+export interface ActiveModifier {
+  id: string;
+  cardId: string;
+  label: string;
+  trigger: import('../data/events').ModifierTrigger;
+  weeksLeft: number;
+  effects: import('../data/events').ImmediateEffect[];
+  subjectId?: string;
+  subjectName?: string;
+}
+
+/** Random events deck state (GitHub #75). */
+export interface EventDeckState {
+  rng: number; // private seeded stream, so events never reshuffle rngSeed
+  pending: PendingEvent[];
+  cooldowns: Record<string, number>; // cardId → absolute week it may be drawn again
+  lastDrawn: number; // absolute week of the latest card (0 = never)
+  modifiers: ActiveModifier[];
 }
 
 /** Set once the board sacks the player; the save is kept so it can be reviewed. */
@@ -126,6 +158,7 @@ export interface GameState {
   boardPatience: number; // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
   objectives: Objective[]; // this season's board objectives (#47)
   sacked?: SackedInfo;
+  eventDeck: EventDeckState; // random events (#75)
   rngSeed: number; // advanced state of the seeded RNG
 }
 
@@ -210,11 +243,18 @@ export function createNewGame(
     history: [],
     boardPatience: BOARD.START_PATIENCE,
     objectives: [],
+    eventDeck: newEventDeck(seed),
     rngSeed: rng.state(),
   };
 
   loadState(result);
   return result;
+}
+
+/** An empty events deck. Its stream is derived from the game seed without
+ *  drawing from the main RNG, so adding it changed no existing squad or league. */
+export function newEventDeck(seed: number): EventDeckState {
+  return { rng: (seed ^ 0x9e3779b9) >>> 0, pending: [], cooldowns: {}, lastDrawn: 0, modifiers: [] };
 }
 
 /**
