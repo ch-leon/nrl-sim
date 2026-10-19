@@ -4,8 +4,10 @@
 // or Infinity anywhere in GameState, no player in two places, rival squads never
 // empty, the events deck within its limits, saves that round-trip through
 // migrateState. It also builds old-version saves (v1–v8) from a live game and
-// plays on from them. Used by scripts/soak.ts (npm run soak) and, at a smaller
-// size, by tests/qa/soak.test.ts. Never imported by the game. No Phaser.
+// plays on from them, and plays on from any real save handed to it (the corpus in
+// tests/fixtures/saves, tests/qa/corpus.test.ts). Used by scripts/soak.ts (npm run
+// soak) and, at a smaller size, by tests/qa/soak.test.ts. Never imported by the
+// game. No Phaser.
 import { createNewGame, getState, loadState, setState, type GameState, type Player } from '../core/state';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../core/time';
 import { bus } from '../core/events';
@@ -38,6 +40,11 @@ export interface SoakOptions {
   mode: SoakMode;
   /** Start from a save of this version (built from the fresh game) instead of v-current. */
   fromVersion?: number;
+  /**
+   * Start from this parsed save (any version; it is migrated first) instead of a new
+   * game: the save corpus (tests/fixtures/saves) plays on from real phone saves.
+   */
+  fromSave?: unknown;
   difficulty?: Difficulty;
 }
 
@@ -308,12 +315,18 @@ export function runSoak(opts: SoakOptions): SoakResult {
   const t0 = Date.now();
   bus.clear();
   const problems: string[] = [];
-  createNewGame(`Soak ${opts.seed}`, opts.seed, { difficulty: opts.difficulty });
-  initLeague(getState());
-  if (opts.fromVersion !== undefined) {
-    const res = migrateState(asOldSave(getState(), opts.fromVersion));
-    if (!res.ok) return { seed: opts.seed, mode: opts.mode, fromVersion: opts.fromVersion, start: gapSample(getState()), seasons: [], problems: [`v${opts.fromVersion} save failed to migrate: ${res.message}`], ms: 0 };
+  if (opts.fromSave !== undefined) {
+    const res = migrateState(opts.fromSave);
+    if (!res.ok) return { seed: opts.seed, mode: opts.mode, start: { bestNine: 0, rivalMean: 0, rivalRange: [0, 0] }, seasons: [], problems: [`save failed to migrate: ${res.message}`], ms: 0 };
     loadState(res.state);
+  } else {
+    createNewGame(`Soak ${opts.seed}`, opts.seed, { difficulty: opts.difficulty });
+    initLeague(getState());
+    if (opts.fromVersion !== undefined) {
+      const res = migrateState(asOldSave(getState(), opts.fromVersion));
+      if (!res.ok) return { seed: opts.seed, mode: opts.mode, fromVersion: opts.fromVersion, start: gapSample(getState()), seasons: [], problems: [`v${opts.fromVersion} save failed to migrate: ${res.message}`], ms: 0 };
+      loadState(res.state);
+    }
   }
   registerAllSystems();
   const seasons: SeasonSample[] = [];

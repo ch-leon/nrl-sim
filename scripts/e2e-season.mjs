@@ -7,7 +7,10 @@
 //   play to the season rollover → into season 2.
 // Every step takes a screenshot and runs layout checks (nothing off-screen, no
 // sideways page scroll); page errors and console errors are collected. Writes
-// e2e-output/report.json and exits 1 if anything failed.
+// e2e-output/report.json and exits 1 if anything failed. Slot 1 is dumped to
+// e2e-output/saves/v<version>-<point>.json at four points (after the tutorial,
+// mid-season, after the rollover, season 2) for the save corpus in
+// tests/fixtures/saves (see the README there).
 //
 //   npm run e2e:season
 //   CHROMIUM_PATH=/path/to/chrome npm run e2e:season
@@ -29,8 +32,10 @@ const SLOT = 'nrl-sim-save-slot-1';
 const W = 844;
 const H = 390;
 
+const SAVES = join(OUT, 'saves');
+
 rmSync(OUT, { recursive: true, force: true });
-mkdirSync(OUT, { recursive: true });
+mkdirSync(SAVES, { recursive: true });
 
 const report = { steps: [], errors: [], findings: [] };
 const log = (...a) => console.log(...a);
@@ -129,6 +134,20 @@ async function step(name, fn, { settle = 300, quietToasts = false } = {}) {
   return rec;
 }
 
+/**
+ * Dump the game's save for the corpus: slot 1 as the game wrote it, or (before the
+ * first autosave, which only happens on a week advance) the live state through the
+ * `?e2e` hook. Same JSON either way.
+ */
+async function dumpSave(point, rec) {
+  const s = (await save()) ?? (await page.evaluate(() => window.__nrlState?.() ?? null));
+  if (!s) { rec?.notes.push(`nothing to dump at ${point}`); return; }
+  const text = JSON.stringify(s);
+  const file = `v${s.version}-${point}.json`;
+  writeFileSync(join(SAVES, file), text);
+  rec?.notes.push(`dumped saves/${file} (${Math.round(text.length / 1024)} KB)`);
+}
+
 /** Facilities the grounds scene actually draws vs the save: problems as strings. */
 async function facilitiesDrawn(rec) {
   await wait(2200); // let any build animation finish
@@ -198,7 +217,7 @@ async function play() {
     const skip = page.locator('.nrl-tutorial-skip');
     if (!(await skip.count())) return 'no tutorial shown';
   });
-  await step('tutorial-skipped', async () => { await tap('.nrl-tutorial-skip'); });
+  await step('tutorial-skipped', async (rec) => { await tap('.nrl-tutorial-skip'); await dumpSave('after-tutorial', rec); });
 
   // Facilities: build two, move one, demolish the other.
   const cx = Math.round(W / 2), cy = Math.round(H / 2) + 10;
@@ -277,6 +296,7 @@ async function play() {
     }, { quietToasts: true });
   }
   await step('rival-signings', async (rec) => {
+    await dumpSave('mid-season', rec);
     const s = await save();
     const taken = s.league.clubs.flatMap((c) => (c.squad ?? []).filter((p) => poolIds.has(p.id)).map((p) => `${c.name} took ${p.name}`));
     rec.notes.push(taken.length ? taken.slice(0, 4).join('; ') : 'no rival signed from the pool yet');
@@ -333,6 +353,7 @@ async function play() {
     const s = await save();
     if (s.season !== 2) throw new Error(`still in season ${s.season} week ${s.week}`);
     rec.notes.push(`season 2 week ${s.week}, ${s.history.length} season(s) in history, board patience ${s.boardPatience}`);
+    await dumpSave('after-rollover', rec);
   });
   await step('history', async () => { await tap('.nrl-nav .nrl-btn:has-text("History")'); await wait(300); });
   await step('season-2-week-2', async (rec) => {
@@ -349,6 +370,7 @@ async function play() {
     const s = await save();
     rec.notes.push(`S${s.season} W${s.week}`);
     await facilitiesDrawn(rec);
+    await dumpSave('season-2', rec);
   }, { quietToasts: true });
 
   await browser.close();
