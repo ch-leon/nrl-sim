@@ -14,7 +14,12 @@ npm install
 npm run dev      # http://localhost:5173 (add `-- --host` to open it on a phone on the same Wi-Fi)
 npm test         # vitest
 npm run build    # typecheck + production build into dist/
+npm run soak         # headless 5 seasons × 20 seeds through every club system, with invariant checks
+npm run e2e:season   # phone-sized (844×390) playthrough of a full season in Chromium, screenshots in e2e-output/
 ```
+
+`e2e:season` uses `playwright-core` with an existing Chromium (`/opt/pw-browsers/chromium`,
+or set `CHROMIUM_PATH`); it never downloads a browser.
 
 CI runs the typecheck, tests and build on every PR. Merges to `main` deploy to
 GitHub Pages automatically. Architecture notes live in `docs/ARCHITECTURE.md`
