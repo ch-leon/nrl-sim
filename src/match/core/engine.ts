@@ -52,6 +52,8 @@ export class Runner {
   readonly history: SimEvent[] = [];
   /** Called with each tick's events as they happen (pop-ups, FX). */
   onEvents: ((events: SimEvent[]) => void) | null = null;
+  /** Called after every tick (a live match's recorder reads the clock). */
+  onStep: (() => void) | null = null;
 
   constructor(factory: SimFactory, seed: number) {
     this.factory = factory;
@@ -187,6 +189,7 @@ export class Runner {
       this.history.push(...this._cur.events);
       this.onEvents?.(this._cur.events);
     }
+    this.onStep?.();
   }
 }
 

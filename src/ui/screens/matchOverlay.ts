@@ -242,7 +242,10 @@ let active: MatchOverlayHandle | null = null;
 export interface MatchOverlayOptions {
   home: TeamSheet;
   away: TeamSheet;
-  result: MatchResult;
+  /** The recorded match (the classic replay); a live match has none until full time (#73). */
+  result?: MatchResult;
+  /** The weather badge when there is no result yet. */
+  weather?: WeatherKind;
   /** Seed for the commentary rng so replays read identically. Defaults derived
    *  from the result's final score + event count. */
   seed?: number;
@@ -266,7 +269,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const halfMinutes = opts.halfMinutes ?? 40;
   /** Set once the live sim drives the clock: events then only move the score and stats. */
   let liveClock = false;
-  const seed = opts.seed ?? deriveSeed(result);
+  const seed = opts.seed ?? (result ? deriveSeed(result) : 1);
   const rng = makeRng(seed);
 
   let state = initLiveState();
@@ -277,7 +280,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const scoreEl = el('span', { class: 'nrl-mo-score', text: '0 – 0' });
   const clockEl = el('span', { class: 'nrl-mo-clock', text: opts.halfMinutes ? formatClockSeconds(0, 2 * halfMinutes) : formatClock(0) });
   const halfEl = el('span', { class: 'nrl-mo-half', text: '1st' });
-  const weatherEl = el('span', { class: 'nrl-mo-weather', text: weatherBadge(result.weather) });
+  const weatherEl = el('span', { class: 'nrl-mo-weather', text: weatherBadge(opts.weather ?? result?.weather ?? 'clear') });
 
   const homeChip = teamChip(home);
   const awayChip = teamChip(away);

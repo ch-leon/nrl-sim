@@ -247,7 +247,7 @@ same `match:event` stream `runMatch` recorded (a test checks the watched stream 
 result's events), the overlay's clock off the sim (MM:SS, Nines halves), ×1/×2/×4/×8 starting
 at ×4, Skip (plays the rest at once, no pop-ups) and `match:finished` at full time. Rival v
 rival matches stay on the classic engine. On this container's software GL the handoff takes
-about 0.8 s longer than classic and Skip 1.3–2.2 s. **Found:** big rating gaps (rivals in a new
+about 0.8 s longer than classic and Skip 1.3–2.2 s (coach calls step 2 since: the week holds at the match and the result comes at full time from the match watched, so no headless match at kick-off; handoff 1.2–1.9 s). **Found:** big rating gaps (rivals in a new
 game range from 34 to 69) give blowouts of 100+ (classic: about 50–0); the first Phase 3 item.
 
 After Phase 2: Phase 3 (balance, with the harness on whole matches) and the lineup screen (#69).

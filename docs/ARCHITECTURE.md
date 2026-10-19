@@ -256,7 +256,7 @@ export interface Events {
   'money:changed': { delta: number; reason: string; balance: number };
   'facility:placed': PlacedFacility;
   'player:signed': Player;
-  'match:started': { fixture: Fixture; sim: MatchResult };
+  'match:started': { fixture: Fixture; sim?: MatchResult; live?: LiveMatchData }; // live: no result until full time
   'match:event': MatchEvent;          // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
   'bankruptcy:warning': { balance: number };
@@ -268,6 +268,15 @@ Week tick pipeline order (WU-4, fixed): 1) training gains → 2) injuries tick �
 3) economy (wages, income) → 4) match of the round (auto-sim or hand off to
 MatchScene) → 5) ladder update → 6) free agent pool refresh (every 4 weeks) →
 7) autosave → 8) emit `week:advanced`.
+
+A live match (the "Live match (beta)" setting, coach calls #73) **holds the week** at
+step 4: the matchday hook calls `ctx.hold()`, the hooks after it and the week's end
+wait, and at `match:finished` matchday applies the live sim's own result and calls
+`resumeWeek()`, so the ladder, finals seeding, morale and a season's end see the
+match the player watched. Fast-forward never holds. The game saves only at a week's
+end, so an app killed mid-match reloads the week before; a small record next to the
+save slot (`systems/liveMatchRecord.ts`: seed, calls, tick) makes the re-advanced
+week resume the same match where it was.
 
 Finals (weeks 25–27, GitHub #2): after the ladder step of week 24/25/26 the
 fixtures system appends the next knockout round — QF 1v8/2v7/3v6/4v5 from the

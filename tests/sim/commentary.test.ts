@@ -100,3 +100,15 @@ describe('possession-change lines', () => {
     }
   });
 });
+
+describe('commentaryFor — a kick at goal that misses', () => {
+  it('reads as a miss, never as points', () => {
+    for (const kind of ['conversion', 'penalty-goal', 'field-goal'] as const) {
+      for (let s = 1; s <= 20; s++) {
+        const line = commentaryFor({ t: 1, kind, teamId: 'H', detail: 'missed' }, HOME, AWAY, makeRng(s).next, 'H');
+        expect(line).not.toBe('');
+        expect(line).not.toMatch(/good|slots|nails|made|two points|one-pointer|ices it|drops it over|easy two|two more|comes off/i);
+      }
+    }
+  });
+});

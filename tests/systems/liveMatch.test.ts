@@ -1,58 +1,83 @@
-// tests/systems/liveMatch.test.ts — live matches behind a setting (BAK-207
-// §5.1 2g): with "Live match (beta)" on, matchday plays the match on the live
-// sim (runMatch) for the result and hands the Match scene the seed; the scene's
-// replay of that seed (a Runner on the same LiveSim, as LivePlayback builds it)
-// reports exactly the recorded events, so the overlay lands on the result; and
-// a whole season plays end to end with the setting on.
-import { describe, it, expect, beforeEach } from 'vitest';
-import { bus } from '../../src/core/events';
+// tests/systems/liveMatch.test.ts — live matches (BAK-207 §5.1 2g) with the
+// result at full time (coach calls #73, docs/specs/coach-calls.md §5): with
+// "Live match (beta)" on, matchday holds the week at kick-off and hands the
+// Match scene the seed; the match the scene plays (a Runner on the LiveSim and
+// a MatchRecorder, as LivePlayback builds it) is the result, applied with the
+// rest of the week at 'match:finished'. With no calls it equals runMatch on
+// that seed. A killed app resumes the same match with its calls. Fast-forward
+// still plays headless, and a whole season plays with the setting on.
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { bus, type LiveMatchData } from '../../src/core/events';
 import { createNewGame, getState, setState, type Fixture } from '../../src/core/state';
-import { advanceWeek, advanceWeeks, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
+import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, weekHeld } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
-import { runMatch } from '../../src/match/league/match';
+import { readLiveMatch } from '../../src/systems/liveMatchRecord';
+import { MatchRecorder, runMatch } from '../../src/match/league/match';
 import { Runner } from '../../src/match/core/engine';
 import { LiveSim } from '../../src/match/league/live';
-import { toMatchEvent } from '../../src/match/league/events';
+import type { CallInput, CoachCall } from '../../src/match/league/calls';
 import { NINES } from '../../src/match/league/rules';
 import { initLiveState, reduceEvent } from '../../src/ui/screens/matchOverlay';
 import { SEASON_ROUNDS } from '../../src/config';
-import type { MatchEvent, MatchResult, TeamSheet } from '../../src/sim/events';
+import type { MatchResult, TeamSheet } from '../../src/sim/events';
 
 interface Started {
   fixture: Fixture;
-  sim: MatchResult;
+  sim?: MatchResult;
   home: TeamSheet;
   away: TeamSheet;
-  live?: { seed: number; injuryRate?: number };
+  live?: LiveMatchData;
 }
 
 function newGame(seed: number, live: boolean): void {
   clearTickHooks();
   clearSeasonHooks();
+  clearHeldWeek();
   createNewGame('Tester', seed);
   initLeague(getState());
   registerPlayerMatchSystem();
   setState({ settings: { ...getState().settings, liveMatch: live } });
 }
 
-/** What the Match scene's LivePlayback reports: the same sim on the same seed, stepped by a Runner. */
-function watched(s: Started): MatchEvent[] {
-  const opts = { weather: s.sim.weather, ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) };
-  const r = new Runner((seed) => new LiveSim(s.home, s.away, seed, opts), s.live!.seed);
-  const ids = { home: s.home.clubId, away: s.away.clubId };
-  const out: MatchEvent[] = [];
-  r.onEvents = (events) => {
-    for (const e of events) {
-      const ev = toMatchEvent(e, r.cur, ids);
-      if (ev) out.push(ev);
+/**
+ * Play the match the way the Match scene's LivePlayback does: a Runner on the
+ * live sim with the calls list, recording the result; optionally the player's
+ * coach calls `call` whenever he may. Stops at `stopAt` (a killed app) or full time.
+ */
+function watch(s: Started, call?: { side: 'home' | 'away'; call: CoachCall }, stopAt = Infinity): { result: MatchResult | null; calls: CallInput[]; tick: number } {
+  const live = s.live!;
+  const calls = live.calls ?? [];
+  const rec = new MatchRecorder({ home: s.home.clubId, away: s.away.clubId });
+  const r = new Runner((seed) => new LiveSim(s.home, s.away, seed, { weather: live.weather, calls, ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}) }), live.seed);
+  r.onEvents = (events) => rec.add(events, r.cur);
+  r.onStep = () => rec.clock((r.current as LiveSim).matchSeconds);
+  while (!r.finished && r.tick < stopAt) {
+    const sim = r.current as LiveSim;
+    if (call && r.tick >= (live.resumeAt ?? 0) && sim.callRefusal(call.side, call.call) === null) {
+      calls.push({ tick: r.tick + 1, side: call.side, call: call.call });
+      live.onProgress?.(calls, r.tick);
     }
-  };
-  while (!r.finished) r.step();
-  return out;
+    r.step();
+  }
+  if (!r.finished) {
+    live.onProgress?.(calls, r.tick);
+    return { result: null, calls, tick: r.tick };
+  }
+  return { result: rec.result(r.current as LiveSim), calls, tick: r.tick };
 }
 
-describe('live match (beta)', () => {
+/** A tiny localStorage for the resume record. */
+function fakeStorage(): void {
+  const m = new Map<string, string>();
+  (globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => m.get(k) ?? null,
+    setItem: (k: string, v: string) => void m.set(k, v),
+    removeItem: (k: string) => void m.delete(k),
+  };
+}
+
+describe('live match (beta): the match on screen is the match', () => {
   let started: Started[] = [];
   let off: () => void = () => {};
   beforeEach(() => {
@@ -60,46 +85,96 @@ describe('live match (beta)', () => {
     started = [];
     off = bus.on('match:started', (e) => started.push(e));
   });
+  afterEach(() => {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
 
-  it('off (the default): the classic engine, no seed handed over', () => {
+  it('off (the default): the classic engine, the result at kick-off, no seed handed over', () => {
     newGame(42, false);
-    expect(getState().settings.liveMatch).toBe(false);
     advanceWeek();
     expect(started).toHaveLength(1);
     expect(started[0]!.live).toBeUndefined();
+    expect(started[0]!.sim).toBeDefined();
+    expect(weekHeld()).toBe(false);
   });
 
-  it('on: the result is the live sim’s, and the watched match reports exactly the recorded events', () => {
+  it('on: the week holds at kick-off; the watched match is the result, applied with the rest of the week at full time', () => {
     newGame(42, true);
+    const week = getState().week;
     advanceWeek();
     expect(started).toHaveLength(1);
     const s = started[0]!;
-    expect(s.live?.seed).toBeGreaterThan(0);
-    // The result is runMatch's on that seed (Nines points; the live sim's event log ends at 18 minutes).
-    const again = runMatch(s.home, s.away, { seed: s.live!.seed, weather: s.sim.weather, ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) });
-    expect(again).toEqual(s.sim);
-    expect(s.sim.events[s.sim.events.length - 1]!.t).toBe(2 * NINES.halfMinutes);
-    // What the scene plays is what was recorded, so the overlay finishes on the result.
-    const evs = watched(s);
-    expect(evs).toEqual(s.sim.events);
+    expect(s.sim).toBeUndefined();
+    expect(weekHeld()).toBe(true);
+    expect(getState().week).toBe(week);
+    advanceWeek(); // nothing while the week is held
+    expect(started).toHaveLength(1);
+    // With no calls, the watched match is runMatch's on that seed.
+    const { result } = watch(s);
+    const head = runMatch(s.home, s.away, { seed: s.live!.seed, weather: s.live!.weather, ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) });
+    expect(result).toEqual(head);
     let st = initLiveState();
-    for (const ev of evs) st = reduceEvent(st, ev, s.home.clubId, NINES.halfMinutes);
-    expect([st.homeScore, st.awayScore]).toEqual([s.sim.homeScore, s.sim.awayScore]);
-    expect(st.half).toBe(2);
-    // The ladder took the live result.
+    for (const ev of result!.events) st = reduceEvent(st, ev, s.home.clubId, NINES.halfMinutes);
+    expect([st.homeScore, st.awayScore]).toEqual([result!.homeScore, result!.awayScore]);
+    // Full time: the result lands, then the rest of the week.
+    bus.emit('match:finished', { fixture: s.fixture, result: result! });
+    expect(weekHeld()).toBe(false);
+    expect(getState().week).toBe(week + 1);
     const f = getState().league.fixtures.find((x) => x.round === s.fixture.round && x.homeId === s.fixture.homeId)!;
-    expect(f.result).toEqual({ homeScore: s.sim.homeScore, awayScore: s.sim.awayScore });
+    expect(f.result).toEqual({ homeScore: result!.homeScore, awayScore: result!.awayScore });
   }, 30_000);
 
-  it('a whole season plays end to end with the setting on', () => {
+  it('the coach’s calls change the match, and the match with its calls is what counts', () => {
+    newGame(42, true);
+    advanceWeek();
+    const s = started[0]!;
+    const side = s.fixture.homeId === PLAYER_ID ? 'home' : 'away';
+    const { result, calls } = watch(s, { side, call: 'kick-early' });
+    expect(calls.length).toBeGreaterThan(3);
+    const plain = runMatch(s.home, s.away, { seed: s.live!.seed, weather: s.live!.weather, ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) });
+    expect(result!.events).not.toEqual(plain.events);
+    expect(runMatch(s.home, s.away, { seed: s.live!.seed, weather: s.live!.weather, calls: [...calls], ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) })).toEqual(result);
+    bus.emit('match:finished', { fixture: s.fixture, result: result! });
+    const f = getState().league.fixtures.find((x) => x.round === s.fixture.round && x.homeId === s.fixture.homeId)!;
+    expect(f.result).toEqual({ homeScore: result!.homeScore, awayScore: result!.awayScore });
+  }, 30_000);
+
+  it('a killed app resumes the same match where it was, with the calls already made', () => {
+    fakeStorage();
+    newGame(42, true);
+    const saved = JSON.stringify(getState()); // the game saves only at a week's end
+    advanceWeek();
+    const first = started[0]!;
+    const side = first.fixture.homeId === PLAYER_ID ? 'home' : 'away';
+    const cut = watch(first, { side, call: 'shift-left' }, 4000);
+    expect(cut.result).toBeNull();
+    const rec = readLiveMatch()!;
+    expect(rec.tick).toBe(cut.tick);
+    expect(rec.calls.length).toBeGreaterThan(0);
+    // Killed: back to the saved week, advance again — the same match, resumed.
+    clearHeldWeek();
+    setState(JSON.parse(saved));
+    advanceWeek();
+    const again = started[1]!;
+    expect(again.live!.seed).toBe(first.live!.seed);
+    expect(again.live!.resumeAt).toBe(cut.tick);
+    expect(again.live!.calls).toEqual(rec.calls);
+    const done = watch(again, { side, call: 'shift-left' });
+    // Straight through with the same calls gives the same full time.
+    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, weather: first.live!.weather, calls: [...done.calls], ...(first.live!.injuryRate !== undefined ? { injuryRate: first.live!.injuryRate } : {}) });
+    expect(done.result).toEqual(straight);
+    bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
+    expect(readLiveMatch()).toBeNull();
+  }, 60_000);
+
+  it('fast-forward plays headless with the setting on, and a whole season plays end to end', () => {
     newGame(7, true);
     const season = getState().season;
-    // Fast-forward: every round of the regular season and the finals, headless on the live sim.
     for (let i = 0; i < SEASON_ROUNDS + 8 && getState().season === season; i++) advanceWeeks(1);
+    expect(started).toHaveLength(0);
+    expect(weekHeld()).toBe(false);
     const mine = getState().league.fixtures.filter((f) => f.round <= SEASON_ROUNDS && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID));
     expect(mine.length).toBeGreaterThan(0);
     for (const f of mine) expect(f.result).toBeDefined();
-    const row = getState().league.ladder.find((r) => r.clubId === PLAYER_ID);
-    if (row) expect(row.played).toBeGreaterThan(0);
   }, 180_000);
 });
