@@ -1,0 +1,83 @@
+{
+  "name": "rotation",
+  "description": "Does the interchange bench (2b) keep legs up late in the match? Each matchup with both coaches rotating off / standard / heavy.",
+  "seeds": 20,
+  "scenarios": [
+    {
+      "name": "even, rotation off",
+      "home": {
+        "rating": 60,
+        "rotation": "off"
+      },
+      "away": {
+        "rating": 60,
+        "rotation": "off"
+      }
+    },
+    {
+      "name": "even, standard",
+      "home": {
+        "rating": 60,
+        "rotation": "standard"
+      },
+      "away": {
+        "rating": 60,
+        "rotation": "standard"
+      }
+    },
+    {
+      "name": "even, heavy",
+      "home": {
+        "rating": 60,
+        "rotation": "heavy"
+      },
+      "away": {
+        "rating": 60,
+        "rotation": "heavy"
+      }
+    },
+    {
+      "name": "standard v off",
+      "home": {
+        "rating": 60,
+        "rotation": "standard"
+      },
+      "away": {
+        "rating": 60,
+        "rotation": "off"
+      }
+    },
+    {
+      "name": "stamina 30 v 80, off",
+      "home": {
+        "rating": 60,
+        "stats": {
+          "stamina": 30
+        },
+        "rotation": "off"
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "stamina": 80
+        },
+        "rotation": "off"
+      }
+    },
+    {
+      "name": "stamina 30 v 80, standard",
+      "home": {
+        "rating": 60,
+        "stats": {
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "stamina": 80
+        }
+      }
+    }
+  ]
+}
