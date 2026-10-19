@@ -1,0 +1,49 @@
+{
+  "name": "all-out sweep 2",
+  "description": "All-out with red-zone early kicks 30% and passing +0.15 still wins ~41% v Balanced (run 20261019-170217). Do its width, cut-outs or offloads cost it?",
+  "seeds": 100,
+  "base": {
+    "presets.attack.all-out.base.earlyKick": 0.3,
+    "presets.attack.all-out.base.pass": 0.15
+  },
+  "scenarios": [
+    {
+      "name": "all-out v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "balanced v all-out",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      }
+    }
+  ],
+  "sweep": {
+    "presets.attack.all-out.base.cutOut": [
+      0.12,
+      0.08
+    ],
+    "presets.attack.all-out.base.width": [
+      0.45,
+      0.35
+    ],
+    "presets.attack.all-out.base.offload": [
+      1.6,
+      1.4
+    ]
+  }
+}
