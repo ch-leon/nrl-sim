@@ -212,6 +212,16 @@ strength at new game / v7→v8 migration, seeded per club so `rngSeed` is untouc
 replaced the old strength drift. Matchday builds a rival's sheet from its fit squad with
 `teamSheetFromSquad` (the strength sheet is the fallback), so the match API is unchanged.
 
+Parity (N5, GitHub #140): `LEAGUE` in `config.ts` holds the league's rating centre
+(`MEAN`, which `RIVAL_LEAGUE_MEAN` re-exports) and the new-game start. The rivals in
+`data/league.ts` are spread 42–70 around it, and `createNewGame` builds the player's
+squad the way rival squads are built (`generatePlayerAround`): one star for a hero, a
+first-grader per position around `START_FIRST_GRADE` plus the difficulty's `startRating`
+(Easy +4, Hard −4), and depth players `START_DEPTH_GAP` below, so the best nine starts
+about two points above the rival mean rather than thirteen. New games only; a save's
+rivals keep the strength their squads give them. `npm run soak` reports the gap, the
+player's record and ladder finish per season (`docs/status/2026-10-league.md`).
+
 Random events (GitHub #75): the deck draws at most one card a week (tick order 58,
 after morale) from its own seeded stream `eventDeck.rng`, so it never moves `rngSeed`.
 A card waits in the News screen for `EVENTS.ANSWER_WEEKS`, then takes its default

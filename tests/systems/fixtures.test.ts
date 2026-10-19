@@ -23,7 +23,7 @@ import { RIVAL_CLUBS } from '../../src/data/league';
 import { createNewGame, getState, setState, type Fixture, type LadderRow, type RivalClub, type GameState } from '../../src/core/state';
 import { makeRng } from '../../src/utils/rng';
 import { bus } from '../../src/core/events';
-import { SEASON_ROUNDS } from '../../src/config';
+import { SEASON_ROUNDS, LEAGUE } from '../../src/config';
 import { advanceWeek, advanceWeeks, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 
@@ -38,11 +38,13 @@ const ids16 = (): string[] => [PLAYER_ID, ...RIVAL_CLUBS.map((c) => c.id)];
 // ── RIVAL_CLUBS data ──────────────────────────────────────────────────────────
 
 describe('RIVAL_CLUBS data', () => {
-  it('has 15 entries with strength in 35..85 and two hex colours', () => {
+  it('has 15 entries with strength in 42..70 around the league mean and two hex colours', () => {
     expect(RIVAL_CLUBS).toHaveLength(15);
+    const mean = RIVAL_CLUBS.reduce((t, c) => t + c.strength, 0) / RIVAL_CLUBS.length;
+    expect(Math.abs(mean - LEAGUE.MEAN)).toBeLessThan(1.5);
     for (const c of RIVAL_CLUBS) {
-      expect(c.strength).toBeGreaterThanOrEqual(35);
-      expect(c.strength).toBeLessThanOrEqual(85);
+      expect(c.strength).toBeGreaterThanOrEqual(42);
+      expect(c.strength).toBeLessThanOrEqual(70);
       expect(c.colors).toHaveLength(2);
       for (const hex of c.colors) expect(hex).toMatch(/^#[0-9a-fA-F]{6}$/);
       expect(c.id.startsWith('rival-')).toBe(true);

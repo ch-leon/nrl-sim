@@ -100,3 +100,24 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
     contractWeeks,
   };
 }
+
+/** How far each stat may land from the target in generatePlayerAround. */
+export const AROUND_SPREAD = 6;
+
+/** The quality band a target overall belongs to (traits and the base roll). */
+export function qualityFor(target: number): Quality {
+  return target >= 68 ? 'star' : target >= 50 ? 'average' : 'rookie';
+}
+
+/**
+ * A player whose stats sit around `target` overall (each stat target ±
+ * AROUND_SPREAD), with the wage re-derived from the result. Rival squads and
+ * the player's starting squad are built from this (#74, #140). Draws from
+ * `rng` in a fixed order: generatePlayer for the base, then one roll a stat.
+ */
+export function generatePlayerAround(rng: Rng, target: number, opts: Omit<GenPlayerOpts, 'quality'> = {}): Player {
+  const base = generatePlayer(rng, { ...opts, quality: qualityFor(target) });
+  const roll = (): number => clampStat(target + rng.int(-AROUND_SPREAD, AROUND_SPREAD));
+  const stats: PlayerStats = { speed: roll(), strength: roll(), stamina: roll(), skill: roll(), footyIQ: roll() };
+  return { ...base, stats, wage: Math.round(overallRating({ stats }) * 15 + 100) };
+}

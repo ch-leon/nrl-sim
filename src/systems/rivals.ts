@@ -14,8 +14,8 @@
 import { getState, setState, type GameState, type Player, type Position, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
-import { ON_FIELD, STAT_MAX } from '../config';
-import { generatePlayer, overallRating, POSITIONS, type Quality } from '../data/player';
+import { LEAGUE, ON_FIELD, STAT_MAX } from '../config';
+import { generatePlayerAround, overallRating, POSITIONS } from '../data/player';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
@@ -39,8 +39,9 @@ export const RIVAL_JUNIOR_GAP = 14;
 /**
  * League level juniors are anchored to: halfway between the club's strength and
  * this, so each generation pulls a club back toward the middle of the league.
+ * The number lives in config (LEAGUE.MEAN, #140) beside the new-game start.
  */
-export const RIVAL_LEAGUE_MEAN = 55;
+export const RIVAL_LEAGUE_MEAN: number = LEAGUE.MEAN;
 /**
  * Salary cap on a rival's squad, in weekly market wages (overall × 15 + 100). A
  * signing that would break it is skipped, so the strongest clubs can't keep
@@ -88,25 +89,16 @@ export function withDerivedStrength(club: RivalClub): RivalClub {
 // ── Generation ───────────────────────────────────────────────────────────────
 
 /**
- * One rival player whose stats sit around `target` overall. Morale is neutral so
- * the team sheet's morale modifier doesn't flatter rivals.
+ * One rival player whose stats sit around `target` overall (data/player.ts
+ * generatePlayerAround). Morale is neutral so the team sheet's morale modifier
+ * doesn't flatter rivals.
  */
 export function rivalPlayer(rng: Rng, clubId: string, position: Position, target: number, age?: number): Player {
-  const quality: Quality = target >= 68 ? 'star' : target >= 50 ? 'average' : 'rookie';
-  const base = generatePlayer(rng, { position, quality, ...(age !== undefined ? { age } : {}) });
-  const stats = {
-    speed: clampStat(target + rng.int(-6, 6)),
-    strength: clampStat(target + rng.int(-6, 6)),
-    stamina: clampStat(target + rng.int(-6, 6)),
-    skill: clampStat(target + rng.int(-6, 6)),
-    footyIQ: clampStat(target + rng.int(-6, 6)),
-  };
+  const base = generatePlayerAround(rng, target, { position, ...(age !== undefined ? { age } : {}) });
   return {
     ...base,
     id: `${clubId}:${base.id}`,
-    stats,
     morale: 50,
-    wage: Math.round(overallRating({ stats }) * 15 + 100),
     career: { games: 0, tries: 0, tackles: 0, lineBreaks: 0 },
   };
 }
