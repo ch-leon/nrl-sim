@@ -87,7 +87,7 @@ describe('soak', () => {
           expect(s.finance.facilities).toBe(0);
           expect(s.finance.upkeep).toBe(0);
         } else {
-          expect(-s.finance.transfers).toBe(s.signingFees);
+          expect(s.finance.transfers).toBeCloseTo(-s.signingFees, 5); // −0 when nobody was signed
           expect(s.finance.upkeep).toBeLessThanOrEqual(0);
         }
       }

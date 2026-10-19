@@ -26,7 +26,7 @@ export const COUNTS = [
   'runDowns', 'blown', 'subs', 'goals', 'goalMisses', 'fieldGoals', 'fgMisses', 'chargeDowns', 'bonusTries',
   'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
-  'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid',
+  'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -284,12 +284,15 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       c.held2 = held[2]!;
       c.held3 = held[3]!;
       c.kickMetres = sim.kickMetres.home + sim.kickMetres.away;
+      // Completion is a share (%), not a count: not scaled to 18 minutes.
+      const sets = sim.sets.home + sim.sets.away;
+      c.completion = sets > 0 ? (100 * (sim.setsCompleted.home + sim.setsCompleted.away)) / sets : 0;
       wrestleCount = 0;
       perSeed.push(c);
       if (sim.points.home > sim.points.away) wins++;
       else if (sim.points.home === sim.points.away) draws++;
     }
-    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * scale))])) as Record<CountKey, Stat>;
+    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' ? 1 : scale)))])) as Record<CountKey, Stat>;
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {
       variant: cell.variant.name,

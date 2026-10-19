@@ -171,3 +171,70 @@ about $100k a season), which is the point: from here a building has to earn its 
   gates. Gates are the next PR.
 - **Idle Hard is now in the red at the end of season 1** on wages × 1.3: the fire-sale
   floor is close, and item 6 will set where it should sit.
+
+## #169 Gates with a roof
+
+- PR #170, merged. No `GameState` change, no save bump.
+- `homeGate(state, fixture)` in `economy.ts`: attendance = min(capacity, demand), receipts
+  = attendance × $20. Capacity is `ECON.CAPACITY` by Grandstand level: the hill holds
+  2,000, a stand 3,500 / 5,000 / 6,500. Demand = (300 + reputation × 30) × form ×
+  occasion: form is 1 ± 25% across the last five results (`recentForm`, five wins +25%,
+  five losses −25%, from the matches before the round); the occasion is ×1.2 for a
+  top-eight opponent (by the ladder, once it has played) and ×1.5 for a home final. A
+  new club at reputation 30 draws 1,200 ($24k a game); the hill sells out from
+  reputation 57; a top club at 97 draws 3,200, 4,000 on a winning run, and fills a
+  stand at its second level. `gateReceipts` is `homeGate` for the current fixture, and
+  the Finance screen's projected next home gate is the same function, with a new
+  Crowd row ("1,140 of 2,000 seats", or "Sold out · 2,000 seats" when a bigger stand
+  would earn more). The Grandstand's Build blurb now says seats, not "+50% attendance".
+- The old `GRANDSTAND_ATTEND_MULT` is gone: a stand no longer multiplies the crowd, it
+  seats it.
+- The soak's managed manager gained two habits (Assumed, needs Leon): it builds a
+  Grandstand, then upgrades it, whenever the next home gate is sold out and $60k is left
+  after paying (`MANAGED.STAND_RESERVE`), and it signs a star only while the weekly net
+  after that wage stays above −$3k (`BURN_ALLOWED`; a season's home gates spread over
+  its weeks, economy functions only). Without the second rule a manager that reads the
+  bank balance alone signs its way into a wage bill the hill can't pay.
+- Verified: tsc, vitest (the roof by level, demand by reputation, form from the last
+  five, the big match and the home final, the projection and the crowd label), build,
+  the full soak (no problems), Playwright at 844×390 and 1280×800
+  (`docs/screenshots/169/`: Finance with the Crowd row, the Build menu).
+- Assumed (needs Leon): the capacities, 300 + 30 × reputation, ±25% form, ×1.2 for a
+  top-eight opponent, ×1.5 for a home final; no derbies (the league has no geography);
+  the ticket price stays $20; the managed manager's two new rules.
+
+### Before → after (20 seeds; wages in, before this PR → after)
+
+A first cut at 400 + 35 × reputation left an idle Normal club gaining +$6k to +$143k
+a season: at reputation 30–48 it never reaches the roof, so the roof alone changes
+nothing for it, and only the demand level does. 300 + 30 × reputation is the number
+below.
+
+| | before | after |
+|---|---|---|
+| A new club's gate (reputation 30, neutral form) | $29k a game, 1,450 | $24k a game, 1,200 |
+| Idle Normal: gates S1 / S3 / S5 | +$417k / +$497k / +$569k | +$321k / +$357k / +$389k |
+| Idle Normal: net S1 / S2 / S3 / S4 | +$38k / +$132k / +$175k / +$210k | −$58k / +$5k / +$38k / +$61k |
+| Idle Normal: money S1 / S3 / S5 | $238k / $545k / $1,207k | $142k / $194k / $518k |
+| Managed: gates S1 / S3 / S5 | +$521k / +$1,099k / +$1,279k | +$443k / +$1,002k / +$1,260k |
+| Managed: stand built, its upkeep S5 | never, $13k | by season 2, upgraded to L3 by 4; $60k |
+| Managed: facilities S1–S5 | −$48k once | −$48k / −$90k / −$144k / −$126k / −$54k |
+| Managed: net S1 / S3 / S5 | +$2k / −$37k / +$24k | +$63k / +$33k / +$9k |
+| Managed: money S1 → S5 | $202k → $280k | $263k → $405k |
+| Managed: best nine S5, premierships S5 | 83.2, 70% | 83.4, 100% |
+| Idle Hard: net S1, money S1 | −$130k, −$30k | −$185k, −$85k |
+
+- **The roof is a success tax, and the stand is an investment.** The managed club
+  sells out the hill in its second season, builds a Grandstand and upgrades it twice
+  (about $720k over four seasons, plus $60k a season to run), and its gates reach
+  $1.26M against a $1.38M wage bill: it finishes five seasons at $405k, the plan's
+  "grows slowly". It still wins everything (the margin for a 25-point gap is Phase 3's).
+- **Idle Normal loses $58k in season 1 and then creeps back up**: its wage bill falls
+  $100k over five seasons as the starting squad retires and juniors arrive on rookie
+  wages, while its reputation drifts from 36 to 48 (+2 for every board objective met,
+  "solvent" among them) and lifts the gate $70k. From $200k it ends season 1 at $142k
+  and season 3 at $194k: not yet "into the red by season 3–4". Item 6 has the lines
+  that do the rest (the reputation grant, board grants, prize and event cash, the
+  ticket price).
+- **Idle Hard is bust in season 1** (−$185k on wages × 1.3 from $100k): item 6 must
+  soften Hard, not sharpen it.

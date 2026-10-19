@@ -130,6 +130,12 @@ Tests: `tests/match/league/kicks.test.ts`.
 | `live.cutOutPerLevelM` / `live.playmakerWidth` / `live.cutOutChance` | `live.ts` | 4 m / 0.25 / 15% per level | Playmaker reach, width bias and deliberate cut-out. |
 | Lab `stars` mode | `src/match/lab/sheets.ts` | two level-III fit traits each | Stress test; `#lab?traits=stars`. |
 
+**Whole matches, Phase 3** (no change made): a club's own generated traits against the same
+club with none, 160 matches each both ways round (`20261019-172234-club-traits-whole-match`):
+the traited side wins 54% (Reapers, 70), 61% (Mariners, 52), 47% (Larrikins, 42) — an edge,
+with team strength still deciding. Every man with two level-3 traits ("stars", the lab's
+showcase) wins 84% (`20261019-172010-traits-whole-match`).
+
 Tests: `tests/data/traits.test.ts`, `tests/match/league/traits.test.ts`.
 
 ## 8. Tactics (§5)
@@ -233,11 +239,16 @@ Tests: `tests/match/league/fatigue.test.ts`.
 ## 12. Balance targets (§7) and how to measure
 
 Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams: tackles
-90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 · tries 5–9 ·
+150–210 · line breaks 13–24 · offloads 8–14 · errors 10–16 · kicks 20–32 · tries 5–9 ·
 completion 70–80%; stronger team wins ~70% at a 20-point rating gap. Measure with the
 balance harness (`balance/README.md`, the `balance-experiments` skill): `npm run balance`
-plays whole matches (§13) over many seeds and marks every count against these bands
-(completion is not counted yet). The Balance workflow re-runs `balance/plans/standard.json`
+plays whole matches (§13) over many seeds and marks every count against these bands.
+**Completion** (`completion`, a share, not scaled for a stretch) is the side's sets not ended
+by its own error (knock-on, spilt kick, loose pass), an intercept or strip against it, or a
+penalty against it; a kick, a try or a handover on the last completes a set, and six-again
+starts a new one (`LiveSim.sets` / `setsCompleted`; counting rolls no dice). Measured
+(standard plan `20261019-174119-standard`): 66–70% across the scenarios, even sides 68.2%,
+a shade under the 70–80% band; left as is (errors are in their band at 12.7). The Balance workflow re-runs `balance/plans/standard.json`
 on every match-code change to `main`; the Balanced-v-Balanced test in `presets.test.ts`
 still pins the coarse bands so a tuning change that breaks them fails CI.
 
@@ -260,8 +271,10 @@ minutes is 9–12 s a tackle, slower than the real game. The play-the-ball was q
 ball played about 2.2 s, NRL about 3 s). Slowed to 3 s, tackles come down to about 170 and
 kicks to 20 with tries in the band, but a slower game is less tiring and the legs tuning (§8,
 §10a) and the tactics tests were set on the old tempo; a 4.5 s ruck still gives 141 tackles
-and drops tries to 4 (tempo sweep `20261019-141554-tempo-2`). Not changed: a question for
-Leon (the band, or a slower game with legs re-tuned).
+and drops tries to 4 (tempo sweep `20261019-141554-tempo-2`). **Assumed (needs Leon), 2026-10-19:**
+the tempo stays and the bands move to it: tackles 150–210, line breaks 13–24, kicks 20–32
+(the old bands scaled ×1.67 low, ×1.75 high; per tackle the sim's line breaks and kicks were
+already in them). `BANDS` in `src/match/balance/report.ts` marks the new ones.
 
 ## 13. The match: clock, halves, points (BAK-207 §5.1, 2a)
 

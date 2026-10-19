@@ -262,8 +262,13 @@ kicks, tries) so balance is seen, not guessed.
 ## 7. Balance targets (to verify in Phase 3)
 
 Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams:
-tackles 90–120 · line breaks 8–14 · offloads 8–14 · errors 10–16 · kicks 12–18 ·
+tackles 150–210 · line breaks 13–24 · offloads 8–14 · errors 10–16 · kicks 20–32 ·
 tries 5–9 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
+*Phase 3 (2026-10-19, assumed — needs Leon):* tackles, line breaks and kicks were first
+set at 90–120, 8–14 and 12–18, a tackle every 9–12 s of game clock, slower than real
+league (about 7.5 s). The sim plays a tackle every 5–7 s, and per tackle its line breaks
+and kicks were already in the old bands; those three bands are scaled to its tempo
+(×1.67 low, ×1.75 high) rather than slowing the game and re-tuning the legs.
 Measured by the balance harness (`balance/README.md`): every report marks these bands,
 and the standard plan re-runs on each match-code change to `main`.
 

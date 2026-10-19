@@ -4,18 +4,23 @@
 // than luck would explain. Pure: results in, Markdown out.
 import { MATCH_MINUTES, type CellResult, type CountKey } from './measure';
 
-/** §7 balance targets per full Nines match, both sides combined. */
+/**
+ * §7 balance targets per full Nines match, both sides combined. Tackles, line
+ * breaks and kicks are at the sim's tempo (a tackle every 5–7 s of game clock,
+ * Phase 3, assumed pending Leon); the rest as first set.
+ */
 export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
-  tackles: [90, 120],
-  lineBreaks: [8, 14],
+  tackles: [150, 210],
+  lineBreaks: [13, 24],
   offloads: [8, 14],
   errors: [10, 16],
-  kicks: [12, 18],
+  kicks: [20, 32],
   tries: [5, 9],
+  completion: [70, 80],
 };
 
 /** The columns of the summary table. */
-const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'lostInContact', 'injuries'];
+const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'lostInContact', 'injuries', 'completion'];
 
 /** ✓ inside the §7 band, ↑ above, ↓ below, '' when the metric has no band. */
 export function bandMark(key: CountKey, v: number): string {
