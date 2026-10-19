@@ -17,6 +17,7 @@ import { BENCH } from './bench';
 import { GOALS } from './goals';
 import { EDGE_COST, TRAIT_PTS } from './traits';
 import { WEATHER } from './weather';
+import { RATING } from './spread';
 import { WRESTLE } from './wrestle';
 
 /** The knob groups, by the first segment of a path. */
@@ -34,6 +35,7 @@ export const KNOBS = {
   touch: TOUCH,
   penalty: PENALTY,
   weather: WEATHER,
+  rating: RATING,
   goals: GOALS,
 } as const;
 

@@ -55,6 +55,7 @@ import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
 import { PENALTY, choosePenalty, offsideChance } from './penalties';
+import { spreadSheets } from './spread';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
@@ -399,6 +400,8 @@ export class LiveSim implements MatchSim {
   private readonly firstReceiver: Side = 'home';
 
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
+    // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average.
+    [home, away] = spreadSheets(home, away);
     this.rng = makeRng(seed);
     this.weather = opts.weather ?? 'clear';
     this.wx = weatherEffect(this.weather);
