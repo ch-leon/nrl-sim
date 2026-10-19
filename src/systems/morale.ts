@@ -12,7 +12,7 @@ import { getState, setState, type GameState, type Player } from '../core/state';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { MORALE } from '../config';
 import { levelMult, SPECIAL_MAGNITUDE, type FacilityDefId } from '../data/facility';
-import { overallRating } from '../data/player';
+import { marketWage } from '../data/player';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
 
 const MORALE_FACILITIES: readonly FacilityDefId[] = ['canteen', 'coachsOffice'];
@@ -46,8 +46,7 @@ export function facilityMoraleBonus(state: GameState): number {
 /** Unhappiness from pay and contract status (≤ 0). */
 export function unhappiness(p: Player): number {
   let d = 0;
-  const marketWage = Math.round(overallRating(p) * 15 + 100); // mirrors data/player.ts generation
-  if (p.wage < marketWage * MORALE.LOW_PAY_RATIO) d += MORALE.LOW_PAY_PENALTY;
+  if (p.wage < marketWage(p) * MORALE.LOW_PAY_RATIO) d += MORALE.LOW_PAY_PENALTY;
   if (p.contractWeeks <= MORALE.EXPIRING_WEEKS) d += MORALE.EXPIRING_PENALTY;
   return d;
 }

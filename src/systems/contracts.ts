@@ -6,7 +6,7 @@
 import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney, spendMoney } from '../data/club';
-import { overallRating } from '../data/player';
+import { marketWage, overallRating } from '../data/player';
 import { CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
 import type { SignResult } from './freeagency';
 
@@ -16,10 +16,8 @@ export function warnForWeeks(name: string, weeks: number): string | null {
   return `${name}'s contract expires in ${weeks} week${weeks === 1 ? '' : 's'}.`;
 }
 
-/** Market wage for a player's overall (mirrors data/player.ts generation). */
-export function marketWage(p: Pick<Player, 'stats'>): number {
-  return Math.round(overallRating(p) * 15 + 100);
-}
+/** Market wage for a player's overall: data/player.ts owns it (#146); kept here for existing imports. */
+export { marketWage };
 
 /**
  * Base weekly wage a player asks for to renew: market wage for their overall,

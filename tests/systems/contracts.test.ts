@@ -3,6 +3,8 @@ import { createNewGame, getState, loadState, type Player } from '../../src/core/
 import { bus } from '../../src/core/events';
 import { tickContracts } from '../../src/systems/economy';
 import { renewEarly, renewalFee, renewalWage, sellPlayer, transferFee, marketWage } from '../../src/systems/contracts';
+import { marketWage as playerMarketWage, WAGE_PER_OVERALL, WAGE_BASE } from '../../src/data/player';
+import { marketWage as rivalMarketWage } from '../../src/systems/rivals';
 import { refreshFreeAgents } from '../../src/systems/freeagency';
 import { makeRng } from '../../src/utils/rng';
 import { overallRating } from '../../src/data/player';
@@ -41,6 +43,15 @@ describe('departures', () => {
     expect(getState().freeAgents.map((p) => p.id)).toContain('a');
     refreshFreeAgents(getState(), makeRng(5));
     expect(getState().freeAgents.map((p) => p.id)).toContain('a');
+  });
+});
+
+describe('marketWage', () => {
+  it('is one formula, owned by data/player.ts and re-exported by contracts and rivals (#146)', () => {
+    const p = mk('w');
+    expect(marketWage).toBe(playerMarketWage);
+    expect(rivalMarketWage).toBe(playerMarketWage);
+    expect(marketWage(p)).toBe(Math.round(overallRating(p) * WAGE_PER_OVERALL + WAGE_BASE));
   });
 });
 
