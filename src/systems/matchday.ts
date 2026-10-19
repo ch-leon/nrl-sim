@@ -1,14 +1,15 @@
-// Orchestrator-owned: simulates the PLAYER's match of the round (rival-vs-rival
-// matches are handled by fixtures.ts's own hook). Emits 'match:started' so the
-// presentation layer (MatchScene playback, wave 4) can replay the result; state
-// is already fully applied before the event fires — playback is view-only.
+// Orchestrator-owned: the PLAYER's match of the round (rival-vs-rival matches
+// are handled by fixtures.ts's own hook). The match is played on the live sim
+// (BAK-207): the week holds at kick-off, 'match:started' hands the Match scene
+// the seed, and the result — what the player watched and called — lands with
+// the rest of the week at 'match:finished'. Fast-forward plays it headless.
 import { bus } from '../core/events';
 import { getState, setState, type Fixture, type RivalClub } from '../core/state';
 import { registerTickHook, resumeWeek, TICK_ORDER } from '../core/time';
 import { clearLiveMatch, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, type Difficulty, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
-import { simulateMatch, teamSheetFromRival, teamSheetFromSquad } from '../sim/engine';
+import { teamSheetFromRival, teamSheetFromSquad } from '../match/league/sheets';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
@@ -201,11 +202,10 @@ export function registerPlayerMatchSystem(): void {
     const prior = readLiveMatch();
     const resumed =
       prior && prior.season === state.season && prior.week === state.week && prior.round === fixture.round && prior.homeId === fixture.homeId && prior.seed === seed ? prior : null;
-    const live = state.settings.liveMatch === true || resumed !== null;
-    // Live match (beta, BAK-207 2g; coach calls #73): the match on screen is the
-    // match. The week holds here; the result and the rest of the week come at
-    // full time, from what the player watched (and called).
-    if (live && !ctx.fastForward && ctx.hold) {
+    // The match on screen is the match (BAK-207; coach calls #73). The week
+    // holds here; the result and the rest of the week come at full time, from
+    // what the player watched (and called).
+    if (!ctx.fastForward && ctx.hold) {
       ctx.hold();
       const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], tick: resumed?.tick ?? 0 };
       writeLiveMatch(record);
@@ -232,20 +232,7 @@ export function registerPlayerMatchSystem(): void {
       });
       return;
     }
-    const sim = live ? runMatch(home, away, matchOpts) : simulateMatch(home, away, matchOpts);
-    const notifyResult = applyPlayerResult(fixture, home, away, sim);
-
-    if (ctx.fastForward) {
-      notifyResult();
-      return;
-    }
-    // Hold the result toast until playback reaches full-time (or is skipped) —
-    // announcing it at kick-off spoils the match.
-    const off = bus.on('match:finished', ({ fixture: done }) => {
-      if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
-      off();
-      notifyResult();
-    });
-    bus.emit('match:started', { fixture, sim, home, away });
+    // Fast-forward: the same match, headless.
+    applyPlayerResult(fixture, home, away, runMatch(home, away, matchOpts))();
   });
 }

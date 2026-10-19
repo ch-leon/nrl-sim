@@ -1,7 +1,7 @@
 // src/scenes/matchField.ts — Phaser-free geometry helpers for the isometric
 // match field (BAK-189, WU-11). Kept separate from MatchScene.ts so the pure math
 // is unit-testable under the node test env (Phaser can't import there).
-// MatchScene.ts re-exports these; playback, particles and the stadium art
+// MatchScene.ts re-exports these; the live view, particles and the stadium art
 // generators import them directly.
 //
 // Grid layout (continuous iso grid units; one tile = TILE_W × TILE_H diamond):
@@ -22,7 +22,7 @@ export const IN_GOAL_DEPTH = 3; // tiles of in-goal at each end
 export const PLAY_LONG = FIELD_LONG - 2 * IN_GOAL_DEPTH; // try-line to try-line (100m)
 /** Tiles per 10 metres along the field (mowing stripes + 10m lines). */
 export const TEN_METRES = PLAY_LONG / 10;
-/** Nines trial (BAK-206) — keep in sync with world/formation PLAYERS. */
+/** Nines trial (BAK-206) — ON_FIELD. */
 export const PLAYERS_PER_TEAM = 9;
 
 /** Parse a `#rrggbb` (or `#rgb`) hex colour to a 24-bit int. */

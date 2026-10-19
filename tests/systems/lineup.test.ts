@@ -8,10 +8,9 @@ import {
   resolveLineup, spotOf, statsAt, swapSpots,
 } from '../../src/systems/lineup';
 import { ROLES } from '../../src/match/league/roles';
-import { SLOTS } from '../../src/world/formation';
 import { POSITIONS, generatePlayerAround, overallRating } from '../../src/data/player';
 import { createNewGame } from '../../src/core/state';
-import { teamSheetFromSquad } from '../../src/sim/engine';
+import { teamSheetFromSquad } from '../../src/match/league/sheets';
 import { runMatch } from '../../src/match/league/match';
 import { LiveSim } from '../../src/match/league/live';
 import { makeRng } from '../../src/utils/rng';
@@ -33,9 +32,8 @@ function squad(first = 65, depth = 55): Player[] {
 
 
 describe('positional fit (pure)', () => {
-  it('the slots are the live sim’s roles and the classic formation’s slots, in order', () => {
+  it('the slots are the live sim’s roles, in order', () => {
     expect([...LINEUP_SLOTS]).toEqual(ROLES.map((r) => r.name));
-    expect([...LINEUP_SLOTS]).toEqual(SLOTS.map((s) => s.role));
     for (const pos of POSITIONS) expect(POSITION_SHORT[pos]).toMatch(/^[A-Z]{2}$/);
   });
   it('same ×1, related ×0.92, unrelated ×0.8, and symmetric', () => {

@@ -222,8 +222,8 @@ export interface GameState {
   freeAgents: Player[];
   league: LeagueState;
   weather?: WeatherKind; // set for current round by fixtures system
-  /** liveMatch: play your matches on the live match sim (BAK-207 2g, beta); off when absent. coachCalls: the call chips in a live match (#73); on when absent. */
-  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; liveMatch?: boolean; coachCalls?: boolean };
+  /** coachCalls: the call chips during your matches (#73); on when absent. (An old save's liveMatch flag is ignored: every match is live since BAK-207 Phase 4.) */
+  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean };
   history: SeasonRecord[];
   boardPatience: number; // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
   objectives: Objective[]; // this season's board objectives (#47)

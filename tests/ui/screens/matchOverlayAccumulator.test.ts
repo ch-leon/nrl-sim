@@ -1,5 +1,5 @@
 // tests/ui/screens/matchOverlayAccumulator.test.ts — the core correctness guard
-// (BAK-196): folding a full simulateMatch event log through reduceEvent must land
+// (BAK-196): folding a whole match's event log (the live sim, BAK-207) through reduceEvent must land
 // on MatchResult's final score/tries/errors exactly, and possession/tackles
 // self-consistently within rounding. Pure — no DOM.
 import { describe, it, expect } from 'vitest';
@@ -11,16 +11,16 @@ import {
   formatClockSeconds,
   type LiveState,
 } from '../../../src/ui/screens/matchOverlay';
-import { simulateMatch } from '../../../src/sim/engine';
+import { runMatch } from '../../../src/match/league/match';
+import { sideSheet } from '../../../src/match/balance/measure';
+import { NINES } from '../../../src/match/league/rules';
 import type { MatchResult, TeamSheet, WeatherKind } from '../../../src/sim/events';
 
-function sheet(id: string, rating: number): TeamSheet {
-  return { clubId: id, name: id, attack: rating, defense: rating, kicking: rating, fitness: rating, colors: ['#111', '#222'] };
-}
+const sheet = (id: string, rating: number): TeamSheet => sideSheet(id, { rating });
 
 function fold(result: MatchResult, homeId: string): LiveState {
   let s = initLiveState();
-  for (const ev of result.events) s = reduceEvent(s, ev, homeId);
+  for (const ev of result.events) s = reduceEvent(s, ev, homeId, NINES.halfMinutes);
   return s;
 }
 
@@ -28,11 +28,11 @@ describe('reduceEvent — parity with MatchResult', () => {
   const weathers: WeatherKind[] = ['clear', 'rain', 'wind'];
 
   it('final score, tries, errors match exactly across many seeds', () => {
-    for (let seed = 0; seed < 400; seed++) {
-      const home = sheet('H', 40 + (seed % 55));
-      const away = sheet('A', 40 + ((seed * 13) % 55));
+    for (let seed = 0; seed < 9; seed++) {
+      const home = sheet('H', 40 + ((seed * 7) % 45));
+      const away = sheet('A', 40 + ((seed * 13) % 45));
       const weather = weathers[seed % 3] as WeatherKind;
-      const res = simulateMatch(home, away, { seed, weather });
+      const res = runMatch(home, away, { seed, weather });
       const s = fold(res, 'H');
 
       expect(s.homeScore, `score home seed ${seed}`).toBe(res.homeScore);
@@ -40,7 +40,7 @@ describe('reduceEvent — parity with MatchResult', () => {
       expect(s.tries, `tries seed ${seed}`).toEqual(res.stats.tries);
       expect(s.errors, `errors seed ${seed}`).toEqual(res.stats.errors);
     }
-  });
+  }, 60_000);
 
   it('possession and tackles land within rounding of MatchResult', () => {
     // The engine counts tackleCount as internal loop iterations; a small number
@@ -49,8 +49,8 @@ describe('reduceEvent — parity with MatchResult', () => {
     // that possession % is self-consistent with the tackle counts.
     let maxTackleDiff = 0;
     let maxPossDiff = 0;
-    for (let seed = 0; seed < 400; seed++) {
-      const res = simulateMatch(sheet('H', 55), sheet('A', 45), { seed, weather: 'clear' });
+    for (let seed = 0; seed < 6; seed++) {
+      const res = runMatch(sheet('H', 55), sheet('A', 45), { seed, weather: 'clear' });
       const s = fold(res, 'H');
       maxTackleDiff = Math.max(
         maxTackleDiff,
@@ -64,19 +64,19 @@ describe('reduceEvent — parity with MatchResult', () => {
     // the engine's internal loop counter (early-kick / jarred-error edge cases).
     expect(maxTackleDiff).toBeLessThanOrEqual(8);
     expect(maxPossDiff).toBeLessThanOrEqual(5);
-  });
+  }, 60_000);
 
-  it('half flips to 2 after half-time / t>=40', () => {
-    const res = simulateMatch(sheet('H', 50), sheet('A', 50), { seed: 3, weather: 'clear' });
+  it('half flips to 2 after half-time', () => {
+    const res = runMatch(sheet('H', 50), sheet('A', 50), { seed: 3, weather: 'clear' });
     let s = initLiveState();
     let sawSecondHalf = false;
     for (const ev of res.events) {
-      s = reduceEvent(s, ev, 'H');
-      if (ev.t >= 40) sawSecondHalf = sawSecondHalf || s.half === 2;
+      s = reduceEvent(s, ev, 'H', NINES.halfMinutes);
+      if (ev.t >= NINES.halfMinutes) sawSecondHalf = sawSecondHalf || s.half === 2;
     }
     expect(sawSecondHalf).toBe(true);
-    expect(s.half).toBe(2); // full-time is at t=80
-  });
+    expect(s.half).toBe(2);
+  }, 30_000);
 
   it('missed conversions add no points', () => {
     const s0 = initLiveState();

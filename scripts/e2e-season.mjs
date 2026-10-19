@@ -359,7 +359,7 @@ async function play() {
     await tap('.nrl-kit-save');
   }, { quietToasts: true });
 
-  // A match on the classic engine: Advance Week hands over to the match scene.
+  // A match: Advance Week hands over to the match scene (the live sim since BAK-207 Phase 4).
   await step('match-classic', async () => {
     await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
@@ -392,7 +392,8 @@ async function play() {
   // the next match plays on the live sim and is watched through the overlay at ×8,
   // skipped to full time, and left by Back to Club; the overlay's score must be the
   // saved result. The setting stays on, so the rest of the season's matches run
-  // the live sim headless. Skipped when the setting isn't there.
+  // the live sim headless. Since the switch-over (BAK-207 Phase 4) there is no
+  // setting and every match is live.
   let liveOn = false;
   await step('live-toggle', async (rec) => {
     await tap('.nrl-nav .nrl-btn:has-text("Fixtures")');
@@ -400,7 +401,12 @@ async function play() {
     // Two toggles share the class and both mention a live match (hasText is a case-insensitive
     // substring match), so pick the "Live match (beta)" label by a case-sensitive regex.
     const box = page.locator('.nrl-live-toggle', { hasText: /Live match \(beta\)/ }).first().locator('input[type="checkbox"]');
-    if (!(await box.count())) return 'no live-match setting on the Fixtures screen';
+    // Since the switch-over (BAK-207 Phase 4) there is no setting: every match is live.
+    if (!(await box.count())) {
+      liveOn = true;
+      rec.notes.push('no setting: every match is live');
+      return;
+    }
     await press(box);
     liveOn = await page.evaluate(() => window.__nrlState?.().settings.liveMatch === true);
     if (!liveOn) throw new Error('the live-match setting did not turn on');

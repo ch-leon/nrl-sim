@@ -6,7 +6,8 @@ import {
   KIT_PATTERNS, type KitDesign,
 } from '../../../src/art/match/kit';
 import { drawPlayerFrame, LOOKS } from '../../../src/art/match/players';
-import { simulateMatch, teamSheetFromSquad } from '../../../src/sim/engine';
+import { teamSheetFromSquad } from '../../../src/match/league/sheets';
+import { runMatch } from '../../../src/match/league/match';
 import { createNewGame, getState } from '../../../src/core/state';
 
 afterEach(() => setKitDesign('player', null));
@@ -54,14 +55,14 @@ describe('kit designs', () => {
     expect(new Set(frames).size).toBe(KIT_PATTERNS.length);
   });
 
-  it('is purely cosmetic: the kit never changes simulateMatch', () => {
+  it('is purely cosmetic: the kit never changes the match', () => {
     createNewGame('Kit FC', 5);
     const s = getState();
     const home = teamSheetFromSquad(s.squad, 'player', 'Kit FC', ['#1a1a2e', '#f4d03f']);
     const away = teamSheetFromSquad(s.squad.slice().reverse(), 'rival-x', 'X', ['#c0392b', '#ffffff']);
-    const before = simulateMatch(home, away, { seed: 99, weather: 'clear' });
+    const before = runMatch(home, away, { seed: 99, weather: 'clear', length: { halves: 1, halfMinutes: 3 } });
     setKitDesign('player', design);
-    const after = simulateMatch(home, away, { seed: 99, weather: 'clear' });
+    const after = runMatch(home, away, { seed: 99, weather: 'clear', length: { halves: 1, halfMinutes: 3 } });
     expect(after).toEqual(before);
   });
 });

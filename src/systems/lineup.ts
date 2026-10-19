@@ -13,8 +13,8 @@ import { BENCH, DEFAULT_ROTATION, isRotation, type Rotation } from '../match/lea
 
 /**
  * The nine formation slots in order. The live sim's roles (match/league/roles.ts)
- * and the classic formation's SLOTS (world/formation.ts) share this order, so a
- * sheet built in it puts each man in the slot the coach picked him for.
+ * share this order, so a sheet built in it puts each man in the slot the coach
+ * picked him for.
  */
 export const LINEUP_SLOTS: readonly Position[] = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'];
 

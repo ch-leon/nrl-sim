@@ -58,15 +58,14 @@ src/
     aging.ts                 # season-rollover ageing + age retirement (GitHub #5)
     events.ts                # random events deck: draw, choices, modifiers (GitHub #75; cards in data/events.ts)
     rivals.ts                # rival squads: generation, signings, ageing/development, strength (GitHub #74)
-  match/                     # LIVE match sim (BAK-207) — replaces sim/engine + world/playback
+  match/                     # the match sim (BAK-207): every match the player plays or fast-forwards
     core/                    # sport-neutral: fixed-step clock, bodies, ball, snapshots, flag codes
-    league/                  # rugby league (Nines) rules, roles, tackle contest, tactics
-    view/                    # draws snapshots on MatchScene's sprites (interpolated)
+    league/                  # rugby league (Nines) rules, roles, tackle contest, tactics, team sheets, runMatch
+    view/                    # LivePlayback: plays the match on MatchScene's sprites (interpolated)
     lab/                     # /#lab dev page: teams/seed, play/pause/step/scrub, Flag
   sim/
-    engine.ts                # simulateMatch() core                   (WU-6 / BAK-191)
     events.ts                # MatchEvent types + MatchResult         (WU-6)
-    weather.ts               # weather + momentum modifiers           (WU-6 / BAK-198)
+    weather.ts               # weekly weather roll + momentum helpers (WU-6 / BAK-198)
     commentary.ts            # event → commentary text templates      (WU-12 / BAK-196)
   scenes/
     BootScene.ts             # texture generation, then start scenes  (WU-2)
@@ -77,7 +76,6 @@ src/
     camera.ts                # pan/zoom controller                    (WU-2 / BAK-159)
     path.ts                  # A* grid pathfinding                    (WU-2 / BAK-161)
     placement.ts             # facility placement controller          (WU-8 / BAK-178)
-    playback.ts              # match event timeline -> sprite anims   (WU-12 / BAK-194)
   ui/
     dom.ts                   # DOM helpers: panel(), button(), mount  (WU-5)
     hud.ts                   # money/week/season HUD                  (WU-5 / BAK-163)
@@ -210,14 +208,14 @@ export interface GameState {
 The lineup (GitHub #69, `systems/lineup.ts`): `{ starters: (playerId | null)[9]; bench:
 playerId[]; rotation: 'off' | 'standard' | 'heavy' }`, the starters in the formation's
 slot order (fullback, two wingers, centre, five-eighth, halfback, hooker, prop,
-second-row: the live sim's roles and the classic `SLOTS` agree). A man out of position
+second-row: the live sim's roles in `match/league/roles.ts`). A man out of position
 plays below his rating (same ×1, related ×0.92, unrelated ×0.8; tuning reference §21).
 Matchday resolves the saved lineup against the squad on the day: an injured starter is
 covered for that match by the best man for the slot (bench first, then the rest of the
 squad) with a line in the news, a man who has left the club is replaced in the saved
 lineup too. The sheet's roster is then the nine in slot order, each entry's `position`
-the slot he plays and his stats scaled by his fit, so the classic engine's actor picks,
-the live sim's slots and the match-screen looks all see the man the coach picked. Rival
+the slot he plays and his stats scaled by his fit, so the live sim's slots and the
+match-screen looks both see the man the coach picked. Rival
 coaches auto-pick by slot with the same fit. Old saves (v10 → v11) get today's auto pick.
 
 Rival squads (GitHub #74): every rival keeps a persistent `squad` (generated to match its
@@ -281,11 +279,11 @@ export interface Events {
 ```
 
 Week tick pipeline order (WU-4, fixed): 1) training gains → 2) injuries tick →
-3) economy (wages, income) → 4) match of the round (auto-sim or hand off to
-MatchScene) → 5) ladder update → 6) free agent pool refresh (every 4 weeks) →
+3) economy (wages, income) → 4) match of the round (headless on fast-forward, else
+hand off to MatchScene) → 5) ladder update → 6) free agent pool refresh (every 4 weeks) →
 7) autosave → 8) emit `week:advanced`.
 
-A live match (the "Live match (beta)" setting, coach calls #73) **holds the week** at
+The player's match (BAK-207; coach calls #73) **holds the week** at
 step 4: the matchday hook calls `ctx.hold()`, the hooks after it and the week's end
 wait, and at `match:finished` matchday applies the live sim's own result and calls
 `resumeWeek()`, so the ladder, finals seeding, morale and a season's end see the
@@ -303,61 +301,59 @@ ladder stays the regular-season finish. At rollover the GF winner is recorded in
 `history` (headless `runFinals` catch-up if the bracket is unfinished), and
 `season:ended` carries that entry to the season-end toast.
 
-## 6. Match simulation contract (src/sim/)
+## 6. Match simulation contract (src/match/, types in src/sim/events.ts)
+
+Every match the player's club plays is played on the live match sim (BAK-207,
+`docs/specs/BAK-207-live-match-sim.md`): eighteen bodies on a 20 Hz fixed-step
+clock, rugby league Nines rules, the tackle contest, tactics, traits, fatigue,
+weather and coach calls (rules and every knob: BAK-208 and
+`docs/specs/BAK-208-tuning.md`). Rival-vs-rival fixtures stay on the cheap
+score model in `systems/fixtures.ts`.
 
 ```ts
-export type WeatherKind = 'clear' | 'rain' | 'wind';
+// src/match/league/sheets.ts — what a side takes onto the field
+export function teamSheetFromSquad(players: Player[], clubId: string, name: string,
+  colors: [string, string], selection?: Selection): TeamSheet; // the coach's lineup (#69), else best fit nine + a bench of four
+export function teamSheetFromRival(club: RivalClub): TeamSheet; // strength-built, generated names
 
-export interface TeamSheet {                 // built from squad or rival strength
-  clubId: string; name: string;
-  attack: number; defense: number; kicking: number; fitness: number; // 1-100 aggregates
-  colors: [string, string];
-}
+// src/match/league/match.ts — a whole match, headless
+export function runMatch(home: TeamSheet, away: TeamSheet, opts: {
+  seed: number; weather?: WeatherKind; injuryRate?: number;
+  length?: MatchLength;                       // two NINES halves unless told
+  calls?: CallInput[];                        // coach calls by tick (#73)
+}): MatchResult;
 
+// src/sim/events.ts — event kinds the overlay, stats and FX read
 export type MatchEventKind =
   | 'kickoff' | 'set-start' | 'run' | 'break' | 'tackle' | 'big-hit'
   | 'fend' | 'break-tackle' | 'error' | 'penalty' | 'kick'
   | 'try' | 'conversion' | 'penalty-goal'
   | 'field-goal' | 'half-time' | 'full-time'
-  | 'sin-bin' | 'sin-bin-return';   // the live sim only (#71): named for the man binned
-// Kick flavour lives in MatchEvent.detail: find-touch | bomb | grubber | chip | 40-20.
-// Sets are SET_TACKLES (5) long; ON_FIELD is 9 per side (Nines trial, BAK-206).
+  | 'sin-bin' | 'sin-bin-return';   // (#71): named for the man binned
 
-export interface MatchEvent {
-  t: number;                   // match minute 0-80
-  kind: MatchEventKind;
-  teamId: string;              // acting team
-  player?: string;             // display name
-  x?: number; y?: number;      // field position 0-100 (length), 0-100 (width)
-  detail?: string;
-}
-
-export interface MatchInjury {
-  teamId: string; playerName: string; playerId?: string; weeks: number;
-}
-
+// src/sim/events.ts — the result every system reads (season, ladder, stats, overlay)
 export interface MatchResult {
   homeScore: number; awayScore: number;
-  events: MatchEvent[];
+  events: MatchEvent[];                       // t = match minute off the sim clock (0–18)
   stats: { possession: [number, number]; tackles: [number, number];
            errors: [number, number]; tries: [number, number] };
   weather: WeatherKind;
   momentumTimeline: { t: number; value: number }[]; // -100 (away) .. +100 (home)
-  injuries: MatchInjury[]; // big-hit rolls; matchday applies to squad (GitHub #7)
+  injuries: MatchInjury[];                    // matchday applies them at full time
 }
-
-export function simulateMatch(home: TeamSheet, away: TeamSheet,
-  opts: { seed: number; weather?: WeatherKind }): MatchResult;
 ```
 
-`simulateMatch` must be synchronous, < 50ms, and fully deterministic per seed.
-
-Inside the sim (callers' sheets are never mutated): the home side gets a small
-attack/defence nudge (GitHub #8 — equal teams win ~52–58% at home); from minute
-60, `fitness` scales error and break weights (50 = neutral, GitHub #6); a big-hit
-can injure the ball carrier vs their `injuryRisk` (GitHub #7). The engine only
-reports injuries — matchday applies `injuredWeeks` to the player's squad and
-announces them with the result toast at full-time.
+- **Deterministic:** a match is `{ seed, sheets, calls[] }`; the same three give the same
+  match, tick for tick. Any new dice roll reshuffles every seed's match, so changes are
+  judged on averages over many seeds (the balance harness, `balance/README.md`).
+- **One sim, two drivers:** `runMatch` plays to full time headless (fast-forward, the
+  balance harness, tests). `LivePlayback` (`src/match/view/`) runs the same `LiveSim` in a
+  `Runner` as the player watches, takes the coach's calls, and builds the result with the
+  same `MatchRecorder`, so the match on screen is exactly the match that counts.
+- **Cost:** a 2 × 9:00 match is 21,600 ticks, about 0.6 s headless in Node (0.3 s in
+  desktop Chromium); a fast-forwarded season of the player's matches is several seconds.
+- Callers' sheets are never mutated. The sim only reports injuries; matchday applies
+  `injuredWeeks` and announces them with the result at full time.
 
 ## 7. Rendering conventions
 
