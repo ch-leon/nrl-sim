@@ -138,6 +138,9 @@ async function boot(): Promise<void> {
 
   const g = new Phaser.Game(config);
   game = g;
+  // `?e2e` exposes the game to the end-to-end playthrough (scripts/e2e-season.mjs),
+  // which checks what the grounds actually draw. Nothing else reads it.
+  if (new URLSearchParams(location.search).has('e2e')) (window as unknown as { __nrlGame?: Phaser.Game }).__nrlGame = g;
   g.events.once(Phaser.Core.Events.READY, () => {
     if (portraitBlocked) g.loop.sleep();
   });
