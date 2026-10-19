@@ -203,7 +203,8 @@ export class LivePlayback {
   private onSimEvents(events: readonly SimEvent[]): void {
     const cur = this.runner.cur;
     for (const e of events) {
-      if (e.kind === 'coach-call' && !this.skipping) this.opts.overlay?.comment(e.text);
+      if ((e.kind === 'coach-call' || e.kind === 'call-paid') && !this.skipping) this.opts.overlay?.comment(e.text);
+      if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);
       const p = this.skipping ? null : popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups.show(p, e.side, e.slot);
