@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsAngleDeg, postsFor } from '../../../src/match/league/goals';
 import { LiveSim } from '../../../src/match/league/live';
+import { PENALTY } from '../../../src/match/league/penalties';
 import { NINES } from '../../../src/match/league/rules';
 import { applyTuning } from '../../../src/match/league/tuning';
 import { sideSheet } from '../../../src/match/balance/measure';
@@ -73,7 +74,9 @@ describe('conversions in the live sim', () => {
       for (const side of ['home', 'away'] as const) {
         const made = convs.filter((x) => x.e.side === side && x.e.detail === 'good').length;
         const bonus = tries.filter((x) => x.e.side === side && x.e.detail === 'bonus').length;
-        expect(sim.points[side]).toBe(sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made * NINES.conversionPoints);
+        const pens = events.filter((x) => x.e.kind === 'penalty-goal' && x.e.side === side && x.e.detail === 'good').length;
+        const fgs = events.filter((x) => x.e.kind === 'field-goal' && x.e.side === side && x.e.detail === 'good').length;
+        expect(sim.points[side]).toBe(sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made * NINES.conversionPoints + pens * PENALTY.goalPoints + fgs * NINES.fieldGoalPoints);
       }
     }
     expect(all).toBeGreaterThan(4);
@@ -104,7 +107,7 @@ describe('field goals in the live sim', () => {
       for (const side of ['home', 'away'] as const) {
         const made = (k: string): number => events.filter((x) => x.e.kind === k && x.e.side === side && x.e.detail === 'good').length;
         const bonus = events.filter((x) => x.e.kind === 'try' && x.e.side === side && x.e.detail === 'bonus').length;
-        expect(sim.points[side]).toBe(sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made('conversion') * NINES.conversionPoints + made('field-goal') * NINES.fieldGoalPoints);
+        expect(sim.points[side]).toBe(sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made('conversion') * NINES.conversionPoints + made('field-goal') * NINES.fieldGoalPoints + made('penalty-goal') * PENALTY.goalPoints);
       }
     }
     expect(drops.length).toBeGreaterThan(3);

@@ -61,7 +61,15 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   'on-full': { word: 'ON THE FULL!', tone: 'bad' },
   'dead-ball': { word: 'DEAD BALL', tone: 'neutral' },
   'drop-out': { word: 'DROP-OUT', tone: 'neutral' },
+  // Penalties (2e): over the man penalised; the captain's call over the taker; six again over the tackler.
+  penalty: { word: 'PENALTY!', tone: 'bad', big: true },
+  'six-again': { word: 'SIX AGAIN!', tone: 'attack' },
+  'penalty-choice': { word: 'TAP AND GO', tone: 'neutral' },
+  'penalty-goal': { word: 'GOAL!', tone: 'attack' },
 };
+
+/** The captain's call on a penalty (2e). */
+const CALL_WORDS: Readonly<Record<string, string>> = { goal: 'GOING FOR GOAL', tap: 'TAP AND GO', touch: 'FOR TOUCH' };
 
 /** A bust out of a wrestle (the defenders' grip went first) reads differently from one at contact. */
 const LATE_BUST = 'BROKE FREE!';
@@ -89,7 +97,7 @@ export function popupFor(e: SimEvent): Popup | null {
   const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
   // A kick at goal that misses reads as a miss, whichever kind it was.
-  if ((e.kind === 'conversion' || e.kind === 'field-goal') && e.detail === 'missed') {
+  if ((e.kind === 'conversion' || e.kind === 'field-goal' || e.kind === 'penalty-goal') && e.detail === 'missed') {
     return { word: 'MISSED!', sub: surnameOf(e.player).toUpperCase(), tone: 'bad', big: false, ms: POPUP_MS };
   }
   const big = w.big ?? false;
@@ -102,7 +110,9 @@ export function popupFor(e: SimEvent): Popup | null {
           ? 'BONUS TRY!'
           : e.kind === 'touch' && e.detail === 'bundled'
             ? 'INTO TOUCH!'
-            : w.word;
+            : e.kind === 'penalty-choice'
+              ? (CALL_WORDS[e.detail ?? 'tap'] ?? w.word)
+              : w.word;
   const p: Popup = { word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;

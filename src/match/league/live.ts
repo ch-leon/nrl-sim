@@ -25,7 +25,9 @@
 // Touch and dead ball (2d): the ball can go into touch or dead; the side that
 // touched it last loses it. Restarts are a play-the-ball 10 m in from touch, a
 // tap on the 20 or for a 40/20, or a goal-line drop-out.
-// Penalties and weather come later in Phase 2 (#86).
+// Penalties (2e): ruck offences give six again; offside and high shots give a
+// penalty, and the captain takes the shot, taps or kicks for touch.
+// Weather comes later in Phase 2 (#86).
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
@@ -50,6 +52,7 @@ import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, t
 import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
+import { PENALTY, choosePenalty, offsideChance } from './penalties';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
@@ -230,7 +233,8 @@ type Phase =
   | { kind: 'try'; t0: number; scorer: number }
   | { kind: 'half-time'; t0: number }
   | { kind: 'full-time' }
-  | { kind: 'conversion'; t0: number; side: Side; kicker: number; spot: Vec; readyAt: number; good: boolean | null }
+  | { kind: 'conversion'; t0: number; side: Side; kicker: number; spot: Vec; readyAt: number; good: boolean | null; what?: 'penalty' }
+  | { kind: 'penalty'; t0: number; side: Side; spot: Vec; kicker: number; kicked: boolean }
   | { kind: 'goal'; t0: number; side: Side };
 
 interface PendingKick {
@@ -334,6 +338,8 @@ export class LiveSim implements MatchSim {
   /** A field goal about to leave the boot, and one in the air (with how it will end). */
   private pendingGoal: { at: number; kicker: number } | null = null;
   private goalUp: { side: Side; kicker: number; good: boolean } | null = null;
+  /** A penalty kicked for touch, in the air (2e). */
+  private penaltyKickUp: { side: Side } | null = null;
   /** Tick the carrier crossed the line while going round for the bonus zone; -1 when he isn't. */
   private overLineAt = -1;
   /** Touch and dead ball (2d): the side that touched the ball last, the kick in play (where from and what for), and a bounce on its way out. */
@@ -573,6 +579,9 @@ export class LiveSim implements MatchSim {
       case 'set-piece':
         this.stepSetPiece(this.phase);
         break;
+      case 'penalty':
+        this.stepPenaltyKick(this.phase);
+        break;
       case 'goal':
         this.stepGoal(this.phase);
         break;
@@ -618,6 +627,7 @@ export class LiveSim implements MatchSim {
     const score = `${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`;
     this.pendingKick = null;
     this.outPending = null;
+    this.penaltyKickUp = null;
     if (this.half < this.length.halves) {
       this.emit('half-time', `Half-time: ${score}`);
       this.phase = { kind: 'half-time', t0: this.tick };
@@ -778,6 +788,18 @@ export class LiveSim implements MatchSim {
     const b = this.ball;
     if (this.goalUp) {
       if (b.kind === 'flight' && landed(b, this.tick)) this.resolveGoal();
+      return;
+    }
+    if (this.penaltyKickUp) {
+      // A penalty kicked for touch: out, and the same side taps 10 m in (2e).
+      if (b.kind === 'flight' && landed(b, this.tick)) {
+        const side = this.penaltyKickUp.side;
+        this.penaltyKickUp = null;
+        this.emit('touch', `${this.names[side]} find touch from the penalty`, this.players[this.lastKicker]);
+        this.events[this.events.length - 1]!.detail = 'penalty';
+        if (this.siren) this.endHalf();
+        else this.startSetPiece(side, touchRestartSpot(b.to), 'tap');
+      }
       return;
     }
     if (b.kind === 'flight') {
@@ -1168,6 +1190,13 @@ export class LiveSim implements MatchSim {
     }
     this.tackles++;
     this.kickCall = this.fgCall = null;
+    // Ruck offences (2e): a tackler holding down after a slow wrestle, or the defence slow off the ruck — six again.
+    const slowWrestle = w ? (this.tick - w.t0) * TICK_S >= WRESTLE.slowS : false;
+    if (this.rng.next() < PENALTY.ruckSixAgain + (slowWrestle ? PENALTY.holdDown : 0)) {
+      this.tackles = 0;
+      const t = this.players[ph.tackler]!;
+      this.emit('six-again', slowWrestle ? `Six again — ${t.name} holds on too long` : `Six again — ${this.names[t.side]} slow off the ruck`, t);
+    }
     const handover = this.tackles >= SET_TACKLES;
     this.mark = { ...c.body.pos };
     this.lineX = this.mark.x + this.dir * LIVE.onsideM;
@@ -1202,6 +1231,13 @@ export class LiveSim implements MatchSim {
         this.tackles = 0;
         this.lastPlay = false;
         this.lineX = this.mark.x + this.dir * LIVE.onsideM;
+      }
+      // Offside as the ball is played (2e): more likely in a defence that rushes up.
+      const defSide = other(this.attacking);
+      if (this.rng.next() < offsideChance(this.tactics[defSide].defence)) {
+        const culprit = [...this.side(defSide)].sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[1] ?? this.side(defSide)[0]!;
+        this.penalize(defSide, { ...this.mark }, `${culprit.name} is offside`, culprit, 'offside');
+        return;
       }
       const dh = this.at(this.attacking, HOOKER);
       const spot = this.dummyHalfSpot();
@@ -1482,11 +1518,90 @@ export class LiveSim implements MatchSim {
       return;
     }
     if (this.ball.kind !== 'flight' || !landed(this.ball, this.tick)) return;
-    if (ph.good) this.points[ph.side] += NINES.conversionPoints;
+    const pen = ph.what === 'penalty';
+    if (ph.good) this.points[ph.side] += pen ? PENALTY.goalPoints : NINES.conversionPoints;
     const score = `${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`;
-    this.emit('conversion', ph.good ? `${k.name} converts — ${score}` : `${k.name} misses the conversion`, k);
+    if (pen) this.emit('penalty-goal', ph.good ? `${k.name} kicks the penalty goal — ${score}` : `${k.name} misses the penalty goal`, k);
+    else this.emit('conversion', ph.good ? `${k.name} converts — ${score}` : `${k.name} misses the conversion`, k);
     this.events[this.events.length - 1]!.detail = ph.good ? 'good' : 'missed';
+    if (pen && !ph.good) {
+      // A missed penalty goal is dead: a 20 m restart for the defence.
+      const def = other(ph.side);
+      if (this.siren) this.endHalf();
+      else this.startSetPiece(def, twentySpot(this.dirOf(def), MID_Y), 'tap', FULLBACK);
+      return;
+    }
     this.afterScore(ph.side);
+  }
+
+  // ── Penalties (2e) ────────────────────────────────────────────────────────
+  /**
+   * `offender` concedes a penalty at `spot` (brought out to 10 m from the line).
+   * The captain's call (penalties.ts): the shot at goal, a tap, or a kick for
+   * touch — each said and shown. After the siren only the shot keeps the half alive.
+   */
+  private penalize(offender: Side, spot: Vec, why: string, culprit: Player, kind: string, trait?: string): void {
+    const award = other(offender);
+    const dir = this.dirOf(award);
+    this.emit('penalty', `Penalty to ${this.names[award]} — ${why}`, culprit, trait);
+    this.events[this.events.length - 1]!.detail = kind;
+    this.pendingKick = null;
+    this.kickFrom = null;
+    this.outPending = null;
+    this.overLineAt = -1;
+    const line = dir > 0 ? FIELD_LENGTH : 0;
+    const mark = clampToGround({ x: dir > 0 ? Math.min(spot.x, line - 10) : Math.max(spot.x, line + 10), y: spot.y }, 1);
+    const kicker = this.at(award, KICKER);
+    const halfS = this.length.halfMinutes * 60;
+    const halfLeftS = Math.max(0, halfS - this.clockTicks * TICK_S);
+    const choice = choosePenalty({
+      shotChance: goalChance(mark, postsFor(dir, FIELD_LENGTH, MID_Y), kicker.stats.skill, bootMult(kicker.traits).acc),
+      toLine: this.toLineFor(award, mark),
+      matchLeftS: (this.length.halves - this.half) * halfS + halfLeftS,
+      halfLeftS,
+      siren: this.siren,
+      margin: this.points[award] - this.points[offender],
+    });
+    if (this.siren && choice !== 'goal') {
+      this.endHalf();
+      return;
+    }
+    const say = { goal: `${this.names[award]} take the shot at goal`, tap: `${this.names[award]} tap and go`, touch: `${this.names[award]} kick for touch` } as const;
+    this.emit('penalty-choice', say[choice], kicker);
+    this.events[this.events.length - 1]!.detail = choice;
+    this.attacking = award;
+    this.dir = dir;
+    this.tackles = 0;
+    this.lastPlay = false;
+    this.kickCall = this.fgCall = null;
+    this.looseFor = null;
+    this.markers = [];
+    if (choice === 'tap') {
+      this.startSetPiece(award, mark, 'tap');
+      return;
+    }
+    this.ball = { kind: 'held', by: this.indexOf(kicker) };
+    this.phase = choice === 'goal'
+      ? { kind: 'conversion', t0: this.tick, side: award, kicker: this.indexOf(kicker), spot: mark, readyAt: 0, good: null, what: 'penalty' }
+      : { kind: 'penalty', t0: this.tick, side: award, spot: mark, kicker: this.indexOf(kicker), kicked: false };
+  }
+
+  /** A penalty kicked for touch: the kicker to the mark, then the ball out 25-odd metres downfield. */
+  private stepPenaltyKick(ph: Extract<Phase, { kind: 'penalty' }>): void {
+    if (ph.kicked) return;
+    const k = this.players[ph.kicker]!;
+    if (this.tick < ph.t0 + PENALTY.minTicks) return;
+    if (dist(k.body.pos, ph.spot) > 1 && this.tick < ph.t0 + PENALTY.maxTicks) return;
+    ph.kicked = true;
+    const dir = this.dirOf(ph.side);
+    const line = dir > 0 ? FIELD_LENGTH : 0;
+    const gain = PENALTY.touchGainM * bootMult(k.traits).dist;
+    const x = dir > 0 ? Math.min(k.body.pos.x + gain, line - 10) : Math.max(k.body.pos.x - gain, line + 10);
+    const y = k.body.pos.y < MID_Y ? -2 : FIELD_WIDTH + 2;
+    this.lock(k, 'kick', LIVE.kickLockTicks);
+    this.ball = kickFlight(k.body.pos, { x, y }, this.tick, null, 10);
+    this.lastKicker = ph.kicker;
+    this.penaltyKickUp = { side: ph.side };
   }
 
   /** Where a kick at goal comes down: just over the bar between the uprights, or wide of one. */
@@ -1685,6 +1800,14 @@ export class LiveSim implements MatchSim {
       }
       default:
         break;
+    }
+    // A high shot (2e): rare, more from a Hothead — a penalty.
+    const hot = traitBoost(t.traits, 'hothead');
+    if (this.rng.next() < PENALTY.highShot + PENALTY.highShotHothead * hot) {
+      this.lock(c, 'tackled', LIVE.contactTicks + LIVE.downTicks);
+      this.lock(t, 'tackle', LIVE.contactTicks);
+      this.penalize(t.side, { ...c.body.pos }, `${t.name} — high shot`, t, 'high', hot > 0 ? announce(t.traits.find((x) => x.id === 'hothead')) : undefined);
+      return;
     }
     // Held or smashed on the touchline: bundled into touch (2d).
     const nearTouch = Math.min(c.body.pos.y, FIELD_WIDTH - c.body.pos.y) < TOUCH.bundleNearM;
@@ -1939,6 +2062,17 @@ export class LiveSim implements MatchSim {
       for (const p of this.players) {
         p.target = { ...p.body.pos };
         p.through = false;
+      }
+      return;
+    }
+    if (ph.kind === 'penalty') {
+      // A penalty kicked for touch: the kicker to the mark, his side behind it, the defence 10 m back.
+      for (const p of this.players) {
+        const role = ROLES[p.slot]!;
+        p.through = false;
+        if (this.indexOf(p) === ph.kicker) p.target = { ...ph.spot };
+        else if (p.side === ph.side) p.target = formationTarget(role, ph.spot, this.dir, true);
+        else p.target = formationTarget(role, ph.spot, this.dir, false);
       }
       return;
     }

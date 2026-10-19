@@ -8,6 +8,7 @@ import { FIELD_LENGTH, IN_GOAL, outOfBounds } from '../../../src/match/core/fiel
 import { grubberFlight, flightAt, landed } from '../../../src/match/core/ball';
 import { toMatchEvent } from '../../../src/match/league/events';
 import { popupFor } from '../../../src/match/view/popups';
+import { applyTuning } from '../../../src/match/league/tuning';
 import type { TeamSheet } from '../../../src/sim/events';
 import type { SimEvent, Snapshot } from '../../../src/match/core/snapshot';
 
@@ -91,7 +92,10 @@ describe('the last-tackle call (pure)', () => {
 });
 
 describe('kicks in the live sim', () => {
+  // The kicking game on its own: no penalties or six-agains (2e) cutting sets short.
+  const restore = applyTuning({ 'penalty.ruckSixAgain': 0, 'penalty.holdDown': 0, 'penalty.offside.slide': 0, 'penalty.offside.rush': 0, 'penalty.offside.compressed': 0, 'penalty.highShot': 0, 'penalty.highShotHothead': 0 });
   const { es } = events(24, 180);
+  restore();
   const kicks = es.filter((e) => e.kind === 'kick');
   const byKind = (d: string): number => kicks.filter((e) => e.detail === d).length;
 
