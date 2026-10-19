@@ -125,8 +125,10 @@ export class MatchActor implements PlaybackActor {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly atlas: string;
-  private readonly look: number;
+  private look: number;
   private current = '';
+  /** Whose look this is (live sim: a slot's player changes at an interchange). */
+  private wearing: string | null = null;
 
   constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string) {
     this.atlas = atlas;
@@ -139,6 +141,14 @@ export class MatchActor implements PlaybackActor {
   place(x: number, y: number, depth: number): void {
     this.sprite.setPosition(x, y).setDepth(depth);
     this.shadow.setPosition(x, y);
+  }
+
+  /** Wear a player's own look (#21) by squad id or name; the next play() switches the sprite to it. */
+  wear(who: string): void {
+    if (who === this.wearing) return;
+    this.wearing = who;
+    this.look = lookForPlayer(who);
+    this.current = '';
   }
 
   play(anim: PlayerAnim, faceLeft: boolean, timeScale: number): void {

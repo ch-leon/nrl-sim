@@ -6,6 +6,7 @@ import { decodeFlag, encodeFlag } from '../core/flag';
 import { isTraitMode, type TraitMode } from './sheets';
 import { isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
 import { isLegs, type Legs } from '../league/fatigue';
+import { DEFAULT_ROTATION, isRotation, type Rotation } from '../league/bench';
 
 /** Per-side preset overrides for the lab; a missing field keeps the club's own style. */
 export interface LabTactics {
@@ -28,9 +29,11 @@ export interface LabParams {
   tactics: LabTactics;
   /** Legs (BAK-208 §8): start fresh, as in the last ten minutes, or cooked. */
   legs: Legs;
+  /** Bench (BAK-207 2b): how hard both coaches rotate; standard when absent. */
+  bench?: Rotation;
 }
 
-export type LabSimFactory = (home: string, away: string, seed: number, traits: TraitMode, tactics: LabTactics, legs: Legs) => MatchSim;
+export type LabSimFactory = (home: string, away: string, seed: number, traits: TraitMode, tactics: LabTactics, legs: Legs, bench: Rotation) => MatchSim;
 
 export const LAB_HASH = '#lab';
 export const DEFAULT_SEED = 1;
@@ -43,7 +46,8 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
   const traits: TraitMode = isTraitMode(sp.get('traits')) ? (sp.get('traits') as TraitMode) : 'gen';
   const tactics = parseTactics(sp);
   const legs: Legs = isLegs(sp.get('legs')) ? (sp.get('legs') as Legs) : 'fresh';
-  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics, legs };
+  const bench: Rotation = isRotation(sp.get('bench')) ? (sp.get('bench') as Rotation) : DEFAULT_ROTATION;
+  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics, legs, bench };
   const seed = Number(sp.get('seed'));
   const tick = Number(sp.get('tick'));
   return {
@@ -55,6 +59,7 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
     traits,
     tactics,
     legs,
+    bench,
   };
 }
 
@@ -71,7 +76,7 @@ function parseTactics(sp: URLSearchParams): LabTactics {
   return { home: side('hatk', 'hdef'), away: side('aatk', 'adef') };
 }
 
-export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics; legs?: Legs }): string {
+export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics; legs?: Legs; bench?: Rotation | undefined }): string {
   const sp = new URLSearchParams({ seed: String(p.seed), home: p.home, away: p.away });
   if (p.tick) sp.set('tick', String(p.tick));
   if (p.traits && p.traits !== 'gen') sp.set('traits', p.traits);
@@ -81,6 +86,7 @@ export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: 
   if (t.away.attack) sp.set('aatk', t.away.attack);
   if (t.away.defence) sp.set('adef', t.away.defence);
   if (p.legs && p.legs !== 'fresh') sp.set('legs', p.legs);
+  if (p.bench && p.bench !== DEFAULT_ROTATION) sp.set('bench', p.bench);
   return `${LAB_HASH}?${sp.toString()}`;
 }
 
@@ -94,7 +100,7 @@ export class LabController {
 
   constructor(factory: LabSimFactory, params: LabParams) {
     this.params = { ...params };
-    this.runner = new Runner((seed) => factory(params.home, params.away, seed, params.traits, params.tactics, params.legs), params.seed);
+    this.runner = new Runner((seed) => factory(params.home, params.away, seed, params.traits, params.tactics, params.legs, params.bench ?? DEFAULT_ROTATION), params.seed);
     if (params.tick > 0) this.runner.seek(params.tick);
   }
 
@@ -142,6 +148,6 @@ export class LabController {
 
   /** The URL hash that reopens the lab on these teams and seed (and this tick). */
   hash(withTick = false): string {
-    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, legs: this.params.legs, ...(withTick ? { tick: this.runner.tick } : {}) });
+    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, legs: this.params.legs, bench: this.params.bench, ...(withTick ? { tick: this.runner.tick } : {}) });
   }
 }

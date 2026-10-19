@@ -277,7 +277,7 @@ restart). Everything he spends is × his **drain rate**: 1.5 − Stamina/100, cl
 | **Spent** < 20% | −20% | −10% / −10% · +6% | −8% / +4% |
 
 A player going under 20% is announced once (**COOKED!**, "… is cooked"; renamed from GASSED! with F2, where gas is the sprint tank) until he
-is back over 30%. Interchanges (#70) answer it later; until then it shapes the last minutes.
+is back over 30%. Half-time and interchanges (BAK-207 2a, 2b) give legs back (§8.2).
 
 Measured (8 seeds × 18 min, 60-rated sheets): at Stamina 50 a side's average legs are
 88 / 78 / 67 / 55 / 44 / 32% at 3 / 6 / 9 / 12 / 15 / 18 min — tired for the last two or
@@ -389,9 +389,12 @@ runs dry.
   he has lost** (40% → 70%), gas full (to his legs). Over whole matches even sides now
   end on about 52% legs instead of 35%, and stamina 30 v 80 on 36% / 69% instead of
   23% / 63% (tuning reference §13).
-- **Interchange** (#70): a benched player recovers **5% a minute, up to 90%**, never
-  back to fresh within a match. Taken off at 40% and back on after 4 minutes, he
-  returns at 60%.
+- **Interchange** — *implemented in BAK-207 2b* (#70): a benched player recovers **5% a
+  minute, up to 90%**, never back to fresh within a match. Taken off at 40% and back on
+  after 4 minutes, he returns at 60%. The coach's rotation (off / standard / heavy) swaps
+  the most tired men after a try; with a standard bench even sides end on about 70% legs
+  instead of 52%, and the Stamina 30 side against Stamina 80 on 56% / 71% (it now wins
+  one match in ten instead of none) (tuning reference §14).
 - **Stoppages** keep F's slow recovery.
 
 **Stats, after F2:** Speed is how fast a player can go; Stamina is how long he can go
@@ -408,7 +411,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | D | Zone tactics and presets | §5 |
 | E | Kick types, catches, scrambles | §4.3–4.4 |
 | F | Fatigue and the wrestle — *shipped* | §8 |
-| F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with #70) | §8.2 |
+| F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with 2b) | §8.2 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 

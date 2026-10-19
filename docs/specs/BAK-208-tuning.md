@@ -248,3 +248,30 @@ even sides. Tries, breaks, tackles and kicks barely move. With four-point tries 
 30% of even matches are drawn; conversions (2c) will split most of them.
 
 Tests: `tests/match/league/match.test.ts`.
+
+## 14. Interchanges (BAK-207 §5.1, 2b; BAK-208 §8.2)
+
+Each side carries a bench of up to four (`TeamSheet.bench`) and a rotation policy
+(`TeamSheet.rotation`: off, standard, heavy; standard by default). After a try the coach
+takes off his most tired men, most tired first, each for the freshest bench man who is
+fresh enough; each jogs to the nearest touchline and the fresh man jogs on from there. At half-time swaps happen in the
+sheds after the break's recovery. A tired start finds the bench rested at `recoverCap`.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `bench.size` | `src/match/league/bench.ts` | 4 | Players a sheet's bench holds. |
+| `bench.recoverPerMin` / `bench.recoverCap` | `bench.ts` | 0.05 / 0.9 | A benched man's legs come back 5% a minute, up to 90%. |
+| `bench.jogOffS` | `bench.ts` | 12 s | The man coming off gets this long to reach the touchline; after that the swap is made where he stands. |
+| `bench.standard.offBelow` / `.gain` / `.perStoppage` | `bench.ts` | 0.55 / 0.15 / 2 | Standard rotation: off under 55% legs, for a man at least 15% fresher, two at a time. |
+| `bench.heavy.offBelow` / `.gain` / `.perStoppage` | `bench.ts` | 0.7 / 0.1 / 3 | Heavy rotation: off under 70%, 10% fresher, three at a time. |
+
+Rival benches are rolled 3 points under the club's starters (`teamSheetFromRival`).
+
+Measured (20 whole matches a row, flat 60-rated squads): legs at full time 52% with no
+benches, 70% on standard (about 5.6 swaps a match, both sides), 75% on heavy (about 15);
+heavy against no bench ends 70% / 53% and wins 55% of matches (10% drawn). Stamina 30 v 80
+goes from 36% / 69% legs and no wins to 56% / 71% and one win in ten on standard benches
+(61% / 71% with the Stamina 30 side on heavy); COOKED! all but disappears. Tackles, breaks
+and kicks barely move; tries between even sides 5.6 → 6.1.
+
+Tests: `tests/match/league/bench.test.ts`.

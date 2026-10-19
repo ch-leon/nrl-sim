@@ -34,7 +34,11 @@ export function labSheet(clubId: string, traits: TraitMode = 'gen', tactics: Par
   const base = teamSheetFromRival(club);
   const sheet: TeamSheet = { ...base, tactics: { ...(base.tactics ?? { attack: 'balanced', defence: 'slide' }), ...stripUndefined(tactics) } };
   if (traits === 'gen' || !sheet.roster) return sheet;
-  return { ...sheet, roster: sheet.roster.map((r, i) => withMode(r, traits, `${club.id}:${i}`)) };
+  return {
+    ...sheet,
+    roster: sheet.roster.map((r, i) => withMode(r, traits, `${club.id}:${i}`)),
+    ...(sheet.bench ? { bench: sheet.bench.map((r, i) => withMode(r, traits, `${club.id}:bench:${i}`)) } : {}),
+  };
 }
 
 function stripUndefined(t: Partial<TeamTactics>): Partial<TeamTactics> {

@@ -16,6 +16,8 @@ export interface PlayerSnap {
   headX: number;
   /** Ground speed m/s (drives run-cycle rate). */
   speed: number;
+  /** Who is in this slot (squad id or name), when the sim can swap players: the look he wears. */
+  who?: string;
   /** Sprint and gas (BAK-208 §8.2): going flat out this tick, ran his gas dry, gas left 0..1. */
   sprint?: boolean;
   blown?: boolean;

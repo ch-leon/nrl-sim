@@ -76,7 +76,9 @@ somewhere else.
 - **Sides**: either a flat squad (`rating` for every stat, `stats` to override some)
   or a league `club`'s generated roster. `tactics` takes `attack` (grind, balanced,
   expansive, kick-chase, all-out) and `defence` (slide, rush, compressed). `traits`:
-  `none` (flat squads' default), `gen` (clubs' default), `stars`.
+  `none` (flat squads' default), `gen` (clubs' default), `stars`. `bench` is how many
+  interchange players (0–4, default 4; a flat squad's bench has its stats) and
+  `rotation` how hard the coach uses them: `off`, `standard` (default), `heavy`.
 - **Scenario extras**: `legs` (`fresh`, `late`, `spent` or 0..1) and its own `minutes`
   (a stretch instead of a whole match, e.g. the last 8 minutes on tired legs).
 - **base**: overrides under every variant, baseline included.

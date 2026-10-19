@@ -10,6 +10,8 @@ import type { PlayerAnim } from '../../art/match/players';
 export interface ActorView {
   place(x: number, y: number, depth: number): void;
   play(anim: PlayerAnim, faceLeft: boolean, timeScale: number): void;
+  /** Wear this player's look (an interchange put someone new in the slot). */
+  wear?(who: string): void;
 }
 
 export interface BallView {
@@ -50,6 +52,7 @@ export class LiveView {
       const p = prev.players[i] ?? c;
       const actor = this.s.players[c.side][c.slot];
       if (!actor) continue;
+      if (c.who !== undefined) actor.wear?.(c.who);
       const f = toFieldPt({ x: p.x + (c.x - p.x) * a, y: p.y + (c.y - p.y) * a });
       const w = snap(this.s.fieldToWorld(f.fx, f.fy));
       // Feet y is the iso sort key; a tiny per-slot bias stops z-fighting flicker.

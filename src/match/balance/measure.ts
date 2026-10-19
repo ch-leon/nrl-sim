@@ -16,12 +16,13 @@ import type { Cell, SideSpec } from './plan';
 
 export const MATCH_MINUTES = 18;
 const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
+const BENCH_POSITIONS = ['prop', 'second-row', 'centre', 'halfback'] as const;
 
 /** Count metrics, per match (or per 18 minutes of a shorter stretch). */
 export const COUNTS = [
   'tackles', 'bigHits', 'busts', 'lateBusts', 'fends', 'steps', 'breaks', 'offloads', 'errors', 'kicks', 'tries',
   'intercepts', 'strips', 'quickPtb', 'slowPtb', 'gassed', 'wrestles', 'held1', 'held2', 'held3',
-  'runDowns', 'blown',
+  'runDowns', 'blown', 'subs',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -52,21 +53,21 @@ export interface CellResult {
 /** A team sheet for one side of a scenario. */
 export function sideSheet(id: string, spec: SideSpec): TeamSheet {
   const tactics = { ...DEFAULT_TACTICS, ...(spec.tactics ?? {}) };
+  const bench = spec.bench ?? 4;
+  const rotation = spec.rotation ?? 'standard';
   if (spec.club) {
     const s = labSheet(spec.club, spec.traits ?? 'gen', spec.tactics ?? {});
-    return { ...s, clubId: `${s.clubId}:${id}` };
+    return { ...s, clubId: `${s.clubId}:${id}`, bench: (s.bench ?? []).slice(0, bench), rotation };
   }
   const r = spec.rating ?? 60;
-  const roster: RosterEntry[] = POSITIONS.map((position, i) => {
-    const entry: RosterEntry = {
-      name: `${id} ${position} ${i}`,
-      position,
-      stats: { speed: r, strength: r, stamina: r, skill: r, footyIQ: r, ...(spec.stats ?? {}) },
-    };
-    if (spec.traits === 'stars') entry.traits = starTraits(position, `${id}:${i}`);
-    return entry;
-  });
-  return { clubId: id, name: id, attack: r, defense: r, kicking: r, fitness: r, colors: ['#111', '#eee'], roster, tactics };
+  const entry = (position: RosterEntry['position'], name: string, key: string): RosterEntry => {
+    const e: RosterEntry = { name, position, stats: { speed: r, strength: r, stamina: r, skill: r, footyIQ: r, ...(spec.stats ?? {}) } };
+    if (spec.traits === 'stars') e.traits = starTraits(position, key);
+    return e;
+  };
+  const roster = POSITIONS.map((position, i) => entry(position, `${id} ${position} ${i}`, `${id}:${i}`));
+  const reserves = BENCH_POSITIONS.slice(0, bench).map((position, i) => entry(position, `${id} bench ${position} ${i}`, `${id}:bench:${i}`));
+  return { clubId: id, name: id, attack: r, defense: r, kicking: r, fitness: r, colors: ['#111', '#eee'], roster, bench: reserves, rotation, tactics };
 }
 
 const LATE = (e: SimEvent): boolean => e.kind === 'break-tackle' && e.detail === 'wrestle';
@@ -129,6 +130,9 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         break;
       case 'blown':
         c.blown++;
+        break;
+      case 'interchange':
+        c.subs++;
         break;
       default:
         break;

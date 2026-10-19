@@ -32,13 +32,13 @@ describe('lab hash', () => {
     expect(isLabHash('')).toBe(false);
   });
   it('parses defaults, explicit params and a flag', () => {
-    expect(parseLabHash('#lab', DEF)).toEqual({ seed: 1, home: 'crushers', away: 'larrikins', tick: 0, note: '', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh' });
-    expect(parseLabHash('#lab?seed=77&home=a&away=b&tick=120', DEF)).toEqual({ seed: 77, home: 'a', away: 'b', tick: 120, note: '', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh' });
+    expect(parseLabHash('#lab', DEF)).toEqual({ seed: 1, home: 'crushers', away: 'larrikins', tick: 0, note: '', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh', bench: 'standard' });
+    expect(parseLabHash('#lab?seed=77&home=a&away=b&tick=120', DEF)).toEqual({ seed: 77, home: 'a', away: 'b', tick: 120, note: '', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh', bench: 'standard' });
     expect(parseLabHash('#lab?seed=-4&tick=x', DEF)).toMatchObject({ seed: 1, tick: 0 });
     const ctrl = new LabController(fake, { seed: 5, home: 'a', away: 'b', tick: 0, note: '', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh' });
     ctrl.seek(42);
     const code = ctrl.flag('late tackle');
-    expect(parseLabHash(`#lab?flag=${encodeURIComponent(code)}`, DEF)).toEqual({ seed: 5, home: 'a', away: 'b', tick: 42, note: 'late tackle', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh' });
+    expect(parseLabHash(`#lab?flag=${encodeURIComponent(code)}`, DEF)).toEqual({ seed: 5, home: 'a', away: 'b', tick: 42, note: 'late tackle', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh', bench: 'standard' });
   });
   it('round-trips through labHash', () => {
     const h = labHash({ seed: 9, home: 'a', away: 'b', tick: 30 });
@@ -49,6 +49,8 @@ describe('lab hash', () => {
     expect(labHash({ seed: 9, home: 'a', away: 'b', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh' })).not.toContain('traits');
     expect(labHash({ seed: 9, home: 'a', away: 'b', legs: 'fresh' })).not.toContain('legs');
     expect(parseLabHash(labHash({ seed: 9, home: 'a', away: 'b', legs: 'late' }), DEF).legs).toBe('late');
+    expect(parseLabHash(labHash({ seed: 9, home: 'a', away: 'b', bench: 'heavy' }), DEF).bench).toBe('heavy');
+    expect(labHash({ seed: 9, home: 'a', away: 'b', bench: 'standard' })).not.toContain('bench');
     expect(parseLabHash('#lab?legs=bogus', DEF).legs).toBe('fresh');
     expect(parseLabHash(labHash({ seed: 9, home: 'a', away: 'b', traits: 'stars' }), DEF)).toMatchObject({ traits: 'stars' });
     expect(parseLabHash('#lab?traits=bogus', DEF).traits).toBe('gen');
