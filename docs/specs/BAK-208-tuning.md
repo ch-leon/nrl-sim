@@ -235,7 +235,7 @@ side that received the opening kick-off kicks off the second half.
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `rules.halfMinutes` | `src/match/league/rules.ts` | 9 | Length of each half (minutes of sim time). |
-| `rules.tryPoints` | `rules.ts` | 4 | Points for a try. Conversions, penalty goals and field goals come later in Phase 2. |
+| `rules.tryPoints` / `rules.conversionPoints` / `rules.fieldGoalPoints` | `rules.ts` | 4 / 2 / 1 | Points for a try, a conversion and a field goal (penalty goals come with 2e). |
 | `rules.halfTimeTicks` | `rules.ts` | 60 (3 s) | The break on screen before the second-half kick-off. |
 | `rules.halfTimeLegsBack` | `rules.ts` | 0.5 | At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2); his gas tank is filled to his legs. |
 | `rules.playOnMaxS` | `rules.ts` | 60 s | After the siren, the half ends at the next dead ball or after this long, whichever is first. |
@@ -277,3 +277,36 @@ wins 25% (35% drawn) against 10%. COOKED! all but disappears and late busts halv
 Tackles, breaks and kicks barely move; tries between even sides 5.6 → 6.1.
 
 Tests: `tests/match/league/bench.test.ts`.
+
+## 15. Goal kicking (BAK-207 §5.1, 2c; BAK-208 §4.4)
+
+Every try is followed by a conversion: a Nines drop kick by the scoring side's kicker
+(slot 5), taken in line with where the try was grounded and as far back as makes the
+posts widest (√(near × far upright offsets), between 10 and 35 m). The clock is stopped.
+A kick at goal goes over when its sideways error, normal with a spread of `errorDeg` ×
+(1 + metres × `errorPerM`) × (1 − (Skill − 60) × `errorPerSkill`) × Big Boot's accuracy
+multiplier, falls inside half the angle the uprights make from the spot. Field goals: in
+the last `fieldGoalLastS` of the match, with the kicker's side level or a point behind,
+when he has the ball within `fieldGoalRangeM` of the posts on tackle 3 or later, he goes
+for it `fieldGoalChance` of the time (decided once a set); `chargeDown` of them are
+blocked. A miss is a dead ball: the defence restarts with a tap on their 20 (a stand-in
+until 2d's dead-ball restarts).
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `goals.halfPosts` | `src/match/league/goals.ts` | 2.75 m | Half the gap between the uprights. |
+| `goals.errorDeg` / `goals.errorPerM` / `goals.errorPerSkill` | `goals.ts` | 5° / 1/40 per m / 1.2% per Skill point | The kick's sideways error (one standard deviation). |
+| `goals.minBackM` / `goals.maxBackM` | `goals.ts` | 10 / 35 m | How far out a conversion is taken. |
+| `goals.conversionTicks` / `goals.conversionMaxTicks` | `goals.ts` | 30 / 160 | Lining it up once on the spot (1.5 s); the longest the conversion waits for him. |
+| `goals.fieldGoalLastS` | `goals.ts` | 180 s | Field goals only in the last three minutes of the match. |
+| `goals.fieldGoalMargin.0` / `.1` | `goals.ts` | −1 / 0 | …with the kicker's side level or a point behind. |
+| `goals.fieldGoalRangeM` / `goals.fieldGoalFromTackle` | `goals.ts` | 30 m / 3 | …within 30 m of the posts, on tackle 3 or later. |
+| `goals.fieldGoalChance` | `goals.ts` | 0.7 | How often he goes for it when it is on (once a set). |
+| `goals.chargeDown` | `goals.ts` | 8% | A field goal charged down: a loose ball. |
+| `goals.goalTicks` | `goals.ts` | 30 | The celebration after a field goal before the restart. |
+
+Odds from a conversion spot at Skill 60 (Skill 80 / Big Boot I): under the posts 99%;
+grounded 9 m off centre 81% (92 / 88); 14 m off 55% (68 / 63); 20 m off 36% (46 / 41);
+in the corner 19–25%. Field goal straight in front: 70% from 20 m, 56% from 25 m.
+
+Tests: `tests/match/league/goals.test.ts`.

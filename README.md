@@ -38,7 +38,8 @@ the match from the kick-off on the same seed.
 `#lab?legs=late`, `legs=spent`); a bar over a tackled carrier shows the wrestle (§8.1).
 **Bench** sets how hard both coaches rotate their four interchange players (off,
 standard, heavy; `#lab?bench=heavy`): after a try the most tired men jog off and fresh
-ones jog on (**ON!**).
+ones jog on (**ON!**). Every try is followed by a drop-kick conversion (**GOAL!** or
+**MISSED!**), and late in a close match the kicker drops for a **FIELD GOAL!**.
 The lab plays a whole Nines match: two 9:00 halves with the clock and score in the
 label, half-time and full time; **⏩** skips to the next break. Speed streaks mark
 anyone sprinting, and a thin gas bar sits under the carrier and whoever is sprinting
