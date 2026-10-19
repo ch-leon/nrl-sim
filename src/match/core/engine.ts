@@ -63,6 +63,10 @@ export class Runner {
   get seed(): number {
     return this._seed;
   }
+  /** The sim being run (the lab asks it which coach calls it would take now). */
+  get current(): MatchSim {
+    return this.sim;
+  }
   get tick(): number {
     return this.sim.tick;
   }

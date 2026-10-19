@@ -12,6 +12,7 @@ import type { LabTactics } from './controller';
 import { statsLine, statsWindow } from './stats';
 import { LEGS, isLegs, type Legs } from '../league/fatigue';
 import { DEFAULT_ROTATION, ROTATIONS, isRotation, type Rotation } from '../league/bench';
+import { CALL_LABEL, COACH_CALLS, type CoachCall } from '../league/calls';
 
 const TRAIT_MODE_LABEL: Readonly<Record<TraitMode, string>> = { gen: 'as rolled', none: 'none', stars: 'all superstars' };
 const LEGS_LABEL: Readonly<Record<Legs, string>> = { fresh: 'fresh', late: 'last 10 min', spent: 'cooked' };
@@ -35,6 +36,8 @@ export class LabPanel {
   private readonly log: HTMLElement;
   private readonly stats: HTMLElement;
   private readonly speedBtns: HTMLButtonElement[];
+  private readonly callBtns: HTMLButtonElement[];
+  private readonly callSide: () => 'home' | 'away';
   private scrubbing = false;
   private lastLogged = -1;
   private lastStatsTick = -1;
@@ -117,7 +120,7 @@ export class LabPanel {
     const go = button('Go', () => {
       const s = Math.max(1, Math.floor(Number(seed.value) || 1));
       const mode = isTraitMode(traits.value) ? traits.value : 'gen';
-      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf() });
+      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf(), ...(p.calls ? { calls: true } : {}) });
     });
     // Any setup change applies at once: the match restarts from the kick-off on the same seed.
     for (const s of [home, away, seed, traits, legs, bench, wx, hAtk, hDef, aAtk, aDef]) s.addEventListener('change', () => go.click());
@@ -165,13 +168,29 @@ export class LabPanel {
     const load = button('Load', () => {
       const f = decodeFlag(codeIn.value);
       if (!f) return hooks.notify('Not a valid Flag code');
-      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf() });
+      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf(), ...(p.calls ? { calls: true } : {}) });
     });
 
     // Event feed: the last few things that happened; tap one to jump back to it.
     this.log = el('div', { class: 'nrl-lab-log' });
     // Stats strip: what the last five minutes produced, so balance is seen.
     this.stats = el('div', { class: 'nrl-lab-stats' });
+
+    // Coach calls (#73, `calls=1`): a chip per call for the side picked; greyed with the reason when it can't be made now.
+    const callSide = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Which coach makes the call' } });
+    for (const sd of ['home', 'away'] as const) callSide.append(el('option', { text: sd === 'home' ? 'H coach' : 'A coach', attrs: { value: sd } }));
+    const sideOf = (): 'home' | 'away' => (callSide.value === 'away' ? 'away' : 'home');
+    this.callBtns = COACH_CALLS.map((c) => {
+      const b = button(CALL_LABEL[c], () => {
+        const why = ctrl.call(sideOf(), c);
+        hooks.notify(why ? `${CALL_LABEL[c]}: ${why}` : `${CALL_LABEL[c]} called`);
+        this.sync();
+      }, { class: 'nrl-lab-mini' });
+      b.setAttribute('data-call', c);
+      return b;
+    });
+    this.callSide = sideOf;
+    const callsRow = p.calls ? [el('div', { class: 'nrl-lab-row nrl-lab-calls' }, callSide, ...this.callBtns)] : [];
 
     const collapse = button('–', () => {
       const on = this.root.toggleAttribute('data-collapsed');
@@ -185,6 +204,7 @@ export class LabPanel {
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, el('span', { text: 'H' }), hAtk, hDef, el('span', { text: 'A' }), aAtk, aDef),
       ...(styles ? [el('div', { class: 'nrl-lab-hint nrl-lab-more', text: styles })] : []),
       el('div', { class: 'nrl-lab-row' }, this.playBtn, step, whistle, ...this.speedBtns, this.readout),
+      ...callsRow,
       this.scrub,
       this.label,
       this.stats,
@@ -205,6 +225,11 @@ export class LabPanel {
   /** Refresh readouts (call every frame). */
   sync(): void {
     const r = this.ctrl.runner;
+    for (const b of this.callBtns) {
+      const why = this.ctrl.callRefusal(this.callSide(), b.getAttribute('data-call') as CoachCall);
+      b.disabled = why !== null;
+      b.title = why ?? 'Make the call';
+    }
     this.playBtn.textContent = r.playing ? '❚❚' : '▶';
     for (const b of this.speedBtns) b.toggleAttribute('data-active', b.textContent === speedLabel(r.speed));
     this.readout.textContent = `t ${r.tick} · ${(r.tick / 20).toFixed(1)}s`;

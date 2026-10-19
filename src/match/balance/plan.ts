@@ -3,6 +3,7 @@
 // hand or as a sweep) × seeds. Pure: parse, check and expand; the runner
 // (scripts/balance.ts) plays the cells and report.ts writes them up.
 import type { RosterStats, WeatherKind } from '../../sim/events';
+import { isCoachCall, type CoachCall } from '../league/calls';
 import { isRotation, type Rotation } from '../league/bench';
 import { isLegs, type Legs } from '../league/fatigue';
 import { isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
@@ -34,6 +35,14 @@ export interface ScenarioSpec {
   minutes?: number;
   /** Rain or wind (2f); clear unless given. */
   weather?: WeatherKind;
+  /** Coach calls (#73) each side makes whenever it can, or only on a given tackle ("shift left on tackle 2"). */
+  calls?: Partial<Record<'home' | 'away', CallRule[]>>;
+}
+
+export interface CallRule {
+  call: CoachCall;
+  /** Only with this many tackles made in the set; any time it is allowed when absent. */
+  tackle?: number;
 }
 
 export interface VariantSpec {
@@ -80,6 +89,9 @@ export function checkPlan(p: Plan): string[] {
     names.add(s.name);
     if (s.minutes !== undefined && !(s.minutes > 0)) errs.push(`${s.name}: minutes must be > 0`);
     if (s.weather !== undefined && !['clear', 'rain', 'wind'].includes(s.weather)) errs.push(`${s.name}: weather must be clear / rain / wind`);
+    for (const side of ['home', 'away'] as const) {
+      for (const r of s.calls?.[side] ?? []) if (!isCoachCall(r.call)) errs.push(`${s.name}: unknown call "${String(r.call)}" for ${side}`);
+    }
     if (s.legs !== undefined && !(typeof s.legs === 'number' ? s.legs >= 0 && s.legs <= 1 : isLegs(s.legs))) errs.push(`${s.name}: legs must be fresh / late / spent or 0..1`);
     for (const [side, spec] of [['home', s.home], ['away', s.away]] as const) {
       if (!spec) {

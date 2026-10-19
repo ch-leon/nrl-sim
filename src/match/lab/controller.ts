@@ -8,6 +8,7 @@ import { isAttackPreset, isDefencePreset, type TeamTactics } from '../league/pre
 import { isLegs, type Legs } from '../league/fatigue';
 import { DEFAULT_ROTATION, isRotation, type Rotation } from '../league/bench';
 import type { WeatherKind } from '../../sim/events';
+import type { CallInput, CoachCall } from '../league/calls';
 
 /** Per-side preset overrides for the lab; a missing field keeps the club's own style. */
 export interface LabTactics {
@@ -34,9 +35,11 @@ export interface LabParams {
   bench?: Rotation;
   /** Weather (BAK-207 2f): clear when absent. */
   weather?: WeatherKind;
+  /** Coach-call chips for both sides (#73, `calls=1`). */
+  calls?: boolean;
 }
 
-export type LabSimFactory = (home: string, away: string, seed: number, traits: TraitMode, tactics: LabTactics, legs: Legs, bench: Rotation, weather: WeatherKind) => MatchSim;
+export type LabSimFactory = (home: string, away: string, seed: number, traits: TraitMode, tactics: LabTactics, legs: Legs, bench: Rotation, weather: WeatherKind, calls: CallInput[]) => MatchSim;
 
 const WEATHERS: readonly WeatherKind[] = ['clear', 'rain', 'wind'];
 export function isWeather(v: unknown): v is WeatherKind {
@@ -57,7 +60,8 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
   const bench: Rotation = isRotation(sp.get('bench')) ? (sp.get('bench') as Rotation) : DEFAULT_ROTATION;
   const wx = sp.get('wx');
   const weather: WeatherKind = isWeather(wx) ? wx : 'clear';
-  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics, legs, bench, weather };
+  const calls = sp.get('calls') === '1';
+  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics, legs, bench, weather, ...(calls ? { calls } : {}) };
   const seed = Number(sp.get('seed'));
   const tick = Number(sp.get('tick'));
   return {
@@ -71,6 +75,7 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
     legs,
     bench,
     weather,
+    ...(calls ? { calls } : {}),
   };
 }
 
@@ -87,7 +92,7 @@ function parseTactics(sp: URLSearchParams): LabTactics {
   return { home: side('hatk', 'hdef'), away: side('aatk', 'adef') };
 }
 
-export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics; legs?: Legs; bench?: Rotation | undefined; weather?: WeatherKind | undefined }): string {
+export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics; legs?: Legs; bench?: Rotation | undefined; weather?: WeatherKind | undefined; calls?: boolean | undefined }): string {
   const sp = new URLSearchParams({ seed: String(p.seed), home: p.home, away: p.away });
   if (p.tick) sp.set('tick', String(p.tick));
   if (p.traits && p.traits !== 'gen') sp.set('traits', p.traits);
@@ -99,6 +104,7 @@ export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: 
   if (p.legs && p.legs !== 'fresh') sp.set('legs', p.legs);
   if (p.bench && p.bench !== DEFAULT_ROTATION) sp.set('bench', p.bench);
   if (p.weather && p.weather !== 'clear') sp.set('wx', p.weather);
+  if (p.calls) sp.set('calls', '1');
   return `${LAB_HASH}?${sp.toString()}`;
 }
 
@@ -109,15 +115,33 @@ export function isLabHash(hash: string): boolean {
 export class LabController {
   readonly runner: Runner;
   readonly params: LabParams;
+  /** Coach calls made in the lab, by tick: replayed when the match is rebuilt to seek (#73). */
+  readonly calls: CallInput[] = [];
 
   constructor(factory: LabSimFactory, params: LabParams) {
     this.params = { ...params };
-    this.runner = new Runner((seed) => factory(params.home, params.away, seed, params.traits, params.tactics, params.legs, params.bench ?? DEFAULT_ROTATION, params.weather ?? 'clear'), params.seed);
+    this.runner = new Runner((seed) => factory(params.home, params.away, seed, params.traits, params.tactics, params.legs, params.bench ?? DEFAULT_ROTATION, params.weather ?? 'clear', this.calls), params.seed);
     if (params.tick > 0) this.runner.seek(params.tick);
   }
 
   get seed(): number {
     return this.runner.seed;
+  }
+
+  /** Why `side` can't make `call` now, or null (#73). */
+  callRefusal(side: 'home' | 'away', call: CoachCall): string | null {
+    const sim = this.runner.current as unknown as { callRefusal?: (s: 'home' | 'away', c: CoachCall) => string | null };
+    return sim.callRefusal ? sim.callRefusal(side, call) : 'no calls in this sim';
+  }
+
+  /** The coach makes a call: it takes effect on the next tick, and replays if the match is rebuilt. */
+  call(side: 'home' | 'away', call: CoachCall): string | null {
+    const why = this.callRefusal(side, call);
+    if (why) return why;
+    // Calls after this tick belong to a future the lab has stepped back from: drop them.
+    while (this.calls.length && this.calls[this.calls.length - 1]!.tick > this.runner.tick) this.calls.pop();
+    this.calls.push({ tick: this.runner.tick + 1, side, call });
+    return null;
   }
   get tick(): number {
     return this.runner.tick;
@@ -160,6 +184,6 @@ export class LabController {
 
   /** The URL hash that reopens the lab on these teams and seed (and this tick). */
   hash(withTick = false): string {
-    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, legs: this.params.legs, bench: this.params.bench, weather: this.params.weather, ...(withTick ? { tick: this.runner.tick } : {}) });
+    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, legs: this.params.legs, bench: this.params.bench, weather: this.params.weather, calls: this.params.calls, ...(withTick ? { tick: this.runner.tick } : {}) });
   }
 }
