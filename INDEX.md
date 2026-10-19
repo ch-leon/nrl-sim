@@ -24,3 +24,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-140842-standard | standard | fe323f0 | main | [report](runs/20261019-140842-standard/report.md) |
 | 20261019-140935-standard | standard | fe323f0 (uncommitted changes) | feat/line-breaks | [report](runs/20261019-140935-standard/report.md) |
 | 20261019-141346-standard | standard | 19a0573 | main | [report](runs/20261019-141346-standard/report.md) |
+| 20261019-142127-offloads | offloads | 4895f01 | feat/offloads | [report](runs/20261019-142127-offloads/report.md) |

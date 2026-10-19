@@ -1,0 +1,43 @@
+{
+  "name": "offloads",
+  "description": "Phase 3 (#87): offloads run at 2.5 a match (§7: 8-14). How far do the support distance (live.offloadM) and the contest's offload share (contest.offload) need to move, and what happens to line breaks, tries and errors?",
+  "seeds": 20,
+  "scenarios": [
+    {
+      "name": "60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v grind",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      }
+    }
+  ],
+  "sweep": {
+    "live.offloadM": [
+      5,
+      7,
+      9
+    ],
+    "contest.offload": [
+      0.09,
+      0.15,
+      0.22
+    ]
+  }
+}
