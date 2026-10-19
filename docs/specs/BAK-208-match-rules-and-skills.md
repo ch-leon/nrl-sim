@@ -45,11 +45,11 @@ through, the crowd lifts.
 
 | Stat | What it drives |
 |---|---|
-| **Speed** | Top speed, acceleration, chase, the burst after a break |
+| **Speed** | Top (sprint) speed, acceleration, chase, the burst after a break |
 | **Strength** | Winning contact both ways: busting, driving back, holding |
 | **Skill** | Execution: passing, catching, offloading, kicking accuracy, footwork |
 | **Footy IQ** | Decisions: when to pass or kick, running the right line, defensive positioning and intercept angles, cover defence |
-| **Stamina** | How fast fatigue sets in (§8); tired players lose speed and contest odds |
+| **Stamina** | How fast fatigue sets in (§8); tired players lose speed and contest odds. With F2, also how long a player can sprint and how fast he gets his gas back (§8.2) |
 
 Derived (not stored): **Footwork** = (Speed + Skill) / 2 for steps; **Defence** =
 (Strength + Footy IQ) / 2 for tackles; **Boot** = (Skill + Footy IQ) / 2 for kicks.
@@ -76,7 +76,7 @@ the commentary line names it, and the lab stats strip counts them (`Skill n`).
 | **Don't Argue** | Tackler not arriving from behind | +12% fend | FEND! |
 | **Offload King** | Held with a support runner inside 5 m | +12% offload | OFFLOAD! |
 | **Finisher** | Inside the opposition 20 m | +10% bust, +5% fend, +10% step | BUST! / STEP! |
-| **Jets** | After a break; on the kick chase | Burst lasts 3 s (not 0.8); +8% speed chasing a kick | longer burst |
+| **Jets** | After a break; on the kick chase | Burst lasts 3 s (not 0.8); +8% speed chasing a kick. *F2: a bigger gas tank instead (§8.2)* | longer burst |
 | **Playmaker** | Engaged with the ball | +10% to pass rather than carry; reach 12 + 3 m/level → the cut-out ball | CUT-OUT! |
 | **Big Boot** | Last-tackle kick | +10% distance, scatter ×0.85 (40/20s arrive with E) | KICK! |
 
@@ -313,6 +313,68 @@ Stamina 30 v 80: ~10 late busts a match.
 Lab: **Legs** = fresh / last 10 min (38%, tired) / out on their feet (18%, spent),
 `#lab?legs=late`; the label reads `legs 74/71%` (home / away average).
 
+### 8.2 Sprint, gas and getting legs back (Leon, 2026-10-18) — *design, F2*
+
+F gave every player one bar, **legs**: full at kick-off, spent by running, contact and
+wrestling, coming back only a little. Everyone also runs flat out all the time. F2 splits
+effort into two bars so that pace is something a player *spends*:
+
+- **Gas** (short-term): a small sprint tank. Sprinting empties it in seconds; jogging
+  or standing refills it in seconds.
+- **Legs** (long-term, F's bar): drains over the match and is the **ceiling** on gas.
+  At 60% legs the gas tank only fills to 60%, and refills more slowly.
+
+**Pace.** A player runs at **cruise**, 88% of his top speed, unless he is sprinting.
+**Sprinting** is top speed (the Speed stat, 6–9 m/s) and burns gas. With the gas gone he
+is **blown**: 75% of top speed until gas is back to a quarter, then cruise again. The
+break burst (×1.15 for 0.8 s today) becomes simply going from cruise to sprint, so
+`live.burst` and `live.burstTicks` retire.
+
+**Who sprints.** Only when it matters, so the burst reads on screen:
+- the carrier with space ahead (no defender in his lane within 6 m) or after a break,
+  step or fend;
+- a committed defender closing the last 8 m, and every defender covering a broken line;
+- kick chasers, and the catcher getting under a kick;
+- a receiver running onto a pass, and a support runner within 10 m of a break.
+
+Everyone else cruises or holds position.
+
+**Starting numbers** (all knobs, tuned with the balance harness):
+
+| | Value | At Stamina 30 / 50 / 80 |
+|---|---|---|
+| Cruise | 88% of top speed | — |
+| Gas tank | 0.5 + Stamina/18 seconds of sprint | 2.2 / 3.3 / 4.9 s |
+| Gas refill (cruising; ×1.5 standing) | full in 12 − Stamina/25 seconds | 10.8 / 10 / 8.8 s |
+| Blown | 75% of top speed until gas is back to 25% | — |
+| Legs as ceiling | gas max = legs; refill × (0.5 + 0.5 × legs) | — |
+| Legs cost of running | per metre ×1.5 sprinting, ×0.8 cruising (re-measured so a match drains as F does now) | — |
+| Jets (replaces its burst) | gas tank × (1 + 0.4 × level multiplier) | I ×1.4, II ×1.64, III ×1.88 |
+
+**What it should produce** (the F2 tests and lab check):
+- A **Speed 90 / Stamina 30** winger who breaks with a defender 2 m behind him is run
+  down inside about 35 m by a **Speed 70 / Stamina 80** fullback: he blows after
+  ~2 s (~19 m), the fullback keeps sprinting.
+- The same winger with **Stamina 70** (4.4 s of gas) gets away.
+- Sides tire later in a match when nobody sprints needlessly; the balance harness
+  re-measures the §7 bands, which may move.
+
+**Shown as:** a speed streak behind a sprinting player; a thin gas bar under the
+carrier and under anyone chasing him while a break is on; **RUN DOWN!** when a sprinting
+carrier is caught from behind; commentary for "out of gas".
+
+**Getting legs back** (rides with the features it belongs to):
+- **Half-time** (BAK-207 Phase 2, the first PR, with the clock and halves): every
+  player gets back **half of what he has lost** (40% → 70%), gas full.
+- **Interchange** (#70): a benched player recovers **5% a minute, up to 90%**, never
+  back to fresh within a match. Taken off at 40% and back on after 4 minutes, he
+  returns at 60%.
+- **Stoppages** keep F's slow recovery.
+
+**Stats, after F2:** Speed is how fast a player can go; Stamina is how long he can go
+that fast and how soon he can do it again. That makes real archetypes: the flier who
+makes the break but can't finish it, the workhorse who is never quick and never stops.
+
 ## 9. Delivery (each a PR with lab sign-off; order fixed, numbers negotiable)
 
 | # | Mechanic | Doc section |
@@ -323,16 +385,21 @@ Lab: **Legs** = fresh / last 10 min (38%, tired) / out on their feet (18%, spent
 | D | Zone tactics and presets | §5 |
 | E | Kick types, catches, scrambles | §4.3–4.4 |
 | F | Fatigue and the wrestle — *shipped* | §8 |
+| F2 | Sprint and gas; legs as their ceiling (half-time with Phase 2, the bench with #70) | §8.2 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 
-## 10. Decisions (Leon, 2026-10-17)
+## 10. Decisions (Leon, 2026-10-17 / 18)
 - Trait **names**: footy slang (§3).
 - **Negative traits**: not straight negatives on generated players — **double-edged** ones
   that make a player brilliant some days and costly on others (§3.3). Injury Prone stays
   only on migrated saves.
 - Presets: **separate attack and defence** presets (D, §5 — to be reshaped accordingly).
 - Slow-motion on big moments: **keep it**.
+- Fatigue (2026-10-18): F's single legs bar stays as the prototype; stamina being decisive
+  is fine for now because **half-time and interchanges** will give legs back (§8.2).
+- **Sprint and gas** (2026-10-18): two bars, gas for short bursts and legs as its
+  ceiling; fast players with little stamina make breaks they can't finish (§8.2, F2).
 
 ## 11. Brainstorm backlog (not scheduled)
 - **Coach calls during play** (Leon, 2026-10-17; extends #73). Presets are set at the
