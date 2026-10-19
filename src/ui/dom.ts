@@ -261,7 +261,8 @@ export function ensureStyles(): void {
 // panels, monospace, pixelated rendering. Font sizes use clamp() so the HUD and
 // nav stay legible on mobile. Every interactive/visible element opts back into
 // pointer-events (the #ui-root container is pointer-events:none).
-const CSS = `
+/** The shared stylesheet (exported for tests). */
+export const CSS = `
 .nrl-panel, .nrl-btn, .nrl-modal, .nrl-modal-backdrop, .nrl-hud, .nrl-nav {
   font-family: 'Courier New', monospace;
   image-rendering: pixelated;
@@ -406,6 +407,21 @@ const CSS = `
 @media (max-width: 480px) {
   .nrl-nav { flex-wrap: wrap; justify-content: center; overflow-x: visible; }
   .nrl-nav .nrl-btn { flex: 0 0 calc(20% - 0.15rem); min-width: 0; }
+}
+/* Landscape phones (844×390 and up to small laptops): ten items in one row of
+   equal buttons, so Help (?) and News with its badge stay on screen instead of
+   scrolling off the right edge. */
+@media (min-width: 481px) and (max-width: 1000px) {
+  .nrl-nav { gap: 0.25rem; overflow-x: visible; }
+  .nrl-nav .nrl-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.4rem 0.1rem;
+    font-size: clamp(0.55rem, 1.35vw, 0.85rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nrl-nav .nrl-nav-badge { margin-left: 0.15rem; }
 }
 
 /* ── Modal ───────────────────────────────────────────────────────────── */

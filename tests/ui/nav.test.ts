@@ -41,3 +41,14 @@ describe('ScreenRegistry (nav registry logic)', () => {
     expect(calls).toEqual(['v2']);
   });
 });
+
+import { CSS } from '../../src/ui/dom';
+
+describe('nav layout on landscape phones (QA)', () => {
+  it('fits every item in one row between the portrait and desktop breakpoints', () => {
+    const block = CSS.slice(CSS.indexOf('@media (min-width: 481px) and (max-width: 1000px)'));
+    expect(block.length).toBeLessThan(CSS.length);
+    expect(block).toMatch(/\.nrl-nav \{[^}]*overflow-x: visible/);
+    expect(block).toMatch(/\.nrl-nav \.nrl-btn \{[^}]*flex: 1 1 0/);
+  });
+});
