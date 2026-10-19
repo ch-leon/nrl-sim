@@ -177,8 +177,8 @@ men under his line (standard 55%, two at a time; heavy 70%, three) for bench men
 15% (heavy 10%) fresher; each jogs to the nearest touchline and the fresh man jogs on
 from there, and the restart waits for them (12 s at most for the jog off; after that the
 swap is made where he stands). At half-time swaps are made in the sheds, but after the break's recovery few men are
-still under the line, so in practice nearly all swaps follow tries (5–7 a match between
-even sides on standard). A tired start (the lab's late legs, a harness stretch) finds the
+still under the line, so in practice nearly all swaps follow tries (about 6.5 a match
+between even sides on standard). A tired start (the lab's late legs, a harness stretch) finds the
 bench rested at 90%. The snapshot carries who is in each slot (`who`) and the view puts
 the new man's own look on the sprite; an **ON!** pop-up and "X on for Y" mark the swap.
 The lab has a **Bench** picker (off / standard / heavy, both sides; `#lab?bench=heavy`);

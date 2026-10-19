@@ -392,9 +392,10 @@ runs dry.
 - **Interchange** — *implemented in BAK-207 2b* (#70): a benched player recovers **5% a
   minute, up to 90%**, never back to fresh within a match. Taken off at 40% and back on
   after 4 minutes, he returns at 60%. The coach's rotation (off / standard / heavy) swaps
-  the most tired men after a try; with a standard bench even sides end on about 70% legs
-  instead of 52%, and the Stamina 30 side against Stamina 80 on 56% / 71% (it now wins
-  one match in ten instead of none) (tuning reference §14).
+  the most tired men after a try; with a standard bench even sides end on about 71% legs
+  instead of 52%, and the Stamina 30 side against Stamina 80 on 60% / 71% instead of
+  36% / 69%; on heavy rotation it wins one match in five instead of none (tuning
+  reference §14).
 - **Stoppages** keep F's slow recovery.
 
 **Stats, after F2:** Speed is how fast a player can go; Stamina is how long he can go

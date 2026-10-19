@@ -268,10 +268,12 @@ sheds after the break's recovery. A tired start finds the bench rested at `recov
 Rival benches are rolled 3 points under the club's starters (`teamSheetFromRival`).
 
 Measured (20 whole matches a row, flat 60-rated squads): legs at full time 52% with no
-benches, 70% on standard (about 5.6 swaps a match, both sides), 75% on heavy (about 15);
-heavy against no bench ends 70% / 53% and wins 55% of matches (10% drawn). Stamina 30 v 80
-goes from 36% / 69% legs and no wins to 56% / 71% and one win in ten on standard benches
-(61% / 71% with the Stamina 30 side on heavy); COOKED! all but disappears. Tackles, breaks
-and kicks barely move; tries between even sides 5.6 → 6.1.
+benches, 71% on standard (about 6.5 swaps a match, both sides), 68% on heavy (about 10:
+it swaps men who are only a little tired, for bench men only a little fresher); heavy
+against no bench ends 71% / 52% and wins 50% of matches (20% drawn). Stamina 30 v 80 goes
+from 36% / 69% legs to 60% / 71% on standard benches (still no wins, 15% drawn) and to
+65% / 72% with the Stamina 30 side on heavy, which wins one in five; fliers v stayers
+wins 25% (35% drawn) against 10%. COOKED! all but disappears and late busts halve.
+Tackles, breaks and kicks barely move; tries between even sides 5.6 → 6.1.
 
 Tests: `tests/match/league/bench.test.ts`.
