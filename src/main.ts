@@ -26,6 +26,7 @@ import { initBoardUi } from './ui/screens/board';
 import { initPlayerOfMatch } from './ui/screens/potm';
 import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
+import { syncKitDesign } from './ui/screens/kit';
 import { openSquadScreen } from './ui/screens/squad';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
@@ -113,6 +114,9 @@ async function boot(): Promise<void> {
     createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
+  // The player's kit design (#79) feeds every kit drawn from here on.
+  syncKitDesign(getState());
+  bus.on('state:changed', (s) => syncKitDesign(s));
   enableAutosave();
 
   // Week-tick pipeline (ARCHITECTURE §5): training/injuries → economy →

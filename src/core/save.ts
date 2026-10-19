@@ -173,6 +173,9 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       return { ...old, league: { ...league, clubs: withRivalSquads(league.clubs as GameState['league']['clubs'], seed) } };
     },
   },
+  // v8 → v9: optional GameState.kit (GitHub #79). Old saves have no design, which
+  // keeps the look derived from their club colours, so nothing is filled in.
+  { from: 8, to: 9, run: (old) => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

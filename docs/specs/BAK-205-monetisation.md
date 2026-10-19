@@ -82,3 +82,10 @@ None implemented here. Illustrative shape only, for the future cosmetic ticket (
 ## Out of scope
 - Any Stripe/ad SDK integration, license endpoint code, purchase UI, or analytics wiring — all
   deferred to post-decision tickets. No pay-to-win mechanics under any model.
+
+## Note: cosmetic kits flag (GitHub #79)
+The kit designer (patterns, trims, an alternate strip) ships free behind
+`FEATURES.cosmeticKits` in `src/config.ts`, default on. The flag exists only so that,
+if a cosmetics model is ever chosen, extra patterns could be gated without code changes.
+No purchase flow or entitlement code exists, and kits never affect a match (a unit test
+checks `simulateMatch` is identical with and without a design).

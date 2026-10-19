@@ -616,6 +616,27 @@ const CSS = `
   font-size: 0.8rem;
 }
 .nrl-placebar[hidden] { display: none; }
+.nrl-kit h2 { margin: 0; font-size: 1.05rem; }
+.nrl-kit h3 { margin: 0.5rem 0 0.2rem; font-size: 0.85rem; }
+.nrl-kit-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.nrl-kit-note { margin: 0.2rem 0 0.4rem; font-size: 0.75rem; }
+.nrl-kit-body { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.nrl-kit-preview { display: flex; gap: 0.5rem; align-items: flex-end; flex: 0 0 auto; }
+.nrl-kit-preview figure { margin: 0; text-align: center; font-size: 0.7rem; }
+.nrl-kit-sprite { width: 84px; height: 90px; image-rendering: pixelated; }
+.nrl-kit-portrait { width: 72px; image-rendering: pixelated; }
+.nrl-kit-controls { flex: 1 1 16rem; min-width: 0; }
+.nrl-kit-label { font-size: 0.72rem; font-weight: bold; margin-top: 0.2rem; }
+.nrl-kit-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.nrl-kit-pattern[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
+.nrl-kit-swatch {
+  pointer-events: auto;
+  width: 32px; height: 32px;
+  border: 3px solid #555;
+  cursor: pointer;
+}
+.nrl-kit-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #000; }
+.nrl-kit-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
 .nrl-ladder-club {
   pointer-events: auto;
   font: inherit;

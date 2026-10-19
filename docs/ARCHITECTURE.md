@@ -339,6 +339,12 @@ announces them with the result toast at full-time.
   A*-walk the scene's `WalkGrid` and sort at layer 2 like the manager. Looks are the
   manager's frames palette-swapped (`src/art/grounds/people.ts`) from the player's
   match look + club kit, one `life-*` strip atlas per distinct look. Presentation only.
+- Kit designs (GitHub #79): `GameState.kit` (optional) holds the player's pattern, trim
+  and alternate strip. `main.ts` registers it with `setKitDesign` in `src/art/match/kit.ts`,
+  and `kitFromColors` consults that registry, so matches (including the away clash
+  switch in `resolveKits`), the crowd, grounds characters and card portraits all wear it
+  without knowing about designs. No design = the look derived from the club colours.
+  Patterns: plain / v / hoops / sleeves / stripes. Behind `FEATURES.cosmeticKits`.
 - Match textures (generated per match in MatchScene from `src/art/match/`, freed
   on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
   from club colours; away side switches to its alt strip on a clash), ball,
