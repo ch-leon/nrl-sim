@@ -52,7 +52,7 @@ export const TRAITS: Readonly<Record<TraitId, TraitDef>> = {
   dontArgue: { name: "Don't Argue", short: 'FEND', group: 'attack', blurb: 'Palms off tacklers (+12% fend at I)', fit: [...OUTSIDE, 'second-row'], pool: true },
   offloadKing: { name: 'Offload King', short: 'OFFL', group: 'attack', blurb: 'Gets the ball away in the tackle (+12% offload at I)', fit: FORWARDS, pool: true },
   finisher: { name: 'Finisher', short: 'FIN', group: 'attack', blurb: 'Inside the opposition 20 m: busts and steps more, and gets over', fit: ['winger', 'centre', 'fullback'], pool: true },
-  jets: { name: 'Jets', short: 'JETS', group: 'attack', blurb: 'A longer burst after a break; quicker on the kick chase (+8% at I)', fit: OUTSIDE, pool: true },
+  jets: { name: 'Jets', short: 'JETS', group: 'attack', blurb: 'A bigger gas tank for sprinting (×1.4 at I); quicker on the kick chase (+8% at I)', fit: OUTSIDE, pool: true },
   playmaker: { name: 'Playmaker', short: 'PLAY', group: 'attack', blurb: 'Reads the shift: passes more, throws the cut-out ball', fit: BALL_PLAYERS, pool: true },
   bigBoot: { name: 'Big Boot', short: 'BOOT', group: 'attack', blurb: 'Kicks longer (+10% at I) and more accurately', fit: HALVES, pool: true },
   hitman: { name: 'Hitman', short: 'HIT', group: 'defence', blurb: 'Square one-on-one: the big hit (+12% at I)', fit: FORWARDS, pool: true },

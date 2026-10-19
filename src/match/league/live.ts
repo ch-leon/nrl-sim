@@ -11,7 +11,8 @@
 //
 // Legs (BAK-208 §8, F): every player's energy drains with metres run and
 // contact and costs him pace and contest odds when low; a held tackle is a
-// wrestle whose length sets the play-the-ball speed. Phase 1 scope: no scoring
+// wrestle whose length sets the play-the-ball speed. Players cruise and sprint
+// only when it matters, spending gas (BAK-208 §8.2, F2). Phase 1 scope: no scoring
 // beyond tries, no weather — those come with the full match (Phase 2, #86).
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
@@ -32,6 +33,7 @@ import { DEFAULT_TACTICS, attackPlan, defencePlan, zoneOf, type AttackPlan, type
 import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
 import { traitBoost, type TraitInstance } from '../../data/traits';
 import { FATIGUE, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
+import { GAS, canSprint, paceMult, refillSeconds, runCostMult, stepGas, tankSeconds, type GasState } from './gas';
 import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
@@ -60,10 +62,10 @@ export const LIVE = {
   passCooldown: 12,
   /** A tackled carrier can't be the next receiver for this long after his ptb. */
   busyAfterPtb: 24,
-  /** Breaking a tackle gives a burst of pace (a Jets player keeps it for 3 s). */
+  /** After beating a man the carrier goes (sprints, gas permitting) for at least this long (§8.2). */
   burstTicks: 16,
-  jetsBurstTicks: 60,
-  burst: 1.15,
+  /** Caught from behind this soon after breaking is RUN DOWN! (6 s). */
+  runDownTicks: 120,
   /** A Wrecking Ball held in the tackle keeps his legs pumping this often per level (more fight in the wrestle, wrestle.ts). */
   wreckDriveChance: 0.3,
   /** A Playmaker's cut-out reach grows this much per level over the normal pass width, and he minds width less. */
@@ -82,6 +84,11 @@ export const LIVE = {
   passPoseTicks: 5,
 
   // Distances (metres)
+  /** Who sprints (§8.2): the carrier with no defender this far ahead and this close to his lane; a defender closing the last stretch; support within reach of a break. */
+  sprintLaneM: 15,
+  sprintLaneW: 3,
+  sprintCloseM: 8,
+  supportSprintM: 10,
   /** A free defender this close to a wrestle comes in to help (and joins it on reaching the carrier). */
   joinM: 6,
   /** Carrier starts deciding (pass / into contact) with a defender this close. */
@@ -145,7 +152,7 @@ interface Player {
   /** Legs (§8): 1 fresh … 0 spent, and how fast he drains (Stamina, Workhorse). */
   energy: number;
   drain: number;
-  /** Already announced as out on his feet (until he recovers some). */
+  /** Already announced as cooked, COOKED! (until he recovers some). */
   gassed: boolean;
   body: Body;
   pose: string;
@@ -160,8 +167,16 @@ interface Player {
   cooldownUntil: number;
   /** Can't be tackled until then (just broke / fended one). */
   immuneUntil: number;
-  /** Faster until then (break-tackle burst). */
+  /** Wants to sprint until then (just beat a man, or picked one off). */
   burstUntil: number;
+  /** Tick he last beat a man with the ball (a tackle from behind soon after is RUN DOWN!). */
+  brokeAt: number;
+  /** Sprint and gas (§8.2): his tank, its size in seconds and refill time, whether he wants to go this tick and whether he is. */
+  gas: GasState;
+  tankS: number;
+  refillS: number;
+  wantsSprint: boolean;
+  sprinting: boolean;
   /** Tick he last gained the ball. */
   catchTick: number;
   /** Already chose pass-or-carry for this possession (decided once, at engagement). */
@@ -276,6 +291,7 @@ export class LiveSim implements MatchSim {
     for (const p of this.players) {
       p.energy = energy;
       p.gassed = energy < FATIGUE.spentAt;
+      p.gas.gas = energy;
     }
     this.ball = { kind: 'held', by: this.idx('away', KICKER) };
     this.phase = { kind: 'restart', t0: 0, kicking: 'away' };
@@ -315,6 +331,12 @@ export class LiveSim implements MatchSim {
         cooldownUntil: 0,
         immuneUntil: 0,
         burstUntil: 0,
+        brokeAt: -1000,
+        gas: { gas: 1, blown: false },
+        tankS: tankSeconds(stamina, traits),
+        refillS: refillSeconds(stamina),
+        wantsSprint: false,
+        sprinting: false,
         catchTick: 0,
         decided: false,
         steppedOn: -1,
@@ -361,10 +383,29 @@ export class LiveSim implements MatchSim {
   private defPlan(): DefencePlan {
     return defencePlan(this.tactics[other(this.attacking)].defence);
   }
-  /** After a break the carrier bursts: longer for a Jets player. */
+  /** After a break the carrier goes: he sprints while his gas lasts (a Jets player has more of it). */
   private burst(c: Player): void {
     c.immuneUntil = this.tick + LIVE.immuneTicks;
-    c.burstUntil = this.tick + (traitBoost(c.traits, 'jets') > 0 ? LIVE.jetsBurstTicks : LIVE.burstTicks);
+    c.burstUntil = this.tick + LIVE.burstTicks;
+    c.brokeAt = this.tick;
+  }
+  /** The carrier is through: in front of the defensive line. */
+  private lineBroken(): boolean {
+    const h = this.holder();
+    return h !== null && h.side === this.attacking && (h.body.pos.x - this.lineX) * this.dir > 0;
+  }
+  /** Nobody in front of him in his lane, close: room to put the foot down. */
+  private laneClear(c: Player): boolean {
+    return !this.side(other(c.side)).some((d) => {
+      if (this.locked(d)) return false;
+      const ahead = (d.body.pos.x - c.body.pos.x) * this.dir;
+      return ahead > 0 && ahead < LIVE.sprintLaneM && Math.abs(d.body.pos.y - c.body.pos.y) < LIVE.sprintLaneW;
+    });
+  }
+  /** Caught from behind by a man sprinting at him, soon after he broke: shown and said. */
+  private runDown(c: Player, t: Player, sit: Situation): void {
+    if (sit.angle !== 'behind' || !t.sprinting || this.tick - c.brokeAt > LIVE.runDownTicks) return;
+    this.emit('run-down', `${t.name} runs down ${c.name}!`, t);
   }
   private lock(p: Player, pose: string, ticks: number, slideTo?: Vec): void {
     p.pose = pose;
@@ -967,6 +1008,7 @@ export class LiveSim implements MatchSim {
       default:
         break;
     }
+    this.runDown(c, t, sit);
     if (outcome === 'big-hit') {
       // Smashed backwards at contact: no wrestle, he is down.
       this.emit('big-hit', `${t.name} smashes ${c.name} backwards!`, t, credit);
@@ -995,7 +1037,7 @@ export class LiveSim implements MatchSim {
     p.slide = null;
   }
 
-  /** Spend some of a player's legs (× his drain rate); announce him once when he is out on his feet. */
+  /** Spend some of a player's legs (× his drain rate); announce him once when he is cooked. */
   private tire(p: Player, amount: number): void {
     p.energy = Math.max(0, p.energy - amount * p.drain);
     this.checkLegs(p);
@@ -1004,7 +1046,7 @@ export class LiveSim implements MatchSim {
   private checkLegs(p: Player): void {
     if (!p.gassed && p.energy < FATIGUE.spentAt) {
       p.gassed = true;
-      this.emit('gassed', `${p.name} is out on his feet`, p);
+      this.emit('gassed', `${p.name} is cooked`, p);
     } else if (p.gassed && p.energy > FATIGUE.gassedReset) p.gassed = false;
   }
 
@@ -1162,6 +1204,8 @@ export class LiveSim implements MatchSim {
     const h = this.holder();
     const flight = this.ball.kind === 'flight' ? this.ball : null;
     const receiver = flight && flight.receiver !== null ? this.players[flight.receiver]! : null;
+    // Everyone cruises unless the moment calls for the foot down (§8.2), set below.
+    for (const p of this.players) p.wantsSprint = false;
 
     if (ph.kind === 'restart' || ph.kind === 'try') {
       // Everyone to their kick-off spots (defenders trudge back after a try).
@@ -1229,19 +1273,24 @@ export class LiveSim implements MatchSim {
       supports.push(...pool.slice(0, 2));
     }
     const spots = supportSpots(anchor, this.dir);
+    const broken = this.lineBroken();
     for (const p of attackers) {
       const role = ROLES[p.slot]!;
       p.through = false;
       if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
+        p.wantsSprint = true;
       } else if (kickUp && kickChasers.has(p)) {
         p.target = { ...kickUp.to };
         p.through = dist(p.body.pos, kickUp.to) > LIVE.chaseThroughM;
+        p.wantsSprint = true;
       } else if (p === carrier) {
         if (ph.kind === 'play') {
           const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
           p.target = gapTarget(p.body.pos, this.dir, defs);
           p.through = true;
+          // Space ahead, just beaten a man, or through the line: go.
+          p.wantsSprint = this.tick < p.burstUntil || broken || this.laneClear(p);
         } else p.target = { ...p.body.pos };
       } else if (p === receiver) {
         // A pass thrown in front of him is run onto, through the catch point;
@@ -1249,6 +1298,8 @@ export class LiveSim implements MatchSim {
         const onto = flight!.via === 'pass' && (flight!.to.x - p.body.pos.x) * this.dir > 0.5;
         p.target = onto ? clampToGround(add(flight!.to, { x: this.dir * LIVE.runOnM, y: 0 }), 1) : { ...flight!.to };
         p.through = onto;
+        // Under a kick he goes; onto a pass he runs at pace but keeps his gas for the line.
+        p.wantsSprint = flight!.via === 'kick';
       } else if (p.slot === HOOKER && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
       } else if (ph.kind === 'ruck' && ph.stage === 'dh' && !this.locked(p)) {
@@ -1263,6 +1314,8 @@ export class LiveSim implements MatchSim {
         // Take the side he's already on.
         const mine = (p.body.pos.y < anchor.y) === (s.y < anchor.y) ? s : spots[supports.indexOf(p) === 0 ? 1 : 0];
         p.target = mine;
+        // Backing up: when the carrier goes, his support goes with him, staying in reach for the pass.
+        p.wantsSprint = carrier !== null && (broken || carrier.sprinting) && dist(p.body.pos, carrier.body.pos) < LIVE.supportSprintM;
       } else {
         p.target = formationTarget(role, anchor, this.dir, true);
       }
@@ -1299,15 +1352,20 @@ export class LiveSim implements MatchSim {
       p.through = false;
       if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
+        p.wantsSprint = true;
       } else if (kickUp && kickChasers.has(p)) {
         p.target = { ...kickUp.to };
         p.through = dist(p.body.pos, kickUp.to) > LIVE.chaseThroughM;
+        p.wantsSprint = true;
       } else if (p === receiver) {
         p.target = { ...flight!.to };
+        p.wantsSprint = true;
       } else if (committed.includes(p) && target) {
         // Cut the angle: meet him where he's going, not where he is (in a wrestle, straight in to help).
         p.target = clampToGround(intercept(p.body.pos, p.body.maxSpeed, target.body.pos, target.body.vel), 0.5);
         p.through = true;
+        // Closing the last stretch, or covering a break: everything he has.
+        p.wantsSprint = broken || dist(p.body.pos, target.body.pos) < LIVE.sprintCloseM;
       } else if (markers.includes(p)) {
         const k = markers.indexOf(p);
         p.target = clampToGround({ x: this.mark.x + this.dir * 0.8, y: this.mark.y + (k === 0 ? -0.9 : 0.9) }, 0.5);
@@ -1315,8 +1373,11 @@ export class LiveSim implements MatchSim {
         // The last line: deeper still on the last tackle, and once the kicker
         // shapes to kick he reads it and goes to where it will land.
         const pk = this.pendingKick;
-        if (pk && this.players[pk.kicker]!.side === atk && !pk.kickoff) p.target = { ...pk.to };
-        else {
+        p.wantsSprint = broken;
+        if (pk && this.players[pk.kicker]!.side === atk && !pk.kickoff) {
+          p.target = { ...pk.to };
+          p.wantsSprint = true;
+        } else {
           const deep = this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM;
           p.target = { x: clamp(this.lineX + this.dir * deep, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
         }
@@ -1335,11 +1396,14 @@ export class LiveSim implements MatchSim {
     // (Jets) and covering a broken line (Last Line).
     const kickChase = this.ball.kind === 'flight' && this.ball.via === 'kick';
     const h = this.holder();
-    const lineBroken = h !== null && h.side === this.attacking && (h.body.pos.x - this.lineX) * this.dir > 0;
+    const lineBroken = this.lineBroken();
     const stopped = this.phase.kind === 'try' || this.phase.kind === 'restart';
     for (const p of this.players) {
       if (this.locked(p)) {
         if (stopped) this.legs(p, 0, 'stop');
+        // On the ground or in a tackle: no sprint, the gas comes back as if standing.
+        p.sprinting = false;
+        stepGas(p.gas, false, true, p.energy, p.tankS, p.refillS, dt);
         held.add(p.body);
         if (p.slide) {
           const u = Math.min(1, (this.tick - p.slide.t0) / Math.max(1, p.slide.t1 - p.slide.t0));
@@ -1349,7 +1413,10 @@ export class LiveSim implements MatchSim {
         continue;
       }
       p.slide = null;
-      let max = this.tick < p.burstUntil ? p.body.maxSpeed * LIVE.burst : p.body.maxSpeed;
+      // Cruise unless he wants to go and has the gas; blown, less than cruise (§8.2).
+      p.sprinting = p.wantsSprint && canSprint(p.gas);
+      let max = p.body.maxSpeed * paceMult(p.gas, p.sprinting);
+      if (p.sprinting && this.tick < p.burstUntil) max *= GAS.breakBurst;
       if (p === h) max *= LIVE.carrySpeed;
       if (kickChase && p.side !== this.attacking) max *= speedMult(p.traits, 'jets');
       if (lineBroken && p.side !== this.attacking) max *= speedMult(p.traits, 'lastLine');
@@ -1357,7 +1424,12 @@ export class LiveSim implements MatchSim {
       arrive(p.body, p.target, dt, { through: p.through, maxSpeed: max });
       const from = p.body.pos;
       integrate(p.body, dt);
-      this.legs(p, dist(from, p.body.pos), stopped ? 'stop' : speedOf(p.body) < FATIGUE.walkSpeed ? 'walk' : 'no');
+      const standing = stopped || speedOf(p.body) < FATIGUE.walkSpeed;
+      if (stepGas(p.gas, p.sprinting, standing, p.energy, p.tankS, p.refillS, dt) && p === h) {
+        this.emit('blown', `${p.name} has nothing left in the tank`, p);
+      }
+      // Sprinting costs the legs more per metre than cruising.
+      this.legs(p, dist(from, p.body.pos) * runCostMult(p.sprinting), stopped ? 'stop' : standing ? 'walk' : 'no');
       if (p.jink) {
         // The sidestep: a sharp lateral shift spread over a few ticks.
         p.body.pos = clampToGround(add(p.body.pos, { x: 0, y: p.jink.dy / LIVE.stepJinkTicks }), 0.5);
@@ -1397,6 +1469,10 @@ export class LiveSim implements MatchSim {
       pose: p.pose,
       headX: p.body.heading.x,
       speed: speedOf(p.body),
+      // As things stand after the tick: the tick he runs dry he is blown, not sprinting.
+      ...(p.sprinting && !p.gas.blown ? { sprint: true } : {}),
+      ...(p.gas.blown ? { blown: true } : {}),
+      gas: p.gas.gas,
     }));
     const b = this.ball;
     let ball: Snapshot['ball'];

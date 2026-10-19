@@ -16,6 +16,10 @@ export interface PlayerSnap {
   headX: number;
   /** Ground speed m/s (drives run-cycle rate). */
   speed: number;
+  /** Sprint and gas (BAK-208 §8.2): going flat out this tick, ran his gas dry, gas left 0..1. */
+  sprint?: boolean;
+  blown?: boolean;
+  gas?: number;
 }
 
 export interface BallSnap {

@@ -19,6 +19,7 @@ const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'hal
 export const COUNTS = [
   'tackles', 'bigHits', 'busts', 'lateBusts', 'fends', 'steps', 'breaks', 'offloads', 'errors', 'kicks', 'tries',
   'intercepts', 'strips', 'quickPtb', 'slowPtb', 'gassed', 'wrestles', 'held1', 'held2', 'held3',
+  'runDowns', 'blown',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -120,6 +121,12 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         break;
       case 'gassed':
         c.gassed++;
+        break;
+      case 'run-down':
+        c.runDowns++;
+        break;
+      case 'blown':
+        c.blown++;
         break;
       default:
         break;

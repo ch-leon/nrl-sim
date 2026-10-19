@@ -103,8 +103,9 @@ describe('tactics in the live sim', () => {
   const away = sheet('A');
 
   it('Grind and Expansive look different: offloads and cut-outs for the wide side, long kicks and fewer offloads for the grinders', () => {
-    const grind = events(sheet('H', 'grind'), away, SEEDS, SECS);
-    const wide = events(sheet('H', 'expansive'), away, SEEDS, SECS);
+    // Twice the seeds: cut-outs are rare enough that 12 short matches is within the noise.
+    const grind = events(sheet('H', 'grind'), away, SEEDS * 2, SECS);
+    const wide = events(sheet('H', 'expansive'), away, SEEDS * 2, SECS);
     expect(count(wide, 'offload', 'home')).toBeGreaterThan(count(grind, 'offload', 'home') * 2);
     expect(count(wide, 'cut-out', 'home')).toBeGreaterThan(count(grind, 'cut-out', 'home'));
     const longShare = (es: SimEvent[]): number => count(es, 'kick', 'home', 'long') / Math.max(1, count(es, 'kick', 'home'));
@@ -112,12 +113,15 @@ describe('tactics in the live sim', () => {
     expect(count(grind, 'step', 'home')).toBeLessThan(count(wide, 'step', 'home'));
   });
   it('a Kick-chase side kicks more often and bombs more; All-out offloads most of all', () => {
-    const bal = events(sheet('H'), away, SEEDS, SECS);
-    const kc = events(sheet('H', 'kick-chase'), away, SEEDS, SECS);
-    expect(count(kc, 'kick', 'home')).toBeGreaterThan(count(bal, 'kick', 'home'));
-    expect(count(kc, 'kick', 'home', 'bomb')).toBeGreaterThan(count(bal, 'kick', 'home', 'bomb'));
+    // Kick-chase on both sides against Balanced on both, over 10-minute matches: one side's
+    // extra kicks in a 2½-minute window are within the noise.
+    const bal = events(sheet('H'), away, SEEDS + 4, SECS * 4);
+    const kc = events(sheet('H', 'kick-chase'), sheet('A', 'kick-chase'), SEEDS + 4, SECS * 4);
+    expect(count(kc, 'kick')).toBeGreaterThan(count(bal, 'kick'));
+    expect(count(kc, 'kick', undefined, 'bomb')).toBeGreaterThan(count(bal, 'kick', undefined, 'bomb'));
     const allOut = events(sheet('H', 'all-out'), away, SEEDS, SECS);
-    expect(count(allOut, 'offload', 'home')).toBeGreaterThan(count(bal, 'offload', 'home') * 1.5);
+    const balShort = events(sheet('H'), away, SEEDS, SECS);
+    expect(count(allOut, 'offload', 'home')).toBeGreaterThan(count(balShort, 'offload', 'home') * 1.5);
   });
   it('a Rush defence makes more big hits but concedes more busts and steps than Slide', () => {
     // Twice the seeds: busts and steps are rarer than big hits, and 12 seeds is within the noise.

@@ -74,7 +74,7 @@ describe('legs (pure)', () => {
     expect(afterRun(0.001, 1000, 1, 0.05, 'no')).toBe(0);
     expect(afterRun(1, 0, 1, 10, 'stop')).toBe(1);
   });
-  it('the lab legs presets: fresh, the last ten minutes (tired), out on their feet (spent)', () => {
+  it('the lab legs presets: fresh, the last ten minutes (tired), cooked (spent)', () => {
     expect(LEGS_ENERGY.fresh).toBe(1);
     expect(tiredness(LEGS_ENERGY.late)).toBe(0.5);
     expect(tiredness(LEGS_ENERGY.spent)).toBe(1);
