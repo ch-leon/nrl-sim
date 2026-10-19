@@ -1,0 +1,73 @@
+{
+  "name": "club traits whole match",
+  "description": "A–D refinement (C, traits): a club's own generated traits against the same club with none, both ways round: a strong (70), mid (52) and weak (42) club. How much do real rosters' traits swing a match?",
+  "seeds": 80,
+  "scenarios": [
+    {
+      "name": "reapers gen v none",
+      "home": {
+        "club": "rival-reapers",
+        "traits": "gen"
+      },
+      "away": {
+        "club": "rival-reapers",
+        "traits": "none"
+      }
+    },
+    {
+      "name": "reapers none v gen",
+      "home": {
+        "club": "rival-reapers",
+        "traits": "none"
+      },
+      "away": {
+        "club": "rival-reapers",
+        "traits": "gen"
+      }
+    },
+    {
+      "name": "mariners gen v none",
+      "home": {
+        "club": "rival-mariners",
+        "traits": "gen"
+      },
+      "away": {
+        "club": "rival-mariners",
+        "traits": "none"
+      }
+    },
+    {
+      "name": "mariners none v gen",
+      "home": {
+        "club": "rival-mariners",
+        "traits": "none"
+      },
+      "away": {
+        "club": "rival-mariners",
+        "traits": "gen"
+      }
+    },
+    {
+      "name": "larrikins gen v none",
+      "home": {
+        "club": "rival-larrikins",
+        "traits": "gen"
+      },
+      "away": {
+        "club": "rival-larrikins",
+        "traits": "none"
+      }
+    },
+    {
+      "name": "larrikins none v gen",
+      "home": {
+        "club": "rival-larrikins",
+        "traits": "none"
+      },
+      "away": {
+        "club": "rival-larrikins",
+        "traits": "gen"
+      }
+    }
+  ]
+}
