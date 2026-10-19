@@ -261,7 +261,7 @@ function buildFixturesTab(state: GameState): HTMLElement {
  * live match sim and watched as it plays them, instead of the classic replay.
  */
 function liveMatchToggle(): HTMLElement {
-  const box = el('input', { attrs: { type: 'checkbox' } });
+  const box = el('input', { class: 'nrl-toggle-box', attrs: { type: 'checkbox' } });
   box.checked = getState().settings.liveMatch === true;
   box.addEventListener('change', () => {
     setState({ settings: { ...getState().settings, liveMatch: box.checked } });
@@ -277,7 +277,7 @@ function liveMatchToggle(): HTMLElement {
 
 /** The coach-call chips in a live match (#73): on unless turned off. */
 function coachCallsToggle(): HTMLElement {
-  const box = el('input', { attrs: { type: 'checkbox' } });
+  const box = el('input', { class: 'nrl-toggle-box', attrs: { type: 'checkbox' } });
   box.checked = getState().settings.coachCalls !== false;
   box.addEventListener('change', () => {
     setState({ settings: { ...getState().settings, coachCalls: box.checked } });
@@ -322,8 +322,8 @@ function buildLadderTab(state: GameState): HTMLElement {
       const club = i === 1 && !r.isPlayer ? state.league.clubs.find((x) => x.id === r.clubId) : undefined;
       // A rival's name opens its squad (#74).
       const cell = club?.squad
-        ? el('td', {}, el('button', { class: 'nrl-ladder-club', text: c, attrs: { type: 'button' }, onClick: () => openRivalSquad(club) }))
-        : el('td', { text: c });
+        ? el('td', { class: 'nrl-ladder-name' }, el('button', { class: 'nrl-ladder-club', text: c, attrs: { type: 'button' }, onClick: () => openRivalSquad(club) }))
+        : el('td', { text: c, ...(i === 1 ? { class: 'nrl-ladder-name' } : {}) });
       tr.append(cell);
     });
     // Last five, oldest first (N7, #183).

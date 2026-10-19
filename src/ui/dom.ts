@@ -543,7 +543,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   background: #f4d03f;
 }
 .nrl-history-detail { font-weight: normal; font-size: 0.78rem; margin-top: 0.1rem; }
-.nrl-history-review { margin-top: 0.3rem; min-height: 36px; padding: 0.25rem 0.6rem; font-size: 0.75rem; }
+.nrl-history-review { margin-top: 0.3rem; padding: 0.25rem 0.6rem; font-size: 0.75rem; } /* 44px min from .nrl-btn (#194) */
 
 /* ── Season review (N7, #190) ──────────────────────────────────────────── */
 .nrl-modal.nrl-review-modal { max-width: min(94vw, 560px); }
@@ -696,7 +696,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-kit-pattern[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
 .nrl-kit-swatch {
   pointer-events: auto;
-  width: 32px; height: 32px;
+  width: 44px; height: 44px; /* #194: a tap target */
   border: 3px solid #555;
   cursor: pointer;
 }
@@ -748,6 +748,17 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-ladder-table th:nth-child(2), .nrl-ladder-table td:nth-child(2) { text-align: left; }
 .nrl-ladder-table td.nrl-ladder-form { text-align: left; }
 .nrl-ladder-table tr[data-player] { background: #f4d03f; }
+/* Phone polish (#194): on a touch screen a club's name is a 44px target that fills
+   its row; a mouse keeps the compact table. */
+@media (pointer: coarse) {
+  .nrl-ladder-table tbody tr { height: 44px; }
+  .nrl-ladder-table td.nrl-ladder-name { padding-top: 0; padding-bottom: 0; }
+  .nrl-ladder-name .nrl-ladder-club { display: flex; align-items: center; min-height: 44px; width: 100%; }
+}
+/* The next-match card's opponent: the same text link, with a 44px hit area (#194). */
+.nrl-next-side .nrl-ladder-club { padding: 0.9rem 0.25rem; margin: -0.9rem -0.25rem; }
+/* The Fixtures tab's two toggles: a box you can see and hit (#194). */
+.nrl-toggle-box { width: 24px; height: 24px; margin: 0 0.3rem 0 0; flex: 0 0 auto; accent-color: #3a6ea5; }
 .nrl-fixtures-round { margin: 0.6rem 0 0.2rem; font-size: 0.95rem; }
 .nrl-fixtures-round[data-current] { color: #b03a2e; }
 .nrl-fixture[data-player] { font-weight: bold; }
