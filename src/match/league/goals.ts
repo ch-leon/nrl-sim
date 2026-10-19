@@ -35,7 +35,7 @@ export const GOALS = {
   fieldGoalChance: 0.7,
   /** A field goal is charged down this often. */
   chargeDown: 0.08,
-  /** Seconds of celebration after a goal before the restart. */
+  /** Ticks of celebration after a field goal before the restart (1.5 s). */
   goalTicks: 30,
 };
 
