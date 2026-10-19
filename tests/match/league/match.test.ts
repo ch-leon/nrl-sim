@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { runMatch } from '../../../src/match/league/match';
+import { PENALTY } from '../../../src/match/league/penalties';
 import { NINES, clockText } from '../../../src/match/league/rules';
 import { TICK_S } from '../../../src/match/core/engine';
 import { initLiveState, possessionPct, reduceEvent } from '../../../src/ui/screens/matchOverlay';
@@ -130,7 +131,7 @@ describe('the match clock, halves and full time', () => {
       for (const side of ['home', 'away'] as const) {
         const made = (kind: string): number => g.events.filter((x) => x.e.kind === kind && x.e.side === side && x.e.detail === 'good').length;
         const bonus = g.events.filter((x) => x.e.kind === 'try' && x.e.side === side && x.e.detail === 'bonus').length;
-        expect(g.sim.points[side]).toBe(g.sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made('conversion') * NINES.conversionPoints + made('field-goal') * NINES.fieldGoalPoints);
+        expect(g.sim.points[side]).toBe(g.sim.tries[side] * NINES.tryPoints + bonus * (NINES.bonusTryPoints - NINES.tryPoints) + made('conversion') * NINES.conversionPoints + made('field-goal') * NINES.fieldGoalPoints + made('penalty-goal') * PENALTY.goalPoints);
       }
       const last = g.events[g.events.length - 1]!.snap;
       expect(last.score).toEqual(g.sim.points);

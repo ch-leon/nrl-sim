@@ -7,6 +7,7 @@
 // — one experiment at a time, never in the game.
 import { BASE } from './contest';
 import { TOUCH } from './touch';
+import { PENALTY } from './penalties';
 import { FATIGUE } from './fatigue';
 import { GAS } from './gas';
 import { LIVE } from './live';
@@ -30,6 +31,7 @@ export const KNOBS = {
   rules: NINES,
   bench: BENCH,
   touch: TOUCH,
+  penalty: PENALTY,
   goals: GOALS,
 } as const;
 

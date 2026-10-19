@@ -365,3 +365,38 @@ balance pass (with #72, the grubber try rate). More stoppages mean more intercha
 (5 → 7 a match).
 
 Tests: `tests/match/league/touch.test.ts`.
+
+## 17. Penalties and six-again (BAK-207 §5.1, 2e)
+
+**Six again** for ruck offences: a small chance at any play-the-ball (a defender lying in or
+slow off the ruck), more after a slow wrestle (a tackler holding down). The tackle count goes
+back to zero, even on the last (no handover). **Penalties**: offside as the ball is played (by
+the defending side's preset: Rush most) and high shots (rare; a Hothead more). The penalty is
+brought out to 10 m from the line. The captain's call (`choosePenalty`): **the shot at goal**
+(a Nines drop kick, 2 points; from the mark) when it is at least 60% to go over and either the
+last 5 minutes with his side no more than 6 behind and no more than 1 ahead, or the half ending
+(20 s or the siren); else **tap and go** inside 25 m, or **kick for touch** (25 m × Big Boot
+distance, never inside their 10) and a tap 10 m in from touch. A missed penalty goal is dead: a
+20 m restart. After the siren only the shot keeps the half alive. Shown as **PENALTY!** over the
+offender, the call over the taker (**GOING FOR GOAL**, **TAP AND GO**, **FOR TOUCH**), **SIX
+AGAIN!** over the tackler; the commentary says why. Sin bins later (BAK-206 B7).
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `penalty.ruckSixAgain` | `src/match/league/penalties.ts` | 0.008 | Six again at any play-the-ball. |
+| `penalty.holdDown` | `penalties.ts` | 0.08 | Extra six-again chance after a slow wrestle (≥ 1.2 s). |
+| `penalty.offside.slide` / `.rush` / `.compressed` | `penalties.ts` | 0.008 / 0.02 / 0.006 | Offside as the ball is played, by the defence preset. |
+| `penalty.highShot` / `penalty.highShotHothead` | `penalties.ts` | 0.002 / 0.03 a level | A high shot in a made tackle. |
+| `penalty.goalPoints` | `penalties.ts` | 2 | A penalty goal. |
+| `penalty.shotMin` / `.shotLateS` / `.shotBehind` / `.shotAhead` / `.shotHalfEndS` | `penalties.ts` | 0.6 / 300 s / 6 / 1 / 20 s | When the captain takes the shot. |
+| `penalty.tapInsideM` | `penalties.ts` | 25 m | Else: tap inside this, kick for touch beyond. |
+| `penalty.touchGainM` | `penalties.ts` | 25 m | A penalty kick for touch gains this (× Big Boot distance). |
+| `penalty.minTicks` / `penalty.maxTicks` | `penalties.ts` | 40 / 220 | The kick for touch is taken once the kicker is on his mark, 2–11 s. |
+
+Measured (standard plan, 20 whole matches a row, run `20261019-124914-standard`), per match:
+2.35 penalties (1.7 offside, 0.65 high shots) and 2.3 six-agains between even sides; slide v
+rush 3.0 penalties, the Rush side conceding 1.85 to Slide's 1.15. Calls: mostly for touch
+(1.9), some taps (0.45); shots at goal are rare (late and close only). Tries between even
+sides 5.55. The extra dice reshuffle every seed; nothing else moves beyond luck.
+
+Tests: `tests/match/league/penalties.test.ts`.

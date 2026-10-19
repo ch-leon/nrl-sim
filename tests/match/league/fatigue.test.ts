@@ -146,7 +146,8 @@ describe('legs and the wrestle in the live sim', () => {
       let breaks = 0;
       let tackles = 0;
       let top = 0;
-      for (let s = 1; s <= 8; s++) {
+      // 24 seeds: the effect is a few per cent, and 8 seeds is within the noise.
+      for (let s = 1; s <= 24; s++) {
         const es = play(new LiveSim(sheet('H'), sheet('A'), s, { energy }), 150, (snap) => {
           for (const p of snap.players) top = Math.max(top, p.speed);
         });

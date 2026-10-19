@@ -24,6 +24,7 @@ export const COUNTS = [
   'intercepts', 'strips', 'quickPtb', 'slowPtb', 'gassed', 'wrestles', 'held1', 'held2', 'held3',
   'runDowns', 'blown', 'subs', 'goals', 'goalMisses', 'fieldGoals', 'fgMisses', 'chargeDowns', 'bonusTries',
   'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
+  'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -149,6 +150,25 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         break;
       case 'drop-out':
         c.dropOuts++;
+        break;
+      case 'penalty':
+        c.penalties++;
+        if (e.detail === 'offside') c.offsides++;
+        else if (e.detail === 'high') c.highShots++;
+        if (e.side === 'home') c.penConcededHome++;
+        else c.penConcededAway++;
+        break;
+      case 'penalty-choice':
+        if (e.detail === 'tap') c.penTaps++;
+        else if (e.detail === 'touch') c.penTouch++;
+        else c.penShots++;
+        break;
+      case 'penalty-goal':
+        if (e.detail === 'good') c.penaltyGoals++;
+        else c.penGoalMisses++;
+        break;
+      case 'six-again':
+        c.sixAgains++;
         break;
       case 'interchange':
         c.subs++;
