@@ -1,0 +1,63 @@
+name: Balance
+
+# Re-measures match balance (balance/README.md) whenever the match code or a
+# plan changes on main, and on demand with any plan. The report shows on the
+# run's summary page; every run is kept on the balance-log branch with the
+# change since the previous run of the same plan.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/match/**'
+      - 'src/sim/**'
+      - 'src/data/**'
+      - 'balance/plans/**'
+      - 'scripts/balance.ts'
+  workflow_dispatch:
+    inputs:
+      plan:
+        description: Plan file to run
+        default: balance/plans/standard.json
+      seeds:
+        description: Matches per row (blank keeps the plan's)
+        default: ''
+
+concurrency:
+  group: balance-log
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Fetch the balance log
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          scripts/balance-log.sh fetch
+      - name: Run the plan
+        env:
+          PLAN: ${{ inputs.plan || 'balance/plans/standard.json' }}
+          SEEDS: ${{ inputs.seeds }}
+        run: |
+          name=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).name)" "$PLAN")
+          prev=$(scripts/balance-log.sh latest "$name")
+          npm run balance -- --plan "$PLAN" --jobs 4 ${SEEDS:+--seeds "$SEEDS"} ${prev:+--previous "$prev"}
+          run=$(ls -d balance/runs/* | sort | tail -1)
+          echo "RUN=$run" >> "$GITHUB_ENV"
+          cat "$run/report.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep it on the balance-log branch
+        run: |
+          git -C .balance-log config user.name 'github-actions[bot]'
+          git -C .balance-log config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          scripts/balance-log.sh publish "$RUN"

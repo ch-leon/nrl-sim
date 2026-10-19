@@ -28,7 +28,7 @@ export const TRAIT_PTS = {
   lastLineSpeed: 0.1,
   bigBootDist: 0.1,
   bigBootAcc: 0.15,
-} as const;
+};
 
 /** The downside of a double-edged trait is fixed — levels raise only the upside. */
 export const EDGE_COST = {
@@ -36,7 +36,7 @@ export const EDGE_COST = {
   hothead: 0.08,
   /** Razzle Dazzle: his offloads spill this much more often. */
   razzleDazzle: 0.1,
-} as const;
+};
 
 /** Inside this many metres of the try line (the red zone) the Finisher fires. */
 export const FINISHER_M = 20;
