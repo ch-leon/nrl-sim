@@ -21,3 +21,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-135126-spread-2 | spread 2 | acd838f (uncommitted changes) | feat/phase3-gaps | [report](runs/20261019-135126-spread-2/report.md) |
 | 20261019-135855-spread-confirm | spread confirm | 444b072 (uncommitted changes) | feat/phase3-gaps | [report](runs/20261019-135855-spread-confirm/report.md) |
 | 20261019-140112-standard | standard | 28f522d | feat/phase3-gaps | [report](runs/20261019-140112-standard/report.md) |
+| 20261019-140842-standard | standard | fe323f0 | main | [report](runs/20261019-140842-standard/report.md) |
