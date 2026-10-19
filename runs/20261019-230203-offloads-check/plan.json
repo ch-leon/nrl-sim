@@ -1,0 +1,31 @@
+{
+  "name": "offloads check",
+  "description": "N9.1: did the speed work (hypot to sqrt, scalar steering) move offloads, or was the standard plan's drop the seed reshuffle? 60 whole matches a row, run on main and on the branch.",
+  "seeds": 60,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v grind",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      }
+    }
+  ]
+}
