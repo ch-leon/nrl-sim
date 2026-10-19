@@ -8,8 +8,10 @@
 export const NINES = {
   /** Length of each half, minutes of sim time. */
   halfMinutes: 9,
-  /** Points for a try (conversions, penalty goals and field goals come later in Phase 2). */
+  /** Points for a try, a conversion (a drop kick in Nines) and a field goal (penalty goals come with 2e). */
   tryPoints: 4,
+  conversionPoints: 2,
+  fieldGoalPoints: 1,
   /** The half-time break on screen, ticks (3 s), before the second-half kick-off. */
   halfTimeTicks: 60,
   /** At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2). */

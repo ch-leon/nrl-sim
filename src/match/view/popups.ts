@@ -51,6 +51,10 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   'run-down': { word: 'RUN DOWN!', tone: 'defence', big: true },
   // Interchanges (BAK-207 2b): over the man coming on.
   interchange: { word: 'ON!', tone: 'neutral' },
+  // Goal kicking (2c): the result over the kicker; a charge-down over the man who blocked it.
+  conversion: { word: 'GOAL!', tone: 'attack' },
+  'field-goal': { word: 'FIELD GOAL!', tone: 'attack', big: true },
+  'charge-down': { word: 'CHARGED DOWN!', tone: 'defence', big: true },
 };
 
 /** A bust out of a wrestle (the defenders' grip went first) reads differently from one at contact. */
@@ -78,6 +82,10 @@ export function surnameOf(name: string | undefined): string {
 export function popupFor(e: SimEvent): Popup | null {
   const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
+  // A kick at goal that misses reads as a miss, whichever kind it was.
+  if ((e.kind === 'conversion' || e.kind === 'field-goal') && e.detail === 'missed') {
+    return { word: 'MISSED!', sub: surnameOf(e.player).toUpperCase(), tone: 'bad', big: false, ms: POPUP_MS };
+  }
   const big = w.big ?? false;
   const word = e.kind === 'kick' && e.detail && KICK_WORDS[e.detail] ? KICK_WORDS[e.detail]! : e.kind === 'break-tackle' && e.detail === 'wrestle' ? LATE_BUST : w.word;
   const p: Popup = { word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };

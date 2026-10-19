@@ -181,7 +181,8 @@ second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip 
 | **Grubber** | 22–40 m (20%), inside 22 m (50%) | Skids and hops 3 m into the in-goal; race for the loose ball: try, or the defender runs it out |
 | **Chip** | 22–40 m (15%), inside 22 m (20%) | 10–13 m over the rushing line, the kicker chases his own |
 | **40/20** | Inside own 40, Boot trait or Playmaker, last tackle | *E:* Finds touch inside the 20 → fresh set to the kicking team |
-| **Field goal** | Last 3 minutes, scores level or within 1, inside 30 m | *Phase 2:* Boot accuracy, defensive charge-down 8% |
+| **Field goal** | Last 3 minutes, his side level or a point behind, inside 30 m, tackle 3 or later | *Implemented in BAK-207 2c:* a drop kick, odds by angle, distance, Skill and Boot; charge-down 8%; a miss is a 20 m restart |
+| **Conversion** | After every try | *Implemented in BAK-207 2c:* a Nines drop kick in line with the try, from where the posts look widest; GOAL! / MISSED! |
 
 Every kick pop-ups its type (BOMB!, GRUBBER!, CHIP!, CROSS-FIELD!, plain KICK! for
 territory); REGATHER! and DROPPED! follow. The camera going wide waits for E. Goal-line
