@@ -286,3 +286,34 @@ describe('initFinanceLedger', () => {
     expect(getState().money).toBe(100_000 + (-wages + income + gate));
   });
 });
+
+describe('financeSummary — average home gate in the run-rate (QA)', () => {
+  it('spreads the remaining home gates over the weeks left in the regular season', () => {
+    const s = setup({
+      week: 21, money: 50_000, reputation: 30, facilities: [],
+      squad: [mkPlayer({ wage: 20_000 })],
+      league: { clubs: [], fixtures: [homeFixture(20), homeFixture(21), awayFixture(22), homeFixture(23), awayFixture(24)], ladder: [] },
+    });
+    const f = financeSummary(s);
+    const gate = gateReceipts({ ...s, week: 21 });
+    // 2 home games left (R21, R23) over 4 weeks (R21–R24)
+    expect(f.gateWeekly).toBe(Math.round((gate * 2) / 4));
+    expect(f.netWeekly).toBe(f.incomeWeekly + f.gateWeekly - f.wagesWeekly);
+    expect(f.burnWeekly).toBe(Math.max(0, f.wagesWeekly - f.incomeWeekly - f.gateWeekly));
+  });
+
+  it('a club whose gates cover the wages has no burn and no runway warning', () => {
+    const fixtures = Array.from({ length: 24 }, (_, i) => (i % 2 ? awayFixture(i + 1) : homeFixture(i + 1)));
+    const s = setup({ week: 1, money: 10_000, reputation: 30, facilities: [], squad: [mkPlayer({ wage: 15_000 })], league: { clubs: [], fixtures, ladder: [] } });
+    const f = financeSummary(s);
+    // gate at rep 30: (500 + 1200) × $20 = $34,000, every other week = $17,000/wk avg
+    expect(f.gateWeekly).toBe(17_000);
+    expect(f.burnWeekly).toBe(0);
+    expect(f.runwayWeeks).toBeNull();
+  });
+
+  it('no home games left means no gate in the average', () => {
+    const s = setup({ week: 24, facilities: [], league: { clubs: [], fixtures: [homeFixture(23), awayFixture(24)], ladder: [] } });
+    expect(financeSummary(s).gateWeekly).toBe(0);
+  });
+});
