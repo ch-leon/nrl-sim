@@ -1,7 +1,12 @@
 // src/fx/pwa.ts — BAK-204 (WU-16): PWA install UX + service-worker registration.
 //
 // initPwa() is called once by the orchestrator from main.ts. It:
-//   * registers the auto-updating service worker (plugin's virtual module),
+//   * registers the service worker (plugin's virtual module). Updates are
+//     prompted, not forced (N7, GitHub #181): a new build waits until the player
+//     taps Reload on the "New version ready" bar (src/ui/updatePrompt.ts), and
+//     that bar never appears during a match,
+//   * checks for a new build every UPDATE_CHECK_MS and whenever the app comes
+//     back to the foreground (main deploys after every merge),
 //   * captures `beforeinstallprompt` so we can offer an Install button
 //     (Android/desktop Chromium) via canInstall()/promptInstall(),
 //   * on install-incapable iOS Safari, shows a one-time "Add to Home Screen"
@@ -14,6 +19,7 @@
 /// <reference types="vite-plugin-pwa/vanillajs" />
 
 import { bus } from '../core/events';
+import { domUpdateHooks, scheduleUpdatePrompt } from '../ui/updatePrompt';
 
 /** The `beforeinstallprompt` event, typed minimally (not in lib.dom yet). */
 interface BeforeInstallPromptEvent extends Event {
@@ -22,9 +28,23 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const IOS_HINT_KEY = 'nrlsim.iosInstallHintShown';
+/** How often a running app asks the server whether a new build is up. */
+export const UPDATE_CHECK_MS = 15 * 60 * 1000;
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 let initialised = false;
+/** Applies the waiting build (reloads the page); set once one is waiting. */
+let applyUpdate: (() => Promise<void>) | null = null;
+
+/** A new build is downloaded and waiting for a reload. */
+export function updateReady(): boolean {
+  return applyUpdate !== null;
+}
+
+/** Swap to the waiting build now (the page reloads). No-op when none is waiting. */
+export function reloadForUpdate(): void {
+  void applyUpdate?.();
+}
 
 /** True once a `beforeinstallprompt` has been captured and not yet consumed. */
 export function canInstall(): boolean {
@@ -91,18 +111,63 @@ export function initPwa(): void {
     deferredPrompt = null;
   });
 
-  // Register the auto-updating service worker. The virtual module only exists
-  // in a Vite build/dev graph, so guard against environments (Vitest) where it
-  // cannot be resolved.
+  // Register the service worker. The virtual module only exists in a Vite
+  // build/dev graph, so guard against environments (Vitest) where it cannot be
+  // resolved.
   void registerServiceWorker();
 
   maybeShowIosHint();
+
+  // `?e2e` (scripts/e2e-season.mjs): let the playthrough raise the update bar
+  // without deploying a build, so it can check the bar waits for full time.
+  if (new URLSearchParams(location.search).has('e2e')) {
+    const w = window as unknown as { __nrlUpdateReady?: () => void };
+    w.__nrlUpdateReady = () => onNewBuildWaiting(() => Promise.resolve());
+  }
+}
+
+/** A new build is waiting: remember how to apply it and prompt (after any match). */
+function onNewBuildWaiting(apply: () => Promise<void>): void {
+  applyUpdate = apply;
+  scheduleUpdatePrompt(domUpdateHooks(() => void apply()));
+}
+
+/**
+ * Ask the browser to look for a new service worker every UPDATE_CHECK_MS and
+ * whenever the page becomes visible again. Pure wiring so a test can drive it
+ * with fake timers; returns a disposer.
+ */
+export function startUpdateChecks(
+  check: () => Promise<unknown>,
+  opts: { intervalMs?: number; doc?: Pick<Document, 'addEventListener' | 'removeEventListener' | 'visibilityState'> } = {},
+): () => void {
+  const run = (): void => {
+    void check().catch(() => {
+      // Offline, or the server is mid-deploy: the next check will try again.
+    });
+  };
+  const timer = setInterval(run, opts.intervalMs ?? UPDATE_CHECK_MS);
+  const doc = opts.doc ?? (typeof document !== 'undefined' ? document : null);
+  const onVisible = (): void => {
+    if (doc?.visibilityState === 'visible') run();
+  };
+  doc?.addEventListener('visibilitychange', onVisible);
+  return () => {
+    clearInterval(timer);
+    doc?.removeEventListener('visibilitychange', onVisible);
+  };
 }
 
 async function registerServiceWorker(): Promise<void> {
   try {
     const { registerSW } = await import('virtual:pwa-register');
-    registerSW({ immediate: true });
+    const update = registerSW({
+      immediate: true,
+      onNeedRefresh: () => onNewBuildWaiting(() => update(true)),
+      onRegisteredSW: (_url, reg) => {
+        if (reg) startUpdateChecks(() => reg.update());
+      },
+    });
   } catch {
     // Virtual module unavailable (test/unsupported env) — SW simply not registered.
   }

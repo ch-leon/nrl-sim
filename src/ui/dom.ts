@@ -496,6 +496,31 @@ export const CSS = `
 .nrl-toast-success { background: #2e7d32; }
 .nrl-toast-danger { background: #b03a2e; }
 
+/* ── Update bar (N7, #181): a new build is waiting; never during a match ── */
+.nrl-update-toast {
+  pointer-events: auto;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--nrl-nav-h, 0px) + 0.5rem + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: min(94vw, 440px);
+  background: #e8e0c8;
+  color: #1a1a2e;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+  padding: 0.3rem 0.4rem 0.3rem 0.7rem;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.nrl-update-toast .nrl-btn { flex: 0 0 auto; }
+body.nrl-match-active .nrl-update-toast { display: none; }
+
 /* ── History (season-end / past seasons) ─────────────────────────────── */
 .nrl-history h2 {
   margin: 0 0 0.75rem;

@@ -147,3 +147,55 @@ describe('canInstall() / promptInstall()', () => {
     await expect(promptInstall()).resolves.toBe('unavailable');
   });
 });
+
+describe('update prompt (N7, #181)', () => {
+  it('reports no update waiting until a build is', async () => {
+    const { updateReady, reloadForUpdate } = await freshPwa();
+    expect(updateReady()).toBe(false);
+    expect(() => reloadForUpdate()).not.toThrow();
+  });
+
+  it('startUpdateChecks polls on the interval and when the app is shown again', async () => {
+    vi.useFakeTimers();
+    try {
+      const { startUpdateChecks } = await freshPwa();
+      const check = vi.fn(() => Promise.resolve());
+      const handlers = new Map<string, () => void>();
+      const doc = {
+        visibilityState: 'hidden' as DocumentVisibilityState,
+        addEventListener: (type: string, cb: EventListenerOrEventListenerObject) => handlers.set(type, cb as () => void),
+        removeEventListener: (type: string) => handlers.delete(type),
+      };
+      const stop = startUpdateChecks(check, { intervalMs: 1000, doc });
+      expect(check).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2500);
+      expect(check).toHaveBeenCalledTimes(2);
+      handlers.get('visibilitychange')?.(); // hidden: nothing
+      expect(check).toHaveBeenCalledTimes(2);
+      doc.visibilityState = 'visible';
+      handlers.get('visibilitychange')?.();
+      expect(check).toHaveBeenCalledTimes(3);
+      stop();
+      vi.advanceTimersByTime(5000);
+      expect(check).toHaveBeenCalledTimes(3);
+      expect(handlers.size).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('startUpdateChecks swallows a failed check (offline, mid-deploy)', async () => {
+    vi.useFakeTimers();
+    try {
+      const { startUpdateChecks } = await freshPwa();
+      const check = vi.fn(() => Promise.reject(new Error('offline')));
+      const stop = startUpdateChecks(check, { intervalMs: 10, doc: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} } });
+      vi.advanceTimersByTime(25);
+      await vi.runAllTicks();
+      expect(check).toHaveBeenCalledTimes(2);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
