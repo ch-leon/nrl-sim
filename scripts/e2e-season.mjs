@@ -1,13 +1,17 @@
 // scripts/e2e-season.mjs — end-to-end playthrough of a full season on a phone
 // (QA pass). Builds the game and serves it with `vite preview`, then in
 // Chromium at 844×390 (touch) or 1280×800 (a desktop window, mouse):
-//   new game → turn the phone upright (rotate card, loop asleep) and back (the
+//   title (build label) → new game → turn the phone upright (rotate card, loop asleep) and back (the
 //   canvas fills the landscape viewport again) → build two facilities → move one →
 //   demolish one → sign a free agent → change the kit → play a match on the
 //   classic engine → turn on Live match (beta)
 //   and watch one on the live sim through the overlay to Back to Club →
 //   answer event cards → renew a contract → watch rivals sign from the pool →
 //   save, reload and continue → play to the season rollover → into season 2.
+// N7's screens ride along (selectors in issue #198): the player page from Squad, an
+// update bar raised mid-match (held until Back to Club), the next-match card and the
+// ladder's form column, the Guide's How Nines works, the season review at the
+// rollover and again from History. Each skips with a note on a build without it.
 // Every step takes a screenshot and runs layout checks (nothing off-screen, no
 // sideways page scroll); a page or console error during a step fails it. Writes
 // e2e-output/<WxH>/report.json and exits 1 if anything failed. Slot 1 is dumped
@@ -230,7 +234,15 @@ async function play() {
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') report.errors.push(`console: ${m.text()}`); });
 
-  await step('title', async () => { await page.goto(BASE); await page.waitForSelector('[data-nrl-start]'); });
+  await step('title', async (rec) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-nrl-start]');
+    // N7 (#182): the build label on the title screen, "Build <date> <sha>".
+    const label = (await page.locator('[data-nrl-build]').first().textContent().catch(() => null))?.trim();
+    if (label === undefined || label === null) return 'no build label on the title screen';
+    if (!/^Build \S+/.test(label)) throw new Error(`build label reads "${label}"`);
+    rec.notes.push(label);
+  });
   await step('new-game', async () => {
     await page.fill('[data-nrl-clubname]', 'Phone Test FC');
     await tap('[data-nrl-start]');
@@ -322,6 +334,22 @@ async function play() {
     rec.notes.push(`signed ${name}`);
   });
   await step('squad', async () => { await closeAny(); await tap('.nrl-nav .nrl-btn:has-text("Squad")'); await page.waitForSelector('.nrl-squad-kit'); });
+  // N7 (#187): a card's top row opens the player page; its close returns to the Squad screen.
+  await step('player-page', async (rec) => {
+    const open = page.locator('[data-player-open]').first();
+    if (!(await open.count())) return 'no player page on this build';
+    const id = await open.getAttribute('data-player-open');
+    await press(open);
+    await page.waitForSelector(`[data-player-page="${id}"]`);
+    const actions = await page.locator(`[data-player-page="${id}"] [data-player-action]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-player-action')));
+    rec.notes.push(`player ${id}; actions ${actions.join(', ') || 'none'}`);
+  });
+  await step('player-page-closed', async () => {
+    if (!(await page.locator('[data-player-page]').count())) return 'skipped';
+    await tap('.nrl-player-close');
+    await page.waitForSelector('[data-player-page]', { state: 'detached', timeout: 5000 });
+    await page.waitForSelector('.nrl-squad-kit');
+  });
 
   // Kit designer.
   await step('kit-designer', async () => { await tap('.nrl-squad-kit'); await page.waitForSelector('.nrl-kit'); });
@@ -342,7 +370,23 @@ async function play() {
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 15000 });
     await wait(500);
   });
+  // N7 (#182): a new build waiting during a match: no bar while the match is on screen.
+  let updateRaised = false;
+  await step('update-held', async (rec) => {
+    updateRaised = await page.evaluate(() => { if (!window.__nrlUpdateReady) return false; window.__nrlUpdateReady(); return true; });
+    if (!updateRaised) return 'no update hook on this build';
+    await wait(500);
+    if (await page.locator('.nrl-update-toast:visible').count()) throw new Error('the update bar shows during a match');
+    rec.notes.push('build raised mid-match, bar held');
+  });
   await step('back-to-club', async (rec) => { await leaveMatch(); await facilitiesDrawn(rec); }, { quietToasts: true });
+  await step('update-bar', async (rec) => {
+    if (!updateRaised) return 'skipped';
+    await page.waitForSelector('.nrl-update-toast', { state: 'visible', timeout: 5000 });
+    await tap('.nrl-update-later');
+    await page.waitForSelector('.nrl-update-toast', { state: 'hidden', timeout: 5000 });
+    rec.notes.push('bar shown after Back to Club; Later dismissed it');
+  });
 
   // Live match (BAK-207 2g): the setting lives on the Fixtures screen. With it on,
   // the next match plays on the live sim and is watched through the overlay at ×8,
@@ -424,7 +468,25 @@ async function play() {
     await tap('.nrl-nav .nrl-btn:has-text("News")');
     await page.waitForSelector('.nrl-news-list');
   });
-  await step('ladder', async () => { await closeAny(); await tap('.nrl-nav .nrl-btn:has-text("Ladder")'); await page.waitForSelector('.nrl-ladder-table'); });
+  // N7 (#184): the next-match card on the Fixtures tab, with the opponent's form.
+  await step('next-match', async (rec) => {
+    await closeAny();
+    await tap('.nrl-nav .nrl-btn:has-text("Fixtures")');
+    await page.waitForSelector('.nrl-league');
+    const card = page.locator('[data-next-match]');
+    if (!(await card.count())) return 'no next-match card on this build';
+    const opp = (await page.locator('[data-next-opponent]').first().textContent())?.trim().replace(/\s+/g, ' ');
+    const form = await page.locator('[data-next-match] .nrl-form i').count();
+    if (!opp) throw new Error('the next-match card names no opponent');
+    rec.notes.push(`next: ${opp.slice(0, 60)}; ${form} form cells`);
+  });
+  await step('ladder', async (rec) => {
+    await closeAny();
+    await tap('.nrl-nav .nrl-btn:has-text("Ladder")');
+    await page.waitForSelector('.nrl-ladder-table');
+    const form = await page.locator('.nrl-ladder-form').count();
+    if (form) rec.notes.push(`form column on ${form} rows`);
+  });
   await step('rival-squad', async () => { await tap('.nrl-ladder-club'); await page.waitForSelector('.nrl-rival-squad'); });
 
   // Contracts: renew someone.
@@ -442,6 +504,21 @@ async function play() {
     rec.notes.push(`tapped ${label}`);
   });
   await step('finance', async () => { await closeAny(); await tap('.nrl-nav .nrl-btn:has-text("Finance")'); await wait(300); });
+  // N7 (#189): ? opens the Guide; its How Nines works page; close.
+  await step('guide-nines', async (rec) => {
+    await closeAny();
+    await tap('.nrl-nav .nrl-btn[data-screen="help"]');
+    if (!(await page.waitForSelector('[data-guide]', { timeout: 5000 }).catch(() => null))) return 'no Guide on this build';
+    await tap('[data-guide-tab="nines"]');
+    await page.waitForSelector('[data-guide-page="nines"]');
+    const tabs = await page.locator('[data-guide-tab]').count();
+    rec.notes.push(`${tabs} Guide pages; How Nines works open`);
+  });
+  await step('guide-closed', async () => {
+    if (!(await page.locator('[data-guide]').count())) return 'skipped';
+    await tap('.nrl-guide-close');
+    await page.waitForSelector('[data-guide]', { state: 'detached', timeout: 5000 });
+  });
 
   // Save, reload, continue.
   const pre = await save();
@@ -475,7 +552,26 @@ async function play() {
     rec.notes.push(`season 2 week ${s.week}, ${s.history.length} season(s) in history, board patience ${s.boardPatience}`);
     await dumpSave('after-rollover', rec);
   });
+  // N7 (#193): the season review opens at the rollover; close it, then reopen it from History.
+  await step('season-review', async (rec) => {
+    const review = page.locator('[data-season-review="1"]');
+    if (!(await review.count())) {
+      if (await page.evaluate(() => (window.__nrlState?.().history ?? []).some((h) => h.review))) throw new Error('season 1 has a review but none opened at the rollover');
+      return 'no season review on this build';
+    }
+    rec.notes.push((await review.textContent())?.trim().replace(/\s+/g, ' ').slice(0, 90));
+    await tap('.nrl-review-close');
+    await page.waitForSelector('[data-season-review]', { state: 'detached', timeout: 5000 });
+  });
   await step('history', async () => { await tap('.nrl-nav .nrl-btn:has-text("History")'); await wait(300); });
+  await step('history-review', async (rec) => {
+    const open = page.locator('.nrl-history-review').first();
+    if (!(await open.count())) return 'no review link on History';
+    await press(open);
+    await page.waitForSelector('[data-season-review="1"]');
+    await tap('.nrl-review-close');
+    rec.notes.push('season 1 review reopened from History');
+  });
   await step('season-2-week-2', async (rec) => {
     await closeAny();
     await answerCards(rec);
