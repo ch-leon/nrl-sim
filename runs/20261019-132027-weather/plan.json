@@ -1,0 +1,46 @@
+{
+  "name": "weather",
+  "description": "2f: the same even sides in clear, rain and wind; a 20-point gap in the rain. Errors, lost in contact and goal kicking should move; injuries ~ old engine.",
+  "seeds": 60,
+  "scenarios": [
+    {
+      "name": "even-clear",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "even-rain",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "weather": "rain"
+    },
+    {
+      "name": "even-wind",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "weather": "wind"
+    },
+    {
+      "name": "gap20-rain",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      },
+      "weather": "rain"
+    }
+  ]
+}
