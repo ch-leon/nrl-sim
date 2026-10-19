@@ -43,3 +43,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-163206-standard | standard | 6d812ab | main | [report](runs/20261019-163206-standard/report.md) |
 | 20261019-164411-calls-paid-off | calls paid off | 6d812ab (uncommitted changes) | feat/coach-calls-paid-off | [report](runs/20261019-164411-calls-paid-off/report.md) |
 | 20261019-163753-calls-paid-off | calls paid off | 6d812ab (uncommitted changes) | feat/coach-calls-paid-off | [report](runs/20261019-163753-calls-paid-off/report.md) |
+| 20261019-165236-standard | standard | d814aaf | main | [report](runs/20261019-165236-standard/report.md) |
