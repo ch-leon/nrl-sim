@@ -206,10 +206,15 @@ export interface GameState {
 
 Rival squads (GitHub #74): every rival keeps a persistent `squad` (generated to match its
 strength at new game / v7→v8 migration, seeded per club so `rngSeed` is untouched). Weekly
-(tick order 59, before the free-agent refresh) rivals heal and may sign from `freeAgents`
-(weakest position first, under a salary cap). At rollover they age and retire through
-`aging.ts`, develop by age with a pull toward the league mean, and take on juniors; this
-replaced the old strength drift. Matchday builds a rival's sheet from its fit squad with
+(tick order 59, before the free-agent refresh) rivals heal, may sign from `freeAgents`
+(weakest position first, under a salary cap), and develop (#143): on their own RNG stream
+(`rivalDevelopSeed`, never `rngSeed`) every rival player has a chance of ±1 on each stat
+that averages `RIVAL_DEVELOPMENT.BY_AGE` over a season (young +4, veterans −4) plus the
+pull toward `LEAGUE.MEAN`, and a league anchor nudges every rival back toward the mean
+once the rival mean has drifted past a deadband, so the league's centre holds at about
+55 while clubs still rise and fall against each other. At rollover they age and retire
+through `aging.ts` and take on juniors; this replaced the old strength drift and the
+rollover development. Matchday builds a rival's sheet from its fit squad with
 `teamSheetFromSquad` (the strength sheet is the fallback), so the match API is unchanged.
 
 Parity (N5, GitHub #140): `LEAGUE` in `config.ts` holds the league's rating centre

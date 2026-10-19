@@ -6,15 +6,17 @@
 //   - New game / old save: generateRivalSquad builds a squad that matches the
 //     club's strength (seeded per club, so it never moves the main rngSeed).
 //   - Weekly: rivals with room or a weak spot may sign from state.freeAgents
-//     (rivalSigningTick); rival injuries heal.
-//   - Season rollover: players age and retire through aging.ts, develop by age,
-//     and juniors top the squad back up (rolloverRivals). This replaces the old
-//     strength drift.
+//     (rivalSigningTick); rival injuries heal; every rival player develops a
+//     little by age on its own RNG stream, and the league anchor nudges every
+//     rival back toward LEAGUE.MEAN when the league as a whole has drifted
+//     (developRivalsWeek, #143).
+//   - Season rollover: players age and retire through aging.ts and juniors top
+//     the squad back up (rolloverRivals). This replaces the old strength drift.
 // Pure functions plus one tick hook. No Phaser.
 import { getState, setState, type GameState, type Player, type Position, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
-import { LEAGUE, ON_FIELD, STAT_MAX } from '../config';
+import { LEAGUE, ON_FIELD, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { generatePlayerAround, overallRating, POSITIONS } from '../data/player';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
@@ -52,8 +54,26 @@ export const RIVAL_WAGE_CAP = 21_000;
  * Each season a rival player's development is nudged this fraction of the way
  * toward RIVAL_LEAGUE_MEAN (stars fade a little faster, battlers catch up), so
  * picking the best nine of a growing squad can't ratchet strength upward.
+ * Applied a week at a time (developRivalsWeek).
  */
 export const RIVAL_DEVELOPMENT_PULL = 0.1;
+/**
+ * In-season development and the league anchor (#143). Development is a chance
+ * each week of ±1 on each stat, so stats stay whole numbers and over a season a
+ * player moves about the BY_AGE amount: the young gain, veterans fade. The
+ * anchor works the same way on every rival once the rival mean has drifted past
+ * ANCHOR_DEADBAND from LEAGUE.MEAN, at ANCHOR_RATE × the gap a week (capped at
+ * ANCHOR_MAX), so the league's centre holds while clubs still rise and fall
+ * against each other. Assumed (needs Leon): the rates. For scale, a player's
+ * squad on one Training Paddock gains about 9 overall a season.
+ */
+export const RIVAL_DEVELOPMENT = {
+  /** [up to this age, overall points a season]. */
+  BY_AGE: [[21, 4], [25, 1.5], [29, 0], [32, -2], [Infinity, -4]] as readonly (readonly [number, number])[],
+  ANCHOR_RATE: 0.1,
+  ANCHOR_DEADBAND: 0.5,
+  ANCHOR_MAX: 0.5,
+} as const;
 /** Tick order: before the free-agent refresh (60), so rivals pick from the pool the player saw. */
 export const RIVALS_TICK_ORDER = 59;
 
@@ -223,6 +243,82 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
   return { clubs: out, freeAgents: pool, news, signed };
 }
 
+// ── Weekly: development and the league anchor (#143) ─────────────────────────
+
+/** Expected change in overall over a season for a player of `age` (RIVAL_DEVELOPMENT.BY_AGE). */
+export function developmentRate(age: number): number {
+  for (const [upTo, rate] of RIVAL_DEVELOPMENT.BY_AGE) if (age <= upTo) return rate;
+  return 0;
+}
+
+/** One week's chance of a ±1 step that averages `perSeason` over a season. */
+function stepStat(value: number, perSeason: number, rng: Rng): number {
+  if (perSeason === 0) return value;
+  const p = Math.min(1, Math.abs(perSeason) / WEEKS_PER_SEASON);
+  if (rng.next() >= p) return value;
+  return clampStat(value + Math.sign(perSeason));
+}
+
+/** Nudge every stat of `p` by a chance of ±1 that averages `perSeason` over a season. */
+function nudgeStats(p: Player, perSeason: number, rng: Rng): Player {
+  if (perSeason === 0) return p;
+  const s = p.stats;
+  return {
+    ...p,
+    stats: {
+      speed: stepStat(s.speed, perSeason, rng),
+      strength: stepStat(s.strength, perSeason, rng),
+      stamina: stepStat(s.stamina, perSeason, rng),
+      skill: stepStat(s.skill, perSeason, rng),
+      footyIQ: stepStat(s.footyIQ, perSeason, rng),
+    },
+  };
+}
+
+/** A week of development for one rival player: by age, plus the pull toward the league mean. */
+export function developRivalPlayerWeek(p: Player, rng: Rng): Player {
+  const perSeason = developmentRate(p.age) + (RIVAL_LEAGUE_MEAN - overallRating(p)) * RIVAL_DEVELOPMENT_PULL;
+  return nudgeStats(p, perSeason, rng);
+}
+
+/** Mean strength of the rivals (the player's entry and squadless clubs excluded). */
+export function rivalMeanStrength(clubs: readonly RivalClub[], playerId = 'player'): number {
+  const rivals = clubs.filter((c) => c.id !== playerId && c.squad && c.squad.length > 0);
+  if (rivals.length === 0) return RIVAL_LEAGUE_MEAN;
+  return rivals.reduce((t, c) => t + c.strength, 0) / rivals.length;
+}
+
+/**
+ * The league anchor's weekly correction, in overall points a season, for a rival
+ * mean of `mean`: zero inside the deadband, otherwise toward LEAGUE.MEAN at
+ * ANCHOR_RATE × the gap a week (capped), expressed per season for nudgeStats.
+ */
+export function anchorPerSeason(mean: number): number {
+  const gap = mean - RIVAL_LEAGUE_MEAN;
+  if (Math.abs(gap) <= RIVAL_DEVELOPMENT.ANCHOR_DEADBAND) return 0;
+  const weekly = Math.min(RIVAL_DEVELOPMENT.ANCHOR_MAX, Math.abs(gap) * RIVAL_DEVELOPMENT.ANCHOR_RATE);
+  return -Math.sign(gap) * weekly * WEEKS_PER_SEASON;
+}
+
+/**
+ * One week of rival development (pure): every rival player develops by age with
+ * the pull toward the league mean, then the anchor nudges every rival player
+ * toward LEAGUE.MEAN if the rival mean has drifted. Strengths are re-derived.
+ * `rng` is the rivals' own development stream (rivalDevelopSeed), never rngSeed.
+ */
+export function developRivalsWeek(clubs: readonly RivalClub[], rng: Rng, playerId = 'player'): RivalClub[] {
+  const developed = clubs.map((club) => {
+    if (club.id === playerId || !club.squad) return club;
+    return withDerivedStrength({ ...club, squad: club.squad.map((p) => developRivalPlayerWeek(p, rng)) });
+  });
+  const anchor = anchorPerSeason(rivalMeanStrength(developed, playerId));
+  if (anchor === 0) return developed;
+  return developed.map((club) => {
+    if (club.id === playerId || !club.squad) return club;
+    return withDerivedStrength({ ...club, squad: club.squad.map((p) => nudgeStats(p, anchor, rng)) });
+  });
+}
+
 /** Rival injuries heal a week. Returns the same array when nothing changed. */
 export function healRivals(clubs: readonly RivalClub[]): RivalClub[] {
   let changed = false;
@@ -251,33 +347,6 @@ export function injureRivalPlayers(clubs: readonly RivalClub[], injuries: readon
 
 // ── Season rollover ──────────────────────────────────────────────────────────
 
-/** A season's development by age: youngsters improve, veterans fade. */
-export function developmentDelta(age: number, rng: Rng): number {
-  if (age <= 21) return rng.int(0, 5);
-  if (age <= 25) return rng.int(-1, 3);
-  if (age <= 29) return rng.int(-2, 2);
-  if (age <= 32) return rng.int(-4, 0);
-  return rng.int(-6, -1);
-}
-
-/** Apply a season's development to every stat (±1 jitter per stat), with the pull toward the league mean. */
-export function developPlayer(p: Player, rng: Rng): Player {
-  const d = developmentDelta(p.age, rng) + (RIVAL_LEAGUE_MEAN - overallRating(p)) * RIVAL_DEVELOPMENT_PULL;
-  const s = p.stats;
-  const j = (): number => rng.int(-1, 1);
-  return {
-    ...p,
-    stats: {
-      speed: clampStat(s.speed + d + j()),
-      strength: clampStat(s.strength + d + j()),
-      stamina: clampStat(s.stamina + d + j()),
-      skill: clampStat(s.skill + d + j()),
-      footyIQ: clampStat(s.footyIQ + d + j()),
-    },
-    injuredWeeks: 0,
-  };
-}
-
 export interface RolloverResult {
   clubs: RivalClub[];
   retired: number;
@@ -286,8 +355,9 @@ export interface RolloverResult {
 
 /**
  * Season rollover for every rival (pure): age and retire through aging.ts,
- * develop by age, then top the squad up to RIVAL_SQUAD_MIN with juniors at the
- * club's weakest positions, and re-derive strength.
+ * heal everyone, then top the squad up to RIVAL_SQUAD_MIN with juniors at the
+ * club's weakest positions, and re-derive strength. Development happens during
+ * the season (developRivalsWeek, #143), not here.
  */
 export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId = 'player'): RolloverResult {
   let retired = 0;
@@ -296,7 +366,7 @@ export function rolloverRivals(clubs: readonly RivalClub[], rng: Rng, playerId =
     if (club.id === playerId || !club.squad) return club;
     const aged = ageAndRetirePlayers(club.squad, [], rng);
     retired += aged.retired.length;
-    const squad = aged.squad.map((p) => developPlayer(p, rng));
+    const squad = aged.squad.map((p) => (p.injuredWeeks > 0 ? { ...p, injuredWeeks: 0 } : p));
     while (squad.length < RIVAL_SQUAD_MIN) {
       const anchor = (club.strength + RIVAL_LEAGUE_MEAN) / 2;
       squad.push(rivalPlayer(rng, club.id, weakestPosition(squad), anchor - RIVAL_JUNIOR_GAP, rng.int(17, 19)));
@@ -314,15 +384,20 @@ export function rivalWeekSeed(state: Pick<GameState, 'season' | 'week' | 'rngSee
   return (hashString(`rivals:${state.season}:${state.week}`) ^ state.rngSeed) >>> 0;
 }
 
-/** Install the weekly rival hook: heal injuries, then sign free agents. */
+/** The development stream's seed for the week: its own hash, so signings and development never share dice. */
+export function rivalDevelopSeed(state: Pick<GameState, 'season' | 'week' | 'rngSeed'>): number {
+  return (hashString(`rivals-develop:${state.season}:${state.week}`) ^ state.rngSeed) >>> 0;
+}
+
+/** Install the weekly rival hook: heal injuries, sign free agents, then develop and anchor. */
 export function registerRivalsSystem(): void {
   registerTickHook('rivals', RIVALS_TICK_ORDER, () => {
     const s = getState();
     if (s.league.clubs.length === 0) return;
     const healed = healRivals(s.league.clubs);
     const r = rivalSigningTick(healed, s.freeAgents, makeRng(rivalWeekSeed(s)));
-    if (r.signed.length === 0 && healed === s.league.clubs) return;
-    setState({ league: { ...s.league, clubs: r.clubs }, freeAgents: r.freeAgents });
+    const clubs = developRivalsWeek(r.clubs, makeRng(rivalDevelopSeed(s)));
+    setState({ league: { ...s.league, clubs }, freeAgents: r.freeAgents });
     for (const text of r.news) bus.emit('ui:notify', { text, kind: 'info' });
   });
 }
