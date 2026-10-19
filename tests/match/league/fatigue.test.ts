@@ -4,6 +4,7 @@
 // end it sooner; a carrier with fight left when the grip goes is through.
 import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
+import { applyTuning } from '../../../src/match/league/tuning';
 import {
   FATIGUE, LEGS_ENERGY, afterRun, drainRate, isLegs, legsSpeed, tiredness,
 } from '../../../src/match/league/fatigue';
@@ -131,11 +132,17 @@ describe('legs and the wrestle in the live sim', () => {
   it('legs drain over a match, and a Stamina-80 squad outlasts a Stamina-40 one over ten minutes (#100)', () => {
     let home = 0;
     let away = 0;
-    for (let s = 1; s <= 2; s++) {
-      const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s);
-      play(sim, 600);
-      home += sim.energyOf('home') / 2;
-      away += sim.energyOf('away') / 2;
+    // The mechanic on the sheets as written: in a real match the gap between the sides counts for less (rating.spread, Phase 3).
+    const restore = applyTuning({ 'rating.spread': 1 });
+    try {
+      for (let s = 1; s <= 2; s++) {
+        const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s);
+        play(sim, 600);
+        home += sim.energyOf('home') / 2;
+        away += sim.energyOf('away') / 2;
+      }
+    } finally {
+      restore();
     }
     expect(home).toBeLessThan(0.75);
     expect(away).toBeLessThan(1);
