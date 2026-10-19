@@ -88,7 +88,7 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
     zones: { redZone: { offload: 0.8 } },
   },
   'all-out': {
-    base: { pass: 0.2, offload: 1.6, cutOut: 0.12, width: 0.45, edges: 0.5, earlyKick: 0.45, kickBias: { chip: 1.6, 'cross-field': 1.3, grubber: 1.2, long: 0.6 } },
+    base: { pass: 0.15, offload: 1.6, cutOut: 0.12, width: 0.45, edges: 0.5, earlyKick: 0.3, kickBias: { chip: 1.6, 'cross-field': 1.3, grubber: 1.2, long: 0.6 } },
     zones: { own20: { offload: 1.2 } },
   },
 };

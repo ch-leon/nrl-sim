@@ -147,6 +147,16 @@ round over 240 (`20261019-153630-rush-confirm`): more big hits, many more busts 
 offside penalties. A coach's Rush or Hold call now also sets the offside rate, as the preset
 does (it had kept the side's own).
 
+**All-out, Phase 3:** at equal strength each preset against Balanced / Slide over 60 whole
+matches (`20261019-165751-presets-whole-match`): Grind 53%, Expansive 47%, Kick-chase 48%,
+Rush 48%, Compressed 58% (Balanced v Balanced 57%; one standard error is ~6%) — and All-out
+**33%**. A third of contenders (65+) play it. Swept (`20261019-165954-all-out-sweep`): passing
+and red-zone early kicks were what cost it; `presets.attack.all-out.base.pass` 0.2 → **0.15**
+(Expansive's) and `.earlyKick` 0.45 → **0.3** take it to 41% over 300 matches both ways round
+(`20261019-170217-all-out-confirm`) and 44% over 200 (`20261019-170618-all-out-sweep-2`, where
+width, cut-outs and offloads moved nothing beyond luck). Still a little below even: the
+offloads and the width cost a few balls more than they make.
+
 Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands for Balanced).
 
 ## 9. Readability (§6)
