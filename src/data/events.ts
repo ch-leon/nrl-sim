@@ -78,10 +78,10 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
   {
     id: 'billboardSponsor',
     title: 'Billboard offer',
-    text: 'A local car yard offers $8,000 to put a billboard on the hill at the {club} ground.',
+    text: 'A local car yard offers $5,000 to put a billboard on the hill at the {club} ground.',
     weight: 10, cooldown: 20,
     choices: [
-      { label: 'Take the cash', effects: [{ kind: 'money', amount: 8_000 }], outcome: 'The car yard billboard goes up on the hill.' },
+      { label: 'Take the cash', effects: [{ kind: 'money', amount: 5_000 }], outcome: 'The car yard billboard goes up on the hill.' },
       { label: 'Keep it clean', effects: [{ kind: 'reputation', amount: 1 }], outcome: 'The fans like the clear view of the hill.' },
     ],
     defaultChoice: 0,
@@ -176,7 +176,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
     text: '{player} said something daft about the referees on breakfast radio.',
     weight: 6, cooldown: 20, subject: 'any',
     choices: [
-      { label: 'Fine them $1k', effects: [{ kind: 'money', amount: 1_000 }, { kind: 'playerMorale', amount: -10 }, { kind: 'reputation', amount: 1 }], outcome: '{player} was fined $1,000 for the radio gaffe.' },
+      { label: 'Fine them $600', effects: [{ kind: 'money', amount: 600 }, { kind: 'playerMorale', amount: -10 }, { kind: 'reputation', amount: 1 }], outcome: '{player} was fined $600 for the radio gaffe.' },
       { label: 'Back them', effects: [{ kind: 'playerMorale', amount: 8 }, { kind: 'reputation', amount: -3 }], outcome: 'The club stood by {player}; the papers were less kind.' },
     ],
     defaultChoice: 0,
@@ -184,11 +184,11 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
   {
     id: 'merchDeal',
     title: 'Merchandise deal',
-    text: 'A merch company wants the rights to {club} jerseys: $12,000 now, or $1,500 a week for 12 weeks.',
+    text: 'A merch company wants the rights to {club} jerseys: $7,000 now, or $900 a week for 12 weeks.',
     weight: 6, cooldown: 40, when: { reputation: [30, 100] },
     choices: [
-      { label: '$12k now', effects: [{ kind: 'money', amount: 12_000 }], outcome: 'The merch deal paid $12,000 up front.' },
-      { label: '$1.5k a week', effects: [{ kind: 'modifier', label: 'Merch royalties', trigger: 'weekly', weeks: 12, effects: [{ kind: 'money', amount: 1_500 }] }], outcome: 'Merch royalties will pay $1,500 a week for 12 weeks.' },
+      { label: '$7k now', effects: [{ kind: 'money', amount: 7_000 }], outcome: 'The merch deal paid $7,000 up front.' },
+      { label: '$900 a week', effects: [{ kind: 'modifier', label: 'Merch royalties', trigger: 'weekly', weeks: 12, effects: [{ kind: 'money', amount: 900 }] }], outcome: 'Merch royalties will pay $900 a week for 12 weeks.' },
     ],
     defaultChoice: 0,
   },
@@ -206,10 +206,10 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
   {
     id: 'councilClinics',
     title: 'Junior clinics',
-    text: 'The council will pay $5,000 if the squad runs junior clinics on their day off.',
+    text: 'The council will pay $3,000 if the squad runs junior clinics on their day off.',
     weight: 6, cooldown: 24,
     choices: [
-      { label: 'Run them (+$5k)', effects: [{ kind: 'money', amount: 5_000 }, { kind: 'squadMorale', amount: -2 }, { kind: 'reputation', amount: 1 }], outcome: 'The squad ran the junior clinics for the council.' },
+      { label: 'Run them (+$3k)', effects: [{ kind: 'money', amount: 3_000 }, { kind: 'squadMorale', amount: -2 }, { kind: 'reputation', amount: 1 }], outcome: 'The squad ran the junior clinics for the council.' },
       { label: 'Rest day', effects: [], outcome: 'The squad kept its day off.' },
     ],
     defaultChoice: 1,
@@ -217,7 +217,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
   {
     id: 'specialistCoach',
     title: 'Specialist coach',
-    text: 'A famous conditioning coach is in town and offers {player} a week of one-on-one work for $8,000.',
+    text: 'A famous conditioning coach is in town and offers {player} a week of one-on-one work for $5,000.',
     weight: 4, cooldown: 40, subject: 'youngster', when: { minMoney: 8_000 },
     choices: [
       { label: 'Hire ($8k)', effects: [{ kind: 'money', amount: -8_000 }, { kind: 'playerTrait', trait: 'workhorse' }], outcome: '{player} came back from the week a workhorse.' },
@@ -231,7 +231,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
     text: 'A pizza chain will pay $3,000 for every win in the next 4 weeks if its logo goes on the shorts.',
     weight: 7, cooldown: 20, when: { weeks: [1, 20] },
     choices: [
-      { label: 'Deal', effects: [{ kind: 'modifier', label: 'Pizza win bonus', trigger: 'win', weeks: 4, effects: [{ kind: 'money', amount: 3_000 }] }], outcome: 'The pizza chain logo is on the shorts: $3,000 a win for 4 weeks.' },
+      { label: 'Deal', effects: [{ kind: 'modifier', label: 'Pizza win bonus', trigger: 'win', weeks: 4, effects: [{ kind: 'money', amount: 2_000 }] }], outcome: 'The pizza chain logo is on the shorts: $2,000 a win for 4 weeks.' },
       { label: 'No thanks', effects: [], outcome: 'The shorts stay sponsor-free.' },
     ],
     defaultChoice: 1,
@@ -253,7 +253,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
     text: 'A food truck wants to park at home games and will pay $400 a week for 8 weeks.',
     weight: 6, cooldown: 30, when: { nextMatch: 'home' },
     choices: [
-      { label: 'Let it park', effects: [{ kind: 'modifier', label: 'Food truck rent', trigger: 'weekly', weeks: 8, effects: [{ kind: 'money', amount: 400 }] }], outcome: 'The food truck pays $400 a week for 8 weeks.' },
+      { label: 'Let it park', effects: [{ kind: 'modifier', label: 'Food truck rent', trigger: 'weekly', weeks: 8, effects: [{ kind: 'money', amount: 250 }] }], outcome: 'The food truck pays $250 a week for 8 weeks.' },
       { label: 'Club canteen only', effects: [{ kind: 'squadMorale', amount: 1 }], outcome: 'The canteen staff are pleased to keep the trade.' },
     ],
     defaultChoice: 0,

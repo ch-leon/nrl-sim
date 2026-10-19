@@ -275,11 +275,11 @@ describe('chooseEvent (store glue)', () => {
     bus.on('ui:notify', ({ text }) => news.push(text));
     const before = getState().money;
     expect(chooseEvent('bb', 0)).toBe(true);
-    expect(getState().money).toBe(before + 8_000);
-    expect(money).toEqual([{ delta: 8_000, reason: 'event: Billboard offer' }]);
+    expect(getState().money).toBe(before + 5_000);
+    expect(money).toEqual([{ delta: 5_000, reason: 'event: Billboard offer' }]);
     expect(news[0]).toContain('billboard');
     expect(chooseEvent('bb', 0)).toBe(false);
-    expect(getState().money).toBe(before + 8_000);
+    expect(getState().money).toBe(before + 5_000);
   });
 });
 
