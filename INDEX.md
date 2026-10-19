@@ -46,3 +46,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-165236-standard | standard | d814aaf | main | [report](runs/20261019-165236-standard/report.md) |
 | 20261019-170903-standard | standard | 7f998ab | main | [report](runs/20261019-170903-standard/report.md) |
 | 20261019-165751-presets-whole-match | presets whole match | d814aaf | main | [report](runs/20261019-165751-presets-whole-match/report.md) |
+| 20261019-165954-all-out-sweep | all-out sweep | d814aaf | main | [report](runs/20261019-165954-all-out-sweep/report.md) |

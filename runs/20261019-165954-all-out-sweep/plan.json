@@ -1,0 +1,33 @@
+{
+  "name": "all-out sweep",
+  "description": "All-out wins ~33% v Balanced at equal strength (run 20261019-165751). Which of its knobs costs it: offloads, red-zone early kicks, passing?",
+  "seeds": 60,
+  "scenarios": [
+    {
+      "name": "all-out v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "sweep": {
+    "presets.attack.all-out.base.offload": [
+      1.6,
+      1.3
+    ],
+    "presets.attack.all-out.base.earlyKick": [
+      0.45,
+      0.3
+    ],
+    "presets.attack.all-out.base.pass": [
+      0.2,
+      0.1
+    ]
+  }
+}
