@@ -680,6 +680,55 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-kit-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #000; }
 .nrl-kit-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+/* ── League screen: the next-match card and the form guide (N7, #183) ──── */
+/* A landscape phone has width to spare and no height: let the league use it. */
+.nrl-screen-backdrop .nrl-league-modal { width: min(96vw, 760px); max-width: none; }
+.nrl-league-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+.nrl-league-close { margin-left: auto; }
+.nrl-next-match {
+  background: #fff8e1;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+  padding: 0.4rem 0.6rem;
+  margin: 0 3px 0.6rem 0;
+  font-size: 0.85rem;
+}
+.nrl-next-head { font-weight: bold; margin-bottom: 0.3rem; }
+.nrl-next-label { background: #1a1a2e; color: #f4d03f; padding: 0 0.3rem; margin-right: 0.2rem; }
+.nrl-next-sides { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin-bottom: 0.3rem; }
+.nrl-next-side { display: flex; align-items: center; gap: 0.4rem; flex: 1 1 16rem; min-width: 0; }
+.nrl-next-swatch { flex: 0 0 auto; width: 18px; height: 18px; border: 3px solid; box-sizing: border-box; }
+.nrl-next-side-text { flex: 1 1 auto; min-width: 0; }
+.nrl-next-name { font-weight: bold; }
+.nrl-next-meta { font-size: 0.75rem; color: #555; }
+.nrl-next-line { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.nrl-next-line b { margin-right: 0.3rem; }
+.nrl-form { display: inline-flex; gap: 2px; white-space: nowrap; vertical-align: middle; }
+.nrl-form i {
+  display: inline-block;
+  width: 1.15em;
+  line-height: 1.3;
+  text-align: center;
+  font-style: normal;
+  font-weight: bold;
+  font-size: 0.75rem;
+  color: #fff;
+  border: 1px solid #000;
+}
+.nrl-form-W { background: #2e7d32; }
+.nrl-form-D { background: #7a7a7a; }
+.nrl-form-L { background: #b03a2e; }
+.nrl-form-empty { color: #777; }
+.nrl-ladder-pos { margin: 0 0 0.4rem; font-size: 0.85rem; }
+.nrl-ladder-scroll { overflow-x: auto; }
+.nrl-ladder-table { border-collapse: collapse; font-size: 0.8rem; width: 100%; }
+.nrl-ladder-table th, .nrl-ladder-table td { padding: 0.15rem 0.3rem; text-align: right; white-space: nowrap; }
+.nrl-ladder-table th:nth-child(2), .nrl-ladder-table td:nth-child(2) { text-align: left; }
+.nrl-ladder-table td.nrl-ladder-form { text-align: left; }
+.nrl-ladder-table tr[data-player] { background: #f4d03f; }
+.nrl-fixtures-round { margin: 0.6rem 0 0.2rem; font-size: 0.95rem; }
+.nrl-fixtures-round[data-current] { color: #b03a2e; }
+.nrl-fixture[data-player] { font-weight: bold; }
 .nrl-ladder-club {
   pointer-events: auto;
   font: inherit;
