@@ -2,7 +2,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   generateRivalSquad, squadStrength, withRivalSquads, pickSigning, rivalSigningTick, healRivals,
-  injureRivalPlayers, rolloverRivals, rivalPlayer, weakestPosition, developmentDelta, registerRivalsSystem,
+  injureRivalPlayers, rolloverRivals, rivalPlayer, weakestPosition, developmentRate, registerRivalsSystem,
+  developRivalsWeek, developRivalPlayerWeek, rivalMeanStrength, anchorPerSeason, RIVAL_LEAGUE_MEAN, RIVAL_DEVELOPMENT,
   RIVAL_SQUAD_SIZE, RIVAL_SQUAD_MIN, RIVAL_SQUAD_MAX, RIVAL_NOTABLE_OVERALL,
 } from '../../src/systems/rivals';
 import { STRENGTH_MIN, STRENGTH_MAX } from '../../src/systems/league';
@@ -135,11 +136,85 @@ describe('rolloverRivals', () => {
     expect(r.clubs[0]!.strength).toBe(squadStrength(out));
   });
 
-  it('young players tend to improve and veterans to fade', () => {
+  it('no longer develops anyone at the rollover: development is weekly (#143)', () => {
     const rng = makeRng(9);
-    const mean = (age: number) => Array.from({ length: 200 }, () => developmentDelta(age, rng)).reduce((t, n) => t + n, 0) / 200;
-    expect(mean(19)).toBeGreaterThan(2);
-    expect(mean(34)).toBeLessThan(-2);
+    const squad = generateRivalSquad(club(60), 9).map((p) => ({ ...p, age: 25 }));
+    const r = rolloverRivals([{ ...club(60), squad }], rng);
+    for (const p of r.clubs[0]!.squad!) {
+      const was = squad.find((q) => q.id === p.id);
+      if (was) expect(p.stats).toEqual(was.stats);
+    }
+  });
+});
+
+describe('weekly development and the league anchor (#143)', () => {
+  const season = (p: Player, seed: number): Player => {
+    const rng = makeRng(seed);
+    let out = p;
+    for (let w = 0; w < WEEKS_PER_SEASON; w++) out = developRivalPlayerWeek(out, rng);
+    return out;
+  };
+
+  it('young players gain about the BY_AGE rate over a season and veterans fade, stats staying whole', () => {
+    const rng = makeRng(10);
+    const gain = (age: number): number => {
+      let total = 0;
+      for (let i = 0; i < 40; i++) {
+        const p = rivalPlayer(rng, 'c', 'lock', RIVAL_LEAGUE_MEAN, age); // at the mean, so no pull
+        const after = season(p, 100 + i);
+        for (const k of Object.keys(after.stats) as (keyof Player['stats'])[]) expect(Number.isInteger(after.stats[k])).toBe(true);
+        total += overallRating(after) - overallRating(p);
+      }
+      return total / 40;
+    };
+    expect(developmentRate(19)).toBe(4);
+    expect(developmentRate(34)).toBe(-4);
+    expect(gain(19)).toBeGreaterThan(2.5);
+    expect(gain(19)).toBeLessThan(5.5);
+    expect(gain(27)).toBeGreaterThan(-1);
+    expect(gain(27)).toBeLessThan(1);
+    expect(gain(34)).toBeLessThan(-2.5);
+  });
+
+  it('the pull brings a star down and a battler up over a season', () => {
+    const rng = makeRng(11);
+    const star = rivalPlayer(rng, 'c', 'prop', 80, 27);
+    const battler = rivalPlayer(rng, 'c', 'prop', 35, 27);
+    expect(overallRating(season(star, 1))).toBeLessThan(overallRating(star));
+    expect(overallRating(season(battler, 1))).toBeGreaterThan(overallRating(battler));
+  });
+
+  it('the anchor pulls a drifted league back toward the mean and leaves a centred one alone', () => {
+    expect(anchorPerSeason(RIVAL_LEAGUE_MEAN)).toBe(0);
+    expect(anchorPerSeason(RIVAL_LEAGUE_MEAN + RIVAL_DEVELOPMENT.ANCHOR_DEADBAND)).toBe(0);
+    expect(anchorPerSeason(RIVAL_LEAGUE_MEAN + 3)).toBeLessThan(0);
+    expect(anchorPerSeason(RIVAL_LEAGUE_MEAN - 3)).toBeGreaterThan(0);
+    const league = (centre: number): RivalClub[] => RIVAL_CLUBS.map((c, i) => {
+      const strength = centre + (i - 7) * 2;
+      return { ...c, strength, squad: generateRivalSquad({ id: c.id, strength }, 500 + i).map((p) => ({ ...p, age: 27 })) };
+    });
+    const run = (centre: number): number => {
+      let clubs = league(centre);
+      const rng = makeRng(12);
+      for (let w = 0; w < WEEKS_PER_SEASON; w++) clubs = developRivalsWeek(clubs, rng);
+      return rivalMeanStrength(clubs);
+    };
+    const high = run(RIVAL_LEAGUE_MEAN + 6);
+    const low = run(RIVAL_LEAGUE_MEAN - 6);
+    expect(high).toBeLessThan(RIVAL_LEAGUE_MEAN + 3);
+    expect(high).toBeGreaterThan(RIVAL_LEAGUE_MEAN - 1);
+    expect(low).toBeGreaterThan(RIVAL_LEAGUE_MEAN - 3);
+    expect(low).toBeLessThan(RIVAL_LEAGUE_MEAN + 1);
+    expect(Math.abs(run(RIVAL_LEAGUE_MEAN) - RIVAL_LEAGUE_MEAN)).toBeLessThan(1.5);
+  });
+
+  it('is deterministic for a seed and never touches the player club', () => {
+    const me: RivalClub = { id: 'player', name: 'Me', colors: ['#000000', '#ffffff'], strength: 55 };
+    const clubs = withRivalSquads([me, ...RIVAL_CLUBS.map((c) => ({ ...c }))], 3);
+    const a = developRivalsWeek(clubs, makeRng(7));
+    const b = developRivalsWeek(clubs, makeRng(7));
+    expect(a).toEqual(b);
+    expect(a[0]).toBe(me);
   });
 
   it('handles 15 rival squads in well under 100ms', () => {
@@ -187,6 +262,8 @@ describe('five-season headless league', () => {
       }
     });
     expect(getState().season).toBe(6);
+    // The league anchor (#143): the rival mean stays near LEAGUE.MEAN at the end of five seasons.
+    expect(Math.abs(rivalMeanStrength(getState().league.clubs) - RIVAL_LEAGUE_MEAN)).toBeLessThanOrEqual(3);
     expect(champions).toHaveLength(5);
     expect(new Set(champions).size).toBeGreaterThan(1);
     const perRivalSeason = signings / (15 * 5);
