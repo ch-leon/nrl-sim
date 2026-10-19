@@ -13,6 +13,7 @@ import { DEFAULT_PLAYER_COLORS, FEATURES } from '../../config';
 import { openKitDesigner } from './kit';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PlayerCard, ensureScreenStyles } from './recruit';
+import { openPlayerPage } from './player';
 
 const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
 
@@ -113,6 +114,7 @@ export function openSquadScreen(): void {
       body.appendChild(PlayerCard(player, {
         showInjury: true,
         kit,
+        onOpen: () => openPlayerPage(player, { kind: 'squad' }),
         action: {
           label: 'RELEASE',
           danger: true,
