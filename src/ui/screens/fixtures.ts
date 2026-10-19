@@ -11,8 +11,9 @@
 // openLadderScreen into the nav bar (main.ts).
 
 import { el, panel, button, openModal, closeScreen } from '../dom';
-import { getState, setState, type GameState, type Fixture, type LadderRow, type RivalClub } from '../../core/state';
+import { getState, setState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
+import { formGuide, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { save } from '../../core/save';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
@@ -81,6 +82,34 @@ export function ladderView(
   }));
 }
 
+/** 1 → 1st, 2 → 2nd, 3 → 3rd, 4 → 4th, 11 → 11th, 21 → 21st. */
+export function fmtOrdinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+/** "R3: won 18–12 at home · R14: drew 10–10 away", or the first meeting. */
+export function fmtHeadToHead(results: readonly ClubResult[]): string {
+  if (results.length === 0) return 'First meeting this season';
+  const verb = { W: 'won', D: 'drew', L: 'lost' } as const;
+  return results
+    .map((r) => `R${r.round}: ${verb[r.result]} ${r.pointsFor}–${r.pointsAgainst} ${r.home ? 'at home' : 'away'}`)
+    .join(' · ');
+}
+
+/** The line under a side's name: "3rd · strength 70" (no place before the ladder exists). */
+export function fmtSideLine(side: Pick<PreviewSide, 'ladderPos' | 'strength'>): string {
+  const place = side.ladderPos > 0 ? `${fmtOrdinal(side.ladderPos)} · ` : '';
+  return `${place}strength ${side.strength}`;
+}
+
+/** The conditions line: 'clear' → "Fine", 'rain' → "Rain", 'wind' → "Windy". */
+export function fmtWeather(w: WeatherKind): string {
+  return { clear: 'Fine', rain: 'Rain', wind: 'Windy' }[w];
+}
+
 /** Group fixtures by round number, ascending. */
 export function fixturesByRound(fixtures: readonly Fixture[]): Array<{ round: number; fixtures: Fixture[] }> {
   const byRound = new Map<number, Fixture[]>();
@@ -138,10 +167,66 @@ export function openLadderScreen(): HTMLElement {
 
 // ── Tab builders ───────────────────────────────────────────────────────────────
 
+/** The form guide as W/D/L cells (N7, #183); a dash before any result. */
+function formCells(form: readonly FormResult[]): HTMLElement {
+  if (form.length === 0) return el('span', { class: 'nrl-form nrl-form-empty', text: '–', attrs: { 'aria-label': 'No results yet' } });
+  const span = el('span', { class: 'nrl-form', attrs: { 'aria-label': `Form: ${form.join(' ')}` } });
+  for (const r of form) span.append(el('i', { class: `nrl-form-${r}`, text: r }));
+  return span;
+}
+
+/**
+ * The next-match card at the top of the Fixtures tab (N7, #183): who, where,
+ * both sides' place, strength and form, the opponent's best three, this
+ * season's meetings, and the conditions when they are known. The fixtures
+ * system rolls the weather on match day, after this card is gone, so no
+ * forecast is passed today; the line shows as soon as one is.
+ */
+function nextMatchCard(state: GameState): HTMLElement {
+  const card = el('div', { class: 'nrl-next-match', attrs: { 'data-next-match': '' } });
+  const p = nextMatchPreview(state);
+  if (!p) {
+    const text = state.week > SEASON_ROUNDS ? 'No more matches this season' : 'No match this week';
+    card.append(el('div', { class: 'nrl-next-head' }, el('span', { class: 'nrl-next-label', text: 'Next' }), ` ${text}`));
+    return card;
+  }
+  const stage = p.stage === 'Round' ? `Round ${p.round}` : p.stage;
+  card.append(el('div', { class: 'nrl-next-head' },
+    el('span', { class: 'nrl-next-label', text: 'Next' }),
+    ` ${stage} · ${p.home ? 'Home' : 'Away'}`,
+  ));
+
+  const oppClub = state.league.clubs.find((c) => c.id === p.opponent.id);
+  // The opponent's name opens its squad, as on the ladder (#74).
+  const oppName = oppClub?.squad
+    ? el('button', { class: 'nrl-ladder-club nrl-next-name', text: p.opponent.name, attrs: { type: 'button' }, onClick: () => openRivalSquad(oppClub) })
+    : el('span', { class: 'nrl-next-name', text: p.opponent.name });
+  const sideRow = (side: PreviewSide, name: Node, attr: string): HTMLElement => el(
+    'div', { class: 'nrl-next-side', attrs: { [attr]: '' } },
+    el('span', { class: 'nrl-next-swatch', attrs: { style: `background:${side.colors[0]};border-color:${side.colors[1]}` } }),
+    el('div', { class: 'nrl-next-side-text' }, el('div', {}, name), el('div', { class: 'nrl-next-meta', text: fmtSideLine(side) })),
+    formCells(side.form),
+  );
+  card.append(el('div', { class: 'nrl-next-sides' },
+    sideRow(p.opponent, oppName, 'data-next-opponent'),
+    sideRow(p.you, el('span', { class: 'nrl-next-name', text: p.you.name }), 'data-next-you'),
+  ));
+
+  const line = (label: string, text: string): HTMLElement =>
+    el('div', { class: 'nrl-next-line' }, el('b', { text: `${label}:` }), text);
+  if (p.bestThree.length > 0) {
+    card.append(line('Their best', p.bestThree.map((b) => `${b.name} (${b.position} ${b.overall})`).join(' · ')));
+  }
+  card.append(line('Head to head', fmtHeadToHead(p.headToHead)));
+  if (p.weather) card.append(line('Conditions', fmtWeather(p.weather)));
+  return card;
+}
+
 function buildFixturesTab(state: GameState): HTMLElement {
   const names = clubNameMap(state.league.clubs);
   const wrap = el('div', { class: 'nrl-fixtures' });
 
+  if (state.league.fixtures.length > 0) wrap.append(nextMatchCard(state));
   wrap.append(liveMatchToggle(), coachCallsToggle());
 
   if (state.league.fixtures.length === 0) {
@@ -218,7 +303,7 @@ function buildLadderTab(state: GameState): HTMLElement {
   const rows = ladderView(state.league.ladder, names);
   const table = el('table', { class: 'nrl-ladder-table' });
 
-  const headCells = ['#', 'Club', 'P', 'W', 'D', 'L', 'PF', 'PA', 'Diff', 'Pts'];
+  const headCells = ['#', 'Club', 'P', 'W', 'D', 'L', 'PF', 'PA', 'Diff', 'Pts', 'Form'];
   const thead = el('thead');
   const hrow = el('tr');
   for (const h of headCells) hrow.append(el('th', { text: h }));
@@ -241,6 +326,8 @@ function buildLadderTab(state: GameState): HTMLElement {
         : el('td', { text: c });
       tr.append(cell);
     });
+    // Last five, oldest first (N7, #183).
+    tr.append(el('td', { class: 'nrl-ladder-form' }, formCells(formGuide(state.league.fixtures, r.clubId))));
     tbody.append(tr);
   }
   table.append(thead, tbody);
@@ -249,6 +336,6 @@ function buildLadderTab(state: GameState): HTMLElement {
   if (playerPos > 0) {
     wrap.append(el('p', { class: 'nrl-ladder-pos', text: `Your position: ${playerPos} of ${rows.length} · tap a club to see its squad` }));
   }
-  wrap.append(table);
+  wrap.append(el('div', { class: 'nrl-ladder-scroll' }, table));
   return wrap;
 }

@@ -75,3 +75,34 @@ describe('fixturesByRound', () => {
     expect(grouped[1]?.fixtures).toHaveLength(1);
   });
 });
+
+// ── Next-match card helpers (N7, #183) ──────────────────────────────────────
+import { fmtHeadToHead, fmtOrdinal, fmtSideLine, fmtWeather } from '../../../src/ui/screens/fixtures';
+
+describe('fmtOrdinal', () => {
+  it('suffixes positions the English way', () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 14, 16, 21, 22, 23, 101, 111].map(fmtOrdinal))
+      .toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '14th', '16th', '21st', '22nd', '23rd', '101st', '111th']);
+  });
+});
+
+describe('fmtHeadToHead', () => {
+  it('reads the first meeting and every meeting since from the player’s side', () => {
+    expect(fmtHeadToHead([])).toBe('First meeting this season');
+    expect(fmtHeadToHead([
+      { round: 3, opponentId: 'x', home: true, pointsFor: 18, pointsAgainst: 12, result: 'W' },
+      { round: 14, opponentId: 'x', home: false, pointsFor: 10, pointsAgainst: 10, result: 'D' },
+      { round: 25, opponentId: 'x', home: false, pointsFor: 4, pointsAgainst: 20, result: 'L' },
+    ])).toBe('R3: won 18–12 at home · R14: drew 10–10 away · R25: lost 4–20 away');
+  });
+});
+
+describe('fmtSideLine / fmtWeather', () => {
+  it('shows the ladder place only once there is one', () => {
+    expect(fmtSideLine({ ladderPos: 3, strength: 70 })).toBe('3rd · strength 70');
+    expect(fmtSideLine({ ladderPos: 0, strength: 61 })).toBe('strength 61');
+  });
+  it('names the conditions', () => {
+    expect(['clear', 'rain', 'wind'].map((w) => fmtWeather(w as 'clear' | 'rain' | 'wind'))).toEqual(['Fine', 'Rain', 'Windy']);
+  });
+});
