@@ -698,6 +698,42 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-rival-table th, .nrl-rival-table td { padding: 0.15rem 0.3rem; text-align: left; white-space: nowrap; }
 .nrl-rival-table thead th { position: sticky; top: 0; background: #e8e0c8; }
 .nrl-rival-traits { font-size: 0.68rem; }
+/* Rows are tap targets for the player page (N7, #185). */
+.nrl-rival-table tbody tr.nrl-rival-row { height: 44px; cursor: pointer; }
+.nrl-rival-table tbody tr.nrl-rival-row:hover, .nrl-rival-table tbody tr.nrl-rival-row:focus-visible { background: #f4d03f; outline: none; }
+
+/* ── Player page (N7, #185) ──────────────────────────────────────────────── */
+.nrl-modal.nrl-player-modal { max-width: min(94vw, 680px); padding: 0.6rem; }
+.nrl-player-panel { padding: 0.5rem 0.7rem; }
+.nrl-player { font-size: 0.82rem; }
+.nrl-player-top { display: flex; gap: 0.6rem; align-items: flex-start; margin-bottom: 0.3rem; }
+.nrl-player-portrait {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 3px solid #000;
+  background: #cfc9b4;
+}
+.nrl-player-id { flex: 1 1 auto; min-width: 0; }
+.nrl-player-name { display: flex; gap: 0.4rem; align-items: baseline; font-weight: bold; font-size: 1.05rem; overflow-wrap: anywhere; }
+.nrl-player-where { font-size: 0.75rem; color: #555; }
+.nrl-player-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.2rem 1rem; }
+.nrl-player h3 { margin: 0.4rem 0 0.15rem; font-size: 0.82rem; border-bottom: 2px solid #b8ae92; }
+.nrl-player-stats .nrl-statrow { grid-template-columns: 4.6rem 1fr 1.8rem; }
+.nrl-player-trait { margin: 0.1rem 0; overflow-wrap: anywhere; }
+.nrl-player-trait b { margin-right: 0.3rem; }
+.nrl-player-trait-bad b { color: #8a3a00; }
+.nrl-player-line { margin: 0.1rem 0; overflow-wrap: anywhere; }
+.nrl-player-expiring { color: #b00020; }
+.nrl-player-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.nrl-player-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
+.nrl-player-actions .nrl-player-close { flex: 1 1 100%; }
+.nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
+.nrl-card-open { cursor: pointer; }
+.nrl-card-open:focus-visible { outline: 3px solid #3a6ea5; }
+.nrl-card-more { color: #555; font-weight: bold; font-size: 1.1rem; line-height: 1; }
 .nrl-placebar-text { flex: 1 1 auto; }
 .nrl-placebar-cancel { flex: 0 0 auto; }
 `;
