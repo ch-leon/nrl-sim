@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { GAS, canSprint, paceMult, refillSeconds, runCostMult, stepGas, tankSeconds, type GasState } from '../../../src/match/league/gas';
 import { LiveSim, LIVE } from '../../../src/match/league/live';
 import { FATIGUE } from '../../../src/match/league/fatigue';
+import { applyTuning } from '../../../src/match/league/tuning';
 import { arrive, integrate, makeBody, maxSpeedFor } from '../../../src/match/core/body';
 import { TICK_S } from '../../../src/match/core/engine';
 import type { TeamSheet } from '../../../src/sim/events';
@@ -144,7 +145,13 @@ describe('sprint and gas in the live sim', () => {
   });
   it('low-Stamina fliers run dry more often and get run down; carriers caught from behind after a break are announced', () => {
     const es: SimEvent[] = [];
-    for (let s = 1; s <= 6; s++) es.push(...play(new LiveSim(sheet('H', { speed: 85, stamina: 30 }), sheet('A', { speed: 65, stamina: 80 }), s), 180));
+    // The mechanic on the sheets as written: in a real match the gap between the sides counts for less (rating.spread, Phase 3).
+    const restore = applyTuning({ 'rating.spread': 1 });
+    try {
+      for (let s = 1; s <= 6; s++) es.push(...play(new LiveSim(sheet('H', { speed: 85, stamina: 30 }), sheet('A', { speed: 65, stamina: 80 }), s), 180));
+    } finally {
+      restore();
+    }
     const blown = (side: 'home' | 'away'): number => es.filter((e) => e.kind === 'blown' && e.side === side).length;
     expect(blown('home')).toBeGreaterThan(blown('away'));
     const runDowns = es.filter((e) => e.kind === 'run-down');

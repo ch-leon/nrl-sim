@@ -74,7 +74,7 @@ describe('contest', () => {
     expect(contestOdds(0.9, OPEN).broken).toBeGreaterThan(contestOdds(0.1, OPEN).broken);
     expect(contestOdds(0.1, OPEN)['big-hit']).toBeGreaterThan(contestOdds(0.9, OPEN)['big-hit']);
     // Design-doc baseline at even stats, one-on-one, square.
-    expect(contestOdds(0.5, { ...OPEN, support: true })).toMatchObject({ 'big-hit': 0.1, broken: 0.12, fend: 0.07, offload: 0.09, strip: 0.02 });
+    expect(contestOdds(0.5, { ...OPEN, support: true })).toMatchObject({ 'big-hit': 0.1, broken: 0.12, fend: 0.07, offload: 0.12, strip: 0.02 });
   });
   it('the situation moves the odds the way the design doc says', () => {
     const one = contestOdds(0.5, OPEN);

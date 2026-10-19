@@ -132,8 +132,9 @@ describe('tactics in the live sim', () => {
     expect(count(rush, 'break-tackle', 'home') + count(rush, 'step', 'home')).toBeGreaterThan(count(slide, 'break-tackle', 'home') + count(slide, 'step', 'home'));
   });
   it('Balanced v Balanced stays in the §7 bands per three minutes', () => {
-    const es = events(sheet('H'), away, 10, 180);
-    const perMatch = (kind: string): number => count(es, kind) / 10;
+    // Twenty three-minute windows: about one try a window, and ten is within the noise.
+    const es = events(sheet('H'), away, 20, 180);
+    const perMatch = (kind: string): number => count(es, kind) / 20;
     expect(perMatch('tackle') + perMatch('big-hit')).toBeGreaterThan(18);
     expect(perMatch('tackle') + perMatch('big-hit')).toBeLessThan(45);
     expect(perMatch('try')).toBeGreaterThan(0.4);

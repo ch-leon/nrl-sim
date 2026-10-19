@@ -62,7 +62,7 @@ Baselines at even stats, one-on-one, square — `src/match/league/contest.ts`:
 
 | Knob | Value | Effect |
 |---|---|---|
-| `contest.bigHit / broken / fend / offload / strip` | 10 / 12 / 7 / 9 / 2 % | Even-stats outcome odds; held is the remainder. |
+| `contest.bigHit / broken / fend / offload / strip` | 10 / 12 / 7 / 12 / 2 % | Even-stats outcome odds; held is the remainder. Offload 9 → 12% in Phase 3 (with `live.offloadM` 5 → 7 m: 2.5 offloads a match → about 10, §7 8–14). |
 | `carrierEdge` weights | atk: Str .5 Spd .3 Skl .2 · def: Str .6 IQ .2 Spd .2; logistic ÷ 22 | How stats tilt the contest. |
 | Stat swing | bust ±8, fend ±4.5, offload ±5, big hit ∓7, strip ∓1 pts | Over edge 0…1. |
 | Two defenders | bust −6, fend −4, offload −3, big hit +4 | Three: −9 / −6 / −5 / +6. |
@@ -74,7 +74,7 @@ Baselines at even stats, one-on-one, square — `src/match/league/contest.ts`:
 | `interceptChance` | 6% + (IQ − 50)/1000, cut-out ×2, cap 1…60% | Defender inside `live.laneM` of the pass line. |
 
 Geometry that feeds it — `live.ts`: `live.engageM` 4.5 (carrier decides), `live.tackleReach` 1.2,
-`live.stepRange` 2.6, `live.secondManM` 3.5 (two-man tackle), `live.offloadM` 5 (support in reach),
+`live.stepRange` 2.6, `live.secondManM` 3.5 (two-man tackle), `live.offloadM` 7 (support in reach; 5 before Phase 3),
 `live.laneM` 1.5 (intercept lane), `live.driveBack` 2.5 m (big hit), `live.stepJinkM` 1.6 over
 `live.stepJinkTicks` 4. `committed` sends 2 defenders, 3 if a third is within 5 m, 4 when the
 line is broken (≤ 2 ahead), + defence preset `commit`.
@@ -235,6 +235,16 @@ season stats and Player of the Match count it). The harness column `lineBreaks` 
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `live.lineBreakM` | `src/match/league/live.ts` | 1 m | How far goal-side of all but the last man counts as a line break (a measure, not play). |
+
+**Tackles and the band** (Phase 3): between even sides the sim made about 196 tackles a
+match, a tackle every 5.5 s of game clock. A real NRL match runs at about 7.5 s a tackle of
+game clock (some 640 tackles in 80 minutes) and close to 5 s of ball in play; 90–120 in 18
+minutes is 9–12 s a tackle, slower than the real game. The play-the-ball was quick (tackle to
+ball played about 2.2 s, NRL about 3 s). Slowed to 3 s, tackles come down to about 170 and
+kicks to 20 with tries in the band, but a slower game is less tiring and the legs tuning (§8,
+§10a) and the tactics tests were set on the old tempo; a 4.5 s ruck still gives 141 tackles
+and drops tries to 4 (tempo sweep `20261019-141554-tempo-2`). Not changed: a question for
+Leon (the band, or a slower game with legs re-tuned).
 
 ## 13. The match: clock, halves, points (BAK-207 §5.1, 2a)
 

@@ -36,7 +36,7 @@ baseline(situation) → ± attributes → ± traits (announced when they fire) �
 - **Roll** is `rng.next()` against the final probabilities. Same seed, same match.
 
 A worked example (tackle, §4.1): one-on-one, carrier running square at a defender of
-equal stats → baseline 10% step, 12% bust, 7% fend, 9% offload (if a support is close),
+equal stats → baseline 10% step, 12% bust, 7% fend, 12% offload (if a support is within 7 m; Phase 3, was 9% within 5 m),
 10% big hit, rest held. Carrier has *Dancing Feet II* → step becomes 10% + 24% = 34%. Roll
 0.22 → **STEP!** with *DANCING FEET II* under it — the defender grasps air, the carrier is
 through, the crowd lifts.
@@ -74,7 +74,7 @@ the commentary line names it, and the lab stats strip counts them (`Skill n`).
 | **Dancing Feet** | One-on-one, before contact | +15% step | STEP! |
 | **Wrecking Ball** | In contact | +12% bust; held → 30% to keep driving: +30% fight in the wrestle (§8.1) | BUST! / DRIVE! |
 | **Don't Argue** | Tackler not arriving from behind | +12% fend | FEND! |
-| **Offload King** | Held with a support runner inside 5 m | +12% offload | OFFLOAD! |
+| **Offload King** | Held with a support runner inside 7 m | +12% offload | OFFLOAD! |
 | **Finisher** | Inside the opposition 20 m | +10% bust, +5% fend, +10% step | BUST! / STEP! |
 | **Jets** | After a break; on the kick chase | A bigger gas tank: ×1.4 at I (§8.2); +8% speed chasing a kick | longer sprint |
 | **Playmaker** | Engaged with the ball | +10% to pass rather than carry; reach 12 + 3 m/level → the cut-out ball | CUT-OUT! |
