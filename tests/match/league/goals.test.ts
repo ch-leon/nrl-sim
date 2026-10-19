@@ -143,7 +143,7 @@ describe('bonus-zone tries (Nines)', () => {
   it('a carrier clear over the line goes round under the posts: a five-point try, grounded in the zone', () => {
     let bonus = 0;
     let plain = 0;
-    for (const seed of [1, 2, 3]) {
+    for (let seed = 1; seed <= 10 && (bonus < 2 || plain < 2); seed++) {
       const { events } = play(seed);
       for (const t of events.filter((x) => x.e.kind === 'try')) {
         const scorer = t.snap.players.find((p) => p.side === t.e.side && p.slot === t.e.slot)!;

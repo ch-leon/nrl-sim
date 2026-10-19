@@ -113,8 +113,8 @@ describe('interchanges in the live sim', () => {
       expect(e.text.startsWith(`${e.player} on for`)).toBe(true);
       const p = snap.players.find((q) => q.side === e.side && q.slot === e.slot)!;
       expect(p.who).toBe(e.player); // flat squads have no ids: the look follows the name
-      // Never in open play: only at the restart after a try (or the break).
-      expect(snap.label).toMatch(/· restart ·/);
+      // Never in open play: only at a stoppage — the restart after a try or a drop-out, or a set piece after touch or a dead ball (2d).
+      expect(snap.label).toMatch(/· (restart|set-piece) ·/);
     }
   });
 

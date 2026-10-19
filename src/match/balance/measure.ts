@@ -23,6 +23,7 @@ export const COUNTS = [
   'tackles', 'bigHits', 'busts', 'lateBusts', 'fends', 'steps', 'breaks', 'offloads', 'errors', 'kicks', 'tries',
   'intercepts', 'strips', 'quickPtb', 'slowPtb', 'gassed', 'wrestles', 'held1', 'held2', 'held3',
   'runDowns', 'blown', 'subs', 'goals', 'goalMisses', 'fieldGoals', 'fgMisses', 'chargeDowns', 'bonusTries',
+  'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -132,6 +133,23 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
       case 'blown':
         c.blown++;
         break;
+      case 'touch':
+        if (e.detail === 'kick') c.touchFinds++;
+        else if (e.detail === 'bundled') c.bundled++;
+        break;
+      case '40-20':
+        c.fortyTwenties++;
+        c.touchFinds++;
+        break;
+      case 'on-full':
+        c.onTheFull++;
+        break;
+      case 'dead-ball':
+        c.deadBalls++;
+        break;
+      case 'drop-out':
+        c.dropOuts++;
+        break;
       case 'interchange':
         c.subs++;
         break;
@@ -221,6 +239,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       c.held1 = held[1]!;
       c.held2 = held[2]!;
       c.held3 = held[3]!;
+      c.kickMetres = sim.kickMetres.home + sim.kickMetres.away;
       wrestleCount = 0;
       perSeed.push(c);
       if (sim.points.home > sim.points.away) wins++;
