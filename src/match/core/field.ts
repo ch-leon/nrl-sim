@@ -28,10 +28,10 @@ export function fromFieldPt(f: FieldPt): Vec {
 
 /** Keep a point on the field including the in-goals (`margin` metres inside the lines). */
 export function clampToGround(p: Vec, margin = 0): Vec {
-  return {
-    x: clamp(p.x, -IN_GOAL + margin, FIELD_LENGTH + IN_GOAL - margin),
-    y: clamp(p.y, margin, FIELD_WIDTH - margin),
-  };
+  const x = clamp(p.x, -IN_GOAL + margin, FIELD_LENGTH + IN_GOAL - margin);
+  const y = clamp(p.y, margin, FIELD_WIDTH - margin);
+  // Already on the ground (nearly always): the same point, no new object.
+  return x === p.x && y === p.y ? p : { x, y };
 }
 
 /** Inside the field of play (between the try-lines and touchlines). */

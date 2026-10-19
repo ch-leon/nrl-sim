@@ -113,6 +113,10 @@ Every transition is a thing that physically happens on the field; nothing is imp
   builds a snapshot every tick (1.7× faster per match). Thousands of matches are minutes on four
   cores, so sweeps aren't blocked; the < 100 ms target needs allocation-free steering, a rewrite
   that would change every seed's match, left for later.
+  *N9.1 (2026-10-19):* no `Math.hypot`, scalar steering and separation, the commit ranking on a
+  cost list: about 485 → 300 ms a match in Node, a phone's week tick 2.2 → 1.5 s. The < 100 ms
+  target assumed about 7,000 ticks; at 21,600 it needs a coarser step (tuning reference §23;
+  Assumed, needs Leon).
 - `src/sim/engine.ts` and `src/world/playback.ts`+`staging.ts` are deleted at switch-over
   (~2,500 lines); ARCHITECTURE §6 is rewritten to this contract. *Phase 4 (#88, #162,
   2026-10-19, merged on Leon's go-ahead after a checker review):* those three and

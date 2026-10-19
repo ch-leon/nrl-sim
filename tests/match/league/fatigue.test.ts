@@ -135,11 +135,12 @@ describe('legs and the wrestle in the live sim', () => {
     // The mechanic on the sheets as written: in a real match the gap between the sides counts for less (rating.spread, Phase 3).
     const restore = applyTuning({ 'rating.spread': 1 });
     try {
-      for (let s = 1; s <= 2; s++) {
+      // Four seeds: two left the mean within a few hundredths of the line whenever the seeds reshuffle.
+      for (let s = 1; s <= 4; s++) {
         const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s);
         play(sim, 600);
-        home += sim.energyOf('home') / 2;
-        away += sim.energyOf('away') / 2;
+        home += sim.energyOf('home') / 4;
+        away += sim.energyOf('away') / 4;
       }
     } finally {
       restore();

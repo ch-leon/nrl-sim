@@ -3,7 +3,7 @@
 // acceleration cap gives smooth starts and stops; separation keeps bodies from
 // standing inside each other. Everything is per fixed tick (see engine.ts), so
 // results never depend on frame rate.
-import { add, clampLen, dist, len, norm, scale, sub, type Vec } from './vec';
+import { len, norm, type Vec } from './vec';
 
 export interface Body {
   pos: Vec;
@@ -56,34 +56,54 @@ export interface SteerOpts {
  * `integrate` to move.
  */
 export function arrive(b: Body, target: Vec, dt: number, opts: SteerOpts = {}): void {
+  // In scalars, one new velocity at the end: this runs for every body every tick.
   const max = opts.maxSpeed ?? b.maxSpeed;
-  const to = sub(target, b.pos);
-  const d = len(to);
-  let desired: Vec;
+  const tx = target.x - b.pos.x;
+  const ty = target.y - b.pos.y;
+  const d = Math.sqrt(tx * tx + ty * ty);
+  let dx: number;
+  let dy: number;
   if (opts.through) {
     // About to pass the point → keep the heading rather than jink onto it.
-    const dir = d > PASS_THROUGH_DIST ? scale(to, 1 / d) : b.heading;
-    desired = scale(dir, max);
+    if (d > PASS_THROUGH_DIST) {
+      dx = (tx / d) * max;
+      dy = (ty / d) * max;
+    } else {
+      dx = b.heading.x * max;
+      dy = b.heading.y * max;
+    }
   } else {
-    if (d < STOP_DIST && len(b.vel) < STOP_SPEED) {
+    if (d < STOP_DIST && b.vel.x * b.vel.x + b.vel.y * b.vel.y < STOP_SPEED * STOP_SPEED) {
       b.vel = { x: 0, y: 0 };
       return;
     }
     const speed = Math.min(max, Math.sqrt(2 * b.accel * d));
-    desired = d > 1e-6 ? scale(to, speed / d) : { x: 0, y: 0 };
+    dx = d > 1e-6 ? (tx * speed) / d : 0;
+    dy = d > 1e-6 ? (ty * speed) / d : 0;
   }
-  const dv = clampLen(sub(desired, b.vel), b.accel * dt);
-  b.vel = add(b.vel, dv);
+  // The change of velocity, capped at the acceleration.
+  let cx = dx - b.vel.x;
+  let cy = dy - b.vel.y;
+  const cap = b.accel * dt;
+  const c = Math.sqrt(cx * cx + cy * cy);
+  if (c > cap && c > 1e-9) {
+    cx *= cap / c;
+    cy *= cap / c;
+  }
+  b.vel = { x: b.vel.x + cx, y: b.vel.y + cy };
 }
 
 /** Come to a stop as fast as the acceleration cap allows. */
 export function brake(b: Body, dt: number): void {
-  b.vel = sub(b.vel, clampLen(b.vel, b.accel * dt));
+  const v = len(b.vel);
+  const cap = b.accel * dt;
+  const k = v > cap && v > 1e-9 ? 1 - cap / v : 0;
+  b.vel = { x: b.vel.x * k, y: b.vel.y * k };
 }
 
 /** Move by the current velocity; update heading while moving. */
 export function integrate(b: Body, dt: number): void {
-  b.pos = add(b.pos, scale(b.vel, dt));
+  b.pos = { x: b.pos.x + b.vel.x * dt, y: b.pos.y + b.vel.y * dt };
   // Squared, to skip the square root on every body every tick (0.15² m/s).
   if (b.vel.x * b.vel.x + b.vel.y * b.vel.y > 0.0225) b.heading = norm(b.vel);
 }
@@ -103,15 +123,21 @@ export function separate(bodies: readonly Body[], radius = BODY_RADIUS, skip?: R
       const dx = a.pos.x - b.pos.x;
       const dy = a.pos.y - b.pos.y;
       if (dx * dx + dy * dy >= r2) continue;
-      const d = dist(a.pos, b.pos);
-      if (d >= radius) continue;
+      const d = Math.sqrt(dx * dx + dy * dy);
       // Coincident bodies get a deterministic nudge along x.
-      const away = d > 1e-6 ? scale(sub(b.pos, a.pos), 1 / d) : { x: 1, y: 0 };
+      const ax = d > 1e-6 ? -dx / d : 1;
+      const ay = d > 1e-6 ? -dy / d : 0;
       const push = (radius - d) / 2;
       const aSkip = skip?.has(a) ?? false;
       const bSkip = skip?.has(b) ?? false;
-      if (!aSkip) a.pos = sub(a.pos, scale(away, bSkip ? push * 2 : push));
-      if (!bSkip) b.pos = add(b.pos, scale(away, aSkip ? push * 2 : push));
+      if (!aSkip) {
+        const k = bSkip ? push * 2 : push;
+        a.pos = { x: a.pos.x - ax * k, y: a.pos.y - ay * k };
+      }
+      if (!bSkip) {
+        const k = aSkip ? push * 2 : push;
+        b.pos = { x: b.pos.x + ax * k, y: b.pos.y + ay * k };
+      }
     }
   }
 }

@@ -635,3 +635,31 @@ on the same dice: nothing else moves beyond luck (tries, line breaks, errors, ho
 within a point or two). Standard plan: see the PR.
 
 Tests: `tests/match/league/sinbin.test.ts`.
+
+## 23. Headless speed (N9.1; BAK-207 §3.5)
+
+What a match costs to play without a screen (fast-forward, the harness, and next the rival
+rounds). The sim's vector maths no longer calls `Math.hypot` (the square root of the sum of
+squares, several times faster), steering and separation work in plain numbers and build one
+new position or velocity each, `clampToGround` hands back the same point when it is already on
+the field, and the tackle commit ranks defenders on a cost list instead of a Map. Every seed
+changes (the square roots differ in the last bits), so matches reshuffle; over 60 whole
+matches nothing moves beyond luck (`20261019-230203-offloads-check` on main against
+`20261019-230253-offloads-check`), and the standard plan holds the §7 bands
+(`20261019-230121-standard` against `20261019-230040-standard`).
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `live.decideEveryTicks` | `src/match/league/live.ts` | 1 | Players re-pick their targets every this many ticks (1 = 20 Hz). 2 is about a fifth faster but costs about a sixth of the line breaks and All-out's edge (38% v 48% against Balanced; `20261019-225416-decide-rate`), so it stays at 1. |
+| `live.separatePasses` | `live.ts` | 2 | Times a tick bodies are pushed apart. 1 saves little and costs about a sixth of the points. |
+
+| | main | N9.1 |
+|---|---|---|
+| A whole match headless, Node, one core (bundled) | about 485 ms | about 300 ms |
+| A week's tick, phone (CPU ×4, 844×390, `npm run e2e:perf`) | 2,154 ms | 1,467 ms |
+| Skip to full time, phone | 5,436 ms | 4,394 ms |
+
+**The < 100 ms target is not met** (Assumed, needs Leon). BAK-207 set it for a match of about
+7,000 ticks, some 14 µs a tick; a real 2 × 9:00 match is 21,600 ticks, and the sim now runs
+at about 14 µs a tick. A 100 ms match needs a coarser sim step (10 Hz, with every tick-counted
+length re-timed) or fewer men moved per tick, which changes how the game plays.

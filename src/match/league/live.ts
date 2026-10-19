@@ -71,6 +71,11 @@ import { BIN, binReason, binReasonText, sinBinChance } from './sinbin';
  * metres. Overridable by name in balance experiments (tuning.ts).
  */
 export const LIVE = {
+  // Speed (N9.1): players re-pick their targets every this many ticks (1 = every tick, 20 Hz;
+  // 2 is a fifth faster but costs a sixth of the line breaks and All-out's edge) and bodies are
+  // pushed apart this many times a tick (1 costs a sixth of the points).
+  decideEveryTicks: 1,
+  separatePasses: 2,
   // Timing (ticks)
   contactTicks: 9,
   downTicks: 10,
@@ -705,7 +710,7 @@ export class LiveSim implements MatchSim {
       default:
         break;
     }
-    this.assignTargets();
+    if (this.tick % LIVE.decideEveryTicks === 0) this.assignTargets();
     this.move();
     this.restBench();
     this.runClock();
@@ -2313,8 +2318,10 @@ export class LiveSim implements MatchSim {
     // A defender already behind the carrier can only chase; the ones in front
     // of him are the tackle, so they rank first.
     const behind = (d: Player): boolean => (d.body.pos.x - h.body.pos.x) * this.dir < 0;
-    const costs = new Map(free.map((d) => [d, dist(d.body.pos, h.body.pos) + (behind(d) ? 60 : 0) + (this.markers.includes(this.indexOf(d)) ? 8 : 0)]));
-    free.sort((a, b) => costs.get(a)! - costs.get(b)!);
+    // Each defender's cost worked out once, then a stable sort on it (the same order as sorting the men).
+    const ranked = free.map((d) => ({ d, cost: dist(d.body.pos, h.body.pos) + (behind(d) ? 60 : 0) + (this.markers.includes(this.indexOf(d)) ? 8 : 0) }));
+    ranked.sort((a, b) => a.cost - b.cost);
+    for (let i = 0; i < ranked.length; i++) free[i] = ranked[i]!.d;
     const ahead = free.filter((d) => !behind(d)).length;
     // A broken line (two or fewer still in front) sends everyone in range after him.
     const n = ahead <= 2 ? 4 : free[2] && dist(free[2].body.pos, h.body.pos) < 5 ? 3 : 2;
@@ -2704,7 +2711,7 @@ export class LiveSim implements MatchSim {
       }
     }
     const bodies = this.players.map((p) => p.body);
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < LIVE.separatePasses; i++) {
       separate(bodies, undefined, held);
       for (const b of bodies) b.pos = clampToGround(b.pos, 0.5);
     }
