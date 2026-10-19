@@ -538,16 +538,21 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
     const overlay = document.createElement('div');
     overlay.setAttribute('data-nrl-title', '');
     // pointer-events opt-in (the #ui-root overlay disables them by default).
+    // On a landscape phone the slots + new-game form are taller than the screen:
+    // the overlay scrolls, and auto margins on the first and last children centre
+    // the content only while it fits (justify-content:center would push the top
+    // of tall content out of reach).
     overlay.style.cssText = [
       'position:absolute', 'inset:0', 'pointer-events:auto',
       'display:flex', 'flex-direction:column', 'align-items:center',
-      'justify-content:center', 'gap:16px', 'background:rgba(26,26,46,0.95)',
+      'justify-content:flex-start', 'overflow-y:auto', 'padding:16px 0', 'box-sizing:border-box',
+      'gap:16px', 'background:rgba(26,26,46,0.95)',
       'color:#fff', 'font-family:"Courier New",monospace',
     ].join(';');
 
     const title = document.createElement('h1');
     title.textContent = 'NRL SIM';
-    title.style.cssText = 'letter-spacing:4px;margin:0 0 8px;';
+    title.style.cssText = 'letter-spacing:4px;margin:auto 0 8px;';
     overlay.appendChild(title);
 
     const list = document.createElement('div');
@@ -555,7 +560,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
     overlay.appendChild(list);
 
     const footer = document.createElement('div');
-    footer.style.cssText = 'display:flex;flex-direction:column;gap:6px;align-items:center;';
+    footer.style.cssText = 'display:flex;flex-direction:column;gap:6px;align-items:center;margin-bottom:auto;';
     overlay.appendChild(footer);
 
     let settled = false;
