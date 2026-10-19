@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, tickContracts,
+  weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, homeGate, recentForm, tickContracts,
   handleBankruptcy, applyEconomy, registerEconomySystem,
 } from '../../src/systems/economy';
 import { FACILITY_CATALOG, facilityUpkeep } from '../../src/data/facility';
@@ -96,9 +96,11 @@ describe('weeklyIncome', () => {
   });
 });
 
-describe('gateReceipts', () => {
-  const homeFixture = (round: number): Fixture => ({ round, homeId: 'player', awayId: 'rivalX' });
+describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
+  const homeFixture = (round: number, awayId = 'rivalX'): Fixture => ({ round, homeId: 'player', awayId });
   const awayFixture = (round: number): Fixture => ({ round, homeId: 'rivalX', awayId: 'player' });
+  const won = (f: Fixture): Fixture => ({ ...f, result: f.homeId === 'player' ? { homeScore: 20, awayScore: 10 } : { homeScore: 10, awayScore: 20 } });
+  const lost = (f: Fixture): Fixture => ({ ...f, result: f.homeId === 'player' ? { homeScore: 10, awayScore: 20 } : { homeScore: 20, awayScore: 10 } });
 
   it('returns 0 when league has no fixtures (graceful)', () => {
     setup({ week: 1, reputation: 30, league: { clubs: [], fixtures: [], ladder: [] } });
@@ -121,33 +123,62 @@ describe('gateReceipts', () => {
     expect(gateReceipts(getState())).toBe(0);
   });
 
-  it('home week, no grandstand: exact attendance × ticket price', () => {
+  it('home week on the hill: demand × ticket price', () => {
     setup({
       week: 3, reputation: 30, facilities: [],
       league: { clubs: [], fixtures: [homeFixture(3)], ladder: [] },
     });
-    // attendance = (500 + 30×40) × (1 + 0) = 1700 ; gate = 1700 × 20 = 34000
-    expect(gateReceipts(getState())).toBe(34000);
+    // demand = 300 + 30×30 = 1,200 (under the hill's 2,000) ; gate = 1,200 × 20 = 24,000
+    expect(gateReceipts(getState())).toBe(24_000);
+    const g = homeGate(getState(), homeFixture(3));
+    expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 24_000, soldOut: false });
   });
 
-  it('home week scales with grandstand level and reputation (exact)', () => {
-    setup({
-      week: 2, reputation: 50, facilities: [pf('grandstand', 3)],
-      league: { clubs: [], fixtures: [homeFixture(2)], ladder: [] },
-    });
-    // attendance = (500 + 50×40) × (1 + 0.5×3) = 2500 × 2.5 = 6250 ; gate = 125000
-    expect(gateReceipts(getState())).toBe(125000);
-  });
-
-  it('higher grandstand level yields higher gate', () => {
-    const mk = (level: PlacedFacility['level']): number => {
-      setup({
-        week: 1, reputation: 20, facilities: [pf('grandstand', level)],
-        league: { clubs: [], fixtures: [homeFixture(1)], ladder: [] },
-      });
-      return gateReceipts(getState());
+  it('the hill holds 2,000: a famous club sells out, and a Grandstand lifts the roof', () => {
+    const at = (facilities: PlacedFacility[]): ReturnType<typeof homeGate> => {
+      setup({ week: 3, reputation: 100, facilities, league: { clubs: [], fixtures: [homeFixture(3)], ladder: [] } });
+      return homeGate(getState(), homeFixture(3));
     };
-    expect(mk(3)).toBeGreaterThan(mk(1));
+    // demand = 300 + 100×30 = 3,300
+    expect(at([])).toEqual({ capacity: 2000, demand: 3300, attendance: 2000, receipts: 40_000, soldOut: true });
+    expect(at([pf('grandstand', 1)])).toEqual({ capacity: 3500, demand: 3300, attendance: 3300, receipts: 66_000, soldOut: false });
+    expect(at([pf('grandstand', 2)]).capacity).toBe(5000);
+    expect(at([pf('grandstand', 3)]).capacity).toBe(6500);
+    expect(gateReceipts(getState())).toBe(66_000);
+  });
+
+  it('form moves demand ±25% over the last five results, from the matches before the round', () => {
+    const run = (results: Fixture[]): number => {
+      setup({ week: 7, reputation: 30, facilities: [], league: { clubs: [], fixtures: [...results, homeFixture(7)], ladder: [] } });
+      return homeGate(getState(), homeFixture(7)).demand;
+    };
+    const five = [awayFixture(1), homeFixture(2), awayFixture(3), homeFixture(4), awayFixture(5)];
+    expect(run(five.map(won))).toBe(1500);
+    expect(run(five.map(lost))).toBe(900);
+    expect(run([won(five[0]!), won(five[1]!), won(five[2]!), lost(five[3]!), lost(five[4]!)])).toBe(1260);
+    // Six results: only the last five count; a sixth loss before them changes nothing.
+    expect(run([lost(awayFixture(6)), ...five.map(won)].map((f) => (f.round === 6 ? { ...f, round: 0 } : f)))).toBe(1500);
+    expect(recentForm(getState())).toBe(1);
+    setup({ week: 1, league: { clubs: [], fixtures: [homeFixture(1)], ladder: [] } });
+    expect(recentForm(getState())).toBe(0);
+  });
+
+  it('a top-eight opponent draws 20% more and a home final 50% more', () => {
+    const row = (clubId: string, points: number) => ({ clubId, played: 5, wins: points / 2, draws: 0, losses: 5 - points / 2, pointsFor: 0, pointsAgainst: 0, points });
+    const ladder = [row('player', 6), ...Array.from({ length: 8 }, (_, i) => row(`top${i}`, 10)), row('rivalX', 0)];
+    setup({ week: 6, reputation: 30, facilities: [], league: { clubs: [], fixtures: [homeFixture(6, 'top3')], ladder } });
+    expect(homeGate(getState(), homeFixture(6, 'top3')).demand).toBe(1440);
+    expect(homeGate(getState(), homeFixture(6, 'rivalX')).demand).toBe(1200);
+    // Round 1: nobody has played, so no big match yet.
+    setup({ week: 1, reputation: 30, facilities: [], league: { clubs: [], fixtures: [homeFixture(1, 'top3')], ladder: ladder.map((r) => ({ ...r, played: 0, points: 0 })) } });
+    expect(homeGate(getState(), homeFixture(1, 'top3')).demand).toBe(1200);
+    // A home final (round 25).
+    setup({ week: 25, reputation: 30, facilities: [], league: { clubs: [], fixtures: [homeFixture(25)], ladder: [] } });
+    expect(homeGate(getState(), homeFixture(25)).demand).toBe(1800);
+    expect(gateReceipts(getState())).toBe(36_000);
+    // A famous club's home final overflows the hill: the roof is why a finals side wants a stand.
+    setup({ week: 25, reputation: 60, facilities: [], league: { clubs: [], fixtures: [homeFixture(25)], ladder: [] } });
+    expect(homeGate(getState(), homeFixture(25))).toEqual({ capacity: 2000, demand: 3150, attendance: 2000, receipts: 40_000, soldOut: true });
   });
 });
 
@@ -320,7 +351,7 @@ describe('applyEconomy — full weekly loop', () => {
       week: 1,
     });
     applyEconomy(getState());
-    // gate = 125000 (from earlier exact test), wages small, income = rep grant.
+    // gate = 1,800 × $20 = $36,000 (rep 50; the L3 stand is not needed), wages small, income = rep grant.
     // Net well above the floor → no forced sales.
     expect(getState().squad.length).toBe(SQUAD_MIN + 2);
     expect(getState().money).toBeGreaterThan(ECON.FORCED_SALE_FLOOR);
