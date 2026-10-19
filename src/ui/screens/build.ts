@@ -125,7 +125,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
     el('div', { class: 'nrl-build-list' }, ...rows),
   );
   ensureBuildStyles();
-  openModal(content, { class: 'nrl-build-modal', screen: true });
+  openModal(content, { class: 'nrl-build-modal', screen: true, closeButton: false });
 }
 
 /**

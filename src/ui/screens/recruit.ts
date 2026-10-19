@@ -101,10 +101,12 @@ const SCREEN_CSS = `
 .nrl-card-name {
   font-weight: bold;
   font-size: clamp(0.8rem, 3vw, 1rem);
+  line-height: 1.1;
   flex: 1 1 auto;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  /* #195: a long name wraps to a second line instead of clipping to "Ezra Kellaw…". */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .nrl-card-ovr {
   font-weight: bold;

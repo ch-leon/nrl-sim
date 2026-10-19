@@ -152,7 +152,7 @@ function openLeagueScreen(initialTab: Tab): HTMLElement {
   content.append(tabBar, body);
   render(initialTab);
 
-  return openModal(content, { class: 'nrl-league-modal', screen: true });
+  return openModal(content, { class: 'nrl-league-modal', screen: true, closeButton: false });
 }
 
 /** Open the League screen on the Fixtures tab. */
