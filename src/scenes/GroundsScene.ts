@@ -102,7 +102,7 @@ export class GroundsScene extends Phaser.Scene {
   private offPlacementMode: (() => void) | null = null;
   // Construction / upgrade animations (GitHub #24); created after the first render
   // so facilities already in the save don't animate on load.
-  private buildFx?: BuildFx;
+  private buildFx: BuildFx | undefined;
   private offFacilityPlaced: (() => void) | null = null;
   private offStateChanged: (() => void) | null = null;
   // Players, staff and fans using the facilities (#23).
@@ -113,6 +113,16 @@ export class GroundsScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Phaser reuses this instance when the scene restarts (Grounds → Match →
+    // Grounds), so per-run bookkeeping must start empty: stale entries point at
+    // sprites the last run destroyed, and the facilities would never be redrawn.
+    this.facilitySprites.clear();
+    this.facilitySpots.clear();
+    this.dimmedId = null;
+    this.path = [];
+    // The last run's BuildFx is detached from the update loop: with it, the first
+    // render would start a build animation (alpha 0) that never plays out.
+    this.buildFx = undefined;
     this.tiles = this.buildTileArray();
     this.renderGround();
     this.setupCamera();
