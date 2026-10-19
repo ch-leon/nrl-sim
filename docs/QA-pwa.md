@@ -53,3 +53,11 @@ The canvas uses `Scale.RESIZE` and fills the viewport (no letterboxing). Check a
 - On a notched phone, HUD/nav/scoreboard clear the safe-area insets
   (`viewport-fit=cover` + `env(safe-area-inset-*)`).
 Screenshots: `docs/screenshots/18/`.
+
+## Save corpus (QA loop)
+`tests/fixtures/saves/` holds real saves from the phone playthrough, one file per save
+version at each of four points (after the tutorial, mid-season, after the rollover,
+season 2). `tests/qa/corpus.test.ts` (part of `npm test`) checks every one still migrates
+to `SAVE_VERSION`, passes the soak's invariant checks and plays a season headless.
+When `SAVE_VERSION` moves, run `npm run e2e:season` on the new `main` and copy its dumps
+from `e2e-output/saves/` in; never edit an old file (rules in the README there).

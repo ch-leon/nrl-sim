@@ -3,7 +3,7 @@ import { BootScene } from './scenes/BootScene';
 import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus } from './core/events';
-import { createNewGame, getState, loadState } from './core/state';
+import { createNewGame, getState, loadState, type GameState } from './core/state';
 import { enableAutosave, load, showTitleFlow } from './core/save';
 import { advanceWeek } from './core/time';
 import { advanceUntil } from './core/advance';
@@ -139,8 +139,13 @@ async function boot(): Promise<void> {
   const g = new Phaser.Game(config);
   game = g;
   // `?e2e` exposes the game to the end-to-end playthrough (scripts/e2e-season.mjs),
-  // which checks what the grounds actually draw. Nothing else reads it.
-  if (new URLSearchParams(location.search).has('e2e')) (window as unknown as { __nrlGame?: Phaser.Game }).__nrlGame = g;
+  // which checks what the grounds actually draw and dumps the live state for the
+  // save corpus (tests/fixtures/saves) before the first autosave. Nothing else reads these.
+  if (new URLSearchParams(location.search).has('e2e')) {
+    const w = window as unknown as { __nrlGame?: Phaser.Game; __nrlState?: () => GameState };
+    w.__nrlGame = g;
+    w.__nrlState = () => getState();
+  }
   g.events.once(Phaser.Core.Events.READY, () => {
     if (portraitBlocked) g.loop.sleep();
   });
