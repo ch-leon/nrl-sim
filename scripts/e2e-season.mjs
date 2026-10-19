@@ -427,13 +427,25 @@ async function play() {
   // one on offer and see it lit for the set; skipped when there are no chips.
   await step('coach-call', async (rec) => {
     if (!liveOn) return 'skipped';
-    const chips = page.locator('.nrl-mo-calls .nrl-btn:not([disabled])');
-    if (!(await chips.count())) return 'no coach-call chips on the match screen';
-    const chip = chips.first();
-    const call = await chip.getAttribute('data-call');
-    await press(chip);
+    if (!(await page.locator('.nrl-mo-calls').count())) return 'no coach-call chips on the match screen';
+    // At ×8 the chips switch with possession every second or so and are never still
+    // long enough for a locator click: call at ×1, tapping the first chip on offer
+    // inside the page, then go back to ×8.
+    await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×1' }));
+    let call = null;
+    for (let i = 0; i < 40 && !call; i++) {
+      call = await page.evaluate(() => {
+        const b = [...document.querySelectorAll('.nrl-mo-calls .nrl-btn')].find((e) => !e.hidden && !e.disabled);
+        if (!b) return null;
+        b.click();
+        return b.getAttribute('data-call');
+      });
+      if (!call) await wait(250);
+    }
+    if (!call) throw new Error('no coach-call chip was on offer for 10 s');
     await page.waitForSelector(`.nrl-mo-calls .nrl-btn[data-call="${call}"][data-made]`, { timeout: 5000 });
     rec.notes.push(`called ${call}`);
+    await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×8' }));
   });
   await step('live-fulltime', async (rec) => {
     if (!liveOn) return 'skipped';
