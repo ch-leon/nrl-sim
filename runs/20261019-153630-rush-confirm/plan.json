@@ -1,0 +1,37 @@
+{
+  "name": "rush confirm",
+  "description": "Rush with busts conceded 0.05 -> 0.11: about even against Slide?",
+  "seeds": 120,
+  "scenarios": [
+    {
+      "name": "slide v rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      }
+    },
+    {
+      "name": "rush v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    }
+  ]
+}
