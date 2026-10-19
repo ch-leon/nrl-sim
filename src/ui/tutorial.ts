@@ -75,8 +75,8 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'match',
     text:
-      'On match day your team plays out the round. Watch it back, or hit ' +
-      'Next to skip ahead.',
+      'On match day your team plays out the round. Watch it, or tap the ' +
+      "match's Skip to jump to full time.",
     anchor: null,
     advanceOn: 'match:finished',
   },
@@ -135,7 +135,7 @@ export function isEventStep(
   return step.advanceOn !== 'next-button';
 }
 
-/** Milliseconds to wait for a not-yet-mounted anchor before falling back. */
+/** Milliseconds between looks for a step's anchor while it is not on screen. */
 export const ANCHOR_RETRY_MS = 500;
 
 // ── Runtime state (module singleton) ───────────────────────────────────────
@@ -146,7 +146,7 @@ interface ActiveTutorial {
   overlay: HTMLElement;
   /** Unsubscribe for the current step's bus listener, if any. */
   offEvent: (() => void) | null;
-  /** Pending anchor-retry timer, if any. */
+  /** The anchor poll (an interval), while the step's anchor is not on screen. */
   retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -211,7 +211,7 @@ function clearStepBindings(a: ActiveTutorial): void {
     a.offEvent = null;
   }
   if (a.retryTimer !== null) {
-    clearTimeout(a.retryTimer);
+    clearInterval(a.retryTimer as ReturnType<typeof setInterval>);
     a.retryTimer = null;
   }
 }
@@ -250,20 +250,21 @@ function renderStep(): void {
   const anchorEl = step.anchor ? findAnchor(step.anchor) : null;
 
   if (step.anchor && !anchorEl) {
-    // Anchor not in the DOM yet (screen not open). Render centered for now with
-    // a Next escape hatch, then retry once; if it appears, re-render anchored.
+    // Anchor not in the DOM yet (screen not open, or the nav hidden by a match).
+    // Render centered for now with a Next escape hatch and keep looking every
+    // ANCHOR_RETRY_MS; once it appears (Back to Club after a match, #188),
+    // re-render anchored. The poll stops with the step.
     renderBubble(a, step, { centered: true, forceNext: true });
-    a.retryTimer = setTimeout(() => {
+    a.retryTimer = setInterval(() => {
       if (active !== a || STEPS[a.index] !== step) return;
-      a.retryTimer = null;
       const retryEl = findAnchor(step.anchor!);
-      if (retryEl) {
-        a.overlay.replaceChildren();
-        scrollAnchorIntoView(retryEl);
-        renderCutout(a, retryEl);
-        renderBubble(a, step, { centered: false, forceNext: false });
-      }
-      // else: leave the centered + forced-Next fallback in place.
+      if (!retryEl) return;
+      clearInterval(a.retryTimer as ReturnType<typeof setInterval>);
+      a.retryTimer = null;
+      a.overlay.replaceChildren();
+      scrollAnchorIntoView(retryEl);
+      renderCutout(a, retryEl);
+      renderBubble(a, step, { centered: false, forceNext: false });
     }, ANCHOR_RETRY_MS);
     return;
   }
