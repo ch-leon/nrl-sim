@@ -118,7 +118,7 @@ export interface DefencePlan {
 
 const DEFENCE: Readonly<Record<DefencePreset, DefencePlan>> = {
   slide: { lineSpeed: 5, commit: 0, pull: 1, markerHold: 1, bigHit: 0, broken: 0, offload: 0, stepAgainst: 0 },
-  rush: { lineSpeed: 6.5, commit: 1, pull: 1, markerHold: 0.6, bigHit: 0.04, broken: 0.05, offload: 0, stepAgainst: 0.04 },
+  rush: { lineSpeed: 6.5, commit: 1, pull: 1, markerHold: 0.6, bigHit: 0.04, broken: 0.11, offload: 0, stepAgainst: 0.04 },
   compressed: { lineSpeed: 4.5, commit: 0, pull: 1.4, markerHold: 1.2, bigHit: 0, broken: -0.04, offload: -0.03, stepAgainst: -0.02 },
 };
 

@@ -4,7 +4,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   runSoak, checkState, nonFinitePaths, duplicatePlayers, asOldSave, OLD_VERSIONS, gapSample, bestNineMean, summariseSeasons,
+  classifyReason, emptyTally, tallyNet, FINANCE_LINES,
 } from '../../src/qa/soak';
+import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS } from '../../src/config';
 import { createNewGame, getState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
@@ -32,6 +34,29 @@ describe('soak checks', () => {
   });
 });
 
+describe('soak P&L (#161)', () => {
+  it('maps every ledger reason the game uses to a line, and the unknown to other', () => {
+    expect(classifyReason('wages')).toBe('wages');
+    expect(classifyReason('sponsor+grant')).toBe('sponsorGrant');
+    expect(classifyReason('gate')).toBe('gate');
+    expect(classifyReason('upkeep')).toBe('upkeep');
+    expect(classifyReason('finals prize money')).toBe('prize');
+    expect(classifyReason('board grant')).toBe('boardGrant');
+    expect(classifyReason('event: Billboard offer')).toBe('events');
+    for (const label of ['Merch royalties', 'Pizza win bonus', 'Food truck rent']) expect(classifyReason(label), label).toBe('events');
+    expect(classifyReason('sign:p_1')).toBe('transfers');
+    expect(classifyReason('sell:p_1')).toBe('transfers');
+    expect(classifyReason('renew:p_1')).toBe('contracts');
+    expect(classifyReason('release:p_1')).toBe('contracts');
+    for (const verb of ['build', 'upgrade', 'move', 'demolish']) expect(classifyReason(`${verb}:grandstand`), verb).toBe('facilities');
+    expect(classifyReason('something new')).toBe('other');
+    const t = emptyTally();
+    expect(Object.keys(t).sort()).toEqual([...FINANCE_LINES].sort());
+    expect(Object.values(t).every((v) => v === 0)).toBe(true);
+    expect(tallyNet({ ...t, wages: -5, gate: 8 })).toBe(3);
+  });
+});
+
 describe('soak', () => {
   it('plays two seasons idle and managed with no problems, reporting the record and the gap (#138)', () => {
     const runs = [];
@@ -52,7 +77,21 @@ describe('soak', () => {
         expect(s.rivalRange[0]).toBeLessThanOrEqual(s.rivalRange[1]);
         if (mode === 'idle') expect(s.signings).toBe(0);
         else expect(s.signingFees).toBeGreaterThanOrEqual(0);
+        // The season's P&L adds up to the balance, line by line (#161).
+        expect(s.finance.wages).toBeLessThan(0);
+        expect(s.finance.sponsorGrant).toBeGreaterThan(0);
+        expect(s.finance.gate).toBeGreaterThan(0);
+        expect(s.finance.other).toBe(0);
+        expect(s.finance.upkeep).toBe(0);
+        if (mode === 'idle') {
+          expect(s.finance.transfers).toBe(0);
+          expect(s.finance.facilities).toBe(0);
+        } else {
+          expect(-s.finance.transfers).toBe(s.signingFees);
+        }
       }
+      expect(tallyNet(r.seasons[0]!.finance)).toBeCloseTo(r.seasons[0]!.money - STARTING_MONEY, 0);
+      expect(tallyNet(r.seasons[1]!.finance)).toBeCloseTo(r.seasons[1]!.money - r.seasons[0]!.money, 0);
       runs.push(r);
     }
     expect(runs[0]!.start).toEqual(runs[1]!.start);
@@ -60,8 +99,12 @@ describe('soak', () => {
     expect(runs[1]!.seasons[1]!.bestNine).toBeGreaterThanOrEqual(runs[0]!.seasons[1]!.bestNine);
     const summary = summariseSeasons(runs);
     expect(summary.map((s) => `${s.mode}:${s.season}`)).toEqual(['idle:1', 'idle:2', 'managed:1', 'managed:2']);
+    // The managed manager built at least a Paddock over two seasons.
+    expect(runs[1]!.seasons[0]!.finance.facilities + runs[1]!.seasons[1]!.finance.facilities).toBeLessThan(0);
     for (const row of summary) {
       expect(row.runs).toBe(1);
+      expect(row.finance.wages).toBeLessThan(0);
+      expect(tallyNet(row.finance)).toBeCloseTo(row.money - (row.season === 1 ? STARTING_MONEY : summary.find((x) => x.mode === row.mode && x.season === row.season - 1)!.money), -1);
       expect(row.gap).toBeCloseTo(row.bestNine - row.rivalMean, 0);
       expect(row.finals).toBe(row.ladderPosition <= 8 ? 1 : 0);
     }

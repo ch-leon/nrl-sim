@@ -10,7 +10,7 @@
 // rival mean, and the managed manager's signings — GitHub #138), then every
 // problem found; exits 1 if there were any. The checks live in src/qa/soak.ts.
 import { writeFileSync } from 'node:fs';
-import { runSoak, summariseSeasons, OLD_VERSIONS, type SoakResult } from '../src/qa/soak';
+import { runSoak, summariseSeasons, tallyNet, OLD_VERSIONS, type FinanceLine, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -79,6 +79,24 @@ if (summary.length) {
       pad(s.bestNine.toFixed(1), 5), pad(s.rivalMean.toFixed(1), 5), pad(signed(s.gap), 5), pad(`${s.rivalRange[0]}-${s.rivalRange[1]}`, 7),
       pad(k(s.money), 7), pad(s.signings ? `${s.signings.toFixed(1)} at ${s.signedOverall.toFixed(0)} ovr, ${k(s.signingFees)}` : '-', 18),
       pad(signed(s.startGap), 5),
+    ].join(' '));
+  }
+}
+
+// The season P&L by mode (N6, #161): where the money came from and went.
+if (summary.length) {
+  const ks = (n: number): string => (Math.abs(n) < 500 ? '0' : `${n < 0 ? '-' : '+'}${Math.round(Math.abs(n) / 1000)}k`);
+  const cols: readonly [FinanceLine, string][] = [
+    ['wages', 'wages'], ['sponsorGrant', 'spons+gr'], ['gate', 'gates'], ['prize', 'prize'], ['boardGrant', 'board'],
+    ['events', 'events'], ['transfers', 'transfers'], ['contracts', 'contracts'], ['facilities', 'facilities'], ['upkeep', 'upkeep'], ['other', 'other'],
+  ];
+  console.log(`\nSeason P&L, averaged over ${seeds} seeds ($k a season; negative = spent). spons+gr = Sponsor Board + reputation grant, board = objective grants, transfers = signing fees and sales, contracts = renewals and releases, facilities = build / upgrade / move / demolish. Net = Σ lines; money = the balance at the rollover.`);
+  console.log(`${pad('mode', 9)} ${pad('season', 6)} ${cols.map(([, h]) => pad(h, 10)).join(' ')} ${pad('net', 7)} ${pad('money', 7)}`);
+  for (const s of summary) {
+    console.log([
+      pad(modeLabel(s), 9), pad(s.season, 6),
+      ...cols.map(([l]) => pad(ks(s.finance[l]), 10)),
+      pad(ks(tallyNet(s.finance)), 7), pad(k(s.money), 7),
     ].join(' '));
   }
 }
