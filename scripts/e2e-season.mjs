@@ -1,8 +1,10 @@
 // scripts/e2e-season.mjs — end-to-end playthrough of a full season on a phone
 // (QA pass). Builds the game and serves it with `vite preview`, then in
 // Chromium at 844×390 (touch) or 1280×800 (a desktop window, mouse):
-//   new game → build two facilities → move one → demolish one → sign a free
-//   agent → change the kit → play a match on the classic engine → turn on Live match (beta)
+//   new game → turn the phone upright (rotate card, loop asleep) and back (the
+//   canvas fills the landscape viewport again) → build two facilities → move one →
+//   demolish one → sign a free agent → change the kit → play a match on the
+//   classic engine → turn on Live match (beta)
 //   and watch one on the live sim through the overlay to Back to Club →
 //   answer event cards → renew a contract → watch rivals sign from the pool →
 //   save, reload and continue → play to the season rollover → into season 2.
@@ -240,6 +242,42 @@ async function play() {
     if (!(await skip.count())) return 'no tutorial shown';
   });
   await step('tutorial-skipped', async (rec) => { await tap('.nrl-tutorial-skip'); await dumpSave('after-tutorial', rec); });
+
+  // A phone held upright: the rotate card covers the game and the loop sleeps
+  // until it is turned sideways again (src/ui/orientation.ts). Turned back, the
+  // canvas must fill the landscape viewport again: Phaser's scale manager can
+  // refresh from the old bounds while the rotation is still settling and then take
+  // the new bounds as "no change", leaving the canvas at the portrait size (every
+  // tap after that lands beside the camera); main.ts refreshes it after waking.
+  const orientation = () => page.evaluate(() => ({
+    coarse: matchMedia('(pointer: coarse)').matches,
+    card: getComputedStyle(document.querySelector('.nrl-rotate')).display !== 'none',
+    running: window.__nrlGame?.loop.running,
+    game: `${window.__nrlGame?.scale.gameSize.width}x${window.__nrlGame?.scale.gameSize.height}`,
+    viewport: `${innerWidth}x${innerHeight}`,
+  }));
+  let rotateCard = false;
+  await step('portrait', async (rec) => {
+    if (!PHONE) return 'desktop window: no rotate card';
+    await page.setViewportSize({ width: H, height: W });
+    await wait(600);
+    const o = await orientation();
+    if (!o.coarse) return 'this Chromium reports a fine pointer in portrait, so the rotate card cannot show';
+    if (!o.card) throw new Error('no rotate card in portrait');
+    if (o.running !== false) throw new Error('game loop still running under the rotate card');
+    rotateCard = true;
+    rec.notes.push('rotate card shown, loop asleep');
+  });
+  await step('landscape-again', async (rec) => {
+    if (!PHONE) return 'desktop window';
+    await page.setViewportSize({ width: W, height: H });
+    await wait(600);
+    const o = await orientation();
+    if (o.card) throw new Error('rotate card still up in landscape');
+    if (rotateCard && o.running !== true) throw new Error('game loop did not wake');
+    if (o.game !== o.viewport) throw new Error(`canvas is ${o.game} in a ${o.viewport} viewport after rotating back`);
+    rec.notes.push(`${rotateCard ? 'card gone, loop awake' : 'card gone'}, canvas ${o.game}`);
+  });
 
   // Facilities: build two, move one, demolish the other.
   const cx = Math.round(W / 2), cy = Math.round(H / 2) + 10;
