@@ -27,7 +27,7 @@ import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { TICK_S, type MatchSim } from '../core/engine';
-import { FIELD_LENGTH, FIELD_WIDTH, MID_Y, clampToGround, inGoal } from '../core/field';
+import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_Y, clampToGround, inGoal } from '../core/field';
 import { arrive, integrate, makeBody, maxSpeedFor, separate, speedOf, type Body } from '../core/body';
 import { CARRY_LIFT, PASS_SPEED, bounceFlight, flightAt, grubberFlight, kickFlight, landed, passFlight, rollFlight, type BallState } from '../core/ball';
 import type { PlayerSnap, Side, SimEvent, Snapshot } from '../core/snapshot';
@@ -46,7 +46,7 @@ import { GAS, canSprint, paceMult, refillSeconds, runCostMult, stepGas, tankSeco
 import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
 import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
-import { GOALS, conversionSpot, goalChance, postsFor } from './goals';
+import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
 /**
@@ -319,6 +319,8 @@ export class LiveSim implements MatchSim {
   /** A field goal about to leave the boot, and one in the air (with how it will end). */
   private pendingGoal: { at: number; kicker: number } | null = null;
   private goalUp: { side: Side; kicker: number; good: boolean } | null = null;
+  /** Tick the carrier crossed the line while going round for the bonus zone; -1 when he isn't. */
+  private overLineAt = -1;
   /** A loose ball only this side may take (after a knock-on); null = anyone's. */
   private looseFor: Side | null = null;
   /** The last ruck's markers and the tick its ball was played (they hold until released). */
@@ -886,11 +888,17 @@ export class LiveSim implements MatchSim {
       this.turnover();
       return;
     }
-    // Try: over the line with the ball.
+    // Try: over the line with the ball. With nobody near him he goes round
+    // under the posts for the five-point bonus try first (Nines).
     if (inGoal(h.body.pos, this.dir) || (this.dir > 0 ? h.body.pos.x >= FIELD_LENGTH : h.body.pos.x <= 0)) {
-      this.score(h);
+      if (!this.goForBonus(h)) {
+        this.score(h);
+        return;
+      }
+      if (this.overLineAt < 0) this.overLineAt = this.tick;
       return;
     }
+    this.overLineAt = -1;
     const defenders = this.side(other(this.attacking));
     const committed = this.committed(h, defenders);
     const nearest = committed[0];
@@ -1503,10 +1511,28 @@ export class LiveSim implements MatchSim {
     return true;
   }
 
+  /**
+   * Over the line: keep going round toward the posts for the bonus zone? Only
+   * while no defender is close, not yet between the posts, not near the dead-ball
+   * line, and not for long.
+   */
+  private goForBonus(h: Player): boolean {
+    const dir = this.dirOf(h.side);
+    const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
+    if (inBonusZone(h.body.pos, posts, dir)) return false;
+    if (this.overLineAt >= 0 && this.tick - this.overLineAt >= GOALS.bonusMaxTicks) return false;
+    if ((h.body.pos.x - posts.x) * dir >= IN_GOAL - GOALS.bonusDeadM) return false;
+    return !this.side(other(h.side)).some((d) => !this.locked(d) && dist(d.body.pos, h.body.pos) < GOALS.bonusClearM);
+  }
+
   private score(scorer: Player): void {
+    this.overLineAt = -1;
+    const dir = this.dirOf(scorer.side);
+    const bonus = inBonusZone(scorer.body.pos, postsFor(dir, FIELD_LENGTH, MID_Y), dir);
     this.tries[scorer.side]++;
-    this.points[scorer.side] += NINES.tryPoints;
-    this.emit('try', `TRY! ${scorer.name} dives over for ${this.names[scorer.side]}`, scorer);
+    this.points[scorer.side] += bonus ? NINES.bonusTryPoints : NINES.tryPoints;
+    this.emit('try', bonus ? `TRY! ${scorer.name} goes round under the posts — five points for ${this.names[scorer.side]}` : `TRY! ${scorer.name} dives over for ${this.names[scorer.side]}`, scorer);
+    if (bonus) this.events[this.events.length - 1]!.detail = 'bonus';
     // Dive and slide, then up to celebrate on the spot — he stays put until the restart.
     this.lock(scorer, 'dive', 10, add(scorer.body.pos, scale({ x: this.dir, y: 0 }, 1.5)));
     scorer.poseUntil = this.tick + LIVE.tryTicks;
@@ -1708,7 +1734,12 @@ export class LiveSim implements MatchSim {
         p.through = dist(p.body.pos, kickUp.to) > LIVE.chaseThroughM;
         p.wantsSprint = true;
       } else if (p === carrier) {
-        if (ph.kind === 'play') {
+        if (ph.kind === 'play' && this.overLineAt >= 0) {
+          // Over the line and clear: round under the posts for the bonus zone.
+          p.target = { x: postsFor(this.dir, FIELD_LENGTH, MID_Y).x + this.dir * 2, y: MID_Y };
+          p.through = false;
+          p.wantsSprint = true;
+        } else if (ph.kind === 'play') {
           const defs = this.side(def).filter((d) => !this.locked(d)).map((d) => d.body.pos);
           p.target = gapTarget(p.body.pos, this.dir, defs);
           p.through = true;

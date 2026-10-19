@@ -1,7 +1,7 @@
 // tests/ui/screens/scoreBanner.test.ts — the centre-screen pop-up for every
 // scoring attempt: who scored, what it was, and how many points. Pure — no DOM.
 import { describe, it, expect } from 'vitest';
-import { BANNER_MS, inkFor, scoreBanner } from '../../../src/ui/screens/matchOverlay';
+import { BANNER_MS, initLiveState, inkFor, reduceEvent, scoreBanner } from '../../../src/ui/screens/matchOverlay';
 import { simulateMatch } from '../../../src/sim/engine';
 import type { MatchEvent, TeamSheet } from '../../../src/sim/events';
 
@@ -18,6 +18,12 @@ describe('scoreBanner', () => {
       points: 4,
       conversion: false,
     });
+  });
+  it('a Nines bonus-zone try (between the posts): BONUS TRY!, +5, and the overlay counts five', () => {
+    expect(scoreBanner(ev({ detail: 'bonus' }), 'H', NAMES)).toMatchObject({ headline: 'BONUS TRY!', points: 5 });
+    const s = reduceEvent(initLiveState(), ev({ detail: 'bonus' }), 'H');
+    expect([s.homeScore, s.awayScore]).toEqual([5, 0]);
+    expect(s.tries).toEqual([1, 0]);
   });
 
   it('kicks: converted / penalty goal +2, field goal +1, for the kicking side', () => {

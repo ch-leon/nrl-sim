@@ -87,7 +87,14 @@ export function popupFor(e: SimEvent): Popup | null {
     return { word: 'MISSED!', sub: surnameOf(e.player).toUpperCase(), tone: 'bad', big: false, ms: POPUP_MS };
   }
   const big = w.big ?? false;
-  const word = e.kind === 'kick' && e.detail && KICK_WORDS[e.detail] ? KICK_WORDS[e.detail]! : e.kind === 'break-tackle' && e.detail === 'wrestle' ? LATE_BUST : w.word;
+  const word =
+    e.kind === 'kick' && e.detail && KICK_WORDS[e.detail]
+      ? KICK_WORDS[e.detail]!
+      : e.kind === 'break-tackle' && e.detail === 'wrestle'
+        ? LATE_BUST
+        : e.kind === 'try' && e.detail === 'bonus'
+          ? 'BONUS TRY!'
+          : w.word;
   const p: Popup = { word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;

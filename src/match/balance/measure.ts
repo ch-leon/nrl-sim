@@ -22,7 +22,7 @@ const BENCH_POSITIONS = ['prop', 'second-row', 'centre', 'halfback'] as const;
 export const COUNTS = [
   'tackles', 'bigHits', 'busts', 'lateBusts', 'fends', 'steps', 'breaks', 'offloads', 'errors', 'kicks', 'tries',
   'intercepts', 'strips', 'quickPtb', 'slowPtb', 'gassed', 'wrestles', 'held1', 'held2', 'held3',
-  'runDowns', 'blown', 'subs', 'goals', 'goalMisses', 'fieldGoals', 'fgMisses', 'chargeDowns',
+  'runDowns', 'blown', 'subs', 'goals', 'goalMisses', 'fieldGoals', 'fgMisses', 'chargeDowns', 'bonusTries',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -109,6 +109,7 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         break;
       case 'try':
         c.tries++;
+        if (e.detail === 'bonus') c.bonusTries++;
         break;
       case 'intercept':
         c.intercepts++;
