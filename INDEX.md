@@ -72,3 +72,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261019-235506-rival-scores | rival scores | 1e826c6 (uncommitted changes) | feat/live-rival-rounds | [report](runs/20261019-235506-rival-scores/report.md) |
 | 20261020-004010-kick-chase | kick chase | c9aa079 (uncommitted changes) | feat/sprint-follow-ups | [report](runs/20261020-004010-kick-chase/report.md) |
 | 20261020-004440-stamina-sweep | stamina sweep | 1348d1f | feat/sprint-follow-ups | [report](runs/20261020-004440-stamina-sweep/report.md) |
+| 20261020-004706-standard | standard | 0081c7f | feat/sprint-follow-ups | [report](runs/20261020-004706-standard/report.md) |
