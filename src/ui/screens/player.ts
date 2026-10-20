@@ -180,7 +180,9 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
   const seasonsAtClub = p.joinedSeason !== undefined ? state.season - p.joinedSeason + 1 : null;
   // A week's training under the squad's focus (N11): what each stat gains, for your own players.
   const focus = state.training?.focus ?? 'balanced';
-  const gain = squad ? weeklyGain(p, state.facilities, focus) : null;
+  const week = squad ? weeklyGain(p, state.facilities, focus) : null;
+  // Nothing trains without facilities: no gains to show.
+  const gain = week && Object.values(week).some((g) => g > 0) ? week : null;
   return {
     id: p.id,
     name: p.name,
