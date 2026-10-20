@@ -28,6 +28,7 @@ export const COUNTS = [
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
   'sinBins', 'shortMin', 'binSwing', 'points', 'margin',
+  'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'kickTries',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -75,11 +76,16 @@ export function sideSheet(id: string, spec: SideSpec): TeamSheet {
   return { clubId: id, name: id, attack: r, defense: r, kicking: r, fitness: r, colors: ['#111', '#eee'], roster, bench: reserves, rotation, tactics };
 }
 
+/** A try this soon after his side's kick came from it (12 s). */
+const KICK_TRY_TICKS = 240;
+
 const LATE = (e: SimEvent): boolean => e.kind === 'break-tackle' && e.detail === 'wrestle';
 
 /** Per-match counts from one match's events. */
 function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
   const c = Object.fromEntries(COUNTS.map((k) => [k, 0])) as Record<CountKey, number>;
+  // The kick in play (#99 close-out): a try by the kicking side within KICK_TRY_TICKS of its kick is a kick try.
+  let lastKick: { side: string | undefined; detail: string | undefined; tick: number } | null = null;
   for (const e of es) {
     switch (e.kind) {
       case 'tackle':
@@ -109,6 +115,7 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
       case 'drop':
         c.errors++;
         if (e.detail === 'contact') c.lostInContact++;
+        if (e.kind === 'drop' && lastKick?.detail === 'bomb') c.bombsSpilled++;
         break;
       case 'injury':
         c.injuries++;
@@ -124,10 +131,24 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         break;
       case 'kick':
         c.kicks++;
+        if (e.detail === 'bomb') c.bombs++;
+        else if (e.detail === 'grubber') c.grubbers++;
+        lastKick = { side: e.side, detail: e.detail, tick: e.tick };
+        break;
+      case 'kickoff':
+        lastKick = null;
+        break;
+      case 'regather':
+        if (lastKick?.detail === 'bomb') c.bombsWon++;
         break;
       case 'try':
         c.tries++;
         if (e.detail === 'bonus') c.bonusTries++;
+        if (lastKick && lastKick.side === e.side && e.tick - lastKick.tick <= KICK_TRY_TICKS) {
+          c.kickTries++;
+          if (lastKick.detail === 'grubber') c.grubberTries++;
+        }
+        lastKick = null;
         break;
       case 'intercept':
         c.intercepts++;

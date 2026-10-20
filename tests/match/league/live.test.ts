@@ -268,6 +268,30 @@ describe('LiveSim', () => {
     expect(maxLoose).toBeLessThan(5 / TICK_S); // a long kick nobody is under + the run to it
   });
 
+  it('pace is continuous (#85): while the ball is in play nobody stands still for more than a second', () => {
+    // In play: a carry or a pass is on (not a ruck, a restart, a kick in the air or a stoppage).
+    // Standing still: under 0.3 m/s, on his feet (not down in a tackle, not binned).
+    const still = new Map<string, number>();
+    const stretches: number[] = [];
+    for (const seed of [1, 2, 3]) {
+      run(factory(seed), 300, (s) => {
+        const live = / · tackle \d\/\d/.test(s.label) && s.ball.holder !== null && s.ball.lift < 3;
+        for (const p of s.players) {
+          const key = `${seed}:${p.side}:${p.slot}`;
+          const idle = live && !p.binned && p.speed < 0.3 && p.pose !== 'tackled' && p.pose !== 'down' && p.pose !== 'ptb';
+          if (idle) still.set(key, (still.get(key) ?? 0) + 1);
+          else if (still.has(key)) {
+            stretches.push(still.get(key)!);
+            still.delete(key);
+          }
+        }
+      });
+    }
+    // Measured: about 500 short pauses over three 5-minute stretches, the longest 0.6 s.
+    expect(stretches.length).toBeGreaterThan(50);
+    expect(Math.max(...stretches) * TICK_S).toBeLessThanOrEqual(1);
+  }, 60_000);
+
   it('nobody teleports, overlaps or leaves the ground; speeds stay human', () => {
     const sim = factory(8);
     let prev = sim.snapshot();
