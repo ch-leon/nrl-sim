@@ -192,9 +192,11 @@ async function advance(index, { probe = false } = {}) {
   const t0 = Date.now();
   await clickTimed('.nrl-hud-menu-item', { nth: index });
   let tapMs, label, probeMs = 0;
-  if (probe && await page.locator('.nrl-hud[data-advancing]').count()) {
+  // Read the progress line in the same breath as checking the run is still going.
+  const running = probe ? await page.evaluate(() => (document.querySelector('.nrl-hud[data-advancing]') ? document.querySelector('.nrl-hud-actions .nrl-btn')?.textContent?.trim() ?? '' : null)) : null;
+  if (running !== null) {
     const p0 = Date.now();
-    label = (await page.locator('.nrl-hud-actions .nrl-btn').first().textContent())?.trim();
+    label = running;
     // Timed inside the page, from the touch's own timestamp to its click handler:
     // the driver's tap() waits for two steady frames, and a frame now holds a week.
     const box = await page.locator('.nrl-nav .nrl-btn[data-screen="ladder"]').boundingBox();
