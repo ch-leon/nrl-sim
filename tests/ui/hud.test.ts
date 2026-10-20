@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fmtMoney, ADVANCE_MENU, HELD_WEEK_TEXT, weekStillFinishing } from '../../src/ui/hud';
+import { fmtMoney, ADVANCE_MENU, HELD_WEEK_TEXT, weekStillFinishing, advanceProgressLabel } from '../../src/ui/hud';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import { createNewGame, getState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
@@ -65,5 +65,11 @@ describe('a held week (#216)', () => {
     expect(getState().week).toBe(week + 1);
     expect(weekStillFinishing()).toBe(false);
     expect(notes).toEqual([HELD_WEEK_TEXT]);
+  });
+});
+
+describe('advance progress (N10.2)', () => {
+  it('labels the Advance button with the week of the season while a run is under way', () => {
+    expect(advanceProgressLabel(12)).toBe('Week 12 of 27…');
   });
 });

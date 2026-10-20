@@ -1,6 +1,6 @@
 {
   "throttle": 4,
-  "notes": "N10.1 (#219): starting budgets, about 1.4x the worst of four runs of the nightly perf job on the GitHub runner (three on main at 54ac3c0, one rebased on fa00b1d after #217 and #218; before any N10 change), so the gate is green on day one and a regression of half again fails it. The bundle allows 5% growth. Each later N10 item tightens its rows toward the plan's goals (a week and Skip under 300 ms of block, the hand-off under 1 s, Start to grounds under 3 s). advanceBlockMs is reported but not budgeted: until N10.2 it is the whole multi-week call, which depends on how many weeks run before a stop.",
+  "notes": "N10.1 (#219): starting budgets, about 1.4x the worst of four runs of the nightly perf job on the GitHub runner (three on main at 54ac3c0, one rebased on fa00b1d after #217 and #218; before any N10 change), so the gate is green on day one and a regression of half again fails it. The bundle allows 5% growth. Each later N10 item tightens its rows toward the plan's goals (a week and Skip under 300 ms of block, the hand-off under 1 s, Start to grounds under 3 s). N10.2 (#223): the multi-week advance yields between weeks, so advanceBlockMs is now one week (about 1.4x the runner's worst week) and midAdvanceTapMs, a tap made mid-run, is bounded by the same week; both tighten to 300 ms when N10.3 plays the week's match in the Worker.",
   "budgets": {
     "titleMs": 2200,
     "groundsMs": 4250,
@@ -10,6 +10,8 @@
     "skipBlockMs": 4750,
     "backToClubMs": 1000,
     "weekMs": 1700,
-    "bundleGzKb": 560
+    "bundleGzKb": 560,
+    "advanceBlockMs": 2000,
+    "midAdvanceTapMs": 2000
   }
 }

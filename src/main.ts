@@ -23,7 +23,7 @@ import { registerBoardSystem } from './systems/board';
 import { registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
 import { initBoardUi } from './ui/screens/board';
-import { initPlayerOfMatch } from './ui/screens/potm';
+import { initMatchReport } from './ui/screens/matchReport';
 import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
 import { syncKitDesign } from './ui/screens/kit';
@@ -143,7 +143,7 @@ async function boot(): Promise<void> {
   registerBoardSystem();
   registerEventsSystem();
   registerRivalsSystem();
-  initPlayerOfMatch();
+  initMatchReport();
   initBoardUi();
 
   const g = new Phaser.Game(config);

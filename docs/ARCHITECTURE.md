@@ -88,6 +88,7 @@ src/
       history.ts             # past-seasons screen + season-end toast (GitHub #3)
       build.ts               # facility build menu                    (WU-8 / BAK-178)
       matchOverlay.ts        # scoreboard/stats/commentary overlay    (WU-12 / BAK-196)
+      matchReport.ts         # the match report at full time: scorers, goals, the numbers, Player of the Match (N9.5)
     tutorial.ts              # onboarding flow                        (WU-15 / BAK-202)
   fx/
     audio.ts                 # WebAudio-synthesised SFX + music       (WU-13 / BAK-200)
@@ -299,6 +300,12 @@ player's match) plays its seven fixtures with `runMatch` in a Web Worker
 (`systems/rivalRound.ts`, `systems/rivalWorker.ts`) and holds the week until they are
 in; off, or on fast-forward, it uses the cheap sim, which scores on the live sim's
 scale (tuning reference §24).
+
+The multi-week advance (`core/advance.ts`, the HUD's ×4 / to finals / to season end;
+N10.2) runs one synchronous `advanceWeek()` per week under fast-forward and awaits a
+frame between weeks, so the page paints and takes taps: the HUD shows "Week n of 27…"
+and a **Stop** that ends the run after the week in hand. No hook sees a half-run week;
+the stop rules (`core/advanceRules.ts`) are asked after each week as before.
 
 Finals (weeks 25–27, GitHub #2): after the ladder step of week 24/25/26 the
 fixtures system appends the next knockout round — QF 1v8/2v7/3v6/4v5 from the
