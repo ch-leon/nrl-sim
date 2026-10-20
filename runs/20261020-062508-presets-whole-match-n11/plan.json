@@ -1,0 +1,88 @@
+{
+  "name": "presets whole match N11",
+  "description": "N11 acceptance: what each preset the player can now pick does over whole matches (home plays the preset, even 60 v 60, against Balanced / Slide), on main after N9.",
+  "seeds": 40,
+  "scenarios": [
+    {
+      "name": "balanced v balanced",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "grind v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "rush v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ]
+}
