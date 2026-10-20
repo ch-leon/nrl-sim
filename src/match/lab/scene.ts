@@ -15,6 +15,8 @@ import { PopupLayer } from '../view/popupLayer';
 import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from '../view/popups';
 import { WrestleBar } from '../view/wrestleBar';
 import { SprintLayer } from '../view/sprintLayer';
+import { LegsLayer } from '../view/legsLayer';
+import { FATIGUE } from '../league/fatigue';
 import type { LabController } from './controller';
 
 export interface LabSceneData {
@@ -36,6 +38,7 @@ export class LabScene extends MatchScene {
   private popups: PopupLayer | null = null;
   private wrestleBar: WrestleBar | null = null;
   private sprintLayer: SprintLayer | null = null;
+  private legsLayer: LegsLayer | null = null;
   private ids!: Record<Side, string>;
   private closeupUntil = 0;
 
@@ -58,6 +61,7 @@ export class LabScene extends MatchScene {
     this.popups = new PopupLayer(this, DEPTH_POPUP);
     this.wrestleBar = new WrestleBar(this, DEPTH_POPUP);
     this.sprintLayer = new SprintLayer(this, DEPTH_POPUP - 1);
+    this.legsLayer = new LegsLayer(this, DEPTH_POPUP - 2, FATIGUE);
     const r = this.controller.runner;
     r.onEvents = (events) => this.onSimEvents(events);
     this.view.draw(r.prev, r.cur, 0, 1);
@@ -69,6 +73,8 @@ export class LabScene extends MatchScene {
       this.wrestleBar = null;
       this.sprintLayer?.destroy();
       this.sprintLayer = null;
+      this.legsLayer?.destroy();
+      this.legsLayer = null;
     });
   }
 
@@ -108,6 +114,8 @@ export class LabScene extends MatchScene {
     this.popups?.update(delta, this.cameras.main.zoom, feet);
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
     this.wrestleBar?.update(r.cur.wrestle, this.cameras.main.zoom, (w) => feet(w.side, w.slot));
+    // Legs (§8): a bar under everyone, green → amber once tired → red once spent.
+    this.legsLayer?.update(r.cur, this.cameras.main.zoom, feet);
     // Sprint and gas (§8.2): streaks behind anyone flat out, gas bars on the carrier and his chasers.
     this.sprintLayer?.update(r.cur, this.cameras.main.zoom, (side, slot) => {
       const a = this.players[side][slot];
