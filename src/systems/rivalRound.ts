@@ -1,7 +1,7 @@
 // src/systems/rivalRound.ts — the rival-v-rival fixtures of a round played on
 // the live match sim (N9.2), so the whole league is on one engine. Off by
 // default (`settings.liveRivals`): each match costs about 300 ms headless, so a
-// round of seven runs off the main thread (rivalWorker.ts) while the player
+// round of seven runs off the main thread (matchWorker.ts) while the player
 // watches his own match, and the week waits for both. Fast-forward keeps the
 // cheap sim (fixtures.ts, on the live sim's scale). Pure apart from the Worker
 // glue at the bottom: jobs from state, results back into state.
@@ -9,7 +9,7 @@ import type { GameState, RivalClub } from '../core/state';
 import type { MatchResult, TeamSheet, WeatherKind } from '../sim/events';
 import type { Rng } from '../utils/rng';
 import { ON_FIELD, SEASON_ROUNDS } from '../config';
-import { runMatch } from '../match/league/match';
+import { canUseWorker, playMatchJob, playMatchesInWorker, type MatchJob } from './matchJobs';
 import { aiCoachSides } from '../match/league/calls';
 import { teamSheetFromRival, teamSheetFromSquad } from '../match/league/sheets';
 import { autoPick, resolveLineup } from './lineup';
@@ -60,7 +60,7 @@ export function rivalJobs(state: GameState, rng: Rng, playerId: string): RivalJo
 
 /** Play one job on the live sim, headless. */
 export function playRivalJob(job: RivalJob): MatchResult {
-  return runMatch(job.home, job.away, { seed: job.seed, weather: job.weather, aiCoach: job.aiCoach, goldenPoint: job.goldenPoint });
+  return playMatchJob(rivalMatchJob(job));
 }
 
 /**
@@ -95,9 +95,9 @@ export function applyRivalResults(
 
 // ── Off the main thread ─────────────────────────────────────────────────────
 
-/** Whether this runtime can play the round in a Web Worker (browsers; not Node or the tests). */
-export function canUseWorker(): boolean {
-  return typeof Worker !== 'undefined' && typeof window !== 'undefined';
+/** A rival job as a match job for the shared worker (matchJobs.ts, N10.3). */
+export function rivalMatchJob(job: RivalJob): MatchJob {
+  return { home: job.home, away: job.away, opts: { seed: job.seed, weather: job.weather, aiCoach: job.aiCoach, goldenPoint: job.goldenPoint } };
 }
 
 /** How long the worker gets before the round is played on the main thread instead (ms): a phone-speed worker needs about 30 s for the round (#216), so this only catches one that has hung. */
@@ -105,30 +105,7 @@ export const RIVAL_WORKER_TIMEOUT_MS = 120_000;
 
 /** Play the jobs in a Web Worker; on any failure or silence, play them here instead. */
 export function playRivalJobsInWorker(jobs: readonly RivalJob[], timeoutMs = RIVAL_WORKER_TIMEOUT_MS): Promise<MatchResult[]> {
-  return new Promise((resolve) => {
-    let worker: Worker;
-    try {
-      worker = new Worker(new URL('./rivalWorker.ts', import.meta.url), { type: 'module' });
-    } catch {
-      resolve(jobs.map(playRivalJob));
-      return;
-    }
-    let settled = false;
-    const done = (results: () => MatchResult[]): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      worker.terminate();
-      resolve(results());
-    };
-    // A worker that never answers doesn't hold the week for good: play them here instead.
-    const timer = setTimeout(() => done(() => jobs.map(playRivalJob)), timeoutMs);
-    worker.onmessage = (e: MessageEvent<MatchResult[]>) => done(() => e.data);
-    worker.onerror = () => done(() => jobs.map(playRivalJob));
-    try {
-      worker.postMessage(jobs);
-    } catch {
-      done(() => jobs.map(playRivalJob));
-    }
-  });
+  return playMatchesInWorker(jobs.map(rivalMatchJob), timeoutMs);
 }
+
+export { canUseWorker };

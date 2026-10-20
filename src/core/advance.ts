@@ -7,10 +7,12 @@
 // N10.2: the run yields a frame between weeks, so the page paints and takes taps
 // (the HUD shows "Week n of 27…" and a Stop button). Each week is still one
 // synchronous advanceWeek(): no hook can observe a half-run week.
+// N10.3: in a browser the week may hold while the player's match plays in the
+// Worker (matchday); the run waits for the week's end before asking the rules.
 
 import { bus } from './events';
 import { getState, type GameState } from './state';
-import { advanceWeek, withFastForward } from './time';
+import { advanceWeek, weekHeld, withFastForward } from './time';
 import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
 import { fitSquadCount } from '../systems/matchday';
 import { overallRating } from '../data/player';
@@ -124,7 +126,17 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       if (pre) return { weeksPlayed, stop: pre };
 
       bankruptcyWarned = false;
-      withFastForward(() => advanceWeek());
+      // A held week (N10.3: the player's match in the Worker) finishes later: wait for its end.
+      const weekDone = new Promise<void>((resolve) => {
+        const off = bus.on('week:advanced', () => { off(); resolve(); });
+        try {
+          if (!withFastForward(() => { advanceWeek(); return weekHeld(); }, { holds: true })) { off(); resolve(); }
+        } catch (err) {
+          off();
+          throw err;
+        }
+      });
+      await weekDone;
       weeksPlayed++;
 
       const after = getState();
