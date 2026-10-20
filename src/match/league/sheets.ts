@@ -167,11 +167,6 @@ export function kickerAndCaptain(nine: readonly Player[], selection?: Pick<Selec
   };
 }
 
-/** A rival's squad-built sheet with the style its nine gives it (N11, `rivalTactics`). */
-export function withRivalStyle(sheet: TeamSheet, club: { id: string; strength: number }): TeamSheet {
-  return { ...sheet, tactics: rivalTactics(club, sheet.roster) };
-}
-
 /**
  * Build a TeamSheet from a rival club. Aggregates derive from club.strength
  * with ±5 jitter; roster is a generated Nines side with synthetic stats.
