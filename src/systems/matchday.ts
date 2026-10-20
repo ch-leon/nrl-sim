@@ -9,7 +9,8 @@ import { registerTickHook, resumeWeek, TICK_ORDER } from '../core/time';
 import { clearLiveMatch, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, type Difficulty, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
-import { teamSheetFromRival, teamSheetFromSquad } from '../match/league/sheets';
+import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
+import { rivalTactics } from '../match/league/presets';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
@@ -74,16 +75,24 @@ function sheetFor(clubId: string): TeamSheet {
   }
   const rival = state.league.clubs.find((c) => c.id === clubId);
   if (!rival) throw new Error(`unknown club ${clubId}`);
-  // Rivals with a squad (#74) field their own players through the same sheet
-  // builder as the player's club: their coach auto-picks his nine by slot with
-  // the same positional fit (#69), so both sides pay for a man out of position.
-  // Difficulty scales the aggregates. Too few fit players (or an old rival with
-  // none) falls back to the strength-based sheet.
+  return rivalMatchSheet(rival, state.settings.difficulty);
+}
+
+/**
+ * The sheet a rival plays the player's club with. Rivals with a squad (#74) field
+ * their own players through the same sheet builder as the player's club: their coach
+ * auto-picks his nine by slot with the same positional fit (#69), so both sides pay
+ * for a man out of position. Difficulty scales the aggregates. Too few fit players
+ * (or an old rival with none) falls back to the strength-based sheet. Either way the
+ * style is the one the screens show (`rivalStyle`, N11): read from the nine, or from
+ * the club's own strength, never the difficulty-scaled one.
+ */
+export function rivalMatchSheet(rival: RivalClub, difficulty: Difficulty | undefined): TeamSheet {
   const fit = (rival.squad ?? []).filter((p) => p.injuredWeeks <= 0);
   if (fit.length >= ON_FIELD) {
-    return scaleSheet(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), state.settings.difficulty);
+    return scaleSheet(withRivalStyle(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), rival), difficulty);
   }
-  return teamSheetFromRival(scaleRivalStrength(rival, state.settings.difficulty));
+  return { ...teamSheetFromRival(scaleRivalStrength(rival, difficulty)), tactics: rivalTactics(rival) };
 }
 
 /** Scale a squad-built rival sheet's aggregates by the difficulty's rival multiplier. */

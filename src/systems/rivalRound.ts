@@ -11,7 +11,8 @@ import type { Rng } from '../utils/rng';
 import { ON_FIELD, SEASON_ROUNDS } from '../config';
 import { canUseWorker, playMatchJob, playMatchesInWorker, type MatchJob } from './matchJobs';
 import { aiCoachSides } from '../match/league/calls';
-import { teamSheetFromRival, teamSheetFromSquad } from '../match/league/sheets';
+import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
+import type { TeamTactics } from '../match/league/presets';
 import { autoPick, resolveLineup } from './lineup';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
@@ -34,13 +35,19 @@ export interface RivalJob {
 /**
  * A rival's side for a match against another rival: its own fit players
  * through the sheet builder with its coach's auto-pick (#69, #74), or the
- * strength-built sheet when it has fewer than nine fit. No difficulty scaling:
- * that is for the sides the player faces.
+ * strength-built sheet when it has fewer than nine fit. Its style follows from
+ * the nine it fields (N11). No difficulty scaling: that is for the sides the
+ * player faces.
  */
 export function rivalSheet(club: RivalClub): TeamSheet {
   const fit = (club.squad ?? []).filter((p) => p.injuredWeeks <= 0);
-  if (fit.length >= ON_FIELD) return teamSheetFromSquad(fit, club.id, club.name, club.colors, resolveLineup(autoPick(fit), fit));
+  if (fit.length >= ON_FIELD) return withRivalStyle(teamSheetFromSquad(fit, club.id, club.name, club.colors, resolveLineup(autoPick(fit), fit)), club);
   return teamSheetFromRival(club);
+}
+
+/** How a rival plays this week (N11): the style of the nine it would field today, for the next-match card, its squad page and the ladder. */
+export function rivalStyle(club: RivalClub): TeamTactics {
+  return rivalSheet(club).tactics ?? { attack: 'balanced', defence: 'slide' };
 }
 
 /** The round's unplayed rival-v-rival fixtures as jobs, one seed each from `rng` in fixture order. */
