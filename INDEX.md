@@ -84,3 +84,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261020-021804-ai-coach-calls | AI coach calls | fa00b1d (uncommitted changes) | feat/ai-calls | [report](runs/20261020-021804-ai-coach-calls/report.md) |
 | 20261020-022907-standard | standard | 6e587b2 | feat/ai-calls | [report](runs/20261020-022907-standard/report.md) |
 | 20261020-023321-kicks-close-out | kicks close-out | 111fc3f (uncommitted changes) | docs/close-out-85-94-99 | [report](runs/20261020-023321-kicks-close-out/report.md) |
+| 20261020-023511-standard | standard | 111fc3f (uncommitted changes) | docs/close-out-85-94-99 | [report](runs/20261020-023511-standard/report.md) |
