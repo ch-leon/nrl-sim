@@ -5,7 +5,7 @@
     "titleMs": 2500,
     "groundsMs": 5500,
     "handoffMs": 5000,
-    "handoffBlockMs": 4500,
+    "handoffBlockMs": 100,
     "skipMs": 5500,
     "skipBlockMs": 5000,
     "backToClubMs": 2000,

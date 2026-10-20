@@ -22,6 +22,13 @@ on:
 permissions:
   contents: read
 
+# `shell: bash` is bash with pipefail: a step's `cmd | tee log` fails when cmd fails,
+# not only when tee does (the default `bash -e` took tee's status, so a failed soak,
+# playthrough or budget left its step green).
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: qa
   cancel-in-progress: false

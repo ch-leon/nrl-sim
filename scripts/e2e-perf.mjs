@@ -26,22 +26,27 @@
 //   npm run e2e:perf
 //   npm run e2e:perf -- --budget              (fail on a missed budget; the nightly QA job)
 //   npm run e2e:perf -- --budget my.json      (another budget file)
+// (With E2E_URL there is no build to measure, so a bundleGzKb budget fails as not reached.)
 //   npm run e2e:perf -- --throttle 1          (no throttling, for a baseline)
 //   CHROMIUM_PATH=/path/to/chrome npm run e2e:perf
 //   E2E_URL=http://localhost:5173/ npm run e2e:perf
 import { spawn } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => (argv.includes(`--${name}`) ? argv[argv.indexOf(`--${name}`) + 1] : dflt);
 const THROTTLE = Number(flag('throttle', 4));
-// --budget alone means the checked-in file; --budget <file.json> another one.
+// --budget alone means the checked-in file (next to this script); --budget <file> another one.
+const budgetArg = argv.includes('--budget') ? argv[argv.indexOf('--budget') + 1] : undefined;
 const BUDGET = argv.includes('--budget')
-  ? (/\.json$/.test(argv[argv.indexOf('--budget') + 1] ?? '') ? argv[argv.indexOf('--budget') + 1] : 'scripts/perf-budget.json')
+  ? (budgetArg && !budgetArg.startsWith('--') ? budgetArg : fileURLToPath(new URL('./perf-budget.json', import.meta.url)))
   : null;
+// Read it now, so a bad path or bad JSON fails before the ten-minute run, not after it.
+const budgetFile = BUDGET ? JSON.parse(readFileSync(BUDGET, 'utf8')) : null;
 const OUT_ROOT = process.env.E2E_OUT ?? 'e2e-output';
 const OUT = join(OUT_ROOT, 'perf');
 const DIST = join(OUT_ROOT, 'dist');
@@ -97,12 +102,18 @@ const state = () => page.evaluate(() => window.__nrlState?.() ?? null);
 const wait = (ms) => page.waitForTimeout(ms);
 const toastsGone = () => page.waitForFunction(() => document.querySelectorAll('.nrl-toast').length === 0, null, { timeout: 8000 }).catch(() => {});
 
-/** The page's clock (ms since its navigation start), or null between pages. */
-const pageNow = () => page.evaluate(() => performance.now()).catch(() => null);
+/** The page's clock: [its time origin, ms since then], or null between pages. */
+const pageNow = () => page.evaluate(() => [performance.timeOrigin, performance.now()]).catch(() => null);
 
-/** The longest Long Task that started in [from, to] on the page's clock, in ms (0 if none). */
-const longestTask = (from, to) => page.evaluate(([a, b]) =>
-  Math.round((window.__nrlLongTasks ?? []).reduce((m, [start, dur]) => (start >= a && start <= b ? Math.max(m, dur) : m), 0)), [from, to]);
+/**
+ * The longest Long Task that started in [from, to] on the page's clock, in ms (0 if
+ * none). Entries the observer has not delivered yet are taken first, so a task that
+ * ended just before the read still counts.
+ */
+const longestTask = (from, to) => page.evaluate(([a, b]) => {
+  for (const e of window.__nrlLongObs?.takeRecords() ?? []) window.__nrlLongTasks.push([e.startTime, e.duration]);
+  return Math.round((window.__nrlLongTasks ?? []).reduce((m, [start, dur]) => (start >= a && start <= b ? Math.max(m, dur) : m), 0));
+}, [from, to]);
 
 /** The longest click handler timed by clickTimed during the current moment. */
 let handlerMax = 0;
@@ -122,9 +133,9 @@ async function timed(name, fn) {
   } catch (err) { result.errors.push(`${name}: ${err.message.split('\n')[0]}`); notes = 'FAILED'; }
   const ms = inPage ?? Date.now() - t0;
   const p1 = await pageNow();
-  // A navigation inside the moment restarts the page's clock: count from its start.
-  const from = p0 !== null && p1 !== null && p0 <= p1 ? p0 : 0;
-  const blockMs = Math.max(handlerMax, p1 === null ? 0 : await longestTask(from, p1).catch(() => 0));
+  // A navigation inside the moment starts a new page clock: count from its start.
+  const from = p0 && p1 && p0[0] === p1[0] ? p0[1] : 0;
+  const blockMs = Math.max(handlerMax, p1 === null ? 0 : await longestTask(from, p1[1]).catch(() => 0));
   result.timings[name] = { ms, blockMs, ...(notes ? { notes } : {}) };
   log(`${String(ms).padStart(6)} ms  ${name}  [block ${blockMs} ms]${notes ? `  (${notes})` : ''}`);
   return ms;
@@ -185,8 +196,8 @@ async function run() {
   await ctx.addInitScript(() => {
     window.__nrlLongTasks = [];
     try {
-      new PerformanceObserver((list) => { for (const e of list.getEntries()) window.__nrlLongTasks.push([e.startTime, e.duration]); })
-        .observe({ type: 'longtask', buffered: true });
+      window.__nrlLongObs = new PerformanceObserver((list) => { for (const e of list.getEntries()) window.__nrlLongTasks.push([e.startTime, e.duration]); });
+      window.__nrlLongObs.observe({ type: 'longtask', buffered: true });
     } catch { /* no Long Tasks API: the handler times still count */ }
   });
   page = await ctx.newPage();
@@ -324,11 +335,9 @@ const metrics = {
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 let verdicts = [];
-let budgetFile = null;
-if (BUDGET) {
-  budgetFile = JSON.parse(readFileSync(BUDGET, 'utf8'));
+if (budgetFile) {
   if (budgetFile.throttle !== undefined && budgetFile.throttle !== THROTTLE) {
-    result.errors.push(`budget: ${BUDGET} is for CPU ×${budgetFile.throttle}, this run is ×${THROTTLE}`);
+    result.errors.push(`budget: ${relative(process.cwd(), BUDGET)} is for CPU ×${budgetFile.throttle}, this run is ×${THROTTLE}`);
   }
   verdicts = Object.entries(budgetFile.budgets).map(([metric, max]) => {
     const value = metrics[metric] ?? null;
@@ -337,7 +346,8 @@ if (BUDGET) {
   });
 }
 const missed = verdicts.filter((v) => !v.ok);
-const report = { throttle: THROTTLE, size: `${W}x${H}`, metrics, budget: BUDGET, verdicts, ok: !result.errors.length && !missed.length, errors: result.errors };
+const budgetName = BUDGET ? relative(process.cwd(), BUDGET) : null;
+const report = { throttle: THROTTLE, size: `${W}x${H}`, metrics, budget: budgetName, verdicts, ok: !result.errors.length && !missed.length, errors: result.errors };
 writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
 
 // Markdown for the log and the job summary.
@@ -346,7 +356,7 @@ const b = result.bundle;
 const md = [`| Moment (CPU ×${THROTTLE}, ${W}×${H}) | Time | Longest block | Notes |`, '|---|---|---|---|', ...rows];
 if (b) md.push(`| bundle (${b.files} js/css files) | ${b.rawKb} KB raw, ${b.gzKb} KB gzipped | | ${b.biggest.map((x) => `${x.file} ${x.kb} KB`).join(', ')} |`);
 if (BUDGET) {
-  md.push('', `| Budget (${BUDGET}) | Value | Max | |`, '|---|---|---|---|');
+  md.push('', `| Budget (${budgetName}) | Value | Max | |`, '|---|---|---|---|');
   for (const v of verdicts) md.push(`| ${v.metric} | ${v.value ?? 'not reached'} | ${v.max} | ${v.ok ? 'ok' : '**over**'} |`);
   md.push('', missed.length ? `**${missed.length} budget(s) missed:** ${missed.map((v) => v.metric).join(', ')}` : 'Every budget met.');
 }
