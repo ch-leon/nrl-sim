@@ -146,7 +146,8 @@ async function boot(): Promise<void> {
   registerRivalsSystem();
   initMatchReport();
   initBoardUi();
-  initMatchArtAhead(); // the next fixture's match art, painted in a Worker during the week (N10.5)
+  // The next fixture's match art, painted in a Worker during the week and uploaded in idle slices (N10.5).
+  initMatchArtAhead({ textures: () => game?.textures ?? null, busy: () => game?.scene.isActive('Match') ?? false });
 
   const g = new Phaser.Game(config);
   game = g;

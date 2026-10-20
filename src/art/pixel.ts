@@ -261,7 +261,7 @@ export function isoDiamond(
 // ── Phaser upload (the only non-pure function) ──────────────────────────────
 
 /** Minimal structural view of Phaser's TextureManager used by toTexture. */
-interface TextureHost {
+export interface TextureHost {
   textures: {
     exists(key: string): boolean;
     remove(key: string): unknown;

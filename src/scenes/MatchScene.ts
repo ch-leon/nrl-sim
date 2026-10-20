@@ -343,8 +343,8 @@ export class MatchScene extends Phaser.Scene {
   /** Build the stadium, players and playback from the fixture's painted art. */
   private build(kits: ReturnType<typeof resolveKits>, art: FixtureArt, ownTeardown = true): void {
     // Static stadium layers.
-    this.art.layer('match-bg', art.bg, DEPTH_BG);
-    this.art.layer('match-fg', art.fg, DEPTH_FG);
+    this.art.layer(art.bg, DEPTH_BG);
+    this.art.layer(art.fg, DEPTH_FG);
     const props = this.art.props('match', kits.home);
     this.spawnPosts(props.upright, props.crossbar);
     this.spawnCrowd(this.art.crowd('match-crowd', art.crowd));

@@ -4,7 +4,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { bus } from '../../src/core/events';
 import { createNewGame, getState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
-import { fixtureArtKey, fixtureArtBuffers, paintFixtureArt, type FixtureKits } from '../../src/art/match/fixtureArt';
+import { fixtureArtKey, fixtureArtBuffers, fixtureArtPieces, paintFixtureArt, type FixtureKits } from '../../src/art/match/fixtureArt';
 import { clearFixtureArt, fixtureArtFor, fixtureKits, initMatchArtAhead, nextFixtureSides, takeFixtureArt } from '../../src/scenes/matchArtAhead';
 import { fieldOffsetX } from '../../src/scenes/matchField';
 
@@ -66,7 +66,7 @@ describe('the next fixture painted ahead (N10.5)', () => {
     stubWorker('paint');
     const art = await fixtureArtFor(offsetX, kitsA);
     const here = paintFixtureArt(offsetX, kitsA);
-    expect(sameBytes(art.bg.buf.data, here.bg.buf.data)).toBe(true);
+    expect(art.bg.every((c, i) => sameBytes(c.buf.data, here.bg[i]!.buf.data))).toBe(true);
     expect(sameBytes(art.home.buf.data, here.home.buf.data)).toBe(true);
     expect(art.crowd.frames).toEqual(here.crowd.frames);
   }, 30_000);
@@ -85,7 +85,8 @@ describe('the next fixture painted ahead (N10.5)', () => {
     stubWorker('error');
     const art = await fixtureArtFor(offsetX, kitsA);
     expect(posted).toBe(1);
-    expect(sameBytes(art.bg.buf.data, paintFixtureArt(offsetX, kitsA).bg.buf.data)).toBe(true);
+    const here = paintFixtureArt(offsetX, kitsA);
+    expect(art.bg.every((c, i) => sameBytes(c.buf.data, here.bg[i]!.buf.data))).toBe(true);
   }, 30_000);
 
   it("looks up the player's next fixture and paints it once the week is in", async () => {
@@ -96,12 +97,44 @@ describe('the next fixture painted ahead (N10.5)', () => {
     const [home, away] = sides!;
     expect([home.clubId, away.clubId]).toContain(PLAYER_ID);
     stubWorker('paint');
-    const off = initMatchArtAhead();
+    const off = initMatchArtAhead({ textures: () => null, busy: () => false });
     await new Promise((r) => setTimeout(r, 0)); // the look is scheduled, not inside the tap
     const key = fixtureArtKey(offsetX, fixtureKits(home, away));
     await fixtureArtFor(offsetX, fixtureKits(home, away)); // the painting already under way
     expect(posted).toBe(1);
     expect(takeFixtureArt(key)).not.toBeNull();
+    off();
+  }, 30_000);
+
+  it('uploads the painting one texture per slice, never under a match; another fixture frees them', async () => {
+    const live = new Set<string>();
+    const textures = {
+      exists: (k: string) => live.has(k),
+      remove: (k: string) => live.delete(k),
+      createCanvas: (k: string, w: number, h: number) => {
+        live.add(k);
+        return { getContext: () => ({ createImageData: () => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: () => {} }) as unknown as CanvasRenderingContext2D, refresh: () => {} };
+      },
+    };
+    const slices: (() => void)[] = [];
+    let matchOn = true;
+    stubWorker('paint');
+    const off = initMatchArtAhead({ textures: () => textures, busy: () => matchOn, schedule: (fn) => slices.push(() => fn()) });
+    const art = await fixtureArtFor(offsetX, kitsA);
+    const pieces = fixtureArtPieces(art);
+    slices.shift()!(); // a match is on: nothing goes up
+    expect(live.size).toBe(0);
+    matchOn = false;
+    let n = 0;
+    while (slices.length) { slices.shift()!(); n++; }
+    expect(live.size).toBe(pieces.length);
+    expect(n).toBe(pieces.length); // one per slice
+    expect(pieces.every((p) => p.texKey && live.has(p.texKey) && p.buf.w === 1)).toBe(true);
+    await fixtureArtFor(offsetX, kitsB); // the next fixture: the old textures go
+    expect(pieces.some((p) => live.has(p.texKey!))).toBe(false);
+    const b = takeFixtureArt(fixtureArtKey(offsetX, kitsB))!;
+    while (slices.length) slices.shift()!(); // taken: its match uploads the rest itself
+    expect(fixtureArtPieces(b).some((p) => p.texKey)).toBe(false);
     off();
   }, 30_000);
 });

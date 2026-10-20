@@ -5,7 +5,7 @@ import { resolveKits, setKitDesign } from '../../../src/art/match/kit';
 import { paintBackground, paintForeground } from '../../../src/art/match/stadium';
 import { buildPlayerAtlas } from '../../../src/art/match/players';
 import { buildCrowdAtlas, crowdShirts } from '../../../src/art/match/crowd';
-import { fixtureArtBuffers, fixtureArtKey, paintFixtureArt, reviveFixtureArt } from '../../../src/art/match/fixtureArt';
+import { chunkLayer, fixtureArtBuffers, fixtureArtKey, LAYER_CHUNK, paintFixtureArt, reviveFixtureArt, type LayerChunk } from '../../../src/art/match/fixtureArt';
 import { PixelBuffer } from '../../../src/art/pixel';
 import { fieldOffsetX } from '../../../src/scenes/matchField';
 
@@ -23,6 +23,10 @@ const sameAtlas = (a: { buf: PixelBuffer; frames: unknown }, b: { buf: PixelBuff
   expect([a.buf.w, a.buf.h, a.frames]).toEqual([b.buf.w, b.buf.h, b.frames]);
   expect(same(a.buf.data, b.buf.data)).toBe(true);
 };
+const sameChunks = (a: LayerChunk[], b: LayerChunk[]): void => {
+  expect(a.map((c) => [c.name, c.x, c.y, c.buf.w, c.buf.h])).toEqual(b.map((c) => [c.name, c.x, c.y, c.buf.w, c.buf.h]));
+  a.forEach((c, i) => expect(same(c.buf.data, b[i]!.buf.data)).toBe(true));
+};
 const kitsOf = () => { const k = resolveKits(home, away); return { home: k.home, away: k.away }; };
 
 describe('fixture art (N10.5)', () => {
@@ -31,11 +35,8 @@ describe('fixture art (N10.5)', () => {
   const art = paintFixtureArt(offsetX, kits);
 
   it("paints the same pixels as the scene's painters", () => {
-    const bg = paintBackground(offsetX, kits.home, kits.away);
-    const fg = paintForeground(offsetX, kits.home, kits.away);
-    expect([art.bg.ox, art.bg.oy, art.bg.buf.w, art.bg.buf.h]).toEqual([bg.ox, bg.oy, bg.buf.w, bg.buf.h]);
-    expect(same(art.bg.buf.data, bg.buf.data)).toBe(true);
-    expect(same(art.fg.buf.data, fg.buf.data)).toBe(true);
+    sameChunks(art.bg, chunkLayer('match-bg', paintBackground(offsetX, kits.home, kits.away)));
+    sameChunks(art.fg, chunkLayer('match-fg', paintForeground(offsetX, kits.home, kits.away)));
     sameAtlas(art.crowd, buildCrowdAtlas(crowdShirts(kits.home, kits.away)));
     sameAtlas(art.home, buildPlayerAtlas(kits.home));
     sameAtlas(art.away, buildPlayerAtlas(kits.away));
@@ -44,10 +45,11 @@ describe('fixture art (N10.5)', () => {
   it("survives a Worker's transfer: cloned with its buffers moved, then revived", () => {
     const copy = paintFixtureArt(offsetX, kits);
     const moved = structuredClone(copy, { transfer: fixtureArtBuffers(copy) });
-    expect(copy.bg.buf.data.length).toBe(0); // transferred, not copied
+    expect(copy.bg[0]!.buf.data.length).toBe(0); // transferred, not copied
     const back = reviveFixtureArt(moved);
-    expect(back.bg.buf).toBeInstanceOf(PixelBuffer);
-    expect(same(back.bg.buf.data, art.bg.buf.data)).toBe(true);
+    expect(back.bg[0]!.buf).toBeInstanceOf(PixelBuffer);
+    sameChunks(back.bg, art.bg);
+    sameChunks(back.fg, art.fg);
     sameAtlas(back.home, art.home);
     expect(back.key).toBe(art.key);
   });
@@ -61,6 +63,29 @@ describe('fixture art (N10.5)', () => {
       setKitDesign('fa-home', null);
     }
     expect(fixtureArtKey(offsetX, kitsOf())).toBe(art.key);
+  });
+
+  it('chunks a layer into pieces of at most 1024 (+1 px overlap), leaving out the transparent ones, every opaque pixel kept', () => {
+    const cv = paintBackground(offsetX, kits.home, kits.away);
+    const chunks = chunkLayer('t', cv);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const c of chunks) {
+      expect(c.buf.w).toBeLessThanOrEqual(LAYER_CHUNK + 1);
+      expect(c.buf.h).toBeLessThanOrEqual(LAYER_CHUNK + 1);
+      expect(c.buf.opaqueCount()).toBeGreaterThan(0);
+    }
+    // Every opaque pixel of the layer is in the chunk that starts at its tile.
+    let opaque = 0;
+    for (let y = 0; y < cv.buf.h; y += 7) {
+      for (let x = 0; x < cv.buf.w; x += 7) {
+        const a = cv.buf.data[(y * cv.buf.w + x) * 4 + 3]!;
+        if (a === 0) continue;
+        opaque++;
+        const c = chunks.find((k) => k.x === cv.ox + Math.floor(x / LAYER_CHUNK) * LAYER_CHUNK && k.y === cv.oy + Math.floor(y / LAYER_CHUNK) * LAYER_CHUNK)!;
+        expect(c.buf.data[((y - (c.y - cv.oy)) * c.buf.w + (x - (c.x - cv.ox))) * 4 + 3]).toBe(a);
+      }
+    }
+    expect(opaque).toBeGreaterThan(1000);
   });
 
   it('a wrapped buffer must be the right size', () => {
