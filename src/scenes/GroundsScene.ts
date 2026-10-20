@@ -25,7 +25,8 @@ import {
   type Side,
 } from '../art/grounds/tiles';
 import { CHAR_H, CHAR_FOOT_Y } from '../art/grounds/manager';
-import { facilityOrigin, facilityTextureKey } from '../art/grounds/facilities';
+import { facilityOrigin } from '../art/grounds/facilities';
+import { ensureFacilityTexture } from '../art/grounds';
 import {
   decorLayout,
   surroundPaths,
@@ -290,7 +291,7 @@ export class GroundsScene extends Phaser.Scene {
       const frontGy = f.y + def.footprint.h - 1;
       const d = depth(frontGx, frontGy, 1);
 
-      const key = facilityTextureKey(f.defId, f.level);
+      const key = ensureFacilityTexture(this, f.defId, f.level); // painted now if boot left it (N10.6)
       let sprite = this.facilitySprites.get(f.id);
       const isNew = !sprite;
       const was = this.facilitySpots.get(f.id);

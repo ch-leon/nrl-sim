@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
-import { registerGroundsArt } from '../art/grounds';
+import { paintFacilitiesWhenIdle, registerGroundsArt } from '../art/grounds';
+import { getState } from '../core/state';
 
 /**
- * BootScene generates all textures (ARCHITECTURE.md §4/§7 — no binary assets),
- * then hands off to GroundsScene. Grounds art (tiles, manager, facilities,
- * decor) is painted as pixel buffers in src/art/grounds/ and uploaded here.
+ * BootScene generates the grounds textures (ARCHITECTURE.md §4/§7 — no binary
+ * assets), then hands off to GroundsScene. Grounds art (tiles, manager,
+ * facilities, decor) is painted as pixel buffers in src/art/grounds/ and
+ * uploaded here: only the facilities placed (N10.6); the rest are painted on
+ * demand or in idle slices after the first frame.
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -12,7 +15,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    registerGroundsArt(this);
+    registerGroundsArt(this, getState().facilities ?? []);
+    paintFacilitiesWhenIdle(this);
 
     this.scene.start('Grounds');
   }
