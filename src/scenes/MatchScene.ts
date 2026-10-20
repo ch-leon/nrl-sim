@@ -63,7 +63,7 @@ import {
   crowdSeats,
   type CrowdSeat,
 } from '../art/match/stadium';
-import { fixtureArtKey, paintFixtureArt, type FixtureArt } from '../art/match/fixtureArt';
+import { fixtureArtKey, fixtureArtPieces, paintFixtureArt, type FixtureArt } from '../art/match/fixtureArt';
 import { CROSSBAR_AX, CROSSBAR_AY, UPRIGHT_H, UPRIGHT_W } from '../art/match/props';
 import {
   CROWD_BASE,
@@ -124,8 +124,13 @@ const MATCH_ZOOM = ZOOM_DEFAULT;
 const TAG_LIFT = 26;
 /** Ghost balls trailing a kicked ball. */
 const TRAIL_LEN = 5;
-/** On screen while a live match waits for its art to be painted (N10.5). */
+/** On screen while a live match waits for its art to be painted or uploaded (N10.5). */
 export const KICK_OFF_TEXT = 'Kick-off…';
+
+/** The next animation frame. */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
 /** A flight must rise this high (world px) before it counts as a kick and gets a trail. */
 const TRAIL_MIN_LIFT = 30;
 /** Crowd animation tick (real ms). */
@@ -315,14 +320,14 @@ export class MatchScene extends Phaser.Scene {
     this.art = new MatchArtRegistry(this);
     const kits = resolveKits(this.home, this.away);
     // N10.5 (#154): the stadium, crowd and kit atlases were painted ahead, in the art
-    // worker, after last week; this only uploads them. Not ready (the first match of a
-    // session, a kit just changed): a live match shows "Kick-off…" and builds when the
-    // worker has painted them, so the tap that started it returns at once; the lab
-    // paints here.
+    // worker, after last week, and uploaded in idle slices: this only places them. Not
+    // ready (the first match of a session, a kit just changed): a live match shows
+    // "Kick-off…" while the worker finishes and the rest goes up a texture a frame, so
+    // the tap that started it returns at once; the lab paints here.
     const fixtureKitsNow = { home: kits.home, away: kits.away };
     const key = fixtureArtKey(this.offsetX, fixtureKitsNow);
     const art = takeFixtureArt(key);
-    if (art || !this.live) {
+    if (!this.live || (art && fixtureArtPieces(art).every((p) => p.texKey))) {
       this.build(kits, art ?? paintFixtureArt(this.offsetX, fixtureKitsNow));
       return;
     }
@@ -332,12 +337,25 @@ export class MatchScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0);
     const token = ++this.buildToken;
-    void fixtureArtFor(this.offsetX, fixtureKitsNow).then((painted) => {
-      if (token !== this.buildToken || !this.sys.isActive()) return;
+    const live = (): boolean => token === this.buildToken && this.sys.isActive();
+    void (async () => {
+      const painted = art ?? (await fixtureArtFor(this.offsetX, fixtureKitsNow));
+      if (!live()) return;
       takeFixtureArt(painted.key);
+      // What didn't go up during the week goes up one texture a frame (a ×4 phone
+      // spends about 50–100 ms on each), so no frame freezes; then the match.
+      let n = 0;
+      for (const piece of fixtureArtPieces(painted)) {
+        if (piece.texKey) continue;
+        await nextFrame();
+        if (!live()) return;
+        piece.texKey = this.art.texture(`kick-off-${n++}`, piece.buf);
+      }
+      await nextFrame();
+      if (!live()) return;
       beat.destroy();
       this.build(kits, painted, false);
-    });
+    })();
   }
 
   /** Build the stadium, players and playback from the fixture's painted art. */
@@ -385,6 +403,22 @@ export class MatchScene extends Phaser.Scene {
 
     this.setupCamera();
     this.mountBackButton();
+    if (ownTeardown) this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
+    this.built = true;
+    // A live match starts its effects and playback on the next frame (N10.5), so the
+    // frame that placed the stadium stays short on a phone; the lab starts at once.
+    if (!this.live) {
+      this.startMatch();
+      return;
+    }
+    const token = this.buildToken;
+    void nextFrame().then(() => {
+      if (token === this.buildToken && this.sys.isActive()) this.startMatch();
+    });
+  }
+
+  /** The effects, atmosphere and playback, over the stadium build() placed. */
+  private startMatch(): void {
     // Publish sheets for the crowd emitters' kit tints (read by attachMatchFx).
     this.data.set('home', this.home);
     this.data.set('away', this.away);
@@ -402,9 +436,6 @@ export class MatchScene extends Phaser.Scene {
     // #18: rotating / resizing re-derives the zoom for the new viewport; the
     // CameraController re-clamps scroll on the same event.
     this.scale.on('resize', this.onResize);
-
-    if (ownTeardown) this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
-    this.built = true;
   }
 
   private startPlayback(): void {
