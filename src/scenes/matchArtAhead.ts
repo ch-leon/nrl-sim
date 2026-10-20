@@ -25,7 +25,7 @@ const ART_WORKER_TIMEOUT_MS = 20_000;
  * The longest an upload waits for an idle slice (ms). A throttled phone drawing the
  * grounds at 17 fps is never idle, so without it nothing would go up before the match.
  */
-const UPLOAD_IDLE_TIMEOUT_MS = 500;
+const UPLOAD_IDLE_TIMEOUT_MS = 100;
 
 /** The next idle slice, or the timeout's end; a timer where there are no idle callbacks (Safari). */
 function whenIdleSoon(fn: (slice?: IdleSlice) => void): void {
