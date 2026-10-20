@@ -22,6 +22,8 @@ export interface LiveMatchData {
   onProgress?: (calls: readonly CallInput[], tick: number) => void;
   /** The player's side, when he has the coach-call chips (#73; the Coach calls setting). */
   coachSide?: 'home' | 'away';
+  /** A final (N9.4): golden point if level at full time. */
+  goldenPoint?: boolean;
 }
 
 /** Event name -> payload type map (verbatim from ARCHITECTURE §5). */

@@ -64,6 +64,13 @@ describe('rival rounds on the live sim (N9.2)', () => {
     resumeWeek();
   }, 60_000);
 
+  it('golden point (N9.4) only in finals: a regular round’s jobs play without it', () => {
+    newGame(true);
+    const jobs = rivalJobs(getState(), makeRng(3), PLAYER_ID);
+    expect(jobs.length).toBeGreaterThan(0);
+    expect(jobs.every((j) => j.goldenPoint === false)).toBe(true);
+  });
+
   it('the scores sit on the cheap sim’s scale: about 30 a match', () => {
     newGame(true);
     advanceWeek();

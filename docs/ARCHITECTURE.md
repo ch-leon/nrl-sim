@@ -302,8 +302,10 @@ scale (tuning reference §24).
 
 Finals (weeks 25–27, GitHub #2): after the ladder step of week 24/25/26 the
 fixtures system appends the next knockout round — QF 1v8/2v7/3v6/4v5 from the
-regular-season ladder, SF re-seeded from QF winners, GF from SF winners (draws go
-to the home/higher seed). Player ties go through matchday → MatchScene like any
+regular-season ladder, SF re-seeded from QF winners, GF from SF winners. A final level
+at full time on the live sim goes to **golden point** (N9.4; `goldenPoint` on `runMatch` /
+`LiveSim`, set by matchday and the rival jobs for rounds past `SEASON_ROUNDS`): the next score
+wins. Still level after it, or drawn on the cheap sim, it goes to the home/higher seed. Player ties go through matchday → MatchScene like any
 round; rival ties are cheap-simmed (or live, with the setting on). Finals results stamp the fixture only — the
 ladder stays the regular-season finish. At rollover the GF winner is recorded in
 `history` (headless `runFinals` catch-up if the bracket is unfinished), and
