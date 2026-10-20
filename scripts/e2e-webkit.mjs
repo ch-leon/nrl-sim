@@ -220,7 +220,9 @@ async function runSize(browser, W, H) {
     out.push(...await page.evaluate(() => {
       const box = document.querySelector('.nrl-player-modal').getBoundingClientRect();
       const nav = document.querySelector('.nrl-nav').getBoundingClientRect();
+      const hud = document.querySelector('.nrl-hud').getBoundingClientRect();
       const problems = box.bottom > nav.top + 1 ? [`the player page runs into the nav (${Math.round(box.bottom)} > ${Math.round(nav.top)})`] : [];
+      if (box.top < hud.bottom - 1) problems.push(`the player page runs under the HUD (${Math.round(box.top)} < ${Math.round(hud.bottom)})`);
       for (const b of document.querySelectorAll('.nrl-nav .nrl-btn')) {
         const r = b.getBoundingClientRect();
         const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
@@ -229,6 +231,14 @@ async function runSize(browser, W, H) {
       return problems;
     }));
     return out;
+  });
+  // A renewal re-renders the page from state: the ✕ and the actions must survive it.
+  await step('player-page-renewed', async (rec) => {
+    const renew = page.locator('[data-player-action="renew"]');
+    if (await renew.isDisabled()) { rec.notes.push('renew not offered for this player'); return []; }
+    await renew.tap();
+    await page.waitForTimeout(300);
+    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="sell"]', '.nrl-player-close']);
   });
   await step('player-page-closed', async () => {
     await tap('.nrl-player-modal .nrl-screen-x');

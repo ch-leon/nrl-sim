@@ -473,14 +473,16 @@ export const CSS = `
   z-index: 50;
   box-sizing: border-box;
 }
-.nrl-screen-backdrop {
+.nrl-screen-backdrop, .nrl-dialog-region {
   padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
 }
-.nrl-screen-backdrop .nrl-modal {
+.nrl-screen-backdrop .nrl-modal, .nrl-dialog-region .nrl-modal {
   /* Fit inside the region (drop-shadow included) rather than the viewport. */
   max-height: calc(100% - 6px);
-  /* #195: a landscape phone has width to spare and no height; use it. */
   position: relative;
+}
+.nrl-screen-backdrop .nrl-modal {
+  /* #195: a landscape phone has width to spare and no height; use it. */
   width: min(96vw, 640px);
   max-width: none;
 }
@@ -488,13 +490,10 @@ export const CSS = `
 .nrl-dialog-region {
   top: var(--nrl-hud-h, 0px);
   bottom: var(--nrl-nav-h, 0px);
-  padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
-  box-sizing: border-box;
 }
-.nrl-dialog-region .nrl-modal {
-  max-height: calc(100% - 6px);
-  position: relative;
-}
+/* Player of the Match (#203): a card, not a wall; taps beside it reach Back to Club. */
+.nrl-potm-backdrop { pointer-events: none; background: transparent; }
+.nrl-potm-backdrop .nrl-modal { pointer-events: auto; }
 .nrl-screen-x {
   position: absolute;
   top: 4px;

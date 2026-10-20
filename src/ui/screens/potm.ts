@@ -4,6 +4,7 @@ import { getState, setState } from '../../core/state';
 import type { MatchResult } from '../../sim/events';
 import { playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
 import { el, button, openModal, closeModal } from '../dom';
+import { MATCH_ACTIVE_CLASS } from './matchOverlay';
 import { addPotm } from './seasonReview';
 
 /** One-line stat summary, e.g. "2 tries · 14 tackles · 1 line break". */
@@ -20,7 +21,20 @@ export function openPlayerOfMatchModal(p: PlayerOfMatch, clubName: string, own: 
     el('p', { text: fmtPotmLine(p) }),
     button('Close', () => closeModal()),
   );
-  return openModal(content, { class: 'nrl-potm-modal', region: true });
+  const backdrop = openModal(content, { class: 'nrl-potm-modal', region: true });
+  // #203: at full time the award card must not swallow the first tap on Back to
+  // Club. Its backdrop lets taps through (only the card itself is solid), and the
+  // card closes when the match view does (the overlay drops MATCH_ACTIVE_CLASS).
+  backdrop.classList.add('nrl-potm-backdrop');
+  const body = typeof document === 'undefined' ? null : document.body;
+  if (body?.classList.contains(MATCH_ACTIVE_CLASS) && typeof MutationObserver !== 'undefined') {
+    const watch = new MutationObserver(() => {
+      if (!backdrop.isConnected) { watch.disconnect(); return; }
+      if (!body.classList.contains(MATCH_ACTIVE_CLASS)) { watch.disconnect(); closeModal(); }
+    });
+    watch.observe(body, { attributes: true, attributeFilter: ['class'] });
+  }
+  return backdrop;
 }
 
 /** Show the modal on every full-time, and count the club's awards for the season review (#190). Returns unsubscribe. */
