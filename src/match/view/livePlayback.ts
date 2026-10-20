@@ -173,7 +173,7 @@ export class LivePlayback {
 
   /** Why the coach can't change the plan now (N11: only at the breaks), or null. */
   planRefusal(): string | null {
-    return this.finishEmitted ? 'full time' : this.sim.planRefusal();
+    return this.finishEmitted || this.awaitingSkip ? 'full time' : this.sim.planRefusal();
   }
 
   /** The coach changes the plan: recorded for the next tick, in force from the restart (N11). Returns why not, or null. */
@@ -193,7 +193,7 @@ export class LivePlayback {
 
   /** The break the match is at: the half-time (or golden point) break, a score or kick-off ('try'), or neither (N11's half-time card and Plan chip). */
   get breakKind(): 'half-time' | 'try' | null {
-    if (this.finishEmitted) return null;
+    if (this.finishEmitted || this.awaitingSkip) return null;
     const k = this.sim.phaseKind;
     if (k === 'half-time') return 'half-time';
     return this.sim.planRefusal() === null ? 'try' : null;
@@ -222,7 +222,7 @@ export class LivePlayback {
     this.runner.pause();
   }
   release(): void {
-    if (!this.finishEmitted) this.runner.play();
+    if (!this.finishEmitted && !this.awaitingSkip) this.runner.play();
   }
 
   /** Who has the ball (the chips show attack or defence calls). */
@@ -275,13 +275,14 @@ export class LivePlayback {
       });
   }
 
-  /** The match's record as runMatch options: the same sheets, seed, weather, injury rate and calls. */
+  /** The match's record as runMatch options: the same sheets, seed, weather, injury rate, calls and plan changes (N11). */
   private runOptions(): RunMatchOptions {
     const o = this.opts;
     return {
       seed: o.seed,
       weather: o.weather,
       calls: [...o.calls],
+      ...(this.plans.length ? { plans: this.plans.map((p) => ({ ...p, tactics: { ...p.tactics } })) } : {}),
       ...(o.injuryRate !== undefined ? { injuryRate: o.injuryRate } : {}),
       ...(o.aiCoach?.length ? { aiCoach: o.aiCoach } : {}),
       ...(o.goldenPoint ? { goldenPoint: true } : {}),
