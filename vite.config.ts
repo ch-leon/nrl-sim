@@ -61,5 +61,9 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  // Claude sessions keep their worktrees in .claude/worktrees/; Vite full-reloads the page for
+  // any tsconfig.json it sees change there, which restarted the game mid-match on the dev
+  // server (tests/qa/devServerWatch.test.ts).
+  server: { watch: { ignored: ['**/.claude/**'] } },
   test: { globals: true, environment: 'node', include: ['tests/**/*.test.ts'] },
 });
