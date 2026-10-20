@@ -20,6 +20,10 @@ export const NINES = {
   halfTimeLegsBack: 0.5,
   /** After the siren the half ends at the next dead ball, or after this many seconds whatever happens. */
   playOnMaxS: 60,
+  /** Golden point (N9.4): a final level at full time plays on this many minutes, next score wins (0 = no golden point). */
+  goldenPointMinutes: 5,
+  /** The break before golden point, ticks (2 s); no legs come back in it. */
+  goldenPointBreakTicks: 40,
 };
 
 /** How long a match lasts: two halves of NINES.halfMinutes by default; tests and the balance harness can play a single stretch. */
@@ -33,5 +37,5 @@ export const fullMatch = (): MatchLength => ({ halves: 2, halfMinutes: NINES.hal
 /** "1st 4:32" for the readout: the half and the time gone in it. */
 export function clockText(half: number, seconds: number): string {
   const s = Math.floor(seconds);
-  return `${half === 1 ? '1st' : '2nd'} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return `${half === 1 ? '1st' : half === 2 ? '2nd' : 'GP'} ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }

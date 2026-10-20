@@ -70,6 +70,8 @@ export interface LivePlaybackOptions {
   calls: CallInput[];
   /** The rival's AI coach (N9.6). */
   aiCoach?: ('home' | 'away')[];
+  /** A final (N9.4): golden point if level at full time. */
+  goldenPoint?: boolean;
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
   resumeAt?: number;
   /** A call was made, or the tick moved on a resumable match: keep the record (resume after the app is killed). */
@@ -100,7 +102,7 @@ export class LivePlayback {
     const { home, away } = opts;
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate and calls.
-    const simOpts = { weather: opts.weather, calls: opts.calls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}) };
+    const simOpts = { weather: opts.weather, calls: opts.calls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.runner = new Runner((seed) => new LiveSim(home, away, seed, simOpts), opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => this.recorder.clock(this.sim.matchSeconds);
@@ -193,7 +195,8 @@ export class LivePlayback {
   /** The overlay's clock off the sim's: match seconds and the half. */
   private showClock(): void {
     const c = this.runner.cur.clock;
-    if (c) this.opts.overlay?.setClock((c.half - 1) * NINES.halfMinutes * 60 + c.seconds, c.half === 1 ? 1 : 2);
+    // Golden point (N9.4) counts its own clock.
+    if (c) this.opts.overlay?.setClock(c.half > 2 ? c.seconds : (c.half - 1) * NINES.halfMinutes * 60 + c.seconds, c.half === 1 ? 1 : c.half === 2 ? 2 : 'gp');
   }
 
   /** Pop-ups, the wrestle bar and sprint streaks, once the camera has moved this frame. */

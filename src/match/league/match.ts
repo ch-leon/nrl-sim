@@ -22,6 +22,8 @@ export interface RunMatchOptions {
   calls?: CallInput[];
   /** Sides with an AI coach (N9.6). */
   aiCoach?: ('home' | 'away')[];
+  /** A final (N9.4): golden point if level at full time. */
+  goldenPoint?: boolean;
 }
 
 /** No real match comes near this many ticks (about 80 minutes of sim time); it only guards against a sim that never finishes. */
@@ -86,6 +88,7 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}),
     ...(opts.calls ? { calls: opts.calls } : {}),
     ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}),
+    ...(opts.goldenPoint ? { goldenPoint: true } : {}),
   });
   const rec = new MatchRecorder({ home: home.clubId, away: away.clubId });
   while (!sim.finished) {

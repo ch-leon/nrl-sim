@@ -157,12 +157,14 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   const [us, them] = playerHome
     ? [sim.homeScore, sim.awayScore]
     : [sim.awayScore, sim.homeScore];
-  // A drawn final is decided on seeding (home = higher seed advances), so say
+  // A final level at full time goes to golden point (N9.4); still level after it, it is decided on
+  // seeding (home = higher seed advances), so say
   // which way it went rather than leaving the player guessing.
   const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
+  const goldenPoint = sim.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
   const seedingNote = us === them && isFinalsRound(fixture.round)
     ? (playerHome ? ' — through on seeding' : ' — out on seeding')
-    : '';
+    : goldenPoint ? ' in golden point' : '';
   return (): void => {
     bus.emit('ui:notify', {
       text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
@@ -205,6 +207,8 @@ export function registerPlayerMatchSystem(): void {
       ...(state.weather ? { weather: state.weather } : {}),
       // The rival's coach makes his own calls when the game gives rivals one (N9.6); the player makes his.
       aiCoach: aiCoachSides([fixture.homeId === PLAYER_ID ? 'away' : 'home']),
+      // A drawn final goes to golden point (N9.4).
+      ...(isFinalsRound(fixture.round) ? { goldenPoint: true } : {}),
     };
     // A live match the app was closed in the middle of (#73): this is the same match.
     const prior = readLiveMatch();
@@ -232,6 +236,7 @@ export function registerPlayerMatchSystem(): void {
           seed,
           weather: state.weather ?? 'clear',
           injuryRate: matchOpts.injuryRate,
+          ...(matchOpts.goldenPoint ? { goldenPoint: true } : {}),
           calls: record.calls,
           ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
           onProgress: (calls, tick) => writeLiveMatch({ ...record, calls: [...calls], tick }),

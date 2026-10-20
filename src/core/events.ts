@@ -26,6 +26,8 @@ export interface LiveMatchData {
   unlockedCalls?: CoachCall[];
   /** The rival's AI coach (N9.6), when the game gives rivals one. */
   aiCoach?: ('home' | 'away')[];
+  /** A final (N9.4): golden point if level at full time. */
+  goldenPoint?: boolean;
 }
 
 /** Event name -> payload type map (verbatim from ARCHITECTURE §5). */

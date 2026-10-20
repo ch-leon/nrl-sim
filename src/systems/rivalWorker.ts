@@ -6,5 +6,5 @@ import { runMatch } from '../match/league/match';
 import type { RivalJob } from './rivalRound';
 
 self.onmessage = (e: MessageEvent<RivalJob[]>): void => {
-  self.postMessage(e.data.map((job) => runMatch(job.home, job.away, { seed: job.seed, weather: job.weather, aiCoach: job.aiCoach })));
+  self.postMessage(e.data.map((job) => runMatch(job.home, job.away, { seed: job.seed, weather: job.weather, aiCoach: job.aiCoach, goldenPoint: job.goldenPoint })));
 };

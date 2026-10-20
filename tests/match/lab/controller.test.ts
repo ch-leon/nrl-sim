@@ -40,6 +40,12 @@ describe('lab hash', () => {
     const code = ctrl.flag('late tackle');
     expect(parseLabHash(`#lab?flag=${encodeURIComponent(code)}`, DEF)).toEqual({ seed: 5, home: 'a', away: 'b', tick: 42, note: 'late tackle', traits: 'gen', tactics: { home: {}, away: {} }, legs: 'fresh', bench: 'standard', weather: 'clear' });
   });
+  it('final=1 plays the lab match as a final (golden point, N9.4), and round-trips', () => {
+    const p = parseLabHash('#lab?seed=3&home=a&away=b&final=1', { home: 'x', away: 'y' });
+    expect(p.final).toBe(true);
+    expect(labHash(p)).toContain('final=1');
+    expect(parseLabHash('#lab?seed=3', { home: 'x', away: 'y' }).final).toBeUndefined();
+  });
   it('round-trips through labHash', () => {
     const h = labHash({ seed: 9, home: 'a', away: 'b', tick: 30 });
     expect(h.startsWith('#lab?')).toBe(true);

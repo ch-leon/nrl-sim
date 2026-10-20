@@ -27,7 +27,7 @@ export const COUNTS = [
   'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
-  'sinBins', 'shortMin', 'binSwing', 'points', 'margin',
+  'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'goldenPoint', 'goldenPointWon', 'draws',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -164,6 +164,12 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
       case 'dead-ball':
         c.deadBalls++;
         break;
+      case 'golden-point':
+        c.goldenPoint++;
+        break;
+      case 'full-time':
+        if (e.detail === 'golden-point') c.goldenPointWon++;
+        break;
       case 'drop-out':
         c.dropOuts++;
         break;
@@ -281,7 +287,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const rules = cell.scenario.calls;
       // The AI coach (N9.6): the scenario's sides, or both when the variant turns calls.ai on.
       const aiSides = cell.scenario.aiCoach ?? aiCoachSides(['home', 'away']);
-      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}) });
+      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();
@@ -335,6 +341,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       // The score: both sides' points, and the winning margin.
       c.points = sim.points.home + sim.points.away;
       c.margin = Math.abs(sim.points.home - sim.points.away);
+      c.draws = sim.points.home === sim.points.away ? 1 : 0;
       wrestleCount = 0;
       perSeed.push(c);
       if (sim.points.home > sim.points.away) wins++;

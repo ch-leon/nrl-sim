@@ -25,6 +25,8 @@ const KIND: Readonly<Record<string, MatchEventKind>> = {
   regather: 'run',
   'half-time': 'half-time',
   'full-time': 'full-time',
+  // A drawn final going to golden point (N9.4): a break in play with the whistle, like half-time.
+  'golden-point': 'half-time',
   conversion: 'conversion',
   'field-goal': 'field-goal',
   'penalty-goal': 'penalty-goal',
@@ -36,7 +38,7 @@ const KIND: Readonly<Record<string, MatchEventKind>> = {
 };
 
 /** Whistle kinds that belong to no side; the contract files them under the home team. */
-const WHISTLES: ReadonlySet<string> = new Set(['half-time', 'full-time']);
+const WHISTLES: ReadonlySet<string> = new Set(['half-time', 'full-time', 'golden-point']);
 
 /** Sim kick detail → contract KickKind (a cross-field kick is a bomb to the contract). */
 const KICK_DETAIL: Readonly<Record<string, KickKind>> = {
@@ -72,5 +74,7 @@ export function toMatchEvent(e: SimEvent, snap: Snapshot, ids: Record<Side, stri
   if (e.kind === 'conversion' || e.kind === 'field-goal' || e.kind === 'penalty-goal') ev.detail = e.detail === 'good' ? 'good' : 'missed';
   // A try in the bonus zone (Nines) is worth five; the overlay reads the mark.
   if (e.kind === 'try' && e.detail === 'bonus') ev.detail = 'bonus';
+  // Won in golden point (N9.4): the full-time whistle says so.
+  if (e.kind === 'full-time' && e.detail === 'golden-point') ev.detail = 'golden-point';
   return ev;
 }

@@ -342,6 +342,8 @@ export interface LiveOptions {
   calls?: CallInput[];
   /** Sides whose coach makes his own calls (N9.6). The game gives rival coaches one when `calls.ai.on` (aiCoachSides). */
   aiCoach?: Side[];
+  /** A final (N9.4): level at full time, play golden point — the next score wins. */
+  goldenPoint?: boolean;
 }
 
 /** A sheet's bench, as many as the bench holds. */
@@ -456,6 +458,9 @@ export class LiveSim implements MatchSim {
   private ends: 1 | -1 = 1;
   /** The side that received the opening kick-off kicks off the second half: a coin toss (Phase 3; always home before, and home then won a third of even matches). */
   private readonly firstReceiver: Side;
+  /** A final: golden point if level at full time (N9.4); `golden` once it is being played. */
+  private readonly goldenPoint: boolean;
+  private golden = false;
 
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
     // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average.
@@ -469,6 +474,7 @@ export class LiveSim implements MatchSim {
     this.injuryRate = opts.injuryRate ?? 1;
     this.clubIds = { home: home.clubId, away: away.clubId };
     this.length = opts.length ?? fullMatch();
+    this.goldenPoint = opts.goldenPoint === true;
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
@@ -904,12 +910,12 @@ export class LiveSim implements MatchSim {
   private runClock(): void {
     const k = this.phase.kind;
     if (k !== 'play' && k !== 'tackle' && k !== 'ruck') return;
-    const halfTicks = Math.round((this.length.halfMinutes * 60) / TICK_S);
+    const halfTicks = Math.round(((this.golden ? NINES.goldenPointMinutes : this.length.halfMinutes) * 60) / TICK_S);
     if (this.clockTicks < halfTicks) this.clockTicks++;
     if (!this.siren && this.clockTicks >= halfTicks) {
       this.siren = true;
       this.sirenAt = this.tick;
-      this.emit('siren', this.half < this.length.halves ? 'The half-time siren — play on until the ball is dead' : 'The full-time siren — play on until the ball is dead');
+      this.emit('siren', this.half < this.length.halves ? 'The half-time siren — play on until the ball is dead' : this.golden ? 'Golden point is over — play on until the ball is dead' : 'The full-time siren — play on until the ball is dead');
       // Time up with a man still down from the tackle: the ball is already dead.
       const ph = this.phase;
       if (ph.kind === 'ruck' && ph.stage === 'down') {
@@ -930,6 +936,11 @@ export class LiveSim implements MatchSim {
     if (this.half < this.length.halves) {
       this.emit('half-time', `Half-time: ${score}`);
       this.phase = { kind: 'half-time', t0: this.tick };
+    } else if (this.goldenPoint && !this.golden && NINES.goldenPointMinutes > 0 && this.points.home === this.points.away) {
+      // A drawn final: golden point, the next score wins (N9.4).
+      this.emit('golden-point', `Full time: ${score} — golden point! The next score wins`);
+      this.golden = true;
+      this.phase = { kind: 'half-time', t0: this.tick };
     } else {
       this.emit('full-time', `Full time: ${score}`);
       this.phase = { kind: 'full-time' };
@@ -937,11 +948,24 @@ export class LiveSim implements MatchSim {
     }
   }
 
+  /** Golden point is won: full time on the spot. */
+  private endGoldenPoint(winner: Side): void {
+    this.pendingKick = null;
+    this.outPending = null;
+    this.penaltyKickUp = null;
+    this.emit('full-time', `Golden point to ${this.names[winner]}! Full time: ${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`);
+    this.events[this.events.length - 1]!.detail = 'golden-point';
+    this.phase = { kind: 'full-time' };
+    this.finished = true;
+  }
+
   /** The break: then legs part-restored, a full tank, ends swapped, and the side that received first kicks off. */
   private stepHalfTime(ph: Extract<Phase, { kind: 'half-time' }>): void {
-    if (this.tick < ph.t0 + NINES.halfTimeTicks) return;
+    if (this.tick < ph.t0 + (this.golden ? NINES.goldenPointBreakTicks : NINES.halfTimeTicks)) return;
+    // Golden point straight after full time: no legs back, no swaps in the sheds.
+    const legsBack = this.golden ? 0 : NINES.halfTimeLegsBack;
     for (const p of this.players) {
-      p.energy += (1 - p.energy) * NINES.halfTimeLegsBack;
+      p.energy += (1 - p.energy) * legsBack;
       p.gas = { gas: p.energy, blown: false };
       p.gassed = p.energy < FATIGUE.spentAt;
       p.pose = 'idle';
@@ -952,16 +976,19 @@ export class LiveSim implements MatchSim {
       p.decided = false;
       p.steppedOn = -1;
     }
-    for (const b of [...this.bench.home, ...this.bench.away]) b.energy += (1 - b.energy) * NINES.halfTimeLegsBack;
+    for (const b of [...this.bench.home, ...this.bench.away]) b.energy += (1 - b.energy) * legsBack;
     // Swaps in the sheds: no jog needed.
-    for (const side of ['home', 'away'] as const) {
-      for (const sw of this.swapsFor(side)) this.swapIn(this.at(side, sw.slot), sw.bench);
+    if (!this.golden) {
+      for (const side of ['home', 'away'] as const) {
+        for (const sw of this.swapsFor(side)) this.swapIn(this.at(side, sw.slot), sw.bench);
+      }
     }
     this.half++;
     this.ends = this.ends === 1 ? -1 : 1;
     this.clockTicks = 0;
     this.siren = false;
-    this.setForKickoff(this.firstReceiver);
+    // The second half is kicked off by the side that received the first; golden point by the side that opened the match.
+    this.setForKickoff(this.golden ? other(this.firstReceiver) : this.firstReceiver);
   }
 
   // ── Interchanges (2b) ─────────────────────────────────────────────────────
@@ -1618,6 +1645,11 @@ export class LiveSim implements MatchSim {
 
   private stepTry(ph: Extract<Phase, { kind: 'try' }>): void {
     if (this.tick < ph.t0 + LIVE.tryTicks) return;
+    // Golden point: the try wins it, no conversion.
+    if (this.golden) {
+      this.endGoldenPoint(this.players[ph.scorer]!.side);
+      return;
+    }
     const scorer = this.players[ph.scorer]!;
     for (const p of this.players) {
       p.pose = 'idle';
@@ -1636,6 +1668,10 @@ export class LiveSim implements MatchSim {
 
   /** After a try, a conversion or a field goal: half-time or full time if the siren has gone, else the kick-off by the side that conceded. */
   private afterScore(scoringSide: Side): void {
+    if (this.golden) {
+      this.endGoldenPoint(scoringSide); // a penalty goal or a field goal wins it
+      return;
+    }
     if (this.siren) {
       this.endHalf(); // the last play of the half
       return;
@@ -1889,12 +1925,12 @@ export class LiveSim implements MatchSim {
     const line = dir > 0 ? FIELD_LENGTH : 0;
     const mark = clampToGround({ x: dir > 0 ? Math.min(spot.x, line - 10) : Math.max(spot.x, line + 10), y: spot.y }, 1);
     const kicker = this.kicker(award);
-    const halfS = this.length.halfMinutes * 60;
+    const halfS = (this.golden ? NINES.goldenPointMinutes : this.length.halfMinutes) * 60;
     const halfLeftS = Math.max(0, halfS - this.clockTicks * TICK_S);
     const choice = choosePenalty({
       shotChance: goalChance(mark, postsFor(dir, FIELD_LENGTH, MID_Y), kicker.stats.skill, this.goalAcc(kicker)),
       toLine: this.toLineFor(award, mark),
-      matchLeftS: (this.length.halves - this.half) * halfS + halfLeftS,
+      matchLeftS: this.golden ? halfLeftS : (this.length.halves - this.half) * halfS + halfLeftS,
       halfLeftS,
       siren: this.siren,
       margin: this.points[award] - this.points[offender],
@@ -1995,11 +2031,11 @@ export class LiveSim implements MatchSim {
     return { x: posts.x + dir * 6, y };
   }
 
-  /** A field goal is on: the last minutes, the scores close, in range, late in the set. */
+  /** A field goal is on: the last minutes (any time in golden point), the scores close, in range, late in the set. */
   private fieldGoalOn(h: Player): boolean {
     if (this.half < this.length.halves || this.siren) return false;
     const left = this.length.halfMinutes * 60 - this.clockTicks * TICK_S;
-    if (left > GOALS.fieldGoalLastS || this.tackles < GOALS.fieldGoalFromTackle) return false;
+    if ((!this.golden && left > GOALS.fieldGoalLastS) || this.tackles < GOALS.fieldGoalFromTackle) return false;
     const margin = this.points[h.side] - this.points[other(h.side)];
     if (margin < GOALS.fieldGoalMargin[0] || margin > GOALS.fieldGoalMargin[1]) return false;
     return dist(h.body.pos, postsFor(this.dirOf(h.side), FIELD_LENGTH, MID_Y)) <= GOALS.fieldGoalRangeM;

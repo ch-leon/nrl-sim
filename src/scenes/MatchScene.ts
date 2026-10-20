@@ -380,6 +380,7 @@ export class MatchScene extends Phaser.Scene {
         ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}),
         calls: live.calls ?? [],
         ...(live.aiCoach?.length ? { aiCoach: live.aiCoach } : {}),
+        ...(live.goldenPoint ? { goldenPoint: true } : {}),
         ...(live.resumeAt ? { resumeAt: live.resumeAt } : {}),
         ...(live.onProgress ? { onProgress: live.onProgress } : {}),
         fixture: this.fixture,
