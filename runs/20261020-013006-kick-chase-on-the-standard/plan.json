@@ -1,0 +1,49 @@
+{
+  "name": "kick chase on the standard",
+  "description": "N9.3: the 20-seed standard run starred dead balls (even), line breaks (expansive v grind) and goals (70 v 50) against main; are they the kick-chase change or luck? Old chase = main's behaviour.",
+  "seeds": 120,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v grind",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "old chase (main)",
+      "tuning": {
+        "live.territoryChaseSprint": 1,
+        "live.wingerChase": 0
+      }
+    }
+  ]
+}
