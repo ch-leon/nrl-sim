@@ -107,6 +107,8 @@ export interface MatchResult {
   momentumTimeline: { t: number; value: number }[]; // -100 (away)..+100 (home)
   /** Big-hit injuries; empty when none. Applied by matchday, not the engine. */
   injuries: MatchInjury[];
+  /** Coach calls made and paid off, home then away (#73), when any were made: the match report's line (N9.5). */
+  calls?: { made: [number, number]; paid: [number, number] };
 }
 
 /**
