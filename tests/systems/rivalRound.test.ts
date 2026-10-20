@@ -102,13 +102,15 @@ describe('the rival round worker falls back to the main thread', () => {
     vi.useRealTimers();
   });
   /** A stand-in Worker that never answers, or fails as soon as it gets the jobs. */
-  const stub = (mode: 'hang' | 'error') =>
+  const stub = (mode: 'hang' | 'error' | 'throw' | 'short') =>
     class {
       onmessage: ((e: unknown) => void) | null = null;
       onerror: (() => void) | null = null;
       terminated = false;
       postMessage(): void {
+        if (mode === 'throw') throw new Error('DataCloneError');
         if (mode === 'error') setTimeout(() => this.onerror?.(), 0);
+        if (mode === 'short') setTimeout(() => this.onmessage?.({ data: [] }), 0);
       }
       terminate(): void {
         this.terminated = true;
@@ -133,5 +135,32 @@ describe('the rival round worker falls back to the main thread', () => {
     (globalThis as { Worker?: unknown }).Worker = stub('error');
     expect(await playRivalJobsInWorker(jobs, 60_000)).toEqual(jobs.map(playRivalJob));
   }, 60_000);
-});
 
+  it('postMessage throwing (a DataCloneError): played here, same results', async () => {
+    const jobs = someJobs();
+    (globalThis as { Worker?: unknown }).Worker = stub('throw');
+    expect(await playRivalJobsInWorker(jobs, 60_000)).toEqual(jobs.map(playRivalJob));
+  }, 60_000);
+
+  it('a worker answering with no results: every rival fixture is still played, and the week resumes', async () => {
+    const g = globalThis as { Worker?: unknown; window?: unknown };
+    const hadWindow = 'window' in g;
+    g.Worker = stub('short');
+    if (!hadWindow) g.window = {};
+    try {
+      newGame(true);
+      const round = getState().week;
+      advanceWeek(); // the player's match and the rival round both hold the week
+      expect(rivalFixtures(round).some((f) => !f.result)).toBe(true); // went to the (stub) worker, not played in place
+      const before = atRivals!;
+      const expected = rivalJobs(before, makeRng(before.rngSeed), PLAYER_ID).map(playRivalJob);
+      await vi.waitFor(() => expect(rivalFixtures(round).every((f) => f.result)).toBe(true), { timeout: 60_000 });
+      const fs = rivalFixtures(round);
+      expect(fs.map((f) => f.result!.homeScore)).toEqual(expected.map((r) => r.homeScore));
+      resumeWeek(); // the player's match
+      expect(getState().week).toBe(round + 1);
+    } finally {
+      if (!hadWindow) delete g.window;
+    }
+  }, 120_000);
+});

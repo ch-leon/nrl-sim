@@ -601,7 +601,9 @@ export function registerFixturesSystem(): void {
       const jobs = rivalJobs(s, rng, PLAYER_ID);
       setState({ rngSeed: rng.state() });
       const land = (results: Parameters<typeof applyRivalResults>[2]): void => {
-        const next = applyRivalResults(getState(), jobs, results, applyResult);
+        // A result missing from the worker's answer is played here, so no fixture is left unplayed.
+        const all = jobs.map((job, i) => results[i] ?? playRivalJob(job));
+        const next = applyRivalResults(getState(), jobs, all, applyResult);
         setState({ league: next.league });
       };
       if (ctx.hold && canUseWorker() && jobs.length > 0) {
@@ -609,7 +611,15 @@ export function registerFixturesSystem(): void {
         // The week always resumes, even if landing the results throws.
         void playRivalJobsInWorker(jobs)
           .then(land)
-          .catch((err: unknown) => console.error('rival round failed to land', err))
+          .catch((err: unknown) => {
+            // Never leave the round unplayed: play it here (fixtures already landed are skipped).
+            console.error('rival round failed to land; playing it on the main thread', err);
+            try {
+              land(jobs.map(playRivalJob));
+            } catch (again: unknown) {
+              console.error('rival round failed to land again', again);
+            }
+          })
           .finally(resumeWeek);
         return;
       }

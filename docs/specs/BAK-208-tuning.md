@@ -689,6 +689,11 @@ each side its own fit squad through its coach's auto-pick (#69, #74), one seed e
 watches his own match. The week holds until both are in (holds now count, `core/time.ts`).
 Results go through `applyResult`; the rivals' injuries land on their squads and their players'
 games, tries, tackles and line breaks on their records. Fast-forward keeps the cheap sim.
+**How long it takes (#216):** at phone speed (page at CPU ×4 and the Worker's own time ×4,
+844×390) the round lands about 30 s after Advance Week; Skip reaches full time in about 8 s, so
+the week stays held about 20 s after Back to Club. A desktop takes about 5–7 s. If the Worker
+fails, can't take the jobs, answers short or not within `RIVAL_WORKER_TIMEOUT_MS` (120 s,
+`rivalRound.ts`), the missing matches are played on the main thread; the round is never dropped.
 Tests: `tests/systems/rivalRound.test.ts`, `tests/systems/fixtures.test.ts` (the cheap sim's
 scale).
 
