@@ -848,8 +848,8 @@ the same at any strength (`rivalTactics`, `src/match/league/presets.ts`). In ord
 (five-eighth or halfback) with **Big Boot** or **Playmaker** → Kick-chase; backs quicker than
 the side → Expansive; a pack stronger than the side → Grind; a contender with none of those →
 All-out; else Balanced. Defence: a strong pack → Rush; a nine whose stamina is above its other
-stats → Compressed; else Slide. Derived, not stored: re-read each week, so an injury or a
-signing can change it. The next-match card ("They play Balanced · Rush"), the rival's squad
+stats → Compressed; else Slide. Derived, not stored: re-read from the squad as it stands, so an
+injury or a signing changes it at once. The next-match card ("They play Balanced · Rush"), the rival's squad
 page and the ladder's form column (`BAL·RSH`) show it. A strength-built sheet (fewer than nine
 fit) keeps the old style from club identity. These are game-side mapping numbers, not match
 knobs: the harness sets each scenario's tactics directly, so they are not overridable by name.
@@ -869,7 +869,8 @@ every match against one changes. Soak at this change (20 seeds, `--jobs 4`): no 
 Normal season 1 14.6-0.6-8.9, 5.1th, top eight 80% (13.7-1.0-9.4, 5.5th, 80% on `main` at
 e713900, within seed luck). Whether any style wins more than luck over a season is not
 measured here: rival-v-rival rounds play on the cheap sim unless *Rival matches on the match
-engine* is on, and the soak fast-forwards, so tactics only touch the player's own matches.
+engine* is on, and the soak fast-forwards, so tactics only touch the player's own matches
+(follow-up #249).
 Head to head at equal strength, §27 and #241 are the reference (Compressed strong; Expansive
 and All-out weak).
 

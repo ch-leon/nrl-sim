@@ -232,7 +232,7 @@ wingers). **Overlap** (all presets): when a side has more players than the defen
 Rivals' styles follow from the nine they field (N11, tuning reference §28): a half with Big
 Boot or Playmaker kicks and chases, quick backs go Expansive, a heavy pack grinds, a
 contender with none of those goes All-out, the rest are Balanced; a strong pack rushes, a fit
-line compresses, the rest slide. Re-read each week from the side on the day. A rival with too
+line compresses, the rest slide. Re-read from the squad as it stands, not stored. A rival with too
 few fit men for a nine (a strength-built sheet) keeps the old fixed style from club identity:
 contenders (65+) Expansive / All-out / Balanced, mid-table Balanced / Kick-chase / Expansive,
 strugglers Grind / Kick-chase / Balanced, with the defence from a second roll. The player's club plays Balanced / Slide

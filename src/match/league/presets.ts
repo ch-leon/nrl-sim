@@ -140,7 +140,7 @@ function hash(s: string): number {
 }
 
 /**
- * How a rival's style follows from its best nine (N11, tuning reference §27): a side's
+ * How a rival's style follows from its best nine (N11, tuning reference §28): a side's
  * units against its own average, so it reads the same at any strength.
  */
 export const RIVAL_STYLE = {

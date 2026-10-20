@@ -7,6 +7,7 @@ import { RIVAL_STYLE, rivalTactics, type StyleEntry } from '../../src/match/leag
 import { createNewGame } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
 import { rivalSheet, rivalStyle } from '../../src/systems/rivalRound';
+import { rivalMatchSheet } from '../../src/systems/matchday';
 
 const SLOTS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
 const BACKS = new Set(['fullback', 'winger', 'centre']);
@@ -71,4 +72,21 @@ describe('rival styles from their squads (N11)', () => {
     expect(attacks.size).toBeGreaterThanOrEqual(4);
     expect(defences.size).toBe(3);
   });
+
+  it('the player sees the style his opponent plays, on any difficulty, squad-built or strength-built', () => {
+    const league = initLeague(createNewGame('X', 5));
+    const rivals = league.clubs.filter((c) => c.id !== 'player');
+    for (const difficulty of ['easy', 'normal', 'hard'] as const) {
+      for (const c of rivals) {
+        expect(rivalMatchSheet(c, difficulty).tactics, `${c.id} ${difficulty}`).toEqual(rivalStyle(c));
+        // Short of a fit nine: the strength-built sheet, its style from the club's own strength.
+        const crocked = { ...c, squad: (c.squad ?? []).map((p) => ({ ...p, injuredWeeks: 3 })) };
+        expect(rivalMatchSheet(crocked, difficulty).tactics, `${c.id} ${difficulty} crocked`).toEqual(rivalStyle(crocked));
+      }
+    }
+    // A club near a tier line plays the same style on Hard as the screens show (Hard scales strength ×1.1).
+    const near = { ...rivals[0]!, strength: 60, squad: [] };
+    expect(rivalMatchSheet(near, 'hard').tactics).toEqual(rivalTactics(near));
+  });
 });
+
