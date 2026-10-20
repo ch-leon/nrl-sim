@@ -87,3 +87,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261020-023511-standard | standard | 111fc3f (uncommitted changes) | docs/close-out-85-94-99 | [report](runs/20261020-023511-standard/report.md) |
 | 20261020-023922-standard | standard | cbb6a6a | main | [report](runs/20261020-023922-standard/report.md) |
 | 20261020-030237-standard | standard | e97e32d (uncommitted changes) | feat/match-report-2 | [report](runs/20261020-030237-standard/report.md) |
+| 20261020-033040-standard | standard | 90e437e | main | [report](runs/20261020-033040-standard/report.md) |
