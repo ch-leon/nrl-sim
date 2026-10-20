@@ -3,7 +3,8 @@
 import type Phaser from 'phaser';
 import { TILE_W, TILE_H } from '../config';
 import type { FacilityDef, FacilityDefId } from '../data/facility';
-import { facilityOrigin, facilityTextureKey } from '../art/grounds/facilities';
+import { facilityOrigin } from '../art/grounds/facilities';
+import { ensureFacilityTexture } from '../art/grounds';
 import { dashSegments, footprintCorners, ghostStyle } from './buildFeedback';
 
 type Pt = { x: number; y: number };
@@ -43,7 +44,7 @@ export class GhostPreview {
     private def: FacilityDef,
     level: 1 | 2 | 3 = 1, // a moved facility keeps its level art (#78)
   ) {
-    this.sprite = scene.add.image(0, 0, facilityTextureKey(defId, level));
+    this.sprite = scene.add.image(0, 0, ensureFacilityTexture(scene, defId, level));
     const o = facilityOrigin(def.footprint, this.sprite.height);
     this.sprite.setOrigin(o.x, o.y);
     this.gfx = scene.add.graphics();
