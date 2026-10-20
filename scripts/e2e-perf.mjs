@@ -191,8 +191,9 @@ async function advance(index, { probe = false } = {}) {
   await clickTimed('.nrl-hud-menu-toggle');
   const t0 = Date.now();
   await clickTimed('.nrl-hud-menu-item', { nth: index });
-  let tapMs, label;
+  let tapMs, label, probeMs = 0;
   if (probe && await page.locator('.nrl-hud[data-advancing]').count()) {
+    const p0 = Date.now();
     label = (await page.locator('.nrl-hud-actions .nrl-btn').first().textContent())?.trim();
     // Timed inside the page, from the touch's own timestamp to its click handler:
     // the driver's tap() waits for two steady frames, and a frame now holds a week.
@@ -206,9 +207,10 @@ async function advance(index, { probe = false } = {}) {
     tapMs = await page.evaluate(() => window.__nrlTapDelay);
     await page.waitForSelector('.nrl-screen-region');
     await page.screenshot({ path: join(OUT, 'advancing.png') });
+    probeMs = Date.now() - p0; // the probe's own driver time is not the run's
   }
   await page.waitForFunction(() => !document.querySelector('.nrl-hud[data-advancing]'), null, { timeout: 240000 });
-  const ms = Date.now() - t0;
+  const ms = Date.now() - t0 - probeMs;
   if (probe) await page.evaluate(() => { for (const b of document.querySelectorAll('.nrl-screen-region .nrl-btn')) if (/^(close|✕)$/i.test(b.textContent?.trim() ?? '')) { b.click(); break; } });
   const after = await state();
   return { ms, weeks: (after.season - before.season) * 27 + (after.week - before.week), ...(tapMs !== undefined ? { tapMs, label } : {}) };

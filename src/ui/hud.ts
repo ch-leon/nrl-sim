@@ -45,6 +45,9 @@ export function fmtMoney(n: number): string {
 
 const FLASH_MS = 450;
 
+/** What the HUD says when a multi-week advance throws mid-run (N10.2). */
+export const ADVANCE_FAILED_TEXT = 'The advance hit a problem and stopped.';
+
 /** What a tap on Advance Week (or its menu) says while the week is still finishing. */
 export const HELD_WEEK_TEXT = 'The other matches are still being played; the week ends when they are in.';
 
@@ -61,8 +64,8 @@ export function weekStillFinishing(): boolean {
 }
 
 /**
- * The Advance button's label while a multi-week advance runs (N10.2): the week
- * just played, of the season. Pure — extracted for unit testing without the DOM.
+ * The Advance button's label while a multi-week advance runs (N10.2): the
+ * season's current week. Pure — extracted for unit testing without the DOM.
  */
 export function advanceProgressLabel(week: number): string {
   return `Week ${week} of ${WEEKS_PER_SEASON}…`;
@@ -101,13 +104,23 @@ export function createHud(opts: HudOpts = {}): Hud {
     ...ADVANCE_MENU.map(({ label, target }) => {
       const item = button(label, () => {
         setMenuOpen(false);
-        if (!weekStillFinishing()) opts.onAdvanceUntil?.(target);
+        if (!weekStillFinishing()) runAdvance(target);
       }, { class: 'nrl-hud-menu-item' });
       item.setAttribute('role', 'menuitem');
       if (!opts.onAdvanceUntil) item.disabled = true;
       return item;
     }),
   );
+
+  /** Start a multi-week advance; one that throws mid-run says so instead of failing silently. */
+  function runAdvance(target: AdvanceTarget): void {
+    void Promise.resolve()
+      .then(() => opts.onAdvanceUntil?.(target))
+      .catch((err: unknown) => {
+        console.error(err);
+        bus.emit('ui:notify', { text: ADVANCE_FAILED_TEXT, kind: 'danger' });
+      });
+  }
 
   function setMenuOpen(open: boolean): void {
     menu.hidden = !open;

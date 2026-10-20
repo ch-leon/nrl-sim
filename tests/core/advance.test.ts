@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { advanceUntil, advanceInProgress, stopAdvance, STOPPED_BY_YOU } from '../../src/core/advance';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { advanceUntil, advanceInProgress, stopAdvance, nextFrame, STOPPED_BY_YOU } from '../../src/core/advance';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import {
   registerTickHook, clearTickHooks, clearSeasonHooks, TICK_ORDER,
@@ -175,5 +175,53 @@ describe('advanceUntil — yields between weeks, Stop', () => {
     registerTickHook('test-ff', TICK_ORDER.economy, (ctx) => { flags.push(ctx.fastForward); });
     await advanceUntil({ kind: 'weeks', weeks: 3 }, async () => {});
     expect(flags).toEqual([true, true, true]);
+  });
+
+  it('a week that throws ends the run (not in progress after it) and the next run works', async () => {
+    registerTickHook('test-throw', TICK_ORDER.economy, (ctx) => { if (ctx.week === 3) throw new Error('boom'); });
+    await expect(advanceUntil({ kind: 'weeks', weeks: 4 }, async () => {})).rejects.toThrow('boom');
+    expect(advanceInProgress()).toBe(false);
+    clearTickHooks();
+    const run = await advanceUntil({ kind: 'weeks', weeks: 1 }, async () => {});
+    expect(run.weeksPlayed).toBe(1);
+  });
+
+  it('a second advance while one runs reports busy, not success', async () => {
+    let inner: Awaited<ReturnType<typeof advanceUntil>> | null = null;
+    await advanceUntil({ kind: 'weeks', weeks: 2 }, async () => { inner = await advanceUntil({ kind: 'finals' }); });
+    expect(inner!.stop.kind).toBe('busy');
+  });
+});
+
+// The real frame wait: a requestAnimationFrame, then a task (so the page has painted).
+describe('nextFrame (N10.2)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('a run waits one animation frame and one timer per week after the first', async () => {
+    vi.useFakeTimers();
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { frames.push(cb); return frames.length; });
+    const start = getState().week;
+    let done = false;
+    const run = advanceUntil({ kind: 'weeks', weeks: 3 }).then((r) => { done = true; return r; });
+    await Promise.resolve();
+    expect(getState().week).toBe(start + 1); // the first week runs in the tap
+    for (let week = 2; week <= 3; week++) {
+      expect(frames.length).toBe(week - 1);
+      expect(done).toBe(false);
+      frames[week - 2]!(0); // the frame paints…
+      expect(getState().week).toBe(start + week - 1); // …but the week waits for the task after it
+      await vi.advanceTimersByTimeAsync(0);
+      expect(getState().week).toBe(start + week);
+    }
+    expect((await run).weeksPlayed).toBe(3);
+    expect(frames.length).toBe(2);
+  });
+
+  it('resolves at once where there is no page', async () => {
+    await expect(nextFrame()).resolves.toBeUndefined();
   });
 });

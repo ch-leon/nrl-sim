@@ -24,8 +24,8 @@ import {
 /** Outcome of one multi-advance. `stop.kind === 'target'` means it finished normally. */
 export interface AdvanceRun {
   weeksPlayed: number;
-  /** A rule's stop, or 'stopped' when the player tapped Stop (N10.2). */
-  stop: StopReason | { kind: 'stopped'; text: string };
+  /** A rule's stop; 'stopped' when the player tapped Stop, 'busy' when a run was already under way (N10.2). */
+  stop: StopReason | { kind: 'stopped' | 'busy'; text: string };
 }
 
 /** What a Stop tap reports, in the same toast as a rule stop. */
@@ -71,7 +71,7 @@ function newCards(before: GameState, after: GameState): string[] {
  */
 export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<void> = nextFrame): Promise<AdvanceRun> {
   if (getState().sacked) return { weeksPlayed: 0, stop: { kind: 'target', text: 'The board has sacked you.' } };
-  if (running) return { weeksPlayed: 0, stop: { kind: 'target', text: 'An advance is already running.' } };
+  if (running) return { weeksPlayed: 0, stop: { kind: 'busy', text: 'An advance is already running.' } };
   running = true;
   stopAsked = false;
   let run: AdvanceRun;
