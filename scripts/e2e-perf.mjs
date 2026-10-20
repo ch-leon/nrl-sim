@@ -11,9 +11,21 @@
 // own, without the test driver's overhead; the async moments (scene hand-offs,
 // the first paint) are timed from the click to the condition. Writes
 // e2e-output/perf/perf.json and prints a markdown table (the budget rows in
-// docs/status/2026-10-qa.md come from it). Exit 1 only if the game broke on the way.
+// docs/status/2026-10-qa.md come from it).
+//
+// Each moment also gets its longest main-thread block: the longest Long Task
+// (PerformanceObserver 'longtask', installed before the page loads) that started
+// inside it, or the click handler's own time if that is longer. A block is how long
+// the page could not paint or take a tap.
+//
+// With --budget (N10 item 1, #219) the moments are checked against
+// scripts/perf-budget.json (or the file given) and the run fails when one is over;
+// report.json and report.md carry every metric, its budget and the verdict. Exit 1
+// if the game broke on the way, or with --budget if a budget was missed.
 //
 //   npm run e2e:perf
+//   npm run e2e:perf -- --budget              (fail on a missed budget; the nightly QA job)
+//   npm run e2e:perf -- --budget my.json      (another budget file)
 //   npm run e2e:perf -- --throttle 1          (no throttling, for a baseline)
 //   CHROMIUM_PATH=/path/to/chrome npm run e2e:perf
 //   E2E_URL=http://localhost:5173/ npm run e2e:perf
@@ -26,6 +38,10 @@ import { chromium } from 'playwright-core';
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => (argv.includes(`--${name}`) ? argv[argv.indexOf(`--${name}`) + 1] : dflt);
 const THROTTLE = Number(flag('throttle', 4));
+// --budget alone means the checked-in file; --budget <file.json> another one.
+const BUDGET = argv.includes('--budget')
+  ? (/\.json$/.test(argv[argv.indexOf('--budget') + 1] ?? '') ? argv[argv.indexOf('--budget') + 1] : 'scripts/perf-budget.json')
+  : null;
 const OUT_ROOT = process.env.E2E_OUT ?? 'e2e-output';
 const OUT = join(OUT_ROOT, 'perf');
 const DIST = join(OUT_ROOT, 'dist');
@@ -81,17 +97,36 @@ const state = () => page.evaluate(() => window.__nrlState?.() ?? null);
 const wait = (ms) => page.waitForTimeout(ms);
 const toastsGone = () => page.waitForFunction(() => document.querySelectorAll('.nrl-toast').length === 0, null, { timeout: 8000 }).catch(() => {});
 
-/** Time `fn` (ms, wall clock); record it under `name` with any notes. A number returned by `fn` replaces the wall clock. */
+/** The page's clock (ms since its navigation start), or null between pages. */
+const pageNow = () => page.evaluate(() => performance.now()).catch(() => null);
+
+/** The longest Long Task that started in [from, to] on the page's clock, in ms (0 if none). */
+const longestTask = (from, to) => page.evaluate(([a, b]) =>
+  Math.round((window.__nrlLongTasks ?? []).reduce((m, [start, dur]) => (start >= a && start <= b ? Math.max(m, dur) : m), 0)), [from, to]);
+
+/** The longest click handler timed by clickTimed during the current moment. */
+let handlerMax = 0;
+
+/**
+ * Time `fn` (ms, wall clock); record it under `name` with any notes and the moment's
+ * longest main-thread block. A number returned by `fn` replaces the wall clock.
+ */
 async function timed(name, fn) {
   const t0 = Date.now();
+  handlerMax = 0;
+  const p0 = await pageNow();
   let notes, inPage;
   try {
     const r = await fn();
     if (typeof r === 'number') inPage = r; else if (r && typeof r === 'object') { inPage = r.ms; notes = r.notes; } else notes = r;
   } catch (err) { result.errors.push(`${name}: ${err.message.split('\n')[0]}`); notes = 'FAILED'; }
   const ms = inPage ?? Date.now() - t0;
-  result.timings[name] = { ms, ...(notes ? { notes } : {}) };
-  log(`${String(ms).padStart(6)} ms  ${name}${notes ? `  (${notes})` : ''}`);
+  const p1 = await pageNow();
+  // A navigation inside the moment restarts the page's clock: count from its start.
+  const from = p0 !== null && p1 !== null && p0 <= p1 ? p0 : 0;
+  const blockMs = Math.max(handlerMax, p1 === null ? 0 : await longestTask(from, p1).catch(() => 0));
+  result.timings[name] = { ms, blockMs, ...(notes ? { notes } : {}) };
+  log(`${String(ms).padStart(6)} ms  ${name}  [block ${blockMs} ms]${notes ? `  (${notes})` : ''}`);
   return ms;
 }
 
@@ -100,14 +135,18 @@ async function timed(name, fn) {
  * from inside the page and return how long its handlers ran, in ms: the cost of a
  * synchronous handler such as the week tick, without the driver's own overhead.
  */
-const clickTimed = (selector, { nth = 0, text } = {}) => page.evaluate(({ selector, nth, text }) => {
-  const all = [...document.querySelectorAll(selector)].filter((e) => !text || e.textContent?.trim() === text);
-  const el = all[nth];
-  if (!el) throw new Error(`no ${selector}${text ? ` "${text}"` : ''}`);
-  const t0 = performance.now();
-  el.click();
-  return Math.round(performance.now() - t0);
-}, { selector, nth, text });
+const clickTimed = async (selector, { nth = 0, text } = {}) => {
+  const ms = await page.evaluate(({ selector, nth, text }) => {
+    const all = [...document.querySelectorAll(selector)].filter((e) => !text || e.textContent?.trim() === text);
+    const el = all[nth];
+    if (!el) throw new Error(`no ${selector}${text ? ` "${text}"` : ''}`);
+    const t0 = performance.now();
+    el.click();
+    return Math.round(performance.now() - t0);
+  }, { selector, nth, text });
+  handlerMax = Math.max(handlerMax, ms);
+  return ms;
+};
 
 /** Answer every waiting decision card (choice 0) so a multi-week advance can run. */
 async function answerCards() {
@@ -142,6 +181,14 @@ async function advance(index) {
 async function run() {
   const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-gl=swiftshader'] });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: true, isMobile: true });
+  // Every Long Task from the first script on, for the block column.
+  await ctx.addInitScript(() => {
+    window.__nrlLongTasks = [];
+    try {
+      new PerformanceObserver((list) => { for (const e of list.getEntries()) window.__nrlLongTasks.push([e.startTime, e.duration]); })
+        .observe({ type: 'longtask', buffered: true });
+    } catch { /* no Long Tasks API: the handler times still count */ }
+  });
   page = await ctx.newPage();
   page.setDefaultTimeout(60000);
   page.on('pageerror', (e) => result.errors.push(`pageerror: ${e.message}`));
@@ -255,10 +302,55 @@ try {
 }
 writeFileSync(join(OUT, 'perf.json'), JSON.stringify(result, null, 2));
 
-// Markdown table for the log.
-const rows = Object.entries(result.timings).map(([k, v]) => `| ${k} | ${v.fps !== undefined ? `${v.fps} fps` : `${v.ms} ms`} | ${v.notes ?? ''} |`);
+// ── Metrics: the named numbers the budget file checks ────────────────────────
+const t = result.timings;
+const pick = (name, key = 'ms') => (t[name] && typeof t[name][key] === 'number' ? t[name][key] : null);
+const advanceRows = Object.entries(t).filter(([k]) => /^(×4 advance|to finals|to season end)/.test(k));
+const maxOf = (vals) => { const v = vals.filter((x) => typeof x === 'number'); return v.length ? Math.max(...v) : null; };
+const metrics = {
+  titleMs: pick('load → title'),
+  groundsMs: pick('Start → grounds (textures painted, HUD up)'),
+  handoffMs: pick('Advance Week → match scene (hand-off)'),
+  handoffBlockMs: pick('Advance Week → match scene (hand-off)', 'blockMs'),
+  skipMs: pick('Skip → full time'),
+  skipBlockMs: pick('Skip → full time', 'blockMs'),
+  backToClubMs: pick('Back to Club → grounds'),
+  weekMs: pick('tick per week (×4 advances)'),
+  advanceCallMaxMs: maxOf(advanceRows.map(([, v]) => v.ms)),
+  advanceBlockMs: maxOf(advanceRows.map(([, v]) => v.blockMs)),
+  longestBlockMs: maxOf(Object.values(t).map((v) => v.blockMs)),
+  bundleGzKb: result.bundle?.gzKb ?? null,
+};
+
+// ── Budget ────────────────────────────────────────────────────────────────────
+let verdicts = [];
+let budgetFile = null;
+if (BUDGET) {
+  budgetFile = JSON.parse(readFileSync(BUDGET, 'utf8'));
+  if (budgetFile.throttle !== undefined && budgetFile.throttle !== THROTTLE) {
+    result.errors.push(`budget: ${BUDGET} is for CPU ×${budgetFile.throttle}, this run is ×${THROTTLE}`);
+  }
+  verdicts = Object.entries(budgetFile.budgets).map(([metric, max]) => {
+    const value = metrics[metric] ?? null;
+    // A metric the run never reached (the game broke first) fails its budget.
+    return { metric, value, max, ok: value !== null && value <= max };
+  });
+}
+const missed = verdicts.filter((v) => !v.ok);
+const report = { throttle: THROTTLE, size: `${W}x${H}`, metrics, budget: BUDGET, verdicts, ok: !result.errors.length && !missed.length, errors: result.errors };
+writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
+
+// Markdown for the log and the job summary.
+const rows = Object.entries(t).map(([k, v]) => `| ${k} | ${v.fps !== undefined ? `${v.fps} fps` : `${v.ms} ms`} | ${v.blockMs ?? ''}${v.blockMs !== undefined ? ' ms' : ''} | ${v.notes ?? ''} |`);
 const b = result.bundle;
-log(`\n| Moment (CPU ×${THROTTLE}, ${W}×${H}) | Time | Notes |\n|---|---|---|\n${rows.join('\n')}`);
-if (b) log(`| bundle (${b.files} js/css files) | ${b.rawKb} KB raw, ${b.gzKb} KB gzipped | ${b.biggest.map((x) => `${x.file} ${x.kb} KB`).join(', ')} |`);
-for (const e of result.errors) log(`  error: ${e}`);
-process.exit(result.errors.length ? 1 : 0);
+const md = [`| Moment (CPU ×${THROTTLE}, ${W}×${H}) | Time | Longest block | Notes |`, '|---|---|---|---|', ...rows];
+if (b) md.push(`| bundle (${b.files} js/css files) | ${b.rawKb} KB raw, ${b.gzKb} KB gzipped | | ${b.biggest.map((x) => `${x.file} ${x.kb} KB`).join(', ')} |`);
+if (BUDGET) {
+  md.push('', `| Budget (${BUDGET}) | Value | Max | |`, '|---|---|---|---|');
+  for (const v of verdicts) md.push(`| ${v.metric} | ${v.value ?? 'not reached'} | ${v.max} | ${v.ok ? 'ok' : '**over**'} |`);
+  md.push('', missed.length ? `**${missed.length} budget(s) missed:** ${missed.map((v) => v.metric).join(', ')}` : 'Every budget met.');
+}
+for (const e of result.errors) md.push(`- error: ${e}`);
+writeFileSync(join(OUT, 'report.md'), `${md.join('\n')}\n`);
+log(`\n${md.join('\n')}`);
+process.exit(report.ok ? 0 : 1);
