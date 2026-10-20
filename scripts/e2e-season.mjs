@@ -190,12 +190,24 @@ async function facilitiesDrawn(rec) {
   if (drawn !== want) throw new Error(`grounds draw ${drawn} facilities, the save has ${want}`);
 }
 
-/** At full time: close the Player of the Match card if it's up, then go back to the club. */
+/**
+ * At full time: go back to the club. With the Player of the Match card up, Back to
+ * Club must take the first tap (#203) and the card must go with the match view.
+ */
 async function leaveMatch() {
-  const potm = page.locator('.nrl-modal .nrl-btn:has-text("Close")');
-  if (await potm.count()) { await press(potm.first()); await wait(200); }
-  await tap('.nrl-btn:has-text("Back to Club")');
+  const back = page.locator('.nrl-btn:has-text("Back to Club")').first();
+  await back.waitFor();
+  if (await page.locator('.nrl-potm-modal').count()) {
+    const hit = await back.evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      const at = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+      return b.contains(at) ? null : at?.className || at?.tagName || 'nothing';
+    });
+    if (hit) throw new Error(`Back to Club is covered by "${hit}" while Player of the Match is up`);
+  }
+  await press(back);
   await page.waitForSelector('.nrl-hud .nrl-btn:has-text("Advance Week")');
+  if (await page.locator('.nrl-potm-modal').count()) throw new Error('the Player of the Match card stayed up after Back to Club');
 }
 
 /** Advance with the split-button menu: index 0 = ×4 weeks, 1 = to finals, 2 = to season end. */
