@@ -203,6 +203,16 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       return lineup ? { ...old, lineup: { ...lineup, tactics: lineup.tactics ?? { ...DEFAULT_TACTICS } } } : { ...old };
     },
   },
+  // v14 → v15 (N11): the coach picks a goal-kicker and a captain. An older save
+  // leaves both to the default: the best-kicking half and the smartest starter.
+  {
+    from: 14,
+    to: 15,
+    run: (old) => {
+      const lineup = old.lineup as Partial<GameState['lineup']> | undefined;
+      return lineup ? { ...old, lineup: { ...lineup, kicker: lineup.kicker ?? null, captain: lineup.captain ?? null } } : { ...old };
+    },
+  },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

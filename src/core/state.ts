@@ -87,7 +87,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 /**
  * The coach's team selection (GitHub #69, systems/lineup.ts): nine starters by
@@ -102,6 +102,9 @@ export interface Lineup {
   rotation: import('../match/league/bench').Rotation;
   /** The side's attack and defence presets (N11, BAK-208 §5): Balanced / Slide unless the coach picks. */
   tactics: import('../match/league/presets').TeamTactics;
+  /** The goal-kicker and the captain the coach picked (N11, player ids); null, or a man not in the nine, = the default (sheets.ts). */
+  kicker: string | null;
+  captain: string | null;
 }
 
 /**

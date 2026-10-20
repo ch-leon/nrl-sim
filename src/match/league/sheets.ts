@@ -139,6 +139,26 @@ export function teamSheetFromSquad(
     ...(selection && picked.length > 0 ? { rotation: selection.rotation } : {}),
     // The coach's presets (N11): what this side plays; Balanced / Slide when he hasn't picked.
     ...(selection?.tactics ? { tactics: selection.tactics } : {}),
+    // The goal-kicker and captain (N11): the coach's picks when they are in the nine, else the defaults.
+    ...kickerAndCaptain(best, selection),
+  };
+}
+
+/**
+ * Who kicks the goals and who captains the side (N11): the coach's picks when
+ * they are in the nine, else the defaults — the half with the best Skill (any
+ * man if there is no half), and the starter with the best Footy IQ. Ties go to
+ * the better player, then the earlier slot.
+ */
+export function kickerAndCaptain(nine: readonly Player[], selection?: Pick<Selection, 'kicker' | 'captain'>): { kicker?: string; captain?: string } {
+  if (nine.length === 0) return {};
+  const inNine = (id: string | null | undefined): string | undefined => (id && nine.some((p) => p.id === id) ? id : undefined);
+  const best = (pool: readonly Player[], stat: (p: Player) => number): Player =>
+    pool.reduce((a, b) => (stat(b) > stat(a) || (stat(b) === stat(a) && overallRating(b) > overallRating(a)) ? b : a));
+  const halves = nine.filter((p) => p.position === 'halfback' || p.position === 'five-eighth');
+  return {
+    kicker: inNine(selection?.kicker) ?? best(halves.length > 0 ? halves : nine, (p) => p.stats.skill).id,
+    captain: inNine(selection?.captain) ?? best(nine, (p) => p.stats.footyIQ).id,
   };
 }
 

@@ -90,7 +90,7 @@ export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_
     used.add(p.id);
   }
   const bench = fit.filter((p) => !used.has(p.id)).sort(byOverall).slice(0, BENCH.size).map((p) => p.id);
-  return { starters, bench, rotation, tactics: { ...tactics } };
+  return { starters, bench, rotation, tactics: { ...tactics }, kicker: null, captain: null };
 }
 
 /** Why a slot had to be filled on the day. */
@@ -113,6 +113,9 @@ export interface Selection {
   rotation: Rotation;
   /** The coach's presets (N11): what the side plays. */
   tactics?: TeamTactics;
+  /** The goal-kicker and captain he picked (N11, player ids); the sheet takes the default when null or not in the nine. */
+  kicker?: string | null;
+  captain?: string | null;
 }
 
 export interface Resolved extends Selection {
@@ -188,9 +191,17 @@ export function resolveLineup(lineup: Lineup, squad: readonly Player[]): Resolve
   }
   const rotation = isRotation(lineup.rotation) ? lineup.rotation : DEFAULT_ROTATION;
   const tactics = validTactics(lineup.tactics);
+  // The kicker and captain (N11) stay picked while they are at the club; a man who has left goes back to the default.
+  const kicker = lineup.kicker && byId.has(lineup.kicker) ? lineup.kicker : null;
+  const captain = lineup.captain && byId.has(lineup.captain) ? lineup.captain : null;
   const same =
-    clean.every((id, i) => id === (lineup.starters[i] ?? null)) && lineup.starters.length === LINEUP_SLOTS.length && cleanBench.length === lineup.bench.length && cleanBench.every((id, i) => id === lineup.bench[i]) && rotation === lineup.rotation && tactics === lineup.tactics;
-  return { starters, bench, rotation, tactics, fills, lineup: same ? lineup : { starters: clean, bench: cleanBench, rotation, tactics }, changed: !same };
+    clean.every((id, i) => id === (lineup.starters[i] ?? null)) && lineup.starters.length === LINEUP_SLOTS.length && cleanBench.length === lineup.bench.length && cleanBench.every((id, i) => id === lineup.bench[i]) && rotation === lineup.rotation && tactics === lineup.tactics &&
+    kicker === lineup.kicker && captain === lineup.captain;
+  return {
+    starters, bench, rotation, tactics, kicker, captain, fills,
+    lineup: same ? lineup : { starters: clean, bench: cleanBench, rotation, tactics, kicker, captain },
+    changed: !same,
+  };
 }
 
 /** The lineup's presets if they are real ones, else Balanced / Slide (N11). */
@@ -203,6 +214,14 @@ export function validTactics(t: Partial<TeamTactics> | undefined): TeamTactics {
 export function setTactics(lineup: Lineup, pick: Partial<TeamTactics>): Lineup {
   const next = validTactics({ ...lineup.tactics, ...pick });
   return next.attack === lineup.tactics?.attack && next.defence === lineup.tactics?.defence ? lineup : { ...lineup, tactics: next };
+}
+
+/** The coach makes a man the goal-kicker or the captain (N11); picking the one already chosen goes back to the default. */
+export function setKicker(lineup: Lineup, id: string): Lineup {
+  return { ...lineup, kicker: lineup.kicker === id ? null : id };
+}
+export function setCaptain(lineup: Lineup, id: string): Lineup {
+  return { ...lineup, captain: lineup.captain === id ? null : id };
 }
 
 /** One line for the news: who filled in where, and why. */

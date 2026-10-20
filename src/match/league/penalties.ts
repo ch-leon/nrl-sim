@@ -31,6 +31,11 @@ export const PENALTY = {
   shotHalfEndS: 20,
   /** Otherwise: inside this many metres of the line, tap and go; further out, kick for touch. */
   tapInsideM: 25,
+  /** The captain (N11): the shot needs this much less likelihood per point of Footy IQ above `captainIqMid` (more above it, less below)… */
+  captainIq: 0.004,
+  captainIqMid: 60,
+  /** …and a Hothead captain taps from this much further out per level. */
+  captainHotheadM: 8,
   /** A penalty kick for touch gains this much (× Big Boot distance), never to inside the other side's 10 m. */
   touchGainM: 25,
   /** The penalty is taken once the taker is on his mark, after at least this long and at most this long (ticks). */
@@ -57,7 +62,19 @@ export interface PenaltySituation {
   siren: boolean;
   /** Points: the side awarded the penalty minus the other side. */
   margin: number;
+  /** Who makes the call (N11); neutral when absent. */
+  captain?: CaptainRead;
 }
+
+/** The captain as the penalty call reads him (N11). */
+export interface CaptainRead {
+  footyIQ: number;
+  /** Hothead level 0–3. */
+  hothead: number;
+}
+
+/** A captain who moves nothing: the call as it was before N11 (a sheet that names none). */
+export const NEUTRAL_CAPTAIN: CaptainRead = { footyIQ: 60, hothead: 0 };
 
 /**
  * The captain's call: a shot at goal when it is likely to go over and the
@@ -65,9 +82,13 @@ export interface PenaltySituation {
  * the line, or kick for touch from further out.
  */
 export function choosePenalty(s: PenaltySituation): PenaltyChoice {
-  const likely = s.shotChance >= PENALTY.shotMin;
+  // The captain (N11): a smart one takes the points on a slimmer chance, a Hothead taps and runs from further out.
+  const c = s.captain ?? NEUTRAL_CAPTAIN;
+  const shotMin = PENALTY.shotMin - (c.footyIQ - PENALTY.captainIqMid) * PENALTY.captainIq;
+  const tapInsideM = PENALTY.tapInsideM + c.hothead * PENALTY.captainHotheadM;
+  const likely = s.shotChance >= shotMin;
   const lateAndClose = s.matchLeftS <= PENALTY.shotLateS && s.margin >= -PENALTY.shotBehind && s.margin <= PENALTY.shotAhead;
   const halfEnding = s.siren || s.halfLeftS <= PENALTY.shotHalfEndS;
   if (likely && (lateAndClose || halfEnding)) return 'goal';
-  return s.toLine <= PENALTY.tapInsideM ? 'tap' : 'touch';
+  return s.toLine <= tapInsideM ? 'tap' : 'touch';
 }

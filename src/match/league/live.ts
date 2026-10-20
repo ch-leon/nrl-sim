@@ -57,7 +57,7 @@ import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, t
 import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
-import { PENALTY, choosePenalty, offsideChance } from './penalties';
+import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, offsideChance, type CaptainRead } from './penalties';
 import { spreadSheets } from './spread';
 import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsDefence, callIsPlay, paidOffText, withAttackCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
@@ -355,6 +355,13 @@ export interface PlanInput {
   tactics: TeamTactics;
 }
 
+/** The sheet's captain as the penalty call reads him (N11): his Footy IQ and Hothead level; neutral when it names none. */
+function captainOf(sheet: TeamSheet): CaptainRead {
+  const c = sheet.captain !== undefined ? sheet.roster?.find((e) => e.id === sheet.captain) : undefined;
+  if (!c) return NEUTRAL_CAPTAIN;
+  return { footyIQ: c.stats?.footyIQ ?? NEUTRAL_CAPTAIN.footyIQ, hothead: c.traits?.find((t) => t.id === 'hothead')?.level ?? 0 };
+}
+
 /** A sheet's bench, as many as the bench holds. */
 function benchOf(sheet: TeamSheet): BenchMan[] {
   return (sheet.bench ?? []).slice(0, BENCH.size).map((e) => {
@@ -379,6 +386,10 @@ export class LiveSim implements MatchSim {
   private readonly names: Record<Side, string>;
   /** How each side plays (BAK-208 §5), changed at the breaks (N11). */
   readonly tactics: Record<Side, TeamTactics>;
+  /** The goal-kicker each side named (N11, a squad id); the slot-5 kicker when absent or off the field. */
+  private readonly goalKickerKey: Record<Side, string | undefined>;
+  /** Each side's captain, as the penalty call reads him (N11): neutral when the sheet names none. */
+  private readonly captain: Record<Side, CaptainRead>;
   private ball!: BallState;
   private phase!: Phase;
   private attacking: Side = 'home';
@@ -491,6 +502,8 @@ export class LiveSim implements MatchSim {
     this.goldenPoint = opts.goldenPoint === true;
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: { ...(home.tactics ?? DEFAULT_TACTICS) }, away: { ...(away.tactics ?? DEFAULT_TACTICS) } };
+    this.goalKickerKey = { home: home.kicker, away: away.kicker };
+    this.captain = { home: captainOf(home), away: captainOf(away) };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
     this.homeOn = this.players.slice(0, PLAYERS);
     this.awayOn = this.players.slice(PLAYERS);
@@ -691,6 +704,11 @@ export class LiveSim implements MatchSim {
   private kicker(side: Side): Player {
     return this.roleMan(side, KICKER);
   }
+  /** Who kicks for goal (N11): the man the side named while he is on the field, else the slot-5 kicker. */
+  private goalKicker(side: Side): Player {
+    const key = this.goalKickerKey[side];
+    return (key !== undefined && this.side(side).find((p) => p.key === key)) || this.kicker(side);
+  }
   private dummyHalf(side: Side): Player {
     return this.roleMan(side, HOOKER);
   }
@@ -797,7 +815,7 @@ export class LiveSim implements MatchSim {
     if ((call === 'run-it' || call === 'bomb') && this.tackles < CALLS.lastFrom) return 'late in the set';
     if (call === 'field-goal') {
       const h = this.holder();
-      if (!this.fieldGoalOn(h && h.side === side ? h : this.kicker(side))) return 'not in range';
+      if (!this.fieldGoalOn(h && h.side === side ? h : this.goalKicker(side))) return 'not in range';
     }
     return null;
   }
@@ -1409,7 +1427,7 @@ export class LiveSim implements MatchSim {
     // A field goal late on with the scores close: the kicker's call, once a set.
     // The coach's kick call for the set (#73) comes before the kicker's own.
     const called = this.callState[this.attacking].attack;
-    const isKicker = h === this.kicker(h.side);
+    const isKicker = h === this.goalKicker(h.side);
     if (isKicker && this.fieldGoalOn(h)) {
       if (this.fgCall === null) this.fgCall = called === 'field-goal' || this.rng.next() < GOALS.fieldGoalChance;
       if (this.fgCall && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
@@ -1712,7 +1730,7 @@ export class LiveSim implements MatchSim {
     }
     // The conversion: a drop kick in line with where he grounded it (taken even after the siren).
     const side = scorer.side;
-    const kicker = this.kicker(side);
+    const kicker = this.goalKicker(side);
     const posts = postsFor(this.dirOf(side), FIELD_LENGTH, MID_Y);
     const spot = clampToGround(conversionSpot(scorer.body.pos.y, posts, this.dirOf(side)), 1);
     this.ball = { kind: 'held', by: this.indexOf(kicker) };
@@ -1979,7 +1997,7 @@ export class LiveSim implements MatchSim {
     this.overLineAt = -1;
     const line = dir > 0 ? FIELD_LENGTH : 0;
     const mark = clampToGround({ x: dir > 0 ? Math.min(spot.x, line - 10) : Math.max(spot.x, line + 10), y: spot.y }, 1);
-    const kicker = this.kicker(award);
+    const kicker = this.goalKicker(award);
     const halfS = (this.golden ? NINES.goldenPointMinutes : this.length.halfMinutes) * 60;
     const halfLeftS = Math.max(0, halfS - this.clockTicks * TICK_S);
     const choice = choosePenalty({
@@ -1989,6 +2007,7 @@ export class LiveSim implements MatchSim {
       halfLeftS,
       siren: this.siren,
       margin: this.points[award] - this.points[offender],
+      captain: this.captain[award],
     });
     if (this.siren && choice !== 'goal') {
       this.endHalf();
