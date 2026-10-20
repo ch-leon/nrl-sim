@@ -649,30 +649,46 @@ async function play() {
     if (!(await toggle.count())) return 'no rival-rounds setting on this build';
     await press(toggle);
     await closeAny();
-    await page.evaluate(() => { window.__nrlWorkerDelayMs = 15000; });
+    await page.evaluate(() => { window.__nrlWorkerDelayMs = 30000; });
     const week = await page.evaluate(() => window.__nrlState().week);
     await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
-    await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
-    await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
-    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
-    await leaveMatch();
+    // A match to skip, or a forfeit (a squad short of 13 after the rollover): then the rivals
+    // alone hold the week and there is no match screen at all.
+    const match = await page.waitForFunction(() => (document.querySelector('.nrl-mo-controls') ? 'match'
+      : [...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited/.test(t.textContent ?? '')) ? 'forfeit' : null), null, { timeout: 15000 })
+      .then((h) => h.jsonValue());
+    if (match === 'match') {
+      await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+      await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
+      await leaveMatch();
+    } else rec.notes.push('the round forfeited (squad short), so only the rivals hold the week');
     const held = () => page.evaluate((w) => window.__nrlState().week === w, week);
-    if (!(await held())) throw new Error('the week finished before Back to Club: the slowed Worker did not hold it');
-    const said = () => page.waitForFunction(() => [...document.querySelectorAll('.nrl-toast')].some((t) => /still being played/.test(t.textContent ?? '')), null, { timeout: 3000 });
+    if (!(await held())) throw new Error('the week finished before the taps: the slowed Worker did not hold it');
+    // Each tap leaves its own message. A toast lasts 4 s and a busy page can take longer than
+    // that between taps, so keep a log of every toast as it is added and count in that.
+    await page.evaluate(() => {
+      window.__nrlToastLog = [];
+      const stack = document.querySelector('.nrl-toast-stack');
+      new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) window.__nrlToastLog.push(n.textContent ?? ''); })
+        .observe(stack, { childList: true });
+    });
+    const said = (n) => page.waitForFunction((k) => window.__nrlToastLog.filter((t) => /still being played/.test(t)).length >= k, n, { timeout: 10000 });
     await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
-    await said().catch(() => { throw new Error('Advance Week during the held week said nothing'); });
+    await said(1).catch(() => { throw new Error('Advance Week during the held week said nothing'); });
     if (await page.locator('.nrl-mo-controls').count()) throw new Error('Advance Week started a match while the week was held');
-    await toastsGone();
+    if (!(await held())) throw new Error('the hold ended before the second tap: the slowed Worker was not slow enough');
     await advanceMenu(0);
-    await said().catch(() => { throw new Error('×4 weeks during the held week said nothing'); });
-    const claimed = await page.evaluate(() => [...document.querySelectorAll('.nrl-toast')].map((t) => t.textContent ?? '').find((t) => /^Advanced/.test(t)));
+    await said(2).catch(() => { throw new Error('×4 weeks during the held week said nothing'); });
+    const claimed = await page.evaluate(() => window.__nrlToastLog.find((t) => /^Advanced/.test(t)));
     if (claimed) throw new Error(`×4 weeks during the held week reported "${claimed}"`);
     if (!(await held())) throw new Error('the week moved on during the hold');
     await page.waitForFunction((w) => window.__nrlState().week !== w, week, { timeout: 60000 });
     const s = await page.evaluate(() => window.__nrlState());
     const round = s.league.fixtures.filter((f) => f.round === week);
-    rec.notes.push(`held at W${week} after Back to Club; both taps said so; W${s.week}, round ${week} ${round.filter((f) => f.result).length}/${round.length} results`);
+    rec.notes.push(`held at W${week}${match === 'match' ? ' after Back to Club' : ''}; both taps said so; W${s.week}, round ${week} ${round.filter((f) => f.result).length}/${round.length} results`);
     if (round.some((f) => !f.result)) throw new Error('the held round finished with fixtures unplayed');
+    // A save with rival matches on the match engine, for the corpus (v13's field).
+    await dumpSave('live-rivals', rec);
     // Back to the default for whatever runs next.
     await page.evaluate(() => { window.__nrlWorkerDelayMs = 0; });
     await tap('.nrl-nav .nrl-btn[data-screen="fixtures"]');
