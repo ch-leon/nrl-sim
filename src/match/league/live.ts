@@ -379,7 +379,7 @@ export class LiveSim implements MatchSim {
   private pendingKick: PendingKick | null = null;
   /** Who kicked the ball now in the air (he leads the chase). */
   private lastKicker = -1;
-  /** What the kick in the air is (a territory kick is chased at cruise, N9.3); null when none. */
+  /** What the last kick was (a territory kick is chased at cruise, N9.3); only read while a kick is in the air. */
   private kickInAir: KickChoice | null = null;
   /** The kick in the air is a kick-off (chased as a line, not for a regather). */
   private kickoffUp = false;
