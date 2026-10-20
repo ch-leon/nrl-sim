@@ -1,0 +1,88 @@
+{
+  "name": "n11 presets confirm",
+  "description": "N11: now that the player picks presets, is Compressed (65% at 40 seeds) dominant, and All-out / Expansive weak? Each preset both ways round against Balanced / Slide, even 60 v 60, 160 whole matches.",
+  "seeds": 160,
+  "scenarios": [
+    {
+      "name": "balanced v balanced",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      }
+    },
+    {
+      "name": "all-out home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      }
+    },
+    {
+      "name": "expansive home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      }
+    }
+  ]
+}
