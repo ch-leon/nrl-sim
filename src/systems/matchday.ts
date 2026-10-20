@@ -223,7 +223,7 @@ export function registerPlayerMatchSystem(): void {
     // what the player watched (and called).
     if (!ctx.fastForward && ctx.hold) {
       ctx.hold();
-      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], tick: resumed?.tick ?? 0 };
+      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0 };
       writeLiveMatch(record);
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
         if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
@@ -242,8 +242,10 @@ export function registerPlayerMatchSystem(): void {
           injuryRate: matchOpts.injuryRate,
           ...(matchOpts.goldenPoint ? { goldenPoint: true } : {}),
           calls: record.calls,
+          plans: record.plans ?? [],
           ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
-          onProgress: (calls, tick) => writeLiveMatch({ ...record, calls: [...calls], tick }),
+          onProgress: (calls, tick, plans) => writeLiveMatch({ ...record, calls: [...calls], plans: [...plans], tick }),
+          planSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const),
           ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
           ...(matchOpts.aiCoach.length ? { aiCoach: matchOpts.aiCoach } : {}),
         },

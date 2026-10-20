@@ -82,7 +82,10 @@ somewhere else.
 - **Scenario extras**: `legs` (`fresh`, `late`, `spent` or 0..1), its own `minutes`
   (a stretch instead of a whole match, e.g. the last 8 minutes on tired legs) and
   `weather` (`clear`, `rain` or `wind`; clear unless given) and `calls`, coach calls each side
-  makes whenever it may (`{ "home": [{ "call": "shift-left", "tackle": 2 }] }`, #73).
+  makes whenever it may (`{ "home": [{ "call": "shift-left", "tackle": 2 }] }`, #73), and
+  `plans`, changes of plan at the breaks, each made once at the first break it names
+  (`[{ "side": "home", "at": "half-time", "tactics": { "attack": "expansive" } }]`; `at` is
+  `half-time`, `try` (the first try) or `conceded` (the first try against that side), N11).
 - **base**: overrides under every variant, baseline included.
 - **variants**: hand-written sets of overrides. A `baseline` with no overrides is
   always run first so every row has something to compare with.

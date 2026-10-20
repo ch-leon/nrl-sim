@@ -10,7 +10,7 @@ import { createNewGame, getState } from '../../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../../src/systems/fixtures';
 import { MatchRecorder, runMatch, type RunMatchOptions } from '../../../src/match/league/match';
 import { Runner } from '../../../src/match/core/engine';
-import { LiveSim } from '../../../src/match/league/live';
+import { LiveSim, type PlanInput } from '../../../src/match/league/live';
 import type { CallInput } from '../../../src/match/league/calls';
 import { teamSheetFromRival } from '../../../src/match/league/sheets';
 import type { TeamSheet } from '../../../src/sim/events';
@@ -56,4 +56,36 @@ describe('Skip from the record (N10.4)', () => {
       }
     }
   }, 300_000);
+
+  it('a change of plan at half-time goes with the record (N11): skipped after it, the same match as playing on', () => {
+    createNewGame('Skip', 8);
+    initLeague(getState());
+    const clubs = getState().league.clubs.filter((c) => c.id !== PLAYER_ID);
+    for (let i = 1; i <= 6; i++) {
+      const home = teamSheetFromRival(clubs[i % clubs.length]!);
+      const away = teamSheetFromRival(clubs[(i + 3) % clubs.length]!);
+      const seed = i * 7_919;
+      const plans: PlanInput[] = [];
+      const rec = new MatchRecorder({ home: home.clubId, away: away.clubId });
+      const r = new Runner((s) => new LiveSim(home, away, s, { weather: 'clear', plans }), seed);
+      r.onEvents = (events) => rec.add(events, r.cur);
+      r.onStep = () => rec.clock((r.current as LiveSim).matchSeconds);
+      let skipAt = Infinity;
+      while (!r.finished && r.tick < skipAt) {
+        if (plans.length === 0 && (r.current as LiveSim).phaseKind === 'half-time') {
+          plans.push({ tick: r.tick + 1, side: 'home', tactics: { attack: 'expansive', defence: 'rush' } });
+          skipAt = r.tick + 2_000; // skipped a little into the second half
+        }
+        r.step();
+      }
+      expect(plans, `seed ${seed}`).toHaveLength(1);
+      const record: RunMatchOptions = { seed, weather: 'clear', calls: [], plans: structuredClone(plans) };
+      while (!r.finished) r.step();
+      const onward = rec.result(r.current as LiveSim);
+      const elsewhere = structuredClone(runMatch(structuredClone(home), structuredClone(away), record));
+      expect(JSON.stringify(elsewhere), `seed ${seed}`).toBe(JSON.stringify(onward));
+      // Without the plan the record is a different match: the plan has to travel with it.
+      expect(JSON.stringify(runMatch(home, away, { seed, weather: 'clear', calls: [] }))).not.toBe(JSON.stringify(onward));
+    }
+  }, 120_000);
 });
