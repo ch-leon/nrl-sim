@@ -76,3 +76,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261020-011748-standard | standard | 159f7be | main | [report](runs/20261020-011748-standard/report.md) |
 | 20261020-012704-standard | standard | 159f7be (uncommitted changes) | fix/rival-round-landing | [report](runs/20261020-012704-standard/report.md) |
 | 20261020-013006-kick-chase-on-the-standard | kick chase on the standard | 68ac317 | feat/sprint-follow-ups | [report](runs/20261020-013006-kick-chase-on-the-standard/report.md) |
+| 20261020-014053-standard | standard | 54ac3c0 | main | [report](runs/20261020-014053-standard/report.md) |
