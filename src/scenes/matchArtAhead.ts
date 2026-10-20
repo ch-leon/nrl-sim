@@ -166,7 +166,12 @@ export interface ArtAheadHost {
   busy: () => boolean;
   /** When to run the next upload (an idle slice; tests run it at once). */
   schedule?: (fn: (slice?: IdleSlice) => void) => void;
+  /** How long after a match nothing goes up, so Back to Club isn't slowed (ms; default UPLOAD_SETTLE_MS). */
+  settleMs?: number;
 }
+
+/** After a match, uploads wait this long: the club screens are starting up (ms). */
+const UPLOAD_SETTLE_MS = 1500;
 
 /** A piece's pixels once its texture is up (the 13 MB of the background no longer held twice). */
 const UPLOADED = new PixelBuffer(1, 1);
@@ -174,12 +179,23 @@ let uploadSerial = 0;
 
 /**
  * Paint the next fixture's art whenever it may have changed: after a week, and on any
- * state change (a new game, a load, a kit designed). Never during a multi-week run:
- * the worker would paint fixtures nobody watches; it looks again when the run ends.
- * Once painted, its textures go up one per idle slice, never under a live match.
+ * state change (a new game, a load, a kit designed). Never during a multi-week run
+ * (the worker would paint fixtures nobody watches) nor under a match (the art on
+ * screen is that fixture's, and Skip needs the cores): it looks again after.
+ * Once painted, its textures go up one per idle slice, never under a live match nor
+ * in the moments after one.
  */
 export function initMatchArtAhead(host: ArtAheadHost): () => void {
   const schedule = host.schedule ?? whenIdleSoon;
+  const settleMs = host.settleMs ?? UPLOAD_SETTLE_MS;
+  let busyUntil = 0;
+  const busy = (): boolean => {
+    if (host.busy()) {
+      busyUntil = performance.now() + settleMs;
+      return true;
+    }
+    return performance.now() < busyUntil;
+  };
   uploadAhead = (art) => {
     const serial = ++uploadSerial;
     const todo = fixtureArtPieces(art).filter((p) => !p.texKey);
@@ -187,7 +203,7 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
     const step = (): void => {
       if (ready !== art) return; // taken by its match, or another fixture painted since
       const textures = host.textures();
-      if (!textures || host.busy()) {
+      if (!textures || busy()) {
         schedule(step);
         return;
       }
@@ -207,7 +223,9 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
   };
   let queued = false;
   const look = (): void => {
-    if (advanceInProgress()) {
+    // Not during a multi-week run, nor under a match: there the fixture is the one on
+    // screen (its art already taken) and the worker would compete with Skip's.
+    if (advanceInProgress() || host.busy()) {
       setTimeout(look, 1000);
       return;
     }

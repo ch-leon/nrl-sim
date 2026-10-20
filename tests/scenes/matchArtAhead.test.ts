@@ -123,7 +123,7 @@ describe('the next fixture painted ahead (N10.5)', () => {
     const slices: (() => void)[] = [];
     let matchOn = true;
     stubWorker('paint');
-    const off = initMatchArtAhead({ textures: () => textures, busy: () => matchOn, schedule: (fn) => slices.push(() => fn()) });
+    const off = initMatchArtAhead({ textures: () => textures, busy: () => matchOn, schedule: (fn) => slices.push(() => fn()), settleMs: 0 });
     const art = await fixtureArtFor(offsetX, kitsA);
     const pieces = fixtureArtPieces(art);
     slices.shift()!(); // a match is on: nothing goes up
@@ -139,6 +139,31 @@ describe('the next fixture painted ahead (N10.5)', () => {
     const b = takeFixtureArt(fixtureArtKey(offsetX, kitsB))!;
     while (slices.length) slices.shift()!(); // taken: its match uploads the rest itself
     expect(fixtureArtPieces(b).some((p) => p.texKey)).toBe(false);
+    off();
+  }, 30_000);
+
+  it('after a match, nothing goes up until the club screens have settled', async () => {
+    const live = new Set<string>();
+    const textures = {
+      exists: (k: string) => live.has(k),
+      remove: (k: string) => live.delete(k),
+      createCanvas: (k: string, w: number, h: number) => {
+        live.add(k);
+        return { getContext: () => ({ createImageData: () => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: () => {} }) as unknown as CanvasRenderingContext2D, refresh: () => {} };
+      },
+    };
+    const slices: (() => void)[] = [];
+    let matchOn = true;
+    stubWorker('paint');
+    const off = initMatchArtAhead({ textures: () => textures, busy: () => matchOn, schedule: (fn) => slices.push(() => fn()), settleMs: 200 });
+    await fixtureArtFor(offsetX, kitsA);
+    slices.shift()!(); // under the match
+    matchOn = false; // Back to Club
+    slices.shift()!();
+    expect(live.size).toBe(0); // still settling
+    await new Promise((r) => setTimeout(r, 250));
+    while (slices.length && live.size === 0) slices.shift()!(); // settled: the next slice uploads
+    expect(live.size).toBe(1);
     off();
   }, 30_000);
 });
