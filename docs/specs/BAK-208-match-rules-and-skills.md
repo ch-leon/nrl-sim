@@ -229,9 +229,13 @@ wingers). **Overlap** (all presets): when a side has more players than the defen
 | **Compressed** | 4.5 m/s | — | pull ×1.4 toward the ball (edges open) | ×1.2 | bust −4%, offload −3% | −2% |
 
 ### 5.3 Who plays what
-Rivals get a fixed style from club identity: contenders (65+) Expansive / All-out /
-Balanced, mid-table Balanced / Kick-chase / Expansive, strugglers Grind / Kick-chase /
-Balanced, with the defence from a second roll. The player's club plays Balanced / Slide
+Rivals' styles follow from the nine they field (N11, tuning reference §28): a half with Big
+Boot or Playmaker kicks and chases, quick backs go Expansive, a heavy pack grinds, a
+contender with none of those goes All-out, the rest are Balanced; a strong pack rushes, a fit
+line compresses, the rest slide. Re-read each week from the side on the day. A rival with too
+few fit men for a nine (a strength-built sheet) keeps the old fixed style from club identity:
+contenders (65+) Expansive / All-out / Balanced, mid-table Balanced / Kick-chase / Expansive,
+strugglers Grind / Kick-chase / Balanced, with the defence from a second roll. The player's club plays Balanced / Slide
 until the coach picks otherwise: since N11 the Lineup screen has a chip per attack and
 defence preset, saved in the lineup (save v14) and carried on the team sheet. Mid-match coach calls
 (#73) will override the preset for a set. Lab: **H / A** pickers per side for attack and

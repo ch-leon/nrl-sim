@@ -840,3 +840,36 @@ error about 4 points): **Compressed wins about 61%** of even matches against Sli
 is a dominant pick and Expansive and All-out are traps: raised as #241 (the plan tables are
 not N11's to change).
 
+## 28. Rival styles from their squads (N11)
+
+A rival's attack and defence presets follow from the nine it would field that week (its
+coach's auto-pick of its fit players), each unit against the side's own average so it reads
+the same at any strength (`rivalTactics`, `src/match/league/presets.ts`). In order: a half
+(five-eighth or halfback) with **Big Boot** or **Playmaker** → Kick-chase; backs quicker than
+the side → Expansive; a pack stronger than the side → Grind; a contender with none of those →
+All-out; else Balanced. Defence: a strong pack → Rush; a nine whose stamina is above its other
+stats → Compressed; else Slide. Derived, not stored: re-read each week, so an injury or a
+signing can change it. The next-match card ("They play Balanced · Rush"), the rival's squad
+page and the ladder's form column (`BAL·RSH`) show it. A strength-built sheet (fewer than nine
+fit) keeps the old style from club identity. These are game-side mapping numbers, not match
+knobs: the harness sets each scenario's tactics directly, so they are not overridable by name.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `RIVAL_STYLE.backsPace` | `src/match/league/presets.ts` | 0.5 | Backs' mean Speed above the nine's → Expansive. |
+| `RIVAL_STYLE.packStrength` | `presets.ts` | 2.5 | Forwards' mean Strength above the nine's → Grind. |
+| `RIVAL_STYLE.allOutFrom` | `presets.ts` | 65 | Club strength from which a side with no other mark goes All-out. |
+| `RIVAL_STYLE.rushPack` | `presets.ts` | 2 | Forwards' Strength above the nine's → Rush. |
+| `RIVAL_STYLE.compressedStamina` | `presets.ts` | 1 | The nine's Stamina above the mean of its other four stats → Compressed. |
+
+The mix over eight generated leagues (120 rivals, before the Grind threshold came down from
+3 to 2.5): attack Balanced 61, Kick-chase 28, Expansive 16, All-out 9, Grind 6; defence Slide
+67, Rush 30, Compressed 23. Until N11 a squad-built rival played Balanced / Slide, so
+every match against one changes. Soak at this change (20 seeds, `--jobs 4`): no problems; idle
+Normal season 1 14.6-0.6-8.9, 5.1th, top eight 80% (13.7-1.0-9.4, 5.5th, 80% on `main` at
+e713900, within seed luck). Whether any style wins more than luck over a season is not
+measured here: rival-v-rival rounds play on the cheap sim unless *Rival matches on the match
+engine* is on, and the soak fast-forwards, so tactics only touch the player's own matches.
+Head to head at equal strength, §27 and #241 are the reference (Compressed strong; Expansive
+and All-out weak).
+
