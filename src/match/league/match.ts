@@ -8,6 +8,7 @@ import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import type { CallInput } from './calls';
 import { toMatchEvent } from './events';
 import { LiveSim, type PlanInput } from './live';
+import type { DifficultyEdge } from './spread';
 import type { MatchLength } from './rules';
 
 export interface RunMatchOptions {
@@ -26,6 +27,8 @@ export interface RunMatchOptions {
   goldenPoint?: boolean;
   /** Plan changes at the breaks by tick (N11). */
   plans?: PlanInput[];
+  /** The difficulty's edge to the player's rival, after the spread (N12.2); absent on Normal. */
+  difficultyEdge?: DifficultyEdge;
 }
 
 /** No real match comes near this many ticks (about 80 minutes of sim time); it only guards against a sim that never finishes. */
@@ -95,6 +98,7 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}),
     ...(opts.goldenPoint ? { goldenPoint: true } : {}),
     ...(opts.plans?.length ? { plans: opts.plans } : {}),
+    ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}),
   });
   const rec = new MatchRecorder({ home: home.clubId, away: away.clubId });
   while (!sim.finished) {

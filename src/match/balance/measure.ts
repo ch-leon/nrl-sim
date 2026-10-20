@@ -10,9 +10,9 @@ import { LEAGUE, ON_FIELD } from '../../config';
 import { createNewGame, type Player } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { autoPick, resolveLineup } from '../../systems/lineup';
-import { scaleSheet } from '../../systems/matchday';
 import { generateRivalSquad, hashString } from '../../systems/rivals';
 import { teamSheetFromSquad } from '../league/sheets';
+import { rivalEdge, type DifficultyEdge } from '../league/spread';
 import { TICK_S } from '../core/engine';
 import type { SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
@@ -133,8 +133,7 @@ const squadSeed = (kind: string, n: number, seed: number): number => (hashString
 /**
  * Both sides of a scenario for one match seed. Flat and club sides are the same
  * every seed; squad-built ones are new each seed, a levelled rival (no `rating`)
- * built after the other side, at its best nine. A side that is the rival of a
- * player on a difficulty (`rivalOf`) gets that difficulty as matchday.ts gives it.
+ * built after the other side, at its best nine.
  */
 export function scenarioSides(home: SideSpec, away: SideSpec, seed: number): { home: TeamSheet; away: TeamSheet; nine: { home?: number; away?: number } } {
   const levelled = (s: SideSpec): boolean => s.squad === 'rival' && s.rating === undefined;
@@ -150,12 +149,17 @@ export function scenarioSides(home: SideSpec, away: SideSpec, seed: number): { h
     h = build('H', home, 0);
     a = build('A', away, awayN, h.nine);
   }
-  const rival = (sheet: TeamSheet, spec: SideSpec): TeamSheet => (spec.rivalOf ? scaleSheet(sheet, spec.rivalOf) : sheet);
   return {
-    home: rival(h.sheet, home),
-    away: rival(a.sheet, away),
+    home: h.sheet,
+    away: a.sheet,
     nine: { ...(h.nine !== undefined ? { home: h.nine } : {}), ...(a.nine !== undefined ? { away: a.nine } : {}) },
   };
+}
+
+/** A side that is the rival of a player on a difficulty (`rivalOf`) plays with that difficulty's edge, as matchday.ts gives it (N12.2); read after the variant's knobs are on. */
+export function scenarioEdge(home: SideSpec, away: SideSpec): DifficultyEdge | undefined {
+  if (home.rivalOf) return rivalEdge('home', home.rivalOf);
+  return away.rivalOf ? rivalEdge('away', away.rivalOf) : undefined;
 }
 
 /** A try this soon after his side's kick came from it (12 s). */
@@ -380,6 +384,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const squads = cell.scenario.home.squad !== undefined || cell.scenario.away.squad !== undefined;
     const fixed = squads ? null : scenarioSides(cell.scenario.home, cell.scenario.away, seedStart);
     const nineSum = { home: 0, away: 0 };
+    const edge = scenarioEdge(cell.scenario.home, cell.scenario.away);
     const perSeed: Record<CountKey, number>[] = [];
     let wrestleTicks = 0;
     let wrestleCount = 0;
@@ -400,7 +405,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const planRules = cell.scenario.plans ?? [];
       const planList: PlanInput[] = [];
       const planDone = planRules.map(() => false);
-      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}) });
+      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(edge ? { difficultyEdge: edge } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();

@@ -58,7 +58,7 @@ import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
 import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, offsideChance, type CaptainRead } from './penalties';
-import { spreadSheets } from './spread';
+import { edgeSheets, spreadSheets, type DifficultyEdge } from './spread';
 import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsDefence, callIsPlay, paidOffText, withAttackCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
@@ -346,6 +346,8 @@ export interface LiveOptions {
   goldenPoint?: boolean;
   /** Plan changes by tick (N11): read like the calls, each taking effect at the next restart. */
   plans?: PlanInput[];
+  /** The difficulty (N12.2): rating points the player's rival plays with on every stat, after the spread (spread.ts). Absent on Normal. */
+  difficultyEdge?: DifficultyEdge;
 }
 
 /** A change of plan at a break (N11): the side's presets from the next restart. A match is { seed, sheets, calls[], plans[] }. */
@@ -487,8 +489,9 @@ export class LiveSim implements MatchSim {
   private golden = false;
 
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
-    // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average.
-    [home, away] = spreadSheets(home, away);
+    // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average;
+    // then the difficulty's edge to the player's rival (N12.2), which the spread would mostly cancel.
+    [home, away] = edgeSheets(...spreadSheets(home, away), opts.difficultyEdge);
     this.rng = makeRng(seed);
     this.firstReceiver = this.rng.next() < 0.5 ? 'home' : 'away';
     this.callList = opts.calls ?? [];

@@ -7,13 +7,13 @@ import { bus } from '../core/events';
 import { getState, setState, type Fixture, type RivalClub } from '../core/state';
 import { registerTickHook, resumeWeek, TICK_ORDER } from '../core/time';
 import { clearLiveMatch, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
-import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, type Difficulty, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
-import { rivalTactics } from '../match/league/presets';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
+import { rivalEdge } from '../match/league/spread';
 import { canUseWorker, playMatchesInWorker } from './matchJobs';
 import { aiCoachSides, unlockedCalls } from '../match/league/calls';
 import { applyMatchStats } from './stats';
@@ -48,13 +48,6 @@ function applyMatchInjuries(injuries: readonly MatchInjury[]): string[] {
   return toasts;
 }
 
-/** Difficulty scales the strength of the rivals the player faces (clamped to the league bounds). */
-export function scaleRivalStrength(rival: RivalClub, difficulty: Difficulty | undefined): RivalClub {
-  const mult = difficultyMultipliers(difficulty).rivalStrength;
-  if (mult === 1) return rival;
-  return { ...rival, strength: Math.round(Math.min(100, Math.max(1, rival.strength * mult))) };
-}
-
 function sheetFor(clubId: string): TeamSheet {
   const state = getState();
   if (clubId === PLAYER_ID) {
@@ -75,35 +68,25 @@ function sheetFor(clubId: string): TeamSheet {
   }
   const rival = state.league.clubs.find((c) => c.id === clubId);
   if (!rival) throw new Error(`unknown club ${clubId}`);
-  return rivalMatchSheet(rival, state.settings.difficulty);
+  return rivalMatchSheet(rival);
 }
 
 /**
  * The sheet a rival plays the player's club with. Rivals with a squad (#74) field
  * their own players through the same sheet builder as the player's club: their coach
  * auto-picks his nine by slot with the same positional fit (#69), so both sides pay
- * for a man out of position. Difficulty scales the aggregates. Too few fit players
- * (or an old rival with none) falls back to the strength-based sheet. Either way the
- * style is the one the screens show (`rivalStyle`, N11): read from the nine, or from
- * the club's own strength, never the difficulty-scaled one.
+ * for a man out of position. Too few fit players (or an old rival with none) falls
+ * back to the strength-based sheet. Either way the style is the one the screens show
+ * (`rivalStyle`, N11): read from the nine, or from the club's own strength. The sheet
+ * is the rival as he is on every difficulty: the difficulty plays in the match, as
+ * his edge after the rating spread (N12.2, `rivalEdge`).
  */
-export function rivalMatchSheet(rival: RivalClub, difficulty: Difficulty | undefined): TeamSheet {
+export function rivalMatchSheet(rival: RivalClub): TeamSheet {
   const fit = (rival.squad ?? []).filter((p) => p.injuredWeeks <= 0);
   if (fit.length >= ON_FIELD) {
-    return scaleSheet(withRivalStyle(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), rival), difficulty);
+    return withRivalStyle(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), rival);
   }
-  return { ...teamSheetFromRival(scaleRivalStrength(rival, difficulty)), tactics: rivalTactics(rival) };
-}
-
-/** Scale a squad-built rival sheet's aggregates by the difficulty's rival multiplier. */
-export function scaleSheet(sheet: TeamSheet, difficulty: Difficulty | undefined): TeamSheet {
-  const mult = difficultyMultipliers(difficulty).rivalStrength;
-  if (mult === 1) return sheet;
-  const scale = (n: number): number => Math.round(Math.min(100, Math.max(1, n * mult)));
-  return {
-    ...sheet,
-    attack: scale(sheet.attack), defense: scale(sheet.defense), kicking: scale(sheet.kicking), fitness: scale(sheet.fitness),
-  };
+  return teamSheetFromRival(rival);
 }
 
 /** Fit (non-injured) squad size. */
@@ -214,9 +197,12 @@ export function registerPlayerMatchSystem(): void {
 
     const home = sheetFor(fixture.homeId);
     const away = sheetFor(fixture.awayId);
+    // The difficulty's edge to the rival, after the rating spread (N12.2); none on Normal.
+    const edge = rivalEdge(fixture.homeId === PLAYER_ID ? 'away' : 'home', state.settings.difficulty);
     const matchOpts = {
       seed,
       injuryRate: difficultyMultipliers(state.settings.difficulty).injuryRate,
+      ...(edge ? { difficultyEdge: edge } : {}),
       ...(state.weather ? { weather: state.weather } : {}),
       // The rival's coach makes his own calls when the game gives rivals one (N9.6); the player makes his.
       aiCoach: aiCoachSides([fixture.homeId === PLAYER_ID ? 'away' : 'home']),
@@ -249,6 +235,7 @@ export function registerPlayerMatchSystem(): void {
           seed,
           weather: state.weather ?? 'clear',
           injuryRate: matchOpts.injuryRate,
+          ...(matchOpts.difficultyEdge ? { difficultyEdge: matchOpts.difficultyEdge } : {}),
           ...(matchOpts.goldenPoint ? { goldenPoint: true } : {}),
           calls: record.calls,
           plans: record.plans ?? [],

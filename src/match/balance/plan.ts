@@ -35,7 +35,7 @@ export interface SideSpec {
   squad?: 'player' | 'rival';
   /** A `player` squad's difficulty (its start rating); normal unless given. */
   difficulty?: Difficulty;
-  /** This side is the rival of a player on this difficulty: it gets the difficulty the way matchday.ts gives it to the player's rival. */
+  /** This side is the rival of a player on this difficulty: it plays with the difficulty's edge after the spread (`difficulty.<d>.rivalEdge`), as matchday.ts gives it (N12.2). */
   rivalOf?: Difficulty;
 }
 
@@ -127,6 +127,7 @@ export function checkPlan(p: Plan): string[] {
       if (r.tactics?.attack && !isAttackPreset(r.tactics.attack)) errs.push(`${s.name}: unknown attack preset "${r.tactics.attack}" in a plan change`);
       if (r.tactics?.defence && !isDefencePreset(r.tactics.defence)) errs.push(`${s.name}: unknown defence preset "${r.tactics.defence}" in a plan change`);
     }
+    if (s.home?.rivalOf && s.away?.rivalOf) errs.push(`${s.name}: only one side is the rival (rivalOf)`);
     if (s.legs !== undefined && !(typeof s.legs === 'number' ? s.legs >= 0 && s.legs <= 1 : isLegs(s.legs))) errs.push(`${s.name}: legs must be fresh / late / spent or 0..1`);
     for (const [side, spec] of [['home', s.home], ['away', s.away]] as const) {
       if (!spec) {

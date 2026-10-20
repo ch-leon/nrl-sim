@@ -22,6 +22,7 @@ import { LiveSim } from '../league/live';
 import { MatchRecorder, type RunMatchOptions } from '../league/match';
 import type { CallInput, CoachCall } from '../league/calls';
 import type { PlanInput } from '../league/live';
+import type { DifficultyEdge } from '../league/spread';
 import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
 import { LiveView, type ViewSurface } from './liveView';
@@ -83,6 +84,8 @@ export interface LivePlaybackOptions {
   seed: number;
   weather: WeatherKind;
   injuryRate?: number;
+  /** The difficulty's edge to the rival, after the rating spread (N12.2); absent on Normal. */
+  difficultyEdge?: DifficultyEdge;
   calls: CallInput[];
   /** Plan changes at the breaks so far (N11); a resumed match brings its own. */
   plans?: PlanInput[];
@@ -128,8 +131,8 @@ export class LivePlayback {
     const { home, away } = opts;
     this.plans = opts.plans ?? [];
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
-    // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate and calls.
-    const simOpts = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
+    const simOpts = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.runner = new Runner((seed) => new LiveSim(home, away, seed, simOpts), opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => this.recorder.clock(this.sim.matchSeconds);
@@ -275,7 +278,7 @@ export class LivePlayback {
       });
   }
 
-  /** The match's record as runMatch options: the same sheets, seed, weather, injury rate, calls and plan changes (N11). */
+  /** The match's record as runMatch options: the same sheets, seed, weather, injury rate, difficulty, calls and plan changes (N11). */
   private runOptions(): RunMatchOptions {
     const o = this.opts;
     return {
@@ -284,6 +287,7 @@ export class LivePlayback {
       calls: [...o.calls],
       ...(this.plans.length ? { plans: this.plans.map((p) => ({ ...p, tactics: { ...p.tactics } })) } : {}),
       ...(o.injuryRate !== undefined ? { injuryRate: o.injuryRate } : {}),
+      ...(o.difficultyEdge ? { difficultyEdge: o.difficultyEdge } : {}),
       ...(o.aiCoach?.length ? { aiCoach: o.aiCoach } : {}),
       ...(o.goldenPoint ? { goldenPoint: true } : {}),
     };

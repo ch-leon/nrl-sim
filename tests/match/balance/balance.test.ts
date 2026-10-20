@@ -10,7 +10,8 @@ import { PRESET_TABLES, attackPlan, defencePlan } from '../../../src/match/leagu
 import { WRESTLE } from '../../../src/match/league/wrestle';
 import { applyTuning, checkTuning, listKnobs } from '../../../src/match/league/tuning';
 import { cellsOf, checkPlan, expandVariants, type Plan } from '../../../src/match/balance/plan';
-import { measureCell, scenarioSides, sideSheet } from '../../../src/match/balance/measure';
+import { measureCell, scenarioEdge, scenarioSides, sideSheet } from '../../../src/match/balance/measure';
+import { DIFFICULTY } from '../../../src/config';
 import { bandMark, delta, reportMarkdown } from '../../../src/match/balance/report';
 
 const EVEN = { name: 'even', home: { rating: 60 }, away: { rating: 60 } };
@@ -119,6 +120,21 @@ describe('plans', () => {
     expect(bare.away.tactics).toEqual({ attack: 'balanced', defence: 'rush' });
     expect(bare.nine.away).toBeGreaterThan(66);
     expect(checkPlan(plan({ scenarios: [{ name: 's', home: { squad: 'coach' as never, club: 'rival-wolves' }, away: { rating: 60, rivalOf: 'nightmare' as never } }] })).join('\n')).toMatch(/player \/ rival[\s\S]*not both[\s\S]*rivalOf/);
+    expect(checkPlan(plan({ scenarios: [{ name: 's', home: { rivalOf: 'hard' }, away: { rivalOf: 'easy' } }] })).join('\n')).toMatch(/only one side is the rival/);
+  });
+  it('plays a rival with the difficulty’s edge (N12.2), swept by name as difficulty.<d>.rivalEdge', () => {
+    expect(listKnobs().map((k) => k.path)).toEqual(expect.arrayContaining(['difficulty.easy.rivalEdge', 'difficulty.normal.rivalEdge', 'difficulty.hard.rivalEdge']));
+    expect(listKnobs().some((k) => k.path.startsWith('difficulty.') && !k.path.endsWith('.rivalEdge'))).toBe(false); // money and wages are not match knobs
+    const was = DIFFICULTY.hard.rivalEdge;
+    const restore = applyTuning({ 'difficulty.hard.rivalEdge': 7 });
+    expect(DIFFICULTY.hard.rivalEdge).toBe(7);
+    expect(scenarioEdge({ rating: 60 }, { rating: 60, rivalOf: 'hard' })).toEqual({ side: 'away', points: 7 });
+    restore();
+    expect(DIFFICULTY.hard.rivalEdge).toBe(was);
+    const p = plan({ scenarios: [{ name: 'hard', home: { rating: 60 }, away: { rating: 60, rivalOf: 'hard' } }], variants: [{ name: 'big', tuning: { 'difficulty.hard.rivalEdge': 10 } }, { name: 'none', tuning: { 'difficulty.hard.rivalEdge': 0 } }] });
+    const [, big, none] = cellsOf(p).map((c) => measureCell(c, 2, 2));
+    expect(big!.counts).not.toEqual(none!.counts);
+    expect(DIFFICULTY.hard.rivalEdge).toBe(was);
   });
 });
 

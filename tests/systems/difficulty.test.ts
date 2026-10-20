@@ -8,13 +8,12 @@ import { createNewGame, getState, setState } from '../../src/core/state';
 import { bestNineMean } from '../../src/qa/soak';
 import { weeklyWages } from '../../src/systems/economy';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
-import { scaleRivalStrength } from '../../src/systems/matchday';
+import { rivalEdge } from '../../src/match/league/spread';
 import { injuryChance } from '../../src/match/league/weather';
-import type { RivalClub } from '../../src/core/state';
 
 describe('difficulty multipliers', () => {
   it('normal is the identity', () => {
-    expect(DIFFICULTY.normal).toEqual({ startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0, overhead: 1 });
+    expect(DIFFICULTY.normal).toEqual({ startingMoney: 1, wages: 1, injuryRate: 1, rivalEdge: 0, startRating: 0, overhead: 1 });
   });
 
   it('startRating moves the starting squad: Easy starts stronger than Normal, Hard weaker (#140)', () => {
@@ -48,15 +47,12 @@ describe('difficulty multipliers', () => {
     expect(weeklyWages(getState())).toBe(Math.round(base * DIFFICULTY[d].wages));
   });
 
-  it.each(DIFFICULTIES)('%s scales rival strength', (d) => {
-    const rival: RivalClub = { id: 'r', name: 'R', colors: ['#fff', '#000'], strength: 60 };
-    expect(scaleRivalStrength(rival, d).strength).toBe(Math.round(60 * DIFFICULTY[d].rivalStrength));
-    expect(rival.strength).toBe(60);
-  });
-
-  it('rival strength is clamped to 1..100', () => {
-    const r: RivalClub = { id: 'r', name: 'R', colors: ['#fff', '#000'], strength: 99 };
-    expect(scaleRivalStrength(r, 'hard').strength).toBeLessThanOrEqual(100);
+  it('Hard’s rival plays with an edge after the spread, Easy’s gives one away, Normal’s has none (N12.2)', () => {
+    expect(DIFFICULTY.hard.rivalEdge).toBeGreaterThan(0);
+    expect(DIFFICULTY.easy.rivalEdge).toBeLessThan(0);
+    expect(rivalEdge('away', 'hard')).toEqual({ side: 'away', points: DIFFICULTY.hard.rivalEdge });
+    expect(rivalEdge('home', 'easy')).toEqual({ side: 'home', points: DIFFICULTY.easy.rivalEdge });
+    expect(rivalEdge('away', 'normal')).toBeUndefined();
   });
 
   it('injury chance scales with the injury rate', () => {
