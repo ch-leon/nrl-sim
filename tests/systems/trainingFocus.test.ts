@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { createNewGame, getState } from '../../src/core/state';
 import { migrateState } from '../../src/core/save';
 import { TRAINING_FOCUS } from '../../src/config';
-import { applyTraining, focusMult, setTrainingFocus, trainPlayer, weakestStat, weeklyGain } from '../../src/systems/training';
+import { VETERAN_DECLINE, applyTraining, focusMult, setTrainingFocus, trainPlayer, weakestStat, weeklyChange, weeklyGain } from '../../src/systems/training';
 import type { PlacedFacility, Player } from '../../src/core/state';
 
 const PADDOCK_GYM: PlacedFacility[] = [
@@ -45,6 +45,19 @@ describe('the squad training focus (N11)', () => {
     const g = weeklyGain(p, PADDOCK_GYM, 'skill');
     const after = trainPlayer(p, PADDOCK_GYM, 'skill');
     for (const k of ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const) expect(after[k] - p.stats[k]).toBeCloseTo(g[k], 9);
+  });
+
+  it('the player page’s weekly change is what the week does: a veteran’s decline and an injury included', () => {
+    const vet = { ...young(), age: 34 };
+    const ch = weeklyChange(vet, PADDOCK_GYM, 'speed');
+    const gain = weeklyGain(vet, PADDOCK_GYM, 'speed');
+    expect(ch.speed).toBeCloseTo(gain.speed - VETERAN_DECLINE, 9);
+    expect(ch.stamina).toBeCloseTo(gain.stamina - VETERAN_DECLINE, 9);
+    expect(ch.skill).toBeCloseTo(gain.skill, 9);
+    const hurt = { ...young(), injuredWeeks: 2 };
+    const after = trainPlayer(hurt, PADDOCK_GYM, 'speed');
+    expect(weeklyChange(hurt, PADDOCK_GYM, 'speed').speed).toBeCloseTo(after.speed - hurt.stats.speed, 9);
+    expect(weeklyChange(hurt, PADDOCK_GYM, 'speed').speed).toBeLessThan(weeklyChange(young(), PADDOCK_GYM, 'speed').speed);
   });
 
   it('the week trains the squad under the state’s focus', () => {

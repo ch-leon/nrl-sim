@@ -103,11 +103,6 @@ export function headroom(stat: number): number {
   return Math.max(0, 1 - stat / STAT_MAX) ** TRAINING_CURVE.HEADROOM_EXP;
 }
 
-/**
- * Compute one week of training for a single player against the given facilities.
- * Pure — returns a new PlayerStats; does not mutate. Exported for unit testing
- * of the exact per-player maths.
- */
 // ── The squad's training focus (N11) ─────────────────────────────────────────
 // What the coach sets on the Squad screen, its labels, and the managed manager's
 // pick (the squad's weakest stat). The multipliers are config.ts TRAINING_FOCUS.
@@ -146,6 +141,11 @@ export function focusMult(focus: TrainingFocus, stat: keyof PlayerStats): number
   return stat === focus ? TRAINING_FOCUS.ON : TRAINING_FOCUS.OFF;
 }
 
+/**
+ * Compute one week of training for a single player against the given facilities.
+ * Pure — returns a new PlayerStats; does not mutate. Exported for unit testing
+ * of the exact per-player maths.
+ */
 export function trainPlayer(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
   const gain = weeklyGain(player, facilities, focus);
   const next: PlayerStats = { ...player.stats };
@@ -191,6 +191,17 @@ export function weeklyGain(player: Player, facilities: PlacedFacility[], focus: 
 
   const out: PlayerStats = { speed: 0, strength: 0, stamina: 0, skill: 0, footyIQ: 0 };
   for (const stat of STAT_KEYS) out[stat] = gains[stat] * scale * focusMult(focus, stat) * headroom(player.stats[stat]);
+  return out;
+}
+
+/**
+ * What a week's training does to each stat (N11, the player page's "+0.8/wk"):
+ * the gain, less the veteran decline, inside the clamp. Pure.
+ */
+export function weeklyChange(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
+  const after = trainPlayer(player, facilities, focus);
+  const out = { ...after };
+  for (const stat of STAT_KEYS) out[stat] = after[stat] - player.stats[stat];
   return out;
 }
 

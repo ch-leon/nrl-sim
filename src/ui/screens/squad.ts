@@ -6,6 +6,7 @@
 import { el, button, openModal, closeModal, openScreen, closeScreen } from '../dom';
 import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
+import { save } from '../../core/save';
 import { overallRating } from '../../data/player';
 import { releasePlayer, RELEASE_PAYOUT_WEEKS } from '../../systems/freeagency';
 import { PLAYER_ID } from '../../systems/fixtures';
@@ -102,7 +103,11 @@ export function openSquadScreen(): void {
 
   // Training focus (N11): what the squad trains hardest; the player page shows each man's weekly gain under it.
   const focusBtns = TRAINING_FOCI.map((f) => {
-    const b = button(focusLabel(f), () => setTrainingFocus(f));
+    // Saved at once, as the Lineup screen does (the game otherwise saves at the week's end).
+    const b = button(focusLabel(f), () => {
+      setTrainingFocus(f);
+      save(getState());
+    });
     b.setAttribute('data-focus', f);
     b.title = f === 'balanced' ? 'Every stat trains as it always has' : `${focusLabel(f)} trains ×${TRAINING_FOCUS.ON}, the rest ×${TRAINING_FOCUS.OFF}`;
     return b;

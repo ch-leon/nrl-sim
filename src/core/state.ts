@@ -89,6 +89,9 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
  *  MIGRATIONS in save.ts (see the pattern comment there). */
 export const SAVE_VERSION = 16;
 
+/** A squad training focus (N11): one stat trained harder, the rest a little less, or Balanced. */
+export type TrainingFocus = keyof PlayerStats | 'balanced';
+
 /**
  * The coach's team selection (GitHub #69, systems/lineup.ts): nine starters by
  * formation slot (LINEUP_SLOTS order; null = nobody picked), the interchange
@@ -96,9 +99,6 @@ export const SAVE_VERSION = 16;
  * (BAK-207 2b). Matchday resolves it against the squad on the day: an injured
  * starter is covered for the match, a man who has left the club is replaced.
  */
-/** A squad training focus (N11): one stat trained harder, the rest a little less, or Balanced. */
-export type TrainingFocus = keyof PlayerStats | 'balanced';
-
 export interface Lineup {
   starters: (string | null)[];
   bench: string[];

@@ -23,7 +23,7 @@ import { PORTRAIT_H, PORTRAIT_W, TRAINING_KIT, portraitDataUrl } from '../../art
 import { button, closeModal, el, openModal, panel } from '../dom';
 import { ensureScreenStyles } from './recruit';
 import { fmtMoney } from './finance';
-import { focusLabel, weeklyGain } from '../../systems/training';
+import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
 
@@ -180,9 +180,9 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
   const seasonsAtClub = p.joinedSeason !== undefined ? state.season - p.joinedSeason + 1 : null;
   // A week's training under the squad's focus (N11): what each stat gains, for your own players.
   const focus = state.training?.focus ?? 'balanced';
-  const week = squad ? weeklyGain(p, state.facilities, focus) : null;
-  // Nothing trains without facilities: no gains to show.
-  const gain = week && Object.values(week).some((g) => g > 0) ? week : null;
+  // Nothing trains without facilities: no gains to show. What shows is the week's change, a veteran's decline included.
+  const trains = squad && Object.values(weeklyGain(p, state.facilities, focus)).some((g) => g > 0);
+  const gain = trains ? weeklyChange(p, state.facilities, focus) : null;
   return {
     id: p.id,
     name: p.name,
@@ -260,7 +260,7 @@ function statBars(stats: PlayerPageModel['stats'], focus: string | null): HTMLEl
     // N11: what a week's training under the squad focus adds.
     if (gain !== undefined) {
       row.style.gridTemplateColumns = '4.6rem 1fr 1.8rem 2.6rem';
-      row.append(el('span', { class: 'nrl-stat-gain', text: `+${gain.toFixed(1)}/wk`, attrs: { title: `A week's training under the ${focus} focus`, 'data-gain': '', style: 'font-size:0.7em;color:#2e7d32;white-space:nowrap' } }));
+      row.append(el('span', { class: 'nrl-stat-gain', text: `${gain < 0 ? '−' : '+'}${Math.abs(gain).toFixed(1)}/wk`, attrs: { title: `A week's training under the ${focus} focus`, 'data-gain': '', style: 'font-size:0.7em;color:#2e7d32;white-space:nowrap' } }));
     }
     return row;
   }));
