@@ -306,8 +306,30 @@ describe('handleBankruptcy', () => {
     bus.on('ui:notify', (n) => { if (n.kind === 'danger') danger = true; });
     setup({ money: -1000, squad: [mkPlayer()] });
     handleBankruptcy(getState());
-    expect(warned).toEqual({ balance: -1000 });
+    expect(warned).toEqual({ balance: -1000, forcedSales: [] });
     expect(danger).toBe(true);
+  });
+
+  it('the warning names the forced sales, after them, and the toasts keep their order (N12.5)', () => {
+    const pricey = mkPlayer({ id: 'pricey', name: 'Big Wage', wage: 20000 });
+    const next = mkPlayer({ id: 'next', name: 'Next Wage', wage: 9000 });
+    const filler = Array.from({ length: SQUAD_MIN }, (_, i) => mkPlayer({ id: `f${i}`, wage: 500 }));
+    setup({ money: ECON.FORCED_SALE_FLOOR - 10_000, squad: [next, pricey, ...filler] });
+    const seen: string[] = [];
+    let squadAtWarning = -1;
+    bus.on('ui:notify', (n) => { seen.push(n.text); });
+    bus.on('bankruptcy:warning', (w) => {
+      seen.push(`warning: ${(w.forcedSales ?? []).join(', ')}`);
+      squadAtWarning = getState().squad.length;
+    });
+    handleBankruptcy(getState());
+    expect(seen).toEqual([
+      `The club is in the red ($${(ECON.FORCED_SALE_FLOOR - 10_000).toLocaleString()}). Balance the books!`,
+      'Big Wage was force-sold to cover debts (no fee).',
+      'Next Wage was force-sold to cover debts (no fee).',
+      'warning: Big Wage, Next Wage',
+    ]);
+    expect(squadAtWarning).toBe(SQUAD_MIN);
   });
 
   it('no warning when money >= 0', () => {

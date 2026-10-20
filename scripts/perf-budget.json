@@ -1,6 +1,6 @@
 {
   "throttle": 4,
-  "notes": "N10.1 (#219): starting budgets, about 1.4x the worst of four runs of the nightly perf job on the GitHub runner (three on main at 54ac3c0, one rebased on fa00b1d after #217 and #218; before any N10 change), so the gate is green on day one and a regression of half again fails it. The bundle allows 5% growth. Each later N10 item tightens its rows toward the plan's goals (a week and Skip under 300 ms of block, the hand-off under 1 s, Start to grounds under 3 s). N10.2 (#223): the multi-week advance yields between weeks, so advanceBlockMs is now one week (about 1.4x the runner's worst week) and midAdvanceTapMs, a tap made mid-run, is bounded by the same week; both tighten to 300 ms when N10.3 plays the week's match in the Worker. N10.6 (#226): the boot paints only the placed facilities, so groundsMs is about 1.5x the worst of two runner runs after it (1.80 s), under the plan's 3 s goal. titleMs widened to N8's 3 s after a runner run reached 2.53 s (load to title is before the boot and unchanged by N10).",
+  "notes": "N10.1 (#219): starting budgets, about 1.4x the worst of four runs of the nightly perf job on the GitHub runner (three on main at 54ac3c0, one rebased on fa00b1d after #217 and #218; before any N10 change), so the gate is green on day one and a regression of half again fails it. The bundle allows 5% growth. Each later N10 item tightens its rows toward the plan's goals (a week and Skip under 300 ms of block, the hand-off under 1 s, Start to grounds under 3 s). N10.2 (#223): the multi-week advance yields between weeks, so advanceBlockMs is now one week (about 1.4x the runner's worst week) and midAdvanceTapMs, a tap made mid-run, is bounded by the same week; both tighten to 300 ms when N10.3 plays the week's match in the Worker. N10.6 (#226): the boot paints only the placed facilities, so groundsMs is about 1.5x the worst of two runner runs after it (1.80 s), under the plan's 3 s goal. titleMs widened to N8's 3 s after a runner run reached 2.53 s (load to title is before the boot and unchanged by N10). N10.3 (#235): the fast-forwarded match plays in the Worker, so advanceBlockMs and midAdvanceTapMs take the plan's 300 ms goal (runner: 1-63 ms and 63-123 ms); weekMs is now the week's wall time with the Worker's replies held back by the throttle (CDP throttling never reaches a Worker), about 1.4x the runner's worst (1.61 s).",
   "budgets": {
     "titleMs": 3000,
     "groundsMs": 2750,
@@ -9,9 +9,9 @@
     "skipMs": 5150,
     "skipBlockMs": 4750,
     "backToClubMs": 1000,
-    "weekMs": 1700,
+    "weekMs": 2250,
     "bundleGzKb": 560,
-    "advanceBlockMs": 2000,
-    "midAdvanceTapMs": 2000
+    "advanceBlockMs": 300,
+    "midAdvanceTapMs": 300
   }
 }

@@ -13,6 +13,7 @@ import { teamSheetFromRival, teamSheetFromSquad } from '../match/league/sheets';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
+import { canUseWorker, playMatchesInWorker } from './matchJobs';
 import { aiCoachSides, unlockedCalls } from '../match/league/calls';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
@@ -174,6 +175,9 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   };
 }
 
+/** How long the Worker gets for the player's fast-forwarded match before it is played here (ms): about 1–2 s on a phone, so this only catches one that has hung. */
+export const PLAYER_WORKER_TIMEOUT_MS = 30_000;
+
 export function registerPlayerMatchSystem(): void {
   registerTickHook('matchday-player', TICK_ORDER.match, (ctx) => {
     const state = getState();
@@ -248,7 +252,17 @@ export function registerPlayerMatchSystem(): void {
       });
       return;
     }
-    // Fast-forward: the same match, headless.
+    // Fast-forward in a browser, inside the async advance (N10.3): the same match,
+    // headless, in the Worker; the week waits for it, so the page keeps painting.
+    if (ctx.fastForward && ctx.hold && canUseWorker()) {
+      ctx.hold();
+      void playMatchesInWorker([{ home, away, opts: matchOpts }], PLAYER_WORKER_TIMEOUT_MS)
+        .then(([result]) => applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))())
+        .catch((err: unknown) => console.error('the fast-forwarded match failed to land', err))
+        .finally(resumeWeek);
+      return;
+    }
+    // Fast-forward elsewhere (the soak, the tests, advanceWeeks): the same match, headless, here.
     applyPlayerResult(fixture, home, away, runMatch(home, away, matchOpts))();
   });
 }

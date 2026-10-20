@@ -20,6 +20,9 @@
 // inside it, or the click handler's own time if that is longer. A block is how long
 // the page could not paint or take a tap.
 //
+// A Worker's replies are held back so its wall time is ×throttle too (CDP throttling
+// never reaches a Worker; QA finding 11).
+//
 // With --budget (N10 item 1, #219) the moments are checked against
 // scripts/perf-budget.json (or the file given) and the run fails when one is over;
 // report.json and report.md carry every metric, its budget and the verdict. Exit 1
@@ -221,6 +224,26 @@ async function advance(index, { probe = false } = {}) {
 async function run() {
   const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-gl=swiftshader'] });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: true, isMobile: true });
+  // CDP throttling slows the page but not a Worker (QA finding 11, #216). From N10.3 the
+  // fast-forwarded match plays in one, so each Worker reply is held back (throttle − 1) ×
+  // the Worker's own time: its wall time is ×throttle like the page's.
+  await ctx.addInitScript((throttle) => {
+    const Base = window.Worker;
+    if (!Base || throttle <= 1) return;
+    window.Worker = class extends Base {
+      postMessage(...args) {
+        this.__nrlPosted = performance.now();
+        super.postMessage(...args);
+      }
+      set onmessage(fn) {
+        super.onmessage = fn && ((e) => {
+          const took = performance.now() - (this.__nrlPosted ?? performance.now());
+          setTimeout(() => fn.call(this, e), took * (throttle - 1));
+        });
+      }
+      get onmessage() { return super.onmessage; }
+    };
+  }, THROTTLE);
   // Every Long Task from the first script on, for the block column.
   await ctx.addInitScript(() => {
     window.__nrlLongTasks = [];
