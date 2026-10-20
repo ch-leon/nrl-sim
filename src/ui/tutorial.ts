@@ -438,7 +438,9 @@ export const TUTORIAL_CSS = `
     left: calc(0.75rem + env(safe-area-inset-left, 0px));
     right: auto;
     transform: none;
-    max-width: min(60vw, 240px);
+    /* 300px with border-box is ~265px of copy: every step fits unscrolled at
+       750×340 and 956×330 (#208); the height cap below is the backstop. */
+    max-width: min(60vw, 300px);
     max-height: calc(100vh - 5.25rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
     max-height: calc(100dvh - 5.25rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
   }
