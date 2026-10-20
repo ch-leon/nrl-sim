@@ -95,7 +95,8 @@ describe('touch and dead ball in the live sim', () => {
   it('the 40/20: kicked from inside his own 40 into touch inside their 20 — the kicking side taps and keeps it', () => {
     restore = applyTuning({ 'touch.fortyTwenty': 1, 'touch.findTouch.own20': 0, 'touch.findTouch.ownHalf': 0 });
     let found = 0;
-    for (const seed of [1, 2, 3]) {
+    // Rare even with every kick sent for touch: play seeds until a few have come up.
+    for (let seed = 1; seed <= 10 && found < 2; seed++) {
       const { events } = play(seed, 5);
       for (const { e, snap } of events) {
         if (e.kind !== '40-20' || snap.clock!.siren) continue;
