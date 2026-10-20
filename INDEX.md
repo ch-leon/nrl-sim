@@ -79,3 +79,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261020-014053-standard | standard | 54ac3c0 | main | [report](runs/20261020-014053-standard/report.md) |
 | 20261020-014111-rival-scores | rival scores | 7af9df7 | fix/rival-round-landing | [report](runs/20261020-014111-rival-scores/report.md) |
 | 20261020-014632-golden-point | golden point | 54ac3c0 (uncommitted changes) | feat/golden-point | [report](runs/20261020-014632-golden-point/report.md) |
+| 20261020-015006-standard | standard | 54ac3c0 (uncommitted changes) | feat/golden-point | [report](runs/20261020-015006-standard/report.md) |
