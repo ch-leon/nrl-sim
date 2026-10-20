@@ -4,13 +4,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   runSoak, checkState, nonFinitePaths, duplicatePlayers, asOldSave, OLD_VERSIONS, gapSample, bestNineMean, summariseSeasons,
-  classifyReason, emptyTally, tallyNet, FINANCE_LINES,
+  classifyReason, emptyTally, tallyNet, FINANCE_LINES, NEAR_RIVALS, nearestRivals, recordAgainst, advanceWeekAsTapped, registerAllSystems,
+  type SeasonSample, type SoakResult,
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS } from '../../src/config';
-import { createNewGame, getState } from '../../src/core/state';
-import { initLeague } from '../../src/systems/fixtures';
+import { createNewGame, getState, setState, type Fixture, type GameState } from '../../src/core/state';
+import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { migrateState } from '../../src/core/save';
+import { advanceWeek, weekHeld, withFastForward } from '../../src/core/time';
 
 describe('soak checks', () => {
   it('spots NaN, Infinity and players in two places', () => {
@@ -72,6 +74,12 @@ describe('soak', () => {
       expect(r.start.rivalMean).toBeLessThanOrEqual(r.start.rivalRange[1]);
       for (const s of r.seasons) {
         expect(s.wins + s.draws + s.losses).toBe(SEASON_ROUNDS);
+        // N12.1: the finals cut is the top eight, and each near rival is met once or twice in 24 rounds.
+        expect(s.madeFinals).toBe(s.ladderPosition <= 8);
+        expect(s.nearRivalGames).toBeGreaterThanOrEqual(NEAR_RIVALS);
+        expect(s.nearRivalGames).toBeLessThanOrEqual(2 * NEAR_RIVALS);
+        expect(s.nearRivalWinRate).toBeGreaterThanOrEqual(0);
+        expect(s.nearRivalWinRate).toBeLessThanOrEqual(1);
         expect(s.ladderPosition).toBeGreaterThanOrEqual(1);
         expect(s.ladderPosition).toBeLessThanOrEqual(16);
         expect(s.bestNine).toBeGreaterThan(30);
@@ -114,6 +122,11 @@ describe('soak', () => {
       expect(tallyNet(row.finance)).toBeCloseTo(row.money - (row.season === 1 ? STARTING_MONEY : summary.find((x) => x.mode === row.mode && x.season === row.season - 1)!.money), -1);
       expect(row.gap).toBeCloseTo(row.bestNine - row.rivalMean, 0);
       expect(row.finals).toBe(row.ladderPosition <= 8 ? 1 : 0);
+      const run = runs.find((r) => r.mode === row.mode)!;
+      const sample = run.seasons[row.season - 1]!;
+      expect(row.nearRivalGames).toBe(sample.nearRivalGames);
+      expect(row.nearRivalWinRate).toBeCloseTo(sample.nearRivalWinRate, 2);
+      expect(row.finalsAppearances).toBe(run.seasons.slice(0, row.season).filter((x) => x.madeFinals).length);
     }
   }, 180_000);
 
@@ -135,4 +148,98 @@ describe('soak', () => {
       expect(r.problems, `v${v}`).toEqual([]);
     }
   }, 180_000);
+});
+
+describe('soak columns (N12.1)', () => {
+  /** A season sample with everything zero but what the test sets. */
+  const sample = (over: Partial<SeasonSample>): SeasonSample => ({
+    season: 1, money: 0, minMoney: 0, squad: 20, freeAgents: 10, saveBytes: 1, rivalStrength: [40, 70], reputation: 30, sacked: false,
+    wins: 12, draws: 0, losses: 12, marginPerGame: 0, ladderPosition: 9, premiership: false, madeFinals: false,
+    nearRivalWinRate: 0, nearRivalGames: 0, bestNine: 55, rivalMean: 55, rivalRange: [40, 70],
+    signings: 0, signingFees: 0, signedOverall: 0, finance: emptyTally(), ...over,
+  });
+  const run = (seed: number, seasons: SeasonSample[]): SoakResult => ({
+    seed, mode: 'managed', start: { bestNine: 55, rivalMean: 55, rivalRange: [40, 70] }, seasons, problems: [], ms: 0,
+  });
+
+  it('picks the three rivals nearest the best nine, ties to the lower club id', () => {
+    createNewGame('Near', 7);
+    initLeague(getState());
+    const s0 = getState();
+    const nine = bestNineMean(s0.squad);
+    const ids = s0.league.clubs.filter((c) => c.id !== s0.clubId).map((c) => c.id).sort();
+    const [a, b, tieLow, tieHigh] = [ids[3]!, ids[7]!, ids[1]!, ids[5]!];
+    const strength: Record<string, number> = { [a]: nine + 1, [b]: nine - 2, [tieLow]: nine + 4, [tieHigh]: nine + 4 };
+    const s: GameState = { ...s0, league: { ...s0.league, clubs: s0.league.clubs.map((c) => ({ ...c, strength: strength[c.id] ?? nine + 12 })) } };
+    expect(nearestRivals(s)).toEqual([a, b, tieLow]);
+    expect(nearestRivals(s, 2)).toEqual([a, b]);
+  });
+
+  it('counts regular-season games against them only: a draw is a game not won, unplayed and finals games are out', () => {
+    createNewGame('Record', 7);
+    initLeague(getState());
+    const s0 = getState();
+    const [x, y, z, other] = s0.league.clubs.filter((c) => c.id !== PLAYER_ID).map((c) => c.id);
+    const fixtures: Fixture[] = [
+      { round: 1, homeId: PLAYER_ID, awayId: x!, result: { homeScore: 20, awayScore: 10 } }, // won at home
+      { round: 2, homeId: y!, awayId: PLAYER_ID, result: { homeScore: 18, awayScore: 18 } }, // drawn
+      { round: 3, homeId: z!, awayId: PLAYER_ID, result: { homeScore: 10, awayScore: 24 } }, // won away
+      { round: 4, homeId: x!, awayId: PLAYER_ID, result: { homeScore: 30, awayScore: 6 } }, // lost
+      { round: 5, homeId: PLAYER_ID, awayId: y! }, // not played yet
+      { round: 6, homeId: PLAYER_ID, awayId: other!, result: { homeScore: 40, awayScore: 0 } }, // not a near rival
+      { round: 7, homeId: x!, awayId: y!, result: { homeScore: 12, awayScore: 0 } }, // not the player's
+      { round: SEASON_ROUNDS + 1, homeId: PLAYER_ID, awayId: z!, result: { homeScore: 30, awayScore: 0 } }, // a final
+    ];
+    const s: GameState = { ...s0, league: { ...s0.league, fixtures } };
+    expect(recordAgainst(s, [x!, y!, z!])).toEqual({ wins: 2, games: 4 });
+    expect(recordAgainst(s, [])).toEqual({ wins: 0, games: 0 });
+  });
+
+  it('summarises finals appearances so far and pools the near-rival games over the runs', () => {
+    const runs = [
+      run(1, [
+        sample({ season: 1, madeFinals: true, ladderPosition: 4, nearRivalWinRate: 0.5, nearRivalGames: 4 }),
+        sample({ season: 2, madeFinals: false, ladderPosition: 10, nearRivalWinRate: 0.333, nearRivalGames: 3 }),
+      ]),
+      run(2, [
+        sample({ season: 1, madeFinals: true, ladderPosition: 2, nearRivalWinRate: 0.6, nearRivalGames: 5 }),
+        sample({ season: 2, madeFinals: true, ladderPosition: 1, premiership: true, nearRivalWinRate: 0, nearRivalGames: 6 }),
+      ]),
+      run(3, [sample({ season: 1, madeFinals: false, ladderPosition: 12, sacked: true, nearRivalWinRate: 0.25, nearRivalGames: 4 })]),
+    ];
+    const [s1, s2] = summariseSeasons(runs);
+    expect(s1).toMatchObject({ season: 1, runs: 3, finals: 0.67, finalsAppearances: 0.7, sacked: 0.33, nearRivalGames: 13, nearRivalWinRate: 0.46 });
+    // Season 2 is the two runs that reached it: one finals appearance, then two.
+    expect(s2).toMatchObject({ season: 2, runs: 2, finals: 0.5, finalsAppearances: 1.5, premierships: 0.5, nearRivalGames: 9, nearRivalWinRate: 0.11 });
+  });
+
+  it('--live-rivals: a tapped week plays the rival round on the live sim and the player\'s match headless', () => {
+    // The live sim records every rival's match stats (applyRivalResults); the cheap sim records none.
+    const rivalsWithGames = (s: GameState): string[] => {
+      const round1 = s.league.fixtures.filter((f) => f.round === 1 && f.homeId !== PLAYER_ID && f.awayId !== PLAYER_ID);
+      return round1.flatMap((f) => [f.homeId, f.awayId]).filter((id) => (s.league.clubs.find((c) => c.id === id)?.squad ?? []).some((p) => (p.career?.games ?? 0) > 0));
+    };
+    createNewGame('Live', 11);
+    initLeague(getState());
+    setState({ settings: { ...getState().settings, liveRivals: true } });
+    registerAllSystems();
+    advanceWeekAsTapped();
+    const live = getState();
+    expect(weekHeld()).toBe(false);
+    expect(live.week).toBe(2);
+    expect(live.league.fixtures.filter((f) => f.round === 1).every((f) => f.result)).toBe(true);
+    expect(live.league.ladder.find((r) => r.clubId === PLAYER_ID)!.played).toBe(1);
+    expect(rivalsWithGames(live)).toHaveLength(14);
+
+    // The same week fast-forwarded keeps the cheap sim, as the game does for ×4 and "to finals".
+    createNewGame('Live', 11);
+    initLeague(getState());
+    setState({ settings: { ...getState().settings, liveRivals: true } });
+    registerAllSystems();
+    withFastForward(advanceWeek);
+    const cheap = getState();
+    expect(cheap.week).toBe(2);
+    expect(cheap.league.fixtures.filter((f) => f.round === 1).every((f) => f.result)).toBe(true);
+    expect(rivalsWithGames(cheap)).toEqual([]);
+  }, 60_000);
 });
