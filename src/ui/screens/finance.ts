@@ -11,7 +11,7 @@ import {
   weeklyWages, weeklyUpkeep, weeklyIncome, sponsorIncome, groundCapacity, homeGate, nextStandGate, financeNet,
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
-import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
+import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { buildObjectivesSection } from './board';
 import { el, panel, button, openModal, closeScreen } from '../dom';
 
@@ -54,6 +54,13 @@ export interface FinanceSummary {
   burnWeekly: number;
   /** Weeks of cash left at the current burn; null when the club is not burning cash. */
   runwayWeeks: number | null;
+  /**
+   * In debt (N12.5): how many weeks until the balance passes the fire-sale floor
+   * at the current burn, from (money − FORCED_SALE_FLOOR) ÷ burn: the first whole
+   * week that leaves it below the floor. 0 once it is below; null when the club
+   * is not in debt or not burning cash.
+   */
+  weeksToFloor: number | null;
   /**
    * The next home fixture (round ≥ current week) and its projected gate, with the
    * crowd against the seats (#169: sold out means a bigger stand would earn more).
@@ -102,6 +109,10 @@ export function financeSummary(state: GameState): FinanceSummary {
   const gateWeekly = averageGateWeekly(state, nextHome?.projectedGate ?? 0);
   const burnWeekly = Math.max(0, wagesWeekly + upkeepWeekly - incomeWeekly - gateWeekly);
   const runwayWeeks = burnWeekly > 0 ? Math.max(0, state.money) / burnWeekly : null;
+  // The economy sells when the balance is below the floor after a week's money.
+  const weeksToFloor = state.money < 0 && burnWeekly > 0
+    ? Math.max(0, Math.floor((state.money - ECON.FORCED_SALE_FLOOR) / burnWeekly) + 1)
+    : null;
 
   const expiring = state.squad
     .filter((p) => p.contractWeeks <= EXPIRY_WINDOW_WEEKS)
@@ -119,6 +130,7 @@ export function financeSummary(state: GameState): FinanceSummary {
     netWeekly: incomeWeekly + gateWeekly - wagesWeekly - upkeepWeekly,
     burnWeekly,
     runwayWeeks,
+    weeksToFloor,
     nextHome,
     nextStand,
     expiring,
@@ -332,6 +344,12 @@ export function fmtRunway(weeks: number | null): string {
   return `${w} ${w === 1 ? 'week' : 'weeks'}`;
 }
 
+/** The fire-sale row's value (N12.5): "in about 6 weeks at this burn", or "below the floor now" at 0. */
+export function fmtFireSale(weeks: number): string {
+  if (weeks <= 0) return 'below the floor now';
+  return `in about ${weeks} ${weeks === 1 ? 'week' : 'weeks'} at this burn`;
+}
+
 // ── DOM screen ─────────────────────────────────────────────────────────────────
 
 /** One label/value line inside a panel. `neg` colours negatives red. */
@@ -387,6 +405,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
     statRow('Home gates (avg/wk)', fmtMoney(s.gateWeekly)),
     statRow('Net weekly (avg)', fmtMoney(s.netWeekly), s.netWeekly < 0),
     statRow('Runway', fmtRunway(s.runwayWeeks), s.runwayWeeks === 0),
+    ...(s.weeksToFloor !== null ? [statRow('Fire sale', fmtFireSale(s.weeksToFloor), true)] : []),
     statRow(
       'Next home gate',
       s.nextHome ? `R${s.nextHome.round} · ${fmtMoney(s.nextHome.projectedGate)}` : 'None left',

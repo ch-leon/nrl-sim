@@ -43,6 +43,19 @@ export function fmtMoney(n: number): string {
   return rounded < 0 ? `-$${grouped}` : `$${grouped}`;
 }
 
+/** The money tile below $0 (N12.5): its red class, and the tag beside the number. */
+export const IN_DEBT_CLASS = 'nrl-money-negative';
+export const IN_DEBT_TEXT = 'in debt';
+
+/**
+ * The money tile: the balance, and whether the club is in debt (below $0 the
+ * tile takes IN_DEBT_CLASS and says "in debt" beside the number, N12.5). Pure —
+ * extracted for unit testing without the DOM.
+ */
+export function moneyTile(balance: number): { text: string; inDebt: boolean } {
+  return { text: fmtMoney(balance), inDebt: balance < 0 };
+}
+
 const FLASH_MS = 450;
 
 /** What the HUD says when a multi-week advance throws mid-run (N10.2). */
@@ -156,8 +169,10 @@ export function createHud(opts: HudOpts = {}): Hud {
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
 
   function renderMoney(balance: number): void {
-    moneyEl.textContent = fmtMoney(balance);
-    moneyEl.classList.toggle('nrl-money-negative', balance < 0);
+    const tile = moneyTile(balance);
+    moneyEl.textContent = tile.text;
+    if (tile.inDebt) moneyEl.append(el('span', { class: 'nrl-hud-debt', text: IN_DEBT_TEXT }));
+    moneyEl.classList.toggle(IN_DEBT_CLASS, tile.inDebt);
 
     if (lastMoney !== null && balance !== lastMoney) {
       const up = balance > lastMoney;

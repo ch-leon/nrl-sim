@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fmtMoney, ADVANCE_MENU, HELD_WEEK_TEXT, weekStillFinishing, advanceProgressLabel } from '../../src/ui/hud';
+import { fmtMoney, moneyTile, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, weekStillFinishing, advanceProgressLabel } from '../../src/ui/hud';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import { createNewGame, getState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
+import { CSS } from '../../src/ui/dom';
 
 // DOM tests (createHud rendering / flash / bus wiring) are skipped: jsdom is not
 // installed and the vitest environment is 'node' (see vite.config.ts). The
@@ -24,6 +25,25 @@ describe('fmtMoney', () => {
   it('rounds fractional balances', () => {
     expect(fmtMoney(1_234.6)).toBe('$1,235');
     expect(fmtMoney(-1_234.6)).toBe('-$1,235');
+  });
+});
+
+describe('moneyTile (N12.5)', () => {
+  it('a negative balance is in debt: the red tile says so beside the number', () => {
+    expect(moneyTile(-4_200)).toEqual({ text: '-$4,200', inDebt: true });
+    expect(moneyTile(-1)).toEqual({ text: '-$1', inDebt: true });
+    expect(IN_DEBT_TEXT).toBe('in debt');
+  });
+
+  it('$0 and up is not in debt', () => {
+    expect(moneyTile(0)).toEqual({ text: '$0', inDebt: false });
+    expect(moneyTile(200_000)).toEqual({ text: '$200,000', inDebt: false });
+  });
+
+  it('the in-debt class colours the tile red and the tag is white on red', () => {
+    expect(IN_DEBT_CLASS).toBe('nrl-money-negative');
+    expect(CSS).toMatch(new RegExp(`\\.nrl-hud-stat\\.${IN_DEBT_CLASS} \\{[^}]*color: #b00020`));
+    expect(CSS).toMatch(/\.nrl-hud-debt \{[^}]*background: #b00020;[^}]*color: #fff/);
   });
 });
 

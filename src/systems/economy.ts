@@ -230,20 +230,23 @@ export function tickContracts(state: GameState): GameState {
  * player (NO payout) to freeAgents, apply squad-wide morale −FORCED_SALE_MORALE_HIT
  * (clamped ≥1), and re-check — stopping at SQUAD_MIN even if still under floor
  * (club stays in debt but fieldable). Terminates: each sale reduces squad size
- * and the loop halts at SQUAD_MIN.
+ * and the loop halts at SQUAD_MIN. The warning comes after the sales and names
+ * them (`forcedSales`, N12.5), so a multi-week advance can stop on a sale; the
+ * toasts keep their order.
  */
 export function handleBankruptcy(_state: GameState): GameState {
   // Gate on the settled live balance, not the entry snapshot — prior pipeline
   // steps may have moved money after `state` was captured.
-  if (getState().money < ECON.BANKRUPTCY_WARN) {
-    const balance = getState().money;
-    bus.emit('bankruptcy:warning', { balance });
+  const balance = getState().money;
+  const warned = balance < ECON.BANKRUPTCY_WARN;
+  if (warned) {
     bus.emit('ui:notify', {
       text: `The club is in the red ($${balance.toLocaleString()}). Balance the books!`,
       kind: 'danger',
     });
   }
 
+  const forcedSales: string[] = [];
   while (getState().money < ECON.FORCED_SALE_FLOOR) {
     const s = getState();
     if (s.squad.length <= SQUAD_MIN) break; // keep a fieldable team
@@ -259,12 +262,14 @@ export function handleBankruptcy(_state: GameState): GameState {
     }));
     // Sold player (no payout) joins the free-agent pool.
     setState({ squad: morale, freeAgents: [...s.freeAgents, victim] });
+    forcedSales.push(victim.name);
 
     bus.emit('ui:notify', {
       text: `${victim.name} was force-sold to cover debts (no fee).`,
       kind: 'danger',
     });
   }
+  if (warned) bus.emit('bankruptcy:warning', { balance, forcedSales });
   return getState();
 }
 

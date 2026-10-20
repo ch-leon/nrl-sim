@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   financeSummary, FinanceLedger, initFinanceLedger, fmtMoney, fmtMoneyCompact,
-  fmtRunway, fmtCrowd, fmtStand, ledgerNote, seasonPnl, FINANCE_LINE_LABELS, EXPIRY_WINDOW_WEEKS,
+  fmtRunway, fmtCrowd, fmtStand, ledgerNote, fmtFireSale, seasonPnl, FINANCE_LINE_LABELS, EXPIRY_WINDOW_WEEKS,
 } from '../../../src/ui/screens/finance';
 import {
   createNewGame, getState, loadState, setState, emptyFinance, FINANCE_LINES,
@@ -125,6 +125,46 @@ describe('financeSummary — weekly P&L', () => {
       squad: [mkPlayer({ wage: 2000 })],
     });
     expect(financeSummary(s).runwayWeeks).toBe(0);
+  });
+});
+
+// N12.5: in debt, the weeks to the fire sale at the current burn.
+describe('financeSummary — weeks to the fire-sale floor', () => {
+  const FLOOR = ECON.FORCED_SALE_FLOOR;
+  /** A club with $0 income and a $10,000 wage bill: a $10,000 burn. */
+  const burning = (money: number): GameState => setup({
+    money, reputation: 0, facilities: [], squad: [mkPlayer({ wage: 10_000 })],
+    league: { clubs: [], fixtures: [], ladder: [] },
+  });
+
+  it('counts the weeks until the balance is below the floor: (money − floor) ÷ burn', () => {
+    // −$20,000: 80k above the floor, so −$100,000 after 8 weeks (not below) and the sale in week 9.
+    expect(financeSummary(burning(-20_000)).burnWeekly).toBe(10_000);
+    expect(financeSummary(burning(-20_000)).weeksToFloor).toBe(9);
+    // −$25,000: 75k above, 7.5 weeks: below the floor in week 8.
+    expect(financeSummary(burning(-25_000)).weeksToFloor).toBe(8);
+    expect(financeSummary(burning(FLOOR + 1)).weeksToFloor).toBe(1);
+    expect(financeSummary(burning(FLOOR)).weeksToFloor).toBe(1);
+  });
+
+  it('is 0 once the balance is below the floor', () => {
+    expect(financeSummary(burning(FLOOR - 1)).weeksToFloor).toBe(0);
+    expect(financeSummary(burning(FLOOR - 250_000)).weeksToFloor).toBe(0);
+  });
+
+  it('is null out of debt or with no burn', () => {
+    expect(financeSummary(burning(0)).weeksToFloor).toBeNull();
+    expect(financeSummary(burning(50_000)).weeksToFloor).toBeNull();
+    // In debt but earning: income 5,000 at reputation 100 covers a 1,000 wage bill.
+    const earning = setup({ money: -30_000, reputation: 100, facilities: [], squad: [mkPlayer({ wage: 1000 })] });
+    expect(financeSummary(earning).burnWeekly).toBe(0);
+    expect(financeSummary(earning).weeksToFloor).toBeNull();
+  });
+
+  it('reads as a Finance row', () => {
+    expect(fmtFireSale(6)).toBe('in about 6 weeks at this burn');
+    expect(fmtFireSale(1)).toBe('in about 1 week at this burn');
+    expect(fmtFireSale(0)).toBe('below the floor now');
   });
 });
 

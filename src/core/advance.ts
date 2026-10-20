@@ -101,11 +101,13 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
   }
   const startSeason = getState().season;
   let weeksPlayed = 0;
-  let bankruptcyWarned = false;
+  let forcedSales: string[] = [];
 
-  // bankruptcy:warning is emitted from inside the economy tick; latch it for the
-  // week it fires in.
-  const offBankrupt = bus.on('bankruptcy:warning', () => { bankruptcyWarned = true; });
+  // bankruptcy:warning is emitted from inside the economy tick, after its forced
+  // sales, and names them (a sale pays nothing, so the balance can't show it); keep
+  // them for the week they happen in. N12.5: debt stops on a sale or a crossing
+  // (the balance before and after the week), not on every week's warning.
+  const offBankrupt = bus.on('bankruptcy:warning', (w) => { forcedSales.push(...(w.forcedSales ?? [])); });
   try {
     for (let guard = 0; guard < MAX_RUN_WEEKS; guard++) {
       // Paint and take taps between weeks (never before the first: the tap that
@@ -123,7 +125,7 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       });
       if (pre) return { weeksPlayed, stop: pre };
 
-      bankruptcyWarned = false;
+      forcedSales = [];
       withFastForward(() => advanceWeek());
       weeksPlayed++;
 
@@ -132,7 +134,9 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       const post = postWeekStop({
         injuredStarters: newlyInjuredStarters(before.squad, after.squad, overallRating, new Set(before.lineup.starters.filter((id): id is string => id !== null))),
         contractAlerts: contractAlerts(before.squad, after.squad),
-        bankruptcyWarned,
+        moneyBefore: before.money,
+        moneyAfter: after.money,
+        forcedSales,
         newDecisions: newCards(before, after),
       });
       if (post) return { weeksPlayed, stop: post };

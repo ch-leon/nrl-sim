@@ -351,6 +351,8 @@ export const CSS = `
 .nrl-hud-stat.nrl-flash-up { background: #7ec850; color: #0a2a00; }
 .nrl-hud-stat.nrl-flash-down { background: #e06666; color: #2a0000; }
 .nrl-hud-stat.nrl-money-negative { color: #b00020; }
+/* N12.5: "in debt" beside a negative balance, a red tag that reads through the flash. */
+.nrl-hud-debt { margin-left: 0.4em; padding: 0 0.3em; font-size: 0.75em; background: #b00020; color: #fff; vertical-align: 0.1em; }
 .nrl-hud-spacer { flex: 1 1 auto; }
 .nrl-hud-actions {
   pointer-events: auto;
