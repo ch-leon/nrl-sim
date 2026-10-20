@@ -114,7 +114,7 @@ export function forfeitResult(
     : { homeScore: FORFEIT_SCORE, awayScore: 0 };
 }
 
-function roundLabel(round: number): string {
+export function roundLabel(round: number): string {
   if (round === 25) return 'Qualifying Final';
   if (round === 26) return 'Semi Final';
   if (round === 27) return 'Grand Final';
