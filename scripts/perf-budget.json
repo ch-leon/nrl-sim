@@ -1,10 +1,15 @@
 {
   "throttle": 4,
+  "notes": "N10.1 (#219): starting budgets, about 1.4x the worst of three runs on main at 54ac3c0 (two in the agent container, one on the GitHub runner), so the nightly gate is green on day one. Each later N10 item tightens its rows toward the plan's goals (a week and Skip under 300 ms of block, the hand-off under 1 s, Start to grounds under 3 s). advanceBlockMs is reported but not budgeted: until N10.2 it is the whole multi-week call, which depends on how many weeks run before a stop.",
   "budgets": {
-    "titleMs": 3000,
-    "groundsMs": 8000,
+    "titleMs": 2500,
+    "groundsMs": 5500,
     "handoffMs": 5000,
-    "weekMs": 2500,
+    "handoffBlockMs": 4500,
+    "skipMs": 5500,
+    "skipBlockMs": 5000,
+    "backToClubMs": 2000,
+    "weekMs": 1700,
     "bundleGzKb": 600
   }
 }
