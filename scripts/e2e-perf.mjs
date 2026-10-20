@@ -21,12 +21,12 @@
 // With --budget (N10 item 1, #219) the moments are checked against
 // scripts/perf-budget.json (or the file given) and the run fails when one is over;
 // report.json and report.md carry every metric, its budget and the verdict. Exit 1
-// if the game broke on the way, or with --budget if a budget was missed.
+// if the game broke on the way, or with --budget if a budget was missed. (With
+// E2E_URL there is no build to measure, so a bundleGzKb budget fails as not reached.)
 //
 //   npm run e2e:perf
 //   npm run e2e:perf -- --budget              (fail on a missed budget; the nightly QA job)
 //   npm run e2e:perf -- --budget my.json      (another budget file)
-// (With E2E_URL there is no build to measure, so a bundleGzKb budget fails as not reached.)
 //   npm run e2e:perf -- --throttle 1          (no throttling, for a baseline)
 //   CHROMIUM_PATH=/path/to/chrome npm run e2e:perf
 //   E2E_URL=http://localhost:5173/ npm run e2e:perf
