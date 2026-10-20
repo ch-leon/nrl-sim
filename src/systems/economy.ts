@@ -10,10 +10,10 @@
 // to push money negative — spendMoney's guard would block that, so we credit a
 // negative delta instead.
 
-import { emptyFinance, getState, setState, type FinanceLine, type Fixture, type GameState, type Player } from '../core/state';
+import { emptyFinance, getState, setState, type FinanceLine, type Fixture, type GameState, type PlacedFacility, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
-import { ECON, SEASON_ROUNDS, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { ECON, SEASON_ROUNDS, SQUAD_MIN, WEEKS_PER_SEASON, difficultyMultipliers } from '../config';
 import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { EVENT_CARDS } from '../data/events';
@@ -139,6 +139,35 @@ export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
   const capacity = groundCapacity(state);
   const attendance = Math.min(capacity, demand);
   return { capacity, demand, attendance, receipts: attendance * ECON.TICKET_PRICE, soldOut: demand > capacity };
+}
+
+/** What the next Grandstand level would draw and pay at a sold-out fixture's demand. */
+export interface StandProjection {
+  /** The Grandstand level it would take: 1 builds a stand on the hill, 2–3 upgrade it. */
+  level: number;
+  /** Its seats (ECON.CAPACITY at that level). */
+  capacity: number;
+  /** min(that capacity, today's demand). */
+  attendance: number;
+  receipts: number;
+  /** receipts − today's gate: what the bigger stand adds a game. */
+  gain: number;
+}
+
+/**
+ * What the next Grandstand level would earn at `fixture` (N12): homeGate on the
+ * same state with that stand built, so it is the gate the weekly tick would pay,
+ * against the gate it pays today. Only when the fixture sells out (demand over
+ * the seats: more seats would fill); null otherwise, and at the top level.
+ */
+export function nextStandGate(state: GameState, fixture: Fixture): StandProjection | null {
+  const today = homeGate(state, fixture);
+  const level = facilityLevel(state, 'grandstand') + 1;
+  if (!today.soldOut || ECON.CAPACITY[level] === undefined) return null;
+  // facilityLevel takes the best Grandstand, so one more at the next level stands in for the upgrade.
+  const stand: PlacedFacility = { id: 'projected-stand', defId: 'grandstand', level: level as PlacedFacility['level'], x: 0, y: 0 };
+  const bigger = homeGate({ ...state, facilities: [...state.facilities, stand] }, fixture);
+  return { level, capacity: bigger.capacity, attendance: bigger.attendance, receipts: bigger.receipts, gain: bigger.receipts - today.receipts };
 }
 
 /**
@@ -314,21 +343,38 @@ export function financeNet(f: Record<FinanceLine, number>): number {
 /** The lines the rollover pays for the season just played (fixtures-season hook → applyBoardReview). */
 const CLOSING_LINES: ReadonlySet<FinanceLine> = new Set(['prize', 'boardGrant']);
 
+/** Where a money movement belongs: its line of the books and the season and week it is stamped with. */
+export interface MovementStamp { line: FinanceLine; season: number; week: number }
+
+/**
+ * Stamp a money movement made at `state`'s clock. Usually the clock itself, but
+ * the rollover pays the finals prize money and the board grant after the season
+ * counter has moved to the next season, in week 1, so those two lines at week 1
+ * close the season just played: they are stamped to its last week
+ * (WEEKS_PER_SEASON, the week whose advance paid them). The books
+ * (registerFinanceSystem) and the Finance screen's weekly ledger both stamp with
+ * this, so the two always agree on where the rollover's money belongs (N12).
+ */
+export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance'>, reason: string): MovementStamp {
+  const line = classifyReason(reason);
+  const closing = state.week === 1 && CLOSING_LINES.has(line) && state.finance.some((e) => e.season === state.season - 1);
+  return closing
+    ? { line, season: state.season - 1, week: WEEKS_PER_SEASON }
+    : { line, season: state.season, week: state.week };
+}
+
 /**
  * Keep the club's books: every money:changed delta is added to its line in the
- * entry for the current season (opened on the first movement, so a save written
- * at any moment loads right). The rollover pays the finals prize money and the
- * board grant after the season counter has moved to the next season but in week
- * 1, so those two lines at week 1 close the season just played instead. Pure
- * bookkeeping: nothing here depends on the order listeners fire in. Called once
- * from main.ts (and the soak); returns the unsubscribe.
+ * entry for the season stampMovement gives (opened on the first movement, so a
+ * save written at any moment loads right): the current season, except the
+ * rollover's prize money and board grant, which close the season just played.
+ * Pure bookkeeping: nothing here depends on the order listeners fire in. Called
+ * once from main.ts (and the soak); returns the unsubscribe.
  */
 export function registerFinanceSystem(): () => void {
   return bus.on('money:changed', ({ delta, reason }) => {
     const s = getState();
-    const line = classifyReason(reason);
-    const closing = s.week === 1 && CLOSING_LINES.has(line) && s.finance.some((e) => e.season === s.season - 1);
-    const season = closing ? s.season - 1 : s.season;
+    const { line, season } = stampMovement(s, reason);
     const books = s.finance.some((e) => e.season === season)
       ? s.finance
       : [...s.finance, emptyFinance(season)].sort((a, b) => a.season - b.season);
