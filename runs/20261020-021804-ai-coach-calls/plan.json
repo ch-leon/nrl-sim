@@ -1,0 +1,77 @@
+{
+  "name": "AI coach calls",
+  "description": "N9.6: does a rule-based AI coach (shift toward an overlap, Rush near his own line, field goal when on) help its side, how many calls does it make and how many pay off; overlap and rush-zone knobs.",
+  "seeds": 120,
+  "scenarios": [
+    {
+      "name": "even, no AI",
+      "aiCoach": [],
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "even, AI home",
+      "aiCoach": [
+        "home"
+      ],
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50, no AI",
+      "aiCoach": [],
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "70 v 50, AI on the 50",
+      "aiCoach": [
+        "away"
+      ],
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "overlap 1",
+      "tuning": {
+        "calls.ai.overlap": 1
+      }
+    },
+    {
+      "name": "overlap 3",
+      "tuning": {
+        "calls.ai.overlap": 3
+      }
+    },
+    {
+      "name": "rush within 10 m",
+      "tuning": {
+        "calls.ai.rushOwnM": 10
+      }
+    },
+    {
+      "name": "rush within 35 m",
+      "tuning": {
+        "calls.ai.rushOwnM": 35
+      }
+    }
+  ]
+}
