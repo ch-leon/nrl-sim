@@ -16,7 +16,9 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     registerGroundsArt(this, getState().facilities ?? []);
-    paintFacilitiesWhenIdle(this);
+    // Not while a match is on screen; stopped with the game.
+    const cancel = paintFacilitiesWhenIdle(this, () => this.game.scene.isActive('Match'));
+    this.game.events.once(Phaser.Core.Events.DESTROY, cancel);
 
     this.scene.start('Grounds');
   }

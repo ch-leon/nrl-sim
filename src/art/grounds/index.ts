@@ -54,23 +54,42 @@ export function ensureFacilityTexture(scene: Phaser.Scene, defId: FacilityDefId,
   return key;
 }
 
-/** Runs `fn` when the page is idle (or soon, where there is no idle callback). */
-function whenIdle(fn: () => void): void {
-  if (typeof requestIdleCallback === 'function') requestIdleCallback(() => fn(), { timeout: 2000 });
-  else setTimeout(fn, 50);
+/** How much of an idle slice one facility texture needs (ms; about 15 unthrottled, 60 at ×4). */
+const IDLE_SLICE_MS = 15;
+
+/** An idle slice: how long is left in it, when the browser can say. */
+export interface IdleSlice { timeRemaining(): number }
+
+/**
+ * Runs `fn` when the page is idle: an idle callback with no deadline forcing it, or a
+ * timer where there is none (Safari); `fn` checks the slice and the game first.
+ */
+function whenIdle(fn: (slice?: IdleSlice) => void): void {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback((deadline) => fn(deadline));
+  else setTimeout(() => fn(), 250);
 }
 
 /**
  * Paint every facility texture not painted yet, one per idle slice, so the Build
- * menu's placements and upgrades find them ready. Returns a cancel function.
+ * menu's placements and upgrades find them ready. A slice too short for a texture,
+ * or one where `busy()` says the game is busy (a live match), paints nothing and
+ * waits for the next. Returns a cancel function.
  */
-export function paintFacilitiesWhenIdle(scene: Phaser.Scene, schedule: (fn: () => void) => void = whenIdle): () => void {
+export function paintFacilitiesWhenIdle(
+  scene: Phaser.Scene,
+  busy: () => boolean = () => false,
+  schedule: (fn: (slice?: IdleSlice) => void) => void = whenIdle,
+): () => void {
   const todo = (Object.keys(FACILITY_CATALOG) as FacilityDefId[])
     .flatMap((defId) => FACILITY_LEVELS.map((level) => ({ defId, level })))
     .filter(({ defId, level }) => !scene.textures.exists(facilityTextureKey(defId, level)));
   let cancelled = false;
-  const step = (): void => {
+  const step = (slice?: IdleSlice): void => {
     if (cancelled) return;
+    if (busy() || (slice && slice.timeRemaining() < IDLE_SLICE_MS)) {
+      schedule(step);
+      return;
+    }
     const next = todo.shift();
     if (!next) return;
     ensureFacilityTexture(scene, next.defId, next.level);

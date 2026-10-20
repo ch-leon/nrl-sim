@@ -87,7 +87,7 @@ describe('lazy facility art (N10.6)', () => {
     const { scene, painted } = fakeScene();
     ensureFacilityTexture(scene, 'weightsRoom', 1);
     const slices: (() => void)[] = [];
-    paintFacilitiesWhenIdle(scene, (fn) => void slices.push(fn));
+    paintFacilitiesWhenIdle(scene, () => false, (fn) => void slices.push(fn));
     let n = 0;
     while (slices.length) { slices.shift()!(); n++; }
     expect(n).toBe(facilityKeys.length - 1);
@@ -97,10 +97,35 @@ describe('lazy facility art (N10.6)', () => {
   it('idle painting stops when cancelled', () => {
     const { scene, painted } = fakeScene();
     const slices: (() => void)[] = [];
-    const cancel = paintFacilitiesWhenIdle(scene, (fn) => void slices.push(fn));
+    const cancel = paintFacilitiesWhenIdle(scene, () => false, (fn) => void slices.push(fn));
     slices.shift()!();
     cancel();
     while (slices.length) slices.shift()!();
     expect(painted.length).toBe(1);
+  });
+
+  it('a busy game or a short idle slice paints nothing and waits for the next slice', () => {
+    const { scene, painted } = fakeScene();
+    const slices: ((slice?: { timeRemaining(): number }) => void)[] = [];
+    let busy = true;
+    paintFacilitiesWhenIdle(scene, () => busy, (fn) => void slices.push(fn));
+    slices.shift()!(); // a match is on
+    expect(painted).toEqual([]);
+    busy = false;
+    slices.shift()!({ timeRemaining: () => 3 }); // too short a slice
+    expect(painted).toEqual([]);
+    slices.shift()!({ timeRemaining: () => 40 });
+    expect(painted.length).toBe(1);
+    expect(slices.length).toBe(1);
+  });
+
+  it('the grounds and the placement ghost get facility textures only through ensureFacilityTexture', async () => {
+    const dynamicImport: (s: string) => Promise<{ readFileSync(p: string, enc: string): string }> = (s) => import(/* @vite-ignore */ s);
+    const { readFileSync } = await dynamicImport('node:fs');
+    for (const file of ['src/scenes/GroundsScene.ts', 'src/world/ghostPreview.ts']) {
+      const src = readFileSync(file, 'utf8');
+      expect(src, file).not.toMatch(/facilityTextureKey\(/);
+      expect(src, file).toMatch(/ensureFacilityTexture\(/);
+    }
   });
 });
