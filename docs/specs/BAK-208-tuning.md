@@ -715,6 +715,11 @@ Rush, Kick-chase v Balanced): nothing beyond luck in tries, breaks, kicks or com
 against the old chase (all sprint, no winger) or either change alone. Rush still concedes about
 twice Slide's penalties (2.1 v 1.1 a match) under every variant; the 30-seed unit test had
 dipped on luck and now plays 60.
+The standard plan's 20-seed stars, checked over 120 matches against the old chase
+(`20261020-013006-kick-chase-on-the-standard`): line breaks in Expansive v Grind and goals are
+luck; **dead balls are real and small**, +0.3 a match between even sides and +0.6 in 70 v 50
+(2.7 → 3.4): a territory kick chased at cruise is grounded or rolls dead before a chaser gets
+there more often. Tries move by +0.4 at most (inside luck).
 
 **Stamina sweep** (`20261020-004440-stamina-sweep`, 60 whole matches a row, `fatigue.drain.perStamina`
 0.005 / 0.01 / 0.015 × `gas.cruise` 0.88 / 0.94, even 60 v 60 and Stamina 30 v 80):
