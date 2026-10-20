@@ -37,6 +37,8 @@ export interface LabParams {
   weather?: WeatherKind;
   /** Coach-call chips for both sides (#73, `calls=1`). */
   calls?: boolean;
+  /** Played as a final (N9.4, `final=1`): golden point if level at full time. */
+  final?: boolean;
 }
 
 export type LabSimFactory = (home: string, away: string, seed: number, traits: TraitMode, tactics: LabTactics, legs: Legs, bench: Rotation, weather: WeatherKind, calls: CallInput[]) => MatchSim;
@@ -61,7 +63,8 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
   const wx = sp.get('wx');
   const weather: WeatherKind = isWeather(wx) ? wx : 'clear';
   const calls = sp.get('calls') === '1';
-  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics, legs, bench, weather, ...(calls ? { calls } : {}) };
+  const final = sp.get('final') === '1';
+  if (flag) return { seed: flag.seed, tick: flag.tick, home: flag.home, away: flag.away, note: flag.note, traits, tactics, legs, bench, weather, ...(calls ? { calls } : {}), ...(final ? { final } : {}) };
   const seed = Number(sp.get('seed'));
   const tick = Number(sp.get('tick'));
   return {
@@ -76,6 +79,7 @@ export function parseLabHash(hash: string, defaults: { home: string; away: strin
     bench,
     weather,
     ...(calls ? { calls } : {}),
+    ...(final ? { final } : {}),
   };
 }
 
@@ -92,7 +96,7 @@ function parseTactics(sp: URLSearchParams): LabTactics {
   return { home: side('hatk', 'hdef'), away: side('aatk', 'adef') };
 }
 
-export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics; legs?: Legs; bench?: Rotation | undefined; weather?: WeatherKind | undefined; calls?: boolean | undefined }): string {
+export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: number; traits?: TraitMode; tactics?: LabTactics; legs?: Legs; bench?: Rotation | undefined; weather?: WeatherKind | undefined; calls?: boolean | undefined; final?: boolean | undefined }): string {
   const sp = new URLSearchParams({ seed: String(p.seed), home: p.home, away: p.away });
   if (p.tick) sp.set('tick', String(p.tick));
   if (p.traits && p.traits !== 'gen') sp.set('traits', p.traits);
@@ -105,6 +109,7 @@ export function labHash(p: Pick<LabParams, 'seed' | 'home' | 'away'> & { tick?: 
   if (p.bench && p.bench !== DEFAULT_ROTATION) sp.set('bench', p.bench);
   if (p.weather && p.weather !== 'clear') sp.set('wx', p.weather);
   if (p.calls) sp.set('calls', '1');
+  if (p.final) sp.set('final', '1');
   return `${LAB_HASH}?${sp.toString()}`;
 }
 
@@ -184,6 +189,6 @@ export class LabController {
 
   /** The URL hash that reopens the lab on these teams and seed (and this tick). */
   hash(withTick = false): string {
-    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, legs: this.params.legs, bench: this.params.bench, weather: this.params.weather, calls: this.params.calls, ...(withTick ? { tick: this.runner.tick } : {}) });
+    return labHash({ seed: this.runner.seed, home: this.params.home, away: this.params.away, traits: this.params.traits, tactics: this.params.tactics, legs: this.params.legs, bench: this.params.bench, weather: this.params.weather, calls: this.params.calls, final: this.params.final, ...(withTick ? { tick: this.runner.tick } : {}) });
   }
 }

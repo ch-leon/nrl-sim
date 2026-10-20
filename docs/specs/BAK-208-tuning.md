@@ -743,3 +743,32 @@ there more often. Tries move by +0.4 at most (inside luck).
 - **Cruise can come down further now.** 0.88 cost 1.1 tries a match at F2 (5.0 → 3.9); with
   the line following cruise it costs 0.3–1.1 (5.7 → 5.3 between even sides). Kept at 0.94.
 
+## 26. Golden point in drawn finals (N9.4)
+
+A final (rounds past `SEASON_ROUNDS`) level at full time on the live sim goes to **golden
+point**: a short break with no legs back and no swaps, ends swapped, a kick-off by the side that
+kicked off the match, and the next score wins it. A try ends it on the spot (no conversion); so
+does a penalty goal or a field goal. Field goals are on from the first second (the usual last-3-
+minutes rule is off) and a penalty shot reads golden point's own clock. Still level when golden
+point is up, it stays a draw and the higher seed goes through, as before. `runMatch` / `LiveSim`
+take `goldenPoint`; matchday sets it for the player's finals, the rival jobs for live rival
+finals. The cheap sim (fast-forward, or rival matches off the match engine) keeps the
+higher-seed rule. Who kicks off after a try is unchanged (Leon's call).
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `rules.goldenPointMinutes` | `src/match/league/rules.ts` | 5 | Length of golden point; play runs on after its siren to the next dead ball. 0 = no golden point. |
+| `rules.goldenPointBreakTicks` | `rules.ts` | 40 (2 s) | The break between full time and golden point. |
+
+Measured (`20261020-014632-golden-point`, 120 whole finals a row; the harness's `finals`
+scenario flag, counts `goldenPoint`, `goldenPointWon`, `draws`):
+
+| | even 60 v 60 | 65 v 55 |
+|---|---|---|
+| Level at full time (go to golden point) | 7.5% | 4.2% |
+| Still level after 5 minutes | 0.8% (1 in 120) | 0% |
+| Still level after 10 minutes | 0% | 0% |
+| Field goals a match, golden point off / on | 0.02 / 0.05 | 0.03 / 0.04 |
+
+Five minutes decides about nine golden points in ten, about two in five of them by a field goal.
+

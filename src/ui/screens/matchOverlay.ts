@@ -234,7 +234,7 @@ export interface MatchOverlayHandle {
   /** Remove the overlay and unsubscribe all bus handlers. Idempotent. */
   destroy(): void;
   /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
-  setClock(matchSeconds: number, half: 1 | 2): void;
+  setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void;
   /** A line in the commentary that is not a match event (a coach's call, #73). */
   comment(line: string): void;
   /** Coach calls made and paid off, home and away (#73): a stats line once there is one. */
@@ -472,11 +472,12 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       callsLabel.style.display = made.home + made.away > 0 ? '' : 'none';
       callsLabel.textContent = callsLine(made, paid);
     },
-    setClock(matchSeconds: number, half: 1 | 2): void {
+    setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void {
       if (root.classList.contains('nrl-mo-final')) return;
       liveClock = true;
-      clockEl.textContent = formatClockSeconds(matchSeconds, 2 * halfMinutes);
-      halfEl.textContent = half === 1 ? '1st' : '2nd';
+      // Golden point (N9.4): its own clock from 00:00.
+      clockEl.textContent = formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes);
+      halfEl.textContent = half === 1 ? '1st' : half === 2 ? '2nd' : 'Golden point';
     },
   };
   // Full-time: freeze on the final score (the result toast is transient). The
