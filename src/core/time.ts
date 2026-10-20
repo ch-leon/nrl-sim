@@ -27,7 +27,9 @@ export interface TickContext {
    * Hold the week here (a live match the player is watching decides its own
    * result, coach calls #73; a rival round played off the main thread, N9.2):
    * the hooks of the same order still run, then the later hooks and the week's
-   * end wait for one resumeWeek() per hold. Absent where a week can't be held.
+   * end wait for one resumeWeek() per hold. Absent where a week can't be held:
+   * under fast-forward unless the caller allows it (the async advance, N10.3,
+   * which plays the player's match in the Worker and waits for the week).
    */
   hold?: () => void;
 }
@@ -87,6 +89,8 @@ let seqCounter = 0;
  * cannot leave fast-forward stuck on.
  */
 let fastForwardFlag = false;
+/** Whether a fast-forwarded week may be held (withFastForward's `holds`, N10.3). */
+let fastForwardHolds = false;
 
 // ── Tick hook registry API ─────────────────────────────────────────────────
 
@@ -151,7 +155,8 @@ export function advanceWeek(): void {
   if (held) return; // a held week finishes first (resumeWeek)
   const { week, season } = getState();
   let holding = 0;
-  const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(fastForwardFlag ? {} : { hold: () => void holding++ }) };
+  const canHold = !fastForwardFlag || fastForwardHolds;
+  const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(canHold ? { hold: () => void holding++ } : {}) };
 
   const entries = sortedEntries(tickHooks);
   for (let i = 0; i < entries.length; i++) {
@@ -159,7 +164,7 @@ export function advanceWeek(): void {
     // Held: finish this order's hooks (the player's match and the rival round
     // run side by side), then wait for every hold to be released.
     if (holding > 0 && entries[i + 1]?.order !== entries[i]!.order) {
-      held = { ctx: { week, season, fastForward: false }, rest: entries.slice(i + 1), pending: holding };
+      held = { ctx: { week, season, fastForward: fastForwardFlag }, rest: entries.slice(i + 1), pending: holding };
       return;
     }
   }
@@ -257,14 +262,18 @@ export function advanceWeeks(n: number): void {
 /**
  * Run fn with fastForward set, restoring the previous value afterwards (even on
  * throw). Lets callers that need per-week checks (see ./advance.ts) auto-sim
- * matches exactly like advanceWeeks does.
+ * matches exactly like advanceWeeks does. With `holds`, a hook may hold the
+ * week (ctx.hold) even so: the caller must then wait for it (weekHeld()).
  */
-export function withFastForward<T>(fn: () => T): T {
+export function withFastForward<T>(fn: () => T, opts: { holds?: boolean } = {}): T {
   const prev = fastForwardFlag;
+  const prevHolds = fastForwardHolds;
   fastForwardFlag = true;
+  fastForwardHolds = opts.holds === true;
   try {
     return fn();
   } finally {
     fastForwardFlag = prev;
+    fastForwardHolds = prevHolds;
   }
 }
