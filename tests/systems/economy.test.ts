@@ -154,11 +154,11 @@ describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
       week: 3, reputation: 30, facilities: [],
       league: { clubs: [], fixtures: [homeFixture(3)], ladder: [] },
     });
-    // demand = 300 + 30×30 = 1,200 (under the hill's 2,000) ; gate = 1,200 × $18 = 21,600
+    // demand = 300 + 30×30 = 1,200 (under the hill's 2,000) ; gate = 1,200 × $20 = 24,000
     expect(gateReceipts(getState())).toBe(1200 * ECON.TICKET_PRICE);
-    expect(ECON.TICKET_PRICE).toBe(18);
+    expect(ECON.TICKET_PRICE).toBe(20);
     const g = homeGate(getState(), homeFixture(3));
-    expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 21_600, soldOut: false });
+    expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 24_000, soldOut: false });
   });
 
   it('the hill holds 2,000: a famous club sells out, and a Grandstand lifts the roof', () => {
@@ -235,18 +235,18 @@ describe('nextStandGate: what the next Grandstand level would earn (N12)', () =>
   it('the hill sold out: a stand at level 1, up to its seats, against today\'s gate', () => {
     // demand 3,300 fits a stand's 3,500
     const s = at(100, 0, homeFixture(6));
-    expect(nextStandGate(s, homeFixture(6))).toEqual({ level: 1, capacity: 3500, attendance: 3300, receipts: 59_400, gain: 59_400 - 36_000 });
+    expect(nextStandGate(s, homeFixture(6))).toEqual({ level: 1, capacity: 3500, attendance: 3300, receipts: 3300 * ECON.TICKET_PRICE, gain: (3300 - 2000) * ECON.TICKET_PRICE });
     expect(nextStandGate(s, homeFixture(6))!.receipts).toBe(builtGate(s, 1));
     // a home final at 100: demand 4,950 fills the stand's 3,500
     const f = at(100, 0, homeFixture(26));
-    expect(nextStandGate(f, homeFixture(26))).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 63_000, gain: 1500 * ECON.TICKET_PRICE });
+    expect(nextStandGate(f, homeFixture(26))).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 3500 * ECON.TICKET_PRICE, gain: 1500 * ECON.TICKET_PRICE });
   });
 
   it('a level-1 stand sold out: level 2\'s 5,000 seats', () => {
     const s = at(100, 1, homeFixture(26));
     // demand 4,950 on 3,500 seats
     expect(homeGate(s, homeFixture(26)).soldOut).toBe(true);
-    expect(nextStandGate(s, homeFixture(26))).toEqual({ level: 2, capacity: 5000, attendance: 4950, receipts: 4950 * 18, gain: 1450 * ECON.TICKET_PRICE });
+    expect(nextStandGate(s, homeFixture(26))).toEqual({ level: 2, capacity: 5000, attendance: 4950, receipts: 4950 * ECON.TICKET_PRICE, gain: 1450 * ECON.TICKET_PRICE });
     expect(nextStandGate(s, homeFixture(26))!.receipts).toBe(builtGate(s, 2));
   });
 
@@ -254,7 +254,7 @@ describe('nextStandGate: what the next Grandstand level would earn (N12)', () =>
     // a home final on a winning run at 100: 3,300 × 1.25 × 1.5 = 6,188 on 5,000 seats
     const s = at(100, 2, homeFixture(26), run);
     expect(homeGate(s, homeFixture(26))).toMatchObject({ demand: 6188, soldOut: true });
-    expect(nextStandGate(s, homeFixture(26))).toEqual({ level: 3, capacity: 6500, attendance: 6188, receipts: 6188 * 18, gain: 1188 * ECON.TICKET_PRICE });
+    expect(nextStandGate(s, homeFixture(26))).toEqual({ level: 3, capacity: 6500, attendance: 6188, receipts: 6188 * ECON.TICKET_PRICE, gain: 1188 * ECON.TICKET_PRICE });
     expect(nextStandGate(s, homeFixture(26))!.receipts).toBe(builtGate(s, 3));
   });
 
@@ -480,7 +480,7 @@ describe('applyEconomy — full weekly loop', () => {
       week: 1,
     });
     applyEconomy(getState());
-    // gate = 1,800 × $18 = $32,400 (rep 50; the L3 stand is not needed), wages small, income = rep grant.
+    // gate = 1,800 × $20 = $36,000 (rep 50; the L3 stand is not needed), wages small, income = rep grant.
     // Net well above the floor → no forced sales.
     expect(getState().squad.length).toBe(SQUAD_MIN + 2);
     expect(getState().money).toBeGreaterThan(ECON.FORCED_SALE_FLOOR);

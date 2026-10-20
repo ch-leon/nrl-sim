@@ -358,7 +358,7 @@ export function fmtCrowd(c: { attendance: number; capacity: number; soldOut: boo
 }
 
 /**
- * The next stand as a Finance row (N12): ["A stand would seat 3,500", "about +$27k
+ * The next stand as a Finance row (N12): ["A stand would seat 3,500", "about +$30k
  * a game"], "A bigger stand" once one is built. Rounded to the thousand: it is
  * one game's demand, which form and the opponent move.
  */

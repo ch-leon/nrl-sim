@@ -197,7 +197,7 @@ describe('financeSummary — next home gate', () => {
       },
     });
     const f = financeSummary(s);
-    // round 2 is past; next home is round 5. Gate at that week = (300+30×30)×$18 = 21,600 on the hill (#169, #176).
+    // round 2 is past; next home is round 5. Gate at that week = (300+30×30)×$20 = 24,000 on the hill (#169, N12.3).
     expect(f.nextHome).toEqual({ round: 5, projectedGate: 1200 * ECON.TICKET_PRICE, attendance: 1200, capacity: 2000, soldOut: false });
     expect(f.nextHome?.projectedGate).toBe(gateReceipts({ ...s, week: 5 }));
   });
@@ -258,25 +258,25 @@ describe('financeSummary — what a bigger stand would earn (N12)', () => {
   it('on a sold-out hill: what a stand would seat and earn at the next home game\'s demand', () => {
     const s = at(100, []);
     const f = financeSummary(s);
-    // demand 3,300 on 2,000 seats; a stand seats 3,500 so all 3,300 come: +1,300 × $18
+    // demand 3,300 on 2,000 seats; a stand seats 3,500 so all 3,300 come: +1,300 × $20
     expect(f.nextHome?.soldOut).toBe(true);
     expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3300, receipts: 3300 * ECON.TICKET_PRICE, gain: 1300 * ECON.TICKET_PRICE });
     expect(f.nextStand).toEqual(nextStandGate({ ...s, week: 6 }, homeFixture(6)));
-    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$23k a game' });
+    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$26k a game' });
   });
 
-  it('demand over the next stand too: it fills it (the +$27k a game example)', () => {
-    // 3,300 × 1.25 on a winning run = 4,125: a stand fills its 3,500, +1,500 × $18
+  it('demand over the next stand too: it fills it (the +$30k a game example)', () => {
+    // 3,300 × 1.25 on a winning run = 4,125: a stand fills its 3,500, +1,500 × $20
     const f = financeSummary(at(100, [], [...winningRun, homeFixture(6)]));
-    expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 3500 * ECON.TICKET_PRICE, gain: 27_000 });
-    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$27k a game' });
+    expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 3500 * ECON.TICKET_PRICE, gain: 30_000 });
+    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$30k a game' });
   });
 
   it('with a stand built, the next level is "a bigger stand"; at the top level nothing', () => {
     const l1 = financeSummary(at(100, [pf('grandstand', 1)], [...winningRun, homeFixture(6)]));
     expect(l1.nextHome).toMatchObject({ capacity: 3500, attendance: 3500, soldOut: true });
     expect(l1.nextStand).toMatchObject({ level: 2, capacity: 5000, attendance: 4125, gain: 625 * ECON.TICKET_PRICE });
-    expect(fmtStand(l1.nextStand!)).toEqual({ label: 'A bigger stand would seat 5,000', value: 'about +$11k a game' });
+    expect(fmtStand(l1.nextStand!)).toEqual({ label: 'A bigger stand would seat 5,000', value: 'about +$13k a game' });
     // Over 6,500 only in a test (reputation 300): the top level still says nothing.
     const top = financeSummary(at(300, [pf('grandstand', 3)]));
     expect(top.nextHome?.soldOut).toBe(true);
@@ -554,7 +554,7 @@ describe('financeSummary — average home gate in the run-rate (QA)', () => {
     const fixtures = Array.from({ length: 24 }, (_, i) => (i % 2 ? awayFixture(i + 1) : homeFixture(i + 1)));
     const s = setup({ week: 1, money: 10_000, reputation: 30, facilities: [], squad: [mkPlayer({ wage: 9_500 })], league: { clubs: [], fixtures, ladder: [] } });
     const f = financeSummary(s);
-    // gate at rep 30: (300 + 30×30) × $18 = $21,600, every other week = $10,800/wk avg; with the $1,200 grant it covers $9,500 of wages and $1,500 of running costs
+    // gate at rep 30: (300 + 30×30) × $20 = $24,000, every other week = $12,000/wk avg; with the $1,200 grant it covers $9,500 of wages and $1,500 of running costs
     expect(f.gateWeekly).toBe(1200 * ECON.TICKET_PRICE / 2);
     expect(f.burnWeekly).toBe(0);
     expect(f.runwayWeeks).toBeNull();

@@ -65,7 +65,7 @@ export const TRAINING_FOCUS = {
 export const ECON = {
   SPONSOR_PER_LEVEL: 3_000,       // × Sponsor Board level, if built
   REP_GRANT_PER_POINT: 40,        // × reputation, weekly base grant (#176: was 50)
-  TICKET_PRICE: 18,               // $ per attendee (#176: was 20)
+  TICKET_PRICE: 20,               // $ per attendee (#176: 20 → 18; N12.3: back to 20 with the running costs, Assumed)
   // Gates with a roof (N6, #169): attendance = min(capacity, demand), where
   // demand = (ATTEND_BASE + reputation × ATTEND_PER_REP) × form × occasion. Form
   // runs 1 ∓ FORM_SWING across the last FORM_GAMES results (all wins +25%, all
