@@ -1,0 +1,34 @@
+{
+  "name": "golden point",
+  "description": "N9.4: how often a final goes to golden point, how often it is decided in it (and how: try, penalty goal, field goal), and how long golden point should be (0 = off, 5, 10 minutes).",
+  "seeds": 120,
+  "scenarios": [
+    {
+      "name": "even final 60 v 60",
+      "finals": true,
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "final 65 v 55",
+      "finals": true,
+      "home": {
+        "rating": 65
+      },
+      "away": {
+        "rating": 55
+      }
+    }
+  ],
+  "sweep": {
+    "rules.goldenPointMinutes": [
+      0,
+      5,
+      10
+    ]
+  }
+}
