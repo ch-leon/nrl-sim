@@ -1,0 +1,36 @@
+{
+  "name": "difficulty scale",
+  "description": "N12.2: does difficulty's rival multiplier (scaleSheet: Hard x1.1, Easy x0.92 on a squad-built rival's aggregates) change the player's match on the live sim? The same new-game squad against the same level rival squad each seed, the rival as Normal, Hard and Easy give it today.",
+  "seeds": 40,
+  "scenarios": [
+    {
+      "name": "player v rival, Normal",
+      "home": {
+        "squad": "player"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    },
+    {
+      "name": "player v rival, Hard's rival (x1.1)",
+      "home": {
+        "squad": "player"
+      },
+      "away": {
+        "squad": "rival",
+        "rivalOf": "hard"
+      }
+    },
+    {
+      "name": "player v rival, Easy's rival (x0.92)",
+      "home": {
+        "squad": "player"
+      },
+      "away": {
+        "squad": "rival",
+        "rivalOf": "easy"
+      }
+    }
+  ]
+}

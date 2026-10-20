@@ -98,3 +98,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261020-081244-standard | standard | eb8210d | coach/rival-styles | [report](runs/20261020-081244-standard/report.md) |
 | 20261020-082919-standard | standard | 06ba585 | main | [report](runs/20261020-082919-standard/report.md) |
 | 20261020-112753-standard | standard | b204356 | main | [report](runs/20261020-112753-standard/report.md) |
+| 20261020-114213-difficulty-scale | difficulty scale | 09838a4 | season/difficulty-spread | [report](runs/20261020-114213-difficulty-scale/report.md) |
+| 20261020-114342-level-rating | level rating | 09838a4 | season/difficulty-spread | [report](runs/20261020-114342-level-rating/report.md) |
