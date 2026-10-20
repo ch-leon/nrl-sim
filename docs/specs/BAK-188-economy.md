@@ -208,6 +208,36 @@ squad of 80s costing $1.2M a season against $1.1M of gates. Idle Hard is bust in
 season 1 and sacked by season 2; managed Hard is a fight for the board's patience,
 in the red half the time. Easy stays comfortable.
 
+**The rival-unsettled card's fee (N12, #247).** The "Unsettled at a rival" card
+quotes `freeagency.signingFee` for the rival's star (overall² × $10 × the age factor,
+less the Scout Office's 10% a level), the fee the Recruit screen charges, instead of
+four weeks' wages: about $13k for an 85-overall who costs $64k from the pool.
+
+**The pool follows the league (N12, #247).** `freeagency.poolTarget` = `LEAGUE.MEAN`
+− `LEAGUE.POOL_BELOW` (3), so 52 at a new club (a level club's first-grader), plus
+`POOL_POINTS_PER_BIAS` (25) points per unit of scouting bias: a Scout Office +3 a
+level, an Academy +2.5 a level, reputation +1 for every 10 points above the baseline
+of 30 (+7 at 100, a little off below it). Each agent's own target is that, rounded,
+plus two rolls of ±`FREE_AGENT_SPREAD` (8); `generatePlayerAround` does the rest. The
+opening pool uses it too. Academy prospects and departed players are kept as they
+were. Measured through the real refresh (300 seeds), mean overall and the 65+ share:
+a new game's pool 60 and 15% → 52 and 4%; a refresh at reputation 30, 50 and 8% → 52
+and 4% (70+ 2.5% → 0.2%); at reputation 100, 61 and 36% → 59 and 24% (70+ 30% → 8%);
+with a Scout Office and an Academy at L3 at reputation 100, 79 → 76. The mean of a
+refresh barely moves; its shape does: the old rookie / average / star rolls made a
+bump of 42s, a bump of 60s and a tail of stars, now it is one bell around the target.
+
+**Easy wages (N12, #247).** `DIFFICULTY.easy.wages` ×0.85 → ×0.9.
+
+**The Sponsor Board (N12, #247).** `ECON.SPONSOR_BASE` $150 + `SPONSOR_PER_REP` $10 ×
+reputation a week, at most `SPONSOR_CAP` $1,000, × the level step every facility uses
+(1 / 1.6 / 2.2); `economy.sponsorReturn`. It replaces a flat `SPONSOR_PER_LEVEL`
+$3,000 a level, which paid the $10,000 build back in 3.4 weeks. Now, net of its $100
+upkeep, L1 pays back in 29 weeks at reputation 30 ($450 a week), 15 at 60 ($750) and
+11 at 100 ($1,000, capped from 85); the whole L3 board ($60k) in 76, 41 and 30 weeks.
+The Build menu, the facility popup and the Guide's Money page quote it at the club's
+reputation.
+
 **The cascade (N14.3).** One forced sale a week, a board loan for a renewal in debt (up to
 $50,000 a season, repaid at the rollover), and an Academy call-up before a forfeit. In the
 matrix soak (20 seeds × 5 seasons) forfeits went from up to 16 a season (idle Hard season
