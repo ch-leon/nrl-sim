@@ -675,6 +675,8 @@ match), wins by about 10, has no home edge, and the stronger side wins about 65%
 strength gap and 75% at 25 (run `20261019-235506-rival-scores`, 30 whole matches each way round
 for 12 pairings, gaps 2–28; the harness now counts `points` and `margin`). The old cheap sim
 scored about 18 a side, gave home 2 points, and the stronger side won nearly every time at 25.
+Re-measured after N9.3's kick chase (`20261020-014111-rival-scores`): 30.6 a match and a margin
+of 10.5 (were 30.2 and 10.6), so `CHEAP` stays.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
