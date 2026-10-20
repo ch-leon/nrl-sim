@@ -7,6 +7,7 @@ import { bus } from '../core/events';
 import { getState, type GameState } from '../core/state';
 import type { AdvanceTarget } from '../core/advanceRules';
 import { weekHeld } from '../core/time';
+import { advanceInProgress, stopAdvance } from '../core/advance';
 import { WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
 
@@ -15,7 +16,7 @@ export interface HudOpts {
   /** Called when the "Advance Week" button is clicked. Absent => button disabled. */
   onAdvanceWeek?: () => void;
   /** Called from the "Advance Week" menu (#44). Absent => menu disabled. */
-  onAdvanceUntil?: (target: AdvanceTarget) => void;
+  onAdvanceUntil?: (target: AdvanceTarget) => unknown;
 }
 
 /** Entries in the "Advance Week" menu, in display order. */
@@ -57,6 +58,14 @@ export function weekStillFinishing(): boolean {
   if (!weekHeld()) return false;
   bus.emit('ui:notify', { text: HELD_WEEK_TEXT, kind: 'info' });
   return true;
+}
+
+/**
+ * The Advance button's label while a multi-week advance runs (N10.2): the week
+ * just played, of the season. Pure — extracted for unit testing without the DOM.
+ */
+export function advanceProgressLabel(week: number): string {
+  return `Week ${week} of ${WEEKS_PER_SEASON}…`;
 }
 
 /**
@@ -118,7 +127,15 @@ export function createHud(opts: HudOpts = {}): Hud {
     if (e.key === 'Escape') setMenuOpen(false);
   }
 
-  const actions = el('div', { class: 'nrl-hud-actions' }, advanceBtn, menuToggle, menu);
+  // N10.2: while a multi-week advance runs, Stop takes the toggle's place; the run
+  // finishes the week in hand and toasts "Stopped after n weeks".
+  const stopBtn = button('Stop', () => {
+    stopAdvance();
+    stopBtn.disabled = true;
+  }, { class: 'nrl-hud-stop' });
+  stopBtn.hidden = true;
+
+  const actions = el('div', { class: 'nrl-hud-actions' }, advanceBtn, menuToggle, stopBtn, menu);
 
   const root = el('div', { class: 'nrl-hud' }, readouts, spacer, actions);
 
@@ -150,6 +167,19 @@ export function createHud(opts: HudOpts = {}): Hud {
       el('span', { class: 'nrl-hud-week-total', text: `/${WEEKS_PER_SEASON}` }),
     );
     seasonEl.textContent = `Season ${s.season}`;
+    renderAdvancing(s);
+  }
+
+  /** Progress and Stop while a multi-week advance runs; the usual controls after it. */
+  function renderAdvancing(s: GameState): void {
+    const on = advanceInProgress();
+    root.toggleAttribute('data-advancing', on);
+    if (on) setMenuOpen(false);
+    advanceBtn.textContent = on ? advanceProgressLabel(s.week) : 'Advance Week';
+    advanceBtn.disabled = on || !opts.onAdvanceWeek;
+    menuToggle.hidden = on;
+    if (on && stopBtn.hidden) stopBtn.disabled = false;
+    stopBtn.hidden = !on;
   }
 
   // Initial paint from the store.

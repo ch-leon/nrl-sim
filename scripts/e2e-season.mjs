@@ -214,6 +214,8 @@ async function leaveMatch() {
 async function advanceMenu(i) {
   await tap('.nrl-hud-menu-toggle');
   await tap(`.nrl-hud-menu-item >> nth=${i}`);
+  // N10.2: the advance yields between weeks; wait for the run to end.
+  await page.waitForFunction(() => !document.querySelector('.nrl-hud[data-advancing]'), null, { timeout: 240000 });
   await wait(400);
 }
 

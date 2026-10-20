@@ -300,6 +300,12 @@ player's match) plays its seven fixtures with `runMatch` in a Web Worker
 in; off, or on fast-forward, it uses the cheap sim, which scores on the live sim's
 scale (tuning reference §24).
 
+The multi-week advance (`core/advance.ts`, the HUD's ×4 / to finals / to season end;
+N10.2) runs one synchronous `advanceWeek()` per week under fast-forward and awaits a
+frame between weeks, so the page paints and takes taps: the HUD shows "Week n of 27…"
+and a **Stop** that ends the run after the week in hand. No hook sees a half-run week;
+the stop rules (`core/advanceRules.ts`) are asked after each week as before.
+
 Finals (weeks 25–27, GitHub #2): after the ladder step of week 24/25/26 the
 fixtures system appends the next knockout round — QF 1v8/2v7/3v6/4v5 from the
 regular-season ladder, SF re-seeded from QF winners, GF from SF winners. A final level

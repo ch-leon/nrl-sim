@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { advanceUntil } from '../../src/core/advance';
+import { advanceUntil, advanceInProgress, stopAdvance, STOPPED_BY_YOU } from '../../src/core/advance';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import {
   registerTickHook, clearTickHooks, clearSeasonHooks, TICK_ORDER,
@@ -32,26 +32,26 @@ function injureTopStarterAtWeek(week: number): void {
 }
 
 describe('advanceUntil — weeks target', () => {
-  it('plays exactly n weeks when nothing needs attention, then reports the target', () => {
+  it('plays exactly n weeks when nothing needs attention, then reports the target', async () => {
     const start = getState().week;
-    const run = advanceUntil({ kind: 'weeks', weeks: 4 });
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 });
     expect(run.weeksPlayed).toBe(4);
     expect(run.stop.kind).toBe('target');
     expect(getState().week).toBe(start + 4);
     expect(toasts[toasts.length - 1]).toEqual({ text: 'Advanced 4 weeks.', kind: 'info' });
   });
 
-  it('weeks: 0 plays nothing', () => {
+  it('weeks: 0 plays nothing', async () => {
     const start = getState().week;
-    const run = advanceUntil({ kind: 'weeks', weeks: 0 });
+    const run = await advanceUntil({ kind: 'weeks', weeks: 0 });
     expect(run.weeksPlayed).toBe(0);
     expect(getState().week).toBe(start);
   });
 
-  it('stops after the week a regular starter is injured, even with weeks remaining', () => {
+  it('stops after the week a regular starter is injured, even with weeks remaining', async () => {
     injureTopStarterAtWeek(2);
     const start = getState().week;
-    const run = advanceUntil({ kind: 'weeks', weeks: 4 });
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 });
     expect(run.stop.kind).toBe('injury');
     expect(run.weeksPlayed).toBe(2);
     expect(getState().week).toBe(start + 2);
@@ -59,23 +59,23 @@ describe('advanceUntil — weeks target', () => {
     expect(toasts[toasts.length - 1]?.text).toContain('Stopped after 2 weeks');
   });
 
-  it('stops at the first event and ignores later ones', () => {
+  it('stops at the first event and ignores later ones', async () => {
     injureTopStarterAtWeek(2);
     injureTopStarterAtWeek(3);
-    const run = advanceUntil({ kind: 'weeks', weeks: 4 });
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 });
     expect(run.weeksPlayed).toBe(2);
   });
 
-  it('stops on a bankruptcy warning emitted during the week', () => {
+  it('stops on a bankruptcy warning emitted during the week', async () => {
     registerTickHook('test-bankrupt', TICK_ORDER.economy, (ctx) => {
       if (ctx.week === 3) bus.emit('bankruptcy:warning', { balance: -1 });
     });
-    const run = advanceUntil({ kind: 'weeks', weeks: 4 });
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 });
     expect(run.stop.kind).toBe('bankruptcy');
     expect(run.weeksPlayed).toBe(3);
   });
 
-  it('stops when a settled contract crosses into the expiring window', () => {
+  it('stops when a settled contract crosses into the expiring window', async () => {
     const first = getState().squad[0]!.id;
     setState({
       squad: getState().squad.map((p) => (p.id === first ? { ...p, contractWeeks: 9 } : p)),
@@ -86,18 +86,18 @@ describe('advanceUntil — weeks target', () => {
         squad: getState().squad.map((p) => ({ ...p, contractWeeks: Math.max(1, p.contractWeeks - 1) })),
       });
     });
-    const run = advanceUntil({ kind: 'weeks', weeks: 4 });
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 });
     expect(run.stop.kind).toBe('contract');
     expect(run.weeksPlayed).toBe(1);
   });
 
-  it('forfeit risk: stops before playing when fewer than SQUAD_MIN players are fit', () => {
+  it('forfeit risk: stops before playing when fewer than SQUAD_MIN players are fit', async () => {
     const s = getState();
     setState({
       squad: s.squad.map((p, i) => (i < SQUAD_MIN - 1 ? p : { ...p, injuredWeeks: 2 })),
     });
     const start = getState().week;
-    const run = advanceUntil({ kind: 'weeks', weeks: 4 });
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 });
     expect(run.stop.kind).toBe('forfeit');
     expect(run.weeksPlayed).toBe(0);
     expect(getState().week).toBe(start);
@@ -105,19 +105,75 @@ describe('advanceUntil — weeks target', () => {
 });
 
 describe('advanceUntil — finals and season end targets', () => {
-  it('to finals: stops on reaching the first finals week', () => {
-    const run = advanceUntil({ kind: 'finals' });
+  it('to finals: stops on reaching the first finals week', async () => {
+    const run = await advanceUntil({ kind: 'finals' });
     expect(run.stop.kind).toBe('target');
     expect(getState().week).toBe(25);
     expect(run.weeksPlayed).toBe(24);
   });
 
-  it('to season end: runs through the rollover and stops on the new season', () => {
+  it('to season end: runs through the rollover and stops on the new season', async () => {
     const startSeason = getState().season;
-    const run = advanceUntil({ kind: 'seasonEnd' });
+    const run = await advanceUntil({ kind: 'seasonEnd' });
     expect(run.stop.kind).toBe('target');
     expect(run.weeksPlayed).toBe(WEEKS_PER_SEASON);
     expect(getState().season).toBe(startSeason + 1);
     expect(getState().week).toBe(1);
+  });
+});
+
+// N10.2: the run yields between weeks so the page paints and takes taps.
+describe('advanceUntil — yields between weeks, Stop', () => {
+  it('awaits one frame between weeks, none before the first, and plays the same weeks', async () => {
+    let frames = 0;
+    const weeksAtFrame: number[] = [];
+    const start = getState().week;
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 }, async () => { frames++; weeksAtFrame.push(getState().week); });
+    expect(run.weeksPlayed).toBe(4);
+    expect(frames).toBe(3);
+    expect(weeksAtFrame).toEqual([start + 1, start + 2, start + 3]);
+  });
+
+  it('is in progress during the run and not after it', async () => {
+    const seen: boolean[] = [];
+    expect(advanceInProgress()).toBe(false);
+    await advanceUntil({ kind: 'weeks', weeks: 3 }, async () => { seen.push(advanceInProgress()); });
+    expect(seen).toEqual([true, true]);
+    expect(advanceInProgress()).toBe(false);
+  });
+
+  it('Stop finishes the week in hand, then stops with a "Stopped after" toast', async () => {
+    const start = getState().week;
+    let frames = 0;
+    const run = await advanceUntil({ kind: 'finals' }, async () => { if (++frames === 2) stopAdvance(); });
+    expect(run.stop).toEqual({ kind: 'stopped', text: STOPPED_BY_YOU });
+    expect(run.weeksPlayed).toBe(2);
+    expect(getState().week).toBe(start + 2);
+    expect(toasts[toasts.length - 1]).toEqual({ text: `Stopped after 2 weeks: ${STOPPED_BY_YOU}`, kind: 'danger' });
+  });
+
+  it('a second advance while one runs does nothing', async () => {
+    const start = getState().week;
+    let inner: Awaited<ReturnType<typeof advanceUntil>> | null = null;
+    const run = await advanceUntil({ kind: 'weeks', weeks: 3 }, async () => {
+      if (!inner) inner = await advanceUntil({ kind: 'weeks', weeks: 4 });
+    });
+    expect(run.weeksPlayed).toBe(3);
+    expect(inner!.weeksPlayed).toBe(0);
+    expect(getState().week).toBe(start + 3);
+  });
+
+  it('Stop with no run under way is a no-op and does not stop the next run', async () => {
+    stopAdvance();
+    const run = await advanceUntil({ kind: 'weeks', weeks: 2 }, async () => {});
+    expect(run.weeksPlayed).toBe(2);
+    expect(run.stop.kind).toBe('target');
+  });
+
+  it('each week runs under fast-forward', async () => {
+    const flags: boolean[] = [];
+    registerTickHook('test-ff', TICK_ORDER.economy, (ctx) => { flags.push(ctx.fastForward); });
+    await advanceUntil({ kind: 'weeks', weeks: 3 }, async () => {});
+    expect(flags).toEqual([true, true, true]);
   });
 });

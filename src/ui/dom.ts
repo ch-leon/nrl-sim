@@ -361,6 +361,9 @@ export const CSS = `
 }
 /* #44: "Advance Week" menu. Tap targets stay ≥44px (.nrl-btn min-height). */
 .nrl-hud-menu-toggle { min-width: 44px; padding: 0.4rem 0.5rem; }
+/* N10.2: Stop beside the progress line while a multi-week advance runs. */
+.nrl-hud-stop { min-width: 44px; padding: 0.4rem 0.6rem; background: #e8a33a; }
+.nrl-hud-stop[hidden], .nrl-hud-menu-toggle[hidden] { display: none; }
 .nrl-hud-menu {
   position: absolute;
   top: calc(100% + 0.25rem);
