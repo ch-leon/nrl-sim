@@ -476,7 +476,7 @@ export interface MatchResult {
   same for every fixture) is painted once, from the title screen, and each background
   starts from a copy of it. One painting is kept, keyed by the field offset and both kits,
   so a kit change or another opponent paints again; nothing is painted during a
-  multi-week run or under a match, nor uploaded in the 1.5 s after one.
+  multi-week run or under a match, and an upload that waited out a match waits 1.5 s more.
   `MatchScene.create()` takes it and only places it, then starts the effects and
   playback on the next frame. Not all up yet, a live match shows "Kick-off…" while the
   worker finishes and the rest goes up a texture a frame; the lab paints in place.

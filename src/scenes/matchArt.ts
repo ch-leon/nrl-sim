@@ -53,6 +53,11 @@ export class MatchArtRegistry {
     return this.texture(key, piece.buf);
   }
 
+  /** Take charge of textures uploaded ahead (N10.5), so a shutdown before build() still frees them. */
+  adopt(pieces: readonly TexturePiece[]): void {
+    for (const p of pieces) if (p.texKey && this.scene.textures.exists(p.texKey)) this.textureKeys.push(p.texKey);
+  }
+
   /** Register named sub-frames on a texture. */
   private frames(real: string, frames: readonly { name: string; x: number; y: number; w: number; h: number }[]): string {
     const tex = this.scene.textures.get(real);

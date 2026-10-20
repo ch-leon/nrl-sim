@@ -344,6 +344,7 @@ export class MatchScene extends Phaser.Scene {
       const painted = art ?? (await fixtureArtFor(this.offsetX, fixtureKitsNow));
       if (!live()) return;
       takeFixtureArt(painted.key);
+      this.art.adopt(fixtureArtPieces(painted)); // freed by teardown even if we never build
       // What didn't go up during the week goes up one texture a frame (a ×4 phone
       // spends about 50–100 ms on each), so no frame freezes; then the match.
       let n = 0;

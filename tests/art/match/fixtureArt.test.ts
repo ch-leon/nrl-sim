@@ -112,6 +112,18 @@ describe('fixture art (N10.5)', () => {
     expect(cachedMs).toBeLessThan(250); // the ground is about 90% of it (about 0.4 s painted)
   });
 
+  it('the chunks put back together are the layer, byte for byte, wherever a chunk was kept', () => {
+    const cv = paintBackground(offsetX, kits.home, kits.away);
+    const back = new Uint8ClampedArray(cv.buf.data.length);
+    for (const c of chunkLayer('t', cv)) {
+      const x0 = c.x - cv.ox;
+      const y0 = c.y - cv.oy;
+      for (let y = 0; y < c.buf.h; y++) back.set(c.buf.data.subarray(y * c.buf.w * 4, (y + 1) * c.buf.w * 4), ((y0 + y) * cv.buf.w + x0) * 4);
+    }
+    // A chunk is left out only when every pixel in it is transparent, so the rest is zeros either way.
+    expect(same(back, cv.buf.data)).toBe(true);
+  });
+
   it('a wrapped buffer must be the right size', () => {
     expect(() => new PixelBuffer(2, 2, new Uint8ClampedArray(15))).toThrow();
     expect(new PixelBuffer(2, 2, new Uint8ClampedArray(16)).w).toBe(2);
