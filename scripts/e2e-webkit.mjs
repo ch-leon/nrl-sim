@@ -51,8 +51,10 @@ async function startServer() {
     const b = spawn('npx', ['vite', 'build', '--outDir', dist, '--emptyOutDir', '--logLevel', 'warn'], { stdio: 'inherit' });
     b.on('exit', (code) => (code === 0 ? res() : rej(new Error(`vite build failed (${code})`))));
   });
-  server = spawn('npx', ['vite', 'preview', '--outDir', dist, '--port', String(PORT), '--strictPort'], { stdio: 'pipe', detached: true });
+  server = spawn('npx', ['vite', 'preview', '--outDir', dist, '--port', String(PORT), '--strictPort'], { stdio: 'ignore', detached: true });
   for (let i = 0; i < 60; i++) {
+    // --strictPort: a taken port makes preview exit; don't test whatever else answers there.
+    if (server.exitCode !== null) throw new Error(`vite preview exited (${server.exitCode}); is port ${PORT} taken? Set E2E_PORT.`);
     try {
       const r = await fetch(BASE.replace('?e2e', ''));
       if (r.ok) return;
@@ -64,6 +66,7 @@ async function startServer() {
 function stopServer() {
   if (server) try { process.kill(-server.pid); } catch { /* gone */ }
 }
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopServer(); process.exit(130); });
 
 // ── In-page probes ───────────────────────────────────────────────────────────
 /**
@@ -169,6 +172,13 @@ async function runSize(browser, W, H) {
     await tap('.nrl-tutorial-next');
     await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
     return reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-skip']);
+  });
+  // The build step is anchored (cutout round the Build tab): the docked bubble, boosted.
+  await step('tutorial-anchored-boosted', async () => {
+    await boostFonts(page, '.nrl-tutorial-bubble', BOOST);
+    const out = await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-skip']);
+    if (!(await scrolls(page, '.nrl-tutorial-text'))) out.push('the copy does not scroll inside the bubble');
+    return out;
   });
   await step('tutorial-skipped', async () => {
     await tap('.nrl-tutorial-skip');
