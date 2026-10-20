@@ -4,6 +4,7 @@ import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerT
 import { createNewGame, getState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { CSS } from '../../src/ui/dom';
+import { ECON } from '../../src/config';
 
 // DOM tests (createHud rendering / flash / bus wiring) are skipped: jsdom is not
 // installed and the vitest environment is 'node' (see vite.config.ts). The
@@ -40,10 +41,25 @@ describe('moneyTile (N12.5)', () => {
     expect(moneyTile(200_000)).toEqual({ text: '$200,000', inDebt: false });
   });
 
+  it('in debt from the line the economy warns at (ECON.BANKRUPTCY_WARN)', () => {
+    expect(moneyTile(ECON.BANKRUPTCY_WARN - 1).inDebt).toBe(true);
+    expect(moneyTile(ECON.BANKRUPTCY_WARN).inDebt).toBe(false);
+  });
+
   it('the in-debt class colours the tile red and the tag is white on red', () => {
     expect(IN_DEBT_CLASS).toBe('nrl-money-negative');
     expect(CSS).toMatch(new RegExp(`\\.nrl-hud-stat\\.${IN_DEBT_CLASS} \\{[^}]*color: #b00020`));
     expect(CSS).toMatch(/\.nrl-hud-debt \{[^}]*background: #b00020;[^}]*color: #fff/);
+  });
+
+  it('below 760px the tag hides (for screen readers only) and the tile wears a red border, so the HUD stays one row at 667×375 (#239)', () => {
+    const at = CSS.indexOf('@media (max-width: 759px)');
+    expect(at).toBeGreaterThan(CSS.indexOf('.nrl-hud-debt {'));
+    const block = CSS.slice(at, CSS.indexOf('\n}', at));
+    expect(block).toMatch(new RegExp(`\\.nrl-hud-stat\\.${IN_DEBT_CLASS} \\{[^}]*border-color: #b00020`));
+    expect(block).toMatch(/\.nrl-hud-debt \{[^}]*position: absolute;[^}]*width: 1px;[^}]*clip: rect\(0 0 0 0\)/);
+    // Visually hidden, not display: none, so the tile still reads "in debt".
+    expect(block).not.toMatch(/\.nrl-hud-debt \{[^}]*display: none/);
   });
 });
 

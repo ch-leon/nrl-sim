@@ -155,6 +155,9 @@ describe('financeSummary — weeks to the fire-sale floor', () => {
   it('is null out of debt or with no burn', () => {
     expect(financeSummary(burning(0)).weeksToFloor).toBeNull();
     expect(financeSummary(burning(50_000)).weeksToFloor).toBeNull();
+    // In debt from the line the economy warns at, as the HUD and the advance rule read it.
+    expect(financeSummary(burning(ECON.BANKRUPTCY_WARN)).weeksToFloor).toBeNull();
+    expect(financeSummary(burning(ECON.BANKRUPTCY_WARN - 1)).weeksToFloor).not.toBeNull();
     // In debt but earning: income 5,000 at reputation 100 covers a 1,000 wage bill.
     const earning = setup({ money: -30_000, reputation: 100, facilities: [], squad: [mkPlayer({ wage: 1000 })] });
     expect(financeSummary(earning).burnWeekly).toBe(0);

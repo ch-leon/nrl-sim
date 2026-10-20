@@ -110,7 +110,7 @@ export function financeSummary(state: GameState): FinanceSummary {
   const burnWeekly = Math.max(0, wagesWeekly + upkeepWeekly - incomeWeekly - gateWeekly);
   const runwayWeeks = burnWeekly > 0 ? Math.max(0, state.money) / burnWeekly : null;
   // The economy sells when the balance is below the floor after a week's money.
-  const weeksToFloor = state.money < 0 && burnWeekly > 0
+  const weeksToFloor = state.money < ECON.BANKRUPTCY_WARN && burnWeekly > 0
     ? Math.max(0, Math.floor((state.money - ECON.FORCED_SALE_FLOOR) / burnWeekly) + 1)
     : null;
 

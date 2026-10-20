@@ -8,7 +8,7 @@ import { getState, type GameState } from '../core/state';
 import type { AdvanceTarget } from '../core/advanceRules';
 import { weekHeld } from '../core/time';
 import { advanceInProgress, stopAdvance } from '../core/advance';
-import { WEEKS_PER_SEASON } from '../config';
+import { ECON, WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
 
 /** Options for {@link createHud}. */
@@ -48,12 +48,13 @@ export const IN_DEBT_CLASS = 'nrl-money-negative';
 export const IN_DEBT_TEXT = 'in debt';
 
 /**
- * The money tile: the balance, and whether the club is in debt (below $0 the
- * tile takes IN_DEBT_CLASS and says "in debt" beside the number, N12.5). Pure —
+ * The money tile: the balance, and whether the club is in debt (below
+ * ECON.BANKRUPTCY_WARN, the line the economy warns at and the advance stops on,
+ * the tile takes IN_DEBT_CLASS and says "in debt" beside the number, N12.5). Pure —
  * extracted for unit testing without the DOM.
  */
 export function moneyTile(balance: number): { text: string; inDebt: boolean } {
-  return { text: fmtMoney(balance), inDebt: balance < 0 };
+  return { text: fmtMoney(balance), inDebt: balance < ECON.BANKRUPTCY_WARN };
 }
 
 const FLASH_MS = 450;
@@ -171,7 +172,8 @@ export function createHud(opts: HudOpts = {}): Hud {
   function renderMoney(balance: number): void {
     const tile = moneyTile(balance);
     moneyEl.textContent = tile.text;
-    if (tile.inDebt) moneyEl.append(el('span', { class: 'nrl-hud-debt', text: IN_DEBT_TEXT }));
+    // The space keeps the tile's text "-$6,070 in debt" for screen readers (#239).
+    if (tile.inDebt) moneyEl.append(' ', el('span', { class: 'nrl-hud-debt', text: IN_DEBT_TEXT }));
     moneyEl.classList.toggle(IN_DEBT_CLASS, tile.inDebt);
 
     if (lastMoney !== null && balance !== lastMoney) {
