@@ -229,7 +229,7 @@ export interface GameState {
   eventDeck: EventDeckState;  // random events: pending cards, cooldowns, modifiers, own RNG stream (#75)
   kit?: KitDesign;            // the player's kit design (#79); absent = derived from the club colours
   finance: SeasonFinance[];   // the club's books by season, oldest first (#172)
-  lineup: Lineup;             // the coach's nine by slot, bench and rotation (#69)
+  lineup: Lineup;             // the coach's nine by slot, bench, rotation and team tactics (#69, N11)
   potmTally?: PotmTally;      // player-of-the-match awards this season, by name (#190); absent until the first
   rngSeed: number;            // advanced state of the seeded RNG
 }
@@ -244,7 +244,7 @@ six-week ledger stamps with the same function (to that season's last week) and n
 its Other column by the same lines, so the two agree (N12).
 
 The lineup (GitHub #69, `systems/lineup.ts`): `{ starters: (playerId | null)[9]; bench:
-playerId[]; rotation: 'off' | 'standard' | 'heavy' }`, the starters in the formation's
+playerId[]; rotation: 'off' | 'standard' | 'heavy'; tactics: TeamTactics }`, the starters in the formation's
 slot order (fullback, two wingers, centre, five-eighth, halfback, hooker, prop,
 second-row: the live sim's roles in `match/league/roles.ts`). A man out of position
 plays below his rating (same ×1, related ×0.92, unrelated ×0.8; tuning reference §21).
@@ -253,7 +253,9 @@ covered for that match by the best man for the slot (bench first, then the rest 
 squad) with a line in the news, a man who has left the club is replaced in the saved
 lineup too. The sheet's roster is then the nine in slot order, each entry's `position`
 the slot he plays and his stats scaled by his fit, so the live sim's slots and the
-match-screen looks both see the man the coach picked. Rival
+match-screen looks both see the man the coach picked. `tactics` is the attack and defence
+preset the coach picks on the Lineup screen (N11, BAK-208 §5): Balanced / Slide by default
+and for saves from before v14, and the sheet carries it into the match. Rival
 coaches auto-pick by slot with the same fit. Old saves (v10 → v11) get today's auto pick.
 
 Rival squads (GitHub #74): every rival keeps a persistent `squad` (generated to match its
