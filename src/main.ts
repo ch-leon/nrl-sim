@@ -38,7 +38,7 @@ import { initNewsInbox, newsInbox, openInboxScreen, pendingDecisionCount } from 
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard } from './ui/orientation';
-import { startTutorial } from './ui/tutorial';
+import { startTutorial, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
 import { openGuideScreen } from './ui/guide/guide';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
@@ -152,9 +152,11 @@ async function boot(): Promise<void> {
   // which checks what the grounds actually draw and dumps the live state for the
   // save corpus (tests/fixtures/saves) before the first autosave. Nothing else reads these.
   if (new URLSearchParams(location.search).has('e2e')) {
-    const w = window as unknown as { __nrlGame?: Phaser.Game; __nrlState?: () => GameState };
+    const w = window as unknown as { __nrlGame?: Phaser.Game; __nrlState?: () => GameState; __nrlTutorialText?: string[] };
     w.__nrlGame = g;
     w.__nrlState = () => getState();
+    // Every tutorial step's copy, for scripts/e2e-webkit.mjs's fit check (#208).
+    w.__nrlTutorialText = TUTORIAL_STEPS.map((st) => st.text);
   }
   g.events.once(Phaser.Core.Events.READY, () => {
     if (portraitBlocked) g.loop.sleep();

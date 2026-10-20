@@ -48,6 +48,10 @@ describe('tutorial bubble fits the viewport (#206)', () => {
     const block = TUTORIAL_CSS.slice(TUTORIAL_CSS.indexOf('@media (max-height: 500px)'));
     expect(block).toContain('max-height: calc(100dvh');
   });
+  it('the landscape-phone dock is wide enough for every step unscrolled (#208)', () => {
+    const block = TUTORIAL_CSS.slice(TUTORIAL_CSS.indexOf('@media (max-height: 500px)'));
+    expect(block).toContain('max-width: min(60vw, 300px)');
+  });
 });
 
 describe('Guide keeps its foot in view (#206)', () => {

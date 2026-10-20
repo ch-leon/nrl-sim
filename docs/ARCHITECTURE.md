@@ -292,11 +292,19 @@ end, so an app killed mid-match reloads the week before; a small record next to 
 save slot (`systems/liveMatchRecord.ts`: seed, calls, tick) makes the re-advanced
 week resume the same match where it was.
 
+Holds count (N9.2): every hook of the holding order still runs, then the later hooks
+and the week's end wait for one `resumeWeek()` per hold. With *Rival matches on the
+match engine* on (`settings.liveRivals`), the rival round (order 40, beside the
+player's match) plays its seven fixtures with `runMatch` in a Web Worker
+(`systems/rivalRound.ts`, `systems/rivalWorker.ts`) and holds the week until they are
+in; off, or on fast-forward, it uses the cheap sim, which scores on the live sim's
+scale (tuning reference §24).
+
 Finals (weeks 25–27, GitHub #2): after the ladder step of week 24/25/26 the
 fixtures system appends the next knockout round — QF 1v8/2v7/3v6/4v5 from the
 regular-season ladder, SF re-seeded from QF winners, GF from SF winners (draws go
 to the home/higher seed). Player ties go through matchday → MatchScene like any
-round; rival ties are cheap-simmed. Finals results stamp the fixture only — the
+round; rival ties are cheap-simmed (or live, with the setting on). Finals results stamp the fixture only — the
 ladder stays the regular-season finish. At rollover the GF winner is recorded in
 `history` (headless `runFinals` catch-up if the bracket is unfinished), and
 `season:ended` carries that entry to the season-end toast.

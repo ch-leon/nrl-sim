@@ -190,12 +190,24 @@ async function facilitiesDrawn(rec) {
   if (drawn !== want) throw new Error(`grounds draw ${drawn} facilities, the save has ${want}`);
 }
 
-/** At full time: close the Player of the Match card if it's up, then go back to the club. */
+/**
+ * At full time: go back to the club. With the Player of the Match card up, Back to
+ * Club must take the first tap (#203) and the card must go with the match view.
+ */
 async function leaveMatch() {
-  const potm = page.locator('.nrl-modal .nrl-btn:has-text("Close")');
-  if (await potm.count()) { await press(potm.first()); await wait(200); }
-  await tap('.nrl-btn:has-text("Back to Club")');
+  const back = page.locator('.nrl-btn:has-text("Back to Club")').first();
+  await back.waitFor();
+  if (await page.locator('.nrl-potm-modal').count()) {
+    const hit = await back.evaluate((b) => {
+      const r = b.getBoundingClientRect();
+      const at = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+      return b.contains(at) ? null : at?.className || at?.tagName || 'nothing';
+    });
+    if (hit) throw new Error(`Back to Club is covered by "${hit}" while Player of the Match is up`);
+  }
+  await press(back);
   await page.waitForSelector('.nrl-hud .nrl-btn:has-text("Advance Week")');
+  if (await page.locator('.nrl-potm-modal').count()) throw new Error('the Player of the Match card stayed up after Back to Club');
 }
 
 /** Advance with the split-button menu: index 0 = ×4 weeks, 1 = to finals, 2 = to season end. */
@@ -552,17 +564,21 @@ async function play() {
   });
 
   // Play out the season: to the finals, then to season end, answering cards on the way.
-  for (let i = 0; i < 12; i++) {
+  // A club in debt stops every advance after one week (the bankruptcy warning), so
+  // budget a call per week left, and fail as soon as a call makes no progress.
+  for (let i = 0; i < 40; i++) {
     const s = await save();
     if (s.season > 1) break;
     const target = s.week < 25 ? 1 : 2;
-    await step(`to-${target === 1 ? 'finals' : 'season-end'}-${i + 1}`, async (rec) => {
+    const r = await step(`to-${target === 1 ? 'finals' : 'season-end'}-${i + 1}`, async (rec) => {
       await answerCards(rec);
       await advanceMenu(target);
       const now = await save();
       const stop = await page.locator('.nrl-toast').last().textContent().catch(() => '');
       rec.notes.push(`S${now.season} W${now.week} $${now.money}${stop ? ` · "${stop.trim()}"` : ''}`);
+      if (now.season === s.season && now.week === s.week) throw new Error(`no progress from S${s.season} W${s.week}`);
     }, { quietToasts: true });
+    if (!r.ok && !r.errors) break;
   }
   await step('season-2', async (rec) => {
     const s = await save();

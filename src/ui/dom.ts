@@ -203,10 +203,14 @@ let openModalEl: HTMLElement | null = null;
  * With `screen: true` the modal is a nav *screen* instead of a dialog: it is
  * confined to the screen region (HUD and nav stay visible and usable), it
  * replaces any other open screen, and it is closed with closeScreen().
+ *
+ * With `region: true` a dialog stays a dialog (it sits over the open screen and
+ * closeModal() closes it) but is laid out in the screen region like a screen
+ * (#203): the HUD and nav stay whole and tappable, and a nav tap closes it.
  */
 export function openModal(
   content: HTMLElement,
-  opts: { class?: string; screen?: boolean; closeButton?: boolean } = {},
+  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean } = {},
 ): HTMLElement {
   ensureStyles();
   const box = el(
@@ -237,7 +241,7 @@ export function openModal(
   closeModal();
   const backdrop = el(
     'div',
-    { class: 'nrl-modal-backdrop', onClick: () => closeModal() },
+    { class: opts.region ? 'nrl-modal-backdrop nrl-dialog-region' : 'nrl-modal-backdrop', onClick: () => closeModal() },
     box,
   );
   openModalEl = backdrop;
@@ -469,17 +473,27 @@ export const CSS = `
   z-index: 50;
   box-sizing: border-box;
 }
-.nrl-screen-backdrop {
+.nrl-screen-backdrop, .nrl-dialog-region {
   padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
 }
-.nrl-screen-backdrop .nrl-modal {
+.nrl-screen-backdrop .nrl-modal, .nrl-dialog-region .nrl-modal {
   /* Fit inside the region (drop-shadow included) rather than the viewport. */
   max-height: calc(100% - 6px);
-  /* #195: a landscape phone has width to spare and no height; use it. */
   position: relative;
+}
+.nrl-screen-backdrop .nrl-modal {
+  /* #195: a landscape phone has width to spare and no height; use it. */
   width: min(96vw, 640px);
   max-width: none;
 }
+/* A region dialog (#203): between HUD and nav like a screen, above it like a dialog. */
+.nrl-dialog-region {
+  top: var(--nrl-hud-h, 0px);
+  bottom: var(--nrl-nav-h, 0px);
+}
+/* Player of the Match (#203): a card, not a wall; taps beside it reach Back to Club. */
+.nrl-potm-backdrop { pointer-events: none; background: transparent; }
+.nrl-potm-backdrop .nrl-modal { pointer-events: auto; }
 .nrl-screen-x {
   position: absolute;
   top: 4px;
@@ -838,9 +852,27 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-player-trait-bad b { color: #8a3a00; }
 .nrl-player-line { margin: 0.1rem 0; overflow-wrap: anywhere; }
 .nrl-player-expiring { color: #b00020; }
-.nrl-player-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+/* #203: the actions stay pinned to the foot of the card while the rest scrolls. */
+.nrl-player-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  position: sticky;
+  bottom: -0.6rem; /* over the card's bottom padding, so nothing scrolls under it */
+  padding: 0.4rem 0 0.6rem;
+  background: #e8e0c8;
+  border-top: 2px solid #b8ae92;
+  z-index: 1;
+}
 .nrl-player-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
 .nrl-player-actions .nrl-player-close { flex: 1 1 100%; }
+.nrl-modal-has-x .nrl-player-top { padding-right: 2.75rem; }
+/* A landscape phone: Close joins the row (the ✕ is in the corner too). */
+@media (max-height: 500px) {
+  .nrl-player-actions .nrl-player-close { flex: 1 1 6rem; }
+  .nrl-player-why { order: 1; }
+}
 .nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
 /* ── Guide under "?" (N7, #188) ─────────────────────────────────────────── */
 .nrl-screen-backdrop .nrl-guide-modal { width: min(96vw, 760px); max-width: none; display: flex; flex-direction: column; }

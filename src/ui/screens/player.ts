@@ -340,7 +340,15 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     render();
   });
   render();
-  const backdrop = openModal(panel({ class: 'nrl-player-panel' }, content), { class: 'nrl-player-modal' });
+  // In the band between HUD and nav, with a ✕ in the corner (#203).
+  const backdrop = openModal(panel({ class: 'nrl-player-panel' }, content), { class: 'nrl-player-modal', region: true });
+  const box = backdrop.querySelector('.nrl-modal');
+  if (box) {
+    const x = button('✕', finish, { class: 'nrl-screen-x' });
+    x.setAttribute('aria-label', 'Close');
+    box.classList.add('nrl-modal-has-x');
+    box.prepend(x);
+  }
   // The backdrop's own listener has closed the dialog; tell whoever opened it.
   backdrop.addEventListener('click', () => { if (!closed) { closed = true; off(); opts.onClose?.(); } });
   return backdrop;

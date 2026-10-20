@@ -720,7 +720,7 @@ export class LiveSim implements MatchSim {
       default:
         break;
     }
-    if (this.tick % LIVE.decideEveryTicks === 0) this.assignTargets();
+    if (this.tick % Math.max(1, Math.round(LIVE.decideEveryTicks)) === 0) this.assignTargets();
     this.move();
     this.restBench();
     this.runClock();

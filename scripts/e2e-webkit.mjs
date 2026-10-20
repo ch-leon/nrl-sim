@@ -1,15 +1,18 @@
-// scripts/e2e-webkit.mjs — Safari-shaped layout check for the long DOM panels (#206).
+// scripts/e2e-webkit.mjs — Safari-shaped layout check for the long DOM panels (#206, #203).
 // Builds the game, serves it with `vite preview`, and in Playwright's WebKit as an
 // iPhone in landscape (touch, DPR 3, iOS user agent) at 956×330 (16 Pro Max with
 // Safari's address bar and tab strip) and 844×390, checks:
 //   - the page pins text-size-adjust to 100% (iOS Safari's landscape text boost off);
+//   - at the authored text size, every tutorial step's copy fits its bubble unscrolled (#208);
 //   - the welcome tutorial bubble sits inside the viewport with Skip and Next on
 //     screen and tappable; Next and Skip work;
 //   - the same with every font in the bubble boosted 2.17× (what Safari's boost did
 //     on Leon's phone, issue #206; WebKit on Linux never boosts by itself): the copy
 //     scrolls inside the bubble and Skip / Next stay reachable;
 //   - the Guide boosted the same way: the page scrolls, Replay and Close reachable,
-//     and Replay brings the tutorial back with its buttons on screen.
+//     and Replay brings the tutorial back with its buttons on screen;
+//   - the player page (#203) between HUD and nav: ✕, Renew / Sell / Release / Close
+//     tappable, the nav uncovered; the ✕ closes it back to Squad.
 // Screenshots and report.json go to e2e-output/webkit/<WxH>/. Exits 1 on any failure.
 //
 //   npm run e2e:webkit
@@ -161,6 +164,21 @@ async function runSize(browser, W, H) {
     return adjust ? [] : ['the page does not set html { -webkit-text-size-adjust: 100% }'];
   });
   await step('tutorial-welcome', () => reachProblems(page, ...TUT));
+  // #208: at the authored text size every step's copy fits without scrolling. Each
+  // step's text is put in the welcome bubble in turn (one rule sizes them all here).
+  await step('tutorial-every-step-fits', () => page.evaluate(() => {
+    const text = document.querySelector('.nrl-tutorial-text');
+    const steps = window.__nrlTutorialText ?? [];
+    if (!text || !steps.length) return ['no tutorial copy to check (?e2e hook missing)'];
+    const original = text.textContent;
+    const out = [];
+    steps.forEach((copy, i) => {
+      text.textContent = copy;
+      if (text.scrollHeight > text.clientHeight + 1) out.push(`step ${i + 1} copy overflows (${text.scrollHeight} > ${text.clientHeight}px): "${copy.slice(0, 30)}…"`);
+    });
+    text.textContent = original;
+    return out;
+  }));
   await step('tutorial-boosted', async (rec) => {
     const px = await boostFonts(page, '.nrl-tutorial-bubble', BOOST);
     rec.notes.push(`copy at ${Math.round(px)}px`);
@@ -204,6 +222,44 @@ async function runSize(browser, W, H) {
     await tap('.nrl-tutorial-skip');
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
     return out;
+  });
+  // #203: the player page (Squad → a player) sits between HUD and nav, with a ✕
+  // and Renew / Sell / Release / Close on screen; the nav stays whole and tappable.
+  const PLAYER = ['.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="renew"]',
+    '[data-player-action="sell"]', '[data-player-action="release"]', '.nrl-player-close']];
+  await step('player-page', async () => {
+    await tap('.nrl-nav .nrl-btn[data-screen="squad"]');
+    await tap('.nrl-card-open');
+    await page.waitForSelector('[data-player-page]');
+    await page.waitForTimeout(300);
+    const out = await reachProblems(page, ...PLAYER);
+    out.push(...await page.evaluate(() => {
+      const box = document.querySelector('.nrl-player-modal').getBoundingClientRect();
+      const nav = document.querySelector('.nrl-nav').getBoundingClientRect();
+      const hud = document.querySelector('.nrl-hud').getBoundingClientRect();
+      const problems = box.bottom > nav.top + 1 ? [`the player page runs into the nav (${Math.round(box.bottom)} > ${Math.round(nav.top)})`] : [];
+      if (box.top < hud.bottom - 1) problems.push(`the player page runs under the HUD (${Math.round(box.top)} < ${Math.round(hud.bottom)})`);
+      for (const b of document.querySelectorAll('.nrl-nav .nrl-btn')) {
+        const r = b.getBoundingClientRect();
+        const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+        if (!hit || !b.contains(hit)) problems.push(`nav "${b.textContent.trim()}" covered`);
+      }
+      return problems;
+    }));
+    return out;
+  });
+  // A renewal re-renders the page from state: the ✕ and the actions must survive it.
+  await step('player-page-renewed', async (rec) => {
+    const renew = page.locator('[data-player-action="renew"]');
+    if (await renew.isDisabled()) { rec.notes.push('renew not offered for this player'); return []; }
+    await renew.tap();
+    await page.waitForTimeout(300);
+    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="sell"]', '.nrl-player-close']);
+  });
+  await step('player-page-closed', async () => {
+    await tap('.nrl-player-modal .nrl-screen-x');
+    await page.waitForSelector('[data-player-page]', { state: 'detached' });
+    return (await page.locator('.nrl-card-open').count()) ? [] : ['the Squad screen did not stay open under the player page'];
   });
 
   for (const e of report.errors) log(`  error: ${e}`);
