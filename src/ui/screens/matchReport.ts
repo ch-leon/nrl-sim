@@ -18,6 +18,8 @@ import { addPotm } from './seasonReview';
 export interface ReportSide {
   id: string;
   name: string;
+  /** The club's last word ("Larrikins"), for the narrow stats columns. */
+  short: string;
   score: number;
   /** "Name 4', 11' (5)" per try scorer, in order of his first; a bonus-zone try is marked. */
   tries: string[];
@@ -25,6 +27,8 @@ export interface ReportSide {
   goals: { made: number; taken: number };
   fieldGoals: number;
   sinBins: string[];
+  /** "Name (3 weeks)" for each man hurt. */
+  injuries: string[];
 }
 
 export interface ReportRow {
@@ -55,17 +59,25 @@ function byPlayer(events: readonly MatchEvent[], mark: (e: MatchEvent) => string
   return [...out].map(([who, marks]) => `${who} ${marks.join(', ')}`);
 }
 
+/** "Launceston Larrikins" → "Larrikins": a club's last word, unless that is a bare "FC" or the like. */
+export function shortName(name: string): string {
+  const last = name.trim().split(/\s+/).pop() ?? name;
+  return last.length >= 4 ? last : name;
+}
+
 function side(result: MatchResult, id: string, name: string, score: number): ReportSide {
   const mine = result.events.filter((e) => e.teamId === id);
   const goals = mine.filter((e) => e.kind === 'conversion' || e.kind === 'penalty-goal');
   return {
     id,
     name,
+    short: shortName(name),
     score,
     tries: byPlayer(mine.filter((e) => e.kind === 'try'), (e) => `${minute(e)}${e.detail === 'bonus' ? ' (5)' : ''}`),
     goals: { made: goals.filter((e) => e.detail === 'good').length, taken: goals.length },
     fieldGoals: mine.filter((e) => e.kind === 'field-goal' && e.detail === 'good').length,
     sinBins: byPlayer(mine.filter((e) => e.kind === 'sin-bin'), minute),
+    injuries: result.injuries.filter((i) => i.teamId === id).map((i) => `${i.playerName} (${i.weeks} week${i.weeks === 1 ? '' : 's'})`),
   };
 }
 
@@ -78,6 +90,11 @@ export function buildMatchReport(
 ): MatchReport {
   const home = side(result, fixture.homeId, names[fixture.homeId] ?? fixture.homeId, result.homeScore);
   const away = side(result, fixture.awayId, names[fixture.awayId] ?? fixture.awayId, result.awayScore);
+  // Two clubs with the same last word ("Brisbane Larrikins" v "Launceston Larrikins"): full names.
+  if (home.short === away.short) {
+    home.short = home.name;
+    away.short = away.name;
+  }
   const count = (kind: MatchEvent['kind'], id: string): number => result.events.filter((e) => e.kind === kind && e.teamId === id).length;
   const pair = (label: string, h: number | string, a: number | string): ReportRow => ({ label, home: String(h), away: String(a) });
   const s = result.stats;
@@ -88,6 +105,8 @@ export function buildMatchReport(
     pair('Errors', s.errors[0], s.errors[1]),
     pair('Kicks', count('kick', home.id), count('kick', away.id)),
     pair('Big hits', count('big-hit', home.id), count('big-hit', away.id)),
+    // Coach calls (#73): made, and how many paid off, when either coach made one.
+    ...(result.calls ? [pair('Calls paid off', `${result.calls.paid[0]}/${result.calls.made[0]}`, `${result.calls.paid[1]}/${result.calls.made[1]}`)] : []),
   ];
   const golden = result.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
   const final = fixture.round > SEASON_ROUNDS;
@@ -107,14 +126,15 @@ function sideBlock(s: ReportSide): HTMLElement {
   if (s.tries.length) lines.push(`Tries: ${s.tries.join(', ')}`);
   if (s.goals.taken) lines.push(`Goals: ${s.goals.made}/${s.goals.taken}`);
   if (s.fieldGoals) lines.push(`Field goals: ${s.fieldGoals}`);
-  if (s.sinBins.length) lines.push(`Sin bin: ${s.sinBins.join(', ')}`);
   if (!lines.length) lines.push('No score');
-  return el('div', { class: 'nrl-report-side' }, el('h3', { text: `${s.name} ${s.score}` }), ...lines.map((t) => el('p', { text: t })));
+  if (s.sinBins.length) lines.push(`Sin bin: ${s.sinBins.join(', ')}`);
+  if (s.injuries.length) lines.push(`Injured: ${s.injuries.join(', ')}`);
+  return el('div', { class: 'nrl-report-side' }, el('h3', { text: `${s.short} ${s.score}` }), ...lines.map((t) => el('p', { text: t })));
 }
 
 export function openMatchReport(r: MatchReport): HTMLElement {
   const table = el('table', { class: 'nrl-report-stats' });
-  table.append(el('tr', {}, el('th', { text: '' }), el('th', { text: r.home.name }), el('th', { text: r.away.name })));
+  table.append(el('tr', {}, el('th', { text: '' }), el('th', { text: r.home.short }), el('th', { text: r.away.short })));
   for (const row of r.rows) table.append(el('tr', {}, el('td', { text: row.label }), el('td', { text: row.home }), el('td', { text: row.away })));
   const content = el(
     'div',

@@ -1,12 +1,16 @@
 // src/ui/screens/finance.ts — Finance nav screen (GitHub #39, part of #49).
 // Weekly P&L, runway and the next home gate, plus contracts expiring soon and a
-// short in-memory ledger built from 'money:changed'. The numbers come from a
-// pure view-model (financeSummary / FinanceLedger) that is unit-tested without
-// the DOM; the DOM part only renders it. No Phaser.
+// short in-memory ledger built from 'money:changed' (stamped and classified as
+// the season books are, N12). The numbers come from a pure view-model
+// (financeSummary / FinanceLedger) that is unit-tested without the DOM; the DOM
+// part only renders it. No Phaser.
 
 import { bus } from '../../core/events';
 import { getState, FINANCE_LINES, type FinanceLine, type GameState, type SeasonFinance } from '../../core/state';
-import { weeklyWages, weeklyUpkeep, weeklyIncome, sponsorIncome, groundCapacity, homeGate, financeNet } from '../../systems/economy';
+import {
+  weeklyWages, weeklyUpkeep, weeklyIncome, sponsorIncome, groundCapacity, homeGate, nextStandGate, financeNet,
+  classifyReason, stampMovement, type StandProjection,
+} from '../../systems/economy';
 import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { buildObjectivesSection } from './board';
 import { el, panel, button, openModal, closeScreen } from '../dom';
@@ -55,6 +59,11 @@ export interface FinanceSummary {
    * crowd against the seats (#169: sold out means a bigger stand would earn more).
    */
   nextHome: { round: number; projectedGate: number; attendance: number; capacity: number; soldOut: boolean } | null;
+  /**
+   * What the next Grandstand level would earn at the next home game's demand
+   * (nextStandGate, N12): only when that game sells out, and not at the top level.
+   */
+  nextStand: StandProjection | null;
   /** Squad players whose contracts end within EXPIRY_WINDOW_WEEKS, soonest first. */
   expiring: ExpiringContract[];
 }
@@ -88,6 +97,8 @@ export function financeSummary(state: GameState): FinanceSummary {
     }
     : null;
 
+  const nextStand = nextFixture ? nextStandGate({ ...state, week: nextFixture.round }, nextFixture) : null;
+
   const gateWeekly = averageGateWeekly(state, nextHome?.projectedGate ?? 0);
   const burnWeekly = Math.max(0, wagesWeekly + upkeepWeekly - incomeWeekly - gateWeekly);
   const runwayWeeks = burnWeekly > 0 ? Math.max(0, state.money) / burnWeekly : null;
@@ -109,6 +120,7 @@ export function financeSummary(state: GameState): FinanceSummary {
     burnWeekly,
     runwayWeeks,
     nextHome,
+    nextStand,
     expiring,
   };
 }
@@ -140,16 +152,20 @@ export interface LedgerWeek {
   income: number;
   /** Gate receipts for the week. */
   gate: number;
-  /** Any other money movement (build, recruit, …). */
+  /** Every other money movement (prize money, signings, the grounds, …). */
   other: number;
+  /** `other` by the books' line (classifyReason), so the screen names it as the season P&L does (N12). */
+  otherLines: Partial<Record<FinanceLine, number>>;
   /** Σ of every movement recorded for the week. */
   net: number;
 }
 
 /**
  * Keeps the last `maxWeeks` weeks of money movements. Feed it money:changed
- * deltas with the season/week they happened in. Reasons match the labels that
- * applyEconomy passes to earnMoney ('wages', 'upkeep', 'sponsor', 'grant', 'gate').
+ * deltas with the season/week they are stamped with (initFinanceLedger uses the
+ * books' stampMovement). Each reason goes to its line of the books
+ * (classifyReason): wages, upkeep, sponsor + grant as income and the gate have
+ * their own columns; every other line is summed into `other` and kept by line.
  */
 export class FinanceLedger {
   private weeks: LedgerWeek[] = []; // oldest → newest
@@ -158,25 +174,32 @@ export class FinanceLedger {
 
   record(entry: { delta: number; reason: string; season: number; week: number }): void {
     const { delta, reason, season, week } = entry;
-    let row = this.weeks[this.weeks.length - 1];
-    if (!row || row.season !== season || row.week !== week) {
-      row = { season, week, wages: 0, upkeep: 0, income: 0, gate: 0, other: 0, net: 0 };
-      this.weeks.push(row);
+    let row = this.weeks.find((r) => r.season === season && r.week === week);
+    if (!row) {
+      row = { season, week, wages: 0, upkeep: 0, income: 0, gate: 0, other: 0, otherLines: {}, net: 0 };
+      // In stamp order: the rollover's money is stamped to the week it closes,
+      // which may already be behind a newer row.
+      const at = this.weeks.findIndex((r) => r.season > season || (r.season === season && r.week > week));
+      this.weeks.splice(at < 0 ? this.weeks.length : at, 0, row);
       if (this.weeks.length > this.maxWeeks) {
         this.weeks.splice(0, this.weeks.length - this.maxWeeks);
       }
     }
-    if (reason === 'wages') row.wages += delta;
-    else if (reason === 'upkeep') row.upkeep += delta;
-    else if (reason === 'sponsor' || reason === 'grant' || reason === 'sponsor+grant') row.income += delta;
-    else if (reason === 'gate') row.gate += delta;
-    else row.other += delta;
+    const line = classifyReason(reason);
+    if (line === 'wages') row.wages += delta;
+    else if (line === 'upkeep') row.upkeep += delta;
+    else if (line === 'sponsor' || line === 'grant') row.income += delta;
+    else if (line === 'gate') row.gate += delta;
+    else {
+      row.other += delta;
+      row.otherLines[line] = (row.otherLines[line] ?? 0) + delta;
+    }
     row.net += delta;
   }
 
   /** Recorded weeks, newest first. Copies, so callers can't mutate the ledger. */
   rows(): LedgerWeek[] {
-    return this.weeks.slice().reverse().map((r) => ({ ...r }));
+    return this.weeks.slice().reverse().map((r) => ({ ...r, otherLines: { ...r.otherLines } }));
   }
 
   clear(): void {
@@ -188,12 +211,15 @@ export class FinanceLedger {
 const financeLedger = new FinanceLedger();
 
 /**
- * Subscribe a ledger to money:changed, stamping each movement with the current
- * season/week. Call once from main.ts. Returns the unsubscribe.
+ * Subscribe a ledger to money:changed, stamping each movement as the season
+ * books do (stampMovement): the current season/week, except the rollover's prize
+ * money and board grant, which go to the last week of the season they close
+ * rather than week 1 of the next (N12). Call once from main.ts. Returns the
+ * unsubscribe.
  */
 export function initFinanceLedger(ledger: FinanceLedger = financeLedger): () => void {
   return bus.on('money:changed', ({ delta, reason }) => {
-    const { season, week } = getState();
+    const { season, week } = stampMovement(getState(), reason);
     ledger.record({ delta, reason, season, week });
   });
 }
@@ -275,6 +301,30 @@ export function fmtCrowd(c: { attendance: number; capacity: number; soldOut: boo
   return c.soldOut ? `Sold out · ${seats} seats` : `${c.attendance.toLocaleString('en-US')} of ${seats} seats`;
 }
 
+/**
+ * The next stand as a Finance row (N12): ["A stand would seat 3,500", "about +$27k
+ * a game"], "A bigger stand" once one is built. Rounded to the thousand: it is
+ * one game's demand, which form and the opponent move.
+ */
+export function fmtStand(p: StandProjection): { label: string; value: string } {
+  const gain = p.gain >= 1000 ? `$${Math.round(p.gain / 1000)}k` : fmtMoney(p.gain);
+  return {
+    label: `${p.level > 1 ? 'A bigger stand' : 'A stand'} would seat ${p.capacity.toLocaleString('en-US')}`,
+    value: `about +${gain} a game`,
+  };
+}
+
+/**
+ * What a ledger week's `other` is, by the books' lines and labels (N12):
+ * "Prize money $25.0k · Board grants $10.0k". Null when it is nothing or only
+ * the books' own `other`, which the column already says.
+ */
+export function ledgerNote(row: Pick<LedgerWeek, 'otherLines'>): string | null {
+  const lines = FINANCE_LINES.filter((l) => (row.otherLines[l] ?? 0) !== 0);
+  if (lines.length === 0 || (lines.length === 1 && lines[0] === 'other')) return null;
+  return lines.map((l) => `${FINANCE_LINE_LABELS[l]} ${fmtMoneyCompact(row.otherLines[l]!)}`).join(' · ');
+}
+
 /** Runway label: "12 weeks", "1 week", "0 weeks", or "No burn" when null. */
 export function fmtRunway(weeks: number | null): string {
   if (weeks === null) return 'No burn';
@@ -343,6 +393,10 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
     ),
     statRow('Crowd', s.nextHome ? fmtCrowd(s.nextHome) : `${groundCapacity(state).toLocaleString('en-US')} seats`),
   );
+  if (s.nextStand) {
+    const stand = fmtStand(s.nextStand);
+    weekly.append(statRow(stand.label, stand.value));
+  }
   nodes.push(panel({ class: 'nrl-finance-panel' }, weekly));
   nodes.push(panel({ class: 'nrl-finance-panel' }, buildSeasonPnl(state)));
   nodes.push(buildObjectivesSection(state));
@@ -380,6 +434,11 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
         tr.append(td);
       }
       tbody.append(tr);
+      // What "Other" was, in the P&L's words (prize money, a signing, the grounds).
+      const note = ledgerNote(r);
+      if (note) {
+        tbody.append(el('tr', {}, el('td', { text: `Other: ${note}`, attrs: { colspan: '7', style: 'font-size:0.7rem;opacity:0.85' } })));
+      }
     }
     table.append(tbody);
     ledger.append(el('div', { class: 'nrl-finance-scroll' }, table));

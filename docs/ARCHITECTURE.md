@@ -132,9 +132,9 @@ export type Position =
   | 'fullback' | 'winger' | 'centre' | 'five-eighth' | 'halfback'
   | 'hooker' | 'prop' | 'second-row' | 'lock';
 
-export type Trait =
-  | 'workhorse' | 'finisher' | 'hardMan' | 'playmaker'
-  | 'injuryProne' | 'clubLegend' | 'youngGun' | 'veteran';
+// Traits are levelled special skills (BAK-208 §3); the catalogue of TraitIds
+// (dancingFeet, hitman, hothead, …) lives in data/traits.ts.
+export interface TraitInstance { id: TraitId; level: 1 | 2 | 3 }
 
 export interface PlayerStats {
   speed: number; strength: number; stamina: number;
@@ -150,9 +150,14 @@ export interface Player {
   morale: number;             // 1-100
   injuryRisk: number;         // 1-100
   injuredWeeks: number;       // 0 = fit
-  traits: Trait[];
+  traits: TraitInstance[];
   wage: number;               // per week
   contractWeeks: number;      // remaining
+  junior?: boolean;           // Academy prospect awaiting signing (#42)
+  departed?: boolean;         // left the club: survives free-agent re-rolls (#40)
+  career?: StatTally;         // games, tries, tackles, line breaks, sin bins, from match events (#46)
+  seasonStats?: StatTally & { season: number }; // this season only (#46)
+  joinedSeason?: number;      // first season at the club (drives clubLegend)
 }
 
 export interface PlacedFacility {
@@ -185,8 +190,21 @@ export interface RivalClub {
   squad?: Player[];           // the rival's own players (#74); absent on the player's club entry
 }
 
+export interface SeasonRecord {
+  season: number; ladderPosition: number; premiership: boolean;
+  wins?: number; losses?: number; draws?: number; // the extended fields are absent on pre-v4 records
+  pointsFor?: number; pointsAgainst?: number;
+  topScorer?: { name: string; tries: number };
+  review?: SeasonReview;      // what the season review showed, so History can reopen it (v12+, #190)
+}
+
+// The club's books by line (#172): Σ money:changed deltas for one season, negative = spent.
+// FINANCE_LINES: wages, upkeep, sponsor, grant, gate, prize, boardGrant, events,
+// transfers, contracts, facilities, other.
+export type SeasonFinance = { season: number } & Record<FinanceLine, number>;
+
 export interface GameState {
-  version: 1;
+  version: typeof SAVE_VERSION; // bumped with a MIGRATIONS step in save.ts on every shape change
   clubId: 'player';
   clubName: string;
   money: number;
@@ -198,13 +216,32 @@ export interface GameState {
   freeAgents: Player[];
   league: LeagueState;
   weather?: WeatherKind;      // set for current round by fixtures system
-  settings: { muted: boolean; volume: number; tutorialDone: boolean };
-  history: { season: number; ladderPosition: number; premiership: boolean }[];
+  settings: {
+    muted: boolean; volume: number; tutorialDone: boolean;
+    difficulty: Difficulty;   // easy | normal | hard (#48)
+    coachCalls?: boolean;     // the call chips in your matches (#73); on when absent
+    liveRivals?: boolean;     // rival rounds played on the live sim (N9.2, #212); off when absent
+  };
+  history: SeasonRecord[];    // one per completed season, oldest first
+  boardPatience: number;      // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
+  objectives: Objective[];    // this season's board objectives (#47)
+  sacked?: SackedInfo;        // set when the board sacks the player; the save is kept (#47)
   eventDeck: EventDeckState;  // random events: pending cards, cooldowns, modifiers, own RNG stream (#75)
+  kit?: KitDesign;            // the player's kit design (#79); absent = derived from the club colours
+  finance: SeasonFinance[];   // the club's books by season, oldest first (#172)
   lineup: Lineup;             // the coach's nine by slot, bench, rotation and team tactics (#69, N11)
+  potmTally?: PotmTally;      // player-of-the-match awards this season, by name (#190); absent until the first
   rngSeed: number;            // advanced state of the seeded RNG
 }
 ```
+
+The club's books (N6, #172; `systems/economy.ts`): `registerFinanceSystem` adds every
+`money:changed` delta to its line (`classifyReason`) in the season's `finance` entry,
+opened on the season's first movement. The rollover pays the finals prize money and the
+board grant after the counters have moved to week 1 of the next season, so
+`stampMovement` books those two lines to the season they close; the Finance screen's
+six-week ledger stamps with the same function (to that season's last week) and names
+its Other column by the same lines, so the two agree (N12).
 
 The lineup (GitHub #69, `systems/lineup.ts`): `{ starters: (playerId | null)[9]; bench:
 playerId[]; rotation: 'off' | 'standard' | 'heavy'; tactics: TeamTactics }`, the starters in the formation's
