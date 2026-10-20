@@ -1,0 +1,223 @@
+{
+  "name": "rival scores",
+  "description": "N9.2: the live sim's scores between rival clubs (their generated squads and traits, their own tactics) across strength gaps 2 to 28, both ways round: points, margins and who wins, to put the cheap rival sim on the same scale.",
+  "seeds": 30,
+  "scenarios": [
+    {
+      "name": "reapers (70) v wolves (68)",
+      "home": {
+        "club": "rival-reapers"
+      },
+      "away": {
+        "club": "rival-wolves"
+      }
+    },
+    {
+      "name": "wolves (68) v reapers (70)",
+      "home": {
+        "club": "rival-wolves"
+      },
+      "away": {
+        "club": "rival-reapers"
+      }
+    },
+    {
+      "name": "stingrays (65) v cyclones (61)",
+      "home": {
+        "club": "rival-stingrays"
+      },
+      "away": {
+        "club": "rival-cyclones"
+      }
+    },
+    {
+      "name": "cyclones (61) v stingrays (65)",
+      "home": {
+        "club": "rival-cyclones"
+      },
+      "away": {
+        "club": "rival-stingrays"
+      }
+    },
+    {
+      "name": "drovers (57) v swagmen (54)",
+      "home": {
+        "club": "rival-drovers"
+      },
+      "away": {
+        "club": "rival-swagmen"
+      }
+    },
+    {
+      "name": "swagmen (54) v drovers (57)",
+      "home": {
+        "club": "rival-swagmen"
+      },
+      "away": {
+        "club": "rival-drovers"
+      }
+    },
+    {
+      "name": "gulls (50) v diggers (48)",
+      "home": {
+        "club": "rival-gulls"
+      },
+      "away": {
+        "club": "rival-diggers"
+      }
+    },
+    {
+      "name": "diggers (48) v gulls (50)",
+      "home": {
+        "club": "rival-diggers"
+      },
+      "away": {
+        "club": "rival-gulls"
+      }
+    },
+    {
+      "name": "reapers (70) v drovers (57)",
+      "home": {
+        "club": "rival-reapers"
+      },
+      "away": {
+        "club": "rival-drovers"
+      }
+    },
+    {
+      "name": "drovers (57) v reapers (70)",
+      "home": {
+        "club": "rival-drovers"
+      },
+      "away": {
+        "club": "rival-reapers"
+      }
+    },
+    {
+      "name": "thunder (63) v mariners (52)",
+      "home": {
+        "club": "rival-thunder"
+      },
+      "away": {
+        "club": "rival-mariners"
+      }
+    },
+    {
+      "name": "mariners (52) v thunder (63)",
+      "home": {
+        "club": "rival-mariners"
+      },
+      "away": {
+        "club": "rival-thunder"
+      }
+    },
+    {
+      "name": "crocs (59) v scorpions (46)",
+      "home": {
+        "club": "rival-crocs"
+      },
+      "away": {
+        "club": "rival-scorpions"
+      }
+    },
+    {
+      "name": "scorpions (46) v crocs (59)",
+      "home": {
+        "club": "rival-scorpions"
+      },
+      "away": {
+        "club": "rival-crocs"
+      }
+    },
+    {
+      "name": "reapers (70) v gulls (50)",
+      "home": {
+        "club": "rival-reapers"
+      },
+      "away": {
+        "club": "rival-gulls"
+      }
+    },
+    {
+      "name": "gulls (50) v reapers (70)",
+      "home": {
+        "club": "rival-gulls"
+      },
+      "away": {
+        "club": "rival-reapers"
+      }
+    },
+    {
+      "name": "wolves (68) v brollys (44)",
+      "home": {
+        "club": "rival-wolves"
+      },
+      "away": {
+        "club": "rival-brollys"
+      }
+    },
+    {
+      "name": "brollys (44) v wolves (68)",
+      "home": {
+        "club": "rival-brollys"
+      },
+      "away": {
+        "club": "rival-wolves"
+      }
+    },
+    {
+      "name": "stingrays (65) v larrikins (42)",
+      "home": {
+        "club": "rival-stingrays"
+      },
+      "away": {
+        "club": "rival-larrikins"
+      }
+    },
+    {
+      "name": "larrikins (42) v stingrays (65)",
+      "home": {
+        "club": "rival-larrikins"
+      },
+      "away": {
+        "club": "rival-stingrays"
+      }
+    },
+    {
+      "name": "reapers (70) v larrikins (42)",
+      "home": {
+        "club": "rival-reapers"
+      },
+      "away": {
+        "club": "rival-larrikins"
+      }
+    },
+    {
+      "name": "larrikins (42) v reapers (70)",
+      "home": {
+        "club": "rival-larrikins"
+      },
+      "away": {
+        "club": "rival-reapers"
+      }
+    },
+    {
+      "name": "brumbies (56) v larrikins (42)",
+      "home": {
+        "club": "rival-brumbies"
+      },
+      "away": {
+        "club": "rival-larrikins"
+      }
+    },
+    {
+      "name": "larrikins (42) v brumbies (56)",
+      "home": {
+        "club": "rival-larrikins"
+      },
+      "away": {
+        "club": "rival-brumbies"
+      }
+    }
+  ]
+}
