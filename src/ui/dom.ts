@@ -499,6 +499,20 @@ export const CSS = `
 /* Player of the Match (#203): a card, not a wall; taps beside it reach Back to Club. */
 .nrl-potm-backdrop { pointer-events: none; background: transparent; }
 .nrl-potm-backdrop .nrl-modal { pointer-events: auto; }
+/* The match report (N9.5): as wide as a screen, above Back to Club, scrolling inside. */
+.nrl-report-backdrop { bottom: 3.75rem; align-items: flex-start; padding-top: 0.5rem; }
+.nrl-report-backdrop .nrl-modal { width: min(96vw, 720px); max-width: none; max-height: calc(100% - 0.75rem); overflow-y: auto; padding: 0.6rem 0.8rem; }
+.nrl-report h2 { margin: 0 0 0.2rem; font-size: 1rem; }
+.nrl-report p { margin: 0.15rem 0; font-size: 0.8rem; }
+.nrl-report .nrl-report-score { font-size: 1.05rem; font-weight: bold; }
+.nrl-report-body { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.3rem 0; }
+.nrl-report-scoring { flex: 1 1 18rem; display: flex; gap: 0.8rem; }
+.nrl-report-side { flex: 1 1 0; min-width: 0; }
+.nrl-report-side h3 { margin: 0 0 0.1rem; font-size: 0.85rem; }
+.nrl-report-stats { flex: 1 1 14rem; border-collapse: collapse; font-size: 0.75rem; }
+.nrl-report-stats th, .nrl-report-stats td { padding: 0.05rem 0.35rem; text-align: center; }
+.nrl-report-stats td:first-child { text-align: left; white-space: nowrap; }
+.nrl-report-stats th { font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 8rem; }
 .nrl-screen-x {
   position: absolute;
   top: 4px;

@@ -88,6 +88,7 @@ src/
       history.ts             # past-seasons screen + season-end toast (GitHub #3)
       build.ts               # facility build menu                    (WU-8 / BAK-178)
       matchOverlay.ts        # scoreboard/stats/commentary overlay    (WU-12 / BAK-196)
+      matchReport.ts         # the match report at full time: scorers, goals, the numbers, Player of the Match (N9.5)
     tutorial.ts              # onboarding flow                        (WU-15 / BAK-202)
   fx/
     audio.ts                 # WebAudio-synthesised SFX + music       (WU-13 / BAK-200)
