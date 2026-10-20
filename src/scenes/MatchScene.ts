@@ -392,7 +392,7 @@ export class MatchScene extends Phaser.Scene {
         overlay: this.overlay,
         // N10.4: Skip plays the rest in the Worker, from the match's record, so the page doesn't freeze.
         ...(canUseWorker()
-          ? { skipElsewhere: (job) => playMatchesInWorker([job], SKIP_WORKER_TIMEOUT_MS).then(([r]) => r ?? runMatch(job.home, job.away, job.opts)) }
+          ? { skipElsewhere: (job) => playMatchesInWorker([job], SKIP_WORKER_TIMEOUT_MS, 'skip').then(([r]) => r ?? runMatch(job.home, job.away, job.opts)) }
           : {}),
         closeUpDone: () => {
           this.beatZoom = ZOOM_DEFAULT;
