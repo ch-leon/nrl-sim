@@ -664,3 +664,49 @@ matches nothing moves beyond luck (`20261019-230203-offloads-check` on main agai
 7,000 ticks, some 14 µs a tick; a real 2 × 9:00 match is 21,600 ticks, and the sim now runs
 at about 14 µs a tick. A 100 ms match needs a coarser sim step (10 Hz, with every tick-counted
 length re-timed) or fewer men moved per tick, which changes how the game plays.
+
+## 25. Sprint follow-ups and the stamina knobs (N9.3; BAK-208 §8, §8.2, §11)
+
+The F2 follow-ups. The kicking side **sprints after an attacking kick** (bomb, grubber, chip,
+cross-field) and **cruises after a territory kick**; the winger nearest an attacking kick's
+landing joins the chase. The defensive line moves up at its preset's speed × `gas.cruise` /
+`live.lineCruiseRef`, so the line slows with the runners when cruise comes down. The drain
+rate's Stamina slope and the contest's fatigue weights are knobs (§10). The lab draws a
+**legs bar under every player** (`src/match/view/legsLayer.ts`: green, amber under
+`fatigue.tiredAt`, red under `fatigue.spentAt`). No default moved.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `live.territoryChaseSprint` | `src/match/league/live.ts` | 0 | 1 sends the chasers after a territory kick at a sprint too (before N9.3). |
+| `live.wingerChase` | `live.ts` | 1 | The winger nearest an attacking kick joins its chase (0 = only the two nearest and the kicker). |
+| `live.lineCruiseRef` | `live.ts` | 0.94 | The cruise the presets' line speeds were set at; the line moves at × `gas.cruise` / this. |
+| `fatigue.drain.*`, `fatigue.contest.*` | `fatigue.ts` | §10 | The drain's Stamina slope; the contest's fatigue weights. |
+
+**Kick chase** (`20261020-004010-kick-chase`, 120 whole matches a row, even 60 v 60, Slide v
+Rush, Kick-chase v Balanced): nothing beyond luck in tries, breaks, kicks or completion
+against the old chase (all sprint, no winger) or either change alone. Rush still concedes about
+twice Slide's penalties (2.1 v 1.1 a match) under every variant; the 30-seed unit test had
+dipped on luck and now plays 60.
+
+**Stamina sweep** (`20261020-004440-stamina-sweep`, 60 whole matches a row, `fatigue.drain.perStamina`
+0.005 / 0.01 / 0.015 × `gas.cruise` 0.88 / 0.94, even 60 v 60 and Stamina 30 v 80):
+
+| | perStamina 0.005 | 0.01 (now) | 0.015 |
+|---|---|---|---|
+| Legs at full time, 30 v 80 (cruise 0.94) | 67% / 68% | 73% / 74% | 75% / 82% |
+| Stamina 30 side's win %, 30 v 80 (cruise 0.94) | 37% | 43% | 40% |
+| Interchanges a match, even sides | 12.8 | 5.5 | 0.3 |
+
+| Tries a match | cruise 0.88 | 0.94 (now) |
+|---|---|---|
+| even 60 v 60 (perStamina 0.01) | 5.3 | 5.7 |
+| Stamina 30 v 80 | 5.3 | 6.4 |
+
+- **The bench hides Stamina.** With Standard rotation the low-Stamina side is subbed back to
+  the same legs at full time (73% v 74%); only a steeper slope (0.015) opens a gap (75% v 82%),
+  and it does so by shrinking everyone's drain at Stamina 60 (×0.6, the floor), which nearly
+  stops the bench (0.3 swaps a match). The slope and the offset move together: a steeper slope
+  wants a higher offset to keep Stamina 50 at ×1. Kept at 0.01 for the Phase 3 pass.
+- **Cruise can come down further now.** 0.88 cost 1.1 tries a match at F2 (5.0 → 3.9); with
+  the line following cruise it costs 0.3–1.1 (5.7 → 5.3 between even sides). Kept at 0.94.
+
