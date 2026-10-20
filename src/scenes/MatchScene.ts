@@ -379,6 +379,7 @@ export class MatchScene extends Phaser.Scene {
         weather: live.weather,
         ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}),
         calls: live.calls ?? [],
+        ...(live.aiCoach?.length ? { aiCoach: live.aiCoach } : {}),
         ...(live.resumeAt ? { resumeAt: live.resumeAt } : {}),
         ...(live.onProgress ? { onProgress: live.onProgress } : {}),
         fixture: this.fixture,
@@ -389,7 +390,7 @@ export class MatchScene extends Phaser.Scene {
         },
       });
       this.mountPlaybackControls(LIVE_DEFAULT_SPEED);
-      if (live.coachSide) this.mountCallChips(live.coachSide);
+      if (live.coachSide) this.mountCallChips(live.coachSide, live.unlockedCalls ?? COACH_CALLS);
       bus.on('match:finished', this.onFinished);
       // A phone may kill the app in the background: keep where the match is (#73).
       document.addEventListener('visibilitychange', this.onHidden);
@@ -605,11 +606,12 @@ export class MatchScene extends Phaser.Scene {
   private madeAt = 0;
   private chipsAt = 0;
 
-  private mountCallChips(side: 'home' | 'away'): void {
+  private mountCallChips(side: 'home' | 'away', unlocked: readonly CoachCall[]): void {
     this.callSide = side;
     const wrap = document.createElement('div');
     wrap.className = 'nrl-mo-calls';
-    this.callChips = COACH_CALLS.map((call) => {
+    // Only the calls his Coach's Office has unlocked (N9.6).
+    this.callChips = COACH_CALLS.filter((c) => unlocked.includes(c)).map((call) => {
       const btn = button(CHIP_LABEL[call], () => {
         if (!(this.playback instanceof LivePlayback)) return;
         const why = this.playback.call(side, call);

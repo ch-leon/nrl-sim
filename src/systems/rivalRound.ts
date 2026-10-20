@@ -10,6 +10,7 @@ import type { MatchResult, TeamSheet, WeatherKind } from '../sim/events';
 import type { Rng } from '../utils/rng';
 import { ON_FIELD } from '../config';
 import { runMatch } from '../match/league/match';
+import { aiCoachSides } from '../match/league/calls';
 import { teamSheetFromRival, teamSheetFromSquad } from '../match/league/sheets';
 import { autoPick, resolveLineup } from './lineup';
 import { applyMatchStats } from './stats';
@@ -24,6 +25,8 @@ export interface RivalJob {
   away: TeamSheet;
   seed: number;
   weather: WeatherKind;
+  /** Sides with an AI coach (N9.6): both, when the game gives rivals one. */
+  aiCoach: ('home' | 'away')[];
 }
 
 /**
@@ -48,14 +51,14 @@ export function rivalJobs(state: GameState, rng: Rng, playerId: string): RivalJo
     const home = byId.get(f.homeId);
     const away = byId.get(f.awayId);
     if (!home || !away) continue;
-    jobs.push({ round, homeId: f.homeId, awayId: f.awayId, home: rivalSheet(home), away: rivalSheet(away), seed: rng.int(1, 2 ** 31), weather: state.weather ?? 'clear' });
+    jobs.push({ round, homeId: f.homeId, awayId: f.awayId, home: rivalSheet(home), away: rivalSheet(away), seed: rng.int(1, 2 ** 31), weather: state.weather ?? 'clear', aiCoach: aiCoachSides(['home', 'away']) });
   }
   return jobs;
 }
 
 /** Play one job on the live sim, headless. */
 export function playRivalJob(job: RivalJob): MatchResult {
-  return runMatch(job.home, job.away, { seed: job.seed, weather: job.weather });
+  return runMatch(job.home, job.away, { seed: job.seed, weather: job.weather, aiCoach: job.aiCoach });
 }
 
 /**

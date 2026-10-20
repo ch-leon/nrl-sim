@@ -20,6 +20,8 @@ export interface RunMatchOptions {
   length?: MatchLength;
   /** Coach calls by tick (#73): the match as the player called it. */
   calls?: CallInput[];
+  /** Sides with an AI coach (N9.6). */
+  aiCoach?: ('home' | 'away')[];
 }
 
 /** No real match comes near this many ticks (about 80 minutes of sim time); it only guards against a sim that never finishes. */
@@ -83,6 +85,7 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     ...(opts.weather ? { weather: opts.weather } : {}),
     ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}),
     ...(opts.calls ? { calls: opts.calls } : {}),
+    ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}),
   });
   const rec = new MatchRecorder({ home: home.clubId, away: away.clubId });
   while (!sim.finished) {

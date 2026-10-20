@@ -92,7 +92,7 @@ export const NINES_PAGE: GuidePage = {
       bullets: [
         'Each side plays an attack preset (Grind, Balanced, Expansive, Kick-chase, All-out) and a defence preset (Slide, Rush, Compressed) by zone of the field.',
         'Traits fire in their moment and are announced when they do: a step, a fend, an offload, a big hit, a strip, an intercept.',
-        'In a live match the chips along the bottom are coach calls for the next play: with the ball Hit-up, Shift left or right, Kick early, Run it, Bomb and Field goal; defending Rush or Hold. One call a set; the stats strip counts the calls that paid off.',
+        'In a live match the chips along the bottom are coach calls for the next play: with the ball Hit-up, Shift left or right, Kick early, Run it, Bomb and Field goal; defending Rush or Hold. One call a set; the stats strip counts the calls that paid off. With no Coach’s Office you have Hit-up and Hold; each level of it adds calls: Shift and Rush, then Kick early and Run it, then Bomb and Field goal.',
       ],
     },
     {

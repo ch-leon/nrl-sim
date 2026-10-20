@@ -340,6 +340,8 @@ export interface LiveOptions {
   injuryRate?: number;
   /** Coach calls by tick (#73): read as the match plays, so a caller may add to the list as it runs (the lab's chips). */
   calls?: CallInput[];
+  /** Sides whose coach makes his own calls (N9.6). The game gives rival coaches one when `calls.ai.on` (aiCoachSides). */
+  aiCoach?: Side[];
 }
 
 /** A sheet's bench, as many as the bench holds. */
@@ -406,6 +408,8 @@ export class LiveSim implements MatchSim {
   private lineBrokenBy: Side | null = null;
   /** Coach calls (#73): the list by tick, how far it has been read, each side's call in force and whether it has had its call this set each way. */
   private readonly callList: CallInput[];
+  /** Sides with an AI coach (N9.6). */
+  private readonly aiCoach: readonly Side[];
   private callRead = 0;
   private readonly callState: Record<Side, { attack: CoachCall | null; defence: CoachCall | null; usedAttack: boolean; usedDefence: boolean }> = {
     home: { attack: null, defence: null, usedAttack: false, usedDefence: false },
@@ -459,6 +463,7 @@ export class LiveSim implements MatchSim {
     this.rng = makeRng(seed);
     this.firstReceiver = this.rng.next() < 0.5 ? 'home' : 'away';
     this.callList = opts.calls ?? [];
+    this.aiCoach = opts.aiCoach ?? [];
     this.weather = opts.weather ?? 'clear';
     this.wx = weatherEffect(this.weather);
     this.injuryRate = opts.injuryRate ?? 1;
@@ -683,6 +688,8 @@ export class LiveSim implements MatchSim {
       const c = this.callList[this.callRead++]!;
       if (c.tick === this.tick) this.call(c.side, c.call);
     }
+    // The AI coaches (N9.6) read the play at each play-the-ball.
+    if (this.aiCoach.length > 0 && this.phase.kind === 'ruck') for (const s of this.aiCoach) this.aiCall(s);
     if (this.phase.kind === 'half-time') this.stepHalfTime(this.phase);
     else if (this.phase.kind !== 'conversion') {
       this.launchPendingKick();
@@ -787,6 +794,40 @@ export class LiveSim implements MatchSim {
     this.events[this.events.length - 1]!.detail = call;
     this.judge.make(side, call, this.attacking, this.dirOf(this.attacking), this.ballPos().x);
     return null;
+  }
+
+  /**
+   * The AI coach's call, if any (N9.6, spec §6): a field goal when one is on (and none of his
+   * other attack calls while one may soon be); a shift toward an overlap; Rush defending near
+   * his own line. Rules only, no dice, and the same refusals as the player's chips.
+   */
+  private aiCall(side: Side): void {
+    if (this.attacking !== side) {
+      if (this.toLineFor(this.attacking, this.ballPos()) <= CALLS.ai.rushOwnM && this.callRefusal(side, 'rush') === null) this.call(side, 'rush');
+      return;
+    }
+    if (this.callRefusal(side, 'field-goal') === null) {
+      this.call(side, 'field-goal');
+      return;
+    }
+    if (this.fieldGoalSoon(side)) return;
+    const by = this.ballPos().y;
+    const count = (ps: readonly Player[], sign: number): number => ps.filter((p) => this.onField(p) && Math.sign(p.body.pos.y - by) === sign).length;
+    const atk = this.side(side);
+    const def = this.side(other(side));
+    // Shift left goes toward +dir in y (see the shift's receiver preference).
+    const left = count(atk, this.dir) - count(def, this.dir);
+    const right = count(atk, -this.dir) - count(def, -this.dir);
+    const call: CoachCall | null = left >= CALLS.ai.overlap && left > right ? 'shift-left' : right >= CALLS.ai.overlap && right > left ? 'shift-right' : null;
+    if (call && this.callRefusal(side, call) === null) this.call(side, call);
+  }
+
+  /** The last minutes of a close match: an AI coach keeps his attack call for the field goal. */
+  private fieldGoalSoon(side: Side): boolean {
+    if (this.half < this.length.halves) return false;
+    const left = this.length.halfMinutes * 60 - this.clockTicks * TICK_S;
+    const margin = this.points[side] - this.points[other(side)];
+    return left <= GOALS.fieldGoalLastS + 60 && margin >= GOALS.fieldGoalMargin[0] && margin <= GOALS.fieldGoalMargin[1];
   }
 
   /** Calls each side has made, and how many paid off. */

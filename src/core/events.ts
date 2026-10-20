@@ -8,7 +8,7 @@ import type {
 // MatchResult / MatchEvent are the canonical match-sim contract types, exported
 // from src/sim/events.ts (WU-6, ARCHITECTURE §6).
 import type { MatchResult, MatchEvent, TeamSheet, WeatherKind } from '../sim/events';
-import type { CallInput } from '../match/league/calls';
+import type { CallInput, CoachCall } from '../match/league/calls';
 
 /** The match handed to the Match scene (BAK-207, coach calls #73). */
 export interface LiveMatchData {
@@ -22,6 +22,10 @@ export interface LiveMatchData {
   onProgress?: (calls: readonly CallInput[], tick: number) => void;
   /** The player's side, when he has the coach-call chips (#73; the Coach calls setting). */
   coachSide?: 'home' | 'away';
+  /** The chips his Coach's Office has unlocked (N9.6). */
+  unlockedCalls?: CoachCall[];
+  /** The rival's AI coach (N9.6), when the game gives rivals one. */
+  aiCoach?: ('home' | 'away')[];
 }
 
 /** Event name -> payload type map (verbatim from ARCHITECTURE §5). */
