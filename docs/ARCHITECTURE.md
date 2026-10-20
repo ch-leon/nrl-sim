@@ -382,6 +382,9 @@ export interface MatchResult {
   `tile-highlight-ok`, `tile-highlight-bad`, path/dirt edge overlays, the
   surround, `char-idle-<dir>`, `char-walk-<dir>-<frame>` (dirs n/e/s/w; anims
   `walk-<dir>`), `facility-<defId>-<level>` for levels 1-3 (anchored via `facilityOrigin`; L2 adds awning/annex/props, L3 an extra storey or lit sign, floodlights and flags; gold pips show the level), and decor.
+  The boot paints only the facilities placed (N10.6); any other `facility-<defId>-<level>` is
+  painted by `ensureFacilityTexture` the moment it is first shown, or by
+  `paintFacilitiesWhenIdle` in idle slices after the first frame.
 - Build feedback (GitHub #24, `src/world/buildFeedback.ts` pure + `ghostPreview.ts` / `buildFx.ts`
   glue): the placement ghost is the real `facility-<defId>-1` texture, tinted green (valid, solid
   outline) or red (invalid, dashed outline + ✕); a new facility shows ~1.5s of scaffolding + dust,

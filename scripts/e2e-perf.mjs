@@ -2,7 +2,7 @@
 // serves it with `vite preview`, then in Chromium at 844×390 with the CPU throttled
 // ×4 (CDP Emulation.setCPUThrottlingRate, a mid-range phone) times the moments that
 // make or break play on a phone:
-//   load → title screen; Start → grounds (BootScene paints every texture); a week
+//   load → title screen; Start → grounds (BootScene paints what the first frame needs); a week
 //   advance (the hand-off to the match scene, then Skip to full time and Back to
 //   Club); ×4 advances (the tick pipeline, per week); "to finals" and "to season
 //   end" (the rollover); the frame rate on the grounds; and the bundle size.
@@ -192,9 +192,11 @@ async function advance(index, { probe = false } = {}) {
   const t0 = Date.now();
   await clickTimed('.nrl-hud-menu-item', { nth: index });
   let tapMs, label, probeMs = 0;
-  if (probe && await page.locator('.nrl-hud[data-advancing]').count()) {
+  // Read the progress line in the same breath as checking the run is still going.
+  const running = probe ? await page.evaluate(() => (document.querySelector('.nrl-hud[data-advancing]') ? document.querySelector('.nrl-hud-actions .nrl-btn')?.textContent?.trim() || 'running' : null)) : null;
+  if (running !== null) {
     const p0 = Date.now();
-    label = (await page.locator('.nrl-hud-actions .nrl-btn').first().textContent())?.trim();
+    label = running;
     // Timed inside the page, from the touch's own timestamp to its click handler:
     // the driver's tap() waits for two steady frames, and a frame now holds a week.
     const box = await page.locator('.nrl-nav .nrl-btn[data-screen="ladder"]').boundingBox();
