@@ -26,9 +26,9 @@ const KNOWN_EVENTS: readonly (keyof Events)[] = [
 ];
 
 describe('STEPS (declarative step list invariants)', () => {
-  it('has the 7 spec steps plus News, Finance and Contracts (#188), in order', () => {
+  it('has the 7 spec steps plus News, Finance and Contracts (#188) and Lineup (N11), in order', () => {
     expect(STEPS.map((s) => s.id)).toEqual([
-      'welcome', 'build', 'recruit', 'squad', 'advance', 'match', 'news', 'finance', 'contracts', 'wrap',
+      'welcome', 'build', 'recruit', 'squad', 'lineup', 'advance', 'match', 'news', 'finance', 'contracts', 'wrap',
     ]);
   });
 
@@ -77,13 +77,13 @@ describe('advance-on mapping', () => {
     }
   });
 
-  it('classifies the 4 event steps and 6 button steps', () => {
+  it('classifies the 4 event steps and 7 button steps', () => {
     const eventSteps = STEPS.filter(isEventStep);
     expect(eventSteps.map((s) => s.id)).toEqual([
       'build', 'recruit', 'advance', 'match',
     ]);
     const buttonSteps = STEPS.filter((s) => !isEventStep(s));
-    expect(buttonSteps.map((s) => s.id)).toEqual(['welcome', 'squad', 'news', 'finance', 'contracts', 'wrap']);
+    expect(buttonSteps.map((s) => s.id)).toEqual(['welcome', 'squad', 'lineup', 'news', 'finance', 'contracts', 'wrap']);
   });
 });
 
@@ -93,7 +93,7 @@ describe('anchors', () => {
     expect(byId.get('welcome')!.anchor).toBeNull();
     expect(byId.get('match')!.anchor).toBeNull();
     expect(byId.get('wrap')!.anchor).toBeNull();
-    for (const id of ['build', 'recruit', 'squad', 'advance']) {
+    for (const id of ['build', 'recruit', 'squad', 'lineup', 'advance']) {
       expect(byId.get(id)!.anchor).not.toBeNull();
     }
   });
