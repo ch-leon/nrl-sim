@@ -351,8 +351,10 @@ N10.3): matchday plays the player's match headless in the same Worker
 (`systems/matchJobs.ts`: a job is `{ home, away, opts }`, the answer `runMatch`'s result),
 applies it on `resumeWeek()`, and the advance waits for the week's end before the rules.
 Node, the tests, the soak and `advanceWeeks` have no holds and play in place, with the same
-result; a Worker that fails or stays silent is replaced by playing the match here. Debt
-stops a run once, not every week in the red (N12.5): on the crossing into the red
+result; a Worker that fails or stays silent is replaced by playing the match here.
+Skip in a live match (N10.4) posts the match's record to its own `'skip'` lane, a second
+worker, so it never queues behind a rival round still being played in the background lane.
+Debt stops a run once, not every week in the red (N12.5): on the crossing into the red
 (money ≥ 0 before the week, < 0 after), on a forced sale (the economy's
 `bankruptcy:warning` names them) and when the balance first passes the fire-sale floor.
 
