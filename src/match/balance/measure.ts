@@ -6,9 +6,10 @@
 // A side is a flat squad, a league club's generated roster, or (N12.2) a squad
 // built the way the game builds it, a new one every seed.
 import type { RosterEntry, TeamSheet } from '../../sim/events';
-import { LEAGUE, ON_FIELD } from '../../config';
+import { LEAGUE, ON_FIELD, difficultyMultipliers } from '../../config';
 import { createNewGame, type Player } from '../../core/state';
-import { overallRating } from '../../data/player';
+import { generatePlayerAround, overallRating } from '../../data/player';
+import { makeRng } from '../../utils/rng';
 import { autoPick, resolveLineup } from '../../systems/lineup';
 import { generateRivalSquad, hashString } from '../../systems/rivals';
 import { teamSheetFromSquad } from '../league/sheets';
@@ -107,7 +108,16 @@ export function squadSide(id: string, spec: SideSpec, seed: number, level: numbe
   if (spec.squad === 'player') {
     const game = createNewGame(id, seed, { difficulty: spec.difficulty });
     squad = game.squad;
-    sheet = teamSheetFromSquad(squad, id, id, ['#111', '#eee'], resolveLineup(game.lineup, squad));
+    let lineup = game.lineup;
+    if (spec.noStar) {
+      // The same squad with its star(s) swapped for a first-grader at his position, and the opening pick made again.
+      const target = LEAGUE.START_FIRST_GRADE + difficultyMultipliers(spec.difficulty).startRating;
+      const stars = new Set([...squad].sort((a, b) => overallRating(b) - overallRating(a)).slice(0, LEAGUE.START_STARS).map((p) => p.id));
+      const rng = makeRng(seed ^ 0x5eed);
+      squad = squad.map((p) => (stars.has(p.id) ? generatePlayerAround(rng, target, { position: p.position }) : p));
+      lineup = autoPick(squad);
+    }
+    sheet = teamSheetFromSquad(squad, id, id, ['#111', '#eee'], resolveLineup(lineup, squad));
   } else {
     squad = generateRivalSquad({ id: 'rival', strength: Math.round(spec.rating ?? level) }, seed);
     sheet = teamSheetFromSquad(squad, id, id, ['#111', '#eee'], resolveLineup(autoPick(squad), squad));

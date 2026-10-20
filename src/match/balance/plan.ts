@@ -35,6 +35,8 @@ export interface SideSpec {
   squad?: 'player' | 'rival';
   /** A `player` squad's difficulty (its start rating); normal unless given. */
   difficulty?: Difficulty;
+  /** A `player` squad with its star swapped for a first-grader at his position (what the squad's shape is worth). */
+  noStar?: boolean;
   /** This side is the rival of a player on this difficulty: it plays with the difficulty's edge after the spread (`difficulty.<d>.rivalEdge`), as matchday.ts gives it (N12.2). */
   rivalOf?: Difficulty;
 }

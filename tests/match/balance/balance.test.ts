@@ -119,6 +119,12 @@ describe('plans', () => {
     expect(bare.home.bench).toEqual([]);
     expect(bare.away.tactics).toEqual({ attack: 'balanced', defence: 'rush' });
     expect(bare.nine.away).toBeGreaterThan(66);
+    // Without his star the same new game's squad rates lower, and its level rival with it.
+    const starless = scenarioSides({ squad: 'player', noStar: true }, { squad: 'rival' }, 1);
+    const top = (s: typeof one.home): number => Math.max(...s.roster!.map((r) => r.stats!.skill + r.stats!.speed + r.stats!.footyIQ));
+    expect(starless.nine.home!).toBeLessThan(one.nine.home! - 1);
+    expect(top(starless.home)).toBeLessThan(top(one.home));
+    expect(Math.abs(starless.nine.away! - starless.nine.home!)).toBeLessThan(2);
     expect(checkPlan(plan({ scenarios: [{ name: 's', home: { squad: 'coach' as never, club: 'rival-wolves' }, away: { rating: 60, rivalOf: 'nightmare' as never } }] })).join('\n')).toMatch(/player \/ rival[\s\S]*not both[\s\S]*rivalOf/);
     expect(checkPlan(plan({ scenarios: [{ name: 's', home: { rivalOf: 'hard' }, away: { rivalOf: 'easy' } }] })).join('\n')).toMatch(/only one side is the rival/);
   });
