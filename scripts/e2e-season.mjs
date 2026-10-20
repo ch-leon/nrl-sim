@@ -459,19 +459,25 @@ async function play() {
     // long enough for a locator click: call at ×1, tapping the first chip on offer
     // inside the page, then go back to ×8.
     await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×1' }));
+    // The tap lights its chip at once (MatchScene.refreshCallChips) unless the call is refused,
+    // and the light goes with the set, which can end a tick later: read it in the same task.
     let call = null;
+    const refused = [];
     for (let i = 0; i < 40 && !call; i++) {
-      call = await page.evaluate(() => {
+      const got = await page.evaluate(() => {
         const b = [...document.querySelectorAll('.nrl-mo-calls .nrl-btn')].find((e) => !e.hidden && !e.disabled);
         if (!b) return null;
         b.click();
-        return b.getAttribute('data-call');
+        return { call: b.getAttribute('data-call'), lit: b.hasAttribute('data-made'), why: b.title };
       });
-      if (!call) await wait(250);
+      if (got?.lit) call = got.call;
+      else {
+        if (got) refused.push(`${got.call}: ${got.why}`);
+        await wait(250);
+      }
     }
-    if (!call) throw new Error('no coach-call chip was on offer for 10 s');
-    await page.waitForSelector(`.nrl-mo-calls .nrl-btn[data-call="${call}"][data-made]`, { timeout: 5000 });
-    rec.notes.push(`called ${call}`);
+    if (!call) throw new Error(refused.length ? `no call lit its chip (${refused.slice(-2).join('; ')})` : 'no coach-call chip was on offer for 10 s');
+    rec.notes.push(`called ${call}${refused.length ? ` (${refused.length} refused first)` : ''}`);
     await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×8' }));
   });
   await step('live-fulltime', async (rec) => {
