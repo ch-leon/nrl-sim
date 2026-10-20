@@ -1,0 +1,42 @@
+{
+  "name": "stamina sweep",
+  "description": "N9.3: how much should Stamina matter (fatigue.drain.perStamina), and can gas.cruise come down for more sprint contrast now the line speed follows it?",
+  "seeds": 60,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "stamina 30 v 80",
+      "home": {
+        "rating": 60,
+        "stats": {
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "stamina": 80
+        }
+      }
+    }
+  ],
+  "sweep": {
+    "fatigue.drain.perStamina": [
+      0.005,
+      0.01,
+      0.015
+    ],
+    "gas.cruise": [
+      0.88,
+      0.94
+    ]
+  }
+}
