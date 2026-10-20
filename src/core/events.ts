@@ -9,6 +9,7 @@ import type {
 // from src/sim/events.ts (WU-6, ARCHITECTURE §6).
 import type { MatchResult, MatchEvent, TeamSheet, WeatherKind } from '../sim/events';
 import type { CallInput, CoachCall } from '../match/league/calls';
+import type { PlanInput } from '../match/league/live';
 
 /** The match handed to the Match scene (BAK-207, coach calls #73). */
 export interface LiveMatchData {
@@ -17,9 +18,13 @@ export interface LiveMatchData {
   injuryRate?: number;
   /** Calls already made (a resumed match), and where it was. */
   calls?: CallInput[];
+  /** Plan changes already made at the breaks (N11). */
+  plans?: PlanInput[];
   resumeAt?: number;
-  /** Keep the resume record: on each call, and when the app goes to the background. */
-  onProgress?: (calls: readonly CallInput[], tick: number) => void;
+  /** Keep the resume record: on each call or plan change, and when the app goes to the background. */
+  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => void;
+  /** The player's side: he may change the plan at the breaks (N11). */
+  planSide?: 'home' | 'away';
   /** The player's side, when he has the coach-call chips (#73; the Coach calls setting). */
   coachSide?: 'home' | 'away';
   /** The chips his Coach's Office has unlocked (N9.6). */
@@ -46,7 +51,9 @@ export interface Events {
   'match:event': MatchEvent; // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
   'board:sacked': { season: number; reason: string };
-  'bankruptcy:warning': { balance: number };
+  // forcedSales (N12.5): who the week's forced sales let go, so a multi-week advance
+  // can stop on a sale; the economy emits the warning after the sales.
+  'bankruptcy:warning': { balance: number; forcedSales?: string[] };
   'ui:notify': { text: string; kind: 'info' | 'success' | 'danger' };
 }
 

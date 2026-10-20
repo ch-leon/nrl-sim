@@ -48,7 +48,7 @@ import {
   MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, gapTarget, grubberTarget, intercept,
   kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate, type KickChoice,
 } from './tactics';
-import { DEFAULT_TACTICS, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type DefencePreset, type TeamTactics } from './presets';
+import { DEFAULT_TACTICS, PRESET_LABEL, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type DefencePreset, type TeamTactics } from './presets';
 import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
 import { traitBoost, type TraitInstance } from '../../data/traits';
 import { FATIGUE, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
@@ -344,6 +344,15 @@ export interface LiveOptions {
   aiCoach?: Side[];
   /** A final (N9.4): level at full time, play golden point — the next score wins. */
   goldenPoint?: boolean;
+  /** Plan changes by tick (N11): read like the calls, each taking effect at the next restart. */
+  plans?: PlanInput[];
+}
+
+/** A change of plan at a break (N11): the side's presets from the next restart. A match is { seed, sheets, calls[], plans[] }. */
+export interface PlanInput {
+  tick: number;
+  side: Side;
+  tactics: TeamTactics;
 }
 
 /** A sheet's bench, as many as the bench holds. */
@@ -368,7 +377,7 @@ export class LiveSim implements MatchSim {
   private homeOn: Player[];
   private awayOn: Player[];
   private readonly names: Record<Side, string>;
-  /** How each side plays (BAK-208 §5). */
+  /** How each side plays (BAK-208 §5), changed at the breaks (N11). */
   readonly tactics: Record<Side, TeamTactics>;
   private ball!: BallState;
   private phase!: Phase;
@@ -412,6 +421,10 @@ export class LiveSim implements MatchSim {
   private readonly callList: CallInput[];
   /** Sides with an AI coach (N9.6). */
   private readonly aiCoach: readonly Side[];
+  /** Plan changes (N11): the list by tick, how far it has been read, and each side's new plan waiting for the restart. */
+  private readonly planList: PlanInput[];
+  private planRead = 0;
+  private readonly nextPlan: Record<Side, TeamTactics | null> = { home: null, away: null };
   private callRead = 0;
   private readonly callState: Record<Side, { attack: CoachCall | null; defence: CoachCall | null; usedAttack: boolean; usedDefence: boolean }> = {
     home: { attack: null, defence: null, usedAttack: false, usedDefence: false },
@@ -469,6 +482,7 @@ export class LiveSim implements MatchSim {
     this.firstReceiver = this.rng.next() < 0.5 ? 'home' : 'away';
     this.callList = opts.calls ?? [];
     this.aiCoach = opts.aiCoach ?? [];
+    this.planList = opts.plans ?? [];
     this.weather = opts.weather ?? 'clear';
     this.wx = weatherEffect(this.weather);
     this.injuryRate = opts.injuryRate ?? 1;
@@ -476,7 +490,7 @@ export class LiveSim implements MatchSim {
     this.length = opts.length ?? fullMatch();
     this.goldenPoint = opts.goldenPoint === true;
     this.names = { home: home.name, away: away.name };
-    this.tactics = { home: home.tactics ?? DEFAULT_TACTICS, away: away.tactics ?? DEFAULT_TACTICS };
+    this.tactics = { home: { ...(home.tactics ?? DEFAULT_TACTICS) }, away: { ...(away.tactics ?? DEFAULT_TACTICS) } };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
     this.homeOn = this.players.slice(0, PLAYERS);
     this.awayOn = this.players.slice(PLAYERS);
@@ -694,6 +708,12 @@ export class LiveSim implements MatchSim {
       const c = this.callList[this.callRead++]!;
       if (c.tick === this.tick) this.call(c.side, c.call);
     }
+    // Plan changes due this tick (N11); a new plan comes in as the restart is set.
+    while (this.planRead < this.planList.length && this.planList[this.planRead]!.tick <= this.tick) {
+      const c = this.planList[this.planRead++]!;
+      if (c.tick === this.tick) this.setTactics(c.side, c.tactics);
+    }
+    if (this.phase.kind === 'restart' && this.phase.from === undefined) this.takeNewPlans();
     // The AI coaches (N9.6) read the play at each play-the-ball.
     if (this.aiCoach.length > 0 && this.phase.kind === 'ruck') for (const s of this.aiCoach) this.aiCall(s);
     if (this.phase.kind === 'half-time') this.stepHalfTime(this.phase);
@@ -780,6 +800,41 @@ export class LiveSim implements MatchSim {
       if (!this.fieldGoalOn(h && h.side === side ? h : this.kicker(side))) return 'not in range';
     }
     return null;
+  }
+
+  /** Why a side can't change its plan now (N11), or null: only at the breaks — half-time, or a score until the kick-off is taken (not a drop-out). */
+  planRefusal(): string | null {
+    const ph = this.phase;
+    if (this.finished) return 'full time';
+    // A restart is a break until the kicker is on his way (his run-up is the kick).
+    const atBreak = ph.kind === 'half-time' || ph.kind === 'try' || ph.kind === 'conversion' || (ph.kind === 'restart' && ph.from === undefined && !this.pendingKick);
+    return atBreak ? null : 'at the breaks';
+  }
+
+  /** The coach changes the plan (N11): the side's presets from the restart. Returns why not, or null when it is made. */
+  setTactics(side: Side, tactics: TeamTactics): string | null {
+    const why = this.planRefusal();
+    if (why) return why;
+    this.nextPlan[side] = { attack: tactics.attack, defence: tactics.defence };
+    return null;
+  }
+
+  /** The plan each side will play from the restart: the new one if the coach changed it, else the one in force. */
+  planFor(side: Side): TeamTactics {
+    return this.nextPlan[side] ?? this.tactics[side];
+  }
+
+  /** The restart: each new plan comes into force, and the commentary says so. */
+  private takeNewPlans(): void {
+    for (const side of ['home', 'away'] as const) {
+      const t = this.nextPlan[side];
+      if (!t) continue;
+      this.nextPlan[side] = null;
+      if (t.attack === this.tactics[side].attack && t.defence === this.tactics[side].defence) continue;
+      this.tactics[side] = t;
+      this.emit('plan', `${this.names[side]} change the plan: ${PRESET_LABEL[t.attack]} / ${PRESET_LABEL[t.defence]}`, this.kicker(side));
+      this.events[this.events.length - 1]!.detail = `${t.attack}/${t.defence}`;
+    }
   }
 
   /** The coach makes a call: in force from now for its scope (a play or the set). Returns why not, or null when it is made. */

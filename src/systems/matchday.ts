@@ -13,6 +13,7 @@ import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
+import { canUseWorker, playMatchesInWorker } from './matchJobs';
 import { aiCoachSides, unlockedCalls } from '../match/league/calls';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
@@ -175,6 +176,9 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   };
 }
 
+/** How long the Worker gets for the player's fast-forwarded match before it is played here (ms): about 1–2 s on a phone, so this only catches one that has hung. */
+export const PLAYER_WORKER_TIMEOUT_MS = 30_000;
+
 export function registerPlayerMatchSystem(): void {
   registerTickHook('matchday-player', TICK_ORDER.match, (ctx) => {
     const state = getState();
@@ -220,7 +224,7 @@ export function registerPlayerMatchSystem(): void {
     // what the player watched (and called).
     if (!ctx.fastForward && ctx.hold) {
       ctx.hold();
-      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], tick: resumed?.tick ?? 0 };
+      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0 };
       writeLiveMatch(record);
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
         if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
@@ -239,15 +243,27 @@ export function registerPlayerMatchSystem(): void {
           injuryRate: matchOpts.injuryRate,
           ...(matchOpts.goldenPoint ? { goldenPoint: true } : {}),
           calls: record.calls,
+          plans: record.plans ?? [],
           ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
-          onProgress: (calls, tick) => writeLiveMatch({ ...record, calls: [...calls], tick }),
+          onProgress: (calls, tick, plans) => writeLiveMatch({ ...record, calls: [...calls], plans: [...plans], tick }),
+          planSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const),
           ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
           ...(matchOpts.aiCoach.length ? { aiCoach: matchOpts.aiCoach } : {}),
         },
       });
       return;
     }
-    // Fast-forward: the same match, headless.
+    // Fast-forward in a browser, inside the async advance (N10.3): the same match,
+    // headless, in the Worker; the week waits for it, so the page keeps painting.
+    if (ctx.fastForward && ctx.hold && canUseWorker()) {
+      ctx.hold();
+      void playMatchesInWorker([{ home, away, opts: matchOpts }], PLAYER_WORKER_TIMEOUT_MS)
+        .then(([result]) => applyPlayerResult(fixture, home, away, result ?? runMatch(home, away, matchOpts))())
+        .catch((err: unknown) => console.error('the fast-forwarded match failed to land', err))
+        .finally(resumeWeek);
+      return;
+    }
+    // Fast-forward elsewhere (the soak, the tests, advanceWeeks): the same match, headless, here.
     applyPlayerResult(fixture, home, away, runMatch(home, away, matchOpts))();
   });
 }

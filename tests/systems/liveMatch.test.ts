@@ -15,7 +15,8 @@ import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 import { readLiveMatch } from '../../src/systems/liveMatchRecord';
 import { MatchRecorder, runMatch } from '../../src/match/league/match';
 import { Runner } from '../../src/match/core/engine';
-import { LiveSim } from '../../src/match/league/live';
+import { LiveSim, type PlanInput } from '../../src/match/league/live';
+import type { TeamTactics } from '../../src/match/league/presets';
 import type { CallInput, CoachCall } from '../../src/match/league/calls';
 import { NINES } from '../../src/match/league/rules';
 import { initLiveState, reduceEvent } from '../../src/ui/screens/matchOverlay';
@@ -44,26 +45,37 @@ function newGame(seed: number): void {
  * live sim with the calls list, recording the result; optionally the player's
  * coach calls `call` whenever he may. Stops at `stopAt` (a killed app) or full time.
  */
-function watch(s: Started, call?: { side: 'home' | 'away'; call: CoachCall }, stopAt = Infinity): { result: MatchResult | null; calls: CallInput[]; tick: number } {
+function watch(
+  s: Started,
+  call?: { side: 'home' | 'away'; call: CoachCall },
+  stopAt = Infinity,
+  plan?: { side: 'home' | 'away'; tactics: TeamTactics },
+): { result: MatchResult | null; calls: CallInput[]; plans: PlanInput[]; tick: number } {
   const live = s.live!;
   const calls = live.calls ?? [];
+  const plans = live.plans ?? [];
   const rec = new MatchRecorder({ home: s.home.clubId, away: s.away.clubId });
-  const r = new Runner((seed) => new LiveSim(s.home, s.away, seed, { weather: live.weather, calls, ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}) }), live.seed);
+  const r = new Runner((seed) => new LiveSim(s.home, s.away, seed, { weather: live.weather, calls, plans, ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}) }), live.seed);
   r.onEvents = (events) => rec.add(events, r.cur);
   r.onStep = () => rec.clock((r.current as LiveSim).matchSeconds);
   while (!r.finished && r.tick < stopAt) {
     const sim = r.current as LiveSim;
     if (call && r.tick >= (live.resumeAt ?? 0) && sim.callRefusal(call.side, call.call) === null) {
       calls.push({ tick: r.tick + 1, side: call.side, call: call.call });
-      live.onProgress?.(calls, r.tick);
+      live.onProgress?.(calls, r.tick, plans);
+    }
+    // The coach changes the plan at half-time (N11), once.
+    if (plan && r.tick >= (live.resumeAt ?? 0) && sim.phaseKind === 'half-time' && plans.length === 0) {
+      plans.push({ tick: r.tick + 1, side: plan.side, tactics: plan.tactics });
+      live.onProgress?.(calls, r.tick, plans);
     }
     r.step();
   }
   if (!r.finished) {
-    live.onProgress?.(calls, r.tick);
-    return { result: null, calls, tick: r.tick };
+    live.onProgress?.(calls, r.tick, plans);
+    return { result: null, calls, plans, tick: r.tick };
   }
-  return { result: rec.result(r.current as LiveSim), calls, tick: r.tick };
+  return { result: rec.result(r.current as LiveSim), calls, plans, tick: r.tick };
 }
 
 /** A tiny localStorage for the resume record. */
@@ -155,6 +167,48 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(done.result).toEqual(straight);
     bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
     expect(readLiveMatch()).toBeNull();
+  }, 60_000);
+
+  it('a change of plan at half-time (N11) changes the match, and the match with its plan is what counts', () => {
+    newGame(42);
+    advanceWeek();
+    const s = started[0]!;
+    const side = s.fixture.homeId === PLAYER_ID ? 'home' : 'away';
+    const { result, plans } = watch(s, undefined, Infinity, { side: side as 'home' | 'away', tactics: { attack: 'expansive', defence: 'rush' } });
+    expect(plans).toHaveLength(1);
+    const opts = { seed: s.live!.seed, weather: s.live!.weather, ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) };
+    const plain = runMatch(s.home, s.away, opts);
+    expect(result!.events).not.toEqual(plain.events);
+    // The first half is the same match: the plan comes in at the second half's kick-off.
+    const firstHalf = (r: MatchResult): unknown[] => r.events.filter((e) => e.t < NINES.halfMinutes);
+    expect(firstHalf(plain).length).toBeGreaterThan(10);
+    expect(firstHalf(result!)).toEqual(firstHalf(plain));
+    expect(runMatch(s.home, s.away, { ...opts, plans: [...plans] })).toEqual(result);
+  }, 30_000);
+
+  it('a killed app resumes after half-time with the plan change already made', () => {
+    fakeStorage();
+    newGame(42);
+    const saved = JSON.stringify(getState());
+    advanceWeek();
+    const first = started[0]!;
+    const side = first.fixture.homeId === PLAYER_ID ? 'home' : 'away';
+    const plan = { side: side as 'home' | 'away', tactics: { attack: 'grind', defence: 'compressed' } as TeamTactics };
+    const cut = watch(first, undefined, 16000, plan);
+    expect(cut.result).toBeNull();
+    const rec = readLiveMatch()!;
+    expect(rec.plans).toEqual(cut.plans);
+    expect(rec.plans).toHaveLength(1);
+    clearHeldWeek();
+    setState(JSON.parse(saved));
+    advanceWeek();
+    const again = started[1]!;
+    expect(again.live!.resumeAt).toBe(cut.tick);
+    expect(again.live!.plans).toEqual(rec.plans);
+    const done = watch(again, undefined, Infinity, plan);
+    expect(done.plans).toHaveLength(1);
+    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, weather: first.live!.weather, plans: [...done.plans], ...(first.live!.injuryRate !== undefined ? { injuryRate: first.live!.injuryRate } : {}) });
+    expect(done.result).toEqual(straight);
   }, 60_000);
 
   it('fast-forward plays headless, and a whole season plays end to end', () => {

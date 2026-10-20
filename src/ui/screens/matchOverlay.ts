@@ -24,6 +24,8 @@ import { makeRng } from '../../utils/rng';
 import { commentaryFor } from '../../sim/commentary';
 import { truncateTicker } from '../../world/readability';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
+import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
+import { TACTIC_BLURB } from '../tacticsBlurbs';
 
 // ── Pure accumulator (unit-tested independent of the DOM) ─────────────────────
 
@@ -245,6 +247,85 @@ export interface MatchOverlayHandle {
 export function callsLine(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): string {
   const one = (s: 'home' | 'away'): string => (made[s] > 0 ? `${paid[s]}/${made[s]}` : '–');
   return `Calls paid off ${one('home')} / ${one('away')}`;
+}
+
+/** The plan card (N11): at half-time (the score, legs and calls) or after a try (Plan chip), the side's presets as two rows of chips. */
+export interface PlanCardOptions {
+  /** "Half-time", "Golden point" or "Change the plan". */
+  head: string;
+  /** Lines under the head: the score, each side's legs, the calls paid off. */
+  lines: string[];
+  /** The plan the side will play from the restart. */
+  tactics: TeamTactics;
+  /** A chip was tapped: the new plan (in force from the restart). Returns why not, or null. */
+  onPick: (t: TeamTactics) => string | null;
+  /** Continue (or the card timed out): the match goes on. */
+  onDone: () => void;
+  /** Go on by itself after this long (half-time at ×4 and above). */
+  autoMs?: number;
+}
+
+export interface PlanCardHandle {
+  readonly el: HTMLElement;
+  close(): void;
+}
+
+/** Show the plan card over the field until Continue (or `autoMs`). */
+export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
+  ensureStyles();
+  let current: TeamTactics = { ...o.tactics };
+  const chips: { preset: AttackPreset | DefencePreset; btn: HTMLButtonElement }[] = [];
+  const hint = el('div', { class: 'nrl-mo-plan-hint' });
+  const render = (): void => {
+    for (const c of chips) c.btn.toggleAttribute('data-active', c.preset === current.attack || c.preset === current.defence);
+    hint.textContent = `${PRESET_LABEL[current.attack]}: ${TACTIC_BLURB[current.attack]} ${PRESET_LABEL[current.defence]}: ${TACTIC_BLURB[current.defence]}`;
+  };
+  const row = (label: string, presets: readonly (AttackPreset | DefencePreset)[], pick: (p: AttackPreset | DefencePreset) => Partial<TeamTactics>): HTMLElement => {
+    const r = el('div', { class: 'nrl-mo-plan-row' }, el('span', { class: 'nrl-mo-plan-label' }, label));
+    for (const preset of presets) {
+      const btn = button(PRESET_LABEL[preset], () => {
+        const next = { ...current, ...pick(preset) };
+        if (o.onPick(next) === null) current = next;
+        render();
+      });
+      btn.setAttribute('data-tactic', preset);
+      btn.title = TACTIC_BLURB[preset];
+      chips.push({ preset, btn });
+      r.append(btn);
+    }
+    return r;
+  };
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    if (timer) clearTimeout(timer);
+    card.remove();
+    o.onDone();
+  };
+  const go = button('Continue', close);
+  go.classList.add('nrl-mo-plan-go');
+  const card = panel(
+    { class: 'nrl-mo-plan' },
+    el('div', { class: 'nrl-mo-plan-head' }, o.head),
+    ...o.lines.map((l) => el('div', { class: 'nrl-mo-plan-line' }, l)),
+    row('Attack', ATTACK_PRESETS, (p) => ({ attack: p as AttackPreset })),
+    row('Defence', DEFENCE_PRESETS, (p) => ({ defence: p as DefencePreset })),
+    hint,
+    go,
+  );
+  render();
+  mount(card);
+  // Any tap on the card holds it: the auto-continue is for a coach who isn't watching.
+  if (o.autoMs) {
+    timer = setTimeout(close, o.autoMs);
+    card.addEventListener('pointerdown', () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    });
+  }
+  return { el: card, close };
 }
 
 let active: MatchOverlayHandle | null = null;
@@ -611,6 +692,26 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: calc(7.5rem + env(sa
 .nrl-mo-calls .nrl-btn[data-made] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; opacity: 1; }
 .nrl-mo-final .nrl-mo-calls, body.nrl-match-final .nrl-mo-calls { display: none; }
 .nrl-mo-controls .nrl-btn[data-active] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; }
+/* The plan card (N11): over the field at half-time or from the Plan chip; above the controls. */
+.nrl-mo-plan {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 25;
+  display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+  width: min(42rem, calc(100vw - 1rem)); max-height: calc(100vh - 1rem); overflow-y: auto; box-sizing: border-box; padding: 0.6rem 0.8rem;
+}
+.nrl-mo-plan-head { font-size: clamp(1rem, 3.5vw, 1.4rem); font-weight: bold; letter-spacing: 0.06em; }
+.nrl-mo-plan-line { font-size: clamp(0.65rem, 2.2vw, 0.85rem); }
+.nrl-mo-plan-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.3rem; }
+.nrl-mo-plan-label { font-size: 0.72rem; min-width: 3.6rem; text-align: right; }
+.nrl-mo-plan-row .nrl-btn { min-height: 44px; padding: 0.15rem 0.45rem; font-size: 0.78rem; white-space: nowrap; }
+.nrl-mo-plan-row .nrl-btn[data-active], .nrl-mo-plan-row .nrl-btn[data-active]:hover:not(:disabled) { background: #7ec850; }
+.nrl-mo-plan-hint { font-size: 0.68rem; max-width: 36rem; text-align: center; }
+.nrl-mo-plan-go { min-width: 9rem; }
+.nrl-mo-calls .nrl-btn[data-plan] { background: #d6e8ff; }
+@media (max-height: 480px) {
+  .nrl-mo-plan { gap: 0.2rem; padding: 0.35rem 0.6rem; }
+  .nrl-mo-plan-head { font-size: 1rem; }
+  .nrl-mo-plan-row .nrl-btn { padding: 0.1rem 0.35rem; font-size: 0.72rem; }
+}
 /* Full-time: scoreboard and stats stay put (HUD/nav are still hidden); the
    feed gives way to the Back-to-Club button (MatchScene, bottom-centre where
    the controls were) and the result toast sits just above it. */

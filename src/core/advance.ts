@@ -7,10 +7,12 @@
 // N10.2: the run yields a frame between weeks, so the page paints and takes taps
 // (the HUD shows "Week n of 27…" and a Stop button). Each week is still one
 // synchronous advanceWeek(): no hook can observe a half-run week.
+// N10.3: in a browser the week may hold while the player's match plays in the
+// Worker (matchday); the run waits for the week's end before asking the rules.
 
 import { bus } from './events';
 import { getState, type GameState } from './state';
-import { advanceWeek, withFastForward } from './time';
+import { advanceWeek, weekHeld, withFastForward } from './time';
 import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
 import { fitSquadCount } from '../systems/matchday';
 import { overallRating } from '../data/player';
@@ -101,11 +103,13 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
   }
   const startSeason = getState().season;
   let weeksPlayed = 0;
-  let bankruptcyWarned = false;
+  let forcedSales: string[] = [];
 
-  // bankruptcy:warning is emitted from inside the economy tick; latch it for the
-  // week it fires in.
-  const offBankrupt = bus.on('bankruptcy:warning', () => { bankruptcyWarned = true; });
+  // bankruptcy:warning is emitted from inside the economy tick, after its forced
+  // sales, and names them (a sale pays nothing, so the balance can't show it); keep
+  // them for the week they happen in. N12.5: debt stops on a sale or a crossing
+  // (the balance before and after the week), not on every week's warning.
+  const offBankrupt = bus.on('bankruptcy:warning', (w) => { forcedSales.push(...(w.forcedSales ?? [])); });
   try {
     for (let guard = 0; guard < MAX_RUN_WEEKS; guard++) {
       // Paint and take taps between weeks (never before the first: the tap that
@@ -123,8 +127,18 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       });
       if (pre) return { weeksPlayed, stop: pre };
 
-      bankruptcyWarned = false;
-      withFastForward(() => advanceWeek());
+      forcedSales = [];
+      // A held week (N10.3: the player's match in the Worker) finishes later: wait for its end.
+      const weekDone = new Promise<void>((resolve) => {
+        const off = bus.on('week:advanced', () => { off(); resolve(); });
+        try {
+          if (!withFastForward(() => { advanceWeek(); return weekHeld(); }, { holds: true })) { off(); resolve(); }
+        } catch (err) {
+          off();
+          throw err;
+        }
+      });
+      await weekDone;
       weeksPlayed++;
 
       const after = getState();
@@ -132,7 +146,9 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
       const post = postWeekStop({
         injuredStarters: newlyInjuredStarters(before.squad, after.squad, overallRating, new Set(before.lineup.starters.filter((id): id is string => id !== null))),
         contractAlerts: contractAlerts(before.squad, after.squad),
-        bankruptcyWarned,
+        moneyBefore: before.money,
+        moneyAfter: after.money,
+        forcedSales,
         newDecisions: newCards(before, after),
       });
       if (post) return { weeksPlayed, stop: post };

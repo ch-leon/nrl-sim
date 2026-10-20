@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   forfeitRisk, newlyInjuredStarters, regularStarterIds, contractAlerts,
-  postWeekStop, targetReached, targetLabel, FINALS_START_WEEK,
+  postWeekStop, debtStop, targetReached, targetLabel, FINALS_START_WEEK,
   type SquadMember,
 } from '../../src/core/advanceRules';
-import { ON_FIELD, SEASON_ROUNDS, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
+import { ECON, ON_FIELD, SEASON_ROUNDS, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
 
 interface Mem extends SquadMember { rating: number }
 
@@ -115,7 +115,7 @@ describe('contractAlerts', () => {
 });
 
 describe('postWeekStop', () => {
-  const quiet = { injuredStarters: [], contractAlerts: [], bankruptcyWarned: false };
+  const quiet = { injuredStarters: [], contractAlerts: [], moneyBefore: 50_000, moneyAfter: 45_000, forcedSales: [] };
 
   it('returns null when nothing needs attention', () => {
     expect(postWeekStop(quiet)).toBeNull();
@@ -125,10 +125,6 @@ describe('postWeekStop', () => {
     expect(postWeekStop({ ...quiet, newDecisions: ['Fan day'] })).toEqual({ kind: 'decision', text: 'Decision needed: Fan day.' });
     expect(postWeekStop({ ...quiet, newDecisions: ['Fan day'], contractAlerts: ['x'] })?.kind).toBe('contract');
     expect(postWeekStop({ ...quiet, newDecisions: [] })).toBeNull();
-  });
-
-  it('stops on a bankruptcy warning', () => {
-    expect(postWeekStop({ ...quiet, bankruptcyWarned: true })?.kind).toBe('bankruptcy');
   });
 
   it('stops on an injury to a regular starter and names them', () => {
@@ -147,10 +143,73 @@ describe('postWeekStop', () => {
     const r = postWeekStop({
       injuredStarters: ['Smith'],
       contractAlerts: ['Jones left'],
-      bankruptcyWarned: true,
+      moneyBefore: 2_000,
+      moneyAfter: -3_000,
+      forcedSales: [],
     });
     expect(r?.kind).toBe('bankruptcy');
     expect(postWeekStop({ ...quiet, injuredStarters: ['Smith'], contractAlerts: ['x'] })?.kind).toBe('injury');
+  });
+});
+
+// N12.5 (QA finding 10): debt stops a multi-week advance once, not every week in the red.
+describe('postWeekStop — debt', () => {
+  const quiet = { injuredStarters: [], contractAlerts: [], forcedSales: [] };
+  const FLOOR = ECON.FORCED_SALE_FLOOR;
+  const FLOOR_TEXT = `Balance below the fire-sale floor (-$${(-FLOOR).toLocaleString('en-US')}).`;
+
+  it('stops on the crossing into the red', () => {
+    expect(postWeekStop({ ...quiet, moneyBefore: 4_000, moneyAfter: -2_500 }))
+      .toEqual({ kind: 'bankruptcy', text: 'Club has gone into debt.' });
+    // From exactly $0 counts: the balance was not yet in the red.
+    expect(postWeekStop({ ...quiet, moneyBefore: 0, moneyAfter: -1 })?.text).toBe('Club has gone into debt.');
+  });
+
+  it('does not stop in the red when nothing is crossed', () => {
+    expect(postWeekStop({ ...quiet, moneyBefore: -2_500, moneyAfter: -9_000 })).toBeNull();
+    expect(postWeekStop({ ...quiet, moneyBefore: -40_000, moneyAfter: -30_000 })).toBeNull();
+    // Below the floor already, with nobody left to sell: no stop either.
+    expect(postWeekStop({ ...quiet, moneyBefore: FLOOR - 5_000, moneyAfter: FLOOR - 12_000 })).toBeNull();
+    // Climbing back to $0 or above is not a stop.
+    expect(postWeekStop({ ...quiet, moneyBefore: -1_000, moneyAfter: 0 })).toBeNull();
+  });
+
+  it('stops when the balance first passes the fire-sale floor', () => {
+    expect(postWeekStop({ ...quiet, moneyBefore: FLOOR + 3_000, moneyAfter: FLOOR - 4_000 }))
+      .toEqual({ kind: 'bankruptcy', text: FLOOR_TEXT });
+    expect(FLOOR_TEXT).toBe('Balance below the fire-sale floor (-$100,000).');
+    // At the floor exactly is not below it.
+    expect(postWeekStop({ ...quiet, moneyBefore: FLOOR + 3_000, moneyAfter: FLOOR })).toBeNull();
+  });
+
+  it('stops on a forced sale and names who went', () => {
+    expect(postWeekStop({ ...quiet, moneyBefore: FLOOR - 5_000, moneyAfter: FLOOR - 9_000, forcedSales: ['J. Smith'] }))
+      .toEqual({ kind: 'bankruptcy', text: 'Forced sale: J. Smith sold to cover debts.' });
+    expect(postWeekStop({ ...quiet, moneyBefore: FLOOR - 5_000, moneyAfter: FLOOR - 9_000, forcedSales: ['A', 'B'] })?.text)
+      .toBe('Forced sales: A, B sold to cover debts.');
+    // The cascade can sell several in one week: three names, then how many more.
+    expect(debtStop({ moneyBefore: FLOOR - 5_000, moneyAfter: FLOOR - 9_000, forcedSales: ['A', 'B', 'C'] })?.text)
+      .toBe('Forced sales: A, B, C sold to cover debts.');
+    expect(debtStop({ moneyBefore: FLOOR - 5_000, moneyAfter: FLOOR - 9_000, forcedSales: ['A', 'B', 'C', 'D', 'E', 'F', 'G'] })?.text)
+      .toBe('Forced sales: A, B, C and 4 more sold to cover debts.');
+  });
+
+  it('a week that does several says the most pressing: sale, then floor, then the red', () => {
+    expect(postWeekStop({ ...quiet, moneyBefore: 10_000, moneyAfter: FLOOR - 1, forcedSales: ['A'] })?.text)
+      .toBe('Forced sale: A sold to cover debts.');
+    expect(postWeekStop({ ...quiet, moneyBefore: 10_000, moneyAfter: FLOOR - 1 })?.text).toBe(FLOOR_TEXT);
+  });
+
+  it('debt comes before an injury or a contract in the same week', () => {
+    const r = postWeekStop({ ...quiet, moneyBefore: 1, moneyAfter: -1, injuredStarters: ['Smith'], contractAlerts: ['x'] });
+    expect(r?.text).toBe('Club has gone into debt.');
+    // In the red with nothing crossed, the injury is what stops it.
+    expect(postWeekStop({ ...quiet, moneyBefore: -1, moneyAfter: -2, injuredStarters: ['Smith'] })?.kind).toBe('injury');
+  });
+
+  it('debtStop is the same verdict on its own', () => {
+    expect(debtStop({ moneyBefore: 500, moneyAfter: -500, forcedSales: [] })?.text).toBe('Club has gone into debt.');
+    expect(debtStop({ moneyBefore: -500, moneyAfter: -900, forcedSales: [] })).toBeNull();
   });
 });
 
