@@ -1,0 +1,64 @@
+{
+  "name": "kick chase",
+  "description": "N9.3: territory kicks chased at cruise and the winger on attacking kicks — what do they change, and does Rush still concede more offsides than Slide?",
+  "seeds": 120,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "slide v rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "old chase (all sprint, no winger)",
+      "tuning": {
+        "live.territoryChaseSprint": 1,
+        "live.wingerChase": 0
+      }
+    },
+    {
+      "name": "cruise territory only",
+      "tuning": {
+        "live.wingerChase": 0
+      }
+    },
+    {
+      "name": "winger only",
+      "tuning": {
+        "live.territoryChaseSprint": 1
+      }
+    }
+  ]
+}
