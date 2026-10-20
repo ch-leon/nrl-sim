@@ -20,6 +20,8 @@ export interface RunMatchOptions {
   length?: MatchLength;
   /** Coach calls by tick (#73): the match as the player called it. */
   calls?: CallInput[];
+  /** Sides with an AI coach (N9.6). */
+  aiCoach?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
 }
@@ -88,6 +90,7 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     ...(opts.weather ? { weather: opts.weather } : {}),
     ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}),
     ...(opts.calls ? { calls: opts.calls } : {}),
+    ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}),
     ...(opts.goldenPoint ? { goldenPoint: true } : {}),
   });
   const rec = new MatchRecorder({ home: home.clubId, away: away.clubId });

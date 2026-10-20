@@ -35,6 +35,8 @@ export interface ScenarioSpec {
   minutes?: number;
   /** Rain or wind (2f); clear unless given. */
   weather?: WeatherKind;
+  /** Sides with an AI coach (N9.6). Absent: both when `calls.ai.on`, else none. */
+  aiCoach?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   finals?: boolean;
   /** Coach calls (#73) each side makes whenever it can, or only on a given tackle ("shift left on tackle 2"). */
@@ -91,6 +93,7 @@ export function checkPlan(p: Plan): string[] {
     names.add(s.name);
     if (s.minutes !== undefined && !(s.minutes > 0)) errs.push(`${s.name}: minutes must be > 0`);
     if (s.weather !== undefined && !['clear', 'rain', 'wind'].includes(s.weather)) errs.push(`${s.name}: weather must be clear / rain / wind`);
+    if (s.aiCoach !== undefined && (!Array.isArray(s.aiCoach) || s.aiCoach.some((x) => x !== 'home' && x !== 'away'))) errs.push(`${s.name}: aiCoach must list home / away`);
     for (const side of ['home', 'away'] as const) {
       for (const r of s.calls?.[side] ?? []) if (!isCoachCall(r.call)) errs.push(`${s.name}: unknown call "${String(r.call)}" for ${side}`);
     }

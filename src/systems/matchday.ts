@@ -13,6 +13,7 @@ import { teamSheetFromRival, teamSheetFromSquad } from '../match/league/sheets';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
+import { aiCoachSides, unlockedCalls } from '../match/league/calls';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { ON_FIELD } from '../config';
@@ -114,6 +115,11 @@ export function forfeitResult(
     : { homeScore: FORFEIT_SCORE, awayScore: 0 };
 }
 
+/** The best Coach's Office built (0 = none): it unlocks the coach's calls (N9.6). */
+export function coachsOfficeLevel(state: { facilities: readonly { defId: string; level: number }[] }): number {
+  return state.facilities.reduce((m, f) => (f.defId === 'coachsOffice' ? Math.max(m, f.level) : m), 0);
+}
+
 export function roundLabel(round: number): string {
   if (round === 25) return 'Qualifying Final';
   if (round === 26) return 'Semi Final';
@@ -199,6 +205,8 @@ export function registerPlayerMatchSystem(): void {
       seed,
       injuryRate: difficultyMultipliers(state.settings.difficulty).injuryRate,
       ...(state.weather ? { weather: state.weather } : {}),
+      // The rival's coach makes his own calls when the game gives rivals one (N9.6); the player makes his.
+      aiCoach: aiCoachSides([fixture.homeId === PLAYER_ID ? 'away' : 'home']),
       // A drawn final goes to golden point (N9.4).
       ...(isFinalsRound(fixture.round) ? { goldenPoint: true } : {}),
     };
@@ -232,7 +240,8 @@ export function registerPlayerMatchSystem(): void {
           calls: record.calls,
           ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
           onProgress: (calls, tick) => writeLiveMatch({ ...record, calls: [...calls], tick }),
-          ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const) } : {}),
+          ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
+          ...(matchOpts.aiCoach.length ? { aiCoach: matchOpts.aiCoach } : {}),
         },
       });
       return;

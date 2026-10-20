@@ -36,7 +36,34 @@ export const CALLS = {
   lastFrom: 3,
   /** When a call paid off (spec §3, last column), in metres: a hit-up's carry, a shift's play, a kick's gain, the most a rushed or held set may make. */
   paid: { hitUpM: 3, shiftM: 8, kickM: 30, rushM: 8, holdM: 15 },
+  /**
+   * The AI coach (N9.6, spec §6): rules, no dice. `on` 0 = no AI calls (the default, so a
+   * match with no calls plays as runMatch). A field goal when one is on; a shift toward an
+   * overlap of this many men (attackers less defenders on that side of the ball); Rush when
+   * defending within this many metres of their own line.
+   */
+  ai: { on: 0, overlap: 2, rushOwnM: 20 },
+  /**
+   * Calls the player's chips offer by Coach's Office level (N9.6): with none built, these;
+   * each level adds its own. Index = level (0–3).
+   */
+  unlocks: [['hit-up', 'hold'], ['shift-left', 'shift-right', 'rush'], ['kick-early', 'run-it'], ['bomb', 'field-goal']] as CoachCall[][],
 };
+
+/** The sides with an AI coach (N9.6): the rivals' (not the player's) when `calls.ai.on`, else none. */
+export function aiCoachSides(sides: readonly ('home' | 'away')[]): ('home' | 'away')[] {
+  return CALLS.ai.on > 0 ? [...sides] : [];
+}
+
+/** The calls a coach has with a Coach's Office at this level (0 = none built). */
+export function unlockedCalls(level: number): CoachCall[] {
+  return CALLS.unlocks.slice(0, Math.max(0, Math.min(CALLS.unlocks.length - 1, Math.floor(level))) + 1).flat();
+}
+
+/** The Coach's Office level that unlocks a call. */
+export function unlockLevel(call: CoachCall): number {
+  return Math.max(0, CALLS.unlocks.findIndex((tier) => tier.includes(call)));
+}
 
 /** Which way a call faces: attack calls while his side has the ball, defence calls while it defends. */
 export function callIsDefence(c: CoachCall): boolean {
