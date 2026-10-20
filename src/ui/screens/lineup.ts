@@ -204,7 +204,9 @@ const LINEUP_CSS = `
 .nrl-lineup-kc { display: flex; gap: 0.3rem; flex-shrink: 0; }
 .nrl-lineup-kc[hidden] { display: none; }
 .nrl-lineup-kc .nrl-btn { min-height: 44px; flex: 1 1 0; }
-.nrl-lineup-role { display: inline-block; margin-left: 0.15rem; padding: 0 0.15rem; background: #1a1a2e; color: #f4d03f; font-size: 0.55rem; line-height: 1.2; }
+.nrl-lineup-role { position: absolute; top: -7px; padding: 0 0.2rem; background: #1a1a2e; color: #f4d03f; border: 1px solid #f4d03f; font-size: 0.55rem; font-weight: bold; line-height: 1.25; pointer-events: none; }
+.nrl-lineup-role-k { right: -5px; }
+.nrl-lineup-role-c { right: 11px; }
 .nrl-lineup-rot { display: flex; gap: 0.2rem; align-items: center; }
 .nrl-lineup-rot-label { color: #e8e0c8; font-size: 0.7rem; }
 .nrl-lineup-tacstrip { display: flex; gap: 0.6rem; align-items: center; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin; }
@@ -351,10 +353,6 @@ export function openLineupScreen(): void {
     if (injured) top.append(el('span', { class: 'nrl-lineup-fit-unrelated', text: `OUT ${p.injuredWeeks}w` }));
     else if (rating !== null) top.append(el('span', { class: fitClass(fit), text: String(rating) }));
     else top.append('—');
-    if (p && spot.kind === 'starter') {
-      if (roles.kicker === p.id) top.append(el('span', { class: 'nrl-lineup-role', text: 'K', attrs: { 'data-kicker': '', title: 'Goal-kicker' } }));
-      if (roles.captain === p.id) top.append(el('span', { class: 'nrl-lineup-role', text: 'C', attrs: { 'data-captain': '', title: 'Captain' } }));
-    }
     const t = el(
       'button',
       {
@@ -375,6 +373,11 @@ export function openLineupScreen(): void {
     );
     if (!p) t.setAttribute('data-empty', '');
     if (injured) t.setAttribute('data-out', '');
+    // K and C (N11): badges on the tile's top edge.
+    if (p && spot.kind === 'starter') {
+      if (roles.kicker === p.id) t.append(el('span', { class: 'nrl-lineup-role nrl-lineup-role-k', text: 'K', attrs: { 'data-kicker': '', title: 'Goal-kicker' } }));
+      if (roles.captain === p.id) t.append(el('span', { class: 'nrl-lineup-role nrl-lineup-role-c', text: 'C', attrs: { 'data-captain': '', title: 'Captain' } }));
+    }
     if (sameSpot(selected, spot)) t.setAttribute('data-selected', '');
     return t;
   };
