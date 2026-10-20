@@ -15,6 +15,7 @@ import { emptyFinance, getState, SAVE_VERSION } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
+import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { buildLabel } from '../ui/buildInfo';
 import {
@@ -192,6 +193,16 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v12 → v13: settings.liveRivals, rival-v-rival matches on the live sim (N9.2).
   // Optional and off when absent, so an old save keeps the cheap rival sim.
   { from: 12, to: 13, run: (old) => ({ ...old }) },
+  // v13 → v14: Lineup.tactics, the coach's attack and defence presets (N11). An old
+  // save plays Balanced / Slide, as it always has.
+  {
+    from: 13,
+    to: 14,
+    run: (old) => {
+      const lineup = old.lineup as Partial<GameState['lineup']> | undefined;
+      return lineup ? { ...old, lineup: { ...lineup, tactics: lineup.tactics ?? { ...DEFAULT_TACTICS } } } : { ...old };
+    },
+  },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

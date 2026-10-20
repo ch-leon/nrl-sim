@@ -10,6 +10,7 @@
 import type { Lineup, Player, PlayerStats, Position } from '../core/state';
 import { overallRating } from '../data/player';
 import { BENCH, DEFAULT_ROTATION, isRotation, type Rotation } from '../match/league/bench';
+import { DEFAULT_TACTICS, isAttackPreset, isDefencePreset, type TeamTactics } from '../match/league/presets';
 
 /**
  * The nine formation slots in order. The live sim's roles (match/league/roles.ts)
@@ -77,7 +78,7 @@ function bestFor(pool: readonly Player[], slot: number): Player | undefined {
  * natural halfback gets his slot before a centre is moved there. The bench is
  * the next best fit players by overall. Old saves and the Auto pick button.
  */
-export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_ROTATION): Lineup {
+export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_ROTATION, tactics: TeamTactics = DEFAULT_TACTICS): Lineup {
   const fit = squad.filter(isFit);
   const starters: (string | null)[] = LINEUP_SLOTS.map(() => null);
   const used = new Set<string>();
@@ -89,7 +90,7 @@ export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_
     used.add(p.id);
   }
   const bench = fit.filter((p) => !used.has(p.id)).sort(byOverall).slice(0, BENCH.size).map((p) => p.id);
-  return { starters, bench, rotation };
+  return { starters, bench, rotation, tactics: { ...tactics } };
 }
 
 /** Why a slot had to be filled on the day. */
@@ -110,6 +111,8 @@ export interface Selection {
   starters: (Player | null)[];
   bench: Player[];
   rotation: Rotation;
+  /** The coach's presets (N11): what the side plays. */
+  tactics?: TeamTactics;
 }
 
 export interface Resolved extends Selection {
@@ -184,8 +187,22 @@ export function resolveLineup(lineup: Lineup, squad: readonly Player[]): Resolve
     if (!cleanBench.includes(p.id)) cleanBench.push(p.id);
   }
   const rotation = isRotation(lineup.rotation) ? lineup.rotation : DEFAULT_ROTATION;
-  const same = clean.every((id, i) => id === (lineup.starters[i] ?? null)) && lineup.starters.length === LINEUP_SLOTS.length && cleanBench.length === lineup.bench.length && cleanBench.every((id, i) => id === lineup.bench[i]) && rotation === lineup.rotation;
-  return { starters, bench, rotation, fills, lineup: same ? lineup : { starters: clean, bench: cleanBench, rotation }, changed: !same };
+  const tactics = validTactics(lineup.tactics);
+  const same =
+    clean.every((id, i) => id === (lineup.starters[i] ?? null)) && lineup.starters.length === LINEUP_SLOTS.length && cleanBench.length === lineup.bench.length && cleanBench.every((id, i) => id === lineup.bench[i]) && rotation === lineup.rotation && tactics === lineup.tactics;
+  return { starters, bench, rotation, tactics, fills, lineup: same ? lineup : { starters: clean, bench: cleanBench, rotation, tactics }, changed: !same };
+}
+
+/** The lineup's presets if they are real ones, else Balanced / Slide (N11). */
+export function validTactics(t: Partial<TeamTactics> | undefined): TeamTactics {
+  if (t && isAttackPreset(t.attack) && isDefencePreset(t.defence)) return t as TeamTactics;
+  return { ...DEFAULT_TACTICS };
+}
+
+/** The coach picks an attack or a defence preset (N11); the other half of the plan stays. */
+export function setTactics(lineup: Lineup, pick: Partial<TeamTactics>): Lineup {
+  const next = validTactics({ ...lineup.tactics, ...pick });
+  return next.attack === lineup.tactics?.attack && next.defence === lineup.tactics?.defence ? lineup : { ...lineup, tactics: next };
 }
 
 /** One line for the news: who filled in where, and why. */

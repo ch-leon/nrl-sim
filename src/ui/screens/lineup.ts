@@ -17,9 +17,11 @@ import { overallRating } from '../../data/player';
 import { PORTRAIT_W, portraitDataUrl } from '../../art/portrait';
 import type { Kit } from '../../art/match/kit';
 import { BENCH, ROTATIONS, type Rotation } from '../../match/league/bench';
+import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
+import { TACTIC_BLURB } from '../tacticsBlurbs';
 import {
   LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
-  resolveLineup, sameSpot, spotOf, swapSpots, type Spot,
+  resolveLineup, sameSpot, setTactics, spotOf, swapSpots, validTactics, type Spot,
 } from '../../systems/lineup';
 import { ensureScreenStyles } from './recruit';
 import { squadKit } from './squad';
@@ -200,6 +202,10 @@ const LINEUP_CSS = `
 .nrl-lineup-where[data-free] { background: transparent; color: transparent; border-color: transparent; }
 .nrl-lineup-rot { display: flex; gap: 0.2rem; align-items: center; }
 .nrl-lineup-rot-label { color: #e8e0c8; font-size: 0.7rem; }
+.nrl-lineup-tacstrip { display: flex; gap: 0.6rem; align-items: center; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin; }
+.nrl-lineup-tac { flex-wrap: nowrap; flex-shrink: 0; }
+.nrl-lineup-tac .nrl-btn { min-height: 44px; white-space: nowrap; }
+.nrl-lineup-tac-hint { color: #e8e0c8; font-size: 0.68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
 .nrl-lineup-rot .nrl-btn { padding: 0.3rem 0.35rem; font-size: clamp(0.6rem, 2vw, 0.8rem); }
 .nrl-lineup-head .nrl-btn { padding: 0.3rem 0.5rem; }
 @media (min-width: 1000px) {
@@ -260,6 +266,23 @@ export function openLineupScreen(): void {
     rotButtons.set(r, b);
     rotRow.append(b);
   }
+
+  // The coach's presets (N11): attack and defence, each chip with what it does.
+  const tacButtons = new Map<AttackPreset | DefencePreset, HTMLButtonElement>();
+  const tacHint = el('div', { class: 'nrl-lineup-tac-hint' });
+  const tacRow = (label: string, presets: readonly (AttackPreset | DefencePreset)[], pick: (p: AttackPreset | DefencePreset) => Partial<TeamTactics>): HTMLElement => {
+    const row = el('div', { class: 'nrl-lineup-rot nrl-lineup-tac' }, el('span', { class: 'nrl-lineup-rot-label', text: label }));
+    for (const p of presets) {
+      const b = button(PRESET_LABEL[p], () => setLineup(setTactics(getState().lineup, pick(p))));
+      b.title = TACTIC_BLURB[p];
+      b.setAttribute('data-tactic', p);
+      tacButtons.set(p, b);
+      row.append(b);
+    }
+    return row;
+  };
+  const attackRow = tacRow('Attack:', ATTACK_PRESETS, (p) => ({ attack: p as AttackPreset }));
+  const defenceRow = tacRow('Defence:', DEFENCE_PRESETS, (p) => ({ defence: p as DefencePreset }));
 
   const toast = (text: string): void => bus.emit('ui:notify', { text, kind: 'info' });
 
@@ -355,6 +378,10 @@ export function openLineupScreen(): void {
     for (let i = 0; i < BENCH.size; i++) bench.append(tile(at(lineup.bench[i] ?? null), { kind: 'bench', index: i }, kit, null));
 
     for (const [r, b] of rotButtons) b.classList.toggle('nrl-sort-active', r === lineup.rotation);
+    const tactics = validTactics(lineup.tactics);
+    for (const [p, b] of tacButtons) b.classList.toggle('nrl-sort-active', p === tactics.attack || p === tactics.defence);
+    tacHint.textContent = `${PRESET_LABEL[tactics.attack]}: ${TACTIC_BLURB[tactics.attack]} ${PRESET_LABEL[tactics.defence]}: ${TACTIC_BLURB[tactics.defence]}`;
+    tacHint.title = tacHint.textContent;
 
     const fit = s.squad.filter((p) => p.injuredWeeks <= 0).length;
     const picked = lineup.starters.filter((id) => id !== null).length;
@@ -413,7 +440,7 @@ export function openLineupScreen(): void {
 
   const autoBtn = button('AUTO PICK', () => {
     selected = null;
-    setLineup(autoPick(getState().squad, getState().lineup.rotation));
+    setLineup(autoPick(getState().squad, getState().lineup.rotation, validTactics(getState().lineup.tactics)));
   });
   autoBtn.title = 'Today’s best nine by slot and the next four';
   autoBtn.setAttribute('data-auto-pick', '');
@@ -432,7 +459,9 @@ export function openLineupScreen(): void {
     el('div', { class: 'nrl-lineup-left' }, field, bench),
     el('div', { class: 'nrl-lineup-right' }, pick, list),
   );
-  const screen = el('div', { class: 'nrl-screen nrl-lineup' }, head, sub, body);
+  // The plan (N11): attack and defence presets on their own strip, the picks' blurbs under it.
+  const tacStrip = el('div', { class: 'nrl-lineup-tacstrip' }, attackRow, defenceRow);
+  const screen = el('div', { class: 'nrl-screen nrl-lineup' }, head, tacStrip, tacHint, sub, body);
   openScreen(screen, onLineupClosed);
   render();
   unsub = bus.on('state:changed', render);

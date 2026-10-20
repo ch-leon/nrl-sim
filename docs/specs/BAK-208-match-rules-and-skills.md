@@ -232,7 +232,8 @@ wingers). **Overlap** (all presets): when a side has more players than the defen
 Rivals get a fixed style from club identity: contenders (65+) Expansive / All-out /
 Balanced, mid-table Balanced / Kick-chase / Expansive, strugglers Grind / Kick-chase /
 Balanced, with the defence from a second roll. The player's club plays Balanced / Slide
-until coaching staff and facilities unlock presets (later ticket). Mid-match coach calls
+until the coach picks otherwise: since N11 the Lineup screen has a chip per attack and
+defence preset, saved in the lineup (save v14) and carried on the team sheet. Mid-match coach calls
 (#73) will override the preset for a set. Lab: **H / A** pickers per side for attack and
 defence ("club" keeps the club's own), `#lab?hatk=grind&hdef=rush&aatk=…&adef=…`, and the
 hint line names what each side is playing.

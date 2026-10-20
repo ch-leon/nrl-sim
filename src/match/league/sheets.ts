@@ -94,7 +94,8 @@ function toRosterEntry(p: Player): RosterEntry {
  * With a `selection` (the coach's lineup resolved for the day, #69) the roster
  * is his nine in slot order: each man plays the slot's position, at the stats
  * his positional fit there leaves him (systems/lineup.ts), and the bench and
- * rotation are the lineup's. The aggregates come from those stats.
+ * rotation are the lineup's, and so are the attack and defence presets (N11).
+ * The aggregates come from those stats.
  */
 export function teamSheetFromSquad(
   players: Player[],
@@ -136,6 +137,8 @@ export function teamSheetFromSquad(
     roster: best.map(toRosterEntry),
     ...(bench.length > 0 ? { bench: bench.map(toRosterEntry) } : {}),
     ...(selection && picked.length > 0 ? { rotation: selection.rotation } : {}),
+    // The coach's presets (N11): what this side plays; Balanced / Slide when he hasn't picked.
+    ...(selection?.tactics ? { tactics: selection.tactics } : {}),
   };
 }
 
