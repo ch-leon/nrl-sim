@@ -245,12 +245,14 @@ async function play() {
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: PHONE, isMobile: PHONE });
   // The held-week step (#216) needs the rival round's Worker as slow as a phone's (CPU
   // throttling never reaches a Worker): a Worker posts its jobs window.__nrlWorkerDelayMs late.
+  // Only the background lane's: the Skip has its own worker (N10.4) and must not wait.
   await ctx.addInitScript(() => {
     const Base = window.Worker;
     if (!Base) return;
     window.Worker = class extends Base {
+      constructor(url, opts) { super(url, opts); this.slowed = opts?.name !== 'match-skip'; }
       postMessage(...args) {
-        const ms = window.__nrlWorkerDelayMs ?? 0;
+        const ms = this.slowed ? window.__nrlWorkerDelayMs ?? 0 : 0;
         if (ms > 0) setTimeout(() => super.postMessage(...args), ms);
         else super.postMessage(...args);
       }
