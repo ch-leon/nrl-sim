@@ -6,6 +6,7 @@
 import { bus } from '../core/events';
 import { getState, type GameState } from '../core/state';
 import type { AdvanceTarget } from '../core/advanceRules';
+import { weekHeld } from '../core/time';
 import { WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
 
@@ -43,6 +44,21 @@ export function fmtMoney(n: number): string {
 
 const FLASH_MS = 450;
 
+/** What a tap on Advance Week (or its menu) says while the week is still finishing. */
+export const HELD_WEEK_TEXT = 'The other matches are still being played; the week ends when they are in.';
+
+/**
+ * True when the week is held (coach calls #73; the rival round played off the
+ * main thread, N9.2), after saying so: back at the club the HUD is live again
+ * while the rivals finish, and a tap would otherwise do nothing, or report
+ * weeks advanced that never were (#216).
+ */
+export function weekStillFinishing(): boolean {
+  if (!weekHeld()) return false;
+  bus.emit('ui:notify', { text: HELD_WEEK_TEXT, kind: 'info' });
+  return true;
+}
+
 /**
  * Build the top HUD, subscribe it to the bus, mount it into #ui-root, and render
  * the current getState() immediately. Returns a handle whose destroy() removes
@@ -59,7 +75,9 @@ export function createHud(opts: HudOpts = {}): Hud {
   const readouts = el('div', { class: 'nrl-hud-readouts' }, moneyEl, weekEl, seasonEl);
   const spacer = el('div', { class: 'nrl-hud-spacer' });
 
-  const advanceBtn = button('Advance Week', () => opts.onAdvanceWeek?.());
+  const advanceBtn = button('Advance Week', () => {
+    if (!weekStillFinishing()) opts.onAdvanceWeek?.();
+  });
   if (!opts.onAdvanceWeek) advanceBtn.disabled = true;
 
   // #44: split-button menu. The toggle is a 44px square beside Advance Week; the
@@ -74,7 +92,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     ...ADVANCE_MENU.map(({ label, target }) => {
       const item = button(label, () => {
         setMenuOpen(false);
-        opts.onAdvanceUntil?.(target);
+        if (!weekStillFinishing()) opts.onAdvanceUntil?.(target);
       }, { class: 'nrl-hud-menu-item' });
       item.setAttribute('role', 'menuitem');
       if (!opts.onAdvanceUntil) item.disabled = true;

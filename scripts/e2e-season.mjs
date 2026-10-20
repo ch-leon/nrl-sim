@@ -241,6 +241,19 @@ async function answerCards(rec) {
 async function play() {
   const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--use-gl=swiftshader'] });
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: PHONE, isMobile: PHONE });
+  // The held-week step (#216) needs the rival round's Worker as slow as a phone's (CPU
+  // throttling never reaches a Worker): a Worker posts its jobs window.__nrlWorkerDelayMs late.
+  await ctx.addInitScript(() => {
+    const Base = window.Worker;
+    if (!Base) return;
+    window.Worker = class extends Base {
+      postMessage(...args) {
+        const ms = window.__nrlWorkerDelayMs ?? 0;
+        if (ms > 0) setTimeout(() => super.postMessage(...args), ms);
+        else super.postMessage(...args);
+      }
+    };
+  });
   page = await ctx.newPage();
   page.setDefaultTimeout(10000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
@@ -621,6 +634,48 @@ async function play() {
     rec.notes.push(`S${s.season} W${s.week}`);
     await facilitiesDrawn(rec);
     await dumpSave('season-2', rec);
+  }, { quietToasts: true });
+
+  // #216: with rival matches on the match engine (#212) the week holds until the rival round is
+  // in, which can outlast the player's match. Back at the club before then, Advance Week and its
+  // menu must say so: not drop the tap, nor report weeks advanced that never were.
+  await step('held-week', async (rec) => {
+    await closeAny();
+    await answerCards(rec);
+    await tap('.nrl-nav .nrl-btn[data-screen="fixtures"]');
+    const toggle = page.locator('.nrl-rivals-toggle input[type="checkbox"]');
+    if (!(await toggle.count())) return 'no rival-rounds setting on this build';
+    await press(toggle);
+    await closeAny();
+    await page.evaluate(() => { window.__nrlWorkerDelayMs = 15000; });
+    const week = await page.evaluate(() => window.__nrlState().week);
+    await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+    await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
+    await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
+    await leaveMatch();
+    const held = () => page.evaluate((w) => window.__nrlState().week === w, week);
+    if (!(await held())) throw new Error('the week finished before Back to Club: the slowed Worker did not hold it');
+    const said = () => page.waitForFunction(() => [...document.querySelectorAll('.nrl-toast')].some((t) => /still being played/.test(t.textContent ?? '')), null, { timeout: 3000 });
+    await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+    await said().catch(() => { throw new Error('Advance Week during the held week said nothing'); });
+    if (await page.locator('.nrl-mo-controls').count()) throw new Error('Advance Week started a match while the week was held');
+    await toastsGone();
+    await advanceMenu(0);
+    await said().catch(() => { throw new Error('×4 weeks during the held week said nothing'); });
+    const claimed = await page.evaluate(() => [...document.querySelectorAll('.nrl-toast')].map((t) => t.textContent ?? '').find((t) => /^Advanced/.test(t)));
+    if (claimed) throw new Error(`×4 weeks during the held week reported "${claimed}"`);
+    if (!(await held())) throw new Error('the week moved on during the hold');
+    await page.waitForFunction((w) => window.__nrlState().week !== w, week, { timeout: 60000 });
+    const s = await page.evaluate(() => window.__nrlState());
+    const round = s.league.fixtures.filter((f) => f.round === week);
+    rec.notes.push(`held at W${week} after Back to Club; both taps said so; W${s.week}, round ${week} ${round.filter((f) => f.result).length}/${round.length} results`);
+    if (round.some((f) => !f.result)) throw new Error('the held round finished with fixtures unplayed');
+    // Back to the default for whatever runs next.
+    await page.evaluate(() => { window.__nrlWorkerDelayMs = 0; });
+    await tap('.nrl-nav .nrl-btn[data-screen="fixtures"]');
+    await press(page.locator('.nrl-rivals-toggle input[type="checkbox"]'));
+    await closeAny();
   }, { quietToasts: true });
 
   await browser.close();

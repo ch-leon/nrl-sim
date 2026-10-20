@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { fmtMoney, ADVANCE_MENU } from '../../src/ui/hud';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { fmtMoney, ADVANCE_MENU, HELD_WEEK_TEXT, weekStillFinishing } from '../../src/ui/hud';
+import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
+import { createNewGame, getState } from '../../src/core/state';
+import { bus } from '../../src/core/events';
 
 // DOM tests (createHud rendering / flash / bus wiring) are skipped: jsdom is not
 // installed and the vitest environment is 'node' (see vite.config.ts). The
@@ -32,5 +35,35 @@ describe('ADVANCE_MENU (#44)', () => {
       { kind: 'seasonEnd' },
     ]);
     expect(ADVANCE_MENU.map((m) => m.label)).toEqual(['×4 weeks', 'To finals', 'To season end']);
+  });
+});
+
+describe('a held week (#216)', () => {
+  beforeEach(() => {
+    bus.clear();
+    clearTickHooks();
+    clearSeasonHooks();
+    clearHeldWeek();
+    createNewGame('Held Test', 1);
+  });
+
+  it('a tap while the rival round finishes says so instead of doing nothing', () => {
+    // The rival round (N9.2) holds the week past the player's match: back at the club, the HUD is live.
+    registerTickHook('rivals', TICK_ORDER.match, (ctx) => ctx.hold?.());
+    const notes: string[] = [];
+    bus.on('ui:notify', ({ text }) => void notes.push(text));
+    const week = getState().week;
+    expect(weekStillFinishing()).toBe(false);
+    expect(notes).toEqual([]);
+
+    advanceWeek();
+    expect(weekStillFinishing()).toBe(true);
+    expect(notes).toEqual([HELD_WEEK_TEXT]);
+    expect(getState().week).toBe(week);
+
+    resumeWeek();
+    expect(getState().week).toBe(week + 1);
+    expect(weekStillFinishing()).toBe(false);
+    expect(notes).toEqual([HELD_WEEK_TEXT]);
   });
 });
