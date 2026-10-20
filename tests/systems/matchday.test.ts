@@ -10,6 +10,7 @@ import {
   registerPlayerMatchSystem,
   forfeitResult,
   fitSquadCount,
+  scaleSheet,
 } from '../../src/systems/matchday';
 import { FORFEIT_SCORE, SQUAD_MIN } from '../../src/config';
 import { generatePlayer } from '../../src/data/player';
@@ -17,7 +18,9 @@ import { makeRng } from '../../src/utils/rng';
 import type { Fixture, Player } from '../../src/core/state';
 import type { MatchResult, TeamSheet } from '../../src/sim/events';
 import { runMatch } from '../../src/match/league/match';
-import { LINEUP_SLOTS, placeAt, swapSpots } from '../../src/systems/lineup';
+import { LINEUP_SLOTS, autoPick, placeAt, resolveLineup, swapSpots } from '../../src/systems/lineup';
+import { teamSheetFromSquad } from '../../src/match/league/sheets';
+import { generateRivalSquad } from '../../src/systems/rivals';
 
 function collect(): {
   toasts: string[];
@@ -331,5 +334,24 @@ describe('the coach’s lineup is the side that runs out (#69)', () => {
     expect(getState().lineup.bench).not.toContain(mine.roster![6]!.id);
     expect(c.toasts.some((t) => t.startsWith('Lineup:') && t.includes('comes in at hooker'))).toBe(true);
     c.stop();
+  });
+});
+
+describe('difficulty on the live sim (N12.2)', () => {
+  it('scaleSheet moves only a squad-built rival’s aggregates, which the live sim never reads: Hard and Easy play exactly as Normal', () => {
+    const game = createNewGame('Level FC', 12);
+    const mine = teamSheetFromSquad(game.squad, PLAYER_ID, 'Level FC', ['#f4d03f', '#1a1a2e'], resolveLineup(game.lineup, game.squad));
+    const squad = generateRivalSquad({ id: 'rival-x', strength: 55 }, 7);
+    const theirs = teamSheetFromSquad(squad, 'rival-x', 'X', ['#000', '#fff'], resolveLineup(autoPick(squad), squad));
+    const hard = scaleSheet(theirs, 'hard');
+    const easy = scaleSheet(theirs, 'easy');
+    expect(hard.attack).toBeGreaterThan(theirs.attack); // the aggregates do move…
+    expect(easy.attack).toBeLessThan(theirs.attack);
+    expect(hard.roster).toEqual(theirs.roster); // …the players don't
+    const length = { halves: 2 as const, halfMinutes: 3 };
+    for (const seed of [1, 2, 3]) {
+      expect(runMatch(mine, hard, { seed, length })).toEqual(runMatch(mine, theirs, { seed, length }));
+      expect(runMatch(easy, mine, { seed, length })).toEqual(runMatch(theirs, mine, { seed, length }));
+    }
   });
 });

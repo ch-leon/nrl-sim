@@ -3,6 +3,7 @@
 // hand or as a sweep) × seeds. Pure: parse, check and expand; the runner
 // (scripts/balance.ts) plays the cells and report.ts writes them up.
 import type { RosterStats, WeatherKind } from '../../sim/events';
+import { DIFFICULTIES, type Difficulty } from '../../config';
 import { isCoachCall, type CoachCall } from '../league/calls';
 import { isRotation, type Rotation } from '../league/bench';
 import { isLegs, type Legs } from '../league/fatigue';
@@ -23,6 +24,19 @@ export interface SideSpec {
   bench?: number;
   /** How hard the coach rotates them: off / standard (default) / heavy. */
   rotation?: Rotation;
+  /**
+   * A squad-built side (N12.2), a new squad every seed, played through the game's
+   * own sheet builder and the coach's pick by slot as matchday.ts builds it:
+   * `player` a new game's squad (one star, a first-grader and a depth man a
+   * position) and its opening lineup; `rival` a rival club's generated squad of
+   * strength `rating`, or level with the other side's best nine when `rating` is
+   * left out. `traits`, `tactics`, `bench` and `rotation` override what it gets.
+   */
+  squad?: 'player' | 'rival';
+  /** A `player` squad's difficulty (its start rating); normal unless given. */
+  difficulty?: Difficulty;
+  /** This side is the rival of a player on this difficulty: it gets the difficulty the way matchday.ts gives it to the player's rival. */
+  rivalOf?: Difficulty;
 }
 
 export interface ScenarioSpec {
@@ -124,6 +138,10 @@ export function checkPlan(p: Plan): string[] {
       if (spec.traits && !['none', 'gen', 'stars'].includes(spec.traits)) errs.push(`${s.name} ${side}: traits must be none / gen / stars`);
       if (spec.bench !== undefined && !(Number.isInteger(spec.bench) && spec.bench >= 0 && spec.bench <= 4)) errs.push(`${s.name} ${side}: bench must be 0–4`);
       if (spec.rotation !== undefined && !isRotation(spec.rotation)) errs.push(`${s.name} ${side}: rotation must be off / standard / heavy`);
+      if (spec.squad !== undefined && spec.squad !== 'player' && spec.squad !== 'rival') errs.push(`${s.name} ${side}: squad must be player / rival`);
+      if (spec.squad !== undefined && spec.club !== undefined) errs.push(`${s.name} ${side}: a side is a club or a squad, not both`);
+      if (spec.difficulty !== undefined && !DIFFICULTIES.includes(spec.difficulty)) errs.push(`${s.name} ${side}: difficulty must be easy / normal / hard`);
+      if (spec.rivalOf !== undefined && !DIFFICULTIES.includes(spec.rivalOf)) errs.push(`${s.name} ${side}: rivalOf must be easy / normal / hard`);
     }
   }
   if (p.base) errs.push(...checkTuning(p.base).map((e) => `base: ${e}`));

@@ -10,7 +10,7 @@ import { PRESET_TABLES, attackPlan, defencePlan } from '../../../src/match/leagu
 import { WRESTLE } from '../../../src/match/league/wrestle';
 import { applyTuning, checkTuning, listKnobs } from '../../../src/match/league/tuning';
 import { cellsOf, checkPlan, expandVariants, type Plan } from '../../../src/match/balance/plan';
-import { measureCell, sideSheet } from '../../../src/match/balance/measure';
+import { measureCell, scenarioSides, sideSheet } from '../../../src/match/balance/measure';
 import { bandMark, delta, reportMarkdown } from '../../../src/match/balance/report';
 
 const EVEN = { name: 'even', home: { rating: 60 }, away: { rating: 60 } };
@@ -102,6 +102,23 @@ describe('plans', () => {
     expect(s.roster![0]!.traits).toBeUndefined();
     expect(sideSheet('H', { traits: 'stars' }).roster![0]!.traits).toHaveLength(2);
     expect(sideSheet('A', { club: 'rival-wolves' }).roster!.length).toBeGreaterThan(0);
+  });
+  it('builds squad sides the way the game does (N12.2): a new pair each seed, a rival level with the other side, the same pair either way round', () => {
+    const one = scenarioSides({ squad: 'player' }, { squad: 'rival' }, 1);
+    expect(one.home.roster).toHaveLength(9);
+    expect(one.home.bench).toHaveLength(4);
+    expect(one.away.roster!.map((r) => r.position)).toEqual(one.home.roster!.map((r) => r.position)); // both picked by slot
+    expect(Math.abs(one.nine.away! - one.nine.home!)).toBeLessThan(2); // level
+    const swapped = scenarioSides({ squad: 'rival' }, { squad: 'player' }, 1);
+    expect(swapped.away.roster).toEqual(one.home.roster);
+    expect(swapped.home.roster).toEqual(one.away.roster);
+    expect(scenarioSides({ squad: 'player' }, { squad: 'rival' }, 2).home.roster).not.toEqual(one.home.roster);
+    const bare = scenarioSides({ squad: 'player', traits: 'none', bench: 0 }, { squad: 'rival', rating: 70, tactics: { defence: 'rush' } }, 1);
+    expect(bare.home.roster!.every((r) => r.traits === undefined)).toBe(true);
+    expect(bare.home.bench).toEqual([]);
+    expect(bare.away.tactics).toEqual({ attack: 'balanced', defence: 'rush' });
+    expect(bare.nine.away).toBeGreaterThan(66);
+    expect(checkPlan(plan({ scenarios: [{ name: 's', home: { squad: 'coach' as never, club: 'rival-wolves' }, away: { rating: 60, rivalOf: 'nightmare' as never } }] })).join('\n')).toMatch(/player \/ rival[\s\S]*not both[\s\S]*rivalOf/);
   });
 });
 
