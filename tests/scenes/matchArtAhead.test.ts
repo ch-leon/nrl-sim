@@ -11,6 +11,7 @@ import { fieldOffsetX } from '../../src/scenes/matchField';
 const g = globalThis as { Worker?: unknown; window?: unknown };
 let built = 0;
 let posted = 0;
+let warmed = 0;
 
 /** A Worker that paints as artWorker.ts does and transfers the buffers back, one task later (or fails). */
 function stubWorker(mode: 'paint' | 'error'): void {
@@ -19,7 +20,8 @@ function stubWorker(mode: 'paint' | 'error'): void {
     constructor() { built++; }
     onmessage: ((e: { data: unknown }) => void) | null = null;
     onerror: (() => void) | null = null;
-    postMessage(msg: { offsetX: number; kits: FixtureKits }): void {
+    postMessage(msg: { offsetX: number; kits: FixtureKits } | { warm: number }): void {
+      if ('warm' in msg) { warmed++; return; }
       posted++;
       setTimeout(() => {
         if (mode === 'error') return this.onerror?.();
@@ -47,6 +49,7 @@ afterEach(() => {
   delete g.window;
   built = 0;
   posted = 0;
+  warmed = 0;
   clearFixtureArt();
   bus.clear();
 });
@@ -101,6 +104,7 @@ describe('the next fixture painted ahead (N10.5)', () => {
     await new Promise((r) => setTimeout(r, 0)); // the look is scheduled, not inside the tap
     const key = fixtureArtKey(offsetX, fixtureKits(home, away));
     await fixtureArtFor(offsetX, fixtureKits(home, away)); // the painting already under way
+    expect(warmed).toBe(1); // the ground first, then the fixture
     expect(posted).toBe(1);
     expect(takeFixtureArt(key)).not.toBeNull();
     off();

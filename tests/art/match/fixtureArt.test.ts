@@ -2,7 +2,7 @@
 // it ahead. The same pixels as the scene's own painters, and keyed by kit design.
 import { describe, it, expect } from 'vitest';
 import { resolveKits, setKitDesign } from '../../../src/art/match/kit';
-import { paintBackground, paintForeground } from '../../../src/art/match/stadium';
+import { clearGroundCache, paintBackground, paintForeground, warmGround } from '../../../src/art/match/stadium';
 import { buildPlayerAtlas } from '../../../src/art/match/players';
 import { buildCrowdAtlas, crowdShirts } from '../../../src/art/match/crowd';
 import { chunkLayer, fixtureArtBuffers, fixtureArtKey, LAYER_CHUNK, paintFixtureArt, reviveFixtureArt, type LayerChunk } from '../../../src/art/match/fixtureArt';
@@ -26,6 +26,10 @@ const sameAtlas = (a: { buf: PixelBuffer; frames: unknown }, b: { buf: PixelBuff
 const sameChunks = (a: LayerChunk[], b: LayerChunk[]): void => {
   expect(a.map((c) => [c.name, c.x, c.y, c.buf.w, c.buf.h])).toEqual(b.map((c) => [c.name, c.x, c.y, c.buf.w, c.buf.h]));
   a.forEach((c, i) => expect(same(c.buf.data, b[i]!.buf.data)).toBe(true));
+};
+const kitsOf2 = () => {
+  const k = resolveKits({ clubId: 'fa-other', colors: ['#14532d', '#f0abfc'] }, { clubId: 'fa-home', colors: ['#1e3a8a', '#ffffff'] });
+  return { home: k.home, away: k.away };
 };
 const kitsOf = () => { const k = resolveKits(home, away); return { home: k.home, away: k.away }; };
 
@@ -65,7 +69,7 @@ describe('fixture art (N10.5)', () => {
     expect(fixtureArtKey(offsetX, kitsOf())).toBe(art.key);
   });
 
-  it('chunks a layer into pieces of at most 1024 (+1 px overlap), leaving out the transparent ones, every opaque pixel kept', () => {
+  it('chunks a layer into pieces of at most LAYER_CHUNK (+1 px overlap), leaving out the transparent ones, every opaque pixel kept', () => {
     const cv = paintBackground(offsetX, kits.home, kits.away);
     const chunks = chunkLayer('t', cv);
     expect(chunks.length).toBeGreaterThan(1);
@@ -86,6 +90,26 @@ describe('fixture art (N10.5)', () => {
       }
     }
     expect(opaque).toBeGreaterThan(1000);
+  });
+
+  it('the ground is painted once and copied: a background from the cache is the same pixels as one painted fresh', () => {
+    clearGroundCache();
+    const fresh = paintBackground(offsetX, kits.home, kits.away); // paints the ground, keeps it
+    const t0 = performance.now();
+    const cached = paintBackground(offsetX, kits.home, kits.away);
+    const cachedMs = performance.now() - t0;
+    expect(same(cached.buf.data, fresh.buf.data)).toBe(true);
+    // Another fixture's kits on the kept ground, against painting it all again.
+    const other = kitsOf2();
+    const onCache = paintBackground(offsetX, other.home, other.away);
+    clearGroundCache();
+    const allFresh = paintBackground(offsetX, other.home, other.away);
+    expect(same(onCache.buf.data, allFresh.buf.data)).toBe(true);
+    // Warmed ahead (the worker at start-up), then used.
+    clearGroundCache();
+    warmGround(offsetX);
+    expect(same(paintBackground(offsetX, other.home, other.away).buf.data, allFresh.buf.data)).toBe(true);
+    expect(cachedMs).toBeLessThan(250); // the ground is about 90% of it (about 0.4 s painted)
   });
 
   it('a wrapped buffer must be the right size', () => {

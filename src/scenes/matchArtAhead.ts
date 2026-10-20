@@ -61,13 +61,39 @@ function canPaintElsewhere(): boolean {
   return typeof Worker !== 'undefined' && typeof window !== 'undefined';
 }
 
+/** The art worker, started on first use; null where there is none or it can't start. */
+function artWorker(): Worker | null {
+  if (!canPaintElsewhere()) return null;
+  try {
+    return (worker ??= new Worker(new URL('../art/match/artWorker.ts', import.meta.url), { type: 'module', name: 'match-art' }));
+  } catch {
+    return null;
+  }
+}
+
+/** The worker that has been asked to paint the ground. */
+let warmed: Worker | null = null;
+
+/**
+ * Have the art worker paint the ground now (main.ts calls it before the title screen):
+ * the same for every fixture and about 90% of the background's cost, so the first
+ * match's art is ready seconds sooner. Once per worker; a no-op without one.
+ */
+export function warmMatchArt(): void {
+  const w = artWorker();
+  if (!w || warmed === w) return;
+  try {
+    w.postMessage({ warm: fieldOffsetX() });
+    warmed = w;
+  } catch {
+    /* painted with the first fixture instead */
+  }
+}
+
 function paintElsewhere(offsetX: number, kits: FixtureKits): Promise<FixtureArt> {
-  if (!canPaintElsewhere()) return Promise.resolve(paintFixtureArt(offsetX, kits));
   return new Promise((resolve) => {
-    let w: Worker;
-    try {
-      w = worker ??= new Worker(new URL('../art/match/artWorker.ts', import.meta.url), { type: 'module', name: 'match-art' });
-    } catch {
+    const w = artWorker();
+    if (!w) {
       resolve(paintFixtureArt(offsetX, kits));
       return;
     }
@@ -195,6 +221,7 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
     setTimeout(look, 0);
   };
   const offs = [bus.on('week:advanced', soon), bus.on('state:changed', soon)];
+  warmMatchArt();
   soon();
   return () => {
     offs.forEach((off) => off());
@@ -207,6 +234,7 @@ export function initMatchArtAhead(host: ArtAheadHost): () => void {
 export function clearFixtureArt(): void {
   worker?.terminate();
   worker = null;
+  warmed = null;
   if (ready) dropUploads?.(ready);
   ready = null;
   pending = null;

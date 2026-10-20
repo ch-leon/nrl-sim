@@ -10,8 +10,12 @@ import { paintBackground, paintForeground } from './stadium';
 import { buildPlayerAtlas, type AtlasFrame } from './players';
 import { buildCrowdAtlas, crowdShirts } from './crowd';
 
-/** Largest texture edge uploaded (safe on old mobile GPUs capped at 2048). */
-export const LAYER_CHUNK = 1024;
+/**
+ * Largest texture edge of a layer's chunk (N10.5: was 1024). A ×4 phone in software GL
+ * spends about 0.3 s uploading a megapixel, so a 1024² chunk froze a frame for 300 ms;
+ * a 512² one is about 80 ms, and each goes up in its own idle slice or frame.
+ */
+export const LAYER_CHUNK = 512;
 
 /**
  * Pixels on their way to a texture. `texKey` is set once they are uploaded ahead

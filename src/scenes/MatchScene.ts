@@ -262,7 +262,7 @@ export class MatchScene extends Phaser.Scene {
   private art!: MatchArtRegistry;
   /** The stadium and players are up (N10.5: a live match may wait a moment for its art). */
   private built = false;
-  /** Bumped on each wait and on shutdown, so art that arrives late builds nothing. */
+  /** Bumped on each wait and on shutdown (teardown), so art that arrives late builds nothing. */
   private buildToken = 0;
   private camController!: CameraController;
   protected backBtn: HTMLButtonElement | null = null;
@@ -337,7 +337,9 @@ export class MatchScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0);
     const token = ++this.buildToken;
-    const live = (): boolean => token === this.buildToken && this.sys.isActive();
+    // Shutdown bumps the token (teardown). Not isActive(): inside create() the scene
+    // is still CREATING, so it reads false and the match would never build.
+    const live = (): boolean => token === this.buildToken;
     void (async () => {
       const painted = art ?? (await fixtureArtFor(this.offsetX, fixtureKitsNow));
       if (!live()) return;
@@ -413,7 +415,7 @@ export class MatchScene extends Phaser.Scene {
     }
     const token = this.buildToken;
     void nextFrame().then(() => {
-      if (token === this.buildToken && this.sys.isActive()) this.startMatch();
+      if (token === this.buildToken) this.startMatch();
     });
   }
 
