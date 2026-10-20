@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, homeGate, recentForm, tickContracts,
   handleBankruptcy, applyEconomy, registerEconomySystem, registerFinanceSystem, financeNet, classifyReason,
+  nextStandGate, stampMovement,
 } from '../../src/systems/economy';
 import { emptyFinance, setState } from '../../src/core/state';
 import { earnMoney, spendMoney } from '../../src/data/club';
@@ -12,7 +13,7 @@ import {
   type Player, type PlacedFacility, type GameState, type Fixture,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { CONTRACTS, ECON, SQUAD_MIN } from '../../src/config';
+import { CONTRACTS, ECON, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
 import { clearTickHooks, advanceWeek, TICK_ORDER } from '../../src/core/time';
 
 // A player with fully controlled economic fields.
@@ -183,6 +184,62 @@ describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
     // A famous club's home final overflows the hill: the roof is why a finals side wants a stand.
     setup({ week: 25, reputation: 60, facilities: [], league: { clubs: [], fixtures: [homeFixture(25)], ladder: [] } });
     expect(homeGate(getState(), homeFixture(25))).toEqual({ capacity: 2000, demand: 3150, attendance: 2000, receipts: 2000 * ECON.TICKET_PRICE, soldOut: true });
+  });
+});
+
+describe('nextStandGate: what the next Grandstand level would earn (N12)', () => {
+  const homeFixture = (round: number): Fixture => ({ round, homeId: 'player', awayId: 'rivalX' });
+  const won = (f: Fixture): Fixture => ({ ...f, result: { homeScore: 20, awayScore: 10 } });
+  /** Round 26 is a home final (×1.5); five wins before it are form +25%. */
+  const run = [21, 22, 23, 24, 25].map((r) => won(homeFixture(r)));
+  const at = (reputation: number, level: 0 | 1 | 2 | 3, fixture: Fixture, results: Fixture[] = []): GameState => {
+    setup({
+      week: fixture.round, reputation, facilities: level ? [pf('grandstand', level)] : [],
+      league: { clubs: [], fixtures: [...results, fixture], ladder: [] },
+    });
+    return getState();
+  };
+  /** The gate the weekly tick would pay with the next level built. */
+  const builtGate = (s: GameState, level: 1 | 2 | 3): number => gateReceipts({ ...s, facilities: [pf('grandstand', level)] });
+
+  it('below capacity at every level: nothing to say', () => {
+    // demand 1,200 / 3,300 / 4,950 (a home final at 100) against 2,000 / 3,500 / 5,000 / 6,500
+    expect(nextStandGate(at(30, 0, homeFixture(6)), homeFixture(6))).toBeNull();
+    expect(nextStandGate(at(100, 1, homeFixture(6)), homeFixture(6))).toBeNull();
+    expect(nextStandGate(at(100, 2, homeFixture(26)), homeFixture(26))).toBeNull();
+    expect(nextStandGate(at(100, 3, homeFixture(26), run), homeFixture(26))).toBeNull();
+  });
+
+  it('the hill sold out: a stand at level 1, up to its seats, against today\'s gate', () => {
+    // demand 3,300 fits a stand's 3,500
+    const s = at(100, 0, homeFixture(6));
+    expect(nextStandGate(s, homeFixture(6))).toEqual({ level: 1, capacity: 3500, attendance: 3300, receipts: 59_400, gain: 59_400 - 36_000 });
+    expect(nextStandGate(s, homeFixture(6))!.receipts).toBe(builtGate(s, 1));
+    // a home final at 100: demand 4,950 fills the stand's 3,500
+    const f = at(100, 0, homeFixture(26));
+    expect(nextStandGate(f, homeFixture(26))).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 63_000, gain: 1500 * ECON.TICKET_PRICE });
+  });
+
+  it('a level-1 stand sold out: level 2\'s 5,000 seats', () => {
+    const s = at(100, 1, homeFixture(26));
+    // demand 4,950 on 3,500 seats
+    expect(homeGate(s, homeFixture(26)).soldOut).toBe(true);
+    expect(nextStandGate(s, homeFixture(26))).toEqual({ level: 2, capacity: 5000, attendance: 4950, receipts: 4950 * 18, gain: 1450 * ECON.TICKET_PRICE });
+    expect(nextStandGate(s, homeFixture(26))!.receipts).toBe(builtGate(s, 2));
+  });
+
+  it('a level-2 stand sold out: level 3\'s 6,500 seats', () => {
+    // a home final on a winning run at 100: 3,300 × 1.25 × 1.5 = 6,188 on 5,000 seats
+    const s = at(100, 2, homeFixture(26), run);
+    expect(homeGate(s, homeFixture(26))).toMatchObject({ demand: 6188, soldOut: true });
+    expect(nextStandGate(s, homeFixture(26))).toEqual({ level: 3, capacity: 6500, attendance: 6188, receipts: 6188 * 18, gain: 1188 * ECON.TICKET_PRICE });
+    expect(nextStandGate(s, homeFixture(26))!.receipts).toBe(builtGate(s, 3));
+  });
+
+  it('the top level sold out (only a test can fill 6,500): nothing above it', () => {
+    const s = at(300, 3, homeFixture(26));
+    expect(homeGate(s, homeFixture(26)).soldOut).toBe(true);
+    expect(nextStandGate(s, homeFixture(26))).toBeNull();
   });
 });
 
@@ -477,6 +534,28 @@ describe('the club\'s books (N6, #172)', () => {
     expect(books.sponsor).toBe(3000);
     expect(books.grant).toBe(30 * ECON.REP_GRANT_PER_POINT);
     expect(books.gate).toBe(1200 * ECON.TICKET_PRICE);
+  });
+});
+
+describe('stampMovement: where a movement belongs (N12)', () => {
+  it('stamps the clock and the books\' line for an ordinary movement', () => {
+    setup({ season: 2, week: 5, finance: [emptyFinance(1), emptyFinance(2)] });
+    expect(stampMovement(getState(), 'wages')).toEqual({ line: 'wages', season: 2, week: 5 });
+    expect(stampMovement(getState(), 'sign:p1')).toEqual({ line: 'transfers', season: 2, week: 5 });
+    // Prize money or a grant away from the rollover is an ordinary movement.
+    expect(stampMovement(getState(), 'board grant')).toEqual({ line: 'boardGrant', season: 2, week: 5 });
+  });
+
+  it('the rollover\'s prize money and board grant go to the last week of the season they close', () => {
+    setup({ season: 2, week: 1, finance: [emptyFinance(1)] });
+    expect(stampMovement(getState(), 'finals prize money')).toEqual({ line: 'prize', season: 1, week: WEEKS_PER_SEASON });
+    expect(stampMovement(getState(), 'board grant')).toEqual({ line: 'boardGrant', season: 1, week: WEEKS_PER_SEASON });
+    // Week 1's ordinary movements open the new season.
+    expect(stampMovement(getState(), 'wages')).toEqual({ line: 'wages', season: 2, week: 1 });
+    expect(stampMovement(getState(), 'gate')).toEqual({ line: 'gate', season: 2, week: 1 });
+    // With no season before on the books there is nothing to close.
+    setup({ season: 1, week: 1, finance: [] });
+    expect(stampMovement(getState(), 'board grant')).toEqual({ line: 'boardGrant', season: 1, week: 1 });
   });
 });
 
