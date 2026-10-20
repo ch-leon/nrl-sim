@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { groundsTextures, registerGroundsArt } from '../../../src/art/grounds';
+import { ensureFacilityTexture, groundsTextures, paintFacilitiesWhenIdle, registerGroundsArt } from '../../../src/art/grounds';
 import { FACILITY_CATALOG } from '../../../src/data/facility';
 import type Phaser from 'phaser';
 
@@ -39,5 +39,68 @@ describe('grounds art registration', () => {
     expect(created).toEqual(groundsTextures().map((t) => t.key));
     expect(anims.map((a) => a.key)).toEqual(['walk-n', 'walk-e', 'walk-s', 'walk-w']);
     expect(anims[1]!.frames.map((f) => f.key)).toEqual(['char-walk-e-0', 'char-walk-e-1', 'char-walk-e-2', 'char-walk-e-3']);
+  });
+});
+
+/** A texture manager that remembers what was painted (no canvas). */
+function fakeScene(): { scene: Phaser.Scene; painted: string[] } {
+  const painted: string[] = [];
+  const have = new Set<string>();
+  const ctx = { createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: vi.fn() };
+  const scene = {
+    textures: {
+      exists: (k: string) => have.has(k),
+      remove: (k: string) => have.delete(k),
+      createCanvas: (key: string) => {
+        painted.push(key);
+        have.add(key);
+        return { getContext: () => ctx, refresh: vi.fn() };
+      },
+    },
+    anims: { create: vi.fn() },
+  } as unknown as Phaser.Scene;
+  return { scene, painted };
+}
+
+// N10.6: the boot paints only the facilities placed; the rest on demand or when idle.
+describe('lazy facility art (N10.6)', () => {
+  const facilityKeys = groundsTextures().map((t) => t.key).filter((k) => k.startsWith('facility-'));
+
+  it('with a facility list, the boot paints every non-facility texture and only those facilities', () => {
+    const { scene, painted } = fakeScene();
+    registerGroundsArt(scene, [{ defId: 'trainingPaddock', level: 2 }]);
+    const nonFacility = groundsTextures().map((t) => t.key).filter((k) => !k.startsWith('facility-'));
+    expect(painted.filter((k) => !k.startsWith('facility-')).sort()).toEqual([...nonFacility].sort());
+    expect(painted.filter((k) => k.startsWith('facility-'))).toEqual(['facility-trainingPaddock-2']);
+  });
+
+  it('a facility texture requested before it is painted is painted then, once', () => {
+    const { scene, painted } = fakeScene();
+    expect(ensureFacilityTexture(scene, 'weightsRoom', 3)).toBe('facility-weightsRoom-3');
+    expect(ensureFacilityTexture(scene, 'weightsRoom', 3)).toBe('facility-weightsRoom-3');
+    expect(painted).toEqual(['facility-weightsRoom-3']);
+    expect(ensureFacilityTexture(scene, 'weightsRoom', 7)).toBe('facility-weightsRoom-3'); // levels clamp as the key does
+    expect(painted).toEqual(['facility-weightsRoom-3']);
+  });
+
+  it('idle painting fills in the rest, one texture per slice, skipping what is there', () => {
+    const { scene, painted } = fakeScene();
+    ensureFacilityTexture(scene, 'weightsRoom', 1);
+    const slices: (() => void)[] = [];
+    paintFacilitiesWhenIdle(scene, (fn) => void slices.push(fn));
+    let n = 0;
+    while (slices.length) { slices.shift()!(); n++; }
+    expect(n).toBe(facilityKeys.length - 1);
+    expect([...painted].sort()).toEqual([...facilityKeys].sort());
+  });
+
+  it('idle painting stops when cancelled', () => {
+    const { scene, painted } = fakeScene();
+    const slices: (() => void)[] = [];
+    const cancel = paintFacilitiesWhenIdle(scene, (fn) => void slices.push(fn));
+    slices.shift()!();
+    cancel();
+    while (slices.length) slices.shift()!();
+    expect(painted.length).toBe(1);
   });
 });

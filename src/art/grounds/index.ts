@@ -31,9 +31,12 @@ export function groundsTextures(): { key: string; buf: PixelBuffer }[] {
  * the rest on demand; without, every facility (tools and tests).
  */
 export function registerGroundsArt(scene: Phaser.Scene, facilities?: readonly { defId: FacilityDefId; level: number }[]): void {
-  for (const { key, buf } of [...tileTextures(), ...charTextures(), ...decorTextures()]) toTexture(scene, key, buf);
-  if (facilities) for (const f of facilities) ensureFacilityTexture(scene, f.defId, f.level);
-  else for (const { key, buf } of facilityTextures()) toTexture(scene, key, buf);
+  if (facilities) {
+    for (const { key, buf } of [...tileTextures(), ...charTextures(), ...decorTextures()]) toTexture(scene, key, buf);
+    for (const f of facilities) ensureFacilityTexture(scene, f.defId, f.level);
+  } else {
+    for (const { key, buf } of groundsTextures()) toTexture(scene, key, buf);
+  }
   for (const dir of CHAR_DIRS) {
     const frames: Phaser.Types.Animations.AnimationFrame[] = [];
     for (let f = 0; f < CHAR_WALK_FRAMES; f++) frames.push({ key: `char-walk-${dir}-${f}` });
