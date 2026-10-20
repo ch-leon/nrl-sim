@@ -459,8 +459,13 @@ export function advanceWeekAsTapped(): void {
   }
   const m = kickOff.match;
   if (!m) return;
-  const { seed, weather, injuryRate, goldenPoint } = m.live;
-  const result = runMatch(m.home, m.away, { seed, weather, ...(injuryRate !== undefined ? { injuryRate } : {}), ...(goldenPoint ? { goldenPoint } : {}) });
+  const { seed, weather, injuryRate, goldenPoint, aiCoach } = m.live;
+  const result = runMatch(m.home, m.away, {
+    seed, weather,
+    ...(injuryRate !== undefined ? { injuryRate } : {}),
+    ...(aiCoach?.length ? { aiCoach } : {}),
+    ...(goldenPoint ? { goldenPoint } : {}),
+  });
   bus.emit('match:finished', { fixture: m.fixture, result });
 }
 

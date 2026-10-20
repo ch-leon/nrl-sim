@@ -13,6 +13,7 @@ import { createNewGame, getState, setState, type Fixture, type GameState } from 
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { migrateState } from '../../src/core/save';
 import { advanceWeek, weekHeld, withFastForward } from '../../src/core/time';
+import { applyTuning } from '../../src/match/league/tuning';
 
 describe('soak checks', () => {
   it('spots NaN, Infinity and players in two places', () => {
@@ -241,5 +242,24 @@ describe('soak columns (N12.1)', () => {
     expect(cheap.week).toBe(2);
     expect(cheap.league.fixtures.filter((f) => f.round === 1).every((f) => f.result)).toBe(true);
     expect(rivalsWithGames(cheap)).toEqual([]);
+  }, 60_000);
+
+  it('a tapped week plays the player\'s match as fast-forward plays it, the rival\'s AI coach included', () => {
+    // Without the live-rivals setting both weeks play the rival round on the cheap sim: the same week.
+    const playerResult = (tapped: boolean): Fixture['result'] => {
+      createNewGame('Tapped', 5);
+      initLeague(getState());
+      registerAllSystems();
+      if (tapped) advanceWeekAsTapped(); else withFastForward(advanceWeek);
+      expect(weekHeld()).toBe(false);
+      return getState().league.fixtures.find((f) => f.round === 1 && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID))!.result;
+    };
+    expect(playerResult(true)).toEqual(playerResult(false));
+    const restore = applyTuning({ 'calls.ai.on': 1 });
+    try {
+      expect(playerResult(true)).toEqual(playerResult(false));
+    } finally {
+      restore();
+    }
   }, 60_000);
 });
