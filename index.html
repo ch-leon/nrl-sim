@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- #206: maximum-scale stops iOS Safari keeping a portrait-width layout zoomed
+         (956/440 = 2.17× on a 16 Pro Max) after the phone is turned sideways. iOS
+         still lets the player pinch-zoom. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
     <title>NRL Sim</title>
     <!-- PWA (BAK-204): theme + iOS install/standalone hints. The manifest link
          and SW registration are auto-injected by vite-plugin-pwa. -->
@@ -15,6 +18,10 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <style>
+      /* #206: iOS Safari boosts text in landscape (text-size-adjust: auto) by up to
+         its landscape/portrait width ratio, 2.17× on a 16 Pro Max; the DOM overlay is
+         laid out for the authored sizes, so keep them. */
+      html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
       html, body { margin: 0; height: 100%; background: #1a1a2e; overflow: hidden; overscroll-behavior: none; }
       * { image-rendering: pixelated; font-family: "Courier New", monospace; }
       #game-root, #ui-root { position: absolute; inset: 0; }

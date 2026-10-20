@@ -26,3 +26,30 @@ jobs:
         run: npx vitest run
       - name: Production build
         run: npm run build
+
+  # #206: the tutorial bubble and the Guide must fit a landscape iPhone in Safari
+  # (956×330, 844×390) with Skip / Next / Close on screen, even with Safari's
+  # landscape text boost reconstructed. The runner has no WebKit, so this job
+  # fetches Playwright's (the only job that downloads a browser).
+  webkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Fetch WebKit
+        run: npx playwright-core install --with-deps webkit
+      - name: WebKit layout (956×330, 844×390)
+        run: npm run e2e:webkit
+      - name: Keep the screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-webkit
+          path: e2e-output/webkit
+          retention-days: 7
+          if-no-files-found: warn

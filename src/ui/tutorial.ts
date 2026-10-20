@@ -368,7 +368,7 @@ function ensureTutorialStyles(): void {
   document.head.appendChild(style);
 }
 
-const TUTORIAL_CSS = `
+export const TUTORIAL_CSS = `
 .nrl-tutorial {
   position: fixed;
   inset: 0;
@@ -397,21 +397,37 @@ const TUTORIAL_CSS = `
   box-shadow: 3px 3px 0 #000;
   padding: 0.75rem 0.9rem;
   z-index: 201;
+  /* #206: never taller than the room above its dock. The copy scrolls inside the
+     bubble and Skip / Next stay pinned at its foot, so however big the text gets
+     (iOS Safari's landscape text boost, a larger system font) they stay on screen.
+     dvh follows Safari's toolbars; the vh line is the fallback. */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 5.75rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
+  max-height: calc(100dvh - 5.75rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
 }
 .nrl-tutorial-centered {
   top: 50%;
   bottom: auto;
   transform: translate(-50%, -50%);
+  max-height: calc(100vh - 1.5rem);
+  max-height: calc(100dvh - 1.5rem);
 }
 .nrl-tutorial-text {
   font-size: clamp(0.8rem, 3vw, 1rem);
   line-height: 1.35;
   margin-bottom: 0.7rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .nrl-tutorial-actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
+  flex: 0 0 auto;
 }
 /* A landscape phone (#195): the bubble docks bottom-left, clear of the tile the
    player has to tap, the match's speed buttons and the home bar. */
@@ -423,6 +439,8 @@ const TUTORIAL_CSS = `
     right: auto;
     transform: none;
     max-width: min(60vw, 240px);
+    max-height: calc(100vh - 5.25rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
+    max-height: calc(100dvh - 5.25rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
   }
 }
 `;
