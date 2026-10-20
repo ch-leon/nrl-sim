@@ -82,3 +82,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261020-015006-standard | standard | 54ac3c0 (uncommitted changes) | feat/golden-point | [report](runs/20261020-015006-standard/report.md) |
 | 20261020-020247-standard | standard | fa00b1d (uncommitted changes) | feat/match-report | [report](runs/20261020-020247-standard/report.md) |
 | 20261020-021804-ai-coach-calls | AI coach calls | fa00b1d (uncommitted changes) | feat/ai-calls | [report](runs/20261020-021804-ai-coach-calls/report.md) |
+| 20261020-022907-standard | standard | 6e587b2 | feat/ai-calls | [report](runs/20261020-022907-standard/report.md) |
