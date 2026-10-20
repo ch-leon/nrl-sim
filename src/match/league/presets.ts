@@ -131,7 +131,7 @@ export const PRESET_TABLES = { attackDefault: BASE_PLAN, attack: ATTACK, defence
 /** Attack-plan fields an experiment may set on a preset that doesn't list them yet. */
 export const ATTACK_PLAN_KEYS: readonly string[] = Object.keys(BASE_PLAN).filter((k) => k !== 'kickBias');
 
-// ── Rivals: a style from club identity ───────────────────────────────────────
+// ── Rivals: a style from the squad (N11), or from club identity ───────────────
 
 function hash(s: string): number {
   let h = 2166136261 >>> 0;
@@ -140,11 +140,42 @@ function hash(s: string): number {
 }
 
 /**
- * A rival's tactics, fixed per club: the contenders play expansive football or
- * go all out, mid-table sides are balanced or kick and chase, the cellar
- * dwellers grind. Defence follows a second roll of the same identity.
+ * How a rival's style follows from its best nine (N11, tuning reference §27): a side's
+ * units against its own average, so it reads the same at any strength.
  */
-export function rivalTactics(club: { id: string; strength: number }): TeamTactics {
+export const RIVAL_STYLE = {
+  /** Backs this much quicker than the side's average → Expansive. */
+  backsPace: 0.5,
+  /** Forwards this much stronger than the side's average → Grind. */
+  packStrength: 2.5,
+  /** Contenders (strength at least this) with no other mark go All-out. */
+  allOutFrom: 65,
+  /** Forwards this much stronger → Rush in defence. */
+  rushPack: 2,
+  /** The nine's stamina this much above its other stats → Compressed. */
+  compressedStamina: 1,
+};
+
+const BACKS: readonly string[] = ['fullback', 'winger', 'centre'];
+const HALVES: readonly string[] = ['five-eighth', 'halfback'];
+const PACK: readonly string[] = ['hooker', 'prop', 'second-row', 'lock'];
+
+/** A man of the nine, as the style reads him (a team sheet's roster entry). */
+export interface StyleEntry {
+  position: string;
+  stats?: { speed: number; strength: number; stamina: number; skill: number; footyIQ: number };
+  traits?: readonly { id: string }[];
+}
+
+/**
+ * A rival's tactics. From its nine (N11): a half with Big Boot or Playmaker kicks
+ * and chases, quick backs throw it wide, a heavy pack grinds, a contender with none
+ * of those goes all out, the rest are balanced; a strong pack rushes in defence and
+ * a fit line compresses. Without a nine (a strength-built sheet) it stays as it was:
+ * fixed per club from a roll of its identity, by strength tier.
+ */
+export function rivalTactics(club: { id: string; strength: number }, nine?: readonly StyleEntry[]): TeamTactics {
+  if (nine && nine.length > 0 && nine.every((e) => e.stats)) return styleOfNine(club.strength, nine);
   const h = hash(club.id);
   const a = h % 3;
   const d = (h >>> 8) % 3;
@@ -153,6 +184,24 @@ export function rivalTactics(club: { id: string; strength: number }): TeamTactic
     : club.strength >= 50 ? (['balanced', 'kick-chase', 'expansive'] as const)[a]!
     : (['grind', 'kick-chase', 'balanced'] as const)[a]!;
   const defence: DefencePreset = (['slide', 'rush', 'compressed'] as const)[d]!;
+  return { attack, defence };
+}
+
+function styleOfNine(strength: number, nine: readonly StyleEntry[]): TeamTactics {
+  const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  const stat = (units: readonly string[] | null, k: keyof NonNullable<StyleEntry['stats']>): number =>
+    mean(nine.filter((e) => !units || units.includes(e.position)).map((e) => e.stats![k]));
+  const backs = stat(BACKS, 'speed') - stat(null, 'speed');
+  const pack = stat(PACK, 'strength') - stat(null, 'strength');
+  const fit = stat(null, 'stamina') - (stat(null, 'strength') + stat(null, 'speed') + stat(null, 'skill') + stat(null, 'footyIQ')) / 4;
+  const kicker = nine.some((e) => HALVES.includes(e.position) && (e.traits ?? []).some((t) => t.id === 'bigBoot' || t.id === 'playmaker'));
+  const attack: AttackPreset =
+    kicker ? 'kick-chase'
+    : backs >= RIVAL_STYLE.backsPace ? 'expansive'
+    : pack >= RIVAL_STYLE.packStrength ? 'grind'
+    : strength >= RIVAL_STYLE.allOutFrom ? 'all-out'
+    : 'balanced';
+  const defence: DefencePreset = pack >= RIVAL_STYLE.rushPack ? 'rush' : fit >= RIVAL_STYLE.compressedStamina ? 'compressed' : 'slide';
   return { attack, defence };
 }
 

@@ -9,7 +9,7 @@ import { registerTickHook, resumeWeek, TICK_ORDER } from '../core/time';
 import { clearLiveMatch, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, type Difficulty, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
-import { teamSheetFromRival, teamSheetFromSquad } from '../match/league/sheets';
+import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
@@ -80,7 +80,8 @@ function sheetFor(clubId: string): TeamSheet {
   // none) falls back to the strength-based sheet.
   const fit = (rival.squad ?? []).filter((p) => p.injuredWeeks <= 0);
   if (fit.length >= ON_FIELD) {
-    return scaleSheet(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), state.settings.difficulty);
+    // Its style follows from the nine it fields (N11), read before the difficulty scales the aggregates.
+    return scaleSheet(withRivalStyle(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), rival), state.settings.difficulty);
   }
   return teamSheetFromRival(scaleRivalStrength(rival, state.settings.difficulty));
 }

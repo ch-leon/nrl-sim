@@ -17,6 +17,9 @@ import { formGuide, nextMatchPreview, type ClubResult, type FormResult, type Pre
 import { save } from '../../core/save';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
+import { rivalStyle } from '../../systems/rivalRound';
+import { DEFAULT_TACTICS, PRESET_LABEL, type TeamTactics } from '../../match/league/presets';
+import { TACTIC_SHORT, styleLine } from '../tacticsBlurbs';
 
 // ── Pure view helpers (unit-tested) ───────────────────────────────────────────
 
@@ -214,6 +217,8 @@ function nextMatchCard(state: GameState): HTMLElement {
 
   const line = (label: string, text: string): HTMLElement =>
     el('div', { class: 'nrl-next-line' }, el('b', { text: `${label}:` }), text);
+  // How they play (N11): the style of the nine they would field today; the Guide's Tactics page explains the words.
+  if (oppClub) card.append(line('They play', styleLine(rivalStyle(oppClub))));
   if (p.bestThree.length > 0) {
     card.append(line('Their best', p.bestThree.map((b) => `${b.name} (${b.position} ${b.overall})`).join(' · ')));
   }
@@ -323,8 +328,17 @@ function buildLadderTab(state: GameState): HTMLElement {
         : el('td', { text: c, ...(i === 1 ? { class: 'nrl-ladder-name' } : {}) });
       tr.append(cell);
     });
-    // Last five, oldest first (N7, #183).
-    tr.append(el('td', { class: 'nrl-ladder-form' }, formCells(formGuide(state.league.fixtures, r.clubId))));
+    // Last five, oldest first (N7, #183), and how the side plays (N11).
+    const club = state.league.clubs.find((x) => x.id === r.clubId);
+    const style: TeamTactics | null = r.isPlayer ? (state.lineup?.tactics ?? DEFAULT_TACTICS) : club ? rivalStyle(club) : null;
+    tr.append(el('td', { class: 'nrl-ladder-form' },
+      formCells(formGuide(state.league.fixtures, r.clubId)),
+      ...(style ? [el('small', {
+        class: 'nrl-ladder-style',
+        text: `${TACTIC_SHORT[style.attack]}·${TACTIC_SHORT[style.defence]}`,
+        attrs: { title: `${PRESET_LABEL[style.attack]} / ${PRESET_LABEL[style.defence]}`, 'data-style': `${style.attack}/${style.defence}`, style: 'margin-left:0.35rem;font-size:0.7em;opacity:0.85;white-space:nowrap' },
+      })] : []),
+    ));
     tbody.append(tr);
   }
   table.append(thead, tbody);

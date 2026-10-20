@@ -5,6 +5,8 @@ import type { RivalClub } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { ROMAN, TRAITS } from '../../data/traits';
 import { button, closeModal, el, openModal, panel } from '../dom';
+import { rivalStyle } from '../../systems/rivalRound';
+import { styleLine } from '../tacticsBlurbs';
 import { openPlayerPage } from './player';
 
 export interface RivalSquadRow {
@@ -66,7 +68,7 @@ export function openRivalSquad(club: RivalClub): HTMLElement {
   const content = panel(
     { class: 'nrl-rival-squad' },
     el('h2', { text: club.name }),
-    el('p', { text: `Strength ${club.strength} · ${rows.length} players · tap a player for his page` }),
+    el('p', { text: `Strength ${club.strength} · plays ${styleLine(rivalStyle(club))} · ${rows.length} players · tap a player for his page`, attrs: { 'data-style': '' } }),
     rows.length > 0
       ? el('div', { class: 'nrl-rival-scroll' }, table)
       : el('p', { text: 'No squad on record.' }),
