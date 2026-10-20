@@ -95,10 +95,10 @@ export function canUseWorker(): boolean {
   return typeof Worker !== 'undefined' && typeof window !== 'undefined';
 }
 
-/** Play the jobs in a Web Worker; on any failure, play them here instead. */
 /** How long the worker gets before the round is played on the main thread instead (ms). */
 export const RIVAL_WORKER_TIMEOUT_MS = 30_000;
 
+/** Play the jobs in a Web Worker; on any failure or silence, play them here instead. */
 export function playRivalJobsInWorker(jobs: readonly RivalJob[], timeoutMs = RIVAL_WORKER_TIMEOUT_MS): Promise<MatchResult[]> {
   return new Promise((resolve) => {
     let worker: Worker;
