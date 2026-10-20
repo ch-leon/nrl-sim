@@ -205,7 +205,9 @@ const LINEUP_CSS = `
 .nrl-lineup-tacstrip { display: flex; gap: 0.6rem; align-items: center; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin; }
 .nrl-lineup-tac { flex-wrap: nowrap; flex-shrink: 0; }
 .nrl-lineup-tac .nrl-btn { min-height: 44px; white-space: nowrap; }
-.nrl-lineup-tac-hint { color: #e8e0c8; font-size: 0.68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+/* The lit chip stays lit under a finger: a touch leaves :hover on the last chip tapped. */
+.nrl-lineup .nrl-btn.nrl-sort-active, .nrl-lineup .nrl-btn.nrl-sort-active:hover:not(:disabled) { background: #7ec850; }
+.nrl-lineup-tac-hint { color: #e8e0c8; font-size: 0.68rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex-shrink: 0; }
 .nrl-lineup-rot .nrl-btn { padding: 0.3rem 0.35rem; font-size: clamp(0.6rem, 2vw, 0.8rem); }
 .nrl-lineup-head .nrl-btn { padding: 0.3rem 0.5rem; }
 @media (min-width: 1000px) {

@@ -38,6 +38,15 @@ describe('team tactics (N11.1)', () => {
     expect(day.changed).toBe(false);
   });
 
+  it('a lineup with presets it does not know is put back to Balanced / Slide on the day, once', () => {
+    const s = game();
+    const bad = { ...s.lineup, tactics: { attack: 'route-one', defence: 'slide' } as never };
+    const day = resolveLineup(bad, s.squad);
+    expect(day.tactics).toEqual(DEFAULT_TACTICS);
+    expect(day.changed).toBe(true);
+    expect(resolveLineup(day.lineup, s.squad).changed).toBe(false);
+  });
+
   it('the sheet carries the pick, and the pick changes the match', () => {
     expect(sheetWith({ attack: 'expansive', defence: 'rush' }).tactics).toEqual({ attack: 'expansive', defence: 'rush' });
     const away = teamSheetFromRival({ id: 'rival-gulls', name: 'Gulls', strength: 60, colors: ['#222', '#ddd'] } as never);
