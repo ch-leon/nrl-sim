@@ -4,7 +4,7 @@
 // verdict, so the whole decision table is unit-tested in isolation. The impure
 // loop that gathers these inputs lives in ./advance.ts.
 
-import { MORALE, ON_FIELD, SEASON_ROUNDS, WEEKS_PER_SEASON, SQUAD_MIN } from '../config';
+import { ECON, MORALE, ON_FIELD, SEASON_ROUNDS, WEEKS_PER_SEASON, SQUAD_MIN } from '../config';
 
 /** How far a multi-advance runs. */
 export type AdvanceTarget =
@@ -122,20 +122,55 @@ export function contractAlerts(
 export interface WeekFacts {
   injuredStarters: readonly string[];
   contractAlerts: readonly string[];
-  bankruptcyWarned: boolean;
+  /** The bank balance before the week and after it (N12.5: debt stops on a crossing). */
+  moneyBefore: number;
+  moneyAfter: number;
+  /** Players the economy force-sold this week to cover debts (the bankruptcy warning's `forcedSales`). */
+  forcedSales: readonly string[];
   /** Titles of event cards drawn this week (#75); optional for older callers. */
   newDecisions?: readonly string[];
 }
 
+/** True when the balance went from at or above `line` to below it during the week. */
+function crossedBelow(f: Pick<WeekFacts, 'moneyBefore' | 'moneyAfter'>, line: number): boolean {
+  return f.moneyBefore >= line && f.moneyAfter < line;
+}
+
+/** Names the stop toast lists before "and n more" (the cascade can sell several in one week). */
+const SALE_NAMES_SHOWN = 3;
+
 /**
- * First attention-needing stop after a tick, in priority order: bankruptcy, then
- * injury to a regular starter, then contract, then a new event card waiting for
- * a choice. Returns null when the run may go on.
+ * Debt needs the manager once, not every week in the red (N12.5, QA finding 10):
+ * on a forced sale, when the balance first passes the fire-sale floor, and on the
+ * crossing into the red, in that order when one week does several. A club that
+ * stays in the red without crossing anything runs on to its target.
+ */
+export function debtStop(f: Pick<WeekFacts, 'moneyBefore' | 'moneyAfter' | 'forcedSales'>): StopReason | null {
+  const sold = f.forcedSales.length;
+  if (sold > 0) {
+    const names = f.forcedSales.slice(0, SALE_NAMES_SHOWN).join(', ');
+    const more = sold > SALE_NAMES_SHOWN ? ` and ${sold - SALE_NAMES_SHOWN} more` : '';
+    return { kind: 'bankruptcy', text: `${sold === 1 ? 'Forced sale' : 'Forced sales'}: ${names}${more} sold to cover debts.` };
+  }
+  if (crossedBelow(f, ECON.FORCED_SALE_FLOOR)) {
+    const floor = `-$${Math.abs(ECON.FORCED_SALE_FLOOR).toLocaleString('en-US')}`;
+    return { kind: 'bankruptcy', text: `Balance below the fire-sale floor (${floor}).` };
+  }
+  if (crossedBelow(f, ECON.BANKRUPTCY_WARN)) {
+    return { kind: 'bankruptcy', text: 'Club has gone into debt.' };
+  }
+  return null;
+}
+
+/**
+ * First attention-needing stop after a tick, in priority order: debt (a forced
+ * sale, the fire-sale floor, the crossing into the red), then injury to a
+ * regular starter, then contract, then a new event card waiting for a choice.
+ * Returns null when the run may go on.
  */
 export function postWeekStop(facts: WeekFacts): StopReason | null {
-  if (facts.bankruptcyWarned) {
-    return { kind: 'bankruptcy', text: 'Club is in debt — bankruptcy warning.' };
-  }
+  const debt = debtStop(facts);
+  if (debt) return debt;
   if (facts.injuredStarters.length > 0) {
     const names = facts.injuredStarters.join(', ');
     return { kind: 'injury', text: `Regular starter injured: ${names}.` };

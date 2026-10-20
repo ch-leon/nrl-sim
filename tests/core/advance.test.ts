@@ -7,7 +7,10 @@ import {
 import { bus, type Events } from '../../src/core/events';
 import { initLeague } from '../../src/systems/fixtures';
 import { overallRating } from '../../src/data/player';
-import { SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
+import { earnMoney } from '../../src/data/club';
+import { handleBankruptcy } from '../../src/systems/economy';
+import type { AdvanceTarget } from '../../src/core/advanceRules';
+import { ECON, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
 
 let toasts: Events['ui:notify'][] = [];
 
@@ -28,6 +31,17 @@ function injureTopStarterAtWeek(week: number): void {
     const s = getState();
     const top = [...s.squad].sort((a, b) => overallRating(b) - overallRating(a))[0]!;
     setState({ squad: s.squad.map((p) => (p.id === top.id ? { ...p, injuredWeeks: 3 } : p)) });
+  });
+}
+
+/**
+ * Stand-in for the economy tick: a fixed weekly burn, then the real bankruptcy
+ * cascade (its warning every week in the red, forced sales below the floor).
+ */
+function burnEachWeek(amount: number): void {
+  registerTickHook('test-burn', TICK_ORDER.economy, () => {
+    earnMoney(-amount, 'wages');
+    handleBankruptcy(getState());
   });
 }
 
@@ -66,13 +80,13 @@ describe('advanceUntil — weeks target', () => {
     expect(run.weeksPlayed).toBe(2);
   });
 
-  it('stops on a bankruptcy warning emitted during the week', async () => {
-    registerTickHook('test-bankrupt', TICK_ORDER.economy, (ctx) => {
-      if (ctx.week === 3) bus.emit('bankruptcy:warning', { balance: -1 });
-    });
+  it('stops the week the club goes into the red', async () => {
+    setState({ money: 25_000 });
+    burnEachWeek(10_000);
     const run = await advanceUntil({ kind: 'weeks', weeks: 4 });
-    expect(run.stop.kind).toBe('bankruptcy');
+    expect(run.stop).toEqual({ kind: 'bankruptcy', text: 'Club has gone into debt.' });
     expect(run.weeksPlayed).toBe(3);
+    expect(toasts[toasts.length - 1]).toEqual({ text: 'Stopped after 3 weeks: Club has gone into debt.', kind: 'danger' });
   });
 
   it('stops when a settled contract crosses into the expiring window', async () => {
@@ -119,6 +133,77 @@ describe('advanceUntil — finals and season end targets', () => {
     expect(run.weeksPlayed).toBe(WEEKS_PER_SEASON);
     expect(getState().season).toBe(startSeason + 1);
     expect(getState().week).toBe(1);
+  });
+});
+
+// N12.5 (QA finding 10): in debt, a multi-week advance stops once on the crossing
+// into the red, then only on a forced sale or at the fire-sale floor.
+describe('advanceUntil — a club in debt', () => {
+  /** Advance to `target` as a player would, again after every stop; the stops' texts in order. */
+  async function playThrough(target: AdvanceTarget): Promise<{ stops: string[]; calls: number }> {
+    const stops: string[] = [];
+    for (let calls = 1; calls <= 10; calls++) {
+      const run = await advanceUntil(target, async () => {});
+      if (run.stop.kind === 'target') return { stops, calls };
+      expect(run.stop.kind).toBe('bankruptcy');
+      stops.push(run.stop.text);
+    }
+    throw new Error(`no target after 10 calls: ${stops.join(' / ')}`);
+  }
+
+  it('already in the red, runs to season end in one call (it used to stop every week)', async () => {
+    setState({ money: -20_000 });
+    burnEachWeek(2_000);
+    const startSeason = getState().season;
+    const run = await advanceUntil({ kind: 'seasonEnd' }, async () => {});
+    expect(run.stop.kind).toBe('target');
+    expect(run.weeksPlayed).toBe(WEEKS_PER_SEASON);
+    expect(getState().season).toBe(startSeason + 1);
+    expect(getState().money).toBe(-20_000 - 2_000 * WEEKS_PER_SEASON);
+    // The economy still warns every week in the red; only the advance stopped stopping.
+    expect(toasts.filter((t) => t.text.startsWith('The club is in the red')).length).toBe(WEEKS_PER_SEASON);
+  });
+
+  it('into the red and down to a forced sale: two stops, then the target', async () => {
+    setState({ money: 25_000 });
+    burnEachWeek(10_000);
+    const squadBefore = getState().squad.length;
+    expect(squadBefore).toBeGreaterThan(SQUAD_MIN);
+    const { stops, calls } = await playThrough({ kind: 'finals' });
+    expect(calls).toBe(3);
+    expect(stops[0]).toBe('Club has gone into debt.');
+    expect(stops[1]).toMatch(/^Forced sales?: .+ sold to cover debts\.$/);
+    // The cascade sells down to SQUAD_MIN in the week the floor is passed; the stop counts them all.
+    expect(getState().squad.length).toBe(SQUAD_MIN);
+    const sold = squadBefore - SQUAD_MIN;
+    expect(sold).toBeGreaterThan(3);
+    expect(stops[1]).toMatch(new RegExp(`^Forced sales: [^,]+, [^,]+, [^,]+ and ${sold - 3} more sold to cover debts\\.$`));
+    expect(getState().week).toBe(25);
+    expect(getState().money).toBeLessThan(ECON.FORCED_SALE_FLOOR);
+  });
+
+  it('with nobody left to sell, the floor stops it once instead', async () => {
+    setState({ money: 25_000, squad: getState().squad.slice(0, SQUAD_MIN) });
+    burnEachWeek(10_000);
+    const { stops, calls } = await playThrough({ kind: 'finals' });
+    expect(stops).toEqual(['Club has gone into debt.', 'Balance below the fire-sale floor (-$100,000).']);
+    expect(calls).toBe(3);
+    expect(getState().week).toBe(25);
+  });
+
+  it('back above $0 and into the red again is a new crossing', async () => {
+    setState({ money: 5_000 });
+    // −10k a week, but +20k in week 3: 5k → −5k → −15k → +5k → −5k → −15k …
+    registerTickHook('test-burn', TICK_ORDER.economy, (ctx) => {
+      earnMoney(ctx.week === 3 ? 20_000 : -10_000, 'wages');
+      handleBankruptcy(getState());
+    });
+    const first = await advanceUntil({ kind: 'weeks', weeks: 6 }, async () => {});
+    expect(first).toEqual({ weeksPlayed: 1, stop: { kind: 'bankruptcy', text: 'Club has gone into debt.' } });
+    const second = await advanceUntil({ kind: 'weeks', weeks: 6 }, async () => {});
+    expect(second).toEqual({ weeksPlayed: 3, stop: { kind: 'bankruptcy', text: 'Club has gone into debt.' } });
+    const third = await advanceUntil({ kind: 'weeks', weeks: 6 }, async () => {});
+    expect(third.stop.kind).toBe('target');
   });
 });
 
