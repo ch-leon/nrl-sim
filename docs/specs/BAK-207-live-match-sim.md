@@ -117,6 +117,10 @@ Every transition is a thing that physically happens on the field; nothing is imp
   cost list: about 485 → 300 ms a match in Node, a phone's week tick 2.2 → 1.5 s. The < 100 ms
   target assumed about 7,000 ticks; at 21,600 it needs a coarser step (tuning reference §23;
   Assumed, needs Leon).
+  *N10 (2026-10-20):* in a browser no headless match runs on the main thread: the rival round,
+  the fast-forwarded match and Skip play in a Worker with byte-identical results, and the
+  match scene's art is painted ahead in another. The phone's taps stop freezing; the
+  per-match cost is unchanged (ARCHITECTURE §6, `docs/status/2026-10-perf.md`).
 - `src/sim/engine.ts` and `src/world/playback.ts`+`staging.ts` are deleted at switch-over
   (~2,500 lines); ARCHITECTURE §6 is rewritten to this contract. *Phase 4 (#88, #162,
   2026-10-19, merged on Leon's go-ahead after a checker review):* those three and
