@@ -17,11 +17,13 @@ import { playMatchesInWorker, type MatchJob } from '../../src/systems/matchJobs'
 type Mode = 'play' | 'error';
 const g = globalThis as { Worker?: unknown; window?: unknown };
 let posted = 0;
+let built = 0;
 
 /** A Worker that plays its jobs as matchWorker.ts does, one task later (or fails). */
 function stubWorker(mode: Mode): void {
   g.window ??= {};
   g.Worker = class {
+    constructor() { built++; }
     onmessage: ((e: { data: unknown }) => void) | null = null;
     onerror: (() => void) | null = null;
     postMessage(jobs: MatchJob[]): void {
@@ -50,6 +52,7 @@ afterEach(() => {
   delete g.Worker;
   delete g.window;
   posted = 0;
+  built = 0;
   clearHeldWeek();
 });
 
@@ -100,6 +103,35 @@ describe('the fast-forwarded match in the Worker (N10.3)', () => {
     const job: MatchJob = { home: teamSheetFromRival(a!), away: teamSheetFromRival(b!), opts: { seed: 5 } };
     stubWorker('error');
     expect(await playMatchesInWorker([job], 60_000)).toEqual([runMatch(job.home, job.away, job.opts)]);
+  }, 60_000);
+});
+
+describe('one worker for the session (N10.3)', () => {
+  const jobsFor = (seed: number): MatchJob[] => {
+    const [a, b] = getState().league.clubs.filter((c) => c.id !== PLAYER_ID);
+    return [{ home: teamSheetFromRival(a!), away: teamSheetFromRival(b!), opts: { seed } }];
+  };
+
+  it('requests share one worker and each gets its own answer, in order', async () => {
+    createNewGame('Shared', 6);
+    initLeague(getState());
+    stubWorker('play');
+    const [x, y] = await Promise.all([playMatchesInWorker(jobsFor(11), 60_000), playMatchesInWorker(jobsFor(12), 60_000)]);
+    expect(built).toBe(1);
+    expect(x).toEqual(jobsFor(11).map((j) => runMatch(j.home, j.away, j.opts)));
+    expect(y).toEqual(jobsFor(12).map((j) => runMatch(j.home, j.away, j.opts)));
+    await playMatchesInWorker(jobsFor(13), 60_000);
+    expect(built).toBe(1);
+  }, 60_000);
+
+  it('a worker that fails is dropped: its request is played here and the next one gets a new worker', async () => {
+    createNewGame('Shared', 7);
+    initLeague(getState());
+    stubWorker('error');
+    expect(await playMatchesInWorker(jobsFor(21), 60_000)).toEqual(jobsFor(21).map((j) => runMatch(j.home, j.away, j.opts)));
+    stubWorker('play');
+    await playMatchesInWorker(jobsFor(22), 60_000);
+    expect(built).toBe(2);
   }, 60_000);
 });
 
