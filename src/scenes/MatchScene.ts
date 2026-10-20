@@ -23,7 +23,7 @@ import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import type { Fixture } from '../core/state';
-import { mountMatchOverlay, type MatchOverlayHandle } from '../ui/screens/matchOverlay';
+import { callsLine, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
 import {
   LivePlayback,
   LIVE_DEFAULT_SPEED,
@@ -379,6 +379,7 @@ export class MatchScene extends Phaser.Scene {
         weather: live.weather,
         ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}),
         calls: live.calls ?? [],
+        ...(live.plans ? { plans: live.plans } : {}),
         ...(live.aiCoach?.length ? { aiCoach: live.aiCoach } : {}),
         ...(live.goldenPoint ? { goldenPoint: true } : {}),
         ...(live.resumeAt ? { resumeAt: live.resumeAt } : {}),
@@ -392,6 +393,7 @@ export class MatchScene extends Phaser.Scene {
       });
       this.mountPlaybackControls(LIVE_DEFAULT_SPEED);
       if (live.coachSide) this.mountCallChips(live.coachSide, live.unlockedCalls ?? COACH_CALLS);
+      if (live.planSide) this.mountPlanChip(live.planSide);
       bus.on('match:finished', this.onFinished);
       // A phone may kill the app in the background: keep where the match is (#73).
       document.addEventListener('visibilitychange', this.onHidden);
@@ -413,9 +415,10 @@ export class MatchScene extends Phaser.Scene {
     // camera follows the freshly-moved ball this frame.
     if (this.playback) this.playback.update(delta);
     // The coach's chips follow the play a few times a second (#73).
-    if (this.callsEl && time - this.chipsAt > 150) {
+    if ((this.callsEl || this.planBtn) && time - this.chipsAt > 150) {
       this.chipsAt = time;
       this.refreshCallChips();
+      this.refreshPlan();
     }
 
     this.updateReadability(delta);
@@ -657,6 +660,76 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
+  // ── The plan at the breaks (N11): the half-time card and the Plan chip after a try ──
+  private planSide: 'home' | 'away' | null = null;
+  private planBtn: HTMLButtonElement | null = null;
+  /** The Plan chip's own row when there are no call chips to sit beside. */
+  private planWrap: HTMLDivElement | null = null;
+  private planCard: PlanCardHandle | null = null;
+  /** The half whose break has had its card (one card a break). */
+  private planCardHalf = 0;
+
+  private mountPlanChip(side: 'home' | 'away'): void {
+    this.planSide = side;
+    const btn = button('Plan', () => this.openPlanCard('Change the plan', ['In force from the kick-off'], undefined));
+    btn.setAttribute('data-plan', '');
+    btn.hidden = true;
+    this.planBtn = btn;
+    if (this.callsEl) this.callsEl.prepend(btn);
+    else {
+      const wrap = document.createElement('div');
+      wrap.className = 'nrl-mo-calls';
+      wrap.append(btn);
+      this.planWrap = wrap;
+      mount(wrap);
+    }
+  }
+
+  /** At half-time the card comes up by itself, once; after a try the Plan chip shows until the restart is kicked. */
+  private refreshPlan(): void {
+    const pb = this.playback;
+    if (!this.planSide || !(pb instanceof LivePlayback) || this.finished) return;
+    const at = pb.breakKind;
+    if (this.planBtn) this.planBtn.hidden = at !== 'try' || this.planCard !== null;
+    if (at === 'half-time' && !this.planCard && this.planCardHalf !== pb.half) {
+      this.planCardHalf = pb.half;
+      const s = pb.score;
+      const pct = (side: 'home' | 'away'): string => `${Math.round(pb.legs(side) * 100)}%`;
+      const lines = [`${this.home.name} ${s.home} – ${s.away} ${this.away.name}`, `Legs ${pct('home')} / ${pct('away')}`, callsLine(pb.calls.made, pb.calls.paid)];
+      // At ×4 and above the card goes on by itself after 8 s (a coach who is not watching).
+      this.openPlanCard(pb.half >= 2 ? 'Golden point' : 'Half-time', lines, pb.getSpeed() >= 4 ? 8000 : undefined);
+    }
+  }
+
+  private openPlanCard(head: string, lines: string[], autoMs: number | undefined): void {
+    const pb = this.playback;
+    const side = this.planSide;
+    if (!(pb instanceof LivePlayback) || !side || this.planCard) return;
+    pb.hold();
+    if (this.planBtn) this.planBtn.hidden = true;
+    this.planCard = showPlanCard({
+      head,
+      lines,
+      tactics: pb.planFor(side),
+      onPick: (t) => pb.setTactics(side, t),
+      onDone: () => {
+        this.planCard = null;
+        pb.release();
+      },
+      ...(autoMs ? { autoMs } : {}),
+    });
+  }
+
+  private closePlan(): void {
+    const card = this.planCard;
+    this.planCard = null;
+    card?.close();
+    this.planBtn?.remove();
+    this.planBtn = null;
+    this.planWrap?.remove();
+    this.planWrap = null;
+  }
+
   // ── DOM return button (shown only at full-time) ──────────────────────────────
   private mountBackButton(): void {
     // Hidden until full-time; before then, playback + Skip drive the flow.
@@ -683,6 +756,7 @@ export class MatchScene extends Phaser.Scene {
     if (result.homeScore !== result.awayScore) this.hype(result.homeScore > result.awayScore ? 'home' : 'away', 0.9, 60_000);
     this.callsEl?.remove();
     this.callsEl = null;
+    this.closePlan();
     if (this.backBtn) this.backBtn.style.display = '';
     if (this.controlsEl) {
       this.controlsEl.remove();
@@ -727,6 +801,7 @@ export class MatchScene extends Phaser.Scene {
     }
     this.callsEl?.remove();
     this.callsEl = null;
+    this.closePlan();
     this.callChips = [];
     this.speedButtons = [];
     if (this.backBtn) {

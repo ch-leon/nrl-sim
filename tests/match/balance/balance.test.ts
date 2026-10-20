@@ -83,6 +83,17 @@ describe('plans', () => {
     expect(errs.join('\n')).toMatch(/yolo/);
     expect(errs.join('\n')).toMatch(/wrestle\.grip/);
   });
+  it('checks plan changes at the breaks (N11), and a change after a try plays a different match', () => {
+    const bad = checkPlan(plan({ scenarios: [{ ...EVEN, plans: [{ side: 'home', at: 'later' as never, tactics: { attack: 'yolo' as never } }] }] }));
+    expect(bad.join('\n')).toMatch(/half-time \/ try \/ conceded/);
+    expect(bad.join('\n')).toMatch(/yolo/);
+    const withPlan = plan({ minutes: 4, scenarios: [{ ...EVEN, plans: [{ side: 'home', at: 'try', tactics: { attack: 'expansive', defence: 'rush' } }] }] });
+    expect(checkPlan(withPlan)).toEqual([]);
+    const changed = measureCell(cellsOf(withPlan)[0]!, 1, 6);
+    const same = measureCell(cellsOf(plan({ minutes: 4 }))[0]!, 1, 6);
+    expect(changed.counts).not.toEqual(same.counts);
+    expect(measureCell(cellsOf(withPlan)[0]!, 1, 6).counts).toEqual(changed.counts);
+  }, 60_000);
   it('builds flat squads with stat overrides, or a club roster', () => {
     const s = sideSheet('H', { rating: 70, stats: { stamina: 30 }, tactics: { defence: 'rush' } });
     expect(s.roster).toHaveLength(9);

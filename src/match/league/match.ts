@@ -7,7 +7,7 @@ import { applyMomentumEvent, decayMomentum } from '../../sim/weather';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import type { CallInput } from './calls';
 import { toMatchEvent } from './events';
-import { LiveSim } from './live';
+import { LiveSim, type PlanInput } from './live';
 import type { MatchLength } from './rules';
 
 export interface RunMatchOptions {
@@ -24,6 +24,8 @@ export interface RunMatchOptions {
   aiCoach?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
+  /** Plan changes at the breaks by tick (N11). */
+  plans?: PlanInput[];
 }
 
 /** No real match comes near this many ticks (about 80 minutes of sim time); it only guards against a sim that never finishes. */
@@ -92,6 +94,7 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     ...(opts.calls ? { calls: opts.calls } : {}),
     ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}),
     ...(opts.goldenPoint ? { goldenPoint: true } : {}),
+    ...(opts.plans?.length ? { plans: opts.plans } : {}),
   });
   const rec = new MatchRecorder({ home: home.clubId, away: away.clubId });
   while (!sim.finished) {

@@ -41,6 +41,16 @@ export interface ScenarioSpec {
   finals?: boolean;
   /** Coach calls (#73) each side makes whenever it can, or only on a given tackle ("shift left on tackle 2"). */
   calls?: Partial<Record<'home' | 'away', CallRule[]>>;
+  /** Plan changes at the breaks (N11): each made once, at the first break it names. */
+  plans?: PlanRule[];
+}
+
+export interface PlanRule {
+  side: 'home' | 'away';
+  /** The half-time break, or the first try scored (by either side, or by the other side: "after we concede"). */
+  at: 'half-time' | 'try' | 'conceded';
+  /** The new presets; what is left out stays as it is. */
+  tactics: Partial<TeamTactics>;
 }
 
 export interface CallRule {
@@ -96,6 +106,12 @@ export function checkPlan(p: Plan): string[] {
     if (s.aiCoach !== undefined && (!Array.isArray(s.aiCoach) || s.aiCoach.some((x) => x !== 'home' && x !== 'away'))) errs.push(`${s.name}: aiCoach must list home / away`);
     for (const side of ['home', 'away'] as const) {
       for (const r of s.calls?.[side] ?? []) if (!isCoachCall(r.call)) errs.push(`${s.name}: unknown call "${String(r.call)}" for ${side}`);
+    }
+    for (const r of s.plans ?? []) {
+      if (r.side !== 'home' && r.side !== 'away') errs.push(`${s.name}: a plan change needs side home / away`);
+      if (!['half-time', 'try', 'conceded'].includes(r.at)) errs.push(`${s.name}: a plan change is at half-time / try / conceded`);
+      if (r.tactics?.attack && !isAttackPreset(r.tactics.attack)) errs.push(`${s.name}: unknown attack preset "${r.tactics.attack}" in a plan change`);
+      if (r.tactics?.defence && !isDefencePreset(r.tactics.defence)) errs.push(`${s.name}: unknown defence preset "${r.tactics.defence}" in a plan change`);
     }
     if (s.legs !== undefined && !(typeof s.legs === 'number' ? s.legs >= 0 && s.legs <= 1 : isLegs(s.legs))) errs.push(`${s.name}: legs must be fresh / late / spent or 0..1`);
     for (const [side, spec] of [['home', s.home], ['away', s.away]] as const) {

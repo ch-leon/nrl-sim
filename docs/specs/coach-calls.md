@@ -16,7 +16,10 @@ call takes effect it shows as a pop-up over the player it went through (**SHIFT 
 **HIT-UP!**) and a line in the commentary; the stats strip counts the calls that paid off.
 
 Presets (BAK-208 §5) stay the plan for the match and are changed at the breaks (kick-off,
-half-time, after a try). Calls are the moment-to-moment layer on top.
+half-time, after a try). Calls are the moment-to-moment layer on top. *Shipped in N11:* the
+coach picks the plan on the Lineup screen; in a live match a half-time card and a **Plan**
+chip (from a score to the kick-off) change it, in force from the kick-off and recorded with
+the calls (`LiveSim.setTactics`, `plans` by tick). Rivals keep theirs (§6).
 
 ## 2. Why this is now simple
 

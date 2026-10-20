@@ -805,3 +805,38 @@ scenario flag, counts `goldenPoint`, `goldenPointWon`, `draws`):
 
 Five minutes decides about nine golden points in ten, about two in five of them by a field goal.
 
+## 27. The coach's plan (N11)
+
+The player picks his side's attack and defence presets (§5) on the Lineup screen
+(`Lineup.tactics`, save v14; Balanced / Slide by default and for older saves) and the team
+sheet carries them. In a live match he changes them at the breaks: the **half-time card**
+(the score, each side's legs, the calls paid off, the two rows of presets) holds the match
+until Continue, and goes on by itself after 8 s at ×4 and above unless it is touched; the
+**Plan** chip shows from a score until the kick-off (and before the opening kick-off). A change
+is an input like a call (`LiveSim.setTactics`, `plans: { tick, side, tactics }[]`), refused
+outside a break ("at the breaks"; never mid-set, never at a goal-line drop-out) and in force
+from the kick-off, with a line in the commentary. It is kept in the live match record, so a
+resumed match and `runMatch` with the same `plans` play the same match. No change plays
+exactly as before (tests). Rivals do not change plans (coach calls §6). No new match knobs:
+the presets' numbers are §5's.
+
+What each preset does when the player picks it (even 60 v 60, the preset side at home
+against Balanced / Slide, 40 whole matches a row, `20261020-062508-presets-whole-match-n11`;
+counts are both sides):
+
+| Preset | Wins | Offloads | Kicks | Breaks | Big hits | Tackles |
+|---|---|---|---|---|---|---|
+| Balanced / Slide (both) | 43% (10% drawn) | 9.7 | 21.4 | 61.2 | 23.9 | 191.6 |
+| Grind | 45% | **5.9** | 24.1 | 54.8 | 26.0 | **200.4** |
+| Expansive | 38% | **12.8** | 21.6 | 59.3 | 25.1 | 180.6 |
+| Kick-chase | 48% | 8.0 | **23.5** (609 m) | 60.5 | 26.2 | 196.1 |
+| All-out | 33% | **14.4** | 20.8 | 59.5 | 24.1 | 181.4 |
+| Rush (defence) | 53% | 10.1 | 22.2 | **79.8** | **32.8** | 193.4 |
+| Compressed (defence) | 65% | 8.6 | 22.9 | **52.6** | 25.9 | 196.6 |
+
+Both ways round over 160 matches a row (`20261020-062700-n11-presets-confirm`; one standard
+error about 4 points): **Compressed wins about 61%** of even matches against Slide (64% at home,
+60% away), **All-out about 37%**, **Expansive about 35%**. With the player picking, Compressed
+is a dominant pick and Expansive and All-out are traps: raised as #241 (the plan tables are
+not N11's to change).
+

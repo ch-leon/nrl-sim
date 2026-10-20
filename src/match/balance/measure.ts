@@ -7,7 +7,7 @@ import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { TICK_S } from '../core/engine';
 import type { SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
-import { LiveSim } from '../league/live';
+import { LiveSim, type PlanInput } from '../league/live';
 import { aiCoachSides, type CallInput } from '../league/calls';
 import { fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
@@ -308,7 +308,11 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const rules = cell.scenario.calls;
       // The AI coach (N9.6): the scenario's sides, or both when the variant turns calls.ai on.
       const aiSides = cell.scenario.aiCoach ?? aiCoachSides(['home', 'away']);
-      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}) });
+      // Plan changes at the breaks (N11): each made once, at the first break it names.
+      const planRules = cell.scenario.plans ?? [];
+      const planList: PlanInput[] = [];
+      const planDone = planRules.map(() => false);
+      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();
@@ -321,6 +325,17 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
             const r = (rules[side] ?? []).find((x) => (x.tackle === undefined || x.tackle === sim.tackleCount) && sim.callRefusal(side, x.call) === null);
             if (r) callList.push({ tick: sim.tick + 1, side, call: r.call });
           }
+        }
+        if (planRules.length) {
+          const k = sim.phaseKind;
+          planRules.forEach((r, i) => {
+            if (planDone[i] || sim.planRefusal() !== null) return;
+            const scoredBy = k === 'try' ? sim.inPossession : null;
+            const due = r.at === 'half-time' ? k === 'half-time' : r.at === 'try' ? scoredBy !== null : scoredBy !== null && scoredBy !== r.side;
+            if (!due) return;
+            planDone[i] = true;
+            planList.push({ tick: sim.tick + 1, side: r.side, tactics: { ...sim.planFor(r.side), ...r.tactics } });
+          });
         }
         sim.step();
         // Read the tick straight off the sim: building a snapshot every tick cost a third of the run.

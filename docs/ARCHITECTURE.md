@@ -329,7 +329,7 @@ wait, and at `match:finished` matchday applies the live sim's own result and cal
 `resumeWeek()`, so the ladder, finals seeding, morale and a season's end see the
 match the player watched. Fast-forward never holds. The game saves only at a week's
 end, so an app killed mid-match reloads the week before; a small record next to the
-save slot (`systems/liveMatchRecord.ts`: seed, calls, tick) makes the re-advanced
+save slot (`systems/liveMatchRecord.ts`: seed, calls, plan changes (N11), tick) makes the re-advanced
 week resume the same match where it was.
 
 Holds count (N9.2): every hook of the holding order still runs, then the later hooks

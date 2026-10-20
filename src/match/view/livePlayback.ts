@@ -17,6 +17,8 @@ import type { Side, SimEvent } from '../core/snapshot';
 import { LiveSim } from '../league/live';
 import { MatchRecorder } from '../league/match';
 import type { CallInput, CoachCall } from '../league/calls';
+import type { PlanInput } from '../league/live';
+import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
 import { LiveView, type ViewSurface } from './liveView';
 import { PopupLayer } from './popupLayer';
@@ -68,14 +70,16 @@ export interface LivePlaybackOptions {
   weather: WeatherKind;
   injuryRate?: number;
   calls: CallInput[];
+  /** Plan changes at the breaks so far (N11); a resumed match brings its own. */
+  plans?: PlanInput[];
   /** The rival's AI coach (N9.6). */
   aiCoach?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
   resumeAt?: number;
-  /** A call was made, or the tick moved on a resumable match: keep the record (resume after the app is killed). */
-  onProgress?: (calls: readonly CallInput[], tick: number) => void;
+  /** A call or a plan change was made, or the tick moved on a resumable match: keep the record (resume after the app is killed). */
+  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => void;
   fixture: Fixture | undefined;
   overlay: MatchOverlayHandle | null;
   /** Ease the camera back out after a big moment's close-up. */
@@ -94,15 +98,17 @@ export class LivePlayback {
   private skipping = false;
   private now = 0;
   private closeupUntil = 0;
+  private readonly plans: PlanInput[];
 
   constructor(
     private readonly scene: LivePlaybackScene & Phaser.Scene,
     private readonly opts: LivePlaybackOptions,
   ) {
     const { home, away } = opts;
+    this.plans = opts.plans ?? [];
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate and calls.
-    const simOpts = { weather: opts.weather, calls: opts.calls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    const simOpts = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.runner = new Runner((seed) => new LiveSim(home, away, seed, simOpts), opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => this.recorder.clock(this.sim.matchSeconds);
@@ -139,8 +145,62 @@ export class LivePlayback {
     const why = this.callRefusal(side, call);
     if (why) return why;
     this.opts.calls.push({ tick: this.runner.tick + 1, side, call });
-    this.opts.onProgress?.(this.opts.calls, this.runner.tick);
+    this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans);
     return null;
+  }
+
+  /** Why the coach can't change the plan now (N11: only at the breaks), or null. */
+  planRefusal(): string | null {
+    return this.finishEmitted ? 'full time' : this.sim.planRefusal();
+  }
+
+  /** The coach changes the plan: recorded for the next tick, in force from the restart (N11). Returns why not, or null. */
+  setTactics(side: Side, tactics: TeamTactics): string | null {
+    const why = this.planRefusal();
+    if (why) return why;
+    this.plans.push({ tick: this.runner.tick + 1, side, tactics: { ...tactics } });
+    this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans);
+    return null;
+  }
+
+  /** The plan a side plays from the restart: a change waiting for it (this tick's or the next), else the one in force. */
+  planFor(side: Side): TeamTactics {
+    const waiting = [...this.plans].reverse().find((p) => p.side === side && p.tick > this.runner.tick);
+    return waiting ? waiting.tactics : this.sim.planFor(side);
+  }
+
+  /** The break the match is at: the half-time (or golden point) break, a score or kick-off ('try'), or neither (N11's half-time card and Plan chip). */
+  get breakKind(): 'half-time' | 'try' | null {
+    if (this.finishEmitted) return null;
+    const k = this.sim.phaseKind;
+    if (k === 'half-time') return 'half-time';
+    return this.sim.planRefusal() === null ? 'try' : null;
+  }
+
+  /** The half being played (1, 2, then golden point). */
+  get half(): number {
+    return this.runner.cur.clock?.half ?? 1;
+  }
+
+  /** The score, and each side's legs on the field (0..1, BAK-208 §8): the half-time card's numbers. */
+  get score(): Record<Side, number> {
+    return this.runner.cur.score ?? { home: 0, away: 0 };
+  }
+  legs(side: Side): number {
+    const on = this.runner.cur.players.filter((p) => p.side === side && p.legs !== undefined);
+    return on.length ? on.reduce((a, p) => a + p.legs!, 0) / on.length : 1;
+  }
+  /** Calls made and paid off (#73), for the card. */
+  get calls(): { made: Readonly<Record<Side, number>>; paid: Readonly<Record<Side, number>> } {
+    return { made: this.sim.callsMade, paid: this.sim.callsPaid };
+  }
+
+  /** Hold the match (the half-time card is up, the coach is changing the plan), and let it go on. */
+  hold(): void {
+    this.runner.pause();
+  }
+  release(): void {
+    if (!this.finishEmitted) this.runner.play();
   }
 
   /** Who has the ball (the chips show attack or defence calls). */
@@ -155,7 +215,7 @@ export class LivePlayback {
 
   /** Keep the resume record up to date (the app is going to the background). */
   saveProgress(): void {
-    if (!this.finishEmitted) this.opts.onProgress?.(this.opts.calls, this.runner.tick);
+    if (!this.finishEmitted) this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans);
   }
 
   getSpeed(): PlaybackSpeed {
@@ -224,7 +284,7 @@ export class LivePlayback {
   private onSimEvents(events: readonly SimEvent[]): void {
     const cur = this.runner.cur;
     for (const e of events) {
-      if ((e.kind === 'coach-call' || e.kind === 'call-paid') && !this.skipping) this.opts.overlay?.comment(e.text);
+      if ((e.kind === 'coach-call' || e.kind === 'call-paid' || e.kind === 'plan') && !this.skipping) this.opts.overlay?.comment(e.text);
       if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);
       const p = this.skipping ? null : popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
