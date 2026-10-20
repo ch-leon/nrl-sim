@@ -13,6 +13,11 @@ on:
       sizes:
         description: Playthrough sizes, space-separated (WxH)
         default: 844x390 1280x800
+      only:
+        description: Run one job only (qa = soak and playthroughs, perf = the budget)
+        type: choice
+        options: [all, qa, perf]
+        default: all
 
 permissions:
   contents: read
@@ -23,6 +28,7 @@ concurrency:
 
 jobs:
   qa:
+    if: ${{ inputs.only != 'perf' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -76,6 +82,7 @@ jobs:
   # CPU throttled x4 at 844x390 (scripts/e2e-perf.mjs); a moment over its budget in
   # scripts/perf-budget.json fails this job. Nightly and on demand, not on PRs.
   perf:
+    if: ${{ inputs.only != 'qa' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

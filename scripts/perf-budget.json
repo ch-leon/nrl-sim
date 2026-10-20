@@ -1,0 +1,10 @@
+{
+  "throttle": 4,
+  "budgets": {
+    "titleMs": 3000,
+    "groundsMs": 8000,
+    "handoffMs": 5000,
+    "weekMs": 2500,
+    "bundleGzKb": 600
+  }
+}
