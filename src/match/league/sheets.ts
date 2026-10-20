@@ -144,6 +144,11 @@ export function teamSheetFromSquad(
   };
 }
 
+/** A rival's squad-built sheet with the style its nine gives it (N11, `rivalTactics`). */
+export function withRivalStyle(sheet: TeamSheet, club: { id: string; strength: number }): TeamSheet {
+  return { ...sheet, tactics: rivalTactics(club, sheet.roster) };
+}
+
 /**
  * Who kicks the goals and who captains the side (N11): the coach's picks when
  * they are in the nine, else the defaults — the half with the best Skill (any
