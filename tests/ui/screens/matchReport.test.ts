@@ -2,7 +2,7 @@
 // built from the MatchResult, it agrees with the score and the overlay's tallies.
 import { describe, it, expect } from 'vitest';
 import { runMatch } from '../../../src/match/league/match';
-import { buildMatchReport } from '../../../src/ui/screens/matchReport';
+import { buildMatchReport, shortName } from '../../../src/ui/screens/matchReport';
 import { playerOfTheMatch } from '../../../src/systems/stats';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../../src/sim/events';
 
@@ -57,5 +57,16 @@ describe('match report (N9.5)', () => {
     expect(buildMatchReport(base, fixture, names, null).note).toBe('Drawn');
     const gp: MatchResult = { ...result, homeScore: 16, awayScore: 12, events: [ev('try'), ev('full-time', 'golden-point')] };
     expect(buildMatchReport(gp, { ...fixture, round: 27 }, names, null)).toMatchObject({ title: 'Grand Final · Full time', note: 'Won in golden point' });
+  });
+
+  it('lists the injured with their weeks, the calls that paid off, and short names over the numbers', () => {
+    const hurt: MatchResult = { ...result, injuries: [{ teamId: 'rival-gulls', playerName: 'Gulls 7', weeks: 3 }, { teamId: 'player', playerName: 'Live Test FC 2', weeks: 1 }], calls: { made: [5, 0], paid: [2, 0] } };
+    const rep = buildMatchReport(hurt, fixture, names, null);
+    expect(rep.away.injuries).toEqual(['Gulls 7 (3 weeks)']);
+    expect(rep.home.injuries).toEqual(['Live Test FC 2 (1 week)']);
+    expect(rep.rows.find((x) => x.label === 'Calls paid off')).toMatchObject({ home: '2/5', away: '0/0' });
+    expect(buildMatchReport(result, fixture, names, null).rows.some((x) => x.label === 'Calls paid off')).toBe(result.calls !== undefined);
+    expect(shortName('Launceston Larrikins')).toBe('Larrikins');
+    expect(rep.home.short).toBe('Live Test FC');
   });
 });

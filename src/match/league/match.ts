@@ -74,6 +74,9 @@ export class MatchRecorder {
       weather: sim.weather,
       momentumTimeline: this.momentumTimeline,
       injuries: [...sim.injuries],
+      ...(sim.callsMade.home + sim.callsMade.away > 0
+        ? { calls: { made: [sim.callsMade.home, sim.callsMade.away] as [number, number], paid: [sim.callsPaid.home, sim.callsPaid.away] as [number, number] } }
+        : {}),
     };
   }
 }
