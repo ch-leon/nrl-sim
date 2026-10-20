@@ -606,10 +606,11 @@ export function registerFixturesSystem(): void {
       };
       if (ctx.hold && canUseWorker() && jobs.length > 0) {
         ctx.hold();
-        void playRivalJobsInWorker(jobs).then((results) => {
-          land(results);
-          resumeWeek();
-        });
+        // The week always resumes, even if landing the results throws.
+        void playRivalJobsInWorker(jobs)
+          .then(land)
+          .catch((err: unknown) => console.error('rival round failed to land', err))
+          .finally(resumeWeek);
         return;
       }
       land(jobs.map(playRivalJob));

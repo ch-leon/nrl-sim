@@ -96,7 +96,10 @@ export function canUseWorker(): boolean {
 }
 
 /** Play the jobs in a Web Worker; on any failure, play them here instead. */
-export function playRivalJobsInWorker(jobs: readonly RivalJob[]): Promise<MatchResult[]> {
+/** How long the worker gets before the round is played on the main thread instead (ms). */
+export const RIVAL_WORKER_TIMEOUT_MS = 30_000;
+
+export function playRivalJobsInWorker(jobs: readonly RivalJob[], timeoutMs = RIVAL_WORKER_TIMEOUT_MS): Promise<MatchResult[]> {
   return new Promise((resolve) => {
     let worker: Worker;
     try {
@@ -105,14 +108,18 @@ export function playRivalJobsInWorker(jobs: readonly RivalJob[]): Promise<MatchR
       resolve(jobs.map(playRivalJob));
       return;
     }
-    worker.onmessage = (e: MessageEvent<MatchResult[]>) => {
+    let settled = false;
+    const done = (results: () => MatchResult[]): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       worker.terminate();
-      resolve(e.data);
+      resolve(results());
     };
-    worker.onerror = () => {
-      worker.terminate();
-      resolve(jobs.map(playRivalJob));
-    };
+    // A worker that never answers doesn't hold the week for good: play them here instead.
+    const timer = setTimeout(() => done(() => jobs.map(playRivalJob)), timeoutMs);
+    worker.onmessage = (e: MessageEvent<MatchResult[]>) => done(() => e.data);
+    worker.onerror = () => done(() => jobs.map(playRivalJob));
     worker.postMessage(jobs);
   });
 }

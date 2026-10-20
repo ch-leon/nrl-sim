@@ -3,14 +3,14 @@
 // fixtures on the live sim (here on the main thread: the tests have no Worker),
 // with the same results as runMatch on their seeds, and the rivals' players get
 // the games, stats and injuries; fast-forward and the default keep the cheap sim.
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { bus } from '../../src/core/events';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import type { GameState } from '../../src/core/state';
 import { initLeague, PLAYER_ID, registerFixturesSystem, simulateRivalRound } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
-import { playRivalJob, rivalJobs } from '../../src/systems/rivalRound';
+import { playRivalJob, playRivalJobsInWorker, rivalJobs } from '../../src/systems/rivalRound';
 import { makeRng } from '../../src/utils/rng';
 
 /** The state just before the rival round runs (a hook of the same order registered first). */
@@ -94,3 +94,44 @@ describe('rival rounds on the live sim (N9.2)', () => {
     }
   }, 60_000);
 });
+
+describe('the rival round worker falls back to the main thread', () => {
+  const real = (globalThis as { Worker?: unknown }).Worker;
+  afterEach(() => {
+    (globalThis as { Worker?: unknown }).Worker = real;
+    vi.useRealTimers();
+  });
+  /** A stand-in Worker that never answers, or fails as soon as it gets the jobs. */
+  const stub = (mode: 'hang' | 'error') =>
+    class {
+      onmessage: ((e: unknown) => void) | null = null;
+      onerror: (() => void) | null = null;
+      terminated = false;
+      postMessage(): void {
+        if (mode === 'error') setTimeout(() => this.onerror?.(), 0);
+      }
+      terminate(): void {
+        this.terminated = true;
+      }
+    };
+  const someJobs = () => {
+    newGame(true);
+    return rivalJobs(getState(), makeRng(5), PLAYER_ID).slice(0, 1);
+  };
+
+  it('a worker that never answers: played here after the timeout, same results', async () => {
+    const jobs = someJobs();
+    (globalThis as { Worker?: unknown }).Worker = stub('hang');
+    vi.useFakeTimers();
+    const p = playRivalJobsInWorker(jobs, 1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await p).toEqual(jobs.map(playRivalJob));
+  }, 60_000);
+
+  it('a worker that fails: played here, same results', async () => {
+    const jobs = someJobs();
+    (globalThis as { Worker?: unknown }).Worker = stub('error');
+    expect(await playRivalJobsInWorker(jobs, 60_000)).toEqual(jobs.map(playRivalJob));
+  }, 60_000);
+});
+
