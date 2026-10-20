@@ -241,6 +241,8 @@ export class LivePlayback {
       const [ph, pa] = result.calls.paid;
       this.opts.overlay?.setCalls?.({ home: mh, away: ma }, { home: ph, away: pa });
     }
+    // The clock to full time (a golden-point final keeps the clock it had: its length isn't in the result).
+    if (!result.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point')) this.opts.overlay?.setClock(2 * NINES.halfMinutes * 60, 2);
     this.awaitingSkip = false;
     this.skipping = false;
     this.finishEmitted = true;
