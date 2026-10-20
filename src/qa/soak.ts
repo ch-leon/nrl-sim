@@ -279,6 +279,10 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  if (version < 15 && raw.lineup) {
+    const { kicker: _k, captain: _c, ...lineup } = raw.lineup;
+    out.lineup = lineup;
+  }
   if (version < 11) delete out.lineup;
   if (version < 10) delete out.finance;
   if (version < 9) delete out.kit;

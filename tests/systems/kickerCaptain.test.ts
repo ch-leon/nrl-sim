@@ -73,7 +73,7 @@ describe('the goal-kicker and the captain (N11)', () => {
     expect(runMatch(neutral, away, { seed: 3 })).toEqual(runMatch(plain, away, { seed: 3 }));
   }, 60_000);
 
-  it('the named kicker takes the goal kicks, and his Skill moves the conversion rate (40 seeds)', () => {
+  it('the named kicker takes the goal kicks while he is on, and his Skill moves the conversion rate (40 seeds)', () => {
     const away = sideSheet('A', { rating: 60 });
     // The fullback (slot 0) kicks; his Skill is the only thing that differs.
     const withKicker = (skill: number): TeamSheet => {
@@ -97,9 +97,38 @@ describe('the goal-kicker and the captain (N11)', () => {
     };
     const good = rate(95);
     const poor = rate(25);
-    expect(good.byKicker).toBe(good.tried);
+    // Nearly all: when the interchange has him off the field, the slot-5 kicker takes it.
+    expect(good.byKicker).toBeGreaterThanOrEqual(good.tried * 0.95);
     expect(good.tried).toBeGreaterThan(30);
     expect(good.made / good.tried).toBeGreaterThan(poor.made / poor.tried + 0.1);
+  }, 240_000);
+
+  it('kicks in play stay with the slot-5 kicker when another man is named; field goals still come', () => {
+    const away = sideSheet('A', { rating: 60 });
+    const plain = named('H');
+    const fullbackKicks = { ...plain, kicker: plain.roster![0]!.id! };
+    const count = (sheet: TeamSheet): { inPlay: number; byFullback: number; fieldGoals: number } => {
+      let inPlay = 0;
+      let byFullback = 0;
+      let fieldGoals = 0;
+      for (let seed = 1; seed <= 20; seed++) {
+        for (const e of runMatch(sheet, away, { seed }).events) {
+          if (e.teamId !== sheet.clubId) continue;
+          if (e.kind === 'kick') {
+            inPlay++;
+            if (e.player === sheet.roster![0]!.name) byFullback++;
+          }
+          if (e.kind === 'field-goal') fieldGoals++;
+        }
+      }
+      return { inPlay, byFullback, fieldGoals };
+    };
+    const before = count(plain);
+    const after = count(fullbackKicks);
+    // The fullback kicks in play no more than he did unnamed (a scramble now and then), and the side kicks as much.
+    expect(after.byFullback).toBeLessThanOrEqual(before.byFullback + 2);
+    expect(after.inPlay).toBeGreaterThan(before.inPlay * 0.8);
+    expect(after.fieldGoals).toBeGreaterThanOrEqual(Math.floor(before.fieldGoals * 0.5));
   }, 240_000);
 
   it('the captain’s Footy IQ and Hothead move the penalty call', () => {
