@@ -191,7 +191,8 @@ All in `src/match/league/fatigue.ts`; the tank lives on each player in `live.ts`
 | `fatigue.wrestleCost` | carrier 0.008 per man per s · tackler 0.006 per s | The wrestle's price. |
 | `fatigue.recoverWalk` / `fatigue.walkSpeed` | 0.0002 per s under 1.5 m/s | Getting a breather in play. 0.001 cancelled most of the drain. |
 | `fatigue.recoverStop` | 0.002 per s | After a try / before a restart. |
-| `drainRate` | 1.5 − Stamina/100, clamp 0.6…1.4 | Stamina 50 ×1, 80 ×0.7, 20 ×1.3. |
+| `fatigue.drain.offset` / `.perStamina` / `.min` / `.max` | 1.5 − Stamina × 0.01, clamp 0.6…1.4 | The drain rate `drainRate`: Stamina 50 ×1, 80 ×0.7, 20 ×1.3. `perStamina` is how much Stamina matters (§25). |
+| `fatigue.contest.*` | carrierBust / carrierFend / carrierOffload / tacklerBigHit 0.1 · tacklerBust 0.06 | Fatigue weights in the contest recipe (`contest.ts`): a tired carrier −0.1 × tiredness on bust, fend and offload, a tired tackler −0.1 on the big hit and +0.06 to the carrier's bust. |
 | `fatigue.workhorseSave` | 0.1 × level mult | Workhorse I ×0.9, II ×0.84, III ×0.78. |
 | `fatigue.tiredAt` / `fatigue.spentAt` | 40% / 20% | Tiers; `tiredness` feeds the contest 0 / 0.5 / 1. |
 | `fatigue.tiredSpeed` / `fatigue.spentSpeed` | ×0.9 / ×0.8 | Top speed. |
