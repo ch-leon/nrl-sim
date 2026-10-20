@@ -5,6 +5,7 @@
 // fatigue), the two players' STATS shift it, traits will add their bonus on
 // top (C, §3), and ONE seeded roll decides. Pure and unit-tested so the
 // numbers in the design doc are the numbers in the game.
+import { FATIGUE } from './fatigue';
 
 export type ContestOutcome = 'held' | 'big-hit' | 'broken' | 'fend' | 'offload' | 'strip';
 
@@ -98,11 +99,12 @@ export function contestOdds(edge: number, s: Situation, mods: ContestMods = {}):
   broken += Math.max(-0.04, Math.min(0.04, s.speedDiff * 0.01));
   if (s.lastTackle) bigHit += 0.03;
   // Fatigue (F): a spent carrier can't bust or fend; a spent tackler can't hit.
-  broken -= 0.1 * s.carrierFatigue;
-  fend -= 0.1 * s.carrierFatigue;
-  offload -= 0.1 * s.carrierFatigue * (offload > 0 ? 1 : 0);
-  bigHit -= 0.1 * s.tacklerFatigue;
-  broken += 0.06 * s.tacklerFatigue;
+  const fw = FATIGUE.contest;
+  broken -= fw.carrierBust * s.carrierFatigue;
+  fend -= fw.carrierFend * s.carrierFatigue;
+  offload -= fw.carrierOffload * s.carrierFatigue * (offload > 0 ? 1 : 0);
+  bigHit -= fw.tacklerBigHit * s.tacklerFatigue;
+  broken += fw.tacklerBust * s.tacklerFatigue;
   // Traits (§3): only where the situation allows the outcome at all.
   broken += mods.broken ?? 0;
   fend += mods.fend ?? 0;

@@ -386,6 +386,11 @@ cruise and keeps his gas for the line.
 - **The cost:** about two fewer tries a match than before F2 in every matchup (even sides
   7.2 → 5.0, still inside §7; Rush and Expansive matchups 4.5–4.7, just under it). Cruise
   pace is the lever (`gas.cruise`); left at 94% pending the Phase 3 balance pass.
+- **N9.3 follow-ups:** attacking kicks (bomb, grubber, chip, cross-field) are chased at a
+  sprint with the nearest winger joining, territory kicks at cruise; the defensive line
+  moves up at its preset speed × cruise / 94%, so cruise can come down without the line
+  outrunning the attack (0.88 now costs 0.3–1.1 tries a match, was 1.1+). Nothing beyond luck
+  in the match counts (tuning reference §25).
 - Fliers v stayers: the fliers break more (63 a match against 50 between even sides) but
   win 7% of matches, on 23% legs at full time to the stayers' 62%. Stamina stays decisive
   until half-time and interchanges give legs back.
@@ -425,6 +430,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | E | Kick types, catches, scrambles | §4.3–4.4 |
 | F | Fatigue and the wrestle — *shipped* | §8 |
 | F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with 2b) | §8.2 |
+| F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 
@@ -449,15 +455,8 @@ Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
   and the stats strip could count calls that paid off. Needs the Phase 2 match screen.
 - **Refinement pass** on everything shipped in A–D once Phase 2 gives full matches to
   measure against §7 (Leon: "we may need to refine it still, come back to it later").
-- **Sprint follow-ups** (raised with F2, 2026-10-18; waiting on lab notes):
-  - Territory kicks chased at cruise; only attacking kicks (bomb, grubber, chip,
-    cross-field) sent at a sprint, the winger running onto it.
-  - Defensive line speed scaled by `gas.cruise`, so cruise can come down (more
-    sprint/cruise contrast) without costing tries (§8.2 "The cost").
-  - A per-player legs indicator in the lab (today only the side's average, in the label).
-- **Stamina knobs not yet overridable by name** in the balance harness: the drain-rate
-  slope in `fatigue.ts` `drainRate` (1.5 − Stamina/100, clamped 0.6–1.4) and the
-  fatigue weights inside the contest recipe (§1). Worth adding before a stamina sweep.
+- ~~**Sprint follow-ups**~~ and ~~**stamina knobs by name**~~: shipped in N9.3 (§8.2; the
+  tuning reference §10 and §25, with a kick-chase run and a stamina sweep).
 - **§7 outliers for the Phase 3 pass**, measured with the standard plan: line breaks
   ~50 a match (target 8–14), offloads ~2 (8–14), tackles ~175 (90–120), and 70 v 50
   winning every match (target ~70%). Structural, not one knob; good harness work.

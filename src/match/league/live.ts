@@ -76,6 +76,14 @@ export const LIVE = {
   // pushed apart this many times a tick (1 costs a sixth of the points).
   decideEveryTicks: 1,
   separatePasses: 2,
+  // Kick chase (N9.3, BAK-208 §11): the kicking side sprints after an attacking kick (bomb,
+  // grubber, chip, cross-field) and cruises after a territory kick (1 = sprint after those too);
+  // the winger nearest an attacking kick's landing joins the chase (0 = no).
+  territoryChaseSprint: 0,
+  wingerChase: 1,
+  // The defensive line moves up at its preset's speed × gas.cruise / this (N9.3), so lowering
+  // cruise for more sprint contrast slows the line with the runners instead of costing tries.
+  lineCruiseRef: 0.94,
   // Timing (ticks)
   contactTicks: 9,
   downTicks: 10,
@@ -371,6 +379,8 @@ export class LiveSim implements MatchSim {
   private pendingKick: PendingKick | null = null;
   /** Who kicked the ball now in the air (he leads the chase). */
   private lastKicker = -1;
+  /** What the last kick was (a territory kick is chased at cruise, N9.3); only read while a kick is in the air. */
+  private kickInAir: KickChoice | null = null;
   /** The kick in the air is a kick-off (chased as a line, not for a regather). */
   private kickoffUp = false;
   /** The kicker's call for this last tackle (rolled once): run it, or which kick. */
@@ -1037,6 +1047,7 @@ export class LiveSim implements MatchSim {
     }
     this.ball = k.kind === 'grubber' ? grubberFlight(kicker.body.pos, to, this.tick) : kickFlight(kicker.body.pos, to, this.tick, k.receiver, k.peak);
     this.lastKicker = k.kicker;
+    this.kickInAir = k.kind;
     this.lastTouch = kicker.side;
     this.kickFrom = k.kickoff ? null : { side: kicker.side, x: kicker.body.pos.x, toLine: this.toLineFor(kicker.side, kicker.body.pos), ...(k.aim ? { aim: k.aim } : {}) };
     this.kickoffUp = k.kickoff;
@@ -2519,12 +2530,23 @@ export class LiveSim implements MatchSim {
     // side gets a second man under it beside the nominated catcher.
     const kickUp = flight && flight.via === 'kick' && !looseAt && !this.kickoffUp ? flight : null;
     const kickChasers = new Set<Player>();
+    // An attacking kick (bomb, grubber, chip, cross-field) is chased flat out; a territory kick at cruise (N9.3).
+    const attackingKick = this.kickInAir !== null && this.kickInAir !== 'long';
+    const chaseSprint = attackingKick || LIVE.territoryChaseSprint > 0;
+    let kickingSide: Side | null = null;
     if (kickUp) {
       const kicker = this.players[this.lastKicker];
-      const kickingSide = kicker ? kicker.side : def;
+      kickingSide = kicker ? kicker.side : def;
       const chase = this.side(kickingSide).filter((p) => !this.locked(p)).sort((a, b) => dist(a.body.pos, kickUp.to) - dist(b.body.pos, kickUp.to));
       for (const p of chase.slice(0, 2)) kickChasers.add(p);
       if (kicker && !this.locked(kicker)) kickChasers.add(kicker);
+      // The winger on that side runs onto an attacking kick.
+      if (attackingKick && LIVE.wingerChase > 0) {
+        const wing = [this.at(kickingSide, 1), this.at(kickingSide, 2)]
+          .filter((p) => this.onField(p) && !this.locked(p))
+          .sort((a, b) => dist(a.body.pos, kickUp.to) - dist(b.body.pos, kickUp.to))[0];
+        if (wing) kickChasers.add(wing);
+      }
       const cover = this.side(other(kickingSide)).filter((p) => p !== receiver && !this.locked(p)).sort((a, b) => dist(a.body.pos, kickUp.to) - dist(b.body.pos, kickUp.to))[0];
       if (cover) kickChasers.add(cover);
     }
@@ -2551,7 +2573,7 @@ export class LiveSim implements MatchSim {
       } else if (kickUp && kickChasers.has(p)) {
         p.target = { ...kickUp.to };
         p.through = dist(p.body.pos, kickUp.to) > LIVE.chaseThroughM;
-        p.wantsSprint = true;
+        p.wantsSprint = p.side !== kickingSide || chaseSprint;
       } else if (p === carrier) {
         if (ph.kind === 'play' && this.overLineAt >= 0) {
           // Over the line and clear: round under the posts for the bonus zone.
@@ -2600,7 +2622,7 @@ export class LiveSim implements MatchSim {
     const dplan = this.defPlan();
     if (ph.kind === 'play' && carrier) {
       const want = carrier.body.pos.x + this.dir * 2.5;
-      const stepM = dplan.lineSpeed * TICK_S;
+      const stepM = dplan.lineSpeed * (GAS.cruise / LIVE.lineCruiseRef) * TICK_S;
       // Rush up toward the carrier, never past him.
       if (this.dir > 0) this.lineX = Math.max(want, this.lineX - stepM);
       else this.lineX = Math.min(want, this.lineX + stepM);
@@ -2629,7 +2651,7 @@ export class LiveSim implements MatchSim {
       } else if (kickUp && kickChasers.has(p)) {
         p.target = { ...kickUp.to };
         p.through = dist(p.body.pos, kickUp.to) > LIVE.chaseThroughM;
-        p.wantsSprint = true;
+        p.wantsSprint = p.side !== kickingSide || chaseSprint;
       } else if (p === receiver) {
         p.target = { ...flight!.to };
         p.wantsSprint = true;
@@ -2747,6 +2769,7 @@ export class LiveSim implements MatchSim {
       ...(p.sprinting && !p.gas.blown ? { sprint: true } : {}),
       ...(p.gas.blown ? { blown: true } : {}),
       gas: p.gas.gas,
+      legs: p.energy,
       who: p.key,
       ...(p.binUntilS >= 0 ? { binned: true } : {}),
     }));

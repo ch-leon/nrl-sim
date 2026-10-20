@@ -28,6 +28,10 @@ export const FATIGUE = {
   /** Top speed: −10% tired, −20% spent. */
   tiredSpeed: 0.9,
   spentSpeed: 0.8,
+  /** His drain rate (N9.3, by name in the harness): offset − Stamina × perStamina, clamped to min..max (Stamina 50 is ×1). */
+  drain: { offset: 1.5, perStamina: 0.01, min: 0.6, max: 1.4 },
+  /** The contest's fatigue weights (§4.1): a spent carrier loses this much bust / fend / offload, a spent tackler this much big hit and concedes `tacklerBust` more busts (half as much when tired). */
+  contest: { carrierBust: 0.1, carrierFend: 0.1, carrierOffload: 0.1, tacklerBigHit: 0.1, tacklerBust: 0.06 },
 };
 
 /**
@@ -35,7 +39,8 @@ export const FATIGUE = {
  * 80 ×0.7, 20 ×1.3 (clamped 0.6…1.4), less again for a Workhorse.
  */
 export function drainRate(stamina: number, traits: readonly TraitInstance[] = []): number {
-  const base = Math.max(0.6, Math.min(1.4, 1.5 - stamina / 100));
+  const d = FATIGUE.drain;
+  const base = Math.max(d.min, Math.min(d.max, d.offset - stamina * d.perStamina));
   return base * (1 - FATIGUE.workhorseSave * traitBoost(traits, 'workhorse'));
 }
 

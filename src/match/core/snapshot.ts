@@ -22,6 +22,8 @@ export interface PlayerSnap {
   sprint?: boolean;
   blown?: boolean;
   gas?: number;
+  /** Legs left 0..1 (BAK-208 §8): the whole-match fatigue the gas bar sits on top of. */
+  legs?: number;
   /** In the sin bin (#71): standing on the touchline, out of the play. */
   binned?: boolean;
 }
