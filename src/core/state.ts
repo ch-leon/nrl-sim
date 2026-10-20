@@ -87,7 +87,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 
 /**
  * The coach's team selection (GitHub #69, systems/lineup.ts): nine starters by
@@ -96,6 +96,9 @@ export const SAVE_VERSION = 15;
  * (BAK-207 2b). Matchday resolves it against the squad on the day: an injured
  * starter is covered for the match, a man who has left the club is replaced.
  */
+/** A squad training focus (N11): one stat trained harder, the rest a little less, or Balanced. */
+export type TrainingFocus = keyof PlayerStats | 'balanced';
+
 export interface Lineup {
   starters: (string | null)[];
   bench: string[];
@@ -245,6 +248,8 @@ export interface GameState {
   finance: SeasonFinance[];
   /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
   lineup: Lineup;
+  /** What the squad trains hardest (N11): one stat, or Balanced (every stat as it always trained). */
+  training: { focus: TrainingFocus };
   /** Player-of-the-match awards this season (#190), kept by the full-time card; absent until the first. */
   potmTally?: PotmTally;
   rngSeed: number; // advanced state of the seeded RNG
@@ -344,6 +349,7 @@ export function createNewGame(
     finance: [emptyFinance(1)],
     // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
     lineup: autoPick(squad),
+    training: { focus: 'balanced' },
     rngSeed: rng.state(),
   };
 

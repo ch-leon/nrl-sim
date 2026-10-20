@@ -14,7 +14,7 @@ import { bus } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { initLeague, registerFixturesSystem } from '../systems/fixtures';
-import { registerTrainingSystem } from '../systems/training';
+import { registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { registerPlayerMatchSystem } from '../systems/matchday';
@@ -338,6 +338,8 @@ function manage(): Signed {
   for (const ev of s.eventDeck.pending) {
     if (cardById(ev.cardId)) chooseEvent(ev.id, 0);
   }
+  // Training focus (N11): the squad's weakest stat.
+  setTrainingFocus(weakestStat(getState().squad));
   for (const defId of MANAGED.BUILDS) {
     const st = getState();
     if (st.facilities.some((f) => f.defId === defId)) continue;

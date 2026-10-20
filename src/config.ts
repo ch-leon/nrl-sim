@@ -53,6 +53,13 @@ export const TRAINING_CURVE = {
   HEADROOM_EXP: 2,
 } as const;
 
+// A squad training focus (N11): the focused stat's facility gains ×ON, the other four
+// ×OFF (1.3 + 4 × 0.85 = 4.7 of Balanced's 5: close to even in total). Balanced is ×1 each.
+export const TRAINING_FOCUS = {
+  ON: 1.3,
+  OFF: 0.85,
+} as const;
+
 // Economy tuning (BAK-188, WU-10). Weekly income/expense loop constants read by
 // src/systems/economy.ts. See the ticket spec for formula derivations.
 export const ECON = {
