@@ -806,7 +806,8 @@ export class LiveSim implements MatchSim {
   planRefusal(): string | null {
     const ph = this.phase;
     if (this.finished) return 'full time';
-    const atBreak = ph.kind === 'half-time' || ph.kind === 'try' || ph.kind === 'conversion' || (ph.kind === 'restart' && ph.from === undefined);
+    // A restart is a break until the kicker is on his way (his run-up is the kick).
+    const atBreak = ph.kind === 'half-time' || ph.kind === 'try' || ph.kind === 'conversion' || (ph.kind === 'restart' && ph.from === undefined && !this.pendingKick);
     return atBreak ? null : 'at the breaks';
   }
 
