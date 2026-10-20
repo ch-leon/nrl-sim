@@ -7,9 +7,11 @@
 //   Club); ×4 advances (the tick pipeline, per week); "to finals" and "to season
 //   end" (the rollover); the frame rate on the grounds; and the bundle size.
 // Clicks are dispatched from inside the page and timed with performance.now(), so
-// a synchronous handler (the week tick, the multi-week advance) is measured on its
-// own, without the test driver's overhead; the async moments (scene hand-offs,
-// the first paint) are timed from the click to the condition. Writes
+// a synchronous handler (the week tick) is measured on its own, without the test
+// driver's overhead; the async moments (scene hand-offs, the first paint, and since
+// N10.2 the multi-week advance, which yields between weeks) are timed from the
+// click to the condition. One "to finals" run also times a tap on the Ladder made
+// while it is under way, from the touch's timestamp to its click handler. Writes
 // e2e-output/perf/perf.json and prints a markdown table (the budget rows in
 // docs/status/2026-10-qa.md come from it).
 //
@@ -177,16 +179,41 @@ async function answerCards() {
 }
 
 /**
- * One multi-week advance (menu index 0 = ×4, 1 = to finals, 2 = to season end):
- * the menu item's handler runs every week synchronously, so its click time is the
- * cost of those ticks. Returns { ms, weeks }.
+ * One multi-week advance (menu index 0 = ×4, 1 = to finals, 2 = to season end).
+ * Since N10.2 the run yields a frame between weeks, so this times the click to the
+ * end of the run (the HUD drops data-advancing); the moment's block column is the
+ * longest week. With `probe`, a tap on the Ladder while the run is under way is
+ * timed to its screen (the page answering mid-run) and the progress line read.
+ * Returns { ms, weeks, tapMs?, label? }.
  */
-async function advance(index) {
+async function advance(index, { probe = false } = {}) {
   const before = await state();
   await clickTimed('.nrl-hud-menu-toggle');
-  const ms = await clickTimed('.nrl-hud-menu-item', { nth: index });
+  const t0 = Date.now();
+  await clickTimed('.nrl-hud-menu-item', { nth: index });
+  let tapMs, label, probeMs = 0;
+  if (probe && await page.locator('.nrl-hud[data-advancing]').count()) {
+    const p0 = Date.now();
+    label = (await page.locator('.nrl-hud-actions .nrl-btn').first().textContent())?.trim();
+    // Timed inside the page, from the touch's own timestamp to its click handler:
+    // the driver's tap() waits for two steady frames, and a frame now holds a week.
+    const box = await page.locator('.nrl-nav .nrl-btn[data-screen="ladder"]').boundingBox();
+    await page.evaluate(() => {
+      window.__nrlTapDelay = undefined;
+      document.addEventListener('click', (e) => { window.__nrlTapDelay = Math.round(performance.now() - e.timeStamp); }, { capture: true, once: true });
+    });
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForFunction(() => window.__nrlTapDelay !== undefined, null, { polling: 50, timeout: 60000 });
+    tapMs = await page.evaluate(() => window.__nrlTapDelay);
+    await page.waitForSelector('.nrl-screen-region');
+    await page.screenshot({ path: join(OUT, 'advancing.png') });
+    probeMs = Date.now() - p0; // the probe's own driver time is not the run's
+  }
+  await page.waitForFunction(() => !document.querySelector('.nrl-hud[data-advancing]'), null, { timeout: 240000 });
+  const ms = Date.now() - t0 - probeMs;
+  if (probe) await page.evaluate(() => { for (const b of document.querySelectorAll('.nrl-screen-region .nrl-btn')) if (/^(close|✕)$/i.test(b.textContent?.trim() ?? '')) { b.click(); break; } });
   const after = await state();
-  return { ms, weeks: (after.season - before.season) * 27 + (after.week - before.week) };
+  return { ms, weeks: (after.season - before.season) * 27 + (after.week - before.week), ...(tapMs !== undefined ? { tapMs, label } : {}) };
 }
 
 async function run() {
@@ -269,10 +296,16 @@ async function run() {
 
   // To the finals, then to the season end: the last call carries the rollover.
   let guard = 0;
+  let probed = false;
   while ((await state()).week < 25 && guard++ < 30) {
     await answerCards();
     await timed(`to finals (call ${guard})`, async () => {
-      const a = await advance(1);
+      // The first call that runs more than a week also checks the page answers a tap mid-run.
+      const a = await advance(1, { probe: !probed });
+      if (a.tapMs !== undefined) {
+        probed = true;
+        result.timings['tap mid-advance (touch to its handler)'] = { ms: a.tapMs, notes: `progress line read "${a.label}"` };
+      }
       return { ms: a.ms, notes: `${a.weeks} weeks, now week ${(await state()).week}` };
     });
     await toastsGone();
@@ -329,6 +362,7 @@ const metrics = {
   weekMs: pick('tick per week (×4 advances)'),
   advanceCallMaxMs: maxOf(advanceRows.map(([, v]) => v.ms)),
   advanceBlockMs: maxOf(advanceRows.map(([, v]) => v.blockMs)),
+  midAdvanceTapMs: pick('tap mid-advance (touch to its handler)'),
   longestBlockMs: maxOf(Object.values(t).map((v) => v.blockMs)),
   bundleGzKb: result.bundle?.gzKb ?? null,
 };

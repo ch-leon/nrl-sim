@@ -99,7 +99,7 @@ export const NINES_PAGE: GuidePage = {
       heading: 'Watching',
       bullets: [
         'Live match (beta) on the Fixtures tab plays your matches on this sim as you watch, with ×1 to ×8 speed and Skip; off, the classic engine plays and replays them. Rival-v-rival rounds are simmed from the clubs’ strength either way.',
-        'Full time brings the Player of the Match, the result into the ladder, and the match’s tallies onto your players’ pages.',
+        'Full time brings the match report (who scored and when, the goals, the numbers side by side and the Player of the Match), the result into the ladder, and the match’s tallies onto your players’ pages.',
       ],
     },
   ],
