@@ -177,6 +177,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     if (on) setMenuOpen(false);
     advanceBtn.textContent = on ? advanceProgressLabel(s.week) : 'Advance Week';
     advanceBtn.disabled = on || !opts.onAdvanceWeek;
+    advanceBtn.classList.toggle('nrl-hud-progress', on);
     menuToggle.hidden = on;
     if (on && stopBtn.hidden) stopBtn.disabled = false;
     stopBtn.hidden = !on;

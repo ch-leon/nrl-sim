@@ -364,6 +364,8 @@ export const CSS = `
 /* N10.2: Stop beside the progress line while a multi-week advance runs. */
 .nrl-hud-stop { min-width: 44px; padding: 0.4rem 0.6rem; background: #e8a33a; }
 .nrl-hud-stop[hidden], .nrl-hud-menu-toggle[hidden] { display: none; }
+/* The progress line reads like a HUD tile, not a faded button. */
+.nrl-hud .nrl-btn.nrl-hud-progress:disabled { opacity: 1; background: #e8e0c8; color: #1a1a2e; cursor: default; }
 .nrl-hud-menu {
   position: absolute;
   top: calc(100% + 0.25rem);
