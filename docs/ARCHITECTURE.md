@@ -327,7 +327,8 @@ The player's match (BAK-207; coach calls #73) **holds the week** at
 step 4: the matchday hook calls `ctx.hold()`, the hooks after it and the week's end
 wait, and at `match:finished` matchday applies the live sim's own result and calls
 `resumeWeek()`, so the ladder, finals seeding, morale and a season's end see the
-match the player watched. Fast-forward never holds. The game saves only at a week's
+match the player watched. Fast-forward holds only inside the multi-week advance in a
+browser (N10.3, below); everywhere else it plays in place. The game saves only at a week's
 end, so an app killed mid-match reloads the week before; a small record next to the
 save slot (`systems/liveMatchRecord.ts`: seed, calls, tick) makes the re-advanced
 week resume the same match where it was.
@@ -336,7 +337,7 @@ Holds count (N9.2): every hook of the holding order still runs, then the later h
 and the week's end wait for one `resumeWeek()` per hold. With *Rival matches on the
 match engine* on (`settings.liveRivals`), the rival round (order 40, beside the
 player's match) plays its seven fixtures with `runMatch` in a Web Worker
-(`systems/rivalRound.ts`, `systems/rivalWorker.ts`) and holds the week until they are
+(`systems/rivalRound.ts`, `systems/matchWorker.ts`) and holds the week until they are
 in; off, or on fast-forward, it uses the cheap sim, which scores on the live sim's
 scale (tuning reference §24).
 
@@ -344,7 +345,13 @@ The multi-week advance (`core/advance.ts`, the HUD's ×4 / to finals / to season
 N10.2) runs one synchronous `advanceWeek()` per week under fast-forward and awaits a
 frame between weeks, so the page paints and takes taps: the HUD shows "Week n of 27…"
 and a **Stop** that ends the run after the week in hand. No hook sees a half-run week;
-the stop rules (`core/advanceRules.ts`) are asked after each week as before. Debt
+the stop rules (`core/advanceRules.ts`) are asked after each week as before. In a browser
+the advance lets a fast-forwarded week hold (`withFastForward(fn, { holds: true })`,
+N10.3): matchday plays the player's match headless in the same Worker
+(`systems/matchJobs.ts`: a job is `{ home, away, opts }`, the answer `runMatch`'s result),
+applies it on `resumeWeek()`, and the advance waits for the week's end before the rules.
+Node, the tests, the soak and `advanceWeeks` have no holds and play in place, with the same
+result; a Worker that fails or stays silent is replaced by playing the match here. Debt
 stops a run once, not every week in the red (N12.5): on the crossing into the red
 (money ≥ 0 before the week, < 0 after), on a forced sale (the economy's
 `bankruptcy:warning` names them) and when the balance first passes the fire-sale floor.
