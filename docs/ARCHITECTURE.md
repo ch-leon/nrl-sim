@@ -313,7 +313,7 @@ export interface Events {
   'match:started': { fixture: Fixture; sim?: MatchResult; live?: LiveMatchData }; // live: no result until full time
   'match:event': MatchEvent;          // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
-  'bankruptcy:warning': { balance: number };
+  'bankruptcy:warning': { balance: number; forcedSales?: string[] }; // after the week's forced sales, naming them (N12.5)
   'ui:notify': { text: string; kind: 'info' | 'success' | 'danger' };
 }
 ```
@@ -352,6 +352,11 @@ N10.3): matchday plays the player's match headless in the same Worker
 applies it on `resumeWeek()`, and the advance waits for the week's end before the rules.
 Node, the tests, the soak and `advanceWeeks` have no holds and play in place, with the same
 result; a Worker that fails or stays silent is replaced by playing the match here.
+Skip in a live match (N10.4) posts the match's record to its own `'skip'` lane, a second
+worker, so it never queues behind a rival round still being played in the background lane.
+Debt stops a run once, not every week in the red (N12.5): on the crossing into the red
+(money ≥ 0 before the week, < 0 after), on a forced sale (the economy's
+`bankruptcy:warning` names them) and when the balance first passes the fire-sale floor.
 
 Finals (weeks 25–27, GitHub #2): after the ladder step of week 24/25/26 the
 fixtures system appends the next knockout round — QF 1v8/2v7/3v6/4v5 from the

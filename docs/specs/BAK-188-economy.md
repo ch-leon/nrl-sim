@@ -87,6 +87,11 @@ Behaviour:
     squad-wide `morale −= FORCED_SALE_MORALE_HIT` (clamped ≥1), and recompute until
     `money >= FORCED_SALE_FLOOR` or squad reaches `SQUAD_MIN` (stop selling below the
     minimum to keep a fieldable team). Forced-sold players go to `freeAgents`.
+  - N12.5: the warning comes after the sales and names them
+    (`bankruptcy:warning {balance, forcedSales}`); the toasts keep their order. A
+    multi-week advance stops on the crossing into the red, on a forced sale and when
+    the balance first passes the floor, not on every week's warning
+    (`core/advanceRules.ts`, `debtStop`).
 - Order within `applyEconomy` is fixed: wages → income → gate → contracts →
   bankruptcy, so a home gate can rescue the club before forced sales trigger.
 

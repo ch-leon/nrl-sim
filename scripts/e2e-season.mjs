@@ -245,12 +245,14 @@ async function play() {
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: PHONE, isMobile: PHONE });
   // The held-week step (#216) needs the rival round's Worker as slow as a phone's (CPU
   // throttling never reaches a Worker): a Worker posts its jobs window.__nrlWorkerDelayMs late.
+  // Only the background lane's: the Skip has its own worker (N10.4) and must not wait.
   await ctx.addInitScript(() => {
     const Base = window.Worker;
     if (!Base) return;
     window.Worker = class extends Base {
+      constructor(url, opts) { super(url, opts); this.slowed = opts?.name !== 'match-skip'; }
       postMessage(...args) {
-        const ms = window.__nrlWorkerDelayMs ?? 0;
+        const ms = this.slowed ? window.__nrlWorkerDelayMs ?? 0 : 0;
         if (ms > 0) setTimeout(() => super.postMessage(...args), ms);
         else super.postMessage(...args);
       }
@@ -454,7 +456,7 @@ async function play() {
   // one on offer and see it lit for the set; skipped when there are no chips.
   await step('coach-call', async (rec) => {
     if (!liveOn) return 'skipped';
-    if (!(await page.locator('.nrl-mo-calls').count())) return 'no coach-call chips on the match screen';
+    if (!(await page.locator('.nrl-mo-calls .nrl-btn[data-call]').count())) return 'no coach-call chips on the match screen';
     // At ×8 the chips switch with possession every second or so and are never still
     // long enough for a locator click: call at ×1, tapping the first chip on offer
     // inside the page, then go back to ×8.
@@ -465,7 +467,8 @@ async function play() {
     const refused = [];
     for (let i = 0; i < 40 && !call; i++) {
       const got = await page.evaluate(() => {
-        const b = [...document.querySelectorAll('.nrl-mo-calls .nrl-btn')].find((e) => !e.hidden && !e.disabled);
+        // Call chips only: the Plan chip (N11.2) shares the row and opens the plan card.
+        const b = [...document.querySelectorAll('.nrl-mo-calls .nrl-btn[data-call]')].find((e) => !e.hidden && !e.disabled);
         if (!b) return null;
         b.click();
         return { call: b.getAttribute('data-call'), lit: b.hasAttribute('data-made'), why: b.title };

@@ -36,6 +36,8 @@ import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
 import { CALL_LABEL, COACH_CALLS, chipState, type CoachCall } from '../match/league/calls';
+import { runMatch } from '../match/league/match';
+import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
 /** Chip words: short enough for six 44 px chips on a phone on its side. Left and right are the attacker's as he faces the line (arrows would flip on screen with the ends). */
 const CHIP_LABEL: Readonly<Record<CoachCall, string>> = {
@@ -228,6 +230,9 @@ export class MatchBall implements PlaybackBall {
  * MatchScene renders the stadium and exposes the PlaybackScene surface
  * (fieldToWorld, players, ball, cameras, homeId) to LivePlayback.
  */
+/** How long the Worker gets for a skipped match before it is played here (ms): about 1–2 s on a phone. */
+const SKIP_WORKER_TIMEOUT_MS = 30_000;
+
 export class MatchScene extends Phaser.Scene {
   // ── Public surface consumed by playback (structural PlaybackScene) ─────────
   public readonly players: { home: MatchActor[]; away: MatchActor[] } = { home: [], away: [] };
@@ -385,6 +390,10 @@ export class MatchScene extends Phaser.Scene {
         ...(live.onProgress ? { onProgress: live.onProgress } : {}),
         fixture: this.fixture,
         overlay: this.overlay,
+        // N10.4: Skip plays the rest in the Worker, from the match's record, so the page doesn't freeze.
+        ...(canUseWorker()
+          ? { skipElsewhere: (job) => playMatchesInWorker([job], SKIP_WORKER_TIMEOUT_MS, 'skip').then(([r]) => r ?? runMatch(job.home, job.away, job.opts)) }
+          : {}),
         closeUpDone: () => {
           this.beatZoom = ZOOM_DEFAULT;
           this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);

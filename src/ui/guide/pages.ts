@@ -34,7 +34,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Advancing further',
         bullets: [
           'The ▾ beside Advance Week runs ×4 weeks, to the finals or to the season’s end.',
-          'A long advance stops early when something needs you: fewer than 13 fit (the match would be forfeited), an injury, a contract about to run out, money in the red, or a decision card in News.',
+          'A long advance stops early when something needs you: fewer than 13 fit (the match would be forfeited), an injury, a contract about to run out, a decision card in News, or money: the week the club goes into the red, a forced sale, and the week the balance passes the −$100,000 floor (not every week in the red).',
         ],
       },
       {
@@ -70,7 +70,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         heading: 'The Finance screen',
-        text: 'This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, the board’s objectives and patience, and the ledger. Below $0 the board warns; below −$100,000 it sells players for you and the squad’s morale drops by 10.',
+        text: 'This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, the board’s objectives and patience, and the ledger. Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below −$100,000 it sells players for you and the squad’s morale drops by 10.',
       },
     ],
   },

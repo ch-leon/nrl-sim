@@ -46,7 +46,9 @@ export interface Events {
   'match:event': MatchEvent; // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
   'board:sacked': { season: number; reason: string };
-  'bankruptcy:warning': { balance: number };
+  // forcedSales (N12.5): who the week's forced sales let go, so a multi-week advance
+  // can stop on a sale; the economy emits the warning after the sales.
+  'bankruptcy:warning': { balance: number; forcedSales?: string[] };
   'ui:notify': { text: string; kind: 'info' | 'success' | 'danger' };
 }
 
