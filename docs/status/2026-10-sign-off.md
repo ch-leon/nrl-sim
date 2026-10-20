@@ -44,4 +44,5 @@ and F2 shipped, and the sprint follow-ups (N9.3) are in.
 - The harness counts `bombs`, `bombsWon` (regathered by the kicking side), `bombsSpilled`,
   `grubbers`, `grubberTries` and `kickTries` (a try by the kicking side within 12 s of its kick),
   added for this close-out (`src/match/balance/measure.ts`).
-- Plan `balance/plans/experiments/20261020-kicks-closeout.json`; run on the `balance-log` branch.
+- The plan as run is on the `balance-log` branch with its report: `runs/20261020-023321-kicks-close-out/plan.json`
+  (experiment plans aren't committed to `main`).
