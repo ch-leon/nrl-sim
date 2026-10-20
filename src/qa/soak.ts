@@ -9,11 +9,11 @@
 // soak) and, at a smaller size, by tests/qa/soak.test.ts. Never imported by the
 // game. No Phaser.
 import { createNewGame, FINANCE_LINES, getState, loadState, setState, type FinanceLine, type Fixture, type GameState, type Player } from '../core/state';
-import { advanceWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../core/time';
-import { bus } from '../core/events';
+import { advanceWeek, clearSeasonHooks, clearTickHooks, weekHeld, withFastForward } from '../core/time';
+import { bus, type Events } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
-import { initLeague, registerFixturesSystem } from '../systems/fixtures';
+import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
 import { registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
@@ -27,6 +27,7 @@ import { chooseEvent, registerEventsSystem } from '../systems/events';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { BENCH } from '../match/league/bench';
+import { runMatch } from '../match/league/match';
 import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDefId } from '../data/facility';
@@ -47,6 +48,15 @@ export interface SoakOptions {
    */
   fromSave?: unknown;
   difficulty?: Difficulty;
+  /**
+   * Rival-v-rival matches on the live sim (N9.2's setting, #212; N12.1). The game
+   * plays them only in a week that is not fast-forwarded (×4 and "to finals" keep
+   * the cheap sim), so these runs advance one week at a time, as a player tapping
+   * Advance Week would, and the soak answers the player's own match (which then
+   * holds the week for the Match scene) with the headless runMatch fast-forward
+   * uses. No Worker in Node: the round plays in place, about 2 s a week.
+   */
+  liveRivals?: boolean;
 }
 
 /**
@@ -103,8 +113,24 @@ export interface SeasonSample extends GapSample {
   /** 1-based regular-season ladder finish (0 = unknown). */
   ladderPosition: number;
   premiership: boolean;
-  // bestNine / rivalMean / rivalRange (GapSample) are taken at the end of the
-  // regular season: the squad that produced the record, before the rollover.
+  /**
+   * In the finals: the club is among finalsSeeds (systems/fixtures.ts, the top
+   * eight of the ladder) at the end of the regular season (N12.1).
+   */
+  madeFinals: boolean;
+  /**
+   * The player's win rate against his nearest-rated rivals (N12.1): wins ÷ games
+   * in the regular season against the NEAR_RIVALS rivals whose strength is nearest
+   * the player's best-nine mean at the end of the regular season (both are the
+   * mean overall of a best nine; ties go to the lower club id). A draw is a game
+   * not won; finals are left out. 0 when no such game was played (nearRivalGames 0).
+   */
+  nearRivalWinRate: number;
+  /** The games behind nearRivalWinRate (each rival is met once or twice in 24 rounds). */
+  nearRivalGames: number;
+  // bestNine / rivalMean / rivalRange (GapSample), madeFinals and the near-rival
+  // record are taken at the end of the regular season: the squad that produced
+  // the record, before the rollover.
   /** Free agents the managed manager signed this season (0 when idle). */
   signings: number;
   /** Total fees paid for those signings. */
@@ -120,6 +146,8 @@ export interface SoakResult {
   mode: SoakMode;
   difficulty?: Difficulty;
   fromVersion?: number;
+  /** Rival rounds were played on the live sim (--live-rivals, N12.1). */
+  liveRivals?: boolean;
   /** The rating gap at week 1 of season 1 (how far ahead a new game starts). */
   start: GapSample;
   seasons: SeasonSample[];
@@ -174,6 +202,40 @@ export function gapSample(s: GameState): GapSample {
     rivalMean,
     rivalRange: strengths.length ? [Math.min(...strengths), Math.max(...strengths)] : [0, 0],
   };
+}
+
+/** How many nearest-rated rivals nearRivalWinRate is read against (N12.1). */
+export const NEAR_RIVALS = 3;
+
+/**
+ * The `n` rivals whose strength is nearest the player's best-nine mean (N12.1),
+ * nearest first; ties go to the lower club id so the pick never depends on the
+ * league's order.
+ */
+export function nearestRivals(s: GameState, n = NEAR_RIVALS): string[] {
+  const nine = bestNineMean(s.squad);
+  return s.league.clubs
+    .filter((c) => c.id !== s.clubId)
+    .map((c) => ({ id: c.id, d: Math.abs(c.strength - nine) }))
+    .sort((a, b) => a.d - b.d || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .slice(0, n)
+    .map((c) => c.id);
+}
+
+/** The player's regular-season wins and games so far against `rivals` (played fixtures only). */
+export function recordAgainst(s: GameState, rivals: readonly string[]): { wins: number; games: number } {
+  const out = { wins: 0, games: 0 };
+  for (const f of s.league.fixtures) {
+    if (!f.result || isFinalsRound(f.round)) continue;
+    const home = f.homeId === s.clubId;
+    const other = home ? f.awayId : f.homeId;
+    if (!(home || f.awayId === s.clubId) || !rivals.includes(other)) continue;
+    out.games++;
+    const ours = home ? f.result.homeScore : f.result.awayScore;
+    const theirs = home ? f.result.awayScore : f.result.homeScore;
+    if (ours > theirs) out.wins++;
+  }
+  return out;
 }
 
 /** Player ids that appear more than once across the squad, the pool and rival squads. */
@@ -381,6 +443,34 @@ function manage(): Signed {
   return out;
 }
 
+/**
+ * One week as a tap on Advance Week plays it (--live-rivals, N12.1): not
+ * fast-forwarded, so with settings.liveRivals the rival round is played on the
+ * live sim (in place in Node, which has no Worker). The week holds at the
+ * player's kick-off for the Match scene; the soak plays that match here,
+ * headless, with the options fast-forward plays it with, and full time
+ * ('match:finished') releases the week. Call outside withFastForward.
+ */
+export function advanceWeekAsTapped(): void {
+  const kickOff: { match: Events['match:started'] | null } = { match: null };
+  const off = bus.on('match:started', (m) => { kickOff.match = m; });
+  try {
+    advanceWeek();
+  } finally {
+    off();
+  }
+  const m = kickOff.match;
+  if (!m) return;
+  const { seed, weather, injuryRate, goldenPoint, aiCoach } = m.live;
+  const result = runMatch(m.home, m.away, {
+    seed, weather,
+    ...(injuryRate !== undefined ? { injuryRate } : {}),
+    ...(aiCoach?.length ? { aiCoach } : {}),
+    ...(goldenPoint ? { goldenPoint } : {}),
+  });
+  bus.emit('match:finished', { fixture: m.fixture, result });
+}
+
 /** Play `seasons` seasons from a new game (or an old save built from it) and check as we go. */
 export function runSoak(opts: SoakOptions): SoakResult {
   const t0 = Date.now();
@@ -399,6 +489,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
       loadState(res.state);
     }
   }
+  if (opts.liveRivals) setState({ settings: { ...getState().settings, liveRivals: true } });
   registerAllSystems();
   const seasons: SeasonSample[] = [];
   let minMoney = getState().money;
@@ -419,6 +510,9 @@ export function runSoak(opts: SoakOptions): SoakResult {
   // The gap at the end of the regular season (after round SEASON_ROUNDS), kept
   // until the rollover sample; the start gap stands in if the season never got there.
   let gap: GapSample = start;
+  // The finals cut and the record against the nearest-rated rivals at the same
+  // moment (N12.1); a season loaded after round 24 falls back to its ladder finish.
+  let regular: { madeFinals: boolean; wins: number; games: number } | null = null;
   let signed: Signed = { count: 0, fees: 0, overall: 0 };
   const note = (msg: string): void => {
     const s = getState();
@@ -426,7 +520,10 @@ export function runSoak(opts: SoakOptions): SoakResult {
   };
   for (const p of checkState(getState())) note(p);
 
-  withFastForward(() => {
+  // Fast-forward plays every match headless; --live-rivals weeks are Advance Week (advanceWeekAsTapped).
+  const play = opts.liveRivals ? (fn: () => void): void => fn() : withFastForward;
+  const playWeek = opts.liveRivals ? advanceWeekAsTapped : advanceWeek;
+  play(() => {
     for (let i = 0; i < opts.seasons * WEEKS_PER_SEASON; i++) {
       if (getState().sacked) break;
       if (opts.mode === 'managed') {
@@ -435,15 +532,23 @@ export function runSoak(opts: SoakOptions): SoakResult {
       }
       const before = getState().season;
       try {
-        advanceWeek();
+        playWeek();
       } catch (err) {
         note(`tick threw: ${(err as Error).message}`);
+        break;
+      }
+      if (weekHeld()) {
+        note('week still held after the match');
         break;
       }
       const s = getState();
       minMoney = Math.min(minMoney, s.money);
       for (const p of checkState(s)) note(p);
-      if (s.season === before && s.week === SEASON_ROUNDS + 1) gap = gapSample(s);
+      if (s.season === before && s.week === SEASON_ROUNDS + 1) {
+        gap = gapSample(s);
+        const near = recordAgainst(s, nearestRivals(s));
+        regular = { madeFinals: finalsSeeds(s).includes(s.clubId), ...near };
+      }
       if (s.season !== before) {
         const text = JSON.stringify(s);
         const back = migrateState(JSON.parse(text));
@@ -476,6 +581,9 @@ export function runSoak(opts: SoakOptions): SoakResult {
           marginPerGame: played ? Math.round((((rec?.pointsFor ?? 0) - (rec?.pointsAgainst ?? 0)) / played) * 10) / 10 : 0,
           ladderPosition: rec?.ladderPosition ?? 0,
           premiership: rec?.premiership ?? false,
+          madeFinals: regular ? regular.madeFinals : (rec?.ladderPosition ?? 0) >= 1 && (rec?.ladderPosition ?? 0) <= 8,
+          nearRivalWinRate: regular?.games ? Math.round((regular.wins / regular.games) * 1000) / 1000 : 0,
+          nearRivalGames: regular?.games ?? 0,
           ...gap,
           signings: signed.count,
           signingFees: signed.fees,
@@ -486,6 +594,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
         seasonStartMoney = s.money;
         minMoney = s.money;
         gap = gapSample(s);
+        regular = null;
         signed = { count: 0, fees: 0, overall: 0 };
       }
     }
@@ -497,7 +606,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (last > first * 1.5) note(`save grew ${Math.round((last / first) * 100)}% over ${seasons.length} seasons (${first} → ${last} bytes)`);
   }
   setState({});
-  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), start, seasons, problems, ms: Date.now() - t0 };
+  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true } : {}), start, seasons, problems, ms: Date.now() - t0 };
 }
 
 // ── Summary across seeds ─────────────────────────────────────────────────────
@@ -513,8 +622,10 @@ export interface SeasonSummary {
   losses: number;
   marginPerGame: number;
   ladderPosition: number;
-  /** Share of runs that finished in the top eight. */
+  /** Share of runs in the finals (madeFinals: the top eight). */
   finals: number;
+  /** Finals appearances per run from season 1 to this one (N12.1): "makes the finals most seasons" reads off it. */
+  finalsAppearances: number;
   /** Share of runs that won the premiership. */
   premierships: number;
   /** Share of runs sacked by the end of this season. */
@@ -523,6 +634,10 @@ export interface SeasonSummary {
   rivalMean: number;
   /** bestNine − rivalMean. */
   gap: number;
+  /** Wins ÷ games against the nearest-rated rivals over every run's games this season (N12.1; 0 with none). */
+  nearRivalWinRate: number;
+  /** Those games, summed over the runs. */
+  nearRivalGames: number;
   rivalRange: [number, number];
   money: number;
   signings: number;
@@ -536,6 +651,8 @@ export interface SeasonSummary {
 
 const mean = (xs: readonly number[]): number => (xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : 0);
 const r1 = (n: number): number => Math.round(n * 10) / 10;
+/** Shares to the percent (N12.1): one decimal turned 20 seeds' 5% steps into 10% ones. */
+const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** Average the fresh-game runs (not the old-save ones) by mode, difficulty and season. */
 export function summariseSeasons(results: readonly SoakResult[]): SeasonSummary[] {
@@ -553,6 +670,9 @@ export function summariseSeasons(results: readonly SoakResult[]): SeasonSummary[
       const rows = runs.flatMap((r) => (r.seasons[i] ? [r.seasons[i]!] : []));
       if (rows.length === 0) continue;
       const signedRows = rows.filter((s) => s.signings > 0);
+      const nearGames = rows.reduce((t, s) => t + s.nearRivalGames, 0);
+      const nearWins = rows.reduce((t, s) => t + Math.round(s.nearRivalWinRate * s.nearRivalGames), 0);
+      const reached = runs.filter((r) => r.seasons[i]);
       out.push({
         mode, difficulty, season: rows[0]!.season, runs: rows.length,
         wins: r1(mean(rows.map((s) => s.wins))),
@@ -560,12 +680,15 @@ export function summariseSeasons(results: readonly SoakResult[]): SeasonSummary[
         losses: r1(mean(rows.map((s) => s.losses))),
         marginPerGame: r1(mean(rows.map((s) => s.marginPerGame))),
         ladderPosition: r1(mean(rows.map((s) => s.ladderPosition))),
-        finals: r1(mean(rows.map((s) => (s.ladderPosition >= 1 && s.ladderPosition <= 8 ? 1 : 0)))),
-        premierships: r1(mean(rows.map((s) => (s.premiership ? 1 : 0)))),
-        sacked: r1(mean(rows.map((s) => (s.sacked ? 1 : 0)))),
+        finals: r2(mean(rows.map((s) => (s.madeFinals ? 1 : 0)))),
+        finalsAppearances: r1(mean(reached.map((r) => r.seasons.slice(0, i + 1).filter((s) => s.madeFinals).length))),
+        premierships: r2(mean(rows.map((s) => (s.premiership ? 1 : 0)))),
+        sacked: r2(mean(rows.map((s) => (s.sacked ? 1 : 0)))),
         bestNine: r1(mean(rows.map((s) => s.bestNine))),
         rivalMean: r1(mean(rows.map((s) => s.rivalMean))),
         gap: r1(mean(rows.map((s) => s.bestNine - s.rivalMean))),
+        nearRivalWinRate: nearGames ? r2(nearWins / nearGames) : 0,
+        nearRivalGames: nearGames,
         rivalRange: [Math.min(...rows.map((s) => s.rivalRange[0])), Math.max(...rows.map((s) => s.rivalRange[1]))],
         money: Math.round(mean(rows.map((s) => s.money))),
         signings: r1(mean(rows.map((s) => s.signings))),
