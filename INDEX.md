@@ -93,3 +93,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261020-061230-standard | standard | 4c5a480 | coach/tactics | [report](runs/20261020-061230-standard/report.md) |
 | 20261020-062508-presets-whole-match-n11 | presets whole match N11 | ca5209e | coach/tactics | [report](runs/20261020-062508-presets-whole-match-n11/report.md) |
 | 20261020-062700-n11-presets-confirm | n11 presets confirm | ca5209e | HEAD | [report](runs/20261020-062700-n11-presets-confirm/report.md) |
+| 20261020-065500-standard | standard | 3678146 | main | [report](runs/20261020-065500-standard/report.md) |
