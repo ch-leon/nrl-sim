@@ -552,17 +552,21 @@ async function play() {
   });
 
   // Play out the season: to the finals, then to season end, answering cards on the way.
-  for (let i = 0; i < 12; i++) {
+  // A club in debt stops every advance after one week (the bankruptcy warning), so
+  // budget a call per week left, and fail as soon as a call makes no progress.
+  for (let i = 0; i < 40; i++) {
     const s = await save();
     if (s.season > 1) break;
     const target = s.week < 25 ? 1 : 2;
-    await step(`to-${target === 1 ? 'finals' : 'season-end'}-${i + 1}`, async (rec) => {
+    const r = await step(`to-${target === 1 ? 'finals' : 'season-end'}-${i + 1}`, async (rec) => {
       await answerCards(rec);
       await advanceMenu(target);
       const now = await save();
       const stop = await page.locator('.nrl-toast').last().textContent().catch(() => '');
       rec.notes.push(`S${now.season} W${now.week} $${now.money}${stop ? ` · "${stop.trim()}"` : ''}`);
+      if (now.season === s.season && now.week === s.week) throw new Error(`no progress from S${s.season} W${s.week}`);
     }, { quietToasts: true });
+    if (!r.ok && !r.errors) break;
   }
   await step('season-2', async (rec) => {
     const s = await save();
