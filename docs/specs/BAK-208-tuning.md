@@ -886,9 +886,10 @@ picks when they are in the nine, else the defaults — the half with the best Sk
 (any man when there is no half) and the starter with the best Footy IQ. Rivals take the same
 defaults.
 
-In the live sim the named kicker takes the **conversions, penalty goals and field goals** while
-he is on the field (`goalKicker`); off it (binned, swapped off) the slot-5 kicker does, as
-before. Kick-offs, drop-outs and kicks in play stay with the slot-5 kicker. The **captain**
+In the live sim the named kicker takes the **conversions and penalty goals** while he is on
+the field (`goalKicker`); off it (binned, swapped off) the slot-5 kicker does, as before. A
+**field goal** is his or the slot-5 kicker's, whoever has the ball when it is on. Kick-offs,
+drop-outs, kicks in play and a penalty kicked for touch stay with the slot-5 kicker. The **captain**
 makes the penalty call (§17): his Footy IQ shifts the shot threshold (`captainIq` per point
 from `captainIqMid`: IQ 80 shoots at 52% likely, IQ 40 at 68%) and each Hothead level taps
 from 8 m further out. A sheet naming neither (the balance harness, a strength-built rival)
@@ -896,6 +897,8 @@ plays exactly as before: the slot-5 kicker and a neutral captain (tested). The s
 is unchanged by construction; the game's matches change, since every squad-built sheet now
 names its defaults.
 
-Measured in tests (40 seeds, even 60 v 60, the fullback named kicker): he takes every
-conversion and penalty goal; Skill 95 converts more than 10 points better than Skill 25.
+Measured in tests (even 60 v 60, the fullback named kicker): over 40 seeds he takes nearly
+every conversion and penalty goal (the rest fall to slot 5 while the interchange has him off)
+and Skill 95 converts more than 10 points better than Skill 25; over 20 seeds the side kicks in
+play as much as before, the fullback no more than unnamed, and field goals still come.
 

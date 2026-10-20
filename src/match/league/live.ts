@@ -1427,8 +1427,9 @@ export class LiveSim implements MatchSim {
     // A field goal late on with the scores close: the kicker's call, once a set.
     // The coach's kick call for the set (#73) comes before the kicker's own.
     const called = this.callState[this.attacking].attack;
-    const isKicker = h === this.goalKicker(h.side);
-    if (isKicker && this.fieldGoalOn(h)) {
+    // Kicks in play are the slot-5 kicker's; a field goal is his or the named goal-kicker's (N11), whoever has the ball.
+    const isKicker = h === this.kicker(h.side);
+    if ((isKicker || h === this.goalKicker(h.side)) && this.fieldGoalOn(h)) {
       if (this.fgCall === null) this.fgCall = called === 'field-goal' || this.rng.next() < GOALS.fieldGoalChance;
       if (this.fgCall && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
         this.lock(h, 'kick', LIVE.kickLockTicks);
@@ -2014,7 +2015,9 @@ export class LiveSim implements MatchSim {
       return;
     }
     const say = { goal: `${this.names[award]} take the shot at goal`, tap: `${this.names[award]} tap and go`, touch: `${this.names[award]} kick for touch` } as const;
-    this.emit('penalty-choice', say[choice], kicker);
+    // The named goal-kicker (N11) takes the shot; a kick for touch is the slot-5 kicker's, as before.
+    const taker = choice === 'goal' ? kicker : this.kicker(award);
+    this.emit('penalty-choice', say[choice], taker);
     this.events[this.events.length - 1]!.detail = choice;
     this.attacking = award;
     this.dir = dir;
@@ -2027,10 +2030,10 @@ export class LiveSim implements MatchSim {
       this.startSetPiece(award, mark, 'tap');
       return;
     }
-    this.ball = { kind: 'held', by: this.indexOf(kicker) };
+    this.ball = { kind: 'held', by: this.indexOf(taker) };
     this.phase = choice === 'goal'
-      ? { kind: 'conversion', t0: this.tick, side: award, kicker: this.indexOf(kicker), spot: mark, readyAt: 0, good: null, what: 'penalty' }
-      : { kind: 'penalty', t0: this.tick, side: award, spot: mark, kicker: this.indexOf(kicker), kicked: false };
+      ? { kind: 'conversion', t0: this.tick, side: award, kicker: this.indexOf(taker), spot: mark, readyAt: 0, good: null, what: 'penalty' }
+      : { kind: 'penalty', t0: this.tick, side: award, spot: mark, kicker: this.indexOf(taker), kicked: false };
   }
 
   /** A penalty kicked for touch: the kicker to the mark, then the ball out 25-odd metres downfield. */
