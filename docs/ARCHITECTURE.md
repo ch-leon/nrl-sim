@@ -468,14 +468,18 @@ export interface MatchResult {
   from club colours; away side switches to its alt strip on a clash), ball,
   shadows, goalpost parts, the stadium background/foreground layers and crowd.
   `particle-square` comes from `src/fx/particles.ts`. The kit-dependent art (stadium
-  layers, crowd, the two player atlases; `src/art/match/fixtureArt.ts`) is painted ahead
-  (N10.5, #154): after each week, and when a game starts or loads,
+  layers in 512 px chunks, crowd, the two player atlases; `src/art/match/fixtureArt.ts`)
+  is painted ahead (N10.5, #154): after each week, and when a game starts or loads,
   `scenes/matchArtAhead.ts` looks up the player's next fixture and has the art worker
-  (`src/art/match/artWorker.ts`) paint it, with the pixel buffers transferred back. One
-  painting is kept, keyed by the field offset and both kits, so a kit change or another
-  opponent paints again; none is painted during a multi-week run. `MatchScene.create()`
-  takes it and only uploads it. Not ready, a live match shows "Kick-off…" and builds when
-  the worker answers; the lab paints in place.
+  (`src/art/match/artWorker.ts`) paint it, with the pixel buffers transferred back, then
+  uploads it one texture per idle slice. The ground (about 90% of the background, the
+  same for every fixture) is painted once, from the title screen, and each background
+  starts from a copy of it. One painting is kept, keyed by the field offset and both kits,
+  so a kit change or another opponent paints again; nothing is painted during a
+  multi-week run or under a match, nor uploaded in the 1.5 s after one.
+  `MatchScene.create()` takes it and only places it, then starts the effects and
+  playback on the next frame. Not all up yet, a live match shows "Kick-off…" while the
+  worker finishes and the rest goes up a texture a frame; the lab paints in place.
 - Match atmosphere (GitHub #16, `src/fx/atmosphere.ts` + pure
   `src/art/match/atmosphere.ts`): per-fixture lighting (`day`/`dusk`/`night`,
   hashed from season/round/clubs; finals are night) and the MatchResult's
