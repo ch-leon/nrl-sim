@@ -120,7 +120,7 @@ export class LabPanel {
     const go = button('Go', () => {
       const s = Math.max(1, Math.floor(Number(seed.value) || 1));
       const mode = isTraitMode(traits.value) ? traits.value : 'gen';
-      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf(), ...(p.calls ? { calls: true } : {}) });
+      hooks.restart({ seed: s, home: home.value, away: away.value, tick: 0, note: '', traits: mode, tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf(), ...(p.calls ? { calls: true } : {}), ...(p.final ? { final: true } : {}) });
     });
     // Any setup change applies at once: the match restarts from the kick-off on the same seed.
     for (const s of [home, away, seed, traits, legs, bench, wx, hAtk, hDef, aAtk, aDef]) s.addEventListener('change', () => go.click());
@@ -168,7 +168,7 @@ export class LabPanel {
     const load = button('Load', () => {
       const f = decodeFlag(codeIn.value);
       if (!f) return hooks.notify('Not a valid Flag code');
-      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf(), ...(p.calls ? { calls: true } : {}) });
+      hooks.restart({ seed: f.seed, home: f.home, away: f.away, tick: f.tick, note: f.note, traits: isTraitMode(traits.value) ? traits.value : 'gen', tactics: tactics(), legs: legsOf(), bench: benchOf(), weather: wxOf(), ...(p.calls ? { calls: true } : {}), ...(p.final ? { final: true } : {}) });
     });
 
     // Event feed: the last few things that happened; tap one to jump back to it.

@@ -35,6 +35,8 @@ export interface ScenarioSpec {
   minutes?: number;
   /** Rain or wind (2f); clear unless given. */
   weather?: WeatherKind;
+  /** A final (N9.4): golden point if level at full time. */
+  finals?: boolean;
   /** Coach calls (#73) each side makes whenever it can, or only on a given tackle ("shift left on tackle 2"). */
   calls?: Partial<Record<'home' | 'away', CallRule[]>>;
 }
