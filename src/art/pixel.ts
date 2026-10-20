@@ -22,10 +22,12 @@ export class PixelBuffer {
   readonly h: number;
   readonly data: Uint8ClampedArray;
 
-  constructor(w: number, h: number) {
+  /** A blank buffer, or one around pixels painted elsewhere (a Worker's transferred `data`, N10.5). */
+  constructor(w: number, h: number, data?: Uint8ClampedArray) {
     this.w = Math.max(1, Math.floor(w));
     this.h = Math.max(1, Math.floor(h));
-    this.data = new Uint8ClampedArray(this.w * this.h * 4);
+    if (data && data.length !== this.w * this.h * 4) throw new Error(`pixel data is ${data.length} bytes, not ${this.w}×${this.h}×4`);
+    this.data = data ?? new Uint8ClampedArray(this.w * this.h * 4);
   }
 
   /** Set one pixel (ignored when out of bounds). alpha 0..1. */

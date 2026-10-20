@@ -8,6 +8,7 @@ import { enableAutosave, load, showTitleFlow } from './core/save';
 import { advanceWeek } from './core/time';
 import { advanceUntil } from './core/advance';
 import { createHud } from './ui/hud';
+import { initMatchArtAhead } from './scenes/matchArtAhead';
 import { createNav } from './ui/nav';
 import { closeModal, closeScreen, ensureStyles } from './ui/dom';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
@@ -145,6 +146,7 @@ async function boot(): Promise<void> {
   registerRivalsSystem();
   initMatchReport();
   initBoardUi();
+  initMatchArtAhead(); // the next fixture's match art, painted in a Worker during the week (N10.5)
 
   const g = new Phaser.Game(config);
   game = g;

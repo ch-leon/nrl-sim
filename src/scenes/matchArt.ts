@@ -10,16 +10,9 @@
 import Phaser from 'phaser';
 import { PixelBuffer, toTexture } from '../art/pixel';
 import type { Kit } from '../art/match/kit';
-import {
-  ANIM_ORDER,
-  PLAYER_ANIMS,
-  buildPlayerAtlas,
-  frameName,
-  type PlayerAnim,
-} from '../art/match/players';
-import { buildCrowdAtlas, crowdShirts } from '../art/match/crowd';
+import { ANIM_ORDER, PLAYER_ANIMS, frameName, type PlayerAnim } from '../art/match/players';
 import { drawBall, drawCrossbar, drawShadow, drawUpright } from '../art/match/props';
-import type { Canvas3D } from '../art/match/iso3d';
+import type { AtlasPixels, LayerPixels } from '../art/match/fixtureArt';
 
 /** Largest texture edge we upload (safe on old mobile GPUs capped at 2048). */
 const CHUNK = 1024;
@@ -57,7 +50,7 @@ export class MatchArtRegistry {
    * A big world-space layer split into ≤CHUNK(+1px overlap) textures, placed as Images at
    * `depth`. Returns the created images.
    */
-  layer(keyPrefix: string, cv: Canvas3D, depth: number): Phaser.GameObjects.Image[] {
+  layer(keyPrefix: string, cv: LayerPixels, depth: number): Phaser.GameObjects.Image[] {
     const images: Phaser.GameObjects.Image[] = [];
     const { buf } = cv;
     for (let cy = 0; cy < buf.h; cy += CHUNK) {
@@ -81,9 +74,9 @@ export class MatchArtRegistry {
     return images;
   }
 
-  /** Player atlas + one Phaser animation per look × anim for a kit. */
-  players(atlasKey: string, kit: Kit): string {
-    const { buf, frames } = buildPlayerAtlas(kit);
+  /** Player atlas (painted for a kit, fixtureArt.ts) + one Phaser animation per look × anim. */
+  players(atlasKey: string, atlas: AtlasPixels): string {
+    const { buf, frames } = atlas;
     const key = this.atlas(atlasKey, buf, frames);
     const looks = new Set(frames.map((f) => Number(f.name.split('-')[0])));
     for (const look of looks) {
@@ -103,10 +96,9 @@ export class MatchArtRegistry {
     return key;
   }
 
-  /** Crowd spectator atlas for a fixture's colours. */
-  crowd(key: string, home: Kit, away: Kit): string {
-    const { buf, frames } = buildCrowdAtlas(crowdShirts(home, away));
-    return this.atlas(key, buf, frames);
+  /** Crowd spectator atlas for a fixture's colours (painted in fixtureArt.ts). */
+  crowd(key: string, atlas: AtlasPixels): string {
+    return this.atlas(key, atlas.buf, atlas.frames);
   }
 
   /** Ball, shadows and goalpost pieces. */

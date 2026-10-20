@@ -420,6 +420,8 @@ export interface MatchResult {
   same `MatchRecorder`, so the match on screen is exactly the match that counts.
 - **Cost:** a 2 × 9:00 match is 21,600 ticks, about 0.6 s headless in Node (0.3 s in
   desktop Chromium); a fast-forwarded season of the player's matches is several seconds.
+  In a browser none of it runs inside a tap: the fast-forwarded match (N10.3) and Skip
+  (N10.4) play in a Worker, and the match scene's art is painted ahead in another (N10.5).
 - Callers' sheets are never mutated. The sim only reports injuries; matchday applies
   `injuredWeeks` and announces them with the result at full time.
 
@@ -465,7 +467,15 @@ export interface MatchResult {
   on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
   from club colours; away side switches to its alt strip on a clash), ball,
   shadows, goalpost parts, the stadium background/foreground layers and crowd.
-  `particle-square` comes from `src/fx/particles.ts`.
+  `particle-square` comes from `src/fx/particles.ts`. The kit-dependent art (stadium
+  layers, crowd, the two player atlases; `src/art/match/fixtureArt.ts`) is painted ahead
+  (N10.5, #154): after each week, and when a game starts or loads,
+  `scenes/matchArtAhead.ts` looks up the player's next fixture and has the art worker
+  (`src/art/match/artWorker.ts`) paint it, with the pixel buffers transferred back. One
+  painting is kept, keyed by the field offset and both kits, so a kit change or another
+  opponent paints again; none is painted during a multi-week run. `MatchScene.create()`
+  takes it and only uploads it. Not ready, a live match shows "Kick-off…" and builds when
+  the worker answers; the lab paints in place.
 - Match atmosphere (GitHub #16, `src/fx/atmosphere.ts` + pure
   `src/art/match/atmosphere.ts`): per-fixture lighting (`day`/`dusk`/`night`,
   hashed from season/round/clubs; finals are night) and the MatchResult's
