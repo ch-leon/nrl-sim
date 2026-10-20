@@ -1,0 +1,28 @@
+{
+  "name": "kicks close-out",
+  "description": "#99 close-out: how often a bomb is a contest (won back by the kickers or spilled), how many tries come from kicks and from grubbers, between even sides and with a Kick-chase side.",
+  "seeds": 120,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ]
+}
