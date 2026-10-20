@@ -20,7 +20,7 @@ export function openPlayerOfMatchModal(p: PlayerOfMatch, clubName: string, own: 
     el('p', { text: fmtPotmLine(p) }),
     button('Close', () => closeModal()),
   );
-  return openModal(content, { class: 'nrl-potm-modal' });
+  return openModal(content, { class: 'nrl-potm-modal', region: true });
 }
 
 /** Show the modal on every full-time, and count the club's awards for the season review (#190). Returns unsubscribe. */
