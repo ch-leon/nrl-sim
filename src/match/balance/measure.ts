@@ -8,7 +8,7 @@ import { TICK_S } from '../core/engine';
 import type { SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
 import { LiveSim } from '../league/live';
-import type { CallInput } from '../league/calls';
+import { aiCoachSides, type CallInput } from '../league/calls';
 import { fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
@@ -285,7 +285,9 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       // Coach calls (#73): each side makes the scenario's calls whenever it is allowed to.
       const callList: CallInput[] = [];
       const rules = cell.scenario.calls;
-      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}) });
+      // The AI coach (N9.6): the scenario's sides, or both when the variant turns calls.ai on.
+      const aiSides = cell.scenario.aiCoach ?? aiCoachSides(['home', 'away']);
+      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();

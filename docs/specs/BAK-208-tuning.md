@@ -547,6 +547,32 @@ say why ("not your ball", "one call a set", "tackles 3–4", "late in the set", 
 Rush and Hold set the defence to Rush or Compressed for the set; Field goal is offered only
 when the 2c field-goal rule is on, and then the kicker drops for goal.
 
+**The AI coach and the Coach's Office (N9.6).** A rival coach can make his own calls (`LiveSim`
+/ `runMatch` option `aiCoach`, the sides that have one; the game gives every rival coach one
+when `calls.ai.on`, which is off, so a match with no calls still plays as `runMatch`). His
+rules roll no dice, and the same refusals as the player's chips apply: a field goal when one is
+on (and in the last minutes of a close match he saves his attack call for it); a shift toward
+an overlap; Rush when defending near his own line. The player's chips are unlocked by his
+Coach's Office (the best one built): none built, Hit-up and Hold; level 1 adds Shift left /
+right and Rush; level 2 Kick early and Run it; level 3 Bomb and Field goal. The lab's `ai=1`
+gives both coaches the AI; the harness's `aiCoach` scenario field names the sides (absent, both
+when `calls.ai.on`).
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `calls.ai.on` | `calls.ts` | 0 | 1 gives every rival coach (both in a rival-v-rival match, the player's opponent) his own calls. |
+| `calls.ai.overlap` | `calls.ts` | 2 | Shift when the attack has this many more men than the defence on one side of the ball. |
+| `calls.ai.rushOwnM` | `calls.ts` | 20 m | Rush when defending this close to his own line. |
+| `CALLS.unlocks` | `calls.ts` | Hit-up, Hold · +Shift ×2, Rush · +Kick early, Run it · +Bomb, Field goal | The calls each Coach's Office level adds (index = level). Not a number, so not a harness knob. |
+
+Measured (`20261020-021804-ai-coach-calls`, 120 whole matches a row, one side's coach on the AI):
+about 23 calls a match, 5 of them paying off; between even sides the AI side wins 51% (no AI:
+50%); the 50 against a 70 holds the favourite to 70% (75% with no AI), inside about one standard
+error; tries 5.9 → 5.5 a match (Rush near his own line). Overlap 1 calls 33 a match and wins 44%
+(shifting at any overlap costs), overlap 3 calls 8 and changes little; Rush from 35 m concedes
+more busts (26 v 23). So the AI coach is fair rather than strong at 2 / 20 m, and stays off
+(`calls.ai.on` 0) until a balance pass turns it on.
+
 **Calls that paid off** (`CallJudge` in `calls.ts`, spec §3's last column; run
 `20261019-164411-calls-paid-off`, 12 whole matches a row, one side making the same call
 whenever it may): Kick early 65%, Rush 65%, Hold 74%, Hit-up 29%, Shift 23%, Bomb 10%, Run it
