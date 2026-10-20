@@ -284,7 +284,7 @@ function liveRivalsToggle(): HTMLElement {
     'label',
     { class: 'nrl-live-toggle nrl-rivals-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
     box,
-    el('span', { text: ' Rival matches on the match engine — every result played out, with real stats and injuries' }),
+    el('span', { text: ' Rival matches on the match engine — every result played out, with real stats and injuries; match weeks take longer on a phone' }),
   );
 }
 

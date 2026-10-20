@@ -97,8 +97,8 @@ export function canUseWorker(): boolean {
   return typeof Worker !== 'undefined' && typeof window !== 'undefined';
 }
 
-/** How long the worker gets before the round is played on the main thread instead (ms). */
-export const RIVAL_WORKER_TIMEOUT_MS = 30_000;
+/** How long the worker gets before the round is played on the main thread instead (ms): a phone-speed worker needs about 30 s for the round (#216), so this only catches one that has hung. */
+export const RIVAL_WORKER_TIMEOUT_MS = 120_000;
 
 /** Play the jobs in a Web Worker; on any failure or silence, play them here instead. */
 export function playRivalJobsInWorker(jobs: readonly RivalJob[], timeoutMs = RIVAL_WORKER_TIMEOUT_MS): Promise<MatchResult[]> {
@@ -122,6 +122,10 @@ export function playRivalJobsInWorker(jobs: readonly RivalJob[], timeoutMs = RIV
     const timer = setTimeout(() => done(() => jobs.map(playRivalJob)), timeoutMs);
     worker.onmessage = (e: MessageEvent<MatchResult[]>) => done(() => e.data);
     worker.onerror = () => done(() => jobs.map(playRivalJob));
-    worker.postMessage(jobs);
+    try {
+      worker.postMessage(jobs);
+    } catch {
+      done(() => jobs.map(playRivalJob));
+    }
   });
 }
