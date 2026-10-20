@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   registerTickHook, unregisterTickHook, clearTickHooks,
   registerSeasonHook, unregisterSeasonHook, clearSeasonHooks,
-  advanceWeek, advanceWeeks, TICK_ORDER,
+  advanceWeek, advanceWeeks, TICK_ORDER, clearHeldWeek, resumeWeek, weekHeld,
   type TickContext,
 } from '../../src/core/time';
 import { createNewGame, getState, setState } from '../../src/core/state';
@@ -212,5 +212,33 @@ describe('advanceWeeks (fast-forward)', () => {
     expect(getState().season).toBe(2);
     expect(getState().week).toBe(2);
     expect(seasonEndedCount).toBe(1);
+  });
+});
+
+describe('held weeks (coach calls #73; N9.2)', () => {
+  beforeEach(() => clearHeldWeek());
+
+  it('hooks of the holding order all run; later hooks and the week end wait for every hold to be released', () => {
+    const ran: string[] = [];
+    registerTickHook('a', TICK_ORDER.match, (ctx) => {
+      ran.push('a');
+      ctx.hold?.();
+    });
+    registerTickHook('b', TICK_ORDER.match, (ctx) => {
+      ran.push('b');
+      ctx.hold?.();
+    });
+    registerTickHook('ladder', TICK_ORDER.ladder, () => void ran.push('ladder'));
+    const week = getState().week;
+    advanceWeek();
+    expect(ran).toEqual(['a', 'b']);
+    expect(weekHeld()).toBe(true);
+    resumeWeek();
+    expect(ran).toEqual(['a', 'b']);
+    expect(getState().week).toBe(week);
+    resumeWeek();
+    expect(ran).toEqual(['a', 'b', 'ladder']);
+    expect(weekHeld()).toBe(false);
+    expect(getState().week).toBe(week + 1);
   });
 });

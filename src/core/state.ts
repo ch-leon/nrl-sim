@@ -87,7 +87,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 /**
  * The coach's team selection (GitHub #69, systems/lineup.ts): nine starters by
@@ -222,8 +222,8 @@ export interface GameState {
   freeAgents: Player[];
   league: LeagueState;
   weather?: WeatherKind; // set for current round by fixtures system
-  /** coachCalls: the call chips during your matches (#73); on when absent. (An old save's liveMatch flag is ignored: every match is live since BAK-207 Phase 4.) */
-  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean };
+  /** coachCalls: the call chips during your matches (#73); on when absent. liveRivals: rival-v-rival matches played on the live sim (N9.2); off when absent. (An old save's liveMatch flag is ignored: every match is live since BAK-207 Phase 4.) */
+  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean; liveRivals?: boolean };
   history: SeasonRecord[];
   boardPatience: number; // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
   objectives: Objective[]; // this season's board objectives (#47)

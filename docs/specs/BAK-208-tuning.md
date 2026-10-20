@@ -35,6 +35,7 @@ result. Keep it in step with the code: when a constant changes, change the row.
 | `MIN_SPEED` / `MAX_SPEED` | `src/match/core/body.ts` | 6 / 9 m/s | Top speed from the Speed stat (1 → 6, 100 → 9). |
 | `ACCEL` | `body.ts` | 9 m/s² | Acceleration and braking cap. Drives the run-on lead (§5 below). |
 | `BODY_RADIUS` | `body.ts` | 0.9 m | Separation radius (nobody stands inside anyone). |
+| `live.separatePasses` / `live.decideEveryTicks` | `live.ts` | 2 / 1 | How many times a tick bodies are pushed apart, and how often players re-pick targets: speed knobs, §23. |
 | `live.carrySpeed` | `src/match/league/live.ts` | 0.95 | Carrier's top speed multiplier. 0.92 halved the tries; keep ≥ 0.94. |
 | `live.burstTicks` | `live.ts` | 16 | After a break, step or fend the carrier sprints (gas permitting) at least this long. The old ×1.15 burst is retired (F2, §10a); `gas.breakBurst` brings it back for experiments. |
 | `live.immuneTicks` | `live.ts` | 8 | Can't be tackled this long after beating a man. |
@@ -663,3 +664,31 @@ matches nothing moves beyond luck (`20261019-230203-offloads-check` on main agai
 7,000 ticks, some 14 µs a tick; a real 2 × 9:00 match is 21,600 ticks, and the sim now runs
 at about 14 µs a tick. A 100 ms match needs a coarser sim step (10 Hz, with every tick-counted
 length re-timed) or fewer men moved per tick, which changes how the game plays.
+
+## 24. Rival rounds and the cheap rival sim (N9.2)
+
+**One scale.** The cheap sim that plays rival-v-rival fixtures (`cheapSimScore`,
+`src/systems/fixtures.ts`) now scores on the live sim's scale, so the ladder reads the same
+whichever engine played a match. Between rival clubs the live sim scores about 15 a side (30 a
+match), wins by about 10, has no home edge, and the stronger side wins about 65% at a 12-point
+strength gap and 75% at 25 (run `20261019-235506-rival-scores`, 30 whole matches each way round
+for 12 pairings, gaps 2–28; the harness now counts `points` and `margin`). The old cheap sim
+scored about 18 a side, gave home 2 points, and the stronger side won nearly every time at 25.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `CHEAP.base` | `src/systems/fixtures.ts` | 0.5 | A side's score before the dice. |
+| `CHEAP.gap` | `fixtures.ts` | 0.17 | Points per point of strength over the other side (75% at a 25-point gap). |
+| `CHEAP.home` | `fixtures.ts` | 0 | Home side's extra points (the live sim has none). |
+| `CHEAP.spread` | `fixtures.ts` | 29 | Each side adds a whole number 0..this (mean 14.5; a margin of about 10). |
+
+**On the live sim.** With *Rival matches on the match engine* on (`settings.liveRivals`, off by
+default; Fixtures screen), an interactive week plays the seven rival fixtures with `runMatch` —
+each side its own fit squad through its coach's auto-pick (#69, #74), one seed each from
+`rngSeed`, the week's weather — in a Web Worker (`src/systems/rivalWorker.ts`) while the player
+watches his own match. The week holds until both are in (holds now count, `core/time.ts`).
+Results go through `applyResult`; the rivals' injuries land on their squads and their players'
+games, tries, tackles and line breaks on their records. Fast-forward keeps the cheap sim.
+Tests: `tests/systems/rivalRound.test.ts`, `tests/systems/fixtures.test.ts` (the cheap sim's
+scale).
+

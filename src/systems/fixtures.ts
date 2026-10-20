@@ -23,7 +23,8 @@ import {
 import { makeRng, type Rng } from '../utils/rng';
 import { rollWeather } from '../sim/weather';
 import { topTryScorer } from './stats';
-import { registerTickHook, registerSeasonHook, TICK_ORDER, type TickContext } from '../core/time';
+import { registerTickHook, registerSeasonHook, resumeWeek, TICK_ORDER, type TickContext } from '../core/time';
+import { applyRivalResults, canUseWorker, playRivalJob, playRivalJobsInWorker, rivalJobs } from './rivalRound';
 import { applyBoardReview } from './board';
 import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, DEFAULT_PLAYER_COLORS } from '../config';
 import { RIVAL_CLUBS } from '../data/league';
@@ -273,22 +274,37 @@ export function getCurrentFixture(state: GameState, clubId: string): Fixture | u
 // ── Cheap rival-vs-rival simulation ───────────────────────────────────────────
 
 /**
- * Cheap-sim a single fixture from the two clubs' strength ratings. Deterministic
- * given `rng`. Per BAK-184:
- *   base(home) = 12 + (H.strength − A.strength) × 0.2 + 2 (home advantage)
- *   base(away) = 12 + (A.strength − H.strength) × 0.2
- *   score = clamp(round(base + rng.int(0,12)), 0, ∞)
- * Draws are allowed.
+ * The cheap rival sim's numbers (N9.2, tuning reference §24), on the live
+ * sim's scale so the ladder reads the same whichever engine played a fixture:
+ * between rival clubs the live sim scores about 15 a side (30 a match), wins by
+ * about 10, has no home edge, and the stronger side wins about 65% at a
+ * 12-point strength gap and 75% at 25 (run 20261019-235506-rival-scores).
+ */
+export const CHEAP = {
+  /** A side's score before the dice: this plus `gap` × the strength difference. */
+  base: 0.5,
+  /** Points per point of strength over the other side. */
+  gap: 0.17,
+  /** Home side's extra points (the live sim has no home edge). */
+  home: 0,
+  /** The dice: each side adds a whole number from 0 to this. */
+  spread: 29,
+};
+
+/**
+ * Cheap-sim a single fixture from the two clubs' strength ratings, on the live
+ * sim's scale (CHEAP). Deterministic given `rng`. Draws are allowed.
+ *   score = max(0, round(base ± gap × (H − A) (+ home) + rng.int(0, spread)))
  */
 export function cheapSimScore(
   home: RivalClub,
   away: RivalClub,
   rng: Rng,
 ): { homeScore: number; awayScore: number } {
-  const homeBase = 12 + (home.strength - away.strength) * 0.2 + 2;
-  const awayBase = 12 + (away.strength - home.strength) * 0.2;
-  const homeScore = Math.max(0, Math.round(homeBase + rng.int(0, 12)));
-  const awayScore = Math.max(0, Math.round(awayBase + rng.int(0, 12)));
+  const homeBase = CHEAP.base + (home.strength - away.strength) * CHEAP.gap + CHEAP.home;
+  const awayBase = CHEAP.base + (away.strength - home.strength) * CHEAP.gap;
+  const homeScore = Math.max(0, Math.round(homeBase + rng.int(0, CHEAP.spread)));
+  const awayScore = Math.max(0, Math.round(awayBase + rng.int(0, CHEAP.spread)));
   return { homeScore, awayScore };
 }
 
@@ -572,12 +588,34 @@ export function registerFixturesSystem(): void {
     if (next !== s) setState({ league: next.league });
   });
 
-  // (b) Rival-vs-rival cheap sim for the round (order 40, alongside player match).
+  // (b) Rival-vs-rival matches for the round (order 40, alongside the player's
+  // match). With "Rival matches on the match engine" on (N9.2) an interactive
+  // week plays them on the live sim — off the main thread where it can, holding
+  // the week until they're in — and fast-forward keeps the cheap sim.
   registerTickHook('fixtures-rivals', TICK_ORDER.match, (ctx: TickContext) => {
     const s = getState();
     if (ctx.week < 1 || ctx.week > WEEKS_PER_SEASON) return;
     if (s.league.clubs.length === 0) return; // league not initialised yet
     const rng = makeRng(s.rngSeed);
+    if (s.settings.liveRivals === true && !ctx.fastForward) {
+      const jobs = rivalJobs(s, rng, PLAYER_ID);
+      setState({ rngSeed: rng.state() });
+      const land = (results: Parameters<typeof applyRivalResults>[2]): void => {
+        const next = applyRivalResults(getState(), jobs, results, applyResult);
+        setState({ league: next.league });
+      };
+      if (ctx.hold && canUseWorker() && jobs.length > 0) {
+        ctx.hold();
+        // The week always resumes, even if landing the results throws.
+        void playRivalJobsInWorker(jobs)
+          .then(land)
+          .catch((err: unknown) => console.error('rival round failed to land', err))
+          .finally(resumeWeek);
+        return;
+      }
+      land(jobs.map(playRivalJob));
+      return;
+    }
     const next = simulateRivalRound(s, rng);
     setState({ league: next.league, rngSeed: rng.state() });
   });
