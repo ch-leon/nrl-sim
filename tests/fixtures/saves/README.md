@@ -15,5 +15,6 @@ Rules:
 
 Points the playthrough dumps: `after-tutorial` (new game, nothing advanced yet),
 `mid-season` (facilities, a signing, a kit, event cards answered, about round 14),
-`after-rollover` (season 2, week 1: history, aged squad, juniors, new fixtures) and
-`season-2` (a week into season 2).
+`after-rollover` (season 2, week 1: history, aged squad, juniors, new fixtures),
+`season-2` (a week into season 2) and, from v13, `live-rivals` (the held-week step: rival
+matches on the match engine turned on and one round of them played).
