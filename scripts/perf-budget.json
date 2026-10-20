@@ -1,15 +1,15 @@
 {
   "throttle": 4,
-  "notes": "N10.1 (#219): starting budgets, about 1.4x the worst of three runs on main at 54ac3c0 (two in the agent container, one on the GitHub runner), so the nightly gate is green on day one. Each later N10 item tightens its rows toward the plan's goals (a week and Skip under 300 ms of block, the hand-off under 1 s, Start to grounds under 3 s). advanceBlockMs is reported but not budgeted: until N10.2 it is the whole multi-week call, which depends on how many weeks run before a stop.",
+  "notes": "N10.1 (#219): starting budgets, about 1.4x the worst of three runs of the nightly perf job on the GitHub runner (main at 54ac3c0, before any N10 change), so the gate is green on day one and a regression of half again fails it. The bundle allows 5% growth. Each later N10 item tightens its rows toward the plan's goals (a week and Skip under 300 ms of block, the hand-off under 1 s, Start to grounds under 3 s). advanceBlockMs is reported but not budgeted: until N10.2 it is the whole multi-week call, which depends on how many weeks run before a stop.",
   "budgets": {
-    "titleMs": 2500,
-    "groundsMs": 5500,
-    "handoffMs": 5000,
-    "handoffBlockMs": 100,
-    "skipMs": 5500,
-    "skipBlockMs": 5000,
-    "backToClubMs": 2000,
-    "weekMs": 1700,
-    "bundleGzKb": 600
+    "titleMs": 2200,
+    "groundsMs": 4100,
+    "handoffMs": 2300,
+    "handoffBlockMs": 2000,
+    "skipMs": 4400,
+    "skipBlockMs": 4200,
+    "backToClubMs": 800,
+    "weekMs": 1600,
+    "bundleGzKb": 560
   }
 }
