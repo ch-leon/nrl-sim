@@ -14,20 +14,22 @@ import { runMatch } from '../../src/match/league/match';
 import { teamSheetFromRival } from '../../src/match/league/sheets';
 import { playMatchesInWorker, type MatchJob } from '../../src/systems/matchJobs';
 
-type Mode = 'play' | 'error';
+type Mode = 'play' | 'error' | 'first-silent';
 const g = globalThis as { Worker?: unknown; window?: unknown };
 let posted = 0;
 let built = 0;
 
-/** A Worker that plays its jobs as matchWorker.ts does, one task later (or fails). */
+/** A Worker that plays its jobs as matchWorker.ts does, one task later (or fails, or the first one built never answers). */
 function stubWorker(mode: Mode): void {
   g.window ??= {};
   g.Worker = class {
+    readonly silent = mode === 'first-silent' && built === 0;
     constructor() { built++; }
     onmessage: ((e: { data: unknown }) => void) | null = null;
     onerror: (() => void) | null = null;
     postMessage(jobs: MatchJob[]): void {
       posted++;
+      if (this.silent) return;
       const copy = structuredClone(jobs);
       setTimeout(() => {
         if (mode === 'error') this.onerror?.();
@@ -132,6 +134,18 @@ describe('one worker for the session (N10.3)', () => {
     stubWorker('play');
     await playMatchesInWorker(jobsFor(22), 60_000);
     expect(built).toBe(2);
+  }, 60_000);
+
+  it("a Skip has its own lane (N10.4): it doesn't wait behind a rival round still being played", async () => {
+    createNewGame('Shared', 8);
+    initLeague(getState());
+    stubWorker('first-silent');
+    const rivals = playMatchesInWorker(jobsFor(31), 60_000);
+    const late = new Promise<'waited'>((r) => setTimeout(() => r('waited'), 5_000));
+    const skip = await Promise.race([playMatchesInWorker(jobsFor(32), 60_000, 'skip'), late]);
+    expect(skip).toEqual(jobsFor(32).map((j) => runMatch(j.home, j.away, j.opts)));
+    expect(built).toBe(2);
+    void rivals;
   }, 60_000);
 });
 
