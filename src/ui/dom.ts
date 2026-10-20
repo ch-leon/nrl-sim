@@ -453,6 +453,7 @@ export const CSS = `
   padding: 1rem;
   max-width: min(90vw, 480px);
   max-height: 85vh;
+  max-height: 85dvh; /* #206: Safari's toolbars */
   overflow: auto;
 }
 
@@ -842,8 +843,11 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-player-actions .nrl-player-close { flex: 1 1 100%; }
 .nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
 /* ── Guide under "?" (N7, #188) ─────────────────────────────────────────── */
-.nrl-screen-backdrop .nrl-guide-modal { width: min(96vw, 760px); max-width: none; }
-.nrl-guide { font-size: 0.85rem; }
+.nrl-screen-backdrop .nrl-guide-modal { width: min(96vw, 760px); max-width: none; display: flex; flex-direction: column; }
+/* #206: only the page scrolls; the tabs and the foot (Replay, Close) stay in view. */
+.nrl-guide { font-size: 0.85rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-guide-tabs, .nrl-guide-foot { flex: 0 0 auto; }
+.nrl-guide-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-guide-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
 .nrl-guide-tabs .nrl-btn { flex: 1 1 auto; font-size: clamp(0.6rem, 1.7vw, 0.85rem); padding: 0.4rem 0.45rem; }
 .nrl-guide-tabs .nrl-btn[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
@@ -863,6 +867,16 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-guide-build { flex: 1 1 auto; font-size: 0.75rem; color: #555; }
 .nrl-guide-update { background: #7ec850; }
+/* #206: a landscape phone leaves the Guide ~180px; one row of tabs (swipe for
+   more) and a one-line foot leave the page room, even with Safari's text boost. */
+@media (max-height: 500px) {
+  .nrl-screen-backdrop .nrl-guide-modal { padding: 0.5rem 0.75rem; }
+  .nrl-guide-tabs { flex-wrap: nowrap; overflow-x: auto; margin-bottom: 0.3rem; }
+  .nrl-guide-tabs .nrl-btn { flex: 0 0 auto; }
+  .nrl-guide-foot { flex-wrap: nowrap; margin-top: 0.3rem; padding-top: 0.3rem; }
+  .nrl-guide-foot .nrl-btn { flex: 0 0 auto; }
+  .nrl-guide-build { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 .nrl-card-open { cursor: pointer; }
 .nrl-card-open:focus-visible { outline: 3px solid #3a6ea5; }
 .nrl-card-more { color: #555; font-weight: bold; font-size: 1.1rem; line-height: 1; }
