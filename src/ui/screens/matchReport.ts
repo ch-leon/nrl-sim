@@ -90,6 +90,11 @@ export function buildMatchReport(
 ): MatchReport {
   const home = side(result, fixture.homeId, names[fixture.homeId] ?? fixture.homeId, result.homeScore);
   const away = side(result, fixture.awayId, names[fixture.awayId] ?? fixture.awayId, result.awayScore);
+  // Two clubs with the same last word ("Brisbane Larrikins" v "Launceston Larrikins"): full names.
+  if (home.short === away.short) {
+    home.short = home.name;
+    away.short = away.name;
+  }
   const count = (kind: MatchEvent['kind'], id: string): number => result.events.filter((e) => e.kind === kind && e.teamId === id).length;
   const pair = (label: string, h: number | string, a: number | string): ReportRow => ({ label, home: String(h), away: String(a) });
   const s = result.stats;

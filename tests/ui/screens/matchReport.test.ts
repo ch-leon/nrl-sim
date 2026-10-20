@@ -68,5 +68,7 @@ describe('match report (N9.5)', () => {
     expect(buildMatchReport(result, fixture, names, null).rows.some((x) => x.label === 'Calls paid off')).toBe(result.calls !== undefined);
     expect(shortName('Launceston Larrikins')).toBe('Larrikins');
     expect(rep.home.short).toBe('Live Test FC');
+    const same = buildMatchReport(result, fixture, { player: 'Brisbane Larrikins', 'rival-gulls': 'Launceston Larrikins' }, null);
+    expect([same.home.short, same.away.short]).toEqual(['Brisbane Larrikins', 'Launceston Larrikins']);
   });
 });
