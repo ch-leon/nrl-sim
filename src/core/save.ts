@@ -189,6 +189,9 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // save's past seasons simply have no review to reopen and the tally starts
   // with the next award; nothing is filled in.
   { from: 11, to: 12, run: (old) => ({ ...old }) },
+  // v12 → v13: settings.liveRivals, rival-v-rival matches on the live sim (N9.2).
+  // Optional and off when absent, so an old save keeps the cheap rival sim.
+  { from: 12, to: 13, run: (old) => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

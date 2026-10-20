@@ -306,6 +306,30 @@ describe('cheapSimScore', () => {
     }
     expect(strongWins / N).toBeGreaterThan(0.6);
   });
+  it('scores on the live sim’s scale (N9.2): about 30 a match, a margin of about 10, no home edge, 75% at a 25-point gap', () => {
+    const club = (id: string, strength: number): RivalClub => ({ id, name: id, colors: ['#000000', '#ffffff'], strength });
+    const N = 3000;
+    let points = 0;
+    let margin = 0;
+    let homeWins = 0;
+    let strongWins = 0;
+    for (let seed = 0; seed < N; seed++) {
+      const even = cheapSimScore(club('a', 55), club('b', 55), makeRng(seed));
+      points += even.homeScore + even.awayScore;
+      margin += Math.abs(even.homeScore - even.awayScore);
+      if (even.homeScore > even.awayScore) homeWins++;
+      const gap = cheapSimScore(club('w', 45), club('s', 70), makeRng(seed + N));
+      if (gap.awayScore > gap.homeScore) strongWins++;
+    }
+    expect(points / N).toBeGreaterThan(27);
+    expect(points / N).toBeLessThan(33);
+    expect(margin / N).toBeGreaterThan(8);
+    expect(margin / N).toBeLessThan(12);
+    expect(homeWins / N).toBeGreaterThan(0.44);
+    expect(homeWins / N).toBeLessThan(0.53);
+    expect(strongWins / N).toBeGreaterThan(0.68);
+    expect(strongWins / N).toBeLessThan(0.84);
+  });
 });
 
 describe('simulateRivalRound', () => {

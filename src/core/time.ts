@@ -25,8 +25,9 @@ export interface TickContext {
   fastForward: boolean;
   /**
    * Hold the week here (a live match the player is watching decides its own
-   * result, coach calls #73): the hooks after this one, and the week's end,
-   * wait for resumeWeek(). Absent where a week can't be held.
+   * result, coach calls #73; a rival round played off the main thread, N9.2):
+   * the hooks of the same order still run, then the later hooks and the week's
+   * end wait for one resumeWeek() per hold. Absent where a week can't be held.
    */
   hold?: () => void;
 }
@@ -149,32 +150,38 @@ export function advanceWeek(): void {
   if (getState().sacked) return; // game over (#47): the save stays, time stops
   if (held) return; // a held week finishes first (resumeWeek)
   const { week, season } = getState();
-  let holding = false;
-  const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(fastForwardFlag ? {} : { hold: () => (holding = true) }) };
+  let holding = 0;
+  const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(fastForwardFlag ? {} : { hold: () => void holding++ }) };
 
   const entries = sortedEntries(tickHooks);
   for (let i = 0; i < entries.length; i++) {
     entries[i]!.fn(ctx);
-    if (holding) {
-      held = { ctx: { week, season, fastForward: false }, rest: entries.slice(i + 1) };
+    // Held: finish this order's hooks (the player's match and the rival round
+    // run side by side), then wait for every hold to be released.
+    if (holding > 0 && entries[i + 1]?.order !== entries[i]!.order) {
+      held = { ctx: { week, season, fastForward: false }, rest: entries.slice(i + 1), pending: holding };
       return;
     }
   }
   finishWeek(week);
 }
 
-/** A week held at a live match (coach calls #73): the hooks still to run. */
-let held: { ctx: TickContext; rest: TickEntry[] } | null = null;
+/** A held week (coach calls #73; N9.2): the hooks still to run, and how many holds are still out. */
+let held: { ctx: TickContext; rest: TickEntry[]; pending: number } | null = null;
 
 /** True while a week is held, waiting for its live match to finish. */
 export function weekHeld(): boolean {
   return held !== null;
 }
 
-/** Finish a held week: the hooks after the one that held it, then the week's end, as advanceWeek would have. */
+/**
+ * Release one hold. With the last one released, finish the week: the hooks
+ * after the ones that held it, then the week's end, as advanceWeek would have.
+ */
 export function resumeWeek(): void {
   const h = held;
   if (!h) return;
+  if (--h.pending > 0) return;
   held = null;
   for (const entry of h.rest) entry.fn(h.ctx);
   finishWeek(h.ctx.week);

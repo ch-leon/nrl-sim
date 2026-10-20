@@ -227,7 +227,7 @@ function buildFixturesTab(state: GameState): HTMLElement {
   const wrap = el('div', { class: 'nrl-fixtures' });
 
   if (state.league.fixtures.length > 0) wrap.append(nextMatchCard(state));
-  wrap.append(coachCallsToggle());
+  wrap.append(coachCallsToggle(), liveRivalsToggle());
 
   if (state.league.fixtures.length === 0) {
     wrap.append(panel({}, el('p', { text: 'No fixtures yet — season not started.' })));
@@ -269,6 +269,22 @@ function coachCallsToggle(): HTMLElement {
     { class: 'nrl-live-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
     box,
     el('span', { text: ' Coach calls — nudge your side during a match (hit-up, shift, kick early, rush…)' }),
+  );
+}
+
+/** Rival-v-rival matches on the live match sim (N9.2): off unless turned on (weeks take longer). */
+function liveRivalsToggle(): HTMLElement {
+  const box = el('input', { class: 'nrl-toggle-box', attrs: { type: 'checkbox' } });
+  box.checked = getState().settings.liveRivals === true;
+  box.addEventListener('change', () => {
+    setState({ settings: { ...getState().settings, liveRivals: box.checked } });
+    save(getState());
+  });
+  return el(
+    'label',
+    { class: 'nrl-live-toggle nrl-rivals-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
+    box,
+    el('span', { text: ' Rival matches on the match engine — every result played out, with real stats and injuries' }),
   );
 }
 
