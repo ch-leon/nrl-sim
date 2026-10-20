@@ -60,7 +60,9 @@ Behaviour:
   built `scoutOffice` facility (0 if none) and `rep = state.reputation`. Compute
   `bias = scoutLevel * 0.12 + rep / 250` (0..~0.76). Roll `r = rng.next() + bias`:
   `r >= 1.1 → 'star'`, `r >= 0.7 → 'average'`, else `'rookie'`. Generate via
-  `generatePlayer(rng, { quality })`.
+  `generatePlayer(rng, { quality })`. *Superseded (N12, #247): the pool is now
+  generated around `freeagency.poolTarget`, the league mean less a little, lifted
+  by the same scouting bias; see BAK-188's 2026-10 retune.*
 - **Sign reasons (exact):** `'squad-full'` when `squad.length >= SQUAD_CAP`;
   `'insufficient-funds'` when `money < SIGNING_FEE_WEEKS * player.wage`;
   `'not-found'` when id absent from `freeAgents`. On success: deduct fee via

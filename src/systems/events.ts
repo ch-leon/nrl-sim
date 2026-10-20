@@ -18,7 +18,7 @@ import {
 } from '../data/events';
 import { EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON } from '../config';
 import { marketWage, withDerivedStrength } from './rivals';
-import { NEW_CONTRACT_WEEKS, SIGNING_FEE_WEEKS } from './freeagency';
+import { NEW_CONTRACT_WEEKS, signingFee } from './freeagency';
 import { makeRng, type Rng } from '../utils/rng';
 import { clampMorale } from './morale';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
@@ -92,6 +92,9 @@ export function subjectCandidates(state: GameState, rule: SubjectRule): Player[]
 /**
  * Each rival's best fit player who would walk into the player's starting side
  * (beats its ON_FIELD-th best), and whom the club could afford and fit (#74).
+ * The fee is the Recruit screen's signingFee (by rating and age, less the Scout
+ * Office discount; N12), so the card is never a cheaper way to the same star:
+ * four weeks' wages made an 85 about $13k.
  */
 export function rivalStars(state: GameState): { club: RivalClub; player: Player; fee: number }[] {
   if (state.squad.length >= SQUAD_CAP) return [];
@@ -103,7 +106,7 @@ export function rivalStars(state: GameState): { club: RivalClub; player: Player;
     const best = club.squad.filter((p) => p.injuredWeeks <= 0)
       .sort((a, b) => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id))[0];
     if (!best || overallRating(best) <= cut) continue;
-    const fee = SIGNING_FEE_WEEKS * marketWage(best);
+    const fee = signingFee(state, best);
     if (fee <= state.money) out.push({ club, player: best, fee });
   }
   return out;

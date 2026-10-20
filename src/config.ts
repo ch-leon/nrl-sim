@@ -33,12 +33,17 @@ export const STAT_MAX = 100;
  * START_DEPTH_GAP below, so on Normal the best nine starts level with the rival
  * mean (within a point) instead of thirteen above it; #148 moved it down from
  * two above so an idle club is a mid-table side in its first season.
+ * The free-agent pool sits around the league too (N12): a new club's pool is
+ * generated around MEAN − POOL_BELOW (a level club's first-grader, so the
+ * Recruit screen is not a shop), and scouting lifts it from there
+ * (systems/freeagency.ts poolTarget). Assumed (needs Leon).
  */
 export const LEAGUE = {
   MEAN: 55,
   START_STARS: 1,
   START_FIRST_GRADE: 52,
   START_DEPTH_GAP: 8,
+  POOL_BELOW: 3,
 } as const;
 
 // Training curve (GitHub #35). Each week's stat gain is multiplied by headroom:
@@ -63,7 +68,14 @@ export const TRAINING_FOCUS = {
 // Economy tuning (BAK-188, WU-10). Weekly income/expense loop constants read by
 // src/systems/economy.ts. See the ticket spec for formula derivations.
 export const ECON = {
-  SPONSOR_PER_LEVEL: 3_000,       // × Sponsor Board level, if built
+  // The Sponsor Board (N12): SPONSOR_BASE + SPONSOR_PER_REP × reputation a week,
+  // at most SPONSOR_CAP, × the level step (LEVEL_MULT: 1 / 1.6 / 2.2). For its
+  // $10,000 build and $100 upkeep, L1 pays back in 29 weeks at reputation 30
+  // ($450 a week), 15 at 60 ($750) and 11 at 100 (the $1,000 cap, from 85). A
+  // flat $3,000 a level paid back in four weeks. Assumed (needs Leon).
+  SPONSOR_BASE: 150,
+  SPONSOR_PER_REP: 10,
+  SPONSOR_CAP: 1_000,
   REP_GRANT_PER_POINT: 40,        // × reputation, weekly base grant (#176: was 50)
   TICKET_PRICE: 20,               // $ per attendee (#176: 20 → 18; N12.3: back to 20 with the running costs, Assumed)
   // Gates with a roof (N6, #169): attendance = min(capacity, demand), where
@@ -177,6 +189,7 @@ export const CONTRACTS = {
 // had a roof); a managed club has to earn its signings and an idle one goes under.
 // N12.2 retired `rivalStrength` (×1.1 Hard, ×0.92 Easy on the rival sheet's
 // aggregates, which the live sim never reads: it changed nothing in a match).
+// Easy pays wages ×0.9 (N12; ×0.85 banked an idle club about $150k a season).
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 export const DEFAULT_DIFFICULTY: Difficulty = 'normal';
@@ -198,7 +211,7 @@ export interface DifficultyMultipliers {
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
-  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalEdge: -2, startRating: 4, overhead: 0.8 },
+  easy: { startingMoney: 1.5, wages: 0.9, injuryRate: 0.7, rivalEdge: -2, startRating: 4, overhead: 0.8 },
   normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalEdge: 0, startRating: 0, overhead: 1 },
   hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalEdge: 0.5, startRating: -4, overhead: 1.2 },
 };

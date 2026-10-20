@@ -61,10 +61,10 @@ describe('financeSummary — weekly P&L', () => {
       squad: [mkPlayer({ wage: 1000 }), mkPlayer({ wage: 2500 })],
     });
     const f = financeSummary(s);
-    // sponsor 3000×2 = 6000 ; grant 40×30 = 1200 ; income 7200 ; wages 3500
-    expect(f.sponsorWeekly).toBe(6000);
+    // sponsor (150 + 10×30) × 1.6 = 720 (N12) ; grant 40×30 = 1200 ; income 1920 ; wages 3500
+    expect(f.sponsorWeekly).toBe(720);
     expect(f.grantWeekly).toBe(1200);
-    expect(f.incomeWeekly).toBe(7200);
+    expect(f.incomeWeekly).toBe(1920);
     expect(f.incomeWeekly).toBe(weeklyIncome(s));
     expect(f.wagesWeekly).toBe(3500);
     expect(f.wagesWeekly).toBe(weeklyWages(s));
@@ -72,8 +72,8 @@ describe('financeSummary — weekly P&L', () => {
     // upkeep: a Sponsor Board at L2 runs at 100 × 1.5 = 150 a week (#164); running costs 1500 (N12.3)
     expect(f.upkeepWeekly).toBe(150);
     expect(f.overheadWeekly).toBe(ECON.OVERHEAD_WEEKLY);
-    expect(f.netWeekly).toBe(7200 - 3500 - 150 - 1500);
-    expect(f.burnWeekly).toBe(0);
+    expect(f.netWeekly).toBe(1920 - 3500 - 150 - 1500);
+    expect(f.burnWeekly).toBe(3500 + 150 + 1500 - 1920);
   });
 
   it('the running costs count against the net and the burn, by difficulty (N12.3)', () => {

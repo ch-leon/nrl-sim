@@ -11,7 +11,9 @@ import { bus } from '../../src/core/events';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../../src/core/time';
 import { makeRng } from '../../src/utils/rng';
 import { EVENTS, WEEKS_PER_SEASON } from '../../src/config';
-import { overallRating } from '../../src/data/player';
+import { marketWage, overallRating } from '../../src/data/player';
+import { SIGNING_FEE_WEEKS, signingFee } from '../../src/systems/freeagency';
+import { transferFee } from '../../src/systems/contracts';
 
 beforeEach(() => {
   bus.clear();
@@ -362,6 +364,38 @@ describe('rival player cards (#74)', () => {
     expect(r.money).toEqual([{ amount: -ev.fee!, reason: 'event: Unsettled at a rival' }]);
     expect(r.news[0]!.text).toContain(ev.vars!.rival!);
     void star; void rivalId;
+  });
+
+  it('quotes the Recruit screen\'s signingFee for the star, not four weeks\' wages (N12)', async () => {
+    const { rivalStars } = await import('../../src/systems/events');
+    const { s: base, star: old, rivalId } = setup();
+    const star = { ...old, age: 26 }; // a 95 in his prime
+    const s = { ...base, league: { ...base.league, clubs: base.league.clubs.map((c) => (c.id === rivalId ? { ...c, squad: [star, ...c.squad!.slice(1)] } : c)) } };
+    const offer = rivalStars(s).find((r) => r.player.id === star.id)!;
+    expect(offer.fee).toBe(signingFee(s, star));
+    expect(offer.fee).toBe(transferFee(star)); // by rating and age, no Scout Office
+    expect(offer.fee).toBeGreaterThan(4 * SIGNING_FEE_WEEKS * marketWage(star)); // was SIGNING_FEE_WEEKS × his wage
+    // The Scout Office's discount applies on the card as on the Recruit screen.
+    const scouted = { ...s, facilities: [{ id: 'sc', defId: 'scoutOffice' as const, level: 2 as const, x: 0, y: 0 }] };
+    const discounted = rivalStars(scouted).find((r) => r.player.id === star.id)!;
+    expect(discounted.fee).toBe(signingFee(scouted, star));
+    expect(discounted.fee).toBe(Math.round(transferFee(star) * 0.8));
+    // Four weeks' wages in the bank is no longer enough to be offered him.
+    expect(rivalStars({ ...s, money: offer.fee - 1 }).some((r) => r.player.id === star.id)).toBe(false);
+  });
+
+  it('the drawn card\'s text and the money taken are that fee (N12)', () => {
+    const { s } = setup();
+    let ev: PendingEvent | null = null;
+    for (let seed = 0; !ev || ev.cardId !== 'rivalUnsettled'; seed++) {
+      const only = { ...s, eventDeck: { ...s.eventDeck, cooldowns: Object.fromEntries(EVENT_CARDS.filter((c) => c.id !== 'rivalUnsettled').map((c) => [c.id, 999])) } };
+      ev = drawEvent(only, 10, makeRng(seed));
+    }
+    const picked = s.league.clubs.find((c) => c.id === ev!.rivalId)!.squad!.find((p) => p.id === ev!.subjectId)!;
+    expect(ev.fee).toBe(signingFee(s, picked));
+    expect(ev.vars!.fee).toBe(`$${signingFee(s, picked).toLocaleString('en-US')}`);
+    const r = resolveEvent({ ...s, eventDeck: { ...s.eventDeck, pending: [ev] } }, ev.id, 0, 10)!;
+    expect(r.money).toEqual([{ amount: -signingFee(s, picked), reason: 'event: Unsettled at a rival' }]);
   });
 
   it('falls through cleanly when the player has gone or the money has run out', () => {

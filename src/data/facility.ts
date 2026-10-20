@@ -149,7 +149,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
  * See BAK-168. Units documented per key.
  */
 export const SPECIAL_MAGNITUDE: Record<FacilitySpecial, number> = {
-  income: 1500, // +$/week per Sponsor Board
+  income: 1500, // not read: the Sponsor Board's return is ECON.SPONSOR_* by reputation (economy.sponsorReturn, N12)
   gate: 4000, // +$/week attendance uplift per Grandstand
   recruitQuality: 0.1, // +free-agent quality bias per Academy level (Scout Office uses 0.12; freeagency.ts)
   injuryRecovery: -0.5, // injuredWeeks decay accel per Physio/Medical

@@ -148,3 +148,22 @@ export function generatePlayerAround(rng: Rng, target: number, opts: Omit<GenPla
   const stats: PlayerStats = { speed: roll(), strength: roll(), stamina: roll(), skill: roll(), footyIQ: roll() };
   return { ...base, stats, wage: marketWage({ stats }) };
 }
+
+/**
+ * How far a free agent's own target may land from the pool's (N12): two rolls of
+ * ±FREE_AGENT_SPREAD added, so most land near it and about one in twenty-five is
+ * 13 or more above it (a 65+ in a new club's pool). Assumed (needs Leon).
+ */
+export const FREE_AGENT_SPREAD = 8;
+
+/**
+ * A free agent around the pool's `target` overall (freeagency.poolTarget): the
+ * target (rounded, so the stats stay whole) moved by two ±FREE_AGENT_SPREAD
+ * rolls, then generatePlayerAround. The pool's quality follows the league (N12)
+ * instead of the old rookie / average / star rolls, which made a new game's
+ * Recruit screen a shop.
+ */
+export function generateFreeAgent(rng: Rng, target: number): Player {
+  const own = Math.round(target) + rng.int(-FREE_AGENT_SPREAD, FREE_AGENT_SPREAD) + rng.int(-FREE_AGENT_SPREAD, FREE_AGENT_SPREAD);
+  return generatePlayerAround(rng, own);
+}
