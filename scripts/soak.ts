@@ -105,9 +105,10 @@ const pct = (n: number): string => `${Math.round(n * 100)}%`;
 
 // One row per run; the record, finish, gap and signings columns are the last season's;
 // fin (finals appearances of seasons played) and near (wins ÷ games against the
-// three nearest-rated rivals, games in brackets) are the whole run's (N12.1).
+// three nearest-rated rivals, games in brackets) are the whole run's (N12.1), and so is
+// forf (rounds forfeited short of 13 fit, finding 20).
 if (liveRivals) console.log('Rival rounds on the live sim (--live-rivals) in the fresh-game runs.');
-console.log(`${pad('seed', 7)} ${pad('mode', 9)} ${pad('from', 4)} ${pad('seasons', 7)} ${pad('money', 9)} ${pad('minMoney', 9)} ${pad('squad', 5)} ${pad('pool', 5)} ${pad('KB', 6)} ${pad('rivals', 7)} ${pad('rep', 4)} ${pad('record', 8)} ${pad('margin', 6)} ${pad('pos', 3)} ${pad('fin', 4)} ${pad('near', 9)} ${pad('nine', 5)} ${pad('rmean', 5)} ${pad('gap', 5)} ${pad('signed', 12)} ${pad('ms', 6)} problems`);
+console.log(`${pad('seed', 7)} ${pad('mode', 9)} ${pad('from', 4)} ${pad('seasons', 7)} ${pad('money', 9)} ${pad('minMoney', 9)} ${pad('squad', 5)} ${pad('pool', 5)} ${pad('KB', 6)} ${pad('rivals', 7)} ${pad('rep', 4)} ${pad('record', 8)} ${pad('margin', 6)} ${pad('pos', 3)} ${pad('forf', 4)} ${pad('fin', 4)} ${pad('near', 9)} ${pad('nine', 5)} ${pad('rmean', 5)} ${pad('gap', 5)} ${pad('signed', 12)} ${pad('ms', 6)} problems`);
 for (const r of results) {
   const last = r.seasons[r.seasons.length - 1];
   const minMoney = Math.min(...r.seasons.map((s) => s.minMoney));
@@ -119,7 +120,7 @@ for (const r of results) {
     pad(last?.squad ?? '-', 5), pad(last?.freeAgents ?? '-', 5), pad(last ? (last.saveBytes / 1024).toFixed(0) : '-', 6),
     pad(last ? `${last.rivalStrength[0]}-${last.rivalStrength[1]}` : '-', 7), pad(last?.reputation ?? '-', 4),
     pad(last ? `${last.wins}-${last.draws}-${last.losses}` : '-', 8), pad(last ? signed(last.marginPerGame) : '-', 6),
-    pad(last?.ladderPosition ?? '-', 3),
+    pad(last?.ladderPosition ?? '-', 3), pad(r.seasons.reduce((t, s) => t + s.forfeits, 0), 4),
     pad(last ? `${r.seasons.filter((s) => s.madeFinals).length}/${r.seasons.length}` : '-', 4),
     pad(nearGames ? `${pct(nearWins / nearGames)} (${nearGames})` : '-', 9),
     pad(last ? last.bestNine.toFixed(1) : '-', 5), pad(last ? last.rivalMean.toFixed(1) : '-', 5),
@@ -133,13 +134,13 @@ for (const r of results) {
 // Per-season averages over the seeds, by mode: the baseline for the parity work.
 const summary = summariseSeasons(results);
 if (summary.length) {
-  console.log(`\nPer season, averaged over ${seeds} seeds (record, margin a game, ladder finish, share in the top eight / premiers / sacked, finals appearances per run so far, the win rate against the three nearest-rated rivals (games in brackets), the player's best nine v the rival mean, rival range, money, managed signings). Start gap = best nine − rival mean at week 1.`);
-  console.log(`${pad('mode', 9)} ${pad('season', 6)} ${pad('runs', 4)} ${pad('record', 14)} ${pad('margin', 6)} ${pad('pos', 4)} ${pad('top8', 4)} ${pad('prem', 4)} ${pad('sack', 4)} ${pad('fin', 4)} ${pad('near', 10)} ${pad('nine', 5)} ${pad('rmean', 5)} ${pad('gap', 5)} ${pad('range', 7)} ${pad('money', 7)} ${pad('signings', 18)} ${pad('start', 5)}`);
+  console.log(`\nPer season, averaged over ${seeds} seeds (record, margin a game, ladder finish, share in the top eight / premiers / sacked, rounds forfeited, finals appearances per run so far, the win rate against the three nearest-rated rivals (games in brackets), the player's best nine v the rival mean, rival range, money, managed signings). Start gap = best nine − rival mean at week 1.`);
+  console.log(`${pad('mode', 9)} ${pad('season', 6)} ${pad('runs', 4)} ${pad('record', 14)} ${pad('margin', 6)} ${pad('pos', 4)} ${pad('top8', 4)} ${pad('prem', 4)} ${pad('sack', 4)} ${pad('forf', 4)} ${pad('fin', 4)} ${pad('near', 10)} ${pad('nine', 5)} ${pad('rmean', 5)} ${pad('gap', 5)} ${pad('range', 7)} ${pad('money', 7)} ${pad('signings', 18)} ${pad('start', 5)}`);
   for (const s of summary) {
     console.log([
       pad(modeLabel(s), 9), pad(s.season, 6), pad(s.runs, 4),
       pad(`${s.wins.toFixed(1)}-${s.draws.toFixed(1)}-${s.losses.toFixed(1)}`, 14), pad(signed(s.marginPerGame), 6), pad(s.ladderPosition.toFixed(1), 4),
-      pad(pct(s.finals), 4), pad(pct(s.premierships), 4), pad(pct(s.sacked), 4),
+      pad(pct(s.finals), 4), pad(pct(s.premierships), 4), pad(pct(s.sacked), 4), pad(s.forfeits.toFixed(1), 4),
       pad(s.finalsAppearances.toFixed(1), 4), pad(s.nearRivalGames ? `${pct(s.nearRivalWinRate)} (${s.nearRivalGames})` : '-', 10),
       pad(s.bestNine.toFixed(1), 5), pad(s.rivalMean.toFixed(1), 5), pad(signed(s.gap), 5), pad(`${s.rivalRange[0]}-${s.rivalRange[1]}`, 7),
       pad(k(s.money), 7), pad(s.signings ? `${s.signings.toFixed(1)} at ${s.signedOverall.toFixed(0)} ovr, ${k(s.signingFees)}` : '-', 18),
@@ -184,6 +185,20 @@ if (jsonOut) {
   writeFileSync(jsonOut, JSON.stringify({ seasons, seeds, liveRivals, results, summary }, null, 1));
   console.log(`\nWrote ${jsonOut}`);
 }
+
+// Forfeits are the game working as written (a club short of 13 fit forfeits), not a problem;
+// but a run that forfeits whole seasons says the manager can't keep a squad (finding 20).
+// Every run counts here, the old-save ones too; the per-season `forf` above is fresh games only.
+const forfeiting = results.filter((r) => r.seasons.some((s) => s.forfeits > 0));
+if (forfeiting.length) {
+  const by = new Map<string, number>();
+  for (const r of forfeiting) {
+    const label = r.fromVersion !== undefined ? 'old saves' : modeLabel(r);
+    by.set(label, (by.get(label) ?? 0) + 1);
+  }
+  const whole = results.filter((r) => r.seasons.some((s) => s.forfeits > 0 && s.forfeits >= s.wins + s.draws + s.losses)).length;
+  console.log(`\nForfeits: ${forfeiting.length} of ${results.length} runs forfeited rounds (${[...by].map(([m, n]) => `${m} ${n}`).join(', ')}); ${whole} forfeited a whole season.`);
+} else console.log(`\nForfeits: none in ${results.length} runs.`);
 
 const all = results.flatMap((r) => r.problems.map((p) => `seed ${r.seed} ${r.mode}${r.fromVersion !== undefined ? ` from v${r.fromVersion}` : ''}: ${p}`));
 console.log(all.length ? `\n${all.length} problems:\n${all.join('\n')}` : '\nNo problems.');
