@@ -34,12 +34,19 @@ describe('soak checks', () => {
       expect(res.ok, `v${v}`).toBe(true);
       if (res.ok) expect(checkState(res.state), `v${v}`).toEqual([]);
     }
-    // Each version's old save lacks what its migration adds, so the step really runs: v18's board loan.
+    // Each version's old save lacks what its migration adds, so the step really runs: v18's board
+    // loan and v19's staff.
     const owing = { ...getState(), boardLoan: { owed: 12_000 } };
     expect(asOldSave(owing, 17)).not.toHaveProperty('boardLoan');
     expect(asOldSave(owing, 18)).toHaveProperty('boardLoan', { owed: 12_000 });
     const back = migrateState(asOldSave(owing, 17));
     expect(back.ok && back.state.boardLoan).toEqual({ owed: 0 });
+    const welfare = { role: 'welfare' as const, name: 'Pat Doyle', wage: 1_500, hiredSeason: 1 };
+    const staffed = { ...getState(), staff: [welfare] };
+    expect(asOldSave(staffed, 18)).not.toHaveProperty('staff');
+    expect(asOldSave(staffed, 19)).toHaveProperty('staff', [welfare]);
+    const unstaffed = migrateState(asOldSave(staffed, 18));
+    expect(unstaffed.ok && unstaffed.state.staff).toEqual([]);
   });
 });
 
