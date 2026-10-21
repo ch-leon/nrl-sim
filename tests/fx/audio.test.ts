@@ -323,6 +323,20 @@ describe('AudioEngine (fake context)', () => {
     expect(spy).toHaveBeenCalledWith('click');
   });
 
+  it('a burst of match events in one moment starts each SFX once (a skipped match, QA finding 16)', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const tackle = SFX_PRESETS.tackle;
+    const one = { oscillators: tackle.tones.length, buffers: tackle.noises.length };
+    // Skip lands the rest of the match's events in one synchronous go: the audio clock doesn't move.
+    for (let t = 0; t < 200; t++) bus.emit('match:event', { t, kind: 'big-hit', teamId: 'player' });
+    expect({ oscillators: fake.oscillators, buffers: fake.buffers }).toEqual(one);
+    // A tackle a moment later is a new sound.
+    fake.currentTime += 0.1;
+    bus.emit('match:event', { t: 201, kind: 'big-hit', teamId: 'player' });
+    expect({ oscillators: fake.oscillators, buffers: fake.buffers }).toEqual({ oscillators: 2 * one.oscillators, buffers: 2 * one.buffers });
+  });
+
   it('playMusic is idempotent per track and switches on match events', () => {
     const spy = vi.spyOn(engine, 'playMusic');
     engine.subscribeBus();
