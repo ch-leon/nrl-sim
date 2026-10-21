@@ -13,18 +13,24 @@ import {
   releasePlayer,
   freeAgencyTick,
   registerFreeAgencySystem,
+  poolTarget,
+  scoutBias,
+  POOL_POINTS_PER_BIAS,
+  SCOUT_BIAS_PER_LEVEL,
 } from '../../src/systems/freeagency';
 import {
   createNewGame, getState, setState, type Player,
 } from '../../src/core/state';
 import { makeRng } from '../../src/utils/rng';
-import { overallRating } from '../../src/data/player';
+import { FREE_AGENT_SPREAD, overallRating } from '../../src/data/player';
+import { SPECIAL_MAGNITUDE } from '../../src/data/facility';
 import { transferFee } from '../../src/systems/contracts';
+import { REP_BASELINE } from '../../src/systems/league';
 import { bus } from '../../src/core/events';
 import {
   clearTickHooks, advanceWeek, TICK_ORDER,
 } from '../../src/core/time';
-import { SQUAD_CAP, SQUAD_MIN } from '../../src/config';
+import { LEAGUE, SQUAD_CAP, SQUAD_MIN } from '../../src/config';
 
 beforeEach(() => {
   bus.clear();
@@ -128,6 +134,78 @@ describe('refreshFreeAgents', () => {
     const lowRep = meanOverallWithRep(1, runs);
     const highRep = meanOverallWithRep(100, runs);
     expect(highRep).toBeGreaterThan(lowRep);
+  });
+});
+
+describe('the pool follows the league (N12)', () => {
+  type Built = { defId: 'scoutOffice' | 'academy'; level: 1 | 2 | 3 };
+  const club = (reputation: number, built: Built[] = []) => ({
+    reputation,
+    facilities: built.map((b) => ({ id: b.defId, defId: b.defId, level: b.level, x: 0, y: 0 })),
+  });
+  /** Every overall from `runs` refreshes through the real refreshFreeAgents at this club. */
+  const refreshed = (reputation: number, built: Built[] = [], runs = 40): number[] => {
+    const out: number[] = [];
+    for (let seed = 1; seed <= runs; seed++) {
+      createNewGame('Test Club', seed);
+      setState({ ...club(reputation, built), freeAgents: [] });
+      out.push(...refreshFreeAgents(getState(), makeRng(seed * 31 + 5)).freeAgents.map(overallRating));
+    }
+    return out;
+  };
+  const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+  it('targets the league mean less POOL_BELOW at a new club, lifted by scouting and reputation', () => {
+    expect(LEAGUE.POOL_BELOW).toBe(3);
+    expect(scoutBias(club(REP_BASELINE))).toBe(0);
+    expect(poolTarget(club(REP_BASELINE))).toBe(LEAGUE.MEAN - LEAGUE.POOL_BELOW);
+    expect(poolTarget(createNewGame('Test Club', 3))).toBe(52);
+    expect(poolTarget(club(REP_BASELINE, [{ defId: 'scoutOffice', level: 1 }])) - 52).toBeCloseTo(SCOUT_BIAS_PER_LEVEL * POOL_POINTS_PER_BIAS); // +3
+    expect(poolTarget(club(REP_BASELINE, [{ defId: 'academy', level: 1 }])) - 52).toBeCloseTo(SPECIAL_MAGNITUDE.recruitQuality * POOL_POINTS_PER_BIAS); // +2.5
+    expect(poolTarget(club(100))).toBeCloseTo(59); // +1 for every 10 points above the baseline
+    expect(poolTarget(club(10))).toBeCloseTo(50); // and a little off below it
+    expect(poolTarget(club(100, [{ defId: 'scoutOffice', level: 3 }, { defId: 'academy', level: 3 }]))).toBeCloseTo(75.5);
+  });
+
+  it('a new game\'s opening pool sits around the target: a level club\'s first-grader, a star now and then', () => {
+    const all: number[] = [];
+    for (let seed = 1; seed <= 100; seed++) all.push(...createNewGame('Test Club', seed).freeAgents.map(overallRating));
+    expect(Math.abs(mean(all) - 52)).toBeLessThan(1.5); // was about 60: every agent an 'average' roll
+    const over65 = all.filter((o) => o >= 65).length / all.length;
+    expect(over65).toBeGreaterThan(0.01); // stars still turn up...
+    expect(over65).toBeLessThan(0.08); // ...but rarely (was about 15%)
+    expect(Math.max(...all)).toBeLessThanOrEqual(52 + 2 * FREE_AGENT_SPREAD + 6);
+  });
+
+  it('a refresh at reputation 30 lands within a point and a half of the target, and higher with a Scout Office or an Academy', () => {
+    const base = refreshed(30);
+    expect(Math.abs(mean(base) - 52)).toBeLessThan(1.5);
+    const scout = refreshed(30, [{ defId: 'scoutOffice', level: 3 }]);
+    expect(Math.abs(mean(scout) - 61)).toBeLessThan(1.5);
+    const academy = refreshed(30, [{ defId: 'academy', level: 3 }]);
+    expect(Math.abs(mean(academy) - 59.5)).toBeLessThan(1.5);
+    expect(mean(scout)).toBeGreaterThan(mean(base) + 6);
+    expect(mean(academy)).toBeGreaterThan(mean(base) + 5);
+  });
+
+  it('keeps every stat a whole number when reputation puts the target between two', () => {
+    createNewGame('Test Club', 5);
+    setState({ reputation: 35 }); // target 52.5
+    for (const p of refreshFreeAgents(getState(), makeRng(8)).freeAgents) {
+      for (const v of Object.values(p.stats)) expect(Number.isInteger(v)).toBe(true);
+    }
+  });
+
+  it('leaves Academy prospects and departed players exactly as they were', () => {
+    createNewGame('Test Club', 6);
+    const [a, b] = getState().freeAgents;
+    const junior: Player = { ...a!, id: 'jr', junior: true, stats: { speed: 41, strength: 42, stamina: 43, skill: 44, footyIQ: 45 } };
+    const departed: Player = { ...b!, id: 'gone', departed: true, stats: { speed: 71, strength: 72, stamina: 73, skill: 74, footyIQ: 75 } };
+    setState({ ...club(100, [{ defId: 'scoutOffice', level: 3 }, { defId: 'academy', level: 3 }]), freeAgents: [junior, departed] });
+    const pool = refreshFreeAgents(getState(), makeRng(9)).freeAgents;
+    expect(pool.slice(0, 2)).toEqual([junior, departed]);
+    expect(pool).toHaveLength(2 + FREE_AGENT_POOL_SIZE);
+    expect(pool.slice(2).every((p) => !p.junior && !p.departed)).toBe(true);
   });
 });
 

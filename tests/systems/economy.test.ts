@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, homeGate, recentForm, tickContracts,
   handleBankruptcy, applyEconomy, registerEconomySystem, registerFinanceSystem, financeNet, classifyReason,
-  nextStandGate, stampMovement, weeklyOverhead,
+  nextStandGate, stampMovement, weeklyOverhead, sponsorIncome, sponsorReturn,
 } from '../../src/systems/economy';
 import { emptyFinance, setState } from '../../src/core/state';
 import { earnMoney, spendMoney } from '../../src/data/club';
-import { FACILITY_CATALOG, facilityUpkeep } from '../../src/data/facility';
+import { FACILITY_CATALOG, LEVEL_MULT, facilityUpkeep, upgradeCost } from '../../src/data/facility';
 import { renewalWage } from '../../src/systems/contracts';
 import {
   createNewGame, getState, loadState,
@@ -110,15 +110,57 @@ describe('weeklyIncome', () => {
     expect(weeklyIncome(getState())).toBe(30 * ECON.REP_GRANT_PER_POINT);
     expect(ECON.REP_GRANT_PER_POINT).toBe(40);
   });
-  it('sponsor board adds 3000 × level', () => {
+  it('a sponsor board adds its return at its level and the club\'s reputation (N12)', () => {
     setup({ reputation: 30, facilities: [pf('sponsorBoard', 2)] });
-    // 3000×2 + 40×30 = 6000 + 1200 = 7200
-    expect(weeklyIncome(getState())).toBe(6000 + 30 * ECON.REP_GRANT_PER_POINT);
+    // (150 + 10×30) × 1.6 = 720 ; grant 40×30 = 1200
+    expect(sponsorIncome(getState())).toBe(720);
+    expect(weeklyIncome(getState())).toBe(720 + 30 * ECON.REP_GRANT_PER_POINT);
   });
   it('sponsor income is 0 without a board (only rep grant)', () => {
     setup({ reputation: 10, facilities: [pf('grandstand', 3)] });
     // grandstand is not a sponsor board → sponsor part 0; 40×10 = 400
     expect(weeklyIncome(getState())).toBe(10 * ECON.REP_GRANT_PER_POINT);
+  });
+});
+
+describe('the Sponsor Board\'s return (N12)', () => {
+  it('is SPONSOR_BASE + SPONSOR_PER_REP × reputation a week at L1', () => {
+    expect(ECON.SPONSOR_BASE).toBe(150);
+    expect(ECON.SPONSOR_PER_REP).toBe(10);
+    expect(sponsorReturn(1, 0)).toBe(150);
+    expect(sponsorReturn(1, 30)).toBe(450);
+    expect(sponsorReturn(1, 60)).toBe(750);
+    expect(sponsorReturn(1, 31) - sponsorReturn(1, 30)).toBe(ECON.SPONSOR_PER_REP);
+  });
+
+  it('is capped at SPONSOR_CAP a level step, from reputation 85', () => {
+    expect(ECON.SPONSOR_CAP).toBe(1_000);
+    expect(sponsorReturn(1, 85)).toBe(1_000);
+    expect(sponsorReturn(1, 84)).toBe(990);
+    expect(sponsorReturn(1, 100)).toBe(1_000);
+  });
+
+  it('steps by level like every facility (LEVEL_MULT) and is 0 unbuilt', () => {
+    expect(LEVEL_MULT).toEqual([1, 1.6, 2.2]);
+    expect(sponsorReturn(0, 60)).toBe(0);
+    expect([1, 2, 3].map((l) => sponsorReturn(l, 30))).toEqual([450, 720, 990]);
+    expect([1, 2, 3].map((l) => sponsorReturn(l, 100))).toEqual([1_000, 1_600, 2_200]);
+  });
+
+  it('pays back its build in a season or more at reputation 30, and fast enough at the top to be worth having', () => {
+    const def = FACILITY_CATALOG.sponsorBoard;
+    const payback = (rep: number): number => upgradeCost(def, 1) / (sponsorReturn(1, rep) - facilityUpkeep(def, 1));
+    expect(payback(30)).toBeGreaterThanOrEqual(WEEKS_PER_SEASON); // 10,000 / 350 ≈ 29 weeks (a flat $3,000 paid back in 4)
+    expect(payback(30)).toBeLessThan(WEEKS_PER_SEASON + 5);
+    expect(Math.round(payback(60))).toBe(15);
+    expect(Math.round(payback(100))).toBe(11);
+  });
+
+  it('weeklyIncome follows the club\'s reputation through the board', () => {
+    setup({ reputation: 80, facilities: [pf('sponsorBoard', 3)] });
+    // min(1000, 150 + 800) × 2.2 = 2090 ; grant 40×80 = 3200
+    expect(sponsorIncome(getState())).toBe(2090);
+    expect(weeklyIncome(getState())).toBe(2090 + 80 * ECON.REP_GRANT_PER_POINT);
   });
 });
 
@@ -452,8 +494,8 @@ describe('applyEconomy — full weekly loop', () => {
       league: { clubs: [], fixtures: [], ladder: [] },
     });
     applyEconomy(getState());
-    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; running costs -1500 ; sponsor 3000 + grant 40×30 = 1200 ; no gate (empty league)
-    expect(getState().money).toBe(100_000 - 5000 - 100 - ECON.OVERHEAD_WEEKLY + 3000 + 30 * ECON.REP_GRANT_PER_POINT);
+    // wages -5000 ; upkeep -100 (Sponsor Board L1) ; running costs -1500 ; sponsor 150 + 10×30 = 450 + grant 40×30 = 1200 ; no gate (empty league)
+    expect(getState().money).toBe(100_000 - 5000 - 100 - ECON.OVERHEAD_WEEKLY + 450 + 30 * ECON.REP_GRANT_PER_POINT);
     expect(reasons).toEqual(['wages', 'upkeep', 'overhead', 'sponsor', 'grant']);
   });
 
@@ -630,7 +672,7 @@ describe('the club\'s books (N6, #172)', () => {
     expect(books.wages).toBe(-1000);
     expect(books.upkeep).toBe(-100);
     expect(books.overhead).toBe(-ECON.OVERHEAD_WEEKLY);
-    expect(books.sponsor).toBe(3000);
+    expect(books.sponsor).toBe(sponsorReturn(1, 30)); // $150 + $10 × 30 (N12)
     expect(books.grant).toBe(30 * ECON.REP_GRANT_PER_POINT);
     expect(books.gate).toBe(1200 * ECON.TICKET_PRICE);
   });
@@ -692,6 +734,6 @@ describe('legacy duplicate facilities', () => {
       { id: 'a', defId: 'sponsorBoard', level: 1, x: 0, y: 0 },
       { id: 'b', defId: 'sponsorBoard', level: 2, x: 5, y: 5 },
     ], reputation: 0 });
-    expect(weeklyIncome(getState())).toBe(ECON.SPONSOR_PER_LEVEL * 2);
+    expect(weeklyIncome(getState())).toBe(sponsorReturn(2, 0));
   });
 });

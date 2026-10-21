@@ -15,7 +15,7 @@ import { bus } from '../core/events';
 import { earnMoney } from '../data/club';
 import { ECON, SEASON_ROUNDS, SQUAD_MIN, WEEKS_PER_SEASON, difficultyMultipliers } from '../config';
 import { sortLadder } from './fixtures';
-import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
+import { FACILITY_CATALOG, facilityUpkeep, levelMult } from '../data/facility';
 import { EVENT_CARDS } from '../data/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks } from './contracts';
@@ -55,9 +55,21 @@ export function weeklyOverhead(state: GameState): number {
   return Math.round(ECON.OVERHEAD_WEEKLY * difficultyMultipliers(state.settings.difficulty).overhead);
 }
 
-/** Sponsor Board income: SPONSOR_PER_LEVEL × its level (0 if unbuilt). */
+/**
+ * What a Sponsor Board at `level` pays a week at `reputation` (N12): SPONSOR_BASE
+ * + SPONSOR_PER_REP × reputation, at most SPONSOR_CAP, × the level step every
+ * facility uses (LEVEL_MULT). 0 at level 0 (unbuilt). The Build menu, the
+ * facility popup and the Guide quote it at the club's reputation.
+ */
+export function sponsorReturn(level: number, reputation: number): number {
+  if (level < 1) return 0;
+  const perLevel = Math.min(ECON.SPONSOR_CAP, ECON.SPONSOR_BASE + ECON.SPONSOR_PER_REP * Math.max(0, reputation));
+  return Math.round(perLevel * levelMult(Math.min(3, level) as 1 | 2 | 3));
+}
+
+/** Sponsor Board income: sponsorReturn at its level and the club's reputation (0 if unbuilt). */
 export function sponsorIncome(state: GameState): number {
-  return ECON.SPONSOR_PER_LEVEL * facilityLevel(state, 'sponsorBoard');
+  return sponsorReturn(facilityLevel(state, 'sponsorBoard'), state.reputation);
 }
 
 /** The weekly reputation grant: REP_GRANT_PER_POINT × reputation. */

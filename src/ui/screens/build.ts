@@ -14,6 +14,7 @@
 import { el, panel, button, openModal, closeModal, closeScreen, mount } from '../dom';
 import {
   FACILITY_CATALOG,
+  LEVEL_MULT,
   SPECIAL_MAGNITUDE,
   facilityUpkeep,
   upgradeCost,
@@ -25,6 +26,9 @@ import { getState, setState } from '../../core/state';
 import { spendMoney } from '../../data/club';
 import { ECON } from '../../config';
 import { bus } from '../../core/events';
+import { sponsorReturn } from '../../systems/economy';
+import { POOL_POINTS_PER_BIAS, SCOUT_BIAS_PER_LEVEL, SCOUT_FEE_DISCOUNT_PER_LEVEL } from '../../systems/freeagency';
+import { REP_BASELINE } from '../../systems/league';
 import {
   activeGroundsScene, demolishFacility, demolishRefund, moveFee, type GroundsSceneLike,
 } from '../../world/placement';
@@ -44,12 +48,15 @@ const STAT_LABEL: Record<keyof PlayerStats, string> = {
   footyIQ: 'Footy IQ',
 };
 
+/** The free-agent pool's lift a level, in overall points (freeagency.poolTarget). */
+const poolLift = (bias: number): number => Math.round(bias * POOL_POINTS_PER_BIAS * 10) / 10;
+
 /** What each special actually does, matching the systems that read it. */
 const SPECIAL_COPY: Record<FacilityDefId, string> = {
-  sponsorBoard: `+$${ECON.SPONSOR_PER_LEVEL.toLocaleString('en-US')}/week per level. One only`,
+  sponsorBoard: '', // depends on the level and the club's reputation: sponsorCopy
   grandstand: `Seats ${ECON.CAPACITY.slice(1).map((n) => n.toLocaleString('en-US')).join(' / ')} by level; the hill holds ${ECON.CAPACITY[0].toLocaleString('en-US')}. One only`,
-  academy: 'Better free-agent quality (+0.1 per level)',
-  scoutOffice: 'Better free-agent quality (+0.12 per level)',
+  academy: `Better free-agent pool (+${poolLift(SPECIAL_MAGNITUDE.recruitQuality)} overall per level)`,
+  scoutOffice: `Better free-agent pool (+${poolLift(SCOUT_BIAS_PER_LEVEL)} overall per level); signing fees ${Math.round(SCOUT_FEE_DISCOUNT_PER_LEVEL * 100)}% cheaper per level`,
   physioCentre: 'Injured players recover 1 week faster',
   medicalBay: 'Injured players recover 1 week faster per level',
   canteen: `+${SPECIAL_MAGNITUDE.morale} squad morale/week per level`,
@@ -57,14 +64,34 @@ const SPECIAL_COPY: Record<FacilityDefId, string> = {
   trainingPaddock: '', weightsRoom: '', videoRoom: '', teamGym: '',
 };
 
-/** Human "what it trains / does" copy derived from a facility's trains + special. */
-export function facilityBlurb(def: FacilityDef): string {
+/** Which level a blurb describes and the club's reputation now (the Sponsor Board's return depends on both). */
+export interface BlurbContext {
+  level: 1 | 2 | 3;
+  reputation: number;
+}
+
+/**
+ * The Sponsor Board's line (N12): what it pays a week at `level` and the club's
+ * reputation (economy.sponsorReturn, the number the weekly tick pays), then the rule.
+ */
+function sponsorCopy({ level, reputation }: BlurbContext): string {
+  const now = fmtMoney(sponsorReturn(level, reputation));
+  const rule = `${fmtMoney(ECON.SPONSOR_BASE)} + ${fmtMoney(ECON.SPONSOR_PER_REP)} a reputation point, up to ${fmtMoney(ECON.SPONSOR_CAP)}; ×${LEVEL_MULT[1]} at L2, ×${LEVEL_MULT[2]} at L3`;
+  return `+${now}/week at L${level} and reputation ${reputation} (${rule}). One only`;
+}
+
+/**
+ * Human "what it trains / does" copy derived from a facility's trains + special.
+ * `ctx` is the level described (the build menu's L1, a placed facility's own)
+ * and the club's reputation; without it, L1 at the baseline reputation.
+ */
+export function facilityBlurb(def: FacilityDef, ctx: BlurbContext = { level: 1, reputation: REP_BASELINE }): string {
   const trains = (Object.entries(def.trains) as [keyof PlayerStats, number][])
     .filter(([, v]) => v > 0)
     .map(([stat, v]) => `+${v} ${STAT_LABEL[stat]}`);
   const parts: string[] = [];
   if (trains.length > 0) parts.push('Trains ' + trains.join(', ') + ' / week');
-  if (def.special) parts.push(SPECIAL_COPY[def.id]);
+  if (def.special) parts.push(def.id === 'sponsorBoard' ? sponsorCopy(ctx) : SPECIAL_COPY[def.id]);
   return parts.length > 0 ? parts.join('. ') : 'A club facility.';
 }
 
@@ -78,6 +105,7 @@ export function facilityBlurb(def: FacilityDef): string {
  */
 export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsScene()): void {
   const money = getState().money;
+  const reputation = getState().reputation;
 
   const rows = Object.values(FACILITY_CATALOG).map((def) => {
     const built = def.unique && getState().facilities.some((f) => f.defId === def.id);
@@ -100,7 +128,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
       },
       el('div', { class: 'nrl-build-title', text: def.name }),
       meta,
-      el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def) }),
+      el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation }) }),
       ...(built ? [el('div', { class: 'nrl-build-hint', text: 'Already built — upgrade it instead.' })] : []),
     );
     if (affordable) {
@@ -159,7 +187,7 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
     el('h2', { class: 'nrl-facility-name', text: def.name }),
     el('div', { class: 'nrl-facility-level', text: `Level ${facility.level} / 3` }),
     el('div', { class: 'nrl-facility-upkeep', text: upkeepText }),
-    el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def) }),
+    el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, reputation: getState().reputation }) }),
   );
 
   if (atMax) {

@@ -41,6 +41,14 @@ describe('difficulty multipliers', () => {
     expect(createNewGame('T', 1).settings.difficulty).toBe('normal');
   });
 
+  it('Easy pays 90% of the wages (N12: 85% banked an idle club about $150k a season), Hard 115%', () => {
+    expect(DIFFICULTY.easy.wages).toBe(0.9);
+    expect(DIFFICULTY.hard.wages).toBe(1.15);
+    createNewGame('T', 1, { difficulty: 'easy' });
+    const base = getState().squad.reduce((n, p) => n + p.wage, 0);
+    expect(weeklyWages(getState())).toBe(Math.round(base * 0.9));
+  });
+
   it.each(DIFFICULTIES)('%s scales weekly wages', (d) => {
     createNewGame('T', 1, { difficulty: d });
     const base = getState().squad.reduce((n, p) => n + p.wage, 0);

@@ -8,8 +8,39 @@
 // match session can update it alone. No Phaser, no DOM.
 
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../match/league/presets';
-import { TRAINING_FOCUS } from '../../config';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
+import { getState, type GameState } from '../../core/state';
+import { DIFFICULTY, ECON, LEAGUE, TRAINING_FOCUS } from '../../config';
+import { LEVEL_MULT } from '../../data/facility';
+import { sponsorReturn } from '../../systems/economy';
+import { REP_BASELINE } from '../../systems/league';
+
+const dollars = (n: number): string => `$${n.toLocaleString('en-US')}`;
+const percent = (x: number): string => `${Math.round(x * 100)}%`;
+
+/** The club the page is read for; null before a game is loaded (the Guide's text then quotes a new club). */
+function clubNow(): Pick<GameState, 'reputation' | 'facilities'> | null {
+  try {
+    return getState();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The Money page's Sponsor Board line (N12): the rule, then what the club's own
+ * board pays at today's reputation (or what a new one would), the number the
+ * weekly tick pays (economy.sponsorReturn). Worked out each time the page is shown.
+ */
+export function sponsorBullet(club: Pick<GameState, 'reputation' | 'facilities'> | null = clubNow()): string {
+  const rep = club?.reputation ?? REP_BASELINE;
+  const level = (club?.facilities ?? []).reduce((m, f) => (f.defId === 'sponsorBoard' ? Math.max(m, f.level) : m), 0);
+  const rule = `A Sponsor Board pays ${dollars(ECON.SPONSOR_BASE)} a week plus ${dollars(ECON.SPONSOR_PER_REP)} a reputation point, up to ${dollars(ECON.SPONSOR_CAP)}, and ${LEVEL_MULT[1]}× that at level 2, ${LEVEL_MULT[2]}× at level 3.`;
+  const now = level > 0
+    ? `Yours (level ${level}) pays ${dollars(sponsorReturn(level, rep))} a week at your reputation of ${rep}.`
+    : `At your reputation of ${rep} a new one would pay ${dollars(sponsorReturn(1, rep))} a week.`;
+  return `${rule} ${now}`;
+}
 
 export interface GuideSection {
   heading?: string;
@@ -63,17 +94,21 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     sections: [
       {
         heading: 'Coming in',
-        bullets: [
-          'Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are $20. A new club draws about 1,200.',
-          'A weekly grant that grows with reputation ($40 a point), and $3,000 a week per level of a Sponsor Board.',
-          'Finals prize money at the rollover: $15,000 for every finals week played, $25,000 more for a grand final and $75,000 for the premiership.',
-          'The board pays $10,000 for every objective met; some event cards pay too.',
-        ],
+        // A getter, so the Sponsor Board line quotes the club's reputation each time the page is shown (N12).
+        get bullets(): string[] {
+          return [
+            'Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are $20. A new club draws about 1,200.',
+            'A weekly grant that grows with reputation ($40 a point).',
+            sponsorBullet(),
+            'Finals prize money at the rollover: $15,000 for every finals week played, $25,000 more for a grand final and $75,000 for the premiership.',
+            'The board pays $10,000 for every objective met; some event cards pay too.',
+          ];
+        },
       },
       {
         heading: 'Going out',
         bullets: [
-          'Wages every week (Easy pays 85%, Hard 115%); wages climb with a player’s rating and with the club’s standing.',
+          `Wages every week (Easy pays ${percent(DIFFICULTY.easy.wages)}, Hard ${percent(DIFFICULTY.hard.wages)}); wages climb with a player’s rating and with the club’s standing.`,
           'Upkeep on every facility: about 1% of its build cost a week, more at higher levels.',
           'Running costs (staff, travel, insurance) every week whatever you have built: $1,500 on Normal, $1,200 on Easy, $1,800 on Hard.',
           'Signing fees, early-renewal fees, building, moving (10% of the build cost) and demolishing (30% back).',
@@ -118,6 +153,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Recruiting',
         bullets: [
           'The free-agent pool holds 12 and refreshes every 4 weeks; rivals sign from the same pool, so a good one does not wait. A signing fee by rating and age applies (a Scout Office takes 10% off per level).',
+          `The pool sits around the league: at a new club its players are about ${LEAGUE.MEAN - LEAGUE.POOL_BELOW} overall, with a star now and then. Reputation, a Scout Office and an Academy lift it.`,
           'Each pre-season the Academy brings 3 prospects aged 17–19 into the pool, 4 with an Academy built and 5 at level 3; from level 2 they arrive as Young Guns.',
           'Short of 13 fit before a match, the Academy calls up juniors to make the side, on the junior wage to the season’s end (better ones with an Academy built).',
         ],
@@ -235,7 +271,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         bullets: [
           'Training Paddock ($8,000): speed and stamina. Weights Room ($15,000): strength. Team Gym ($40,000): strength, speed and stamina. Video Room ($18,000): footy IQ. Coach’s Office ($30,000): IQ and skill, and morale.',
           'Physio Centre ($22,000): stamina, and injuries heal a week faster. Medical Bay ($35,000): injuries heal faster by its level.',
-          'Canteen ($12,000): morale. Sponsor Board ($10,000, one only): $3,000 a week per level. Grandstand ($120,000, one only): seats 3,500, 5,000 or 6,500.',
+          `Canteen ($12,000): morale. Sponsor Board ($10,000, one only): ${dollars(ECON.SPONSOR_BASE)} a week plus ${dollars(ECON.SPONSOR_PER_REP)} a reputation point (up to ${dollars(ECON.SPONSOR_CAP)}), more at levels 2 and 3. Grandstand ($120,000, one only): seats 3,500, 5,000 or 6,500.`,
           'Academy ($60,000): skill and IQ, more and better juniors each pre-season. Scout Office ($25,000): a better free-agent pool and signing fees 10% cheaper per level.',
         ],
       },

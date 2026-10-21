@@ -4,7 +4,7 @@
 
 import { bus } from './events';
 import { makeRng } from '../utils/rng';
-import { generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
+import { generateFreeAgent, generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
 import { BOARD, LEAGUE, STARTING_MONEY, DEFAULT_DIFFICULTY, difficultyMultipliers, type Difficulty } from '../config';
 import { autoPick } from '../systems/lineup';
@@ -291,8 +291,9 @@ export function loadState(next: GameState): void {
 /**
  * Deterministically create a brand-new game. Squad = 20 players shaped like a
  * rival's at the league mean (#140: one star, one first-grader and one depth
- * player per position, a spare depth player), 12 free agents, empty
- * facilities/league. Persists via loadState and returns the new state.
+ * player per position, a spare depth player), 12 free agents around the
+ * league (N12), empty facilities/league. Persists via loadState and returns
+ * the new state.
  */
 export function createNewGame(
   clubName: string,
@@ -324,8 +325,10 @@ export function createNewGame(
     joinedSeason: 1,
   }));
 
+  // The opening pool sits around the league (N12): a new club has nothing built
+  // and the baseline reputation, so freeagency.poolTarget is MEAN − POOL_BELOW.
   const freeAgents: Player[] = Array.from({ length: 12 }, () => ({
-    ...generatePlayer(rng),
+    ...generateFreeAgent(rng, LEAGUE.MEAN - LEAGUE.POOL_BELOW),
     career: { games: 0, tries: 0, tackles: 0, lineBreaks: 0 },
     joinedSeason: 1,
   }));

@@ -8,11 +8,12 @@ import type { Rng } from '../utils/rng';
 import { makeRng } from '../utils/rng';
 import { bus } from '../core/events';
 import { spendMoney } from '../data/club';
-import { generatePlayer, type Quality } from '../data/player';
+import { generateFreeAgent } from '../data/player';
 import { registerTickHook, TICK_ORDER, type TickContext } from '../core/time';
 import { SPECIAL_MAGNITUDE } from '../data/facility';
-import { SQUAD_CAP, SQUAD_MIN } from '../config';
+import { LEAGUE, SQUAD_CAP, SQUAD_MIN } from '../config';
 import { transferFee } from './contracts';
+import { REP_BASELINE } from './league';
 
 // ── Tuning constants (spec §Key interfaces) ─────────────────────────────────
 
@@ -33,51 +34,63 @@ export interface SignResult {
 
 // ── Quality bias ────────────────────────────────────────────────────────────
 
-function bestLevel(state: GameState, defId: 'scoutOffice' | 'academy'): number {
+/** Scouting bias a Scout Office adds per level (the Academy's is SPECIAL_MAGNITUDE.recruitQuality). */
+export const SCOUT_BIAS_PER_LEVEL = 0.12;
+/** Reputation points above REP_BASELINE per unit of scouting bias. */
+export const REP_PER_BIAS = 250;
+/**
+ * Overall rating points one unit of scouting bias lifts the pool's target (N12):
+ * a Scout Office +3 a level, an Academy +2.5 a level, reputation +1 for every 10
+ * points above the baseline (+7 at 100). A Scout Office and an Academy at L3 at
+ * reputation 100 centre the pool on about 75, near the old star-heavy pool's 79.
+ * Assumed (needs Leon).
+ */
+export const POOL_POINTS_PER_BIAS = 25;
+
+type ScoutingClub = Pick<GameState, 'facilities' | 'reputation'>;
+
+function bestLevel(state: Pick<GameState, 'facilities'>, defId: 'scoutOffice' | 'academy'): number {
   return state.facilities.reduce((m, f) => (f.defId === defId ? Math.max(m, f.level) : m), 0);
 }
 
 /**
  * Scouting bias derived from the club's built Scout Office level (0 if none),
- * Academy level (SPECIAL_MAGNITUDE.recruitQuality per level) and reputation.
- * `bias = scoutLevel * 0.12 + academyLevel * 0.1 + rep / 250`. Higher bias
- * shifts the rolled quality upward toward 'average'/'star'.
+ * Academy level (SPECIAL_MAGNITUDE.recruitQuality per level) and reputation:
+ * `scoutLevel × 0.12 + academyLevel × 0.1 + (rep − REP_BASELINE) / 250`. A new
+ * club (nothing built, the baseline reputation) is at 0; reputation below the
+ * baseline takes a little off.
  */
-function scoutBias(state: GameState): number {
-  return bestLevel(state, 'scoutOffice') * 0.12
+export function scoutBias(state: ScoutingClub): number {
+  return bestLevel(state, 'scoutOffice') * SCOUT_BIAS_PER_LEVEL
     + bestLevel(state, 'academy') * SPECIAL_MAGNITUDE.recruitQuality
-    + state.reputation / 250;
+    + (state.reputation - REP_BASELINE) / REP_PER_BIAS;
 }
 
 /**
- * Roll a Quality using the scouting bias. `r = rng.next() + bias`:
- * r >= 1.1 → 'star', r >= 0.7 → 'average', else 'rookie'.
+ * The overall the free-agent pool is generated around (N12): the league mean
+ * less LEAGUE.POOL_BELOW, lifted POOL_POINTS_PER_BIAS points per unit of
+ * scouting bias. 52 for a new club; each agent lands around it
+ * (data/player.ts generateFreeAgent), so a 65+ still turns up now and then.
  */
-function rollQuality(rng: Rng, bias: number): Quality {
-  const r = rng.next() + bias;
-  if (r >= 1.1) return 'star';
-  if (r >= 0.7) return 'average';
-  return 'rookie';
+export function poolTarget(state: ScoutingClub): number {
+  return LEAGUE.MEAN - LEAGUE.POOL_BELOW + scoutBias(state) * POOL_POINTS_PER_BIAS;
 }
 
 // ── Pool refresh ────────────────────────────────────────────────────────────
 
 /**
  * Regenerate GameState.freeAgents to a fresh pool of FREE_AGENT_POOL_SIZE.
- * Quality per agent is biased upward by Scout Office level + reputation. Consumes
- * RNG in a fixed order (quality roll then generatePlayer, per agent) so a given
- * seed + state yields the same pool. Mutates the store (via setState) and returns
- * the new state; also persists the advanced rngSeed so subsequent draws continue
- * the sequence.
+ * Every agent is generated around poolTarget (the league mean, lifted by the
+ * Scout Office, the Academy and reputation). Consumes RNG in a fixed order (one
+ * generateFreeAgent per agent) so a given seed + state yields the same pool.
+ * Mutates the store (via setState) and returns the new state; also persists the
+ * advanced rngSeed so subsequent draws continue the sequence.
  */
 export function refreshFreeAgents(state: GameState, rng: Rng): GameState {
-  const bias = scoutBias(state);
+  const target = poolTarget(state);
   // Academy prospects (#42) and players who just left the club (#40) survive re-rolls; the next season's intake clears them.
   const pool: Player[] = state.freeAgents.filter((p) => p.junior || p.departed);
-  for (let i = 0; i < FREE_AGENT_POOL_SIZE; i++) {
-    const quality = rollQuality(rng, bias);
-    pool.push(generatePlayer(rng, { quality }));
-  }
+  for (let i = 0; i < FREE_AGENT_POOL_SIZE; i++) pool.push(generateFreeAgent(rng, target));
   setState({ freeAgents: pool, rngSeed: rng.state() });
   return getState();
 }

@@ -2,7 +2,7 @@
 // not rendered here (the vitest env is 'node'); the pages are data.
 import { describe, it, expect } from 'vitest';
 import { GUIDE_PAGES, GUIDE_SCREENS, guidePage } from '../../src/ui/guide/guide';
-import { CLUB_PAGES } from '../../src/ui/guide/pages';
+import { CLUB_PAGES, sponsorBullet } from '../../src/ui/guide/pages';
 import { NINES_FACTS, NINES_PAGE } from '../../src/ui/guide/nines';
 import { NINES } from '../../src/match/league/rules';
 import { GOALS } from '../../src/match/league/goals';
@@ -12,6 +12,7 @@ import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../src/match/l
 import { TACTIC_BLURB } from '../../src/ui/tacticsBlurbs';
 import { TRAINING_FOCUS } from '../../src/config';
 import { BOARD, DIFFICULTY, ECON, ON_FIELD, SET_TACKLES, SQUAD_MIN } from '../../src/config';
+import { createNewGame, setState } from '../../src/core/state';
 
 describe('GUIDE_PAGES', () => {
   it('is the club pages then How Nines works, each with an id, a title and something to read', () => {
@@ -87,6 +88,32 @@ describe('How Nines works stays true to the live sim', () => {
     expect(text).toContain(`A try is ${NINES_FACTS.tryPoints} points`);
     expect(text).toContain(`it is ${NINES_FACTS.bonusTryPoints}`);
     expect(text).toContain(`bench of ${NINES_FACTS.benchSize}`);
+  });
+});
+
+describe('the Money page says the real numbers (N12)', () => {
+  const bullets = (pageId: string): string => CLUB_PAGES.find((p) => p.id === pageId)!.sections.map((s) => s.bullets?.join(' ') ?? '').join(' ');
+  const board = (level: 1 | 2 | 3) => [{ id: 'sb', defId: 'sponsorBoard' as const, level, x: 0, y: 0 }];
+
+  it('the Sponsor Board line states the rule, then what one pays at the club\'s reputation', () => {
+    expect(sponsorBullet(null)).toBe('A Sponsor Board pays $150 a week plus $10 a reputation point, up to $1,000, and 1.6× that at level 2, 2.2× at level 3. At your reputation of 30 a new one would pay $450 a week.');
+    expect(sponsorBullet({ reputation: 60, facilities: [] })).toContain('At your reputation of 60 a new one would pay $750 a week.');
+    expect(sponsorBullet({ reputation: 80, facilities: board(3) })).toContain('Yours (level 3) pays $2,090 a week at your reputation of 80.');
+  });
+
+  it('is worked out each time the page is shown, for the club in play', () => {
+    createNewGame('Guide FC', 4);
+    expect(bullets('money')).toContain('a new one would pay $450 a week');
+    setState({ reputation: 100, facilities: board(1) });
+    expect(bullets('money')).toContain('Yours (level 1) pays $1,000 a week at your reputation of 100.');
+    expect(bullets('money')).not.toContain('$3,000');
+  });
+
+  it('quotes the difficulty wage multipliers and the pool\'s level', () => {
+    expect(bullets('money')).toContain(`Easy pays ${Math.round(DIFFICULTY.easy.wages * 100)}%, Hard ${Math.round(DIFFICULTY.hard.wages * 100)}%`);
+    expect(bullets('money')).toContain('Easy pays 90%, Hard 115%');
+    expect(bullets('squad')).toContain('about 52 overall');
+    expect(bullets('grounds')).toContain('Sponsor Board ($10,000, one only): $150 a week plus $10 a reputation point (up to $1,000)');
   });
 });
 
