@@ -11,7 +11,8 @@ import { createNewGame, type Player } from '../../core/state';
 import { generatePlayerAround, overallRating } from '../../data/player';
 import { makeRng } from '../../utils/rng';
 import { autoPick, resolveLineup } from '../../systems/lineup';
-import { generateRivalSquad, hashString } from '../../systems/rivals';
+import { generateRivalSquad, hashString, squadStrength } from '../../systems/rivals';
+import { rivalMatchSheet } from '../../systems/matchday';
 import { teamSheetFromSquad } from '../league/sheets';
 import { rivalEdge, type DifficultyEdge } from '../league/spread';
 import { TICK_S } from '../core/engine';
@@ -97,9 +98,10 @@ export function bestNine(squad: readonly Player[]): number {
 /**
  * A squad-built side for one squad seed (N12.2) and its best nine, built as
  * matchday.ts builds the two sides of the player's match: a new game's squad
- * through its opening lineup (resolveLineup), or a rival's generated squad
- * through its coach's auto-pick, each through teamSheetFromSquad. A rival with
- * no `rating` is built at `level`. Note: a `player` squad is a whole new game,
+ * through its opening lineup (resolveLineup and teamSheetFromSquad), or a
+ * rival's generated squad as matchday's rivalMatchSheet fields it (his coach's
+ * auto-pick and the style his nine gives him, N11). A rival with no `rating` is
+ * built at `level`. Note: a `player` squad is a whole new game,
  * so the module's game state is that game afterwards (the soak does the same).
  */
 export function squadSide(id: string, spec: SideSpec, seed: number, level: number = LEAGUE.MEAN): { sheet: TeamSheet; nine: number } {
@@ -120,7 +122,7 @@ export function squadSide(id: string, spec: SideSpec, seed: number, level: numbe
     sheet = teamSheetFromSquad(squad, id, id, ['#111', '#eee'], resolveLineup(lineup, squad));
   } else {
     squad = generateRivalSquad({ id: 'rival', strength: Math.round(spec.rating ?? level) }, seed);
-    sheet = teamSheetFromSquad(squad, id, id, ['#111', '#eee'], resolveLineup(autoPick(squad), squad));
+    sheet = rivalMatchSheet({ id, name: id, colors: ['#111', '#eee'], strength: squadStrength(squad), squad });
   }
   const traits = (r: RosterEntry, key: string): RosterEntry => {
     if (!spec.traits || spec.traits === 'gen') return r;

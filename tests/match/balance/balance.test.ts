@@ -117,7 +117,7 @@ describe('plans', () => {
     const bare = scenarioSides({ squad: 'player', traits: 'none', bench: 0 }, { squad: 'rival', rating: 70, tactics: { defence: 'rush' } }, 1);
     expect(bare.home.roster!.every((r) => r.traits === undefined)).toBe(true);
     expect(bare.home.bench).toEqual([]);
-    expect(bare.away.tactics).toEqual({ attack: 'balanced', defence: 'rush' });
+    expect(bare.away.tactics!.defence).toBe('rush'); // over the style his nine gives him (N11)
     expect(bare.nine.away).toBeGreaterThan(66);
     // Without his star the same new game's squad rates lower, and its level rival with it.
     const starless = scenarioSides({ squad: 'player', noStar: true }, { squad: 'rival' }, 1);
