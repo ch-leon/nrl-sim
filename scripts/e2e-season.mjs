@@ -445,12 +445,6 @@ async function play() {
     rec.notes.push('bar shown after Back to Club; Later dismissed it');
   });
 
-  // Live match (BAK-207 2g): the setting lives on the Fixtures screen. With it on,
-  // the next match plays on the live sim and is watched through the overlay at ×8,
-  // skipped to full time, and left by Back to Club; the overlay's score must be the
-  // saved result. The setting stays on, so the rest of the season's matches run
-  // the live sim headless. Since the switch-over (BAK-207 Phase 4) there is no
-  // setting and every match is live.
   // N11: a plan and a goal-kicker on the Lineup screen; the half-time card changes the plan below.
   await step('lineup-plan', async (rec) => {
     await closeAny();
@@ -472,6 +466,13 @@ async function play() {
     rec.notes.push(`Grind / ${l.tactics.defence}; kicker ${l.kicker} (${spot})`);
     await closeAny();
   });
+
+  // Live match (BAK-207 2g): the setting lives on the Fixtures screen. With it on,
+  // the next match plays on the live sim and is watched through the overlay at ×8,
+  // skipped to full time, and left by Back to Club; the overlay's score must be the
+  // saved result. The setting stays on, so the rest of the season's matches run
+  // the live sim headless. Since the switch-over (BAK-207 Phase 4) there is no
+  // setting and every match is live.
   let liveOn = false;
   await step('live-toggle', async (rec) => {
     await tap('.nrl-nav .nrl-btn:has-text("Fixtures")');
