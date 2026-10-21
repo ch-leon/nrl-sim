@@ -606,11 +606,38 @@ function paintFrontTerraces(cv: Canvas3D, away: Kit): void {
 
 // ── Public painters ─────────────────────────────────────────────────────────
 
+/**
+ * The ground alone: grass, lines and the trees outside (about 90% of the background's
+ * cost, and the same for every fixture). Painted once and kept (N10.5), so each
+ * fixture's background starts from a copy of it.
+ */
+let groundCache: { offsetX: number; data: Uint8ClampedArray } | null = null;
+
+function groundFor(offsetX: number, cv: Canvas3D): void {
+  if (groundCache?.offsetX !== offsetX || groundCache.data.length !== cv.buf.data.length) {
+    paintGround(cv);
+    groundCache = { offsetX, data: cv.buf.data.slice() };
+    return;
+  }
+  cv.buf.data.set(groundCache.data);
+}
+
+/** Forget the painted ground (tests). */
+export function clearGroundCache(): void {
+  groundCache = null;
+}
+
+/** Paint the ground ahead, so the first fixture's background is cheap (the art worker at start-up). */
+export function warmGround(offsetX: number): void {
+  const b = stadiumWorldBounds(offsetX);
+  groundFor(offsetX, new Canvas3D(b.x, b.y, b.width, b.height, offsetX));
+}
+
 /** Paint the static background (everything behind the players). */
 export function paintBackground(offsetX: number, home: Kit, away: Kit): Canvas3D {
   const b = stadiumWorldBounds(offsetX);
   const cv = new Canvas3D(b.x, b.y, b.width, b.height, offsetX);
-  paintGround(cv);
+  groundFor(offsetX, cv);
   paintCornerBlocks(cv, home);
   paintBackStand(cv, home);
   paintHill(cv);
