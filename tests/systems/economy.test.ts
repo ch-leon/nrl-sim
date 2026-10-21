@@ -332,7 +332,7 @@ describe('handleBankruptcy', () => {
     expect(danger).toBe(true);
   });
 
-  it('the warning names the forced sales, after them, and the toasts keep their order (N12.5)', () => {
+  it('the warning names the forced sale, after it, and the toasts keep their order (N12.5)', () => {
     const pricey = mkPlayer({ id: 'pricey', name: 'Big Wage', wage: 20000 });
     const next = mkPlayer({ id: 'next', name: 'Next Wage', wage: 9000 });
     const filler = Array.from({ length: SQUAD_MIN }, (_, i) => mkPlayer({ id: `f${i}`, wage: 500 }));
@@ -348,10 +348,9 @@ describe('handleBankruptcy', () => {
     expect(seen).toEqual([
       `The club is in the red ($${(ECON.FORCED_SALE_FLOOR - 10_000).toLocaleString()}). Balance the books!`,
       'Big Wage was force-sold to cover debts (no fee).',
-      'Next Wage was force-sold to cover debts (no fee).',
-      'warning: Big Wage, Next Wage',
+      'warning: Big Wage',
     ]);
-    expect(squadAtWarning).toBe(SQUAD_MIN);
+    expect(squadAtWarning).toBe(SQUAD_MIN + 1);
   });
 
   it('no warning when money >= 0', () => {
@@ -378,9 +377,6 @@ describe('handleBankruptcy', () => {
   });
 
   it('applies squad-wide morale −10 per forced sale, clamped ≥1', () => {
-    // Exactly SQUAD_MIN+1 players so precisely one sale (the highest-paid) fires
-    // before the loop halts at SQUAD_MIN. (Sales carry no payout, so money never
-    // rises inside the loop; termination is by squad size.)
     const pricey = mkPlayer({ id: 'pricey', wage: 30000, morale: 60 });
     const lowMorale = mkPlayer({ id: 'low', wage: 100, morale: 5 });
     const filler = Array.from({ length: SQUAD_MIN - 1 }, (_, i) => mkPlayer({ id: `f${i}`, wage: 100, morale: 50 }));
@@ -394,14 +390,18 @@ describe('handleBankruptcy', () => {
     expect(s.squad.find((p) => p.id === 'f0')!.morale).toBe(40);
   });
 
-  it('stops selling at SQUAD_MIN even if still under the floor (terminates)', () => {
-    // Huge debt: would sell forever, but must stop at SQUAD_MIN.
+  it('sells one a week under the floor, the highest wage first, and never below SQUAD_MIN (N14.3)', () => {
+    // Huge debt: one sale a week until the squad is at the minimum, then none.
     const squad = Array.from({ length: SQUAD_MIN + 2 }, (_, i) => mkPlayer({ id: `s${i}`, wage: 1000 * (i + 1) }));
     setup({ money: -5_000_000, squad });
-    handleBankruptcy(getState());
+    const sold: string[][] = [];
+    bus.on('bankruptcy:warning', (w) => sold.push(w.forcedSales ?? []));
+    for (let week = 0; week < 4; week++) handleBankruptcy(getState());
     const s = getState();
-    expect(s.squad.length).toBe(SQUAD_MIN); // sold exactly 2 down to the minimum
-    expect(s.money).toBeLessThan(ECON.FORCED_SALE_FLOOR); // still in debt, but stopped
+    expect(sold.map((names) => names.length)).toEqual([1, 1, 0, 0]);
+    expect(s.freeAgents.filter((p) => p.id.startsWith("s")).map((p) => p.id)).toEqual([`s${SQUAD_MIN + 1}`, `s${SQUAD_MIN}`]);
+    expect(s.squad.length).toBe(SQUAD_MIN);
+    expect(s.money).toBeLessThan(ECON.FORCED_SALE_FLOOR); // still in debt, but fieldable
   });
 
   /** The test's own players in the free-agent pool, in the order they were sold (a new game has its own pool). */
@@ -413,7 +413,7 @@ describe('handleBankruptcy', () => {
     const injured = [0, 1].map((i) => mkPlayer({ id: `hurt${i}`, wage: 100, injuredWeeks: 3 }));
     const fit = Array.from({ length: SQUAD_MIN + 2 }, (_, i) => mkPlayer({ id: `fit${i}`, wage: 1000 * (i + 1) }));
     setup({ money: -5_000_000, squad: [...injured, ...fit] });
-    handleBankruptcy(getState());
+    for (let week = 0; week < 6; week++) handleBankruptcy(getState()); // one a week (N14.3)
     const s = getState();
     expect(s.squad.length).toBe(SQUAD_MIN);
     expect(s.squad.filter((p) => p.injuredWeeks <= 0).length).toBe(SQUAD_MIN);
@@ -425,7 +425,7 @@ describe('handleBankruptcy', () => {
     const injured = [0, 1, 2].map((i) => mkPlayer({ id: `hurt${i}`, wage: 100 + i, injuredWeeks: 2 }));
     const fit = Array.from({ length: SQUAD_MIN - 1 }, (_, i) => mkPlayer({ id: `fit${i}`, wage: 50_000 }));
     setup({ money: -5_000_000, squad: [...injured, ...fit] });
-    handleBankruptcy(getState());
+    for (let week = 0; week < 4; week++) handleBankruptcy(getState()); // one a week (N14.3)
     const s = getState();
     // Squad SQUAD_MIN + 2: two injured go (highest-paid of them first), every fit player stays.
     expect(sold()).toEqual(['hurt2', 'hurt1']);
@@ -535,7 +535,7 @@ describe('applyEconomy — full weekly loop', () => {
       money: 0, reputation: 0, squad, facilities: [],
       league: { clubs: [], fixtures: [], ladder: [] },
     });
-    // enormous wages drive deep below floor → forced sales down to SQUAD_MIN.
+    // enormous wages drive deep below floor → one forced sale this week.
     expect(() => applyEconomy(getState())).not.toThrow();
     expect(getState().squad.length).toBe(SQUAD_MIN);
   });

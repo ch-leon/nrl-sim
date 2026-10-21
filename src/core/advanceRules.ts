@@ -40,9 +40,10 @@ const EXPIRING_WEEKS = MORALE.EXPIRING_WEEKS;
 // ── Pre-week: forfeit risk ─────────────────────────────────────────────────
 
 /**
- * Stop before a week whose player fixture would be forfeited. The tick forfeits
- * when fewer than SQUAD_MIN players are fit, so checking before the tick is the
- * only point where the player can still react.
+ * Stop before a week whose player fixture is short of fit men. The tick calls up
+ * Academy juniors to make SQUAD_MIN (N14.3; a forfeit only when the squad is
+ * full), so checking before the tick is the only point where the player can
+ * sign someone better instead.
  */
 export function forfeitRisk(input: {
   fitCount: number;
@@ -52,7 +53,7 @@ export function forfeitRisk(input: {
   if (input.fitCount >= SQUAD_MIN) return null;
   return {
     kind: 'forfeit',
-    text: `Only ${input.fitCount} fit (need ${SQUAD_MIN}) — next match would be forfeited.`,
+    text: `Only ${input.fitCount} fit (need ${SQUAD_MIN}) — the Academy will call up juniors unless you sign players.`,
   };
 }
 
