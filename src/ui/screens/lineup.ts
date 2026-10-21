@@ -181,6 +181,8 @@ const LINEUP_CSS = `
   font-size: 0.65rem;
   text-align: left;
 }
+/* N14 (#263): 44px rows on a touch screen (the list scrolls; the field is unchanged). */
+@media (pointer: coarse) { .nrl-lineup-row { min-height: 44px; } }
 .nrl-lineup-row img { width: ${PORTRAIT_PX}px; height: ${PORTRAIT_PX}px; image-rendering: pixelated; image-rendering: crisp-edges; }
 .nrl-lineup-row[data-selected] { outline: 3px solid #f4d03f; }
 .nrl-lineup-row[data-injured] { opacity: 0.55; cursor: default; }

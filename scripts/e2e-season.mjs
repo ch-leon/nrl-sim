@@ -132,6 +132,22 @@ async function layoutProblems() {
   });
 }
 
+/**
+ * The smallest box among the visible elements a selector matches, for the touch-size
+ * read (N14, #263): "W×H", or null when none is on screen.
+ */
+async function smallestBox(selector) {
+  return page.evaluate((sel) => {
+    const boxes = [...document.querySelectorAll(sel)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    if (!boxes.length) return null;
+    const min = boxes.reduce((a, b) => (Math.min(b.width, b.height) < Math.min(a.width, a.height) ? b : a));
+    return { w: Math.round(min.width), h: Math.round(min.height) };
+  }, selector);
+}
+/** On a touch screen, a control under 44px is a finding (N7's rule, N14's backlog). */
+const TOUCH_MIN = 44;
+const tooSmall = (box) => PHONE && box && (box.w < TOUCH_MIN || box.h < TOUCH_MIN);
+
 /** Run a step: do it, screenshot it, check the layout, record the outcome. */
 async function step(name, fn, { settle = 300, quietToasts = false } = {}) {
   stepNo++;
@@ -271,6 +287,10 @@ async function play() {
     if (label === undefined || label === null) return 'no build label on the title screen';
     if (!/^Build \S+/.test(label)) throw new Error(`build label reads "${label}"`);
     rec.notes.push(label);
+    // N14 (#263): the colour swatches are a finger's size on a touch screen.
+    const sw = await smallestBox('[data-nrl-primary], [data-nrl-secondary]');
+    if (sw) rec.notes.push(`swatches ${sw.w}×${sw.h}`);
+    if (tooSmall(sw)) throw new Error(`title swatches ${sw.w}×${sw.h}, under ${TOUCH_MIN}px on touch`);
   });
   await step('new-game', async () => {
     await page.fill('[data-nrl-clubname]', 'Phone Test FC');
@@ -572,6 +592,36 @@ async function play() {
     if (!(await page.locator('[data-guide]').count())) return 'skipped';
     await tap('.nrl-guide-close');
     await page.waitForSelector('[data-guide]', { state: 'detached', timeout: 5000 });
+  });
+
+  // N14 (#263): the controls N7 left under 44px on a touch screen, and the League's Close
+  // staying in view while the ladder scrolls.
+  await step('control-sizes', async (rec) => {
+    await closeAny();
+    const found = [];
+    await tap('.nrl-audio-gear');
+    const mute = await smallestBox('.nrl-audio-row input[type="checkbox"]');
+    if (mute) rec.notes.push(`mute ${mute.w}×${mute.h}`);
+    if (tooSmall(mute)) found.push(`Mute ${mute.w}×${mute.h}`);
+    await closeAny();
+    await tap('.nrl-nav .nrl-btn[data-screen="lineup"]');
+    await page.waitForSelector('.nrl-lineup-row');
+    const row = await smallestBox('.nrl-lineup-row');
+    if (row) rec.notes.push(`lineup rows ${row.w}×${row.h}`);
+    if (tooSmall(row)) found.push(`lineup row ${row.w}×${row.h}`);
+    await closeAny();
+    await tap('.nrl-nav .nrl-btn:has-text("Ladder")');
+    await page.waitForSelector('.nrl-ladder-table');
+    const closeInView = await page.evaluate(() => {
+      const body = document.querySelector('.nrl-league-body');
+      if (body) body.scrollTop = body.scrollHeight;
+      const c = document.querySelector('.nrl-league-close')?.getBoundingClientRect();
+      return !!c && c.top >= 0 && c.bottom <= window.innerHeight;
+    });
+    rec.notes.push(closeInView ? 'League Close in view after scrolling' : 'League Close scrolled away');
+    if (!closeInView) found.push('League Close scrolled away');
+    await closeAny();
+    if (found.length) throw new Error(found.join('; '));
   });
 
   // Save, reload, continue.

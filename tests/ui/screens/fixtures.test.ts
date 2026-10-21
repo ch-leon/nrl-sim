@@ -106,3 +106,21 @@ describe('fmtSideLine / fmtWeather', () => {
     expect(['clear', 'rain', 'wind'].map((w) => fmtWeather(w as 'clear' | 'rain' | 'wind'))).toEqual(['Fine', 'Rain', 'Windy']);
   });
 });
+
+// N14 (#263, QA finding 3): long club names wrapped on the ladder at 844px.
+import { ladderName, LADDER_NAME_MAX } from '../../../src/ui/screens/fixtures';
+import { RIVAL_CLUBS } from '../../../src/data/league';
+
+describe('ladderName', () => {
+  it('a long name is its short name, as the match report says it; a short one stays whole', () => {
+    expect(ladderName('Woolloomooloo Wolves')).toBe('Wolves');
+    expect(ladderName('Redcliffe Reapers')).toBe('Reapers');
+    expect(ladderName('Ballarat Brumbies')).toBe('Brumbies');
+    expect(ladderName('Phone Test FC')).toBe('Phone Test FC');
+    expect(ladderName('A Very Long Club Name FC')).toBe('A Very Long Club Name FC'); // a bare "FC" is no name
+  });
+
+  it('every rival on the ladder fits the limit or has a short name', () => {
+    for (const { name } of RIVAL_CLUBS) expect(ladderName(name).length, name).toBeLessThanOrEqual(LADDER_NAME_MAX);
+  });
+});

@@ -780,6 +780,8 @@ function ensureAudioStyles(): void {
   pointer-events: auto;
 }
 .nrl-audio-slider { flex: 1 1 auto; pointer-events: auto; }
+/* N14 (#263): the Mute box a finger can hit on a touch screen (was 13px). */
+@media (pointer: coarse) { .nrl-audio-row input[type="checkbox"] { width: 44px; height: 44px; margin: 0; } }
 `;
   document.head.appendChild(style);
 }
