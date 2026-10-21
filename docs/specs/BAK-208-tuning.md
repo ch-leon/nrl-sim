@@ -888,12 +888,17 @@ mean score of every side with the same gap, in 2-point bands; `styleTable`, `src
 | Defence | Sides | Score | Expected | Difference |
 |---|---|---|---|---|
 | Slide | 5,362 | 47% | 51% | **−3.8** |
-| Rush | 3,102 | 50% | 48% | **+2.6** |
+| Rush | 3,102 | 50% | 48% | +2.6 |
 | Compressed | 1,894 | 57% | 51% | **+6.4** |
 
-Bold is beyond two standard errors (0.7–2.7 points as printed). The three runs on a seed share
-its seeds, so the true errors are larger, up to √3 times. Even so, Expansive, All-out, Compressed,
-Grind, Kick-chase and Slide are beyond luck; Rush is borderline. So styles do win and lose beyond
+Bold is beyond two standard errors after allowing for the runs sharing seeds (0.7–2.7 points as
+printed, which assume independent games; the three runs on a seed share it, so up to √3 times
+that). Rush is beyond two printed errors but not after that allowance: borderline. The errors are
+still a little optimistic: a club plays many of these games, and whatever makes it good beyond
+its strength carries across them. The expected score takes no account of home ground (roughly
+even across styles), uses `club.strength` as the week began (not the nine after injuries), and
+the games leave out the grand final (the rollover week) and any finals tie made in the week it
+is played. So styles do win and lose beyond
 luck over a season, the same way round as head to head (§27, #241): Compressed strong, Expansive
 and All-out weak. A style here is also a squad (quick backs pick Expansive), so the difference
 mixes the preset with what the squad is like beyond its strength; §27's even-rated head-to-head
