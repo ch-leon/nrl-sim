@@ -39,6 +39,12 @@ export type SoakMode = 'idle' | 'managed';
 export interface SoakOptions {
   seed: number;
   seasons: number;
+  /**
+   * Stop after this many weeks instead of `seasons` whole seasons: the save corpus's
+   * short runs from the versions in between (tests/qa/corpus.test.ts), which only
+   * need to show a migrated save plays on.
+   */
+  weeks?: number;
   mode: SoakMode;
   /** Start from a save of this version (built from the fresh game) instead of v-current. */
   fromVersion?: number;
@@ -530,7 +536,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
   const play = opts.liveRivals ? (fn: () => void): void => fn() : withFastForward;
   const playWeek = opts.liveRivals ? advanceWeekAsTapped : advanceWeek;
   play(() => {
-    for (let i = 0; i < opts.seasons * WEEKS_PER_SEASON; i++) {
+    for (let i = 0; i < (opts.weeks ?? opts.seasons * WEEKS_PER_SEASON); i++) {
       if (getState().sacked) break;
       if (opts.mode === 'managed') {
         const w = manage();
