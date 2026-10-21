@@ -821,6 +821,7 @@ async function play() {
     await closeAny();
     await page.evaluate(() => { window.__nrlWorkerDelayMs = 30000; });
     const week = await page.evaluate(() => window.__nrlState().week);
+    const slotBefore = JSON.stringify(await save());
     await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
     // A match to skip; or, since #285's Academy call-up only past a full squad (SQUAD_CAP with too
     // many hurt), a forfeit: then the rivals alone hold the week and there is no match screen.
@@ -834,6 +835,18 @@ async function play() {
     } else rec.notes.push('the round forfeited (short of 13 fit at a full squad), so only the rivals hold the week');
     const held = () => page.evaluate((w) => window.__nrlState().week === w, week);
     if (!(await held())) throw new Error('the week finished before the taps: the slowed Worker did not hold it');
+    // QA finding 22: the screens that save at once are live during the hold. A change now (the
+    // squad's training focus) must not write the half-ticked week: slot 1 stays as the week began.
+    await tap('.nrl-nav .nrl-btn[data-screen="squad"]');
+    const focus = page.locator('.nrl-squad-focus [data-focus]:not(.nrl-sort-active)').first();
+    rec.notes.push(`focus → ${await focus.getAttribute('data-focus')} during the hold`);
+    await press(focus);
+    await closeAny();
+    if (!(await held())) throw new Error('the hold ended before the focus change: the slowed Worker was not slow enough');
+    const slot = await save();
+    if (JSON.stringify(slot) !== slotBefore) {
+      throw new Error(`a change during the held week wrote it half-ticked: slot 1 at W${slot.week}, ${slot.league.fixtures.filter((f) => f.round === week && f.result).length} of round ${week}'s results in, $${slot.money}`);
+    }
     // Each tap leaves its own message. A toast lasts 4 s and a busy page can take longer than
     // that between taps, so keep a log of every toast as it is added and count in that.
     await page.evaluate(() => {

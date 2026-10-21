@@ -103,7 +103,30 @@ describe('enableAutosave (QA finding 21)', () => {
     page.doc.visibilityState = 'hidden';
     page.fire('visibilitychange');
     advanceWeek();
+    save(getState()); // a screen that saves at once (the squad's focus) in the 600 ms before the reload
     expect(load()?.clubName).toBe('Imported FC');
     expect(load()?.week).toBe(1);
+  });
+});
+
+// QA finding 22: the Lineup, the squad's focus and the fixture settings save straight after
+// a change, and the HUD is live again while the rival round finishes. A change then wrote the
+// held week's half-ticked state: the week's money and results in, the week counter not moved.
+describe('save() during a held week (QA finding 22)', () => {
+  it('writes nothing while the week is held; the week\'s end saves the change with the rest', () => {
+    setState({ money: 500 });
+    save(getState());
+    registerTickHook('test-hold', 0, (ctx) => { setState({ money: 999 }); ctx.hold?.(); });
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+
+    setState({ settings: { ...getState().settings, coachCalls: false } }); // a fixture setting, mid-hold
+    save(getState());
+    expect(load()).toMatchObject({ week: 1, money: 500 }); // the slot still holds the week's start
+
+    resumeWeek();
+    save(getState()); // the week's end (enableAutosave's week save)
+    expect(load()).toMatchObject({ week: 2, money: 999 });
+    expect(load()?.settings.coachCalls).toBe(false);
   });
 });

@@ -103,7 +103,7 @@ export function openSquadScreen(): void {
 
   // Training focus (N11): what the squad trains hardest; the player page shows each man's weekly gain under it.
   const focusBtns = TRAINING_FOCI.map((f) => {
-    // Saved at once, as the Lineup screen does (the game otherwise saves at the week's end).
+    // Saved at once, as the Lineup screen does (the game otherwise saves at the week's end or when the page hides).
     const b = button(focusLabel(f), () => {
       setTrainingFocus(f);
       save(getState());

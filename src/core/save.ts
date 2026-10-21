@@ -51,6 +51,7 @@ let injectedStorage: StorageLike | null = null;
 /** Test hook: inject a fake storage (pass null to clear and fall back to real). */
 export function __setStorage(s: StorageLike | null): void {
   injectedStorage = s;
+  slotImported = false; // a fresh storage is a fresh page
 }
 
 /**
@@ -311,8 +312,8 @@ function parseSave(text: string): MigrateResult {
 
 let activeSlot = 1;
 
-/** Set when an import replaces the active slot; autosave writes nothing after it
- *  until enableAutosave starts a game again (in the browser, after the reload). */
+/** Set when an import replaces the active slot: save() writes nothing after it until
+ *  enableAutosave starts a game again (in the browser, after the reload). */
 let slotImported = false;
 
 export function getActiveSlot(): number {
@@ -422,8 +423,14 @@ export function writeSlot(slot: number, state: GameState): boolean {
  * Persist state to the active slot. Never throws: on QuotaExceededError or any
  * storage failure it emits a `ui:notify` danger and console.warns, leaving the
  * game playable in-memory. If no storage exists at all, it likewise warns.
+ * Writes nothing while a week is held (QA finding 22): that state is half-ticked,
+ * and the screens that save straight after a change (the Lineup, the squad's
+ * focus, the fixture settings) are live while the rival round finishes. The
+ * week's end saves their change with the rest. Nor after an import has replaced
+ * the active slot: the page is on its way to the title screen to load it.
  */
 export function save(state: GameState): void {
+  if (weekHeld() || slotImported) return;
   const storage = getStorage();
   if (storage) migrateLegacySave(storage);
   writeSlot(activeSlot, state);
@@ -579,17 +586,17 @@ interface PageEvents {
  * fully settled). Also persist when the page is hidden or unloaded (QA finding 21):
  * a change made between weeks (a hire, a build, a signing, the kit) was kept only
  * until the next week's save, so a phone that dropped the tab lost it. Never while
- * a week is held: that state is half-ticked, and the next load replays the week
- * from its start, and never after an import has replaced the active slot. Returns
- * the unsubscribe closure for teardown/tests.
+ * a week is held, nor after an import has replaced the active slot (save() writes
+ * nothing then; a held week's next load replays it from its start). Returns the
+ * unsubscribe closure for teardown/tests.
  */
 export function enableAutosave(page: PageEvents = {
   ...(typeof document !== 'undefined' ? { doc: document } : {}),
   ...(typeof window !== 'undefined' ? { win: window } : {}),
 }): () => void {
   slotImported = false;
-  const offWeek = bus.on('week:advanced', () => { if (!slotImported) save(getState()); });
-  const persist = (): void => { if (!weekHeld() && !slotImported) save(getState()); };
+  const persist = (): void => save(getState());
+  const offWeek = bus.on('week:advanced', persist);
   const onVisibility = (): void => { if (page.doc?.visibilityState === 'hidden') persist(); };
   page.doc?.addEventListener('visibilitychange', onVisibility);
   page.win?.addEventListener('pagehide', persist);
