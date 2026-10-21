@@ -18,6 +18,7 @@ import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep, levelMult } from '../data/facility';
 import { EVENT_CARDS } from '../data/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
+import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks } from './contracts';
 
 /**
@@ -49,10 +50,11 @@ export function weeklyUpkeep(state: GameState): number {
 /**
  * The club's running costs a week (N12.3): staff, travel, insurance.
  * ECON.OVERHEAD_WEEKLY × the difficulty's overhead multiplier, the same whatever
- * the club has built or signed, so an idle club cannot shed it.
+ * the club has built or signed, so an idle club cannot shed it; plus the wages of
+ * the staff it has hired (N14.5), paid on the same line.
  */
 export function weeklyOverhead(state: GameState): number {
-  return Math.round(ECON.OVERHEAD_WEEKLY * difficultyMultipliers(state.settings.difficulty).overhead);
+  return Math.round(ECON.OVERHEAD_WEEKLY * difficultyMultipliers(state.settings.difficulty).overhead) + staffWages(state);
 }
 
 /**

@@ -11,6 +11,7 @@ import { BENCH } from '../../src/match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../src/match/league/presets';
 import { TACTIC_BLURB } from '../../src/ui/tacticsBlurbs';
 import { TRAINING_FOCUS } from '../../src/config';
+import { STAFF, STAFF_ROLES } from '../../src/systems/staff';
 import { BOARD, DIFFICULTY, ECON, ON_FIELD, SET_TACKLES, SQUAD_MIN } from '../../src/config';
 import { createNewGame, setState } from '../../src/core/state';
 
@@ -137,5 +138,16 @@ describe('the Squad page stays true to the cascade (N14.3)', () => {
   it('quotes the board loan\'s cap and the call-up', () => {
     expect(text).toContain(`up to $${BOARD.LOAN_CAP.toLocaleString('en-US')} a season`);
     expect(text).toContain(`Short of ${SQUAD_MIN} fit before a match, the Academy calls up juniors`);
+  });
+});
+
+describe('the Squad page\'s Staff section stays true to the hires (N14.5)', () => {
+  const squad = CLUB_PAGES.find((p) => p.id === 'squad')!;
+  const text = squad.sections.map((s) => `${s.text ?? ''} ${s.bullets?.join(' ') ?? ''}`).join(' ');
+
+  it('quotes each role\'s wage on Normal', () => {
+    for (const role of STAFF_ROLES) {
+      expect(text).toContain(`${STAFF[role].title} ($${STAFF[role].wage.toLocaleString('en-US')} a week on Normal)`);
+    }
   });
 });

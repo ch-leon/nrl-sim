@@ -7,6 +7,7 @@ import { getState, type GameState } from '../../core/state';
 import { getActiveSlot } from '../../core/save';
 import { BOARD } from '../../config';
 import { objectiveLine, sackedSummary } from '../../systems/board';
+import { STAFF, STAFF_ROLES, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
 import { el, panel, button, openModal, closeScreen } from '../dom';
 
 /** Objectives + patience as a panel (pure of side effects; rebuilt on refresh). */
@@ -23,6 +24,31 @@ export function buildObjectivesSection(state: GameState): HTMLElement {
     for (const o of state.objectives) {
       box.append(el('div', { class: `nrl-board-obj nrl-board-${o.status}`, text: objectiveLine(o, state) }));
     }
+  }
+  return panel({ class: 'nrl-board-panel' }, box);
+}
+
+/**
+ * The club's staff (N14.5): each role with its holder and wage, or what it would
+ * cost, and Hire / Release. Under the objectives on the Finance screen (no new nav
+ * button); the screen re-renders on the state change a hire makes.
+ */
+export function buildStaffSection(state: GameState): HTMLElement {
+  const box = el('div', { class: 'nrl-staff' });
+  box.append(el('h3', { text: 'Staff' }));
+  for (const role of STAFF_ROLES) {
+    const def = STAFF[role];
+    const member = state.staff.find((m) => m.role === role);
+    const who = member
+      ? `${def.title}: ${member.name} · $${member.wage.toLocaleString('en-US')}/wk`
+      : `${def.title} · $${staffWage(state, role).toLocaleString('en-US')}/wk`;
+    const row = el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': role } },
+      el('div', { class: 'nrl-staff-info' }, el('strong', { text: who }), el('span', { class: 'nrl-staff-blurb', text: def.blurb })),
+      member
+        ? button('Release', () => { releaseStaff(role); })
+        : button('Hire', () => { hireStaff(role); }),
+    );
+    box.append(row);
   }
   return panel({ class: 'nrl-board-panel' }, box);
 }

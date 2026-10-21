@@ -8,13 +8,14 @@
 // tests/fixtures/saves, tests/qa/corpus.test.ts). Used by scripts/soak.ts (npm run
 // soak) and, at a smaller size, by tests/qa/soak.test.ts. Never imported by the
 // game. No Phaser.
-import { createNewGame, FINANCE_LINES, getState, loadState, setState, type FinanceLine, type Fixture, type GameState, type Player } from '../core/state';
+import { createNewGame, FINANCE_LINES, getState, loadState, setState, type FinanceLine, type Fixture, type GameState, type Player, type StaffRole } from '../core/state';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, weekHeld, withFastForward } from '../core/time';
 import { bus, type Events } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
 import { isTrainingFocus, registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
+import { hasStaff, hireStaff, staffWage } from '../systems/staff';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyOverhead, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { registerPlayerMatchSystem } from '../systems/matchday';
@@ -356,7 +357,12 @@ export const MANAGED = {
   BURN_ALLOWED: 3_000,
   /** Build or upgrade the Grandstand when the next home gate is sold out and this much is left after paying (#169). */
   STAND_RESERVE: 60_000,
+  /** Hire staff (N14.5) while a season of the hire's wage still leaves this much. */
+  STAFF_RESERVE: 40_000,
 } as const;
+
+/** The roles the managed manager hires, in order (N14.5). */
+export const MANAGED_STAFF: readonly StaffRole[] = ['welfare'];
 
 /** The club's next home fixture from this week, if any. */
 function nextHomeFixture(s: GameState): Fixture | undefined {
@@ -443,6 +449,14 @@ function manage(): Signed {
     buildFirstFree(defId);
   }
   seatTheCrowd();
+  // Staff (N14.5): each once a season of his wage is affordable. Only the roles that act today: the
+  // Assistant Coach (first) and the Analyst join MANAGED_STAFF when the break rule lands (N13.5).
+  for (const role of MANAGED_STAFF) {
+    const st = getState();
+    if (hasStaff(st, role)) continue;
+    if (st.money - staffWage(st, role) * WEEKS_PER_SEASON < MANAGED.STAFF_RESERVE) break;
+    hireStaff(role);
+  }
   const out: Signed = { count: 0, fees: 0, overall: 0 };
   const record = (p: Player, fee: number): void => {
     out.count++;
