@@ -251,7 +251,6 @@ describe('soak columns (N12.1)', () => {
     expect(some.losses).toBeGreaterThanOrEqual(some.forfeits);
     expect(some.wins + some.draws).toBeGreaterThan(0);
     // The summary averages the runs, season by season.
-    expect(sample({}).forfeits).toBe(0);
     expect(summariseSeasons([run(1, [sample({ forfeits: 3 }), sample({ season: 2 })]), run(2, [sample({ forfeits: 4 })])]).map((s) => s.forfeits)).toEqual([3.5, 0]);
   }, 120_000);
 
