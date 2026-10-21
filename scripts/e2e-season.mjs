@@ -61,7 +61,9 @@ const log = (...a) => console.log(...a);
 let server = null;
 async function startServer() {
   if (EXTERNAL) return;
-  const dist = join(OUT_ROOT, 'dist');
+  // Per size: two sizes run side by side would otherwise rebuild one dist under each other's
+  // preview, and the page's service worker offered "New version ready" over the season review.
+  const dist = join(OUT, 'dist');
   log('building…');
   await new Promise((res, rej) => {
     const b = spawn('npx', ['vite', 'build', '--outDir', dist, '--emptyOutDir', '--logLevel', 'warn'], { stdio: 'inherit' });
@@ -708,16 +710,19 @@ async function play() {
     if (found.length) throw new Error(found.join('; '));
   });
 
-  // Save, reload, continue.
-  const pre = await save();
+  // Save, reload, continue. The game as it stands before the reload (live, not slot 1: a change
+  // made since the last week, like the staff hire, must come back too; QA finding 21).
+  const pre = await page.evaluate(() => window.__nrlState());
   await step('reload-title', async () => { await page.reload(); await page.waitForSelector('[data-nrl-continue-1]'); });
   await step('continued', async (rec) => {
     await tap('[data-nrl-continue-1]');
     await page.waitForSelector('.nrl-hud');
     await wait(800);
-    const s = await save();
+    const s = await page.evaluate(() => window.__nrlState());
     if (s.week !== pre.week || s.money !== pre.money) throw new Error(`state changed across reload (W${pre.week}→${s.week}, $${pre.money}→$${s.money})`);
-    rec.notes.push(`same week ${s.week} and money after reload`);
+    const staff = (x) => (x.staff ?? []).map((m) => m.role).join(',');
+    if (staff(s) !== staff(pre)) throw new Error(`staff changed across reload ("${staff(pre)}" → "${staff(s)}"): a change made between weeks was lost`);
+    rec.notes.push(`same week ${s.week}, money and staff (${staff(s) || 'none'}) after reload`);
     await facilitiesDrawn(rec);
   });
 
