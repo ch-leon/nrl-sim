@@ -85,6 +85,12 @@ export const ECON = {
   BANKRUPTCY_WARN: 0,             // balance < 0 → warning
   FORCED_SALE_FLOOR: -100_000,    // balance < this → forced sales (#176: was −50k, so the red is a warning first)
   FORCED_SALE_MORALE_HIT: 10,     // squad-wide morale −10 per forced sale
+  // The club's running costs (N12.3): staff, travel, insurance, the same for every
+  // club whatever it has built, × the difficulty's `overhead`, paid every week after
+  // upkeep (ledger reason 'overhead', the books' "Running costs"). About $40k a
+  // season on Normal: the one cost an idle club cannot shed as its squad ages into
+  // cheap juniors (docs/status/2026-10-economy.md). Assumed (needs Leon).
+  OVERHEAD_WEEKLY: 1_500,
 } as const;
 
 // Board objectives, finals prize money and the sacking state (GitHub #47).
@@ -179,12 +185,14 @@ export interface DifficultyMultipliers {
   rivalStrength: number;
   /** Rating points added to the starting squad's targets (new games only). */
   startRating: number;
+  /** × ECON.OVERHEAD_WEEKLY, the club's running costs (economy.weeklyOverhead, N12.3). Assumed (needs Leon). */
+  overhead: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
-  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalStrength: 0.92, startRating: 4 },
-  normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0 },
-  hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalStrength: 1.1, startRating: -4 },
+  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalStrength: 0.92, startRating: 4, overhead: 0.8 },
+  normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0, overhead: 1 },
+  hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalStrength: 1.1, startRating: -4, overhead: 1.2 },
 };
 
 /** Multipliers for a difficulty; unknown/missing values fall back to Normal. */

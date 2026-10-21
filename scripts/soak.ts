@@ -151,7 +151,7 @@ if (summary.length) {
 if (summary.length) {
   const ks = (n: number): string => (Math.abs(n) < 500 ? '0' : `${n < 0 ? '-' : '+'}${Math.round(Math.abs(n) / 1000)}k`);
   const cols: readonly [FinanceLine, string][] = [
-    ['wages', 'wages'], ['upkeep', 'upkeep'], ['sponsor', 'sponsor'], ['grant', 'grant'], ['gate', 'gates'], ['prize', 'prize'], ['boardGrant', 'board'],
+    ['wages', 'wages'], ['upkeep', 'upkeep'], ['overhead', 'overhead'], ['sponsor', 'sponsor'], ['grant', 'grant'], ['gate', 'gates'], ['prize', 'prize'], ['boardGrant', 'board'],
     ['events', 'events'], ['transfers', 'transfers'], ['contracts', 'contracts'], ['facilities', 'facilities'], ['other', 'other'],
   ];
   console.log(`\nSeason P&L, averaged over ${seeds} seeds ($k a season; negative = spent). sponsor = Sponsor Board, grant = the reputation grant, board = objective grants, transfers = signing fees and sales, contracts = renewals and releases, facilities = build / upgrade / move / demolish. Net = Σ lines; money = the balance at the rollover.`);

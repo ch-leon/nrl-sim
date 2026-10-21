@@ -75,6 +75,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         bullets: [
           'Wages every week (Easy pays 85%, Hard 115%); wages climb with a player’s rating and with the club’s standing.',
           'Upkeep on every facility: about 1% of its build cost a week, more at higher levels.',
+          'Running costs (staff, travel, insurance) every week whatever you have built: $1,500 on Normal, $1,200 on Easy, $1,800 on Hard.',
           'Signing fees, early-renewal fees, building, moving (10% of the build cost) and demolishing (30% back).',
         ],
       },

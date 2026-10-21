@@ -199,8 +199,8 @@ export interface SeasonRecord {
 }
 
 // The club's books by line (#172): Σ money:changed deltas for one season, negative = spent.
-// FINANCE_LINES: wages, upkeep, sponsor, grant, gate, prize, boardGrant, events,
-// transfers, contracts, facilities, other.
+// FINANCE_LINES: wages, upkeep, overhead (running costs, v17+, N12.3), sponsor, grant,
+// gate, prize, boardGrant, events, transfers, contracts, facilities, other.
 export type SeasonFinance = { season: number } & Record<FinanceLine, number>;
 
 export interface GameState {
