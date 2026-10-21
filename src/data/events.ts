@@ -217,7 +217,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
   {
     id: 'specialistCoach',
     title: 'Specialist coach',
-    text: 'A famous conditioning coach is in town and offers {player} a week of one-on-one work for $5,000.',
+    text: 'A famous conditioning coach is in town and offers {player} a week of one-on-one work for $8,000.',
     weight: 4, cooldown: 40, subject: 'youngster', when: { minMoney: 8_000 },
     choices: [
       { label: 'Hire ($8k)', effects: [{ kind: 'money', amount: -8_000 }, { kind: 'playerTrait', trait: 'workhorse' }], outcome: '{player} came back from the week a workhorse.' },
@@ -228,7 +228,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
   {
     id: 'shortsSponsor',
     title: 'Win bonus sponsor',
-    text: 'A pizza chain will pay $3,000 for every win in the next 4 weeks if its logo goes on the shorts.',
+    text: 'A pizza chain will pay $2,000 for every win in the next 4 weeks if its logo goes on the shorts.',
     weight: 7, cooldown: 20, when: { weeks: [1, 20] },
     choices: [
       { label: 'Deal', effects: [{ kind: 'modifier', label: 'Pizza win bonus', trigger: 'win', weeks: 4, effects: [{ kind: 'money', amount: 2_000 }] }], outcome: 'The pizza chain logo is on the shorts: $2,000 a win for 4 weeks.' },
@@ -250,7 +250,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
   {
     id: 'foodTruck',
     title: 'Food truck',
-    text: 'A food truck wants to park at home games and will pay $400 a week for 8 weeks.',
+    text: 'A food truck wants to park at home games and will pay $250 a week for 8 weeks.',
     weight: 6, cooldown: 30, when: { nextMatch: 'home' },
     choices: [
       { label: 'Let it park', effects: [{ kind: 'modifier', label: 'Food truck rent', trigger: 'weekly', weeks: 8, effects: [{ kind: 'money', amount: 250 }] }], outcome: 'The food truck pays $250 a week for 8 weeks.' },
