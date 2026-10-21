@@ -691,6 +691,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-staff-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; border-top: 1px solid #d8cfb4; }
 .nrl-staff-info { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 .nrl-staff-blurb { font-size: 0.72rem; color: #555; }
+.nrl-staff-row .nrl-btn { flex: 0 0 auto; margin-right: 6px; } /* clear of the panel's edge and its shadow */
 
 /* ── News inbox (#45) ─────────────────────────────────────────────────── */
 .nrl-nav-badge {
