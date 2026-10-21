@@ -11,10 +11,10 @@
   ],
   "variants": [
     { "name": "baseline" },
+    { "name": "edge 0.5", "tuning": { "difficulty.hard.rivalEdge": 0.5, "difficulty.easy.rivalEdge": -0.5 } },
     { "name": "edge 1", "tuning": { "difficulty.hard.rivalEdge": 1, "difficulty.easy.rivalEdge": -1 } },
     { "name": "edge 1.5", "tuning": { "difficulty.hard.rivalEdge": 1.5, "difficulty.easy.rivalEdge": -1.5 } },
     { "name": "edge 2", "tuning": { "difficulty.hard.rivalEdge": 2, "difficulty.easy.rivalEdge": -2 } },
-    { "name": "edge 3", "tuning": { "difficulty.hard.rivalEdge": 3, "difficulty.easy.rivalEdge": -3 } },
-    { "name": "edge 4", "tuning": { "difficulty.hard.rivalEdge": 4, "difficulty.easy.rivalEdge": -4 } }
+    { "name": "edge 3", "tuning": { "difficulty.hard.rivalEdge": 3, "difficulty.easy.rivalEdge": -3 } }
   ]
 }
