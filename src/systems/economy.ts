@@ -18,7 +18,7 @@ import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { EVENT_CARDS } from '../data/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
-import { renewalWage, warnForWeeks } from './contracts';
+import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks } from './contracts';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -214,11 +214,18 @@ export function tickContracts(state: GameState): GameState {
       continue;
     }
 
-    // Contract expired this tick — renew at the ask if affordable, else depart.
+    // Contract expired this tick — renew at the ask if affordable, on a board loan
+    // of the four weeks if not (N14.3), else depart.
     const newWage = renewalWage(p, state);
 
     if (money >= newWage * 4) {
       keep.push({ ...p, wage: newWage, contractWeeks: 52 });
+    } else if (takeBoardLoan(newWage * 4)) {
+      keep.push({ ...p, wage: newWage, contractWeeks: 52 });
+      bus.emit('ui:notify', {
+        text: `${p.name} re-signed on a board loan of $${(newWage * 4).toLocaleString()}, repaid at the season's end.`,
+        kind: 'info',
+      });
     } else {
       departed.push({ ...p, contractWeeks: 0, departed: true });
       bus.emit('ui:notify', {
@@ -348,7 +355,7 @@ export function classifyReason(reason: string): FinanceLine {
   if (reason === 'grant' || reason === 'sponsor+grant') return 'grant';
   if (reason === 'gate') return 'gate';
   if (reason === 'finals prize money') return 'prize';
-  if (reason === 'board grant') return 'boardGrant';
+  if (reason === 'board grant' || reason === BOARD_LOAN || reason === BOARD_LOAN_REPAID) return 'boardGrant';
   if (reason.startsWith('event: ') || MODIFIER_LABELS.has(reason)) return 'events';
   if (/^(sign|sell):/.test(reason)) return 'transfers';
   if (/^(renew|release):/.test(reason)) return 'contracts';
@@ -380,7 +387,8 @@ export interface MovementStamp { line: FinanceLine; season: number; week: number
  */
 export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance'>, reason: string): MovementStamp {
   const line = classifyReason(reason);
-  const closing = state.week === 1 && CLOSING_LINES.has(line) && state.finance.some((e) => e.season === state.season - 1);
+  // A loan taken in week 1 is that season's; its repayment, like the grant, closes the one before.
+  const closing = state.week === 1 && CLOSING_LINES.has(line) && reason !== BOARD_LOAN && state.finance.some((e) => e.season === state.season - 1);
   return closing
     ? { line, season: state.season - 1, week: WEEKS_PER_SEASON }
     : { line, season: state.season, week: state.week };

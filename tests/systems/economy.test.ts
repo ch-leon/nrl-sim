@@ -13,7 +13,7 @@ import {
   type Player, type PlacedFacility, type GameState, type Fixture,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { CONTRACTS, DIFFICULTY, ECON, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
+import { BOARD, CONTRACTS, DIFFICULTY, ECON, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
 import { clearTickHooks, advanceWeek, TICK_ORDER } from '../../src/core/time';
 
 // A player with fully controlled economic fields.
@@ -305,8 +305,8 @@ describe('tickContracts', () => {
     let notified: { text: string; kind: string } | null = null;
     bus.on('ui:notify', (n) => { if (n.kind === 'info') notified = n; });
     const p = mkPlayer({ id: 'depart', name: 'Gone Guy', wage: 5000, contractWeeks: 1 });
-    // money too low: needs newWage×4 = 20000; give 100.
-    setup({ money: 100, squad: [p, mkPlayer({ id: 'other', contractWeeks: 30 })] });
+    // money too low: needs newWage×4 = 20000; give 100, and the board has no room (N14.3).
+    setup({ money: 100, squad: [p, mkPlayer({ id: 'other', contractWeeks: 30 })], boardLoan: { owed: BOARD.LOAN_CAP } });
     tickContracts(getState());
     expect(getState().squad.some((x) => x.id === 'depart')).toBe(false);
     expect(getState().freeAgents.some((x) => x.id === 'depart')).toBe(true);

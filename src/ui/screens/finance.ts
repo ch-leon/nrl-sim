@@ -407,6 +407,11 @@ function statRow(label: string, value: string, neg = false): HTMLElement {
 }
 
 /** The season P&L panel: this season v last, biggest lines first, a net row at the foot (#172). */
+/** The board's row's note while a loan is owed (N14.3). */
+export function boardLoanNote(owed: number): string {
+  return `↳ incl. board loan ${fmtMoneyCompact(owed)}, repaid at the season's end`;
+}
+
 function buildSeasonPnl(state: GameState): HTMLElement {
   const pnl = seasonPnl(state);
   const box = el('div', { class: 'nrl-finance-pnl' });
@@ -427,6 +432,11 @@ function buildSeasonPnl(state: GameState): HTMLElement {
   };
   for (const r of pnl.rows) {
     tbody.append(el('tr', {}, el('td', { text: r.label }), cell(r.thisSeason), cell(r.lastSeason)));
+    // The board loan (N14.3) is board money moved, not a line of its own: a note under the board's row.
+    if (r.line === 'boardGrant' && state.boardLoan.owed > 0) {
+      tbody.append(el('tr', { class: 'nrl-finance-pnl-sub' },
+        el('td', { text: boardLoanNote(state.boardLoan.owed), attrs: { colspan: '3' } })));
+    }
   }
   const net = el('tr', { class: 'nrl-finance-pnl-net' }, el('td', { text: 'Net' }), cell(pnl.net), cell(pnl.lastNet));
   tbody.append(net);

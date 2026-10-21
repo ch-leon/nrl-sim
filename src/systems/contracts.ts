@@ -7,7 +7,7 @@ import { getState, setState, type GameState, type Player } from '../core/state';
 import { bus } from '../core/events';
 import { earnMoney, spendMoney } from '../data/club';
 import { marketWage, overallRating } from '../data/player';
-import { CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { BOARD, CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { REP_BASELINE, REP_MAX } from './league';
 import type { SignResult } from './freeagency';
 
@@ -65,22 +65,70 @@ export function transferFee(p: Player): number {
   return Math.round(o * o * CONTRACTS.SELL_PER_OVERALL_SQ * ageMult);
 }
 
-/** Reasons: 'not-found', 'already-fresh' (contract already full length), 'insufficient-funds'. */
+/** The ledger reasons of the board loan (N14.3): on the board's line, so the books still sum. */
+export const BOARD_LOAN = 'board loan';
+export const BOARD_LOAN_REPAID = 'board loan repaid';
+
+/** How much more the board will advance this season. */
+export function boardLoanRoom(state: Pick<GameState, 'boardLoan'>): number {
+  return Math.max(0, BOARD.LOAN_CAP - state.boardLoan.owed);
+}
+
+/**
+ * The board advances `amount` (N14.3) when it has the room: the money comes in on
+ * the board's line and is owed until the rollover. False, and nothing moves, when
+ * it hasn't.
+ */
+export function takeBoardLoan(amount: number): boolean {
+  if (amount <= 0 || amount > boardLoanRoom(getState())) return false;
+  earnMoney(amount, BOARD_LOAN);
+  setState({ boardLoan: { owed: getState().boardLoan.owed + amount } });
+  return true;
+}
+
+/** At the rollover, after the grant and the prize: the season's loan is repaid in full. */
+export function repayBoardLoan(): number {
+  const owed = getState().boardLoan.owed;
+  if (owed <= 0) return 0;
+  earnMoney(-owed, BOARD_LOAN_REPAID);
+  setState({ boardLoan: { owed: 0 } });
+  return owed;
+}
+
+/** A renewal the club can't pay for today, but the board would advance (N14.3). */
+export function renewsOnLoan(state: GameState, p: Player): boolean {
+  const fee = renewalFee(state, p);
+  return state.money < fee && fee <= boardLoanRoom(state);
+}
+
+/**
+ * Reasons: 'not-found', 'already-fresh' (contract already full length),
+ * 'insufficient-funds' (short, and more than the board would advance). Short but
+ * within the board's room, the fee is advanced as a board loan (N14.3).
+ */
 export function renewEarly(state: GameState, playerId: string): SignResult {
   const p = state.squad.find((x) => x.id === playerId);
   if (!p) return { ok: false, reason: 'not-found' };
   if (p.contractWeeks >= CONTRACTS.NEW_CONTRACT_WEEKS) return { ok: false, reason: 'already-fresh' };
   const fee = renewalFee(state, p);
-  if (state.money < fee) return { ok: false, reason: 'insufficient-funds' };
+  const onLoan = state.money < fee;
+  if (onLoan && !takeBoardLoan(fee)) return { ok: false, reason: 'insufficient-funds' };
 
-  spendMoney(fee, `renew:${playerId}`);
+  // On a loan the balance can stay below zero, which spendMoney refuses: the fee is paid all the same.
+  if (onLoan) earnMoney(-fee, `renew:${playerId}`);
+  else spendMoney(fee, `renew:${playerId}`);
   const after = getState();
   const wage = renewalWage(p, state);
   setState({
     squad: after.squad.map((x) =>
       x.id === playerId ? { ...x, wage, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS } : x),
   });
-  bus.emit('ui:notify', { text: `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks`, kind: 'success' });
+  bus.emit('ui:notify', {
+    text: onLoan
+      ? `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks on a board loan of $${fee.toLocaleString()}, repaid at the season's end`
+      : `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks`,
+    kind: 'success',
+  });
   return { ok: true };
 }
 

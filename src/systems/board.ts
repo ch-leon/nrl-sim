@@ -8,6 +8,7 @@ import { registerSeasonHook } from '../core/time';
 import { earnMoney } from '../data/club';
 import { makeRng } from '../utils/rng';
 import { BOARD, PRIZE } from '../config';
+import { repayBoardLoan } from './contracts';
 
 /** Facts about the season just played, supplied by the fixtures season hook. */
 export interface SeasonOutcome {
@@ -154,6 +155,9 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
   const after = getState();
   const review = reviewObjectives(after, outcome);
   if (review.grant > 0) earnMoney(review.grant, 'board grant');
+  // The season's board loan (N14.3) comes out of the grant and the prize just paid.
+  const repaid = repayBoardLoan();
+  if (repaid > 0) bus.emit('ui:notify', { text: `Board loan repaid: $${repaid.toLocaleString()}.`, kind: 'info' });
   const sacked = review.sacked ? { season: s.season - 1, reason: sackingReason(review) } : undefined;
   setState({
     objectives: review.objectives,

@@ -103,6 +103,7 @@ export const BOARD = {
   GRANT_PER_MET: 10_000,     // one-off cash grant for each objective met (#176: was 15k)
   BUILD_TARGET_EXTRA: 2,     // 'build' objective: facilities beyond the current count
   SOLVENT_FLOOR: { easy: -10_000, normal: 0, hard: 20_000 },
+  LOAN_CAP: 50_000,          // most the board advances for renewals in a season (N14.3), repaid at the rollover
 } as const;
 
 /** Finals prize money, paid at season rollover (per round played, plus bonuses). */
