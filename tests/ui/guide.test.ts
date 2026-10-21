@@ -8,11 +8,14 @@ import { NINES } from '../../src/match/league/rules';
 import { GOALS } from '../../src/match/league/goals';
 import { PENALTY } from '../../src/match/league/penalties';
 import { BENCH } from '../../src/match/league/bench';
+import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../src/match/league/presets';
+import { TACTIC_BLURB } from '../../src/ui/tacticsBlurbs';
+import { TRAINING_FOCUS } from '../../src/config';
 import { ON_FIELD, SET_TACKLES } from '../../src/config';
 
 describe('GUIDE_PAGES', () => {
   it('is the club pages then How Nines works, each with an id, a title and something to read', () => {
-    expect(GUIDE_PAGES.map((p) => p.id)).toEqual(['week', 'money', 'squad', 'events', 'ladder', 'grounds', 'nines']);
+    expect(GUIDE_PAGES.map((p) => p.id)).toEqual(['week', 'money', 'squad', 'tactics', 'events', 'ladder', 'grounds', 'nines']);
     expect(GUIDE_PAGES.length).toBe(CLUB_PAGES.length + 1);
     expect(GUIDE_PAGES[GUIDE_PAGES.length - 1]).toBe(NINES_PAGE);
     expect(new Set(GUIDE_PAGES.map((p) => p.id)).size).toBe(GUIDE_PAGES.length);
@@ -24,6 +27,15 @@ describe('GUIDE_PAGES', () => {
         expect((s.text?.length ?? 0) + (s.bullets?.join('').length ?? 0)).toBeGreaterThan(20);
       }
     }
+  });
+
+  it('the Tactics page (N11) names every preset in its chip words and quotes the training focus', () => {
+    const tactics = GUIDE_PAGES.find((p) => p.id === 'tactics')!;
+    const text = tactics.sections.flatMap((s) => [s.text ?? '', ...(s.bullets ?? [])]).join(' ');
+    for (const p of [...ATTACK_PRESETS, ...DEFENCE_PRESETS]) expect(text).toContain(`${PRESET_LABEL[p]}: ${TACTIC_BLURB[p]}`);
+    expect(text).toContain(`×${TRAINING_FOCUS.ON}`);
+    expect(text).toContain(`×${TRAINING_FOCUS.OFF}`);
+    expect(text).toContain('Kicker or Captain');
   });
 
   it('falls back to the first page for an unknown id', () => {

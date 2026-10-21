@@ -32,7 +32,7 @@ export interface TutorialStep {
 
 /**
  * The onboarding steps, in order (BAK-202 spec; News, Finance and Contracts
- * added by N7, #188). Anchor selectors reference elements that really exist in
+ * added by N7, #188; Lineup by N11). Anchor selectors reference elements that really exist in
  * the shipped UI:
  *   - nav buttons carry `data-screen="<id>"` (see ui/nav.ts registerScreen)
  *   - the HUD money tile carries `data-hud="money"` (see ui/hud.ts)
@@ -64,6 +64,14 @@ export const STEPS: readonly TutorialStep[] = [
     id: 'squad',
     text: "Here's your squad. Check positions, stats and morale here any time.",
     anchor: '.nrl-nav .nrl-btn[data-screen="squad"]',
+    advanceOn: 'next-button',
+  },
+  {
+    id: 'lineup',
+    text:
+      'Lineup is your nine and your plan: the attack and defence chips, a goal-kicker ' +
+      'and a captain (select a starter, then Kicker or Captain). Change the plan at half-time.',
+    anchor: '.nrl-nav .nrl-btn[data-screen="lineup"]',
     advanceOn: 'next-button',
   },
   {
