@@ -6,9 +6,9 @@
 // applyTraining runs strictly before applyInjuries so an injured player trains at
 // ×0.3 THIS week and recovers AFTER.
 
-import { getState, setState, type GameState, type Player, type PlacedFacility, type PlayerStats } from '../core/state';
+import { getState, setState, type GameState, type Player, type PlacedFacility, type PlayerStats, type TrainingFocus } from '../core/state';
 import { FACILITY_CATALOG, levelMult, type FacilityDef, type FacilityDefId } from '../data/facility';
-import { STAT_MAX, TRAINING_CURVE } from '../config';
+import { STAT_MAX, TRAINING_CURVE, TRAINING_FOCUS } from '../config';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { hasTrait, traitBoost } from '../data/traits';
 
@@ -103,12 +103,73 @@ export function headroom(stat: number): number {
   return Math.max(0, 1 - stat / STAT_MAX) ** TRAINING_CURVE.HEADROOM_EXP;
 }
 
+// ── The squad's training focus (N11) ─────────────────────────────────────────
+// What the coach sets on the Squad screen, its labels, and the managed manager's
+// pick (the squad's weakest stat). The multipliers are config.ts TRAINING_FOCUS.
+
+export const TRAINING_FOCI: readonly TrainingFocus[] = ['balanced', 'speed', 'strength', 'stamina', 'skill', 'footyIQ'];
+
+const LABEL: Readonly<Record<TrainingFocus, string>> = {
+  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', skill: 'Skill', footyIQ: 'Footy IQ',
+};
+
+export function focusLabel(f: TrainingFocus): string {
+  return LABEL[f];
+}
+
+export function isTrainingFocus(v: unknown): v is TrainingFocus {
+  return TRAINING_FOCI.includes(v as TrainingFocus);
+}
+
+/** The coach sets the squad's focus. */
+export function setTrainingFocus(focus: TrainingFocus): void {
+  if (getState().training?.focus === focus) return;
+  setState({ training: { focus } });
+}
+
+/** The squad's weakest stat on average (ties to the first in TRAINING_FOCI order): what a manager short on that would train. */
+export function weakestStat(squad: readonly Player[]): keyof PlayerStats {
+  const keys = TRAINING_FOCI.filter((f): f is keyof PlayerStats => f !== 'balanced');
+  if (squad.length === 0) return keys[0]!;
+  const mean = (k: keyof PlayerStats): number => squad.reduce((a, p) => a + p.stats[k], 0) / squad.length;
+  return keys.reduce((a, b) => (mean(b) < mean(a) ? b : a));
+}
+
+/** A stat's share of the week under a squad focus (N11): ×ON for the focus, ×OFF for the rest, ×1 under Balanced. */
+export function focusMult(focus: TrainingFocus, stat: keyof PlayerStats): number {
+  if (focus === 'balanced') return 1;
+  return stat === focus ? TRAINING_FOCUS.ON : TRAINING_FOCUS.OFF;
+}
+
 /**
  * Compute one week of training for a single player against the given facilities.
  * Pure — returns a new PlayerStats; does not mutate. Exported for unit testing
  * of the exact per-player maths.
  */
-export function trainPlayer(player: Player, facilities: PlacedFacility[]): PlayerStats {
+export function trainPlayer(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
+  const gain = weeklyGain(player, facilities, focus);
+  const next: PlayerStats = { ...player.stats };
+  for (const stat of STAT_KEYS) next[stat] += gain[stat];
+
+  // 3. Veteran decline: age>=31 subtract flat 0.3 from speed & stamina, post-gain.
+  if (player.age >= 31) {
+    next.speed -= VETERAN_DECLINE;
+    next.stamina -= VETERAN_DECLINE;
+  }
+
+  // 4. Clamp every stat to [STAT_FLOOR, STAT_MAX]; stays fractional.
+  for (const stat of STAT_KEYS) {
+    next[stat] = clamp(next[stat]);
+  }
+  return next;
+}
+
+/**
+ * What a player gains in a week of training (before the veteran decline and the
+ * clamp): the facilities' gains, scaled by his age, traits and fitness, the squad
+ * focus (N11) and each stat's headroom. Pure; the player page's "+0.8 a week".
+ */
+export function weeklyGain(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
   // 1. Sum per-stat base contributions across all built facilities.
   const gains: Record<keyof PlayerStats, number> = {
     speed: 0, strength: 0, stamina: 0, skill: 0, footyIQ: 0,
@@ -128,22 +189,20 @@ export function trainPlayer(player: Player, facilities: PlacedFacility[]): Playe
   //    and each stat's headroom towards STAT_MAX.
   const scale = ageMod(player.age) * traitMult(player) * injuryMult(player) * TRAINING_CURVE.GAIN_RATE;
 
-  const next: PlayerStats = { ...player.stats };
-  for (const stat of STAT_KEYS) {
-    next[stat] = next[stat] + gains[stat] * scale * headroom(player.stats[stat]);
-  }
+  const out: PlayerStats = { speed: 0, strength: 0, stamina: 0, skill: 0, footyIQ: 0 };
+  for (const stat of STAT_KEYS) out[stat] = gains[stat] * scale * focusMult(focus, stat) * headroom(player.stats[stat]);
+  return out;
+}
 
-  // 3. Veteran decline: age>=31 subtract flat 0.3 from speed & stamina, post-gain.
-  if (player.age >= 31) {
-    next.speed -= VETERAN_DECLINE;
-    next.stamina -= VETERAN_DECLINE;
-  }
-
-  // 4. Clamp every stat to [STAT_FLOOR, STAT_MAX]; stays fractional.
-  for (const stat of STAT_KEYS) {
-    next[stat] = clamp(next[stat]);
-  }
-  return next;
+/**
+ * What a week's training does to each stat (N11, the player page's "+0.8/wk"):
+ * the gain, less the veteran decline, inside the clamp. Pure.
+ */
+export function weeklyChange(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
+  const after = trainPlayer(player, facilities, focus);
+  const out = { ...after };
+  for (const stat of STAT_KEYS) out[stat] = after[stat] - player.stats[stat];
+  return out;
 }
 
 /**
@@ -152,7 +211,8 @@ export function trainPlayer(player: Player, facilities: PlacedFacility[]): Playe
  */
 export function applyTraining(state: GameState): GameState {
   const facilities = state.facilities;
-  const squad = state.squad.map((p) => ({ ...p, stats: trainPlayer(p, facilities) }));
+  const focus = state.training?.focus ?? 'balanced';
+  const squad = state.squad.map((p) => ({ ...p, stats: trainPlayer(p, facilities, focus) }));
   setState({ squad });
   return getState();
 }

@@ -213,6 +213,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       return lineup ? { ...old, lineup: { ...lineup, kicker: lineup.kicker ?? null, captain: lineup.captain ?? null } } : { ...old };
     },
   },
+  // v15 → v16 (N11): a squad training focus. An older save trains Balanced, as it always has.
+  { from: 15, to: 16, run: (old) => ({ ...old, training: { focus: 'balanced' } }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

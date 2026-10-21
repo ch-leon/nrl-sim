@@ -23,6 +23,7 @@ import { PORTRAIT_H, PORTRAIT_W, TRAINING_KIT, portraitDataUrl } from '../../art
 import { button, closeModal, el, openModal, panel } from '../dom';
 import { ensureScreenStyles } from './recruit';
 import { fmtMoney } from './finance';
+import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
 
@@ -56,7 +57,10 @@ export interface PlayerPageModel {
   overall: number;
   /** "Your squad", "Free agent" or the rival's name. */
   where: string;
-  stats: { label: string; value: number }[];
+  /** Each stat, and (your own players, N11) what a week's training under the squad focus adds. */
+  stats: { label: string; value: number; gain?: number }[];
+  /** The squad's training focus in words, for your own players (N11). */
+  trainingFocus: string | null;
   traits: { label: string; tip: string; bad: boolean }[];
   morale: { value: number; word: string; reasons: string[] };
   /** "Fit" or "Out 3 weeks". */
@@ -174,6 +178,11 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     ? { text: `Asks ${fmtMoney(wage)}/wk on a ${CONTRACTS.NEW_CONTRACT_WEEKS}-week deal`, expiring: false }
     : { text: `${weeksText(p.contractWeeks)} left · ${fmtMoney(wage)}/wk`, expiring: p.contractWeeks <= MORALE.EXPIRING_WEEKS };
   const seasonsAtClub = p.joinedSeason !== undefined ? state.season - p.joinedSeason + 1 : null;
+  // A week's training under the squad's focus (N11): what each stat gains, for your own players.
+  const focus = state.training?.focus ?? 'balanced';
+  // Nothing trains without facilities: no gains to show. What shows is the week's change, a veteran's decline included.
+  const trains = squad && Object.values(weeklyGain(p, state.facilities, focus)).some((g) => g > 0);
+  const gain = trains ? weeklyChange(p, state.facilities, focus) : null;
   return {
     id: p.id,
     name: p.name,
@@ -181,7 +190,8 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     age: p.age,
     overall: overallRating(p),
     where: ctx.kind === 'squad' ? 'Your squad' : ctx.kind === 'freeAgent' ? (p.junior ? 'Academy prospect' : 'Free agent') : ctx.club.name,
-    stats: STAT_LABELS.map(([key, label]) => ({ label, value: p.stats[key] })),
+    stats: STAT_LABELS.map(([key, label]) => ({ label, value: p.stats[key], ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}) })),
+    trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
       .filter((t) => t.id in TRAITS)
       .map((t) => ({ label: `${TRAITS[t.id].name} ${ROMAN[t.level]}`, tip: TRAITS[t.id].blurb, bad: TRAITS[t.id].bad ?? false })),
@@ -242,11 +252,17 @@ function findPlayer(id: string, ctx: PlayerContext, state: GameState): Player | 
   return list.find((p) => p.id === id) ?? null;
 }
 
-function statBars(stats: PlayerPageModel['stats']): HTMLElement {
-  return el('div', { class: 'nrl-statbars nrl-player-stats' }, ...stats.map(({ label, value }) => {
+function statBars(stats: PlayerPageModel['stats'], focus: string | null): HTMLElement {
+  return el('div', { class: 'nrl-statbars nrl-player-stats' }, ...stats.map(({ label, value, gain }) => {
     const fill = el('div', { class: 'nrl-statfill' });
     fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
-    return el('div', { class: 'nrl-statrow' }, el('span', { text: label }), el('div', { class: 'nrl-stattrack' }, fill), el('span', { text: String(value) }));
+    const row = el('div', { class: 'nrl-statrow' }, el('span', { text: label }), el('div', { class: 'nrl-stattrack' }, fill), el('span', { text: String(value) }));
+    // N11: what a week's training under the squad focus adds.
+    if (gain !== undefined) {
+      row.style.gridTemplateColumns = '4.6rem 1fr 1.8rem 2.6rem';
+      row.append(el('span', { class: 'nrl-stat-gain', text: `${gain < 0 ? '−' : '+'}${Math.abs(gain).toFixed(1)}/wk`, attrs: { title: `A week's training under the ${focus} focus`, 'data-gain': '', style: 'font-size:0.7em;color:#2e7d32;white-space:nowrap' } }));
+    }
+    return row;
   }));
 }
 
@@ -297,7 +313,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
 
     const about = el('div', { class: 'nrl-player-col' },
       el('h3', { text: 'Stats' }),
-      statBars(m.stats),
+      statBars(m.stats, m.trainingFocus),
       el('h3', { text: 'Traits' }),
       ...(m.traits.length > 0
         ? m.traits.map((t) => el('div', { class: `nrl-player-trait${t.bad ? ' nrl-player-trait-bad' : ''}` }, el('b', { text: t.label }), t.tip))

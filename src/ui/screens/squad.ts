@@ -6,10 +6,12 @@
 import { el, button, openModal, closeModal, openScreen, closeScreen } from '../dom';
 import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
+import { save } from '../../core/save';
 import { overallRating } from '../../data/player';
 import { releasePlayer, RELEASE_PAYOUT_WEEKS } from '../../systems/freeagency';
 import { PLAYER_ID } from '../../systems/fixtures';
-import { DEFAULT_PLAYER_COLORS, FEATURES } from '../../config';
+import { DEFAULT_PLAYER_COLORS, FEATURES, TRAINING_FOCUS } from '../../config';
+import { TRAINING_FOCI, focusLabel, setTrainingFocus } from '../../systems/training';
 import { openKitDesigner } from './kit';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PlayerCard, ensureScreenStyles } from './recruit';
@@ -99,9 +101,29 @@ export function openSquadScreen(): void {
   const body = el('div', { class: 'nrl-screen-body' });
   const sub = el('div', { class: 'nrl-screen-sub' });
 
+  // Training focus (N11): what the squad trains hardest; the player page shows each man's weekly gain under it.
+  const focusBtns = TRAINING_FOCI.map((f) => {
+    // Saved at once, as the Lineup screen does (the game otherwise saves at the week's end).
+    const b = button(focusLabel(f), () => {
+      setTrainingFocus(f);
+      save(getState());
+    });
+    b.setAttribute('data-focus', f);
+    b.title = f === 'balanced' ? 'Every stat trains as it always has' : `${focusLabel(f)} trains ×${TRAINING_FOCUS.ON}, the rest ×${TRAINING_FOCUS.OFF}`;
+    return b;
+  });
+  const focusRow = el(
+    'div',
+    { class: 'nrl-squad-focus', attrs: { style: 'display:flex;gap:0.3rem;align-items:center;overflow-x:auto;flex-shrink:0;padding-bottom:0.3rem;' } },
+    el('span', { text: 'Training:', attrs: { style: 'color:#e8e0c8;font-size:0.75rem;' } }),
+    ...focusBtns,
+  );
+
   const render = (): void => {
     body.replaceChildren();
     const s = getState();
+    const focus = s.training?.focus ?? 'balanced';
+    focusBtns.forEach((b, i) => b.classList.toggle('nrl-sort-active', TRAINING_FOCI[i] === focus));
     const wageBill = s.squad.reduce((sum, p) => sum + p.wage, 0);
     sub.textContent = `${s.squad.length} players · wage bill ${money(wageBill)}/wk`;
 
@@ -145,7 +167,7 @@ export function openSquadScreen(): void {
     button('CLOSE', closeScreen),
   );
 
-  const screen = el('div', { class: 'nrl-screen' }, head, sub, body);
+  const screen = el('div', { class: 'nrl-screen' }, head, focusRow, sub, body);
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onSquadClosed);
   render();

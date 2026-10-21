@@ -230,6 +230,7 @@ export interface GameState {
   kit?: KitDesign;            // the player's kit design (#79); absent = derived from the club colours
   finance: SeasonFinance[];   // the club's books by season, oldest first (#172)
   lineup: Lineup;             // the coach's nine by slot, bench, rotation and team tactics (#69, N11)
+  training: { focus: TrainingFocus }; // what the squad trains hardest: a stat or 'balanced' (N11, v16)
   potmTally?: PotmTally;      // player-of-the-match awards this season, by name (#190); absent until the first
   rngSeed: number;            // advanced state of the seeded RNG
 }

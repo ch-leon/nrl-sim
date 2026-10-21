@@ -14,7 +14,7 @@ import { bus, type Events } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
-import { registerTrainingSystem } from '../systems/training';
+import { isTrainingFocus, registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { registerPlayerMatchSystem } from '../systems/matchday';
@@ -254,6 +254,7 @@ export function checkState(s: GameState): string[] {
   const dupes = duplicatePlayers(s);
   if (dupes.length) out.push(`players in two places: ${dupes.slice(0, 5).join(', ')}`);
   if (s.squad.length > SQUAD_CAP) out.push(`squad over cap: ${s.squad.length}`);
+  if (!isTrainingFocus(s.training?.focus)) out.push(`invalid training focus: ${String(s.training?.focus)}`);
   for (const c of s.league.clubs) {
     if (c.id === s.clubId) continue;
     if (!c.squad || c.squad.length < Math.min(RIVAL_SQUAD_MIN, 13)) out.push(`${c.id} squad too small: ${c.squad?.length ?? 0}`);
@@ -279,6 +280,7 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  if (version < 16) delete out.training;
   if (version < 15 && raw.lineup) {
     const { kicker: _k, captain: _c, ...lineup } = raw.lineup;
     out.lineup = lineup;
@@ -404,6 +406,8 @@ function manage(): Signed {
   for (const ev of s.eventDeck.pending) {
     if (cardById(ev.cardId)) chooseEvent(ev.id, 0);
   }
+  // Training focus (N11): the squad's weakest stat.
+  setTrainingFocus(weakestStat(getState().squad));
   for (const defId of MANAGED.BUILDS) {
     const st = getState();
     if (st.facilities.some((f) => f.defId === defId)) continue;
