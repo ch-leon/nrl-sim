@@ -639,9 +639,11 @@ async function play() {
   });
 
   // Play out the season: to the finals, then to season end, answering cards on the way.
-  // A club in debt stops every advance after one week (the bankruptcy warning), so
-  // budget a call per week left, and fail as soon as a call makes no progress.
-  for (let i = 0; i < 40; i++) {
+  // Cards, injuries and contracts stop an advance; since N12.5 (#239) debt stops it only on
+  // the crossing, a forced sale and the floor, and the season takes up to 12 calls. 24 is
+  // twice that: a club stopping every week again (debt or otherwise) runs out of calls
+  // and fails 'season-2'. A call that makes no progress fails at once.
+  for (let i = 0; i < 24; i++) {
     const s = await save();
     if (s.season > 1) break;
     const target = s.week < 25 ? 1 : 2;
