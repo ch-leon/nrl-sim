@@ -646,6 +646,21 @@ async function play() {
     rec.notes.push(`tapped ${label}`);
   });
   await step('finance', async () => { await closeAny(); await tap('.nrl-nav .nrl-btn:has-text("Finance")'); await wait(300); });
+  // N14.5 (#287): the Staff section on Finance. Hire the Welfare Manager, so the saves dumped
+  // after this (after-rollover, live-rivals) carry a staffed club for the corpus.
+  await step('staff-hire', async (rec) => {
+    const row = page.locator('.nrl-staff-row[data-staff="welfare"]');
+    if (!(await row.count())) return 'no Staff section on this build';
+    const hire = row.locator('.nrl-btn:has-text("Hire")');
+    if (!(await hire.count())) return 'the Welfare Manager is already hired';
+    await hire.scrollIntoViewIfNeeded();
+    await press(hire);
+    await page.waitForSelector('.nrl-staff-row[data-staff="welfare"] .nrl-btn:has-text("Release")', { timeout: 5000 });
+    const staff = await page.evaluate(() => window.__nrlState().staff);
+    const welfare = staff.find((m) => m.role === 'welfare');
+    if (!welfare) throw new Error('Hire tapped but no Welfare Manager in the state');
+    rec.notes.push(`hired ${welfare.name}, $${welfare.wage}/wk`);
+  });
   // N7 (#189): ? opens the Guide; its How Nines works page; close.
   await step('guide-nines', async (rec) => {
     await closeAny();
