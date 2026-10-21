@@ -1,8 +1,9 @@
 // src/systems/liveMatchRecord.ts — the record of a live match in progress
-// (coach calls #73, docs/specs/coach-calls.md §5). The game saves when a week
-// ends and when the page hides, never while a week is held, so a phone that
-// kills the app mid-match reloads the week before it; advancing again rebuilds the same match (the seed comes from the saved
-// rng). This record — the fixture, seed, the calls and plan changes made and the tick — lets
+// (coach calls #73, docs/specs/coach-calls.md §5). The game never saves a held
+// week (it saves as a week starts, at its end and when the page hides), so a
+// phone that kills the app mid-match reloads the week's start; advancing again
+// rebuilds the same match (the seed comes from the saved rng). This record — the
+// fixture, seed, the calls and plan changes made and the tick — lets
 // that match carry on where it was, with the calls already made, instead of
 // starting over (no reloading for a better result). A few hundred bytes, kept
 // next to the save slot; cleared at full time.

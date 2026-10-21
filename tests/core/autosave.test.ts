@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { enableAutosave, exportSave, getActiveSlot, importIntoSlot, load, save, __setStorage, type StorageLike } from '../../src/core/save';
 import { createNewGame, getState, setState } from '../../src/core/state';
-import { advanceWeek, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
+import { advanceWeek, clearHeldWeek, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
 
 // QA finding 21: a change made between weeks (here, money) was saved only by the next
 // week's advance, so a phone that dropped the tab lost it. The page going away saves it,
@@ -21,12 +21,14 @@ function fakePage() {
 }
 
 let store: Map<string, string>;
+let writes = 0;
 let off: (() => void) | undefined;
 beforeEach(() => {
   store = new Map();
+  writes = 0;
   const storage: StorageLike = {
     getItem: (k) => store.get(k) ?? null,
-    setItem: (k, v) => void store.set(k, v),
+    setItem: (k, v) => { writes++; store.set(k, v); },
     removeItem: (k) => void store.delete(k),
   };
   __setStorage(storage);
@@ -35,6 +37,7 @@ beforeEach(() => {
 afterEach(() => {
   off?.();
   off = undefined;
+  clearHeldWeek();
   clearTickHooks();
   __setStorage(null);
 });
@@ -128,5 +131,42 @@ describe('save() during a held week (QA finding 22)', () => {
     save(getState()); // the week's end (enableAutosave's week save)
     expect(load()).toMatchObject({ week: 2, money: 999 });
     expect(load()?.settings.coachCalls).toBe(false);
+  });
+});
+
+// QA finding 21's follow-up: a held week is never written, so a change made between weeks was
+// lost if the tab died while the week held (the live match, the rival round): the slot kept the
+// previous week's end. The week's start saves it, before any hook can hold.
+describe('the week-start save', () => {
+  it('saves a change made between weeks before the week can hold', () => {
+    const page = fakePage();
+    off = enableAutosave({ doc: page.doc, win: page.win });
+    advanceWeek(); // week 1 → 2, saved at its end
+    setState({ money: 600 }); // a hire between weeks
+    registerTickHook('test-hold', 40, (ctx) => { setState({ money: 999 }); ctx.hold?.(); });
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+    // The tab dies here, mid-match: no pagehide reaches a page the phone has already dropped.
+    expect(load()).toMatchObject({ week: 2, money: 600 });
+    resumeWeek();
+    expect(load()).toMatchObject({ week: 3, money: 999 });
+  });
+
+  it('writes nothing at the week start when nothing changed since the last save', () => {
+    const page = fakePage();
+    off = enableAutosave({ doc: page.doc, win: page.win });
+    save(getState()); // a new game is saved at its first week's start (or its first hide), like any change
+    writes = 0;
+    advanceWeek();
+    advanceWeek();
+    expect(writes).toBe(2); // each week's end, no more
+    setState({ money: 600 });
+    advanceWeek();
+    expect(writes).toBe(4); // the change at the week's start, then the week's end
+    off();
+    off = undefined;
+    setState({ money: 700 });
+    advanceWeek();
+    expect(writes).toBe(4); // unsubscribed: the week-start hook is gone too
   });
 });

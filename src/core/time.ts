@@ -43,6 +43,7 @@ export type SeasonHook = (ctx: { season: number }) => void;
  * registration timing.
  */
 export const TICK_ORDER = {
+  weekStart: 0, // the autosave's save of a change made since the last save (QA finding 21)
   training: 10,
   injuries: 20,
   economy: 30,

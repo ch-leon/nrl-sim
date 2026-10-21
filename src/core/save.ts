@@ -17,7 +17,7 @@ import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
-import { weekHeld } from './time';
+import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld } from './time';
 import { buildLabel } from '../ui/buildInfo';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -419,6 +419,9 @@ export function writeSlot(slot: number, state: GameState): boolean {
   return true;
 }
 
+/** The state save() last wrote to the active slot: any later one holds a change not saved yet. */
+let lastSaved: GameState | null = null;
+
 /**
  * Persist state to the active slot. Never throws: on QuotaExceededError or any
  * storage failure it emits a `ui:notify` danger and console.warns, leaving the
@@ -433,7 +436,7 @@ export function save(state: GameState): void {
   if (weekHeld() || slotImported) return;
   const storage = getStorage();
   if (storage) migrateLegacySave(storage);
-  writeSlot(activeSlot, state);
+  if (writeSlot(activeSlot, state)) lastSaved = state;
 }
 
 /**
@@ -580,6 +583,8 @@ interface PageEvents {
   win?: { addEventListener(type: string, fn: () => void): void; removeEventListener(type: string, fn: () => void): void };
 }
 
+const WEEK_START_HOOK = 'autosave-week-start';
+
 /**
  * Subscribe to 'week:advanced' and persist the settled post-tick state (the §5
  * pipeline emits this at step 8, after the step-7 autosave hook, so the state is
@@ -587,8 +592,9 @@ interface PageEvents {
  * a change made between weeks (a hire, a build, a signing, the kit) was kept only
  * until the next week's save, so a phone that dropped the tab lost it. Never while
  * a week is held, nor after an import has replaced the active slot (save() writes
- * nothing then; a held week's next load replays it from its start). Returns the
- * unsubscribe closure for teardown/tests.
+ * nothing then; a held week's next load replays it from its start), so a change
+ * not yet saved is also saved as each week starts. Returns the unsubscribe
+ * closure for teardown/tests.
  */
 export function enableAutosave(page: PageEvents = {
   ...(typeof document !== 'undefined' ? { doc: document } : {}),
@@ -597,11 +603,16 @@ export function enableAutosave(page: PageEvents = {
   slotImported = false;
   const persist = (): void => save(getState());
   const offWeek = bus.on('week:advanced', persist);
+  // A held week (the live match, the rival round) is never written, so a change made since the
+  // last save is saved as the next week starts, before its first hook: a tab that dies mid-match
+  // comes back at the week's start with the change, and the live-match record still matches it.
+  registerTickHook(WEEK_START_HOOK, TICK_ORDER.weekStart, () => { if (getState() !== lastSaved) persist(); });
   const onVisibility = (): void => { if (page.doc?.visibilityState === 'hidden') persist(); };
   page.doc?.addEventListener('visibilitychange', onVisibility);
   page.win?.addEventListener('pagehide', persist);
   return () => {
     offWeek();
+    unregisterTickHook(WEEK_START_HOOK);
     page.doc?.removeEventListener('visibilitychange', onVisibility);
     page.win?.removeEventListener('pagehide', persist);
   };

@@ -324,7 +324,8 @@ export interface Events {
 }
 ```
 
-Week tick pipeline order (WU-4, fixed): 1) training gains → 2) injuries tick →
+Week tick pipeline order (WU-4, fixed): 0) a change made since the last save is saved
+(the week may hold, and a held week is never written; QA finding 21) → 1) training gains → 2) injuries tick →
 3) economy (wages, income) → 4) match of the round (headless on fast-forward, else
 hand off to MatchScene) → 5) ladder update → 6) free agent pool refresh (every 4 weeks) →
 7) autosave → 8) emit `week:advanced`.
