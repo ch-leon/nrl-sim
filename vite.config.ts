@@ -1,8 +1,10 @@
 /// <reference types="vitest" />
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { formatBuildLabel } from './src/ui/buildInfo';
+import { claudeDirIgnored } from './src/utils/devWatch';
 
 // BAK-204 (WU-16): installable, offline-capable PWA via generateSW.
 // The Phaser chunk is large, so the Workbox precache size cap is raised to ~6MB.
@@ -63,7 +65,8 @@ export default defineConfig({
   ],
   // Claude sessions keep their worktrees in .claude/worktrees/; Vite full-reloads the page for
   // any tsconfig.json it sees change there, which restarted the game mid-match on the dev
-  // server (tests/qa/devServerWatch.test.ts).
-  server: { watch: { ignored: ['**/.claude/**'] } },
+  // server (tests/qa/devServerWatch.test.ts). Only this checkout's own .claude/: a checkout
+  // that is itself one of those worktrees still watches its own files.
+  server: { watch: { ignored: [claudeDirIgnored(fileURLToPath(new URL('.', import.meta.url)))] } },
   test: { globals: true, environment: 'node', include: ['tests/**/*.test.ts'] },
 });

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type HMRPayload, type ViteDevServer } from 'vite';
+import { claudeDirIgnored } from '../../src/utils/devWatch';
 
 // The dev server (`npm run dev`, .claude/launch.json) watches the whole checkout. Claude
 // sessions keep their worktrees under .claude/worktrees/, and Vite full-reloads the page for
@@ -82,4 +83,24 @@ describe('dev server watch', () => {
     expect(await until(() => sent.some((p) => p.type === 'full-reload'), 10_000)).toBe(true);
     expect(seen).toContain(path.join(controlDir, 'tsconfig.json'));
   }, 30_000);
+
+  it('watches the game\'s own files, wherever the checkout is', () => {
+    expect(Object.keys(server.watcher.getWatched())).toContain(path.join(root, 'src'));
+  });
+});
+
+describe('claudeDirIgnored', () => {
+  it('leaves out only the checkout\'s own .claude/, also when the checkout is a session worktree', () => {
+    const plain = claudeDirIgnored('/home/u/nrl-sim');
+    expect(plain('/home/u/nrl-sim/.claude')).toBe(true);
+    expect(plain('/home/u/nrl-sim/.claude/worktrees/s/tsconfig.json')).toBe(true);
+    expect(plain('/home/u/nrl-sim/src/main.ts')).toBe(false);
+    expect(plain('/home/u/nrl-sim/.claudette/x.ts')).toBe(false);
+    // A checkout under another's .claude/worktrees/ (where sessions work): a `**/.claude/**`
+    // glob matched all of it, so its dev server watched nothing (#250's first form).
+    const worktree = claudeDirIgnored('/home/u/nrl-sim/.claude/worktrees/s/');
+    expect(worktree('/home/u/nrl-sim/.claude/worktrees/s/src/main.ts')).toBe(false);
+    expect(worktree('/home/u/nrl-sim/.claude/worktrees/s/tsconfig.json')).toBe(false);
+    expect(worktree('/home/u/nrl-sim/.claude/worktrees/s/.claude/worktrees/t/tsconfig.json')).toBe(true);
+  });
 });
