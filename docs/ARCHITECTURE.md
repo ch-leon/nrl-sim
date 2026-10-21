@@ -290,8 +290,9 @@ age (`signingFee` in `freeagency.ts`, built on `contracts.transferFee`: overallÂ
 an age factor, so an 80-overall in his prime is about $64k and a 55 about $30k), less a
 Scout Office discount per level; Academy prospects still cost `SIGNING_FEE_WEEKS` Ã— wage.
 `marketWage` has one copy, in `data/player.ts` (contracts and rivals re-export it). Rivals
-compete for the pool as before: 94% of 65+ free agents an idle club leaves are signed by a
-rival before the next refresh, half of them the very next week.
+compete for the same pool, which since N12 (#247) is generated around the league
+(`freeagency.poolTarget`), so there are fewer stars to take: over a first season they sign
+about 3.2 players of 65+, down from 6.4.
 
 Random events (GitHub #75): the deck draws at most one card a week (tick order 58,
 after morale) from its own seeded stream `eventDeck.rng`, so it never moves `rngSeed`.
