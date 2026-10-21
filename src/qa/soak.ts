@@ -308,6 +308,7 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  if (version < 18) delete out.boardLoan;
   if (version < 17) out.finance = raw.finance.map(({ overhead: _o, ...lines }) => lines);
   if (version < 16) delete out.training;
   if (version < 15 && raw.lineup) {
@@ -509,10 +510,12 @@ export function advanceWeekAsTapped(): void {
   }
   const m = kickOff.match;
   if (!m) return;
-  const { seed, weather, injuryRate, goldenPoint, aiCoach } = m.live;
+  const { seed, weather, injuryRate, goldenPoint, aiCoach, difficultyEdge } = m.live;
   const result = runMatch(m.home, m.away, {
     seed, weather,
     ...(injuryRate !== undefined ? { injuryRate } : {}),
+    // The rival's difficulty edge (N12.2): Hard and Easy play him up or down, as matchday does.
+    ...(difficultyEdge ? { difficultyEdge } : {}),
     ...(aiCoach?.length ? { aiCoach } : {}),
     ...(goldenPoint ? { goldenPoint } : {}),
   });

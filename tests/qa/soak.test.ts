@@ -34,6 +34,12 @@ describe('soak checks', () => {
       expect(res.ok, `v${v}`).toBe(true);
       if (res.ok) expect(checkState(res.state), `v${v}`).toEqual([]);
     }
+    // Each version's old save lacks what its migration adds, so the step really runs: v18's board loan.
+    const owing = { ...getState(), boardLoan: { owed: 12_000 } };
+    expect(asOldSave(owing, 17)).not.toHaveProperty('boardLoan');
+    expect(asOldSave(owing, 18)).toHaveProperty('boardLoan', { owed: 12_000 });
+    const back = migrateState(asOldSave(owing, 17));
+    expect(back.ok && back.state.boardLoan).toEqual({ owed: 0 });
   });
 });
 
@@ -281,8 +287,8 @@ describe('soak columns (N12.1)', () => {
 
   it('a tapped week plays the player\'s match as fast-forward plays it, the rival\'s AI coach included', () => {
     // Without the live-rivals setting both weeks play the rival round on the cheap sim: the same week.
-    const playerResult = (tapped: boolean): Fixture['result'] => {
-      createNewGame('Tapped', 5);
+    const playerResult = (tapped: boolean, difficulty?: 'easy' | 'hard'): Fixture['result'] => {
+      createNewGame('Tapped', 5, difficulty ? { difficulty } : undefined);
       initLeague(getState());
       registerAllSystems();
       if (tapped) advanceWeekAsTapped(); else withFastForward(advanceWeek);
@@ -290,6 +296,9 @@ describe('soak columns (N12.1)', () => {
       return getState().league.fixtures.find((f) => f.round === 1 && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID))!.result;
     };
     expect(playerResult(true)).toEqual(playerResult(false));
+    // Off Normal the rival carries the difficulty's edge (N12.2) both ways too.
+    expect(playerResult(true, 'hard')).toEqual(playerResult(false, 'hard'));
+    expect(playerResult(true, 'easy')).toEqual(playerResult(false, 'easy'));
     const restore = applyTuning({ 'calls.ai.on': 1 });
     try {
       expect(playerResult(true)).toEqual(playerResult(false));
