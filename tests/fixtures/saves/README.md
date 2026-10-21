@@ -4,7 +4,7 @@ Real saves from the phone playthrough (`npm run e2e:season`), one file per save
 version at each point: `v<version>-<point>.json`, about 120 KB each.
 `tests/qa/corpus.test.ts` checks that every one still migrates to `SAVE_VERSION`,
 passes the soak's invariant checks and plays on headless: a whole season for the
-oldest and the newest version here, four weeks for the versions in between (a season
+oldest and the newest version here, past the season's end for the `mid-season` save of one version in between, four weeks for the rest (a season
 each made the corpus the slowest file in CI's 10-minute check job).
 
 Rules:
