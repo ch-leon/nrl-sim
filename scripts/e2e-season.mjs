@@ -240,7 +240,7 @@ async function weekAsTapped(rec) {
     const s = window.__nrlState();
     return `${s.season}:${s.week}` !== a ? 'week' : null;
   }, at, { timeout: 15000 }).then((h) => h.jsonValue())
-    .catch(() => { throw new Error(`Advance Week did nothing at ${at.replace(/(\d+):(\d+)/, 'S$1 W$2')}`); });
+    .catch(() => { throw new Error(`Advance Week did nothing within 15 s at ${at.replace(/(\d+):(\d+)/, 'S$1 W$2')}`); });
   if (what === 'match') {
     await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
@@ -724,10 +724,11 @@ async function play() {
       const stop = await page.locator('.nrl-toast').last().textContent().catch(() => '');
       rec.notes.push(`S${now.season} W${now.week} $${now.money}${stop ? ` · "${stop.trim()}"` : ''}`);
       if (now.season === s.season && now.week === s.week && /Only \d+ fit/.test(stop ?? '')) {
-        // Not a failure, but worth seeing: since #278 a forced sale keeps 13 fit, so a stop here is
-        // injuries or expiries, or #278 regressed (finding 19).
+        // Not a failure, but worth seeing (finding 19): since #278 a forced sale keeps 13 fit, and
+        // since #285 the Academy calls up juniors to make the side, so Advance Week plays a match.
+        // A forfeit here means the squad is at SQUAD_CAP with too many hurt, or one of those regressed.
         const [fit, squad] = await page.evaluate(() => { const l = window.__nrlState(); return [l.squad.filter((p) => p.injuredWeeks <= 0).length, l.squad.length]; });
-        report.findings.push(`S${now.season} W${now.week}: a long advance stopped for a forfeit, ${fit} fit of ${squad} ($${now.money}); the week was played with Advance Week.`);
+        report.findings.push(`S${now.season} W${now.week}: a long advance stopped short of 13 fit, ${fit} fit of ${squad} ($${now.money}); the week was played with Advance Week.`);
         await toastsGone();
         await weekAsTapped(rec);
         now = await save();
@@ -797,7 +798,7 @@ async function play() {
     // A match to skip, or a forfeit (a squad short of 13 after the rollover): then the rivals
     // alone hold the week and there is no match screen at all.
     const match = await page.waitForFunction(() => (document.querySelector('.nrl-mo-controls') ? 'match'
-      : [...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited/.test(t.textContent ?? '')) ? 'forfeit' : null), null, { timeout: 15000 })
+      : [...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited \(\d+/.test(t.textContent ?? '')) ? 'forfeit' : null), null, { timeout: 15000 })
       .then((h) => h.jsonValue());
     if (match === 'match') {
       await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');

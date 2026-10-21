@@ -188,13 +188,17 @@ if (jsonOut) {
 
 // Forfeits are the game working as written (a club short of 13 fit forfeits), not a problem;
 // but a run that forfeits whole seasons says the manager can't keep a squad (finding 20).
+// Every run counts here, the old-save ones too; the per-season `forf` above is fresh games only.
 const forfeiting = results.filter((r) => r.seasons.some((s) => s.forfeits > 0));
 if (forfeiting.length) {
   const by = new Map<string, number>();
-  for (const r of forfeiting) by.set(modeLabel(r), (by.get(modeLabel(r)) ?? 0) + 1);
+  for (const r of forfeiting) {
+    const label = r.fromVersion !== undefined ? 'old saves' : modeLabel(r);
+    by.set(label, (by.get(label) ?? 0) + 1);
+  }
   const whole = results.filter((r) => r.seasons.some((s) => s.forfeits > 0 && s.forfeits >= s.wins + s.draws + s.losses)).length;
   console.log(`\nForfeits: ${forfeiting.length} of ${results.length} runs forfeited rounds (${[...by].map(([m, n]) => `${m} ${n}`).join(', ')}); ${whole} forfeited a whole season.`);
-}
+} else console.log(`\nForfeits: none in ${results.length} runs.`);
 
 const all = results.flatMap((r) => r.problems.map((p) => `seed ${r.seed} ${r.mode}${r.fromVersion !== undefined ? ` from v${r.fromVersion}` : ''}: ${p}`));
 console.log(all.length ? `\n${all.length} problems:\n${all.join('\n')}` : '\nNo problems.');

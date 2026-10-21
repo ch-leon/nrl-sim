@@ -8,7 +8,7 @@ import {
   styleTable, type SeasonSample, type SoakResult, type StyleGame,
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
-import { SEASON_ROUNDS } from '../../src/config';
+import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
 import { createNewGame, getState, setState, type Fixture, type GameState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { migrateState } from '../../src/core/save';
@@ -75,6 +75,8 @@ describe('soak', () => {
       expect(r.start.rivalMean).toBeLessThanOrEqual(r.start.rivalRange[1]);
       for (const s of r.seasons) {
         expect(s.wins + s.draws + s.losses).toBe(SEASON_ROUNDS);
+        // A squad with room for the Academy's call-up (#285) never forfeits (finding 20).
+        expect(s.forfeits, `${mode} S${s.season}`).toBe(0);
         // N12.1: the finals cut is the top eight, and each near rival is met once or twice in 24 rounds.
         expect(s.madeFinals).toBe(s.ladderPosition <= 8);
         expect(s.nearRivalGames).toBeGreaterThanOrEqual(NEAR_RIVALS);
@@ -215,23 +217,37 @@ describe('soak columns (N12.1)', () => {
   });
 
   it('counts the rounds forfeited short of 13 fit, per season and in the summary (finding 20)', () => {
-    // A squad of 12 that never signs (idle) forfeits every round it plays: the soak said
-    // "No problems" over whole seasons of 0-0-24 and showed nothing of it.
-    createNewGame('Short', 12);
-    initLeague(getState());
-    const s0 = getState();
-    const fromSave = { ...s0, squad: s0.squad.slice(0, 12).map((p) => ({ ...p, injuredWeeks: 0 })) };
-    const rounds = s0.league.fixtures.filter((f) => f.round <= SEASON_ROUNDS && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID)).length;
-    const r = runSoak({ seed: 12, seasons: 1, mode: 'idle', fromSave });
-    const season = r.seasons[0]!;
-    expect(rounds).toBeGreaterThan(20);
-    expect(season.forfeits).toBe(rounds);
-    expect([season.wins, season.draws, season.losses]).toEqual([0, 0, rounds]);
-    expect(summariseSeasons([r])[0]!.forfeits).toBe(rounds);
-    // A squad that can field a side forfeits nothing.
+    // A club short of 13 fit forfeits. Since #285 the Academy calls up juniors first, but never
+    // past SQUAD_CAP: a full squad with all but 12 hurt (and money enough that nobody is sold)
+    // forfeits until they heal. The soak said "No problems" over whole seasons of 0-0-24.
+    const shortAtTheCap = (hurtWeeks: number): SoakResult => {
+      createNewGame('Short', 12);
+      initLeague(getState());
+      const s0 = getState();
+      const squad = Array.from({ length: SQUAD_CAP }, (_, i) => {
+        const p = s0.squad[i % s0.squad.length]!;
+        const copy = i < s0.squad.length ? p : { ...p, id: `${p.id}-${i}`, name: `${p.name} ${i}` };
+        return { ...copy, injuredWeeks: i < 12 ? 0 : hurtWeeks };
+      });
+      return runSoak({ seed: 12, seasons: 1, mode: 'idle', fromSave: { ...s0, squad, money: 10_000_000 } });
+    };
+    // Hurt all season: every round forfeited, nothing played.
+    const all = shortAtTheCap(99);
+    expect(all.problems).toEqual([]);
+    const season = all.seasons[0]!;
+    expect(season.forfeits).toBe(SEASON_ROUNDS);
+    expect([season.wins, season.draws, season.losses]).toEqual([0, 0, SEASON_ROUNDS]);
+    expect(summariseSeasons([all])[0]!.forfeits).toBe(SEASON_ROUNDS);
+    // Hurt for the first weeks: those rounds forfeited, the rest played (and counted as played).
+    const some = shortAtTheCap(6).seasons[0]!;
+    expect(some.forfeits).toBeGreaterThan(0);
+    expect(some.forfeits).toBeLessThan(SEASON_ROUNDS - 10);
+    expect(some.losses).toBeGreaterThanOrEqual(some.forfeits);
+    expect(some.wins + some.draws).toBeGreaterThan(0);
+    // The summary averages the runs, season by season.
     expect(sample({}).forfeits).toBe(0);
     expect(summariseSeasons([run(1, [sample({ forfeits: 3 }), sample({ season: 2 })]), run(2, [sample({ forfeits: 4 })])]).map((s) => s.forfeits)).toEqual([3.5, 0]);
-  }, 60_000);
+  }, 120_000);
 
   it('--live-rivals: a tapped week plays the rival round on the live sim and the player\'s match headless', () => {
     // The live sim records every rival's match stats (applyRivalResults); the cheap sim records none.

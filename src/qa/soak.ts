@@ -505,10 +505,10 @@ export function advanceWeekAsTapped(): void {
   bus.emit('match:finished', { fixture: m.fixture, result });
 }
 
-/** Play `seasons` seasons from a new game (or an old save built from it) and check as we go. */
 /** Matchday's toast for a forfeited round (systems/matchday.ts): "… Round 9 forfeited (0–24)." */
 export const FORFEITED = / forfeited \(\d+–\d+\)\.$/;
 
+/** Play `seasons` seasons from a new game (or an old save built from it) and check as we go. */
 export function runSoak(opts: SoakOptions): SoakResult {
   const t0 = Date.now();
   bus.clear();
