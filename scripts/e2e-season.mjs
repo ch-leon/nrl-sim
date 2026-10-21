@@ -880,11 +880,14 @@ async function play() {
     await page.waitForSelector('[data-nrl-continue-1]', { timeout: 15000 });
     const slot = await save();
     if (slot?.clubName !== 'Imported FC') throw new Error(`slot 1 holds "${slot?.clubName}" after the import's reload: the game being left was saved over the import`);
+    rec.notes.push(`slot 1 holds "Imported FC" at S${slot.season} W${slot.week} after the reload`);
+  });
+  await step('import-continued', async (rec) => {
     await tap('[data-nrl-continue-1]');
     await page.waitForSelector('.nrl-hud');
     const live = await page.evaluate(() => window.__nrlState().clubName);
     if (live !== 'Imported FC') throw new Error(`Continue opened "${live}", not the imported club`);
-    rec.notes.push(`imported "Imported FC" at S${slot.season} W${slot.week}; the title and Continue both have it`);
+    rec.notes.push('Continue opened the imported club');
   });
 
   await browser.close();
