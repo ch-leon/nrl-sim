@@ -206,3 +206,9 @@ players. Managed Normal grows from about $190k to $370k and ends around $330k wi
 squad of 80s costing $1.2M a season against $1.1M of gates. Idle Hard is bust in
 season 1 and sacked by season 2; managed Hard is a fight for the board's patience,
 in the red half the time. Easy stays comfortable.
+
+**The cascade (N14.3).** One forced sale a week, a board loan for a renewal in debt (up to
+$50,000 a season, repaid at the rollover), and an Academy call-up before a forfeit. In the
+matrix soak (20 seeds × 5 seasons) forfeits went from up to 16 a season (idle Hard season
+3) to none in any mode. Most had not been debt: expiries and retirements left fewer than
+13 fit. The numbers are in `docs/status/2026-10-living.md` (N14.3).
