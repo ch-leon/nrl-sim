@@ -147,6 +147,10 @@ export interface SeasonSample extends GapSample {
   signedOverall: number;
   /** The season's money by source (#161): the rollover's prize and grants count for the season they close. */
   finance: FinanceTally;
+  // The debt cascade (N14.3): the player's forfeited matches, the Academy's call-ups and the forced sales.
+  forfeits?: number;
+  callUps?: number;
+  forcedSales?: number;
 }
 
 /**
@@ -543,6 +547,13 @@ export function runSoak(opts: SoakOptions): SoakResult {
   // moment (N12.1); a season loaded after round 24 falls back to its ladder finish.
   let regular: { madeFinals: boolean; wins: number; games: number } | null = null;
   let signed: Signed = { count: 0, fees: 0, overall: 0 };
+  // N14.3: counted from what the player is told, the forfeit and call-up toasts and the bankruptcy warning.
+  let cascade = { forfeits: 0, callUps: 0, forcedSales: 0 };
+  bus.on('ui:notify', ({ text }) => {
+    if (/ forfeited \(\d+–\d+\)\.$/.test(text)) cascade.forfeits++;
+    else if (text.startsWith('Academy call-up: ')) cascade.callUps++;
+  });
+  bus.on('bankruptcy:warning', ({ forcedSales }) => { cascade.forcedSales += forcedSales?.length ?? 0; });
   const note = (msg: string): void => {
     const s = getState();
     if (problems.length < 20) problems.push(`S${s.season}W${s.week}: ${msg}`);
@@ -622,7 +633,9 @@ export function runSoak(opts: SoakOptions): SoakResult {
           signingFees: signed.fees,
           signedOverall: signed.count ? Math.round((signed.overall / signed.count) * 10) / 10 : 0,
           finance: tally,
+          ...cascade,
         });
+        cascade = { forfeits: 0, callUps: 0, forcedSales: 0 };
         tally = emptyTally();
         seasonStartMoney = s.money;
         minMoney = s.money;
@@ -767,6 +780,10 @@ export interface SeasonSummary {
   startGap: number;
   /** Mean money by line over the runs (#161). */
   finance: FinanceTally;
+  /** The debt cascade per run this season (N14.3): forfeits, Academy call-ups, forced sales. */
+  forfeits: number;
+  callUps: number;
+  forcedSales: number;
 }
 
 const mean = (xs: readonly number[]): number => (xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : 0);
@@ -816,6 +833,9 @@ export function summariseSeasons(results: readonly SoakResult[]): SeasonSummary[
         signedOverall: r1(mean(signedRows.map((s) => s.signedOverall))),
         startGap: r1(mean(runs.map((r) => r.start.bestNine - r.start.rivalMean))),
         finance: Object.fromEntries(FINANCE_LINES.map((l) => [l, Math.round(mean(rows.map((s) => s.finance[l])))])) as FinanceTally,
+        forfeits: r2(mean(rows.map((s) => s.forfeits ?? 0))),
+        callUps: r2(mean(rows.map((s) => s.callUps ?? 0))),
+        forcedSales: r2(mean(rows.map((s) => s.forcedSales ?? 0))),
       });
     }
   }

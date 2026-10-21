@@ -148,6 +148,15 @@ if (summary.length) {
   }
 }
 
+// The debt cascade by mode (N14.3): forfeited matches, Academy call-ups and forced sales per run each season.
+if (summary.length) {
+  console.log('\nThe debt cascade, per run each season (forfeits, Academy call-ups, forced sales):');
+  console.log(`${pad('mode', 9)} ${pad('season', 6)} ${pad('runs', 4)} ${pad('forfeits', 8)} ${pad('callups', 7)} ${pad('sales', 5)}`);
+  for (const s of summary) {
+    console.log([pad(modeLabel(s), 9), pad(s.season, 6), pad(s.runs, 4), pad(s.forfeits.toFixed(2), 8), pad(s.callUps.toFixed(2), 7), pad(s.forcedSales.toFixed(2), 5)].join(' '));
+  }
+}
+
 // The season P&L by mode (N6, #161): where the money came from and went.
 if (summary.length) {
   const ks = (n: number): string => (Math.abs(n) < 500 ? '0' : `${n < 0 ? '-' : '+'}${Math.round(Math.abs(n) / 1000)}k`);
