@@ -226,6 +226,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   },
   // v17 → v18 (N14.3): the board loan. An older save owes the board nothing.
   { from: 17, to: 18, run: (old) => ({ ...old, boardLoan: { owed: 0 } }) },
+  // v18 → v19 (N14.5): staff. An older save has hired nobody.
+  { from: 18, to: 19, run: (old) => ({ ...old, staff: [] }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

@@ -19,6 +19,7 @@ import {
 import { EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON } from '../config';
 import { marketWage, withDerivedStrength } from './rivals';
 import { NEW_CONTRACT_WEEKS, signingFee } from './freeagency';
+import { hasStaff, WELFARE_CARDS } from './staff';
 import { makeRng, type Rng } from '../utils/rng';
 import { clampMorale } from './morale';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
@@ -137,13 +138,18 @@ export function isEligible(card: EventCardDef, state: GameState, now: number): b
   return true;
 }
 
+/** A card's weight this week: a Welfare Manager (N14.5) halves the players' grievance cards. */
+export function cardWeight(card: EventCardDef, state: Pick<GameState, 'staff'>): number {
+  return WELFARE_CARDS.has(card.id) && hasStaff(state, 'welfare') ? card.weight / 2 : card.weight;
+}
+
 /** Weighted pick; null when nothing is eligible. */
-function pickWeighted(cards: readonly EventCardDef[], rng: Rng): EventCardDef | null {
-  const total = cards.reduce((t, c) => t + c.weight, 0);
+function pickWeighted(cards: readonly EventCardDef[], rng: Rng, weight: (c: EventCardDef) => number): EventCardDef | null {
+  const total = cards.reduce((t, c) => t + weight(c), 0);
   if (total <= 0) return null;
   let roll = rng.next() * total;
   for (const c of cards) {
-    roll -= c.weight;
+    roll -= weight(c);
     if (roll < 0) return c;
   }
   return cards[cards.length - 1] ?? null;
@@ -158,7 +164,7 @@ export function drawEvent(state: GameState, now: number, rng: Rng): PendingEvent
   if (deck.pending.length >= EVENTS.MAX_PENDING) return null;
   if (deck.lastDrawn > 0 && now - deck.lastDrawn < EVENTS.MIN_GAP_WEEKS) return null;
   if (rng.next() >= EVENTS.WEEKLY_CHANCE) return null;
-  const card = pickWeighted(EVENT_CARDS.filter((c) => isEligible(c, state, now)), rng);
+  const card = pickWeighted(EVENT_CARDS.filter((c) => isEligible(c, state, now)), rng, (c) => cardWeight(c, state));
   if (!card) return null;
   const ev: PendingEvent = {
     id: `${card.id}-s${state.season}w${state.week}`,

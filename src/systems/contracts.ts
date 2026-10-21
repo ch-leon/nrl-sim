@@ -10,6 +10,7 @@ import { marketWage, overallRating } from '../data/player';
 import { BOARD, CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { REP_BASELINE, REP_MAX } from './league';
 import type { SignResult } from './freeagency';
+import { hasStaff, WELFARE_RENEWAL_CUT } from './staff';
 
 /** Warning text when `weeks` is a warning threshold, else null. */
 export function warnForWeeks(name: string, weeks: number): string | null {
@@ -20,8 +21,8 @@ export function warnForWeeks(name: string, weeks: number): string | null {
 /** Market wage for a player's overall: data/player.ts owns it (#146); kept here for existing imports. */
 export { marketWage };
 
-/** The club a renewal is priced for (N6, #167): its reputation and the season. */
-export type RenewalClub = Pick<GameState, 'reputation' | 'season'>;
+/** The club a renewal is priced for (N6, #167): its reputation and the season, and its staff (N14.5). */
+export type RenewalClub = Pick<GameState, 'reputation' | 'season'> & Partial<Pick<GameState, 'staff'>>;
 
 /**
  * What a club's standing adds to a renewal ask: +RENEW_REP_PREMIUM at reputation
@@ -45,7 +46,9 @@ export function clubWageFactor(club: RenewalClub): number {
  */
 export function renewalWage(p: Player, club: RenewalClub): number {
   const t = Math.max(-1, Math.min(1, (MORALE.NEUTRAL - p.morale) / MORALE.NEUTRAL));
-  return Math.round(marketWage(p) * (1 + t * CONTRACTS.RENEW_MORALE_SWING) * clubWageFactor(club));
+  // A Welfare Manager (N14.5) takes a tenth off the ask.
+  const welfare = hasStaff(club, 'welfare') ? 1 - WELFARE_RENEWAL_CUT : 1;
+  return Math.round(marketWage(p) * (1 + t * CONTRACTS.RENEW_MORALE_SWING) * clubWageFactor(club) * welfare);
 }
 
 /** What the player asks, as paid per week (difficulty-scaled). */

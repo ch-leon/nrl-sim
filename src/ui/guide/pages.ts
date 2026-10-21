@@ -110,7 +110,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         bullets: [
           `Wages every week (Easy pays ${percent(DIFFICULTY.easy.wages)}, Hard ${percent(DIFFICULTY.hard.wages)}); wages climb with a player’s rating and with the club’s standing.`,
           'Upkeep on every facility: about 1% of its build cost a week, more at higher levels.',
-          'Running costs (staff, travel, insurance) every week whatever you have built: $1,500 on Normal, $1,200 on Easy, $1,800 on Hard.',
+          'Running costs (staff, travel, insurance) every week whatever you have built: $1,500 on Normal, $1,200 on Easy, $1,800 on Hard, plus the wages of any staff you hire.',
           'Signing fees, early-renewal fees, building, moving (10% of the build cost) and demolishing (30% back).',
         ],
       },
@@ -147,6 +147,15 @@ export const CLUB_PAGES: readonly GuidePage[] = [
           'Deals run 52 weeks. You are warned at 8, 4 and 1 weeks; when one ends the player re-signs at his asking wage. If the club can’t pay, the board lends the money (up to $50,000 a season, repaid at the season’s end, before the board judges whether you finished solvent); past that he leaves as a free agent.',
           'Renew early for a fee of two weeks of the new wage; the ask rises when he is unhappy and when the club’s reputation is high.',
           'Sell for a transfer fee (rating² × $10, more for the young, less for the old) or release for two weeks’ wage. The squad can never drop below 13.',
+        ],
+      },
+      {
+        heading: 'Staff',
+        bullets: [
+          'Three hires the facilities don’t cover, under the board’s objectives on the Finance screen. Each is paid a wage a week with the running costs and stays until you let him go.',
+          'Assistant Coach ($800 a week on Normal): will change the plan at the break when you fast-forward a match, as the rival coaches do (coming in a later update).',
+          'Analyst ($600 a week on Normal): will say on the next-match card what the rival plays and what it switches to when behind (coming in a later update).',
+          'Welfare Manager ($700 a week on Normal): halves the odds of a player’s grievance card (a meeting, a pay-rise demand, a homesick youngster) and takes a tenth off renewal asks.',
         ],
       },
       {

@@ -87,7 +87,11 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 18;
+export const SAVE_VERSION = 19;
+
+/** The three hires the facilities don't cover (N14.5). */
+export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare';
+export interface StaffMember { role: StaffRole; name: string; wage: number; hiredSeason: number }
 
 /** A squad training focus (N11): one stat trained harder, the rest a little less, or Balanced. */
 export type TrainingFocus = keyof PlayerStats | 'balanced';
@@ -253,6 +257,8 @@ export interface GameState {
   training: { focus: TrainingFocus };
   /** What the club owes the board (N14.3): renewals it couldn't afford, advanced and repaid at the rollover. */
   boardLoan: { owed: number };
+  /** The club's hires (N14.5): at most one of each role, none at the start. */
+  staff: StaffMember[];
   /** Player-of-the-match awards this season (#190), kept by the full-time card; absent until the first. */
   potmTally?: PotmTally;
   rngSeed: number; // advanced state of the seeded RNG
@@ -357,6 +363,7 @@ export function createNewGame(
     lineup: autoPick(squad),
     training: { focus: 'balanced' },
     boardLoan: { owed: 0 },
+    staff: [],
     rngSeed: rng.state(),
   };
 

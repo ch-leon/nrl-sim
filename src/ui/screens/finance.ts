@@ -12,7 +12,7 @@ import {
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
-import { buildObjectivesSection } from './board';
+import { buildObjectivesSection, buildStaffSection } from './board';
 import { openHistoryScreen } from './history';
 import { el, panel, button, openModal, closeScreen } from '../dom';
 
@@ -406,12 +406,17 @@ function statRow(label: string, value: string, neg = false): HTMLElement {
   );
 }
 
-/** The season P&L panel: this season v last, biggest lines first, a net row at the foot (#172). */
+/** The running costs' label: it names the staff once any are hired (N14.5), since their wages are paid there. */
+export function overheadLabel(state: Pick<GameState, 'staff'>): string {
+  return state.staff.length > 0 ? 'Running costs and staff' : FINANCE_LINE_LABELS.overhead;
+}
+
 /** The board's row's note while a loan is owed (N14.3). */
 export function boardLoanNote(owed: number): string {
   return `↳ incl. board loan ${fmtMoneyCompact(owed)}, repaid at the season's end`;
 }
 
+/** The season P&L panel: this season v last, biggest lines first, a net row at the foot (#172). */
 function buildSeasonPnl(state: GameState): HTMLElement {
   const pnl = seasonPnl(state);
   const box = el('div', { class: 'nrl-finance-pnl' });
@@ -431,7 +436,7 @@ function buildSeasonPnl(state: GameState): HTMLElement {
     return td;
   };
   for (const r of pnl.rows) {
-    tbody.append(el('tr', {}, el('td', { text: r.label }), cell(r.thisSeason), cell(r.lastSeason)));
+    tbody.append(el('tr', {}, el('td', { text: r.line === 'overhead' ? overheadLabel(state) : r.label }), cell(r.thisSeason), cell(r.lastSeason)));
     // The board loan (N14.3) is board money moved, not a line of its own: a note under the board's row.
     if (r.line === 'boardGrant' && state.boardLoan.owed > 0) {
       tbody.append(el('tr', { class: 'nrl-finance-pnl-sub' },
@@ -456,7 +461,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
     statRow('Bank balance', fmtMoney(s.money), s.money < 0),
     statRow('Wage bill', fmtMoney(-s.wagesWeekly)),
     statRow('Upkeep', fmtMoney(-s.upkeepWeekly)),
-    statRow('Running costs', fmtMoney(-s.overheadWeekly)),
+    statRow(overheadLabel(state), fmtMoney(-s.overheadWeekly)),
     statRow('Sponsor', fmtMoney(s.sponsorWeekly)),
     statRow('Grant', fmtMoney(s.grantWeekly)),
     statRow('Home gates (avg/wk)', fmtMoney(s.gateWeekly)),
@@ -476,6 +481,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
   nodes.push(panel({ class: 'nrl-finance-panel' }, weekly));
   nodes.push(panel({ class: 'nrl-finance-panel' }, buildSeasonPnl(state)));
   nodes.push(buildObjectivesSection(state));
+  nodes.push(buildStaffSection(state));
 
   const expiring = el('div', { class: 'nrl-finance-expiring' });
   expiring.append(el('h3', { text: `Contracts ending in ${EXPIRY_WINDOW_WEEKS} wks` }));
