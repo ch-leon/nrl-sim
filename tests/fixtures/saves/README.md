@@ -12,8 +12,10 @@ Rules:
 - **Never edit a file here.** Each one is what a player on that version has in
   their phone; the migrations have to keep loading it as it is.
 - **Add, don't replace.** When `SAVE_VERSION` moves, run the playthrough on the new
-  `main` and copy two or three of its dumps from `e2e-output/saves/` here (the
-  file names already carry the version). Old versions stay.
+  `main` and copy its `after-tutorial`, `mid-season`, `after-rollover` and `live-rivals`
+  dumps from `e2e-output/<WxH>/saves/` here (the file names already carry the version).
+  Old versions stay. The soak's old-save runs don't read these files: they build each old
+  version from a fresh game (`asOldSave`); only `tests/qa/corpus.test.ts` plays them.
 
 Points the playthrough dumps: `after-tutorial` (new game, nothing advanced yet),
 `mid-season` (facilities, a signing, a kit, event cards answered, about round 14),
