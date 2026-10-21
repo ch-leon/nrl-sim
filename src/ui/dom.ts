@@ -613,7 +613,12 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   background: #f4d03f;
 }
 .nrl-history-detail { font-weight: normal; font-size: 0.78rem; margin-top: 0.1rem; }
-.nrl-history-review { margin-top: 0.3rem; padding: 0.25rem 0.6rem; font-size: 0.75rem; } /* 44px min from .nrl-btn (#194) */
+.nrl-history-review, .nrl-history-books { margin-top: 0.3rem; padding: 0.25rem 0.6rem; font-size: 0.75rem; } /* 44px min from .nrl-btn (#194) */
+.nrl-history-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.nrl-books-heading { margin: 0 0 0.5rem; font-weight: bold; }
+.nrl-books-summary { margin: 0.5rem 0; }
+.nrl-books-closing td { font-weight: bold; border-top: 1px solid #c8c0a8; }
+.nrl-finance-past { margin-top: 0.4rem; }
 
 /* ── Season review (N7, #190) ──────────────────────────────────────────── */
 .nrl-modal.nrl-review-modal { max-width: min(94vw, 560px); }

@@ -13,6 +13,7 @@ import {
 } from '../../systems/economy';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { buildObjectivesSection } from './board';
+import { openHistoryScreen } from './history';
 import { el, panel, button, openModal, closeScreen } from '../dom';
 
 /** Contracts whose remaining weeks are at most this are listed as expiring. */
@@ -289,6 +290,41 @@ function stripSeason(f: SeasonFinance): Record<FinanceLine, number> {
   return lines;
 }
 
+// ── A past season's books (N14, #262) ─────────────────────────────────────────
+
+export interface SeasonBooks {
+  season: number;
+  /** Every line of the books, in the books' order, zeros included. */
+  rows: { line: FinanceLine; label: string; amount: number }[];
+  net: number;
+  /**
+   * The balance the season closed on, prize money and the board grant included
+   * (the books stamp them into the season they close). Not stored: today's
+   * balance less every later season's net, which holds because every money
+   * movement is booked (the soak checks the ledger against the books).
+   */
+  closing: number;
+}
+
+/** One season's books and closing balance, or null when none were kept (seasons before save v12). Pure. */
+export function seasonBooks(state: Pick<GameState, 'finance' | 'money'>, season: number): SeasonBooks | null {
+  const books = state.finance.find((f) => f.season === season);
+  if (!books) return null;
+  const later = state.finance.filter((f) => f.season > season).reduce((sum, f) => sum + financeNet(stripSeason(f)), 0);
+  return {
+    season,
+    rows: FINANCE_LINES.map((line) => ({ line, label: FINANCE_LINE_LABELS[line], amount: books[line] })),
+    net: financeNet(stripSeason(books)),
+    closing: Math.round(state.money - later),
+  };
+}
+
+/** "Net +$22,000 · closed on $480,000". */
+export function fmtNetClosing(b: Pick<SeasonBooks, 'net' | 'closing'>): string {
+  const net = Math.round(b.net);
+  return `Net ${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))} · closed on ${fmtMoney(b.closing)}`;
+}
+
 // ── Formatting ─────────────────────────────────────────────────────────────────
 
 /** Whole dollars with thousands separators: 1234 → "$1,234", -50 → "-$50". */
@@ -388,6 +424,8 @@ function buildSeasonPnl(state: GameState): HTMLElement {
   tbody.append(net);
   table.append(tbody);
   box.append(el('div', { class: 'nrl-finance-scroll' }, table));
+  // Every closed season's books are in History (N14, #262).
+  if (state.history.length > 0) box.append(button('Past seasons', () => { closeScreen(); openHistoryScreen(); }, { class: 'nrl-finance-past' }));
   return box;
 }
 

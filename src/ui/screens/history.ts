@@ -5,6 +5,7 @@
 import { getState, type GameState, type SeasonRecord, type Player } from '../../core/state';
 import { el, panel, button, openModal, closeScreen } from '../dom';
 import { initSeasonReview, openSeasonReview } from './seasonReview';
+import { FINANCE_LINE_LABELS, fmtMoney, fmtMoneyCompact, fmtNetClosing, seasonBooks } from './finance';
 
 export type SeasonHistoryEntry = SeasonRecord;
 
@@ -125,10 +126,13 @@ export function openHistoryScreen(): HTMLElement {
       });
       const detail = fmtSeasonDetail(entry);
       if (detail) line.append(el('div', { class: 'nrl-history-detail', text: detail }));
-      // The season review (#190), for seasons that have one (v12+).
+      // The season review (#190), for seasons that have one (v12+), and its books (N14, #262).
+      const actions = el('div', { class: 'nrl-history-actions' });
       if (entry.review) {
-        line.append(button('Review', () => openSeasonReview(entry, { back: () => { openHistoryScreen(); } }), { class: 'nrl-history-review' }));
+        actions.append(button('Review', () => openSeasonReview(entry, { back: () => { openHistoryScreen(); } }), { class: 'nrl-history-review' }));
       }
+      actions.append(button('Books', () => openSeasonBooks(entry, { back: () => { openHistoryScreen(); } }), { class: 'nrl-history-books' }));
+      line.append(actions);
       list.append(line);
     }
     content.append(list);
@@ -151,6 +155,43 @@ export function openHistoryScreen(): HTMLElement {
 
   content.append(button('Close', () => closeScreen()));
   return openModal(content, { class: 'nrl-history-modal', screen: true });
+}
+
+/** The line at the top of a season's books: "Season 2 — finished 4th · W12 L10 D2 · PF 480 PA 400". */
+export function fmtBooksHeading(entry: SeasonHistoryEntry): string {
+  const detail = fmtSeasonDetail(entry).split(' · Top try-scorer')[0];
+  return detail ? `${fmtSeasonSummary(entry)} · ${detail}` : fmtSeasonSummary(entry);
+}
+
+/**
+ * A past season's books (N14, #262): every line of its P&L, the net and the
+ * balance it closed on, under the season's one-line summary. Seasons from before
+ * the books were kept (save v12) say so.
+ */
+export function openSeasonBooks(entry: SeasonHistoryEntry, opts: { back?: () => void } = {}): HTMLElement {
+  const books = seasonBooks(getState(), entry.season);
+  const content = el('div', { class: 'nrl-season-books', attrs: { 'data-season-books': String(entry.season) } });
+  content.append(el('h2', { text: `Season ${entry.season} books` }));
+  content.append(el('p', { class: 'nrl-books-heading', text: fmtBooksHeading(entry) }));
+  if (!books) {
+    content.append(panel({}, el('p', { text: 'No books kept for this season: the club started keeping them in a later version of the game.' })));
+  } else {
+    const table = el('table', { class: 'nrl-finance-table nrl-books-table' });
+    const tbody = el('tbody');
+    const cell = (v: number): HTMLElement => {
+      const td = el('td', { text: v === 0 ? '—' : fmtMoneyCompact(v) });
+      if (v < 0) td.classList.add('nrl-finance-neg');
+      return td;
+    };
+    for (const r of books.rows) tbody.append(el('tr', {}, el('td', { text: FINANCE_LINE_LABELS[r.line] }), cell(r.amount)));
+    tbody.append(el('tr', { class: 'nrl-finance-pnl-net' }, el('td', { text: 'Net' }), cell(books.net)));
+    tbody.append(el('tr', { class: 'nrl-books-closing' }, el('td', { text: 'Closing balance' }), el('td', { text: fmtMoney(books.closing), class: books.closing < 0 ? 'nrl-finance-neg' : '' })));
+    table.append(tbody);
+    content.append(el('div', { class: 'nrl-finance-scroll' }, table));
+    content.append(el('p', { class: 'nrl-books-summary', text: fmtNetClosing(books) }));
+  }
+  content.append(button('Close', () => { closeScreen(); opts.back?.(); }, { class: 'nrl-books-close' }));
+  return openModal(content, { class: 'nrl-books-modal', screen: true });
 }
 
 /**
