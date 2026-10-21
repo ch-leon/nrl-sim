@@ -15,7 +15,7 @@ import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
 import { isTrainingFocus, registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
-import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyUpkeep, weeklyWages } from '../systems/economy';
+import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyOverhead, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { registerPlayerMatchSystem } from '../systems/matchday';
 import { registerMoraleSystem } from '../systems/morale';
@@ -302,6 +302,7 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  if (version < 17) out.finance = raw.finance.map(({ overhead: _o, ...lines }) => lines);
   if (version < 16) delete out.training;
   if (version < 15 && raw.lineup) {
     const { kicker: _k, captain: _c, ...lineup } = raw.lineup;
@@ -361,7 +362,7 @@ function nextHomeFixture(s: GameState): Fixture | undefined {
 function weeklyNet(s: GameState): number {
   const next = nextHomeFixture(s);
   const gate = next ? (homeGate(s, next).receipts * (SEASON_ROUNDS / 2)) / WEEKS_PER_SEASON : 0;
-  return weeklyIncome(s) + gate - weeklyWages(s) - weeklyUpkeep(s);
+  return weeklyIncome(s) + gate - weeklyWages(s) - weeklyUpkeep(s) - weeklyOverhead(s);
 }
 
 /** Seats for a sold-out crowd (#169): a Grandstand, then its upgrades, while the money allows. */

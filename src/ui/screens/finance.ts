@@ -8,7 +8,7 @@
 import { bus } from '../../core/events';
 import { getState, FINANCE_LINES, type FinanceLine, type GameState, type SeasonFinance } from '../../core/state';
 import {
-  weeklyWages, weeklyUpkeep, weeklyIncome, sponsorIncome, groundCapacity, homeGate, nextStandGate, financeNet,
+  weeklyWages, weeklyUpkeep, weeklyOverhead, weeklyIncome, sponsorIncome, groundCapacity, homeGate, nextStandGate, financeNet,
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
@@ -36,6 +36,8 @@ export interface FinanceSummary {
   wagesWeekly: number;
   /** Σ facility upkeep per week (weeklyUpkeep, N6). */
   upkeepWeekly: number;
+  /** The club's running costs per week (weeklyOverhead, N12.3). */
+  overheadWeekly: number;
   /** Sponsor Board part of weeklyIncome. */
   sponsorWeekly: number;
   /** Reputation grant part of weeklyIncome. */
@@ -49,9 +51,9 @@ export interface FinanceSummary {
    * games left, e.g. in the off-season stretch of the finals.
    */
   gateWeekly: number;
-  /** income + average gate − wages − upkeep. */
+  /** income + average gate − wages − upkeep − running costs. */
   netWeekly: number;
-  /** max(0, wages + upkeep − income − average gate): the weekly cash drain. */
+  /** max(0, wages + upkeep + running costs − income − average gate): the weekly cash drain. */
   burnWeekly: number;
   /** Weeks of cash left at the current burn; null when the club is not burning cash. */
   runwayWeeks: number | null;
@@ -84,6 +86,7 @@ export interface FinanceSummary {
 export function financeSummary(state: GameState): FinanceSummary {
   const wagesWeekly = weeklyWages(state);
   const upkeepWeekly = weeklyUpkeep(state);
+  const overheadWeekly = weeklyOverhead(state);
   const incomeWeekly = weeklyIncome(state);
   const sponsorWeekly = sponsorIncome(state);
   const grantWeekly = incomeWeekly - sponsorWeekly;
@@ -108,7 +111,7 @@ export function financeSummary(state: GameState): FinanceSummary {
   const nextStand = nextFixture ? nextStandGate({ ...state, week: nextFixture.round }, nextFixture) : null;
 
   const gateWeekly = averageGateWeekly(state, nextHome?.projectedGate ?? 0);
-  const burnWeekly = Math.max(0, wagesWeekly + upkeepWeekly - incomeWeekly - gateWeekly);
+  const burnWeekly = Math.max(0, wagesWeekly + upkeepWeekly + overheadWeekly - incomeWeekly - gateWeekly);
   const runwayWeeks = burnWeekly > 0 ? Math.max(0, state.money) / burnWeekly : null;
   // The economy sells when the balance is below the floor after a week's money.
   const weeksToFloor = state.money < ECON.BANKRUPTCY_WARN && burnWeekly > 0
@@ -124,11 +127,12 @@ export function financeSummary(state: GameState): FinanceSummary {
     money: state.money,
     wagesWeekly,
     upkeepWeekly,
+    overheadWeekly,
     sponsorWeekly,
     grantWeekly,
     incomeWeekly,
     gateWeekly,
-    netWeekly: incomeWeekly + gateWeekly - wagesWeekly - upkeepWeekly,
+    netWeekly: incomeWeekly + gateWeekly - wagesWeekly - upkeepWeekly - overheadWeekly,
     burnWeekly,
     runwayWeeks,
     weeksToFloor,
@@ -161,6 +165,8 @@ export interface LedgerWeek {
   wages: number;
   /** Negative: facility upkeep for the week (N6). */
   upkeep: number;
+  /** Negative: the club's running costs for the week (N12.3). */
+  overhead: number;
   /** Sponsor + grant income for the week. */
   income: number;
   /** Gate receipts for the week. */
@@ -177,8 +183,9 @@ export interface LedgerWeek {
  * Keeps the last `maxWeeks` weeks of money movements. Feed it money:changed
  * deltas with the season/week they are stamped with (initFinanceLedger uses the
  * books' stampMovement). Each reason goes to its line of the books
- * (classifyReason): wages, upkeep, sponsor + grant as income and the gate have
- * their own columns; every other line is summed into `other` and kept by line.
+ * (classifyReason): wages, upkeep, running costs, sponsor + grant as income and
+ * the gate have their own columns; every other line is summed into `other` and
+ * kept by line.
  */
 export class FinanceLedger {
   private weeks: LedgerWeek[] = []; // oldest → newest
@@ -189,7 +196,7 @@ export class FinanceLedger {
     const { delta, reason, season, week } = entry;
     let row = this.weeks.find((r) => r.season === season && r.week === week);
     if (!row) {
-      row = { season, week, wages: 0, upkeep: 0, income: 0, gate: 0, other: 0, otherLines: {}, net: 0 };
+      row = { season, week, wages: 0, upkeep: 0, overhead: 0, income: 0, gate: 0, other: 0, otherLines: {}, net: 0 };
       // In stamp order: the rollover's money is stamped to the week it closes,
       // which may already be behind a newer row.
       const at = this.weeks.findIndex((r) => r.season > season || (r.season === season && r.week > week));
@@ -201,6 +208,7 @@ export class FinanceLedger {
     const line = classifyReason(reason);
     if (line === 'wages') row.wages += delta;
     else if (line === 'upkeep') row.upkeep += delta;
+    else if (line === 'overhead') row.overhead += delta;
     else if (line === 'sponsor' || line === 'grant') row.income += delta;
     else if (line === 'gate') row.gate += delta;
     else {
@@ -241,7 +249,7 @@ export function initFinanceLedger(ledger: FinanceLedger = financeLedger): () => 
 
 /** What each line of the books is called on the screen. */
 export const FINANCE_LINE_LABELS: Record<FinanceLine, string> = {
-  wages: 'Wages', upkeep: 'Upkeep', sponsor: 'Sponsor', grant: 'Grant', gate: 'Gates', prize: 'Prize money',
+  wages: 'Wages', upkeep: 'Upkeep', overhead: 'Running costs', sponsor: 'Sponsor', grant: 'Grant', gate: 'Gates', prize: 'Prize money',
   boardGrant: 'Board grants', events: 'Events', transfers: 'Transfers', contracts: 'Contracts', facilities: 'Facilities', other: 'Other',
 };
 
@@ -350,7 +358,7 @@ export function fmtCrowd(c: { attendance: number; capacity: number; soldOut: boo
 }
 
 /**
- * The next stand as a Finance row (N12): ["A stand would seat 3,500", "about +$27k
+ * The next stand as a Finance row (N12): ["A stand would seat 3,500", "about +$30k
  * a game"], "A bigger stand" once one is built. Rounded to the thousand: it is
  * one game's demand, which form and the opponent move.
  */
@@ -438,6 +446,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
     statRow('Bank balance', fmtMoney(s.money), s.money < 0),
     statRow('Wage bill', fmtMoney(-s.wagesWeekly)),
     statRow('Upkeep', fmtMoney(-s.upkeepWeekly)),
+    statRow('Running costs', fmtMoney(-s.overheadWeekly)),
     statRow('Sponsor', fmtMoney(s.sponsorWeekly)),
     statRow('Grant', fmtMoney(s.grantWeekly)),
     statRow('Home gates (avg/wk)', fmtMoney(s.gateWeekly)),
@@ -479,13 +488,13 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
   } else {
     const table = el('table', { class: 'nrl-finance-table' });
     const head = el('tr');
-    for (const h of ['Wk', 'Wages', 'Upkeep', 'Income', 'Gate', 'Other', 'Net']) head.append(el('th', { text: h }));
+    for (const h of ['Wk', 'Wages', 'Upkeep', 'Running', 'Income', 'Gate', 'Other', 'Net']) head.append(el('th', { text: h }));
     table.append(el('thead', {}, head));
     const tbody = el('tbody');
     for (const r of ledgerRows) {
       const tr = el('tr');
       tr.append(el('td', { text: `S${r.season} W${r.week}` }));
-      for (const v of [r.wages, r.upkeep, r.income, r.gate, r.other, r.net]) {
+      for (const v of [r.wages, r.upkeep, r.overhead, r.income, r.gate, r.other, r.net]) {
         const td = el('td', { text: fmtMoneyCompact(v) });
         if (v < 0) td.classList.add('nrl-finance-neg');
         tr.append(td);
@@ -494,7 +503,7 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
       // What "Other" was, in the P&L's words (prize money, a signing, the grounds).
       const note = ledgerNote(r);
       if (note) {
-        tbody.append(el('tr', {}, el('td', { text: `Other: ${note}`, attrs: { colspan: '7', style: 'font-size:0.7rem;opacity:0.85' } })));
+        tbody.append(el('tr', {}, el('td', { text: `Other: ${note}`, attrs: { colspan: '8', style: 'font-size:0.7rem;opacity:0.85' } })));
       }
     }
     table.append(tbody);

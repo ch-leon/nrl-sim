@@ -149,14 +149,30 @@ its own tally at every rollover. Save v10.
 cost; a Grandstand $1,200), ×1.5 at L2 and ×2 at L3, paid after wages with reason
 `upkeep`.
 
+**Running costs (N12.3, #264).** `ECON.OVERHEAD_WEEKLY` $1,500 a week (staff, travel,
+insurance) × the difficulty's `overhead` (Easy ×0.8 $1,200, Normal $1,500, Hard ×1.2
+$1,800), the same whatever the club has built or signed, paid every week after upkeep
+(wages → upkeep → running costs → sponsor → grant → gate) with reason `overhead`: about
+$40k a season on Normal, the one cost an idle club cannot shed as its squad ages into
+cheap juniors. The books' thirteenth line, `overhead` ("Running costs"; save v17, which
+books 0 for every season an older save kept). The Finance screen counts it in the weekly
+net, the burn and the runway, and the ledger gives it a column.
+The ticket goes back to $20 with it (#176 had cut it to $18). On the matrix soak the
+running costs at $18 left the managed clubs deeper in the red than before (Normal 73% and
+Hard 83% of runs at season 5), while at $20 they end better off than with neither change
+and an idle club ends about where it was. Neither price keeps an idle Normal club sinking:
+a flat cost takes as much from the managed club as from the idle one, and on the live sim
+the idle club out-earns the managed one by about $140k a season from season 2
+(`docs/status/2026-10-season.md`).
+
 **Wages (#167).** `wageForOverall` in `data/player.ts`: overall × 15 + 100 plus 2 ×
 (points above 55)². 55 $925, 70 $1,600, 85 $3,175. Renewal asks, early and at
 contract end, are the market wage for the player's overall today × morale ×
 `clubWageFactor` (+25% at reputation 100, +4% for every season after the first). The
 rival salary cap is a 20-man squad of 62.5s on the curve ($23,000).
 
-**Gates (#169).** attendance = min(seats, demand); receipts = attendance × $18.
-Seats: the hill 2,000, a Grandstand 3,500 / 5,000 / 6,500. Demand = (300 +
+**Gates (#169).** attendance = min(seats, demand); receipts = attendance × $20 (N12.3;
+$18 from #176). Seats: the hill 2,000, a Grandstand 3,500 / 5,000 / 6,500. Demand = (300 +
 reputation × 30) × form (last five results, ±25%) × occasion (a top-eight opponent
 ×1.2, a home final ×1.5). `homeGate` is the one function the tick and the Finance
 projection share.

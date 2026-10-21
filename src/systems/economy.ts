@@ -46,6 +46,15 @@ export function weeklyUpkeep(state: GameState): number {
   }, 0);
 }
 
+/**
+ * The club's running costs a week (N12.3): staff, travel, insurance.
+ * ECON.OVERHEAD_WEEKLY × the difficulty's overhead multiplier, the same whatever
+ * the club has built or signed, so an idle club cannot shed it.
+ */
+export function weeklyOverhead(state: GameState): number {
+  return Math.round(ECON.OVERHEAD_WEEKLY * difficultyMultipliers(state.settings.difficulty).overhead);
+}
+
 /** Sponsor Board income: SPONSOR_PER_LEVEL × its level (0 if unbuilt). */
 export function sponsorIncome(state: GameState): number {
   return ECON.SPONSOR_PER_LEVEL * facilityLevel(state, 'sponsorBoard');
@@ -284,8 +293,8 @@ export function handleBankruptcy(_state: GameState): GameState {
 
 /**
  * Tick hook order 30. Fixed order: wages (deduct, may go negative) → upkeep →
- * sponsor → grant → gate → contracts → bankruptcy. Emits money:changed per net
- * movement (via earnMoney; deductions credit a negative delta).
+ * overhead → sponsor → grant → gate → contracts → bankruptcy. Emits
+ * money:changed per net movement (via earnMoney; deductions credit a negative delta).
  */
 export function applyEconomy(state: GameState): GameState {
   // Compute wages from the entry snapshot; subsequent reads use getState() as the
@@ -295,6 +304,9 @@ export function applyEconomy(state: GameState): GameState {
 
   const upkeep = weeklyUpkeep(state);
   if (upkeep !== 0) earnMoney(-upkeep, 'upkeep');
+
+  const overhead = weeklyOverhead(state);
+  if (overhead !== 0) earnMoney(-overhead, 'overhead');
 
   const sponsor = sponsorIncome(getState());
   if (sponsor !== 0) earnMoney(sponsor, 'sponsor');
@@ -335,6 +347,7 @@ const MODIFIER_LABELS = new Set(EVENT_CARDS.flatMap((c) => c.choices.flatMap((ch
 export function classifyReason(reason: string): FinanceLine {
   if (reason === 'wages') return 'wages';
   if (reason === 'upkeep') return 'upkeep';
+  if (reason === 'overhead') return 'overhead';
   if (reason === 'sponsor') return 'sponsor';
   if (reason === 'grant' || reason === 'sponsor+grant') return 'grant';
   if (reason === 'gate') return 'gate';

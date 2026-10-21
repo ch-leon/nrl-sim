@@ -14,7 +14,7 @@ import type { RivalClub } from '../../src/core/state';
 
 describe('difficulty multipliers', () => {
   it('normal is the identity', () => {
-    expect(DIFFICULTY.normal).toEqual({ startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0 });
+    expect(DIFFICULTY.normal).toEqual({ startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0, overhead: 1 });
   });
 
   it('startRating moves the starting squad: Easy starts stronger than Normal, Hard weaker (#140)', () => {

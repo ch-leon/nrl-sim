@@ -11,7 +11,7 @@ import { BENCH } from '../../src/match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../src/match/league/presets';
 import { TACTIC_BLURB } from '../../src/ui/tacticsBlurbs';
 import { TRAINING_FOCUS } from '../../src/config';
-import { ON_FIELD, SET_TACKLES } from '../../src/config';
+import { DIFFICULTY, ECON, ON_FIELD, SET_TACKLES } from '../../src/config';
 
 describe('GUIDE_PAGES', () => {
   it('is the club pages then How Nines works, each with an id, a title and something to read', () => {
@@ -42,6 +42,22 @@ describe('GUIDE_PAGES', () => {
     expect(guidePage('nines').id).toBe('nines');
     expect(guidePage('nope').id).toBe('week');
     expect(guidePage(undefined).id).toBe('week');
+  });
+});
+
+describe('the Money page stays true to the economy', () => {
+  const money = CLUB_PAGES.find((p) => p.id === 'money')!;
+  const text = money.sections.map((s) => `${s.text ?? ''} ${s.bullets?.join(' ') ?? ''}`).join(' ');
+  const dollars = (n: number): string => `$${Math.round(n).toLocaleString('en-US')}`;
+
+  it('quotes the running costs a week on every difficulty (N12.3)', () => {
+    expect(text).toContain(`${dollars(ECON.OVERHEAD_WEEKLY * DIFFICULTY.normal.overhead)} on Normal`);
+    expect(text).toContain(`${dollars(ECON.OVERHEAD_WEEKLY * DIFFICULTY.easy.overhead)} on Easy`);
+    expect(text).toContain(`${dollars(ECON.OVERHEAD_WEEKLY * DIFFICULTY.hard.overhead)} on Hard`);
+  });
+
+  it('quotes the ticket price', () => {
+    expect(text).toContain(`Tickets are ${dollars(ECON.TICKET_PRICE)}.`);
   });
 });
 

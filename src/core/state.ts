@@ -87,7 +87,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 16;
+export const SAVE_VERSION = 17;
 
 /** A squad training focus (N11): one stat trained harder, the rest a little less, or Balanced. */
 export type TrainingFocus = keyof PlayerStats | 'balanced';
@@ -114,9 +114,10 @@ export interface Lineup {
  * The lines of the club's books (N6, #172): where the money comes from and
  * where it goes. Every ledger reason maps to one (systems/economy.ts
  * classifyReason); anything new lands in `other` so it shows rather than vanishes.
+ * `overhead` is the club's running costs (N12.3, save v17).
  */
 export const FINANCE_LINES = [
-  'wages', 'upkeep', 'sponsor', 'grant', 'gate', 'prize', 'boardGrant', 'events', 'transfers', 'contracts', 'facilities', 'other',
+  'wages', 'upkeep', 'overhead', 'sponsor', 'grant', 'gate', 'prize', 'boardGrant', 'events', 'transfers', 'contracts', 'facilities', 'other',
 ] as const;
 export type FinanceLine = (typeof FINANCE_LINES)[number];
 

@@ -215,6 +215,15 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   },
   // v15 → v16 (N11): a squad training focus. An older save trains Balanced, as it always has.
   { from: 15, to: 16, run: (old) => ({ ...old, training: { focus: 'balanced' } }) },
+  // v16 → v17: the books' thirteenth line, `overhead`, the club's running costs
+  // (N12.3). Every season an old save has booked paid none: it gets 0.
+  {
+    from: 16,
+    to: 17,
+    run: (old) => (Array.isArray(old.finance)
+      ? { ...old, finance: (old.finance as RawState[]).map((e) => ({ ...e, overhead: typeof e.overhead === 'number' ? e.overhead : 0 })) }
+      : { ...old }),
+  },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */
