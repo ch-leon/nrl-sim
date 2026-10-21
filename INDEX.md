@@ -109,3 +109,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261021-050444-difficulty-more-seeds | difficulty more seeds | be325ea | season/difficulty-spread | [report](runs/20261021-050444-difficulty-more-seeds/report.md) |
 | 20261021-075107-standard | standard | b3bc534 | season/difficulty-spread | [report](runs/20261021-075107-standard/report.md) |
 | 20261021-081159-difficulty | difficulty | b3bc534 | season/difficulty-spread | [report](runs/20261021-081159-difficulty/report.md) |
+| 20261021-082512-difficulty-2001 | difficulty 2001 | b3bc534 | season/difficulty-spread | [report](runs/20261021-082512-difficulty-2001/report.md) |
