@@ -1,0 +1,95 @@
+{
+  "name": "difficulty sweep",
+  "description": "N12.2: how many rating points after the spread move the player's win rate against an even-rated rival by about 8 points? Each seed a new game's squad on Hard (or Easy) through its opening lineup against a rival's generated squad level with its best nine, the rival with the difficulty's edge (difficulty.<d>.rivalEdge), both ways round. The baseline has no edge (the match before N12.2); each variant gives Hard's rival +n and Easy's -n. homeMargin and nine are in results.jsonl.",
+  "seeds": 150,
+  "base": {
+    "difficulty.hard.rivalEdge": 0,
+    "difficulty.easy.rivalEdge": 0
+  },
+  "scenarios": [
+    {
+      "name": "Hard: player v rival",
+      "home": {
+        "squad": "player",
+        "difficulty": "hard"
+      },
+      "away": {
+        "squad": "rival",
+        "rivalOf": "hard"
+      }
+    },
+    {
+      "name": "Hard: rival v player",
+      "home": {
+        "squad": "rival",
+        "rivalOf": "hard"
+      },
+      "away": {
+        "squad": "player",
+        "difficulty": "hard"
+      }
+    },
+    {
+      "name": "Easy: player v rival",
+      "home": {
+        "squad": "player",
+        "difficulty": "easy"
+      },
+      "away": {
+        "squad": "rival",
+        "rivalOf": "easy"
+      }
+    },
+    {
+      "name": "Easy: rival v player",
+      "home": {
+        "squad": "rival",
+        "rivalOf": "easy"
+      },
+      "away": {
+        "squad": "player",
+        "difficulty": "easy"
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "baseline"
+    },
+    {
+      "name": "edge 0.5",
+      "tuning": {
+        "difficulty.hard.rivalEdge": 0.5,
+        "difficulty.easy.rivalEdge": -0.5
+      }
+    },
+    {
+      "name": "edge 1",
+      "tuning": {
+        "difficulty.hard.rivalEdge": 1,
+        "difficulty.easy.rivalEdge": -1
+      }
+    },
+    {
+      "name": "edge 1.5",
+      "tuning": {
+        "difficulty.hard.rivalEdge": 1.5,
+        "difficulty.easy.rivalEdge": -1.5
+      }
+    },
+    {
+      "name": "edge 2",
+      "tuning": {
+        "difficulty.hard.rivalEdge": 2,
+        "difficulty.easy.rivalEdge": -2
+      }
+    },
+    {
+      "name": "edge 3",
+      "tuning": {
+        "difficulty.hard.rivalEdge": 3,
+        "difficulty.easy.rivalEdge": -3
+      }
+    }
+  ]
+}
