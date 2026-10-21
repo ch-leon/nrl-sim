@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   runSoak, checkState, nonFinitePaths, duplicatePlayers, asOldSave, OLD_VERSIONS, gapSample, bestNineMean, summariseSeasons,
   classifyReason, emptyTally, tallyNet, FINANCE_LINES, NEAR_RIVALS, nearestRivals, recordAgainst, advanceWeekAsTapped, registerAllSystems,
-  type SeasonSample, type SoakResult,
+  styleTable, type SeasonSample, type SoakResult, type StyleGame,
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS } from '../../src/config';
@@ -263,3 +263,49 @@ describe('soak columns (N12.1)', () => {
     }
   }, 60_000);
 });
+
+describe('rival styles over a season (#249, N11)', () => {
+  const g = (home: string, away: string, homeStrength: number, awayStrength: number, homeScore: number): StyleGame => ({
+    home: { attack: home as StyleGame['home']['attack'], defence: 'slide' },
+    away: { attack: away as StyleGame['away']['attack'], defence: 'slide' },
+    homeStrength, awayStrength, homeScore,
+  });
+
+  it('scores each style against what its strength gaps alone predict', () => {
+    // All-out is only played by the strong side; it wins what strength wins, no more.
+    // Expansive wins its even games, which an even gap predicts at a half.
+    const games: StyleGame[] = [
+      ...Array.from({ length: 30 }, (_, i) => g('all-out', 'balanced', 70, 60, i % 3 === 0 ? 0 : 1)),
+      ...Array.from({ length: 30 }, (_, i) => g('grind', 'balanced', 70, 60, i % 3 === 0 ? 0 : 1)),
+      ...Array.from({ length: 20 }, () => g('expansive', 'balanced', 60, 60, 1)),
+      ...Array.from({ length: 20 }, () => g('balanced', 'grind', 60, 60, 0)),
+    ];
+    const rows = new Map(styleTable(games, 'attack').map((r) => [r.style, r]));
+    const allOut = rows.get('all-out')!;
+    expect(allOut.games).toBe(30);
+    expect(allOut.score).toBeCloseTo(2 / 3);
+    expect(allOut.expected).toBeCloseTo(2 / 3);
+    const expansive = rows.get('expansive')!;
+    expect(expansive.score).toBe(1);
+    expect(expansive.expected).toBeCloseTo(0.5);
+    expect(expansive.score - expansive.expected).toBeGreaterThan(2 * expansive.se);
+    // Every game counts once for each side.
+    expect([...rows.values()].reduce((t, r) => t + r.games, 0)).toBe(games.length * 2);
+    // Defence: every side played Slide, so it scores what it is expected to.
+    const [slide] = styleTable(games, 'defence');
+    expect(slide!.score).toBeCloseTo(slide!.expected);
+  });
+
+  it('a --live-rivals soak records every rival-v-rival game with the styles it was played with', () => {
+    const r = runSoak({ seed: 11, seasons: 1, weeks: 1, mode: 'idle', liveRivals: true });
+    expect(r.problems).toEqual([]);
+    expect(r.styleGames).toHaveLength(7);
+    for (const game of r.styleGames!) {
+      expect(game.home.attack).toBeTruthy();
+      expect(game.away.defence).toBeTruthy();
+      expect([0, 0.5, 1]).toContain(game.homeScore);
+    }
+    expect(runSoak({ seed: 11, seasons: 1, weeks: 1, mode: 'idle' }).styleGames).toBeUndefined();
+  }, 60_000);
+});
+

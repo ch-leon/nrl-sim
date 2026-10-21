@@ -27,6 +27,8 @@ import { chooseEvent, registerEventsSystem } from '../systems/events';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { BENCH } from '../match/league/bench';
+import { rivalStyle } from '../systems/rivalRound';
+import type { TeamTactics } from '../match/league/presets';
 import { runMatch } from '../match/league/match';
 import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
@@ -147,6 +149,18 @@ export interface SeasonSample extends GapSample {
   finance: FinanceTally;
 }
 
+/**
+ * A rival-v-rival game for the style measure (#249, N11): each side's style and
+ * strength as the week began, and the home side's score (1 a win, ½ a draw, 0 a loss).
+ */
+export interface StyleGame {
+  home: TeamTactics;
+  away: TeamTactics;
+  homeStrength: number;
+  awayStrength: number;
+  homeScore: number;
+}
+
 export interface SoakResult {
   seed: number;
   mode: SoakMode;
@@ -154,6 +168,8 @@ export interface SoakResult {
   fromVersion?: number;
   /** Rival rounds were played on the live sim (--live-rivals, N12.1). */
   liveRivals?: boolean;
+  /** --live-rivals only: every rival-v-rival game played on the live sim (#249). */
+  styleGames?: StyleGame[];
   /** The rating gap at week 1 of season 1 (how far ahead a new game starts). */
   start: GapSample;
   seasons: SeasonSample[];
@@ -533,6 +549,8 @@ export function runSoak(opts: SoakOptions): SoakResult {
   for (const p of checkState(getState())) note(p);
 
   // Fast-forward plays every match headless; --live-rivals weeks are Advance Week (advanceWeekAsTapped).
+  // --live-rivals: the rival-v-rival games and the styles they were played with (#249).
+  const styleGames: StyleGame[] = [];
   const play = opts.liveRivals ? (fn: () => void): void => fn() : withFastForward;
   const playWeek = opts.liveRivals ? advanceWeekAsTapped : advanceWeek;
   play(() => {
@@ -543,6 +561,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
         signed = { count: signed.count + w.count, fees: signed.fees + w.fees, overall: signed.overall + w.overall };
       }
       const before = getState().season;
+      const styles = opts.liveRivals ? rivalStylesNow(getState()) : null;
       try {
         playWeek();
       } catch (err) {
@@ -554,6 +573,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
         break;
       }
       const s = getState();
+      if (styles && s.season === before) styleGames.push(...newStyleGames(styles, s));
       minMoney = Math.min(minMoney, s.money);
       for (const p of checkState(s)) note(p);
       if (s.season === before && s.week === SEASON_ROUNDS + 1) {
@@ -618,7 +638,94 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (last > first * 1.5) note(`save grew ${Math.round((last / first) * 100)}% over ${seasons.length} seasons (${first} → ${last} bytes)`);
   }
   setState({});
-  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true } : {}), start, seasons, problems, ms: Date.now() - t0 };
+  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
+}
+
+interface RivalStylesNow {
+  /** Each rival's style and strength as the week begins. */
+  clubs: Map<string, { tactics: TeamTactics; strength: number }>;
+  /** The rival-v-rival fixtures still to be played, by index. */
+  open: number[];
+}
+
+/** The rivals' styles and the unplayed rival-v-rival fixtures, before a week is played (#249). */
+function rivalStylesNow(s: GameState): RivalStylesNow {
+  const clubs = new Map<string, { tactics: TeamTactics; strength: number }>();
+  for (const c of s.league.clubs) if (c.id !== s.clubId) clubs.set(c.id, { tactics: rivalStyle(c), strength: c.strength });
+  const open: number[] = [];
+  s.league.fixtures.forEach((f, i) => {
+    if (!f.result && f.homeId !== s.clubId && f.awayId !== s.clubId) open.push(i);
+  });
+  return { clubs, open };
+}
+
+/** The rival-v-rival games the week played, with the styles they began it with. Same season only. */
+function newStyleGames(was: RivalStylesNow, s: GameState): StyleGame[] {
+  const out: StyleGame[] = [];
+  for (const i of was.open) {
+    const f = s.league.fixtures[i];
+    const home = f && was.clubs.get(f.homeId);
+    const away = f && was.clubs.get(f.awayId);
+    if (!f?.result || !home || !away) continue;
+    const { homeScore: h, awayScore: a } = f.result;
+    out.push({ home: home.tactics, away: away.tactics, homeStrength: home.strength, awayStrength: away.strength, homeScore: h > a ? 1 : h === a ? 0.5 : 0 });
+  }
+  return out;
+}
+
+/** One style's season (#249): its games, mean score, the score its strength gaps alone predict, and one standard error. */
+export interface StyleRow {
+  style: string;
+  games: number;
+  score: number;
+  expected: number;
+  se: number;
+}
+
+/** Strength gaps are grouped in bands this wide (rating points) for the expected score. */
+export const STYLE_GAP_BAND = 2;
+/** Gaps beyond this many points share the outermost band. */
+export const STYLE_GAP_MAX = 10;
+
+/**
+ * Each attack (or defence) style's score in rival-v-rival games against what its
+ * strength gaps alone predict (#249): both sides of every game are a sample; a
+ * side's expected score is the mean score of every side, whatever its style, with
+ * the same strength gap (in STYLE_GAP_BAND-point bands). So a style that only
+ * strong clubs play (All-out) is not flattered by their strength. The standard
+ * error is the binomial one on the games; beyond two of them is beyond luck.
+ */
+export function styleTable(games: readonly StyleGame[], key: keyof TeamTactics): StyleRow[] {
+  const band = (gap: number): number => Math.max(-STYLE_GAP_MAX, Math.min(STYLE_GAP_MAX, Math.round(gap / STYLE_GAP_BAND) * STYLE_GAP_BAND));
+  const sides = games.flatMap((g) => [
+    { style: g.home[key], band: band(g.homeStrength - g.awayStrength), score: g.homeScore },
+    { style: g.away[key], band: band(g.awayStrength - g.homeStrength), score: 1 - g.homeScore },
+  ]);
+  const byBand = new Map<number, { n: number; sum: number }>();
+  for (const x of sides) {
+    const b = byBand.get(x.band) ?? { n: 0, sum: 0 };
+    b.n++;
+    b.sum += x.score;
+    byBand.set(x.band, b);
+  }
+  const expect = (b: number): number => {
+    const t = byBand.get(b)!;
+    return t.sum / t.n;
+  };
+  const byStyle = new Map<string, { n: number; score: number; expected: number }>();
+  for (const x of sides) {
+    const t = byStyle.get(x.style) ?? { n: 0, score: 0, expected: 0 };
+    t.n++;
+    t.score += x.score;
+    t.expected += expect(x.band);
+    byStyle.set(x.style, t);
+  }
+  return [...byStyle.entries()]
+    .map(([style, t]) => {
+      const score = t.score / t.n;
+      return { style, games: t.n, score, expected: t.expected / t.n, se: Math.sqrt(Math.max(score * (1 - score), 0.01) / t.n) };
+    })
+    .sort((a, b) => b.games - a.games);
 }
 
 // ── Summary across seeds ─────────────────────────────────────────────────────
