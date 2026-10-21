@@ -38,7 +38,7 @@ describe('playerPageModel', () => {
     const s = getState();
     const p = s.squad.find((x) => x.traits.length > 0) ?? s.squad[0]!;
     const m = playerPageModel(p, { kind: 'squad' }, s);
-    expect(m.where).toBe('Your squad');
+    expect(m.where).toMatch(/^Your squad · (Starting \S+|On the bench|Not picked)$/); // the lineup slot (N14)
     expect(m.overall).toBe(overallRating(p));
     expect(m.stats.map((x) => x.label)).toEqual(['Speed', 'Strength', 'Stamina', 'Skill', 'Footy IQ']);
     expect(m.traits).toHaveLength(p.traits.length);
@@ -122,5 +122,18 @@ describe('playerPageModel', () => {
     expect(m.actions).toEqual([]);
     expect(m.tenure).toBeNull();
     expect(m.season).toBeNull();
+  });
+});
+
+// N14 (#263): the player page says where he sits in the coach's nine.
+import { lineupSlotText } from '../../../src/ui/screens/player';
+
+describe('lineupSlotText', () => {
+  const lineup = { starters: ['a', null, 'c', null, null, 'f', null, null, null], bench: ['x'], rotation: 'standard', tactics: { attack: 'balanced', defence: 'slide' } } as unknown as import('../../../src/core/state').Lineup;
+  it('a starter by his slot, the bench, or not picked', () => {
+    expect(lineupSlotText({ lineup }, 'a')).toBe('Starting fullback');
+    expect(lineupSlotText({ lineup }, 'f')).toBe('Starting halfback');
+    expect(lineupSlotText({ lineup }, 'x')).toBe('On the bench');
+    expect(lineupSlotText({ lineup }, 'z')).toBe('Not picked');
   });
 });
