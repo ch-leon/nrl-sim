@@ -17,11 +17,16 @@ export interface GuideSection {
   bullets?: string[];
 }
 
+/** A nav screen a page can link to (N14, #263): guide.ts opens it. */
+export type GuideScreen = 'finance' | 'squad' | 'lineup' | 'news' | 'ladder' | 'build';
+
 export interface GuidePage {
   id: string;
   /** Tab label (short). */
   short: string;
   title: string;
+  /** The screen this page describes, opened from a button under the title. */
+  screen?: GuideScreen;
   sections: GuideSection[];
 }
 
@@ -54,6 +59,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     id: 'money',
     short: 'Money',
     title: 'Money',
+    screen: 'finance',
     sections: [
       {
         heading: 'Coming in',
@@ -82,6 +88,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     id: 'squad',
     short: 'Squad',
     title: 'Squad and contracts',
+    screen: 'squad',
     sections: [
       {
         text: 'Between 13 and 30 players (you need 13 fit to field a side). A player’s overall is skill and footy IQ (25% each), speed (20%), strength and stamina (15% each). Tap any player card for his page: stats, traits and tips, morale, contract, tallies and the actions that apply.',
@@ -119,6 +126,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     id: 'tactics',
     short: 'Tactics',
     title: 'Tactics and the coach',
+    screen: 'lineup',
     sections: [
       {
         text: 'Your side plays a plan: an attack and a defence, picked on the Lineup screen (the chips under the header). It stays the plan for the match until you change it at a break.',
@@ -168,6 +176,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     id: 'events',
     short: 'Events',
     title: 'Events',
+    screen: 'news',
     sections: [
       {
         text: 'Every few weeks a card turns up in News: a fan day, a sponsor’s offer, a player unsettled at a rival, a story about one of yours. Each has two or three choices with their cost or gain shown.',
@@ -185,6 +194,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     id: 'ladder',
     short: 'Ladder',
     title: 'Ladder and finals',
+    screen: 'ladder',
     sections: [
       {
         text: '16 clubs play 24 rounds: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.',
@@ -213,6 +223,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     id: 'grounds',
     short: 'Grounds',
     title: 'Grounds',
+    screen: 'build',
     sections: [
       {
         text: 'Build from the Build menu, tap a spot on the grounds, and the facility goes up. Tap a building for its popup: upgrade (levels 1–3, each about 1.6× then 2.2× as effective; an upgrade costs the build price × the level), move (10% of the build cost) or demolish (30% back). Some pair up: a Weights Room next to a Training Paddock trains 25% harder.',
