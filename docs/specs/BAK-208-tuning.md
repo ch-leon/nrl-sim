@@ -870,12 +870,39 @@ The mix over eight generated leagues (120 rivals, before the Grind threshold cam
 67, Rush 30, Compressed 23. Until N11 a squad-built rival played Balanced / Slide, so
 every match against one changes. Soak at this change (20 seeds, `--jobs 4`): no problems; idle
 Normal season 1 14.6-0.6-8.9, 5.1th, top eight 80% (13.7-1.0-9.4, 5.5th, 80% on `main` at
-e713900, within seed luck). Whether any style wins more than luck over a season is not
-measured here: rival-v-rival rounds play on the cheap sim unless *Rival matches on the match
-engine* is on, and the soak fast-forwards, so tactics only touch the player's own matches
-(follow-up #249).
-Head to head at equal strength, §27 and #241 are the reference (Compressed strong; Expansive
-and All-out weak).
+e713900, within seed luck).
+
+**Over a season (#249).** `npm run soak -- --live-rivals` plays the rival rounds on the live sim
+and scores each style in rival-v-rival games against what its strength gaps alone predict (the
+mean score of every side with the same gap, in 2-point bands; `styleTable`, `src/qa/soak.ts`).
+10 seeds × 1 season × idle, managed and idle Hard, 5,179 games (both sides of each counted):
+
+| Attack | Sides | Score | Expected | Difference |
+|---|---|---|---|---|
+| Balanced | 3,443 | 49% | 48% | +1.0 |
+| Kick-chase | 2,941 | 58% | 54% | **+4.4** |
+| Expansive | 2,096 | 39% | 48% | **−9.6** |
+| Grind | 1,528 | 52% | 46% | **+5.5** |
+| All-out | 350 | 51% | 63% | **−12.8** |
+
+| Defence | Sides | Score | Expected | Difference |
+|---|---|---|---|---|
+| Slide | 5,362 | 47% | 51% | **−3.8** |
+| Rush | 3,102 | 50% | 48% | +2.6 |
+| Compressed | 1,894 | 57% | 51% | **+6.4** |
+
+Bold is beyond two standard errors after allowing for the runs sharing seeds (0.7–2.7 points as
+printed, which assume independent games; the three runs on a seed share it, so up to √3 times
+that). Rush is beyond two printed errors but not after that allowance: borderline. The errors are
+still a little optimistic: a club plays many of these games, and whatever makes it good beyond
+its strength carries across them. The expected score takes no account of home ground (roughly
+even across styles), uses `club.strength` as the week began (not the nine after injuries), and
+the games leave out the grand final (the rollover week) and any finals tie made in the week it
+is played. So styles do win and lose beyond
+luck over a season, the same way round as head to head (§27, #241): Compressed strong, Expansive
+and All-out weak. A style here is also a squad (quick backs pick Expansive), so the difference
+mixes the preset with what the squad is like beyond its strength; §27's even-rated head-to-head
+is the clean measure of the preset. Raised on #241, not tuned here (the plan tables are not N11's).
 
 ## 29. The goal-kicker and the captain (N11)
 

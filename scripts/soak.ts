@@ -5,7 +5,8 @@
 //   npm run soak -- --difficulties easy,normal,hard   idle + managed on each difficulty (#148)
 //   npm run soak -- --json out.json      also write every run's samples to a file
 //   npm run soak -- --jobs 4             split the runs over 4 processes (same results, in order)
-//   npm run soak -- --live-rivals        rival rounds on the live sim too (N9.2's setting; several times slower)
+//   npm run soak -- --live-rivals        rival rounds on the live sim too (N9.2's setting; several times slower),
+//                                        and each rival style's score against its strength (#249)
 //
 // Since the switch-over to the live match sim (BAK-207 Phase 4) every match the
 // player's club plays is a whole live match, about 15 s a season headless, so the
@@ -26,7 +27,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runSoak, summariseSeasons, tallyNet, OLD_VERSIONS, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
+import { runSoak, styleTable, summariseSeasons, tallyNet, OLD_VERSIONS, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -162,6 +163,20 @@ if (summary.length) {
       ...cols.map(([l]) => pad(ks(s.finance[l]), 10)),
       pad(ks(tallyNet(s.finance)), 7), pad(k(s.money), 7),
     ].join(' '));
+  }
+}
+
+// Rival styles over the seasons (#249, N11): every rival-v-rival game on the live sim, each
+// style's score (a win 1, a draw ½) against what its strength gaps alone predict.
+if (liveRivals) {
+  const games = results.flatMap((r) => r.styleGames ?? []);
+  console.log(`\nRival styles in ${games.length} rival-v-rival games on the live sim (#249): each side's score (win 1, draw ½) against the score its strength gap predicts (the mean of every side with the same gap, in 2-point bands). * = beyond two standard errors. Head-to-head reference: tuning §27, #241.`);
+  for (const key of ['attack', 'defence'] as const) {
+    console.log(`${pad(key, 11)} ${pad('games', 6)} ${pad('score', 6)} ${pad('expect', 6)} ${pad('diff', 6)} ${pad('se', 5)}`);
+    for (const row of styleTable(games, key)) {
+      const d = row.score - row.expected;
+      console.log([pad(row.style, 11), pad(row.games, 6), pad(pct(row.score), 6), pad(pct(row.expected), 6), pad(`${signed(d * 100)}${Math.abs(d) > 2 * row.se ? '*' : ''}`, 6), pad((row.se * 100).toFixed(1), 5)].join(' '));
+    }
   }
 }
 
