@@ -134,7 +134,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Changing it in a match',
         bullets: [
-          'At half-time a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue (at ×4 and faster it goes on by itself after 8 seconds unless you touch it).',
+          'At half-time (and before golden point) a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue (at ×4 and faster it goes on by itself after 8 seconds unless you touch it).',
           'After a score, the Plan chip beside the call chips opens the same rows until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
           'Coach calls are the moment-to-moment layer on top: one call a set each way.',
         ],
@@ -143,7 +143,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Kicker and captain',
         bullets: [
           'On the Lineup screen select a starter and tap Kicker or Captain (tap again for the default). K and C mark them on the field.',
-          'Your goal-kicker takes the conversions and penalty goals, and a field goal when he has the ball; his Skill (and Big Boot) is what goes over. Off the field, the halfback takes them. Kicks in play stay with the halfback.',
+          'Your goal-kicker takes the conversions and penalty goals, and a field goal when he has the ball; his Skill (and Big Boot) is what goes over. Unpicked, or off the field, your best-kicking half takes them. Kicks in play stay with the halfback.',
           'Your captain makes the penalty call: a smart one (Footy IQ) takes the points on a slimmer chance; a Hothead taps and runs from further out.',
           'Leave them unpicked and the best-kicking half kicks and the starter with the best Footy IQ captains.',
         ],
