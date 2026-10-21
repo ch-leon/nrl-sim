@@ -726,8 +726,8 @@ async function play() {
       if (now.season === s.season && now.week === s.week && /Only \d+ fit/.test(stop ?? '')) {
         // Not a failure, but worth seeing: since #278 a forced sale keeps 13 fit, so a stop here is
         // injuries or expiries, or #278 regressed (finding 19).
-        const fit = now.squad.filter((p) => p.injuredWeeks <= 0).length;
-        report.findings.push(`S${now.season} W${now.week}: a long advance stopped for a forfeit, ${fit} fit of ${now.squad.length} ($${now.money}); the week was played with Advance Week.`);
+        const [fit, squad] = await page.evaluate(() => { const l = window.__nrlState(); return [l.squad.filter((p) => p.injuredWeeks <= 0).length, l.squad.length]; });
+        report.findings.push(`S${now.season} W${now.week}: a long advance stopped for a forfeit, ${fit} fit of ${squad} ($${now.money}); the week was played with Advance Week.`);
         await toastsGone();
         await weekAsTapped(rec);
         now = await save();
