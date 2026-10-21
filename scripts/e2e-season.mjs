@@ -233,19 +233,21 @@ async function leaveMatch() {
 async function weekAsTapped(rec) {
   const at = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}`; });
   await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+  // The round's own toast ("… Round 9 forfeited (0–24)."), not the stop's "… would be forfeited."
   const what = await page.waitForFunction((a) => {
     if (document.querySelector('.nrl-mo-controls')) return 'match';
-    if ([...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited/.test(t.textContent ?? ''))) return 'forfeit';
+    if ([...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited \(\d+/.test(t.textContent ?? ''))) return 'forfeit';
     const s = window.__nrlState();
     return `${s.season}:${s.week}` !== a ? 'week' : null;
-  }, at, { timeout: 15000 }).then((h) => h.jsonValue());
+  }, at, { timeout: 15000 }).then((h) => h.jsonValue())
+    .catch(() => { throw new Error(`Advance Week did nothing at ${at.replace(/(\d+):(\d+)/, 'S$1 W$2')}`); });
   if (what === 'match') {
     await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
     await leaveMatch();
   }
-  // The week ends once the rival round is in; wait for it.
-  await page.waitForFunction((a) => { const s = window.__nrlState(); return `${s.season}:${s.week}` !== a; }, at, { timeout: 30000 }).catch(() => {});
+  // The week ends once the rival round is in (as long as held-week allows); wait for it.
+  await page.waitForFunction((a) => { const s = window.__nrlState(); return `${s.season}:${s.week}` !== a; }, at, { timeout: 60000 }).catch(() => {});
   rec.notes.push(what === 'forfeit' ? 'the round forfeited' : what === 'match' ? 'a match, skipped' : 'no match that week');
 }
 
@@ -722,6 +724,10 @@ async function play() {
       const stop = await page.locator('.nrl-toast').last().textContent().catch(() => '');
       rec.notes.push(`S${now.season} W${now.week} $${now.money}${stop ? ` · "${stop.trim()}"` : ''}`);
       if (now.season === s.season && now.week === s.week && /Only \d+ fit/.test(stop ?? '')) {
+        // Not a failure, but worth seeing: since #278 a forced sale keeps 13 fit, so a stop here is
+        // injuries or expiries, or #278 regressed (finding 19).
+        const fit = now.squad.filter((p) => p.injuredWeeks <= 0).length;
+        report.findings.push(`S${now.season} W${now.week}: a long advance stopped for a forfeit, ${fit} fit of ${now.squad.length} ($${now.money}); the week was played with Advance Week.`);
         await toastsGone();
         await weekAsTapped(rec);
         now = await save();
