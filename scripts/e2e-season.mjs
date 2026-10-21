@@ -383,6 +383,14 @@ async function play() {
     rec.notes.push(`signed ${name}`);
   });
   await step('squad', async () => { await closeAny(); await tap('.nrl-nav .nrl-btn:has-text("Squad")'); await page.waitForSelector('.nrl-squad-kit'); });
+  // N11: the squad's training focus, a chip on the Squad screen; the pick is saved at once.
+  await step('training-focus', async (rec) => {
+    if (!(await page.locator('.nrl-squad-focus [data-focus="speed"]').count())) return 'no training focus on this build';
+    await tap('.nrl-squad-focus [data-focus="speed"]');
+    const focus = (await save())?.training?.focus;
+    if (focus !== 'speed') throw new Error(`the saved training focus is ${focus}, not speed`);
+    rec.notes.push('focus Speed');
+  });
   // N7 (#187): a card's top row opens the player page; its close returns to the Squad screen.
   await step('player-page', async (rec) => {
     const open = page.locator('[data-player-open]').first();
@@ -443,6 +451,27 @@ async function play() {
   // saved result. The setting stays on, so the rest of the season's matches run
   // the live sim headless. Since the switch-over (BAK-207 Phase 4) there is no
   // setting and every match is live.
+  // N11: a plan and a goal-kicker on the Lineup screen; the half-time card changes the plan below.
+  await step('lineup-plan', async (rec) => {
+    await closeAny();
+    await tap('.nrl-nav .nrl-btn[data-screen="lineup"]');
+    await page.waitForSelector('.nrl-lineup-row');
+    if (!(await page.locator('.nrl-lineup-tac [data-tactic="grind"]').count())) return 'no tactics on this build';
+    await tap('.nrl-lineup-tac [data-tactic="grind"]');
+    // Select a fit starter's tile (an injured one is replaced on the day, and the kick with
+    // him), then make him the goal-kicker.
+    const fit = page.locator('.nrl-lineup-tile[data-spot^="s"]:not([data-out]):not([data-empty])').first();
+    const spot = await fit.getAttribute('data-spot');
+    await press(fit);
+    await tap('.nrl-lineup-kc .nrl-btn:has-text("Kicker")');
+    const l = await page.evaluate(() => window.__nrlState?.().lineup ?? null);
+    const slot = Number(spot.slice(1));
+    if (l?.tactics?.attack !== 'grind') throw new Error(`the lineup's attack is ${l?.tactics?.attack}, not grind`);
+    if (!l?.kicker || l.kicker !== l.starters[slot]) throw new Error(`the kicker is ${l?.kicker}, not ${l?.starters?.[slot]} (${spot})`);
+    if (!(await page.locator(`.nrl-lineup-tile[data-spot="${spot}"] [data-kicker]`).count())) throw new Error(`no K badge on ${spot}`);
+    rec.notes.push(`Grind / ${l.tactics.defence}; kicker ${l.kicker} (${spot})`);
+    await closeAny();
+  });
   let liveOn = false;
   await step('live-toggle', async (rec) => {
     await tap('.nrl-nav .nrl-btn:has-text("Fixtures")');
@@ -502,6 +531,19 @@ async function play() {
     if (!call) throw new Error(refused.length ? `no call lit its chip (${refused.slice(-2).join('; ')})` : 'no coach-call chip was on offer for 10 s');
     rec.notes.push(`called ${call}${refused.length ? ` (${refused.length} refused first)` : ''}`);
     await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×8' }));
+  });
+  // N11: the half-time card comes up by itself; change the attack and play on.
+  await step('half-time-plan', async (rec) => {
+    if (!liveOn) return 'skipped';
+    const card = page.locator('.nrl-mo-plan', { has: page.locator('.nrl-mo-plan-head', { hasText: 'Half-time' }) });
+    // A 9-minute half at ×8 is about 70 s.
+    await card.waitFor({ timeout: 120000 });
+    // At ×4 and above the card goes on by itself after 8 s unless it is tapped, so tap at once.
+    await press(card.locator('[data-tactic="expansive"]'));
+    if (!(await card.locator('[data-tactic="expansive"][data-active]').count())) throw new Error('Expansive did not light on the half-time card');
+    await press(card.locator('.nrl-mo-plan-go'));
+    await card.waitFor({ state: 'detached', timeout: 5000 });
+    rec.notes.push('half-time: Expansive');
   });
   await step('live-fulltime', async (rec) => {
     if (!liveOn) return 'skipped';
