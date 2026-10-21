@@ -24,7 +24,7 @@ import { button, closeModal, el, openModal, panel } from '../dom';
 import { ensureScreenStyles } from './recruit';
 import { fmtMoney } from './finance';
 import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
-import { LINEUP_SLOTS } from '../../systems/lineup';
+import { LINEUP_SLOTS, resolveLineup } from '../../systems/lineup';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
 
@@ -175,10 +175,14 @@ const ordinal = (n: number): string => {
  * Where your player sits in the coach's nine (N14, #263): "Starting halfback",
  * "On the bench" or "Not picked". Pure.
  */
-export function lineupSlotText(state: Pick<GameState, 'lineup'>, playerId: string): string {
-  const slot = state.lineup.starters.indexOf(playerId);
+export function lineupSlotText(state: Pick<GameState, 'lineup' | 'squad'>, playerId: string): string {
+  // The side as it runs out (injured men covered, the bench topped up), not the saved sheet.
+  const side = resolveLineup(state.lineup, state.squad);
+  const slot = side.starters.findIndex((p) => p?.id === playerId);
   if (slot >= 0) return `Starting ${positionLabel(LINEUP_SLOTS[slot]!).toLowerCase()}`;
-  return state.lineup.bench.includes(playerId) ? 'On the bench' : 'Not picked';
+  if (side.bench.some((p) => p.id === playerId)) return 'On the bench';
+  const picked = state.lineup.starters.includes(playerId) || state.lineup.bench.includes(playerId);
+  return picked ? 'Picked, but injured' : 'Not picked';
 }
 
 /** Everything the page shows, from the player, where he is and the game state. */

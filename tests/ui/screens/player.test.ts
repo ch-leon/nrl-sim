@@ -2,7 +2,7 @@
 // The DOM (openPlayerPage) is not rendered here: the vitest env is 'node'.
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  fmtTally, moraleReasons, moraleWord, playerActions, playerPageModel, positionLabel, riskWord,
+  fmtTally, lineupSlotText, moraleReasons, moraleWord, playerActions, playerPageModel, positionLabel, riskWord,
 } from '../../../src/ui/screens/player';
 import { createNewGame, getState, setState, type Player } from '../../../src/core/state';
 import { initLeague } from '../../../src/systems/fixtures';
@@ -125,15 +125,35 @@ describe('playerPageModel', () => {
   });
 });
 
-// N14 (#263): the player page says where he sits in the coach's nine.
-import { lineupSlotText } from '../../../src/ui/screens/player';
-
+// N14 (#263): the player page says where he sits in the side that runs out.
 describe('lineupSlotText', () => {
-  const lineup = { starters: ['a', null, 'c', null, null, 'f', null, null, null], bench: ['x'], rotation: 'standard', tactics: { attack: 'balanced', defence: 'slide' } } as unknown as import('../../../src/core/state').Lineup;
+  beforeEach(() => {
+    bus.clear();
+    setState(createNewGame('Test FC', 11));
+    initLeague(getState());
+  });
+
   it('a starter by his slot, the bench, or not picked', () => {
-    expect(lineupSlotText({ lineup }, 'a')).toBe('Starting fullback');
-    expect(lineupSlotText({ lineup }, 'f')).toBe('Starting halfback');
-    expect(lineupSlotText({ lineup }, 'x')).toBe('On the bench');
-    expect(lineupSlotText({ lineup }, 'z')).toBe('Not picked');
+    const s = getState();
+    s.squad.forEach((p) => { p.injuredWeeks = 0; });
+    s.lineup.starters = s.squad.slice(0, 9).map((p) => p.id);
+    s.lineup.bench = s.squad.slice(9, 13).map((p) => p.id);
+    expect(lineupSlotText(s, s.squad[0]!.id)).toBe('Starting fullback');
+    expect(lineupSlotText(s, s.squad[9]!.id)).toBe('On the bench');
+    const rest = s.squad.filter((p) => !lineupSlotText(s, p.id).startsWith('Starting') && lineupSlotText(s, p.id) !== 'On the bench');
+    for (const p of rest) expect(lineupSlotText(s, p.id)).toBe('Not picked');
+  });
+
+  it('an injured starter is out of the side and the man covering him is starting', () => {
+    const s = getState();
+    s.squad.forEach((p) => { p.injuredWeeks = 0; });
+    const fb = s.squad[0]!;
+    s.lineup.starters = [fb.id, ...s.squad.slice(1, 9).map((p) => p.id)];
+    s.lineup.bench = s.squad.slice(9, 13).map((p) => p.id);
+    fb.injuredWeeks = 3;
+    expect(lineupSlotText(s, fb.id)).toBe('Picked, but injured');
+    const cover = s.squad.find((p) => lineupSlotText(s, p.id) === 'Starting fullback');
+    expect(cover).toBeDefined();
+    expect(cover!.id).not.toBe(fb.id);
   });
 });

@@ -148,7 +148,7 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
   const prize = finalsPrize(outcome);
   if (prize > 0) {
     earnMoney(prize, 'finals prize money');
-    bus.emit('ui:notify', { text: `Finals prize money: $${prize.toLocaleString()}.`, kind: 'success', quiet: true }); // in the review's money (N14)
+    bus.emit('ui:notify', { text: `Finals prize money: $${prize.toLocaleString()}.`, kind: 'success' });
   }
 
   const after = getState();
