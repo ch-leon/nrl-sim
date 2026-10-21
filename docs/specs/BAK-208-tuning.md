@@ -539,8 +539,10 @@ keep a fifth. Until N12.2 the difficulty multiplied the rival sheet's aggregates
 The strength-built fallback (a rival short of nine fit) gets the same edge on its generated
 players. Normal has none, so its matches are exactly as they were: the standard plan's seven
 cells are identical to the run before (`20261021-075107-standard` and, after the rebase onto
-`main`, `20261021-083727-standard`, against `20261021-014058-standard`). Rival-v-rival rounds
-(§24) have no difficulty.
+`main` at ea12527, `20261021-091408-standard` at f919d13, against `20261021-014058-standard`;
+`git diff 6718006 ea12527` touches nothing under `src/match`, `src/sim`,
+`src/systems/matchday.ts` or `src/data`, only `src/config.ts`, N12.3's overhead field and
+ticket price, which no match reads). Rival-v-rival rounds (§24) have no difficulty.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
