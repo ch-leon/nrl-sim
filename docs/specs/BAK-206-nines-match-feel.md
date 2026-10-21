@@ -339,7 +339,9 @@ export type MatchIntent =
 ### Polish already noted
 - Raise break visibility and kick chase spectacle in playback (anims for bomb contest,
   driven tackle backwards).
-- Commentary lines for fend / break-tackle / kick types.
+- Commentary lines for fend / break-tackle / kick types. Done in N15.2 (#293): the live
+  sim's commentary (`src/match/view/commentary.ts`) has its own lines for every kind it
+  emits, each kick type and its outcome among them.
 
 ---
 

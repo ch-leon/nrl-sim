@@ -18,10 +18,12 @@
 // `nrl-match-final` is added too: the feed gives way to the Back-to-Club button
 // and the result toast sits just above it. Both are removed on destroy (the
 // scene's teardown when leaving), which hands the HUD/nav back.
+//
+// The ticker's lines come from the live playback (match/view/commentary.ts, N15.2)
+// through `comment()`: the overlay keeps the score from the events and says
+// nothing of its own.
 import { el, panel, button, mount, ensureStyles } from '../dom';
 import { bus } from '../../core/events';
-import { makeRng } from '../../utils/rng';
-import { commentaryFor } from '../../sim/commentary';
 import { truncateTicker } from '../../world/readability';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
@@ -337,9 +339,6 @@ export interface MatchOverlayOptions {
   result?: MatchResult;
   /** The weather badge when there is no result yet. */
   weather?: WeatherKind;
-  /** Seed for the commentary rng so replays read identically. Defaults derived
-   *  from the result's final score + event count. */
-  seed?: number;
   /** Minutes in a half: 40 for the old engine's log (default), NINES.halfMinutes for a live match (BAK-207 2g). */
   halfMinutes?: number;
 }
@@ -360,8 +359,6 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const halfMinutes = opts.halfMinutes ?? 40;
   /** Set once the live sim drives the clock: events then only move the score and stats. */
   let liveClock = false;
-  const seed = opts.seed ?? (result ? deriveSeed(result) : 1);
-  const rng = makeRng(seed);
 
   let state = initLiveState();
 
@@ -517,8 +514,6 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     if (burst++ === 0) setTimeout(() => (burst = 0), 0);
     state = reduceEvent(state, ev, homeId, halfMinutes);
     render();
-    const line = commentaryFor(ev, home.name, away.name, rng.next, homeId);
-    if (line) appendCommentary(line);
     const b = scoreBanner(ev, homeId, [home.name, away.name]);
     if (b) {
       queued = { b, score: `${state.homeScore} – ${state.awayScore}` };
@@ -609,11 +604,6 @@ function weatherBadge(w: WeatherKind): string {
     default:
       return '☀ Clear';
   }
-}
-
-/** Deterministic seed for commentary from the result (score + event count). */
-function deriveSeed(result: MatchResult): number {
-  return ((result.homeScore + 1) * 73856093) ^ ((result.awayScore + 1) * 19349663) ^ result.events.length;
 }
 
 const OVERLAY_STYLE_ID = 'nrl-match-overlay-styles';

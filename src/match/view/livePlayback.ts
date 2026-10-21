@@ -31,6 +31,7 @@ import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from './popups';
 import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
+import { Commentator } from './commentary';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
 
@@ -119,6 +120,10 @@ export class LivePlayback {
   private readonly sprintLayer: SprintLayer;
   private readonly zone: ZoneLayer;
   private readonly recorder: MatchRecorder;
+  /** The ticker's lines (N15.2): it hears every event, said or not. */
+  private readonly commentator: Commentator;
+  /** The full-time line of a match skipped here, said once it is over. */
+  private finalLine = '';
   private speed: PlaybackSpeed = LIVE_DEFAULT_SPEED;
   private finishEmitted = false;
   private skipping = false;
@@ -135,6 +140,7 @@ export class LivePlayback {
     const { home, away } = opts;
     this.plans = opts.plans ?? [];
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
+    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
     const simOpts = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.runner = new Runner((seed) => new LiveSim(home, away, seed, simOpts), opts.seed);
@@ -306,13 +312,16 @@ export class LivePlayback {
   private finishFrom(result: MatchResult): void {
     if (this.finishEmitted) return;
     for (const ev of result.events.slice(this.recorder.events.length)) bus.emit('match:event', ev);
+    const golden = result.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
+    // The final whistle in the ticker: the same line the match would have ended on here (the whistles hash the seed alone).
+    this.opts.overlay?.comment(this.commentator.fullTime({ home: result.homeScore, away: result.awayScore }, golden));
     if (result.calls) {
       const [mh, ma] = result.calls.made;
       const [ph, pa] = result.calls.paid;
       this.opts.overlay?.setCalls?.({ home: mh, away: ma }, { home: ph, away: pa });
     }
     // The clock to full time (a golden-point final keeps the clock it had: its length isn't in the result).
-    if (!result.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point')) this.opts.overlay?.setClock(2 * NINES.halfMinutes * 60, 2);
+    if (!golden) this.opts.overlay?.setClock(2 * NINES.halfMinutes * 60, 2);
     this.awaitingSkip = false;
     this.skipping = false;
     this.finishEmitted = true;
@@ -325,6 +334,7 @@ export class LivePlayback {
     this.skipping = true;
     while (!this.runner.finished) this.runner.step();
     this.skipping = false;
+    if (this.finalLine) this.opts.overlay?.comment(this.finalLine);
     this.view.draw(this.runner.prev, this.runner.cur, 1, 0.001);
     this.showClock();
     this.finish();
@@ -378,7 +388,10 @@ export class LivePlayback {
   private onSimEvents(events: readonly SimEvent[]): void {
     const cur = this.runner.cur;
     for (const e of events) {
-      if ((e.kind === 'coach-call' || e.kind === 'call-paid' || e.kind === 'plan') && !this.skipping) this.opts.overlay?.comment(e.text);
+      // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
+      const line = this.commentator.line(e, cur.score);
+      if (line && !this.skipping) this.opts.overlay?.comment(line);
+      else if (line && e.kind === 'full-time') this.finalLine = line;
       if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);
       const p = this.skipping ? null : popupFor(e);
       // A bonus try: the zone it was grounded in lights up under the pop-up (#77).

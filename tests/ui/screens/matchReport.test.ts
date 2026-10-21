@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { runMatch } from '../../../src/match/league/match';
 import { buildMatchReport, shortName } from '../../../src/ui/screens/matchReport';
 import { playerOfTheMatch } from '../../../src/systems/stats';
+import { summaryLines } from '../../../src/match/view/commentary';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../../src/sim/events';
 
 const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
@@ -48,6 +49,13 @@ describe('match report (N9.5)', () => {
 
   it('names the Player of the Match with his club', () => {
     expect(r.potm?.who).toMatch(/\((Live Test FC|Gulls)\)$/);
+  });
+
+  it('carries the commentary’s summary (N15.2): the final whistle with the score, then the tries', () => {
+    expect(r.summary).toEqual(summaryLines(result, { id: 'player', name: 'Live Test FC' }, { id: 'rival-gulls', name: 'Gulls' }));
+    expect(r.summary.length).toBe(2);
+    const [hi, lo] = [Math.max(result.homeScore, result.awayScore), Math.min(result.homeScore, result.awayScore)];
+    expect(r.summary[0]).toContain(`${hi}–${lo}`);
   });
 
   it('says a final was won in golden point, or drawn and decided on seeding', () => {

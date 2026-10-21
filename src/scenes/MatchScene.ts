@@ -445,7 +445,7 @@ export class MatchScene extends Phaser.Scene {
     if (this.live) {
       // The overlay reads Nines halves and the sim's running clock.
       const live = this.live;
-      this.overlay = mountMatchOverlay({ home: this.home, away: this.away, weather: live.weather, seed: live.seed, halfMinutes: NINES.halfMinutes });
+      this.overlay = mountMatchOverlay({ home: this.home, away: this.away, weather: live.weather, halfMinutes: NINES.halfMinutes });
       this.playback = new LivePlayback(this, {
         home: this.home,
         away: this.away,
