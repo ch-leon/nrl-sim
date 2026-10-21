@@ -111,3 +111,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261021-081159-difficulty | difficulty | b3bc534 | season/difficulty-spread | [report](runs/20261021-081159-difficulty/report.md) |
 | 20261021-082512-difficulty-2001 | difficulty 2001 | b3bc534 | season/difficulty-spread | [report](runs/20261021-082512-difficulty-2001/report.md) |
 | 20261021-083727-standard | standard | 1374861 | season/difficulty-spread | [report](runs/20261021-083727-standard/report.md) |
+| 20261021-091408-standard | standard | f919d13 | season/difficulty-spread | [report](runs/20261021-091408-standard/report.md) |
