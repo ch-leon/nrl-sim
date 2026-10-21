@@ -224,6 +224,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       ? { ...old, finance: (old.finance as RawState[]).map((e) => ({ ...e, overhead: typeof e.overhead === 'number' ? e.overhead : 0 })) }
       : { ...old }),
   },
+  // v17 → v18 (N14.3): the board loan. An older save owes the board nothing.
+  { from: 17, to: 18, run: (old) => ({ ...old, boardLoan: { owed: 0 } }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

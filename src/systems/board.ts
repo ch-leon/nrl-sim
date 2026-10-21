@@ -8,6 +8,7 @@ import { registerSeasonHook } from '../core/time';
 import { earnMoney } from '../data/club';
 import { makeRng } from '../utils/rng';
 import { BOARD, PRIZE } from '../config';
+import { repayBoardLoan } from './contracts';
 
 /** Facts about the season just played, supplied by the fixtures season hook. */
 export interface SeasonOutcome {
@@ -150,6 +151,11 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
     earnMoney(prize, 'finals prize money');
     bus.emit('ui:notify', { text: `Finals prize money: $${prize.toLocaleString()}.`, kind: 'success' });
   }
+
+  // The season's board loan (N14.3) is repaid before the board judges the season, so a
+  // club is not "solvent" on borrowed money; the prize just paid helps cover it.
+  const repaid = repayBoardLoan();
+  if (repaid > 0) bus.emit('ui:notify', { text: `Board loan repaid: $${repaid.toLocaleString()}.`, kind: 'info' });
 
   const after = getState();
   const review = reviewObjectives(after, outcome);

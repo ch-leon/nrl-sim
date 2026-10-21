@@ -142,13 +142,13 @@ describe('advanceUntil — a club in debt', () => {
   /** Advance to `target` as a player would, again after every stop; the stops' texts in order. */
   async function playThrough(target: AdvanceTarget): Promise<{ stops: string[]; calls: number }> {
     const stops: string[] = [];
-    for (let calls = 1; calls <= 10; calls++) {
+    for (let calls = 1; calls <= 30; calls++) {
       const run = await advanceUntil(target, async () => {});
       if (run.stop.kind === 'target') return { stops, calls };
       expect(run.stop.kind).toBe('bankruptcy');
       stops.push(run.stop.text);
     }
-    throw new Error(`no target after 10 calls: ${stops.join(' / ')}`);
+    throw new Error(`no target after 30 calls: ${stops.join(' / ')}`);
   }
 
   it('already in the red, runs to season end in one call (it used to stop every week)', async () => {
@@ -164,20 +164,19 @@ describe('advanceUntil — a club in debt', () => {
     expect(toasts.filter((t) => t.text.startsWith('The club is in the red')).length).toBe(WEEKS_PER_SEASON);
   });
 
-  it('into the red and down to a forced sale: two stops, then the target', async () => {
+  it('into the red, then one forced sale a week down to the minimum, each a stop, then the target (N14.3)', async () => {
     setState({ money: 25_000 });
     burnEachWeek(10_000);
     const squadBefore = getState().squad.length;
     expect(squadBefore).toBeGreaterThan(SQUAD_MIN);
-    const { stops, calls } = await playThrough({ kind: 'finals' });
-    expect(calls).toBe(3);
-    expect(stops[0]).toBe('Club has gone into debt.');
-    expect(stops[1]).toMatch(/^Forced sales?: .+ sold to cover debts\.$/);
-    // The cascade sells down to SQUAD_MIN in the week the floor is passed; the stop counts them all.
-    expect(getState().squad.length).toBe(SQUAD_MIN);
     const sold = squadBefore - SQUAD_MIN;
-    expect(sold).toBeGreaterThan(3);
-    expect(stops[1]).toMatch(new RegExp(`^Forced sales: [^,]+, [^,]+, [^,]+ and ${sold - 3} more sold to cover debts\\.$`));
+    const { stops, calls } = await playThrough({ kind: 'finals' });
+    expect(stops[0]).toBe('Club has gone into debt.');
+    // The club sinks in steps: a sale a week, each named, until the squad is at the minimum.
+    expect(stops.slice(1)).toHaveLength(sold);
+    for (const stop of stops.slice(1)) expect(stop).toMatch(/^Forced sale: [^,]+ sold to cover debts\.$/);
+    expect(calls).toBe(sold + 2);
+    expect(getState().squad.length).toBe(SQUAD_MIN);
     expect(getState().week).toBe(25);
     expect(getState().money).toBeLessThan(ECON.FORCED_SALE_FLOOR);
   });

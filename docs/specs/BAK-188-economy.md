@@ -96,6 +96,21 @@ Behaviour:
     multi-week advance stops on the crossing into the red, on a forced sale and when
     the balance first passes the floor, not on every week's warning
     (`core/advanceRules.ts`, `debtStop`).
+  - N14.3: **one sale a week**, not "until money ≥ floor" (the loop never got there: a
+    sale pays nothing, so it always sold down to `SQUAD_MIN` in one tick). A club under
+    the floor sinks in steps and the advance stops each week with the name.
+  - N14.3: a renewal the club can't afford goes on a **board loan** (`boardLoan.owed`,
+    at most `BOARD.LOAN_CAP` $50k): at contract end the four weeks' wage, or an early
+    renewal's fee, comes in on the board's line (`board loan`). It is repaid in full at
+    the rollover, after the prize and before the board judges the season (so a club is
+    not "solvent" on borrowed money), on the same line (`board loan
+    repaid`). The Contracts screen says "on a board loan"; the Finance P&L notes it
+    under the board's row.
+  - N14.3: before a round the club would forfeit (fewer than `SQUAD_MIN` fit), the
+    Academy **calls up** juniors to make the side (`systems/youth.ts`,
+    `callUpJuniors`). They are generated at the Academy's level (no Academy: the lowest
+    band) and signed at the junior wage to the season's end; there is no fee. A
+    forfeit is left only for a full squad (`SQUAD_CAP`).
 - Order within `applyEconomy` is fixed: wages → income → gate → contracts →
   bankruptcy, so a home gate can rescue the club before forced sales trigger.
 
@@ -192,3 +207,9 @@ players. Managed Normal grows from about $190k to $370k and ends around $330k wi
 squad of 80s costing $1.2M a season against $1.1M of gates. Idle Hard is bust in
 season 1 and sacked by season 2; managed Hard is a fight for the board's patience,
 in the red half the time. Easy stays comfortable.
+
+**The cascade (N14.3).** One forced sale a week, a board loan for a renewal in debt (up to
+$50,000 a season, repaid at the rollover), and an Academy call-up before a forfeit. In the
+matrix soak (20 seeds × 5 seasons) forfeits went from up to 16 a season (idle Hard season
+3) to none in any mode. Most had not been debt: expiries and retirements left fewer than
+13 fit. The numbers are in `docs/status/2026-10-living.md` (N14.3).

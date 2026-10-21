@@ -686,6 +686,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-finance-table td.nrl-finance-neg { color: #b00020; }
 .nrl-finance-pnl-table { width: 100%; }
 .nrl-finance-pnl-net td { font-weight: bold; border-top: 2px solid #000; }
+.nrl-finance-pnl-sub td { font-size: 0.72rem; color: #555; padding-top: 0; }
 
 /* ── News inbox (#45) ─────────────────────────────────────────────────── */
 .nrl-nav-badge {

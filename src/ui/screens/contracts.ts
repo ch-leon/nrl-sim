@@ -7,7 +7,7 @@ import { getState } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { RELEASE_PAYOUT_WEEKS, releasePlayer } from '../../systems/freeagency';
 import {
-  contractRows, renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee,
+  contractRows, renewalFee, renewalWeeklyCost, renewEarly, renewsOnLoan, sellPlayer, transferFee,
 } from '../../systems/contracts';
 import { SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { el, panel, button, openModal, closeScreen } from '../dom';
@@ -51,7 +51,7 @@ function render(content: HTMLElement): void {
       ` · ${fmtMoney(Math.round(p.wage * wageMult))}/wk`,
     );
     const actions = el('div', { class: 'nrl-contract-actions' },
-      button(`Renew ${fmtMoney(renewalFee(s, p))} (${fmtMoney(renewalWeeklyCost(s, p))}/wk)`, () => { armed = null; act(renewEarly(getState(), p.id)); render(content); }),
+      button(`Renew ${fmtMoney(renewalFee(s, p))}${renewsOnLoan(s, p) ? ' on a board loan' : ''} (${fmtMoney(renewalWeeklyCost(s, p))}/wk)`, () => { armed = null; act(renewEarly(getState(), p.id)); render(content); }),
       button(armed === `release:${p.id}` ? 'Really release?' : `Release ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`, () => {
         const g = guardTap(armed, `release:${p.id}`);
         armed = g.armed;

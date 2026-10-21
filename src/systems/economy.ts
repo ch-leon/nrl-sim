@@ -18,7 +18,7 @@ import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep } from '../data/facility';
 import { EVENT_CARDS } from '../data/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
-import { renewalWage, warnForWeeks } from './contracts';
+import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks } from './contracts';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -214,11 +214,18 @@ export function tickContracts(state: GameState): GameState {
       continue;
     }
 
-    // Contract expired this tick — renew at the ask if affordable, else depart.
+    // Contract expired this tick — renew at the ask if affordable, on a board loan
+    // of the four weeks if not (N14.3), else depart.
     const newWage = renewalWage(p, state);
 
     if (money >= newWage * 4) {
       keep.push({ ...p, wage: newWage, contractWeeks: 52 });
+    } else if (takeBoardLoan(newWage * 4)) {
+      keep.push({ ...p, wage: newWage, contractWeeks: 52 });
+      bus.emit('ui:notify', {
+        text: `${p.name} re-signed on a board loan of $${(newWage * 4).toLocaleString()}, repaid at the season's end.`,
+        kind: 'info',
+      });
     } else {
       departed.push({ ...p, contractWeeks: 0, departed: true });
       bus.emit('ui:notify', {
@@ -235,16 +242,14 @@ export function tickContracts(state: GameState): GameState {
 
 /**
  * Bankruptcy cascade. Emits a single warning + danger notify when money < 0.
- * While money < FORCED_SALE_FLOOR, repeatedly release the highest-`wage` squad
- * player (NO payout) to freeAgents, apply squad-wide morale −FORCED_SALE_MORALE_HIT
- * (clamped ≥1), and re-check — stopping at SQUAD_MIN even if still under floor
- * (club stays in debt but fieldable). Fieldable means fit: a fit player is sold
- * only while more than SQUAD_MIN are fit, an injured one while the squad is over
- * SQUAD_MIN, so a sale never takes the fit count under the minimum (QA finding 19).
- * Terminates: each sale reduces squad size and the loop halts at SQUAD_MIN or when
- * no player can go. The warning comes after the sales and names
- * them (`forcedSales`, N12.5), so a multi-week advance can stop on a sale; the
- * toasts keep their order.
+ * While money < FORCED_SALE_FLOOR, release the highest-`wage` squad player who
+ * can go (NO payout) to freeAgents and apply squad-wide morale
+ * −FORCED_SALE_MORALE_HIT (clamped ≥1): one a week (N14.3), so a club sinks in
+ * steps and the advance stops each week with a name. Never below SQUAD_MIN, and
+ * fieldable means fit: a fit player is sold only while more than SQUAD_MIN are
+ * fit, an injured one while the squad is over SQUAD_MIN, so a sale never takes the
+ * fit count under the minimum (QA finding 19). The warning comes after the sale
+ * and names it (`forcedSales`, N12.5); the toasts keep their order.
  */
 export function handleBankruptcy(_state: GameState): GameState {
   // Gate on the settled live balance, not the entry snapshot — prior pipeline
@@ -259,20 +264,18 @@ export function handleBankruptcy(_state: GameState): GameState {
   }
 
   const forcedSales: string[] = [];
-  while (getState().money < ECON.FORCED_SALE_FLOOR) {
-    const s = getState();
-    if (s.squad.length <= SQUAD_MIN) break; // keep a fieldable team
+  // One sale a week (N14.3); a fieldable team is kept.
+  const s = getState();
+  let victim: Player | undefined;
+  if (s.money < ECON.FORCED_SALE_FLOOR && s.squad.length > SQUAD_MIN) {
     const spareFit = s.squad.filter((p) => p.injuredWeeks <= 0).length > SQUAD_MIN;
-
     // Highest-paid player who can go (stable: first max in array order).
-    let pick: Player | undefined;
     for (const p of s.squad) {
       if (!spareFit && p.injuredWeeks <= 0) continue;
-      if (!pick || p.wage > pick.wage) pick = p;
+      if (!victim || p.wage > victim.wage) victim = p;
     }
-    const victim = pick;
-    if (!victim) break;
-
+  }
+  if (victim) {
     const remaining = s.squad.filter((p) => p.id !== victim.id);
     const morale = remaining.map((p) => ({
       ...p,
@@ -352,7 +355,7 @@ export function classifyReason(reason: string): FinanceLine {
   if (reason === 'grant' || reason === 'sponsor+grant') return 'grant';
   if (reason === 'gate') return 'gate';
   if (reason === 'finals prize money') return 'prize';
-  if (reason === 'board grant') return 'boardGrant';
+  if (reason === 'board grant' || reason === BOARD_LOAN || reason === BOARD_LOAN_REPAID) return 'boardGrant';
   if (reason.startsWith('event: ') || MODIFIER_LABELS.has(reason)) return 'events';
   if (/^(sign|sell):/.test(reason)) return 'transfers';
   if (/^(renew|release):/.test(reason)) return 'contracts';
@@ -384,7 +387,8 @@ export interface MovementStamp { line: FinanceLine; season: number; week: number
  */
 export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance'>, reason: string): MovementStamp {
   const line = classifyReason(reason);
-  const closing = state.week === 1 && CLOSING_LINES.has(line) && state.finance.some((e) => e.season === state.season - 1);
+  // A loan taken in week 1 is that season's; its repayment, like the grant, closes the one before.
+  const closing = state.week === 1 && CLOSING_LINES.has(line) && reason !== BOARD_LOAN && state.finance.some((e) => e.season === state.season - 1);
   return closing
     ? { line, season: state.season - 1, week: WEEKS_PER_SEASON }
     : { line, season: state.season, week: state.week };

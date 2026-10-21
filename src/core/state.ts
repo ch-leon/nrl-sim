@@ -87,7 +87,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 17;
+export const SAVE_VERSION = 18;
 
 /** A squad training focus (N11): one stat trained harder, the rest a little less, or Balanced. */
 export type TrainingFocus = keyof PlayerStats | 'balanced';
@@ -251,6 +251,8 @@ export interface GameState {
   lineup: Lineup;
   /** What the squad trains hardest (N11): one stat, or Balanced (every stat as it always trained). */
   training: { focus: TrainingFocus };
+  /** What the club owes the board (N14.3): renewals it couldn't afford, advanced and repaid at the rollover. */
+  boardLoan: { owed: number };
   /** Player-of-the-match awards this season (#190), kept by the full-time card; absent until the first. */
   potmTally?: PotmTally;
   rngSeed: number; // advanced state of the seeded RNG
@@ -351,6 +353,7 @@ export function createNewGame(
     // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
     lineup: autoPick(squad),
     training: { focus: 'balanced' },
+    boardLoan: { owed: 0 },
     rngSeed: rng.state(),
   };
 
