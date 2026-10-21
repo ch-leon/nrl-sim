@@ -6,8 +6,8 @@ import { bus } from '../../src/core/events';
 import { createNewGame, emptyFinance, getState, loadState, setState } from '../../src/core/state';
 import { migrateState } from '../../src/core/save';
 import { STAFF, STAFF_ROLES, WELFARE_CARDS, WELFARE_RENEWAL_CUT, hireStaff, releaseStaff, staffWage, staffWages } from '../../src/systems/staff';
-import { applyEconomy, registerFinanceSystem, weeklyOverhead } from '../../src/systems/economy';
-import { renewalWage } from '../../src/systems/contracts';
+import { applyEconomy, registerFinanceSystem, tickContracts, weeklyOverhead } from '../../src/systems/economy';
+import { renewalWage, renewalWeeklyCost } from '../../src/systems/contracts';
 import { cardWeight, drawEvent } from '../../src/systems/events';
 import { EVENT_CARDS } from '../../src/data/events';
 import { makeRng } from '../../src/utils/rng';
@@ -65,6 +65,19 @@ describe('the Welfare Manager', () => {
     expect(Math.abs(renewalWage(p, getState()) - before * (1 - WELFARE_RENEWAL_CUT))).toBeLessThanOrEqual(1);
     releaseStaff('welfare');
     expect(renewalWage(p, getState())).toBe(before);
+  });
+
+  it('cuts the ask at contract end and on the Contracts screen too', () => {
+    const p = { ...getState().squad[0]!, contractWeeks: 1 };
+    loadState({ ...getState(), squad: [p, ...getState().squad.slice(1)], money: 1_000_000 });
+    const plain = renewalWage(p, getState());
+    const shown = renewalWeeklyCost(getState(), p);
+    hireStaff('welfare');
+    expect(renewalWeeklyCost(getState(), p)).toBeLessThan(shown);
+    tickContracts(getState());
+    expect(Math.abs(getState().squad.find((x) => x.id === p.id)!.wage - plain * (1 - WELFARE_RENEWAL_CUT))).toBeLessThanOrEqual(1);
+    // A club without staff (a rival's pricing) asks the full amount.
+    expect(renewalWage(p, { reputation: getState().reputation, season: getState().season })).toBe(plain);
   });
 
   it('halves the grievance cards\' weight, and only theirs', () => {

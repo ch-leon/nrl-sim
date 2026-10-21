@@ -406,7 +406,6 @@ function statRow(label: string, value: string, neg = false): HTMLElement {
   );
 }
 
-/** The season P&L panel: this season v last, biggest lines first, a net row at the foot (#172). */
 /** The running costs' label: it names the staff once any are hired (N14.5), since their wages are paid there. */
 export function overheadLabel(state: Pick<GameState, 'staff'>): string {
   return state.staff.length > 0 ? 'Running costs and staff' : FINANCE_LINE_LABELS.overhead;
@@ -417,6 +416,7 @@ export function boardLoanNote(owed: number): string {
   return `↳ incl. board loan ${fmtMoneyCompact(owed)}, repaid at the season's end`;
 }
 
+/** The season P&L panel: this season v last, biggest lines first, a net row at the foot (#172). */
 function buildSeasonPnl(state: GameState): HTMLElement {
   const pnl = seasonPnl(state);
   const box = el('div', { class: 'nrl-finance-pnl' });
