@@ -197,9 +197,9 @@ export interface DifficultyMultipliers {
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
-  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalEdge: -1.5, startRating: 4, overhead: 0.8 },
+  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalEdge: -2, startRating: 4, overhead: 0.8 },
   normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalEdge: 0, startRating: 0, overhead: 1 },
-  hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalEdge: 1, startRating: -4, overhead: 1.2 },
+  hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalEdge: 0.5, startRating: -4, overhead: 1.2 },
 };
 
 /** Multipliers for a difficulty; unknown/missing values fall back to Normal. */
