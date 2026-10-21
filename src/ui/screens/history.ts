@@ -29,6 +29,24 @@ export function fmtSeasonDetail(e: SeasonRecord): string {
   return parts.join(' · ');
 }
 
+/** The History note on a season played before the Nines rules (#77). */
+export const PRE_NINES_NOTE = 'Before Nines: 80-minute matches, no bonus tries';
+
+/**
+ * Was this season played before the Nines rules (#77)? Derived, not stored: the
+ * old engine's 80-minute matches gave way to the Nines sim (#162) after the season
+ * review arrived (save v12, #190), and every season recorded since carries a review,
+ * so a season without one was played on the old rules.
+ */
+export function playedBeforeNines(e: SeasonRecord): boolean {
+  return e.review === undefined;
+}
+
+/** The season's rules note for History, or '' for a Nines season. */
+export function fmtRulesNote(e: SeasonRecord): string {
+  return playedBeforeNines(e) ? PRE_NINES_NOTE : '';
+}
+
 export interface ClubRecords {
   premierships: number;
   bestFinish: number | null;
@@ -126,6 +144,8 @@ export function openHistoryScreen(): HTMLElement {
       });
       const detail = fmtSeasonDetail(entry);
       if (detail) line.append(el('div', { class: 'nrl-history-detail', text: detail }));
+      const rules = fmtRulesNote(entry);
+      if (rules) line.append(el('div', { class: 'nrl-history-detail nrl-history-rules', text: rules }));
       // The season review (#190), for seasons that have one (v12+), and its books (N14, #262).
       const actions = el('div', { class: 'nrl-history-actions' });
       if (entry.review) {

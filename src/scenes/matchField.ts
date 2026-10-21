@@ -14,6 +14,8 @@
 // the width. fx outside 0..100 lands in the in-goal (try dives, goal kicks).
 import { TILE_W, TILE_H } from '../config';
 import { gridToScreen } from '../world/iso';
+import { FIELD_LENGTH, IN_GOAL, MID_Y, toFieldPt } from '../match/core/field';
+import { GOALS } from '../match/league/goals';
 
 // ── Field dimensions ─────────────────────────────────────────────────────────
 export const FIELD_LONG = 30; // iso tiles dead-ball line to dead-ball line
@@ -41,6 +43,59 @@ export function fieldToGrid(fx: number, fy: number): { gx: number; gy: number } 
     gx: IN_GOAL_DEPTH + (fx / 100) * PLAY_LONG,
     gy: (fy / 100) * FIELD_WIDE,
   };
+}
+
+/** A rectangle on the field: x along (metres, or grid gx), y across (metres, or grid gy). */
+export interface FieldRect {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+/**
+ * The bonus zone (Nines, #77) at the end a side attacking `dir` scores at, in
+ * sim metres: the in-goal between the uprights, try line to dead-ball line,
+ * exactly where goals.ts's inBonusZone makes a try worth five.
+ */
+export function bonusZone(dir: 1 | -1): FieldRect {
+  const line = dir > 0 ? FIELD_LENGTH : 0;
+  const back = line + dir * IN_GOAL;
+  return {
+    x0: Math.min(line, back),
+    x1: Math.max(line, back),
+    y0: MID_Y - GOALS.halfPosts,
+    y1: MID_Y + GOALS.halfPosts,
+  };
+}
+
+/** The bonus zone in grid units (x0..x1 → gx, y0..y1 → gy), for the pitch art. */
+export function bonusZoneGrid(dir: 1 | -1): FieldRect {
+  const z = bonusZone(dir);
+  const a = toFieldPt({ x: z.x0, y: z.y0 });
+  const b = toFieldPt({ x: z.x1, y: z.y1 });
+  const ga = fieldToGrid(a.fx, a.fy);
+  const gb = fieldToGrid(b.fx, b.fy);
+  return { x0: ga.gx, x1: gb.gx, y0: ga.gy, y1: gb.gy };
+}
+
+/**
+ * The bonus zone's four corners on screen (try-line corners first), through a
+ * field-coords → world mapping (the scene's fieldToWorld), for a layer drawn over it.
+ */
+export function bonusZoneCorners(dir: 1 | -1, toWorld: (fx: number, fy: number) => { x: number; y: number }): { x: number; y: number }[] {
+  const z = bonusZone(dir);
+  const line = dir > 0 ? z.x0 : z.x1;
+  const back = dir > 0 ? z.x1 : z.x0;
+  return [
+    { x: line, y: z.y0 },
+    { x: line, y: z.y1 },
+    { x: back, y: z.y1 },
+    { x: back, y: z.y0 },
+  ].map((m) => {
+    const f = toFieldPt(m);
+    return toWorld(f.fx, f.fy);
+  });
 }
 
 /**

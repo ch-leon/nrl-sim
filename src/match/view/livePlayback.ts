@@ -30,6 +30,7 @@ import { PopupLayer } from './popupLayer';
 import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from './popups';
 import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
+import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
 
@@ -52,6 +53,8 @@ export interface PlaybackBall {
 export const LIVE_DEFAULT_SPEED: PlaybackSpeed = 4;
 /** Pop-ups sit above the name tag (73k) and below the weather (80k), as in the lab. */
 const DEPTH_POPUP = 74_000;
+/** The bonus zone's glow lies on the ground: over the field (−100k), under the shadows (−80k) and every sprite. */
+const DEPTH_ZONE = -85_000;
 /** What the commentary says while a skipped match is played elsewhere (N10.4). */
 export const SKIPPING_TEXT = 'Skipping to full time…';
 
@@ -114,6 +117,7 @@ export class LivePlayback {
   private readonly popups: PopupLayer;
   private readonly wrestleBar: WrestleBar;
   private readonly sprintLayer: SprintLayer;
+  private readonly zone: ZoneLayer;
   private readonly recorder: MatchRecorder;
   private speed: PlaybackSpeed = LIVE_DEFAULT_SPEED;
   private finishEmitted = false;
@@ -148,6 +152,7 @@ export class LivePlayback {
     this.popups = new PopupLayer(scene, DEPTH_POPUP);
     this.wrestleBar = new WrestleBar(scene, DEPTH_POPUP);
     this.sprintLayer = new SprintLayer(scene, DEPTH_POPUP - 1);
+    this.zone = new ZoneLayer(scene, DEPTH_ZONE, (fx, fy) => scene.fieldToWorld(fx, fy));
     this.view.draw(this.runner.prev, this.runner.cur, 0, 1);
   }
 
@@ -354,6 +359,7 @@ export class LivePlayback {
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
     };
     this.popups.update(deltaMs, zoom, feet);
+    this.zone.update(deltaMs);
     this.wrestleBar.update(this.runner.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
     this.sprintLayer.update(this.runner.cur, zoom, (side, slot) => {
       const a = this.scene.players[side][slot];
@@ -366,6 +372,7 @@ export class LivePlayback {
     this.popups.destroy();
     this.wrestleBar.destroy();
     this.sprintLayer.destroy();
+    this.zone.destroy();
   }
 
   private onSimEvents(events: readonly SimEvent[]): void {
@@ -374,6 +381,9 @@ export class LivePlayback {
       if ((e.kind === 'coach-call' || e.kind === 'call-paid' || e.kind === 'plan') && !this.skipping) this.opts.overlay?.comment(e.text);
       if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);
       const p = this.skipping ? null : popupFor(e);
+      // A bonus try: the zone it was grounded in lights up under the pop-up (#77).
+      const end = this.skipping ? null : bonusTryEnd(e, cur);
+      if (end) this.zone.flash(end);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups.show(p, e.side, e.slot);
         if (p.big) {

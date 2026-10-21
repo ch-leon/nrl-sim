@@ -42,10 +42,14 @@ export function sponsorBullet(club: Pick<GameState, 'reputation' | 'facilities'>
   return `${rule} ${now}`;
 }
 
+/** A picture a section can show under its text (guide.ts draws it). */
+export type GuideFigure = 'bonus-zone';
+
 export interface GuideSection {
   heading?: string;
   text?: string;
   bullets?: string[];
+  figure?: GuideFigure;
 }
 
 /** A nav screen a page can link to (N14, #263): guide.ts opens it. */

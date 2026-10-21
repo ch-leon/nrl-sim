@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { kitFromColors } from '../../../src/art/match/kit';
 import {
   PAL,
+  POST_GY,
   cameraWorldBounds,
   crowdSeats,
   foregroundWorldBounds,
@@ -10,7 +11,7 @@ import {
   stadiumWorldBounds,
 } from '../../../src/art/match/stadium';
 import { isoProject, isoUnproject } from '../../../src/art/match/iso3d';
-import { FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, fieldOffsetX, fieldToWorldPoint, fieldWorldBounds } from '../../../src/scenes/matchField';
+import { FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, bonusZoneGrid, fieldOffsetX, fieldToWorldPoint, fieldWorldBounds } from '../../../src/scenes/matchField';
 
 /** Byte-for-byte equality of two pixel arrays. */
 function sameData(a: Uint8ClampedArray, b: Uint8ClampedArray): boolean {
@@ -73,6 +74,40 @@ describe('paintBackground / paintForeground', () => {
       for (let dx = -2; dx <= 2; dx++) if (bgAt({ x: w.x + dx, y: w.y }).color === PAL.line) lines++;
     }
     expect(lines).toBeGreaterThan(30);
+  });
+
+  // Nines (#77): the bonus zone, a lighter band between the uprights, quieter than the try line.
+  it('stands the uprights on the bonus zone\'s sides', () => {
+    const z = bonusZoneGrid(1);
+    expect(POST_GY[0]).toBeCloseTo(z.y0, 9);
+    expect(POST_GY[1]).toBeCloseTo(z.y1, 9);
+  });
+
+  it('paints the bonus zone at each end as a lighter band with no solid line of its own', () => {
+    const lum = (c: number): number => ((c >> 16) & 0xff) + ((c >> 8) & 0xff) + (c & 0xff);
+    const patch = (gx: number, gy: number): number => {
+      let sum = 0;
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+        const w = isoProject(gx, gy, 0, off);
+        sum += lum(bgAt({ x: w.x + dx, y: w.y + dy }).color);
+      }
+      return sum / 49;
+    };
+    for (const dir of [1, -1] as const) {
+      const z = bonusZoneGrid(dir);
+      // Away from the posts' shadows (thrown toward +gx): the near half at the far end, the middle at the near end.
+      const gx = dir > 0 ? z.x0 + 0.4 * (z.x1 - z.x0) : (z.x0 + z.x1) / 2;
+      const mid = (z.y0 + z.y1) / 2;
+      const inZone = patch(gx, mid);
+      const beside = patch(gx, z.y0 - 1.5);
+      expect(inZone, `end ${dir}`).toBeGreaterThan(beside + 20);
+      // No pixel inside the zone (its dashed edge included, the try line it hangs off not) is the try line's pure white.
+      let solid = 0;
+      for (let gy = z.y0; gy <= z.y1; gy += 0.02) for (let g = z.x0 + 0.05; g <= z.x1 - 0.05; g += 0.02) {
+        if (bgAt(isoProject(g, gy, 0, off)).color === PAL.line) solid++;
+      }
+      expect(solid, `end ${dir}`).toBe(0);
+    }
   });
 
   it('is deterministic', () => {

@@ -494,7 +494,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       banner.classList.remove('nrl-mo-banner-in');
       void banner.offsetWidth;
       banner.classList.add('nrl-mo-banner-in');
-      bannerWasTry = b.headline === 'TRY!';
+      bannerWasTry = b.headline === 'TRY!' || b.headline === 'BONUS TRY!'; // a bonus try's conversion folds in too (#77)
     }
     banner.hidden = false;
     if (bannerTimer) clearTimeout(bannerTimer);

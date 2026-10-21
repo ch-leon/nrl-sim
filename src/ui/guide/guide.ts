@@ -10,7 +10,7 @@ import { buildLabel } from '../buildInfo';
 import { button, closeScreen, el, openModal } from '../dom';
 import { startTutorial } from '../tutorial';
 import { reloadForUpdate, updateReady } from '../../fx/pwa';
-import { CLUB_PAGES, type GuidePage, type GuideScreen, type GuideSection } from './pages';
+import { CLUB_PAGES, type GuideFigure, type GuidePage, type GuideScreen, type GuideSection } from './pages';
 import { openFinanceScreen } from '../screens/finance';
 import { openSquadScreen } from '../screens/squad';
 import { openLineupScreen } from '../screens/lineup';
@@ -18,6 +18,7 @@ import { openLadderScreen } from '../screens/fixtures';
 import { openBuildScreen } from '../screens/build';
 import { openInboxScreen } from '../inbox';
 import { NINES_PAGE } from './nines';
+import { bonusZoneSvg } from './zonePicture';
 
 /** Every page, in tab order. */
 export const GUIDE_PAGES: readonly GuidePage[] = [...CLUB_PAGES, NINES_PAGE];
@@ -37,6 +38,11 @@ export const GUIDE_SCREENS: Record<GuideScreen, { label: string; open: () => voi
   build: { label: 'Open Build', open: () => openBuildScreen() },
 };
 
+/** Each picture's markup (a static SVG built from the page's facts). */
+const GUIDE_FIGURES: Record<GuideFigure, () => string> = {
+  'bonus-zone': bonusZoneSvg,
+};
+
 /** The page the Guide reopens on. */
 let lastPageId: string | undefined;
 
@@ -44,6 +50,7 @@ function renderSection(s: GuideSection): HTMLElement[] {
   const out: HTMLElement[] = [];
   if (s.heading) out.push(el('h3', { text: s.heading }));
   if (s.text) out.push(el('p', { text: s.text }));
+  if (s.figure) out.push(el('figure', { class: 'nrl-guide-figure', html: GUIDE_FIGURES[s.figure](), attrs: { 'data-guide-figure': s.figure, style: 'margin: 0.3rem 0' } }));
   if (s.bullets && s.bullets.length > 0) out.push(el('ul', {}, ...s.bullets.map((b) => el('li', { text: b }))));
   return out;
 }

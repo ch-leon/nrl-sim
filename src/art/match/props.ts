@@ -49,9 +49,9 @@ export function drawUpright(kit: Kit): PixelBuffer {
   return b;
 }
 
-/** Screen delta between the two uprights (A → B, B is down-left). */
-export const CROSSBAR_DX = -Math.round((POST_GY[1] - POST_GY[0]) * (TILE_W / 2));
+/** Screen delta between the two uprights (A → B, B is down-left), rounded to a clean 2:1 step. */
 export const CROSSBAR_DY = Math.round((POST_GY[1] - POST_GY[0]) * (TILE_H / 2));
+export const CROSSBAR_DX = -CROSSBAR_DY * (TILE_W / TILE_H);
 
 /** Crossbar buffer; its A end is at (CROSSBAR_AX, CROSSBAR_AY). */
 export const CROSSBAR_AX = -CROSSBAR_DX + 1;

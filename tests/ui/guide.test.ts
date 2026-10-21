@@ -14,6 +14,8 @@ import { TRAINING_FOCUS } from '../../src/config';
 import { STAFF, STAFF_ROLES } from '../../src/systems/staff';
 import { BOARD, DIFFICULTY, ECON, ON_FIELD, SET_TACKLES, SQUAD_MIN } from '../../src/config';
 import { createNewGame, setState } from '../../src/core/state';
+import { IN_GOAL } from '../../src/match/core/field';
+import { bonusZoneSvg, zonePictureGeometry } from '../../src/ui/guide/zonePicture';
 
 describe('GUIDE_PAGES', () => {
   it('is the club pages then How Nines works, each with an id, a title and something to read', () => {
@@ -79,6 +81,8 @@ describe('How Nines works stays true to the live sim', () => {
     expect(NINES_FACTS.fieldGoalLastS).toBe(GOALS.fieldGoalLastS);
     expect(NINES_FACTS.fieldGoalRangeM).toBe(GOALS.fieldGoalRangeM);
     expect(NINES_FACTS.halfTimeLegsBack).toBe(NINES.halfTimeLegsBack);
+    expect(NINES_FACTS.postGapM).toBe(2 * GOALS.halfPosts);
+    expect(NINES_FACTS.inGoalM).toBe(IN_GOAL);
   });
 
   it('puts the numbers in the text', () => {
@@ -149,5 +153,26 @@ describe('the Squad page\'s Staff section stays true to the hires (N14.5)', () =
     for (const role of STAFF_ROLES) {
       expect(text).toContain(`${STAFF[role].title} ($${STAFF[role].wage.toLocaleString('en-US')} a week on Normal)`);
     }
+  });
+});
+
+// Nines (#77): the page shows the bonus zone, drawn to the rule's measurements.
+describe('the bonus zone picture', () => {
+  it('sits on the Nines page under its own heading', () => {
+    const sec = NINES_PAGE.sections.find((x) => x.figure === 'bonus-zone');
+    expect(sec?.heading).toBe('The bonus zone');
+    expect(sec?.text).toContain(`${NINES_FACTS.postGapM} m wide and ${NINES_FACTS.inGoalM} m deep`);
+  });
+
+  it('draws the zone as wide as the posts are apart and as deep as the in-goal, at one scale', () => {
+    const g = zonePictureGeometry();
+    expect(g.zone.y).toBe(g.deadBallY);
+    expect(g.zone.y + g.zone.h).toBe(g.tryLineY);
+    expect(g.zone.w / g.zone.h).toBeCloseTo(NINES_FACTS.postGapM / NINES_FACTS.inGoalM);
+    const svg = bonusZoneSvg();
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(svg).toContain(`width="${g.zone.w}" height="${g.zone.h}"`);
+    expect(svg).toContain('stroke-dasharray');
+    expect(svg).toContain(`>${NINES_FACTS.bonusTryPoints}</text>`);
   });
 });

@@ -19,6 +19,9 @@ export const NINES_FACTS = {
   tackles: 5,
   tryPoints: 4,
   bonusTryPoints: 5,
+  /** The bonus zone (the picture): the gap between the posts, and the in-goal's depth, metres. */
+  postGapM: 5.5,
+  inGoalM: 10,
   conversionPoints: 2,
   fieldGoalPoints: 1,
   penaltyGoalPoints: 2,
@@ -49,6 +52,11 @@ export const NINES_PAGE: GuidePage = {
         `Conversions are drop kicks, ${F.conversionPoints} points, taken quickly in line with where the try was scored; a longer or wider kick is harder, a better kicker (Skill, Big Boot) straighter. Your named goal-kicker (Lineup) takes them while he is on; otherwise your best-kicking half.`,
         `A field goal is ${F.fieldGoalPoints} point: in the last ${F.fieldGoalLastS / 60} minutes, from inside ${F.fieldGoalRangeM} m, late in the set, with the scores level or his side a point behind. A penalty goal is a ${F.penaltyGoalPoints}-point drop kick.`,
       ],
+    },
+    {
+      heading: 'The bonus zone',
+      text: `The in-goal between the posts, ${F.postGapM} m wide and ${F.inGoalM} m deep, is marked on the pitch as a lighter band with a dashed edge. A try grounded in it is worth ${F.bonusTryPoints}, and the zone lights up when one is scored; a carrier over the line with nobody near him goes round toward the posts for it.`,
+      figure: 'bonus-zone',
     },
     {
       heading: 'Kick-offs and interchange',
