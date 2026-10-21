@@ -20,6 +20,7 @@ import { openRivalSquad } from './rivalSquad';
 import { rivalStyle } from '../../systems/rivalRound';
 import { DEFAULT_TACTICS, PRESET_LABEL, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_SHORT, styleLine } from '../tacticsBlurbs';
+import { shortName } from './matchReport';
 
 // ── Pure view helpers (unit-tested) ───────────────────────────────────────────
 
@@ -156,6 +157,14 @@ function openLeagueScreen(initialTab: Tab): HTMLElement {
   render(initialTab);
 
   return openModal(content, { class: 'nrl-league-modal', screen: true, closeButton: false });
+}
+
+/** Longer than this, a club's name on the ladder is its short name (QA finding 3: it wrapped at 844px). */
+export const LADDER_NAME_MAX = 16;
+
+/** "Woolloomooloo Wolves" → "Wolves" on the ladder, as the match report says it; shorter names stay whole. */
+export function ladderName(name: string): string {
+  return name.length > LADDER_NAME_MAX ? shortName(name) : name;
 }
 
 /** Open the League screen on the Fixtures tab. */
@@ -317,15 +326,15 @@ function buildLadderTab(state: GameState): HTMLElement {
     if (r.isPlayer) tr.setAttribute('data-player', 'true');
     const diffStr = r.diff > 0 ? `+${r.diff}` : String(r.diff);
     const cells = [
-      String(r.pos), r.name, String(r.played), String(r.wins), String(r.draws),
+      String(r.pos), ladderName(r.name), String(r.played), String(r.wins), String(r.draws),
       String(r.losses), String(r.pointsFor), String(r.pointsAgainst), diffStr, String(r.points),
     ];
     cells.forEach((c, i) => {
       const club = i === 1 && !r.isPlayer ? state.league.clubs.find((x) => x.id === r.clubId) : undefined;
       // A rival's name opens its squad (#74).
       const cell = club?.squad
-        ? el('td', { class: 'nrl-ladder-name' }, el('button', { class: 'nrl-ladder-club', text: c, attrs: { type: 'button' }, onClick: () => openRivalSquad(club) }))
-        : el('td', { text: c, ...(i === 1 ? { class: 'nrl-ladder-name' } : {}) });
+        ? el('td', { class: 'nrl-ladder-name' }, el('button', { class: 'nrl-ladder-club', text: c, attrs: { type: 'button', title: r.name }, onClick: () => openRivalSquad(club) }))
+        : el('td', { text: c, ...(i === 1 ? { class: 'nrl-ladder-name', attrs: { title: r.name } } : {}) });
       tr.append(cell);
     });
     // Last five, oldest first (N7, #183), and how the side plays (N11).

@@ -589,9 +589,12 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       'color:#fff', 'font-family:"Courier New",monospace',
     ].join(';');
 
+    // A short touch screen (a landscape phone): the 44px swatches (N14, #263) take
+    // room the heading and the gaps give back, so the form still fits above the fold.
+    const compact = typeof matchMedia === 'function' && matchMedia('(pointer: coarse) and (max-height: 480px)').matches;
     const title = document.createElement('h1');
     title.textContent = 'NRL SIM';
-    title.style.cssText = 'letter-spacing:4px;margin:auto 0 8px;';
+    title.style.cssText = compact ? 'letter-spacing:4px;margin:auto 0 2px;font-size:1.4rem;' : 'letter-spacing:4px;margin:auto 0 8px;';
     overlay.appendChild(title);
 
     const list = document.createElement('div');
@@ -628,7 +631,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
 
     const mkRow = (): HTMLDivElement => {
       const d = document.createElement('div');
-      d.style.cssText = 'display:flex;flex-direction:column;gap:8px;align-items:center;';
+      d.style.cssText = `display:flex;flex-direction:column;gap:${compact ? 4 : 8}px;align-items:center;`;
       return d;
     };
 
@@ -656,12 +659,14 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         row.style.cssText = 'display:flex;gap:6px;align-items:center;font-size:13px;';
         row.appendChild(mkLabel(label));
         const buttons: HTMLButtonElement[] = [];
+        // 44px on a touch screen (N14, #263): a finger's target, as everywhere else.
+        const size = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 44 : 26;
         for (const c of palette) {
           const b = document.createElement('button');
           b.type = 'button';
           b.setAttribute(attr, c);
           b.setAttribute('aria-label', `${label} ${c}`);
-          b.style.cssText = `width:26px;height:26px;background:${c};border:2px solid #555;cursor:pointer;`;
+          b.style.cssText = `width:${size}px;height:${size}px;background:${c};border:2px solid #555;cursor:pointer;`;
           b.addEventListener('click', () => { pick(c); refresh(); });
           buttons.push(b);
           row.appendChild(b);
