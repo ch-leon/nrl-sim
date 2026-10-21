@@ -55,6 +55,8 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(SAVES, { recursive: true });
 
 const report = { size: `${W}x${H}`, phone: PHONE, steps: [], errors: [], findings: [] };
+// A promise that rejects unawaited would end the run there, with no report: record it as an error.
+process.on('unhandledRejection', (err) => { report.errors.push(`unhandled rejection: ${err?.message?.split('\n')[0] ?? err}`); });
 const log = (...a) => console.log(...a);
 
 // ── Server: a production build served by `vite preview` (no hot reload mid-run) ──
@@ -887,10 +889,14 @@ async function play() {
     const file = join(OUT, 'import.json');
     writeFileSync(file, JSON.stringify({ ...s, clubName: 'Imported FC' }));
     await tap('.nrl-audio-gear');
-    const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
-    await tap('.nrl-audio-settings .nrl-btn:has-text("Import save")');
-    await (await chooser).setFiles(file);
-    await page.waitForSelector('[data-nrl-continue-1]', { timeout: 15000 });
+    // Wait and tap together: a wait started alone rejects unhandled if the tap outlasts it, and
+    // Node ends the whole run there (1280×800 under load, 21 Oct 23:10).
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser', { timeout: 15000 }),
+      tap('.nrl-audio-settings .nrl-btn:has-text("Import save")'),
+    ]);
+    await chooser.setFiles(file);
+    await page.waitForSelector('[data-nrl-continue-1]', { timeout: 30000 });
     const slot = await save();
     if (slot?.clubName !== 'Imported FC') throw new Error(`slot 1 holds "${slot?.clubName}" after the import's reload: the game being left was saved over the import`);
     rec.notes.push(`slot 1 holds "Imported FC" at S${slot.season} W${slot.week} after the reload`);
