@@ -564,8 +564,9 @@ async function play() {
   await step('half-time-plan', async (rec) => {
     if (!liveOn) return 'skipped';
     const card = page.locator('.nrl-mo-plan', { has: page.locator('.nrl-mo-plan-head', { hasText: 'Half-time' }) });
-    // A 9-minute half at ×8 is about 70 s.
-    await card.waitFor({ timeout: 120000 });
+    // A 9-minute half at ×8 is about 70 s, but about 105 s on a loaded machine: two runs beside
+    // other work ran out of 120 s with the clock at 06:56 and 08:55 of the half. 300 s leaves room.
+    await card.waitFor({ timeout: 300000 });
     // At ×4 and above the card goes on by itself after 8 s unless it is tapped, so tap at once.
     await press(card.locator('[data-tactic="expansive"]'));
     if (!(await card.locator('[data-tactic="expansive"][data-active]').count())) throw new Error('Expansive did not light on the half-time card');
