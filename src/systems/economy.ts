@@ -229,8 +229,11 @@ export function tickContracts(state: GameState): GameState {
  * While money < FORCED_SALE_FLOOR, repeatedly release the highest-`wage` squad
  * player (NO payout) to freeAgents, apply squad-wide morale −FORCED_SALE_MORALE_HIT
  * (clamped ≥1), and re-check — stopping at SQUAD_MIN even if still under floor
- * (club stays in debt but fieldable). Terminates: each sale reduces squad size
- * and the loop halts at SQUAD_MIN. The warning comes after the sales and names
+ * (club stays in debt but fieldable). Fieldable means fit: a fit player is sold
+ * only while more than SQUAD_MIN are fit, an injured one while the squad is over
+ * SQUAD_MIN, so a sale never takes the fit count under the minimum (QA finding 19).
+ * Terminates: each sale reduces squad size and the loop halts at SQUAD_MIN or when
+ * no player can go. The warning comes after the sales and names
  * them (`forcedSales`, N12.5), so a multi-week advance can stop on a sale; the
  * toasts keep their order.
  */
@@ -250,10 +253,16 @@ export function handleBankruptcy(_state: GameState): GameState {
   while (getState().money < ECON.FORCED_SALE_FLOOR) {
     const s = getState();
     if (s.squad.length <= SQUAD_MIN) break; // keep a fieldable team
+    const spareFit = s.squad.filter((p) => p.injuredWeeks <= 0).length > SQUAD_MIN;
 
-    // Highest-paid player (stable: first max in array order).
-    let victim = s.squad[0];
-    for (const p of s.squad) if (p.wage > victim.wage) victim = p;
+    // Highest-paid player who can go (stable: first max in array order).
+    let pick: Player | undefined;
+    for (const p of s.squad) {
+      if (!spareFit && p.injuredWeeks <= 0) continue;
+      if (!pick || p.wage > pick.wage) pick = p;
+    }
+    const victim = pick;
+    if (!victim) break;
 
     const remaining = s.squad.filter((p) => p.id !== victim.id);
     const morale = remaining.map((p) => ({

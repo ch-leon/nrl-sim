@@ -382,6 +382,35 @@ describe('handleBankruptcy', () => {
     expect(s.money).toBeLessThan(ECON.FORCED_SALE_FLOOR); // still in debt, but stopped
   });
 
+  /** The test's own players in the free-agent pool, in the order they were sold (a new game has its own pool). */
+  const sold = () => getState().freeAgents.map((p) => p.id).filter((id) => /^(fit|hurt)\d/.test(id));
+
+  it('keeps SQUAD_MIN fit: injured players go before a sale would leave too few fit (QA finding 19)', () => {
+    // As in a playthrough's week 27: the highest-paid fit players were sold down to a squad of
+    // SQUAD_MIN with two of them injured, 11 fit, and the finals match was forfeited.
+    const injured = [0, 1].map((i) => mkPlayer({ id: `hurt${i}`, wage: 100, injuredWeeks: 3 }));
+    const fit = Array.from({ length: SQUAD_MIN + 2 }, (_, i) => mkPlayer({ id: `fit${i}`, wage: 1000 * (i + 1) }));
+    setup({ money: -5_000_000, squad: [...injured, ...fit] });
+    handleBankruptcy(getState());
+    const s = getState();
+    expect(s.squad.length).toBe(SQUAD_MIN);
+    expect(s.squad.filter((p) => p.injuredWeeks <= 0).length).toBe(SQUAD_MIN);
+    // The two best-paid fit players first, then the injured ones (cheaper, but the only ones left to go).
+    expect(sold()).toEqual(['fit14', 'fit13', 'hurt0', 'hurt1']);
+  });
+
+  it('never sells a fit player out of a squad already short of fit players', () => {
+    const injured = [0, 1, 2].map((i) => mkPlayer({ id: `hurt${i}`, wage: 100 + i, injuredWeeks: 2 }));
+    const fit = Array.from({ length: SQUAD_MIN - 1 }, (_, i) => mkPlayer({ id: `fit${i}`, wage: 50_000 }));
+    setup({ money: -5_000_000, squad: [...injured, ...fit] });
+    handleBankruptcy(getState());
+    const s = getState();
+    // Squad SQUAD_MIN + 2: two injured go (highest-paid of them first), every fit player stays.
+    expect(sold()).toEqual(['hurt2', 'hurt1']);
+    expect(s.squad.filter((p) => p.injuredWeeks <= 0).length).toBe(SQUAD_MIN - 1);
+    expect(s.squad.length).toBe(SQUAD_MIN);
+  });
+
   it('no forced sale when between floor and 0 (warning only)', () => {
     const squad = Array.from({ length: SQUAD_MIN + 3 }, (_, i) => mkPlayer({ id: `s${i}`, wage: 1000 }));
     setup({ money: -10_000, squad });

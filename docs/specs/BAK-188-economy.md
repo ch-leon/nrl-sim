@@ -87,6 +87,10 @@ Behaviour:
     squad-wide `morale −= FORCED_SALE_MORALE_HIT` (clamped ≥1), and recompute until
     `money >= FORCED_SALE_FLOOR` or squad reaches `SQUAD_MIN` (stop selling below the
     minimum to keep a fieldable team). Forced-sold players go to `freeAgents`.
+  - Fieldable means fit (QA finding 19): a fit player can go only while more than
+    `SQUAD_MIN` are fit, an injured one while the squad is over `SQUAD_MIN`; of those
+    who can go, the highest-paid is sold. Before, a squad sold down to 13 with two
+    injured had 11 fit and forfeited its next match.
   - N12.5: the warning comes after the sales and names them
     (`bankruptcy:warning {balance, forcedSales}`); the toasts keep their order. A
     multi-week advance stops on the crossing into the red, on a forced sale and when
