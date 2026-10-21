@@ -182,7 +182,7 @@ async function step(name, fn, { settle = 300, quietToasts = false } = {}) {
 
 /**
  * Dump the game's save for the corpus: slot 1 as the game wrote it, or (before the
- * first autosave, which only happens on a week advance) the live state through the
+ * first autosave: a week advance, or the page hiding) the live state through the
  * `?e2e` hook. Same JSON either way.
  */
 async function dumpSave(point, rec) {
@@ -720,10 +720,16 @@ async function play() {
     await page.waitForSelector('.nrl-hud');
     await wait(800);
     const s = await page.evaluate(() => window.__nrlState());
-    if (s.week !== pre.week || s.money !== pre.money) throw new Error(`state changed across reload (W${pre.week}→${s.week}, $${pre.money}→$${s.money})`);
-    const staff = (x) => (x.staff ?? []).map((m) => m.role).join(',');
-    if (staff(s) !== staff(pre)) throw new Error(`staff changed across reload ("${staff(pre)}" → "${staff(s)}"): a change made between weeks was lost`);
-    rec.notes.push(`same week ${s.week}, money and staff (${staff(s) || 'none'}) after reload`);
+    // What the player can change between weeks, some of it free (the kit, a card left open).
+    const kept = (x) => ({
+      week: x.week, money: x.money, staff: (x.staff ?? []).map((m) => m.role).join(','),
+      squad: x.squad.map((p) => p.id).join(','), facilities: x.facilities.map((f) => `${f.defId}${f.level}@${f.x},${f.y}`).join(','),
+      cards: x.eventDeck?.pending?.length ?? 0, kit: JSON.stringify(x.kit ?? null),
+    });
+    const [a, b] = [kept(pre), kept(s)];
+    const lost = Object.keys(a).filter((k) => a[k] !== b[k]);
+    if (lost.length) throw new Error(`changed across reload: ${lost.map((k) => `${k} ${String(a[k]).slice(0, 40)} → ${String(b[k]).slice(0, 40)}`).join('; ')}`);
+    rec.notes.push(`same week ${s.week}, money, staff (${b.staff || 'none'}), squad, facilities, cards and kit after reload`);
     await facilitiesDrawn(rec);
   });
 
@@ -859,6 +865,27 @@ async function play() {
     await press(page.locator('.nrl-rivals-toggle input[type="checkbox"]'));
     await closeAny();
   }, { quietToasts: true });
+
+  // Settings → Import save writes the file over slot 1 and reloads to the title screen. Nothing
+  // may save the game being left over it on the way out (#295's checker: the page-hide save did).
+  await step('import-save', async (rec) => {
+    await closeAny();
+    const s = await save();
+    const file = join(OUT, 'import.json');
+    writeFileSync(file, JSON.stringify({ ...s, clubName: 'Imported FC' }));
+    await tap('.nrl-audio-gear');
+    const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+    await tap('.nrl-audio-settings .nrl-btn:has-text("Import save")');
+    await (await chooser).setFiles(file);
+    await page.waitForSelector('[data-nrl-continue-1]', { timeout: 15000 });
+    const slot = await save();
+    if (slot?.clubName !== 'Imported FC') throw new Error(`slot 1 holds "${slot?.clubName}" after the import's reload: the game being left was saved over the import`);
+    await tap('[data-nrl-continue-1]');
+    await page.waitForSelector('.nrl-hud');
+    const live = await page.evaluate(() => window.__nrlState().clubName);
+    if (live !== 'Imported FC') throw new Error(`Continue opened "${live}", not the imported club`);
+    rec.notes.push(`imported "Imported FC" at S${slot.season} W${slot.week}; the title and Continue both have it`);
+  });
 
   await browser.close();
 }

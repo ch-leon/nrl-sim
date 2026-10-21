@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { enableAutosave, load, __setStorage, type StorageLike } from '../../src/core/save';
-import { createNewGame, setState } from '../../src/core/state';
+import { enableAutosave, exportSave, getActiveSlot, importIntoSlot, load, save, __setStorage, type StorageLike } from '../../src/core/save';
+import { createNewGame, getState, setState } from '../../src/core/state';
 import { advanceWeek, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
 
 // QA finding 21: a change made between weeks (here, money) was saved only by the next
@@ -21,6 +21,7 @@ function fakePage() {
 }
 
 let store: Map<string, string>;
+let off: (() => void) | undefined;
 beforeEach(() => {
   store = new Map();
   const storage: StorageLike = {
@@ -32,6 +33,8 @@ beforeEach(() => {
   createNewGame('Autosave', 21);
 });
 afterEach(() => {
+  off?.();
+  off = undefined;
   clearTickHooks();
   __setStorage(null);
 });
@@ -39,7 +42,7 @@ afterEach(() => {
 describe('enableAutosave (QA finding 21)', () => {
   it('saves a change made between weeks when the page is hidden or unloaded', () => {
     const page = fakePage();
-    const off = enableAutosave({ doc: page.doc, win: page.win });
+    off = enableAutosave({ doc: page.doc, win: page.win });
     setState({ money: 123_456 });
     expect(load()).toBeNull(); // nothing saved yet: no week has advanced
 
@@ -54,6 +57,7 @@ describe('enableAutosave (QA finding 21)', () => {
     expect(load()?.money).toBe(654_321);
 
     off();
+    off = undefined;
     expect(page.count()).toBe(0);
     setState({ money: 1 });
     page.fire('pagehide');
@@ -62,7 +66,7 @@ describe('enableAutosave (QA finding 21)', () => {
 
   it('does not save a held week, whose state is half-ticked', () => {
     const page = fakePage();
-    const off = enableAutosave({ doc: page.doc, win: page.win });
+    off = enableAutosave({ doc: page.doc, win: page.win });
     setState({ money: 500 });
     page.fire('pagehide');
     expect(load()?.week).toBe(1);
@@ -77,6 +81,29 @@ describe('enableAutosave (QA finding 21)', () => {
     release?.(); // the week finishes: week:advanced saves it
     expect(weekHeld()).toBe(false);
     expect(load()?.week).toBe(2);
-    off();
+  });
+
+  it('does not save over a save imported into the active slot (Settings → Import save, then reload)', () => {
+    const page = fakePage();
+    save(getState());
+    off = enableAutosave({ doc: page.doc, win: page.win });
+    const file = (clubName: string): string => exportSave({ ...getState(), clubName });
+
+    // Into another slot: this game still owns its own, so the page going away saves it.
+    expect(importIntoSlot(file('Other FC'), getActiveSlot() + 1)).not.toBeNull();
+    setState({ money: 777 });
+    page.fire('pagehide');
+    expect(load()?.money).toBe(777);
+
+    // Into this game's slot: Settings reloads to the title screen, and the pagehide on the
+    // way must not write the game being left over the import (#295's checker).
+    expect(importIntoSlot(file('Imported FC'), getActiveSlot())?.clubName).toBe('Imported FC');
+    page.fire('pagehide');
+    expect(load()?.clubName).toBe('Imported FC');
+    page.doc.visibilityState = 'hidden';
+    page.fire('visibilitychange');
+    advanceWeek();
+    expect(load()?.clubName).toBe('Imported FC');
+    expect(load()?.week).toBe(1);
   });
 });

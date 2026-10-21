@@ -311,6 +311,10 @@ function parseSave(text: string): MigrateResult {
 
 let activeSlot = 1;
 
+/** Set when an import replaces the active slot; autosave writes nothing after it
+ *  until enableAutosave starts a game again (in the browser, after the reload). */
+let slotImported = false;
+
 export function getActiveSlot(): number {
   return activeSlot;
 }
@@ -554,6 +558,9 @@ export function importIntoSlot(text: string, slot: number): GameState | null {
     return null;
   }
   if (!writeSlot(slot, res.state)) return null;
+  // The import now owns the active slot: this page's game must not save over it on
+  // the way to the title screen (Settings → Import save reloads; #295's checker).
+  if (slot === activeSlot) slotImported = true;
   bus.emit('ui:notify', { text: `Save imported into slot ${slot}`, kind: 'success' });
   return res.state;
 }
@@ -573,14 +580,16 @@ interface PageEvents {
  * a change made between weeks (a hire, a build, a signing, the kit) was kept only
  * until the next week's save, so a phone that dropped the tab lost it. Never while
  * a week is held: that state is half-ticked, and the next load replays the week
- * from its start. Returns the unsubscribe closure for teardown/tests.
+ * from its start, and never after an import has replaced the active slot. Returns
+ * the unsubscribe closure for teardown/tests.
  */
 export function enableAutosave(page: PageEvents = {
   ...(typeof document !== 'undefined' ? { doc: document } : {}),
   ...(typeof window !== 'undefined' ? { win: window } : {}),
 }): () => void {
-  const offWeek = bus.on('week:advanced', () => save(getState()));
-  const persist = (): void => { if (!weekHeld()) save(getState()); };
+  slotImported = false;
+  const offWeek = bus.on('week:advanced', () => { if (!slotImported) save(getState()); });
+  const persist = (): void => { if (!weekHeld() && !slotImported) save(getState()); };
   const onVisibility = (): void => { if (page.doc?.visibilityState === 'hidden') persist(); };
   page.doc?.addEventListener('visibilitychange', onVisibility);
   page.win?.addEventListener('pagehide', persist);
