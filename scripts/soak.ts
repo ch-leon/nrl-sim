@@ -134,7 +134,7 @@ for (const r of results) {
 // Per-season averages over the seeds, by mode: the baseline for the parity work.
 const summary = summariseSeasons(results);
 if (summary.length) {
-  console.log(`\nPer season, averaged over ${seeds} seeds (record, margin a game, ladder finish, share in the top eight / premiers / sacked, rounds forfeited, finals appearances per run so far, the win rate against the three nearest-rated rivals (games in brackets), the player's best nine v the rival mean, rival range, money, managed signings). Start gap = best nine − rival mean at week 1.`);
+  console.log(`\nPer season, averaged over ${seeds} seeds of the fresh-game runs (record, margin a game, ladder finish, share in the top eight / premiers / sacked, rounds forfeited, finals appearances per run so far, the win rate against the three nearest-rated rivals (games in brackets), the player's best nine v the rival mean, rival range, money, managed signings). Start gap = best nine − rival mean at week 1.`);
   console.log(`${pad('mode', 9)} ${pad('season', 6)} ${pad('runs', 4)} ${pad('record', 14)} ${pad('margin', 6)} ${pad('pos', 4)} ${pad('top8', 4)} ${pad('prem', 4)} ${pad('sack', 4)} ${pad('forf', 4)} ${pad('fin', 4)} ${pad('near', 10)} ${pad('nine', 5)} ${pad('rmean', 5)} ${pad('gap', 5)} ${pad('range', 7)} ${pad('money', 7)} ${pad('signings', 18)} ${pad('start', 5)}`);
   for (const s of summary) {
     console.log([

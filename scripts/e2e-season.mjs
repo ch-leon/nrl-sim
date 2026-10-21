@@ -795,8 +795,8 @@ async function play() {
     await page.evaluate(() => { window.__nrlWorkerDelayMs = 30000; });
     const week = await page.evaluate(() => window.__nrlState().week);
     await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
-    // A match to skip, or a forfeit (a squad short of 13 after the rollover): then the rivals
-    // alone hold the week and there is no match screen at all.
+    // A match to skip; or, since #285's Academy call-up only past a full squad (SQUAD_CAP with too
+    // many hurt), a forfeit: then the rivals alone hold the week and there is no match screen.
     const match = await page.waitForFunction(() => (document.querySelector('.nrl-mo-controls') ? 'match'
       : [...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited \(\d+/.test(t.textContent ?? '')) ? 'forfeit' : null), null, { timeout: 15000 })
       .then((h) => h.jsonValue());
@@ -804,7 +804,7 @@ async function play() {
       await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
       await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
       await leaveMatch();
-    } else rec.notes.push('the round forfeited (squad short), so only the rivals hold the week');
+    } else rec.notes.push('the round forfeited (short of 13 fit at a full squad), so only the rivals hold the week');
     const held = () => page.evaluate((w) => window.__nrlState().week === w, week);
     if (!(await held())) throw new Error('the week finished before the taps: the slowed Worker did not hold it');
     // Each tap leaves its own message. A toast lasts 4 s and a busy page can take longer than
