@@ -19,9 +19,10 @@ import type { Kit } from '../../art/match/kit';
 import { BENCH, ROTATIONS, type Rotation } from '../../match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
+import { kickerAndCaptain } from '../../match/league/sheets';
 import {
   LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
-  resolveLineup, sameSpot, setTactics, spotOf, swapSpots, validTactics, type Spot,
+  resolveLineup, sameSpot, setCaptain, setKicker, setTactics, spotOf, statsAt, swapSpots, validTactics, type Spot,
 } from '../../systems/lineup';
 import { ensureScreenStyles } from './recruit';
 import { squadKit } from './squad';
@@ -200,6 +201,12 @@ const LINEUP_CSS = `
 .nrl-lineup-where[data-bench] { background: #3a6ea5; color: #fff; }
 .nrl-lineup-where[data-injured] { background: #b03a2e; color: #fff; }
 .nrl-lineup-where[data-free] { background: transparent; color: transparent; border-color: transparent; }
+.nrl-lineup-kc { display: flex; gap: 0.3rem; flex-shrink: 0; }
+.nrl-lineup-kc[hidden] { display: none; }
+.nrl-lineup-kc .nrl-btn { min-height: 44px; flex: 1 1 0; }
+.nrl-lineup-role { position: absolute; top: -7px; padding: 0 0.2rem; background: #1a1a2e; color: #f4d03f; border: 1px solid #f4d03f; font-size: 0.55rem; font-weight: bold; line-height: 1.25; pointer-events: none; }
+.nrl-lineup-role-k { right: -5px; }
+.nrl-lineup-role-c { right: 11px; }
 .nrl-lineup-rot { display: flex; gap: 0.2rem; align-items: center; }
 .nrl-lineup-rot-label { color: #e8e0c8; font-size: 0.7rem; }
 .nrl-lineup-tacstrip { display: flex; gap: 0.6rem; align-items: center; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin; }
@@ -258,6 +265,20 @@ export function openLineupScreen(): void {
   const field = el('div', { class: 'nrl-lineup-field' });
   const bench = el('div', { class: 'nrl-lineup-bench' });
   const pick = el('div', { class: 'nrl-lineup-pick' });
+  // Kicker and captain (N11): for the starter in the selected slot.
+  const chosen = (): string | null => (selected && selected.kind === 'starter' ? getState().lineup.starters[selected.slot] ?? null : null);
+  const kBtn = button('Kicker', () => {
+    const id = chosen();
+    if (id) setLineup(setKicker(getState().lineup, id));
+  });
+  kBtn.setAttribute('data-make-kicker', '');
+  const cBtn = button('Captain', () => {
+    const id = chosen();
+    if (id) setLineup(setCaptain(getState().lineup, id));
+  });
+  cBtn.setAttribute('data-make-captain', '');
+  const kcRow = el('div', { class: 'nrl-lineup-kc' }, kBtn, cBtn);
+  kcRow.hidden = true;
   const list = el('div', { class: 'nrl-lineup-list' });
   const rotRow = el('div', { class: 'nrl-lineup-rot' }, el('span', { class: 'nrl-lineup-rot-label', text: 'Bench:' }));
   const rotButtons = new Map<Rotation, HTMLButtonElement>();
@@ -321,6 +342,8 @@ export function openLineupScreen(): void {
     } else toast('Tap a slot or a bench seat first, then the player to put there.');
   };
 
+  // Who kicks and who captains today (N11): the coach's picks, or the defaults.
+  let roles: { kicker?: string; captain?: string } = {};
   const tile = (p: Player | null, spot: Spot, kit: Kit, slotPos: Position | null): HTMLElement => {
     const label = spot.kind === 'starter' ? POSITION_SHORT[slotPos!] : `B${spot.index + 1}`;
     const injured = p !== null && p.injuredWeeks > 0;
@@ -350,6 +373,11 @@ export function openLineupScreen(): void {
     );
     if (!p) t.setAttribute('data-empty', '');
     if (injured) t.setAttribute('data-out', '');
+    // K and C (N11): badges on the tile's top edge.
+    if (p && spot.kind === 'starter') {
+      if (roles.kicker === p.id) t.append(el('span', { class: 'nrl-lineup-role nrl-lineup-role-k', text: 'K', attrs: { 'data-kicker': '', title: 'Goal-kicker' } }));
+      if (roles.captain === p.id) t.append(el('span', { class: 'nrl-lineup-role nrl-lineup-role-c', text: 'C', attrs: { 'data-captain': '', title: 'Captain' } }));
+    }
     if (sameSpot(selected, spot)) t.setAttribute('data-selected', '');
     return t;
   };
@@ -364,6 +392,8 @@ export function openLineupScreen(): void {
     }
     const lineup = s.lineup;
     const kit = squadKit();
+    const nine = today.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : []));
+    roles = kickerAndCaptain(nine, lineup);
     const byId = new Map(s.squad.map((p) => [p.id, p] as const));
     const at = (id: string | null): Player | null => (id ? byId.get(id) ?? null : null);
 
@@ -392,6 +422,17 @@ export function openLineupScreen(): void {
 
     // The squad list, best for the picked slot first.
     const slotPos = selected && selected.kind === 'starter' ? LINEUP_SLOTS[selected.slot]! : null;
+    // The selected starter can be made the goal-kicker or the captain (N11); tapping again goes back to the default.
+    const chosenId = selected && selected.kind === 'starter' ? lineup.starters[selected.slot] ?? null : null;
+    kcRow.hidden = chosenId === null;
+    if (chosenId) {
+      kBtn.toggleAttribute('data-active', roles.kicker === chosenId);
+      cBtn.toggleAttribute('data-active', roles.captain === chosenId);
+      kBtn.classList.toggle('nrl-sort-active', lineup.kicker === chosenId);
+      cBtn.classList.toggle('nrl-sort-active', lineup.captain === chosenId);
+      kBtn.title = lineup.kicker === chosenId ? 'Your goal-kicker: tap to go back to the default' : 'Make him the goal-kicker';
+      cBtn.title = lineup.captain === chosenId ? 'Your captain: tap to go back to the default' : 'Make him captain';
+    }
     pick.textContent = selected
       ? slotPos
         ? `Pick for ${positionLabel(slotPos)} (tap a player)`
@@ -442,7 +483,8 @@ export function openLineupScreen(): void {
 
   const autoBtn = button('AUTO PICK', () => {
     selected = null;
-    setLineup(autoPick(getState().squad, getState().lineup.rotation, validTactics(getState().lineup.tactics)));
+    const cur = getState().lineup;
+    setLineup({ ...autoPick(getState().squad, cur.rotation, validTactics(cur.tactics)), kicker: cur.kicker ?? null, captain: cur.captain ?? null });
   });
   autoBtn.title = 'Today’s best nine by slot and the next four';
   autoBtn.setAttribute('data-auto-pick', '');
@@ -459,7 +501,7 @@ export function openLineupScreen(): void {
     'div',
     { class: 'nrl-lineup-body' },
     el('div', { class: 'nrl-lineup-left' }, field, bench),
-    el('div', { class: 'nrl-lineup-right' }, pick, list),
+    el('div', { class: 'nrl-lineup-right' }, pick, kcRow, list),
   );
   // The plan (N11): attack and defence presets on their own strip, the picks' blurbs under it.
   const tacStrip = el('div', { class: 'nrl-lineup-tacstrip' }, attackRow, defenceRow);

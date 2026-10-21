@@ -444,6 +444,9 @@ AGAIN!** over the tackler; the commentary says why. Sin bins later (BAK-206 B7).
 | `penalty.goalPoints` | `penalties.ts` | 2 | A penalty goal. |
 | `penalty.shotMin` / `.shotLateS` / `.shotBehind` / `.shotAhead` / `.shotHalfEndS` | `penalties.ts` | 0.6 / 300 s / 6 / 1 / 20 s | When the captain takes the shot. |
 | `penalty.tapInsideM` | `penalties.ts` | 25 m | Else: tap inside this, kick for touch beyond. |
+| `penalty.captainIq` | `penalties.ts` | 0.004 | The captain (N11, §29): the shot needs this much less likelihood per point of Footy IQ above `captainIqMid`, more below. |
+| `penalty.captainIqMid` | `penalties.ts` | 60 | The Footy IQ at which the captain moves nothing (a sheet naming no captain reads as this). |
+| `penalty.captainHotheadM` | `penalties.ts` | 8 m | A Hothead captain taps from this much further out, per level. |
 | `penalty.touchGainM` | `penalties.ts` | 25 m | A penalty kick for touch gains this (× Big Boot distance). |
 | `penalty.minTicks` / `penalty.maxTicks` | `penalties.ts` | 40 / 220 | The kick for touch is taken once the kicker is on his mark, 2–11 s. |
 
@@ -873,4 +876,29 @@ engine* is on, and the soak fast-forwards, so tactics only touch the player's ow
 (follow-up #249).
 Head to head at equal strength, §27 and #241 are the reference (Compressed strong; Expansive
 and All-out weak).
+
+## 29. The goal-kicker and the captain (N11)
+
+The coach names a goal-kicker and a captain on the Lineup screen (`Lineup.kicker`,
+`Lineup.captain`, save v15; select a starter, then **Kicker** or **Captain**, and tap again for
+the default). The team sheet carries them as roster ids (`kickerAndCaptain`, sheets.ts): his
+picks when they are in the nine, else the defaults — the half with the best Skill as he plays
+(any man when there is no half) and the starter with the best Footy IQ. Rivals take the same
+defaults.
+
+In the live sim the named kicker takes the **conversions and penalty goals** while he is on
+the field (`goalKicker`); off it (binned, swapped off) the slot-5 kicker does, as before. A
+**field goal** is his or the slot-5 kicker's, whoever has the ball when it is on. Kick-offs,
+drop-outs, kicks in play and a penalty kicked for touch stay with the slot-5 kicker. The **captain**
+makes the penalty call (§17): his Footy IQ shifts the shot threshold (`captainIq` per point
+from `captainIqMid`: IQ 80 shoots at 52% likely, IQ 40 at 68%) and each Hothead level taps
+from 8 m further out. A sheet naming neither (the balance harness, a strength-built rival)
+plays exactly as before: the slot-5 kicker and a neutral captain (tested). The standard plan
+is unchanged by construction; the game's matches change, since every squad-built sheet now
+names its defaults.
+
+Measured in tests (even 60 v 60, the fullback named kicker): over 40 seeds he takes nearly
+every conversion and penalty goal (the rest fall to slot 5 while the interchange has him off)
+and Skill 95 converts more than 10 points better than Skill 25; over 20 seeds the side kicks in
+play as much as before, the fullback no more than unnamed, and field goals still come.
 

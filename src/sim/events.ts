@@ -56,6 +56,9 @@ export interface TeamSheet {
   bench?: RosterEntry[];
   /** How hard the coach rotates the bench; the live sim defaults to Standard. */
   rotation?: import('../match/league/bench').Rotation;
+  /** The goal-kicker and the captain (N11): roster ids. The live sim falls back to the slot-5 kicker and a neutral captain when absent. */
+  kicker?: string;
+  captain?: string;
 }
 
 /** Attacking / territorial kick flavour (stored on MatchEvent.detail). */
