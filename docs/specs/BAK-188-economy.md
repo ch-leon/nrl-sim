@@ -251,3 +251,49 @@ $50,000 a season, repaid at the rollover), and an Academy call-up before a forfe
 matrix soak (20 seeds × 5 seasons) forfeits went from up to 16 a season (idle Hard season
 3) to none in any mode. Most had not been debt: expiries and retirements left fewer than
 13 fit. The numbers are in `docs/status/2026-10-living.md` (N14.3).
+
+**The small lines, again (N12.7, #288).** With N12.2–N12.6, N14.3 and N14.5 in, the
+matrix soak (20 seeds × 5 seasons, idle and managed on each difficulty) on `main` at
+3ed809f, read against the restated targets (`docs/status/2026-10-season.md`): idle
+Normal $141k → $165k → $314k → $567k → $826k, so above its season-1 balance from season
+2 (target 1, not met); managed Normal $148k → $540k at season 5 (target 2 met; the mean,
+± $108k, is over the plan's $300k–$500k and the median, $441k, inside it); idle Easy
++$216k a season (target 3, not met); no forfeits. Managed Hard at season 5 was 18% in
+the red and 9% below the fire-sale floor on 20 seeds, but 27% and 15% (5 of 33) on 60,
+so its "bust at most one run in ten" is not met on `main` either (target 4).
+
+**No amount moved.** The one move that looked right, the premiership's bonus $75,000 →
+$50,000 (it lands on the premiers, a club flush that season), brought managed Normal to
+$464k and trimmed Easy (idle −$8k a season, managed $1,305k → $1,226k), but on 60 seeds
+of Hard it took managed Hard at season 5 from 27% to 44% in the red, from 15% to 22%
+bust and from $178k to $91k: a managed Hard club climbs out of its first season on prize
+money (26% of its seasons end in a premiership), and the prize lines are the same on
+every difficulty. The board grant and the per-week prize land on Hard's marginal clubs
+harder still (repricing the 60 Hard seeds' own seasons, halving the grant takes the
+season-4 and season-5 bust shares from 17% and 15% to 32% and 24%, where the
+premiership's cut gives 23% and 18%), and the floor is not where the bust share comes
+from: a club that reaches it is held just under it by the weekly sale (six of the eight
+managed Hard runs bust at the season-4 rollover sat between −$101k and −$126k), so a
+deeper floor would move that pile down and a shallower one would bust clubs sooner.
+Three cards' texts now say what their money does (#176 trimmed the pizza chain to $2,000
+a win and the food truck to $250 a week under texts still quoting $3,000 and $400; the
+specialist coach has cost $8,000 since the deck's first cut under a text saying $5,000),
+and the Guide reads the prize money, the grant and the floor from config.
+
+**What these lines cannot do.** An idle club spends nothing, so its balance is the sum
+of its lines (the experiment moved every idle run, 120 over its two soaks, by exactly
+$25,000 a premiership): with prize money, the board's grant and the cards' cash all at
+zero, idle Easy would still bank +$122k to +$193k a season from season 2, and idle
+Normal would end season 3 at $142k and season 4 at $306k against $70k in season 1. Idle
+Normal climbs because its reputation does (40 → 67 by season 5 as a 6th–7th side: two
+points for each objective met, finals wins, the odd premiership) and its gates and
+reputation grant follow (+$141k and +$35k a season by season 5), while its wage bill
+falls $78k as nobody renews and the squad shrinks from 18 to 13. Idle Easy is a
+top-three side on Easy's match edge (2.1–3.0th, a premiership a third of the time). What
+would reach them, for Leon: income that follows results (a mid-table finish holding
+reputation where it is) and a cost that does not shrink with the squad for idle Normal;
+difficulty in the money as well as the match for Easy (an Easy factor of about ×0.75 on
+gates and prize money would take idle Easy to +$91k to +$135k a season from season 2;
+Easy's wages and running costs back to Normal's are only about $55k); and for Hard, its
+burn (wages ×1.15, running costs ×1.2 and the soak manager signing while its weekly net
+stays above −$3,000), not the small lines.
