@@ -109,7 +109,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Contracts',
         bullets: [
-          'Deals run 52 weeks. You are warned at 8, 4 and 1 weeks; when one ends the player re-signs at his asking wage if you can pay it, or leaves as a free agent.',
+          'Deals run 52 weeks. You are warned at 8, 4 and 1 weeks; when one ends the player re-signs at his asking wage. If the club can’t pay, the board lends the money (up to $50,000 a season, repaid at the season’s end out of the board grant and prize money); past that he leaves as a free agent.',
           'Renew early for a fee of two weeks of the new wage; the ask rises when he is unhappy and when the club’s reputation is high.',
           'Sell for a transfer fee (rating² × $10, more for the young, less for the old) or release for two weeks’ wage. The squad can never drop below 13.',
         ],
@@ -119,6 +119,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         bullets: [
           'The free-agent pool holds 12 and refreshes every 4 weeks; rivals sign from the same pool, so a good one does not wait. A signing fee by rating and age applies (a Scout Office takes 10% off per level).',
           'Each pre-season the Academy brings 3 prospects aged 17–19 into the pool, 4 with an Academy built and 5 at level 3; from level 2 they arrive as Young Guns.',
+          'Short of 13 fit before a match, the Academy calls up juniors to make the side, on the junior wage to the season’s end (better ones with an Academy built).',
         ],
       },
     ],

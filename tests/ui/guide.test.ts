@@ -11,7 +11,7 @@ import { BENCH } from '../../src/match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../src/match/league/presets';
 import { TACTIC_BLURB } from '../../src/ui/tacticsBlurbs';
 import { TRAINING_FOCUS } from '../../src/config';
-import { DIFFICULTY, ECON, ON_FIELD, SET_TACKLES } from '../../src/config';
+import { BOARD, DIFFICULTY, ECON, ON_FIELD, SET_TACKLES, SQUAD_MIN } from '../../src/config';
 
 describe('GUIDE_PAGES', () => {
   it('is the club pages then How Nines works, each with an id, a title and something to read', () => {
@@ -100,5 +100,15 @@ describe('Guide links', () => {
       ['money', 'finance'], ['squad', 'squad'], ['tactics', 'lineup'], ['events', 'news'], ['ladder', 'ladder'], ['grounds', 'build'],
     ]);
     for (const p of GUIDE_PAGES) if (p.screen) expect(GUIDE_SCREENS[p.screen].label).toMatch(/^Open /);
+  });
+});
+
+describe('the Squad page stays true to the cascade (N14.3)', () => {
+  const squad = CLUB_PAGES.find((p) => p.id === 'squad')!;
+  const text = squad.sections.map((s) => `${s.text ?? ''} ${s.bullets?.join(' ') ?? ''}`).join(' ');
+
+  it('quotes the board loan\'s cap and the call-up', () => {
+    expect(text).toContain(`up to $${BOARD.LOAN_CAP.toLocaleString('en-US')} a season`);
+    expect(text).toContain(`Short of ${SQUAD_MIN} fit before a match, the Academy calls up juniors`);
   });
 });
