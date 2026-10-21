@@ -226,6 +226,29 @@ async function leaveMatch() {
   if (await page.locator('.nrl-potm-modal').count()) throw new Error('the Player of the Match card stayed up after Back to Club');
 }
 
+/**
+ * One week with Advance Week, as tapped: skip the match if one opens, or see the round forfeited
+ * (a squad short of 13), or nothing at all (a bye or a week out of the finals).
+ */
+async function weekAsTapped(rec) {
+  const at = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}`; });
+  await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+  const what = await page.waitForFunction((a) => {
+    if (document.querySelector('.nrl-mo-controls')) return 'match';
+    if ([...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited/.test(t.textContent ?? ''))) return 'forfeit';
+    const s = window.__nrlState();
+    return `${s.season}:${s.week}` !== a ? 'week' : null;
+  }, at, { timeout: 15000 }).then((h) => h.jsonValue());
+  if (what === 'match') {
+    await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
+    await leaveMatch();
+  }
+  // The week ends once the rival round is in; wait for it.
+  await page.waitForFunction((a) => { const s = window.__nrlState(); return `${s.season}:${s.week}` !== a; }, at, { timeout: 30000 }).catch(() => {});
+  rec.notes.push(what === 'forfeit' ? 'the round forfeited' : what === 'match' ? 'a match, skipped' : 'no match that week');
+}
+
 /** Advance with the split-button menu: index 0 = ×4 weeks, 1 = to finals, 2 = to season end. */
 async function advanceMenu(i) {
   await tap('.nrl-hud-menu-toggle');
@@ -685,7 +708,9 @@ async function play() {
   // Cards, injuries and contracts stop an advance; since N12.5 (#239) debt stops it only on
   // the crossing, a forced sale and the floor, and the season takes up to 12 calls. 24 is
   // twice that: a club stopping every week again (debt or otherwise) runs out of calls
-  // and fails 'season-2'. A call that makes no progress fails at once.
+  // and fails 'season-2'. A call that makes no progress fails at once, unless it stopped for
+  // a squad short of 13 (#66): the long advance will not play a forfeit, so the week is played
+  // with Advance Week, as a player with no money for signings would (QA finding 19).
   for (let i = 0; i < 24; i++) {
     const s = await save();
     if (s.season > 1) break;
@@ -693,9 +718,15 @@ async function play() {
     const r = await step(`to-${target === 1 ? 'finals' : 'season-end'}-${i + 1}`, async (rec) => {
       await answerCards(rec);
       await advanceMenu(target);
-      const now = await save();
+      let now = await save();
       const stop = await page.locator('.nrl-toast').last().textContent().catch(() => '');
       rec.notes.push(`S${now.season} W${now.week} $${now.money}${stop ? ` · "${stop.trim()}"` : ''}`);
+      if (now.season === s.season && now.week === s.week && /Only \d+ fit/.test(stop ?? '')) {
+        await toastsGone();
+        await weekAsTapped(rec);
+        now = await save();
+        rec.notes.push(`played the short week with Advance Week: S${now.season} W${now.week}`);
+      }
       if (now.season === s.season && now.week === s.week) throw new Error(`no progress from S${s.season} W${s.week}`);
     }, { quietToasts: true });
     if (!r.ok && !r.errors) break;
