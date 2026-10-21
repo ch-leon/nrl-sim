@@ -10,7 +10,8 @@ import { PRESET_TABLES, attackPlan, defencePlan } from '../../../src/match/leagu
 import { WRESTLE } from '../../../src/match/league/wrestle';
 import { applyTuning, checkTuning, listKnobs } from '../../../src/match/league/tuning';
 import { cellsOf, checkPlan, expandVariants, type Plan } from '../../../src/match/balance/plan';
-import { measureCell, sideSheet } from '../../../src/match/balance/measure';
+import { measureCell, scenarioEdge, scenarioSides, sideSheet } from '../../../src/match/balance/measure';
+import { DIFFICULTY } from '../../../src/config';
 import { bandMark, delta, reportMarkdown } from '../../../src/match/balance/report';
 
 const EVEN = { name: 'even', home: { rating: 60 }, away: { rating: 60 } };
@@ -102,6 +103,44 @@ describe('plans', () => {
     expect(s.roster![0]!.traits).toBeUndefined();
     expect(sideSheet('H', { traits: 'stars' }).roster![0]!.traits).toHaveLength(2);
     expect(sideSheet('A', { club: 'rival-wolves' }).roster!.length).toBeGreaterThan(0);
+  });
+  it('builds squad sides the way the game does (N12.2): a new pair each seed, a rival level with the other side, the same pair either way round', () => {
+    const one = scenarioSides({ squad: 'player' }, { squad: 'rival' }, 1);
+    expect(one.home.roster).toHaveLength(9);
+    expect(one.home.bench).toHaveLength(4);
+    expect(one.away.roster!.map((r) => r.position)).toEqual(one.home.roster!.map((r) => r.position)); // both picked by slot
+    expect(Math.abs(one.nine.away! - one.nine.home!)).toBeLessThan(2); // level
+    const swapped = scenarioSides({ squad: 'rival' }, { squad: 'player' }, 1);
+    expect(swapped.away.roster).toEqual(one.home.roster);
+    expect(swapped.home.roster).toEqual(one.away.roster);
+    expect(scenarioSides({ squad: 'player' }, { squad: 'rival' }, 2).home.roster).not.toEqual(one.home.roster);
+    const bare = scenarioSides({ squad: 'player', traits: 'none', bench: 0 }, { squad: 'rival', rating: 70, tactics: { defence: 'rush' } }, 1);
+    expect(bare.home.roster!.every((r) => r.traits === undefined)).toBe(true);
+    expect(bare.home.bench).toEqual([]);
+    expect(bare.away.tactics!.defence).toBe('rush'); // over the style his nine gives him (N11)
+    expect(bare.nine.away).toBeGreaterThan(66);
+    // Without his star the same new game's squad rates lower, and its level rival with it.
+    const starless = scenarioSides({ squad: 'player', noStar: true }, { squad: 'rival' }, 1);
+    const top = (s: typeof one.home): number => Math.max(...s.roster!.map((r) => r.stats!.skill + r.stats!.speed + r.stats!.footyIQ));
+    expect(starless.nine.home!).toBeLessThan(one.nine.home! - 1);
+    expect(top(starless.home)).toBeLessThan(top(one.home));
+    expect(Math.abs(starless.nine.away! - starless.nine.home!)).toBeLessThan(2);
+    expect(checkPlan(plan({ scenarios: [{ name: 's', home: { squad: 'coach' as never, club: 'rival-wolves' }, away: { rating: 60, rivalOf: 'nightmare' as never } }] })).join('\n')).toMatch(/player \/ rival[\s\S]*not both[\s\S]*rivalOf/);
+    expect(checkPlan(plan({ scenarios: [{ name: 's', home: { rivalOf: 'hard' }, away: { rivalOf: 'easy' } }] })).join('\n')).toMatch(/only one side is the rival/);
+  });
+  it('plays a rival with the difficulty’s edge (N12.2), swept by name as difficulty.<d>.rivalEdge', () => {
+    expect(listKnobs().map((k) => k.path)).toEqual(expect.arrayContaining(['difficulty.easy.rivalEdge', 'difficulty.normal.rivalEdge', 'difficulty.hard.rivalEdge']));
+    expect(listKnobs().some((k) => k.path.startsWith('difficulty.') && !k.path.endsWith('.rivalEdge'))).toBe(false); // money and wages are not match knobs
+    const was = DIFFICULTY.hard.rivalEdge;
+    const restore = applyTuning({ 'difficulty.hard.rivalEdge': 7 });
+    expect(DIFFICULTY.hard.rivalEdge).toBe(7);
+    expect(scenarioEdge({ rating: 60 }, { rating: 60, rivalOf: 'hard' })).toEqual({ side: 'away', points: 7 });
+    restore();
+    expect(DIFFICULTY.hard.rivalEdge).toBe(was);
+    const p = plan({ scenarios: [{ name: 'hard', home: { rating: 60 }, away: { rating: 60, rivalOf: 'hard' } }], variants: [{ name: 'big', tuning: { 'difficulty.hard.rivalEdge': 10 } }, { name: 'none', tuning: { 'difficulty.hard.rivalEdge': 0 } }] });
+    const [, big, none] = cellsOf(p).map((c) => measureCell(c, 2, 2));
+    expect(big!.counts).not.toEqual(none!.counts);
+    expect(DIFFICULTY.hard.rivalEdge).toBe(was);
   });
 });
 

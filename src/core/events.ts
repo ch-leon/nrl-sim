@@ -10,6 +10,7 @@ import type {
 import type { MatchResult, MatchEvent, TeamSheet, WeatherKind } from '../sim/events';
 import type { CallInput, CoachCall } from '../match/league/calls';
 import type { PlanInput } from '../match/league/live';
+import type { DifficultyEdge } from '../match/league/spread';
 
 /** The match handed to the Match scene (BAK-207, coach calls #73). */
 export interface LiveMatchData {
@@ -33,6 +34,8 @@ export interface LiveMatchData {
   aiCoach?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
+  /** The difficulty's edge to the rival, after the rating spread (N12.2); absent on Normal. */
+  difficultyEdge?: DifficultyEdge;
 }
 
 /** Event name -> payload type map (verbatim from ARCHITECTURE §5). */

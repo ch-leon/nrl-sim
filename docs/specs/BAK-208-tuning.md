@@ -527,7 +527,66 @@ The sweep (`20261019-135126-spread-2`, 40 a row): 0.3 gave 95% at a 20-point gap
 stamina 30 v 80 now goes 40% to the low-stamina side (was 10%), fliers v stayers 30% (was
 35%), and 70 v 50 lost 6 tries a match. The legs mechanic test plays its sheets as written.
 
-Tests: `tests/match/league/spread.test.ts`; kick-off tests in `live.test.ts`, `match.test.ts`.
+**Difficulty in the match (N12.2).** On Hard the player's rival plays with an edge, on Easy he
+gives one away: `rivalEdge` rating points on every stat of every one of the rival's players,
+starters and bench, added **after** the spread (`edgeSheets` in `spread.ts`, clamped to 1–100,
+so each man keeps his edge over his teammates). `matchday.ts` names the rival's end and the
+points (`rivalEdge`) and the live sim applies them (`LiveOptions.difficultyEdge`, carried by
+the match on screen, its resume and fast-forward alike). Added before the spread the edge would
+keep a fifth. Until N12.2 the difficulty multiplied the rival sheet's aggregates (×1.1 Hard,
+×0.92 Easy, `scaleSheet`), which the live sim never reads: it changed no match (run
+`20261020-114213-difficulty-scale`, three identical rows; a unit test in `matchday.test.ts`).
+The strength-built fallback (a rival short of nine fit) gets the same edge on its generated
+players. Normal has none, so its matches are exactly as they were: the standard plan's seven
+cells are identical to the run before (`20261021-075107-standard` and, after the rebase onto
+`main` at ea12527, `20261021-091408-standard` at f919d13, against `20261021-014058-standard`;
+`git diff 6718006 ea12527` touches nothing under `src/match`, `src/sim`,
+`src/systems/matchday.ts` or `src/data`, only `src/config.ts`, N12.3's overhead field and
+ticket price, which no match reads). Rival-v-rival rounds (§24) have no difficulty.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `difficulty.hard.rivalEdge` | `src/config.ts` (`DIFFICULTY`) | +0.5 | Rating points on every stat of Hard's rival, after the spread. A point moves the player's even-rated win rate about 6 points. |
+| `difficulty.easy.rivalEdge` | `src/config.ts` (`DIFFICULTY`) | −2 | The same for Easy's rival (negative: he plays weaker). |
+| `difficulty.normal.rivalEdge` | `src/config.ts` (`DIFFICULTY`) | 0 | Normal: no edge, the match as before. |
+
+**Target (Assumed, needs Leon):** against a rival level with his best nine, the player wins
+about 8 points less on Hard than on Normal and about 8 more on Easy (N12, re-baselined in
+`docs/status/2026-10-season.md`: the soak puts Normal at 58% within ±5 rating points, so about
+50% and 66% there). Read in the harness, where Normal stands at 55%: each seed a new game's
+squad on that difficulty through its opening lineup against a rival's generated squad level
+with its best nine, both ways round (`balance/plans/difficulty.json`, a scenario per
+difficulty; `difficulty-sweep.json` sweeps the edge).
+
+The sweep (`20261021-042801-difficulty-sweep`, seeds 1–150, 300 matches a row, ±2.9; the
+player's win rate and margin a game, a draw not a win):
+
+| Edge (Hard +n, Easy −n) | Hard | Easy |
+|---|---|---|
+| none (before) | 49.7%, +0.3 | 51.0%, +1.4 |
+| 0.5 | 45.3%, +0.1 | 56.3%, +3.2 |
+| 1 | 41.7%, −1.3 | 56.0%, +3.6 |
+| 1.5 | 40.7%, −3.4 | 59.3%, +4.7 |
+| 2 | 35.7%, −3.9 | 61.0%, +6.2 |
+| 3 | 31.7%, −5.4 | 66.0%, +8.3 |
+
+With no edge, Hard's and Easy's new-game squads already win about 4 points less than
+Normal's against a level rival (below), so Hard's rival needs half a point and Easy's two.
+Confirmed on fresh seeds (`20261021-081159-difficulty`, seeds 1001–1200, and
+`20261021-082512-difficulty-2001`, the same plan on 2001–2200; 800 matches a difficulty, ±1.8):
+
+| Difficulty | Player win, no edge | Player win, the edge | Against Normal | Margin a game |
+|---|---|---|---|---|
+| Easy (−2) | 51.0% | **63.6%** | **+8.4** | +1.6 → +5.4 |
+| Normal (0) | 55.2% | 55.2% | — | +2.6 |
+| Hard (+0.5) | 50.9% | **47.9%** | **−7.3** | +1.9 → +0.9 |
+
+Tests: `tests/match/league/spread.test.ts` (the spread; the edge: bench included, clamped,
+every man's edge over his teammates kept, none on Normal); `tests/systems/matchday.test.ts`
+(the aggregates never played; Hard's rival stronger after the spread, Easy's weaker, Normal's
+untouched; the fast-forwarded match plays the same edge; the fallback sheet);
+`tests/systems/difficulty.test.ts`; `tests/match/balance/balance.test.ts` (squad-built sides,
+the knob by name); kick-off tests in `live.test.ts`, `match.test.ts`.
 
 ## 20. Coach calls (#73, `docs/specs/coach-calls.md` step 1)
 

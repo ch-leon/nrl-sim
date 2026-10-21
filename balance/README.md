@@ -79,6 +79,18 @@ somewhere else.
   `none` (flat squads' default), `gen` (clubs' default), `stars`. `bench` is how many
   interchange players (0–4, default 4; a flat squad's bench has its stats) and
   `rotation` how hard the coach uses them: `off`, `standard` (default), `heavy`.
+- **Squads as the game builds them** (N12.2): `"squad": "player"` is a new game's squad
+  (one star, a first-grader and a depth man a position; `difficulty` sets its start
+  rating) through its opening lineup, and `"squad": "rival"` a rival club's generated
+  squad of strength `rating` through its coach's auto-pick, both through the game's own
+  sheet builder as `matchday.ts` builds the player's match. A new pair every seed, the
+  same pair either way round; a rival with no `rating` is level with the other side's
+  best nine. `traits`, `tactics`, `bench` and `rotation` override what the squad gets.
+  `results*.jsonl` carries each squad's best nine (`nine`) and the home side's signed
+  margin (`homeMargin`). `"rivalOf": "hard"` on a side plays it as the rival of a player
+  on that difficulty: with the difficulty's edge after the spread
+  (`difficulty.hard.rivalEdge`), as the game gives it. `balance/plans/difficulty.json`
+  and `level-rating.json` use them.
 - **Scenario extras**: `legs` (`fresh`, `late`, `spent` or 0..1), its own `minutes`
   (a stretch instead of a whole match, e.g. the last 8 minutes on tired legs) and
   `weather` (`clear`, `rain` or `wind`; clear unless given) and `calls`, coach calls each side

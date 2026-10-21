@@ -167,14 +167,16 @@ export const CONTRACTS = {
 
 // Difficulty (GitHub #48). Multipliers applied at the existing call sites:
 // starting money (createNewGame), weekly wages (economy.weeklyWages), the
-// big-hit injury chance (engine opts.injuryRate via matchday) and rival strength
-// when building the opponent's team sheet (matchday.sheetFor). startRating
-// (#140) is added to the starting squad's first-grade and depth targets, in
-// rating points. Normal is 1.0 / 0 everywhere so it plays exactly as before;
-// old saves load as Normal. Hard (#148): rivals ×1.1 and, since the economy's
-// retune (#176, docs/status/2026-10-economy.md), three-quarters of the money and
-// wages ×1.15 (half and ×1.3 went bust in the first season once gates had a roof);
-// a managed club has to earn its signings and an idle one goes under.
+// big-hit injury chance (engine opts.injuryRate via matchday) and the rival's
+// edge in the player's matches (matchday → the live sim's difficultyEdge, N12.2).
+// startRating (#140) is added to the starting squad's first-grade and depth
+// targets, in rating points. Normal is 1.0 / 0 everywhere so it plays exactly as
+// before; old saves load as Normal. Hard (#148): the rival's edge and, since the
+// economy's retune (#176, docs/status/2026-10-economy.md), three-quarters of the
+// money and wages ×1.15 (half and ×1.3 went bust in the first season once gates
+// had a roof); a managed club has to earn its signings and an idle one goes under.
+// N12.2 retired `rivalStrength` (×1.1 Hard, ×0.92 Easy on the rival sheet's
+// aggregates, which the live sim never reads: it changed nothing in a match).
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export const DIFFICULTIES: readonly Difficulty[] = ['easy', 'normal', 'hard'];
 export const DEFAULT_DIFFICULTY: Difficulty = 'normal';
@@ -183,7 +185,12 @@ export interface DifficultyMultipliers {
   startingMoney: number;
   wages: number;
   injuryRate: number;
-  rivalStrength: number;
+  /**
+   * Rating points the player's rival plays with on every stat of every player,
+   * starters and bench, after the rating spread (N12.2; tuning reference §19,
+   * `difficulty.<d>.rivalEdge` in the harness). Positive on Hard, negative on Easy.
+   */
+  rivalEdge: number;
   /** Rating points added to the starting squad's targets (new games only). */
   startRating: number;
   /** × ECON.OVERHEAD_WEEKLY, the club's running costs (economy.weeklyOverhead, N12.3). Assumed (needs Leon). */
@@ -191,9 +198,9 @@ export interface DifficultyMultipliers {
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
-  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalStrength: 0.92, startRating: 4, overhead: 0.8 },
-  normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalStrength: 1, startRating: 0, overhead: 1 },
-  hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalStrength: 1.1, startRating: -4, overhead: 1.2 },
+  easy: { startingMoney: 1.5, wages: 0.85, injuryRate: 0.7, rivalEdge: -2, startRating: 4, overhead: 0.8 },
+  normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalEdge: 0, startRating: 0, overhead: 1 },
+  hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalEdge: 0.5, startRating: -4, overhead: 1.2 },
 };
 
 /** Multipliers for a difficulty; unknown/missing values fall back to Normal. */

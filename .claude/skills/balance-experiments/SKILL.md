@@ -48,6 +48,10 @@ include a neutral one (`even 60 v 60`) so effects can be told from matchup quirk
   "defence": "slide|rush|compressed" }` (default balanced / slide).
 - **Traits**: `none` (flat default), `gen` (club default), `stars` (two level-III
   traits each: a stress test).
+- **Squads** (`"squad": "player"` or `"rival"`, N12.2) are built as the game builds the
+  player's match, a new pair every seed; a rival with no `rating` is level with the
+  other side. `"rivalOf": "easy|normal|hard"` gives a side the difficulty's edge.
+  Use them for questions about the player's club against its rivals.
 - **Bench**: `"bench": 0–4` interchange players (default 4) and `"rotation":
   "off|standard|heavy"` (default standard). Rotation is a side setting, not a knob: to
   compare policies write one scenario per policy.

@@ -3,7 +3,18 @@
 // By default each seed is a whole match (two 9:00 halves to full time); a plan
 // or scenario can ask for a single stretch of N minutes instead, whose counts
 // are scaled to an 18-minute match so they still read against the §7 targets.
+// A side is a flat squad, a league club's generated roster, or (N12.2) a squad
+// built the way the game builds it, a new one every seed.
 import type { RosterEntry, TeamSheet } from '../../sim/events';
+import { LEAGUE, ON_FIELD, difficultyMultipliers } from '../../config';
+import { createNewGame, type Player } from '../../core/state';
+import { generatePlayerAround, overallRating } from '../../data/player';
+import { makeRng } from '../../utils/rng';
+import { autoPick, resolveLineup } from '../../systems/lineup';
+import { generateRivalSquad, hashString, squadStrength } from '../../systems/rivals';
+import { rivalMatchSheet } from '../../systems/matchday';
+import { teamSheetFromSquad } from '../league/sheets';
+import { rivalEdge, type DifficultyEdge } from '../league/spread';
 import { TICK_S } from '../core/engine';
 import type { SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
@@ -27,7 +38,7 @@ export const COUNTS = [
   'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
-  'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'goldenPoint', 'goldenPointWon', 'draws',
+  'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws',
   'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'kickTries',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
@@ -52,6 +63,8 @@ export interface CellResult {
   draw: number;
   /** Average legs (0..1) per side at each 3-minute mark of the match clock. */
   legs: { minute: number; home: number; away: number }[];
+  /** Squad-built sides (N12.2): each one's best nine (mean overall, the soak's rating), averaged over the seeds. */
+  nine?: { home?: number; away?: number };
   /** Wall-clock seconds this cell took. */
   ms: number;
 }
@@ -74,6 +87,91 @@ export function sideSheet(id: string, spec: SideSpec): TeamSheet {
   const roster = POSITIONS.map((position, i) => entry(position, `${id} ${position} ${i}`, `${id}:${i}`));
   const reserves = BENCH_POSITIONS.slice(0, bench).map((position, i) => entry(position, `${id} bench ${position} ${i}`, `${id}:bench:${i}`));
   return { clubId: id, name: id, attack: r, defense: r, kicking: r, fitness: r, colors: ['#111', '#eee'], roster, bench: reserves, rotation, tactics };
+}
+
+/** Mean overall of a squad's best nine: the soak's rating for the player's club, and a rival's strength before rounding (systems/rivals.ts). */
+export function bestNine(squad: readonly Player[]): number {
+  const best = squad.map(overallRating).sort((a, b) => b - a).slice(0, ON_FIELD);
+  return best.reduce((a, b) => a + b, 0) / best.length;
+}
+
+/**
+ * A squad-built side for one squad seed (N12.2) and its best nine, built as
+ * matchday.ts builds the two sides of the player's match: a new game's squad
+ * through its opening lineup (resolveLineup and teamSheetFromSquad), or a
+ * rival's generated squad as matchday's rivalMatchSheet fields it (his coach's
+ * auto-pick and the style his nine gives him, N11). A rival with no `rating` is
+ * built at `level`. Note: a `player` squad is a whole new game,
+ * so the module's game state is that game afterwards (the soak does the same).
+ */
+export function squadSide(id: string, spec: SideSpec, seed: number, level: number = LEAGUE.MEAN): { sheet: TeamSheet; nine: number } {
+  let squad: Player[];
+  let sheet: TeamSheet;
+  if (spec.squad === 'player') {
+    const game = createNewGame(id, seed, { difficulty: spec.difficulty });
+    squad = game.squad;
+    let lineup = game.lineup;
+    if (spec.noStar) {
+      // The same squad with its star(s) swapped for a first-grader at his position, and the opening pick made again.
+      const target = LEAGUE.START_FIRST_GRADE + difficultyMultipliers(spec.difficulty).startRating;
+      const stars = new Set([...squad].sort((a, b) => overallRating(b) - overallRating(a)).slice(0, LEAGUE.START_STARS).map((p) => p.id));
+      const rng = makeRng(seed ^ 0x5eed);
+      squad = squad.map((p) => (stars.has(p.id) ? generatePlayerAround(rng, target, { position: p.position }) : p));
+      lineup = autoPick(squad);
+    }
+    sheet = teamSheetFromSquad(squad, id, id, ['#111', '#eee'], resolveLineup(lineup, squad));
+  } else {
+    squad = generateRivalSquad({ id: 'rival', strength: Math.round(spec.rating ?? level) }, seed);
+    sheet = rivalMatchSheet({ id, name: id, colors: ['#111', '#eee'], strength: squadStrength(squad), squad });
+  }
+  const traits = (r: RosterEntry, key: string): RosterEntry => {
+    if (!spec.traits || spec.traits === 'gen') return r;
+    const { traits: _drop, ...rest } = r;
+    return spec.traits === 'stars' ? { ...rest, traits: starTraits(r.position, key) } : rest;
+  };
+  sheet = {
+    ...sheet,
+    roster: (sheet.roster ?? []).map((r, i) => traits(r, `${id}:${i}`)),
+    bench: (sheet.bench ?? []).slice(0, spec.bench ?? 4).map((r, i) => traits(r, `${id}:bench:${i}`)),
+    ...(spec.rotation ? { rotation: spec.rotation } : {}),
+    ...(spec.tactics ? { tactics: { ...DEFAULT_TACTICS, ...(sheet.tactics ?? {}), ...spec.tactics } } : {}),
+  };
+  return { sheet, nine: bestNine(squad) };
+}
+
+/** The squad seed for a scenario's n-th squad of a kind on a match seed: the same squads whichever end they play, so a swapped scenario meets the same pair. */
+const squadSeed = (kind: string, n: number, seed: number): number => (hashString(`squad:${kind}:${n}`) ^ Math.imul(seed >>> 0, 2654435761)) >>> 0;
+
+/**
+ * Both sides of a scenario for one match seed. Flat and club sides are the same
+ * every seed; squad-built ones are new each seed, a levelled rival (no `rating`)
+ * built after the other side, at its best nine.
+ */
+export function scenarioSides(home: SideSpec, away: SideSpec, seed: number): { home: TeamSheet; away: TeamSheet; nine: { home?: number; away?: number } } {
+  const levelled = (s: SideSpec): boolean => s.squad === 'rival' && s.rating === undefined;
+  const build = (id: string, spec: SideSpec, n: number, level?: number): { sheet: TeamSheet; nine?: number } =>
+    spec.squad ? squadSide(id, spec, squadSeed(spec.squad, n, seed), level) : { sheet: sideSheet(id, spec) };
+  const awayN = home.squad !== undefined && home.squad === away.squad ? 1 : 0;
+  let h: { sheet: TeamSheet; nine?: number };
+  let a: { sheet: TeamSheet; nine?: number };
+  if (levelled(home) && !levelled(away)) {
+    a = build('A', away, awayN);
+    h = build('H', home, 0, a.nine);
+  } else {
+    h = build('H', home, 0);
+    a = build('A', away, awayN, h.nine);
+  }
+  return {
+    home: h.sheet,
+    away: a.sheet,
+    nine: { ...(h.nine !== undefined ? { home: h.nine } : {}), ...(a.nine !== undefined ? { away: a.nine } : {}) },
+  };
+}
+
+/** A side that is the rival of a player on a difficulty (`rivalOf`) plays with that difficulty's edge, as matchday.ts gives it (N12.2); read after the variant's knobs are on. */
+export function scenarioEdge(home: SideSpec, away: SideSpec): DifficultyEdge | undefined {
+  if (home.rivalOf) return rivalEdge('home', home.rivalOf);
+  return away.rivalOf ? rivalEdge('away', away.rivalOf) : undefined;
 }
 
 /** A try this soon after his side's kick came from it (12 s). */
@@ -294,8 +392,11 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const minutes = length.halves * length.halfMinutes;
     const scale = MATCH_MINUTES / minutes;
     const legsAt = cell.scenario.legs === undefined ? 1 : typeof cell.scenario.legs === 'number' ? cell.scenario.legs : LEGS_ENERGY[cell.scenario.legs];
-    const home = sideSheet('H', cell.scenario.home);
-    const away = sideSheet('A', cell.scenario.away);
+    // Flat and club sides once; squad-built sides (N12.2) a new pair every seed.
+    const squads = cell.scenario.home.squad !== undefined || cell.scenario.away.squad !== undefined;
+    const fixed = squads ? null : scenarioSides(cell.scenario.home, cell.scenario.away, seedStart);
+    const nineSum = { home: 0, away: 0 };
+    const edge = scenarioEdge(cell.scenario.home, cell.scenario.away);
     const perSeed: Record<CountKey, number>[] = [];
     let wrestleTicks = 0;
     let wrestleCount = 0;
@@ -303,6 +404,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     let draws = 0;
     const legSum = new Map<number, { home: number; away: number }>();
     for (let s = seedStart; s < seedStart + seeds; s++) {
+      const sides = fixed ?? scenarioSides(cell.scenario.home, cell.scenario.away, s);
+      const { home, away } = sides;
+      nineSum.home += sides.nine.home ?? 0;
+      nineSum.away += sides.nine.away ?? 0;
       // Coach calls (#73): each side makes the scenario's calls whenever it is allowed to.
       const callList: CallInput[] = [];
       const rules = cell.scenario.calls;
@@ -312,7 +417,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const planRules = cell.scenario.plans ?? [];
       const planList: PlanInput[] = [];
       const planDone = planRules.map(() => false);
-      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}) });
+      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(edge ? { difficultyEdge: edge } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();
@@ -374,9 +479,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       // Completion is a share (%), not a count: not scaled to 18 minutes.
       const sets = sim.sets.home + sim.sets.away;
       c.completion = sets > 0 ? (100 * (sim.setsCompleted.home + sim.setsCompleted.away)) / sets : 0;
-      // The score: both sides' points, and the winning margin.
+      // The score: both sides' points, the winning margin, and the home side's (signed).
       c.points = sim.points.home + sim.points.away;
       c.margin = Math.abs(sim.points.home - sim.points.away);
+      c.homeMargin = sim.points.home - sim.points.away;
       c.draws = sim.points.home === sim.points.away ? 1 : 0;
       wrestleCount = 0;
       perSeed.push(c);
@@ -396,6 +502,9 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       homeWin: wins / seeds,
       draw: draws / seeds,
       legs: [...legSum.entries()].map(([minute, v]) => ({ minute, home: v.home / seeds, away: v.away / seeds })),
+      ...(squads
+        ? { nine: { ...(cell.scenario.home.squad ? { home: nineSum.home / seeds } : {}), ...(cell.scenario.away.squad ? { away: nineSum.away / seeds } : {}) } }
+        : {}),
       ms: Date.now() - t0,
     };
   } finally {

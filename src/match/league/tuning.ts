@@ -21,6 +21,26 @@ import { RATING } from './spread';
 import { CALLS } from './calls';
 import { WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
+import { DIFFICULTIES, DIFFICULTY } from '../../config';
+
+/**
+ * The difficulty's edge (N12.2) by name, `difficulty.hard.rivalEdge`: it lives
+ * in config.ts's DIFFICULTY beside the club-side numbers (money, wages), which
+ * are not match knobs, so only this field is named, read and written through.
+ */
+const DIFFICULTY_EDGE = Object.fromEntries(
+  DIFFICULTIES.map((d) => [
+    d,
+    {
+      get rivalEdge(): number {
+        return DIFFICULTY[d].rivalEdge;
+      },
+      set rivalEdge(v: number) {
+        DIFFICULTY[d].rivalEdge = v;
+      },
+    },
+  ]),
+);
 
 /** The knob groups, by the first segment of a path. */
 export const KNOBS = {
@@ -41,6 +61,7 @@ export const KNOBS = {
   calls: CALLS,
   goals: GOALS,
   bin: BIN,
+  difficulty: DIFFICULTY_EDGE,
 } as const;
 
 export type Overrides = Readonly<Record<string, number>>;

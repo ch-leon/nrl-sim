@@ -1,0 +1,17 @@
+{
+  "name": "level rating",
+  "description": "N12.2: does the player's club have an edge in the match itself at a level rating (the re-baseline's +3.8 a game within 2 points)? Each seed a new game's squad (Normal) through its opening lineup against a rival's generated squad level with its best nine, through the rival coach's auto-pick and in the style his nine gives him (N11), as matchday.ts builds them: both ways round, with the rival on Balanced / Slide (as before N11's rival styles), with the rival's AI coach, with the rival on a plan, with no traits, with no bench, two rival squads as the control, and the player's squad with its star swapped for a first-grader (the squad's shape). homeMargin and nine are in results.jsonl.",
+  "seeds": 240,
+  "scenarios": [
+    { "name": "player v rival", "home": { "squad": "player" }, "away": { "squad": "rival" } },
+    { "name": "rival v player", "home": { "squad": "rival" }, "away": { "squad": "player" } },
+    { "name": "player v rival, rival on balanced / slide", "home": { "squad": "player" }, "away": { "squad": "rival", "tactics": { "attack": "balanced", "defence": "slide" } } },
+    { "name": "player v rival, rival AI coach", "home": { "squad": "player" }, "away": { "squad": "rival" }, "aiCoach": ["away"] },
+    { "name": "player v rival, rival on kick-chase / rush", "home": { "squad": "player" }, "away": { "squad": "rival", "tactics": { "attack": "kick-chase", "defence": "rush" } } },
+    { "name": "player v rival, no traits", "home": { "squad": "player", "traits": "none" }, "away": { "squad": "rival", "traits": "none" } },
+    { "name": "player v rival, no bench", "home": { "squad": "player", "bench": 0 }, "away": { "squad": "rival", "bench": 0 } },
+    { "name": "rival v rival (control)", "home": { "squad": "rival" }, "away": { "squad": "rival" } },
+    { "name": "player without his star v rival", "home": { "squad": "player", "noStar": true }, "away": { "squad": "rival" } },
+    { "name": "rival v player without his star", "home": { "squad": "rival" }, "away": { "squad": "player", "noStar": true } }
+  ]
+}

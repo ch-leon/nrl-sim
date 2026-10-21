@@ -1,0 +1,18 @@
+{
+  "name": "difficulty",
+  "description": "N12.2: the player's win rate against an even-rated rival on each difficulty, in the match itself. Each seed a new game's squad on that difficulty through its opening lineup against a rival's generated squad level with its best nine (through the rival coach's auto-pick), the rival with the difficulty's edge after the spread (difficulty.<d>.rivalEdge), both ways round: 400 matches a difficulty, on seeds the sweep (difficulty-sweep.json, seeds 1-150) did not play. 'no edge' is the match before N12.2 (Normal is the same in both rows). The player's win rate is the home win share of 'player v rival' and 1 - home win - drawn of 'rival v player'; homeMargin and nine are in results.jsonl.",
+  "seeds": 200,
+  "seedStart": 1001,
+  "scenarios": [
+    { "name": "Easy: player v rival", "home": { "squad": "player", "difficulty": "easy" }, "away": { "squad": "rival", "rivalOf": "easy" } },
+    { "name": "Easy: rival v player", "home": { "squad": "rival", "rivalOf": "easy" }, "away": { "squad": "player", "difficulty": "easy" } },
+    { "name": "Normal: player v rival", "home": { "squad": "player", "difficulty": "normal" }, "away": { "squad": "rival", "rivalOf": "normal" } },
+    { "name": "Normal: rival v player", "home": { "squad": "rival", "rivalOf": "normal" }, "away": { "squad": "player", "difficulty": "normal" } },
+    { "name": "Hard: player v rival", "home": { "squad": "player", "difficulty": "hard" }, "away": { "squad": "rival", "rivalOf": "hard" } },
+    { "name": "Hard: rival v player", "home": { "squad": "rival", "rivalOf": "hard" }, "away": { "squad": "player", "difficulty": "hard" } }
+  ],
+  "variants": [
+    { "name": "baseline" },
+    { "name": "no edge", "tuning": { "difficulty.hard.rivalEdge": 0, "difficulty.easy.rivalEdge": 0 } }
+  ]
+}

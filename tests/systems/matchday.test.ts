@@ -1,6 +1,7 @@
 // tests/systems/matchday.test.ts — player match tick: result toast timing (the
 // result comes at full time from the match played on screen, BAK-207),
-// SQUAD_MIN forfeit (GitHub #4), big-hit injuries applied to squad (GitHub #7).
+// SQUAD_MIN forfeit (GitHub #4), big-hit injuries applied to squad (GitHub #7),
+// the difficulty's edge on the rival (N12.2).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bus } from '../../src/core/events';
 import { createNewGame, getState, setState } from '../../src/core/state';
@@ -11,13 +12,17 @@ import {
   forfeitResult,
   fitSquadCount,
 } from '../../src/systems/matchday';
-import { FORFEIT_SCORE, SQUAD_MIN } from '../../src/config';
+import { DIFFICULTY, FORFEIT_SCORE, SQUAD_MIN, type Difficulty } from '../../src/config';
 import { generatePlayer } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
 import type { Fixture, Player } from '../../src/core/state';
-import type { MatchResult, TeamSheet } from '../../src/sim/events';
+import type { MatchResult, RosterEntry, TeamSheet } from '../../src/sim/events';
+import type { LiveMatchData } from '../../src/core/events';
 import { runMatch } from '../../src/match/league/match';
-import { LINEUP_SLOTS, placeAt, swapSpots } from '../../src/systems/lineup';
+import { LINEUP_SLOTS, autoPick, placeAt, resolveLineup, swapSpots } from '../../src/systems/lineup';
+import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../../src/match/league/sheets';
+import { generateRivalSquad } from '../../src/systems/rivals';
+import { edgeSheets, spreadSheets } from '../../src/match/league/spread';
 
 function collect(): {
   toasts: string[];
@@ -331,5 +336,103 @@ describe('the coach’s lineup is the side that runs out (#69)', () => {
     expect(getState().lineup.bench).not.toContain(mine.roster![6]!.id);
     expect(c.toasts.some((t) => t.startsWith('Lineup:') && t.includes('comes in at hooker'))).toBe(true);
     c.stop();
+  });
+});
+
+describe('difficulty plays in the match: the rival’s edge after the spread (N12.2)', () => {
+  beforeEach(() => {
+    bus.clear();
+    clearTickHooks();
+    clearSeasonHooks();
+    clearHeldWeek();
+  });
+
+  interface Kickoff { home: TeamSheet; away: TeamSheet; live: LiveMatchData; rival: 'home' | 'away' }
+  /** Round 1 on a difficulty, as matchday hands it to the Match scene (`prep` runs on the new league first). */
+  function kickoff(difficulty: Difficulty, prep?: () => void): Kickoff {
+    createNewGame('Edge FC', 41, { difficulty });
+    initLeague(getState());
+    prep?.();
+    registerPlayerMatchSystem();
+    let k: Kickoff | null = null;
+    const off = bus.on('match:started', ({ fixture, home, away, live }) => {
+      k = { home, away, live, rival: fixture.homeId === PLAYER_ID ? 'away' : 'home' };
+    });
+    advanceWeek();
+    off();
+    clearHeldWeek();
+    return k!;
+  }
+  const pick = (k: Kickoff, sheets: readonly [TeamSheet, TeamSheet], who: 'rival' | 'own'): TeamSheet =>
+    sheets[(k.rival === 'home') === (who === 'rival') ? 0 : 1];
+  const men = (s: TeamSheet): RosterEntry[] => [...(s.roster ?? []), ...(s.bench ?? [])];
+
+  it('the live sim plays the roster, not the aggregates: the rival multiplier N12.2 retired (×1.1 / ×0.92 on attack, defence, kicking and fitness) changed no match', () => {
+    const game = createNewGame('Level FC', 12);
+    const mine = teamSheetFromSquad(game.squad, PLAYER_ID, 'Level FC', ['#f4d03f', '#1a1a2e'], resolveLineup(game.lineup, game.squad));
+    const squad = generateRivalSquad({ id: 'rival-x', strength: 55 }, 7);
+    const theirs = teamSheetFromSquad(squad, 'rival-x', 'X', ['#000', '#fff'], resolveLineup(autoPick(squad), squad));
+    const scaled = (mult: number): TeamSheet => {
+      const scale = (n: number): number => Math.round(Math.min(100, Math.max(1, n * mult)));
+      return { ...theirs, attack: scale(theirs.attack), defense: scale(theirs.defense), kicking: scale(theirs.kicking), fitness: scale(theirs.fitness) };
+    };
+    const length = { halves: 2 as const, halfMinutes: 3 };
+    for (const seed of [1, 2, 3]) {
+      expect(runMatch(mine, scaled(1.1), { seed, length })).toEqual(runMatch(mine, theirs, { seed, length }));
+      expect(runMatch(scaled(0.92), mine, { seed, length })).toEqual(runMatch(theirs, mine, { seed, length }));
+    }
+  });
+
+  it('the rival runs out as he is; after the spread Hard’s plays stronger, Easy’s weaker, Normal’s untouched, and the live sim reads it', () => {
+    for (const d of ['hard', 'easy'] as const) {
+      const k = kickoff(d);
+      expect(k.live.difficultyEdge).toEqual({ side: k.rival, points: DIFFICULTY[d].rivalEdge });
+      // The sheet is the rival's squad through his coach's pick, in his style (N11), nothing scaled (scaleSheet is gone).
+      const theirs = pick(k, [k.home, k.away], 'rival');
+      const club = getState().league.clubs.find((c) => c.id === theirs.clubId)!;
+      const fit = club.squad!.filter((p) => p.injuredWeeks <= 0);
+      expect(theirs).toEqual(withRivalStyle(teamSheetFromSquad(fit, club.id, club.name, club.colors, resolveLineup(autoPick(fit), fit)), club));
+      const spread = spreadSheets(k.home, k.away);
+      const played = edgeSheets(...spread, k.live.difficultyEdge);
+      const before = men(pick(k, spread, 'rival'));
+      men(pick(k, played, 'rival')).forEach((e, i) => {
+        for (const stat of ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const) {
+          expect(Math.sign(e.stats![stat] - before[i]!.stats![stat])).toBe(d === 'hard' ? 1 : -1);
+        }
+      });
+      expect(pick(k, played, 'own')).toBe(pick(k, spread, 'own')); // the player's side as it was
+      const opts = { seed: k.live.seed, weather: k.live.weather, length: { halves: 2 as const, halfMinutes: 3 } };
+      expect(runMatch(k.home, k.away, { ...opts, difficultyEdge: k.live.difficultyEdge! }).events).not.toEqual(runMatch(k.home, k.away, opts).events);
+    }
+    const normal = kickoff('normal');
+    expect(normal.live.difficultyEdge).toBeUndefined();
+    const spread = spreadSheets(normal.home, normal.away);
+    expect(edgeSheets(...spread, normal.live.difficultyEdge)).toEqual(spread);
+  });
+
+  it('a fast-forwarded match plays with the same edge as the one on screen', () => {
+    const k = kickoff('hard');
+    const watched = runMatch(k.home, k.away, { seed: k.live.seed, weather: k.live.weather, injuryRate: k.live.injuryRate!, difficultyEdge: k.live.difficultyEdge! });
+    const flat = runMatch(k.home, k.away, { seed: k.live.seed, weather: k.live.weather, injuryRate: k.live.injuryRate! });
+    expect([watched.homeScore, watched.awayScore]).not.toEqual([flat.homeScore, flat.awayScore]); // this seed's score feels the edge
+    // The same new game and week again, fast-forwarded.
+    clearTickHooks();
+    createNewGame('Edge FC', 41, { difficulty: 'hard' });
+    initLeague(getState());
+    registerPlayerMatchSystem();
+    advanceWeeks(1);
+    const f = getState().league.fixtures.find((x) => x.round === 1 && (x.homeId === PLAYER_ID || x.awayId === PLAYER_ID))!;
+    expect(f.result).toEqual({ homeScore: watched.homeScore, awayScore: watched.awayScore });
+  });
+
+  it('a rival without nine fit falls back to the strength-based sheet, unscaled, and gets the same edge on its generated players', () => {
+    const k = kickoff('hard', () => {
+      const lg = getState().league;
+      setState({ league: { ...lg, clubs: lg.clubs.map((c) => (c.squad ? { ...c, squad: c.squad.map((p) => ({ ...p, injuredWeeks: 5 })) } : c)) } });
+    });
+    const theirs = pick(k, [k.home, k.away], 'rival');
+    expect(theirs.roster!.every((r) => r.id === undefined)).toBe(true);
+    expect(theirs).toEqual(teamSheetFromRival(getState().league.clubs.find((c) => c.id === theirs.clubId)!));
+    expect(k.live.difficultyEdge).toEqual({ side: k.rival, points: DIFFICULTY.hard.rivalEdge });
   });
 });
