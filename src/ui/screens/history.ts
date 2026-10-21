@@ -166,7 +166,7 @@ export function fmtBooksHeading(entry: SeasonHistoryEntry): string {
 /**
  * A past season's books (N14, #262): every line of its P&L, the net and the
  * balance it closed on, under the season's one-line summary. Seasons from before
- * the books were kept (save v12) say so.
+ * the books were kept (save v10) say so.
  */
 export function openSeasonBooks(entry: SeasonHistoryEntry, opts: { back?: () => void } = {}): HTMLElement {
   const books = seasonBooks(getState(), entry.season);

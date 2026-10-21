@@ -306,7 +306,7 @@ export interface SeasonBooks {
   closing: number;
 }
 
-/** One season's books and closing balance, or null when none were kept (seasons before save v12). Pure. */
+/** One season's books and closing balance, or null when none were kept (seasons before save v10). Pure. */
 export function seasonBooks(state: Pick<GameState, 'finance' | 'money'>, season: number): SeasonBooks | null {
   const books = state.finance.find((f) => f.season === season);
   if (!books) return null;

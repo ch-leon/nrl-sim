@@ -618,6 +618,12 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-books-heading { margin: 0 0 0.5rem; font-weight: bold; }
 .nrl-books-summary { margin: 0.5rem 0; }
 .nrl-books-closing td { font-weight: bold; border-top: 1px solid #c8c0a8; }
+/* Only the table scrolls, so the heading, the summary and Close stay in view at phone height. */
+.nrl-screen-backdrop .nrl-books-modal { display: flex; flex-direction: column; }
+.nrl-season-books { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-season-books > .nrl-finance-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-season-books h2 { margin: 0 0 0.2rem; }
+.nrl-books-close { align-self: flex-start; }
 .nrl-finance-past { margin-top: 0.4rem; }
 
 /* ── Season review (N7, #190) ──────────────────────────────────────────── */
