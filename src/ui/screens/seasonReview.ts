@@ -19,7 +19,7 @@ import { strengthChanges } from '../../systems/league';
 import { BOARD, FINALS_WEEKS, SEASON_ROUNDS } from '../../config';
 import { button, closeScreen, el, openModal } from '../dom';
 import { whenNoMatch } from '../updatePrompt';
-import { fmtMoney } from './finance';
+import { fmtMoney, seasonBooks } from './finance';
 import { fmtSeasonEndToast, fmtSeasonSummary, openHistoryScreen, seasonEndToastKind } from './history';
 
 // ── Pure builders ───────────────────────────────────────────────────────────
@@ -203,7 +203,11 @@ export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void 
     content.append(line('Board', `${verdict} · patience ${b.patience}/${BOARD.MAX_PATIENCE}`, b.missed === 0 ? 'nrl-review-good' : 'nrl-review-bad'));
     content.append(el('ul', { class: 'nrl-review-objectives' }, ...b.objectives.map((o) => el('li', { class: o.met ? 'nrl-review-good' : 'nrl-review-bad', text: `${tick(o.met)} ${o.text}` }))));
   }
-  if (r.money) content.append(line('Money', fmtMoneyInOut(r.money), r.money.in >= r.money.out ? '' : 'nrl-review-bad'));
+  if (r.money) {
+    // The closing balance from the books (N14, #262), where they were kept.
+    const books = seasonBooks(getState(), entry.season);
+    content.append(line('Money', `${fmtMoneyInOut(r.money)}${books ? ` · closed on ${fmtMoney(books.closing)}` : ''}`, r.money.in >= r.money.out ? '' : 'nrl-review-bad'));
+  }
   if (r.retired && r.retired.length > 0) content.append(line('Retired', r.retired.map((p) => `${p.name} (${p.age})`).join(', ')));
   if (r.juniors) content.append(line('Academy', `${r.juniors} prospect${r.juniors === 1 ? '' : 's'} in the free-agent pool`));
   if (r.movers && r.movers.length > 0) content.append(line('Rivals', fmtMovers(r.movers)));
