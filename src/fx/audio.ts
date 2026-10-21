@@ -349,6 +349,7 @@ function resolveAudioCtor(): AudioCtor | null {
 const LOOKAHEAD_MS = 25; // scheduler tick interval
 const SCHEDULE_AHEAD = 0.1; // schedule notes up to 100ms ahead (tolerates throttle)
 const CROSSFADE = 0.15; // music crossfade seconds
+const SFX_GAP = 0.05; // the same SFX again within this many seconds is dropped (one burst, one sound)
 
 interface ActiveMusic {
   track: MusicTrack;
@@ -373,6 +374,8 @@ export class AudioEngine {
   private fadingOut: ActiveMusic[] = [];
   private unsubs: (() => void)[] = [];
   private disposed = false;
+  /** When each SFX last started (audio time), for SFX_GAP. */
+  private sfxStarted = new Map<SfxName, number>();
 
   /** `ctx` injectable for tests. If omitted, one is created when available. */
   constructor(ctx?: AudioContext) {
@@ -427,8 +430,14 @@ export class AudioEngine {
     if (!this.ctx || !this.master) return;
     if (this.ctx.state === 'suspended') return;
     if (getState().settings.muted) return;
-    const preset = SFX_PRESETS[name];
     const now = this.ctx.currentTime;
+    // A skipped match lands the rest of its events in one go (N10.4): hundreds of the same few
+    // sounds at one moment, each a fresh noise buffer, cost Skip ~200 ms of main thread at ×4
+    // and play as one burst (QA finding 16). The first of a kind in the moment is enough.
+    const last = this.sfxStarted.get(name);
+    if (last !== undefined && now - last < SFX_GAP) return;
+    this.sfxStarted.set(name, now);
+    const preset = SFX_PRESETS[name];
     for (const tone of preset.tones) this.renderTone(tone, now);
     for (const noise of preset.noises) this.renderNoise(noise, now);
   }
