@@ -614,7 +614,8 @@ async function play() {
     await page.waitForSelector('.nrl-ladder-table');
     const closeInView = await page.evaluate(() => {
       const body = document.querySelector('.nrl-league-body');
-      if (body) body.scrollTop = body.scrollHeight;
+      if (!body) return false; // no body to scroll: the check can't pass by not scrolling
+      body.scrollTop = body.scrollHeight;
       const c = document.querySelector('.nrl-league-close')?.getBoundingClientRect();
       return !!c && c.top >= 0 && c.bottom <= window.innerHeight;
     });
