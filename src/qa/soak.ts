@@ -136,6 +136,11 @@ export interface SeasonSample extends GapSample {
   nearRivalWinRate: number;
   /** The games behind nearRivalWinRate (each rival is met once or twice in 24 rounds). */
   nearRivalGames: number;
+  /**
+   * Rounds the player forfeited, short of SQUAD_MIN fit at kick-off (QA finding 20):
+   * a squad run down by expiries or sales that cannot sign forfeits every round, 0-0-24.
+   */
+  forfeits: number;
   // bestNine / rivalMean / rivalRange (GapSample), madeFinals and the near-rival
   // record are taken at the end of the regular season: the squad that produced
   // the record, before the rollover.
@@ -501,6 +506,9 @@ export function advanceWeekAsTapped(): void {
 }
 
 /** Play `seasons` seasons from a new game (or an old save built from it) and check as we go. */
+/** Matchday's toast for a forfeited round (systems/matchday.ts): "… Round 9 forfeited (0–24)." */
+export const FORFEITED = / forfeited \(\d+–\d+\)\.$/;
+
 export function runSoak(opts: SoakOptions): SoakResult {
   const t0 = Date.now();
   bus.clear();
@@ -535,6 +543,9 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (open) for (const l of FINANCE_LINES) opening[l] = open[l];
   }
   bus.on('money:changed', ({ delta, reason }) => { tally[classifyReason(reason)] += delta; });
+  // A forfeit leaves only the score on the fixture; matchday says so in a danger toast (finding 20).
+  let forfeits = 0;
+  bus.on('ui:notify', ({ text, kind }) => { if (kind === 'danger' && FORFEITED.test(text)) forfeits++; });
   const start = gapSample(getState());
   // The gap at the end of the regular season (after round SEASON_ROUNDS), kept
   // until the rollover sample; the start gap stands in if the season never got there.
@@ -617,6 +628,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
           madeFinals: regular ? regular.madeFinals : (rec?.ladderPosition ?? 0) >= 1 && (rec?.ladderPosition ?? 0) <= 8,
           nearRivalWinRate: regular?.games ? Math.round((regular.wins / regular.games) * 1000) / 1000 : 0,
           nearRivalGames: regular?.games ?? 0,
+          forfeits,
           ...gap,
           signings: signed.count,
           signingFees: signed.fees,
@@ -628,6 +640,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
         minMoney = s.money;
         gap = gapSample(s);
         regular = null;
+        forfeits = 0;
         signed = { count: 0, fees: 0, overall: 0 };
       }
     }
@@ -758,6 +771,8 @@ export interface SeasonSummary {
   nearRivalWinRate: number;
   /** Those games, summed over the runs. */
   nearRivalGames: number;
+  /** Rounds forfeited, averaged over the runs (finding 20). */
+  forfeits: number;
   rivalRange: [number, number];
   money: number;
   signings: number;
@@ -809,6 +824,7 @@ export function summariseSeasons(results: readonly SoakResult[]): SeasonSummary[
         gap: r1(mean(rows.map((s) => s.bestNine - s.rivalMean))),
         nearRivalWinRate: nearGames ? r2(nearWins / nearGames) : 0,
         nearRivalGames: nearGames,
+        forfeits: r1(mean(rows.map((s) => s.forfeits))),
         rivalRange: [Math.min(...rows.map((s) => s.rivalRange[0])), Math.max(...rows.map((s) => s.rivalRange[1]))],
         money: Math.round(mean(rows.map((s) => s.money))),
         signings: r1(mean(rows.map((s) => s.signings))),

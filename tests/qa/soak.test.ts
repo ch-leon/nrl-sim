@@ -156,7 +156,7 @@ describe('soak columns (N12.1)', () => {
   const sample = (over: Partial<SeasonSample>): SeasonSample => ({
     season: 1, money: 0, minMoney: 0, squad: 20, freeAgents: 10, saveBytes: 1, rivalStrength: [40, 70], reputation: 30, sacked: false,
     wins: 12, draws: 0, losses: 12, marginPerGame: 0, ladderPosition: 9, premiership: false, madeFinals: false,
-    nearRivalWinRate: 0, nearRivalGames: 0, bestNine: 55, rivalMean: 55, rivalRange: [40, 70],
+    nearRivalWinRate: 0, nearRivalGames: 0, forfeits: 0, bestNine: 55, rivalMean: 55, rivalRange: [40, 70],
     signings: 0, signingFees: 0, signedOverall: 0, finance: emptyTally(), ...over,
   });
   const run = (seed: number, seasons: SeasonSample[]): SoakResult => ({
@@ -213,6 +213,25 @@ describe('soak columns (N12.1)', () => {
     // Season 2 is the two runs that reached it: one finals appearance, then two.
     expect(s2).toMatchObject({ season: 2, runs: 2, finals: 0.5, finalsAppearances: 1.5, premierships: 0.5, nearRivalGames: 9, nearRivalWinRate: 0.11 });
   });
+
+  it('counts the rounds forfeited short of 13 fit, per season and in the summary (finding 20)', () => {
+    // A squad of 12 that never signs (idle) forfeits every round it plays: the soak said
+    // "No problems" over whole seasons of 0-0-24 and showed nothing of it.
+    createNewGame('Short', 12);
+    initLeague(getState());
+    const s0 = getState();
+    const fromSave = { ...s0, squad: s0.squad.slice(0, 12).map((p) => ({ ...p, injuredWeeks: 0 })) };
+    const rounds = s0.league.fixtures.filter((f) => f.round <= SEASON_ROUNDS && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID)).length;
+    const r = runSoak({ seed: 12, seasons: 1, mode: 'idle', fromSave });
+    const season = r.seasons[0]!;
+    expect(rounds).toBeGreaterThan(20);
+    expect(season.forfeits).toBe(rounds);
+    expect([season.wins, season.draws, season.losses]).toEqual([0, 0, rounds]);
+    expect(summariseSeasons([r])[0]!.forfeits).toBe(rounds);
+    // A squad that can field a side forfeits nothing.
+    expect(sample({}).forfeits).toBe(0);
+    expect(summariseSeasons([run(1, [sample({ forfeits: 3 }), sample({ season: 2 })]), run(2, [sample({ forfeits: 4 })])]).map((s) => s.forfeits)).toEqual([3.5, 0]);
+  }, 60_000);
 
   it('--live-rivals: a tapped week plays the rival round on the live sim and the player\'s match headless', () => {
     // The live sim records every rival's match stats (applyRivalResults); the cheap sim records none.
