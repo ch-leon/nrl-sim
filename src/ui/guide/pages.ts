@@ -10,7 +10,7 @@
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { getState, type GameState } from '../../core/state';
-import { DIFFICULTY, ECON, LEAGUE, TRAINING_FOCUS } from '../../config';
+import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, TRAINING_FOCUS } from '../../config';
 import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
 import { REP_BASELINE } from '../../systems/league';
@@ -78,7 +78,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Advancing further',
         bullets: [
           'The ▾ beside Advance Week runs ×4 weeks, to the finals or to the season’s end.',
-          'A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the club goes into the red, a forced sale, and the week the balance passes the −$100,000 floor (not every week in the red).',
+          `A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the club goes into the red, a forced sale, and the week the balance passes the −${dollars(-ECON.FORCED_SALE_FLOOR)} floor (not every week in the red).`,
         ],
       },
       {
@@ -104,8 +104,8 @@ export const CLUB_PAGES: readonly GuidePage[] = [
             'Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are $20. A new club draws about 1,200.',
             'A weekly grant that grows with reputation ($40 a point).',
             sponsorBullet(),
-            'Finals prize money at the rollover: $15,000 for every finals week played, $25,000 more for a grand final and $75,000 for the premiership.',
-            'The board pays $10,000 for every objective met; some event cards pay too.',
+            `Finals prize money at the rollover: ${dollars(PRIZE.PER_FINALS_WEEK)} for every finals week played, ${dollars(PRIZE.GRAND_FINAL)} more for a grand final and ${dollars(PRIZE.PREMIERSHIP)} for the premiership.`,
+            `The board pays ${dollars(BOARD.GRANT_PER_MET)} for every objective met; some event cards pay too.`,
           ];
         },
       },
@@ -120,7 +120,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         heading: 'The Finance screen',
-        text: 'This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, the board’s objectives and patience, and the ledger. Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below −$100,000 it sells your highest-paid player each week (never below 13), and the squad’s morale drops by 10 each time.',
+        text: `This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, the board’s objectives and patience, and the ledger. Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below −${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player each week (never below 13), and the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time.`,
       },
     ],
   },
@@ -261,7 +261,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Reputation and the board',
         bullets: [
           'Reputation moves with the finish: the top four gain (+4 for first, down to +1), the bottom four lose (−1 to −4), each finals win adds 1 and a lost grand final 3. It then settles 10% of the way back toward 30, so a club has to keep earning it.',
-          'The board sets objectives each season (a ladder finish, staying solvent, beating a rival, building) and keeps 5 points of patience: a missed objective costs one, a clean sweep earns one back, zero and you are sacked. Each one met pays $10,000 and 2 reputation.',
+          `The board sets objectives each season (a ladder finish, staying solvent, beating a rival, building) and keeps 5 points of patience: a missed objective costs one, a clean sweep earns one back, zero and you are sacked. Each one met pays ${dollars(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation.`,
         ],
       },
       {
