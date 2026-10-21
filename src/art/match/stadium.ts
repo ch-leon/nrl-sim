@@ -20,7 +20,7 @@
 // Pure + deterministic (noise2/valueNoise, never Math.random). Light comes from
 // the top-left: faces toward +gx (screen bottom-right) are the darker side.
 import { mix, noise2, shade } from '../pixel';
-import { FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, TEN_METRES } from '../../scenes/matchField';
+import { FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, TEN_METRES, bonusZoneGrid } from '../../scenes/matchField';
 import { Canvas3D, isoProject, isoUnproject, noiseTile, sampleTile, whiteTile, type NoiseTile, type P3 } from './iso3d';
 import { drawText, textWidth } from './font';
 import type { Kit } from './kit';
@@ -55,8 +55,13 @@ const END_FAR = X1 + FRONT_TIERS * TIER_D;
 const TRY_A = IN_GOAL_DEPTH;
 const TRY_B = FIELD_LONG - IN_GOAL_DEPTH;
 
-/** Goalpost geometry shared with posts.ts and the ground-shadow painter. */
-export const POST_GY = [FIELD_WIDE / 2 - 0.9, FIELD_WIDE / 2 + 0.9] as const;
+/**
+ * Goalpost geometry shared with posts.ts and the ground-shadow painter. The
+ * uprights stand on the bonus zone's sides (the rule file's 5.5 m gap, goals.ts),
+ * so the zone painted between them is the one the sim scores (#77).
+ */
+const ZONE_R = bonusZoneGrid(1);
+export const POST_GY = [ZONE_R.y0, ZONE_R.y1] as const;
 export const POST_GX = [TRY_A, TRY_B] as const;
 export const POST_H = 84;
 export const CROSSBAR_Z = 30;
@@ -129,6 +134,8 @@ export const PAL = {
   poleShade: 0x60656f,
   lamp: 0xfff4c4,
   shadow: 0x000000,
+  /** The bonus zone's tint over the in-goal grass (#77). */
+  zone: 0xeef6b8,
 };
 
 // ── Ground pass ─────────────────────────────────────────────────────────────
@@ -163,6 +170,39 @@ function onMarking(gx: number, gy: number): boolean {
   if (Math.abs(gx - L) < 0.18 && (Math.abs(gy - DASH_GY[0]) < THIN || Math.abs(gy - DASH_GY[1]) < THIN)) return true;
   // Centre spot.
   return Math.abs(gx - HALFWAY) < 0.09 && Math.abs(gy - FIELD_WIDE / 2) < 0.09;
+}
+
+/**
+ * The bonus zone (Nines, #77): the in-goal between the uprights at each end, from
+ * the rule file (matchField.bonusZoneGrid), snapped like the other lines. A lighter
+ * band with a thin dashed edge on its three open sides, quieter than the try line
+ * it hangs off (that line is solid and twice as thick).
+ */
+const ZONES = [bonusZoneGrid(-1), bonusZoneGrid(1)].map((z) => ({
+  x0: snap(z.x0),
+  x1: snap(z.x1),
+  y0: snap(z.y0),
+  y1: snap(z.y1),
+  /** The try line it hangs off, and the dead-ball side opposite. */
+  line: z.x0 < FIELD_LONG / 2 ? snap(z.x1) : snap(z.x0),
+  back: z.x0 < FIELD_LONG / 2 ? snap(z.x0) : snap(z.x1),
+}));
+/** Dash length and period along the zone's edge, tiles. */
+const ZONE_DASH = 0.2;
+const ZONE_DASH_PERIOD = 0.36;
+const ZONE_EDGE = 2;
+const ZONE_IN = 1;
+
+/** 0 outside a bonus zone, ZONE_IN inside, ZONE_EDGE on a dash of its edge. */
+function zoneMark(gx: number, gy: number): number {
+  for (const z of ZONES) {
+    if (gx < z.x0 - THIN || gx > z.x1 + THIN || gy < z.y0 - THIN || gy > z.y1 + THIN) continue;
+    const side = Math.abs(gy - z.y0) < THIN || Math.abs(gy - z.y1) < THIN;
+    if (side && Math.abs(gx - z.line) % ZONE_DASH_PERIOD < ZONE_DASH) return ZONE_EDGE;
+    if (Math.abs(gx - z.back) < THIN && (gy - z.y0) % ZONE_DASH_PERIOD < ZONE_DASH) return ZONE_EDGE;
+    return gx >= z.x0 && gx <= z.x1 && gy >= z.y0 && gy <= z.y1 ? ZONE_IN : 0;
+  }
+  return 0;
 }
 
 /** Long thin post shadows thrown toward +gx (light from the top-left). */
@@ -249,7 +289,13 @@ function paintGround(cv: Canvas3D): void {
       const gy = (b - a) / 2;
       let c: number;
       if (gx >= 0 && gx <= FIELD_LONG && gy >= 0 && gy <= FIELD_WIDE) {
-        c = onMarking(gx, gy) ? PAL.line : grassColor(gx, x, y, tex);
+        if (onMarking(gx, gy)) c = PAL.line;
+        else {
+          c = grassColor(gx, x, y, tex);
+          const z = zoneMark(gx, gy);
+          if (z === ZONE_EDGE) c = mix(c, PAL.line, 0.6);
+          else if (z === ZONE_IN) c = mix(c, PAL.zone, 0.24);
+        }
         if (inPostShadow(gx, gy)) c = shadowMix(c);
       } else if (gx >= -HOARD && gx <= FIELD_LONG + HOARD && gy >= -HOARD && gy <= FIELD_WIDE + HOARD) {
         c = textured(T_APRON, sampleTile(tex.clump, x + 61, y + 17), sampleTile(tex.speck, x + 13, y + 71));

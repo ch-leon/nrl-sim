@@ -1,6 +1,6 @@
 // tests/match/view/popups.test.ts — which events get shouted about (BAK-208 §6).
 import { describe, it, expect } from 'vitest';
-import { POPUP_BIG_MS, POPUP_MS, SLOWMO_FACTOR, SLOWMO_MS, TONE_COLOR, popupFor, surnameOf } from '../../../src/match/view/popups';
+import { BONUS_SUB, POPUP_BIG_MS, POPUP_MS, SLOWMO_FACTOR, SLOWMO_MS, TONE_COLOR, popupFor, surnameOf } from '../../../src/match/view/popups';
 import type { SimEvent } from '../../../src/match/core/snapshot';
 
 const ev = (kind: string, player = 'Jarrah Kavanagh'): SimEvent => ({ tick: 10, kind, text: '', side: 'home', slot: 3, player });
@@ -15,6 +15,11 @@ describe('popupFor', () => {
     expect(popupFor(ev('kick'))).toMatchObject({ word: 'KICK!', tone: 'neutral' });
     expect(popupFor(ev('try'))).toMatchObject({ word: 'TRY!', big: true });
     expect(popupFor(ev('handover'))).toMatchObject({ word: 'HANDOVER' });
+  });
+  it('points a bonus try at the zone (#77): its second line says where it came from', () => {
+    expect(popupFor({ ...ev('try'), detail: 'bonus' })).toEqual({ word: 'BONUS TRY!', sub: BONUS_SUB, tone: 'attack', big: true, ms: POPUP_BIG_MS });
+    expect(BONUS_SUB).toBe('FROM THE ZONE');
+    expect(popupFor(ev('try'))?.sub).toBe('KAVANAGH');
   });
   it('stays quiet for routine events', () => {
     for (const k of ['tackle', 'set-start', 'kickoff', 'pass', 'turnover']) expect(popupFor(ev(k))).toBeNull();

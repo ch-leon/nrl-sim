@@ -14,7 +14,12 @@ import {
   panTowards,
   PAN_MAX_PX_PER_MS,
   PAN_RATE_PER_S,
+  bonusZone,
+  bonusZoneCorners,
+  bonusZoneGrid,
 } from '../../src/scenes/matchField';
+import { FIELD_LENGTH, IN_GOAL, MID_Y } from '../../src/match/core/field';
+import { GOALS, inBonusZone, postsFor } from '../../src/match/league/goals';
 import { gridToScreen } from '../../src/world/iso';
 import { TILE_W } from '../../src/config';
 
@@ -144,5 +149,58 @@ describe('matchField.panTowards', () => {
     expect(panTowards(0, -10_000, 100, PAN_RATE_PER_S, PAN_MAX_PX_PER_MS)).toBeCloseTo(-PAN_MAX_PX_PER_MS * 100);
     // Capped motion is also frame-rate independent.
     expect(Math.abs(run(30, 500, 10_000, 0.4) - run(120, 500, 10_000, 0.4))).toBeLessThan(1);
+  });
+});
+
+// Nines (#77): the zone drawn on the pitch is the zone the sim scores five from.
+describe('matchField.bonusZone', () => {
+  it('is the in-goal between the uprights, try line to dead-ball line, at each end', () => {
+    expect(bonusZone(1)).toEqual({ x0: FIELD_LENGTH, x1: FIELD_LENGTH + IN_GOAL, y0: MID_Y - GOALS.halfPosts, y1: MID_Y + GOALS.halfPosts });
+    expect(bonusZone(-1)).toEqual({ x0: -IN_GOAL, x1: 0, y0: MID_Y - GOALS.halfPosts, y1: MID_Y + GOALS.halfPosts });
+  });
+
+  it('has exactly the bounds of the rule file: inside it is where inBonusZone says five, inside the in-goal', () => {
+    for (const dir of [1, -1] as const) {
+      const z = bonusZone(dir);
+      const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
+      let inside = 0;
+      for (let x = -14; x <= FIELD_LENGTH + 14; x += 0.25) {
+        if (x > 14 && x < FIELD_LENGTH - 14) continue;
+        for (let y = MID_Y - 6; y <= MID_Y + 6; y += 0.25) {
+          const p = { x, y };
+          const drawn = x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1;
+          const scored = inBonusZone(p, posts, dir) && (x - posts.x) * dir <= IN_GOAL;
+          expect(drawn, `${dir} at ${x}, ${y}`).toBe(scored);
+          if (drawn) inside++;
+        }
+      }
+      expect(inside).toBeGreaterThan(500);
+    }
+  });
+
+  it('maps onto the grid from the try line into the in-goal, centred across', () => {
+    const r = bonusZoneGrid(1);
+    expect(r.x0).toBeCloseTo(FIELD_LONG - IN_GOAL_DEPTH);
+    expect(r.x1).toBeCloseTo(FIELD_LONG - IN_GOAL_DEPTH + (IN_GOAL / FIELD_LENGTH) * PLAY_LONG);
+    expect((r.y0 + r.y1) / 2).toBeCloseTo(FIELD_WIDE / 2);
+    const l = bonusZoneGrid(-1);
+    expect(l.x1).toBeCloseTo(IN_GOAL_DEPTH);
+    expect(l.x0).toBeCloseTo(IN_GOAL_DEPTH - (IN_GOAL / FIELD_LENGTH) * PLAY_LONG);
+    expect([l.y0, l.y1]).toEqual([r.y0, r.y1]);
+    expect(l.x0).toBeGreaterThanOrEqual(0); // inside the painted in-goal
+  });
+
+  it('gives its corners on screen, the try-line pair first', () => {
+    const off = fieldOffsetX();
+    const toWorld = (fx: number, fy: number) => fieldToWorldPoint(fx, fy, off);
+    const c = bonusZoneCorners(1, toWorld);
+    const z = bonusZone(1);
+    expect(c).toHaveLength(4);
+    expect(c[0]).toEqual(toWorld(100, (z.y0 / 68) * 100));
+    expect(c[1]).toEqual(toWorld(100, (z.y1 / 68) * 100));
+    expect(c[2]).toEqual(toWorld(110, (z.y1 / 68) * 100));
+    const back = bonusZoneCorners(-1, toWorld);
+    expect(back[0]).toEqual(toWorld(0, (z.y0 / 68) * 100));
+    expect(back[3]).toEqual(toWorld(-10, (z.y0 / 68) * 100));
   });
 });

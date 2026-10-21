@@ -8,7 +8,7 @@ export type PopupTone = 'attack' | 'defence' | 'neutral' | 'bad';
 
 export interface Popup {
   word: string;
-  /** Second line: the player's surname. */
+  /** Second line: the player's surname (a bonus try's says where it was scored from). */
   sub: string;
   tone: PopupTone;
   /** A big moment: larger text, slow-motion beat. */
@@ -82,6 +82,9 @@ const CALL_WORDS: Readonly<Record<string, string>> = { goal: 'GOING FOR GOAL', t
 /** A bust out of a wrestle (the defenders' grip went first) reads differently from one at contact. */
 const LATE_BUST = 'BROKE FREE!';
 
+/** A bonus try's second line, in place of the scorer's name (the ticker names him). */
+export const BONUS_SUB = 'FROM THE ZONE';
+
 /** A kick's pop-up names its type (BAK-208 §4.4). */
 const KICK_WORDS: Readonly<Record<string, string>> = {
   bomb: 'BOMB!',
@@ -125,7 +128,9 @@ export function popupFor(e: SimEvent): Popup | null {
               : e.kind === 'penalty-choice'
               ? (CALL_WORDS[e.detail ?? 'tap'] ?? w.word)
               : w.word;
-  const p: Popup = { word, sub: surnameOf(e.player).toUpperCase(), tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
+  // A bonus try points at the zone it was grounded in (#77; zoneLayer.ts lights it).
+  const sub = e.kind === 'try' && e.detail === 'bonus' ? BONUS_SUB : surnameOf(e.player).toUpperCase();
+  const p: Popup = { word, sub, tone: w.tone, big, ms: big ? POPUP_BIG_MS : POPUP_MS };
   if (e.trait) p.trait = e.trait.toUpperCase();
   return p;
 }
