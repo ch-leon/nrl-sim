@@ -103,3 +103,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261020-115727-difficulty-sweep | difficulty sweep | a7d6c70 | season/difficulty-spread | [report](runs/20261020-115727-difficulty-sweep/report.md) |
 | 20261020-123009-standard | standard | aa757ce | main | [report](runs/20261020-123009-standard/report.md) |
 | 20261021-014058-standard | standard | 0315e14 | main | [report](runs/20261021-014058-standard/report.md) |
+| 20261021-040931-level-rating | level rating | 12261a9 | season/difficulty-spread | [report](runs/20261021-040931-level-rating/report.md) |
