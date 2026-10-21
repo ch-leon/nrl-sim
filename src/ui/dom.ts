@@ -928,6 +928,10 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-guide-tabs .nrl-btn[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
 .nrl-guide h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
 .nrl-guide h3 { margin: 0.5rem 0 0.15rem; font-size: 0.88rem; border-bottom: 2px solid #b8ae92; }
+/* N14 (#263): the screen a page describes, one tap away. */
+.nrl-guide-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem 0.75rem; margin: 0 0 0.3rem; }
+.nrl-guide-head h2 { margin: 0; }
+.nrl-guide-link { font-size: 0.78rem; padding: 0.3rem 0.6rem; }
 .nrl-guide p { margin: 0.2rem 0; overflow-wrap: anywhere; }
 .nrl-guide ul { margin: 0.2rem 0 0.2rem 1.1rem; padding: 0; }
 .nrl-guide li { margin: 0.15rem 0; overflow-wrap: anywhere; }

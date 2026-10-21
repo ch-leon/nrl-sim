@@ -1,7 +1,7 @@
 // tests/ui/guide.test.ts — the Guide's pages (N7, #188). The DOM screen is
 // not rendered here (the vitest env is 'node'); the pages are data.
 import { describe, it, expect } from 'vitest';
-import { GUIDE_PAGES, guidePage } from '../../src/ui/guide/guide';
+import { GUIDE_PAGES, GUIDE_SCREENS, guidePage } from '../../src/ui/guide/guide';
 import { CLUB_PAGES } from '../../src/ui/guide/pages';
 import { NINES_FACTS, NINES_PAGE } from '../../src/ui/guide/nines';
 import { NINES } from '../../src/match/league/rules';
@@ -71,5 +71,18 @@ describe('How Nines works stays true to the live sim', () => {
     expect(text).toContain(`A try is ${NINES_FACTS.tryPoints} points`);
     expect(text).toContain(`it is ${NINES_FACTS.bonusTryPoints}`);
     expect(text).toContain(`bench of ${NINES_FACTS.benchSize}`);
+  });
+});
+
+// N14 (#263): each page links to the screen it describes.
+
+describe('Guide links', () => {
+  it('Money opens Finance and Tactics opens Lineup; every link names a screen', () => {
+    expect(guidePage('money').screen).toBe('finance');
+    expect(guidePage('tactics').screen).toBe('lineup');
+    expect(GUIDE_PAGES.filter((p) => p.screen).map((p) => [p.id, p.screen])).toEqual([
+      ['money', 'finance'], ['squad', 'squad'], ['tactics', 'lineup'], ['events', 'news'], ['ladder', 'ladder'], ['grounds', 'build'],
+    ]);
+    for (const p of GUIDE_PAGES) if (p.screen) expect(GUIDE_SCREENS[p.screen].label).toMatch(/^Open /);
   });
 });

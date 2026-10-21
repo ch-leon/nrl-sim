@@ -10,7 +10,13 @@ import { buildLabel } from '../buildInfo';
 import { button, closeScreen, el, openModal } from '../dom';
 import { startTutorial } from '../tutorial';
 import { reloadForUpdate, updateReady } from '../../fx/pwa';
-import { CLUB_PAGES, type GuidePage, type GuideSection } from './pages';
+import { CLUB_PAGES, type GuidePage, type GuideScreen, type GuideSection } from './pages';
+import { openFinanceScreen } from '../screens/finance';
+import { openSquadScreen } from '../screens/squad';
+import { openLineupScreen } from '../screens/lineup';
+import { openLadderScreen } from '../screens/fixtures';
+import { openBuildScreen } from '../screens/build';
+import { openInboxScreen } from '../inbox';
 import { NINES_PAGE } from './nines';
 
 /** Every page, in tab order. */
@@ -20,6 +26,16 @@ export const GUIDE_PAGES: readonly GuidePage[] = [...CLUB_PAGES, NINES_PAGE];
 export function guidePage(id: string | undefined): GuidePage {
   return GUIDE_PAGES.find((p) => p.id === id) ?? GUIDE_PAGES[0]!;
 }
+
+/** Each linked screen: the button's label and how to open it (N14, #263). */
+export const GUIDE_SCREENS: Record<GuideScreen, { label: string; open: () => void }> = {
+  finance: { label: 'Open Finance', open: () => openFinanceScreen() },
+  squad: { label: 'Open Squad', open: () => openSquadScreen() },
+  lineup: { label: 'Open Lineup', open: () => openLineupScreen() },
+  news: { label: 'Open News', open: () => openInboxScreen() },
+  ladder: { label: 'Open Ladder', open: () => openLadderScreen() },
+  build: { label: 'Open Build', open: () => openBuildScreen() },
+};
 
 /** The page the Guide reopens on. */
 let lastPageId: string | undefined;
@@ -32,10 +48,20 @@ function renderSection(s: GuideSection): HTMLElement[] {
   return out;
 }
 
-/** The page's body: title, then its sections. */
+/** The page's body: title (and the screen it describes), then its sections. */
 export function renderGuidePage(page: GuidePage): HTMLElement {
   const body = el('div', { class: 'nrl-guide-page', attrs: { 'data-guide-page': page.id } });
-  body.append(el('h2', { text: page.title }));
+  const head = el('div', { class: 'nrl-guide-head' }, el('h2', { text: page.title }));
+  if (page.screen) {
+    const link = GUIDE_SCREENS[page.screen];
+    const b = button(`${link.label} →`, () => {
+      closeScreen();
+      link.open();
+    }, { class: 'nrl-guide-link' });
+    b.setAttribute('data-guide-link', page.screen);
+    head.append(b);
+  }
+  body.append(head);
   for (const s of page.sections) body.append(...renderSection(s));
   return body;
 }
