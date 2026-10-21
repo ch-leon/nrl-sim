@@ -86,7 +86,7 @@ export function takeBoardLoan(amount: number): boolean {
   return true;
 }
 
-/** At the rollover, after the grant and the prize: the season's loan is repaid in full. */
+/** At the rollover, after the prize and before the board's verdict: the season's loan is repaid in full. */
 export function repayBoardLoan(): number {
   const owed = getState().boardLoan.owed;
   if (owed <= 0) return 0;

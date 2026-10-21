@@ -109,7 +109,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Contracts',
         bullets: [
-          'Deals run 52 weeks. You are warned at 8, 4 and 1 weeks; when one ends the player re-signs at his asking wage. If the club can’t pay, the board lends the money (up to $50,000 a season, repaid at the season’s end out of the board grant and prize money); past that he leaves as a free agent.',
+          'Deals run 52 weeks. You are warned at 8, 4 and 1 weeks; when one ends the player re-signs at his asking wage. If the club can’t pay, the board lends the money (up to $50,000 a season, repaid at the season’s end, before the board judges whether you finished solvent); past that he leaves as a free agent.',
           'Renew early for a fee of two weeks of the new wage; the ask rises when he is unhappy and when the club’s reputation is high.',
           'Sell for a transfer fee (rating² × $10, more for the young, less for the old) or release for two weeks’ wage. The squad can never drop below 13.',
         ],

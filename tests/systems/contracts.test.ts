@@ -4,7 +4,7 @@ import { migrateState } from '../../src/core/save';
 import { applyBoardReview } from '../../src/systems/board';
 import { bus } from '../../src/core/events';
 import { registerFinanceSystem, tickContracts } from '../../src/systems/economy';
-import { BOARD_LOAN, boardLoanRoom, clubWageFactor, repayBoardLoan, renewEarly, renewsOnLoan, renewalFee, renewalWage, renewalWeeklyCost, sellPlayer, transferFee, marketWage } from '../../src/systems/contracts';
+import { BOARD_LOAN, boardLoanRoom, takeBoardLoan, clubWageFactor, repayBoardLoan, renewEarly, renewsOnLoan, renewalFee, renewalWage, renewalWeeklyCost, sellPlayer, transferFee, marketWage } from '../../src/systems/contracts';
 import { marketWage as playerMarketWage, wageForOverall } from '../../src/data/player';
 import { BOARD, CONTRACTS } from '../../src/config';
 import { marketWage as rivalMarketWage } from '../../src/systems/rivals';
@@ -190,6 +190,27 @@ describe('the board loan at the rollover and in old saves (N14.3)', () => {
     // The repayment closes the season just played, with the grant, on the board's line.
     const closed = getState().finance.find((f) => f.season === 1)!;
     expect(closed.boardGrant).toBe(getState().money - -30_000 - closed.prize);
+  });
+
+  it('the board judges solvency after the loan is repaid', () => {
+    setup([mk('a')], 30_000);
+    loadState({
+      ...getState(), season: 2, week: 1, finance: [emptyFinance(1), emptyFinance(2)], boardLoan: { owed: 40_000 },
+      objectives: [{ id: 's1-solvent', kind: 'solvent', text: 'Finish solvent', target: 0, status: 'pending' }],
+    });
+    const review = applyBoardReview({ ladderPosition: 1, positions: { player: 1 }, finalsPlayed: 0, playedGrandFinal: false, premiership: false });
+    // $30k in hand, $40k of it borrowed: −$10k after the repayment, so not solvent.
+    expect(review.missed).toBe(1);
+  });
+
+  it('a loan taken in week 1 is that season\'s, not the one before', () => {
+    setup([mk('a')], -10_000);
+    loadState({ ...getState(), season: 2, week: 1, finance: [emptyFinance(1), emptyFinance(2)] });
+    const off = registerFinanceSystem();
+    expect(takeBoardLoan(5_000)).toBe(true);
+    off();
+    expect(getState().finance.find((f) => f.season === 2)!.boardGrant).toBe(5_000);
+    expect(getState().finance.find((f) => f.season === 1)!.boardGrant).toBe(0);
   });
 
   it('a v17 save owes the board nothing', () => {

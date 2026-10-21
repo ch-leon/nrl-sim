@@ -102,7 +102,8 @@ Behaviour:
   - N14.3: a renewal the club can't afford goes on a **board loan** (`boardLoan.owed`,
     at most `BOARD.LOAN_CAP` $50k): at contract end the four weeks' wage, or an early
     renewal's fee, comes in on the board's line (`board loan`). It is repaid in full at
-    the rollover, after the board grant and the prize, on the same line (`board loan
+    the rollover, after the prize and before the board judges the season (so a club is
+    not "solvent" on borrowed money), on the same line (`board loan
     repaid`). The Contracts screen says "on a board loan"; the Finance P&L notes it
     under the board's row.
   - N14.3: before a round the club would forfeit (fewer than `SQUAD_MIN` fit), the
