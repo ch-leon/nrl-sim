@@ -190,7 +190,8 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     age: p.age,
     overall: overallRating(p),
     where: ctx.kind === 'squad' ? 'Your squad' : ctx.kind === 'freeAgent' ? (p.junior ? 'Academy prospect' : 'Free agent') : ctx.club.name,
-    stats: STAT_LABELS.map(([key, label]) => ({ label, value: p.stats[key], ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}) })),
+    // Stats train in fractions; the page shows whole numbers.
+    stats: STAT_LABELS.map(([key, label]) => ({ label, value: Math.round(p.stats[key]), ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}) })),
     trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
       .filter((t) => t.id in TRAITS)

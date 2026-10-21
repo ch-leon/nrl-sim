@@ -55,6 +55,12 @@ describe('playerPageModel', () => {
     expect(m.actions.map((a) => a.id)).toEqual(['renew', 'sell', 'release']);
   });
 
+  it('shows whole-number stats when training has left fractions', () => {
+    const s = getState();
+    const p = { ...s.squad[0]!, stats: { speed: 78.6487606885, strength: 54.428, stamina: 55, skill: 60.5, footyIQ: 41.49 } };
+    expect(playerPageModel(p, { kind: 'squad' }, s).stats.map((x) => x.value)).toEqual([79, 54, 55, 61, 41]);
+  });
+
   it('prices the squad actions the way the Contracts screen does and guards them', () => {
     const s = getState();
     const p = s.squad[0]!;
