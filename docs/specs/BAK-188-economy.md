@@ -229,9 +229,9 @@ bump of 42s, a bump of 60s and a tail of stars, now it is one bell around the ta
 Rivals sign from the same pool: over a first season (the same probe) they take 3.2
 players of 65+, was 6.4. In the soak (Easy and Normal, 20 seeds × 5 seasons, against
 `main` at 3b9ff6d) the rival mean at the end of the regular season is 0.1–0.5 lower
-(season 5: 56.9 → 56.4; the strongest rival about 64, was 65–68). The managed manager
-finds fewer stars to buy, so signs cheaper and banks more: managed Normal ends season 5
-at $385k (was $39k), managed Easy at $561k (was $26k).
+(season 5: 56.9 → 56.4; in seasons 4 and 5 the strongest rival is about 64, was
+65–68). The managed manager finds fewer stars to buy, so signs cheaper and banks more:
+managed Normal ends season 5 at $385k (was $39k), managed Easy at $561k (was $26k).
 
 **Easy wages (N12, #247).** `DIFFICULTY.easy.wages` ×0.85 → ×0.9: about $20k a season
 more in wages. Idle Easy's season net, averaged over five seasons, +$121k → +$115k; the
