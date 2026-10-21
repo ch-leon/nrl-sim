@@ -843,7 +843,9 @@ async function play() {
     const focus = page.locator('.nrl-squad-focus [data-focus]:not(.nrl-sort-active)').first();
     rec.notes.push(`focus → ${await focus.getAttribute('data-focus')} during the hold`);
     await press(focus);
-    await closeAny();
+    // A screen, not a modal: closeAny leaves it up, over the Advance menu the taps below need.
+    await press(page.locator('.nrl-screen-region .nrl-btn').filter({ hasText: /^close$/i }).first());
+    await page.waitForSelector('.nrl-squad-focus', { state: 'detached', timeout: 5000 });
     if (!(await held())) throw new Error('the hold ended before the focus change: the slowed Worker was not slow enough');
     const slot = await save();
     if (JSON.stringify(slot) !== slotBefore) {
