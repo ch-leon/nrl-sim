@@ -11,7 +11,7 @@ import { BENCH } from '../../src/match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../src/match/league/presets';
 import { TACTIC_BLURB } from '../../src/ui/tacticsBlurbs';
 import { TRAINING_FOCUS } from '../../src/config';
-import { STAFF, STAFF_ROLES } from '../../src/systems/staff';
+import { STAFF, STAFF_ROLES, WELFARE_RENEWAL_CUT } from '../../src/systems/staff';
 import { BOARD, DIFFICULTY, ECON, ON_FIELD, PRIZE, SET_TACKLES, SQUAD_MIN } from '../../src/config';
 import { createNewGame, setState } from '../../src/core/state';
 import { IN_GOAL } from '../../src/match/core/field';
@@ -164,6 +164,10 @@ describe('the Squad page\'s Staff section stays true to the hires (N14.5)', () =
     for (const role of STAFF_ROLES) {
       expect(text).toContain(`${STAFF[role].title} ($${STAFF[role].wage.toLocaleString('en-US')} a week on Normal)`);
     }
+  });
+
+  it('quotes the Welfare Manager\'s cut on renewal asks', () => {
+    expect(text).toContain(`takes ${Math.round(WELFARE_RENEWAL_CUT * 100)}% off renewal asks`);
   });
 });
 

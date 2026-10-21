@@ -10,7 +10,8 @@
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { getState, type GameState } from '../../core/state';
-import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, TRAINING_FOCUS } from '../../config';
+import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, TRAINING_FOCUS } from '../../config';
+import { STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
 import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
 import { REP_BASELINE } from '../../systems/league';
@@ -148,7 +149,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Contracts',
         bullets: [
-          'Deals run 52 weeks. You are warned at 8, 4 and 1 weeks; when one ends the player re-signs at his asking wage. If the club can’t pay, the board lends the money (up to $50,000 a season, repaid at the season’s end, before the board judges whether you finished solvent); past that he leaves as a free agent.',
+          `Deals run 52 weeks. You are warned at 8, 4 and 1 weeks; when one ends the player re-signs at his asking wage. If the club can’t pay, the board lends the money (up to ${dollars(BOARD.LOAN_CAP)} a season, repaid at the season’s end, before the board judges whether you finished solvent); past that he leaves as a free agent.`,
           'Renew early for a fee of two weeks of the new wage; the ask rises when he is unhappy and when the club’s reputation is high.',
           'Sell for a transfer fee (rating² × $10, more for the young, less for the old) or release for two weeks’ wage. The squad can never drop below 13.',
         ],
@@ -157,9 +158,9 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Staff',
         bullets: [
           'Three hires the facilities don’t cover, under the board’s objectives on the Finance screen. Each is paid a wage a week with the running costs and stays until you let him go.',
-          'Assistant Coach ($800 a week on Normal): will change the plan at the break when you fast-forward a match, as the rival coaches do (coming in a later update).',
-          'Analyst ($600 a week on Normal): will say on the next-match card what the rival plays and what it switches to when behind (coming in a later update).',
-          'Welfare Manager ($700 a week on Normal): halves the odds of a player’s grievance card (a meeting, a pay-rise demand, a homesick youngster) and takes a tenth off renewal asks.',
+          `${STAFF.assistantCoach.title} (${dollars(STAFF.assistantCoach.wage)} a week on Normal): will change the plan at the break when you fast-forward a match, as the rival coaches do (coming in a later update).`,
+          `${STAFF.analyst.title} (${dollars(STAFF.analyst.wage)} a week on Normal): will say on the next-match card what the rival plays and what it switches to when behind (coming in a later update).`,
+          `${STAFF.welfare.title} (${dollars(STAFF.welfare.wage)} a week on Normal): halves the odds of a player’s grievance card (a meeting, a pay-rise demand, a homesick youngster) and takes ${percent(WELFARE_RENEWAL_CUT)} off renewal asks.`,
         ],
       },
       {
@@ -168,7 +169,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
           'The free-agent pool holds 12 and refreshes every 4 weeks; rivals sign from the same pool, so a good one does not wait. A signing fee by rating and age applies (a Scout Office takes 10% off per level).',
           `The pool sits around the league: at a new club its players are about ${LEAGUE.MEAN - LEAGUE.POOL_BELOW} overall, with a star now and then. Reputation, a Scout Office and an Academy lift it.`,
           'Each pre-season the Academy brings 3 prospects aged 17–19 into the pool, 4 with an Academy built and 5 at level 3; from level 2 they arrive as Young Guns.',
-          'Short of 13 fit before a match, the Academy calls up juniors to make the side, on the junior wage to the season’s end (better ones with an Academy built).',
+          `Short of ${SQUAD_MIN} fit before a match, the Academy calls up juniors to make the side, on the junior wage to the season’s end (better ones with an Academy built).`,
         ],
       },
     ],
