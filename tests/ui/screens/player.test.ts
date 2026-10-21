@@ -2,7 +2,7 @@
 // The DOM (openPlayerPage) is not rendered here: the vitest env is 'node'.
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  fmtTally, moraleReasons, moraleWord, playerActions, playerPageModel, positionLabel, riskWord,
+  fmtTally, lineupSlotText, moraleReasons, moraleWord, playerActions, playerPageModel, positionLabel, riskWord,
 } from '../../../src/ui/screens/player';
 import { createNewGame, getState, setState, type Player } from '../../../src/core/state';
 import { initLeague } from '../../../src/systems/fixtures';
@@ -38,7 +38,7 @@ describe('playerPageModel', () => {
     const s = getState();
     const p = s.squad.find((x) => x.traits.length > 0) ?? s.squad[0]!;
     const m = playerPageModel(p, { kind: 'squad' }, s);
-    expect(m.where).toBe('Your squad');
+    expect(m.where).toMatch(/^Your squad · (Starting \S+|On the bench|Not picked)$/); // the lineup slot (N14)
     expect(m.overall).toBe(overallRating(p));
     expect(m.stats.map((x) => x.label)).toEqual(['Speed', 'Strength', 'Stamina', 'Skill', 'Footy IQ']);
     expect(m.traits).toHaveLength(p.traits.length);
@@ -53,6 +53,12 @@ describe('playerPageModel', () => {
     expect(m.season).toEqual({ games: 0, tries: 0, tackles: 0, lineBreaks: 0 });
     expect(m.career).toEqual(p.career);
     expect(m.actions.map((a) => a.id)).toEqual(['renew', 'sell', 'release']);
+  });
+
+  it('shows whole-number stats when training has left fractions', () => {
+    const s = getState();
+    const p = { ...s.squad[0]!, stats: { speed: 78.6487606885, strength: 54.428, stamina: 55, skill: 60.5, footyIQ: 41.49 } };
+    expect(playerPageModel(p, { kind: 'squad' }, s).stats.map((x) => x.value)).toEqual([79, 54, 55, 61, 41]);
   });
 
   it('prices the squad actions the way the Contracts screen does and guards them', () => {
@@ -116,5 +122,38 @@ describe('playerPageModel', () => {
     expect(m.actions).toEqual([]);
     expect(m.tenure).toBeNull();
     expect(m.season).toBeNull();
+  });
+});
+
+// N14 (#263): the player page says where he sits in the side that runs out.
+describe('lineupSlotText', () => {
+  beforeEach(() => {
+    bus.clear();
+    setState(createNewGame('Test FC', 11));
+    initLeague(getState());
+  });
+
+  it('a starter by his slot, the bench, or not picked', () => {
+    const s = getState();
+    s.squad.forEach((p) => { p.injuredWeeks = 0; });
+    s.lineup.starters = s.squad.slice(0, 9).map((p) => p.id);
+    s.lineup.bench = s.squad.slice(9, 13).map((p) => p.id);
+    expect(lineupSlotText(s, s.squad[0]!.id)).toBe('Starting fullback');
+    expect(lineupSlotText(s, s.squad[9]!.id)).toBe('On the bench');
+    const rest = s.squad.filter((p) => !lineupSlotText(s, p.id).startsWith('Starting') && lineupSlotText(s, p.id) !== 'On the bench');
+    for (const p of rest) expect(lineupSlotText(s, p.id)).toBe('Not picked');
+  });
+
+  it('an injured starter is out of the side and the man covering him is starting', () => {
+    const s = getState();
+    s.squad.forEach((p) => { p.injuredWeeks = 0; });
+    const fb = s.squad[0]!;
+    s.lineup.starters = [fb.id, ...s.squad.slice(1, 9).map((p) => p.id)];
+    s.lineup.bench = s.squad.slice(9, 13).map((p) => p.id);
+    fb.injuredWeeks = 3;
+    expect(lineupSlotText(s, fb.id)).toBe('Picked, but injured');
+    const cover = s.squad.find((p) => lineupSlotText(s, p.id) === 'Starting fullback');
+    expect(cover).toBeDefined();
+    expect(cover!.id).not.toBe(fb.id);
   });
 });

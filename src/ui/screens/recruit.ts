@@ -235,7 +235,8 @@ export function PlayerCard(p: Player, opts: PlayerCardOpts = {}): HTMLElement {
     'div',
     { class: 'nrl-statbars' },
     ...STAT_LABELS.map(([key, label]) => {
-      const val = p.stats[key];
+      // Stats train in fractions; the card shows whole numbers.
+      const val = Math.round(p.stats[key]);
       const fill = el('div', { class: 'nrl-statfill' });
       fill.style.width = `${Math.max(0, Math.min(100, val))}%`;
       return el(

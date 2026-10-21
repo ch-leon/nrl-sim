@@ -787,6 +787,11 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 /* A landscape phone has width to spare and no height: let the league use it. */
 .nrl-screen-backdrop .nrl-league-modal { width: min(96vw, 760px); max-width: none; }
 .nrl-league-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+/* N14 (#263): only the tab's body scrolls, so the tabs and Close stay in view at phone height (as the Guide, #206). */
+.nrl-screen-backdrop .nrl-league-modal { display: flex; flex-direction: column; }
+.nrl-league { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-league-tabs { flex: 0 0 auto; }
+.nrl-league-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-league-close { margin-left: auto; }
 .nrl-next-match {
   background: #fff8e1;

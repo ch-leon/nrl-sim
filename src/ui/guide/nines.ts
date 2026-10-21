@@ -46,7 +46,7 @@ export const NINES_PAGE: GuidePage = {
       bullets: [
         `A set is ${F.tackles} tackles, then the last-tackle kick. Six again (a ruck offence against the defence) starts the count over.`,
         `A try is ${F.tryPoints} points; grounded in the bonus zone, the in-goal between the posts, it is ${F.bonusTryPoints}.`,
-        `Conversions are drop kicks, ${F.conversionPoints} points, taken quickly in line with where the try was scored; a longer or wider kick is harder, a better kicker (Skill, Big Boot) straighter.`,
+        `Conversions are drop kicks, ${F.conversionPoints} points, taken quickly in line with where the try was scored; a longer or wider kick is harder, a better kicker (Skill, Big Boot) straighter. Your named goal-kicker (Lineup) takes them while he is on; otherwise your best-kicking half.`,
         `A field goal is ${F.fieldGoalPoints} point: in the last ${F.fieldGoalLastS / 60} minutes, from inside ${F.fieldGoalRangeM} m, late in the set, with the scores level or his side a point behind. A penalty goal is a ${F.penaltyGoalPoints}-point drop kick.`,
       ],
     },

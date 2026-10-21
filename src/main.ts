@@ -75,7 +75,8 @@ function initToasts(): void {
   // #45: announce toasts to screen readers without stealing focus.
   stack.setAttribute('aria-live', 'polite');
   uiRoot.appendChild(stack);
-  bus.on('ui:notify', ({ text, kind }) => {
+  bus.on('ui:notify', ({ text, kind, quiet }) => {
+    if (quiet) return; // already on screen (the season review, N14)
     const toast = document.createElement('div');
     toast.className = `nrl-toast nrl-toast-${kind}`;
     toast.textContent = text;

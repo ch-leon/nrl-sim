@@ -24,6 +24,7 @@ import { button, closeModal, el, openModal, panel } from '../dom';
 import { ensureScreenStyles } from './recruit';
 import { fmtMoney } from './finance';
 import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
+import { LINEUP_SLOTS, resolveLineup } from '../../systems/lineup';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
 
@@ -170,6 +171,20 @@ const ordinal = (n: number): string => {
   return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th'}`;
 };
 
+/**
+ * Where your player sits in the coach's nine (N14, #263): "Starting halfback",
+ * "On the bench" or "Not picked". Pure.
+ */
+export function lineupSlotText(state: Pick<GameState, 'lineup' | 'squad'>, playerId: string): string {
+  // The side as it runs out (injured men covered, the bench topped up), not the saved sheet.
+  const side = resolveLineup(state.lineup, state.squad);
+  const slot = side.starters.findIndex((p) => p?.id === playerId);
+  if (slot >= 0) return `Starting ${positionLabel(LINEUP_SLOTS[slot]!).toLowerCase()}`;
+  if (side.bench.some((p) => p.id === playerId)) return 'On the bench';
+  const picked = state.lineup.starters.includes(playerId) || state.lineup.bench.includes(playerId);
+  return picked ? 'Picked, but injured' : 'Not picked';
+}
+
 /** Everything the page shows, from the player, where he is and the game state. */
 export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState): PlayerPageModel {
   const squad = ctx.kind === 'squad';
@@ -189,8 +204,9 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     position: positionLabel(p.position),
     age: p.age,
     overall: overallRating(p),
-    where: ctx.kind === 'squad' ? 'Your squad' : ctx.kind === 'freeAgent' ? (p.junior ? 'Academy prospect' : 'Free agent') : ctx.club.name,
-    stats: STAT_LABELS.map(([key, label]) => ({ label, value: p.stats[key], ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}) })),
+    where: ctx.kind === 'squad' ? `Your squad · ${lineupSlotText(state, p.id)}` : ctx.kind === 'freeAgent' ? (p.junior ? 'Academy prospect' : 'Free agent') : ctx.club.name,
+    // Stats train in fractions; the page shows whole numbers.
+    stats: STAT_LABELS.map(([key, label]) => ({ label, value: Math.round(p.stats[key]), ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}) })),
     trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
       .filter((t) => t.id in TRAITS)

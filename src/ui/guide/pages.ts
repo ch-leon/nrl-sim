@@ -7,6 +7,10 @@
 // likely to move in step. "How Nines works" is its own file, nines.ts, so the
 // match session can update it alone. No Phaser, no DOM.
 
+import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../match/league/presets';
+import { TRAINING_FOCUS } from '../../config';
+import { TACTIC_BLURB } from '../tacticsBlurbs';
+
 export interface GuideSection {
   heading?: string;
   text?: string;
@@ -107,6 +111,55 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         bullets: [
           'The free-agent pool holds 12 and refreshes every 4 weeks; rivals sign from the same pool, so a good one does not wait. A signing fee by rating and age applies (a Scout Office takes 10% off per level).',
           'Each pre-season the Academy brings 3 prospects aged 17–19 into the pool, 4 with an Academy built and 5 at level 3; from level 2 they arrive as Young Guns.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'tactics',
+    short: 'Tactics',
+    title: 'Tactics and the coach',
+    sections: [
+      {
+        text: 'Your side plays a plan: an attack and a defence, picked on the Lineup screen (the chips under the header). It stays the plan for the match until you change it at a break.',
+      },
+      {
+        heading: 'Attack',
+        bullets: ATTACK_PRESETS.map((p) => `${PRESET_LABEL[p]}: ${TACTIC_BLURB[p]}`),
+      },
+      {
+        heading: 'Defence',
+        bullets: DEFENCE_PRESETS.map((p) => `${PRESET_LABEL[p]}: ${TACTIC_BLURB[p]}`),
+      },
+      {
+        heading: 'Changing it in a match',
+        bullets: [
+          'At half-time (and before golden point) a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue (at ×4 and faster it goes on by itself after 8 seconds unless you touch it).',
+          'After a score, the Plan chip beside the call chips opens the same rows until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
+          'Coach calls are the moment-to-moment layer on top: one call a set each way.',
+        ],
+      },
+      {
+        heading: 'Kicker and captain',
+        bullets: [
+          'On the Lineup screen select a starter and tap Kicker or Captain (tap again for the default). K and C mark them on the field.',
+          'Your goal-kicker takes the conversions and penalty goals, and a field goal when he has the ball; his Skill (and Big Boot) is what goes over. Unpicked, or off the field, your best-kicking half takes them. Kicks in play stay with the halfback.',
+          'Your captain makes the penalty call: a smart one (Footy IQ) takes the points on a slimmer chance; a Hothead taps and runs from further out.',
+          'Leave them unpicked and the best-kicking half kicks and the starter with the best Footy IQ captains.',
+        ],
+      },
+      {
+        heading: 'Training focus',
+        bullets: [
+          `On the Squad screen pick what the squad trains hardest: that stat gains ×${TRAINING_FOCUS.ON}, the other four ×${TRAINING_FOCUS.OFF}. Balanced trains every stat evenly.`,
+          'A player’s page shows what each stat will gain in a week under the focus (an old player’s Speed and Stamina can still fall).',
+        ],
+      },
+      {
+        heading: 'Reading the opposition',
+        bullets: [
+          'Every rival plays a style that follows from its nine: a kicking half kicks and chases, quick backs go wide, a heavy pack grinds; a strong pack rushes in defence and a fit side compresses.',
+          'The next-match card says how they play (“They play Expansive · Rush”); the ladder tags each club (EXP·RSH) and a rival’s squad page names it.',
         ],
       },
     ],

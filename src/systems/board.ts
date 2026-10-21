@@ -168,6 +168,7 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
         ? `Board: all ${review.met} objectives met. +$${review.grant.toLocaleString()} grant, reputation up.`
         : `Board: ${review.met} met, ${review.missed} missed. Patience ${review.patience}/${BOARD.MAX_PATIENCE}.`,
       kind: review.missed === 0 ? 'success' : 'danger',
+      quiet: true, // the review's Board line (N14)
     });
   }
   if (sacked) bus.emit('board:sacked', sacked);
