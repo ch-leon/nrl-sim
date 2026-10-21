@@ -239,7 +239,7 @@ export interface MatchOverlayHandle {
   destroy(): void;
   /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
   setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void;
-  /** A line in the commentary that is not a match event (a coach's call, #73). */
+  /** A line in the ticker and the log: every line comes this way, from the live playback's commentary (N15.2). */
   comment(line: string): void;
   /** Coach calls made and paid off, home and away (#73): a stats line once there is one. */
   setCalls?(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): void;
@@ -346,7 +346,7 @@ export interface MatchOverlayOptions {
 /**
  * Mount the match overlay. Idempotent — mounting while one is active tears the
  * old one down first (guards against double-mount / leaks). Subscribes to
- * 'match:event' (accumulate + render + commentary) and removes itself on
+ * 'match:event' (accumulate + render; the ticker's lines come through comment()) and removes itself on
  * 'match:finished'. Returns a handle whose destroy() also unsubscribes.
  */
 export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle {

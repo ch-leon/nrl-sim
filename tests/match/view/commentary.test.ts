@@ -121,6 +121,28 @@ describe('the lines', () => {
     expect(LINES['set-start:gathered']).toContain(templateOf(c.line(ev('set-start', { tick: 40 })), 'set-start:gathered'));
   });
 
+  it('read a kick that came to ground and was picked up as a scoop, not a catch', () => {
+    const c = new Commentator(5, { home: 'Home Side', away: 'Away Side' });
+    c.line(ev('kick', { tick: 10, detail: 'long' }));
+    // The kick's own tick, and a ball up in the air or in a man's hands, do not bring it down.
+    c.ball({ lift: 0, holder: null }, 10);
+    c.ball({ lift: 6, holder: null }, 30);
+    c.ball({ lift: 0, holder: { side: 'away', slot: 1 } }, 40);
+    expect(LINES['set-start:caught']).toContain(templateOf(c.line(ev('set-start', { tick: 41 })), 'set-start:caught'));
+    // Down to the ground on its last tick and caught the tick after: still a catch.
+    c.line(ev('kick', { tick: 50, detail: 'bomb' }));
+    c.ball({ lift: 0, holder: null }, 60);
+    c.ball({ lift: 1, holder: { side: 'home', slot: 2 } }, 61);
+    expect(LINES['set-start:caught']).toContain(templateOf(c.line(ev('set-start', { tick: 61 })), 'set-start:caught'));
+    // It lands with nobody under it and bounces (on the ground two ticks running): whoever picks it up scoops it.
+    c.line(ev('kick', { tick: 70, detail: 'long' }));
+    c.ball({ lift: 3, holder: null }, 75);
+    c.ball({ lift: 0, holder: null }, 80);
+    c.ball({ lift: 0, holder: null }, 81);
+    c.ball({ lift: 0.6, holder: null }, 82);
+    expect(LINES['set-start:gathered']).toContain(templateOf(c.line(ev('set-start', { tick: 99 })), 'set-start:gathered'));
+  });
+
   it('score the whistles from the snapshot: who leads, level, golden point', () => {
     expect(lineKey(ev('half-time'), false, { home: 6, away: 4 })).toBe('half-time:lead');
     expect(lineKey(ev('half-time'), false, { home: 4, away: 4 })).toBe('half-time:level');
@@ -137,25 +159,47 @@ function templateOf(line: string, key: string): string {
 }
 
 describe('the voice is seeded, never rolled', () => {
-  const play = (seed: number): { lines: string[]; kinds: Set<string> } => {
+  /** A whole match through a Commentator as LivePlayback drives it: each tick's events, then its ball. */
+  const play = (seed: number): { lines: string[]; kinds: Set<string>; pickups: { text: string; line: string; player: string }[] } => {
     const sim = new LiveSim(sideSheet('H', { rating: 62 }), sideSheet('A', { rating: 58 }), seed);
     const c = new Commentator(seed, { home: 'Launceston Larrikins', away: 'Shellharbour Scorpions' });
     const lines: string[] = [];
     const kinds = new Set<string>();
+    const pickups: { text: string; line: string; player: string }[] = [];
     while (!sim.finished && sim.tick < 100_000) {
       sim.step();
-      const es = sim.tickEvents;
-      if (!es.length) continue;
       const snap = sim.snapshot();
-      for (const e of es) {
+      for (const e of sim.tickEvents) {
         kinds.add(e.kind);
         // A kind the sim emits always has lines of ours (caught or not).
         expect(LINES[lineKey(e, false, snap.score)] && LINES[lineKey(e, true, snap.score)], `${e.kind}:${e.detail ?? ''}`).toBeDefined();
-        lines.push(c.line(e, snap.score));
+        const line = c.line(e, snap.score);
+        lines.push(line);
+        if (e.kind === 'set-start') pickups.push({ text: e.text, line, player: e.player ?? '' });
+      }
+      c.ball(snap.ball, snap.tick);
+    }
+    return { lines, kinds, pickups };
+  };
+
+  it('says a catch where the sim has the kick taken and a scoop where it has the ball scooped up', () => {
+    const said = (key: string, p: { line: string; player: string }): boolean => LINES[key]!.some((t) => fillLine(t, { player: p.player }) === p.line);
+    let caught = 0;
+    let scooped = 0;
+    for (const seed of [21, 22, 23, 24]) {
+      for (const p of play(seed).pickups) {
+        if (p.text.includes('takes the kick')) {
+          caught++;
+          expect(said('set-start:caught', p), `${p.text} → ${p.line}`).toBe(true);
+        } else if (p.text.includes('scoops it up')) {
+          scooped++;
+          expect(said('set-start:gathered', p), `${p.text} → ${p.line}`).toBe(true);
+        }
       }
     }
-    return { lines, kinds };
-  };
+    expect(caught).toBeGreaterThan(5);
+    expect(scooped).toBeGreaterThan(5);
+  });
 
   it('reads a match the same way twice with the same seed, and differently with another', () => {
     const a = play(11);

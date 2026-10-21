@@ -1,5 +1,5 @@
 // src/match/view/commentary.ts — the ticker's lines for the live sim (N15.2), in
-// place of the old engine's templates (src/sim/commentary.ts, gone). Keyed by the
+// place of the old engine's templates (its sim-side module is deleted). Keyed by the
 // kinds live.ts emits (and their detail: a kick's type, the captain's call, a
 // bonus try, a goal good or missed...), at least three lines each, in the words
 // the pop-ups and the Guide use (six again, tap and go, the 40/20, the sin bin).
@@ -8,8 +8,9 @@
 // Which line a moment gets is a hash of the match seed, the tick and the moment,
 // never a dice roll, so the same match reads the same way twice (at any speed, or
 // resumed), and nothing here is anything the sim reads. A Commentator follows the
-// match event by event: it knows a kick is in the air (so a catch reads as one)
-// and does not say the same line twice running. The whistles (half-time, full
+// match event by event and the ball tick by tick: it knows a kick is in the air
+// (so a catch reads as one, and a kick picked up off the ground as a scoop) and
+// does not say the same line twice running. The whistles (half-time, full
 // time, golden point, the siren) hash the seed alone, so a match skipped to full
 // time in the Worker ends on the line it would have ended on.
 //
@@ -59,7 +60,7 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'touch:kick': ['It finds touch — {other} ball.', '{player} finds touch.', 'Out it goes off the boot of {player}.'],
   'touch:penalty': ['{team} find touch from the penalty.', '{player} kicks for the line.', 'Penalty kick to touch by {player}.'],
   'touch:bundled': ['{player} bundles his man into touch.', 'Bundled into touch by {player}.', '{player} pushes him over the sideline.'],
-  touch: ['Into touch.', 'The ball runs into touch.', 'Out it goes — a tap 10 m in.'],
+  touch: ['Into touch.', 'The ball runs into touch.', 'Out it goes — a play-the-ball 10 m in.'],
   'dead-ball:20m': ['Dead ball — a 20-metre restart.', 'It runs dead. Restart from the 20.', 'Dead ball. Tap on the 20.'],
   'dead-ball:grounded': ['{player} grounds it in-goal.', '{player} touches it down in-goal.', '{player} plays it safe in-goal.'],
   'dead-ball:drop-out': ['Dead in-goal — goal-line drop-out.', 'It goes dead in-goal. Drop-out.', 'Dead in-goal off a defender: drop-out.'],
@@ -168,7 +169,7 @@ function scoreline(score: Readonly<Record<Side, number>>): { leader?: Side; hi: 
 /**
  * The moment an event is, for LINES: its kind, sharpened by its detail where the
  * line changes with it (a kick's type, the call, a bonus try, good or missed).
- * `kickInAir`: a kick went up and nobody has the ball yet (a catch, not a scoop).
+ * `kickInAir`: a kick went up and nobody has the ball yet, and it has not touched the ground (a catch, not a scoop).
  * `score`: the score after the event, for the whistles.
  */
 export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record<Side, number>>): string {
@@ -266,13 +267,25 @@ function planLabel(detail: string | undefined): string | undefined {
 }
 
 /**
+ * A ball lower than this, metres, with nobody holding it, is flat on the ground. A
+ * kick comes down to it on its last tick whether it is caught or not (the catch is
+ * the tick after), so it has touched the ground when it is there two ticks running:
+ * the end of its flight and then a bounce or a ball lying loose. A grubber's hops
+ * skim close to the ground but never lie on it two ticks running.
+ */
+const GROUNDED_LIFT = 1e-4;
+
+/**
  * Follows one match and says each moment. Give it every event in order, said or
- * not (a resumed match's silent stretch too), so it knows what is in the air and
- * what it said last.
+ * not (a resumed match's silent stretch too), and every tick's ball, so it knows
+ * what is in the air and what it said last.
  */
 export class Commentator {
   private readonly words: Record<Side, string>;
   private kickInAir = false;
+  /** The tick the kick in the air was struck on, and the last tick the ball lay on the ground unheld. */
+  private kickTick = -1;
+  private groundAt = -2;
   private tick = -1;
   private ordinal = 0;
   /** The last line index used for each moment, so the same line never comes twice running. */
@@ -290,8 +303,10 @@ export class Commentator {
     const ordinal = e.tick === this.tick ? ++this.ordinal : (this.ordinal = 0);
     this.tick = e.tick;
     const key = lineKey(e, this.kickInAir, score);
-    if (KICKS.has(e.kind)) this.kickInAir = true;
-    else if (ENDS_KICK.has(e.kind)) this.kickInAir = false;
+    if (KICKS.has(e.kind)) {
+      this.kickInAir = true;
+      this.kickTick = e.tick;
+    } else if (ENDS_KICK.has(e.kind)) this.kickInAir = false;
     const lines = LINES[key];
     // A moment with no lines of its own (a kind the sim gained since): the sim's own words.
     if (!lines) return e.text;
@@ -305,6 +320,16 @@ export class Commentator {
       ...(score ? this.scoreFill(score) : {}),
     };
     return this.say(key, lines, f, e.tick, ordinal) ?? e.text;
+  }
+
+  /**
+   * Each tick's ball (after its events): a kick that has come to ground with
+   * nobody holding it is down, so whoever picks it up scoops it rather than takes it.
+   */
+  ball(b: Readonly<{ lift: number; holder: unknown }>, tick: number): void {
+    if (!this.kickInAir || tick <= this.kickTick || b.holder !== null || b.lift >= GROUNDED_LIFT) return;
+    if (this.groundAt === tick - 1) this.kickInAir = false;
+    this.groundAt = tick;
   }
 
   /** The full-time line for a match finished elsewhere (Skip in the Worker), from its score. */

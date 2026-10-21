@@ -145,7 +145,11 @@ export class LivePlayback {
     const simOpts = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.runner = new Runner((seed) => new LiveSim(home, away, seed, simOpts), opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
-    this.runner.onStep = () => this.recorder.clock(this.sim.matchSeconds);
+    this.runner.onStep = () => {
+      this.recorder.clock(this.sim.matchSeconds);
+      // The commentator watches the ball land: a kick picked up off the ground is a scoop, not a catch.
+      this.commentator.ball(this.runner.cur.ball, this.runner.cur.tick);
+    };
     this.runner.setSpeed(this.speed);
     // A resumed match plays on, silently, to where it was.
     if (opts.resumeAt) {
