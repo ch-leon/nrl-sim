@@ -17,6 +17,7 @@ import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
+import { weekHeld } from './time';
 import { buildLabel } from '../ui/buildInfo';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -310,6 +311,10 @@ function parseSave(text: string): MigrateResult {
 
 let activeSlot = 1;
 
+/** Set when an import replaces the active slot; autosave writes nothing after it
+ *  until enableAutosave starts a game again (in the browser, after the reload). */
+let slotImported = false;
+
 export function getActiveSlot(): number {
   return activeSlot;
 }
@@ -553,19 +558,46 @@ export function importIntoSlot(text: string, slot: number): GameState | null {
     return null;
   }
   if (!writeSlot(slot, res.state)) return null;
+  // The import now owns the active slot: this page's game must not save over it on
+  // the way to the title screen (Settings → Import save reloads; #295's checker).
+  if (slot === activeSlot) slotImported = true;
   bus.emit('ui:notify', { text: `Save imported into slot ${slot}`, kind: 'success' });
   return res.state;
 }
 
 // ── Autosave ────────────────────────────────────────────────────────────────
 
+/** The page events enableAutosave listens on; tests pass stand-ins (Node has neither). */
+interface PageEvents {
+  doc?: { visibilityState?: string; addEventListener(type: string, fn: () => void): void; removeEventListener(type: string, fn: () => void): void };
+  win?: { addEventListener(type: string, fn: () => void): void; removeEventListener(type: string, fn: () => void): void };
+}
+
 /**
  * Subscribe to 'week:advanced' and persist the settled post-tick state (the §5
  * pipeline emits this at step 8, after the step-7 autosave hook, so the state is
- * fully settled). Returns the unsubscribe closure for teardown/tests.
+ * fully settled). Also persist when the page is hidden or unloaded (QA finding 21):
+ * a change made between weeks (a hire, a build, a signing, the kit) was kept only
+ * until the next week's save, so a phone that dropped the tab lost it. Never while
+ * a week is held: that state is half-ticked, and the next load replays the week
+ * from its start, and never after an import has replaced the active slot. Returns
+ * the unsubscribe closure for teardown/tests.
  */
-export function enableAutosave(): () => void {
-  return bus.on('week:advanced', () => save(getState()));
+export function enableAutosave(page: PageEvents = {
+  ...(typeof document !== 'undefined' ? { doc: document } : {}),
+  ...(typeof window !== 'undefined' ? { win: window } : {}),
+}): () => void {
+  slotImported = false;
+  const offWeek = bus.on('week:advanced', () => { if (!slotImported) save(getState()); });
+  const persist = (): void => { if (!weekHeld() && !slotImported) save(getState()); };
+  const onVisibility = (): void => { if (page.doc?.visibilityState === 'hidden') persist(); };
+  page.doc?.addEventListener('visibilitychange', onVisibility);
+  page.win?.addEventListener('pagehide', persist);
+  return () => {
+    offWeek();
+    page.doc?.removeEventListener('visibilitychange', onVisibility);
+    page.win?.removeEventListener('pagehide', persist);
+  };
 }
 
 // ── Title flow (minimal DOM) ─────────────────────────────────────────────────

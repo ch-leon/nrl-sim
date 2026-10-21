@@ -61,7 +61,9 @@ const log = (...a) => console.log(...a);
 let server = null;
 async function startServer() {
   if (EXTERNAL) return;
-  const dist = join(OUT_ROOT, 'dist');
+  // Per size: two sizes run side by side would otherwise rebuild one dist under each other's
+  // preview, and the page's service worker offered "New version ready" over the season review.
+  const dist = join(OUT, 'dist');
   log('building…');
   await new Promise((res, rej) => {
     const b = spawn('npx', ['vite', 'build', '--outDir', dist, '--emptyOutDir', '--logLevel', 'warn'], { stdio: 'inherit' });
@@ -180,7 +182,7 @@ async function step(name, fn, { settle = 300, quietToasts = false } = {}) {
 
 /**
  * Dump the game's save for the corpus: slot 1 as the game wrote it, or (before the
- * first autosave, which only happens on a week advance) the live state through the
+ * first autosave: a week advance, or the page hiding) the live state through the
  * `?e2e` hook. Same JSON either way.
  */
 async function dumpSave(point, rec) {
@@ -562,8 +564,9 @@ async function play() {
   await step('half-time-plan', async (rec) => {
     if (!liveOn) return 'skipped';
     const card = page.locator('.nrl-mo-plan', { has: page.locator('.nrl-mo-plan-head', { hasText: 'Half-time' }) });
-    // A 9-minute half at ×8 is about 70 s.
-    await card.waitFor({ timeout: 120000 });
+    // A 9-minute half at ×8 is about 70 s, but about 105 s on a loaded machine: two runs beside
+    // other work ran out of 120 s with the clock at 06:56 and 08:55 of the half. 300 s leaves room.
+    await card.waitFor({ timeout: 300000 });
     // At ×4 and above the card goes on by itself after 8 s unless it is tapped, so tap at once.
     await press(card.locator('[data-tactic="expansive"]'));
     if (!(await card.locator('[data-tactic="expansive"][data-active]').count())) throw new Error('Expansive did not light on the half-time card');
@@ -646,6 +649,21 @@ async function play() {
     rec.notes.push(`tapped ${label}`);
   });
   await step('finance', async () => { await closeAny(); await tap('.nrl-nav .nrl-btn:has-text("Finance")'); await wait(300); });
+  // N14.5 (#287): the Staff section on Finance. Hire the Welfare Manager, so the saves dumped
+  // after this (after-rollover, live-rivals) carry a staffed club for the corpus.
+  await step('staff-hire', async (rec) => {
+    const row = page.locator('.nrl-staff-row[data-staff="welfare"]');
+    if (!(await row.count())) return 'no Staff section on this build';
+    const hire = row.locator('.nrl-btn:has-text("Hire")');
+    if (!(await hire.count())) return 'the Welfare Manager is already hired';
+    await hire.scrollIntoViewIfNeeded();
+    await press(hire);
+    await page.waitForSelector('.nrl-staff-row[data-staff="welfare"] .nrl-btn:has-text("Release")', { timeout: 5000 });
+    const staff = await page.evaluate(() => window.__nrlState().staff);
+    const welfare = staff.find((m) => m.role === 'welfare');
+    if (!welfare) throw new Error('Hire tapped but no Welfare Manager in the state');
+    rec.notes.push(`hired ${welfare.name}, $${welfare.wage}/wk`);
+  });
   // N7 (#189): ? opens the Guide; its How Nines works page; close.
   await step('guide-nines', async (rec) => {
     await closeAny();
@@ -693,16 +711,25 @@ async function play() {
     if (found.length) throw new Error(found.join('; '));
   });
 
-  // Save, reload, continue.
-  const pre = await save();
+  // Save, reload, continue. The game as it stands before the reload (live, not slot 1: a change
+  // made since the last week, like the staff hire, must come back too; QA finding 21).
+  const pre = await page.evaluate(() => window.__nrlState());
   await step('reload-title', async () => { await page.reload(); await page.waitForSelector('[data-nrl-continue-1]'); });
   await step('continued', async (rec) => {
     await tap('[data-nrl-continue-1]');
     await page.waitForSelector('.nrl-hud');
     await wait(800);
-    const s = await save();
-    if (s.week !== pre.week || s.money !== pre.money) throw new Error(`state changed across reload (W${pre.week}→${s.week}, $${pre.money}→$${s.money})`);
-    rec.notes.push(`same week ${s.week} and money after reload`);
+    const s = await page.evaluate(() => window.__nrlState());
+    // What the player can change between weeks, some of it free (the kit, a card left open).
+    const kept = (x) => ({
+      week: x.week, money: x.money, staff: (x.staff ?? []).map((m) => m.role).join(','),
+      squad: x.squad.map((p) => p.id).join(','), facilities: x.facilities.map((f) => `${f.defId}${f.level}@${f.x},${f.y}`).join(','),
+      cards: x.eventDeck?.pending?.length ?? 0, kit: JSON.stringify(x.kit ?? null),
+    });
+    const [a, b] = [kept(pre), kept(s)];
+    const lost = Object.keys(a).filter((k) => a[k] !== b[k]);
+    if (lost.length) throw new Error(`changed across reload: ${lost.map((k) => `${k} ${String(a[k]).slice(0, 40)} → ${String(b[k]).slice(0, 40)}`).join('; ')}`);
+    rec.notes.push(`same week ${s.week}, money, staff (${b.staff || 'none'}), squad, facilities, cards and kit after reload`);
     await facilitiesDrawn(rec);
   });
 
@@ -838,6 +865,30 @@ async function play() {
     await press(page.locator('.nrl-rivals-toggle input[type="checkbox"]'));
     await closeAny();
   }, { quietToasts: true });
+
+  // Settings → Import save writes the file over slot 1 and reloads to the title screen. Nothing
+  // may save the game being left over it on the way out (#295's checker: the page-hide save did).
+  await step('import-save', async (rec) => {
+    await closeAny();
+    const s = await save();
+    const file = join(OUT, 'import.json');
+    writeFileSync(file, JSON.stringify({ ...s, clubName: 'Imported FC' }));
+    await tap('.nrl-audio-gear');
+    const chooser = page.waitForEvent('filechooser', { timeout: 5000 });
+    await tap('.nrl-audio-settings .nrl-btn:has-text("Import save")');
+    await (await chooser).setFiles(file);
+    await page.waitForSelector('[data-nrl-continue-1]', { timeout: 15000 });
+    const slot = await save();
+    if (slot?.clubName !== 'Imported FC') throw new Error(`slot 1 holds "${slot?.clubName}" after the import's reload: the game being left was saved over the import`);
+    rec.notes.push(`slot 1 holds "Imported FC" at S${slot.season} W${slot.week} after the reload`);
+  });
+  await step('import-continued', async (rec) => {
+    await tap('[data-nrl-continue-1]');
+    await page.waitForSelector('.nrl-hud');
+    const live = await page.evaluate(() => window.__nrlState().clubName);
+    if (live !== 'Imported FC') throw new Error(`Continue opened "${live}", not the imported club`);
+    rec.notes.push('Continue opened the imported club');
+  });
 
   await browser.close();
 }
