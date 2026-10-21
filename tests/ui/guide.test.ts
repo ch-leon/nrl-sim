@@ -12,7 +12,7 @@ import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../src/match/l
 import { TACTIC_BLURB } from '../../src/ui/tacticsBlurbs';
 import { TRAINING_FOCUS } from '../../src/config';
 import { STAFF, STAFF_ROLES } from '../../src/systems/staff';
-import { BOARD, DIFFICULTY, ECON, ON_FIELD, SET_TACKLES, SQUAD_MIN } from '../../src/config';
+import { BOARD, DIFFICULTY, ECON, ON_FIELD, PRIZE, SET_TACKLES, SQUAD_MIN } from '../../src/config';
 import { createNewGame, setState } from '../../src/core/state';
 import { IN_GOAL } from '../../src/match/core/field';
 import { bonusZoneSvg, zonePictureGeometry } from '../../src/ui/guide/zonePicture';
@@ -62,6 +62,17 @@ describe('the Money page stays true to the economy', () => {
 
   it('quotes the ticket price', () => {
     expect(text).toContain(`Tickets are ${dollars(ECON.TICKET_PRICE)}.`);
+  });
+
+  it('quotes the finals prize money, the board\'s grant, the fire-sale floor and its morale hit (N12.7)', () => {
+    expect(text).toContain(`Finals prize money at the rollover: ${dollars(PRIZE.PER_FINALS_WEEK)} for every finals week played, `
+      + `${dollars(PRIZE.GRAND_FINAL)} more for a grand final and ${dollars(PRIZE.PREMIERSHIP)} for the premiership.`);
+    expect(text).toContain(`The board pays ${dollars(BOARD.GRANT_PER_MET)} for every objective met`);
+    expect(text).toContain(`below −${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player`);
+    expect(text).toContain(`the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time`);
+    const all = CLUB_PAGES.flatMap((p) => p.sections.map((s) => `${s.text ?? ''} ${s.bullets?.join(' ') ?? ''}`)).join(' ');
+    expect(all).toContain(`Each one met pays ${dollars(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation.`);
+    expect(all).toContain(`the week the balance passes the −${dollars(-ECON.FORCED_SALE_FLOOR)} floor`);
   });
 });
 

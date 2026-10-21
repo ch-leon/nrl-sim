@@ -4,7 +4,7 @@ import {
   absWeek, applyEffects, chooseEvent, describeEffects, drawEvent, eventsTick, fillText, isEligible,
   registerEventsSystem, resolveEvent, subjectCandidates, tickModifiers, weekResult,
 } from '../../src/systems/events';
-import { EVENT_CARDS, cardById, type EventCardDef } from '../../src/data/events';
+import { EVENT_CARDS, cardById, type EventCardDef, type EventEffect } from '../../src/data/events';
 import { initLeague, registerFixturesSystem, PLAYER_ID } from '../../src/systems/fixtures';
 import { createNewGame, getState, setState, type GameState, type PendingEvent } from '../../src/core/state';
 import { bus } from '../../src/core/events';
@@ -51,6 +51,18 @@ describe('the deck', () => {
       // {player} only appears on cards that pick a subject.
       const usesPlayer = [c.text, ...c.choices.map((ch) => ch.outcome)].some((t) => t.includes('{player}'));
       if (usesPlayer) expect(c.subject).toBeDefined();
+    }
+  });
+
+  it('every dollar figure a card quotes is money one of its choices moves (N12.7)', () => {
+    const quoted = (t: string): number[] =>
+      [...t.matchAll(/\$(\d[\d,]*)(k?)/g)].map((m) => Number(m[1]!.replace(/,/g, '')) * (m[2] ? 1000 : 1));
+    const moved = (effects: readonly EventEffect[]): number[] => effects.flatMap((e) =>
+      e.kind === 'money' ? [Math.abs(e.amount)] : e.kind === 'modifier' ? moved(e.effects) : []);
+    for (const c of EVENT_CARDS) {
+      const amounts = new Set(c.choices.flatMap((ch) => moved(ch.effects)));
+      const words = [c.text, ...c.choices.flatMap((ch) => [ch.label, ch.outcome])];
+      for (const n of words.flatMap(quoted)) expect([c.id, amounts.has(n)]).toEqual([c.id, true]);
     }
   });
 });
