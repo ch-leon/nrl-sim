@@ -2,27 +2,18 @@
 //
 // The art itself is pure (src/art/match/*); this module is the only place that
 // uploads those PixelBuffers as textures, registers atlas frames and player
-// animations, and creates the static stadium layers. Every key it creates is
-// recorded so MatchScene can free them on shutdown — the stadium layers are a
+// animations, and creates the static stadium layers. Every key it creates (or
+// adopts, uploaded ahead by matchArtAhead.ts) is recorded so MatchScene can free them on shutdown — the stadium layers are a
 // few megapixels and are rebuilt per fixture (team colours differ). Keys carry a
 // per-registry serial so a quick restart of the scene can never have its fresh
 // textures removed by the previous instance's deferred cleanup.
 import Phaser from 'phaser';
-import { PixelBuffer, toTexture } from '../art/pixel';
+import { toTexture } from '../art/pixel';
+import type { PixelBuffer } from '../art/pixel';
 import type { Kit } from '../art/match/kit';
-import {
-  ANIM_ORDER,
-  PLAYER_ANIMS,
-  buildPlayerAtlas,
-  frameName,
-  type PlayerAnim,
-} from '../art/match/players';
-import { buildCrowdAtlas, crowdShirts } from '../art/match/crowd';
+import { ANIM_ORDER, PLAYER_ANIMS, frameName, type PlayerAnim } from '../art/match/players';
 import { drawBall, drawCrossbar, drawShadow, drawUpright } from '../art/match/props';
-import type { Canvas3D } from '../art/match/iso3d';
-
-/** Largest texture edge we upload (safe on old mobile GPUs capped at 2048). */
-const CHUNK = 1024;
+import type { AtlasPixels, LayerChunk, TexturePiece } from '../art/match/fixtureArt';
 
 let registrySerial = 0;
 
@@ -47,44 +38,42 @@ export class MatchArtRegistry {
 
   /** Upload a buffer and register named sub-frames on it. */
   atlas(key: string, buf: PixelBuffer, frames: readonly { name: string; x: number; y: number; w: number; h: number }[]): string {
-    const real = this.texture(key, buf);
-    const tex = this.scene.textures.get(real);
-    for (const f of frames) tex.add(f.name, 0, f.x, f.y, f.w, f.h);
-    return real;
+    return this.frames(this.texture(key, buf), frames);
   }
 
   /**
-   * A big world-space layer split into ≤CHUNK(+1px overlap) textures, placed as Images at
-   * `depth`. Returns the created images.
+   * A piece's texture: the one uploaded ahead (N10.5, matchArtAhead.ts), adopted
+   * and freed with the rest, or the pixels uploaded now.
    */
-  layer(keyPrefix: string, cv: Canvas3D, depth: number): Phaser.GameObjects.Image[] {
-    const images: Phaser.GameObjects.Image[] = [];
-    const { buf } = cv;
-    for (let cy = 0; cy < buf.h; cy += CHUNK) {
-      for (let cx = 0; cx < buf.w; cx += CHUNK) {
-        // Chunks overlap their right/bottom neighbour by 1px: at fractional camera
-        // zoom the quads round independently and would leave a 1px seam.
-        const w = Math.min(CHUNK + 1, buf.w - cx);
-        const h = Math.min(CHUNK + 1, buf.h - cy);
-        const part = new PixelBuffer(w, h);
-        // Row-wise copy (fast path: straight RGBA slices).
-        for (let y = 0; y < h; y++) {
-          const src = ((cy + y) * buf.w + cx) * 4;
-          part.data.set(buf.data.subarray(src, src + w * 4), y * w * 4);
-        }
-        if (part.opaqueCount() === 0) continue; // fully transparent chunk
-        const key = this.texture(`${keyPrefix}-${cx}-${cy}`, part);
-        const img = this.scene.add.image(cv.ox + cx, cv.oy + cy, key).setOrigin(0, 0).setDepth(depth);
-        images.push(img);
-      }
+  private own(key: string, piece: TexturePiece): string {
+    if (piece.texKey && this.scene.textures.exists(piece.texKey)) {
+      this.textureKeys.push(piece.texKey);
+      return piece.texKey;
     }
-    return images;
+    return this.texture(key, piece.buf);
   }
 
-  /** Player atlas + one Phaser animation per look × anim for a kit. */
-  players(atlasKey: string, kit: Kit): string {
-    const { buf, frames } = buildPlayerAtlas(kit);
-    const key = this.atlas(atlasKey, buf, frames);
+  /** Take charge of textures uploaded ahead (N10.5), so a shutdown before build() still frees them. */
+  adopt(pieces: readonly TexturePiece[]): void {
+    for (const p of pieces) if (p.texKey && this.scene.textures.exists(p.texKey)) this.textureKeys.push(p.texKey);
+  }
+
+  /** Register named sub-frames on a texture. */
+  private frames(real: string, frames: readonly { name: string; x: number; y: number; w: number; h: number }[]): string {
+    const tex = this.scene.textures.get(real);
+    for (const f of frames) if (!tex.has(f.name)) tex.add(f.name, 0, f.x, f.y, f.w, f.h);
+    return real;
+  }
+
+  /** A big world-space layer, already split into chunks (fixtureArt.ts), placed as Images at `depth`. */
+  layer(chunks: readonly LayerChunk[], depth: number): Phaser.GameObjects.Image[] {
+    return chunks.map((c) => this.scene.add.image(c.x, c.y, this.own(c.name, c)).setOrigin(0, 0).setDepth(depth));
+  }
+
+  /** Player atlas (painted for a kit, fixtureArt.ts) + one Phaser animation per look × anim. */
+  players(atlasKey: string, atlas: AtlasPixels): string {
+    const { frames } = atlas;
+    const key = this.frames(this.own(atlasKey, atlas), frames);
     const looks = new Set(frames.map((f) => Number(f.name.split('-')[0])));
     for (const look of looks) {
       for (const anim of ANIM_ORDER) {
@@ -103,10 +92,9 @@ export class MatchArtRegistry {
     return key;
   }
 
-  /** Crowd spectator atlas for a fixture's colours. */
-  crowd(key: string, home: Kit, away: Kit): string {
-    const { buf, frames } = buildCrowdAtlas(crowdShirts(home, away));
-    return this.atlas(key, buf, frames);
+  /** Crowd spectator atlas for a fixture's colours (painted in fixtureArt.ts). */
+  crowd(key: string, atlas: AtlasPixels): string {
+    return this.frames(this.own(key, atlas), atlas.frames);
   }
 
   /** Ball, shadows and goalpost pieces. */
