@@ -104,6 +104,7 @@ export function registerAgingSystem(): void {
       bus.emit('ui:notify', {
         text: `${p.name} retired at ${p.age}.`,
         kind: 'info',
+        quiet: true, // in the season review (N14)
       });
     }
     // Retirement ignores the SQUAD_MIN floor (careers end regardless), so warn

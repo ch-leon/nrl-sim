@@ -13,7 +13,7 @@
 import { el, panel, button, openModal, closeScreen } from '../dom';
 import { getState, setState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
-import { formGuide, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
+import { formGuide, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { save } from '../../core/save';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
@@ -159,6 +159,16 @@ function openLeagueScreen(initialTab: Tab): HTMLElement {
   return openModal(content, { class: 'nrl-league-modal', screen: true, closeButton: false });
 }
 
+/**
+ * The forecast for the player's next match: state.weather between weeks is the
+ * coming week's (rolled at the end of the last), so it counts only when the next
+ * fixture is this coming week's. Pure.
+ */
+export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather'>): WeatherKind | undefined {
+  const f = nextFixture(state.league.fixtures, state.week, 'player');
+  return f && f.round === state.week ? state.weather : undefined;
+}
+
 /** Longer than this, a club's name on the ladder is its short name (QA finding 3: it wrapped at 844px). */
 export const LADDER_NAME_MAX = 16;
 
@@ -190,13 +200,13 @@ function formCells(form: readonly FormResult[]): HTMLElement {
 /**
  * The next-match card at the top of the Fixtures tab (N7, #183): who, where,
  * both sides' place, strength and form, the opponent's best three, this
- * season's meetings, and the conditions when they are known. The fixtures
- * system rolls the weather on match day, after this card is gone, so no
- * forecast is passed today; the line shows as soon as one is.
+ * season's meetings, and the forecast: the fixtures system rolls next week's
+ * weather at the end of this one (N14), so it shows when the match is this coming week's.
  */
 function nextMatchCard(state: GameState): HTMLElement {
   const card = el('div', { class: 'nrl-next-match', attrs: { 'data-next-match': '' } });
-  const p = nextMatchPreview(state);
+  const forecast = forecastFor(state);
+  const p = nextMatchPreview(state, forecast ? { weather: forecast } : {});
   if (!p) {
     const text = state.week > SEASON_ROUNDS ? 'No more matches this season' : 'No match this week';
     card.append(el('div', { class: 'nrl-next-head' }, el('span', { class: 'nrl-next-label', text: 'Next' }), ` ${text}`));

@@ -71,6 +71,7 @@ export function registerYouthSystem(): void {
     bus.emit('ui:notify', {
       text: `Academy intake: ${prospects.length} prospects (aged ${JUNIOR_MIN_AGE}-${JUNIOR_MAX_AGE}) are in the free-agent pool.`,
       kind: 'info',
+      quiet: true, // in the season review (N14)
     });
   });
 }

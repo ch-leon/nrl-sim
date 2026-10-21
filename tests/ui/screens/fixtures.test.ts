@@ -124,3 +124,15 @@ describe('ladderName', () => {
     for (const { name } of RIVAL_CLUBS) expect(ladderName(name).length, name).toBeLessThanOrEqual(LADDER_NAME_MAX);
   });
 });
+
+// N14 (#263): the Contracts screen's two-tap guard, as the player page's.
+import { guardTap } from '../../../src/ui/screens/contracts';
+
+describe('guardTap', () => {
+  it('the first tap arms, the second runs, a tap on another action re-arms', () => {
+    expect(guardTap(null, 'sell:a')).toEqual({ armed: 'sell:a', run: false });
+    expect(guardTap('sell:a', 'sell:a')).toEqual({ armed: null, run: true });
+    expect(guardTap('sell:a', 'release:a')).toEqual({ armed: 'release:a', run: false });
+    expect(guardTap('sell:a', 'sell:b')).toEqual({ armed: 'sell:b', run: false });
+  });
+});
