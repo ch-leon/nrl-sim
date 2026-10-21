@@ -61,12 +61,12 @@ src/
   match/                     # the match sim (BAK-207): every match the player plays or fast-forwards
     core/                    # sport-neutral: fixed-step clock, bodies, ball, snapshots, flag codes
     league/                  # rugby league (Nines) rules, roles, tackle contest, tactics, team sheets, runMatch
-    view/                    # LivePlayback: plays the match on MatchScene's sprites (interpolated)
+    view/                    # LivePlayback: plays the match on MatchScene's sprites (interpolated);
+                             #   commentary.ts, the ticker's lines and the report's summary (N15.2)
     lab/                     # /#lab dev page: teams/seed, play/pause/step/scrub, Flag
   sim/
     events.ts                # MatchEvent types + MatchResult         (WU-6)
     weather.ts               # weekly weather roll + momentum helpers (WU-6 / BAK-198)
-    commentary.ts            # event → commentary text templates      (WU-12 / BAK-196)
   scenes/
     BootScene.ts             # texture generation, then start scenes  (WU-2)
     GroundsScene.ts          # isometric club grounds                 (WU-2, extended WU-8)

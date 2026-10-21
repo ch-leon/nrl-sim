@@ -3,6 +3,8 @@
 // with the Player of the Match. Built from the MatchResult (the live sim's
 // events as recorded), so it agrees with the overlay's tallies. A card, not a
 // wall (#203): it sits above Back to Club and lets taps beside it through.
+// Under the score, a summary in the ticker's voice (N15.2, match/view/commentary.ts):
+// the final whistle, then the story of the tries, as many lines as fit the card.
 import { bus } from '../../core/events';
 import { getState, setState } from '../../core/state';
 import type { MatchEvent, MatchResult } from '../../sim/events';
@@ -14,6 +16,9 @@ import { el, button, openModal, closeModal } from '../dom';
 import { MATCH_ACTIVE_CLASS } from './matchOverlay';
 import { fmtPotmLine } from './potm';
 import { addPotm } from './seasonReview';
+import { shortName, summaryLines } from '../../match/view/commentary';
+
+export { shortName };
 
 export interface ReportSide {
   id: string;
@@ -43,6 +48,8 @@ export interface MatchReport {
   away: ReportSide;
   /** "Won in golden point", "Drawn — through on seeding", or empty. */
   note: string;
+  /** The commentary's summary (N15.2), first lines first: the card shows as many as fit. */
+  summary: string[];
   rows: ReportRow[];
   potm: { line: string; who: string } | null;
 }
@@ -57,12 +64,6 @@ function byPlayer(events: readonly MatchEvent[], mark: (e: MatchEvent) => string
     out.set(who, [...(out.get(who) ?? []), mark(e)]);
   }
   return [...out].map(([who, marks]) => `${who} ${marks.join(', ')}`);
-}
-
-/** "Launceston Larrikins" → "Larrikins": a club's last word, unless that is a bare "FC" or the like. */
-export function shortName(name: string): string {
-  const last = name.trim().split(/\s+/).pop() ?? name;
-  return last.length >= 4 ? last : name;
 }
 
 function side(result: MatchResult, id: string, name: string, score: number): ReportSide {
@@ -116,6 +117,7 @@ export function buildMatchReport(
     home,
     away,
     note,
+    summary: summaryLines(result, { id: home.id, name: home.name }, { id: away.id, name: away.name }),
     rows,
     potm: potm ? { line: fmtPotmLine(potm), who: `${potm.name} (${names[potm.teamId] ?? potm.teamId})` } : null,
   };
@@ -142,6 +144,7 @@ export function openMatchReport(r: MatchReport): HTMLElement {
     el('h2', { text: r.title }),
     el('p', { class: 'nrl-report-score', text: `${r.home.name} ${r.home.score} – ${r.away.score} ${r.away.name}` }),
     ...(r.note ? [el('p', { class: 'nrl-report-note', text: r.note })] : []),
+    ...(r.summary.length ? [el('p', { class: 'nrl-report-summary', text: r.summary.join(' '), attrs: { style: 'font-style: italic' } })] : []),
     el('div', { class: 'nrl-report-body' }, el('div', { class: 'nrl-report-scoring' }, sideBlock(r.home), sideBlock(r.away)), table),
     ...(r.potm ? [el('p', { class: 'nrl-report-potm', text: `Player of the Match: ${r.potm.who} — ${r.potm.line}` })] : []),
     button('Close', () => closeModal()),
@@ -149,6 +152,15 @@ export function openMatchReport(r: MatchReport): HTMLElement {
   const backdrop = openModal(content, { class: 'nrl-potm-modal nrl-report-modal', region: true });
   // #203: the card must not swallow the first tap on Back to Club; it closes with the match view.
   backdrop.classList.add('nrl-potm-backdrop', 'nrl-report-backdrop');
+  // The summary drops its last line while the card would scroll with it (a phone held sideways): first lines first.
+  const summary = content.querySelector('.nrl-report-summary');
+  const card = backdrop.querySelector('.nrl-modal');
+  if (summary && card) {
+    for (let n = r.summary.length; n > 0 && card.scrollHeight > card.clientHeight + 1; n--) {
+      if (n === 1) summary.remove();
+      else summary.textContent = r.summary.slice(0, n - 1).join(' ');
+    }
+  }
   const body = typeof document === 'undefined' ? null : document.body;
   if (body?.classList.contains(MATCH_ACTIVE_CLASS) && typeof MutationObserver !== 'undefined') {
     const watch = new MutationObserver(() => {
