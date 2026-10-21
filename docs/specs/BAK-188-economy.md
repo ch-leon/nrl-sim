@@ -226,8 +226,16 @@ and 4% (70+ 2.5% → 0.2%); at reputation 100, 61 and 36% → 59 and 24% (70+ 30
 with a Scout Office and an Academy at L3 at reputation 100, 79 → 76. The mean of a
 refresh barely moves; its shape does: the old rookie / average / star rolls made a
 bump of 42s, a bump of 60s and a tail of stars, now it is one bell around the target.
+Rivals sign from the same pool: over a first season (the same probe) they take 3.2
+players of 65+, was 6.4. In the soak (Easy and Normal, 20 seeds × 5 seasons, against
+`main` at 3b9ff6d) the rival mean at the end of the regular season is 0.1–0.5 lower
+(season 5: 56.9 → 56.4; the strongest rival about 64, was 65–68). The managed manager
+finds fewer stars to buy, so signs cheaper and banks more: managed Normal ends season 5
+at $385k (was $39k), managed Easy at $561k (was $26k).
 
-**Easy wages (N12, #247).** `DIFFICULTY.easy.wages` ×0.85 → ×0.9.
+**Easy wages (N12, #247).** `DIFFICULTY.easy.wages` ×0.85 → ×0.9: about $20k a season
+more in wages. Idle Easy's season net, averaged over five seasons, +$121k → +$115k; the
+rest of the way to N12's "Easy idle under $100k a season" is left to item 7.
 
 **The Sponsor Board (N12, #247).** `ECON.SPONSOR_BASE` $150 + `SPONSOR_PER_REP` $10 ×
 reputation a week, at most `SPONSOR_CAP` $1,000, × the level step every facility uses
@@ -236,7 +244,7 @@ $3,000 a level, which paid the $10,000 build back in 3.4 weeks. Now, net of its 
 upkeep, L1 pays back in 29 weeks at reputation 30 ($450 a week), 15 at 60 ($750) and
 11 at 100 ($1,000, capped from 85); the whole L3 board ($60k) in 76, 41 and 30 weeks.
 The Build menu, the facility popup and the Guide's Money page quote it at the club's
-reputation.
+reputation. Nothing in the soak builds a Sponsor Board, so the soak does not see it.
 
 **The cascade (N14.3).** One forced sale a week, a board loan for a renewal in debt (up to
 $50,000 a season, repaid at the rollover), and an Academy call-up before a forfeit. In the
