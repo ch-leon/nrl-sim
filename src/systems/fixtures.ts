@@ -555,7 +555,10 @@ export function initLeague(
  *
  * Hooks:
  *   - 'weather' (order match-1): roll state.weather for the round via rollWeather
- *     (BAK-198 boundary — the fixtures system owns writing per-round weather).
+ *     when no forecast set it (BAK-198 boundary — the fixtures system owns writing
+ *     per-round weather).
+ *   - 'weather-forecast' (order ladder+2): roll next week's weather into
+ *     state.weather once this round is in (N14), so the next-match card shows it.
  *   - 'fixtures-finals' (order match-2): generate this week's finals fixtures
  *     (QF/SF/GF) when entering weeks 25–27.
  *   - 'fixtures-rivals' (order 40 / TICK_ORDER.match): cheap-sim rival-vs-rival
@@ -571,8 +574,20 @@ export function initLeague(
  *     ladder for the new season.
  */
 export function registerFixturesSystem(): void {
-  // (a) Weather roll — must run before the match hook so the sim reads it.
+  // (a) Weather: the round's conditions were rolled at the end of last week (the
+  // forecast, (e) below), so the next-match card can say them; the match plays in
+  // them. Only a new game, or a save from before the forecast, rolls on the day.
   registerTickHook('weather', TICK_ORDER.match - 1, () => {
+    const s = getState();
+    if (s.weather !== undefined) return;
+    const rng = makeRng(s.rngSeed);
+    const weather = rollWeather(rng.next);
+    setState({ weather, rngSeed: rng.state() });
+  });
+
+  // (e) The forecast (N14, #263): next week's conditions, rolled once the round is in,
+  // from the same seeded stream as before (one roll a week, a week early).
+  registerTickHook('weather-forecast', TICK_ORDER.ladder + 2, () => {
     const s = getState();
     const rng = makeRng(s.rngSeed);
     const weather = rollWeather(rng.next);
@@ -724,6 +739,7 @@ export function registerFixturesSystem(): void {
     bus.emit('ui:notify', {
       text: `${repText}${movers.length ? ` Rivals: ${movers.join(', ')}.` : ''}`,
       kind: rep.reputation >= s.reputation ? 'success' : 'info',
+      quiet: true, // the review's Reputation and Rivals lines (N14)
     });
   });
 }

@@ -54,7 +54,12 @@ export interface Events {
   // forcedSales (N12.5): who the week's forced sales let go, so a multi-week advance
   // can stop on a sale; the economy emits the warning after the sales.
   'bankruptcy:warning': { balance: number; forcedSales?: string[] };
-  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger' };
+  /**
+   * A message for the player. `quiet` (N14): it is already on screen elsewhere (the
+   * season review shows the rollover's retirements, juniors, verdict, prize and
+   * movers), so the news inbox keeps it but no toast pops.
+   */
+  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean };
 }
 
 export type EventName = keyof Events;

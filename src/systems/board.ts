@@ -148,7 +148,7 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
   const prize = finalsPrize(outcome);
   if (prize > 0) {
     earnMoney(prize, 'finals prize money');
-    bus.emit('ui:notify', { text: `Finals prize money: $${prize.toLocaleString()}.`, kind: 'success' });
+    bus.emit('ui:notify', { text: `Finals prize money: $${prize.toLocaleString()}.`, kind: 'success', quiet: true }); // in the review's money (N14)
   }
 
   const after = getState();
@@ -168,6 +168,7 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
         ? `Board: all ${review.met} objectives met. +$${review.grant.toLocaleString()} grant, reputation up.`
         : `Board: ${review.met} met, ${review.missed} missed. Patience ${review.patience}/${BOARD.MAX_PATIENCE}.`,
       kind: review.missed === 0 ? 'success' : 'danger',
+      quiet: true, // the review's Board line (N14)
     });
   }
   if (sacked) bus.emit('board:sacked', sacked);
