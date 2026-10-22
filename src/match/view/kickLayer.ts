@@ -41,6 +41,8 @@ export const KICK_RETURN_MS = 800;
  */
 export const KICK_OUT_PER_S = 6;
 export const KICK_BACK_PER_S = 8;
+/** The pan's speed cap going out and back (world px per ms): too high to bind, so the ease alone sets the pace. Finite: a 0 ms frame times Infinity is NaN. */
+export const KICK_PAN_MAX_PX_PER_MS = 1e6;
 /** The trail fades over this long after the kick comes down (real ms); the winner's ring grows over the first part of it. */
 export const TRAIL_FADE_MS = 900;
 const WIN_POP_MS = 400;

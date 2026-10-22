@@ -32,7 +32,7 @@ import {
   type PlaybackBall,
   type PlaybackSpeed,
 } from '../match/view/livePlayback';
-import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_RETURN_MS, type Frame } from '../match/view/kickLayer';
+import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, type Frame } from '../match/view/kickLayer';
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
@@ -529,7 +529,7 @@ export class MatchScene extends Phaser.Scene {
     // Frame-rate independent; the speed cap scales with ×2/×4 playback. Going out to a
     // kick and back the ease alone sets the pace, so the return takes under a second at ×1 too.
     const kicking = kf !== null || this.kickBack;
-    const maxPx = kicking ? Infinity : PAN_MAX_PX_PER_MS * (this.playback?.getSpeed() ?? 1);
+    const maxPx = kicking ? KICK_PAN_MAX_PX_PER_MS : PAN_MAX_PX_PER_MS * (this.playback?.getSpeed() ?? 1);
     const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : PAN_RATE_PER_S;
     cam.setScroll(panTowards(cam.scrollX, tx, delta, rate, maxPx), panTowards(cam.scrollY, ty, delta, rate, maxPx));
     // A live match's pop-ups and bars sit over the sprites where the camera now has them.

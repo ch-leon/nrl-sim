@@ -7,6 +7,7 @@ import {
   KICK_BACK_PER_S,
   KICK_HOLD_MS,
   KICK_OUT_PER_S,
+  KICK_PAN_MAX_PX_PER_MS,
   KICK_RETURN_MS,
   KickWatch,
   LANDING_INSET,
@@ -137,7 +138,8 @@ describe('kickFrame: the framing that holds the kicker and where the ball comes 
 
   it('goes out in half a second and comes back within a second of the catch or the bounce, at any speed', () => {
     // The framing holds KICK_HOLD_MS after the kick comes down, then the camera eases back at
-    // KICK_BACK_PER_S with no pan cap: the zoom is whole again and the pan home inside the second.
+    // KICK_BACK_PER_S with a pan cap too high to bind: the zoom is whole again and the pan home
+    // inside the second. The cap is finite, so a 0 ms frame leaves the scroll where it is.
     expect(KICK_HOLD_MS + KICK_RETURN_MS).toBeLessThanOrEqual(1000);
     for (const fps of [60, 30, 20]) {
       const dt = 1000 / fps;
@@ -145,7 +147,7 @@ describe('kickFrame: the framing that holds the kicker and where the ball comes 
       let scroll = 0;
       for (let t = 0; t + dt <= KICK_RETURN_MS + 1e-9; t += dt) {
         zoom = easeZoom(zoom, 2, dt, KICK_BACK_PER_S);
-        scroll = panTowards(scroll, 600, dt, KICK_BACK_PER_S, Infinity);
+        scroll = panTowards(scroll, 600, dt, KICK_BACK_PER_S, KICK_PAN_MAX_PX_PER_MS);
       }
       expect(zoom).toBe(2);
       expect(Math.abs(600 - scroll)).toBeLessThan(1);
@@ -153,6 +155,7 @@ describe('kickFrame: the framing that holds the kicker and where the ball comes 
       for (let t = 0; t + dt <= 500 + 1e-9; t += dt) out = easeZoom(out, 1, dt, KICK_OUT_PER_S);
       expect(out - 1).toBeLessThan(0.05);
     }
+    expect(panTowards(250, 600, 0, KICK_BACK_PER_S, KICK_PAN_MAX_PX_PER_MS)).toBe(250);
     expect(framingHeld(null)).toBe(true);
     expect(framingHeld(KICK_HOLD_MS - 1)).toBe(true);
     expect(framingHeld(KICK_HOLD_MS)).toBe(false);
