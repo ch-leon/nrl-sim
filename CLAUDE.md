@@ -50,3 +50,22 @@ To write scenarios or run an experiment, follow the `balance-experiments` skill
   its row and the spec section it came from.
 - The sim is deterministic: same seed, same match. Adding a dice roll reshuffles every
   seed's match, so compare averages over many seeds, not one seed against itself.
+
+## Cloud environment
+
+Cursor cloud agents and Claude Code on the web both start from
+`scripts/cloud-setup.sh`. It is idempotent. It makes sure Node is 22 (the version
+CI uses; nothing else in the repo pins one), runs `npm ci` when `node_modules` is
+missing or `package-lock.json` has changed, and installs the Chromium build that
+matches this repo's `playwright-core`, linked at `/opt/pw-browsers/chromium`. That
+is the path `e2e:season` and `e2e:perf` use when `CHROMIUM_PATH` is unset. WebKit
+for `e2e:webkit` is optional and not installed.
+
+- Cursor reads `.cursor/environment.json` and runs the script as `install` while
+  it builds the environment, so a new agent boots with dependencies and Chromium
+  already on disk.
+- Claude Code on the web runs it from a SessionStart hook in `.claude/settings.json`,
+  and only when `CLAUDE_CODE_REMOTE=true`. If setup fails, the hook logs that and
+  the session still starts.
+
+The checks are the three commands at the top of this file.
