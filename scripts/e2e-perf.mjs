@@ -6,6 +6,9 @@
 //   advance (the hand-off to the match scene, then Skip to full time and Back to
 //   Club); ×4 advances (the tick pipeline, per week); "to finals" and "to season
 //   end" (the rollover); the frame rate on the grounds; and the bundle size.
+//   Between the hand-off and Skip, the match plays at its default ×4 for MATCH_WATCH_MS
+//   and the longest frame is read (N15.3: kicks going wide, the trail, the view's layers;
+//   the plan's goal is no frame over 100 ms).
 // Clicks are dispatched from inside the page and timed with performance.now(), so
 // a synchronous handler (the week tick) is measured on its own, without the test
 // driver's overhead; the async moments (scene hand-offs, the first paint, and since
@@ -60,6 +63,9 @@ const EXTERNAL = process.env.E2E_URL;
 const BASE = `${EXTERNAL ?? `http://localhost:${PORT}/`}?e2e`;
 const CHROMIUM = process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium';
 const W = 844, H = 390;
+/** The match plays this long between the hand-off and Skip while its frames are read (N15.3). */
+const MATCH_WATCH_MS = 15000;
+const MATCH_FRAME_MOMENT = `match play at ×4 (${MATCH_WATCH_MS / 1000} s): longest frame`;
 
 mkdirSync(OUT, { recursive: true });
 const log = (...a) => console.log(...a);
@@ -291,6 +297,27 @@ async function run() {
     return `of which the tick itself ${tickMs} ms`;
   });
   await page.screenshot({ path: join(OUT, 'match.png') });
+  // N15.3: the match as it plays (the default ×4) — the longest gap between two animation
+  // frames, and how many went over 100 ms. Before Skip, so Skip now plays the rest from a
+  // minute of match later.
+  await timed(MATCH_FRAME_MOMENT, async () => {
+    const r = await page.evaluate((ms) => new Promise((res) => {
+      const t0 = performance.now();
+      let last = t0, longest = 0, frames = 0, over = 0;
+      const tick = (t) => {
+        const d = t - last;
+        last = t;
+        frames++;
+        if (d > longest) longest = d;
+        if (d > 100) over++;
+        if (t - t0 < ms) requestAnimationFrame(tick);
+        else res({ longest: Math.round(longest), frames, over });
+      };
+      requestAnimationFrame(tick);
+    }), MATCH_WATCH_MS);
+    return { ms: r.longest, notes: `${r.frames} frames, ${r.over} over 100 ms` };
+  });
+  await page.screenshot({ path: join(OUT, 'match-play.png') });
   await timed('Skip → full time', async () => {
     await clickTimed('.nrl-mo-controls .nrl-btn', { text: 'Skip' });
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")');
@@ -381,6 +408,7 @@ const metrics = {
   groundsMs: pick('Start → grounds (textures painted, HUD up)'),
   handoffMs: pick('Advance Week → match scene (hand-off)'),
   handoffBlockMs: pick('Advance Week → match scene (hand-off)', 'blockMs'),
+  matchFrameMs: pick(MATCH_FRAME_MOMENT),
   skipMs: pick('Skip → full time'),
   skipBlockMs: pick('Skip → full time', 'blockMs'),
   backToClubMs: pick('Back to Club → grounds'),

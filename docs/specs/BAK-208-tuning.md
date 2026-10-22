@@ -178,8 +178,14 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `ZOOM_DEFAULT` / `ZOOM_CLOSE` / `ZOOM_WIDE` | `src/world/readability.ts` | 2 / 3 / 2 (integers) | Camera zooms; integers keep the pixels crisp. |
 | Stats strip window | `src/match/lab/stats.ts` `WINDOW_TICKS` | 5 min | `last m:ss · T · Brk · Off · Err · K · Try · Skill`. |
 | `BAR_W` / `BAR_H` / `BAR_LIFT` / `FIGHT_COLORS` | `src/match/view/wrestleBar.ts` | 30 / 5 screen px, 38 world px / green > 50% > yellow > 25% > red | The wrestle bar over the carrier, a pip per man on him. |
+| `FRAME_MARGIN` | `src/match/view/kickLayer.ts` | 76 top / 120 bottom / 40 left / 160 right, screen px | A kick goes wide (N15.3): the band its framing holds the landing, the kicker and the top of the flight in, clear of the scoreboard, the ticker and the speed buttons and the Stats panel. The zoom is the widest whole number from the beat's down to 1 that holds them; when they cannot all fit at 1, the landing first (and `LANDING_INSET`, 40 px, in from the band's edges: room for the men under it), then the kicker, then the top as far as it goes. At 844×390 nearly every kick goes from 2 to 1; at 1280×800 most fit at 2 and only the centre moves. On a phone a long kick holds its landing but loses the kicker about half the time. **Assumed (needs Leon)**: how far it widens. |
+| `KICK_OUT_PER_S` / `KICK_BACK_PER_S` | `kickLayer.ts` | 6 / 8 per s | Zoom and pan ease out to a kick (95% in 0.5 s) and back (whole again inside `KICK_RETURN_MS`); the pan's speed cap is lifted for both (`KICK_PAN_MAX_PX_PER_MS`, 1e6). **Assumed (needs Leon)**: the return time. |
+| `KICK_HOLD_MS` / `KICK_RETURN_MS` | `kickLayer.ts` | 200 / 800 ms (real) | The framing holds this long after the catch or the bounce, then has this long to get back: back within a second. **Assumed (needs Leon)**: the return time. |
+| `TRAIL_FADE_MS` | `kickLayer.ts` | 900 ms (real) | The ball's trail fades out after the kick comes down. **Assumed (needs Leon)**: the trail's look. |
+| `CONTEST_M` | `kickLayer.ts` | 9 m | A bomb's or cross-field kick's contest is drawn from the top of its flight: the nearest man of each side within 9 m of where it lands, a ring each in his side's colours; the one who takes it gets a white ring that grows, the others' fade. **Assumed (needs Leon)**: the contest's look. |
+| `SKID_LIFT_M` | `kickLayer.ts` | 0.12 m | A grubber's hop that comes down under this leaves a skid mark. **Assumed (needs Leon)**: the skid's look. |
 
-Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`.
+Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`, `tests/match/view/kickLayer.test.ts`.
 
 ## 10. Legs (§8)
 
