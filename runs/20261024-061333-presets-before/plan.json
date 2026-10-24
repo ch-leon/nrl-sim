@@ -1,0 +1,160 @@
+{
+  "name": "presets-before",
+  "description": "Before N13.1: each attack preset against Balanced and each defence preset against Slide, even 60 v 60, the preset at home and away. Calls and the AI coach off. The before table for the 45–55% band.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "balanced v balanced",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "grind at home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "grind away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      }
+    },
+    {
+      "name": "expansive at home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      }
+    },
+    {
+      "name": "kick-chase at home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      }
+    },
+    {
+      "name": "all-out at home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      }
+    },
+    {
+      "name": "rush at home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "rush away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      }
+    },
+    {
+      "name": "compressed at home",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed away",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      }
+    }
+  ]
+}

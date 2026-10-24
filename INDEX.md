@@ -119,3 +119,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261021-231255-standard | standard | 65a9b12 | main | [report](runs/20261021-231255-standard/report.md) |
 | 20261022-005633-standard | standard | 27b4ef1 | main | [report](runs/20261022-005633-standard/report.md) |
 | 20261024-043546-standard | standard | 35afd04 | main | [report](runs/20261024-043546-standard/report.md) |
+| 20261024-063629-presets | presets | 35afd04 (uncommitted changes) | cursor/presets-balance-aa42 | [report](runs/20261024-063629-presets/report.md) |
+| 20261024-061333-presets-before | presets-before | 35afd04 | HEAD | [report](runs/20261024-061333-presets-before/report.md) |
