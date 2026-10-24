@@ -363,8 +363,12 @@ export const MANAGED = {
   STAFF_RESERVE: 40_000,
 } as const;
 
-/** The roles the managed manager hires, in order (N14.5). */
-export const MANAGED_STAFF: readonly StaffRole[] = ['welfare'];
+/**
+ * The roles the managed manager hires, in order (N14.5, then the Assistant
+ * Coach and the Analyst once their effects landed). Welfare stays last, and
+ * his cut is unchanged.
+ */
+export const MANAGED_STAFF: readonly StaffRole[] = ['assistantCoach', 'analyst', 'welfare'];
 
 /** The club's next home fixture from this week, if any. */
 function nextHomeFixture(s: GameState): Fixture | undefined {
@@ -451,8 +455,7 @@ function manage(): Signed {
     buildFirstFree(defId);
   }
   seatTheCrowd();
-  // Staff (N14.5): each once a season of his wage is affordable. Only the roles that act today: the
-  // Assistant Coach (first) and the Analyst join MANAGED_STAFF when the break rule lands (N13.5).
+  // Staff: each once a season of his wage is affordable. Assistant Coach, then Analyst, then Welfare.
   for (const role of MANAGED_STAFF) {
     const st = getState();
     if (hasStaff(st, role)) continue;

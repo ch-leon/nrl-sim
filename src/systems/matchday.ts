@@ -4,7 +4,7 @@
 // the seed, and the result — what the player watched and called — lands with
 // the rest of the week at 'match:finished'. Fast-forward plays it headless.
 import { bus, type LiveMatchData } from '../core/events';
-import { getState, setState, type Fixture, type RivalClub } from '../core/state';
+import { getState, setState, type Fixture, type GameState, type RivalClub } from '../core/state';
 import { registerTickHook, resumeWeek, weekHeld, TICK_ORDER } from '../core/time';
 import { clearLiveMatch, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, difficultyMultipliers } from '../config';
@@ -16,10 +16,26 @@ import { runMatch } from '../match/league/match';
 import { rivalEdge } from '../match/league/spread';
 import { canUseWorker, playMatchesInWorker } from './matchJobs';
 import { aiCoachSides, unlockedCalls } from '../match/league/calls';
+import { hasStaff } from './staff';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { ON_FIELD } from '../config';
 import { autoPick, describeFills, resolveLineup } from './lineup';
+
+/**
+ * Who changes plan at the breaks. The rival always. The player's side too when
+ * an Assistant Coach is hired and the match is fast-forwarded (N14). A watched
+ * match, and Skip from it, stay on the plan the player set.
+ */
+export function breakRuleSidesFor(
+  state: Pick<GameState, 'staff'>,
+  rivalSide: 'home' | 'away',
+  fastForward: boolean,
+): ('home' | 'away')[] {
+  const sides: ('home' | 'away')[] = [rivalSide];
+  if (fastForward && hasStaff(state, 'assistantCoach')) sides.push(rivalSide === 'home' ? 'away' : 'home');
+  return sides;
+}
 
 /**
  * The live match the player left with Save & exit (or is watching). The week
@@ -243,7 +259,7 @@ export function registerPlayerMatchSystem(): void {
     // The difficulty's edge to the rival, after the rating spread (N12.2); none on Normal.
     const edge = rivalEdge(rivalSide, state.settings.difficulty);
     // The rival changes plan at the breaks (N13.5, N14.1), on every difficulty.
-    // The player's side does not, unless a later hire says so on a fast-forward.
+    // An Assistant Coach adds the player's side, and only on a fast-forward.
     // Hard's rival also has an AI coach (Assumed: the break rule alone won 50.2%,
     // not the 8 points N12.2 used). Normal and Easy stay off. The global knob stays 0.
     const matchOpts = {
@@ -252,7 +268,7 @@ export function registerPlayerMatchSystem(): void {
       ...(edge ? { difficultyEdge: edge } : {}),
       ...(state.weather ? { weather: state.weather } : {}),
       aiCoach: aiCoachSides([rivalSide], state.settings.difficulty === 'hard'),
-      breakRuleSides: [rivalSide],
+      breakRuleSides: breakRuleSidesFor(state, rivalSide, !!ctx.fastForward),
       // A drawn final goes to golden point (N9.4).
       ...(isFinalsRound(fixture.round) ? { goldenPoint: true } : {}),
     };

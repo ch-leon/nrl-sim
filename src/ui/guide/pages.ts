@@ -158,8 +158,8 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Staff',
         bullets: [
           'Three hires the facilities don’t cover, under the board’s objectives on the Finance screen. Each is paid a wage a week with the running costs and stays until you let him go.',
-          `${STAFF.assistantCoach.title} (${dollars(STAFF.assistantCoach.wage)} a week on Normal): will change the plan at the break when you fast-forward a match, as the rival coaches do (coming in a later update).`,
-          `${STAFF.analyst.title} (${dollars(STAFF.analyst.wage)} a week on Normal): will say on the next-match card what the rival plays and what it switches to when behind (coming in a later update).`,
+          `${STAFF.assistantCoach.title} (${dollars(STAFF.assistantCoach.wage)} a week on Normal): changes your plan at the break when you fast-forward a match, the same way a rival’s does. A match you watch, and Skip, stay on the plan you set.`,
+          `${STAFF.analyst.title} (${dollars(STAFF.analyst.wage)} a week on Normal): on the next-match card and the rival’s squad page, says what they switch to when they are behind.`,
           `${STAFF.welfare.title} (${dollars(STAFF.welfare.wage)} a week on Normal): halves the odds of a player’s grievance card (a meeting, a pay-rise demand, a homesick youngster) and takes ${percent(WELFARE_RENEWAL_CUT)} off renewal asks.`,
         ],
       },
