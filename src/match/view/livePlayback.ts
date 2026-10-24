@@ -33,7 +33,7 @@ import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
-import { TraitLayer } from './traitLayer';
+import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer } from './traitLayer';
 import { liveMatchSaveDue } from '../../systems/liveMatchRecord';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
@@ -434,7 +434,7 @@ export class LivePlayback {
     this.popups.update(deltaMs, zoom, feet);
     this.zone.update(deltaMs);
     this.kickLayer.update(this.kicks.kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
-    this.traits.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
+    this.traits.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet, this.runner.speed);
     this.wrestleBar.update(this.runner.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
     this.sprintLayer.update(this.runner.cur, zoom, (side, slot) => {
       const a = this.scene.players[side][slot];
@@ -473,7 +473,8 @@ export class LivePlayback {
         this.traits.clear();
       } else {
         this.kicks.event(e, cur);
-        this.traits.note(e, cur);
+        // At ×4 and ×8 a one-second move is gone before it can be read. Ease the match; the mark also holds longer.
+        if (this.traits.note(e, cur) && this.runner.speed >= TRAIT_FAST_FROM) this.runner.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
       }
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
       const line = this.commentator.line(e, cur.score);

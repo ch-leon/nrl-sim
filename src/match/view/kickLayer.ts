@@ -170,7 +170,7 @@ export class KickWatch {
         downTick: null,
         contest: null,
         winner: null,
-        boot: Boolean(e.trait),
+        boot: typeof e.trait === 'string' && (e.trait === 'Big Boot' || e.trait.startsWith('Big Boot ')),
       };
       this.groundAt = -2;
       this.prevLift = snap.ball.lift;

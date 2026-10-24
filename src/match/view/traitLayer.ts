@@ -10,12 +10,30 @@ import type Phaser from 'phaser';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import { toFieldPt } from '../core/field';
 
-/** How long a move stays up, real ms. A second or less. */
+/** How long a move stays up, real ms. A second or less at ×1 and ×2. */
 export const TRAIT_MOVE_MS = 1000;
+/** From this playback speed the move is held longer, and the match eases, so ×8 does not run past it. */
+export const TRAIT_FAST_FROM = 4;
+/** Real-time multiplier on TRAIT_MOVE_MS while the playback is at TRAIT_FAST_FROM or faster. */
+export const TRAIT_FAST_HOLD = 2;
+/** A short ease when a move fires at that speed: real ms, and the time factor. */
+export const TRAIT_SLOW_MS = 420;
+export const TRAIT_SLOW_FACTOR = 0.4;
+
+/** How many real seconds a move lasts at this playback speed. ×4 and ×8 hold it twice as long. */
+export function moveHold(speed: number): number {
+  return speed >= TRAIT_FAST_FROM ? TRAIT_FAST_HOLD : 1;
+}
 /** The last part of that is the fade. */
 const FADE_MS = 280;
 /** A teammate this close to the pass line, between the passer and the man he finds, is the one skipped. */
 export const CUT_NEAR_M = 2.5;
+/**
+ * Keep this much of the pass clear of either end, in metres. A fraction of the
+ * pass length dropped the man beside the passer on a long cut-out (he sits in
+ * the first 12% of a 20 m ball) and circled someone further down the line.
+ */
+export const CUT_END_M = 0.4;
 /** The arm, the cut and the shock, in the trait colour (popups.ts TRAIT_COLOR). */
 const MOVE_COLOR = 0xd9a5ff;
 const DUST_COLOR = 0xd9c9a3;
@@ -34,7 +52,25 @@ export interface TraitMove {
   /** A cut-out: the man he found. */
   to?: { x: number; y: number; slot: number };
   /** A cut-out: the teammate the line passes through, when one stands on it. */
-  through?: { x: number; y: number };
+  through?: { x: number; y: number; slot: number };
+}
+
+/**
+ * Which announced name may draw the move. Finisher shares the step, the fend
+ * and the drive. A Hothead's big hit is his temper, not a Hitman's shock, and
+ * draws nothing here.
+ */
+const MOVE_TRAITS: Readonly<Record<MoveKind, readonly string[]>> = {
+  fend: ["Don't Argue", 'Finisher'],
+  step: ['Dancing Feet', 'Finisher'],
+  'cut-out': ['Playmaker'],
+  drive: ['Wrecking Ball', 'Finisher'],
+  hit: ['Hitman'],
+};
+
+/** The event's trait line ("Hitman II") is one of the names that own this move. */
+export function traitOwnsMove(kind: MoveKind, trait: string): boolean {
+  return MOVE_TRAITS[kind].some((name) => trait === name || trait.startsWith(`${name} `));
 }
 
 const KIND_OF: Readonly<Record<string, MoveKind>> = {
@@ -55,27 +91,32 @@ export function moveAlpha(ageMs: number): number {
 }
 
 /**
- * The teammate nearest the line from `from` to `to` and between them, within
- * CUT_NEAR_M of it. Null when the pass is too short to skip anyone, or nobody
- * stands on it.
+ * The man a cut-out skips: the teammate nearest the passer who still stands
+ * on the line to the man he found, within CUT_NEAR_M of it and clear of both
+ * ends. The nearest point on the line would rather circle a trailer in a
+ * crowded shift than the man beside the ball. Null when the pass is too short
+ * to skip anyone, or nobody stands on it.
  */
-export function manOnTheLine(
+export function manOnTheLine<T extends { x: number; y: number }>(
   from: { x: number; y: number },
   to: { x: number; y: number },
-  others: readonly { x: number; y: number }[],
-): { x: number; y: number } | null {
+  others: readonly T[],
+): T | null {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len2 = dx * dx + dy * dy;
-  if (len2 < 1) return null;
-  let best: { x: number; y: number } | null = null;
-  let bd = CUT_NEAR_M;
+  const len = Math.sqrt(len2);
+  if (len < 1) return null;
+  let best: T | null = null;
+  let bestAlong = Infinity;
   for (const p of others) {
-    const u = ((p.x - from.x) * dx + (p.y - from.y) * dy) / len2;
-    if (u <= 0.12 || u >= 0.88) continue;
+    const along = ((p.x - from.x) * dx + (p.y - from.y) * dy) / len;
+    if (along <= CUT_END_M || along >= len - CUT_END_M) continue;
+    const u = along / len;
     const off = Math.hypot(p.x - (from.x + u * dx), p.y - (from.y + u * dy));
-    if (off < bd) {
-      bd = off;
+    if (off > CUT_NEAR_M) continue;
+    if (along < bestAlong) {
+      bestAlong = along;
       best = p;
     }
   }
@@ -91,7 +132,7 @@ export function manOnTheLine(
 export function traitMoveFor(e: SimEvent, snap: Snapshot): TraitMove | null {
   if (!e.trait || e.side === undefined || e.slot === undefined) return null;
   const kind = KIND_OF[e.kind];
-  if (!kind) return null;
+  if (!kind || !traitOwnsMove(kind, e.trait)) return null;
   const who = snap.players.find((p) => p.side === e.side && p.slot === e.slot);
   if (!who) return null;
   const move: TraitMove = { kind, side: e.side, slot: e.slot, x: who.x, y: who.y, headX: who.headX || 1 };
@@ -104,7 +145,7 @@ export function traitMoveFor(e: SimEvent, snap: Snapshot): TraitMove | null {
         to,
         snap.players.filter((p) => p.side === e.side && p.slot !== who.slot && p.slot !== to.slot),
       );
-      if (through) move.through = { x: through.x, y: through.y };
+      if (through) move.through = { x: through.x, y: through.y, slot: through.slot };
     }
   }
   return move;
@@ -146,9 +187,12 @@ export class TraitLayer {
     this.g = scene.add.graphics().setDepth(depth);
   }
 
-  note(e: SimEvent, snap: Snapshot): void {
+  /** True when the event drew a move (the playback eases ×4 and ×8 so it can be seen). */
+  note(e: SimEvent, snap: Snapshot): boolean {
     const move = traitMoveFor(e, snap);
-    if (move) this.live.push({ move, born: this.now });
+    if (!move) return false;
+    this.live.push({ move, born: this.now });
+    return true;
   }
 
   clear(): void {
@@ -160,8 +204,10 @@ export class TraitLayer {
     zoom: number,
     toWorld: (fx: number, fy: number) => WorldPt,
     feet: (side: Side, slot: number) => WorldPt | null,
+    speed = 1,
   ): void {
-    this.now += deltaMs;
+    // Age in held time: at ×8 the mark stays up for two real seconds, not one.
+    this.now += deltaMs / moveHold(speed);
     this.g.clear();
     const px = 1 / Math.max(0.25, zoom);
     for (let i = this.live.length - 1; i >= 0; i--) {
@@ -205,15 +251,18 @@ export class TraitLayer {
       return;
     }
     if (move.kind === 'cut-out' && move.to) {
-      const from = worldOf(move.x, move.y, toWorld);
-      const to = worldOf(move.to.x, move.to.y, toWorld);
+      // Follow the men, so at ×8 the line is still through the man he skipped
+      // and not a patch of grass he has run off.
+      const from = feet(move.side, move.slot) ?? worldOf(move.x, move.y, toWorld);
+      const to = feet(move.side, move.to.slot) ?? worldOf(move.to.x, move.to.y, toWorld);
+      const mid = move.through ? feet(move.side, move.through.slot) ?? worldOf(move.through.x, move.through.y, toWorld) : null;
       g.lineStyle(3 * px, MOVE_COLOR, 0.9 * a);
-      g.lineBetween(from.x, from.y, to.x, to.y);
-      g.fillStyle(MOVE_COLOR, 0.85 * a).fillCircle(to.x, to.y, 3.5 * px);
-      if (move.through) {
-        const mid = worldOf(move.through.x, move.through.y, toWorld);
+      if (mid) {
+        g.lineBetween(from.x, from.y, mid.x, mid.y);
+        g.lineBetween(mid.x, mid.y, to.x, to.y);
         g.lineStyle(2 * px, 0xffffff, 0.9 * a).strokeCircle(mid.x, mid.y, 8);
-      }
+      } else g.lineBetween(from.x, from.y, to.x, to.y);
+      g.fillStyle(MOVE_COLOR, 0.85 * a).fillCircle(to.x, to.y, 3.5 * px);
       return;
     }
     if (move.kind === 'drive') {
