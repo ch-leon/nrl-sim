@@ -97,7 +97,10 @@ somewhere else.
   makes whenever it may (`{ "home": [{ "call": "shift-left", "tackle": 2 }] }`, #73), and
   `plans`, changes of plan at the breaks, each made once at the first break it names
   (`[{ "side": "home", "at": "half-time", "tactics": { "attack": "expansive" } }]`; `at` is
-  `half-time`, `try` (the first try) or `conceded` (the first try against that side), N11).
+  `half-time`, `try` (the first try) or `conceded` (the first try against that side), N11),
+  and `breakRule` (`["home"]`, `["away"]` or both): those sides, as written, change plan
+  at the breaks by the default rule (N13.5, `breaks.*`). With `bothWays` the named side
+  stays the written one, so `away` is the opponent of a tracked home preset.
 - **A scenario's own matches** (`seeds`): that row plays this many matches instead of
   the plan's. `--seeds` still replaces the plan's count and leaves a row's own count
   alone, so a preset matrix stays at the size it was signed off at. With `track`

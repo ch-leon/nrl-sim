@@ -442,6 +442,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | F | Fatigue and the wrestle — *shipped* | §8 |
 | F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with 2b) | §8.2 |
 | F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
+| N13.5 | A side's plan can change at half-time and after a try, by a rule the match opts into — *shipped* (off unless a side is named; N14 wires the rivals). Tuning §30 | §5 |
 
 Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
 
@@ -468,6 +469,9 @@ Then BAK-207 Phase 2 (full match, scoring, halves) and Phase 3 (balance).
   measure against §7 (Leon: "we may need to refine it still, come back to it later").
 - ~~**Sprint follow-ups**~~ and ~~**stamina knobs by name**~~: shipped in N9.3 (§8.2; the
   tuning reference §10 and §25, with a kick-chase run and a stamina sweep).
+- ~~**A side changes plan at the breaks**~~: shipped in N13.5 (tuning §30). The rule
+  is off unless the match names the sides, so the golden even match is unchanged.
+  N14 decides which rivals use it.
 - **§7 outliers for the Phase 3 pass**, measured with the standard plan: line breaks
   ~50 a match (target 8–14), offloads ~2 (8–14), tackles ~175 (90–120), and 70 v 50
   winning every match (target ~70%). Structural, not one knob; good harness work.

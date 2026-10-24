@@ -431,7 +431,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const planList: PlanInput[] = [];
       const planDone = planRules.map(() => false);
       const simEdge = edge && flip ? { ...edge, side: flipSide(edge.side) } : edge;
-      const sim = new LiveSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) });
+      const ruleSides = (cell.scenario.breakRule ?? []).map(onSim);
+      const sim = new LiveSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(ruleSides.length ? { breakRuleSides: ruleSides } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();

@@ -18,6 +18,7 @@ import { GOALS } from './goals';
 import { EDGE_COST, TRAIT_PTS } from './traits';
 import { WEATHER } from './weather';
 import { RATING } from './spread';
+import { BREAKS } from './breaks';
 import { CALLS } from './calls';
 import { WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
@@ -59,6 +60,7 @@ export const KNOBS = {
   weather: WEATHER,
   rating: RATING,
   calls: CALLS,
+  breaks: BREAKS,
   goals: GOALS,
   bin: BIN,
   difficulty: DIFFICULTY_EDGE,

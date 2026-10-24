@@ -88,7 +88,11 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
     zones: { own20: { offload: 0.8, cutOut: 0.01 } },
   },
   'kick-chase': {
-    base: { pass: -0.05, offload: 0.6, step: 0.9, earlyKick: 0.55, earlyTerritory: 0.35, kickBias: { bomb: 1.8, long: 1.2, grubber: 1.3, 'cross-field': 0.8, chip: 0.8 } },
+    // N13.5: with the other side changing plan at the breaks, step 0.9 won
+    // 43.0% (seeds 1–200) and 41.8% (seeds 10001–10200). Stepping the
+    // one-on-one every time, as Balanced does, brings those blocks to 48.8%
+    // and 45.5%. The bombs stay; a match still has about 24 kicks.
+    base: { pass: -0.05, offload: 0.6, step: 1, earlyKick: 0.55, earlyTerritory: 0.35, kickBias: { bomb: 1.8, long: 1.2, grubber: 1.3, 'cross-field': 0.8, chip: 0.8 } },
     zones: { redZone: { offload: 0.8 } },
   },
   'all-out': {

@@ -49,6 +49,7 @@ import {
   kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate, type KickChoice,
 } from './tactics';
 import { DEFAULT_TACTICS, PRESET_LABEL, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type DefencePreset, type TeamTactics } from './presets';
+import { defaultBreakRule, type BreakRule, type PlanChange } from './breaks';
 import { EDGE_COST, FINISHER_M, TRAIT_PTS, announce, bootMult, contestTraits, interceptTraits, speedMult, stepTraits } from './traits';
 import { traitBoost, type TraitInstance } from '../../data/traits';
 import { FATIGUE, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
@@ -346,6 +347,15 @@ export interface LiveOptions {
   goldenPoint?: boolean;
   /** Plan changes by tick (N11): read like the calls, each taking effect at the next restart. */
   plans?: PlanInput[];
+  /**
+   * A plan at the breaks (N13.5). With `breakRuleSides`, those sides are asked
+   * at half-time and after a try. Absent, and no sides named: the default rule
+   * is not used, and the match is unchanged. A function is not cloneable, so
+   * the worker and a replay pass sides only and the sim uses the default rule.
+   */
+  breakRule?: BreakRule;
+  /** Sides the break rule runs for. Empty or absent, with no function: nobody. */
+  breakRuleSides?: readonly Side[];
   /** The difficulty (N12.2): rating points the player's rival plays with on every stat, after the spread (spread.ts). Absent on Normal. */
   difficultyEdge?: DifficultyEdge;
 }
@@ -437,7 +447,14 @@ export class LiveSim implements MatchSim {
   /** Plan changes (N11): the list by tick, how far it has been read, and each side's new plan waiting for the restart. */
   private readonly planList: PlanInput[];
   private planRead = 0;
-  private readonly nextPlan: Record<Side, TeamTactics | null> = { home: null, away: null };
+  private readonly nextPlan: Record<Side, { tactics: TeamTactics; at: PlanChange['at']; minute: number } | null> = { home: null, away: null };
+  /** The break rule (N13.5), and the sides it runs for. Null when the match has none. */
+  private readonly breakRule: BreakRule | null;
+  private readonly breakRuleSides: ReadonlySet<Side>;
+  /** Tries conceded in a row, without this side scoring in between. */
+  private readonly concededRun: Record<Side, number> = { home: 0, away: 0 };
+  /** Plan changes the restart actually played (the match report's line). */
+  readonly planChanges: PlanChange[] = [];
   private callRead = 0;
   private readonly callState: Record<Side, { attack: CoachCall | null; defence: CoachCall | null; usedAttack: boolean; usedDefence: boolean }> = {
     home: { attack: null, defence: null, usedAttack: false, usedDefence: false },
@@ -497,6 +514,17 @@ export class LiveSim implements MatchSim {
     this.callList = opts.calls ?? [];
     this.aiCoach = opts.aiCoach ?? [];
     this.planList = opts.plans ?? [];
+    const listed = opts.breakRuleSides;
+    if (opts.breakRule) {
+      this.breakRule = opts.breakRule;
+      this.breakRuleSides = new Set(listed ?? (['home', 'away'] as const));
+    } else if (listed && listed.length > 0) {
+      this.breakRule = defaultBreakRule;
+      this.breakRuleSides = new Set(listed);
+    } else {
+      this.breakRule = null;
+      this.breakRuleSides = new Set();
+    }
     this.weather = opts.weather ?? 'clear';
     this.wx = weatherEffect(this.weather);
     this.injuryRate = opts.injuryRate ?? 1;
@@ -836,23 +864,55 @@ export class LiveSim implements MatchSim {
   setTactics(side: Side, tactics: TeamTactics): string | null {
     const why = this.planRefusal();
     if (why) return why;
-    this.nextPlan[side] = { attack: tactics.attack, defence: tactics.defence };
+    this.nextPlan[side] = { tactics: { attack: tactics.attack, defence: tactics.defence }, at: this.breakKind(), minute: Math.floor(this.matchSeconds / 60) };
     return null;
   }
 
   /** The plan each side will play from the restart: the new one if the coach changed it, else the one in force. */
   planFor(side: Side): TeamTactics {
-    return this.nextPlan[side] ?? this.tactics[side];
+    return this.nextPlan[side]?.tactics ?? this.tactics[side];
+  }
+
+  /** Where a plan change made now would be filed: half-time, the break after a try, or the kick-off. */
+  private breakKind(): PlanChange['at'] {
+    const k = this.phase.kind;
+    if (k === 'half-time') return 'half-time';
+    if (k === 'try' || k === 'conversion') return 'try';
+    return 'kickoff';
+  }
+
+  /**
+   * The break rule (N13.5), once, as the break opens. A coach who has already
+   * chosen this break is left alone. No rule, no call, and nothing about the
+   * match changes.
+   */
+  private considerBreak(at: 'half-time' | 'try'): void {
+    const rule = this.breakRule;
+    if (!rule) return;
+    for (const side of ['home', 'away'] as const) {
+      if (!this.breakRuleSides.has(side) || this.nextPlan[side]) continue;
+      const next = rule({
+        score: { home: this.points.home, away: this.points.away },
+        minute: Math.floor(this.matchSeconds / 60),
+        plan: this.planFor(side),
+        side,
+        at,
+        concededInARow: this.concededRun[side],
+      });
+      if (next) this.setTactics(side, next);
+    }
   }
 
   /** The restart: each new plan comes into force, and the commentary says so. */
   private takeNewPlans(): void {
     for (const side of ['home', 'away'] as const) {
-      const t = this.nextPlan[side];
-      if (!t) continue;
+      const queued = this.nextPlan[side];
+      if (!queued) continue;
       this.nextPlan[side] = null;
+      const t = queued.tactics;
       if (t.attack === this.tactics[side].attack && t.defence === this.tactics[side].defence) continue;
       this.tactics[side] = t;
+      this.planChanges.push({ minute: queued.minute, side, attack: t.attack, defence: t.defence, at: queued.at });
       this.emit('plan', `${this.names[side]} change the plan: ${PRESET_LABEL[t.attack]} / ${PRESET_LABEL[t.defence]}`, this.kicker(side));
       this.events[this.events.length - 1]!.detail = `${t.attack}/${t.defence}`;
     }
@@ -1012,11 +1072,13 @@ export class LiveSim implements MatchSim {
     if (this.half < this.length.halves) {
       this.emit('half-time', `Half-time: ${score}`);
       this.phase = { kind: 'half-time', t0: this.tick };
+      this.considerBreak('half-time');
     } else if (this.goldenPoint && !this.golden && NINES.goldenPointMinutes > 0 && this.points.home === this.points.away) {
       // A drawn final: golden point, the next score wins (N9.4).
       this.emit('golden-point', `Full time: ${score} — golden point! The next score wins`);
       this.golden = true;
       this.phase = { kind: 'half-time', t0: this.tick };
+      this.considerBreak('half-time');
     } else {
       this.emit('full-time', `Full time: ${score}`);
       this.phase = { kind: 'full-time' };
@@ -2463,6 +2525,8 @@ export class LiveSim implements MatchSim {
     const dir = this.dirOf(scorer.side);
     const bonus = inBonusZone(scorer.body.pos, postsFor(dir, FIELD_LENGTH, MID_Y), dir);
     this.tries[scorer.side]++;
+    this.concededRun[other(scorer.side)]++;
+    this.concededRun[scorer.side] = 0;
     this.points[scorer.side] += bonus ? NINES.bonusTryPoints : NINES.tryPoints;
     this.emit('try', bonus ? `TRY! ${scorer.name} goes round under the posts — five points for ${this.names[scorer.side]}` : `TRY! ${scorer.name} dives over for ${this.names[scorer.side]}`, scorer);
     if (bonus) this.events[this.events.length - 1]!.detail = 'bonus';
@@ -2475,6 +2539,7 @@ export class LiveSim implements MatchSim {
       p.poseUntil = this.tick + LIVE.tryTicks;
     }
     this.phase = { kind: 'try', t0: this.tick, scorer: this.indexOf(scorer) };
+    this.considerBreak('try');
   }
 
   // ── Who goes where ────────────────────────────────────────────────────────

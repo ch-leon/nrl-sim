@@ -60,6 +60,11 @@ export interface ScenarioSpec {
   /** Plan changes at the breaks (N11): each made once, at the first break it names. */
   plans?: PlanRule[];
   /**
+   * Sides that use the default break rule (N13.5). With `bothWays` a named
+   * side stays the side as written: `away` is the opponent of a tracked home preset.
+   */
+  breakRule?: ('home' | 'away')[];
+  /**
    * Matches for this scenario, instead of the plan's `seeds` (N13). A row that
    * has to be read closely (a preset's win rate) can ask for more than the
    * plan's smoke count. With `bothWays`, this many in each orientation.
@@ -140,6 +145,7 @@ export function checkPlan(p: Plan): string[] {
     for (const side of ['home', 'away'] as const) {
       for (const r of s.calls?.[side] ?? []) if (!isCoachCall(r.call)) errs.push(`${s.name}: unknown call "${String(r.call)}" for ${side}`);
     }
+    if (s.breakRule !== undefined && (!Array.isArray(s.breakRule) || s.breakRule.some((x) => x !== 'home' && x !== 'away'))) errs.push(`${s.name}: breakRule must list home / away`);
     for (const r of s.plans ?? []) {
       if (r.side !== 'home' && r.side !== 'away') errs.push(`${s.name}: a plan change needs side home / away`);
       if (!['half-time', 'try', 'conceded'].includes(r.at)) errs.push(`${s.name}: a plan change is at half-time / try / conceded`);

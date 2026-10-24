@@ -173,7 +173,7 @@ same 400 matches, on `35afd04`). After:
 |---|---:|---:|---|
 | Grind | 49.2% | 49.2% | unchanged |
 | Expansive | 35.0% | 46.2% | pass +0.15 → 0, cut-out 0.08 → 0.02 (own 20 0.03 → 0.01, so it stays under the new base), width 0.35 → 0.28, early kick 0.30 → 0.18 |
-| Kick-chase | 46.5% | 46.5% | unchanged |
+| Kick-chase | 46.5% | 46.5% | unchanged here; step 0.9 → 1 in N13.5 once the other side changes plan (§30) |
 | All-out | 38.0% | 54.8% | pass +0.15 → 0, offload ×1.6 → ×1.5, cut-out 0.12 → 0.03, width 0.45 → 0.35, early kick 0.30 → 0.15. 54.8% is seeds 1–200; five blocks of 400 pool to 48.3% (see `docs/status/2026-10-balance.md`) |
 | Rush | 57.2% | 49.8% | line speed 6.5 → 6.2 m/s (busts stayed at +0.11: 0.115 already fell to about 45%) |
 | Compressed | 64.0% | 49.0% | pull ×1.4 → ×1.1, markers ×1.2 → ×1.05, busts −0.04 → −0.02, step-against −0.02 → +0.03 |
@@ -1025,4 +1025,65 @@ Measured in tests (even 60 v 60, the fullback named kicker): over 40 seeds he ta
 every conversion and penalty goal (the rest fall to slot 5 while the interchange has him off)
 and Skill 95 converts more than 10 points better than Skill 25; over 20 seeds the side kicks in
 play as much as before, the fullback no more than unnamed, and field goals still come.
+
+## 30. The break rule (N13.5, #316)
+
+A side's plan can change at half-time and after a try. The rule lives in
+`src/match/league/breaks.ts` and the sim calls it from `live.ts` when the break
+opens (`endHalf`, and `score` once the phase is the try). It does not run on a
+penalty goal or a field goal. No dice of its own: a match that names no side
+is the match it was, and the golden even Balanced / Slide match stays
+`8-14:495:67db8b634c5a2e73`.
+
+The harness turns it on per side (`breakRule: ["home"]` or `["away"]` on a
+scenario; `breakRuleSides` on `runMatch`). With `bothWays` the named side stays
+the side as written, so `away` is the opponent of a tracked home preset. An
+in-process caller can pass its own function (`LiveOptions.breakRule`); the
+worker, a resume and a replay only carry the side list and use
+`defaultBreakRule`. A coach's own `PlanInput` on a later tick overwrites the
+rule. The golden-point break is treated as half-time.
+
+**Assumed (needs Leon):** the thresholds, Kick-chase's neighbours (open goes to
+Expansive, tighten goes to Grind), Compressed as the tight end of defence, and
+that two tries conceded in a row open the plan even when the side is still ahead.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `breaks.downBy` | `breaks.ts` | 8 | Points behind at half-time: one step more open. |
+| `breaks.concededRun` | `breaks.ts` | 2 | Tries conceded in a row, at a break: one step more open. Beats the late-lead tighten. |
+| `breaks.upBy` | `breaks.ts` | 12 | Points ahead at a break: one step tighter. |
+| `breaks.tightenFromMinute` | `breaks.ts` | 15 | A lead only tightens from this minute. A Nines match is 2 × 9:00, so this is the last three minutes. |
+
+Attack, tight to open: Grind → Balanced → Expansive → All-out. Defence: Compressed → Slide → Rush. Already at the end of the line, the step does nothing and the plan stays.
+
+**Even sides.** The rule on one side of an even 60 v 60, 200 seeds both ways
+(`balance/plans/break-rule.json`, run `20261024-134002-break-rule`): that side
+wins **50.2%** (6.5% drawn). Two standard errors of even at 400 matches is
+about 5 points, so the rule alone is not an 8-point edge. N14's AI-coach
+decision uses that number.
+
+**Presets, the rule on the other side** (the rival). Same run, then Kick-chase
+remeasured after its step moved (`20261024-135701-kick-chase-step-confirm` on
+seeds 1–200, `20261024-135245-kick-chase-step` on seeds 10001–10200). Wins are
+on points. 45–55% is the band.
+
+| Preset | No rule (N13.1) | Rule on, step 0.9 | Rule on, after |
+|---|---:|---:|---:|
+| Grind | 49.2% | 48.3% | unchanged |
+| Expansive | 46.2% | 45.3% | unchanged |
+| Kick-chase | 46.5% | 43.0% and 41.8% | **48.8%** and **45.5%** (step 0.9 → 1) |
+| All-out | 54.8% | 51.2% | unchanged |
+| Rush | 49.8% | 46.8% | unchanged |
+| Compressed | 49.0% | 49.0% | unchanged |
+
+Kick-chase's two blocks with step 0.9 were both under the band (pool 42.4% over
+800 matches). Sweeping its own knobs (`20261024-134815-kick-chase-sweep`, then
+the step run above): early kick, territory and a pass of 0 did not move the
+wins beyond luck; offload ×1.1 did, and cut the kick metres. Step 1.0 is
+Balanced's step. On the low block it wins 45.5% with kicks still about 24 and
+offloads still inside 8–14; on seeds 1–200 it wins 48.8%. Pool of the two
+blocks, **47.2%**. Kick metres on seeds 1–200 fell 22.6, beyond luck, because
+more one-on-ones are stepped instead of being carried into a long kick. The
+bombs are the same bias. **Assumed (needs Leon):** that step, and leaving the
+other presets on the N13.1 tables.
 

@@ -1,0 +1,14 @@
+{
+  "name": "break rule",
+  "description": "N13.5: the default break rule on one side, even 60 v 60, and each preset against Balanced or Slide with the rule on the other side (the rival). Side win is the tracked side. 45–55% is the preset band. The rule on one side should stay within two standard errors of even.",
+  "seeds": 200,
+  "scenarios": [
+    { "name": "rule on one side", "track": "home", "bothWays": true, "breakRule": ["home"], "home": { "rating": 60 }, "away": { "rating": 60 } },
+    { "name": "grind v balanced", "track": "home", "bothWays": true, "breakRule": ["away"], "home": { "rating": 60, "tactics": { "attack": "grind" } }, "away": { "rating": 60 } },
+    { "name": "expansive v balanced", "track": "home", "bothWays": true, "breakRule": ["away"], "home": { "rating": 60, "tactics": { "attack": "expansive" } }, "away": { "rating": 60 } },
+    { "name": "kick-chase v balanced", "track": "home", "bothWays": true, "breakRule": ["away"], "home": { "rating": 60, "tactics": { "attack": "kick-chase" } }, "away": { "rating": 60 } },
+    { "name": "all-out v balanced", "track": "home", "bothWays": true, "breakRule": ["away"], "home": { "rating": 60, "tactics": { "attack": "all-out" } }, "away": { "rating": 60 } },
+    { "name": "rush v slide", "track": "home", "bothWays": true, "breakRule": ["away"], "home": { "rating": 60, "tactics": { "defence": "rush" } }, "away": { "rating": 60 } },
+    { "name": "compressed v slide", "track": "home", "bothWays": true, "breakRule": ["away"], "home": { "rating": 60, "tactics": { "defence": "compressed" } }, "away": { "rating": 60 } }
+  ]
+}
