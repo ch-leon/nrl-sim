@@ -66,6 +66,14 @@ describe('the AI coach (N9.6)', () => {
     restore = applyTuning({ 'calls.ai.on': 1 });
     expect(aiCoachSides(['away'])).toEqual(['away']);
   });
+
+  it('an explicit flag wins over the knob (N14.1): Hard on, Normal off, the knob stays 0', () => {
+    expect(aiCoachSides(['away'], true)).toEqual(['away']);
+    expect(aiCoachSides(['home', 'away'], false)).toEqual([]);
+    restore = applyTuning({ 'calls.ai.on': 1 });
+    expect(aiCoachSides(['away'], false)).toEqual([]);
+    expect(aiCoachSides(['home', 'away'], true)).toEqual(['home', 'away']);
+  });
 });
 
 describe('calls unlocked by the Coach’s Office (N9.6)', () => {

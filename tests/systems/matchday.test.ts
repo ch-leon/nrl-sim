@@ -387,6 +387,9 @@ describe('difficulty plays in the match: the rival’s edge after the spread (N1
     for (const d of ['hard', 'easy'] as const) {
       const k = kickoff(d);
       expect(k.live.difficultyEdge).toEqual({ side: k.rival, points: DIFFICULTY[d].rivalEdge });
+      // The rival changes plan at the breaks on every difficulty. Only Hard's rival has an AI coach (N14.1).
+      expect(k.live.breakRuleSides).toEqual([k.rival]);
+      expect(k.live.aiCoach).toEqual(d === 'hard' ? [k.rival] : undefined);
       // The sheet is the rival's squad through his coach's pick, in his style (N11), nothing scaled (scaleSheet is gone).
       const theirs = pick(k, [k.home, k.away], 'rival');
       const club = getState().league.clubs.find((c) => c.id === theirs.clubId)!;
@@ -406,13 +409,19 @@ describe('difficulty plays in the match: the rival’s edge after the spread (N1
     }
     const normal = kickoff('normal');
     expect(normal.live.difficultyEdge).toBeUndefined();
+    expect(normal.live.breakRuleSides).toEqual([normal.rival]);
+    expect(normal.live.aiCoach).toBeUndefined();
     const spread = spreadSheets(normal.home, normal.away);
     expect(edgeSheets(...spread, normal.live.difficultyEdge)).toEqual(spread);
   });
 
   it('a fast-forwarded match plays with the same edge as the one on screen', () => {
     const k = kickoff('hard');
-    const watched = runMatch(k.home, k.away, { seed: k.live.seed, weather: k.live.weather, injuryRate: k.live.injuryRate!, difficultyEdge: k.live.difficultyEdge! });
+    const watched = runMatch(k.home, k.away, {
+      seed: k.live.seed, weather: k.live.weather, injuryRate: k.live.injuryRate!, difficultyEdge: k.live.difficultyEdge!,
+      ...(k.live.aiCoach?.length ? { aiCoach: k.live.aiCoach } : {}),
+      ...(k.live.breakRuleSides?.length ? { breakRuleSides: k.live.breakRuleSides } : {}),
+    });
     const flat = runMatch(k.home, k.away, { seed: k.live.seed, weather: k.live.weather, injuryRate: k.live.injuryRate! });
     expect([watched.homeScore, watched.awayScore]).not.toEqual([flat.homeScore, flat.awayScore]); // this seed's score feels the edge
     // The same new game and week again, fast-forwarded.

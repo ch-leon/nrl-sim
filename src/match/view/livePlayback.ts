@@ -107,6 +107,8 @@ export interface LivePlaybackOptions {
   plans?: PlanInput[];
   /** The rival's AI coach (N9.6). */
   aiCoach?: ('home' | 'away')[];
+  /** Sides whose plan changes at the breaks (N13.5). The watched match, a resume and a Skip all use it. */
+  breakRuleSides?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
@@ -177,7 +179,7 @@ export class LivePlayback {
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
     this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
-    const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.simOpts = simOpts;
     this.factory = (seed) => new LiveSim(home, away, seed, simOpts);
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
@@ -389,6 +391,7 @@ export class LivePlayback {
       ...(o.injuryRate !== undefined ? { injuryRate: o.injuryRate } : {}),
       ...(o.difficultyEdge ? { difficultyEdge: o.difficultyEdge } : {}),
       ...(o.aiCoach?.length ? { aiCoach: o.aiCoach } : {}),
+      ...(o.breakRuleSides?.length ? { breakRuleSides: o.breakRuleSides } : {}),
       ...(o.goldenPoint ? { goldenPoint: true } : {}),
     };
   }

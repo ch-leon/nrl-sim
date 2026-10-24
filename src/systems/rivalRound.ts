@@ -26,8 +26,10 @@ export interface RivalJob {
   away: TeamSheet;
   seed: number;
   weather: WeatherKind;
-  /** Sides with an AI coach (N9.6): both, when the game gives rivals one. */
+  /** Sides with an AI coach (N9.6): both, on Hard (N14.1). */
   aiCoach: ('home' | 'away')[];
+  /** Sides whose plan changes at the breaks (N13.5): both, in a rival-v-rival game (N14.1). */
+  breakRuleSides: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint: boolean;
 }
@@ -60,7 +62,14 @@ export function rivalJobs(state: GameState, rng: Rng, playerId: string): RivalJo
     const home = byId.get(f.homeId);
     const away = byId.get(f.awayId);
     if (!home || !away) continue;
-    jobs.push({ round, homeId: f.homeId, awayId: f.awayId, home: rivalSheet(home), away: rivalSheet(away), seed: rng.int(1, 2 ** 31), weather: state.weather ?? 'clear', aiCoach: aiCoachSides(['home', 'away']), goldenPoint: round > SEASON_ROUNDS });
+    jobs.push({
+      round, homeId: f.homeId, awayId: f.awayId, home: rivalSheet(home), away: rivalSheet(away),
+      seed: rng.int(1, 2 ** 31), weather: state.weather ?? 'clear',
+      // Both sides change plan at the breaks. Hard gives both an AI coach; Normal and Easy do not (N14.1).
+      aiCoach: aiCoachSides(['home', 'away'], state.settings.difficulty === 'hard'),
+      breakRuleSides: ['home', 'away'],
+      goldenPoint: round > SEASON_ROUNDS,
+    });
   }
   return jobs;
 }
@@ -104,7 +113,7 @@ export function applyRivalResults(
 
 /** A rival job as a match job for the shared worker (matchJobs.ts, N10.3). */
 export function rivalMatchJob(job: RivalJob): MatchJob {
-  return { home: job.home, away: job.away, opts: { seed: job.seed, weather: job.weather, aiCoach: job.aiCoach, goldenPoint: job.goldenPoint } };
+  return { home: job.home, away: job.away, opts: { seed: job.seed, weather: job.weather, aiCoach: job.aiCoach, breakRuleSides: job.breakRuleSides, goldenPoint: job.goldenPoint } };
 }
 
 /** How long the worker gets before the round is played on the main thread instead (ms): a phone-speed worker needs about 30 s for the round (#216), so this only catches one that has hung. */

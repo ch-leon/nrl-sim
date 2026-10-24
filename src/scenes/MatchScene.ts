@@ -467,6 +467,7 @@ export class MatchScene extends Phaser.Scene {
         calls: live.calls ?? [],
         ...(live.plans ? { plans: live.plans } : {}),
         ...(live.aiCoach?.length ? { aiCoach: live.aiCoach } : {}),
+        ...(live.breakRuleSides?.length ? { breakRuleSides: live.breakRuleSides } : {}),
         ...(live.goldenPoint ? { goldenPoint: true } : {}),
         ...(live.resumeAt ? { resumeAt: live.resumeAt } : {}),
         ...(live.onProgress ? { onProgress: live.onProgress } : {}),

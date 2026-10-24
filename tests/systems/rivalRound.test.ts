@@ -44,6 +44,8 @@ describe('rival rounds on the live sim (N9.2)', () => {
     const before = atRivals!;
     const jobs = rivalJobs(before, makeRng(before.rngSeed), PLAYER_ID);
     expect(jobs.length).toBeGreaterThan(0);
+    // Both sides of a rival game change plan at the breaks. A Normal game has no AI coach (N14.1).
+    expect(jobs.every((j) => j.breakRuleSides.join() === 'home,away' && j.aiCoach.length === 0)).toBe(true);
     const expected = jobs.map(playRivalJob);
     for (const [i, job] of jobs.entries()) {
       const f = getState().league.fixtures.find((x) => x.round === round && x.homeId === job.homeId)!;

@@ -239,15 +239,20 @@ export function registerPlayerMatchSystem(): void {
 
     const home = sheetFor(fixture.homeId);
     const away = sheetFor(fixture.awayId);
+    const rivalSide = fixture.homeId === PLAYER_ID ? 'away' as const : 'home' as const;
     // The difficulty's edge to the rival, after the rating spread (N12.2); none on Normal.
-    const edge = rivalEdge(fixture.homeId === PLAYER_ID ? 'away' : 'home', state.settings.difficulty);
+    const edge = rivalEdge(rivalSide, state.settings.difficulty);
+    // The rival changes plan at the breaks (N13.5, N14.1), on every difficulty.
+    // The player's side does not, unless a later hire says so on a fast-forward.
+    // Hard's rival also has an AI coach (Assumed: the break rule alone won 50.2%,
+    // not the 8 points N12.2 used). Normal and Easy stay off. The global knob stays 0.
     const matchOpts = {
       seed,
       injuryRate: difficultyMultipliers(state.settings.difficulty).injuryRate,
       ...(edge ? { difficultyEdge: edge } : {}),
       ...(state.weather ? { weather: state.weather } : {}),
-      // The rival's coach makes his own calls when the game gives rivals one (N9.6); the player makes his.
-      aiCoach: aiCoachSides([fixture.homeId === PLAYER_ID ? 'away' : 'home']),
+      aiCoach: aiCoachSides([rivalSide], state.settings.difficulty === 'hard'),
+      breakRuleSides: [rivalSide],
       // A drawn final goes to golden point (N9.4).
       ...(isFinalsRound(fixture.round) ? { goldenPoint: true } : {}),
     };
@@ -282,6 +287,7 @@ export function registerPlayerMatchSystem(): void {
         planSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const),
         ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
         ...(matchOpts.aiCoach.length ? { aiCoach: matchOpts.aiCoach } : {}),
+        breakRuleSides: matchOpts.breakRuleSides,
       };
       // Keep the tick on the parked match too, so Resume still has it if the
       // stored record is later missing or unreadable.

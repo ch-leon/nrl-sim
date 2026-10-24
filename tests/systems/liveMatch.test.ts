@@ -26,6 +26,18 @@ import { initLiveState, reduceEvent } from '../../src/ui/screens/matchOverlay';
 import { SEASON_ROUNDS } from '../../src/config';
 import type { MatchResult, TeamSheet } from '../../src/sim/events';
 
+/** The options the Match scene plays: weather, the edge, the rival's coach and his break rule. */
+function asPlayed(live: LiveMatchData) {
+  return {
+    weather: live.weather,
+    ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}),
+    ...(live.difficultyEdge ? { difficultyEdge: live.difficultyEdge } : {}),
+    ...(live.aiCoach?.length ? { aiCoach: live.aiCoach } : {}),
+    ...(live.breakRuleSides?.length ? { breakRuleSides: live.breakRuleSides } : {}),
+    ...(live.goldenPoint ? { goldenPoint: true } : {}),
+  };
+}
+
 interface Started {
   fixture: Fixture;
   sim?: MatchResult;
@@ -58,7 +70,7 @@ function watch(
   const calls = live.calls ?? [];
   const plans = live.plans ?? [];
   const rec = new MatchRecorder({ home: s.home.clubId, away: s.away.clubId });
-  const r = new Runner((seed) => new LiveSim(s.home, s.away, seed, { weather: live.weather, calls, plans, ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}) }), live.seed);
+  const r = new Runner((seed) => new LiveSim(s.home, s.away, seed, { ...asPlayed(live), calls, plans }), live.seed);
   r.onEvents = (events) => rec.add(events, r.cur);
   r.onStep = () => rec.clock((r.current as LiveSim).matchSeconds);
   while (!r.finished && r.tick < stopAt) {
@@ -116,7 +128,7 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(started).toHaveLength(1);
     // With no calls, the watched match is runMatch's on that seed.
     const { result } = watch(s);
-    const head = runMatch(s.home, s.away, { seed: s.live!.seed, weather: s.live!.weather, ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) });
+    const head = runMatch(s.home, s.away, { seed: s.live!.seed, ...asPlayed(s.live!) });
     expect(result).toEqual(head);
     let st = initLiveState();
     for (const ev of result!.events) st = reduceEvent(st, ev, s.home.clubId, NINES.halfMinutes);
@@ -136,9 +148,9 @@ describe('live match (beta): the match on screen is the match', () => {
     const side = s.fixture.homeId === PLAYER_ID ? 'home' : 'away';
     const { result, calls } = watch(s, { side, call: 'kick-early' });
     expect(calls.length).toBeGreaterThan(3);
-    const plain = runMatch(s.home, s.away, { seed: s.live!.seed, weather: s.live!.weather, ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) });
+    const plain = runMatch(s.home, s.away, { seed: s.live!.seed, ...asPlayed(s.live!) });
     expect(result!.events).not.toEqual(plain.events);
-    expect(runMatch(s.home, s.away, { seed: s.live!.seed, weather: s.live!.weather, calls: [...calls], ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) })).toEqual(result);
+    expect(runMatch(s.home, s.away, { seed: s.live!.seed, ...asPlayed(s.live!), calls: [...calls] })).toEqual(result);
     bus.emit('match:finished', { fixture: s.fixture, result: result! });
     const f = getState().league.fixtures.find((x) => x.round === s.fixture.round && x.homeId === s.fixture.homeId)!;
     expect(f.result).toEqual({ homeScore: result!.homeScore, awayScore: result!.awayScore });
@@ -166,7 +178,7 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(again.live!.calls).toEqual(rec.calls);
     const done = watch(again, { side, call: 'shift-left' });
     // Straight through with the same calls gives the same full time.
-    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, weather: first.live!.weather, calls: [...done.calls], ...(first.live!.injuryRate !== undefined ? { injuryRate: first.live!.injuryRate } : {}) });
+    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, ...asPlayed(first.live!), calls: [...done.calls] });
     expect(done.result).toEqual(straight);
     bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
     expect(readLiveMatch()).toBeNull();
@@ -190,7 +202,7 @@ describe('live match (beta): the match on screen is the match', () => {
     const live = first.live!;
     const calls = live.calls ?? [];
     const plans = live.plans ?? [];
-    const r = new Runner((seed) => new LiveSim(first.home, first.away, seed, { weather: live.weather, calls, plans, ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}) }), live.seed);
+    const r = new Runner((seed) => new LiveSim(first.home, first.away, seed, { ...asPlayed(live), calls, plans }), live.seed);
     let last = 0;
     // Past one write, short of the next: the ticks after the write are what a kill loses.
     const stopAt = LIVE_MATCH_SAVE_TICKS + 15;
@@ -215,7 +227,7 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(again.live!.resumeAt).toBe(LIVE_MATCH_SAVE_TICKS);
     expect(again.live!.calls).toEqual([]);
     const done = watch(again);
-    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, weather: first.live!.weather, ...(first.live!.injuryRate !== undefined ? { injuryRate: first.live!.injuryRate } : {}) });
+    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, ...asPlayed(first.live!) });
     expect(done.result).toEqual(straight);
     bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
     expect(readLiveMatch()).toBeNull();
@@ -247,7 +259,7 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(again.home).toBe(first.home);
     expect(again.away).toBe(first.away);
     const done = watch(again, { side, call: 'shift-left' });
-    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, weather: first.live!.weather, calls: [...done.calls], ...(first.live!.injuryRate !== undefined ? { injuryRate: first.live!.injuryRate } : {}) });
+    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, ...asPlayed(first.live!), calls: [...done.calls] });
     expect(done.result).toEqual(straight);
     bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
     expect(readLiveMatch()).toBeNull();
@@ -341,7 +353,7 @@ describe('live match (beta): the match on screen is the match', () => {
     const side = s.fixture.homeId === PLAYER_ID ? 'home' : 'away';
     const { result, plans } = watch(s, undefined, Infinity, { side: side as 'home' | 'away', tactics: { attack: 'expansive', defence: 'rush' } });
     expect(plans).toHaveLength(1);
-    const opts = { seed: s.live!.seed, weather: s.live!.weather, ...(s.live!.injuryRate !== undefined ? { injuryRate: s.live!.injuryRate } : {}) };
+    const opts = { seed: s.live!.seed, ...asPlayed(s.live!) };
     const plain = runMatch(s.home, s.away, opts);
     expect(result!.events).not.toEqual(plain.events);
     // The first half is the same match: the plan comes in at the second half's kick-off.
@@ -372,7 +384,7 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(again.live!.plans).toEqual(rec.plans);
     const done = watch(again, undefined, Infinity, plan);
     expect(done.plans).toHaveLength(1);
-    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, weather: first.live!.weather, plans: [...done.plans], ...(first.live!.injuryRate !== undefined ? { injuryRate: first.live!.injuryRate } : {}) });
+    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, ...asPlayed(first.live!), plans: [...done.plans] });
     expect(done.result).toEqual(straight);
   }, 60_000);
 
