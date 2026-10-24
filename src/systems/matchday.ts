@@ -3,9 +3,9 @@
 // (BAK-207): the week holds at kick-off, 'match:started' hands the Match scene
 // the seed, and the result — what the player watched and called — lands with
 // the rest of the week at 'match:finished'. Fast-forward plays it headless.
-import { bus } from '../core/events';
+import { bus, type LiveMatchData } from '../core/events';
 import { getState, setState, type Fixture, type RivalClub } from '../core/state';
-import { registerTickHook, resumeWeek, TICK_ORDER } from '../core/time';
+import { registerTickHook, resumeWeek, weekHeld, TICK_ORDER } from '../core/time';
 import { clearLiveMatch, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
@@ -20,6 +20,48 @@ import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { ON_FIELD } from '../config';
 import { autoPick, describeFills, resolveLineup } from './lineup';
+
+/**
+ * The live match the player left with Save & exit (or is watching). The week
+ * is already held; resuming re-emits match:started and does not hold again.
+ */
+interface ParkedMatch {
+  fixture: Fixture;
+  home: TeamSheet;
+  away: TeamSheet;
+  live: LiveMatchData;
+}
+let parked: ParkedMatch | null = null;
+
+/**
+ * True while this week's live match is still on: the club's Advance Week resumes it.
+ * The in-memory match is enough. A missing or corrupt record must not hide Resume
+ * and leave the held week with nothing that will release it.
+ */
+export function playerMatchPending(): boolean {
+  return parked !== null && weekHeld();
+}
+
+/**
+ * Back at the club with the match still on: start the Match scene again from
+ * the record. The week stays held (one hold, from kick-off), so the result
+ * still lands once, at full time. Returns false when there is nothing to resume.
+ */
+export function resumePlayerMatch(): boolean {
+  if (!parked || !weekHeld()) return false;
+  const rec = readLiveMatch();
+  const live = parked.live;
+  // Prefer the stored record (a kill, or a write newer than this page). A missing
+  // or other match's record keeps the calls and tick already on the parked match.
+  if (rec && rec.seed === live.seed) {
+    live.calls = [...rec.calls];
+    live.plans = rec.plans ? [...rec.plans] : [];
+    if (rec.tick > 0) live.resumeAt = rec.tick;
+    else delete live.resumeAt;
+  }
+  bus.emit('match:started', { fixture: parked.fixture, home: parked.home, away: parked.away, live });
+  return true;
+}
 
 /**
  * Apply sim-emitted injuries onto the player squad (by id, then name) and
@@ -223,29 +265,33 @@ export function registerPlayerMatchSystem(): void {
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
         if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
         off();
+        parked = null;
         clearLiveMatch();
         applyPlayerResult(fixture, home, away, result)();
         resumeWeek();
       });
-      bus.emit('match:started', {
-        fixture,
-        home,
-        away,
-        live: {
-          seed,
-          weather: state.weather ?? 'clear',
-          injuryRate: matchOpts.injuryRate,
-          ...(matchOpts.difficultyEdge ? { difficultyEdge: matchOpts.difficultyEdge } : {}),
-          ...(matchOpts.goldenPoint ? { goldenPoint: true } : {}),
-          calls: record.calls,
-          plans: record.plans ?? [],
-          ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
-          onProgress: (calls, tick, plans) => writeLiveMatch({ ...record, calls: [...calls], plans: [...plans], tick }),
-          planSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const),
-          ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
-          ...(matchOpts.aiCoach.length ? { aiCoach: matchOpts.aiCoach } : {}),
-        },
-      });
+      const live: LiveMatchData = {
+        seed,
+        weather: state.weather ?? 'clear',
+        injuryRate: matchOpts.injuryRate,
+        ...(matchOpts.difficultyEdge ? { difficultyEdge: matchOpts.difficultyEdge } : {}),
+        ...(matchOpts.goldenPoint ? { goldenPoint: true } : {}),
+        calls: record.calls,
+        plans: record.plans ?? [],
+        ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
+        planSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const),
+        ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
+        ...(matchOpts.aiCoach.length ? { aiCoach: matchOpts.aiCoach } : {}),
+      };
+      // Keep the tick on the parked match too, so Resume still has it if the
+      // stored record is later missing or unreadable.
+      live.onProgress = (calls, tick, plans) => {
+        const wrote = writeLiveMatch({ ...record, calls: [...calls], plans: [...plans], tick });
+        if (wrote && tick > 0) live.resumeAt = tick;
+        return wrote;
+      };
+      parked = { fixture, home, away, live };
+      bus.emit('match:started', { fixture, home, away, live });
       return;
     }
     // Fast-forward in a browser, inside the async advance (N10.3): the same match,

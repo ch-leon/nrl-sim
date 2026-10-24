@@ -451,6 +451,42 @@ async function play() {
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
     await wait(3000);
   });
+  // Save & exit (mid-match save): the record is written, the club comes back, and
+  // Advance Week reads Resume match. The ▾ menu must not skip the week.
+  await step('save-exit', async (rec) => {
+    const btn = page.locator('.nrl-mo-controls [data-save-exit]');
+    const box = await btn.boundingBox();
+    if (!box) throw new Error('no Save & exit control');
+    if (PHONE && (box.width < 44 || box.height < 44)) throw new Error(`Save & exit is ${Math.round(box.width)}×${Math.round(box.height)}`);
+    const placed = await btn.evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      return { left: b.left, right: b.right, top: b.top, bottom: b.bottom, w: window.innerWidth, h: window.innerHeight };
+    });
+    if (placed.left < -1 || placed.right > placed.w + 1 || placed.top < -1 || placed.bottom > placed.h + 1) {
+      throw new Error(`Save & exit is off-screen (${Math.round(placed.left)}–${Math.round(placed.right)}, ${Math.round(placed.top)}–${Math.round(placed.bottom)})`);
+    }
+    const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    await tap('.nrl-mo-controls [data-save-exit]');
+    await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud', { timeout: 15000 });
+    const label = (await page.locator('.nrl-hud-actions > .nrl-btn').first().textContent())?.trim();
+    if (label !== 'Resume match') throw new Error(`Advance Week reads "${label}", not Resume match`);
+    await tap('.nrl-hud-menu-toggle');
+    await tap('.nrl-hud-menu .nrl-btn:has-text("×4 weeks")');
+    await page.waitForFunction(() => [...document.querySelectorAll('.nrl-toast')].some((t) => /still on/.test(t.textContent || '')));
+    const toast = (await page.locator('.nrl-toast', { hasText: /still on/ }).last().textContent())?.trim() ?? '';
+    const week = await page.evaluate(() => window.__nrlState?.().week);
+    rec.notes.push(`left at ${clock}; button "${label}"; week still ${week}; menu: ${toast}`);
+  }, { quietToasts: true });
+  await step('resume-match', async (rec) => {
+    await tap('.nrl-hud .nrl-btn:has-text("Resume match")');
+    await page.waitForSelector('.nrl-mo-controls', { timeout: 20000 });
+    await page.waitForFunction(() => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== '00:00';
+    }, { timeout: 10000 });
+    const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    rec.notes.push(`resumed at ${clock}`);
+  });
   await step('match-fulltime', async () => {
     await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 15000 });
@@ -530,6 +566,32 @@ async function play() {
     const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
     if (!clock || clock === '00:00') throw new Error(`the live match clock did not move (${clock})`);
     rec.notes.push(`×8, clock ${clock}`);
+  });
+  // A hard kill: reload mid-match (no pagehide the game can trust) and Continue.
+  // The same match comes back, not kick-off.
+  await step('live-kill', async (rec) => {
+    if (!liveOn) return 'skipped';
+    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    const tick = await page.evaluate(() => {
+      const raw = localStorage.getItem('nrl-live-match-1');
+      return raw ? JSON.parse(raw).tick : 0;
+    });
+    if (!(tick > 0)) throw new Error(`the live-match record has no tick (${tick})`);
+    await page.reload();
+    await page.waitForSelector('[data-nrl-continue-1]', { timeout: 30000 });
+    await tap('[data-nrl-continue-1]');
+    await page.waitForSelector('.nrl-mo-controls', { timeout: 20000 });
+    await page.waitForFunction(() => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== '00:00';
+    }, { timeout: 15000 });
+    const after = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    const afterTick = await page.evaluate(() => {
+      const raw = localStorage.getItem('nrl-live-match-1');
+      return raw ? JSON.parse(raw).tick : 0;
+    });
+    if (afterTick + 40 < tick) throw new Error(`resumed tick ${afterTick} is behind the kill tick ${tick}`);
+    rec.notes.push(`killed at ${before} (tick ${tick}); resumed at ${after} (tick ${afterTick})`);
   });
   // Coach calls (#73): the chips under the scoreboard in a live match. Tap the first
   // one on offer and see it lit for the set; skipped when there are no chips.

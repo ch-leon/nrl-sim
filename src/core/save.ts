@@ -17,7 +17,8 @@ import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
-import { weekHeld } from './time';
+import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld } from './time';
+import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, liveMatchKey, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { buildLabel } from '../ui/buildInfo';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -419,6 +420,9 @@ export function writeSlot(slot: number, state: GameState): boolean {
   return true;
 }
 
+/** The state save() last wrote to the active slot: any later one holds a change not saved yet. */
+let lastSaved: GameState | null = null;
+
 /**
  * Persist state to the active slot. Never throws: on QuotaExceededError or any
  * storage failure it emits a `ui:notify` danger and console.warns, leaving the
@@ -433,7 +437,7 @@ export function save(state: GameState): void {
   if (weekHeld() || slotImported) return;
   const storage = getStorage();
   if (storage) migrateLegacySave(storage);
-  writeSlot(activeSlot, state);
+  if (writeSlot(activeSlot, state)) lastSaved = state;
 }
 
 /**
@@ -480,11 +484,16 @@ function removeSlot(storage: StorageLike, slot: number): void {
   if (slot === 1) storage.removeItem(SAVE_KEY);
 }
 
-/** Delete a slot (leaves CORRUPT_KEY intact). */
+/** Delete a slot (leaves CORRUPT_KEY intact) and the live-match record beside it. */
 export function deleteSlot(slot: number): void {
   const storage = getStorage();
-  if (!storage) return;
-  removeSlot(storage, slot);
+  if (storage) {
+    removeSlot(storage, slot);
+    // The record lives in localStorage next to the slot. Drop it there, and on the
+    // injected store too when a test is not using the real localStorage.
+    try { storage.removeItem(liveMatchKey(slot)); } catch { /* best effort */ }
+  }
+  clearLiveMatch(slot);
 }
 
 /** Remove the active slot's save. */
@@ -503,9 +512,32 @@ export function hasSave(slot: number = activeSlot): boolean {
 
 // ── Export / import ──────────────────────────────────────────────────────────
 
-/** Serialise a state to the export file format (plain state JSON). */
+/**
+ * The snapshot Export may write while a week is held: the state save() last
+ * landed, when it is this week. Null when nothing has landed, or the last
+ * landing was another week (the week-start write failed, so the object still
+ * in memory is not this kick-off).
+ */
+function heldWeekSnapshot(): GameState | null {
+  if (!weekHeld() || !lastSaved) return null;
+  const now = getState();
+  if (lastSaved.season !== now.season || lastSaved.week !== now.week) return null;
+  return lastSaved;
+}
+
+/**
+ * Serialise a state to the export file format (plain state JSON).
+ * A held week is half-ticked in memory (training, wages and the match seed
+ * already applied) and must not be the file: the file is the week-start save,
+ * plus the live-match record so an import resumes that match instead of
+ * replaying the week on top of itself. With no snapshot for this week the
+ * caller (downloadSave) refuses; this falls back to `state` only then.
+ */
 export function exportSave(state: GameState): string {
-  return JSON.stringify(state, null, 2);
+  const snap = heldWeekSnapshot();
+  const live = snap ? readLiveMatch() : null;
+  const payload = live ? { ...snap, [LIVE_MATCH_EXPORT_FIELD]: live } : (snap ?? state);
+  return JSON.stringify(payload, null, 2);
 }
 
 export type ImportResult =
@@ -524,8 +556,19 @@ export function exportFilename(state: GameState): string {
   return `nrl-sim-${club || 'save'}-s${state.season}w${state.week}.json`;
 }
 
+/** What Export says when the week is held and no week-start save landed. */
+export const EXPORT_HELD_FAILED_TEXT = "Couldn't export: this week is mid-match and its save didn't land.";
+
+/** What Export says when the file is the kick-off save plus the parked match. */
+export const EXPORT_HELD_TEXT = 'Exported the save from the start of this week, with the match to resume. A change made since kick-off is kept if you finish the match.';
+
 /** Browser: download the state as a JSON file. No-op outside a browser. */
 export function downloadSave(state: GameState): void {
+  if (weekHeld() && !heldWeekSnapshot()) {
+    bus.emit('ui:notify', { text: EXPORT_HELD_FAILED_TEXT, kind: 'danger' });
+    return;
+  }
+  const held = weekHeld();
   if (typeof document === 'undefined' || typeof Blob === 'undefined') return;
   const url = URL.createObjectURL(new Blob([exportSave(state)], { type: 'application/json' }));
   const a = document.createElement('a');
@@ -535,6 +578,7 @@ export function downloadSave(state: GameState): void {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  if (held) bus.emit('ui:notify', { text: EXPORT_HELD_TEXT, kind: 'info' });
 }
 
 /** Browser: open a file picker and resolve with the chosen file's text (null if
@@ -555,16 +599,35 @@ export function pickSaveFile(): Promise<string | null> {
 }
 
 /**
+ * Validate imported text, write it to `slot`, and replace that slot's live-match
+ * record with the one in the file (or clear a stale one). No toast. An empty
+ * message means the write itself failed and already notified.
+ */
+export function installImportedSave(text: string, slot: number): ImportResult {
+  const peeled = peelLiveMatchExport(text);
+  if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
+  const res = importSave(peeled.text);
+  if (!res.ok) return res;
+  if (!writeSlot(slot, res.state)) return { ok: false, message: '' };
+  if (peeled.live) {
+    if (!writeLiveMatch(peeled.live, slot)) clearLiveMatch(slot);
+  } else {
+    clearLiveMatch(slot);
+  }
+  return res;
+}
+
+/**
  * Validate imported text and write it to `slot`. Notifies the player either way.
- * Returns the imported state on success, else null (storage left unchanged).
+ * Returns the imported state on success, else null (storage left unchanged when
+ * the file itself is refused).
  */
 export function importIntoSlot(text: string, slot: number): GameState | null {
-  const res = importSave(text);
+  const res = installImportedSave(text, slot);
   if (!res.ok) {
-    bus.emit('ui:notify', { text: `Import failed: ${res.message}`, kind: 'danger' });
+    if (res.message) bus.emit('ui:notify', { text: `Import failed: ${res.message}`, kind: 'danger' });
     return null;
   }
-  if (!writeSlot(slot, res.state)) return null;
   // The import now owns the active slot: this page's game must not save over it on
   // the way to the title screen (Settings → Import save reloads; #295's checker).
   if (slot === activeSlot) slotImported = true;
@@ -580,6 +643,8 @@ interface PageEvents {
   win?: { addEventListener(type: string, fn: () => void): void; removeEventListener(type: string, fn: () => void): void };
 }
 
+const WEEK_START_HOOK = 'autosave-week-start';
+
 /**
  * Subscribe to 'week:advanced' and persist the settled post-tick state (the §5
  * pipeline emits this at step 8, after the step-7 autosave hook, so the state is
@@ -587,8 +652,9 @@ interface PageEvents {
  * a change made between weeks (a hire, a build, a signing, the kit) was kept only
  * until the next week's save, so a phone that dropped the tab lost it. Never while
  * a week is held, nor after an import has replaced the active slot (save() writes
- * nothing then; a held week's next load replays it from its start). Returns the
- * unsubscribe closure for teardown/tests.
+ * nothing then; a held week's next load replays it from its start), so a change
+ * not yet saved is also saved as each week starts. Returns the unsubscribe
+ * closure for teardown/tests.
  */
 export function enableAutosave(page: PageEvents = {
   ...(typeof document !== 'undefined' ? { doc: document } : {}),
@@ -597,11 +663,16 @@ export function enableAutosave(page: PageEvents = {
   slotImported = false;
   const persist = (): void => save(getState());
   const offWeek = bus.on('week:advanced', persist);
+  // A held week (the live match, the rival round) is never written, so a change made since the
+  // last save is saved as the next week starts, before its first hook: a tab that dies mid-match
+  // comes back at the week's start with the change, and the live-match record still matches it.
+  registerTickHook(WEEK_START_HOOK, TICK_ORDER.weekStart, () => { if (getState() !== lastSaved) persist(); });
   const onVisibility = (): void => { if (page.doc?.visibilityState === 'hidden') persist(); };
   page.doc?.addEventListener('visibilitychange', onVisibility);
   page.win?.addEventListener('pagehide', persist);
   return () => {
     offWeek();
+    unregisterTickHook(WEEK_START_HOOK);
     page.doc?.removeEventListener('visibilitychange', onVisibility);
     page.win?.removeEventListener('pagehide', persist);
   };
@@ -859,13 +930,12 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
           setNotice('All slots are full — delete one before importing.');
           return;
         }
-        const res = importSave(text);
+        const res = installImportedSave(text, free.slot);
         if (!res.ok) {
-          setNotice(`Import failed: ${res.message}`);
+          setNotice(res.message ? `Import failed: ${res.message}` : 'Import failed: could not write to storage.');
           return;
         }
-        if (writeSlot(free.slot, res.state)) render(null);
-        else setNotice('Import failed: could not write to storage.');
+        render(null);
       });
     });
     footer.appendChild(importBtn);

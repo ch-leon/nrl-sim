@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { advanceUntil, advanceInProgress, stopAdvance, nextFrame, STOPPED_BY_YOU } from '../../src/core/advance';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import {
-  registerTickHook, clearTickHooks, clearSeasonHooks, TICK_ORDER,
+  registerTickHook, clearTickHooks, clearSeasonHooks, clearHeldWeek, advanceWeek, weekHeld, TICK_ORDER,
 } from '../../src/core/time';
+import { HELD_WEEK_TEXT } from '../../src/ui/hud';
 import { bus, type Events } from '../../src/core/events';
 import { initLeague } from '../../src/systems/fixtures';
 import { overallRating } from '../../src/data/player';
@@ -18,6 +19,7 @@ beforeEach(() => {
   bus.clear();
   clearTickHooks();
   clearSeasonHooks();
+  clearHeldWeek();
   createNewGame('Advance Test', 11);
   initLeague(getState());
   toasts = [];
@@ -53,6 +55,20 @@ describe('advanceUntil — weeks target', () => {
     expect(run.stop.kind).toBe('target');
     expect(getState().week).toBe(start + 4);
     expect(toasts[toasts.length - 1]).toEqual({ text: 'Advanced 4 weeks.', kind: 'info' });
+  });
+
+  it('a week that is already held is not fast-forwarded, and the run does not wait for it', async () => {
+    registerTickHook('hold', TICK_ORDER.match, (ctx) => ctx.hold?.());
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+    const week = getState().week;
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 }, async () => {});
+    expect(run.weeksPlayed).toBe(0);
+    expect(run.stop).toEqual({ kind: 'stopped', text: HELD_WEEK_TEXT });
+    expect(getState().week).toBe(week);
+    expect(weekHeld()).toBe(true);
+    expect(toasts[toasts.length - 1]).toEqual({ text: HELD_WEEK_TEXT, kind: 'info' });
+    clearHeldWeek();
   });
 
   it('weeks: 0 plays nothing', async () => {

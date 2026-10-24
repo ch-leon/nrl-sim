@@ -672,7 +672,8 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: calc(7.5rem + env(sa
    sits outside a match; the commentary feed stacks above them. */
 .nrl-mo-controls {
   position: fixed; left: 50%; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
-  z-index: 20; display: flex; gap: 0.35rem; pointer-events: auto;
+  z-index: 20; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem; pointer-events: auto;
+  max-width: calc(100vw - 1rem);
 }
 .nrl-mo-calls {
   position: fixed; right: 0.5rem; bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px));
@@ -747,6 +748,8 @@ body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
 }
 /* Short (landscape phone) viewports: keep stats and commentary apart. */
 @media (max-height: 480px) {
+  .nrl-mo-controls { gap: 0.25rem; }
+  .nrl-mo-controls .nrl-btn { padding: 0.2rem 0.4rem; font-size: 0.72rem; }
   .nrl-mo-stats { top: 4rem; min-width: 8.5rem; padding: 0.3rem 0.5rem; }
   .nrl-mo-stat-line { font-size: 0.62rem; margin: 0.05rem 0; }
   .nrl-mo-feed { max-height: 3.4rem; }

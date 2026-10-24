@@ -121,8 +121,14 @@ async function boot(): Promise<void> {
   if (choice.mode === 'continue') {
     const saved = load();
     if (saved) loadState(saved);
-    else createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
+    else {
+      // Continue on an empty slot still starts fresh: drop a match record left behind.
+      clearLiveMatch();
+      createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
+    }
   } else {
+    // New Game must not resume a match that belonged to the save this slot had.
+    clearLiveMatch();
     createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);

@@ -12,7 +12,10 @@ import { createNewGame, getState, setState, type Fixture } from '../../src/core/
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, weekHeld } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
-import { readLiveMatch } from '../../src/systems/liveMatchRecord';
+import { isLiveMatchRecord, LIVE_MATCH_SAVE_SECONDS, LIVE_MATCH_SAVE_TICKS, liveMatchSaveDue, readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
+import { playerMatchPending, resumePlayerMatch } from '../../src/systems/matchday';
+import { advanceUntil } from '../../src/core/advance';
+import { MATCH_STILL_ON_TEXT } from '../../src/ui/hud';
 import { MatchRecorder, runMatch } from '../../src/match/league/match';
 import { Runner } from '../../src/match/core/engine';
 import { LiveSim, type PlanInput } from '../../src/match/league/live';
@@ -168,6 +171,168 @@ describe('live match (beta): the match on screen is the match', () => {
     bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
     expect(readLiveMatch()).toBeNull();
   }, 60_000);
+
+  it('the periodic save falls due every two seconds of match time and not before', () => {
+    expect(LIVE_MATCH_SAVE_SECONDS).toBe(2);
+    expect(LIVE_MATCH_SAVE_TICKS).toBe(40);
+    expect(liveMatchSaveDue(39, 0)).toBe(false);
+    expect(liveMatchSaveDue(40, 0)).toBe(true);
+    expect(liveMatchSaveDue(79, 40)).toBe(false);
+    expect(liveMatchSaveDue(80, 40)).toBe(true);
+  });
+
+  it('a kill between coach calls resumes from the last periodic save, at most one interval behind, and matches playing straight through', () => {
+    fakeStorage();
+    newGame(42);
+    const saved = JSON.stringify(getState());
+    advanceWeek();
+    const first = started[0]!;
+    const live = first.live!;
+    const calls = live.calls ?? [];
+    const plans = live.plans ?? [];
+    const r = new Runner((seed) => new LiveSim(first.home, first.away, seed, { weather: live.weather, calls, plans, ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}) }), live.seed);
+    let last = 0;
+    // Past one write, short of the next: the ticks after the write are what a kill loses.
+    const stopAt = LIVE_MATCH_SAVE_TICKS + 15;
+    while (!r.finished && r.tick < stopAt) {
+      r.step();
+      if (liveMatchSaveDue(r.tick, last)) {
+        live.onProgress?.(calls, r.tick, plans);
+        last = r.tick;
+      }
+    }
+    expect(r.tick).toBe(stopAt);
+    expect(last).toBe(LIVE_MATCH_SAVE_TICKS);
+    const rec = readLiveMatch()!;
+    expect(rec.tick).toBe(LIVE_MATCH_SAVE_TICKS);
+    expect(rec.calls).toEqual([]);
+    expect(stopAt - rec.tick).toBeLessThan(LIVE_MATCH_SAVE_TICKS);
+    clearHeldWeek();
+    setState(JSON.parse(saved));
+    advanceWeek();
+    const again = started[1]!;
+    expect(again.live!.seed).toBe(first.live!.seed);
+    expect(again.live!.resumeAt).toBe(LIVE_MATCH_SAVE_TICKS);
+    expect(again.live!.calls).toEqual([]);
+    const done = watch(again);
+    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, weather: first.live!.weather, ...(first.live!.injuryRate !== undefined ? { injuryRate: first.live!.injuryRate } : {}) });
+    expect(done.result).toEqual(straight);
+    bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
+    expect(readLiveMatch()).toBeNull();
+    expect(playerMatchPending()).toBe(false);
+  }, 60_000);
+
+  it('Save & exit leaves the week held, and resuming continues the same match with the same sheets and calls', () => {
+    fakeStorage();
+    newGame(42);
+    const week = getState().week;
+    advanceWeek();
+    const first = started[0]!;
+    const side = first.fixture.homeId === PLAYER_ID ? 'home' : 'away';
+    const cut = watch(first, { side, call: 'shift-left' }, 80);
+    expect(cut.result).toBeNull();
+    expect(weekHeld()).toBe(true);
+    expect(playerMatchPending()).toBe(true);
+    expect(getState().week).toBe(week);
+    // The week tick itself still refuses a held week, so nothing can skip the match.
+    advanceWeek();
+    expect(started).toHaveLength(1);
+    expect(getState().week).toBe(week);
+    expect(resumePlayerMatch()).toBe(true);
+    expect(started).toHaveLength(2);
+    const again = started[1]!;
+    expect(again.live!.seed).toBe(first.live!.seed);
+    expect(again.live!.resumeAt).toBe(cut.tick);
+    expect(again.live!.calls).toEqual(cut.calls);
+    expect(again.home).toBe(first.home);
+    expect(again.away).toBe(first.away);
+    const done = watch(again, { side, call: 'shift-left' });
+    const straight = runMatch(first.home, first.away, { seed: first.live!.seed, weather: first.live!.weather, calls: [...done.calls], ...(first.live!.injuryRate !== undefined ? { injuryRate: first.live!.injuryRate } : {}) });
+    expect(done.result).toEqual(straight);
+    bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
+    expect(readLiveMatch()).toBeNull();
+    expect(playerMatchPending()).toBe(false);
+    expect(weekHeld()).toBe(false);
+    expect(getState().week).toBe(week + 1);
+  }, 60_000);
+
+  it('a full storage does not claim the record was written, and the previous record stays', () => {
+    fakeStorage();
+    newGame(42);
+    advanceWeek();
+    const live = started[0]!.live!;
+    expect(readLiveMatch()!.tick).toBe(0);
+    const storage = (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage;
+    storage.setItem = () => { throw new Error('full'); };
+    expect(writeLiveMatch({ ...readLiveMatch()!, tick: 40 })).toBe(false);
+    expect(live.onProgress?.(live.calls ?? [], 80, live.plans ?? [])).toBe(false);
+    // The kick-off record is still what a reload would resume.
+    expect(readLiveMatch()!.tick).toBe(0);
+    expect(playerMatchPending()).toBe(true);
+    expect(weekHeld()).toBe(true);
+    // The match can still be finished; the failed write did not trap the week.
+    bus.emit('match:finished', {
+      fixture: started[0]!.fixture,
+      result: {
+        homeScore: 0, awayScore: 0, events: [], injuries: [],
+        stats: { possession: [0, 0], tackles: [0, 0], errors: [0, 0], tries: [0, 0] },
+        weather: live.weather, momentumTimeline: [],
+      },
+    });
+    expect(weekHeld()).toBe(false);
+    expect(playerMatchPending()).toBe(false);
+  });
+
+  it('a corrupt record is ignored, and Resume still continues the parked match', () => {
+    fakeStorage();
+    newGame(42);
+    advanceWeek();
+    const first = started[0]!;
+    const side = first.fixture.homeId === PLAYER_ID ? 'home' : 'away';
+    const cut = watch(first, { side, call: 'shift-left' }, 80);
+    expect(readLiveMatch()!.tick).toBe(cut.tick);
+    expect(isLiveMatchRecord({ season: 1, week: 1, seed: 1 })).toBe(false);
+    (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage.setItem('nrl-live-match-1', '{');
+    expect(readLiveMatch()).toBeNull();
+    expect(playerMatchPending()).toBe(true);
+    expect(resumePlayerMatch()).toBe(true);
+    const again = started[1]!;
+    expect(again.live!.resumeAt).toBe(cut.tick);
+    expect(again.live!.calls).toEqual(cut.calls);
+    expect(again.live!.seed).toBe(first.live!.seed);
+  });
+
+  it('a record missing its calls does not throw when the week starts again', () => {
+    fakeStorage();
+    newGame(42);
+    const saved = JSON.stringify(getState());
+    advanceWeek();
+    clearHeldWeek();
+    setState(JSON.parse(saved));
+    (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage.setItem(
+      'nrl-live-match-1',
+      JSON.stringify({ season: getState().season, week: getState().week, seed: started[0]!.live!.seed }),
+    );
+    expect(readLiveMatch()).toBeNull();
+    expect(() => advanceWeek()).not.toThrow();
+    expect(started).toHaveLength(2);
+    expect(started[1]!.live!.resumeAt).toBeUndefined();
+    expect(started[1]!.live!.calls).toEqual([]);
+  });
+
+  it('fast-forward does not skip a parked match or wait on it', async () => {
+    fakeStorage();
+    newGame(42);
+    const week = getState().week;
+    advanceWeek();
+    expect(playerMatchPending()).toBe(true);
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 }, async () => {});
+    expect(run.weeksPlayed).toBe(0);
+    expect(run.stop).toEqual({ kind: 'stopped', text: MATCH_STILL_ON_TEXT });
+    expect(getState().week).toBe(week);
+    expect(weekHeld()).toBe(true);
+    expect(started).toHaveLength(1);
+  });
 
   it('a change of plan at half-time (N11) changes the match, and the match with its plan is what counts', () => {
     newGame(42);

@@ -33,6 +33,7 @@ import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
+import { liveMatchSaveDue } from '../../systems/liveMatchRecord';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
 
@@ -105,8 +106,8 @@ export interface LivePlaybackOptions {
   goldenPoint?: boolean;
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
   resumeAt?: number;
-  /** A call or a plan change was made, or the tick moved on a resumable match: keep the record (resume after the app is killed). */
-  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => void;
+  /** A call, a plan change, the periodic write, Save & exit, or the app going to the background. False when the write did not land. */
+  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => boolean;
   fixture: Fixture | undefined;
   overlay: MatchOverlayHandle | null;
   /** Ease the camera back out after a big moment's close-up. */
@@ -141,6 +142,8 @@ export class LivePlayback {
   private now = 0;
   private closeupUntil = 0;
   private readonly plans: PlanInput[];
+  /** Tick last written to the resume record (calls, hide, the periodic write, Save & exit). */
+  private lastSavedTick = 0;
 
   constructor(
     private readonly scene: LivePlaybackScene & Phaser.Scene,
@@ -156,6 +159,8 @@ export class LivePlayback {
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => {
       this.recorder.clock(this.sim.matchSeconds);
+      // A kill with no pagehide loses at most one save interval (liveMatchRecord.ts).
+      this.maybePersist();
       // The commentator watches the ball land: a kick picked up off the ground is a scoop, not a catch.
       this.commentator.ball(this.runner.cur.ball, this.runner.cur.tick);
       if (!this.skipping) this.kicks.tick(this.runner.cur);
@@ -167,6 +172,8 @@ export class LivePlayback {
       while (!this.runner.finished && this.runner.tick < opts.resumeAt) this.runner.step();
       this.skipping = false;
     }
+    // Kick-off and a resume already wrote this tick; the next write is one interval on.
+    this.lastSavedTick = this.runner.tick;
     this.runner.play();
     this.view = new LiveView(scene);
     this.popups = new PopupLayer(scene, DEPTH_POPUP);
@@ -196,7 +203,7 @@ export class LivePlayback {
     const why = this.callRefusal(side, call);
     if (why) return why;
     this.opts.calls.push({ tick: this.runner.tick + 1, side, call });
-    this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans);
+    this.persistProgress();
     return null;
   }
 
@@ -210,7 +217,7 @@ export class LivePlayback {
     const why = this.planRefusal();
     if (why) return why;
     this.plans.push({ tick: this.runner.tick + 1, side, tactics: { ...tactics } });
-    this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans);
+    this.persistProgress();
     return null;
   }
 
@@ -264,9 +271,42 @@ export class LivePlayback {
     return this.runner.tick;
   }
 
-  /** Keep the resume record up to date (the app is going to the background). */
-  saveProgress(): void {
-    if (!this.finishEmitted) this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans);
+  /**
+   * Keep the resume record up to date (the app is going to the background, or Save & exit).
+   * False when the write did not land.
+   */
+  saveProgress(): boolean {
+    return this.persistProgress();
+  }
+
+  /**
+   * Save & exit can park the match. Not while Skip is waiting on the Worker:
+   * that result still lands as full time, and parking as well would finish the
+   * week out from under the club.
+   */
+  canPark(): boolean {
+    return !this.finishEmitted && !this.awaitingSkip;
+  }
+
+  /** Write the record now and start the interval again from this tick. False when the write did not land. */
+  private persistProgress(): boolean {
+    if (this.finishEmitted) return false;
+    const wrote = this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans) ?? true;
+    if (!wrote) return false;
+    this.lastSavedTick = this.runner.tick;
+    return true;
+  }
+
+  /**
+   * While the match is actually playing (not the silent catch-up, not Skip's
+   * tight loop), write the record once a save interval. A frame that steps
+   * several ticks still writes on the tick that falls due.
+   */
+  private maybePersist(): void {
+    if (this.finishEmitted || this.skipping || this.awaitingSkip) return;
+    if (!liveMatchSaveDue(this.runner.tick, this.lastSavedTick)) return;
+    // A failed write backs off a whole interval, so a full disk is not hit every tick.
+    if (!this.persistProgress()) this.lastSavedTick = this.runner.tick;
   }
 
   getSpeed(): PlaybackSpeed {
@@ -286,6 +326,8 @@ export class LivePlayback {
    */
   skip(): void {
     if (this.finishEmitted || this.awaitingSkip) return;
+    // A kill while Skip is away resumes here, not from the previous interval.
+    this.persistProgress();
     const elsewhere = this.opts.skipElsewhere;
     if (!elsewhere) {
       this.skipHere();
