@@ -126,7 +126,7 @@ Every transition is a thing that physically happens on the field; nothing is imp
   bonus-zone glow, the wrestle bar and the sprint trail. The commentary ticker and the
   instant replay read the same seed a second way. Merged: the bonus zone (#289),
   commentary (#294), kicks landing wide (#301). Open, stacked: traits (#309), the replay
-  (#310), the pop-up and contest polish (#312), and the §6 update itself. None of them
+  (#310), the pop-up and contest polish (#312), and this cost note (#313). None of them
   changes `runMatch`'s result. §6's cost line now says the N9.1 figure (about 300 ms in
   Node) and that rival rounds use this sim behind the setting.
 - `src/sim/engine.ts` and `src/world/playback.ts`+`staging.ts` are deleted at switch-over
