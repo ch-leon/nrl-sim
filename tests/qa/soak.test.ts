@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   runSoak, checkState, nonFinitePaths, duplicatePlayers, asOldSave, OLD_VERSIONS, gapSample, bestNineMean, summariseSeasons,
   classifyReason, emptyTally, tallyNet, FINANCE_LINES, NEAR_RIVALS, nearestRivals, recordAgainst, advanceWeekAsTapped, registerAllSystems,
-  styleTable, type SeasonSample, type SoakResult, type StyleGame,
+  styleTable, styleMixOf, levelWinRates, offTheLevelMean, type SeasonSample, type SoakResult, type StyleGame,
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
@@ -172,7 +172,8 @@ describe('soak columns (N12.1)', () => {
     season: 1, money: 0, minMoney: 0, squad: 20, freeAgents: 10, saveBytes: 1, rivalStrength: [40, 70], reputation: 30, sacked: false,
     wins: 12, draws: 0, losses: 12, marginPerGame: 0, ladderPosition: 9, premiership: false, madeFinals: false,
     nearRivalWinRate: 0, nearRivalGames: 0, forfeits: 0, bestNine: 55, rivalMean: 55, rivalRange: [40, 70],
-    signings: 0, signingFees: 0, signedOverall: 0, finance: emptyTally(), ...over,
+    signings: 0, signingFees: 0, signedOverall: 0, finance: emptyTally(),
+    styleMix: { attacks: 0, defences: 0, switches: 0, games: 0 }, ...over,
   });
   const run = (seed: number, seasons: SeasonSample[]): SoakResult => ({
     seed, mode: 'managed', start: { bestNine: 55, rivalMean: 55, rivalRange: [40, 70] }, seasons, problems: [], ms: 0,
@@ -315,10 +316,10 @@ describe('soak columns (N12.1)', () => {
 });
 
 describe('rival styles over a season (#249, N11)', () => {
-  const g = (home: string, away: string, homeStrength: number, awayStrength: number, homeScore: number): StyleGame => ({
+  const g = (home: string, away: string, homeStrength: number, awayStrength: number, homeScore: number, switches = 0): StyleGame => ({
     home: { attack: home as StyleGame['home']['attack'], defence: 'slide' },
     away: { attack: away as StyleGame['away']['attack'], defence: 'slide' },
-    homeStrength, awayStrength, homeScore,
+    homeStrength, awayStrength, homeScore, switches,
   });
 
   it('scores each style against what its strength gaps alone predict', () => {
@@ -354,8 +355,30 @@ describe('rival styles over a season (#249, N11)', () => {
       expect(game.home.attack).toBeTruthy();
       expect(game.away.defence).toBeTruthy();
       expect([0, 0.5, 1]).toContain(game.homeScore);
+      expect(game.switches).toBeGreaterThanOrEqual(0);
+      expect(Number.isInteger(game.switches)).toBe(true);
     }
     expect(runSoak({ seed: 11, seasons: 1, weeks: 1, mode: 'idle' }).styleGames).toBeUndefined();
   }, 60_000);
+
+  it('a level rating is wins ÷ games, and a style more than 4 points from even is logged', () => {
+    const games: StyleGame[] = [
+      ...Array.from({ length: 10 }, () => g('expansive', 'balanced', 60, 60, 1, 2)),
+      ...Array.from({ length: 10 }, () => g('grind', 'balanced', 60, 61, 0.5, 1)),
+      // A big gap is not a level rating, so All-out's perfect record does not count.
+      ...Array.from({ length: 10 }, () => g('all-out', 'balanced', 70, 55, 1)),
+    ];
+    const rows = new Map(levelWinRates(games, 'attack').map((row) => [row.style, row]));
+    expect(rows.get('all-out')).toBeUndefined();
+    expect(rows.get('expansive')!.games).toBe(10);
+    expect(rows.get('expansive')!.score).toBe(1);
+    expect(rows.get('grind')!.score).toBe(0.5);
+    // Balanced played both level sets: 0 against Expansive, 0.5 against Grind.
+    expect(rows.get('balanced')!.games).toBe(20);
+    expect(rows.get('balanced')!.score).toBeCloseTo(0.25);
+    const logged = offTheLevelMean([...rows.values()]).map((row) => row.style).sort();
+    expect(logged).toEqual(['balanced', 'expansive']);
+    expect(styleMixOf(games)).toEqual({ attacks: 4, defences: 1, switches: 30, games: 30 });
+  });
 });
 

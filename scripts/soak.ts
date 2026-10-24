@@ -6,7 +6,8 @@
 //   npm run soak -- --json out.json      also write every run's samples to a file
 //   npm run soak -- --jobs 4             split the runs over 4 processes (same results, in order)
 //   npm run soak -- --live-rivals        rival rounds on the live sim too (N9.2's setting; several times slower),
-//                                        and each rival style's score against its strength (#249)
+//                                        each style's score against its strength (#249), and at a level
+//                                        rating the wins ÷ games and the break-rule switches (N14.2)
 //
 // Since the switch-over to the live match sim (BAK-207 Phase 4) every match the
 // player's club plays is a whole live match, about 15 s a season headless, so the
@@ -27,7 +28,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runSoak, styleTable, summariseSeasons, tallyNet, OLD_VERSIONS, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
+import { levelWinRates, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -134,8 +135,8 @@ for (const r of results) {
 // Per-season averages over the seeds, by mode: the baseline for the parity work.
 const summary = summariseSeasons(results);
 if (summary.length) {
-  console.log(`\nPer season, averaged over ${seeds} seeds of the fresh-game runs (record, margin a game, ladder finish, share in the top eight / premiers / sacked, rounds forfeited, finals appearances per run so far, the win rate against the three nearest-rated rivals (games in brackets), the player's best nine v the rival mean, rival range, money, managed signings). Start gap = best nine − rival mean at week 1.`);
-  console.log(`${pad('mode', 9)} ${pad('season', 6)} ${pad('runs', 4)} ${pad('record', 14)} ${pad('margin', 6)} ${pad('pos', 4)} ${pad('top8', 4)} ${pad('prem', 4)} ${pad('sack', 4)} ${pad('forf', 4)} ${pad('fin', 4)} ${pad('near', 10)} ${pad('nine', 5)} ${pad('rmean', 5)} ${pad('gap', 5)} ${pad('range', 7)} ${pad('money', 7)} ${pad('signings', 18)} ${pad('start', 5)}`);
+  console.log(`\nPer season, averaged over ${seeds} seeds of the fresh-game runs (record, margin a game, ladder finish, share in the top eight / premiers / sacked, rounds forfeited, finals appearances per run so far, the win rate against the three nearest-rated rivals (games in brackets), the player's best nine v the rival mean, rival range, money, managed signings${liveRivals ? ', distinct attack/defence styles' : ''}). Start gap = best nine − rival mean at week 1.`);
+  console.log(`${pad('mode', 9)} ${pad('season', 6)} ${pad('runs', 4)} ${pad('record', 14)} ${pad('margin', 6)} ${pad('pos', 4)} ${pad('top8', 4)} ${pad('prem', 4)} ${pad('sack', 4)} ${pad('forf', 4)} ${pad('fin', 4)} ${pad('near', 10)} ${pad('nine', 5)} ${pad('rmean', 5)} ${pad('gap', 5)} ${pad('range', 7)} ${pad('money', 7)} ${pad('signings', 18)} ${pad('start', 5)}${liveRivals ? ` ${pad('styles', 7)}` : ''}`);
   for (const s of summary) {
     console.log([
       pad(modeLabel(s), 9), pad(s.season, 6), pad(s.runs, 4),
@@ -145,6 +146,7 @@ if (summary.length) {
       pad(s.bestNine.toFixed(1), 5), pad(s.rivalMean.toFixed(1), 5), pad(signed(s.gap), 5), pad(`${s.rivalRange[0]}-${s.rivalRange[1]}`, 7),
       pad(k(s.money), 7), pad(s.signings ? `${s.signings.toFixed(1)} at ${s.signedOverall.toFixed(0)} ovr, ${k(s.signingFees)}` : '-', 18),
       pad(signed(s.startGap), 5),
+      ...(liveRivals ? [pad(`${s.attackStyles.toFixed(1)}/${s.defenceStyles.toFixed(1)}`, 7)] : []),
     ].join(' '));
   }
 }
@@ -171,13 +173,42 @@ if (summary.length) {
 // style's score (a win 1, a draw ½) against what its strength gaps alone predict.
 if (liveRivals) {
   const games = results.flatMap((r) => r.styleGames ?? []);
-  console.log(`\nRival styles in ${games.length} rival-v-rival games on the live sim (#249): each side's score (win 1, draw ½) against the score its strength gap predicts (the mean of every side with the same gap, in 2-point bands). * = beyond two standard errors. Head-to-head reference: tuning §27, #241.`);
+  const switches = games.reduce((t, g) => t + g.switches, 0);
+  console.log(`\nRival styles in ${games.length} rival-v-rival games on the live sim (#249, N14.2).`);
+  console.log(`Break-rule switches: ${switches} in ${games.length} games (${games.length ? (switches / games.length).toFixed(2) : '0'} a match).`);
+  const mix = (key: 'attack' | 'defence'): string => {
+    const rows = styleTable(games, key);
+    const total = rows.reduce((t, r) => t + r.games, 0);
+    return rows.map((r) => `${r.style} ${total ? Math.round((r.games / total) * 100) : 0}%`).join(', ');
+  };
+  console.log(`Attack mix: ${mix('attack') || '-'}`);
+  console.log(`Defence mix: ${mix('defence') || '-'}`);
+  console.log(`\nWins ÷ games at a level rating (clubs within ${STYLE_GAP_BAND} points as the week began). A draw is half a win. ! = more than ${LEVEL_OFF_MEAN * 100} points from even; logged for N13, not tuned here.`);
+  for (const key of ['attack', 'defence'] as const) {
+    console.log(`${pad(key, 11)} ${pad('games', 6)} ${pad('score', 6)} ${pad('off', 6)}`);
+    const rows = levelWinRates(games, key);
+    for (const row of rows) {
+      const off = (row.score - 0.5) * 100;
+      console.log([pad(row.style, 11), pad(row.games, 6), pad(pct(row.score), 6), pad(`${signed(off, 1)}${Math.abs(off) > LEVEL_OFF_MEAN * 100 ? '!' : ''}`, 6)].join(' '));
+    }
+    const logged = offTheLevelMean(rows);
+    console.log(logged.length
+      ? `Logged for N13 (${key}, level rating): ${logged.map((r) => `${r.style} ${pct(r.score)} over ${r.games} sides (${signed((r.score - 0.5) * 100)} pts)`).join('; ')}.`
+      : `Logged for N13 (${key}, level rating): none more than 4 points from even.`);
+  }
+  console.log(`\nAgainst strength, every game (#249): each side's score against the score its strength gap predicts (the mean of every side with the same gap, in 2-point bands). * = beyond two standard errors. A difference over 4 points is logged for N13 too.`);
   for (const key of ['attack', 'defence'] as const) {
     console.log(`${pad(key, 11)} ${pad('games', 6)} ${pad('score', 6)} ${pad('expect', 6)} ${pad('diff', 6)} ${pad('se', 5)}`);
-    for (const row of styleTable(games, key)) {
+    const rows = styleTable(games, key);
+    const wide: string[] = [];
+    for (const row of rows) {
       const d = row.score - row.expected;
       console.log([pad(row.style, 11), pad(row.games, 6), pad(pct(row.score), 6), pad(pct(row.expected), 6), pad(`${signed(d * 100)}${Math.abs(d) > 2 * row.se ? '*' : ''}`, 6), pad((row.se * 100).toFixed(1), 5)].join(' '));
+      if (Math.abs(d) > LEVEL_OFF_MEAN) wide.push(`${row.style} ${signed(d * 100)} over ${row.games} sides`);
     }
+    console.log(wide.length
+      ? `Logged for N13 (${key}, against strength): ${wide.join('; ')}.`
+      : `Logged for N13 (${key}, against strength): none more than 4 points from the strength-adjusted mean.`);
   }
 }
 

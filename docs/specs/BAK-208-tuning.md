@@ -1001,6 +1001,15 @@ and All-out weak. A style here is also a squad (quick backs pick Expansive), so 
 mixes the preset with what the squad is like beyond its strength; §27's even-rated head-to-head
 is the clean measure of the preset. Raised on #241, not tuned here (the plan tables are not N11's).
 
+**With the break rule (N14.2).** The same soak now plays those games with the rule on both
+sides, counts the plan changes as each result lands (not stored on the fixture), and also
+prints wins ÷ games for clubs that began the week within 2 points. A style more than 4 points
+from even there, or more than 4 from the strength-adjusted mean above, is logged for N13 and
+not moved. 10 seeds × 3 seasons on Normal, 10,354 games: 2.51 plan changes a
+match. At a level rating Grind +5.7 and Expansive −6.9. Against strength
+Expansive −5.7, Kick-chase +4.5, All-out +5.3. The full table is in
+`docs/status/2026-10-living.md`.
+
 ## 29. The goal-kicker and the captain (N11)
 
 The coach names a goal-kicker and a captain on the Lineup screen (`Lineup.kicker`,

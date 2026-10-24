@@ -8,10 +8,11 @@ import { bus } from '../../src/core/events';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import type { GameState } from '../../src/core/state';
-import { initLeague, PLAYER_ID, registerFixturesSystem, simulateRivalRound } from '../../src/systems/fixtures';
+import { applyResult, initLeague, PLAYER_ID, registerFixturesSystem, simulateRivalRound } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
-import { playRivalJob, playRivalJobsInWorker, rivalJobs } from '../../src/systems/rivalRound';
+import { applyRivalResults, onRivalPlanChanges, playRivalJob, playRivalJobsInWorker, rivalJobs } from '../../src/systems/rivalRound';
 import { makeRng } from '../../src/utils/rng';
+import type { MatchResult, TeamSheet } from '../../src/sim/events';
 
 /** The state just before the rival round runs (a hook of the same order registered first). */
 let atRivals: GameState | null = null;
@@ -172,4 +173,29 @@ describe('the rival round worker falls back to the main thread', () => {
       if (!hadWindow) delete g.window;
     }
   }, 120_000);
+
+  it('counts break-rule switches as the result lands and leaves them off the fixture', () => {
+    newGame(false);
+    const s = getState();
+    const f = s.league.fixtures.find((x) => x.round === s.week && x.homeId !== PLAYER_ID && x.awayId !== PLAYER_ID)!;
+    const sheet = (id: string): TeamSheet => ({
+      clubId: id, name: id, attack: 60, defense: 60, kicking: 60, fitness: 60, colors: ['#111111', '#eeeeee'],
+    });
+    const result: MatchResult = {
+      homeScore: 12, awayScore: 6, events: [], weather: 'clear', momentumTimeline: [], injuries: [],
+      stats: { possession: [50, 50], tackles: [0, 0], errors: [0, 0], tries: [2, 1] },
+      planChanges: [{ minute: 9, side: 'home', attack: 'expansive', defence: 'rush', at: 'half-time' }],
+    };
+    const seen: number[] = [];
+    const off = onRivalPlanChanges((n) => seen.push(n.switches));
+    const next = applyRivalResults(s, [{
+      round: f.round, homeId: f.homeId, awayId: f.awayId, home: sheet(f.homeId), away: sheet(f.awayId),
+      seed: 1, weather: 'clear', aiCoach: [], breakRuleSides: ['home', 'away'], goldenPoint: false,
+    }], [result], applyResult);
+    off();
+    expect(seen).toEqual([1]);
+    const stamped = next.league.fixtures.find((x) => x.round === f.round && x.homeId === f.homeId)!;
+    expect(stamped.result).toEqual({ homeScore: 12, awayScore: 6 });
+    expect(JSON.stringify(next)).not.toContain('planChanges');
+  });
 });
