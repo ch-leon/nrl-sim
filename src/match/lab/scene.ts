@@ -12,7 +12,8 @@ import type { Side, SimEvent } from '../core/snapshot';
 import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
 import { PopupLayer } from '../view/popupLayer';
-import { SLOWMO_FACTOR, SLOWMO_MS, popupFor } from '../view/popups';
+import { ContestLayer } from '../view/contestLayer';
+import { SLOWMO_FACTOR, SLOWMO_MS, popupFor, type PopupView } from '../view/popups';
 import { WrestleBar } from '../view/wrestleBar';
 import { SprintLayer } from '../view/sprintLayer';
 import { LegsLayer } from '../view/legsLayer';
@@ -36,6 +37,7 @@ export class LabScene extends MatchScene {
   private controller!: LabController;
   private view: LiveView | null = null;
   private popups: PopupLayer | null = null;
+  private contest: ContestLayer | null = null;
   private wrestleBar: WrestleBar | null = null;
   private sprintLayer: SprintLayer | null = null;
   private legsLayer: LegsLayer | null = null;
@@ -59,6 +61,7 @@ export class LabScene extends MatchScene {
     this.backBtn = null;
     this.view = new LiveView(this);
     this.popups = new PopupLayer(this, DEPTH_POPUP);
+    this.contest = new ContestLayer(this, DEPTH_POPUP - 3);
     this.wrestleBar = new WrestleBar(this, DEPTH_POPUP);
     this.sprintLayer = new SprintLayer(this, DEPTH_POPUP - 1);
     this.legsLayer = new LegsLayer(this, DEPTH_POPUP - 2, FATIGUE);
@@ -69,6 +72,8 @@ export class LabScene extends MatchScene {
       r.onEvents = null;
       this.popups?.destroy();
       this.popups = null;
+      this.contest?.destroy();
+      this.contest = null;
       this.wrestleBar?.destroy();
       this.wrestleBar = null;
       this.sprintLayer?.destroy();
@@ -81,6 +86,7 @@ export class LabScene extends MatchScene {
   private onSimEvents(events: readonly SimEvent[]): void {
     const r = this.controller.runner;
     for (const e of events) {
+      this.contest?.note(e, r.cur);
       const p = popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups?.show(p, e.side, e.slot);
@@ -111,7 +117,10 @@ export class LabScene extends MatchScene {
       const a = this.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
     };
-    this.popups?.update(delta, this.cameras.main.zoom, feet);
+    const cam = this.cameras.main;
+    const view: PopupView = { left: cam.scrollX, top: cam.scrollY, width: cam.width / cam.zoom, height: cam.height / cam.zoom };
+    this.popups?.update(delta, cam.zoom, feet, view);
+    this.contest?.update(delta, cam.zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet);
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
     this.wrestleBar?.update(r.cur.wrestle, this.cameras.main.zoom, (w) => feet(w.side, w.slot));
     // Legs (§8): a bar under everyone, green → amber once tired → red once spent.

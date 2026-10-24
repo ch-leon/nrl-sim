@@ -2,7 +2,7 @@
 // Phaser scene: pooled texts that follow the player, drift up and fade.
 import Phaser from 'phaser';
 import type { Side } from '../core/snapshot';
-import { TONE_COLOR, TRAIT_COLOR, type Popup } from './popups';
+import { POPUP_LINE_H, TONE_COLOR, TRAIT_COLOR, clampPopupAnchor, popupTextHeight, type Popup, type PopupView } from './popups';
 
 interface Live {
   text: Phaser.GameObjects.Text;
@@ -27,7 +27,7 @@ const BASE_LIFT = 40;
 const DRIFT = 12;
 /** Two pop-ups closer than this across (screen px) count as on top of each other; a line of text is about this tall. */
 const CLEAR_W = 110;
-const LINE_H = 22;
+const LINE_H = POPUP_LINE_H;
 
 export class PopupLayer {
   private readonly pool: Phaser.GameObjects.Text[] = [];
@@ -78,8 +78,17 @@ export class PopupLayer {
     }
   }
 
-  /** Call every frame with the real delta and where each player's feet are. */
-  update(deltaMs: number, zoom: number, feet: (side: Side, slot: number) => { x: number; y: number } | null): void {
+  /**
+   * Call every frame with the real delta and where each player's feet are.
+   * `view` is the camera's visible rectangle in world px: the anchor is clamped
+   * inside it (finding 4, clipped at the top at ×8).
+   */
+  update(
+    deltaMs: number,
+    zoom: number,
+    feet: (side: Side, slot: number) => { x: number; y: number } | null,
+    view?: PopupView,
+  ): void {
     this.now += deltaMs;
     for (let i = this.live.length - 1; i >= 0; i--) {
       const l = this.live[i]!;
@@ -95,8 +104,10 @@ export class PopupLayer {
       const clear = l.parent ? (l.parent.clear ?? 0) : l.clear;
       // Pop in (scale overshoot) then drift up and fade in the last third.
       const pop = u < 0.12 ? 0.6 + (u / 0.12) * 0.4 : 1;
+      const raw = { x: at.x, y: at.y - l.lift - clear / zoom - DRIFT * u };
+      const pos = view ? clampPopupAnchor(raw, popupTextHeight(l.lines, zoom), view, zoom) : raw;
       l.text
-        .setPosition(at.x, at.y - l.lift - clear / zoom - DRIFT * u)
+        .setPosition(pos.x, pos.y)
         .setScale(pop / zoom)
         .setAlpha(u > 0.66 ? 1 - (u - 0.66) / 0.34 : 1);
     }

@@ -23,8 +23,8 @@ import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
-import type { Fixture } from '../core/state';
-import { callsLine, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
+import { getState, type Fixture } from '../core/state';
+import { callsLine, callsLockedHint, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
 import {
   LivePlayback,
   LIVE_DEFAULT_SPEED,
@@ -33,7 +33,7 @@ import {
   type PlaybackBall,
   type PlaybackSpeed,
 } from '../match/view/livePlayback';
-import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, type Frame } from '../match/view/kickLayer';
+import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, cameraFrame, type Frame } from '../match/view/kickLayer';
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
@@ -482,7 +482,14 @@ export class MatchScene extends Phaser.Scene {
         },
       });
       this.mountPlaybackControls(LIVE_DEFAULT_SPEED);
-      if (live.coachSide) this.mountCallChips(live.coachSide, live.unlockedCalls ?? COACH_CALLS);
+      if (live.coachSide) {
+        const unlocked = live.unlockedCalls ?? COACH_CALLS;
+        this.mountCallChips(live.coachSide, unlocked);
+        // One ticker line when an old save (or any club past week 1) is short of calls (N9.6, #224). Not the calls row.
+        const club = getState();
+        const hint = callsLockedHint(unlocked.length, COACH_CALLS.length, club.season > 1 || club.week > 1 || club.history.length > 0);
+        if (hint) this.overlay?.comment(hint);
+      }
       if (live.planSide) this.mountPlanChip(live.planSide);
       bus.on('match:finished', this.onFinished);
       // A phone may kill the app in the background: keep where the match is (#73).
@@ -510,7 +517,9 @@ export class MatchScene extends Phaser.Scene {
     const cam0 = this.cameras.main;
     // A try's replay (N15.5) frames the ball wide, ahead of a kick's own framing.
     const replayFrame = this.playback?.replayFraming() ?? null;
-    this.kickFrame = replayFrame ?? this.playback?.kickFraming({ width: cam0.width, height: cam0.height }, this.zoomTarget) ?? null;
+    const kick = this.playback?.kickFraming({ width: cam0.width, height: cam0.height }, this.zoomTarget) ?? null;
+    // A pinch or a wheel has the camera: a kick does not pan it off the ball (note 10).
+    this.kickFrame = cameraFrame(replayFrame, kick, this.autoZoom === null);
     if (this.kickFrame) this.kickBackUntil = time + KICK_RETURN_MS;
     this.kickBack = !this.kickFrame && time < this.kickBackUntil;
     // The coach's chips follow the play a few times a second (#73).

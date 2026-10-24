@@ -142,3 +142,51 @@ export const TONE_COLOR: Readonly<Record<PopupTone, string>> = {
   neutral: '#f4ecd8',
   bad: '#ff4a4a',
 };
+
+/** Screen px kept clear of the camera's edge (N15.6). A line of a pop-up is about this tall. */
+export const POPUP_EDGE = 8;
+export const POPUP_LINE_H = 22;
+/** Half the widest word, screen px, so the sides of the word stay on screen. */
+export const POPUP_HALF_W = 64;
+
+/** The camera's visible rectangle, in world px. */
+export interface PopupView {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** World px a pop-up's text occupies at this zoom (it is drawn at 1/zoom so it stays screen-sized). */
+export function popupTextHeight(lines: number, zoom: number): number {
+  return (Math.max(1, lines) * POPUP_LINE_H) / Math.max(zoom, 1e-3);
+}
+
+/**
+ * Keep a pop-up's anchor inside the camera (N15.6, finding 4). The text hangs
+ * upward from `anchor` (origin at its bottom edge) and is `textH` world px tall.
+ * At ×8 a 40 px lift over a man near the top of the view walks off the screen;
+ * this pulls the anchor back in, on every edge.
+ */
+export function clampPopupAnchor(
+  anchor: { x: number; y: number },
+  textH: number,
+  view: PopupView,
+  zoom: number,
+): { x: number; y: number } {
+  const z = Math.max(zoom, 1e-3);
+  if (!(view.width > 0) || !(view.height > 0)) return { x: anchor.x, y: anchor.y };
+  const mx = Math.min(POPUP_HALF_W / z, view.width / 2);
+  const my = Math.min(POPUP_EDGE / z, view.height / 2);
+  const left = view.left + mx;
+  const right = view.left + view.width - mx;
+  const top = view.top + my;
+  const bottom = view.top + view.height - my;
+  const x = left <= right ? Math.min(right, Math.max(left, anchor.x)) : view.left + view.width / 2;
+  const room = Math.max(0, bottom - top);
+  const h = Math.min(Math.max(0, textH), room);
+  const minY = top + h;
+  const maxY = bottom;
+  const y = minY <= maxY ? Math.min(maxY, Math.max(minY, anchor.y)) : top + h;
+  return { x, y };
+}

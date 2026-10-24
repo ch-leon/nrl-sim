@@ -340,7 +340,9 @@ export type MatchIntent =
 - Raise break visibility and kick chase spectacle in playback (anims for bomb contest,
   driven tackle backwards). The bomb contest done in N15.3 (#297): the two under a bomb or
   a cross-field kick are ringed as it comes down and the one who takes it lights up, with
-  the camera wide and the ball's trail; the break and the driven tackle are N15.6's.
+  the camera wide and the ball's trail. The break and the driven tackle are drawn in
+  N15.6: a flash across the defensive line where it was broken, and a dust puff a
+  metre behind the carrier on a big hit (the sim already drives him back).
   Traits that fire draw a move of their own (N15.4): the fend's arm, the step's cut,
   Big Boot's wider trail, the Playmaker's line through the man he skips, the Wrecking
   Ball's drive and the Hitman's shock, each only when the event names the trait.

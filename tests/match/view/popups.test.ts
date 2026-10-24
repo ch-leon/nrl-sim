@@ -1,6 +1,19 @@
 // tests/match/view/popups.test.ts — which events get shouted about (BAK-208 §6).
 import { describe, it, expect } from 'vitest';
-import { BONUS_SUB, POPUP_BIG_MS, POPUP_MS, SLOWMO_FACTOR, SLOWMO_MS, TONE_COLOR, popupFor, surnameOf } from '../../../src/match/view/popups';
+import {
+  BONUS_SUB,
+  POPUP_BIG_MS,
+  POPUP_EDGE,
+  POPUP_LINE_H,
+  POPUP_MS,
+  SLOWMO_FACTOR,
+  SLOWMO_MS,
+  TONE_COLOR,
+  clampPopupAnchor,
+  popupFor,
+  popupTextHeight,
+  surnameOf,
+} from '../../../src/match/view/popups';
 import type { SimEvent } from '../../../src/match/core/snapshot';
 
 const ev = (kind: string, player = 'Jarrah Kavanagh'): SimEvent => ({ tick: 10, kind, text: '', side: 'home', slot: 3, player });
@@ -45,6 +58,28 @@ describe('popupFor', () => {
     expect(popupFor(ev('slow-ptb'))).toBeNull();
     expect(popupFor(ev('run-down'))).toMatchObject({ word: 'RUN DOWN!', tone: 'defence', big: true });
     expect(popupFor(ev('blown'))).toBeNull(); // out of gas is commentary, not a shout
+  });
+  it('keeps a pop-up inside the view, including one lifted off the top at ×8', () => {
+    const phone = { left: 0, top: 0, width: 844, height: 390 };
+    const mid = { x: 400, y: 200 };
+    const h = popupTextHeight(2, 1);
+    expect(clampPopupAnchor(mid, h, phone, 1)).toEqual(mid);
+    // ×8: the view is an eighth of the screen, and a 40 px world lift (BASE_LIFT) over a man near the top walks off it.
+    const zoom = 8;
+    const view = { left: 200, top: 100, width: 844 / zoom, height: 390 / zoom };
+    const feetY = view.top + 6;
+    const lifted = { x: view.left + view.width / 2, y: feetY - 40 };
+    const textH = popupTextHeight(2, zoom);
+    const clamped = clampPopupAnchor(lifted, textH, view, zoom);
+    const top = view.top + POPUP_EDGE / zoom;
+    expect(lifted.y).toBeLessThan(top);
+    expect(clamped.y - textH).toBeGreaterThanOrEqual(top - 1e-6);
+    expect(clamped.y).toBeLessThanOrEqual(view.top + view.height - POPUP_EDGE / zoom + 1e-6);
+    expect(clamped.x).toBe(lifted.x);
+    // The left edge keeps half a word on screen.
+    const wide = clampPopupAnchor({ x: view.left, y: view.top + view.height / 2 }, popupTextHeight(1, zoom), view, zoom);
+    expect(wide.x).toBeCloseTo(view.left + Math.min(64 / zoom, view.width / 2));
+    expect(POPUP_LINE_H).toBeGreaterThan(0);
   });
   it('big moments last longer and get a short slow-motion beat', () => {
     expect(POPUP_BIG_MS).toBeGreaterThan(POPUP_MS);

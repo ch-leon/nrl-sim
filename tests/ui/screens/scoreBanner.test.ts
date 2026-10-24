@@ -1,7 +1,8 @@
 // tests/ui/screens/scoreBanner.test.ts — the centre-screen pop-up for every
 // scoring attempt: who scored, what it was, and how many points. Pure — no DOM.
 import { describe, it, expect } from 'vitest';
-import { BANNER_MS, initLiveState, inkFor, reduceEvent, scoreBanner } from '../../../src/ui/screens/matchOverlay';
+import { BANNER_MS, CALLS_LOCKED_HINT, bannerLife, callsLockedHint, initLiveState, inkFor, reduceEvent, scoreBanner } from '../../../src/ui/screens/matchOverlay';
+import { TICKER_FIT_CHARS } from '../../../src/match/view/commentary';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
 import type { MatchEvent } from '../../../src/sim/events';
@@ -65,9 +66,19 @@ describe('scoreBanner', () => {
     }
   }, 60_000);
 
-  it('holds a try banner longer than a kick banner', () => {
+  it('holds a try banner longer than a kick banner, and a bonus try for the same time', () => {
     expect(BANNER_MS.try).toBeGreaterThan(BANNER_MS.kick);
     expect(BANNER_MS.kick).toBeGreaterThanOrEqual(2000);
+    expect(bannerLife('TRY!')).toBe(BANNER_MS.try);
+    expect(bannerLife('BONUS TRY!')).toBe(BANNER_MS.try);
+    expect(bannerLife('CONVERTED')).toBe(BANNER_MS.kick);
+  });
+
+  it('hints in the ticker when a seasoned club is short of call chips, and the line fits', () => {
+    expect(callsLockedHint(2, 9, false)).toBeNull();
+    expect(callsLockedHint(9, 9, true)).toBeNull();
+    expect(callsLockedHint(2, 9, true)).toBe(CALLS_LOCKED_HINT);
+    expect(CALLS_LOCKED_HINT.length).toBeLessThanOrEqual(TICKER_FIT_CHARS);
   });
 });
 
