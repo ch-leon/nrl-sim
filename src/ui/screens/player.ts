@@ -12,7 +12,7 @@
 import { bus } from '../../core/events';
 import { getState, type GameState, type Player, type PlayerStats, type RivalClub, type StatTally } from '../../core/state';
 import { marketWage, overallRating } from '../../data/player';
-import { ROMAN, TRAITS } from '../../data/traits';
+import { ROMAN, TRAITS, traitTip } from '../../data/traits';
 import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } from '../../systems/contracts';
 import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis, signPlayer } from '../../systems/freeagency';
@@ -210,7 +210,7 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
       .filter((t) => t.id in TRAITS)
-      .map((t) => ({ label: `${TRAITS[t.id].name} ${ROMAN[t.level]}`, tip: TRAITS[t.id].blurb, bad: TRAITS[t.id].bad ?? false })),
+      .map((t) => ({ label: `${TRAITS[t.id].name} ${ROMAN[t.level]}`, tip: traitTip(t.id), bad: TRAITS[t.id].bad ?? false })),
     morale: { value: p.morale, word: moraleWord(p.morale), reasons: squad ? moraleReasons(p) : [] },
     fitness: p.injuredWeeks > 0 ? `Out ${weeksText(p.injuredWeeks)}` : 'Fit',
     injured: p.injuredWeeks > 0,

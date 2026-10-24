@@ -260,7 +260,7 @@ less; Kick-chase kicks more and bombs more; All-out offloads 1.5× Balanced; Rus
 | Step / fend / bust / offload | word + player surname over his head, 1.2 s | 0.25 s slow-mo on bust |
 | Big hit | BIG HIT! | camera shake, 0.3 s slow-mo, crowd roar |
 | Intercept / strip | word + name | camera snaps to the ball |
-| Trait firing | "SIDESTEP II!" in the trait colour under the word | commentary names the trait |
+| Trait firing | "SIDESTEP II!" in the trait colour under the word | commentary names the trait; six moves draw on the pitch when the trait fired (N15.4): the fend's arm, the step's cut, Big Boot's wider trail, the Playmaker's line, the Wrecking Ball's drive, the Hitman's shock |
 | Kick | type (BOMB!, 40/20!) | wide camera, trail |
 | Try | existing banner (#82) | scorer's traits listed |
 | Wrestle (§8.1) | bar over the carrier: fight left, green → yellow → red, a pip per man on him | BROKE FREE! on a late bust |

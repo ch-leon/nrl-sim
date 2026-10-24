@@ -90,6 +90,8 @@ export interface Kick {
   contest: [Contestant, Contestant] | null;
   /** Who took the ball out of the contest, or null (a spill is nobody's). */
   winner: Contestant | null;
+  /** Big Boot made the kick (the event names the trait): the trail is wider and in the trait colour (N15.4). The flight is already longer. */
+  boot?: boolean;
 }
 
 /**
@@ -168,6 +170,7 @@ export class KickWatch {
         downTick: null,
         contest: null,
         winner: null,
+        boot: Boolean(e.trait),
       };
       this.groundAt = -2;
       this.prevLift = snap.ball.lift;
@@ -302,6 +305,15 @@ export function framingHeld(msSinceDown: number | null): boolean {
 
 const TRAIL_COLOR = 0xffffff;
 const TRAIL_SHADE = 0x1b2a12;
+/** Big Boot's trail: wider, and in the trait colour (popups.ts TRAIT_COLOR), so his kick reads as his (N15.4). */
+export const BOOT_TRAIL_COLOR = 0xd9a5ff;
+const PLAIN_WIDTHS: readonly [number, number] = [5, 3];
+const BOOT_WIDTHS: readonly [number, number] = [9, 5];
+
+/** The trail's two widths (shade, then the line) and the line's colour. Wider and in the trait colour when Big Boot struck it. */
+export function trailStyle(boot: boolean): { widths: readonly [number, number]; color: number } {
+  return boot ? { widths: BOOT_WIDTHS, color: BOOT_TRAIL_COLOR } : { widths: PLAIN_WIDTHS, color: TRAIL_COLOR };
+}
 const SKID_COLOR = 0xd9c9a3;
 const MARK_COLOR = 0xffffff;
 /** The contest's rings and the landing mark, world px: the carrier's ring is 22 × 11 (MatchScene). */
@@ -368,7 +380,8 @@ export class KickLayer {
     };
     // The trail: from the boot to the ball, older stretches fainter, over a dark edge so it reads on the grass.
     const pts = [at({ ...k.strike, lift: 0.4 }), ...k.path.map(at)];
-    for (const [width, color, strength] of [[5, TRAIL_SHADE, 0.3], [3, TRAIL_COLOR, 1]] as const) {
+    const style = trailStyle(k.boot === true);
+    for (const [width, color, strength] of [[style.widths[0], TRAIL_SHADE, 0.3], [style.widths[1], style.color, 1]] as const) {
       for (let i = 1; i < pts.length; i++) {
         const p = pts[i - 1]!;
         const q = pts[i]!;

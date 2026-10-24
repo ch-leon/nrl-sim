@@ -18,6 +18,7 @@ import {
   kickPoints,
   predictFlight,
   trailAlpha,
+  trailStyle,
   type BallPoint,
   type Frame,
   type Kick,
@@ -196,7 +197,14 @@ describe('KickWatch', () => {
     const kicker = man('home', 4, 40, 30);
     const f = kickFlight({ x: 40, y: 30 }, { x: 72, y: 24 }, 10, null, 12) as Flight;
     w.event(ev(10, 'kick', { detail: 'long' }), snapAt(10, ballOf(f, 10), [kicker]));
-    expect(w.kick).toMatchObject({ type: 'long', side: 'home', slot: 4, strike: { x: 40, y: 30 }, strikeTick: 10, downTick: null, flight: null });
+    expect(w.kick).toMatchObject({ type: 'long', side: 'home', slot: 4, strike: { x: 40, y: 30 }, strikeTick: 10, downTick: null, flight: null, boot: false });
+    // Big Boot (the event names him): the same kick, a wider trail in the trait colour.
+    const boot = new KickWatch();
+    boot.event(ev(10, 'kick', { detail: 'long', trait: 'Big Boot II' }), snapAt(10, ballOf(f, 10), [kicker]));
+    expect(boot.kick!.boot).toBe(true);
+    expect(trailStyle(true).widths[0]).toBeGreaterThan(trailStyle(false).widths[0]);
+    expect(trailStyle(true).widths[1]).toBeGreaterThan(trailStyle(false).widths[1]);
+    expect(trailStyle(true).color).not.toBe(trailStyle(false).color);
     for (let t = 11; t <= 12; t++) w.tick(snapAt(t, ballOf(f, t)));
     expect(w.kick!.flight).toBeNull();
     w.tick(snapAt(13, ballOf(f, 13)));
