@@ -125,8 +125,8 @@ Every transition is a thing that physically happens on the field; nothing is imp
   shouts, the kick, the six trait moves, the line-break flash and the big-hit dust, the
   bonus-zone glow, the wrestle bar and the sprint trail. The commentary ticker and the
   instant replay read the same seed a second way. Merged: the bonus zone (#289),
-  commentary (#294), kicks landing wide (#301). Open, stacked: traits (#309), the replay
-  (#310), the pop-up and contest polish (#312), and this cost note (#313). None of them
+  commentary (#294), kicks landing wide (#301), traits (#309) and the replay (#310).
+  Open: the pop-up and contest polish (#312) and this cost note (#313). None of them
   changes `runMatch`'s result. §6's cost line now says the N9.1 figure (about 300 ms in
   Node) and that rival rounds use this sim behind the setting.
 - `src/sim/engine.ts` and `src/world/playback.ts`+`staging.ts` are deleted at switch-over
@@ -153,7 +153,7 @@ Every transition is a thing that physically happens on the field; nothing is imp
 | **2** | **Full match:** scoring (try, conversion, penalty goal, field goal), kick types, errors/loose ball, penalties, restarts, halves, stamina; `MatchResult` output; headless mode; behind a setting. Split into seven PRs in §5.1 | A season plays end-to-end on the new engine; all stats/overlay tests pass |
 | **3** | **Balance:** thousands of headless matches; score bands, try/error/penalty rates, home edge, weather effects; calibration tests | Rates within agreed bands; `< 100 ms` headless |
 | **4** | **Switch-over:** default on, delete old engine/playback, rewrite ARCHITECTURE §6 | Old code gone; Pages live |
-| **5** | The match as a show: traits as visible moves, the Nines bonus zone, commentary, kicks, a replay | Bonus zone #289, commentary #294 and kicks #301 are merged. Traits #309, the instant replay #310, and the pop-up and contest polish #312 are open. Capacitor store builds stay #89 and are not started (Needs Leon) |
+| **5** | The match as a show: traits as visible moves, the Nines bonus zone, commentary, kicks, a replay | Bonus zone #289, commentary #294, kicks #301, traits #309 and the instant replay #310 are merged. The pop-up and contest polish #312 is open. Capacitor store builds stay #89 and are not started (Needs Leon) |
 
 Phases 0–1 are the point: if the prototype isn't fun to watch, nothing after it matters.
 
