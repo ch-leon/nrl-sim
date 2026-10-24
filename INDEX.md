@@ -131,3 +131,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261024-134815-kick-chase-sweep | kick-chase sweep | 511ea26 (uncommitted changes) | cursor/break-rule-710a | [report](runs/20261024-134815-kick-chase-sweep/report.md) |
 | 20261024-135245-kick-chase-step | kick-chase step | 511ea26 (uncommitted changes) | cursor/break-rule-710a | [report](runs/20261024-135245-kick-chase-step/report.md) |
 | 20261024-135701-kick-chase-step-confirm | kick-chase step confirm | 511ea26 (uncommitted changes) | cursor/break-rule-710a | [report](runs/20261024-135701-kick-chase-step-confirm/report.md) |
+| 20261024-154725-standard | standard | afa2b63 | main | [report](runs/20261024-154725-standard/report.md) |
