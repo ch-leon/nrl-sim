@@ -112,6 +112,12 @@ export interface MatchResult {
   injuries: MatchInjury[];
   /** Coach calls made and paid off, home then away (#73), when any were made: the match report's line (N9.5). */
   calls?: { made: [number, number]; paid: [number, number] };
+  /**
+   * Plan changes that came into force (N13.5), when any did. `attack` and
+   * `defence` are the preset ids. Absent when the plan never changed, so a
+   * match with no rule still compares equal.
+   */
+  planChanges?: { minute: number; side: 'home' | 'away'; attack: string; defence: string; at: 'half-time' | 'try' | 'kickoff' }[];
 }
 
 /**

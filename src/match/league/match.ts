@@ -7,6 +7,7 @@ import { applyMomentumEvent, decayMomentum } from '../../sim/weather';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import type { CallInput } from './calls';
 import { toMatchEvent } from './events';
+import type { PlanChange } from './breaks';
 import { LiveSim, type PlanInput } from './live';
 import type { DifficultyEdge } from './spread';
 import type { MatchLength } from './rules';
@@ -27,6 +28,12 @@ export interface RunMatchOptions {
   goldenPoint?: boolean;
   /** Plan changes at the breaks by tick (N11). */
   plans?: PlanInput[];
+  /**
+   * Sides that change plan at the breaks by the default rule (N13.5).
+   * A list, not a function: the worker and a replay have to clone it.
+   * Absent: no rule, and the match is unchanged.
+   */
+  breakRuleSides?: readonly ('home' | 'away')[];
   /** The difficulty's edge to the player's rival, after the spread (N12.2); absent on Normal. */
   difficultyEdge?: DifficultyEdge;
 }
@@ -84,6 +91,7 @@ export class MatchRecorder {
       ...(sim.callsMade.home + sim.callsMade.away > 0
         ? { calls: { made: [sim.callsMade.home, sim.callsMade.away] as [number, number], paid: [sim.callsPaid.home, sim.callsPaid.away] as [number, number] } }
         : {}),
+      ...(sim.planChanges.length ? { planChanges: sim.planChanges.map((p): PlanChange => ({ ...p })) } : {}),
     };
   }
 }
@@ -98,6 +106,7 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}),
     ...(opts.goldenPoint ? { goldenPoint: true } : {}),
     ...(opts.plans?.length ? { plans: opts.plans } : {}),
+    ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}),
     ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}),
   });
   const rec = new MatchRecorder({ home: home.clubId, away: away.clubId });

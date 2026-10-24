@@ -1,14 +1,52 @@
 # Match balance — October 2026 (N13)
 
 The live match sim's knobs, measured with the harness (`npm run balance`, `balance/README.md`).
-N13 item 1 is the presets. Later items (grubbers, completion, the 20-point gap, the home
-edge, stamina, the break rule) are still to come; this file starts with item 1.
+N13 item 1 is the presets. N13.5 is the break rule (below). Later items (grubbers, completion,
+the 20-point gap, the home edge, stamina) are still to come.
 
 N15.4 (traits you can see) adds an optional `toSlot` on a cut-out event in `src/match/league/live.ts`
 (this plan's file): the receiver's slot, so the view can draw the line. The sim does not
 read it, no dice changed, and the golden Balanced / Slide match is the same string.
 
 Every decision taken without a fresh word from Leon is marked **Assumed (needs Leon)**.
+
+## N13.5 The break rule (24 Oct, #316)
+
+The rule is in the sim and off unless a match names the sides. A player watching a
+match sees nothing new until N14 turns it on for the rival. Full knobs and the
+assumed choices: tuning §30. Short version, even 60 v 60, 200 seeds both ways,
+wins on points:
+
+The side that has the rule wins **50.2%** (6.5% drawn). That is inside two
+standard errors of even (about 5 points at 400 matches), so the rule alone is
+not the 8-point edge N12.2 used for difficulty. N14 should turn Hard's AI coach
+on, and leave Normal and Easy off. **Assumed (needs Leon).**
+
+Each preset against Balanced or Slide, with the rule on the other side:
+
+| Preset | No rule (N13.1) | Rule on the rival |
+|---|---:|---:|
+| Grind | 49.2% | 48.3% |
+| Expansive | 46.2% | 45.3% |
+| Kick-chase | 46.5% | 48.8% and 45.5% |
+| All-out | 54.8% | 51.2% |
+| Rush | 49.8% | 46.8% |
+| Compressed | 49.0% | 49.0% |
+
+Kick-chase at the old step (0.9) won 43.0% on seeds 1–200 and 41.8% on seeds
+10001–10200, both under the band (pool 42.4% over 800). Step 1.0, which is
+Balanced's step, wins 48.8% and 45.5% on those same blocks (pool **47.2%**).
+Kicks stay about 24 a match and the bomb bias is unchanged. Kick metres on
+seeds 1–200 fell 22.6, beyond luck. The other presets were left on the N13.1
+tables. **Assumed (needs Leon):** the thresholds (8 down at half-time, two
+tries in a row, 12 up after minute 15), Kick-chase opening to Expansive and
+tightening to Grind, Compressed as the tight defence, a conceded run beating a
+late lead, and this step.
+
+Runs: `20261024-134002-break-rule`, `20261024-135701-kick-chase-step-confirm`,
+`20261024-135245-kick-chase-step`. The plan is `balance/plans/break-rule.json`.
+The golden even match is unchanged, because no side in that match is given the
+rule. No club file and no QA file: the club does not pass the option yet.
 
 ## N13.1 Presets back in balance (24 Oct)
 
