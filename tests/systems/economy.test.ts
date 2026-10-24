@@ -203,6 +203,23 @@ describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
     expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 24_000, soldOut: false });
   });
 
+  it('Easy pays three quarters of the same gate; Hard and Normal pay the full gate', () => {
+    const at = (d: 'easy' | 'normal' | 'hard'): number => {
+      const settings = { ...getState().settings, difficulty: d };
+      setup({
+        week: 3, reputation: 30, facilities: [], settings,
+        league: { clubs: [], fixtures: [homeFixture(3)], ladder: [] },
+      });
+      return homeGate(getState(), homeFixture(3)).receipts;
+    };
+    const full = 1200 * ECON.TICKET_PRICE;
+    expect(at('normal')).toBe(full);
+    expect(at('hard')).toBe(full);
+    expect(at('easy')).toBe(Math.round(full * DIFFICULTY.easy.gate));
+    // Form and the occasion still move demand the same way; only the receipt scales.
+    expect(at('easy')).toBeLessThan(full);
+  });
+
   it('the hill holds 2,000: a famous club sells out, and a Grandstand lifts the roof', () => {
     const at = (facilities: PlacedFacility[]): ReturnType<typeof homeGate> => {
       setup({ week: 3, reputation: 100, facilities, league: { clubs: [], fixtures: [homeFixture(3)], ladder: [] } });
