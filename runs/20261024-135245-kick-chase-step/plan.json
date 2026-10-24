@@ -1,0 +1,52 @@
+{
+  "name": "kick-chase step",
+  "description": "On seeds 10001-10200, where kick-chase won 41.8% with the break rule on the other side, does always stepping (step 1), fewer grubbers, or more offloads in the red zone bring Side win into the middle of 45-55% without giving up the kicks?",
+  "seeds": 200,
+  "seedStart": 10001,
+  "scenarios": [
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "away"
+      ],
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "step 1",
+      "tuning": {
+        "presets.attack.kick-chase.base.step": 1
+      }
+    },
+    {
+      "name": "grubber 0.6",
+      "tuning": {
+        "presets.attack.kick-chase.base.kickBias.grubber": 0.6
+      }
+    },
+    {
+      "name": "step 1, grubber 0.6",
+      "tuning": {
+        "presets.attack.kick-chase.base.step": 1,
+        "presets.attack.kick-chase.base.kickBias.grubber": 0.6
+      }
+    },
+    {
+      "name": "red zone offload 1.4",
+      "tuning": {
+        "presets.attack.kick-chase.zones.redZone.offload": 1.4
+      }
+    }
+  ]
+}

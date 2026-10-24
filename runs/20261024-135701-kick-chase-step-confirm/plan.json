@@ -1,0 +1,32 @@
+{
+  "name": "kick-chase step confirm",
+  "description": "Kick-chase with step 1.0 against Balanced, break rule on the other side, seeds 1-200 both ways. The same change won 45.5% on seeds 10001-10200 (baseline 41.8%). This block's baseline was 43.0%.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "away"
+      ],
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "step 1",
+      "tuning": {
+        "presets.attack.kick-chase.base.step": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "kick-chase block",
+  "description": "Kick-chase against Balanced with the break rule on the other side, seeds 10001-10200 both ways. A check that the seeds 1-200 block (43.0%) is the low one.",
+  "seeds": 200,
+  "seedStart": 10001,
+  "scenarios": [
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "away"
+      ],
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ]
+}

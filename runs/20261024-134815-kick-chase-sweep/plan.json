@@ -1,0 +1,80 @@
+{
+  "name": "kick-chase sweep",
+  "description": "Kick-chase wins about 42% of even matches when the other side uses the break rule (seeds 1-200 at 43.0%, seeds 10001-10200 at 41.8%). Which single base knob brings Side win into 45-55% while kicks stay above a Balanced match (about 22)?",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "away"
+      ],
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "early kick 0.40",
+      "tuning": {
+        "presets.attack.kick-chase.base.earlyKick": 0.4
+      }
+    },
+    {
+      "name": "early kick 0.45",
+      "tuning": {
+        "presets.attack.kick-chase.base.earlyKick": 0.45
+      }
+    },
+    {
+      "name": "early kick 0.70",
+      "tuning": {
+        "presets.attack.kick-chase.base.earlyKick": 0.7
+      }
+    },
+    {
+      "name": "offload 0.9",
+      "tuning": {
+        "presets.attack.kick-chase.base.offload": 0.9
+      }
+    },
+    {
+      "name": "offload 1.1",
+      "tuning": {
+        "presets.attack.kick-chase.base.offload": 1.1
+      }
+    },
+    {
+      "name": "territory 0.15",
+      "tuning": {
+        "presets.attack.kick-chase.base.earlyTerritory": 0.15
+      }
+    },
+    {
+      "name": "territory 0.55",
+      "tuning": {
+        "presets.attack.kick-chase.base.earlyTerritory": 0.55
+      }
+    },
+    {
+      "name": "step 1.0",
+      "tuning": {
+        "presets.attack.kick-chase.base.step": 1
+      }
+    },
+    {
+      "name": "pass 0",
+      "tuning": {
+        "presets.attack.kick-chase.base.pass": 0
+      }
+    }
+  ]
+}
