@@ -33,6 +33,8 @@ import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
 import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer } from './traitLayer';
+import { ContestLayer } from './contestLayer';
+import type { PopupView } from './popups';
 import { replayFrame, replayFrom, REPLAY_WORKER_MS } from './replay';
 import { toFieldPt } from '../core/field';
 import { canUseWorker, playReplayInWorker } from '../../systems/matchJobs';
@@ -86,7 +88,7 @@ interface Sprite {
 /** What the live playback needs of the Match scene. */
 export interface LivePlaybackScene extends ViewSurface {
   players: Record<Side, readonly (ViewSurface['players'][Side][number] & { sprite: Sprite })[]>;
-  cameras: { main: { zoom: number } };
+  cameras: { main: { zoom: number; worldView: { x: number; y: number; width: number; height: number } } };
   /** The sides' colours (the carrier ring's), for the kick contest's rings. */
   readonly sideColors?: Readonly<Record<Side, number>>;
 }
@@ -134,6 +136,8 @@ export class LivePlayback {
   private readonly kickLayer: KickLayer;
   /** Traits you can see (N15.4): the arm, the cut, the cut-out line, the drive, the shock. */
   private readonly traits: TraitLayer;
+  /** Line-break flash and the driven tackle's dust (N15.6). */
+  private readonly contest: ContestLayer;
   private readonly recorder: MatchRecorder;
   /** The ticker's lines (N15.2): it hears every event, said or not. */
   private readonly commentator: Commentator;
@@ -178,6 +182,7 @@ export class LivePlayback {
     this.factory = (seed) => new LiveSim(home, away, seed, simOpts);
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
     this.traits = new TraitLayer(scene, DEPTH_POPUP - 0.5);
+    this.contest = new ContestLayer(scene, DEPTH_POPUP - 3);
     this.runner = new Runner(this.factory, opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => {
@@ -455,16 +460,21 @@ export class LivePlayback {
 
   /** Pop-ups, the wrestle bar and sprint streaks, once the camera has moved this frame. */
   late(deltaMs: number): void {
-    const zoom = this.scene.cameras.main.zoom;
+    const cam = this.scene.cameras.main;
+    const zoom = cam.zoom;
     const feet = (side: Side, slot: number): { x: number; y: number } | null => {
       const a = this.scene.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
     };
-    this.popups.update(deltaMs, zoom, feet);
+    // worldView is the visible rectangle. scrollX is not its left edge once the camera is zoomed (Phaser adds half the screen width, not half the world width).
+    const v = cam.worldView;
+    const view: PopupView = { left: v.x, top: v.y, width: v.width, height: v.height };
+    this.popups.update(deltaMs, zoom, feet, view);
     this.zone.update(deltaMs);
     const kick = this.replay ? this.replayKicks.kick : this.kicks.kick;
     this.kickLayer.update(kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
     this.traits.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet, this.replay ? 1 : this.runner.speed);
+    this.contest.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
     // The picture on screen is the replay's tick, not the live match still paused underneath.
     const shown = this.replay ? this.replay.snaps[this.replay.index]! : this.runner.cur;
     this.wrestleBar.update(shown.wrestle, zoom, (w) => feet(w.side, w.slot));
@@ -483,6 +493,7 @@ export class LivePlayback {
     this.zone.destroy();
     this.kickLayer.destroy();
     this.traits.destroy();
+    this.contest.destroy();
   }
 
   /**
@@ -521,10 +532,12 @@ export class LivePlayback {
       if (this.skipping) {
         this.kicks.clear();
         this.traits.clear();
+        this.contest.clear();
       } else {
         this.kicks.event(e, cur);
         // At ×4 and ×8 a one-second move is gone before it can be read. Ease the match; the mark also holds longer.
         if (this.traits.note(e, cur) && this.runner.speed >= TRAIT_FAST_FROM) this.runner.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
+        this.contest.note(e, cur);
       }
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
       const line = this.commentator.line(e, cur.score);
@@ -592,6 +605,7 @@ export class LivePlayback {
     this.replayKicks.clear();
     this.traits.clear();
     this.popups.clear();
+    this.contest.clear();
     this.replay = { snaps, index: 0, acc: 0 };
     this.feedReplay(snaps[0]!);
     this.replayGate = 'playing';
@@ -604,6 +618,7 @@ export class LivePlayback {
     for (const e of snap.events) {
       this.replayKicks.event(e, snap);
       this.traits.note(e, snap);
+      this.contest.note(e, snap);
     }
     this.replayKicks.tick(snap);
   }
@@ -639,6 +654,7 @@ export class LivePlayback {
     this.replay = null;
     this.replayKicks.clear();
     this.traits.clear();
+    this.contest.clear();
     this.replayGate = 'off';
     this.opts.overlay?.setReplaying(false);
     this.opts.overlay?.showLiveScore();
@@ -658,6 +674,7 @@ export class LivePlayback {
     if (was === 'off') return;
     this.traits.clear();
     this.popups.clear();
+    this.contest.clear();
     this.opts.overlay?.setReplaying(false);
     this.opts.overlay?.showLiveScore();
   }

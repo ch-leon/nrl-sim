@@ -231,6 +231,16 @@ export interface Frame {
 }
 
 /**
+ * Which frame the camera takes (N15.6, note 10). A replay frames the ball.
+ * A kick's own framing is skipped once the player has pinched or wheeled
+ * (`handHeld`): otherwise the kick pans away from the ball he zoomed onto.
+ */
+export function cameraFrame(replay: Frame | null, kick: Frame | null, handHeld: boolean): Frame | null {
+  if (replay) return replay;
+  return handHeld ? null : kick;
+}
+
+/**
  * The framing that holds the points: the widest whole-number zoom from `base` down
  * (never under 1, where a player is still 20 px tall) at which their box fits inside
  * the view less its margins, centred in the band the overlay leaves clear. Whole

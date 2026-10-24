@@ -2,7 +2,7 @@
 // Phaser scene: pooled texts that follow the player, drift up and fade.
 import Phaser from 'phaser';
 import type { Side } from '../core/snapshot';
-import { TONE_COLOR, TRAIT_COLOR, type Popup } from './popups';
+import { POPUP_LINE_H, TONE_COLOR, TRAIT_COLOR, placePopup, type Popup, type PopupBox, type PopupView } from './popups';
 
 interface Live {
   text: Phaser.GameObjects.Text;
@@ -27,7 +27,7 @@ const BASE_LIFT = 40;
 const DRIFT = 12;
 /** Two pop-ups closer than this across (screen px) count as on top of each other; a line of text is about this tall. */
 const CLEAR_W = 110;
-const LINE_H = 22;
+const LINE_H = POPUP_LINE_H;
 
 export class PopupLayer {
   private readonly pool: Phaser.GameObjects.Text[] = [];
@@ -78,27 +78,47 @@ export class PopupLayer {
     }
   }
 
-  /** Call every frame with the real delta and where each player's feet are. */
-  update(deltaMs: number, zoom: number, feet: (side: Side, slot: number) => { x: number; y: number } | null): void {
+  /**
+   * Call every frame with the real delta and where each player's feet are.
+   * `view` is the camera's visible rectangle in world px: the anchor is clamped
+   * inside it (finding 4, clipped at the top at ×8).
+   */
+  update(
+    deltaMs: number,
+    zoom: number,
+    feet: (side: Side, slot: number) => { x: number; y: number } | null,
+    view?: PopupView,
+  ): void {
     this.now += deltaMs;
     for (let i = this.live.length - 1; i >= 0; i--) {
       const l = this.live[i]!;
-      const u = (this.now - l.born) / l.ms;
-      if (u >= 1) {
+      if ((this.now - l.born) / l.ms >= 1) {
         l.text.setVisible(false);
         this.live.splice(i, 1);
-        continue;
       }
+    }
+    // Oldest first, so a shout already up keeps its place and a new one moves aside.
+    const placed: PopupBox[] = [];
+    for (const l of this.live) {
+      const u = (this.now - l.born) / l.ms;
       const at = feet(l.side, l.slot);
       if (!at) continue;
-      if (l.clear === null) l.clear = this.clearance(l, at, zoom);
-      const clear = l.parent ? (l.parent.clear ?? 0) : l.clear;
-      // Pop in (scale overshoot) then drift up and fade in the last third.
       const pop = u < 0.12 ? 0.6 + (u / 0.12) * 0.4 : 1;
-      l.text
-        .setPosition(at.x, at.y - l.lift - clear / zoom - DRIFT * u)
-        .setScale(pop / zoom)
-        .setAlpha(u > 0.66 ? 1 - (u - 0.66) / 0.34 : 1);
+      const alpha = u > 0.66 ? 1 - (u - 0.66) / 0.34 : 1;
+      if (l.parent) {
+        // The trait line rides with its shout. Clamping it on its own walks it onto another edge.
+        const dy = l.parent.lift - l.lift;
+        l.text.setPosition(l.parent.text.x, l.parent.text.y + dy).setScale(pop / zoom).setAlpha(alpha);
+        continue;
+      }
+      if (l.clear === null) l.clear = this.clearance(l, at, zoom);
+      const raw = { x: at.x, y: at.y - l.lift - l.clear / zoom - DRIFT * u };
+      // The text's own height, plus the stroke, so the top of the word stays inside the view.
+      const localH = (l.text.height > 0 ? l.text.height : Math.max(1, l.lines) * LINE_H) + 4;
+      const textH = localH / Math.max(zoom, 1e-3);
+      const pos = view ? placePopup(raw, textH, placed, view, zoom) : raw;
+      l.text.setPosition(pos.x, pos.y).setScale(pop / zoom).setAlpha(alpha);
+      if (view) placed.push({ x: pos.x, y: pos.y, h: textH });
     }
   }
 

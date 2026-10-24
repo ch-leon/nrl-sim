@@ -14,6 +14,7 @@ import {
   TRAIL_FADE_MS,
   contestants,
   framingHeld,
+  cameraFrame,
   kickFrame,
   kickPoints,
   predictFlight,
@@ -394,6 +395,18 @@ describe('kicks in real matches', () => {
     for (const z of [...zooms.phone, ...zooms.desktop]) expect([1, 2]).toContain(z);
     expect(withKicker / framed).toBeGreaterThan(0.9);
     for (const t of ['long', 'bomb', 'kickoff']) expect(types).toContain(t);
+  });
+});
+
+describe('cameraFrame: a pinch keeps a kick from panning the camera', () => {
+  const replay = { cx: 1, cy: 2, zoom: 1 };
+  const kick = { cx: 9, cy: 8, zoom: 1 };
+  it('takes the replay, else the kick, and skips the kick once the player holds the zoom', () => {
+    expect(cameraFrame(replay, kick, false)).toBe(replay);
+    expect(cameraFrame(null, kick, false)).toBe(kick);
+    expect(cameraFrame(null, kick, true)).toBeNull();
+    expect(cameraFrame(replay, kick, true)).toBe(replay);
+    expect(cameraFrame(null, null, false)).toBeNull();
   });
 });
 

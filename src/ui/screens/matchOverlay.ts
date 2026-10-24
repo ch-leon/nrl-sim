@@ -13,10 +13,11 @@
 // hides the HUD strip and bottom nav (no Advance Week / screen hopping
 // mid-match, and nothing for the scoreboard or the ×1/×2/×4/Skip controls to
 // collide with), moves the sound button to the bottom-right corner and
-// re-anchors toasts above the commentary feed. It stays on through full-time
-// (GitHub #14: the match view stays clean until "Back to Club"), when
-// `nrl-match-final` is added too: the feed gives way to the Back-to-Club button
-// and the result toast sits just above it. Both are removed on destroy (the
+// re-anchors toasts under the scoreboard, clear of the ticker (finding 3). It
+// stays on through full-time (GitHub #14: the match view stays clean until
+// "Back to Club"), when `nrl-match-final` is added too: the feed gives way to
+// the Back-to-Club button and the result toast stays under the scoreboard.
+// Both are removed on destroy (the
 // scene's teardown when leaving), which hands the HUD/nav back.
 //
 // The ticker's lines come from the live playback (match/view/commentary.ts, N15.2)
@@ -229,6 +230,32 @@ export function inkFor(hex: string): '#000' | '#fff' {
 
 /** How long a banner stays up (real ms): tries longest, a conversion extends it. */
 export const BANNER_MS = { try: 3200, kick: 2400 } as const;
+
+/**
+ * How long this headline stays up. A bonus try gets the try's window, so its
+ * conversion has the same time to fold in (N15.6, the show log's note 1).
+ */
+export function bannerLife(headline: string): number {
+  return headline === 'TRY!' || headline === 'BONUS TRY!' ? BANNER_MS.try : BANNER_MS.kick;
+}
+
+/**
+ * One ticker line when the Coach's Office has not unlocked every call (N15.6,
+ * the #224 note). For a club with a season already behind it, not week 2 of a
+ * new club, and not once every call is there. A season-1 save from before the
+ * unlock tiers has no version stored, so it stays quiet too.
+ */
+export const CALLS_LOCKED_HINT = "More calls unlock as you build up the Coach's Office.";
+
+/** True once a season has been completed, or the club is already into a later one. */
+export function callsHintSeasoned(season: number, seasonsPlayed: number): boolean {
+  return season > 1 || seasonsPlayed > 0;
+}
+
+export function callsLockedHint(unlocked: number, all: number, seasoned: boolean): string | null {
+  if (!seasoned || unlocked >= all) return null;
+  return CALLS_LOCKED_HINT;
+}
 
 // ── DOM overlay ────────────────────────────────────────────────────────────────
 
@@ -519,7 +546,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     }
     banner.hidden = false;
     if (bannerTimer) clearTimeout(bannerTimer);
-    bannerTimer = setTimeout(hideBanner, b.headline === 'TRY!' ? BANNER_MS.try : BANNER_MS.kick);
+    bannerTimer = setTimeout(hideBanner, bannerLife(b.headline));
 
     if (b.points > 0) {
       // Pulse the score and light up the scoring team's chip.
@@ -692,8 +719,16 @@ const OVERLAY_CSS = `
 body.nrl-match-active .nrl-hud,
 body.nrl-match-active .nrl-nav { display: none; }
 body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
-/* Toasts: above the commentary feed (clear of the scoreboard and stats). */
-body.nrl-match-active .nrl-toast-stack { top: auto; bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px)); }
+/* Toasts: under the scoreboard, in the overlay's top margin, clear of the ticker and the Log button (finding 3). */
+body.nrl-match-active .nrl-toast-stack,
+body.nrl-match-final .nrl-toast-stack {
+  top: calc(4.7rem + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  right: auto;
+  left: calc(0.5rem + env(safe-area-inset-left, 0px));
+  align-items: flex-start;
+  max-width: min(22rem, calc(100vw - 12rem));
+}
 .nrl-mo-scoreboard {
   position: fixed; top: calc(0.5rem + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 0.75rem; z-index: 15;
@@ -771,9 +806,8 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: calc(7.5rem + env(sa
 }
 /* Full-time: scoreboard and stats stay put (HUD/nav are still hidden); the
    feed gives way to the Back-to-Club button (MatchScene, bottom-centre where
-   the controls were) and the result toast sits just above it. */
+   the controls were). The result toast stays under the scoreboard, off the ticker. */
 .nrl-mo-final .nrl-mo-commentary, .nrl-mo-final .nrl-mo-log { display: none; }
-body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
 /* Score banner: big, team-coloured, centre-top over the pitch; never blocks taps. */
 .nrl-mo-banner {
   position: fixed; left: 50%; top: 22%; transform: translateX(-50%);
@@ -831,8 +865,8 @@ body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
   .nrl-mo-commentary, .nrl-mo-log { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
   .nrl-mo-banner { top: 19%; min-width: 14rem; padding: 0.25rem 0.9rem 0.35rem; border-width: 3px; }
   .nrl-mo-banner-score { margin-top: 0.2rem; }
-  body.nrl-match-active .nrl-toast-stack { bottom: 5.5rem; }
-  body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
+  body.nrl-match-active .nrl-toast-stack,
+  body.nrl-match-final .nrl-toast-stack { top: calc(4.7rem + env(safe-area-inset-top, 0px)); }
   .nrl-mo-replay, .nrl-mo-replay-tag { bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px)); }
 }
 `;
