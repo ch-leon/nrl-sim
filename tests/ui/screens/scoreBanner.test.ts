@@ -1,7 +1,7 @@
 // tests/ui/screens/scoreBanner.test.ts — the centre-screen pop-up for every
 // scoring attempt: who scored, what it was, and how many points. Pure — no DOM.
 import { describe, it, expect } from 'vitest';
-import { BANNER_MS, CALLS_LOCKED_HINT, bannerLife, callsLockedHint, initLiveState, inkFor, reduceEvent, scoreBanner } from '../../../src/ui/screens/matchOverlay';
+import { BANNER_MS, CALLS_LOCKED_HINT, bannerLife, callsHintSeasoned, callsLockedHint, initLiveState, inkFor, reduceEvent, scoreBanner } from '../../../src/ui/screens/matchOverlay';
 import { TICKER_FIT_CHARS } from '../../../src/match/view/commentary';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
@@ -75,6 +75,10 @@ describe('scoreBanner', () => {
   });
 
   it('hints in the ticker when a seasoned club is short of call chips, and the line fits', () => {
+    expect(callsHintSeasoned(1, 0)).toBe(false);
+    expect(callsHintSeasoned(2, 0)).toBe(true);
+    expect(callsHintSeasoned(1, 1)).toBe(true);
+    expect(callsLockedHint(2, 9, callsHintSeasoned(1, 0))).toBeNull();
     expect(callsLockedHint(2, 9, false)).toBeNull();
     expect(callsLockedHint(9, 9, true)).toBeNull();
     expect(callsLockedHint(2, 9, true)).toBe(CALLS_LOCKED_HINT);

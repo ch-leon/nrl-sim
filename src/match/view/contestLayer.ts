@@ -127,13 +127,14 @@ export class ContestLayer {
     const g = this.g;
     const at = feet(mark.side, mark.slot) ?? worldOf(mark.x, mark.y, toWorld);
     if (mark.kind === 'break') {
-      // Across the defensive line, where he went through.
+      // On the line where he went through. His feet have already left it.
       const half = BREAK_SPAN_M / 2;
+      const onLine = worldOf(mark.x, mark.y, toWorld);
       const left = worldOf(mark.x, mark.y - half, toWorld);
       const right = worldOf(mark.x, mark.y + half, toWorld);
       g.lineStyle(7 * px, 0xffffff, 0.35 * a).lineBetween(left.x, left.y, right.x, right.y);
       g.lineStyle(3 * px, BREAK_COLOR, 0.95 * a).lineBetween(left.x, left.y, right.x, right.y);
-      g.fillStyle(0xffffff, 0.9 * a).fillCircle(at.x, at.y, 4 * px);
+      g.fillStyle(0xffffff, 0.9 * a).fillCircle(onLine.x, onLine.y, 4 * px);
       return;
     }
     // Dust a metre behind him: the shove the sim already drove.

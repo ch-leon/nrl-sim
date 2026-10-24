@@ -241,11 +241,16 @@ export function bannerLife(headline: string): number {
 
 /**
  * One ticker line when the Coach's Office has not unlocked every call (N15.6,
- * the #224 note). Null on a brand-new week 1, and null once they are all there.
- * The wording is an unlock hint: an old save that lost chips and a later week
- * of a new club read the same way.
+ * the #224 note). For a club with a season already behind it, not week 2 of a
+ * new club, and not once every call is there. A season-1 save from before the
+ * unlock tiers has no version stored, so it stays quiet too.
  */
 export const CALLS_LOCKED_HINT = "More calls unlock as you build up the Coach's Office.";
+
+/** True once a season has been completed, or the club is already into a later one. */
+export function callsHintSeasoned(season: number, seasonsPlayed: number): boolean {
+  return season > 1 || seasonsPlayed > 0;
+}
 
 export function callsLockedHint(unlocked: number, all: number, seasoned: boolean): string | null {
   if (!seasoned || unlocked >= all) return null;

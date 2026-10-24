@@ -148,6 +148,8 @@ export const POPUP_EDGE = 8;
 export const POPUP_LINE_H = 22;
 /** Half the widest word, screen px, so the sides of the word stay on screen. */
 export const POPUP_HALF_W = 64;
+/** Screen px between two shouts the clamp has pulled onto the same edge. */
+export const POPUP_GAP = 2;
 
 /** The camera's visible rectangle, in world px. */
 export interface PopupView {
@@ -189,4 +191,48 @@ export function clampPopupAnchor(
   const maxY = bottom;
   const y = minY <= maxY ? Math.min(maxY, Math.max(minY, anchor.y)) : top + h;
   return { x, y };
+}
+
+/** A shout already on screen: anchor at the bottom edge, height in world px. */
+export interface PopupBox {
+  x: number;
+  y: number;
+  h: number;
+}
+
+function boxesOverlap(a: PopupBox, b: PopupBox, half: number): boolean {
+  if (Math.abs(a.x - b.x) >= half * 2) return false;
+  // Each text hangs upward from its anchor, so it occupies (y − h, y).
+  return a.y > b.y - b.h && a.y - a.h < b.y;
+}
+
+/**
+ * Clamp, then keep this shout off the ones already placed. The clamp pulls two
+ * shouts near the top onto the same edge and undoes the midfield stack; this
+ * drops the later one below, and steps it sideways if the view has no room.
+ */
+export function placePopup(
+  anchor: { x: number; y: number },
+  textH: number,
+  taken: readonly PopupBox[],
+  view: PopupView,
+  zoom: number,
+): { x: number; y: number } {
+  const z = Math.max(zoom, 1e-3);
+  const half = POPUP_HALF_W / z;
+  const gap = POPUP_GAP / z;
+  let pos = clampPopupAnchor(anchor, textH, view, zoom);
+  for (const hit of taken) {
+    if (!boxesOverlap({ x: pos.x, y: pos.y, h: textH }, hit, half)) continue;
+    let next = clampPopupAnchor({ x: pos.x, y: hit.y + textH + gap }, textH, view, zoom);
+    if (boxesOverlap({ x: next.x, y: next.y, h: textH }, hit, half)) {
+      const dir = pos.x >= hit.x ? 1 : -1;
+      const stepped = clampPopupAnchor({ x: hit.x + dir * (half * 2 + gap), y: next.y }, textH, view, zoom);
+      next = boxesOverlap({ x: stepped.x, y: stepped.y, h: textH }, hit, half)
+        ? clampPopupAnchor({ x: hit.x - dir * (half * 2 + gap), y: next.y }, textH, view, zoom)
+        : stepped;
+    }
+    pos = next;
+  }
+  return pos;
 }

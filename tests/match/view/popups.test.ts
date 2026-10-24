@@ -9,7 +9,10 @@ import {
   SLOWMO_FACTOR,
   SLOWMO_MS,
   TONE_COLOR,
+  POPUP_GAP,
+  POPUP_HALF_W,
   clampPopupAnchor,
+  placePopup,
   popupFor,
   popupTextHeight,
   surnameOf,
@@ -80,6 +83,31 @@ describe('popupFor', () => {
     const wide = clampPopupAnchor({ x: view.left, y: view.top + view.height / 2 }, popupTextHeight(1, zoom), view, zoom);
     expect(wide.x).toBeCloseTo(view.left + Math.min(64 / zoom, view.width / 2));
     expect(POPUP_LINE_H).toBeGreaterThan(0);
+  });
+  it('separates two shouts the clamp would pin to the same edge', () => {
+    const zoom = 8;
+    const view = { left: 200, top: 100, width: 844 / zoom, height: 390 / zoom };
+    const textH = popupTextHeight(2, zoom);
+    const a = { x: view.left + view.width / 2, y: view.top - 10 };
+    const b = { x: a.x + 1, y: view.top - 4 };
+    const first = placePopup(a, textH, [], view, zoom);
+    const second = placePopup(b, textH, [{ x: first.x, y: first.y, h: textH }], view, zoom);
+    const half = POPUP_HALF_W / zoom;
+    const overlapX = Math.abs(first.x - second.x) < half * 2;
+    const overlapY = second.y > first.y - textH && second.y - textH < first.y;
+    expect(overlapX && overlapY).toBe(false);
+    const top = view.top + POPUP_EDGE / zoom;
+    const bottom = view.top + view.height - POPUP_EDGE / zoom;
+    expect(second.y - textH).toBeGreaterThanOrEqual(top - 1e-6);
+    expect(second.y).toBeLessThanOrEqual(bottom + 1e-6);
+    expect(POPUP_GAP).toBeGreaterThan(0);
+    // A view only one shout tall cannot drop the second one, so it steps aside.
+    const short = { left: 0, top: 0, width: 400, height: 60 };
+    const tall = 44;
+    const left = placePopup({ x: 200, y: 30 }, tall, [], short, 1);
+    const right = placePopup({ x: 200, y: 30 }, tall, [{ x: left.x, y: left.y, h: tall }], short, 1);
+    const still = Math.abs(left.x - right.x) < POPUP_HALF_W * 2 && right.y > left.y - tall && right.y - tall < left.y;
+    expect(still).toBe(false);
   });
   it('big moments last longer and get a short slow-motion beat', () => {
     expect(POPUP_BIG_MS).toBeGreaterThan(POPUP_MS);

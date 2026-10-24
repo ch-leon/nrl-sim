@@ -24,7 +24,7 @@ import { button, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, type Fixture } from '../core/state';
-import { callsLine, callsLockedHint, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
+import { callsHintSeasoned, callsLine, callsLockedHint, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
 import {
   LivePlayback,
   LIVE_DEFAULT_SPEED,
@@ -485,9 +485,9 @@ export class MatchScene extends Phaser.Scene {
       if (live.coachSide) {
         const unlocked = live.unlockedCalls ?? COACH_CALLS;
         this.mountCallChips(live.coachSide, unlocked);
-        // One ticker line when an old save (or any club past week 1) is short of calls (N9.6, #224). Not the calls row.
+        // One ticker line when a club with a season behind it is short of calls (N9.6, #224). Not the calls row, and not week 2 of a new club.
         const club = getState();
-        const hint = callsLockedHint(unlocked.length, COACH_CALLS.length, club.season > 1 || club.week > 1 || club.history.length > 0);
+        const hint = callsLockedHint(unlocked.length, COACH_CALLS.length, callsHintSeasoned(club.season, club.history.length));
         if (hint) this.overlay?.comment(hint);
       }
       if (live.planSide) this.mountPlanChip(live.planSide);
