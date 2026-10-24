@@ -118,7 +118,8 @@ export class LabScene extends MatchScene {
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
     };
     const cam = this.cameras.main;
-    const view: PopupView = { left: cam.scrollX, top: cam.scrollY, width: cam.width / cam.zoom, height: cam.height / cam.zoom };
+    const v = cam.worldView;
+    const view: PopupView = { left: v.x, top: v.y, width: v.width, height: v.height };
     this.popups?.update(delta, cam.zoom, feet, view);
     this.contest?.update(delta, cam.zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet);
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).

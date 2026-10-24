@@ -2,7 +2,7 @@
 // Phaser scene: pooled texts that follow the player, drift up and fade.
 import Phaser from 'phaser';
 import type { Side } from '../core/snapshot';
-import { POPUP_LINE_H, TONE_COLOR, TRAIT_COLOR, clampPopupAnchor, popupTextHeight, type Popup, type PopupView } from './popups';
+import { POPUP_LINE_H, TONE_COLOR, TRAIT_COLOR, clampPopupAnchor, type Popup, type PopupView } from './popups';
 
 interface Live {
   text: Phaser.GameObjects.Text;
@@ -105,7 +105,9 @@ export class PopupLayer {
       // Pop in (scale overshoot) then drift up and fade in the last third.
       const pop = u < 0.12 ? 0.6 + (u / 0.12) * 0.4 : 1;
       const raw = { x: at.x, y: at.y - l.lift - clear / zoom - DRIFT * u };
-      const pos = view ? clampPopupAnchor(raw, popupTextHeight(l.lines, zoom), view, zoom) : raw;
+      // The text's own height, plus the stroke, so the top of the word stays inside the view.
+      const localH = (l.text.height > 0 ? l.text.height : Math.max(1, l.lines) * LINE_H) + 4;
+      const pos = view ? clampPopupAnchor(raw, localH / Math.max(zoom, 1e-3), view, zoom) : raw;
       l.text
         .setPosition(pos.x, pos.y)
         .setScale(pop / zoom)

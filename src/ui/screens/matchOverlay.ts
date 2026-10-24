@@ -717,7 +717,7 @@ body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env
 /* Toasts: under the scoreboard, in the overlay's top margin, clear of the ticker and the Log button (finding 3). */
 body.nrl-match-active .nrl-toast-stack,
 body.nrl-match-final .nrl-toast-stack {
-  top: calc(3.6rem + env(safe-area-inset-top, 0px));
+  top: calc(4.7rem + env(safe-area-inset-top, 0px));
   bottom: auto;
   right: auto;
   left: calc(0.5rem + env(safe-area-inset-left, 0px));
@@ -861,7 +861,7 @@ body.nrl-match-final .nrl-toast-stack {
   .nrl-mo-banner { top: 19%; min-width: 14rem; padding: 0.25rem 0.9rem 0.35rem; border-width: 3px; }
   .nrl-mo-banner-score { margin-top: 0.2rem; }
   body.nrl-match-active .nrl-toast-stack,
-  body.nrl-match-final .nrl-toast-stack { top: calc(3.1rem + env(safe-area-inset-top, 0px)); }
+  body.nrl-match-final .nrl-toast-stack { top: calc(4.7rem + env(safe-area-inset-top, 0px)); }
   .nrl-mo-replay, .nrl-mo-replay-tag { bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px)); }
 }
 `;

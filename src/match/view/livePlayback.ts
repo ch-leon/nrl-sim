@@ -88,7 +88,7 @@ interface Sprite {
 /** What the live playback needs of the Match scene. */
 export interface LivePlaybackScene extends ViewSurface {
   players: Record<Side, readonly (ViewSurface['players'][Side][number] & { sprite: Sprite })[]>;
-  cameras: { main: { zoom: number; scrollX: number; scrollY: number; width: number; height: number } };
+  cameras: { main: { zoom: number; worldView: { x: number; y: number; width: number; height: number } } };
   /** The sides' colours (the carrier ring's), for the kick contest's rings. */
   readonly sideColors?: Readonly<Record<Side, number>>;
 }
@@ -466,7 +466,9 @@ export class LivePlayback {
       const a = this.scene.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
     };
-    const view: PopupView = { left: cam.scrollX, top: cam.scrollY, width: cam.width / zoom, height: cam.height / zoom };
+    // worldView is the visible rectangle. scrollX is not its left edge once the camera is zoomed (Phaser adds half the screen width, not half the world width).
+    const v = cam.worldView;
+    const view: PopupView = { left: v.x, top: v.y, width: v.width, height: v.height };
     this.popups.update(deltaMs, zoom, feet, view);
     this.zone.update(deltaMs);
     const kick = this.replay ? this.replayKicks.kick : this.kicks.kick;
