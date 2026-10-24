@@ -423,19 +423,22 @@ async function runPortrait(browser) {
     if (o.advance !== 'Resume match') throw new Error(`the parked match was dropped (${o.advance})`);
     rec.notes.push(`still Resume match, canvas ${o.canvas}`);
   });
-  // Continue with a live-match record auto-starts the match. Opened upright, that
-  // must not play a frame under the card; turning sideways is what resumes it.
+  // Continue with a live-match record auto-starts the match. Opened upright, the
+  // loop is already asleep, so the match may draw under the card (the same as a
+  // phone turned upright mid-match) but its clock must not move until landscape.
   await step('reopen-portrait', async (rec) => {
     await turn(390, 844);
     await page.reload();
     await page.waitForSelector('[data-nrl-continue-1]');
     await press('[data-nrl-continue-1]');
     await asleep('reopened upright');
-    await page.waitForTimeout(1000);
+    await page.waitForSelector('.nrl-mo-controls').catch(() => {});
+    const held = await state();
+    await page.waitForTimeout(1200);
     const o = await state();
     if (o.running !== false || !o.started) throw new Error(`loop did not stay asleep (${JSON.stringify(o)})`);
-    if (o.controls) throw new Error('match controls mounted while the loop was asleep');
-    rec.notes.push('loop stayed asleep, match not on screen');
+    if (o.clock !== held.clock) throw new Error(`clock moved under the card (${held.clock} → ${o.clock})`);
+    rec.notes.push(`loop asleep, clock held at ${o.clock || 'not shown'}`);
   });
   await step('reopen-landscape', async (rec) => {
     await turn(844, 390);
