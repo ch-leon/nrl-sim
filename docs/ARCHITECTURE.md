@@ -398,7 +398,10 @@ Every match the player's club plays is played on the live match sim (BAK-207,
 clock, rugby league Nines rules, the tackle contest, tactics, traits, fatigue,
 weather and coach calls (rules and every knob: BAK-208 and
 `docs/specs/BAK-208-tuning.md`). Rival-vs-rival fixtures stay on the cheap
-score model in `systems/fixtures.ts`.
+score model in `systems/fixtures.ts` unless **Rival matches on the match engine**
+is on (`settings.liveRivals`, off by default, N9.2). With it on, the other games
+of the round run this same sim in a Worker (`systems/rivalRound.ts`) and the week
+waits until they land. A fast-forwarded week keeps the cheap model either way.
 
 ```ts
 // src/match/league/sheets.ts — what a side takes onto the field
@@ -411,6 +414,10 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: {
   seed: number; weather?: WeatherKind; injuryRate?: number;
   length?: MatchLength;                       // two NINES halves unless told
   calls?: CallInput[];                        // coach calls by tick (#73)
+  aiCoach?: ('home' | 'away')[];              // sides whose coach calls for himself (N9.6)
+  goldenPoint?: boolean;                      // a final: the next score wins if level (N9.4)
+  plans?: PlanInput[];                        // a change of plan at a break, by tick (N11)
+  difficultyEdge?: DifficultyEdge;            // the difficulty's nudge, after the spread (N12.2); absent on Normal
 }): MatchResult;
 
 // src/sim/events.ts — event kinds the overlay, stats and FX read
@@ -430,20 +437,35 @@ export interface MatchResult {
   weather: WeatherKind;
   momentumTimeline: { t: number; value: number }[]; // -100 (away) .. +100 (home)
   injuries: MatchInjury[];                    // matchday applies them at full time
+  calls?: { made: [number, number]; paid: [number, number] }; // when any coach call was made (N9.5)
 }
 ```
 
-- **Deterministic:** a match is `{ seed, sheets, calls[] }`; the same three give the same
-  match, tick for tick. Any new dice roll reshuffles every seed's match, so changes are
-  judged on averages over many seeds (the balance harness, `balance/README.md`).
+- **Deterministic:** a match is `{ seed, sheets, calls[], plans[] }` plus the options on
+  `runMatch` (weather, length, the AI coach, golden point, the difficulty edge). The same
+  inputs give the same match, tick for tick. Any new dice roll reshuffles every seed's
+  match, so changes are judged on averages over many seeds (the balance harness,
+  `balance/README.md`).
 - **One sim, two drivers:** `runMatch` plays to full time headless (fast-forward, the
   balance harness, tests). `LivePlayback` (`src/match/view/`) runs the same `LiveSim` in a
   `Runner` as the player watches, takes the coach's calls, and builds the result with the
   same `MatchRecorder`, so the match on screen is exactly the match that counts.
-- **Cost:** a 2 × 9:00 match is 21,600 ticks, about 0.6 s headless in Node (0.3 s in
-  desktop Chromium); a fast-forwarded season of the player's matches is several seconds.
-  In a browser none of it runs inside a tap: the fast-forwarded match (N10.3) and Skip
-  (N10.4) play in a Worker, and the match scene's art is painted ahead in another (N10.5).
+- **The view's layers.** Each one is told the frame and draws; none of them is the sim.
+  `LiveView` draws the bodies and the ball. `popupLayer` draws the shouts. `kickLayer`
+  draws a kick's trail, the contest rings and the wide framing. `traitLayer` draws the
+  six trait moves. `contestLayer` draws a line-break flash and the dust of a big hit.
+  `zoneLayer` draws the bonus-zone glow. `wrestleBar` and `sprintLayer` draw the wrestle
+  and the sprint. `commentary` is the DOM ticker, not a drawn layer. The instant replay
+  is a second playback of the same seed, on its own runner. `legsLayer` is the lab's.
+  The DOM overlay (`matchOverlay.ts`) is the scoreboard, the controls and the
+  final-whistle actions.
+- **Cost:** a 2 × 9:00 match is 21,600 ticks, about **300 ms** headless in Node after
+  N9.1 (BAK-207 §3.5; about 485 ms before that pass). The 0.6 s figure was the
+  measurement from before N9.1. Desktop Chromium was about 275 ms after the Phase 3
+  pass; N9.1 did not re-measure it. In a browser none of that time runs inside a tap:
+  the fast-forwarded match (N10.3) and Skip (N10.4) play in a Worker, a rival round
+  does the same when the live setting is on (N9.2), and the match scene's art is painted
+  ahead in another (N10.5).
 - Callers' sheets are never mutated. The sim only reports injuries; matchday applies
   `injuredWeeks` and announces them with the result at full time.
 
