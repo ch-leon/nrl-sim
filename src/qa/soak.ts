@@ -517,8 +517,10 @@ function manage(): Signed {
  * fast-forwarded, so with settings.liveRivals the rival round is played on the
  * live sim (in place in Node, which has no Worker). The week holds at the
  * player's kick-off for the Match scene; the soak plays that match here,
- * headless, with the options fast-forward plays it with, and full time
- * ('match:finished') releases the week. Call outside withFastForward.
+ * headless, with the options the watched match was given, and full time
+ * ('match:finished') releases the week. That is the rival's break rule and,
+ * on Hard, his coach. It is not a fast-forward, so an Assistant Coach does
+ * not change the player's plan. Call outside withFastForward.
  */
 export function advanceWeekAsTapped(): void {
   const kickOff: { match: Events['match:started'] | null } = { match: null };
