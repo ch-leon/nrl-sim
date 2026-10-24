@@ -58,9 +58,18 @@ export interface CellResult {
   counts: Record<CountKey, Stat>;
   /** Mean wrestle length, seconds. */
   wrestleSecs: number;
-  /** Home side's share of matches won / drawn on points. */
+  /** Home side's share of matches won / drawn on points, in the matchup as written. */
   homeWin: number;
   draw: number;
+  /**
+   * Win rate of the scenario's tracked side (N13). With `bothWays` it pools the
+   * written matchup and the same seed with the sides swapped, so a preset's
+   * rate is not just its home rate. Absent when the scenario tracks nobody.
+   */
+  trackedWin?: number;
+  trackedDraw?: number;
+  /** Matches the tracked rate is over (twice `seeds` when the scenario plays both ways). */
+  trackedSeeds?: number;
   /** Average legs (0..1) per side at each 3-minute mark of the match clock. */
   legs: { minute: number; home: number; away: number }[];
   /** Squad-built sides (N12.2): each one's best nine (mean overall, the soak's rating), averaged over the seeds. */
@@ -399,35 +408,42 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const edge = scenarioEdge(cell.scenario.home, cell.scenario.away);
     const perSeed: Record<CountKey, number>[] = [];
     let wrestleTicks = 0;
-    let wrestleCount = 0;
     let wins = 0;
     let draws = 0;
+    let trackedWins = 0;
+    let trackedDraws = 0;
+    let trackedN = 0;
     const legSum = new Map<number, { home: number; away: number }>();
-    for (let s = seedStart; s < seedStart + seeds; s++) {
-      const sides = fixed ?? scenarioSides(cell.scenario.home, cell.scenario.away, s);
-      const { home, away } = sides;
-      nineSum.home += sides.nine.home ?? 0;
-      nineSum.away += sides.nine.away ?? 0;
-      // Coach calls (#73): each side makes the scenario's calls whenever it is allowed to.
+    const track = cell.scenario.track;
+    const bothWays = cell.scenario.bothWays === true;
+    const flipSide = (side: 'home' | 'away'): 'home' | 'away' => (side === 'home' ? 'away' : 'home');
+    /**
+     * One match. `flip` plays the sheets already swapped: counts, the home-win
+     * rate and the legs stay on the written orientation, and the tracked side's
+     * result is read off whichever end it is sitting at.
+     */
+    const playOne = (homeSheet: TeamSheet, awaySheet: TeamSheet, seed: number, flip: boolean): { homePts: number; awayPts: number } => {
+      const onSim = (side: 'home' | 'away'): 'home' | 'away' => (flip ? flipSide(side) : side);
       const callList: CallInput[] = [];
       const rules = cell.scenario.calls;
-      // The AI coach (N9.6): the scenario's sides, or both when the variant turns calls.ai on.
-      const aiSides = cell.scenario.aiCoach ?? aiCoachSides(['home', 'away']);
-      // Plan changes at the breaks (N11): each made once, at the first break it names.
+      const aiSides = (cell.scenario.aiCoach ?? aiCoachSides(['home', 'away'])).map(onSim);
       const planRules = cell.scenario.plans ?? [];
       const planList: PlanInput[] = [];
       const planDone = planRules.map(() => false);
-      const sim = new LiveSim(home, away, s, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(edge ? { difficultyEdge: edge } : {}) });
+      const simEdge = edge && flip ? { ...edge, side: flipSide(edge.side) } : edge;
+      const sim = new LiveSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();
       let inW = 0;
       let lastMen = 0;
       let nextLegs = 3;
+      let matchWrestles = 0;
       while (!sim.finished && sim.tick < MAX_TICKS) {
         if (rules) {
-          for (const side of ['home', 'away'] as const) {
-            const r = (rules[side] ?? []).find((x) => (x.tackle === undefined || x.tackle === sim.tackleCount) && sim.callRefusal(side, x.call) === null);
+          for (const written of ['home', 'away'] as const) {
+            const side = onSim(written);
+            const r = (rules[written] ?? []).find((x) => (x.tackle === undefined || x.tackle === sim.tackleCount) && sim.callRefusal(side, x.call) === null);
             if (r) callList.push({ tick: sim.tick + 1, side, call: r.call });
           }
         }
@@ -435,14 +451,16 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
           const k = sim.phaseKind;
           planRules.forEach((r, i) => {
             if (planDone[i] || sim.planRefusal() !== null) return;
+            const simSide = onSim(r.side);
             const scoredBy = k === 'try' ? sim.inPossession : null;
-            const due = r.at === 'half-time' ? k === 'half-time' : r.at === 'try' ? scoredBy !== null : scoredBy !== null && scoredBy !== r.side;
+            const due = r.at === 'half-time' ? k === 'half-time' : r.at === 'try' ? scoredBy !== null : scoredBy !== null && scoredBy !== simSide;
             if (!due) return;
             planDone[i] = true;
-            planList.push({ tick: sim.tick + 1, side: r.side, tactics: { ...sim.planFor(r.side), ...r.tactics } });
+            planList.push({ tick: sim.tick + 1, side: simSide, tactics: { ...sim.planFor(simSide), ...r.tactics } });
           });
         }
         sim.step();
+        if (flip) continue;
         // Read the tick straight off the sim: building a snapshot every tick cost a third of the run.
         const tickEvents = sim.tickEvents;
         if (tickEvents.length) events.push(...tickEvents);
@@ -455,7 +473,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
           lastMen = men;
         } else if (inW > 0) {
           wrestleTicks += inW;
-          wrestleCount++;
+          matchWrestles++;
           if (tickEvents.some((e) => e.kind === 'tackle')) held[Math.min(3, lastMen)]!++;
           inW = 0;
         }
@@ -468,26 +486,43 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
           nextLegs += 3;
         }
       }
-      const c = countEvents(events);
-      c.wrestles = wrestleCount;
-      c.held1 = held[1]!;
-      c.held2 = held[2]!;
-      c.held3 = held[3]!;
-      c.kickMetres = sim.kickMetres.home + sim.kickMetres.away;
-      c.shortMin = bins.shortS / 60;
-      c.binSwing = bins.swing;
-      // Completion is a share (%), not a count: not scaled to 18 minutes.
-      const sets = sim.sets.home + sim.sets.away;
-      c.completion = sets > 0 ? (100 * (sim.setsCompleted.home + sim.setsCompleted.away)) / sets : 0;
-      // The score: both sides' points, the winning margin, and the home side's (signed).
-      c.points = sim.points.home + sim.points.away;
-      c.margin = Math.abs(sim.points.home - sim.points.away);
-      c.homeMargin = sim.points.home - sim.points.away;
-      c.draws = sim.points.home === sim.points.away ? 1 : 0;
-      wrestleCount = 0;
-      perSeed.push(c);
-      if (sim.points.home > sim.points.away) wins++;
-      else if (sim.points.home === sim.points.away) draws++;
+      if (!flip) {
+        const c = countEvents(events);
+        c.wrestles = matchWrestles;
+        c.held1 = held[1]!;
+        c.held2 = held[2]!;
+        c.held3 = held[3]!;
+        c.kickMetres = sim.kickMetres.home + sim.kickMetres.away;
+        c.shortMin = bins.shortS / 60;
+        c.binSwing = bins.swing;
+        // Completion is a share (%), not a count: not scaled to 18 minutes.
+        const sets = sim.sets.home + sim.sets.away;
+        c.completion = sets > 0 ? (100 * (sim.setsCompleted.home + sim.setsCompleted.away)) / sets : 0;
+        // The score: both sides' points, the winning margin, and the home side's (signed).
+        c.points = sim.points.home + sim.points.away;
+        c.margin = Math.abs(sim.points.home - sim.points.away);
+        c.homeMargin = sim.points.home - sim.points.away;
+        c.draws = sim.points.home === sim.points.away ? 1 : 0;
+        perSeed.push(c);
+        if (sim.points.home > sim.points.away) wins++;
+        else if (sim.points.home === sim.points.away) draws++;
+      }
+      return { homePts: sim.points.home, awayPts: sim.points.away };
+    };
+    const noteTracked = (pts: { homePts: number; awayPts: number }, flip: boolean): void => {
+      if (!track) return;
+      trackedN++;
+      // After the swap the written home sheet is the sim's away end.
+      const trackedIsHome = flip ? track === 'away' : track === 'home';
+      if (pts.homePts === pts.awayPts) trackedDraws++;
+      else if (trackedIsHome ? pts.homePts > pts.awayPts : pts.awayPts > pts.homePts) trackedWins++;
+    };
+    for (let s = seedStart; s < seedStart + seeds; s++) {
+      const sides = fixed ?? scenarioSides(cell.scenario.home, cell.scenario.away, s);
+      nineSum.home += sides.nine.home ?? 0;
+      nineSum.away += sides.nine.away ?? 0;
+      noteTracked(playOne(sides.home, sides.away, s, false), false);
+      if (bothWays) noteTracked(playOne(sides.away, sides.home, s, true), true);
     }
     const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' ? 1 : scale)))])) as Record<CountKey, Stat>;
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
@@ -501,6 +536,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       wrestleSecs: totalWrestles ? (wrestleTicks * TICK_S) / totalWrestles : 0,
       homeWin: wins / seeds,
       draw: draws / seeds,
+      ...(track && trackedN > 0 ? { trackedWin: trackedWins / trackedN, trackedDraw: trackedDraws / trackedN, trackedSeeds: trackedN } : {}),
       legs: [...legSum.entries()].map(([minute, v]) => ({ minute, home: v.home / seeds, away: v.away / seeds })),
       ...(squads
         ? { nine: { ...(cell.scenario.home.squad ? { home: nineSum.home / seeds } : {}), ...(cell.scenario.away.squad ? { away: nineSum.away / seeds } : {}) } }

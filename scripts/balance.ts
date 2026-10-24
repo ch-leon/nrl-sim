@@ -116,7 +116,7 @@ if (jobs > 1 && !shard) {
   if (!shard) console.log(`${plan.name}: ${cells.length} cells, ${todo.length} to run → ${dir}`);
   let spent = 0;
   todo.forEach((cell, i) => {
-    const r = measureCell(cell, plan.seeds, plan.minutes, plan.seedStart ?? 1);
+    const r = measureCell(cell, cell.scenario.seeds ?? plan.seeds, plan.minutes, plan.seedStart ?? 1);
     appendFileSync(resultsPath, `${JSON.stringify(r)}\n`);
     results.push(r);
     if (!shard) writeReport();
