@@ -2,7 +2,6 @@
 // knobs by name with a clean way back, plans that fail fast on a typo, sweeps
 // expanded in order, the report's bands and luck test, and a measured cell
 // that is deterministic and actually feels its overrides.
-import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import { BASE } from '../../../src/match/league/contest';
 import { FATIGUE } from '../../../src/match/league/fatigue';
@@ -214,13 +213,16 @@ describe('measuring and reporting', () => {
     expect(tuned.homeWin).toBe(plain.homeWin);
     expect(measureCell({ ...even, scenario: { ...even.scenario, track: 'home' } }, 1, 6).trackedWin).toBe(plain.homeWin);
   }, 60_000);
-  it('pins an even Balanced / Slide match (seed 1) so a preset retune cannot move it', () => {
+  it('pins an even Balanced / Slide match (seed 1) so a preset retune cannot move it', async () => {
     const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
     while (!sim.finished && sim.tick < 100_000) {
       sim.step();
       for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
     }
+    // No @types/node in the tsconfig, so the hasher comes in through a variable specifier.
+    const spec = 'node:crypto';
+    const { createHash } = await import(spec);
     const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('8-14:495:67db8b634c5a2e73');
   });
