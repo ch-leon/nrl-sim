@@ -34,8 +34,13 @@ export interface LiveMatchData {
   coachSide?: 'home' | 'away';
   /** The chips his Coach's Office has unlocked (N9.6). */
   unlockedCalls?: CoachCall[];
-  /** The rival's AI coach (N9.6), when the game gives rivals one. */
+  /** The rival's AI coach (N9.6), when the game gives rivals one. Hard's rival has one (N14.1). */
   aiCoach?: ('home' | 'away')[];
+  /**
+   * Sides whose plan changes at the breaks (N13.5). The rival, in every match
+   * the player plays (N14.1). A list, so a resume and a Skip replay the same match.
+   */
+  breakRuleSides?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
   /** The difficulty's edge to the rival, after the rating spread (N12.2); absent on Normal. */

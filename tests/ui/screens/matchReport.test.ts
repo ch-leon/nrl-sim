@@ -2,7 +2,7 @@
 // built from the MatchResult, it agrees with the score and the overlay's tallies.
 import { describe, it, expect } from 'vitest';
 import { runMatch } from '../../../src/match/league/match';
-import { buildMatchReport, shortName } from '../../../src/ui/screens/matchReport';
+import { buildMatchReport, planChangeLines, shortName } from '../../../src/ui/screens/matchReport';
 import { playerOfTheMatch } from '../../../src/systems/stats';
 import { summaryLines } from '../../../src/match/view/commentary';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../../src/sim/events';
@@ -78,5 +78,21 @@ describe('match report (N9.5)', () => {
     expect(rep.home.short).toBe('Live Test FC');
     const same = buildMatchReport(result, fixture, { player: 'Brisbane Larrikins', 'rival-gulls': 'Launceston Larrikins' }, null);
     expect([same.home.short, same.away.short]).toEqual(['Brisbane Larrikins', 'Launceston Larrikins']);
+  });
+
+  it('names a plan change with the short name (N14.1)', () => {
+    expect(planChangeLines([
+      { minute: 9, side: 'away', attack: 'expansive', defence: 'rush', at: 'half-time' },
+      { minute: 14, side: 'home', attack: 'grind', defence: 'compressed', at: 'try' },
+    ], { home: 'Larrikins', away: 'Gulls' })).toEqual([
+      'Half-time: Gulls went Expansive · Rush.',
+      'Minute 14: Larrikins went Grind · Compressed.',
+    ]);
+    const changed: MatchResult = {
+      ...result,
+      planChanges: [{ minute: 9, side: 'away', attack: 'expansive', defence: 'rush', at: 'half-time' }],
+    };
+    expect(buildMatchReport(changed, fixture, names, null).changes).toEqual(['Half-time: Gulls went Expansive · Rush.']);
+    expect(buildMatchReport(result, fixture, names, null).changes).toEqual([]);
   });
 });

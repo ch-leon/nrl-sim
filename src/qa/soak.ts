@@ -511,13 +511,15 @@ export function advanceWeekAsTapped(): void {
   }
   const m = kickOff.match;
   if (!m) return;
-  const { seed, weather, injuryRate, goldenPoint, aiCoach, difficultyEdge } = m.live;
+  const { seed, weather, injuryRate, goldenPoint, aiCoach, difficultyEdge, breakRuleSides } = m.live;
   const result = runMatch(m.home, m.away, {
     seed, weather,
     ...(injuryRate !== undefined ? { injuryRate } : {}),
     // The rival's difficulty edge (N12.2): Hard and Easy play him up or down, as matchday does.
     ...(difficultyEdge ? { difficultyEdge } : {}),
     ...(aiCoach?.length ? { aiCoach } : {}),
+    // The rival's plan changes at the breaks (N14.1), as fast-forward plays it.
+    ...(breakRuleSides?.length ? { breakRuleSides } : {}),
     ...(goldenPoint ? { goldenPoint } : {}),
   });
   bus.emit('match:finished', { fixture: m.fixture, result });

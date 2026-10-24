@@ -17,6 +17,7 @@ import { MATCH_ACTIVE_CLASS } from './matchOverlay';
 import { fmtPotmLine } from './potm';
 import { addPotm } from './seasonReview';
 import { shortName, summaryLines } from '../../match/view/commentary';
+import { PRESET_LABEL, isAttackPreset, isDefencePreset } from '../../match/league/presets';
 
 export { shortName };
 
@@ -50,6 +51,8 @@ export interface MatchReport {
   note: string;
   /** The commentary's summary (N15.2), first lines first: the card shows as many as fit. */
   summary: string[];
+  /** Plan changes the restart actually played (N14.1): "Half-time: Larrikins went Expansive · Rush." */
+  changes: string[];
   rows: ReportRow[];
   potm: { line: string; who: string } | null;
 }
@@ -118,9 +121,24 @@ export function buildMatchReport(
     away,
     note,
     summary: summaryLines(result, { id: home.id, name: home.name }, { id: away.id, name: away.name }),
+    changes: planChangeLines(result.planChanges, { home: home.short, away: away.short }),
     rows,
     potm: potm ? { line: fmtPotmLine(potm), who: `${potm.name} (${names[potm.teamId] ?? potm.teamId})` } : null,
   };
+}
+
+/** One line per plan the restart played. The short name, because both sides can switch. */
+export function planChangeLines(
+  changes: MatchResult['planChanges'],
+  names: { home: string; away: string },
+): string[] {
+  return (changes ?? []).map((p) => {
+    const who = p.side === 'home' ? names.home : names.away;
+    const attack = isAttackPreset(p.attack) ? PRESET_LABEL[p.attack] : p.attack;
+    const defence = isDefencePreset(p.defence) ? PRESET_LABEL[p.defence] : p.defence;
+    const when = p.at === 'half-time' ? 'Half-time' : p.at === 'kickoff' ? 'Kick-off' : `Minute ${p.minute}`;
+    return `${when}: ${who} went ${attack} · ${defence}.`;
+  });
 }
 
 function sideBlock(s: ReportSide): HTMLElement {
@@ -145,6 +163,7 @@ export function openMatchReport(r: MatchReport): HTMLElement {
     el('p', { class: 'nrl-report-score', text: `${r.home.name} ${r.home.score} – ${r.away.score} ${r.away.name}` }),
     ...(r.note ? [el('p', { class: 'nrl-report-note', text: r.note })] : []),
     ...(r.summary.length ? [el('p', { class: 'nrl-report-summary', text: r.summary.join(' '), attrs: { style: 'font-style: italic' } })] : []),
+    ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })),
     el('div', { class: 'nrl-report-body' }, el('div', { class: 'nrl-report-scoring' }, sideBlock(r.home), sideBlock(r.away)), table),
     ...(r.potm ? [el('p', { class: 'nrl-report-potm', text: `Player of the Match: ${r.potm.who} — ${r.potm.line}` })] : []),
     button('Close', () => closeModal()),

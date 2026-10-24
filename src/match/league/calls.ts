@@ -51,8 +51,14 @@ export const CALLS = {
 };
 
 /** The sides with an AI coach (N9.6): the rivals' (not the player's) when `calls.ai.on`, else none. */
-export function aiCoachSides(sides: readonly ('home' | 'away')[]): ('home' | 'away')[] {
-  return CALLS.ai.on > 0 ? [...sides] : [];
+/**
+ * The sides that get an AI coach. The global knob (`calls.ai.on`) is the
+ * default, off since N9.6. A caller can force it: Hard's rivals pass true
+ * and Normal and Easy pass false (N14.1), so the knob stays off for the
+ * harness and for every difficulty that was not asked.
+ */
+export function aiCoachSides(sides: readonly ('home' | 'away')[], on = CALLS.ai.on > 0): ('home' | 'away')[] {
+  return on ? [...sides] : [];
 }
 
 /** The calls a coach has with a Coach's Office at this level (0 = none built). */
