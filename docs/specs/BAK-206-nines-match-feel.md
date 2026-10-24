@@ -341,6 +341,9 @@ export type MatchIntent =
   driven tackle backwards). The bomb contest done in N15.3 (#297): the two under a bomb or
   a cross-field kick are ringed as it comes down and the one who takes it lights up, with
   the camera wide and the ball's trail; the break and the driven tackle are N15.6's.
+  Traits that fire draw a move of their own (N15.4): the fend's arm, the step's cut,
+  Big Boot's wider trail, the Playmaker's line through the man he skips, the Wrecking
+  Ball's drive and the Hitman's shock, each only when the event names the trait.
 - Commentary lines for fend / break-tackle / kick types. Done in N15.2 (#293): the live
   sim's commentary (`src/match/view/commentary.ts`) has its own lines for every kind it
   emits, each kick type and its outcome among them.

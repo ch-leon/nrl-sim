@@ -33,6 +33,7 @@ import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
+import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer } from './traitLayer';
 import { liveMatchSaveDue } from '../../systems/liveMatchRecord';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
@@ -129,6 +130,8 @@ export class LivePlayback {
   /** Kicks go wide (N15.3): the kick being watched, and its trail and contest. */
   private readonly kicks = new KickWatch();
   private readonly kickLayer: KickLayer;
+  /** Traits you can see (N15.4): the arm, the cut, the cut-out line, the drive, the shock. */
+  private readonly traits: TraitLayer;
   private readonly recorder: MatchRecorder;
   /** The ticker's lines (N15.2): it hears every event, said or not. */
   private readonly commentator: Commentator;
@@ -155,6 +158,8 @@ export class LivePlayback {
     this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
     const simOpts = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
+    this.traits = new TraitLayer(scene, DEPTH_POPUP - 0.5);
     this.runner = new Runner((seed) => new LiveSim(home, away, seed, simOpts), opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => {
@@ -429,6 +434,7 @@ export class LivePlayback {
     this.popups.update(deltaMs, zoom, feet);
     this.zone.update(deltaMs);
     this.kickLayer.update(this.kicks.kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
+    this.traits.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet, this.runner.speed);
     this.wrestleBar.update(this.runner.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
     this.sprintLayer.update(this.runner.cur, zoom, (side, slot) => {
       const a = this.scene.players[side][slot];
@@ -443,6 +449,7 @@ export class LivePlayback {
     this.sprintLayer.destroy();
     this.zone.destroy();
     this.kickLayer.destroy();
+    this.traits.destroy();
   }
 
   /**
@@ -461,8 +468,14 @@ export class LivePlayback {
     const cur = this.runner.cur;
     for (const e of events) {
       // A kick struck or brought down (N15.3); a skipped or resumed stretch shows none.
-      if (this.skipping) this.kicks.clear();
-      else this.kicks.event(e, cur);
+      if (this.skipping) {
+        this.kicks.clear();
+        this.traits.clear();
+      } else {
+        this.kicks.event(e, cur);
+        // At ×4 and ×8 a one-second move is gone before it can be read. Ease the match; the mark also holds longer.
+        if (this.traits.note(e, cur) && this.runner.speed >= TRAIT_FAST_FROM) this.runner.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
+      }
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
       const line = this.commentator.line(e, cur.score);
       if (line && !this.skipping) this.opts.overlay?.comment(line);

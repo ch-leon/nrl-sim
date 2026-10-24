@@ -51,6 +51,8 @@ export interface SimEvent {
   trait?: string;
   /** Flavour of the kind (a kick's type: long, bomb, grubber, chip, cross-field). */
   detail?: string;
+  /** The receiver's slot, when a cut-out names the man it was thrown to (N15.4). The view draws the line; the sim does not read it. */
+  toSlot?: number;
 }
 
 export interface Snapshot {

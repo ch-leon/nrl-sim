@@ -1477,6 +1477,8 @@ export class LiveSim implements MatchSim {
         const to = this.players[receiver]!;
         if (Math.abs(to.body.pos.y - h.body.pos.y) > MAX_LAT_M) {
           this.emit('cut-out', `${h.name} throws the cut-out ball to ${to.name}`, h, announce(h.traits.find((t) => t.id === 'playmaker')));
+          // Who he found, so the view can draw the line through the man he skipped (N15.4). Not read by the sim.
+          this.events[this.events.length - 1]!.toSlot = to.slot;
         }
         this.pass(h, to);
         return;

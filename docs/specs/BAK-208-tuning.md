@@ -204,8 +204,11 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `TRAIL_FADE_MS` | `kickLayer.ts` | 900 ms (real) | The ball's trail fades out after the kick comes down. **Assumed (needs Leon)**: the trail's look. |
 | `CONTEST_M` | `kickLayer.ts` | 9 m | A bomb's or cross-field kick's contest is drawn from the top of its flight: the nearest man of each side within 9 m of where it lands, a ring each in his side's colours; the one who takes it gets a white ring that grows, the others' fade. **Assumed (needs Leon)**: the contest's look. |
 | `SKID_LIFT_M` | `kickLayer.ts` | 0.12 m | A grubber's hop that comes down under this leaves a skid mark. **Assumed (needs Leon)**: the skid's look. |
+| `TRAIT_MOVE_MS` | `src/match/view/traitLayer.ts` | 1000 ms (real) | How long a trait's move stays up (N15.4): the fend's arm, the step's cut, the cut-out line, the drive, the shock. It fades over the last 280 ms. At ×4 and ×8 (`TRAIT_FAST_FROM`, `TRAIT_FAST_HOLD` 2) it stays up twice as long, and the match eases for `TRAIT_SLOW_MS` 420 ms at factor `TRAIT_SLOW_FACTOR` 0.4, so the camera does not run past it. **Assumed (needs Leon)**: a second, and the longer hold at the fast speeds. |
+| `CUT_NEAR_M` / `CUT_END_M` | `traitLayer.ts` | 2.5 m / 0.4 m | A Playmaker's line goes through the teammate nearest him who is within 2.5 m of the line and at least 0.4 m clear of either end. The man beside the ball, not a trailer closer to the line. |
+| `trailStyle` | `kickLayer.ts` | plain 5/3 px white; Big Boot 9/5 px `#d9a5ff` | Big Boot's trail is wider and in the trait colour. The kick is already longer in the sim. **Assumed (needs Leon)**: the look. |
 
-Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`, `tests/match/view/kickLayer.test.ts`.
+Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`, `tests/match/view/kickLayer.test.ts`, `tests/match/view/traitLayer.test.ts`.
 
 ## 10. Legs (§8)
 

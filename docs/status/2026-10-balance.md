@@ -4,6 +4,10 @@ The live match sim's knobs, measured with the harness (`npm run balance`, `balan
 N13 item 1 is the presets. Later items (grubbers, completion, the 20-point gap, the home
 edge, stamina, the break rule) are still to come; this file starts with item 1.
 
+N15.4 (traits you can see) adds an optional `toSlot` on a cut-out event in `src/match/league/live.ts`
+(this plan's file): the receiver's slot, so the view can draw the line. The sim does not
+read it, no dice changed, and the golden Balanced / Slide match is the same string.
+
 Every decision taken without a fresh word from Leon is marked **Assumed (needs Leon)**.
 
 ## N13.1 Presets back in balance (24 Oct)

@@ -33,6 +33,12 @@ export interface TraitDef {
   group: TraitGroup;
   /** One line for the tooltip / codex: when it fires and what it does at level I. */
   blurb: string;
+  /**
+   * What a firing looks like on the pitch (N15.4), appended on the player page as
+   * "You will see it as …". Absent for a trait with no move of its own (Workhorse,
+   * Hothead, and the ones that only change a number).
+   */
+  seen?: string;
   /** Positions it is rolled for most often; null = any. */
   fit: readonly Position[] | null;
   /** Rolled at generation (meta traits arrive by age / tenure instead). */
@@ -47,15 +53,15 @@ const HALVES: readonly Position[] = ['five-eighth', 'halfback'];
 const BALL_PLAYERS: readonly Position[] = ['five-eighth', 'halfback', 'hooker', 'fullback'];
 
 export const TRAITS: Readonly<Record<TraitId, TraitDef>> = {
-  dancingFeet: { name: 'Dancing Feet', short: 'FEET', group: 'attack', blurb: 'Steps a lone defender more often (+15% at I)', fit: OUTSIDE, pool: true },
-  wreckingBall: { name: 'Wrecking Ball', short: 'WRECK', group: 'attack', blurb: 'Busts tackles (+12% at I) and keeps driving when held', fit: FORWARDS, pool: true },
-  dontArgue: { name: "Don't Argue", short: 'FEND', group: 'attack', blurb: 'Palms off tacklers (+12% fend at I)', fit: [...OUTSIDE, 'second-row'], pool: true },
+  dancingFeet: { name: 'Dancing Feet', short: 'FEET', group: 'attack', blurb: 'Steps a lone defender more often (+15% at I)', seen: 'a sidestep cut', fit: OUTSIDE, pool: true },
+  wreckingBall: { name: 'Wrecking Ball', short: 'WRECK', group: 'attack', blurb: 'Busts tackles (+12% at I) and keeps driving when held', seen: 'a drive through the tackle', fit: FORWARDS, pool: true },
+  dontArgue: { name: "Don't Argue", short: 'FEND', group: 'attack', blurb: 'Palms off tacklers (+12% fend at I)', seen: 'a straight arm', fit: [...OUTSIDE, 'second-row'], pool: true },
   offloadKing: { name: 'Offload King', short: 'OFFL', group: 'attack', blurb: 'Gets the ball away in the tackle (+12% offload at I)', fit: FORWARDS, pool: true },
-  finisher: { name: 'Finisher', short: 'FIN', group: 'attack', blurb: 'Inside the opposition 20 m: busts and steps more, and gets over', fit: ['winger', 'centre', 'fullback'], pool: true },
+  finisher: { name: 'Finisher', short: 'FIN', group: 'attack', blurb: 'Inside the opposition 20 m: busts and steps more, and gets over', seen: 'the step, the fend or the drive', fit: ['winger', 'centre', 'fullback'], pool: true },
   jets: { name: 'Jets', short: 'JETS', group: 'attack', blurb: 'A bigger gas tank for sprinting (×1.4 at I); quicker on the kick chase (+8% at I)', fit: OUTSIDE, pool: true },
-  playmaker: { name: 'Playmaker', short: 'PLAY', group: 'attack', blurb: 'Reads the shift: passes more, throws the cut-out ball', fit: BALL_PLAYERS, pool: true },
-  bigBoot: { name: 'Big Boot', short: 'BOOT', group: 'attack', blurb: 'Kicks longer (+10% at I) and more accurately', fit: HALVES, pool: true },
-  hitman: { name: 'Hitman', short: 'HIT', group: 'defence', blurb: 'Square one-on-one: the big hit (+12% at I)', fit: FORWARDS, pool: true },
+  playmaker: { name: 'Playmaker', short: 'PLAY', group: 'attack', blurb: 'Reads the shift: passes more, throws the cut-out ball', seen: 'a line through the man he skips', fit: BALL_PLAYERS, pool: true },
+  bigBoot: { name: 'Big Boot', short: 'BOOT', group: 'attack', blurb: 'Kicks longer (+10% at I) and more accurately', seen: 'a longer, higher kick', fit: HALVES, pool: true },
+  hitman: { name: 'Hitman', short: 'HIT', group: 'defence', blurb: 'Square one-on-one: the big hit (+12% at I)', seen: 'a shock on the big hit', fit: FORWARDS, pool: true },
   lastLine: { name: 'Last Line', short: 'LAST', group: 'defence', blurb: 'Cover defender: quicker chasing a break, harder to beat one-on-one', fit: ['fullback', 'winger'], pool: true },
   pickpocket: { name: 'Pickpocket', short: 'PICK', group: 'defence', blurb: 'Strips the ball one-on-one (+8% at I)', fit: null, pool: true },
   brickWall: { name: 'Brick Wall', short: 'WALL', group: 'defence', blurb: 'In a two-man tackle the carrier busts and offloads less (−10% at I)', fit: FORWARDS, pool: true },
@@ -98,6 +104,12 @@ export function traitBoost(traits: readonly TraitInstance[] | undefined, id: Tra
 /** "Dancing Feet II" — how a firing trait is announced. */
 export function traitLabel(t: TraitInstance): string {
   return `${TRAITS[t.id].name} ${ROMAN[t.level]}`;
+}
+
+/** The player-page line: the blurb, and "You will see it as …" when the trait has a move (N15.4). */
+export function traitTip(id: TraitId): string {
+  const d = TRAITS[id];
+  return d.seen ? `${d.blurb}. You will see it as ${d.seen}` : d.blurb;
 }
 
 /** Add a trait, or raise its level if already held (never above III). */
