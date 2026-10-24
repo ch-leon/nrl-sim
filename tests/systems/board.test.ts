@@ -6,7 +6,7 @@ import {
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { createNewGame, getState, setState, type Objective } from '../../src/core/state';
 import { bus } from '../../src/core/events';
-import { BOARD, PRIZE } from '../../src/config';
+import { BOARD, DIFFICULTY, PRIZE, scaledMoney } from '../../src/config';
 
 beforeEach(() => bus.clear());
 
@@ -91,6 +91,28 @@ describe('finalsPrize', () => {
     expect(finalsPrize({ finalsPlayed: 1, playedGrandFinal: false, premiership: false })).toBe(PRIZE.PER_FINALS_WEEK);
     expect(finalsPrize({ finalsPlayed: 3, playedGrandFinal: true, premiership: true }))
       .toBe(3 * PRIZE.PER_FINALS_WEEK + PRIZE.GRAND_FINAL + PRIZE.PREMIERSHIP);
+  });
+});
+
+describe('difficulty scales the prize and the grant, not the reputation', () => {
+  const base = { finalsPlayed: 2, playedGrandFinal: true, premiership: false };
+  const raw = finalsPrize(base);
+
+  it.each(['easy', 'normal', 'hard'] as const)('%s pays prize × its factor and the same for a met objective', (d) => {
+    createNewGame('Test FC', 3, { difficulty: d });
+    initLeague(getState());
+    setState({
+      objectives: [{ id: 'a', kind: 'finals', text: 'top 8', target: 8, status: 'pending' }],
+      money: 0,
+      boardPatience: 5,
+    });
+    const beforeRep = getState().reputation;
+    applyBoardReview(outcome({ ladderPosition: 1, ...base }));
+    const after = getState();
+    const factor = DIFFICULTY[d].prize;
+    expect(after.money).toBe(scaledMoney(raw, factor) + scaledMoney(BOARD.GRANT_PER_MET, factor));
+    expect(after.reputation - beforeRep).toBe(BOARD.REP_PER_MET);
+    expect(reviewObjectives(getState(), outcome({ ladderPosition: 1 })).grant).toBe(scaledMoney(BOARD.GRANT_PER_MET, factor));
   });
 });
 

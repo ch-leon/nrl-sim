@@ -7,7 +7,7 @@ import { bus } from '../core/events';
 import { registerSeasonHook } from '../core/time';
 import { earnMoney } from '../data/club';
 import { makeRng } from '../utils/rng';
-import { BOARD, PRIZE } from '../config';
+import { BOARD, PRIZE, difficultyMultipliers, scaledMoney } from '../config';
 import { repayBoardLoan } from './contracts';
 
 /** Facts about the season just played, supplied by the fixtures season hook. */
@@ -110,7 +110,8 @@ export function reviewObjectives(state: GameState, outcome: SeasonOutcome): Boar
   return {
     objectives, met, missed, patience,
     reputation: Math.min(100, state.reputation + met * BOARD.REP_PER_MET),
-    grant: met * BOARD.GRANT_PER_MET,
+    // The cash grant scales with difficulty; the reputation for meeting one does not.
+    grant: scaledMoney(met * BOARD.GRANT_PER_MET, difficultyMultipliers(state.settings.difficulty).prize),
     sacked: patience <= 0,
   };
 }
@@ -146,7 +147,7 @@ export function sackedSummary(state: GameState): {
  */
 export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
   const s = getState();
-  const prize = finalsPrize(outcome);
+  const prize = scaledMoney(finalsPrize(outcome), difficultyMultipliers(s.settings.difficulty).prize);
   if (prize > 0) {
     earnMoney(prize, 'finals prize money');
     bus.emit('ui:notify', { text: `Finals prize money: $${prize.toLocaleString()}.`, kind: 'success' });

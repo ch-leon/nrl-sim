@@ -297,3 +297,19 @@ gates and prize money would take idle Easy to +$91k to +$135k a season from seas
 Easy's wages and running costs back to Normal's are only about $55k); and for Hard, its
 burn (wages ×1.15, running costs ×1.2 and the soak manager signing while its weekly net
 stays above −$3,000), not the small lines.
+
+**Prize, grant and the Easy gate (season pass after N12, retuned after #307).**
+`DIFFICULTY.*.prize` scales finals prize money and the board's cash grant together
+(Easy ×0.85, Normal ×1, Hard ×1.2) and `DIFFICULTY.*.gate` scales gate receipts
+(Easy ×0.96, Normal and Hard ×1). Normal's gate still follows reputation, form and the
+occasion exactly as before; the factor is 1. The reputation for an objective met does
+not scale. Assumed (needs Leon): ×0.85 and ×0.96. ×0.75 on both, the first cut, put a
+managing Easy club behind Normal: the manager's gates were $4.93M over five seasons
+against an idle club's $2.56M, so the same percentage took more dollars off the club
+that was spending them, and wages and facilities did not fall by as much. On `main`
+after the presets balance, the same 16 seeds (5 seasons, idle and managed, no
+problems): Normal's cash is unchanged to the dollar. Managed Easy's season-5 mean
+goes from $1,216k to $1,168k ($403k–$1,907k), 0 of 16 in the red, against managed
+Normal at $542k. Idle Easy goes from $1,422k to $1,249k and every season closes above
+Easy's −$10k solvency line. The gate stays at ×0.96 because ×0.94 closed one idle
+season under that line. The reading is in `docs/status/2026-10-season.md`.

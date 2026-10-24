@@ -102,11 +102,11 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         // A getter, so the Sponsor Board line quotes the club's reputation each time the page is shown (N12).
         get bullets(): string[] {
           return [
-            'Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are $20. A new club draws about 1,200.',
+            `Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are $20. On Easy the gate pays ${percent(DIFFICULTY.easy.gate)} of that; Normal and Hard pay the full gate. A new club draws about 1,200.`,
             'A weekly grant that grows with reputation ($40 a point).',
             sponsorBullet(),
-            `Finals prize money at the rollover: ${dollars(PRIZE.PER_FINALS_WEEK)} for every finals week played, ${dollars(PRIZE.GRAND_FINAL)} more for a grand final and ${dollars(PRIZE.PREMIERSHIP)} for the premiership.`,
-            `The board pays ${dollars(BOARD.GRANT_PER_MET)} for every objective met; some event cards pay too.`,
+            `Finals prize money at the rollover: ${dollars(PRIZE.PER_FINALS_WEEK)} for every finals week played, ${dollars(PRIZE.GRAND_FINAL)} more for a grand final and ${dollars(PRIZE.PREMIERSHIP)} for the premiership. Easy pays ${percent(DIFFICULTY.easy.prize)} of that and Hard ${percent(DIFFICULTY.hard.prize)}; Normal pays it as written.`,
+            `The board pays ${dollars(BOARD.GRANT_PER_MET)} for every objective met (Easy ${percent(DIFFICULTY.easy.prize)}, Hard ${percent(DIFFICULTY.hard.prize)}); some event cards pay too.`,
           ];
         },
       },
@@ -262,7 +262,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Reputation and the board',
         bullets: [
           'Reputation moves with the finish: the top four gain (+4 for first, down to +1), the bottom four lose (−1 to −4), each finals win adds 1 and a lost grand final 3. It then settles 10% of the way back toward 30, so a club has to keep earning it.',
-          `The board sets objectives each season (a ladder finish, staying solvent, beating a rival, building) and keeps 5 points of patience: a missed objective costs one, a clean sweep earns one back, zero and you are sacked. Each one met pays ${dollars(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation.`,
+          `The board sets objectives each season (a ladder finish, staying solvent, beating a rival, building) and keeps 5 points of patience: a missed objective costs one, a clean sweep earns one back, zero and you are sacked. Each one met pays ${dollars(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation. Easy pays ${percent(DIFFICULTY.easy.prize)} of the grant and Hard ${percent(DIFFICULTY.hard.prize)}.`,
         ],
       },
       {

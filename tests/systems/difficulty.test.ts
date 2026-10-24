@@ -13,7 +13,7 @@ import { injuryChance } from '../../src/match/league/weather';
 
 describe('difficulty multipliers', () => {
   it('normal is the identity', () => {
-    expect(DIFFICULTY.normal).toEqual({ startingMoney: 1, wages: 1, injuryRate: 1, rivalEdge: 0, startRating: 0, overhead: 1 });
+    expect(DIFFICULTY.normal).toEqual({ startingMoney: 1, wages: 1, injuryRate: 1, rivalEdge: 0, startRating: 0, overhead: 1, prize: 1, gate: 1 });
   });
 
   it('startRating moves the starting squad: Easy starts stronger than Normal, Hard weaker (#140)', () => {
@@ -61,6 +61,15 @@ describe('difficulty multipliers', () => {
     expect(rivalEdge('away', 'hard')).toEqual({ side: 'away', points: DIFFICULTY.hard.rivalEdge });
     expect(rivalEdge('home', 'easy')).toEqual({ side: 'home', points: DIFFICULTY.easy.rivalEdge });
     expect(rivalEdge('away', 'normal')).toBeUndefined();
+  });
+
+  it('Easy pays less prize money and a smaller gate, Hard pays more prize money and the same gate', () => {
+    expect(DIFFICULTY.easy.prize).toBe(0.85);
+    expect(DIFFICULTY.easy.gate).toBe(0.96);
+    expect(DIFFICULTY.hard.prize).toBe(1.2);
+    expect(DIFFICULTY.hard.gate).toBe(1);
+    expect(DIFFICULTY.easy.prize).toBeLessThan(DIFFICULTY.normal.prize);
+    expect(DIFFICULTY.hard.prize).toBeGreaterThan(DIFFICULTY.normal.prize);
   });
 
   it('injury chance scales with the injury rate', () => {
