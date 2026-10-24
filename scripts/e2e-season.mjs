@@ -567,6 +567,35 @@ async function play() {
     if (!clock || clock === '00:00') throw new Error(`the live match clock did not move (${clock})`);
     rec.notes.push(`×8, clock ${clock}`);
   });
+  // Instant replay of a try (N15.5). Additive (N8's playthrough): at ×8, wait for
+  // the Replay button, tap it, and check the re-sim did not block the page and
+  // the clock is back where the live match left it. Noted in docs/status/2026-10-qa.md.
+  await step('try-replay', async (rec) => {
+    if (!liveOn) return 'skipped';
+    const btn = page.locator('.nrl-mo-replay');
+    const seen = await btn.waitFor({ state: 'visible', timeout: 90000 }).then(() => true).catch(() => false);
+    if (!seen) {
+      if (await page.locator('.nrl-mo-final').count()) return 'no try before full time';
+      throw new Error('no Replay button within 90s of the live match');
+    }
+    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    await tap('.nrl-mo-replay');
+    await page.waitForFunction(() => document.querySelector('.nrl-match-overlay')?.hasAttribute('data-replay-block'), null, { timeout: 15000 });
+    const block = Number(await page.locator('.nrl-match-overlay').getAttribute('data-replay-block'));
+    if (!Number.isFinite(block)) throw new Error(`replay block is not a number`);
+    if (block >= 300) throw new Error(`replay blocked the page for ${block} ms`);
+    await page.waitForSelector('.nrl-mo-replaying', { timeout: 5000 });
+    await page.waitForFunction((was) => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== was;
+    }, before, { timeout: 4000 });
+    await page.waitForFunction((was) => {
+      const playing = document.querySelector('.nrl-mo-replaying');
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !playing && t === was;
+    }, before, { timeout: 14000 });
+    rec.notes.push(`Replay from ${before}; main-thread block ${block} ms`);
+  });
   // A hard kill: reload mid-match (no pagehide the game can trust) and Continue.
   // The same match comes back, not kick-off.
   await step('live-kill', async (rec) => {

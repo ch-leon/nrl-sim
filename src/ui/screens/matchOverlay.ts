@@ -22,6 +22,7 @@
 // The ticker's lines come from the live playback (match/view/commentary.ts, N15.2)
 // through `comment()`: the overlay keeps the score from the events and says
 // nothing of its own.
+import { REPLAY_OFFER_MS } from '../../match/view/replay';
 import { el, panel, button, mount, ensureStyles } from '../dom';
 import { bus } from '../../core/events';
 import { truncateTicker } from '../../world/readability';
@@ -243,6 +244,16 @@ export interface MatchOverlayHandle {
   comment(line: string): void;
   /** Coach calls made and paid off, home and away (#73): a stats line once there is one. */
   setCalls?(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): void;
+  /** Show Replay for eight seconds after a try (N15.5). Tapping hides it and calls `onTap`. */
+  offerReplay(onTap: () => void): void;
+  /** How long the re-sim blocked the main thread, in ms. The page's perf read. */
+  noteReplayBlock(ms: number): void;
+  /** The picture is the replay: a REPLAY tag, cleared when the live view returns. */
+  setReplaying(on: boolean): void;
+  /** The scoreboard follows the replay, then the live score again. */
+  setScore(home: number, away: number): void;
+  /** Put the scoreboard back on the score the events have accumulated. */
+  showLiveScore(): void;
 }
 
 /** "2/5" for a side's calls paid off of made, "–" when it made none. */
@@ -424,6 +435,16 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   root.append(scoreboard, statsPanel, logPanel, commentaryPanel, banner);
   mount(root);
+
+  let replayTimer: ReturnType<typeof setTimeout> | null = null;
+  let replayBtn: HTMLButtonElement | null = null;
+  let replayTag: HTMLElement | null = null;
+  const clearReplayOffer = (): void => {
+    if (replayTimer) clearTimeout(replayTimer);
+    replayTimer = null;
+    replayBtn?.remove();
+    replayBtn = null;
+  };
   document.body?.classList.add(MATCH_ACTIVE_CLASS);
 
   const render = (): void => {
@@ -536,6 +557,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       offEvent();
       offFinished();
       if (bannerTimer) clearTimeout(bannerTimer);
+      clearReplayOffer();
+      replayTag?.remove();
       queued = null;
       root.remove();
       document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
@@ -554,6 +577,33 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       // Golden point (N9.4): its own clock from 00:00.
       clockEl.textContent = formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes);
       halfEl.textContent = half === 1 ? '1st' : half === 2 ? '2nd' : 'Golden point';
+    },
+    offerReplay(onTap: () => void): void {
+      clearReplayOffer();
+      if (root.classList.contains('nrl-mo-final')) return;
+      replayBtn = button('Replay', () => {
+        clearReplayOffer();
+        onTap();
+      }, { class: 'nrl-mo-replay' });
+      root.append(replayBtn);
+      replayTimer = setTimeout(clearReplayOffer, REPLAY_OFFER_MS);
+    },
+    noteReplayBlock(ms: number): void {
+      root.setAttribute('data-replay-block', String(Math.max(0, Math.round(ms))));
+    },
+    setReplaying(on: boolean): void {
+      root.classList.toggle('nrl-mo-replaying', on);
+      replayTag?.remove();
+      replayTag = null;
+      if (!on) return;
+      replayTag = el('div', { class: 'nrl-mo-replay-tag', text: 'REPLAY', attrs: { role: 'status' } });
+      root.append(replayTag);
+    },
+    setScore(home: number, away: number): void {
+      scoreEl.textContent = `${home} – ${away}`;
+    },
+    showLiveScore(): void {
+      scoreEl.textContent = `${state.homeScore} – ${state.awayScore}`;
     },
   };
   // Full-time: freeze on the final score (the result toast is transient). The
@@ -743,6 +793,16 @@ body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
 }
 .nrl-mo-chip.nrl-mo-scored { animation: nrl-mo-chip-scored 1.2s ease-out; }
 @keyframes nrl-mo-chip-scored { 0%, 40% { background: #f4d03f; } 100% { background: transparent; } }
+/* Replay (N15.5): above the ticker, clear of the speed buttons and the calls. */
+.nrl-mo-replay, .nrl-mo-replay-tag {
+  position: fixed; left: 50%; bottom: calc(8rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  z-index: 26; pointer-events: auto; min-height: 44px; min-width: 7rem;
+}
+.nrl-mo-replay-tag {
+  pointer-events: none; padding: 0.35rem 0.8rem; background: #1a1a2e; color: #fff; border: 3px solid #000;
+  font-weight: bold; letter-spacing: 0.08em; box-shadow: 3px 3px 0 #000;
+}
+.nrl-mo-final .nrl-mo-replay, .nrl-mo-final .nrl-mo-replay-tag { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .nrl-mo-banner-in, .nrl-mo-scored, .nrl-mo-chip.nrl-mo-scored, .nrl-mo-banner-extra { animation: none; }
 }
@@ -758,5 +818,6 @@ body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
   .nrl-mo-banner-score { margin-top: 0.2rem; }
   body.nrl-match-active .nrl-toast-stack { bottom: 5.5rem; }
   body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
+  .nrl-mo-replay, .nrl-mo-replay-tag { bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px)); }
 }
 `;

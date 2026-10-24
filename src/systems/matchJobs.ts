@@ -5,6 +5,8 @@
 // soak have none and play them in place. A worker that fails or stays silent past a timeout is
 // dropped and everything it owed is played here; a post that throws plays that
 // request here. The same results either way, later.
+import type { Snapshot } from '../match/core/snapshot';
+import type { LiveOptions } from '../match/league/live';
 import type { MatchResult, TeamSheet } from '../sim/events';
 import { runMatch, type RunMatchOptions } from '../match/league/match';
 
@@ -83,6 +85,99 @@ function laneWorker(name: MatchLane): Lane {
   worker.onerror = () => abandonWorker(name, s);
   lanes.set(name, s);
   return s;
+}
+
+/** A try's replay (N15.5): re-simulate one range off the main thread. Not a match job. */
+export interface ReplayRequest {
+  kind: 'replay';
+  home: TeamSheet;
+  away: TeamSheet;
+  opts: LiveOptions;
+  seed: number;
+  from: number;
+  to: number;
+}
+
+/** What the replay worker posts back. */
+export interface ReplayResponse {
+  kind: 'replay';
+  snaps: Snapshot[];
+}
+
+/** The replay's own worker, so it never shares a lane's match-result queue. */
+let replayLane: { worker: Worker; ctor: unknown; pending: ((snaps: Snapshot[] | null) => void) | null } | null = null;
+
+function replayWorker(): NonNullable<typeof replayLane> {
+  if (replayLane && replayLane.ctor !== Worker) {
+    const stale = replayLane;
+    replayLane = null;
+    stale.pending?.(null);
+    stale.worker.terminate();
+  }
+  if (replayLane) return replayLane;
+  const worker = new Worker(new URL('./matchWorker.ts', import.meta.url), { type: 'module', name: 'match-replay' });
+  const lane = { worker, ctor: Worker as unknown, pending: null as ((snaps: Snapshot[] | null) => void) | null };
+  worker.onmessage = (e: MessageEvent<ReplayResponse>) => {
+    if (!e.data || e.data.kind !== 'replay') return;
+    const done = lane.pending;
+    lane.pending = null;
+    done?.(e.data.snaps);
+  };
+  worker.onerror = () => {
+    const done = lane.pending;
+    lane.pending = null;
+    worker.terminate();
+    if (replayLane === lane) replayLane = null;
+    done?.(null);
+  };
+  replayLane = lane;
+  return lane;
+}
+
+/**
+ * Re-simulate a try's range in the replay worker. Null when this runtime has no
+ * Worker, one replay is already in flight, or the worker fails or stays silent:
+ * the caller plays the range here. The match lanes are left alone.
+ */
+export function playReplayInWorker(req: Omit<ReplayRequest, 'kind'>, timeoutMs: number): Promise<Snapshot[] | null> {
+  if (!canUseWorker()) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    let lane: NonNullable<typeof replayLane>;
+    try {
+      lane = replayWorker();
+    } catch {
+      resolve(null);
+      return;
+    }
+    if (lane.pending) {
+      resolve(null);
+      return;
+    }
+    let settled = false;
+    const finish = (snaps: Snapshot[] | null): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (lane.pending === finish) lane.pending = null;
+      resolve(snaps);
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      try {
+        lane.worker.terminate();
+      } catch {
+        // Already gone.
+      }
+      if (replayLane === lane) replayLane = null;
+      finish(null);
+    }, timeoutMs);
+    lane.pending = finish;
+    try {
+      lane.worker.postMessage({ kind: 'replay', ...req } satisfies ReplayRequest);
+    } catch {
+      finish(null);
+    }
+  });
 }
 
 /** Play the jobs in the lane's Web Worker; on any failure or silence past `timeoutMs`, play them here instead. */
