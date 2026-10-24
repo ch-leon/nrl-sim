@@ -247,9 +247,14 @@ describe('five-season headless league', () => {
       for (let i = 0; i < 5 * WEEKS_PER_SEASON; i++) {
         const before = rivalIds();
         const rollover = getState().week === WEEKS_PER_SEASON;
+        // A final the club itself plays is a live match (a few hundred ms). The
+        // budget below is the other final weeks: the rival grand final, the
+        // rollover and the season hooks. N13's preset retune puts this seed in
+        // the season-1 grand final, which it used to miss.
+        const playing = getState().league.fixtures.some((f) => f.round === getState().week && !f.result && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID));
         const t0 = performance.now();
         advanceWeek();
-        if (rollover) rolloverMs = Math.max(rolloverMs, performance.now() - t0);
+        if (rollover && !playing) rolloverMs = Math.max(rolloverMs, performance.now() - t0);
         const s = getState();
         expect(s.freeAgents.length).toBeGreaterThan(0);
         for (const c of s.league.clubs) {
@@ -269,7 +274,8 @@ describe('five-season headless league', () => {
     const perRivalSeason = signings / (15 * 5);
     expect(perRivalSeason).toBeGreaterThanOrEqual(1);
     expect(perRivalSeason).toBeLessThanOrEqual(3);
-    // The whole final week: the grand final, rollover and every season hook (~10ms here).
+    // A final week the club does not play: the rival grand final, rollover and every season hook.
+    expect(rolloverMs).toBeGreaterThan(0);
     expect(rolloverMs).toBeLessThan(100);
   }, 60_000);
 });

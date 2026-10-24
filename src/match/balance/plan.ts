@@ -59,6 +59,20 @@ export interface ScenarioSpec {
   calls?: Partial<Record<'home' | 'away', CallRule[]>>;
   /** Plan changes at the breaks (N11): each made once, at the first break it names. */
   plans?: PlanRule[];
+  /**
+   * Matches for this scenario, instead of the plan's `seeds` (N13). A row that
+   * has to be read closely (a preset's win rate) can ask for more than the
+   * plan's smoke count. With `bothWays`, this many in each orientation.
+   */
+  seeds?: number;
+  /**
+   * The side the row is about. Its win rate is reported as Side win: that
+   * side's wins as written, and with `bothWays` the same tactics' wins after
+   * the sides are swapped.
+   */
+  track?: 'home' | 'away';
+  /** Also play each seed with the sides swapped, and pool the tracked side's wins. */
+  bothWays?: boolean;
 }
 
 export interface PlanRule {
@@ -118,6 +132,9 @@ export function checkPlan(p: Plan): string[] {
     if (names.has(s.name)) errs.push(`scenario "${s.name}" is listed twice`);
     names.add(s.name);
     if (s.minutes !== undefined && !(s.minutes > 0)) errs.push(`${s.name}: minutes must be > 0`);
+    if (s.seeds !== undefined && (!Number.isInteger(s.seeds) || s.seeds < 1)) errs.push(`${s.name}: seeds must be a whole number ≥ 1`);
+    if (s.track !== undefined && s.track !== 'home' && s.track !== 'away') errs.push(`${s.name}: track must be home / away`);
+    if (s.bothWays && !s.track) errs.push(`${s.name}: bothWays needs track, the side whose wins are pooled`);
     if (s.weather !== undefined && !['clear', 'rain', 'wind'].includes(s.weather)) errs.push(`${s.name}: weather must be clear / rain / wind`);
     if (s.aiCoach !== undefined && (!Array.isArray(s.aiCoach) || s.aiCoach.some((x) => x !== 'home' && x !== 'away'))) errs.push(`${s.name}: aiCoach must list home / away`);
     for (const side of ['home', 'away'] as const) {
