@@ -46,7 +46,8 @@ late lead, and this step.
 Runs: `20261024-134002-break-rule`, `20261024-135701-kick-chase-step-confirm`,
 `20261024-135245-kick-chase-step`. The plan is `balance/plans/break-rule.json`.
 The golden even match is unchanged, because no side in that match is given the
-rule. No club file and no QA file: the club does not pass the option yet.
+rule. N14 turns the rule on for rivals. N14.2 counts the switches over a season
+and logs any style more than 4 points from even. It does not move a preset.
 
 ## N13.1 Presets back in balance (24 Oct)
 

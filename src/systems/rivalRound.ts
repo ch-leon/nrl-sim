@@ -79,10 +79,39 @@ export function playRivalJob(job: RivalJob): MatchResult {
   return playMatchJob(rivalMatchJob(job));
 }
 
+/** How many break-rule plan changes a rival-v-rival result carried (N14.2). */
+export interface RivalPlanChangeNote {
+  round: number;
+  homeId: string;
+  awayId: string;
+  switches: number;
+}
+
+const planChangeListeners = new Set<(n: RivalPlanChangeNote) => void>();
+
+/**
+ * Told each rival-v-rival result as it lands. The soak counts switches here.
+ * Nothing is written onto the fixture or the save: a result stays the two scores.
+ */
+export function onRivalPlanChanges(fn: (n: RivalPlanChangeNote) => void): () => void {
+  planChangeListeners.add(fn);
+  return () => { planChangeListeners.delete(fn); };
+}
+
+function notePlanChanges(job: RivalJob, result: MatchResult): void {
+  if (planChangeListeners.size === 0) return;
+  const note: RivalPlanChangeNote = {
+    round: job.round, homeId: job.homeId, awayId: job.awayId,
+    switches: result.planChanges?.length ?? 0,
+  };
+  for (const fn of planChangeListeners) fn(note);
+}
+
 /**
  * The round's results into the league: each score through `applyResult`
  * (ladder or finals stamp), the injuries onto the rivals' squads, and the
  * players' match stats (games, tries, tackles, line breaks) onto their records.
+ * Plan changes are counted for a listener and then dropped.
  */
 export function applyRivalResults(
   state: GameState,
@@ -96,6 +125,7 @@ export function applyRivalResults(
     if (!r) return;
     const f = next.league.fixtures.find((x) => x.round === job.round && x.homeId === job.homeId && x.awayId === job.awayId);
     if (!f || f.result) return;
+    notePlanChanges(job, r);
     next = applyResult(next, f, { homeScore: r.homeScore, awayScore: r.awayScore });
     let clubs = injureRivalPlayers(next.league.clubs, r.injuries.filter((x) => x.playerId));
     clubs = clubs.map((c) => {

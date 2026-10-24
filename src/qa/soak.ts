@@ -28,7 +28,7 @@ import { chooseEvent, registerEventsSystem } from '../systems/events';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { BENCH } from '../match/league/bench';
-import { rivalStyle } from '../systems/rivalRound';
+import { onRivalPlanChanges, rivalStyle } from '../systems/rivalRound';
 import type { TeamTactics } from '../match/league/presets';
 import { runMatch } from '../match/league/match';
 import { overallRating } from '../data/player';
@@ -153,6 +153,20 @@ export interface SeasonSample extends GapSample {
   signedOverall: number;
   /** The season's money by source (#161): the rollover's prize and grants count for the season they close. */
   finance: FinanceTally;
+  /**
+   * Rival-v-rival styles this season (N14.2, --live-rivals). Attacks and
+   * defences are how many distinct presets the games used; switches are the
+   * break-rule plan changes in them. All zero when the cheap sim played the round.
+   */
+  styleMix: StyleMix;
+}
+
+/** Distinct styles and break-rule switches in one season's rival-v-rival games (N14.2). */
+export interface StyleMix {
+  attacks: number;
+  defences: number;
+  switches: number;
+  games: number;
 }
 
 /**
@@ -165,6 +179,8 @@ export interface StyleGame {
   homeStrength: number;
   awayStrength: number;
   homeScore: number;
+  /** Break-rule plan changes in this game (N14.2). 0 when the result carried none. */
+  switches: number;
 }
 
 export interface SoakResult {
@@ -585,9 +601,16 @@ export function runSoak(opts: SoakOptions): SoakResult {
 
   // Fast-forward plays every match headless; --live-rivals weeks are Advance Week (advanceWeekAsTapped).
   // --live-rivals: the rival-v-rival games and the styles they were played with (#249).
+  // Plan changes are counted as each result lands (N14.2) and are not stored on the fixture.
   const styleGames: StyleGame[] = [];
+  const planChanges = new Map<string, number>();
+  const stopPlanChanges = opts.liveRivals
+    ? onRivalPlanChanges((n) => { planChanges.set(`${n.round}:${n.homeId}`, n.switches); })
+    : null;
+  let styleFrom = 0;
   const play = opts.liveRivals ? (fn: () => void): void => fn() : withFastForward;
   const playWeek = opts.liveRivals ? advanceWeekAsTapped : advanceWeek;
+  try {
   play(() => {
     for (let i = 0; i < (opts.weeks ?? opts.seasons * WEEKS_PER_SEASON); i++) {
       if (getState().sacked) break;
@@ -608,7 +631,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
         break;
       }
       const s = getState();
-      if (styles && s.season === before) styleGames.push(...newStyleGames(styles, s));
+      if (styles && s.season === before) styleGames.push(...newStyleGames(styles, s, planChanges));
       minMoney = Math.min(minMoney, s.money);
       for (const p of checkState(s)) note(p);
       if (s.season === before && s.week === SEASON_ROUNDS + 1) {
@@ -657,7 +680,9 @@ export function runSoak(opts: SoakOptions): SoakResult {
           signingFees: signed.fees,
           signedOverall: signed.count ? Math.round((signed.overall / signed.count) * 10) / 10 : 0,
           finance: tally,
+          styleMix: styleMixOf(styleGames.slice(styleFrom)),
         });
+        styleFrom = styleGames.length;
         tally = emptyTally();
         seasonStartMoney = s.money;
         minMoney = s.money;
@@ -676,6 +701,9 @@ export function runSoak(opts: SoakOptions): SoakResult {
   }
   setState({});
   return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
+  } finally {
+    stopPlanChanges?.();
+  }
 }
 
 interface RivalStylesNow {
@@ -697,7 +725,7 @@ function rivalStylesNow(s: GameState): RivalStylesNow {
 }
 
 /** The rival-v-rival games the week played, with the styles they began it with. Same season only. */
-function newStyleGames(was: RivalStylesNow, s: GameState): StyleGame[] {
+function newStyleGames(was: RivalStylesNow, s: GameState, planChanges: ReadonlyMap<string, number>): StyleGame[] {
   const out: StyleGame[] = [];
   for (const i of was.open) {
     const f = s.league.fixtures[i];
@@ -705,9 +733,28 @@ function newStyleGames(was: RivalStylesNow, s: GameState): StyleGame[] {
     const away = f && was.clubs.get(f.awayId);
     if (!f?.result || !home || !away) continue;
     const { homeScore: h, awayScore: a } = f.result;
-    out.push({ home: home.tactics, away: away.tactics, homeStrength: home.strength, awayStrength: away.strength, homeScore: h > a ? 1 : h === a ? 0.5 : 0 });
+    out.push({
+      home: home.tactics, away: away.tactics, homeStrength: home.strength, awayStrength: away.strength,
+      homeScore: h > a ? 1 : h === a ? 0.5 : 0,
+      switches: planChanges.get(`${f.round}:${f.homeId}`) ?? 0,
+    });
   }
   return out;
+}
+
+/** Distinct attack and defence styles, and the break-rule switches, in these games (N14.2). */
+export function styleMixOf(games: readonly StyleGame[]): StyleMix {
+  const attacks = new Set<string>();
+  const defences = new Set<string>();
+  let switches = 0;
+  for (const g of games) {
+    attacks.add(g.home.attack);
+    attacks.add(g.away.attack);
+    defences.add(g.home.defence);
+    defences.add(g.away.defence);
+    switches += g.switches;
+  }
+  return { attacks: attacks.size, defences: defences.size, switches, games: games.length };
 }
 
 /** One style's season (#249): its games, mean score, the score its strength gaps alone predict, and one standard error. */
@@ -765,6 +812,47 @@ export function styleTable(games: readonly StyleGame[], key: keyof TeamTactics):
     .sort((a, b) => b.games - a.games);
 }
 
+/** Games whose clubs began the week within this many rating points: a level rating (N14.2). */
+export function levelRated(games: readonly StyleGame[], within = STYLE_GAP_BAND): StyleGame[] {
+  return games.filter((g) => Math.abs(g.homeStrength - g.awayStrength) <= within);
+}
+
+/** One style's wins ÷ games among level-rated games. A draw counts as half a win. */
+export interface LevelStyleRow {
+  style: string;
+  games: number;
+  score: number;
+}
+
+/**
+ * Wins ÷ games for each style when the two clubs began within a level rating.
+ * The mean to compare with is even (0.5): both sides of every game are counted.
+ */
+export function levelWinRates(games: readonly StyleGame[], key: keyof TeamTactics): LevelStyleRow[] {
+  const sides = levelRated(games).flatMap((g) => [
+    { style: g.home[key], score: g.homeScore },
+    { style: g.away[key], score: 1 - g.homeScore },
+  ]);
+  const by = new Map<string, { n: number; score: number }>();
+  for (const x of sides) {
+    const t = by.get(x.style) ?? { n: 0, score: 0 };
+    t.n++;
+    t.score += x.score;
+    by.set(x.style, t);
+  }
+  return [...by.entries()]
+    .map(([style, t]) => ({ style, games: t.n, score: t.score / t.n }))
+    .sort((a, b) => b.games - a.games);
+}
+
+/** More than 4 points from even. Logged for N13's owner; not tuned in this pass. */
+export const LEVEL_OFF_MEAN = 0.04;
+
+/** Styles whose level-rated win rate sits more than LEVEL_OFF_MEAN from 0.5. */
+export function offTheLevelMean(rows: readonly LevelStyleRow[]): LevelStyleRow[] {
+  return rows.filter((r) => Math.abs(r.score - 0.5) > LEVEL_OFF_MEAN);
+}
+
 // ── Summary across seeds ─────────────────────────────────────────────────────
 
 /** One season of one mode, averaged over every seed that reached it (#138). */
@@ -805,6 +893,12 @@ export interface SeasonSummary {
   startGap: number;
   /** Mean money by line over the runs (#161). */
   finance: FinanceTally;
+  /** Mean distinct attack and defence styles in the season's rival-v-rival games (0 without --live-rivals). */
+  attackStyles: number;
+  defenceStyles: number;
+  /** Break-rule plan changes and the games they came from, summed over the runs. */
+  breakSwitches: number;
+  rivalGames: number;
 }
 
 const mean = (xs: readonly number[]): number => (xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : 0);
@@ -855,6 +949,10 @@ export function summariseSeasons(results: readonly SoakResult[]): SeasonSummary[
         signedOverall: r1(mean(signedRows.map((s) => s.signedOverall))),
         startGap: r1(mean(runs.map((r) => r.start.bestNine - r.start.rivalMean))),
         finance: Object.fromEntries(FINANCE_LINES.map((l) => [l, Math.round(mean(rows.map((s) => s.finance[l])))])) as FinanceTally,
+        attackStyles: r1(mean(rows.map((s) => s.styleMix.attacks))),
+        defenceStyles: r1(mean(rows.map((s) => s.styleMix.defences))),
+        breakSwitches: rows.reduce((t, s) => t + s.styleMix.switches, 0),
+        rivalGames: rows.reduce((t, s) => t + s.styleMix.games, 0),
       });
     }
   }
