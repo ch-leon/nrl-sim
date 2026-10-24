@@ -5,11 +5,27 @@
 // rebuilds the same match (the seed comes from the saved rng). This record — the
 // fixture, seed, the calls and plan changes made and the tick — lets
 // that match carry on where it was, with the calls already made, instead of
-// starting over (no reloading for a better result). A few hundred bytes, kept
-// next to the save slot; cleared at full time.
+// starting over (no reloading for a better result). It is written on each call
+// and plan change, when the page hides, every LIVE_MATCH_SAVE_SECONDS of match
+// time, and on Save & exit, so a kill that never fires pagehide loses at most
+// that much. A few hundred bytes, kept next to the save slot; cleared at full time.
 import { getActiveSlot } from '../core/save';
+import { TICK_S } from '../match/core/engine';
 import type { CallInput } from '../match/league/calls';
 import type { PlanInput } from '../match/league/live';
+
+/**
+ * How often a match that is being watched writes this record. Two seconds of
+ * match time (the sim ticks at 1/TICK_S Hz): a hard kill loses at most that,
+ * and a reload cannot rewind further. One small localStorage write per interval.
+ */
+export const LIVE_MATCH_SAVE_SECONDS = 2;
+export const LIVE_MATCH_SAVE_TICKS = Math.round(LIVE_MATCH_SAVE_SECONDS / TICK_S);
+
+/** True when `tick` is at least one save interval past the last write. */
+export function liveMatchSaveDue(tick: number, lastSavedTick: number, every = LIVE_MATCH_SAVE_TICKS): boolean {
+  return tick - lastSavedTick >= every;
+}
 
 export interface LiveMatchRecord {
   season: number;

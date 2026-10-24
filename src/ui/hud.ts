@@ -8,6 +8,7 @@ import { getState, type GameState } from '../core/state';
 import type { AdvanceTarget } from '../core/advanceRules';
 import { weekHeld } from '../core/time';
 import { advanceInProgress, stopAdvance } from '../core/advance';
+import { playerMatchPending, resumePlayerMatch } from '../systems/matchday';
 import { ECON, WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
 
@@ -65,6 +66,35 @@ export const ADVANCE_FAILED_TEXT = 'The advance hit a problem and stopped.';
 /** What a tap on Advance Week (or its menu) says while the week is still finishing. */
 export const HELD_WEEK_TEXT = 'The other matches are still being played; the week ends when they are in.';
 
+/** Advance Week's label while the player's own match is parked (Save & exit). */
+export const RESUME_MATCH_LABEL = 'Resume match';
+
+/** What Save & exit tells the player on the way back to the club. */
+export const MATCH_SAVED_TEXT = 'Match saved. Advance Week resumes it.';
+
+/** Save & exit while Skip is waiting on the rest of the match. */
+export const SKIPPING_EXIT_TEXT = 'Skipping to full time.';
+
+/** What the ▾ menu says while that match is still on: it must not skip the week. */
+export const MATCH_STILL_ON_TEXT = 'Your match is still on. Advance Week resumes it.';
+
+/**
+ * What a tap on Advance Week does. A parked live match resumes; a week held for
+ * the rival round waits; otherwise the week advances.
+ */
+export function clubAdvanceChoice(matchPending: boolean, weekStillHeld: boolean): 'resume' | 'wait' | 'advance' {
+  if (matchPending) return 'resume';
+  if (weekStillHeld) return 'wait';
+  return 'advance';
+}
+
+/** What a ▾ pick does. The menu never skips a match that is still on. */
+export function clubMenuChoice(matchPending: boolean, weekStillHeld: boolean): 'match' | 'wait' | 'advance' {
+  if (matchPending) return 'match';
+  if (weekStillHeld) return 'wait';
+  return 'advance';
+}
+
 /**
  * True when the week is held (coach calls #73; the rival round played off the
  * main thread, N9.2), after saying so: back at the club the HUD is live again
@@ -102,7 +132,16 @@ export function createHud(opts: HudOpts = {}): Hud {
   const spacer = el('div', { class: 'nrl-hud-spacer' });
 
   const advanceBtn = button('Advance Week', () => {
-    if (!weekStillFinishing()) opts.onAdvanceWeek?.();
+    const choice = clubAdvanceChoice(playerMatchPending(), weekHeld());
+    if (choice === 'resume') {
+      resumePlayerMatch();
+      return;
+    }
+    if (choice === 'wait') {
+      weekStillFinishing();
+      return;
+    }
+    opts.onAdvanceWeek?.();
   });
   if (!opts.onAdvanceWeek) advanceBtn.disabled = true;
 
@@ -118,7 +157,16 @@ export function createHud(opts: HudOpts = {}): Hud {
     ...ADVANCE_MENU.map(({ label, target }) => {
       const item = button(label, () => {
         setMenuOpen(false);
-        if (!weekStillFinishing()) runAdvance(target);
+        const choice = clubMenuChoice(playerMatchPending(), weekHeld());
+        if (choice === 'match') {
+          bus.emit('ui:notify', { text: MATCH_STILL_ON_TEXT, kind: 'info' });
+          return;
+        }
+        if (choice === 'wait') {
+          weekStillFinishing();
+          return;
+        }
+        runAdvance(target);
       }, { class: 'nrl-hud-menu-item' });
       item.setAttribute('role', 'menuitem');
       if (!opts.onAdvanceUntil) item.disabled = true;
@@ -205,7 +253,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     const on = advanceInProgress();
     root.toggleAttribute('data-advancing', on);
     if (on) setMenuOpen(false);
-    advanceBtn.textContent = on ? advanceProgressLabel(s.week) : 'Advance Week';
+    advanceBtn.textContent = on ? advanceProgressLabel(s.week) : playerMatchPending() ? RESUME_MATCH_LABEL : 'Advance Week';
     advanceBtn.disabled = on || !opts.onAdvanceWeek;
     advanceBtn.classList.toggle('nrl-hud-progress', on);
     menuToggle.hidden = on;
@@ -220,6 +268,10 @@ export function createHud(opts: HudOpts = {}): Hud {
   // money-only update (and drives the flash) between full state changes.
   const offState = bus.on('state:changed', (s) => render(s));
   const offMoney = bus.on('money:changed', ({ balance }) => renderMoney(balance));
+  // Save & exit shows the club again without a state change; full time clears the
+  // record in the same turn as match:finished, so the label updates after that.
+  const offParked = bus.on('match:parked', () => render(getState()));
+  const offFinished = bus.on('match:finished', () => queueMicrotask(() => render(getState())));
 
   mount(root);
   // Screens sit below the HUD (GitHub #14): publish our live height.
@@ -230,6 +282,8 @@ export function createHud(opts: HudOpts = {}): Hud {
     destroy() {
       offState();
       offMoney();
+      offParked();
+      offFinished();
       offInset();
       setMenuOpen(false);
       if (flashTimer) clearTimeout(flashTimer);

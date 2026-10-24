@@ -319,6 +319,7 @@ export interface Events {
   'match:started': { fixture: Fixture; sim?: MatchResult; live?: LiveMatchData }; // live: no result until full time
   'match:event': MatchEvent;          // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
+  'match:parked': { tick: number }; // Save & exit: the week stays held; Advance Week resumes the match
   'bankruptcy:warning': { balance: number; forcedSales?: string[] }; // after the week's forced sales, naming them (N12.5)
   'ui:notify': { text: string; kind: 'info' | 'success' | 'danger' };
 }
@@ -335,11 +336,18 @@ step 4: the matchday hook calls `ctx.hold()`, the hooks after it and the week's 
 wait, and at `match:finished` matchday applies the live sim's own result and calls
 `resumeWeek()`, so the ladder, finals seeding, morale and a season's end see the
 match the player watched. Fast-forward holds only inside the multi-week advance in a
-browser (N10.3, below); everywhere else it plays in place. The game saves at a week's end
-and when the page hides (QA finding 21), never while a week is held, so an app killed
-mid-match reloads the week before; a small record next to the
-save slot (`systems/liveMatchRecord.ts`: seed, calls, plan changes (N11), tick) makes the re-advanced
-week resume the same match where it was.
+browser (N10.3, below); everywhere else it plays in place. The game saves at a week's end, when the page hides, and at the start of a week
+when the state has changed since the last save (QA finding 21), never while a week
+is held. A small record next to the save slot (`systems/liveMatchRecord.ts`: seed,
+calls, plan changes (N11), tick) is written on each call and plan change, when the
+page hides, every 2 seconds of match time, and on Save & exit. An app killed
+mid-match reloads the week-start slot plus that record, and advancing resumes the
+same match within those 2 seconds (no reloading for a better result). Save & exit
+returns to the club with the week still held: Advance Week reads Resume match and
+continues it, and the ▾ menu will not skip it. Continue on the slot does the same
+after a reload. A hire or a build made back at the club stays in memory and is
+saved with the week at full time; a kill before then drops it, because a held week
+is never written.
 
 Holds count (N9.2): every hook of the holding order still runs, then the later hooks
 and the week's end wait for one `resumeWeek()` per hold. With *Rival matches on the

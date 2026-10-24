@@ -107,6 +107,7 @@ export const NINES_PAGE: GuidePage = {
       heading: 'Watching',
       bullets: [
         'Live match (beta) on the Fixtures tab plays your matches on this sim as you watch, with ×1 to ×8 speed and Skip; off, the classic engine plays and replays them. Rival-v-rival rounds are simmed from the clubs’ strength either way.',
+        'Save & exit writes the match and goes back to the club. Advance Week then reads Resume match and continues it; the menu beside it will not skip the week. Closing the app and choosing Continue does the same, from a couple of seconds back at most. A hire or a build made back at the club is kept if you finish the match, and dropped if the app is killed before full time: a week in the middle of its match is not written into the slot.',
         'Full time brings the match report (who scored and when, the goals, the numbers side by side and the Player of the Match), the result into the ladder, and the match’s tallies onto your players’ pages.',
       ],
     },

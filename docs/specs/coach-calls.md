@@ -93,7 +93,10 @@ headless one. With calls it can. So when calls ship:
   tick with the same calls (deterministic), then carry on. Recommended over forfeiting (harsh
   on a phone that gets killed in the background) and over auto-simming the rest.
 - **Save-scumming** is not possible: reloading resumes the same match at the same tick with
-  the calls already made; there is no point to reload to.
+  the calls already made; there is no point to reload to. The record is also written
+  every 2 seconds of match time (40 ticks at 20 Hz), and on Save & exit, so a kill
+  that never fires `pagehide` loses at most that. Save & exit returns to the club
+  with the week still held; Advance Week resumes the match instead of skipping it.
 - 2g as planned is fine for the first release without calls; the coach-calls PR moves result
   application to full time.
 

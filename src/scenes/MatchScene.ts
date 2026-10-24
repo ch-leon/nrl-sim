@@ -21,6 +21,7 @@ import { CameraController } from '../world/camera';
 import { zoomForViewport } from '../world/viewport';
 import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
+import { MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import type { Fixture } from '../core/state';
 import { callsLine, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
@@ -676,6 +677,13 @@ export class MatchScene extends Phaser.Scene {
     const skip = button('Skip', () => this.playback?.skip());
     wrap.append(skip);
 
+    // Save & exit: write the resume record and go back to the club. The week
+    // stays held, so Advance Week reads Resume match and continues this one.
+    const exit = button('Save & exit', () => this.saveAndExit());
+    exit.setAttribute('data-save-exit', '');
+    exit.setAttribute('aria-label', 'Save and exit to club');
+    wrap.append(exit);
+
     this.controlsEl = wrap;
     mount(wrap);
   }
@@ -846,6 +854,21 @@ export class MatchScene extends Phaser.Scene {
 
   private exitToGrounds(): void {
     // Playback owns the single 'match:finished' emission (full time or Skip).
+    this.scene.start('Grounds');
+  }
+
+  /** Persist the live match and return to the club without finishing the week. */
+  private saveAndExit(): void {
+    const pb = this.playback;
+    if (!(pb instanceof LivePlayback) || this.finished) return;
+    if (!pb.canPark()) {
+      bus.emit('ui:notify', { text: SKIPPING_EXIT_TEXT, kind: 'info' });
+      return;
+    }
+    pb.saveProgress();
+    const tick = pb.tick;
+    bus.emit('ui:notify', { text: MATCH_SAVED_TEXT, kind: 'success' });
+    bus.emit('match:parked', { tick });
     this.scene.start('Grounds');
   }
 
