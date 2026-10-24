@@ -207,8 +207,11 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `TRAIT_MOVE_MS` | `src/match/view/traitLayer.ts` | 1000 ms (real) | How long a trait's move stays up (N15.4): the fend's arm, the step's cut, the cut-out line, the drive, the shock. It fades over the last 280 ms. At ×4 and ×8 (`TRAIT_FAST_FROM`, `TRAIT_FAST_HOLD` 2) it stays up twice as long, and the match eases for `TRAIT_SLOW_MS` 420 ms at factor `TRAIT_SLOW_FACTOR` 0.4, so the camera does not run past it. **Assumed (needs Leon)**: a second, and the longer hold at the fast speeds. |
 | `CUT_NEAR_M` / `CUT_END_M` | `traitLayer.ts` | 2.5 m / 0.4 m | A Playmaker's line goes through the teammate nearest him who is within 2.5 m of the line and at least 0.4 m clear of either end. The man beside the ball, not a trailer closer to the line. |
 | `trailStyle` | `kickLayer.ts` | plain 5/3 px white; Big Boot 9/5 px `#d9a5ff` | Big Boot's trail is wider and in the trait colour. The kick is already longer in the sim. **Assumed (needs Leon)**: the look. |
+| `REPLAY_SECONDS` / `REPLAY_OFFER_MS` / `REPLAY_TICKS` | `src/match/view/replay.ts` | 8 s / 8000 ms / 160 ticks | A try's replay (N15.5): the button stays up for eight real seconds; tapping re-simulates the 160 ticks before the try and plays them at ×1. One replay per try. **Assumed (needs Leon)**: eight seconds, one each, ×1. |
+| `REPLAY_ZOOM` | `replay.ts` | 1 | The replay's camera, centred on the ball. Wider than the match's 2; the same floor a kick's framing uses. **Assumed (needs Leon)**: how wide. |
+| `REPLAY_BLOCK_MS` | `replay.ts` | 300 ms | The re-sim on the main thread, when no Worker is there, may block the page this long. The Worker path times only the hand-off. |
 
-Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`, `tests/match/view/kickLayer.test.ts`, `tests/match/view/traitLayer.test.ts`.
+Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `tests/match/view/wrestleBar.test.ts`, `tests/match/view/kickLayer.test.ts`, `tests/match/view/traitLayer.test.ts`, `tests/match/view/replay.test.ts`.
 
 ## 10. Legs (§8)
 

@@ -567,6 +567,49 @@ async function play() {
     if (!clock || clock === '00:00') throw new Error(`the live match clock did not move (${clock})`);
     rec.notes.push(`×8, clock ${clock}`);
   });
+  // Instant replay of a try (N15.5). Additive (N8's playthrough): at ×8, wait for
+  // the Replay button, tap it, and check the re-sim did not block the page and
+  // the clock is back where the live match left it. Noted in docs/status/2026-10-qa.md.
+  await step('try-replay', async (rec) => {
+    if (!liveOn) return 'skipped';
+    const btn = page.locator('.nrl-mo-replay');
+    const seen = await btn.waitFor({ state: 'visible', timeout: 90000 }).then(() => true).catch(() => false);
+    if (!seen) {
+      if (await page.locator('.nrl-mo-final').count()) return 'no try before full time';
+      throw new Error('no Replay button within 90s of the live match');
+    }
+    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    // Full time used to hide the button (display:none). The class alone must not cover it.
+    const covered = await page.evaluate(() => {
+      const b = document.querySelector('.nrl-mo-replay');
+      const root = document.querySelector('.nrl-match-overlay');
+      if (!b || !root) return 'missing';
+      root.classList.add('nrl-mo-final');
+      const r = b.getBoundingClientRect();
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      const hidden = getComputedStyle(b).display === 'none' || r.height < 44;
+      root.classList.remove('nrl-mo-final');
+      return hidden || !(at === b || b.contains(at)) ? 'covered' : null;
+    });
+    if (covered) throw new Error(`Replay is not tappable with the full-time class on (${covered})`);
+    await tap('.nrl-mo-replay');
+    await page.waitForFunction(() => document.querySelector('.nrl-match-overlay')?.hasAttribute('data-replay-block'), null, { timeout: 15000 });
+    const block = Number(await page.locator('.nrl-match-overlay').getAttribute('data-replay-block'));
+    if (!Number.isFinite(block)) throw new Error(`replay block is not a number`);
+    if (block >= 300) throw new Error(`replay blocked the page for ${block} ms`);
+    // The overlay root is only a holder for fixed children, so it has no height and a visibility wait on `.nrl-mo-replaying` never sees it. The tag is the thing on screen.
+    await page.waitForSelector('.nrl-mo-replay-tag', { timeout: 5000 });
+    await page.waitForFunction((was) => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== was;
+    }, before, { timeout: 4000 });
+    await page.waitForFunction((was) => {
+      const playing = document.querySelector('.nrl-mo-replaying');
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !playing && t === was;
+    }, before, { timeout: 14000 });
+    rec.notes.push(`Replay from ${before}; main-thread block ${block} ms`);
+  });
   // A hard kill: reload mid-match (no pagehide the game can trust) and Continue.
   // The same match comes back, not kick-off.
   await step('live-kill', async (rec) => {

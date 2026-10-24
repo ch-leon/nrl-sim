@@ -344,6 +344,9 @@ export type MatchIntent =
   Traits that fire draw a move of their own (N15.4): the fend's arm, the step's cut,
   Big Boot's wider trail, the Playmaker's line through the man he skips, the Wrecking
   Ball's drive and the Hitman's shock, each only when the event names the trait.
+  A try offers Replay for eight seconds (N15.5): the eight seconds before it play
+  again at ×1 from a wider camera, with the trail and those moves, then the live
+  picture returns where the clock was.
 - Commentary lines for fend / break-tackle / kick types. Done in N15.2 (#293): the live
   sim's commentary (`src/match/view/commentary.ts`) has its own lines for every kind it
   emits, each kick type and its outcome among them.

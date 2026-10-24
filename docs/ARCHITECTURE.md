@@ -63,7 +63,8 @@ src/
     league/                  # rugby league (Nines) rules, roles, tackle contest, tactics, team sheets, runMatch
     view/                    # LivePlayback: plays the match on MatchScene's sprites (interpolated);
                              #   commentary.ts, the ticker's lines and the report's summary (N15.2);
-                             #   traitLayer.ts, the moves a firing trait draws (N15.4)
+                             #   traitLayer.ts, the moves a firing trait draws (N15.4);
+                             #   replay.ts, a try's eight seconds re-simulated from the seed (N15.5)
     lab/                     # /#lab dev page: teams/seed, play/pause/step/scrub, Flag
   sim/
     events.ts                # MatchEvent types + MatchResult         (WU-6)

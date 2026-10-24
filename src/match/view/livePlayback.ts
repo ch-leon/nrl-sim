@@ -16,12 +16,11 @@ import type { Fixture } from '../../core/state';
 import type { MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 import type { PlayerAnim } from '../../art/match/players';
 import type { MatchOverlayHandle } from '../../ui/screens/matchOverlay';
-import { Runner } from '../core/engine';
-import type { Side, SimEvent } from '../core/snapshot';
-import { LiveSim } from '../league/live';
+import { replayRange, Runner, TICK_MS, type SimFactory } from '../core/engine';
+import type { Side, SimEvent, Snapshot } from '../core/snapshot';
+import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { MatchRecorder, type RunMatchOptions } from '../league/match';
 import type { CallInput, CoachCall } from '../league/calls';
-import type { PlanInput } from '../league/live';
 import type { DifficultyEdge } from '../league/spread';
 import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
@@ -34,6 +33,9 @@ import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
 import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer } from './traitLayer';
+import { replayFrame, replayFrom, REPLAY_WORKER_MS } from './replay';
+import { toFieldPt } from '../core/field';
+import { canUseWorker, playReplayInWorker } from '../../systems/matchJobs';
 import { liveMatchSaveDue } from '../../systems/liveMatchRecord';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
@@ -147,6 +149,20 @@ export class LivePlayback {
   private readonly plans: PlanInput[];
   /** Tick last written to the resume record (calls, hide, the periodic write, Save & exit). */
   private lastSavedTick = 0;
+  /** The sim the runner plays, so a replay can build the same one from the seed. */
+  private readonly factory: SimFactory;
+  private readonly simOpts: LiveOptions;
+  /** Half-time (and a plan card) holds the match; a replay does not resume over one. */
+  private holds = 0;
+  /** off, waiting on the re-sim, or playing the snaps. */
+  private replayGate: 'off' | 'loading' | 'playing' = 'off';
+  /** Bumped to drop a re-sim that comes back after Skip or destroy. */
+  private replayGen = 0;
+  private replay: { snaps: Snapshot[]; index: number; acc: number } | null = null;
+  /** The replay's own kick watch: the live one only goes forward (N15.3's note). */
+  private readonly replayKicks = new KickWatch();
+  /** Tries that have already been offered a replay (one each). */
+  private readonly replayedTries = new Set<number>();
 
   constructor(
     private readonly scene: LivePlaybackScene & Phaser.Scene,
@@ -157,10 +173,12 @@ export class LivePlayback {
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
     this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
-    const simOpts = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    this.simOpts = simOpts;
+    this.factory = (seed) => new LiveSim(home, away, seed, simOpts);
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
     this.traits = new TraitLayer(scene, DEPTH_POPUP - 0.5);
-    this.runner = new Runner((seed) => new LiveSim(home, away, seed, simOpts), opts.seed);
+    this.runner = new Runner(this.factory, opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => {
       this.recorder.clock(this.sim.matchSeconds);
@@ -260,10 +278,12 @@ export class LivePlayback {
 
   /** Hold the match (the half-time card is up, the coach is changing the plan), and let it go on. */
   hold(): void {
+    this.holds++;
     this.runner.pause();
   }
   release(): void {
-    if (!this.finishEmitted && !this.awaitingSkip) this.runner.play();
+    this.holds = Math.max(0, this.holds - 1);
+    if (this.holds === 0 && this.replayGate === 'off' && !this.finishEmitted && !this.awaitingSkip) this.runner.play();
   }
 
   /** Who has the ball (the chips show attack or defence calls). */
@@ -331,6 +351,7 @@ export class LivePlayback {
    */
   skip(): void {
     if (this.finishEmitted || this.awaitingSkip) return;
+    this.abortReplay();
     // A kill while Skip is away resumes here, not from the previous interval.
     this.persistProgress();
     const elsewhere = this.opts.skipElsewhere;
@@ -406,6 +427,10 @@ export class LivePlayback {
   /** Step the sim by real time and place the sprites (before the camera follows the ball). */
   update(deltaMs: number): void {
     this.now += deltaMs;
+    if (this.replay) {
+      this.stepReplay(deltaMs);
+      return;
+    }
     const r = this.runner;
     r.update(deltaMs);
     this.view.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001);
@@ -417,11 +442,15 @@ export class LivePlayback {
     if (r.finished) this.finish();
   }
 
-  /** The overlay's clock off the sim's: match seconds and the half. */
-  private showClock(): void {
-    const c = this.runner.cur.clock;
+  /** The overlay's clock off a snapshot: match seconds and the half. */
+  private showClockFrom(c: Snapshot['clock']): void {
     // Golden point (N9.4) counts its own clock.
     if (c) this.opts.overlay?.setClock(c.half > 2 ? c.seconds : (c.half - 1) * NINES.halfMinutes * 60 + c.seconds, c.half === 1 ? 1 : c.half === 2 ? 2 : 'gp');
+  }
+
+  /** The overlay's clock off the sim's: match seconds and the half. */
+  private showClock(): void {
+    this.showClockFrom(this.runner.cur.clock);
   }
 
   /** Pop-ups, the wrestle bar and sprint streaks, once the camera has moved this frame. */
@@ -433,16 +462,20 @@ export class LivePlayback {
     };
     this.popups.update(deltaMs, zoom, feet);
     this.zone.update(deltaMs);
-    this.kickLayer.update(this.kicks.kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
-    this.traits.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet, this.runner.speed);
-    this.wrestleBar.update(this.runner.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
-    this.sprintLayer.update(this.runner.cur, zoom, (side, slot) => {
+    const kick = this.replay ? this.replayKicks.kick : this.kicks.kick;
+    this.kickLayer.update(kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
+    this.traits.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet, this.replay ? 1 : this.runner.speed);
+    // The picture on screen is the replay's tick, not the live match still paused underneath.
+    const shown = this.replay ? this.replay.snaps[this.replay.index]! : this.runner.cur;
+    this.wrestleBar.update(shown.wrestle, zoom, (w) => feet(w.side, w.slot));
+    this.sprintLayer.update(shown, zoom, (side, slot) => {
       const a = this.scene.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y, faceLeft: a.sprite.flipX } : null;
     });
   }
 
   destroy(): void {
+    this.abortReplay();
     this.runner.onEvents = null;
     this.popups.destroy();
     this.wrestleBar.destroy();
@@ -459,9 +492,26 @@ export class LivePlayback {
    * the ball again).
    */
   kickFraming(view: { width: number; height: number }, base: number): Frame | null {
+    if (this.replay) return null;
     const k = this.kicks.kick;
     if (!k || !this.kickLayer.active || !framingHeld(this.kickLayer.msSinceDown)) return null;
     return kickFrame(kickPoints(k, (fx, fy) => this.scene.fieldToWorld(fx, fy)), view, base);
+  }
+
+  /**
+   * The replay's wider framing, centred on the ball it is showing (N15.5).
+   * Null while the live match is on screen. The live kick watch is not rewound.
+   */
+  replayFraming(): Frame | null {
+    const replay = this.replay;
+    if (!replay) return null;
+    const cur = replay.snaps[replay.index];
+    const prev = replay.snaps[Math.max(0, replay.index - 1)];
+    if (!cur || !prev) return null;
+    const a = replay.index === 0 ? 0 : Math.min(0.999, replay.acc / TICK_MS);
+    const f = toFieldPt({ x: prev.ball.x + (cur.ball.x - prev.ball.x) * a, y: prev.ball.y + (cur.ball.y - prev.ball.y) * a });
+    const w = this.scene.fieldToWorld(f.fx, f.fy);
+    return replayFrame(w);
   }
 
   private onSimEvents(events: readonly SimEvent[]): void {
@@ -480,6 +530,7 @@ export class LivePlayback {
       const line = this.commentator.line(e, cur.score);
       if (line && !this.skipping) this.opts.overlay?.comment(line);
       else if (line && e.kind === 'full-time') this.finalLine = line;
+      if (e.kind === 'try' && !this.skipping) this.offerTryReplay(e.tick);
       if (e.kind === 'coach-call' || e.kind === 'call-paid') this.opts.overlay?.setCalls?.(this.sim.callsMade, this.sim.callsPaid);
       const p = this.skipping ? null : popupFor(e);
       // A bonus try: the zone it was grounded in lights up under the pop-up (#77).
@@ -495,6 +546,120 @@ export class LivePlayback {
     }
     // The contract's events, recorded for the result and sent to the overlay and FX.
     for (const ev of this.recorder.add(events, cur)) bus.emit('match:event', ev);
+  }
+
+  /** One replay per try: the button stays up for eight seconds, including after the siren. */
+  private offerTryReplay(tryTick: number): void {
+    if (this.replayedTries.has(tryTick)) return;
+    this.replayedTries.add(tryTick);
+    this.opts.overlay?.offerReplay(() => void this.beginReplay(tryTick));
+  }
+
+  /** Pause, re-simulate the eight seconds before the try, and play them at ×1. */
+  private async beginReplay(tryTick: number): Promise<void> {
+    // Full time does not cancel the offer: at ×8 the siren often beats the eight seconds.
+    if (this.replayGate !== 'off' || this.awaitingSkip) return;
+    const gen = ++this.replayGen;
+    this.replayGate = 'loading';
+    this.runner.pause();
+    const from = replayFrom(tryTick);
+    const req = { home: this.opts.home, away: this.opts.away, opts: this.simOpts, seed: this.opts.seed, from, to: tryTick };
+    let snaps: Snapshot[] | null = null;
+    let block = 0;
+    if (canUseWorker()) {
+      // The Worker's time is not main-thread block: time only the hand-off, and the fallback if it fails.
+      const t0 = performance.now();
+      const pending = playReplayInWorker(req, REPLAY_WORKER_MS);
+      block = performance.now() - t0;
+      snaps = await pending;
+    } else snaps = null;
+    // Skip or leaving the match bumps the generation. The siren, during the wait, does not.
+    if (gen !== this.replayGen) {
+      if (this.replayGate === 'loading') this.replayGate = 'off';
+      return;
+    }
+    if (snaps === null) {
+      const t1 = performance.now();
+      snaps = replayRange(this.factory, this.opts.seed, from, tryTick);
+      block = performance.now() - t1;
+    }
+    this.opts.overlay?.noteReplayBlock(block);
+    if (snaps.length === 0) {
+      this.replayGate = 'off';
+      if (this.holds === 0 && !this.finishEmitted && !this.awaitingSkip) this.runner.play();
+      return;
+    }
+    this.replayKicks.clear();
+    this.traits.clear();
+    this.popups.clear();
+    this.replay = { snaps, index: 0, acc: 0 };
+    this.feedReplay(snaps[0]!);
+    this.replayGate = 'playing';
+    this.opts.overlay?.setReplaying(true);
+    this.showReplayPicture();
+  }
+
+  /** One replayed tick: its kicks and trait moves, on the replay's own watch. */
+  private feedReplay(snap: Snapshot): void {
+    for (const e of snap.events) {
+      this.replayKicks.event(e, snap);
+      this.traits.note(e, snap);
+    }
+    this.replayKicks.tick(snap);
+  }
+
+  /** Draw the replay's current tick and put its clock and score on the overlay. */
+  private showReplayPicture(): void {
+    const replay = this.replay;
+    if (!replay) return;
+    const cur = replay.snaps[replay.index]!;
+    const prev = replay.snaps[Math.max(0, replay.index - 1)]!;
+    const a = replay.index === 0 ? 0 : Math.min(0.999, replay.acc / TICK_MS);
+    this.view.draw(prev, cur, a, 1);
+    this.showClockFrom(cur.clock);
+    if (cur.score) this.opts.overlay?.setScore(cur.score.home, cur.score.away);
+  }
+
+  /** Play the stored ticks at ×1 (real time, not the live match's speed). */
+  private stepReplay(deltaMs: number): void {
+    const replay = this.replay;
+    if (!replay) return;
+    replay.acc += deltaMs;
+    while (replay.acc >= TICK_MS && replay.index < replay.snaps.length - 1) {
+      replay.acc -= TICK_MS;
+      replay.index++;
+      this.feedReplay(replay.snaps[replay.index]!);
+    }
+    this.showReplayPicture();
+    if (replay.index >= replay.snaps.length - 1 && replay.acc >= TICK_MS) this.endReplay();
+  }
+
+  /** Back to the live picture, the live clock and the speed the match was on. */
+  private endReplay(): void {
+    this.replay = null;
+    this.replayKicks.clear();
+    this.traits.clear();
+    this.replayGate = 'off';
+    this.opts.overlay?.setReplaying(false);
+    this.opts.overlay?.showLiveScore();
+    const r = this.runner;
+    this.view.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001);
+    this.showClock();
+    if (this.holds === 0 && !this.finishEmitted && !this.awaitingSkip) this.runner.play();
+  }
+
+  /** Drop a replay (Skip, leaving the match) without starting the live clock. */
+  private abortReplay(): void {
+    this.replayGen++;
+    const was = this.replayGate;
+    this.replay = null;
+    this.replayKicks.clear();
+    this.replayGate = 'off';
+    if (was === 'off') return;
+    this.traits.clear();
+    this.popups.clear();
+    this.opts.overlay?.setReplaying(false);
+    this.opts.overlay?.showLiveScore();
   }
 
   private finish(): void {

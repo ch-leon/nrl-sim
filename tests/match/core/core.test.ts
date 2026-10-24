@@ -5,7 +5,7 @@ import { add, clampLen, dist, len, lerp, norm, scale, sub } from '../../../src/m
 import { ACCEL, BODY_RADIUS, MAX_SPEED, MIN_SPEED, arrive, brake, integrate, makeBody, maxSpeedFor, separate, speedOf } from '../../../src/match/core/body';
 import { CARRY_LIFT, bounceFlight, flightAt, flightLift, landed, passFlight } from '../../../src/match/core/ball';
 import { decodeFlag, encodeFlag } from '../../../src/match/core/flag';
-import { RUN_SPEEDS, Runner, TICK_MS, TICK_S, replayTo, type MatchSim } from '../../../src/match/core/engine';
+import { RUN_SPEEDS, Runner, TICK_MS, TICK_S, replayRange, replayTo, type MatchSim } from '../../../src/match/core/engine';
 import { FIELD_WIDTH, IN_GOAL, clampToGround, fromFieldPt, inGoal, inPlay, outOfBounds, toFieldPt } from '../../../src/match/core/field';
 import type { Snapshot } from '../../../src/match/core/snapshot';
 
@@ -234,6 +234,34 @@ describe('Runner', () => {
     r.update(500);
     expect(r.tick).toBe(10);
     expect(r.playing).toBe(true);
+  });
+
+  it('pause holds the tick and play carries on from there', () => {
+    const r = new Runner(counter, 1);
+    r.play();
+    r.update(TICK_MS * 10);
+    expect(r.tick).toBe(10);
+    r.pause();
+    r.update(TICK_MS * 40);
+    expect(r.playing).toBe(false);
+    expect(r.tick).toBe(10);
+    r.play();
+    r.update(TICK_MS * 4);
+    expect(r.tick).toBe(14);
+  });
+
+  it('replayRange matches replayTo at every tick in the window, events copied', () => {
+    const range = replayRange(counter, 4, 8, 25);
+    expect(range.map((s) => s.tick)).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
+    for (const s of range) {
+      const one = replayTo(counter, 4, s.tick);
+      expect(s.ball).toEqual(one.ball);
+      expect(s.events.map((e) => e.text)).toEqual(one.events.map((e) => e.text));
+      s.events.push({ tick: -1, kind: 'probe', text: 'probe' });
+      expect(replayTo(counter, 4, s.tick).events.some((e) => e.kind === 'probe')).toBe(false);
+    }
+    expect(replayRange(counter, 4, 0, 2).map((s) => s.tick)).toEqual([0, 1, 2]);
+    expect(replayRange(counter, 4, 5, 1).map((s) => s.tick)).toEqual([5]);
   });
 
   it('banks partial ticks so frame rate does not change the tick count', () => {

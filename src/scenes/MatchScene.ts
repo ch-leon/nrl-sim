@@ -508,7 +508,9 @@ export class MatchScene extends Phaser.Scene {
     // A kick goes wide (N15.3): the camera holds the kicker and where the ball comes down
     // while it is up, then comes back to the ball within a second of the catch or the bounce.
     const cam0 = this.cameras.main;
-    this.kickFrame = this.playback?.kickFraming({ width: cam0.width, height: cam0.height }, this.zoomTarget) ?? null;
+    // A try's replay (N15.5) frames the ball wide, ahead of a kick's own framing.
+    const replayFrame = this.playback?.replayFraming() ?? null;
+    this.kickFrame = replayFrame ?? this.playback?.kickFraming({ width: cam0.width, height: cam0.height }, this.zoomTarget) ?? null;
     if (this.kickFrame) this.kickBackUntil = time + KICK_RETURN_MS;
     this.kickBack = !this.kickFrame && time < this.kickBackUntil;
     // The coach's chips follow the play a few times a second (#73).

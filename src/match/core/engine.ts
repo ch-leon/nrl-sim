@@ -199,3 +199,34 @@ export function replayTo(factory: SimFactory, seed: number, tick: number): Snaps
   for (let i = 0; i < tick && !sim.finished; i++) sim.step();
   return sim.snapshot();
 }
+
+/**
+ * Snapshots from tick `from` through `to` inclusive, off a fresh sim (N15.5).
+ * Tick t is the picture after t steps, the same picture `replayTo` returns.
+ * Each snapshot is copied: the sim hands out the events array it is about to
+ * replace, and a replay holds the range while that sim is gone.
+ */
+export function replayRange(factory: SimFactory, seed: number, from: number, to: number): Snapshot[] {
+  const sim = factory(seed);
+  const start = Math.max(0, Math.floor(from));
+  const end = Math.max(start, Math.floor(to));
+  const out: Snapshot[] = [];
+  const take = (): void => {
+    const s = sim.snapshot();
+    out.push({
+      ...s,
+      players: s.players.map((p) => ({ ...p })),
+      ball: { ...s.ball, holder: s.ball.holder ? { ...s.ball.holder } : null },
+      events: s.events.map((e) => ({ ...e })),
+      ...(s.clock ? { clock: { ...s.clock } } : {}),
+      ...(s.score ? { score: { ...s.score } } : {}),
+      ...(s.wrestle ? { wrestle: { ...s.wrestle } } : {}),
+    });
+  };
+  if (sim.tick >= start) take();
+  while (sim.tick < end && !sim.finished) {
+    sim.step();
+    if (sim.tick >= start) take();
+  }
+  return out;
+}
