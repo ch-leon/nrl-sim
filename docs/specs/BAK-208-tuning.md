@@ -164,6 +164,26 @@ and red-zone early kicks were what cost it; `presets.attack.all-out.base.pass` 0
 width, cut-outs and offloads moved nothing beyond luck). Still a little below even: the
 offloads and the width cost a few balls more than they make.
 
+**N13 (the 45–55% band):** even 60 v 60, calls and the AI coach off, 200 matches each way
+(`balance/plans/presets.json`, run `20261024-063629-presets`; one standard error about 2.5
+points). Before that pass Compressed won 64% and Expansive 35% (run `20261024-061333-presets-before`,
+same 400 matches, on `35afd04`). After:
+
+| Preset | Before | After | What moved |
+|---|---:|---:|---|
+| Grind | 49.2% | 49.2% | unchanged |
+| Expansive | 35.0% | 46.2% | pass +0.15 → 0, cut-out 0.08 → 0.02, width 0.35 → 0.28, early kick 0.30 → 0.18 |
+| Kick-chase | 46.5% | 46.5% | unchanged |
+| All-out | 38.0% | 54.8% | pass +0.15 → 0, offload ×1.6 → ×1.5, cut-out 0.12 → 0.03, width 0.45 → 0.35, early kick 0.30 → 0.15 |
+| Rush | 57.2% | 49.8% | line speed 6.5 → 6.2 m/s (busts stayed at +0.11: 0.115 already fell to about 45%) |
+| Compressed | 64.0% | 49.0% | pull ×1.4 → ×1.1, markers ×1.2 → ×1.05, busts −0.04 → −0.02, step-against −0.02 → +0.03 |
+
+Styles still read as their names (Grind offloads about 6 and completes about 72%, Expansive
+about 11 offloads, All-out about 13, Kick-chase kicks about 24, Rush about 34 big hits and
+80 breaks, Compressed still bunches). A Grind side that switches to Expansive at half-time
+offloads more (5.9 → 8.6 over 40 matches). **Assumed (needs Leon):** the band, and these
+numbers. The full before/after is in `docs/status/2026-10-balance.md`.
+
 Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands for Balanced).
 
 ## 9. Readability (§6)
@@ -906,7 +926,11 @@ Both ways round over 160 matches a row (`20261020-062700-n11-presets-confirm`; o
 error about 4 points): **Compressed wins about 61%** of even matches against Slide (64% at home,
 60% away), **All-out about 37%**, **Expansive about 35%**. With the player picking, Compressed
 is a dominant pick and Expansive and All-out are traps: raised as #241 (the plan tables are
-not N11's to change).
+not N11's to change). N13 retuned the tables into the 45–55% band (§8, run
+`20261024-063629-presets`): Grind 49.2%, Expansive 46.2%, Kick-chase 46.5%, All-out 54.8%,
+Rush 49.8%, Compressed 49.0%, each over 400 even matches both ways. The standard plan's preset rows
+(`grind v balanced` and the five beside it, 100 seeds both ways) keep that reading on every
+match-code change.
 
 ## 28. Rival styles from their squads (N11)
 

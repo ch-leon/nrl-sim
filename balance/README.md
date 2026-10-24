@@ -98,6 +98,14 @@ somewhere else.
   `plans`, changes of plan at the breaks, each made once at the first break it names
   (`[{ "side": "home", "at": "half-time", "tactics": { "attack": "expansive" } }]`; `at` is
   `half-time`, `try` (the first try) or `conceded` (the first try against that side), N11).
+- **A scenario's own matches** (`seeds`): that row plays this many matches instead of
+  the plan's. `--seeds` still replaces the plan's count and leaves a row's own count
+  alone, so a preset matrix stays at the size it was signed off at. With `track`
+  (`home` or `away`) the report adds a **Side win** column for that side. `bothWays`
+  also plays each seed with the sides swapped and pools the tracked side's wins
+  (its `seeds` is per orientation, so the column is over twice that); it needs
+  `track`. Counts, Home win and the legs stay the matchup as written, so a style
+  still reads on the side that has it.
 - **base**: overrides under every variant, baseline included.
 - **variants**: hand-written sets of overrides. A `baseline` with no overrides is
   always run first so every row has something to compare with.

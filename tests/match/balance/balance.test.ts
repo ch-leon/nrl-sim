@@ -2,10 +2,11 @@
 // knobs by name with a clean way back, plans that fail fast on a typo, sweeps
 // expanded in order, the report's bands and luck test, and a measured cell
 // that is deterministic and actually feels its overrides.
+import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import { BASE } from '../../../src/match/league/contest';
 import { FATIGUE } from '../../../src/match/league/fatigue';
-import { LIVE } from '../../../src/match/league/live';
+import { LIVE, LiveSim } from '../../../src/match/league/live';
 import { PRESET_TABLES, attackPlan, defencePlan } from '../../../src/match/league/presets';
 import { WRESTLE } from '../../../src/match/league/wrestle';
 import { applyTuning, checkTuning, listKnobs } from '../../../src/match/league/tuning';
@@ -127,6 +128,8 @@ describe('plans', () => {
     expect(Math.abs(starless.nine.away! - starless.nine.home!)).toBeLessThan(2);
     expect(checkPlan(plan({ scenarios: [{ name: 's', home: { squad: 'coach' as never, club: 'rival-wolves' }, away: { rating: 60, rivalOf: 'nightmare' as never } }] })).join('\n')).toMatch(/player \/ rival[\s\S]*not both[\s\S]*rivalOf/);
     expect(checkPlan(plan({ scenarios: [{ name: 's', home: { rivalOf: 'hard' }, away: { rivalOf: 'easy' } }] })).join('\n')).toMatch(/only one side is the rival/);
+    expect(checkPlan(plan({ scenarios: [{ ...EVEN, seeds: 0, bothWays: true }] })).join('\n')).toMatch(/seeds must be a whole number[\s\S]*bothWays needs track/);
+    expect(checkPlan(plan({ scenarios: [{ ...EVEN, seeds: 40, track: 'home', bothWays: true }] }))).toEqual([]);
   });
   it('plays a rival with the difficulty’s edge (N12.2), swept by name as difficulty.<d>.rivalEdge', () => {
     expect(listKnobs().map((k) => k.path)).toEqual(expect.arrayContaining(['difficulty.easy.rivalEdge', 'difficulty.normal.rivalEdge', 'difficulty.hard.rivalEdge']));
@@ -178,5 +181,47 @@ describe('measuring and reporting', () => {
     // A previous run from before a metric existed is compared on the metrics it has.
     const older = results.map((r) => ({ ...r, counts: Object.fromEntries(Object.entries(r.counts).filter(([k]) => k !== 'runDowns')) })) as typeof results;
     expect(reportMarkdown({ plan: plan(), meta: {}, results, previous: older })).toContain('nothing beyond noise');
+    const tracked = reportMarkdown({
+      plan: plan(),
+      meta: {},
+      results: results.map((r) => ({ ...r, trackedWin: 0.5, trackedDraw: 0.1, trackedSeeds: r.seeds * 2 })),
+    });
+    expect(tracked).toContain('Side win');
+    expect(tracked).toContain('50% (10% drawn)');
+    expect(tracked).toContain('both ways round');
+  });
+  it('tracks a side both ways, and another preset\'s numbers leave a Balanced / Slide match unchanged', () => {
+    const written = { name: 'grind', home: { rating: 60, tactics: { attack: 'grind' as const } }, away: { rating: 60 }, track: 'home' as const };
+    const cell = { variant: { name: 'baseline', tuning: {} }, scenario: written };
+    const home = measureCell(cell, 2, 4);
+    const away = measureCell({ ...cell, scenario: { name: 'grind away', track: 'away' as const, home: written.away, away: written.home } }, 2, 4);
+    const both = measureCell({ ...cell, scenario: { ...written, bothWays: true } }, 2, 4);
+    const pooled = (home.trackedWin! * home.trackedSeeds! + away.trackedWin! * away.trackedSeeds!) / (home.trackedSeeds! + away.trackedSeeds!);
+    expect(both.trackedSeeds).toBe(4);
+    expect(both.seeds).toBe(2);
+    expect(both.trackedWin).toBeCloseTo(pooled);
+    expect(both.counts).toEqual(home.counts);
+    expect(both.homeWin).toBe(home.homeWin);
+    // Same cell again: the swap does not reshuffle the written match.
+    expect(measureCell({ ...cell, scenario: { ...written, bothWays: true } }, 2, 4).counts).toEqual(both.counts);
+    const even = cellsOf(plan({ minutes: 6 }))[0]!;
+    const plain = measureCell(even, 1, 6);
+    const tuned = measureCell({
+      ...even,
+      variant: { name: 'baseline', tuning: { 'presets.defence.compressed.pull': 2.2, 'presets.attack.all-out.base.offload': 2.4, 'presets.attack.expansive.base.pass': 0.4 } },
+    }, 1, 6);
+    expect(tuned.counts).toEqual(plain.counts);
+    expect(tuned.homeWin).toBe(plain.homeWin);
+    expect(measureCell({ ...even, scenario: { ...even.scenario, track: 'home' } }, 1, 6).trackedWin).toBe(plain.homeWin);
+  }, 60_000);
+  it('pins an even Balanced / Slide match (seed 1) so a preset retune cannot move it', () => {
+    const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 1);
+    const parts: string[] = [];
+    while (!sim.finished && sim.tick < 100_000) {
+      sim.step();
+      for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
+    }
+    const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
+    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('8-14:495:67db8b634c5a2e73');
   });
 });

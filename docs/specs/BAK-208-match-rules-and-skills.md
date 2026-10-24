@@ -215,9 +215,9 @@ sim's defaults (`src/match/league/presets.ts`).
 |---|---|---|---|---|---|---|---|
 | **Grind** | −15% (−25% own 20) | never (½ in the attacking half, 0.7 red zone) | tries 60% | — | hit-ups +1.0 | territory 25% from deep (40% own 20); red zone 20% | long ×1.6, bomb ×0.7, chip/cross ×0.5 |
 | **Balanced** (default) | 0 | normal (0.6 own 20) | always | — | halves first, forwards early | red zone 35% | — |
-| **Expansive** | +15% | ×1.3 (0.8 own 20) | always | width 0.35, cut-out 8%, reach +3 m | edges +0.8 | red zone 30% | cross-field ×1.5, long ×0.8 |
+| **Expansive** | 0 (N13: was +15%) | ×1.3 (0.8 own 20) | always | width 0.28, cut-out 2% (N13: was 0.35 / 8%) | edges +0.8 | red zone 18% (N13: was 30%) | cross-field ×1.5, long ×0.8 |
 | **Kick-chase** | −5% | ×0.6 | tries 90% | — | — | territory 35% from deep (bomb 40% of those); red zone 55% | bomb ×1.8, grubber ×1.3, long ×1.2 |
-| **All-out** | +15% (Phase 3: was +20%) | ×1.6 (1.2 own 20) | always | width 0.45, cut-out 12% | edges +0.5 | red zone 30% (Phase 3: was 45%) | chip ×1.6, cross ×1.3, grubber ×1.2, long ×0.6 |
+| **All-out** | 0 (N13: was +15%; Phase 3 had cut +20% to +15%) | ×1.5 (1.2 own 20; N13: was ×1.6) | always | width 0.35, cut-out 3% (N13: was 0.45 / 12%) | edges +0.5 | red zone 15% (N13: was 30%) | chip ×1.6, cross ×1.3, grubber ×1.2, long ×0.6 |
 
 *Pass* adds to the engaged carrier's chance of passing (base 30% + Skill/300). *Offloads*
 multiplies the offload odds (§4.1); 0 means support is ignored. *Step* is the chance he
@@ -231,8 +231,8 @@ wingers). **Overlap** (all presets): when a side has more players than the defen
 | Preset | Line speed | Commits | Lanes | Markers hold | Every tackle | Stepped |
 |---|---|---|---|---|---|---|
 | **Slide** (default) | 5 m/s | 2 (3–4 when the line is broken) | normal | ×1.0 | — | — |
-| **Rush** | 6.5 m/s | +1 | normal | ×0.6 | big hit +4%, bust +11% (Phase 3: was +5%) | +4% |
-| **Compressed** | 4.5 m/s | — | pull ×1.4 toward the ball (edges open) | ×1.2 | bust −4%, offload −3% | −2% |
+| **Rush** | 6.2 m/s (N13: was 6.5) | +1 | normal | ×0.6 | big hit +4%, bust +11% (Phase 3: was +5%) | +4% |
+| **Compressed** | 4.5 m/s | — | pull ×1.1 toward the ball (N13: was ×1.4) | ×1.05 (N13: was ×1.2) | bust −2% (N13: was −4%), offload −3% | +3% (N13: was −2%; the open edges can be stepped) |
 
 ### 5.3 Who plays what
 Rivals' styles follow from the nine they field (N11, tuning reference §28): a half with Big

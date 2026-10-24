@@ -80,7 +80,9 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
     zones: { own20: { offload: 0.6, pass: -0.05 } },
   },
   expansive: {
-    base: { pass: 0.15, offload: 1.3, cutOut: 0.08, width: 0.35, edges: 0.8, earlyKick: 0.3, kickBias: { 'cross-field': 1.5, long: 0.8 } },
+    // N13: pass, cut-out and the early kick came down so a wide side wins about half
+    // its even matches (was pass +0.15, cut-out 0.08, early kick 0.3, width 0.35).
+    base: { pass: 0, offload: 1.3, cutOut: 0.02, width: 0.28, edges: 0.8, earlyKick: 0.18, kickBias: { 'cross-field': 1.5, long: 0.8 } },
     zones: { own20: { offload: 0.8, cutOut: 0.03 } },
   },
   'kick-chase': {
@@ -88,7 +90,9 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
     zones: { redZone: { offload: 0.8 } },
   },
   'all-out': {
-    base: { pass: 0.15, offload: 1.6, cutOut: 0.12, width: 0.45, edges: 0.5, earlyKick: 0.3, kickBias: { chip: 1.6, 'cross-field': 1.3, grubber: 1.2, long: 0.6 } },
+    // N13: the pass bonus and the cut-out were what lost it games (was pass +0.15,
+    // offload ×1.6, cut-out 0.12, width 0.45, early kick 0.3).
+    base: { pass: 0, offload: 1.5, cutOut: 0.03, width: 0.35, edges: 0.5, earlyKick: 0.15, kickBias: { chip: 1.6, 'cross-field': 1.3, grubber: 1.2, long: 0.6 } },
     zones: { own20: { offload: 1.2 } },
   },
 };
@@ -118,8 +122,11 @@ export interface DefencePlan {
 
 const DEFENCE: Readonly<Record<DefencePreset, DefencePlan>> = {
   slide: { lineSpeed: 5, commit: 0, pull: 1, markerHold: 1, bigHit: 0, broken: 0, offload: 0, stepAgainst: 0 },
-  rush: { lineSpeed: 6.5, commit: 1, pull: 1, markerHold: 0.6, bigHit: 0.04, broken: 0.11, offload: 0, stepAgainst: 0.04 },
-  compressed: { lineSpeed: 4.5, commit: 0, pull: 1.4, markerHold: 1.2, bigHit: 0, broken: -0.04, offload: -0.03, stepAgainst: -0.02 },
+  // N13: 6.5 m/s won a bit over half its even games; 6.2 keeps the rush and lands near half.
+  rush: { lineSpeed: 6.2, commit: 1, pull: 1, markerHold: 0.6, bigHit: 0.04, broken: 0.11, offload: 0, stepAgainst: 0.04 },
+  // N13: a packed middle (pull ×1.4, markers ×1.2, harder to step) won about 64%.
+  // Softer bunching, and the edges can be stepped.
+  compressed: { lineSpeed: 4.5, commit: 0, pull: 1.1, markerHold: 1.05, bigHit: 0, broken: -0.02, offload: -0.03, stepAgainst: 0.03 },
 };
 
 export function defencePlan(preset: DefencePreset): DefencePlan {

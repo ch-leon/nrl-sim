@@ -75,8 +75,13 @@ export function reportMarkdown(r: ReportInput): string {
     const base = rows.find((x) => x.variant === 'baseline') ?? rows[0]!;
     out.push(`## ${sc}`, '');
     if (base.minutes !== (r.plan.minutes ?? MATCH_MINUTES)) out.push(`_${base.minutes}-minute stretch, counts scaled to 18._`, '');
-    out.push(`| Variant | ${COLUMNS.join(' | ')} | Home win | Wrestle s | Legs end H/A |`);
-    out.push(`|---|${COLUMNS.map(() => '---:').join('|')}|---:|---:|---:|`);
+    if (base.seeds !== r.plan.seeds) out.push(`_${base.seeds} matches in this row (the plan's other rows use ${r.plan.seeds})._`, '');
+    const tracked = rows.some((x) => x.trackedWin !== undefined);
+    if (tracked && base.trackedSeeds && base.trackedSeeds !== base.seeds) {
+      out.push(`_Side win is the tracked side over ${base.trackedSeeds} matches, both ways round. The other columns are the matchup as written (${base.seeds})._`, '');
+    }
+    out.push(`| Variant | ${COLUMNS.join(' | ')} | Home win |${tracked ? ' Side win |' : ''} Wrestle s | Legs end H/A |`);
+    out.push(`|---|${COLUMNS.map(() => '---:').join('|')}|---:|${tracked ? '---:|' : ''}---:|---:|`);
     for (const row of rows) {
       const cells = COLUMNS.map((k) => {
         const v = row.counts[k];
@@ -84,7 +89,10 @@ export function reportMarkdown(r: ReportInput): string {
         const d = row === base ? '' : ` (${delta(v, base.counts[k], Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})`;
         return `${v.mean.toFixed(1)}${mark ? ` ${mark}` : ''}${d}`;
       });
-      out.push(`| ${row.variant} | ${cells.join(' | ')} | ${pct(row.homeWin)}${row.draw > 0 ? ` (${pct(row.draw)} drawn)` : ''} | ${row.wrestleSecs.toFixed(2)} | ${legsEnd(row)} |`);
+      const side = tracked
+        ? ` ${row.trackedWin === undefined ? '—' : `${pct(row.trackedWin)}${row.trackedDraw ? ` (${pct(row.trackedDraw)} drawn)` : ''}`} |`
+        : '';
+      out.push(`| ${row.variant} | ${cells.join(' | ')} | ${pct(row.homeWin)}${row.draw > 0 ? ` (${pct(row.draw)} drawn)` : ''} |${side} ${row.wrestleSecs.toFixed(2)} | ${legsEnd(row)} |`);
     }
     out.push('');
     const prev = r.previous?.filter((x) => x.scenario === sc) ?? [];
