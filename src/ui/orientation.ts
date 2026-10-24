@@ -104,3 +104,30 @@ export function initLandscapeGuard(hooks: LandscapeGuardHooks): void {
   };
   window.addEventListener('pointerdown', tryLock, { once: true });
 }
+
+/**
+ * The bit of a Phaser game this pause needs. Kept narrow so the boot sites and
+ * the unit test don't pull the whole engine in.
+ */
+export interface PortraitLoop {
+  loop: { running: boolean; sleep: () => void };
+  events: { once: (event: string, fn: () => void) => void };
+}
+
+/**
+ * Sleep the loop when the phone is already upright (#315).
+ *
+ * Phaser emits `ready` and only then starts the loop. `TimeStep.sleep` does
+ * nothing until `running` is true, so a listener that sleeps on `ready` never
+ * pauses a game created in portrait. A microtask runs after `start` returns
+ * and before the first frame. If the textures are not ready yet, `ready` is
+ * still to come: sleep again on the microtask after it, once the loop is up.
+ * `blocked` is read at sleep time, so a rotate to landscape in between is kept.
+ */
+export function sleepLoopIfPortrait(game: PortraitLoop, blocked: () => boolean): void {
+  const sleep = (): void => {
+    if (blocked() && game.loop.running) game.loop.sleep();
+  };
+  queueMicrotask(sleep);
+  game.events.once('ready', () => queueMicrotask(sleep));
+}

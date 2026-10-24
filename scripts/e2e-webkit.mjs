@@ -1,7 +1,8 @@
-// scripts/e2e-webkit.mjs — Safari-shaped layout check for the long DOM panels (#206, #203).
+// scripts/e2e-webkit.mjs — Safari-shaped checks: long DOM panels (#206, #203) and
+// a phone that opens already upright (#315).
 // Builds the game, serves it with `vite preview`, and in Playwright's WebKit as an
-// iPhone in landscape (touch, DPR 3, iOS user agent) at 956×330 (16 Pro Max with
-// Safari's address bar and tab strip) and 844×390, checks:
+// iPhone (touch, DPR 3, iOS user agent). Landscape at 956×330 (16 Pro Max with
+// Safari's address bar and tab strip) and 844×390 checks:
 //   - the page pins text-size-adjust to 100% (iOS Safari's landscape text boost off);
 //   - at the authored text size, every tutorial step's copy fits its bubble unscrolled (#208);
 //   - the welcome tutorial bubble sits inside the viewport with Skip and Next on
@@ -13,7 +14,12 @@
 //     and Replay brings the tutorial back with its buttons on screen;
 //   - the player page (#203) between HUD and nav: ✕, Renew / Sell / Release / Close
 //     tappable, the nav uncovered; the ✕ closes it back to Squad.
-// Screenshots and report.json go to e2e-output/webkit/<WxH>/. Exits 1 on any failure.
+// Screenshots and report.json go to e2e-output/webkit/<WxH>/.
+// Then one portrait boot (390×844): the loop must already be asleep, and turning
+// to 844×390 must wake it with the canvas filling the screen. The same turn
+// mid-match freezes the clock and resumes it, and a parked match stays paused
+// until the phone is sideways, including after Continue reopens the page upright.
+// Exits 1 on any failure.
 //
 //   npm run e2e:webkit
 //   npm run e2e:webkit -- --size 956x330           (or E2E_SIZES="956x330 844x390")
@@ -268,11 +274,194 @@ async function runSize(browser, W, H) {
   return report.steps.filter((s) => !s.ok).length + report.errors.length;
 }
 
+// #315: the page opened upright, not turned upright after boot. 390×844 is the
+// portrait pair of the 844×390 phone. Clicks go through element.click(): the
+// rotate card covers the title and the HUD, so a Playwright tap never lands.
+async function runPortrait(browser) {
+  const OUT = join(OUT_ROOT, 'webkit', '390x844-boot');
+  rmSync(OUT, { recursive: true, force: true });
+  mkdirSync(OUT, { recursive: true });
+  const report = { size: '390x844-boot', steps: [], errors: [] };
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
+  });
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(20000);
+  page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
+  let n = 0;
+  const step = async (name, fn) => {
+    n++;
+    const rec = { n, name, ok: true, notes: [] };
+    try {
+      const problems = (await fn(rec)) ?? [];
+      if (problems.length) { rec.ok = false; rec.notes.push(...problems); }
+    } catch (err) {
+      rec.ok = false;
+      rec.notes.push(`threw: ${err.message.split('\n')[0]}`);
+    }
+    rec.file = `${String(n).padStart(2, '0')}-${name}.png`;
+    await page.screenshot({ path: join(OUT, rec.file) }).catch(() => {});
+    report.steps.push(rec);
+    log(`${rec.ok ? 'ok ' : 'FAIL'} 390x844 ${rec.file}${rec.notes.length ? ` — ${rec.notes.join('; ')}` : ''}`);
+  };
+  const press = (sel) => page.locator(sel).first().evaluate((el) => el.click());
+  const state = () => page.evaluate(() => {
+    const g = window.__nrlGame;
+    const card = document.querySelector('.nrl-rotate');
+    const canvas = document.querySelector('#game-root canvas');
+    const box = canvas?.getBoundingClientRect();
+    return {
+      coarse: matchMedia('(pointer: coarse)').matches,
+      portrait: matchMedia('(orientation: portrait)').matches,
+      card: !!card && getComputedStyle(card).display !== 'none',
+      started: !!g?.loop.started,
+      running: g ? g.loop.running : null,
+      game: g ? `${g.scale.gameSize.width}x${g.scale.gameSize.height}` : '',
+      canvas: box ? `${Math.round(box.width)}x${Math.round(box.height)}` : '',
+      viewport: `${innerWidth}x${innerHeight}`,
+      clock: document.querySelector('.nrl-mo-clock')?.textContent?.trim() ?? '',
+      advance: document.querySelector('.nrl-hud-actions > .nrl-btn')?.textContent?.trim() ?? '',
+      controls: document.querySelectorAll('.nrl-mo-controls').length,
+    };
+  });
+  // `started` stays true once the loop has been started; `running` drops when it sleeps.
+  // Waiting only on `running === false` would pass in the gap before Phaser starts it.
+  const asleep = (label) => page.waitForFunction(() => {
+    const loop = window.__nrlGame?.loop;
+    const card = document.querySelector('.nrl-rotate');
+    return !!loop?.started && loop.running === false && !!card && getComputedStyle(card).display !== 'none';
+  }, null, { timeout: 15000 }).catch(async () => {
+    throw new Error(`${label}: loop not asleep under the rotate card (${JSON.stringify(await state())})`);
+  });
+  const awake = (label) => page.waitForFunction(() => {
+    const g = window.__nrlGame;
+    if (!g?.loop.running) return false;
+    const card = document.querySelector('.nrl-rotate');
+    if (card && getComputedStyle(card).display !== 'none') return false;
+    const canvas = document.querySelector('#game-root canvas')?.getBoundingClientRect();
+    if (!canvas) return false;
+    const size = `${g.scale.gameSize.width}x${g.scale.gameSize.height}`;
+    const fills = size === `${innerWidth}x${innerHeight}`
+      && Math.abs(canvas.width - innerWidth) <= 1
+      && Math.abs(canvas.height - innerHeight) <= 1;
+    return fills;
+  }, null, { timeout: 8000 }).catch(async () => {
+    throw new Error(`${label}: loop did not resume with the canvas filling the screen (${JSON.stringify(await state())})`);
+  });
+  const turn = (width, height) => page.setViewportSize({ width, height });
+
+  await step('portrait-boot', async (rec) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-nrl-start]');
+    await press('[data-nrl-start]');
+    await page.waitForSelector('.nrl-hud');
+    await asleep('opened upright');
+    const o = await state();
+    if (!o.coarse) throw new Error('WebKit did not report a coarse pointer, so this is not a phone');
+    rec.notes.push(`loop asleep, canvas ${o.canvas} in ${o.viewport}`);
+  });
+  await step('landscape-boot', async (rec) => {
+    await turn(844, 390);
+    await awake('turned sideways from boot');
+    const o = await state();
+    rec.notes.push(`loop awake, canvas ${o.canvas}`);
+  });
+  await step('tutorial-skipped', async () => {
+    const skip = page.locator('.nrl-tutorial-skip');
+    if (!(await skip.count())) return [];
+    await skip.tap();
+    await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
+  });
+  await step('match-running', async (rec) => {
+    await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
+    await page.waitForSelector('.nrl-mo-controls');
+    await page.waitForFunction(() => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== '00:00';
+    });
+    rec.notes.push(`clock ${(await state()).clock}`);
+  });
+  await step('mid-match-portrait', async (rec) => {
+    const before = (await state()).clock;
+    await turn(390, 844);
+    await asleep('mid-match');
+    await page.waitForTimeout(1200);
+    const o = await state();
+    if (o.running !== false) throw new Error('loop woke itself while the phone was still upright');
+    if (o.clock !== before) throw new Error(`clock moved under the card (${before} → ${o.clock})`);
+    rec.notes.push(`clock held at ${o.clock}`);
+  });
+  await step('mid-match-landscape', async (rec) => {
+    const before = (await state()).clock;
+    await turn(844, 390);
+    await awake('mid-match');
+    await page.waitForFunction((from) => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== from;
+    }, before);
+    const o = await state();
+    rec.notes.push(`clock ${before} → ${o.clock}, canvas ${o.canvas}`);
+  });
+  await step('parked', async (rec) => {
+    await page.locator('[data-save-exit]').tap();
+    await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud');
+    const o = await state();
+    if (o.advance !== 'Resume match') throw new Error(`Advance Week reads "${o.advance}", not Resume match`);
+    rec.notes.push('Advance Week reads Resume match');
+  });
+  await step('parked-portrait', async (rec) => {
+    await turn(390, 844);
+    await asleep('parked at the club');
+    const o = await state();
+    if (o.advance !== 'Resume match') throw new Error(`the parked match was dropped (${o.advance})`);
+    rec.notes.push('still Resume match, loop asleep');
+  });
+  await step('parked-landscape', async (rec) => {
+    await turn(844, 390);
+    await awake('parked at the club');
+    const o = await state();
+    if (o.advance !== 'Resume match') throw new Error(`the parked match was dropped (${o.advance})`);
+    rec.notes.push(`still Resume match, canvas ${o.canvas}`);
+  });
+  // Continue with a live-match record auto-starts the match. Opened upright, that
+  // must not play a frame under the card; turning sideways is what resumes it.
+  await step('reopen-portrait', async (rec) => {
+    await turn(390, 844);
+    await page.reload();
+    await page.waitForSelector('[data-nrl-continue-1]');
+    await press('[data-nrl-continue-1]');
+    await asleep('reopened upright');
+    await page.waitForTimeout(1000);
+    const o = await state();
+    if (o.running !== false || !o.started) throw new Error(`loop did not stay asleep (${JSON.stringify(o)})`);
+    if (o.controls) throw new Error('match controls mounted while the loop was asleep');
+    rec.notes.push('loop stayed asleep, match not on screen');
+  });
+  await step('reopen-landscape', async (rec) => {
+    await turn(844, 390);
+    await awake('reopened match');
+    await page.waitForSelector('.nrl-mo-controls');
+    const before = (await state()).clock;
+    await page.waitForFunction((from) => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== from;
+    }, before);
+    const o = await state();
+    rec.notes.push(`clock ${before} → ${o.clock}, canvas ${o.canvas}`);
+  });
+
+  for (const e of report.errors) log(`  error: ${e}`);
+  writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
+  await ctx.close();
+  return report.steps.filter((s) => !s.ok).length + report.errors.length;
+}
+
 let failed = 0;
 try {
   await startServer();
   const browser = await webkit.launch(process.env.WEBKIT_PATH ? { executablePath: process.env.WEBKIT_PATH } : {});
   for (const [W, H] of SIZES) failed += await runSize(browser, W, H);
+  failed += await runPortrait(browser);
   await browser.close();
 } catch (err) {
   console.error(err);

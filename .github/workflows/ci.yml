@@ -29,8 +29,10 @@ jobs:
 
   # #206: the tutorial bubble and the Guide must fit a landscape iPhone in Safari
   # (956×330, 844×390) with Skip / Next / Close on screen, even with Safari's
-  # landscape text boost reconstructed. The runner has no WebKit, so this job
-  # fetches Playwright's (the only job that downloads a browser).
+  # landscape text boost reconstructed. #315: opening already upright (390×844)
+  # sleeps the loop, and turning sideways (844×390) wakes it with the canvas
+  # filling the screen, mid-match and with a parked match. The runner has no
+  # WebKit, so this job fetches Playwright's (the only job that downloads a browser).
   webkit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -43,7 +45,7 @@ jobs:
       - run: npm ci
       - name: Fetch WebKit
         run: npx playwright-core install --with-deps webkit
-      - name: WebKit layout (956×330, 844×390)
+      - name: WebKit layout and portrait boot
         run: npm run e2e:webkit
       - name: Keep the screenshots
         if: ${{ !cancelled() }}

@@ -4,7 +4,7 @@
 // moment exactly.
 import Phaser from 'phaser';
 import { bus } from '../../core/events';
-import { initLandscapeGuard } from '../../ui/orientation';
+import { initLandscapeGuard, sleepLoopIfPortrait } from '../../ui/orientation';
 import { ensureStyles } from '../../ui/dom';
 import { LiveSim } from '../league/live';
 import { LabController, labHash, parseLabHash, type LabParams } from './controller';
@@ -68,9 +68,9 @@ export function bootLab(): void {
         scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
         scene: [],
       });
-      game.events.once(Phaser.Core.Events.READY, () => {
-        if (blocked) game?.loop.sleep();
-      });
+      // Same as the club boot: a lab link opened upright must pause once the
+      // loop has started, not on `ready` (that sleep is a no-op, #315).
+      sleepLoopIfPortrait(game, () => blocked);
       game.events.on(Phaser.Core.Events.POST_STEP, () => panel?.sync());
       game.scene.add(SCENE_KEY, LabScene, true, data);
     } else {

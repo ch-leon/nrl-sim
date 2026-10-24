@@ -38,7 +38,7 @@ import { openContractsScreen } from './ui/screens/contracts';
 import { initNewsInbox, newsInbox, openInboxScreen, pendingDecisionCount } from './ui/inbox';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
-import { initLandscapeGuard } from './ui/orientation';
+import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
 import { startTutorial, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
 import { openGuideScreen } from './ui/guide/guide';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
@@ -169,9 +169,10 @@ async function boot(): Promise<void> {
     // Every tutorial step's copy, for scripts/e2e-webkit.mjs's fit check (#208).
     w.__nrlTutorialText = TUTORIAL_STEPS.map((st) => st.text);
   }
-  g.events.once(Phaser.Core.Events.READY, () => {
-    if (portraitBlocked) g.loop.sleep();
-  });
+  // Opened upright, the rotate card is already up but the game did not exist
+  // when it first asked for a pause. Sleep once the loop has actually started
+  // (#315). A later turn to portrait still sleeps from onBlock, above.
+  sleepLoopIfPortrait(g, () => portraitBlocked);
   createHud({ onAdvanceWeek: () => advanceWeek(), onAdvanceUntil: (t) => advanceUntil(t) });
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
