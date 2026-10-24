@@ -203,7 +203,7 @@ describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
     expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 24_000, soldOut: false });
   });
 
-  it('Easy pays three quarters of the same gate; Hard and Normal pay the full gate', () => {
+  it('Easy pays its factor of the same gate; Hard and Normal pay the full gate', () => {
     const at = (d: 'easy' | 'normal' | 'hard'): number => {
       const settings = { ...getState().settings, difficulty: d };
       setup({

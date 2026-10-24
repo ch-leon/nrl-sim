@@ -161,8 +161,8 @@ export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
   const demand = Math.round(base * form * occasion);
   const capacity = groundCapacity(state);
   const attendance = Math.min(capacity, demand);
-  // Easy pays about a quarter less at the gate. Normal and Hard are ×1, so the
-  // crowd, the form and the occasion still decide the receipt exactly as before.
+  // Easy pays a little less at the gate (DIFFICULTY.easy.gate). Normal and Hard
+  // are ×1, so the crowd, the form and the occasion still decide the receipt.
   const receipts = scaledMoney(attendance * ECON.TICKET_PRICE, difficultyMultipliers(state.settings.difficulty).gate);
   return { capacity, demand, attendance, receipts, soldOut: demand > capacity };
 }

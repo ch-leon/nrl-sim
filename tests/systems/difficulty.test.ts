@@ -64,8 +64,8 @@ describe('difficulty multipliers', () => {
   });
 
   it('Easy pays less prize money and a smaller gate, Hard pays more prize money and the same gate', () => {
-    expect(DIFFICULTY.easy.prize).toBe(0.75);
-    expect(DIFFICULTY.easy.gate).toBe(0.75);
+    expect(DIFFICULTY.easy.prize).toBe(0.85);
+    expect(DIFFICULTY.easy.gate).toBe(0.96);
     expect(DIFFICULTY.hard.prize).toBe(1.2);
     expect(DIFFICULTY.hard.gate).toBe(1);
     expect(DIFFICULTY.easy.prize).toBeLessThan(DIFFICULTY.normal.prize);

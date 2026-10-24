@@ -211,19 +211,20 @@ export interface DifficultyMultipliers {
   /**
    * × finals prize money and the board's cash grant (board.ts). Hard earns more
    * of both, Easy less; Normal is 1, so a result pays what it always paid.
-   * Assumed (needs Leon): 0.75 / 1 / 1.2.
+   * Assumed (needs Leon): 0.85 / 1 / 1.2. Lower than the gate, which one idle
+   * Easy season cannot spare. 0.75 put a managing Easy club behind Normal.
    */
   prize: number;
   /**
-   * × gate receipts (economy.homeGate). Easy pays about a quarter less at the
-   * gate; Normal and Hard are 1, so a crowd still pays what the result, the
-   * form and the occasion say. Assumed (needs Leon): 0.75 on Easy.
+   * × gate receipts (economy.homeGate). Easy pays a little less at the gate;
+   * Normal and Hard are 1, so a crowd still pays what the result, the form
+   * and the occasion say. Assumed (needs Leon): 0.96 on Easy.
    */
   gate: number;
 }
 
 export const DIFFICULTY: Record<Difficulty, DifficultyMultipliers> = {
-  easy: { startingMoney: 1.5, wages: 0.9, injuryRate: 0.7, rivalEdge: -2, startRating: 4, overhead: 0.8, prize: 0.75, gate: 0.75 },
+  easy: { startingMoney: 1.5, wages: 0.9, injuryRate: 0.7, rivalEdge: -2, startRating: 4, overhead: 0.8, prize: 0.85, gate: 0.96 },
   normal: { startingMoney: 1, wages: 1, injuryRate: 1, rivalEdge: 0, startRating: 0, overhead: 1, prize: 1, gate: 1 },
   hard: { startingMoney: 0.75, wages: 1.15, injuryRate: 1.4, rivalEdge: 0.5, startRating: -4, overhead: 1.2, prize: 1.2, gate: 1 },
 };
