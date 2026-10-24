@@ -14,7 +14,7 @@ import { bus } from './events';
 import { getState, type GameState } from './state';
 import { advanceWeek, weekHeld, withFastForward } from './time';
 import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
-import { fitSquadCount } from '../systems/matchday';
+import { fitSquadCount, playerMatchPending } from '../systems/matchday';
 import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
 import {
@@ -74,6 +74,16 @@ function newCards(before: GameState, after: GameState): string[] {
 export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<void> = nextFrame): Promise<AdvanceRun> {
   if (getState().sacked) return { weeksPlayed: 0, stop: { kind: 'target', text: 'The board has sacked you.' } };
   if (running) return { weeksPlayed: 0, stop: { kind: 'busy', text: 'An advance is already running.' } };
+  // A week already held (Save & exit, or the rival round) must not be waited on here:
+  // advanceWeek returns immediately, week:advanced never fires, and this run would
+  // sit forever with Advance Week disabled. The HUD refuses the tap too.
+  if (weekHeld()) {
+    const text = playerMatchPending()
+      ? 'Your match is still on. Advance Week resumes it.'
+      : 'The other matches are still being played; the week ends when they are in.';
+    bus.emit('ui:notify', { text, kind: 'info' });
+    return { weeksPlayed: 0, stop: { kind: 'stopped', text } };
+  }
   running = true;
   stopAsked = false;
   let run: AdvanceRun;

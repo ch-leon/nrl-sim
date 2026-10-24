@@ -12,8 +12,10 @@ import { createNewGame, getState, setState, type Fixture } from '../../src/core/
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, weekHeld } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
-import { LIVE_MATCH_SAVE_SECONDS, LIVE_MATCH_SAVE_TICKS, liveMatchSaveDue, readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
+import { isLiveMatchRecord, LIVE_MATCH_SAVE_SECONDS, LIVE_MATCH_SAVE_TICKS, liveMatchSaveDue, readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
 import { playerMatchPending, resumePlayerMatch } from '../../src/systems/matchday';
+import { advanceUntil } from '../../src/core/advance';
+import { MATCH_STILL_ON_TEXT } from '../../src/ui/hud';
 import { MatchRecorder, runMatch } from '../../src/match/league/match';
 import { Runner } from '../../src/match/core/engine';
 import { LiveSim, type PlanInput } from '../../src/match/league/live';
@@ -279,6 +281,57 @@ describe('live match (beta): the match on screen is the match', () => {
     });
     expect(weekHeld()).toBe(false);
     expect(playerMatchPending()).toBe(false);
+  });
+
+  it('a corrupt record is ignored, and Resume still continues the parked match', () => {
+    fakeStorage();
+    newGame(42);
+    advanceWeek();
+    const first = started[0]!;
+    const side = first.fixture.homeId === PLAYER_ID ? 'home' : 'away';
+    const cut = watch(first, { side, call: 'shift-left' }, 80);
+    expect(readLiveMatch()!.tick).toBe(cut.tick);
+    expect(isLiveMatchRecord({ season: 1, week: 1, seed: 1 })).toBe(false);
+    (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage.setItem('nrl-live-match-1', '{');
+    expect(readLiveMatch()).toBeNull();
+    expect(playerMatchPending()).toBe(true);
+    expect(resumePlayerMatch()).toBe(true);
+    const again = started[1]!;
+    expect(again.live!.resumeAt).toBe(cut.tick);
+    expect(again.live!.calls).toEqual(cut.calls);
+    expect(again.live!.seed).toBe(first.live!.seed);
+  });
+
+  it('a record missing its calls does not throw when the week starts again', () => {
+    fakeStorage();
+    newGame(42);
+    const saved = JSON.stringify(getState());
+    advanceWeek();
+    clearHeldWeek();
+    setState(JSON.parse(saved));
+    (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage.setItem(
+      'nrl-live-match-1',
+      JSON.stringify({ season: getState().season, week: getState().week, seed: started[0]!.live!.seed }),
+    );
+    expect(readLiveMatch()).toBeNull();
+    expect(() => advanceWeek()).not.toThrow();
+    expect(started).toHaveLength(2);
+    expect(started[1]!.live!.resumeAt).toBeUndefined();
+    expect(started[1]!.live!.calls).toEqual([]);
+  });
+
+  it('fast-forward does not skip a parked match or wait on it', async () => {
+    fakeStorage();
+    newGame(42);
+    const week = getState().week;
+    advanceWeek();
+    expect(playerMatchPending()).toBe(true);
+    const run = await advanceUntil({ kind: 'weeks', weeks: 4 }, async () => {});
+    expect(run.weeksPlayed).toBe(0);
+    expect(run.stop).toEqual({ kind: 'stopped', text: MATCH_STILL_ON_TEXT });
+    expect(getState().week).toBe(week);
+    expect(weekHeld()).toBe(true);
+    expect(started).toHaveLength(1);
   });
 
   it('a change of plan at half-time (N11) changes the match, and the match with its plan is what counts', () => {

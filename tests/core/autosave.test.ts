@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { enableAutosave, exportSave, getActiveSlot, importIntoSlot, load, save, __setStorage, type StorageLike } from '../../src/core/save';
+import { enableAutosave, exportSave, deleteSlot, downloadSave, EXPORT_HELD_FAILED_TEXT, getActiveSlot, importIntoSlot, load, save, slotKey, __setStorage, type StorageLike } from '../../src/core/save';
+import { bus } from '../../src/core/events';
+import { readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
 
@@ -168,5 +170,89 @@ describe('the week-start save', () => {
     setState({ money: 700 });
     advanceWeek();
     expect(writes).toBe(4); // unsubscribed: the week-start hook is gone too
+  });
+});
+
+/** The live-match record uses localStorage; point it at the same map as the slot. */
+function shareLocalStorage(): void {
+  const storage: StorageLike = {
+    getItem: (k) => store.get(k) ?? null,
+    setItem: (k, v) => void store.set(k, v),
+    removeItem: (k) => void store.delete(k),
+  };
+  Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
+}
+
+describe('export and import during a held week', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+
+  it('exports the week-start save and the match, not the half-ticked week', () => {
+    shareLocalStorage();
+    const page = fakePage();
+    off = enableAutosave({ doc: page.doc, win: page.win });
+    const money = getState().money;
+    registerTickHook('hold', 40, (ctx) => { setState({ money: 1 }); ctx.hold?.(); });
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+    expect(getState().money).toBe(1);
+    const record = {
+      season: getState().season, week: getState().week, round: 1, homeId: 'p', awayId: 'r', seed: 9,
+      calls: [{ tick: 4, side: 'home' as const, call: 'rush' as const }], tick: 80,
+    };
+    expect(writeLiveMatch(record)).toBe(true);
+    const parsed = JSON.parse(exportSave(getState())) as { money: number; nrlLiveMatch?: { tick: number; calls: unknown[] } };
+    expect(parsed.money).toBe(money);
+    expect(parsed.nrlLiveMatch?.tick).toBe(80);
+    expect(parsed.nrlLiveMatch?.calls).toEqual(record.calls);
+
+    expect(importIntoSlot(JSON.stringify(parsed), getActiveSlot())?.money).toBe(money);
+    expect(load()?.money).toBe(money);
+    expect(load()).not.toHaveProperty('nrlLiveMatch');
+    expect(JSON.parse(store.get(slotKey(1))!)).not.toHaveProperty('nrlLiveMatch');
+    expect(readLiveMatch()?.tick).toBe(80);
+  });
+
+  it('importing a save with no match clears a stale record, and a bad record is refused', () => {
+    shareLocalStorage();
+    save(getState());
+    expect(writeLiveMatch({
+      season: 1, week: 1, round: 1, homeId: 'p', awayId: 'r', seed: 3, calls: [], tick: 40,
+    })).toBe(true);
+    const plain = exportSave(getState());
+    expect(JSON.parse(plain)).not.toHaveProperty('nrlLiveMatch');
+    expect(importIntoSlot(plain, getActiveSlot())).not.toBeNull();
+    expect(readLiveMatch()).toBeNull();
+
+    const bad = JSON.parse(plain) as Record<string, unknown>;
+    bad.nrlLiveMatch = { tick: 'nope' };
+    expect(importIntoSlot(JSON.stringify(bad), getActiveSlot())).toBeNull();
+    expect(load()?.clubName).toBe('Autosave');
+  });
+
+  it('refuses to export a held week whose last landed save is another week', () => {
+    save(getState()); // week 1 landed; nothing saves the week-2 kick-off
+    advanceWeek();
+    registerTickHook('hold', 40, (ctx) => { setState({ money: 1 }); ctx.hold?.(); });
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+    expect(getState().week).toBe(2);
+    const notes: string[] = [];
+    const offNote = bus.on('ui:notify', (n) => notes.push(n.text));
+    downloadSave(getState());
+    offNote();
+    expect(notes).toContain(EXPORT_HELD_FAILED_TEXT);
+  });
+
+  it('deletes the live-match record with the slot', () => {
+    shareLocalStorage();
+    save(getState());
+    writeLiveMatch({ season: 1, week: 1, round: 1, homeId: 'p', awayId: 'r', seed: 3, calls: [], tick: 40 });
+    expect(readLiveMatch()?.tick).toBe(40);
+    deleteSlot(1);
+    expect(readLiveMatch()).toBeNull();
+    expect(store.has('nrl-live-match-1')).toBe(false);
+    expect(store.has(slotKey(1))).toBe(false);
   });
 });

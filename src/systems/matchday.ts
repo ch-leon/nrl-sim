@@ -33,12 +33,13 @@ interface ParkedMatch {
 }
 let parked: ParkedMatch | null = null;
 
-/** True while this week's live match is still on: the club's Advance Week resumes it. */
+/**
+ * True while this week's live match is still on: the club's Advance Week resumes it.
+ * The in-memory match is enough. A missing or corrupt record must not hide Resume
+ * and leave the held week with nothing that will release it.
+ */
 export function playerMatchPending(): boolean {
-  const rec = readLiveMatch();
-  if (!parked || !rec || !weekHeld()) return false;
-  const s = getState();
-  return rec.season === s.season && rec.week === s.week && rec.seed === parked.live.seed;
+  return parked !== null && weekHeld();
 }
 
 /**
@@ -47,13 +48,17 @@ export function playerMatchPending(): boolean {
  * still lands once, at full time. Returns false when there is nothing to resume.
  */
 export function resumePlayerMatch(): boolean {
-  if (!playerMatchPending() || !parked) return false;
-  const rec = readLiveMatch()!;
+  if (!parked || !weekHeld()) return false;
+  const rec = readLiveMatch();
   const live = parked.live;
-  live.calls = [...rec.calls];
-  live.plans = rec.plans ? [...rec.plans] : [];
-  if (rec.tick > 0) live.resumeAt = rec.tick;
-  else delete live.resumeAt;
+  // Prefer the stored record (a kill, or a write newer than this page). A missing
+  // or other match's record keeps the calls and tick already on the parked match.
+  if (rec && rec.seed === live.seed) {
+    live.calls = [...rec.calls];
+    live.plans = rec.plans ? [...rec.plans] : [];
+    if (rec.tick > 0) live.resumeAt = rec.tick;
+    else delete live.resumeAt;
+  }
   bus.emit('match:started', { fixture: parked.fixture, home: parked.home, away: parked.away, live });
   return true;
 }
@@ -274,10 +279,16 @@ export function registerPlayerMatchSystem(): void {
         calls: record.calls,
         plans: record.plans ?? [],
         ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
-        onProgress: (calls, tick, plans) => writeLiveMatch({ ...record, calls: [...calls], plans: [...plans], tick }),
         planSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const),
         ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
         ...(matchOpts.aiCoach.length ? { aiCoach: matchOpts.aiCoach } : {}),
+      };
+      // Keep the tick on the parked match too, so Resume still has it if the
+      // stored record is later missing or unreadable.
+      live.onProgress = (calls, tick, plans) => {
+        const wrote = writeLiveMatch({ ...record, calls: [...calls], plans: [...plans], tick });
+        if (wrote && tick > 0) live.resumeAt = tick;
+        return wrote;
       };
       parked = { fixture, home, away, live };
       bus.emit('match:started', { fixture, home, away, live });

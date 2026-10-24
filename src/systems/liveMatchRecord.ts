@@ -40,7 +40,12 @@ export interface LiveMatchRecord {
   tick: number;
 }
 
-const key = (): string => `nrl-live-match-${getActiveSlot()}`;
+/** Key for one slot's record. Export files carry the same object under this field. */
+export const LIVE_MATCH_EXPORT_FIELD = 'nrlLiveMatch';
+
+export function liveMatchKey(slot: number): string {
+  return `nrl-live-match-${slot}`;
+}
 
 function store(): Storage | null {
   try {
@@ -50,21 +55,35 @@ function store(): Storage | null {
   }
 }
 
+/** A record this game can resume: a bad or partial one is ignored, not spread. */
+export function isLiveMatchRecord(x: unknown): x is LiveMatchRecord {
+  if (x === null || typeof x !== 'object') return false;
+  const r = x as Partial<LiveMatchRecord>;
+  return typeof r.season === 'number' && typeof r.week === 'number'
+    && typeof r.round === 'number' && typeof r.homeId === 'string' && typeof r.awayId === 'string'
+    && typeof r.seed === 'number' && typeof r.tick === 'number'
+    && Array.isArray(r.calls)
+    && (r.plans === undefined || Array.isArray(r.plans));
+}
+
 export function readLiveMatch(): LiveMatchRecord | null {
   try {
-    const raw = store()?.getItem(key());
-    return raw ? (JSON.parse(raw) as LiveMatchRecord) : null;
+    const raw = store()?.getItem(liveMatchKey(getActiveSlot()));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isLiveMatchRecord(parsed) ? parsed : null;
   } catch {
     return null;
   }
 }
 
-/** Write the record. False when storage is missing, full or blocked: nothing was stored. */
-export function writeLiveMatch(r: LiveMatchRecord): boolean {
+/** Write the record for `slot` (the active one, when omitted). False when storage is missing, full or blocked. */
+export function writeLiveMatch(r: LiveMatchRecord, slot: number = getActiveSlot()): boolean {
+  if (!isLiveMatchRecord(r)) return false;
   try {
     const s = store();
     if (!s) return false;
-    s.setItem(key(), JSON.stringify(r));
+    s.setItem(liveMatchKey(slot), JSON.stringify(r));
     return true;
   } catch {
     // Storage full or blocked: the match can still be played, just not resumed.
@@ -72,10 +91,32 @@ export function writeLiveMatch(r: LiveMatchRecord): boolean {
   }
 }
 
-export function clearLiveMatch(): void {
+export function clearLiveMatch(slot: number = getActiveSlot()): void {
   try {
-    store()?.removeItem(key());
+    store()?.removeItem(liveMatchKey(slot));
   } catch {
     // nothing to clear
   }
+}
+
+/**
+ * An exported save may carry the live-match record beside the week-start state
+ * (`nrlLiveMatch`). Peel it off so migrate sees a plain save. `bad` is a field
+ * that was present but not a record.
+ */
+export function peelLiveMatchExport(text: string): { text: string; live: LiveMatchRecord | null; bad: boolean } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { text, live: null, bad: false };
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed) || !(LIVE_MATCH_EXPORT_FIELD in parsed)) {
+    return { text, live: null, bad: false };
+  }
+  const bag = { ...(parsed as Record<string, unknown>) };
+  const live = bag[LIVE_MATCH_EXPORT_FIELD];
+  delete bag[LIVE_MATCH_EXPORT_FIELD];
+  if (!isLiveMatchRecord(live)) return { text: JSON.stringify(bag), live: null, bad: true };
+  return { text: JSON.stringify(bag), live, bad: false };
 }

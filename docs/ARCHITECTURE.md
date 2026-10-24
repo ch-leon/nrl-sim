@@ -347,7 +347,10 @@ returns to the club with the week still held: Advance Week reads Resume match an
 continues it, and the ▾ menu will not skip it. Continue on the slot does the same
 after a reload. A hire or a build made back at the club stays in memory and is
 saved with the week at full time; a kill before then drops it, because a held week
-is never written.
+is never written. Export during the hold writes that week-start save plus the
+live-match record, not the half-ticked week, and refuses when that save is
+missing or from another week. Deleting the slot, or starting a
+new game in it, drops the record so the next game does not kick the old match off.
 
 Holds count (N9.2): every hook of the holding order still runs, then the later hooks
 and the week's end wait for one `resumeWeek()` per hold. With *Rival matches on the
