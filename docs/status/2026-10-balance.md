@@ -36,7 +36,7 @@ Rush 3.8%, Compressed 5.2%.
 
 **What moved** (`src/match/league/presets.ts`, spec §5.1–5.2, tuning §8):
 
-- Expansive: pass +0.15 → 0, cut-out 0.08 → 0.02, width 0.35 → 0.28, early kick 0.30 → 0.18.
+- Expansive: pass +0.15 → 0, cut-out 0.08 → 0.02 (own 20 0.03 → 0.01), width 0.35 → 0.28, early kick 0.30 → 0.18.
   Offload stays ×1.3 and the edges stay +0.8, so it still throws more than Grind.
 - All-out: pass +0.15 → 0, offload ×1.6 → ×1.5, cut-out 0.12 → 0.03, width 0.45 → 0.35,
   early kick 0.30 → 0.15. It still offloads the most.
@@ -66,7 +66,15 @@ The standard plan carries the same six rows at 100 seeds both ways, so the next 
 change reports the band again. Rival-style results over a whole season are N14.2, not this
 item.
 
-**Open.** All-out at 54.8% is inside the band and within a point of the top of it; another
-400 matches could print a 56. Expansive and Kick-chase sit near the bottom (46%). Neither
-was pushed further: softer Expansive (less width, an earlier kick, fewer edges) did not
-win more games, and Kick-chase was already inside without being made to kick less.
+**Open.** All-out at 54.8% is the seeds 1–200 block, inside the band and within a point of
+the top of it. That block is the high one, not the rate. The same tables on later blocks of
+400 matches: seeds 201–400 **48.5%**, 401–600 **45.5%**, 601–800 **49.0%**, and an
+independent block on seeds 10001–10200 **43.8%** (below the band). Pooled, 966 wins in
+2000 matches, **48.3%** (one standard error about 1.1 points). All-out sits near the middle.
+A single block of 400 can still print outside 45–55%; it did not print above 55% on the
+fresh seeds. The knobs were left as the sign-off set them: chasing the low block up would
+aim a 48% rate at the top of the band. Expansive and Kick-chase sat near 46% on seeds
+1–200 (49.8% and 47.5% on seeds 10001–10200). Softer Expansive was not pushed further on
+the sign-off pass. Own 20's cut-out had been left at 3% after the base came down to 2%, so
+an Expansive side cut out more from its own 20 than anywhere else; it is 1%, under the base.
+Remeasured after that, Expansive won 46.5% on seeds 1–200 and 49.5% on seeds 10001–10200.

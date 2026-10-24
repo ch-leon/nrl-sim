@@ -45,6 +45,8 @@ export function delta(cur: { mean: number; se: number }, base: { mean: number; s
 }
 
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
+/** A tenth. Side win is read against the 45–55% band, and a whole percent prints 54.8% as 55%. */
+const pct1 = (v: number): string => `${(v * 100).toFixed(1)}%`;
 const legsEnd = (r: CellResult): string => {
   const l = r.legs[r.legs.length - 1];
   return l ? `${pct(l.home)}/${pct(l.away)}` : '—';
@@ -90,7 +92,7 @@ export function reportMarkdown(r: ReportInput): string {
         return `${v.mean.toFixed(1)}${mark ? ` ${mark}` : ''}${d}`;
       });
       const side = tracked
-        ? ` ${row.trackedWin === undefined ? '—' : `${pct(row.trackedWin)}${row.trackedDraw ? ` (${pct(row.trackedDraw)} drawn)` : ''}`} |`
+        ? ` ${row.trackedWin === undefined ? '—' : `${pct1(row.trackedWin)}${row.trackedDraw ? ` (${pct1(row.trackedDraw)} drawn)` : ''}`} |`
         : '';
       out.push(`| ${row.variant} | ${cells.join(' | ')} | ${pct(row.homeWin)}${row.draw > 0 ? ` (${pct(row.draw)} drawn)` : ''} |${side} ${row.wrestleSecs.toFixed(2)} | ${legsEnd(row)} |`);
     }

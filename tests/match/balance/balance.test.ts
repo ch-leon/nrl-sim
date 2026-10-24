@@ -186,8 +186,15 @@ describe('measuring and reporting', () => {
       results: results.map((r) => ({ ...r, trackedWin: 0.5, trackedDraw: 0.1, trackedSeeds: r.seeds * 2 })),
     });
     expect(tracked).toContain('Side win');
-    expect(tracked).toContain('50% (10% drawn)');
+    expect(tracked).toContain('50.0% (10.0% drawn)');
     expect(tracked).toContain('both ways round');
+    // A whole percent would print 54.8% as 55%, on the wrong side of the preset band's top.
+    const edge = reportMarkdown({
+      plan: plan(),
+      meta: {},
+      results: results.map((r) => ({ ...r, trackedWin: 0.548, trackedDraw: 0.038, trackedSeeds: r.seeds * 2 })),
+    });
+    expect(edge).toContain('54.8% (3.8% drawn)');
   });
   it('tracks a side both ways, and another preset\'s numbers leave a Balanced / Slide match unchanged', () => {
     const written = { name: 'grind', home: { rating: 60, tactics: { attack: 'grind' as const } }, away: { rating: 60 }, track: 'home' as const };

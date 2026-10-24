@@ -62,6 +62,8 @@ describe('presets (pure)', () => {
     expect(e.width).toBeGreaterThan(0);
     expect(e.cutOut).toBeGreaterThan(0);
     expect(e.edges).toBeGreaterThan(0);
+    // Own 20 is the careful zone: fewer cut-outs than the rest of the field, not more.
+    expect(attackPlan('expansive', 'own20').cutOut).toBeLessThan(e.cutOut);
     expect(attackPlan('kick-chase', 'ownHalf').earlyTerritory).toBeGreaterThan(0);
     expect(attackPlan('kick-chase', 'midfield').kickBias.bomb).toBeGreaterThan(1);
     for (const a of ATTACK_PRESETS) {

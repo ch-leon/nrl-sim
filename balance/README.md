@@ -101,7 +101,7 @@ somewhere else.
 - **A scenario's own matches** (`seeds`): that row plays this many matches instead of
   the plan's. `--seeds` still replaces the plan's count and leaves a row's own count
   alone, so a preset matrix stays at the size it was signed off at. With `track`
-  (`home` or `away`) the report adds a **Side win** column for that side. `bothWays`
+  (`home` or `away`) the report adds a **Side win** column for that side, to a tenth of a percent. `bothWays`
   also plays each seed with the sides swapped and pools the tracked side's wins
   (its `seeds` is per orientation, so the column is over twice that); it needs
   `track`. Counts, Home win and the legs stay the matchup as written, so a style

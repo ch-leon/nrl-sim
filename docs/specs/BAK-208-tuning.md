@@ -172,9 +172,9 @@ same 400 matches, on `35afd04`). After:
 | Preset | Before | After | What moved |
 |---|---:|---:|---|
 | Grind | 49.2% | 49.2% | unchanged |
-| Expansive | 35.0% | 46.2% | pass +0.15 → 0, cut-out 0.08 → 0.02, width 0.35 → 0.28, early kick 0.30 → 0.18 |
+| Expansive | 35.0% | 46.2% | pass +0.15 → 0, cut-out 0.08 → 0.02 (own 20 0.03 → 0.01, so it stays under the new base), width 0.35 → 0.28, early kick 0.30 → 0.18 |
 | Kick-chase | 46.5% | 46.5% | unchanged |
-| All-out | 38.0% | 54.8% | pass +0.15 → 0, offload ×1.6 → ×1.5, cut-out 0.12 → 0.03, width 0.45 → 0.35, early kick 0.30 → 0.15 |
+| All-out | 38.0% | 54.8% | pass +0.15 → 0, offload ×1.6 → ×1.5, cut-out 0.12 → 0.03, width 0.45 → 0.35, early kick 0.30 → 0.15. 54.8% is seeds 1–200; five blocks of 400 pool to 48.3% (see `docs/status/2026-10-balance.md`) |
 | Rush | 57.2% | 49.8% | line speed 6.5 → 6.2 m/s (busts stayed at +0.11: 0.115 already fell to about 45%) |
 | Compressed | 64.0% | 49.0% | pull ×1.4 → ×1.1, markers ×1.2 → ×1.05, busts −0.04 → −0.02, step-against −0.02 → +0.03 |
 

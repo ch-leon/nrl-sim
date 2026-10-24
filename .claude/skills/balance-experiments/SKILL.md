@@ -59,7 +59,7 @@ include a neutral one (`even 60 v 60`) so effects can be told from matchup quirk
   (a single stretch instead of a whole match; late legs over 18 minutes run dry, so
   use about 8).
 - **Own match count**: `"seeds"` on a scenario overrides the plan's. `"track":
-  "home"|"away"` reports that side's win rate; `"bothWays": true` (needs `track`)
+  "home"|"away"` reports that side's win rate to a tenth of a percent; `"bothWays": true` (needs `track`)
   also plays the swapped fixture and pools it. Counts stay the written orientation.
 - Names are what the report shows. Make them say the matchup ("rush v slide",
   "70 v 50"), unique within the plan.

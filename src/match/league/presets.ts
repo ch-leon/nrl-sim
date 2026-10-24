@@ -82,8 +82,10 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
   expansive: {
     // N13: pass, cut-out and the early kick came down so a wide side wins about half
     // its even matches (was pass +0.15, cut-out 0.08, early kick 0.3, width 0.35).
+    // Own 20 stays the careful zone: its cut-out was left at 0.03, above the new
+    // base, so a side cut out more from its own 20 than anywhere else.
     base: { pass: 0, offload: 1.3, cutOut: 0.02, width: 0.28, edges: 0.8, earlyKick: 0.18, kickBias: { 'cross-field': 1.5, long: 0.8 } },
-    zones: { own20: { offload: 0.8, cutOut: 0.03 } },
+    zones: { own20: { offload: 0.8, cutOut: 0.01 } },
   },
   'kick-chase': {
     base: { pass: -0.05, offload: 0.6, step: 0.9, earlyKick: 0.55, earlyTerritory: 0.35, kickBias: { bomb: 1.8, long: 1.2, grubber: 1.3, 'cross-field': 0.8, chip: 0.8 } },
