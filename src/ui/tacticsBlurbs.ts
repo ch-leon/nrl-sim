@@ -1,6 +1,7 @@
 // src/ui/tacticsBlurbs.ts — one line on what each preset does (N11), from
 // BAK-208 §5's tables in plain words, for the Lineup screen's tactic chips and
 // the Guide. Data only: the numbers live in match/league/presets.ts.
+import { planWhenBehind } from '../match/league/breaks';
 import { PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../match/league/presets';
 
 export const TACTIC_BLURB: Readonly<Record<AttackPreset | DefencePreset, string>> = {
@@ -29,4 +30,14 @@ export const TACTIC_SHORT: Readonly<Record<AttackPreset | DefencePreset, string>
 /** "Expansive · Rush": how a side plays, in words. */
 export function styleLine(t: TeamTactics): string {
   return `${PRESET_LABEL[t.attack]} · ${PRESET_LABEL[t.defence]}`;
+}
+
+/**
+ * What the Analyst adds: the plan a side steps to when it goes more open.
+ * Null when that step would not change the plan (already All-out and Rush).
+ */
+export function whenBehindLine(plan: TeamTactics): string | null {
+  const next = planWhenBehind(plan);
+  if (next.attack === plan.attack && next.defence === plan.defence) return null;
+  return styleLine(next);
 }

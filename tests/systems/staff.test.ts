@@ -6,6 +6,8 @@ import { bus } from '../../src/core/events';
 import { createNewGame, emptyFinance, getState, loadState, setState } from '../../src/core/state';
 import { migrateState } from '../../src/core/save';
 import { STAFF, STAFF_ROLES, WELFARE_CARDS, WELFARE_RENEWAL_CUT, hireStaff, releaseStaff, staffWage, staffWages } from '../../src/systems/staff';
+import { breakRuleSidesFor } from '../../src/systems/matchday';
+import { whenBehindLine } from '../../src/ui/tacticsBlurbs';
 import { applyEconomy, registerFinanceSystem, tickContracts, weeklyOverhead } from '../../src/systems/economy';
 import { renewalWage, renewalWeeklyCost } from '../../src/systems/contracts';
 import { cardWeight, drawEvent } from '../../src/systems/events';
@@ -108,6 +110,25 @@ describe('the Welfare Manager', () => {
     const withWelfare = share(true);
     expect(without).toBeGreaterThan(0);
     expect(withWelfare).toBeLessThan(without * 0.7);
+  });
+});
+
+describe('the Assistant Coach and the Analyst (N14)', () => {
+  const coach = { role: 'assistantCoach' as const, name: 'Ali Coach', wage: 800, hiredSeason: 1 };
+
+  it('the Assistant Coach changes the player’s plan only on a fast-forward', () => {
+    expect(breakRuleSidesFor({ staff: [] }, 'away', true)).toEqual(['away']);
+    expect(breakRuleSidesFor({ staff: [coach] }, 'away', false)).toEqual(['away']);
+    expect(breakRuleSidesFor({ staff: [coach] }, 'away', true)).toEqual(['away', 'home']);
+    expect(breakRuleSidesFor({ staff: [coach] }, 'home', true)).toEqual(['home', 'away']);
+  });
+
+  it('the Analyst names the more-open plan, and says nothing when the side is already there', () => {
+    expect(whenBehindLine({ attack: 'balanced', defence: 'slide' })).toBe('Expansive · Rush');
+    expect(whenBehindLine({ attack: 'kick-chase', defence: 'compressed' })).toBe('Expansive · Slide');
+    expect(whenBehindLine({ attack: 'all-out', defence: 'rush' })).toBeNull();
+    expect(STAFF.assistantCoach.blurb).not.toMatch(/later update/);
+    expect(STAFF.analyst.blurb).not.toMatch(/later update/);
   });
 });
 

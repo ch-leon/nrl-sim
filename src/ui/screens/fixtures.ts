@@ -18,8 +18,9 @@ import { save } from '../../core/save';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
 import { rivalStyle } from '../../systems/rivalRound';
+import { hasStaff } from '../../systems/staff';
 import { DEFAULT_TACTICS, PRESET_LABEL, type TeamTactics } from '../../match/league/presets';
-import { TACTIC_SHORT, styleLine } from '../tacticsBlurbs';
+import { TACTIC_SHORT, styleLine, whenBehindLine } from '../tacticsBlurbs';
 import { shortName } from './matchReport';
 
 // ── Pure view helpers (unit-tested) ───────────────────────────────────────────
@@ -237,7 +238,15 @@ function nextMatchCard(state: GameState): HTMLElement {
   const line = (label: string, text: string): HTMLElement =>
     el('div', { class: 'nrl-next-line' }, el('b', { text: `${label}:` }), text);
   // How they play (N11): the style of the nine they would field today; the Guide's Tactics page explains the words.
-  if (oppClub) card.append(line('They play', styleLine(rivalStyle(oppClub))));
+  if (oppClub) {
+    const style = rivalStyle(oppClub);
+    card.append(line('They play', styleLine(style)));
+    // The Analyst (N14): what they step to when they go more open. Everyone else just sees how they play.
+    if (hasStaff(state, 'analyst')) {
+      const behind = whenBehindLine(style);
+      if (behind) card.append(line('When behind', behind));
+    }
+  }
   if (p.bestThree.length > 0) {
     card.append(line('Their best', p.bestThree.map((b) => `${b.name} (${b.position} ${b.overall})`).join(' · ')));
   }

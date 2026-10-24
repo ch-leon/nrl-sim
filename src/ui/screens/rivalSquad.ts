@@ -6,7 +6,10 @@ import { overallRating } from '../../data/player';
 import { ROMAN, TRAITS } from '../../data/traits';
 import { button, closeModal, el, openModal, panel } from '../dom';
 import { rivalStyle } from '../../systems/rivalRound';
+import { hasStaff } from '../../systems/staff';
+import { getState } from '../../core/state';
 import { tacticsLabel } from '../../match/league/presets';
+import { whenBehindLine } from '../tacticsBlurbs';
 import { openPlayerPage } from './player';
 
 export interface RivalSquadRow {
@@ -66,10 +69,12 @@ export function openRivalSquad(club: RivalClub): HTMLElement {
     body.append(tr);
   }
   table.append(body);
+  const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
   const content = panel(
     { class: 'nrl-rival-squad' },
     el('h2', { text: club.name }),
     el('p', { text: `Strength ${club.strength} · plays ${tacticsLabel(style)} · ${rows.length} players · tap a player for his page`, attrs: { 'data-style': `${style.attack}/${style.defence}` } }),
+    ...(behind ? [el('p', { text: `When behind: ${behind}`, attrs: { 'data-when-behind': '' } })] : []),
     rows.length > 0
       ? el('div', { class: 'nrl-rival-scroll' }, table)
       : el('p', { text: 'No squad on record.' }),

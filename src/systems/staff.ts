@@ -23,11 +23,11 @@ export interface StaffDef {
 export const STAFF: Record<StaffRole, StaffDef> = {
   assistantCoach: {
     title: 'Assistant Coach', wage: 800,
-    blurb: 'Will change the plan at the break when you fast-forward a match, as the rival coaches do (coming in a later update).',
+    blurb: 'Changes your plan at the break when you fast-forward a match, the same way a rival’s does.',
   },
   analyst: {
     title: 'Analyst', wage: 600,
-    blurb: 'Will say what the next rival plays and what it switches to when behind (coming in a later update).',
+    blurb: 'On the next-match card and the rival’s squad page, says what they switch to when they are behind.',
   },
   welfare: {
     title: 'Welfare Manager', wage: 700,
