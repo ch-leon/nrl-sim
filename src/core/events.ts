@@ -22,8 +22,12 @@ export interface LiveMatchData {
   /** Plan changes already made at the breaks (N11). */
   plans?: PlanInput[];
   resumeAt?: number;
-  /** Keep the resume record: on each call or plan change, every couple of seconds of match time, on Save & exit, and when the app goes to the background. */
-  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => void;
+  /**
+   * Keep the resume record: on each call or plan change, every couple of seconds of
+   * match time, on Save & exit, and when the app goes to the background.
+   * False when the write did not land (storage full or blocked).
+   */
+  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => boolean;
   /** The player's side: he may change the plan at the breaks (N11). */
   planSide?: 'home' | 'away';
   /** The player's side, when he has the coach-call chips (#73; the Coach calls setting). */

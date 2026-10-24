@@ -59,11 +59,16 @@ export function readLiveMatch(): LiveMatchRecord | null {
   }
 }
 
-export function writeLiveMatch(r: LiveMatchRecord): void {
+/** Write the record. False when storage is missing, full or blocked: nothing was stored. */
+export function writeLiveMatch(r: LiveMatchRecord): boolean {
   try {
-    store()?.setItem(key(), JSON.stringify(r));
+    const s = store();
+    if (!s) return false;
+    s.setItem(key(), JSON.stringify(r));
+    return true;
   } catch {
     // Storage full or blocked: the match can still be played, just not resumed.
+    return false;
   }
 }
 

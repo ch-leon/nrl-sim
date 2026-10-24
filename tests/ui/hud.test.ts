@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fmtMoney, moneyTile, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice } from '../../src/ui/hud';
+import { fmtMoney, moneyTile, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice } from '../../src/ui/hud';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import { createNewGame, getState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
@@ -116,6 +116,7 @@ describe('a parked live match (Save & exit)', () => {
     expect(RESUME_MATCH_LABEL).toBe('Resume match');
     expect(MATCH_STILL_ON_TEXT).toBe('Your match is still on. Advance Week resumes it.');
     expect(MATCH_SAVED_TEXT).toBe('Match saved. Advance Week resumes it.');
+    expect(MATCH_NOT_SAVED_TEXT).toBe("Couldn't save the match. It is still going.");
     expect(SKIPPING_EXIT_TEXT).toBe('Skipping to full time.');
     expect(HELD_WEEK_TEXT).toMatch(/still being played/);
   });

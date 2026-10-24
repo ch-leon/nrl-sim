@@ -100,8 +100,8 @@ export interface LivePlaybackOptions {
   goldenPoint?: boolean;
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
   resumeAt?: number;
-  /** A call or a plan change was made, or the tick moved on a resumable match: keep the record (resume after the app is killed). */
-  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => void;
+  /** A call, a plan change, the periodic write, Save & exit, or the app going to the background. False when the write did not land. */
+  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => boolean;
   fixture: Fixture | undefined;
   overlay: MatchOverlayHandle | null;
   /** Ease the camera back out after a big moment's close-up. */
@@ -260,9 +260,12 @@ export class LivePlayback {
     return this.runner.tick;
   }
 
-  /** Keep the resume record up to date (the app is going to the background, or Save & exit). */
-  saveProgress(): void {
-    this.persistProgress();
+  /**
+   * Keep the resume record up to date (the app is going to the background, or Save & exit).
+   * False when the write did not land.
+   */
+  saveProgress(): boolean {
+    return this.persistProgress();
   }
 
   /**
@@ -274,11 +277,13 @@ export class LivePlayback {
     return !this.finishEmitted && !this.awaitingSkip;
   }
 
-  /** Write the record now and start the interval again from this tick. */
-  private persistProgress(): void {
-    if (this.finishEmitted) return;
-    this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans);
+  /** Write the record now and start the interval again from this tick. False when the write did not land. */
+  private persistProgress(): boolean {
+    if (this.finishEmitted) return false;
+    const wrote = this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans) ?? true;
+    if (!wrote) return false;
     this.lastSavedTick = this.runner.tick;
+    return true;
   }
 
   /**
@@ -289,7 +294,8 @@ export class LivePlayback {
   private maybePersist(): void {
     if (this.finishEmitted || this.skipping || this.awaitingSkip) return;
     if (!liveMatchSaveDue(this.runner.tick, this.lastSavedTick)) return;
-    this.persistProgress();
+    // A failed write backs off a whole interval, so a full disk is not hit every tick.
+    if (!this.persistProgress()) this.lastSavedTick = this.runner.tick;
   }
 
   getSpeed(): PlaybackSpeed {

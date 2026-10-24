@@ -12,7 +12,7 @@ import { createNewGame, getState, setState, type Fixture } from '../../src/core/
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, weekHeld } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
-import { LIVE_MATCH_SAVE_SECONDS, LIVE_MATCH_SAVE_TICKS, liveMatchSaveDue, readLiveMatch } from '../../src/systems/liveMatchRecord';
+import { LIVE_MATCH_SAVE_SECONDS, LIVE_MATCH_SAVE_TICKS, liveMatchSaveDue, readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
 import { playerMatchPending, resumePlayerMatch } from '../../src/systems/matchday';
 import { MatchRecorder, runMatch } from '../../src/match/league/match';
 import { Runner } from '../../src/match/core/engine';
@@ -253,6 +253,33 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(weekHeld()).toBe(false);
     expect(getState().week).toBe(week + 1);
   }, 60_000);
+
+  it('a full storage does not claim the record was written, and the previous record stays', () => {
+    fakeStorage();
+    newGame(42);
+    advanceWeek();
+    const live = started[0]!.live!;
+    expect(readLiveMatch()!.tick).toBe(0);
+    const storage = (globalThis as { localStorage: { setItem: (k: string, v: string) => void } }).localStorage;
+    storage.setItem = () => { throw new Error('full'); };
+    expect(writeLiveMatch({ ...readLiveMatch()!, tick: 40 })).toBe(false);
+    expect(live.onProgress?.(live.calls ?? [], 80, live.plans ?? [])).toBe(false);
+    // The kick-off record is still what a reload would resume.
+    expect(readLiveMatch()!.tick).toBe(0);
+    expect(playerMatchPending()).toBe(true);
+    expect(weekHeld()).toBe(true);
+    // The match can still be finished; the failed write did not trap the week.
+    bus.emit('match:finished', {
+      fixture: started[0]!.fixture,
+      result: {
+        homeScore: 0, awayScore: 0, events: [], injuries: [],
+        stats: { possession: [0, 0], tackles: [0, 0], errors: [0, 0], tries: [0, 0] },
+        weather: live.weather, momentumTimeline: [],
+      },
+    });
+    expect(weekHeld()).toBe(false);
+    expect(playerMatchPending()).toBe(false);
+  });
 
   it('a change of plan at half-time (N11) changes the match, and the match with its plan is what counts', () => {
     newGame(42);

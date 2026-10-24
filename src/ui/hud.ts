@@ -72,6 +72,9 @@ export const RESUME_MATCH_LABEL = 'Resume match';
 /** What Save & exit tells the player on the way back to the club. */
 export const MATCH_SAVED_TEXT = 'Match saved. Advance Week resumes it.';
 
+/** Save & exit when the record could not be written: stay in the match. */
+export const MATCH_NOT_SAVED_TEXT = "Couldn't save the match. It is still going.";
+
 /** Save & exit while Skip is waiting on the rest of the match. */
 export const SKIPPING_EXIT_TEXT = 'Skipping to full time.';
 
