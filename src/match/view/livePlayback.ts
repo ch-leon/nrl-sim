@@ -465,8 +465,10 @@ export class LivePlayback {
     const kick = this.replay ? this.replayKicks.kick : this.kicks.kick;
     this.kickLayer.update(kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
     this.traits.update(deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet, this.replay ? 1 : this.runner.speed);
-    this.wrestleBar.update(this.runner.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
-    this.sprintLayer.update(this.runner.cur, zoom, (side, slot) => {
+    // The picture on screen is the replay's tick, not the live match still paused underneath.
+    const shown = this.replay ? this.replay.snaps[this.replay.index]! : this.runner.cur;
+    this.wrestleBar.update(shown.wrestle, zoom, (w) => feet(w.side, w.slot));
+    this.sprintLayer.update(shown, zoom, (side, slot) => {
       const a = this.scene.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y, faceLeft: a.sprite.flipX } : null;
     });
@@ -546,16 +548,17 @@ export class LivePlayback {
     for (const ev of this.recorder.add(events, cur)) bus.emit('match:event', ev);
   }
 
-  /** One replay per try: the button stays up for eight seconds, and the match plays on until it is tapped. */
+  /** One replay per try: the button stays up for eight seconds, including after the siren. */
   private offerTryReplay(tryTick: number): void {
-    if (this.replayedTries.has(tryTick) || this.finishEmitted) return;
+    if (this.replayedTries.has(tryTick)) return;
     this.replayedTries.add(tryTick);
     this.opts.overlay?.offerReplay(() => void this.beginReplay(tryTick));
   }
 
   /** Pause, re-simulate the eight seconds before the try, and play them at ×1. */
   private async beginReplay(tryTick: number): Promise<void> {
-    if (this.replayGate !== 'off' || this.finishEmitted || this.awaitingSkip) return;
+    // Full time does not cancel the offer: at ×8 the siren often beats the eight seconds.
+    if (this.replayGate !== 'off' || this.awaitingSkip) return;
     const gen = ++this.replayGen;
     this.replayGate = 'loading';
     this.runner.pause();
@@ -570,7 +573,8 @@ export class LivePlayback {
       block = performance.now() - t0;
       snaps = await pending;
     } else snaps = null;
-    if (gen !== this.replayGen || this.finishEmitted) {
+    // Skip or leaving the match bumps the generation. The siren, during the wait, does not.
+    if (gen !== this.replayGen) {
       if (this.replayGate === 'loading') this.replayGate = 'off';
       return;
     }
@@ -582,11 +586,12 @@ export class LivePlayback {
     this.opts.overlay?.noteReplayBlock(block);
     if (snaps.length === 0) {
       this.replayGate = 'off';
-      if (this.holds === 0 && !this.awaitingSkip) this.runner.play();
+      if (this.holds === 0 && !this.finishEmitted && !this.awaitingSkip) this.runner.play();
       return;
     }
     this.replayKicks.clear();
     this.traits.clear();
+    this.popups.clear();
     this.replay = { snaps, index: 0, acc: 0 };
     this.feedReplay(snaps[0]!);
     this.replayGate = 'playing';
@@ -650,11 +655,11 @@ export class LivePlayback {
     this.replay = null;
     this.replayKicks.clear();
     this.replayGate = 'off';
-    if (was !== 'off') {
-      this.traits.clear();
+    if (was === 'off') return;
+    this.traits.clear();
+    this.popups.clear();
     this.opts.overlay?.setReplaying(false);
     this.opts.overlay?.showLiveScore();
-  }
   }
 
   private finish(): void {

@@ -134,6 +134,12 @@ export class PopupLayer {
     return oldest.text;
   }
 
+  /** Drop every shout. A replay must not keep the live match's words on the rewound picture. */
+  clear(): void {
+    for (const l of this.live) l.text.setVisible(false);
+    this.live.length = 0;
+  }
+
   destroy(): void {
     for (const t of this.pool) t.destroy();
     this.pool.length = 0;

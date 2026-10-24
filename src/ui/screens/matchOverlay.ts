@@ -398,7 +398,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const errorLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Errors 0 / 0' });
   const callsLabel = el('div', { class: 'nrl-mo-stat-line', text: '' });
   callsLabel.style.display = 'none';
-  const statsBody = el('div', { class: 'nrl-mo-stats-body' }, possLabel, possBar, tackleLabel, errorLabel, callsLabel);
+  // Possession and the tackle count stay on the live match while a replay rewinds the scoreboard.
+  const statsNote = el('div', { class: 'nrl-mo-stat-note', text: 'Live match', attrs: { hidden: '' } });
+  const statsBody = el('div', { class: 'nrl-mo-stats-body' }, statsNote, possLabel, possBar, tackleLabel, errorLabel, callsLabel);
   // #18: stats start collapsed on phones so the pitch stays clear.
   let statsOpen = typeof window === 'undefined' || window.innerWidth > 600;
   const statsToggle = button(statsOpen ? 'Stats ▾' : 'Stats ▸', () => {
@@ -484,6 +486,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     banner.hidden = true;
     banner.classList.remove('nrl-mo-banner-in');
     bannerWasTry = false;
+    bannerTimer = null;
   };
 
   const showBanner = (b: ScoreBanner, score: string): void => {
@@ -572,15 +575,19 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       callsLabel.textContent = callsLine(made, paid);
     },
     setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void {
-      if (root.classList.contains('nrl-mo-final')) return;
       liveClock = true;
       // Golden point (N9.4): its own clock from 00:00.
       clockEl.textContent = formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes);
+      // Full time keeps its label, except while a replay is showing an earlier half.
+      if (root.classList.contains('nrl-mo-final') && !root.classList.contains('nrl-mo-replaying')) {
+        halfEl.textContent = 'Full-time';
+        return;
+      }
       halfEl.textContent = half === 1 ? '1st' : half === 2 ? '2nd' : 'Golden point';
     },
     offerReplay(onTap: () => void): void {
       clearReplayOffer();
-      if (root.classList.contains('nrl-mo-final')) return;
+      // Still offered after the siren: at ×8 the last try's eight seconds often include full time.
       replayBtn = button('Replay', () => {
         clearReplayOffer();
         onTap();
@@ -595,9 +602,16 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       root.classList.toggle('nrl-mo-replaying', on);
       replayTag?.remove();
       replayTag = null;
-      if (!on) return;
-      replayTag = el('div', { class: 'nrl-mo-replay-tag', text: 'REPLAY', attrs: { role: 'status' } });
-      root.append(replayTag);
+      statsNote.hidden = !on;
+      statsToggle.textContent = on ? (statsOpen ? 'Live ▾' : 'Live ▸') : statsOpen ? 'Stats ▾' : 'Stats ▸';
+      if (on) {
+        // The banner still shows the try's score. Hide it while the board is rewound, and bring it back if its time has not run out.
+        banner.hidden = true;
+        replayTag = el('div', { class: 'nrl-mo-replay-tag', text: 'REPLAY', attrs: { role: 'status' } });
+        root.append(replayTag);
+        return;
+      }
+      if (bannerTimer) banner.hidden = false;
     },
     setScore(home: number, away: number): void {
       scoreEl.textContent = `${home} – ${away}`;
@@ -700,6 +714,8 @@ body.nrl-match-active .nrl-toast-stack { top: auto; bottom: calc(7.5rem + env(sa
 }
 .nrl-mo-stats-toggle { width: 100%; margin-bottom: 0.35rem; }
 .nrl-mo-stat-line { font-size: 0.7rem; margin: 0.15rem 0; }
+.nrl-mo-stat-note { font-size: 0.62rem; font-weight: bold; letter-spacing: 0.04em; margin: 0 0 0.15rem; }
+.nrl-mo-stat-note[hidden] { display: none; }
 .nrl-mo-poss-bar { height: 0.6rem; border: 2px solid #000; background: #b34747; margin: 0.2rem 0; }
 .nrl-mo-poss-fill { display: block; height: 100%; background: #4779b3; width: 50%; }
 .nrl-mo-commentary {
@@ -802,7 +818,6 @@ body.nrl-match-final .nrl-toast-stack { bottom: 3.75rem; }
   pointer-events: none; padding: 0.35rem 0.8rem; background: #1a1a2e; color: #fff; border: 3px solid #000;
   font-weight: bold; letter-spacing: 0.08em; box-shadow: 3px 3px 0 #000;
 }
-.nrl-mo-final .nrl-mo-replay, .nrl-mo-final .nrl-mo-replay-tag { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .nrl-mo-banner-in, .nrl-mo-scored, .nrl-mo-chip.nrl-mo-scored, .nrl-mo-banner-extra { animation: none; }
 }
