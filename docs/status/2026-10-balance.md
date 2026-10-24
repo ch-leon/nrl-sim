@@ -46,8 +46,11 @@ late lead, and this step.
 Runs: `20261024-134002-break-rule`, `20261024-135701-kick-chase-step-confirm`,
 `20261024-135245-kick-chase-step`. The plan is `balance/plans/break-rule.json`.
 The golden even match is unchanged, because no side in that match is given the
-rule. N14 turns the rule on for rivals. N14.2 counts the switches over a season
-and logs any style more than 4 points from even. It does not move a preset.
+rule. N14 turns the rule on for rivals. N14.2's season (10 seeds × 3, Normal,
+10,354 rival games) changed a plan 2.51 times a match. Still more than 4 points
+off, and left for a later sweep: at a level rating Grind +5.7 and Expansive
+−6.9; against strength Expansive −5.7, Kick-chase +4.5, All-out +5.3.
+Compressed, which was +6.4 before the rule, is now +0.1. No preset was moved.
 
 ## N13.1 Presets back in balance (24 Oct)
 
