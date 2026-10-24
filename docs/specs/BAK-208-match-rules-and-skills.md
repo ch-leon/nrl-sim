@@ -186,7 +186,13 @@ second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip 
 | **Conversion** | After every try | *Implemented in BAK-207 2c:* a Nines drop kick in line with the try, from where the posts look widest; GOAL! / MISSED! |
 
 Every kick pop-ups its type (BOMB!, GRUBBER!, CHIP!, CROSS-FIELD!, plain KICK! for
-territory); REGATHER! and DROPPED! follow. The camera going wide waits for E.
+territory); REGATHER! and DROPPED! follow. **The camera goes wide** (N15.3, #297): from the kick's
+third tick in the air the view reads where it will land (the sim flies it on a fixed curve)
+and frames the landing, the kicker and the top of the flight at the widest whole-number
+zoom that holds them; a trail follows the ball from the boot and fades after the catch or
+the bounce, and the framing is back on the ball within a second. A bomb or a cross-field
+kick rings the two under it as it comes down and lights the one who takes it; a grubber
+leaves a skid mark at each hop (`src/match/view/kickLayer.ts`, tuning reference §9).
 **Touch and dead ball** (BAK-207 2d): the side that touched the ball last loses it. Into
 touch → TOUCH, a play-the-ball 10 m in from touch for the other side (no scrums); a carrier
 held on the touchline can be bundled out (INTO TOUCH!). Dead in-goal or over the dead-ball

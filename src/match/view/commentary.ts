@@ -273,7 +273,7 @@ function planLabel(detail: string | undefined): string | undefined {
  * the end of its flight and then a bounce or a ball lying loose. A grubber's hops
  * skim close to the ground but never lie on it two ticks running.
  */
-const GROUNDED_LIFT = 1e-4;
+export const GROUNDED_LIFT = 1e-4;
 
 /**
  * Follows one match and says each moment. Give it every event in order, said or

@@ -1,0 +1,5 @@
+{
+  "name": "nrl-sim",
+  "install": "bash scripts/cloud-setup.sh",
+  "chromeExecutablePath": "/opt/pw-browsers/chromium"
+}

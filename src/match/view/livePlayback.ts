@@ -32,6 +32,7 @@ import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
+import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
 import { liveMatchSaveDue } from '../../systems/liveMatchRecord';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
@@ -57,6 +58,9 @@ export const LIVE_DEFAULT_SPEED: PlaybackSpeed = 4;
 const DEPTH_POPUP = 74_000;
 /** The bonus zone's glow lies on the ground: over the field (−100k), under the shadows (−80k) and every sprite. */
 const DEPTH_ZONE = -85_000;
+/** A kick's landing mark, skids and contest rings lie on the ground: over the shadows (−80k), under the carrier's ring (−79,998) and every sprite. Its trail is in the air, over the players and under the pop-ups. */
+const DEPTH_KICK_GROUND = -79_999;
+const DEPTH_KICK_AIR = DEPTH_POPUP - 2;
 /** What the commentary says while a skipped match is played elsewhere (N10.4). */
 export const SKIPPING_TEXT = 'Skipping to full time…';
 
@@ -80,6 +84,8 @@ interface Sprite {
 export interface LivePlaybackScene extends ViewSurface {
   players: Record<Side, readonly (ViewSurface['players'][Side][number] & { sprite: Sprite })[]>;
   cameras: { main: { zoom: number } };
+  /** The sides' colours (the carrier ring's), for the kick contest's rings. */
+  readonly sideColors?: Readonly<Record<Side, number>>;
 }
 
 export interface LivePlaybackOptions {
@@ -120,6 +126,9 @@ export class LivePlayback {
   private readonly wrestleBar: WrestleBar;
   private readonly sprintLayer: SprintLayer;
   private readonly zone: ZoneLayer;
+  /** Kicks go wide (N15.3): the kick being watched, and its trail and contest. */
+  private readonly kicks = new KickWatch();
+  private readonly kickLayer: KickLayer;
   private readonly recorder: MatchRecorder;
   /** The ticker's lines (N15.2): it hears every event, said or not. */
   private readonly commentator: Commentator;
@@ -154,6 +163,7 @@ export class LivePlayback {
       this.maybePersist();
       // The commentator watches the ball land: a kick picked up off the ground is a scoop, not a catch.
       this.commentator.ball(this.runner.cur.ball, this.runner.cur.tick);
+      if (!this.skipping) this.kicks.tick(this.runner.cur);
     };
     this.runner.setSpeed(this.speed);
     // A resumed match plays on, silently, to where it was.
@@ -170,6 +180,7 @@ export class LivePlayback {
     this.wrestleBar = new WrestleBar(scene, DEPTH_POPUP);
     this.sprintLayer = new SprintLayer(scene, DEPTH_POPUP - 1);
     this.zone = new ZoneLayer(scene, DEPTH_ZONE, (fx, fy) => scene.fieldToWorld(fx, fy));
+    this.kickLayer = new KickLayer(scene, { air: DEPTH_KICK_AIR, ground: DEPTH_KICK_GROUND }, () => scene.sideColors ?? { home: 0xffffff, away: 0xffffff });
     this.view.draw(this.runner.prev, this.runner.cur, 0, 1);
   }
 
@@ -324,6 +335,7 @@ export class LivePlayback {
     }
     this.awaitingSkip = true;
     this.skipping = true;
+    this.kicks.clear();
     this.runner.pause();
     this.opts.overlay?.comment(SKIPPING_TEXT);
     void elsewhere({ home: this.opts.home, away: this.opts.away, opts: this.runOptions() })
@@ -416,6 +428,7 @@ export class LivePlayback {
     };
     this.popups.update(deltaMs, zoom, feet);
     this.zone.update(deltaMs);
+    this.kickLayer.update(this.kicks.kick, deltaMs, zoom, (fx, fy) => this.scene.fieldToWorld(fx, fy), feet);
     this.wrestleBar.update(this.runner.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
     this.sprintLayer.update(this.runner.cur, zoom, (side, slot) => {
       const a = this.scene.players[side][slot];
@@ -429,11 +442,27 @@ export class LivePlayback {
     this.wrestleBar.destroy();
     this.sprintLayer.destroy();
     this.zone.destroy();
+    this.kickLayer.destroy();
+  }
+
+  /**
+   * The framing a kick asks of the camera (N15.3): where it comes down, the kicker and
+   * the top of its flight, at the widest whole-number zoom from `base` they need, while
+   * it is up and for a moment after it comes down; null otherwise (the camera follows
+   * the ball again).
+   */
+  kickFraming(view: { width: number; height: number }, base: number): Frame | null {
+    const k = this.kicks.kick;
+    if (!k || !this.kickLayer.active || !framingHeld(this.kickLayer.msSinceDown)) return null;
+    return kickFrame(kickPoints(k, (fx, fy) => this.scene.fieldToWorld(fx, fy)), view, base);
   }
 
   private onSimEvents(events: readonly SimEvent[]): void {
     const cur = this.runner.cur;
     for (const e of events) {
+      // A kick struck or brought down (N15.3); a skipped or resumed stretch shows none.
+      if (this.skipping) this.kicks.clear();
+      else this.kicks.event(e, cur);
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
       const line = this.commentator.line(e, cur.score);
       if (line && !this.skipping) this.opts.overlay?.comment(line);

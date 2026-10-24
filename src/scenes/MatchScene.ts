@@ -33,6 +33,7 @@ import {
   type PlaybackBall,
   type PlaybackSpeed,
 } from '../match/view/livePlayback';
+import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, type Frame } from '../match/view/kickLayer';
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
@@ -253,6 +254,10 @@ export class MatchScene extends Phaser.Scene {
   public get homeId(): string {
     return this.home.clubId;
   }
+  /** The sides' colours (the carrier ring's), for the kick contest's rings (N15.3). */
+  public get sideColors(): Readonly<Record<TeamSide, number>> {
+    return this.markerColors;
+  }
 
   private home!: TeamSheet;
   private away!: TeamSheet;
@@ -291,6 +296,11 @@ export class MatchScene extends Phaser.Scene {
   };
   /** Zoom this scene last set; a mismatch means the player zoomed by hand. */
   private autoZoom: number | null = MATCH_ZOOM;
+  /** A kick in the air: where the camera holds and at what zoom (N15.3), or null to follow the ball. */
+  private kickFrame: Frame | null = null;
+  /** Until this loop time the camera eases back from a kick's framing at the quick rate; whether it is doing so this frame. */
+  private kickBackUntil = 0;
+  private kickBack = false;
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
   private playback: LivePlayback | null = null;
@@ -495,6 +505,12 @@ export class MatchScene extends Phaser.Scene {
     // Advance playback (fires due events, steps sprites) before panning so the
     // camera follows the freshly-moved ball this frame.
     if (this.playback) this.playback.update(delta);
+    // A kick goes wide (N15.3): the camera holds the kicker and where the ball comes down
+    // while it is up, then comes back to the ball within a second of the catch or the bounce.
+    const cam0 = this.cameras.main;
+    this.kickFrame = this.playback?.kickFraming({ width: cam0.width, height: cam0.height }, this.zoomTarget) ?? null;
+    if (this.kickFrame) this.kickBackUntil = time + KICK_RETURN_MS;
+    this.kickBack = !this.kickFrame && time < this.kickBackUntil;
     // The coach's chips follow the play a few times a second (#73).
     if ((this.callsEl || this.planBtn) && time - this.chipsAt > 150) {
       this.chipsAt = time;
@@ -508,14 +524,15 @@ export class MatchScene extends Phaser.Scene {
     // and roundPixels (global config) avoids shimmering.
     if (!this.ball) return;
     const cam = this.cameras.main;
-    const tx = this.ball.gx - cam.width / 2;
-    const ty = this.ball.gy - cam.height / 2;
-    // Frame-rate independent; the speed cap scales with ×2/×4 playback.
-    const maxPx = PAN_MAX_PX_PER_MS * (this.playback?.getSpeed() ?? 1);
-    cam.setScroll(
-      panTowards(cam.scrollX, tx, delta, PAN_RATE_PER_S, maxPx),
-      panTowards(cam.scrollY, ty, delta, PAN_RATE_PER_S, maxPx),
-    );
+    const kf = this.kickFrame;
+    const tx = (kf ? kf.cx : this.ball.gx) - cam.width / 2;
+    const ty = (kf ? kf.cy : this.ball.gy) - cam.height / 2;
+    // Frame-rate independent; the speed cap scales with ×2/×4 playback. Going out to a
+    // kick and back the ease alone sets the pace, so the return takes under a second at ×1 too.
+    const kicking = kf !== null || this.kickBack;
+    const maxPx = kicking ? KICK_PAN_MAX_PX_PER_MS : PAN_MAX_PX_PER_MS * (this.playback?.getSpeed() ?? 1);
+    const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : PAN_RATE_PER_S;
+    cam.setScroll(panTowards(cam.scrollX, tx, delta, rate, maxPx), panTowards(cam.scrollY, ty, delta, rate, maxPx));
     // A live match's pop-ups and bars sit over the sprites where the camera now has them.
     if (this.playback instanceof LivePlayback) this.playback.late(delta);
   }
@@ -554,12 +571,14 @@ export class MatchScene extends Phaser.Scene {
         this.tagActor = null;
       }
     }
-    // Ease toward this beat's zoom unless the player has taken over (wheel/pinch).
+    // Ease toward this beat's zoom, or a kick's (N15.3), unless the player has taken over (wheel/pinch).
     if (this.autoZoom !== null) {
       if (Math.abs(cam.zoom - this.autoZoom) > 0.01) {
         this.autoZoom = null;
       } else {
-        cam.setZoom(easeZoom(cam.zoom, this.zoomTarget, delta));
+        const kf = this.kickFrame;
+        const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : undefined;
+        cam.setZoom(easeZoom(cam.zoom, kf ? kf.zoom : this.zoomTarget, delta, rate));
         this.autoZoom = cam.zoom;
       }
     }
