@@ -456,7 +456,8 @@ export interface MatchResult {
   six trait moves. `contestLayer` draws a line-break flash and the dust of a big hit.
   `zoneLayer` draws the bonus-zone glow. `wrestleBar` and `sprintLayer` draw the wrestle
   and the sprint. `commentary` is the DOM ticker, not a drawn layer. The instant replay
-  is a second playback of the same seed, on its own runner. `legsLayer` is the lab's.
+  is a second playback of the same seed (`replayRange`), drawn by these layers. It does not
+  step the live runner, and nothing it draws is read back by the sim. `legsLayer` is the lab's.
   The DOM overlay (`matchOverlay.ts`) is the scoreboard, the controls and the
   final-whistle actions.
 - **Cost:** a 2 × 9:00 match is 21,600 ticks, about **300 ms** headless in Node after
