@@ -6,7 +6,8 @@
 import { bus, type LiveMatchData } from '../core/events';
 import { getState, setState, type Fixture, type GameState, type RivalClub } from '../core/state';
 import { registerTickHook, resumeWeek, weekHeld, TICK_ORDER } from '../core/time';
-import { clearLiveMatch, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
+import { clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
+import { NINES } from '../match/league/rules';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
@@ -58,10 +59,14 @@ export function playerMatchPending(): boolean {
   return parked !== null && weekHeld();
 }
 
+/** Said once when a mid-match save from the old halves cannot be carried on. */
+export const MATCH_RESTARTED_TEXT = 'This match restarted under the new rules.';
+
 /**
  * Back at the club with the match still on: start the Match scene again from
  * the record. The week stays held (one hold, from kick-off), so the result
  * still lands once, at full time. Returns false when there is nothing to resume.
+ * A record from the old halves starts again at the kick-off.
  */
 export function resumePlayerMatch(): boolean {
   if (!parked || !weekHeld()) return false;
@@ -70,10 +75,18 @@ export function resumePlayerMatch(): boolean {
   // Prefer the stored record (a kill, or a write newer than this page). A missing
   // or other match's record keeps the calls and tick already on the parked match.
   if (rec && rec.seed === live.seed) {
-    live.calls = [...rec.calls];
-    live.plans = rec.plans ? [...rec.plans] : [];
-    if (rec.tick > 0) live.resumeAt = rec.tick;
-    else delete live.resumeAt;
+    if (rec.tick > 0 && !liveMatchSameRules(rec)) {
+      live.calls = [];
+      live.plans = [];
+      delete live.resumeAt;
+      writeLiveMatch({ ...rec, calls: [], plans: [], tick: 0, halfMinutes: NINES.halfMinutes });
+      bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info' });
+    } else {
+      live.calls = [...rec.calls];
+      live.plans = rec.plans ? [...rec.plans] : [];
+      if (rec.tick > 0) live.resumeAt = rec.tick;
+      else delete live.resumeAt;
+    }
   }
   bus.emit('match:started', { fixture: parked.fixture, home: parked.home, away: parked.away, live });
   return true;
@@ -274,14 +287,19 @@ export function registerPlayerMatchSystem(): void {
     };
     // A live match the app was closed in the middle of (#73): this is the same match.
     const prior = readLiveMatch();
-    const resumed =
+    const sameMatch =
       prior && prior.season === state.season && prior.week === state.week && prior.round === fixture.round && prior.homeId === fixture.homeId && prior.seed === seed ? prior : null;
+    // A v19 mid-match save has no half length. Re-simming that tick under 7:00
+    // rules is a different match, so it starts again from the kick-off.
+    const stale = sameMatch && sameMatch.tick > 0 && !liveMatchSameRules(sameMatch);
+    if (stale) bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info' });
+    const resumed = stale ? null : sameMatch;
     // The match on screen is the match (BAK-207; coach calls #73). The week
     // holds here; the result and the rest of the week come at full time, from
     // what the player watched (and called).
     if (!ctx.fastForward && ctx.hold) {
       ctx.hold();
-      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0 };
+      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes };
       writeLiveMatch(record);
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
         if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;

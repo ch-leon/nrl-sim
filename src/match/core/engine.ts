@@ -127,7 +127,10 @@ export class Runner {
       this.acc += (slow * this.slowFactor + (ms - slow)) * this._speed;
     } else this.acc += ms * this._speed;
     let n = 0;
-    while (this.acc >= TICK_MS && n < MAX_TICKS_PER_UPDATE) {
+    // Stop on the tick the sim finishes. Another step in this frame would
+    // snapshot the last tick's events again (a tackle, full time) and the
+    // recorder would count them twice. Smart pace makes a fast frame do that.
+    while (this.acc >= TICK_MS && n < MAX_TICKS_PER_UPDATE && !this.sim.finished) {
       this.stepOnce();
       this.acc -= TICK_MS;
       n++;
@@ -180,6 +183,9 @@ export class Runner {
   }
 
   private stepOnce(): void {
+    // A finished sim's step is a no-op that leaves the last tick's events in
+    // place. Stepping it again would hand those events to onEvents a second time.
+    if (this.sim.finished) return;
     this._prev = this._cur;
     this.sim.step();
     this._cur = this.sim.snapshot();

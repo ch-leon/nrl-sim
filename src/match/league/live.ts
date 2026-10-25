@@ -749,7 +749,12 @@ export class LiveSim implements MatchSim {
 
   // ── Tick ──────────────────────────────────────────────────────────────────
   step(): void {
-    if (this.finished) return;
+    if (this.finished) {
+      // The last tick's events stay until the next step replaces them. A step
+      // after full time replaces them with nothing, so they cannot be recorded again.
+      this.events = [];
+      return;
+    }
     this.tick++;
     this.events = [];
     // Coach calls due this tick (#73).

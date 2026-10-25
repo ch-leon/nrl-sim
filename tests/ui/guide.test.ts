@@ -43,6 +43,12 @@ describe('GUIDE_PAGES', () => {
     expect(text).toContain('Kicker or Captain');
   });
 
+  it('the Ladder page quotes golden point from the rule', () => {
+    const ladder = GUIDE_PAGES.find((p) => p.id === 'ladder')!;
+    const text = ladder.sections.flatMap((s) => [s.text ?? '', ...(s.bullets ?? [])]).join(' ');
+    expect(text).toContain(`golden point: ${NINES.goldenPointMinutes} more minutes`);
+  });
+
   it('falls back to the first page for an unknown id', () => {
     expect(guidePage('nines').id).toBe('nines');
     expect(guidePage('nope').id).toBe('week');
