@@ -23,8 +23,38 @@ field goal) plays at twice the chosen speed, eased over 0.4 s; the half-time
 card goes on after 4.5 s at every speed unless it is tapped; the chosen speed
 is kept on the save (v20), and an old save still starts at ×4.
 
-The preset table, the soak and the economy numbers for this cut are filled in
-below once those runs finish.
+Presets, `balance/runs/20261025-080627-presets` on `c6770da`, 200 seeds both
+ways (400 matches). Side win, 45–55% is the band:
+
+| Preset | Side win | |
+|---|---:|---|
+| Grind | 44.8% | 0.2 under. Standard error on 400 matches is about 2.5 points, so this is not a miss a knob change can honestly fix. |
+| Expansive | 50.2% | in |
+| Kick-chase | 53.0% | in |
+| All-out | 47.3% | in |
+| Rush | 44.8% | same as Grind |
+| Compressed | 47.8% | in |
+
+No preset knob was moved. Grind's offloads are 4.5, under the new 6–11 band; that is the style (it was already under the old 8–14). Completion sits at 68–72%, a shade under 70 on the expansive, all-out and rush rows, as it did on 9:00 halves. A half-time change from Grind to Expansive still offloads more (6.7 against 4.9 over 40 matches).
+
+Soak, `npm run soak -- --difficulties easy,normal,hard --jobs 4` on `c6770da`. 20 seeds × 5 seasons × idle and managed × Easy, Normal and Hard, plus one 2-season managed run of each old save (v1–v19; the v20 playback-speed migration adds the nineteenth). **139 runs, no problems, forfeits none.** About 20 minutes on 4 jobs. No prize, gate or difficulty factor was moved. Hard's prize and grant stay ×1.2, Easy's prize and grant ×0.85 and gate ×0.96, Normal ×1.
+
+Season 5, against the 24 Oct matrix on `6f9d323` (that table stays in `docs/status/2026-10-qa.md`). Money is the balance at the rollover.
+
+| | Record | Pos | Top 8 | Prem | Sack | Money | 24 Oct money |
+|---|---|---:|---:|---:|---:|---:|---:|
+| idle Easy (20) | 15.3-1.2-7.5 | 3.0 | 90% | 35% | 5% | $1,080k | $1,186k (19) |
+| managed Easy (20) | 20.7-0.3-3.1 | 1.1 | 100% | 65% | 5% | $798k | $1,124k |
+| idle Normal (11) | 12.9-1.2-9.9 | 6.7 | 64% | 18% | 45% | $817k | $748k (11) |
+| managed Normal (19) | 18.8-0.7-4.5 | 1.3 | 100% | 37% | 16% | $417k | $581k (19) |
+| idle Hard (4) | 16.3-0.5-7.3 | 2.0 | 100% | 0% | 0% | $687k | $883k (5) |
+| managed Hard (13) | 16.8-1.2-6.0 | 1.6 | 100% | 15% | 15% | $209k | $304k (11) |
+
+Shorter matches score fewer points, so prize and gate dollars are lower. Season-1 gates / prize, idle: Easy +$391k / +$40k (was +$405k / +$60k), Normal +$355k / +$34k (was +$375k / +$46k), Hard +$320k / +$22k (was +$339k / +$35k). Managed season 1: Easy +$469k / +$87k, Normal +$451k / +$74k, Hard +$404k / +$63k. Easy's mean balance is still above Normal's in every season (idle season 5 $1,080k against $817k; managed $798k against $417k).
+
+In the red is a season-end balance below zero. Managed Easy: 2 of 20 careers end there. Managed Normal: 4 of 20 end there, and 3 of the 19 who reach season 5 are negative at that rollover. Managed Hard: 7 of 20 end there. That is more than 1 in 16 managed runs. The factors were left as they are: the miss is fewer points on a shorter match, not a retune of the economy.
+
+A phone (844×390, touch, no taps) watched one match at the default ×4 in 3 min 21 s, siren at 14:00, and one at ×8 in 1 min 38 s. The half-time card went on by itself after 4.5 s both times. The aim was about 3½–4 minutes at ×4; 3:21 is a little under that, and the dead-time pace was not raised to close the gap. Commentary is 12.8px and stays on the screen without an ellipsis. At ×4 a line is the bright one for about half a second (median); at ×8 about a quarter of a second, with the dimmed line above holding the previous one. Held upright, the rotate card covers the match and the clock stays put (00:16, then 00:29 once it is sideways again).
 
 ## N13
 
