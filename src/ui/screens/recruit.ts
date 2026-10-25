@@ -132,6 +132,7 @@ const SCREEN_CSS = `
   background: #cfc9b4;
 }
 .nrl-badge-out { background: #e06666; color: #2a0000; }
+.nrl-badge-ban { background: #6b2d5b; color: #fff; }
 .nrl-badge-trait { background: #9fc5e8; color: #0b1d33; }
 .nrl-badge-trait-bad { background: #f0b27a; color: #2a1400; }
 .nrl-statbars { display: grid; gap: 0.15rem; margin-bottom: 0.4rem; }
@@ -217,6 +218,9 @@ export function PlayerCard(p: Player, opts: PlayerCardOpts = {}): HTMLElement {
   ];
   if (opts.showInjury && p.injuredWeeks > 0) {
     metaChildren.push(el('span', { class: 'nrl-badge nrl-badge-out', text: `OUT ${p.injuredWeeks}w` }));
+  }
+  if (opts.showInjury && (p.suspendedWeeks ?? 0) > 0) {
+    metaChildren.push(el('span', { class: 'nrl-badge nrl-badge-ban', text: `BAN ${p.suspendedWeeks}w` }));
   }
   for (const t of p.traits) {
     if (!(t.id in TRAITS)) continue;

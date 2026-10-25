@@ -122,6 +122,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
     morale,
     injuryRisk,
     injuredWeeks: 0,
+    suspendedWeeks: 0,
     traits,
     wage,
     contractWeeks,

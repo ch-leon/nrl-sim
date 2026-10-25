@@ -304,7 +304,9 @@ export function checkState(s: GameState): string[] {
     if (!c.squad || c.squad.length < Math.min(RIVAL_SQUAD_MIN, 13)) out.push(`${c.id} squad too small: ${c.squad?.length ?? 0}`);
     if (c.strength < STRENGTH_MIN || c.strength > STRENGTH_MAX) out.push(`${c.id} strength out of band: ${c.strength}`);
   }
-  if (s.eventDeck.pending.length > EVENTS.MAX_PENDING) out.push(`too many pending cards: ${s.eventDeck.pending.length}`);
+  const weeklyCards = s.eventDeck.pending.filter((p) => cardById(p.cardId)?.when?.offer !== 'rollover');
+  if (weeklyCards.length > EVENTS.MAX_PENDING) out.push(`too many pending cards: ${weeklyCards.length}`);
+  if (!Array.isArray(s.eventDeck.flags)) out.push('event deck has no chain flags');
   if (s.eventDeck.modifiers.some((m) => m.weeksLeft <= 0)) out.push('expired modifier kept');
   if (s.reputation < 1 || s.reputation > 100) out.push(`reputation out of range: ${s.reputation}`);
   // The lineup (#69): nine slots, nobody listed twice (men who have left are cleaned on match day, so they may linger a week).
@@ -359,6 +361,32 @@ export function asOldSave(s: GameState, version: number): Record<string, unknown
     out.freeAgents = strip(out.freeAgents as unknown[]);
   }
   if (version < 3) out.settings = { ...(raw.settings as object), difficulty: undefined };
+  // v21: bans and chain flags (#324). Stripped last so an earlier step that
+  // rebuilds the squad from `raw` does not put suspendedWeeks back.
+  if (version < 21) {
+    const stripBan = (list: unknown): unknown =>
+      Array.isArray(list)
+        ? list.map((p) => {
+            if (!p || typeof p !== 'object') return p;
+            const { suspendedWeeks: _s, ...rest } = p as { suspendedWeeks?: number };
+            return rest;
+          })
+        : list;
+    out.squad = stripBan(out.squad);
+    out.freeAgents = stripBan(out.freeAgents);
+    const league = out.league as GameState['league'] | undefined;
+    if (league?.clubs) {
+      out.league = {
+        ...league,
+        clubs: league.clubs.map((c) => (c.squad ? { ...c, squad: stripBan(c.squad) as Player[] } : c)),
+      };
+    }
+    const deck = out.eventDeck as GameState['eventDeck'] | undefined;
+    if (deck) {
+      const { flags: _f, ...rest } = deck;
+      out.eventDeck = rest;
+    }
+  }
   out.version = version;
   return out;
 }

@@ -706,8 +706,18 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   line-height: 1.2;
   text-align: center;
 }
-.nrl-news { font-size: 0.85rem; }
-.nrl-news h2 { margin: 0 0 0.4rem; font-size: 1.05rem; }
+.nrl-screen-backdrop .nrl-news-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  width: min(96vw, 640px);
+  max-width: none;
+  padding: 0.55rem 0.65rem;
+}
+.nrl-news { font-size: 0.9rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-news-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-news-close { flex: 0 0 auto; margin-top: 0.45rem; align-self: stretch; }
+.nrl-news h2 { margin: 0 0 0.4rem; font-size: 1.05rem; flex: 0 0 auto; }
 .nrl-news h3 { margin: 0.6rem 0 0.2rem; font-size: 0.9rem; }
 .nrl-news-filters {
   display: flex;
@@ -717,7 +727,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-news-filter { flex: 0 0 auto; }
 .nrl-news-filter.nrl-news-active { background: #3a6ea5; color: #fff; }
-.nrl-news-list { max-height: 55vh; overflow-y: auto; }
+.nrl-news-list { overflow-y: visible; }
 .nrl-news-item {
   padding: 0.2rem 0.4rem;
   margin-bottom: 0.25rem;
@@ -735,19 +745,23 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   padding: 0.4rem 0.5rem;
   margin: 0 3px 0.6rem 0;
 }
-.nrl-event-title { font-weight: bold; font-size: 0.95rem; }
-.nrl-event-meta { font-size: 0.72rem; color: #555; }
-.nrl-event-text { margin: 0.3rem 0; overflow-wrap: anywhere; }
-.nrl-event-choices { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.nrl-event-title { font-weight: bold; font-size: 1rem; line-height: 1.25; }
+.nrl-event-meta { font-size: 0.75rem; color: #555; line-height: 1.3; }
+.nrl-event-text { margin: 0.35rem 0; overflow-wrap: anywhere; line-height: 1.35; font-size: 0.9rem; }
+.nrl-event-choices { display: flex; flex-direction: column; gap: 0.4rem; }
 .nrl-event-choice {
-  flex: 1 1 10rem;
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
+  white-space: normal;
+  min-height: 44px;
 }
-.nrl-event-choice-label { font-weight: bold; }
-.nrl-event-choice-hint { font-size: 0.72rem; opacity: 0.85; white-space: normal; font-weight: normal; }
+.nrl-event-choice-label { font-weight: bold; font-size: 0.95rem; line-height: 1.2; }
+.nrl-event-choice-hint { font-size: 0.78rem; opacity: 0.9; white-space: normal; font-weight: normal; line-height: 1.3; }
 .nrl-placebar {
   pointer-events: auto;
   position: fixed;

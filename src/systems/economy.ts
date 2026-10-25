@@ -285,10 +285,11 @@ export function handleBankruptcy(_state: GameState): GameState {
   const s = getState();
   let victim: Player | undefined;
   if (s.money < ECON.FORCED_SALE_FLOOR && s.squad.length > SQUAD_MIN) {
-    const spareFit = s.squad.filter((p) => p.injuredWeeks <= 0).length > SQUAD_MIN;
+    const spareFit = s.squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length > SQUAD_MIN;
     // Highest-paid player who can go (stable: first max in array order).
+    // A ban counts as not fieldable, the same as an injury (#324).
     for (const p of s.squad) {
-      if (!spareFit && p.injuredWeeks <= 0) continue;
+      if (!spareFit && p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0) continue;
       if (!victim || p.wage > victim.wage) victim = p;
     }
   }

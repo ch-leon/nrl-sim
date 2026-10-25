@@ -21,7 +21,7 @@ import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
 import { registerStatsSystem } from './systems/stats';
 import { registerBoardSystem } from './systems/board';
-import { registerEventsSystem } from './systems/events';
+import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
 import { initBoardUi } from './ui/screens/board';
 import { initMatchReport } from './ui/screens/matchReport';
@@ -163,9 +163,13 @@ async function boot(): Promise<void> {
   // which checks what the grounds actually draw and dumps the live state for the
   // save corpus (tests/fixtures/saves) before the first autosave. Nothing else reads these.
   if (new URLSearchParams(location.search).has('e2e')) {
-    const w = window as unknown as { __nrlGame?: Phaser.Game; __nrlState?: () => GameState; __nrlTutorialText?: string[] };
+    const w = window as unknown as {
+      __nrlGame?: Phaser.Game; __nrlState?: () => GameState; __nrlTutorialText?: string[];
+      __nrlShowCard?: (cardId: string) => boolean;
+    };
     w.__nrlGame = g;
     w.__nrlState = () => getState();
+    w.__nrlShowCard = plantPending;
     // Every tutorial step's copy, for scripts/e2e-webkit.mjs's fit check (#208).
     w.__nrlTutorialText = TUTORIAL_STEPS.map((st) => st.text);
   }

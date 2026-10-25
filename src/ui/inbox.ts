@@ -13,6 +13,7 @@ import { bus, type Events } from '../core/events';
 import { getState, type GameState } from '../core/state';
 import { cardById } from '../data/events';
 import { absWeek, chooseEvent, describeEffects, fillText } from '../systems/events';
+import { hasStaff } from '../systems/staff';
 import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
 import { el, button, openModal, closeScreen } from './dom';
 
@@ -205,7 +206,7 @@ export function decisionViews(state: GameState): DecisionView[] {
       weeksLeft: Math.max(1, ev.expiresAt - now),
       choices: card.choices.map((c, index) => ({
         index, label: c.label, isDefault: index === card.defaultChoice,
-        hint: ev.fee && c.effects.some((e) => e.kind === 'signSubject') ? `−$${ev.fee.toLocaleString('en-US')} fee, ${NEW_CONTRACT_WEEKS}-week deal` : describeEffects(c.effects),
+        hint: ev.fee && c.effects.some((e) => e.kind === 'signSubject') ? `−$${ev.fee.toLocaleString('en-US')} fee, ${NEW_CONTRACT_WEEKS}-week deal` : describeEffects(c.effects, { welfare: hasStaff(state, 'welfare') }),
       })),
     });
   }
@@ -255,6 +256,7 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
   let filter: NewsFilter = 'all';
 
   const content = el('div', { class: 'nrl-news' });
+  const body = el('div', { class: 'nrl-news-body' });
   const list = el('div', { class: 'nrl-news-list' });
   const decisions = el('div', { class: 'nrl-news-decisions' });
 
@@ -312,12 +314,11 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
     filters.append(btn);
   }
 
+  body.append(decisions, filters, list);
   content.append(
     el('h2', { text: 'News' }),
-    decisions,
-    filters,
-    list,
-    button('Close', () => closeScreen()),
+    body,
+    button('Close', () => closeScreen(), { class: 'nrl-news-close' }),
   );
   setFilter('all');
   renderDecisions();

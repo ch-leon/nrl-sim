@@ -9,17 +9,19 @@
 // else is announced in the news with the outcome line.
 import { getState, setState, type ActiveModifier, type GameState, type PendingEvent, type Player, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
-import { registerTickHook } from '../core/time';
+import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
 import { earnMoney } from '../data/club';
 import { overallRating } from '../data/player';
 import { TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
 import {
   cardById, EVENT_CARDS, type EventCardDef, type EventEffect, type SubjectRule,
 } from '../data/events';
-import { EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON } from '../config';
+import { BOARD, EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON, WILDCARDS } from '../config';
 import { marketWage, withDerivedStrength } from './rivals';
 import { NEW_CONTRACT_WEEKS, signingFee } from './freeagency';
 import { hasStaff, WELFARE_CARDS } from './staff';
+import { isFieldable } from './lineup';
+import { reviewSuspension, withSuspension } from './suspension';
 import { makeRng, type Rng } from '../utils/rng';
 import { clampMorale } from './morale';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
@@ -47,22 +49,42 @@ export function fillText(
 const signed = (n: number): string => (n >= 0 ? `+${n}` : `${n}`);
 const dollars = (n: number): string => `${n < 0 ? '−' : '+'}$${Math.abs(n).toLocaleString('en-US')}`;
 
+/** A risky chance after the Welfare Manager, who halves it (#324, #325). */
+export function effectiveChance(p: number, risk: boolean | undefined, welfare: boolean): number {
+  return risk && welfare ? p * WILDCARDS.WELFARE_CHANCE : p;
+}
+
+const formatPct = (p: number): string => {
+  const n = Math.round(p * 1000) / 10;
+  return Number.isInteger(n) ? `${n.toFixed(0)}%` : `${n}%`;
+};
+
+const banPhrase = (weeks: number | readonly [number, number]): string =>
+  (typeof weeks === 'number' ? `a ${weeks}-week ban` : `a ${weeks[0]}-${weeks[1]} week ban`);
+
 /** Short summary of what effects do, for choice buttons and news lines. */
-export function describeEffects(effects: readonly EventEffect[]): string {
-  const parts = effects.map((e): string => {
+export function describeEffects(effects: readonly EventEffect[], opts?: { welfare?: boolean }): string {
+  const parts = effects.flatMap((e): string[] => {
     switch (e.kind) {
-      case 'money': return dollars(e.amount);
-      case 'reputation': return `reputation ${signed(e.amount)}`;
-      case 'squadMorale': return `squad morale ${signed(e.amount)}`;
-      case 'playerMorale': return `morale ${signed(e.amount)}`;
-      case 'playerWage': return `wage ${signed(Math.round(e.pct * 100))}%`;
-      case 'playerTrait': return `${TRAITS[e.trait].name} trait`;
-      case 'signSubject': return 'sign them for the fee';
+      case 'money': return [dollars(e.amount)];
+      case 'reputation': return [`reputation ${signed(e.amount)}`];
+      case 'squadMorale': return [`squad morale ${signed(e.amount)}`];
+      case 'playerMorale': return [`morale ${signed(e.amount)}`];
+      case 'playerWage': return [`wage ${signed(Math.round(e.pct * 100))}%`];
+      case 'playerTrait': return [`${TRAITS[e.trait].name} trait`];
+      case 'signSubject': return ['sign them for the fee'];
+      case 'suspend': return [banPhrase(e.weeks)];
+      case 'boardPatience': return [`board patience ${signed(e.amount)}`];
+      case 'flag': return [];
+      case 'chance': {
+        const p = effectiveChance(e.p, e.risk, opts?.welfare === true);
+        return [`${formatPct(p)} chance of ${describeEffects(e.hit, opts)}`];
+      }
       case 'modifier': {
-        const what = describeEffects(e.effects);
-        if (e.trigger === 'weekly') return `${what} a week for ${e.weeks} weeks`;
-        if (e.weeks === 1) return `${what} if you ${e.trigger === 'win' ? 'win' : 'lose'} next week`;
-        return `${what} a ${e.trigger} for ${e.weeks} weeks`;
+        const what = describeEffects(e.effects, opts);
+        if (e.trigger === 'weekly') return [`${what} a week for ${e.weeks} weeks`];
+        if (e.weeks === 1) return [`${what} if you ${e.trigger === 'win' ? 'win' : 'lose'} next week`];
+        return [`${what} a ${e.trigger} for ${e.weeks} weeks`];
       }
     }
   });
@@ -73,7 +95,34 @@ export function describeEffects(effects: readonly EventEffect[]): string {
 
 /** The player's fit, signed squad members (juniors are not first-graders yet). */
 function fitSquad(state: GameState): Player[] {
-  return state.squad.filter((p) => p.injuredWeeks <= 0 && !p.junior);
+  return state.squad.filter((p) => isFieldable(p) && !p.junior);
+}
+
+/**
+ * How likely a trip or a night out is to land on this player (#325). A hothead
+ * and a low-morale player weigh more. A star is not singled out, and can still
+ * be the one.
+ */
+export function incidentWeight(p: Player): number {
+  return 1 + traitLevel(p.traits, 'hothead') * 2 + (p.morale < 45 ? 2 : 0);
+}
+
+/** Who an incident can land on: fit seniors, or any senior if the whole squad is out. */
+function incidentPool(state: GameState): Player[] {
+  const seniors = state.squad.filter((p) => !p.junior);
+  const fit = seniors.filter((p) => isFieldable(p));
+  return [...(fit.length > 0 ? fit : seniors)].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function pickWeightedPlayer(players: readonly Player[], rng: Rng, weight: (p: Player) => number): Player | null {
+  const total = players.reduce((t, p) => t + weight(p), 0);
+  if (total <= 0 || players.length === 0) return null;
+  let roll = rng.next() * total;
+  for (const p of players) {
+    roll -= weight(p);
+    if (roll < 0) return p;
+  }
+  return players[players.length - 1] ?? null;
 }
 
 /** Candidate players for a subject rule, best candidate first. Empty = card can't be drawn. */
@@ -118,12 +167,16 @@ function fixtureInRound(state: GameState, round: number) {
   return state.league.fixtures.find((f) => f.round === round && (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID));
 }
 
-/** Is `card` allowed this week? `now` is the absolute week of the tick drawing it. */
-export function isEligible(card: EventCardDef, state: GameState, now: number): boolean {
+/** Is `card` allowed this week? `now` is the absolute week of the tick drawing it.
+ *  Pass `{ rollover: true }` from the season hook; the weekly draw leaves it off,
+ *  so a trip card is never drawn mid-season. */
+export function isEligible(card: EventCardDef, state: GameState, now: number, opts?: { rollover?: boolean }): boolean {
   const deck = state.eventDeck;
+  if ((card.when?.offer === 'rollover') !== (opts?.rollover === true)) return false;
   if ((deck.cooldowns[card.id] ?? 0) > now) return false;
   if (deck.pending.some((p) => p.cardId === card.id)) return false;
   const w = card.when;
+  if (w?.flag && !(deck.flags ?? []).includes(w.flag)) return false;
   if (w?.weeks && (state.week < w.weeks[0] || state.week > w.weeks[1])) return false;
   if (w?.reputation && (state.reputation < w.reputation[0] || state.reputation > w.reputation[1])) return false;
   if (w?.minMoney !== undefined && state.money < w.minMoney) return false;
@@ -159,9 +212,14 @@ function pickWeighted(cards: readonly EventCardDef[], rng: Rng, weight: (c: Even
  * Maybe draw this week's card. Nothing is drawn while MAX_PENDING cards wait,
  * within MIN_GAP_WEEKS of the last card, or when the weekly roll misses.
  */
+/** Pending cards that count towards the weekly cap. A season-end trip does not. */
+function weeklyPending(pending: readonly PendingEvent[]): PendingEvent[] {
+  return pending.filter((p) => cardById(p.cardId)?.when?.offer !== 'rollover');
+}
+
 export function drawEvent(state: GameState, now: number, rng: Rng): PendingEvent | null {
   const deck = state.eventDeck;
-  if (deck.pending.length >= EVENTS.MAX_PENDING) return null;
+  if (weeklyPending(deck.pending).length >= EVENTS.MAX_PENDING) return null;
   if (deck.lastDrawn > 0 && now - deck.lastDrawn < EVENTS.MIN_GAP_WEEKS) return null;
   if (rng.next() >= EVENTS.WEEKLY_CHANCE) return null;
   const card = pickWeighted(EVENT_CARDS.filter((c) => isEligible(c, state, now)), rng, (c) => cardWeight(c, state));
@@ -201,6 +259,8 @@ export interface Applied {
   news: { text: string; kind: 'info' | 'success' | 'danger' }[];
   /** Why the choice couldn't go ahead (replaces its outcome line), e.g. a signing that fell through. */
   failed?: string;
+  /** A ban this call actually wrote, so a chance can name the weeks. */
+  banned?: { name: string; weeks: number };
 }
 
 interface EffectCtx {
@@ -211,15 +271,31 @@ interface EffectCtx {
   rivalId?: string | undefined;
   fee?: number | undefined;
   now: number;
+  clubName?: string | undefined;
+  vars?: Record<string, string> | undefined;
 }
 
 const clampRep = (n: number): number => Math.max(1, Math.min(100, n));
+const clampPatience = (n: number): number => Math.max(0, Math.min(BOARD.MAX_PATIENCE, n));
 
-/** Apply effects to state (pure). Effects on a subject who has left the squad do nothing. */
-export function applyEffects(state: GameState, effects: readonly EventEffect[], ctx: EffectCtx): Applied {
+const textCtx = (ctx: EffectCtx, subjectName?: string): { subjectName?: string | undefined; clubName: string; vars?: Record<string, string> | undefined } => ({
+  subjectName: subjectName ?? ctx.subjectName,
+  clubName: ctx.clubName ?? '',
+  ...(ctx.vars ? { vars: ctx.vars } : {}),
+});
+
+/**
+ * Apply effects to state (pure). Effects on a subject who has left the squad do
+ * nothing. A chance rolls `rng` (the deck's stream): the incident roll, then
+ * the weighted player, then a ban's length, then which story line. Passing no
+ * rng is only safe for effects that do not roll.
+ */
+export function applyEffects(state: GameState, effects: readonly EventEffect[], ctx: EffectCtx, rng: Rng = makeRng(0)): Applied {
   let s = state;
   const money: Applied['money'] = [];
+  const news: Applied['news'] = [];
   let failed: string | undefined;
+  let banned: Applied['banned'];
   const updateSubject = (fn: (p: Player) => Player): void => {
     if (!ctx.subjectId) return;
     s = { ...s, squad: s.squad.map((p) => (p.id === ctx.subjectId ? fn(p) : p)) };
@@ -247,6 +323,47 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
         }
         break;
       }
+      case 'suspend': {
+        const rolled = typeof e.weeks === 'number' ? e.weeks : rng.int(e.weeks[0], e.weeks[1]);
+        const granted = reviewSuspension(s, { weeks: rolled, source: e.source, cause: ctx.reason }, rng);
+        const put = withSuspension(s, ctx.subjectId, granted);
+        s = put.state;
+        if (put.applied && put.name) banned = { name: put.name, weeks: put.standing };
+        break;
+      }
+      case 'boardPatience': s = { ...s, boardPatience: clampPatience(s.boardPatience + e.amount) }; break;
+      case 'flag': {
+        const flags = s.eventDeck.flags ?? [];
+        if (!flags.includes(e.id)) s = { ...s, eventDeck: { ...s.eventDeck, flags: [...flags, e.id] } };
+        break;
+      }
+      case 'chance': {
+        const p = effectiveChance(e.p, e.risk, hasStaff(s, 'welfare'));
+        if (rng.next() >= p) {
+          if (e.missNews) news.push({ text: fillText(e.missNews, textCtx(ctx)), kind: 'info' });
+          break;
+        }
+        let subjectId = ctx.subjectId;
+        let subjectName = ctx.subjectName;
+        if (e.pick === 'incident') {
+          const who = pickWeightedPlayer(incidentPool(s), rng, incidentWeight);
+          if (who) { subjectId = who.id; subjectName = who.name; }
+        }
+        const inner = applyEffects(s, e.hit, { ...ctx, subjectId, subjectName }, rng);
+        s = inner.state;
+        money.push(...inner.money);
+        news.push(...inner.news);
+        if (inner.banned) banned = inner.banned;
+        const story = e.hitNews.length > 0 ? fillText(rng.pick([...e.hitNews]), textCtx(ctx, subjectName)) : '';
+        if (inner.banned) {
+          news.push({ text: `${story}${story ? ' ' : ''}Out ${inner.banned.weeks} weeks.`.trim(), kind: 'danger' });
+        } else if (e.hit.some((h) => h.kind === 'suspend')) {
+          news.push({ text: `${subjectName ?? 'A player'} was in the news, but the charge didn't stick.`, kind: 'info' });
+        } else if (story) {
+          news.push({ text: story, kind: 'info' });
+        }
+        break;
+      }
       case 'modifier': {
         const mod: ActiveModifier = {
           id: `${ctx.cardId}-${ctx.now}-${i}`, cardId: ctx.cardId, label: e.label,
@@ -259,7 +376,7 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
       }
     }
   });
-  return { state: s, money, news: [], ...(failed ? { failed } : {}) };
+  return { state: s, money, news, ...(failed ? { failed } : {}), ...(banned ? { banned } : {}) };
 }
 
 /**
@@ -297,19 +414,21 @@ export function resolveEvent(state: GameState, eventId: string, index: number, n
   if (!card) return { state: without, money: [], news: [] };
   const choice = card.choices[index];
   if (!choice) return null;
+  const rng = makeRng(without.eventDeck.rng);
   const applied = applyEffects(without, choice.effects, {
     cardId: card.id, reason: `event: ${card.title}`, subjectId: ev.subjectId, subjectName: ev.subjectName,
-    rivalId: ev.rivalId, fee: ev.fee, now,
-  });
+    rivalId: ev.rivalId, fee: ev.fee, now, clubName: state.clubName, vars: ev.vars,
+  }, rng);
+  applied.state = { ...applied.state, eventDeck: { ...applied.state.eventDeck, rng: rng.state() } };
   const ctx = { subjectName: ev.subjectName, clubName: state.clubName, vars: ev.vars };
   if (applied.failed) {
     applied.news.push({ text: `${card.title}: no deal, ${applied.failed}.`, kind: 'danger' });
     return applied;
   }
   const text = fillText(choice.outcome, ctx);
-  const summary = describeEffects(choice.effects);
+  const summary = describeEffects(choice.effects, { welfare: hasStaff(state, 'welfare') });
   const fee = ev.fee && choice.effects.some((e) => e.kind === 'signSubject') ? ` (−$${ev.fee.toLocaleString('en-US')})` : '';
-  applied.news.push({
+  applied.news.unshift({
     text: `${auto ? 'No answer, so: ' : ''}${text}${fee || (choice.effects.length > 0 ? ` (${summary})` : '')}`,
     kind: 'info',
   });
@@ -359,9 +478,21 @@ export interface EventsTick extends Applied {
  * The weekly events tick (pure): fire modifiers, take the default on cards whose
  * time ran out, then maybe draw a new card.
  */
+/** Count a ban down by one week. The medics do not hurry it (#324). */
+function tickSuspensions(state: GameState): GameState {
+  if (!state.squad.some((p) => (p.suspendedWeeks ?? 0) > 0)) return state;
+  return {
+    ...state,
+    squad: state.squad.map((p) => {
+      const weeks = p.suspendedWeeks ?? 0;
+      return weeks > 0 ? { ...p, suspendedWeeks: weeks - 1 } : p;
+    }),
+  };
+}
+
 export function eventsTick(state: GameState): EventsTick {
   const now = absWeek(state.season, state.week);
-  const mods = tickModifiers(state, now);
+  const mods = tickModifiers(tickSuspensions(state), now);
   let s = mods.state;
   const money = [...mods.money];
   const news = [...mods.news];
@@ -396,7 +527,10 @@ export function eventsTick(state: GameState): EventsTick {
 
 /** Write an Applied result to the store: state first, then money (ledger) and news. */
 function commit(a: Applied): void {
-  setState({ squad: a.state.squad, reputation: a.state.reputation, eventDeck: a.state.eventDeck, league: a.state.league });
+  setState({
+    squad: a.state.squad, reputation: a.state.reputation, boardPatience: a.state.boardPatience,
+    eventDeck: a.state.eventDeck, league: a.state.league,
+  });
   for (const m of a.money) earnMoney(m.amount, m.reason);
   for (const n of a.news) bus.emit('ui:notify', n);
 }
@@ -410,11 +544,97 @@ export function chooseEvent(eventId: string, index: number): boolean {
   return true;
 }
 
-/** Install the weekly events hook. */
+/**
+ * Offer season-end cards (the Bali trip) once the new season's week 1 has
+ * begun. An unanswered trip expires the same week, and the pre-match hook
+ * takes its default before that match.
+ */
+export function applySeasonEvents(state: GameState): GameState {
+  if (state.sacked) return state;
+  const now = absWeek(state.season, state.week);
+  const pending = [...state.eventDeck.pending];
+  const cooldowns = { ...state.eventDeck.cooldowns };
+  let added = false;
+  for (const card of EVENT_CARDS) {
+    const probe: GameState = { ...state, eventDeck: { ...state.eventDeck, pending, cooldowns } };
+    if (!isEligible(card, probe, now, { rollover: true })) continue;
+    pending.push({
+      id: `${card.id}-s${state.season}w${state.week}`,
+      cardId: card.id,
+      season: state.season,
+      week: state.week,
+      expiresAt: now,
+    });
+    cooldowns[card.id] = now + card.cooldown;
+    added = true;
+  }
+  if (!added) return state;
+  return { ...state, eventDeck: { ...state.eventDeck, pending, cooldowns } };
+}
+
+/** Take the default on a season-end card whose answer window has closed. */
+export function resolveDueRollovers(state: GameState, now: number): Applied {
+  let s = state;
+  const money: Applied['money'] = [];
+  const news: Applied['news'] = [];
+  for (const ev of [...s.eventDeck.pending]) {
+    const card = cardById(ev.cardId);
+    if (card?.when?.offer !== 'rollover' || ev.expiresAt > now) continue;
+    const r = resolveEvent(s, ev.id, card.defaultChoice, now, true);
+    if (!r) continue;
+    s = r.state;
+    money.push(...r.money);
+    news.push(...r.news);
+  }
+  if (s === state) return { state, money, news };
+  return { state: s, money, news };
+}
+
+/** Put one card in front of the player. The e2e hook uses it to open a choice. */
+export function plantPending(cardId: string): boolean {
+  const card = cardById(cardId);
+  if (!card) return false;
+  const s = getState();
+  const now = absWeek(s.season, s.week);
+  const ev: PendingEvent = {
+    id: `${cardId}-show`,
+    cardId,
+    season: s.season,
+    week: s.week,
+    expiresAt: now + (card.when?.offer === 'rollover' ? 0 : EVENTS.ANSWER_WEEKS),
+  };
+  if (card.subject && card.subject !== 'rivalStar') {
+    const who = subjectCandidates(s, card.subject)[0];
+    if (who) { ev.subjectId = who.id; ev.subjectName = who.name; }
+  }
+  setState({
+    eventDeck: { ...s.eventDeck, pending: [ev, ...s.eventDeck.pending.filter((p) => p.cardId !== cardId)] },
+  });
+  return true;
+}
+
+/** Install the weekly events hook, the pre-match trip default, and the season offer. */
 export function registerEventsSystem(): void {
+  registerTickHook('events-rollover', TICK_ORDER.match - 5, () => {
+    const s = getState();
+    if (s.sacked) return;
+    const due = resolveDueRollovers(s, absWeek(s.season, s.week));
+    if (due.state !== s) commit(due);
+  });
   registerTickHook('events', EVENTS_TICK_ORDER, () => {
     const s = getState();
     if (s.sacked) return;
     commit(eventsTick(s));
+  });
+  registerSeasonHook('events-season', 25, () => {
+    const s = getState();
+    const next = applySeasonEvents(s);
+    if (next === s) return;
+    setState({ eventDeck: next.eventDeck });
+    for (const ev of next.eventDeck.pending) {
+      if (s.eventDeck.pending.some((p) => p.id === ev.id)) continue;
+      const card = cardById(ev.cardId);
+      if (card) bus.emit('ui:notify', { text: `Decision needed: ${card.title}. Open News to choose.`, kind: 'info' });
+    }
   });
 }

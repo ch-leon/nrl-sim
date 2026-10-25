@@ -62,7 +62,12 @@ export function statsAt(p: Pick<Player, 'stats' | 'position'>, slot: Position): 
   return { speed: scale(p.stats.speed), strength: scale(p.stats.strength), stamina: scale(p.stats.stamina), skill: scale(p.stats.skill), footyIQ: scale(p.stats.footyIQ) };
 }
 
-const isFit = (p: Player): boolean => p.injuredWeeks <= 0;
+/** Fit to play: not injured and not banned (#324). A missing ban field is 0. */
+export function isFieldable(p: { injuredWeeks: number; suspendedWeeks?: number }): boolean {
+  return p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0;
+}
+
+const isFit = (p: Player): boolean => isFieldable(p);
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const byOverall = (a: Player, b: Player): number => overallRating(b) - overallRating(a) || cmp(a.id, b.id);
 
@@ -94,7 +99,7 @@ export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_
 }
 
 /** Why a slot had to be filled on the day. */
-export type FillReason = 'injured' | 'gone' | 'empty';
+export type FillReason = 'injured' | 'suspended' | 'gone' | 'empty';
 
 export interface Fill {
   slot: number;
@@ -151,8 +156,8 @@ export function resolveLineup(lineup: Lineup, squad: readonly Player[]): Resolve
     }
     starters[slot] = null;
     if (p && !used.has(p.id)) {
-      // Hurt: his slot is kept for him.
-      empties.push({ slot, why: 'injured', out: p.name });
+      // Hurt or banned: his slot is kept for him.
+      empties.push({ slot, why: p.injuredWeeks > 0 ? 'injured' : 'suspended', out: p.name });
       used.add(p.id);
       return;
     }
@@ -172,7 +177,7 @@ export function resolveLineup(lineup: Lineup, squad: readonly Player[]): Resolve
     used.add(pick.id);
     starters[e.slot] = pick;
     fills.push({ slot: e.slot, position: LINEUP_SLOTS[e.slot]!, player: pick, out: e.out, why: e.why });
-    if (e.why !== 'injured') {
+    if (e.why === 'gone' || e.why === 'empty') {
       clean[e.slot] = pick.id;
       cleanBench = cleanBench.filter((id) => id !== pick.id);
     }
@@ -229,6 +234,7 @@ export function describeFills(fills: readonly Fill[]): string {
   const parts = fills.map((f) => {
     const at = f.position;
     if (f.why === 'injured' && f.out) return `${f.player.name} fills in at ${at} for the injured ${f.out}`;
+    if (f.why === 'suspended' && f.out) return `${f.player.name} fills in at ${at} for ${f.out}, who is suspended`;
     return `${f.player.name} comes in at ${at}`;
   });
   return `Lineup: ${parts.join('; ')}.`;

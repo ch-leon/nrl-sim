@@ -37,6 +37,8 @@ export interface Player {
   morale: number; // 1-100
   injuryRisk: number; // 1-100
   injuredWeeks: number; // 0 = fit
+  /** Weeks left of a ban (#324). 0 or absent = available. The lineup treats it like an injury; the medics do not shorten it. */
+  suspendedWeeks?: number;
   traits: import('../data/traits').TraitInstance[];
   wage: number; // per week
   contractWeeks: number; // remaining
@@ -87,7 +89,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 20;
+export const SAVE_VERSION = 21;
 
 /** The three hires the facilities don't cover (N14.5). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare';
@@ -217,6 +219,8 @@ export interface EventDeckState {
   cooldowns: Record<string, number>; // cardId → absolute week it may be drawn again
   lastDrawn: number; // absolute week of the latest card (0 = never)
   modifiers: ActiveModifier[];
+  /** Set by choices, so a follow-up card can be drawn later (#324). */
+  flags: string[];
 }
 
 /** Set once the board sacks the player; the save is kept so it can be reviewed. */
@@ -379,7 +383,7 @@ export function createNewGame(
 /** An empty events deck. Its stream is derived from the game seed without
  *  drawing from the main RNG, so adding it changed no existing squad or league. */
 export function newEventDeck(seed: number): EventDeckState {
-  return { rng: (seed ^ 0x9e3779b9) >>> 0, pending: [], cooldowns: {}, lastDrawn: 0, modifiers: [] };
+  return { rng: (seed ^ 0x9e3779b9) >>> 0, pending: [], cooldowns: {}, lastDrawn: 0, modifiers: [], flags: [] };
 }
 
 /**

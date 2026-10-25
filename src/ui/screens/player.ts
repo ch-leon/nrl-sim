@@ -110,6 +110,7 @@ export function moraleReasons(p: Player): string[] {
   if (p.wage < market * MORALE.LOW_PAY_RATIO) out.push(`paid under the market (${fmtMoney(p.wage)} v ${fmtMoney(market)}/wk)`);
   if (p.contractWeeks <= MORALE.EXPIRING_WEEKS) out.push('contract running down');
   if (p.injuredWeeks > 0) out.push('injured');
+  if ((p.suspendedWeeks ?? 0) > 0) out.push('suspended');
   return out;
 }
 
@@ -212,8 +213,8 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
       .filter((t) => t.id in TRAITS)
       .map((t) => ({ label: `${TRAITS[t.id].name} ${ROMAN[t.level]}`, tip: traitTip(t.id), bad: TRAITS[t.id].bad ?? false })),
     morale: { value: p.morale, word: moraleWord(p.morale), reasons: squad ? moraleReasons(p) : [] },
-    fitness: p.injuredWeeks > 0 ? `Out ${weeksText(p.injuredWeeks)}` : 'Fit',
-    injured: p.injuredWeeks > 0,
+    fitness: p.injuredWeeks > 0 ? `Out ${weeksText(p.injuredWeeks)}` : (p.suspendedWeeks ?? 0) > 0 ? `Banned ${weeksText(p.suspendedWeeks ?? 0)}` : 'Fit',
+    injured: p.injuredWeeks > 0 || (p.suspendedWeeks ?? 0) > 0,
     injuryRisk: riskWord(p.injuryRisk),
     contract,
     tenure: squad && seasonsAtClub !== null
