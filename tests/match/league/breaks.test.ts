@@ -40,7 +40,8 @@ describe('the break rule’s table (N13.5)', () => {
   it('opens after two tries conceded in a row, even in front, and a late lead tightens when the run has not', () => {
     expect(defaultBreakRule(facts({ at: 'try', minute: 16, score: { home: 18, away: 6 }, concededInARow: 2 }))).toEqual({ attack: 'expansive', defence: 'rush' });
     expect(defaultBreakRule(facts({ at: 'try', minute: 16, score: { home: 18, away: 6 }, concededInARow: 1 }))).toEqual({ attack: 'grind', defence: 'compressed' });
-    expect(defaultBreakRule(facts({ at: 'try', minute: 14, score: { home: 18, away: 0 }, concededInARow: 0 }))).toBeNull();
+    expect(defaultBreakRule(facts({ at: 'try', minute: 11, score: { home: 18, away: 0 }, concededInARow: 0 }))).toBeNull();
+    expect(defaultBreakRule(facts({ at: 'try', minute: 12, score: { home: 18, away: 0 }, concededInARow: 0 }))).toEqual({ attack: 'grind', defence: 'compressed' });
     expect(defaultBreakRule(facts({ at: 'half-time', minute: 9, score: { home: 18, away: 0 } }))).toBeNull();
   });
 

@@ -11,8 +11,11 @@
 
 /** The sin-bin knobs (tuning reference §22). Overridable by name in balance experiments (tuning.ts). */
 export const BIN = {
-  /** Minutes of match clock a binned man sits out (Nines: five, not the thirteen-a-side ten). */
-  minutes: 5,
+  /**
+   * Minutes of match clock a binned man sits out (Nines, not the thirteen-a-side ten).
+   * Was 5 of an 18-minute match. 5 × 7/9 ≈ 3.9; 4 is the same share of a 14-minute match.
+   */
+  minutes: 4,
   /** Chance a penalty anywhere else on the field is a sin bin… */
   base: 0.05,
   /** …one conceded inside the offender's own `redZoneM` (a professional foul)… */

@@ -33,7 +33,7 @@ describe('knobs by name', () => {
     expect(defencePlan('rush').lineSpeed).toBe(9);
     restore();
     expect(WRESTLE.gripBase).toBe(1.3);
-    expect(FATIGUE.contactCost.carrier).toBe(0.006);
+    expect(FATIGUE.contactCost.carrier).toBeCloseTo(0.006 * (9 / 7));
     expect(BASE.broken).toBe(0.12);
     expect(LIVE.carrySpeed).toBe(0.95);
     expect(WRESTLE.gang[1]).toBe(1.5);
@@ -90,10 +90,13 @@ describe('plans', () => {
     expect(bad.join('\n')).toMatch(/yolo/);
     const withPlan = plan({ minutes: 4, scenarios: [{ ...EVEN, plans: [{ side: 'home', at: 'try', tactics: { attack: 'expansive', defence: 'rush' } }] }] });
     expect(checkPlan(withPlan)).toEqual([]);
-    const changed = measureCell(cellsOf(withPlan)[0]!, 1, 6);
-    const same = measureCell(cellsOf(plan({ minutes: 4 }))[0]!, 1, 6);
+    // Seed 1's six-minute stretch scores nothing on 7-minute halves, so the
+    // try-time change never fires. Seed 2 scores early enough that the new plan
+    // plays a different match, and the same seed plays it again.
+    const changed = measureCell(cellsOf(withPlan)[0]!, 1, 6, 2);
+    const same = measureCell(cellsOf(plan({ minutes: 4 }))[0]!, 1, 6, 2);
     expect(changed.counts).not.toEqual(same.counts);
-    expect(measureCell(cellsOf(withPlan)[0]!, 1, 6).counts).toEqual(changed.counts);
+    expect(measureCell(cellsOf(withPlan)[0]!, 1, 6, 2).counts).toEqual(changed.counts);
   }, 60_000);
   it('builds flat squads with stat overrides, or a club roster', () => {
     const s = sideSheet('H', { rating: 70, stats: { stamina: 30 }, tactics: { defence: 'rush' } });
@@ -156,7 +159,7 @@ describe('measuring and reporting', () => {
     expect(a.legs.map((l) => l.minute)).toEqual([]); // under 3 minutes: no legs reading yet
     const tired = measureCell(cell({ 'fatigue.runCost': 0.002 }), 2, 3);
     expect(tired.legs[0]!.home).toBeLessThan(0.7);
-    expect(FATIGUE.runCost).toBe(0.00015);
+    expect(FATIGUE.runCost).toBeCloseTo(0.00015 * (9 / 7));
     expect(measureCell(cell(), 2, 3).legs[0]!.home).toBeGreaterThan(0.85);
   });
   it('marks the §7 bands and flags only changes beyond luck', () => {
@@ -231,6 +234,9 @@ describe('measuring and reporting', () => {
     const spec = 'node:crypto';
     const { createHash } = await import(spec);
     const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
-    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('8-14:495:67db8b634c5a2e73');
+    // Deliberately moved when halves went from 9:00 to 7:00 (2026-10-25). The
+    // siren, the rescaled legs and the rescaled windows make seed 1 a different
+    // match from 8-14:495:67db8b634c5a2e73. See docs/status/2026-10-balance.md.
+    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('6-7:362:e959099a69ffd994');
   });
 });

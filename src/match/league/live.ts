@@ -969,7 +969,7 @@ export class LiveSim implements MatchSim {
     if (this.half < this.length.halves) return false;
     const left = this.length.halfMinutes * 60 - this.clockTicks * TICK_S;
     const margin = this.points[side] - this.points[other(side)];
-    return left <= GOALS.fieldGoalLastS + 60 && margin >= GOALS.fieldGoalMargin[0] && margin <= GOALS.fieldGoalMargin[1];
+    return left <= GOALS.fieldGoalLastS + GOALS.fieldGoalSoonExtraS && margin >= GOALS.fieldGoalMargin[0] && margin <= GOALS.fieldGoalMargin[1];
   }
 
   /** Calls each side has made, and how many paid off. */

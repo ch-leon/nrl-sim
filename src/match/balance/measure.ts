@@ -1,8 +1,8 @@
 // src/match/balance/measure.ts — play one cell of an experiment (a variant on
 // a scenario) over its seeds, headless, and count what happened per match.
-// By default each seed is a whole match (two 9:00 halves to full time); a plan
+// By default each seed is a whole match (two 7:00 halves to full time); a plan
 // or scenario can ask for a single stretch of N minutes instead, whose counts
-// are scaled to an 18-minute match so they still read against the §7 targets.
+// are scaled to a 14-minute match so they still read against the §7 targets.
 // A side is a flat squad, a league club's generated roster, or (N12.2) a squad
 // built the way the game builds it, a new one every seed.
 import type { RosterEntry, TeamSheet } from '../../sim/events';
@@ -20,17 +20,18 @@ import type { SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
 import { LiveSim, type PlanInput } from '../league/live';
 import { aiCoachSides, type CallInput } from '../league/calls';
-import { fullMatch, type MatchLength } from '../league/rules';
+import { NINES, fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import type { Cell, SideSpec } from './plan';
 
-export const MATCH_MINUTES = 18;
+/** A full match: two halves. Stretches scale their counts up to this. */
+export const MATCH_MINUTES = 2 * NINES.halfMinutes;
 const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
 const BENCH_POSITIONS = ['prop', 'second-row', 'centre', 'halfback'] as const;
 
-/** Count metrics, per match (or per 18 minutes of a shorter stretch). */
+/** Count metrics, per match (or per MATCH_MINUTES of a shorter stretch). */
 export const COUNTS = [
   'tackles', 'bigHits', 'busts', 'lateBusts', 'fends', 'steps', 'breaks', 'offloads', 'errors', 'kicks', 'tries',
   'intercepts', 'strips', 'quickPtb', 'slowPtb', 'gassed', 'wrestles', 'held1', 'held2', 'held3',

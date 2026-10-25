@@ -71,7 +71,7 @@ describe('the match clock, halves and full time', () => {
     for (const s of seeds) games.push(play(s));
   });
 
-  it('kicks off, sounds the siren at 9:00, goes to half-time, and ends at full time after 18:00', () => {
+  it('kicks off, sounds the siren at 7:00, goes to half-time, and ends at full time after 14:00', () => {
     for (const g of games) {
       const kinds = g.events.map((x) => x.e.kind);
       expect(kinds[0]).toBe('kickoff');
@@ -145,7 +145,7 @@ describe('the match clock, halves and full time', () => {
       const last = g.events[g.events.length - 1]!.snap;
       expect(last.score).toEqual(g.sim.points);
       expect(last.label).toContain(`${g.sim.points.home}–${g.sim.points.away}`);
-      expect(last.label).toContain('2nd 9:00');
+      expect(last.label).toContain(`2nd ${NINES.halfMinutes}:00`);
     }
     expect(clockText(1, 272.4)).toBe('1st 4:32');
   });

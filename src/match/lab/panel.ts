@@ -2,7 +2,7 @@
 // play/pause/step, speed, scrub, Flag, load-a-code, and a live event log.
 // Thin: all state lives in LabController.
 import { button, el, mount, panel } from '../../ui/dom';
-import { RUN_SPEEDS, type RunSpeed } from '../core/engine';
+import { RUN_SPEEDS } from '../core/engine';
 import { decodeFlag } from '../core/flag';
 import { isWeather, type LabController, type LabParams } from './controller';
 import type { WeatherKind } from '../../sim/events';
@@ -11,11 +11,12 @@ import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, isAttackPreset, isDefenc
 import type { LabTactics } from './controller';
 import { statsLine, statsWindow } from './stats';
 import { LEGS, isLegs, type Legs } from '../league/fatigue';
+import { NINES } from '../league/rules';
 import { DEFAULT_ROTATION, ROTATIONS, isRotation, type Rotation } from '../league/bench';
 import { CALL_LABEL, COACH_CALLS, type CoachCall } from '../league/calls';
 
 const TRAIT_MODE_LABEL: Readonly<Record<TraitMode, string>> = { gen: 'as rolled', none: 'none', stars: 'all superstars' };
-const LEGS_LABEL: Readonly<Record<Legs, string>> = { fresh: 'fresh', late: 'last 10 min', spent: 'cooked' };
+const LEGS_LABEL: Readonly<Record<Legs, string>> = { fresh: 'fresh', late: 'last 8 min', spent: 'cooked' };
 
 export interface LabPanelHooks {
   /** Rebuild the lab on new teams / seed / tick (new sprites need a new scene). */
@@ -71,8 +72,8 @@ export class LabPanel {
       if (m === p.traits) o.selected = true;
       traits.append(o);
     }
-    // Legs (§8): start fresh, as the last ten minutes, or cooked — fatigue without waiting for it.
-    const legs = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Legs: fresh / the last ten minutes / cooked' } });
+    // Legs (§8): start fresh, as the last eight minutes of a 14-minute match, or cooked.
+    const legs = el('select', { class: 'nrl-lab-select nrl-lab-traits', attrs: { title: 'Legs: fresh / the last eight minutes / cooked' } });
     for (const m of LEGS) {
       const o = el('option', { text: LEGS_LABEL[m], attrs: { value: m } });
       if (m === p.legs) o.selected = true;
@@ -210,7 +211,7 @@ export class LabPanel {
       this.stats,
       el('div', { class: 'nrl-lab-row nrl-lab-more' }, flag, codeIn, load),
       this.log,
-      el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : 'Nines match: two 9:00 halves, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.' }),
+      el('div', { class: 'nrl-lab-hint nrl-lab-more', text: p.note ? `Flag note: ${p.note}` : `Nines match: two ${NINES.halfMinutes}:00 halves, the clock in the label, ⏩ skips to the next break. ⚑ Flag anything that looks wrong.` }),
     );
     this.log.classList.add('nrl-lab-more');
     // A short screen (a phone on its side) starts with just the play controls; + opens the rest.
@@ -266,7 +267,7 @@ export class LabPanel {
   }
 }
 
-function speedLabel(s: RunSpeed): string {
+function speedLabel(s: number): string {
   return s < 1 ? `×${s === 0.25 ? '¼' : '½'}` : `×${s}`;
 }
 

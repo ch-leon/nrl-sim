@@ -15,7 +15,7 @@ import type { GuidePage } from './pages';
 /** The numbers the page quotes. Kept equal to the rule constants by a test. */
 export const NINES_FACTS = {
   aSide: 9,
-  halfMinutes: 9,
+  halfMinutes: 7,
   tackles: 5,
   tryPoints: 4,
   bonusTryPoints: 5,
@@ -26,8 +26,12 @@ export const NINES_FACTS = {
   fieldGoalPoints: 1,
   penaltyGoalPoints: 2,
   benchSize: 4,
-  /** Field goals are on in the last this many seconds. */
-  fieldGoalLastS: 180,
+  /** Field goals are on in the last this many seconds (was 180 of an 18-minute match). */
+  fieldGoalLastS: 140,
+  /** A sin bin, minutes of the match clock. Was 5; the same share of a 14-minute match. */
+  sinBinMinutes: 4,
+  /** Golden point in a drawn final, minutes. Was 5. */
+  goldenPointMinutes: 4,
   /** A field goal is tried from inside this many metres. */
   fieldGoalRangeM: 30,
   /** Legs back at half-time, as a share of what was lost. */
@@ -42,7 +46,7 @@ export const NINES_PAGE: GuidePage = {
   title: 'How Nines works',
   sections: [
     {
-      text: `Matches are Rugby League Nines: ${F.aSide} a side on a full-size field, two halves of ${F.halfMinutes} minutes. The clock runs while the ball is in play and stops from a try to the restart; when the siren goes, play carries on until the ball is next dead. At half-time everyone gets back ${Math.round(F.halfTimeLegsBack * 100)}% of the legs he has lost.`,
+      text: `Matches are Rugby League Nines: ${F.aSide} a side on a full-size field, two halves of ${F.halfMinutes} minutes. The clock runs while the ball is in play and stops from a try to the restart; when the siren goes, play carries on until the ball is next dead. At half-time everyone gets back ${Math.round(F.halfTimeLegsBack * 100)}% of the legs he has lost. A drawn final plays ${F.goldenPointMinutes} minutes of golden point: the next score wins.`,
     },
     {
       heading: 'Sets and scoring',
@@ -50,7 +54,7 @@ export const NINES_PAGE: GuidePage = {
         `A set is ${F.tackles} tackles, then the last-tackle kick. Six again (a ruck offence against the defence) starts the count over.`,
         `A try is ${F.tryPoints} points; grounded in the bonus zone, the in-goal between the posts, it is ${F.bonusTryPoints}.`,
         `Conversions are drop kicks, ${F.conversionPoints} points, taken quickly in line with where the try was scored; a longer or wider kick is harder, a better kicker (Skill, Big Boot) straighter. Your named goal-kicker (Lineup) takes them while he is on; otherwise your best-kicking half.`,
-        `A field goal is ${F.fieldGoalPoints} point: in the last ${F.fieldGoalLastS / 60} minutes, from inside ${F.fieldGoalRangeM} m, late in the set, with the scores level or his side a point behind. A penalty goal is a ${F.penaltyGoalPoints}-point drop kick.`,
+        `A field goal is ${F.fieldGoalPoints} point: in the last ${Math.floor(F.fieldGoalLastS / 60)} minutes ${F.fieldGoalLastS % 60} seconds, from inside ${F.fieldGoalRangeM} m, late in the set, with the scores level or his side a point behind. A penalty goal is a ${F.penaltyGoalPoints}-point drop kick.`,
       ],
     },
     {
@@ -78,7 +82,7 @@ export const NINES_PAGE: GuidePage = {
       bullets: [
         'Holding down after a long wrestle, or lying in the ruck, gives the attack six again.',
         'Offside at the ruck (a Rush defence pays for its line speed) and high shots (Hotheads more often) give a penalty. The captain takes a shot at goal when it is likely and the clock or score says so, taps and goes inside 25 m, and otherwise kicks for touch and taps 10 m in.',
-        'No sin-bins yet.',
+        `A penalty can be a sin bin. He sits out ${F.sinBinMinutes} minutes of the match clock — a high shot, a professional foul on his own line, or repeat offences — and his side plays a man short until he is back.`,
       ],
     },
     {
@@ -106,7 +110,7 @@ export const NINES_PAGE: GuidePage = {
     {
       heading: 'Watching',
       bullets: [
-        'Live match (beta) on the Fixtures tab plays your matches on this sim as you watch, with ×1 to ×8 speed and Skip; off, the classic engine plays and replays them. Rival-v-rival rounds are simmed from the clubs’ strength either way.',
+        'Live match (beta) on the Fixtures tab plays your matches on this sim as you watch, with ×1 to ×8 speed and Skip. The speed you pick is kept for the next match. Rucks, tackles, restarts and the kick at goal run at twice that speed; open play stays at the speed you picked. The half-time card goes on by itself after a few seconds, and a tap holds it. Rival-v-rival rounds are simmed from the clubs’ strength either way.',
         'Save & exit writes the match and goes back to the club. Advance Week then reads Resume match and continues it; the menu beside it will not skip the week. Closing the app and choosing Continue does the same, from a couple of seconds back at most. A hire or a build made back at the club is kept if you finish the match, and dropped if the app is killed before full time: a week in the middle of its match is not written into the slot. Export save during that week writes the kick-off save and the match, not the half-played week, and refuses if that kick-off save never landed.',
         'Full time brings the match report (who scored and when, the goals, the numbers side by side and the Player of the Match), the result into the ladder, and the match’s tallies onto your players’ pages.',
       ],

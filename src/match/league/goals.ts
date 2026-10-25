@@ -24,8 +24,13 @@ export const GOALS = {
   conversionTicks: 30,
   /** …and the longest the conversion waits for him to get there. */
   conversionMaxTicks: 160,
-  /** Field goal: only in the last this-many seconds of the match… */
-  fieldGoalLastS: 180,
+  /**
+   * Field goal: only in the last this-many seconds of the match…
+   * Was 180 (the last sixth of an 18-minute match). 180 × 7/9 = 140, the same share of 14 minutes.
+   */
+  fieldGoalLastS: 140,
+  /** An AI coach holds his attack call this long before a field goal is on. Was 60; 60 × 7/9. */
+  fieldGoalSoonExtraS: 47,
   /** …with his side this far behind at worst and this far ahead at most… */
   fieldGoalMargin: [-1, 0] as [number, number],
   /** …from inside this many metres of the posts, on this tackle or later (0-based, of 5)… */

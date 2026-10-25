@@ -40,7 +40,7 @@ export class Runner {
   private _prev: Snapshot;
   private _cur: Snapshot;
   private acc = 0;
-  private _speed: RunSpeed = 1;
+  private _speed = 1;
   private _playing = false;
   private _maxTick = 0;
   /** Slow-motion beat: real ms left and the time factor while it lasts. */
@@ -79,7 +79,7 @@ export class Runner {
   get playing(): boolean {
     return this._playing;
   }
-  get speed(): RunSpeed {
+  get speed(): number {
     return this._speed;
   }
   get finished(): boolean {
@@ -105,8 +105,9 @@ export class Runner {
   toggle(): void {
     this._playing = !this._playing;
   }
-  setSpeed(s: RunSpeed): void {
-    this._speed = s;
+  /** `s` is a multiplier on real time. The buttons offer the RunSpeed steps; smart pace can sit between them. */
+  setSpeed(s: number): void {
+    if (s > 0) this._speed = s;
   }
 
   /** Run at `factor` speed for the next `ms` of real time (a beat of slow-motion). */

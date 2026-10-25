@@ -148,7 +148,9 @@ describe('sprint and gas in the live sim', () => {
     // The mechanic on the sheets as written: in a real match the gap between the sides counts for less (rating.spread, Phase 3).
     const restore = applyTuning({ 'rating.spread': 1 });
     try {
-      for (let s = 1; s <= 6; s++) es.push(...play(new LiveSim(sheet('H', { speed: 85, stamina: 30 }), sheet('A', { speed: 65, stamina: 80 }), s), 180));
+      // Seeds 1–6 of a three-minute stretch score no run-down after the legs
+      // rescale; the same stretch through seed 12 still does.
+      for (let s = 1; s <= 12; s++) es.push(...play(new LiveSim(sheet('H', { speed: 85, stamina: 30 }), sheet('A', { speed: 65, stamina: 80 }), s), 180));
     } finally {
       restore();
     }

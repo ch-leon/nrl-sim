@@ -56,8 +56,8 @@ include a neutral one (`even 60 v 60`) so effects can be told from matchup quirk
   "off|standard|heavy"` (default standard). Rotation is a side setting, not a knob: to
   compare policies write one scenario per policy.
 - **Legs**: `"legs": "fresh|late|spent"` or 0..1, with `"minutes"` for that scenario
-  (a single stretch instead of a whole match; late legs over 18 minutes run dry, so
-  use about 8).
+  (a single stretch instead of a whole match; late legs over a full 14 minutes run dry, so
+  use about 6).
 - **Own match count**: `"seeds"` on a scenario overrides the plan's. `"track":
   "home"|"away"` reports that side's win rate to a tenth of a percent; `"bothWays": true` (needs `track`)
   also plays the swapped fixture and pools it. Counts stay the written orientation.
@@ -78,7 +78,7 @@ include a neutral one (`even 60 v 60`) so effects can be told from matchup quirk
 ## 4. Size it
 
 - **seeds**: 20 for a general measurement, 40+ for rare events (late busts, strips,
-  intercepts, home win %). Each seed is a **whole match** (two 9:00 halves, half-time,
+  intercepts, home win %). Each seed is a **whole match** (two 7:00 halves, half-time,
   full time, won on points) unless the plan or scenario gives **minutes** for a single
   stretch.
 - Time ≈ cells × seeds × 0.75 seconds on one core, where cells = variants ×

@@ -9,7 +9,8 @@ import type { AttackPreset, DefencePreset, TeamTactics } from './presets';
 
 /**
  * The rule's thresholds (tuning reference §30). Assumed (needs Leon).
- * A Nines match is 2 × 9:00, so minute 15 is the last three minutes.
+ * A Nines match is 2 × 7:00. Minute 12 is the last two minutes: the same
+ * share as minute 15 of the old 2 × 9:00 (15 × 7/9 ≈ 11.7, rounded).
  */
 export const BREAKS = {
   /** Points behind at half-time: one step more open. */
@@ -18,8 +19,8 @@ export const BREAKS = {
   concededRun: 2,
   /** Points ahead after `tightenFromMinute`: one step tighter. */
   upBy: 12,
-  /** Match minute from which a lead tightens the plan. */
-  tightenFromMinute: 15,
+  /** Match minute from which a lead tightens the plan. Was 15 of an 18-minute match. */
+  tightenFromMinute: 12,
 };
 
 /** What the sim tells the rule. `concededInARow` counts the try just scored. */
@@ -84,7 +85,7 @@ export function planWhenBehind(plan: TeamTactics): TeamTactics {
 /**
  * The default rule. Opens when 8 or more down at half-time, or after two
  * tries conceded in a row. Tightens when 12 or more up at a break after the
- * 15th minute. A side that has just shipped two tries opens even if it is
+ * 12th minute. A side that has just shipped two tries opens even if it is
  * still in front. Otherwise the plan stays. Assumed (needs Leon): the
  * thresholds, Kick-chase's neighbours, and that a try-run beats the late lead.
  */

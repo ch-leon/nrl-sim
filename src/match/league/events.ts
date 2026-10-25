@@ -64,7 +64,7 @@ export function toMatchEvent(e: SimEvent, snap: Snapshot, ids: Record<Side, stri
   const side = e.side ?? (WHISTLES.has(e.kind) ? 'home' : undefined);
   if (!kind || !side) return null;
   const f = toFieldPt({ x: snap.ball.x, y: snap.ball.y });
-  // The match clock's minute when the sim keeps one (Nines minutes, 0–18).
+  // The match clock's minute when the sim keeps one (Nines minutes, 0–14).
   const t = snap.clock ? snap.clock.minute : minuteOf(e.tick);
   const ev: MatchEvent = { t, kind, teamId: ids[side], x: Math.round(f.fx), y: Math.round(f.fy) };
   if (e.player) ev.player = e.player;

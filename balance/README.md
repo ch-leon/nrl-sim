@@ -69,10 +69,10 @@ somewhere else.
 ```
 
 - **seeds**: matches per cell. 20 is a fair measurement; 40+ for rare events (late
-  busts, strips, intercepts). Each seed is a **whole match**: two 9:00 halves,
+  busts, strips, intercepts). Each seed is a **whole match**: two 7:00 halves,
   half-time (legs part-restored), the siren and full time, won on points. **minutes**
   (optional) plays one stretch of that many minutes from a kick-off instead, with no
-  half-time; its counts are scaled to 18 minutes.
+  half-time; its counts are scaled to 14 minutes.
 - **Sides**: either a flat squad (`rating` for every stat, `stats` to override some)
   or a league `club`'s generated roster. `tactics` takes `attack` (grind, balanced,
   expansive, kick-chase, all-out) and `defence` (slide, rush, compressed). `traits`:
@@ -128,7 +128,7 @@ one core, 40–50 minutes on four. There is no limit; resume makes long runs saf
 ## Reading a report
 
 One table per scenario, one row per variant. Counts are per match (a stretch is
-scaled to 18 minutes), both sides together, so they read against the §7 targets: **✓** inside, **↑** above,
+scaled to 14 minutes), both sides together, so they read against the §7 targets: **✓** inside, **↑** above,
 **↓** below. In brackets, the change from the baseline row; a **\*** means the change
 is bigger than luck explains (more than two standard errors, only judged with 8+
 matches a row). No star means it may be noise: run more seeds before deciding.

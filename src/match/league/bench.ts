@@ -23,8 +23,12 @@ export interface RotationPolicy {
 export const BENCH = {
   /** Players on the bench (sheets carry up to this many). */
   size: 4,
-  /** A benched player's legs come back this much a minute… */
-  recoverPerMin: 0.05,
+  /**
+   * A benched player's legs come back this much a minute…
+   * Was 0.05, which reaches the 0.9 cap across an 18-minute match.
+   * ×9/7 keeps that on a 14-minute match (0.05 × 18 = 0.05 × 9/7 × 14).
+   */
+  recoverPerMin: 0.05 * (9 / 7),
   /** …up to here, never all the way to fresh within a match. */
   recoverCap: 0.9,
   /** A man coming off gets this long to reach the touchline before the swap is made where he stands (seconds). */

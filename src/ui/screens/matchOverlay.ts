@@ -301,7 +301,7 @@ export interface PlanCardOptions {
   onPick: (t: TeamTactics) => string | null;
   /** Continue (or the card timed out): the match goes on. */
   onDone: () => void;
-  /** Go on by itself after this long (half-time at ×4 and above). */
+  /** Go on by itself after this long. A tap on the card holds it. */
   autoMs?: number;
 }
 
@@ -309,6 +309,9 @@ export interface PlanCardHandle {
   readonly el: HTMLElement;
   close(): void;
 }
+
+/** The half-time card goes on by itself after this long, at every speed. A tap holds it. */
+export const HALF_TIME_CARD_MS = 4500;
 
 /** Show the plan card over the field until Continue (or `autoMs`). */
 export function showPlanCard(o: PlanCardOptions): PlanCardHandle {

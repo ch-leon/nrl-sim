@@ -10,12 +10,13 @@ import { MATCH_MINUTES, type CellResult, type CountKey } from './measure';
  * Phase 3, assumed pending Leon); the rest as first set.
  */
 export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
-  tackles: [150, 210],
-  lineBreaks: [13, 24],
-  offloads: [8, 14],
-  errors: [10, 16],
-  kicks: [20, 32],
-  tries: [5, 9],
+  // Counts scaled ×7/9 with the half (9 → 7). Completion is a share, so it stays.
+  tackles: [117, 163],
+  lineBreaks: [10, 19],
+  offloads: [6, 11],
+  errors: [8, 12],
+  kicks: [16, 25],
+  tries: [4, 7],
   completion: [70, 80],
 };
 
@@ -67,7 +68,7 @@ export function reportMarkdown(r: ReportInput): string {
   if (r.plan.description) out.push(r.plan.description, '');
   out.push(Object.entries(r.meta).map(([k, v]) => `**${k}** ${v}`).join(' · '), '');
   out.push(
-    `${r.plan.seeds} matches per row, ${r.plan.minutes ? `${r.plan.minutes}-minute stretches, counts scaled to an 18-minute match` : 'whole matches (two 9:00 halves)'}; counts are both sides. Wins are on points. ` +
+    `${r.plan.seeds} matches per row, ${r.plan.minutes ? `${r.plan.minutes}-minute stretches, counts scaled to a ${MATCH_MINUTES}-minute match` : `whole matches (two ${MATCH_MINUTES / 2}:00 halves)`}; counts are both sides. Wins are on points. ` +
       `✓ inside the §7 target, ↑ above, ↓ below. A change marked * is bigger than luck explains (over 2 standard errors, flagged only with ${MIN_SEEDS_TO_FLAG}+ matches a row); unmarked ones may be noise.`,
     '',
   );
@@ -76,7 +77,7 @@ export function reportMarkdown(r: ReportInput): string {
     const rows = r.results.filter((x) => x.scenario === sc);
     const base = rows.find((x) => x.variant === 'baseline') ?? rows[0]!;
     out.push(`## ${sc}`, '');
-    if (base.minutes !== (r.plan.minutes ?? MATCH_MINUTES)) out.push(`_${base.minutes}-minute stretch, counts scaled to 18._`, '');
+    if (base.minutes !== (r.plan.minutes ?? MATCH_MINUTES)) out.push(`_${base.minutes}-minute stretch, counts scaled to ${MATCH_MINUTES}._`, '');
     if (base.seeds !== r.plan.seeds) out.push(`_${base.seeds} matches in this row (the plan's other rows use ${r.plan.seeds})._`, '');
     const tracked = rows.some((x) => x.trackedWin !== undefined);
     if (tracked && base.trackedSeeds && base.trackedSeeds !== base.seeds) {

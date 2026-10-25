@@ -5,6 +5,7 @@ import { GUIDE_PAGES, GUIDE_SCREENS, guidePage } from '../../src/ui/guide/guide'
 import { CLUB_PAGES, sponsorBullet } from '../../src/ui/guide/pages';
 import { NINES_FACTS, NINES_PAGE } from '../../src/ui/guide/nines';
 import { NINES } from '../../src/match/league/rules';
+import { BIN } from '../../src/match/league/sinbin';
 import { GOALS } from '../../src/match/league/goals';
 import { PENALTY } from '../../src/match/league/penalties';
 import { BENCH } from '../../src/match/league/bench';
@@ -95,6 +96,8 @@ describe('How Nines works stays true to the live sim', () => {
     expect(NINES_FACTS.fieldGoalLastS).toBe(GOALS.fieldGoalLastS);
     expect(NINES_FACTS.fieldGoalRangeM).toBe(GOALS.fieldGoalRangeM);
     expect(NINES_FACTS.halfTimeLegsBack).toBe(NINES.halfTimeLegsBack);
+    expect(NINES_FACTS.sinBinMinutes).toBe(BIN.minutes);
+    expect(NINES_FACTS.goldenPointMinutes).toBe(NINES.goldenPointMinutes);
     expect(NINES_FACTS.postGapM).toBe(2 * GOALS.halfPosts);
     expect(NINES_FACTS.inGoalM).toBe(IN_GOAL);
   });

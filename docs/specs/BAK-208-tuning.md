@@ -221,11 +221,11 @@ All in `src/match/league/fatigue.ts`; the tank lives on each player in `live.ts`
 
 | Knob | Value | Effect |
 |---|---|---|
-| `fatigue.runCost` | 0.00015 per metre | Running drain (~240 m a minute per player). The main lever on when sides go tired. |
-| `fatigue.contactCost` | carrier 0.006 · tackler 0.004 | Per contact, any outcome (and per joiner). |
-| `fatigue.wrestleCost` | carrier 0.008 per man per s · tackler 0.006 per s | The wrestle's price. |
-| `fatigue.recoverWalk` / `fatigue.walkSpeed` | 0.0002 per s under 1.5 m/s | Getting a breather in play. 0.001 cancelled most of the drain. |
-| `fatigue.recoverStop` | 0.002 per s | After a try / before a restart. |
+| `fatigue.runCost` | 0.00015 × 9/7 per metre | Running drain. Was 0.00015 on a 9:00 half; ×9/7 keeps the same share of a 7:00 half as tired. The gas tank (seconds of a sprint) is not scaled. |
+| `fatigue.contactCost` | carrier 0.006 × 9/7 · tackler 0.004 × 9/7 | Per contact, any outcome (and per joiner). Scaled with the half, 2026-10-25. |
+| `fatigue.wrestleCost` | carrier 0.008 × 9/7 per man per s · tackler 0.006 × 9/7 per s | The wrestle's price. Scaled with the half. |
+| `fatigue.recoverWalk` / `fatigue.walkSpeed` | 0.0002 × 9/7 per s under 1.5 m/s | Getting a breather in play. 0.001 cancelled most of the drain. Scaled with the half. |
+| `fatigue.recoverStop` | 0.002 × 9/7 per s | After a try / before a restart. Scaled with the half. |
 | `fatigue.drain.offset` / `.perStamina` / `.min` / `.max` | 1.5 − Stamina × 0.01, clamp 0.6…1.4 | The drain rate `drainRate`: Stamina 50 ×1, 80 ×0.7, 20 ×1.3. `perStamina` is how much Stamina matters (§25). |
 | `fatigue.contest.*` | carrierBust / carrierFend / carrierOffload / tacklerBigHit 0.1 · tacklerBust 0.06 | Fatigue weights in the contest recipe (`contest.ts`): a tired carrier −0.1 × tiredness on bust, fend and offload, a tired tackler −0.1 on the big hit and +0.06 to the carrier's bust. |
 | `fatigue.workhorseSave` | 0.1 × level mult | Workhorse I ×0.9, II ×0.84, III ×0.78. |
@@ -274,9 +274,11 @@ Tests: `tests/match/league/fatigue.test.ts`.
 
 ## 12. Balance targets (§7) and how to measure
 
-Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams: tackles
-150–210 · line breaks 13–24 · offloads 8–14 · errors 10–16 · kicks 20–32 · tries 5–9 ·
-completion 70–80%; stronger team wins ~70% at a 20-point rating gap. Measure with the
+Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams: tackles
+117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 · tries 4–7 ·
+completion 70–80%; stronger team wins ~70% at a 20-point rating gap. The count bands
+were the 9:00-half bands ×7/9, rounded, on 2026-10-25, so a shorter match is not marked
+low just for being shorter. Completion is a rate and did not move. Measure with the
 balance harness (`balance/README.md`, the `balance-experiments` skill): `npm run balance`
 plays whole matches (§13) over many seeds and marks every count against these bands.
 **Completion** (`completion`, a share, not scaled for a stretch) is the side's sets not ended
@@ -314,15 +316,17 @@ already in them). `BANDS` in `src/match/balance/report.ts` marks the new ones.
 
 ## 13. The match: clock, halves, points (BAK-207 §5.1, 2a)
 
-Two 9:00 halves of real sim time. The clock runs while the ball is in play (play, tackle,
+Two 7:00 halves of real sim time (was 9:00; Leon, 2026-10-25, so a watched match is
+shorter). The clock runs while the ball is in play (play, tackle,
 ruck) and stops from a try to the restart kick. At time up the siren sounds and play goes
 on until the ball is dead: a tackle completed, a try (after its celebration), a knock-on,
 or a man still down from the tackle when the siren goes. Half-time swaps the ends and the
-side that received the opening kick-off kicks off the second half.
+side that received the opening kick-off kicks off the second half. The measurements in
+this section were taken on 9:00 halves.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `rules.halfMinutes` | `src/match/league/rules.ts` | 9 | Length of each half (minutes of sim time). |
+| `rules.halfMinutes` | `src/match/league/rules.ts` | 7 | Length of each half (minutes of sim time). Was 9. |
 | `rules.tryPoints` / `rules.conversionPoints` / `rules.fieldGoalPoints` | `rules.ts` | 4 / 2 / 1 | Points for a try, a conversion and a field goal (penalty goals come with 2e). |
 | `rules.halfTimeTicks` | `rules.ts` | 60 (3 s) | The break on screen before the second-half kick-off. |
 | `rules.halfTimeLegsBack` | `rules.ts` | 0.5 | At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2); his gas tank is filled to his legs. |
@@ -348,7 +352,7 @@ sheds after the break's recovery. A tired start finds the bench rested at `recov
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `bench.size` | `src/match/league/bench.ts` | 4 | Players a sheet's bench holds. |
-| `bench.recoverPerMin` / `bench.recoverCap` | `bench.ts` | 0.05 / 0.9 | A benched man's legs come back 5% a minute, up to 90%. |
+| `bench.recoverPerMin` / `bench.recoverCap` | `bench.ts` | 0.05 × 9/7 / 0.9 | A benched man's legs come back this much a minute, up to 90%. Was 0.05, which reaches the cap across 18 minutes; ×9/7 reaches it across 14. |
 | `bench.jogOffS` | `bench.ts` | 12 s | The man coming off gets this long to reach the touchline; after that the swap is made where he stands. |
 | `bench.standard.offBelow` / `.gain` / `.perStoppage` | `bench.ts` | 0.55 / 0.15 / 2 | Standard rotation: off under 55% legs, for a man at least 15% fresher, two at a time. |
 | `bench.heavy.offBelow` / `.gain` / `.perStoppage` | `bench.ts` | 0.7 / 0.1 / 3 | Heavy rotation: off under 70%, 10% fresher, three at a time. |
@@ -386,7 +390,8 @@ until 2d's dead-ball restarts).
 | `goals.errorDeg` / `goals.errorPerM` / `goals.errorPerSkill` | `goals.ts` | 5° / 1/40 per m / 1.2% per Skill point | The kick's sideways error (one standard deviation). |
 | `goals.minBackM` / `goals.maxBackM` | `goals.ts` | 10 / 35 m | How far out a conversion is taken. |
 | `goals.conversionTicks` / `goals.conversionMaxTicks` | `goals.ts` | 30 / 160 | Lining it up once on the spot (1.5 s); the longest the conversion waits for him. |
-| `goals.fieldGoalLastS` | `goals.ts` | 180 s | Field goals only in the last three minutes of the match. |
+| `goals.fieldGoalLastS` | `goals.ts` | 140 s | Field goals only in the last 2:20 of the match. Was 180 s, the last sixth of 18:00. |
+| `goals.fieldGoalSoonExtraS` | `goals.ts` | 47 s | An AI coach holds his attack call this long before a field goal is on. Was 60; 60 × 7/9, rounded. |
 | `goals.fieldGoalMargin.0` / `.1` | `goals.ts` | −1 / 0 | …with the kicker's side level or a point behind. |
 | `goals.fieldGoalRangeM` / `goals.fieldGoalFromTackle` | `goals.ts` | 30 m / 3 | …within 30 m of the posts, on tackle 3 or later. |
 | `goals.fieldGoalChance` | `goals.ts` | 0.7 | How often he goes for it when it is on (once a set). |
@@ -462,7 +467,7 @@ back to zero, even on the last (no handover). **Penalties**: offside as the ball
 the defending side's preset: Rush most) and high shots (rare; a Hothead more). The penalty is
 brought out to 10 m from the line. The captain's call (`choosePenalty`): **the shot at goal**
 (a Nines drop kick, 2 points; from the mark) when it is at least 60% to go over and either the
-last 5 minutes with his side no more than 6 behind and no more than 1 ahead, or the half ending
+last 233 seconds with his side no more than 6 behind and no more than 1 ahead, or the half ending
 (20 s or the siren); else **tap and go** inside 25 m, or **kick for touch** (25 m × Big Boot
 distance, never inside their 10) and a tap 10 m in from touch. A missed penalty goal is dead: a
 20 m restart. After the siren only the shot keeps the half alive. Shown as **PENALTY!** over the
@@ -476,7 +481,7 @@ AGAIN!** over the tackler; the commentary says why. Sin bins later (BAK-206 B7).
 | `penalty.offside.slide` / `.rush` / `.compressed` | `penalties.ts` | 0.008 / 0.02 / 0.006 | Offside as the ball is played, by the defence preset. |
 | `penalty.highShot` / `penalty.highShotHothead` | `penalties.ts` | 0.002 / 0.03 a level | A high shot in a made tackle. |
 | `penalty.goalPoints` | `penalties.ts` | 2 | A penalty goal. |
-| `penalty.shotMin` / `.shotLateS` / `.shotBehind` / `.shotAhead` / `.shotHalfEndS` | `penalties.ts` | 0.6 / 300 s / 6 / 1 / 20 s | When the captain takes the shot. |
+| `penalty.shotMin` / `.shotLateS` / `.shotBehind` / `.shotAhead` / `.shotHalfEndS` | `penalties.ts` | 0.6 / 233 s / 6 / 1 / 20 s | When the captain takes the shot. `shotLateS` was 300 (the last five minutes of 18:00); 300 × 7/9, rounded. |
 | `penalty.tapInsideM` | `penalties.ts` | 25 m | Else: tap inside this, kick for touch beyond. |
 | `penalty.captainIq` | `penalties.ts` | 0.004 | The captain (N11, §29): the shot needs this much less likelihood per point of Footy IQ above `captainIqMid`, more below. |
 | `penalty.captainIqMid` | `penalties.ts` | 60 | The Footy IQ at which the captain moves nothing (a sheet naming no captain reads as this). |
@@ -721,8 +726,8 @@ side that runs out), `tests/core/save.test.ts` (v10 → v11).
 
 ## 22. Sin bins and professional fouls (#71; BAK-206 B7)
 
-A penalty can send the offender to the sin bin for `bin.minutes` of match clock (five: the
-Nines bin, not the thirteen-a-side ten; the issue's "10 sim-minutes" was written for an
+A penalty can send the offender to the sin bin for `bin.minutes` of match clock (four: the
+same share of a 14-minute match as five was of 18; not the thirteen-a-side ten; the issue's "10 sim-minutes" was written for an
 80-minute match). The chance: a small one anywhere, more for a high shot, more inside the
 offender's own 20 (a professional foul, the infringement that stops a try) and more again
 for every earlier penalty his side conceded there (repeated infringements), plus a little
@@ -739,7 +744,7 @@ the knobs play the same match as the default until a bin would have happened.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `bin.minutes` | `src/match/league/sinbin.ts` | 5 | Match clock a binned man sits out (carries over half-time). |
+| `bin.minutes` | `src/match/league/sinbin.ts` | 4 | Match clock a binned man sits out (carries over half-time). Was 5; 5 × 7/9 ≈ 3.9, and 4/14 is the same share as 5/18 within a point. |
 | `bin.base` | `sinbin.ts` | 0.05 | A penalty anywhere else is a bin this often… |
 | `bin.redZone` / `bin.redZoneM` | `sinbin.ts` | 0.25 / 20 m | …one inside the offender's own 20 this often… |
 | `bin.repeat` | `sinbin.ts` | 0.2 | …plus this per earlier penalty his side conceded in its own 20. |
@@ -877,8 +882,8 @@ there more often. Tries move by +0.4 at most (inside luck).
 A final (rounds past `SEASON_ROUNDS`) level at full time on the live sim goes to **golden
 point**: a short break with no legs back and no swaps, ends swapped, a kick-off by the side that
 kicked off the match, and the next score wins it. A try ends it on the spot (no conversion); so
-does a penalty goal or a field goal. Field goals are on from the first second (the usual last-3-
-minutes rule is off) and a penalty shot reads golden point's own clock. Still level when golden
+does a penalty goal or a field goal. Field goals are on from the first second (the usual last-
+140-seconds rule is off) and a penalty shot reads golden point's own clock. Still level when golden
 point is up, it stays a draw and the higher seed goes through, as before. `runMatch` / `LiveSim`
 take `goldenPoint`; matchday sets it for the player's finals, the rival jobs for live rival
 finals. The cheap sim (fast-forward, or rival matches off the match engine) keeps the
@@ -886,7 +891,7 @@ higher-seed rule. Who kicks off after a try is unchanged (Leon's call).
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `rules.goldenPointMinutes` | `src/match/league/rules.ts` | 5 | Length of golden point; play runs on after its siren to the next dead ball. 0 = no golden point. |
+| `rules.goldenPointMinutes` | `src/match/league/rules.ts` | 4 | Length of golden point; play runs on after its siren to the next dead ball. 0 = no golden point. Was 5; 4/14 is the same share as 5/18. The "still level after 5 minutes" row below was measured on the old length. |
 | `rules.goldenPointBreakTicks` | `rules.ts` | 40 (2 s) | The break between full time and golden point. |
 
 Measured (`20261020-014632-golden-point`, 120 whole finals a row; the harness's `finals`
@@ -907,7 +912,8 @@ The player picks his side's attack and defence presets (§5) on the Lineup scree
 (`Lineup.tactics`, save v14; Balanced / Slide by default and for older saves) and the team
 sheet carries them. In a live match he changes them at the breaks: the **half-time card**
 (the score, each side's legs, the calls paid off, the two rows of presets) holds the match
-until Continue, and goes on by itself after 8 s at ×4 and above unless it is touched; the
+until Continue, and goes on by itself after 4.5 s at every speed unless it is touched
+(a tap clears the timer and holds the card); the
 **Plan** chip shows from a score until the kick-off (and before the opening kick-off). A change
 is an input like a call (`LiveSim.setTactics`, `plans: { tick, side, tactics }[]`), refused
 outside a break ("at the breaks"; never mid-set, never at a goal-line drop-out) and in force
@@ -915,6 +921,15 @@ from the kick-off, with a line in the commentary. It is kept in the live match r
 resumed match and `runMatch` with the same `plans` play the same match. No change plays
 exactly as before (tests). Rivals do not change plans (coach calls §6). No new match knobs:
 the presets' numbers are §5's.
+
+The screen around that card (2026-10-25; none of these change the sim):
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `HALF_TIME_CARD_MS` | `src/ui/screens/matchOverlay.ts` | 4500 ms | The half-time card goes on by itself after this long, at every speed. A tap clears the timer and holds the card. Was 8 s, and only at ×4 and above. |
+| `playbackPace` | `src/match/view/livePlayback.ts` | ×2 on ruck, tackle, restart, set-piece, conversion, try, penalty, goal | Dead time plays at twice the chosen speed. Open play, half-time and full time stay at the chosen speed. The ruck includes the play-the-ball; a set piece is a tap restart. |
+| `PACE_BLEND_MS` | `livePlayback.ts` | 400 ms | The pace eases between ×1 and ×2 (exponential). A 16 ms frame barely moves, so a phase change does not lurch. |
+| `LIVE_DEFAULT_SPEED` / `settings.playbackSpeed` | `livePlayback.ts` / `state.ts` | ×4 / saved 1, 2, 4 or 8 | The buttons remember the last speed (save v20). An old save, or any other value, plays at ×4. |
 
 What each preset does when the player picks it (even 60 v 60, the preset side at home
 against Balanced / Slide, 40 whole matches a row, `20261020-062508-presets-whole-match-n11`;
@@ -1041,8 +1056,10 @@ A side's plan can change at half-time and after a try. The rule lives in
 `src/match/league/breaks.ts` and the sim calls it from `live.ts` when the break
 opens (`endHalf`, and `score` once the phase is the try). It does not run on a
 penalty goal or a field goal. No dice of its own: a match that names no side
-is the match it was, and the golden even Balanced / Slide match stays
-`8-14:495:67db8b634c5a2e73`.
+is the match it was. The golden even Balanced / Slide match (seed 1) is
+`6-7:362:e959099a69ffd994`. It was `8-14:495:67db8b634c5a2e73` on 9:00 halves.
+It moved on purpose on 2026-10-25: the siren, the rescaled legs and the rescaled
+windows make seed 1 a different match. See `docs/status/2026-10-balance.md`.
 
 The harness turns it on per side (`breakRule: ["home"]` or `["away"]` on a
 scenario; `breakRuleSides` on `runMatch`). With `bothWays` the named side stays
@@ -1061,7 +1078,7 @@ that two tries conceded in a row open the plan even when the side is still ahead
 | `breaks.downBy` | `breaks.ts` | 8 | Points behind at half-time: one step more open. |
 | `breaks.concededRun` | `breaks.ts` | 2 | Tries conceded in a row, at a break: one step more open. Beats the late-lead tighten. |
 | `breaks.upBy` | `breaks.ts` | 12 | Points ahead at a break: one step tighter. |
-| `breaks.tightenFromMinute` | `breaks.ts` | 15 | A lead only tightens from this minute. A Nines match is 2 × 9:00, so this is the last three minutes. |
+| `breaks.tightenFromMinute` | `breaks.ts` | 12 | A lead only tightens from this minute. A Nines match is 2 × 7:00, so this is the last two minutes. Was 15 (the last three of 18:00); 15 × 7/9 ≈ 11.7, rounded. |
 
 Attack, tight to open: Grind → Balanced → Expansive → All-out. Defence: Compressed → Slide → Rush. Already at the end of the line, the step does nothing and the plan stays.
 

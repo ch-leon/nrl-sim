@@ -102,7 +102,7 @@ The upside scales with level; the cost is fixed, so training one is always a net
 Workhorse (training ×1.2 at I, ×1.32 II, ×1.44 III; legs drain ×0.9 at I, ×0.84 II, ×0.78 III — §8), Young Gun
 (training ×1.3; age ≤ 20 and rated 60+), Veteran (age 31+), Club Legend (tenure),
 Injury Prone (legacy saves only; ×1.4 injury rolls — no longer generated). *Clutch*
-(last 3 minutes) waits for the match clock in Phase 2.
+(the last sixth of the match, now 2:20 — `goals.fieldGoalLastS`) waits for the match clock in Phase 2.
 
 ### 3.5 Data model
 `Player.traits: TraitInstance[] = { id: TraitId; level: 1 | 2 | 3 }` (`src/data/traits.ts`
@@ -272,9 +272,11 @@ kicks, tries) so balance is seen, not guessed.
 
 ## 7. Balance targets (to verify in Phase 3)
 
-Per full Nines match (two 9:00 halves), both sides combined, 60-rated teams:
-tackles 150–210 · line breaks 13–24 · offloads 8–14 · errors 10–16 · kicks 20–32 ·
-tries 5–9 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
+Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams:
+tackles 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 ·
+tries 4–7 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
+The count bands are the 9:00-half bands ×7/9, rounded (2026-10-25). Completion is a
+rate and stayed.
 *Phase 3 (2026-10-19, assumed — needs Leon):* tackles, line breaks and kicks were first
 set at 90–120, 8–14 and 12–18, a tackle every 9–12 s of game clock, slower than real
 league (about 7.5 s). The sim plays a tackle every 5–7 s, and per tackle its line breaks
@@ -286,11 +288,12 @@ and the standard plan re-runs on each match-code change to `main`.
 ## 8. Fatigue — *implemented in F*
 
 Every player has **legs**, an energy tank from 1 (fresh) to 0 (spent)
-(`src/match/league/fatigue.ts`). It drains **0.015% per metre run** (≈ 240 m a minute,
-so ~0.65 over a match for running alone), **0.6% / 0.4%** per contact for carrier /
-tackler and the wrestle's cost (§8.1); it comes back **0.02% a second** standing or
-walking (under 1.5 m/s) and **0.2% a second** in a stoppage (after a try, before the
-restart). Everything he spends is × his **drain rate**: 1.5 − Stamina/100, clamped 0.6…1.4
+(`src/match/league/fatigue.ts`). It drains **0.0193% per metre run** (0.015% × 9/7:
+the same share of a 7:00 half as 0.015% was of a 9:00 half), **0.77% / 0.51%** per
+contact for carrier / tackler (0.6% / 0.4% × 9/7) and the wrestle's cost (§8.1); it
+comes back **0.0257% a second** standing or walking (under 1.5 m/s) and **0.257% a
+second** in a stoppage (after a try, before the restart). The sprint tank is not
+scaled: a sprint is still a few seconds. Everything he spends is × his **drain rate**: 1.5 − Stamina/100, clamped 0.6…1.4
 (Stamina 50 ×1, 80 ×0.7, 20 ×1.3), × 0.9 / 0.84 / 0.78 for Workhorse I / II / III.
 
 | Legs | Top speed | Contest (§4.1) | Step |
@@ -302,10 +305,11 @@ restart). Everything he spends is × his **drain rate**: 1.5 − Stamina/100, cl
 A player going under 20% is announced once (**COOKED!**, "… is cooked"; renamed from GASSED! with F2, where gas is the sprint tank) until he
 is back over 30%. Half-time and interchanges (BAK-207 2a, 2b) give legs back (§8.2).
 
-Measured (8 seeds × 18 min, 60-rated sheets): at Stamina 50 a side's average legs are
+Measured (8 seeds × 18 min, 60-rated sheets, on the old 9:00 halves): at Stamina 50 a side's average legs are
 88 / 78 / 67 / 55 / 44 / 32% at 3 / 6 / 9 / 12 / 15 / 18 min — tired for the last two or
 three minutes. Stamina 30 is tired from ~12 min and down to 20% at full time; Stamina 80
-finishes on 61%.
+finishes on 61%. The drain and the recovery above are that curve ×9/7, so the same
+share of a 7:00 half is about as tired.
 
 ### 8.1 The wrestle (Leon, 2026-10-17) — *implemented in F*
 Contact is a **struggle**, Kairosoft-soccer style (`src/match/league/wrestle.ts`). The
@@ -328,7 +332,7 @@ for one / two / three men. The defenders have **grip**: the first man 1.3 s, eac
   old fixed 10 sits at ~0.65 s, the average). **QUICK PTB!** at ≤ 0.35 s, a "slow
   play-the-ball" line at ≥ 1.2 s. The big hit still resolves at contact (no wrestle, the
   old 10 ticks down).
-- **Legs**: carrier 0.8% per second per man on him, each tackler 0.6% a second.
+- **Legs**: carrier 1.03% per second per man on him, each tackler 0.77% a second (the 9:00-half rates × 9/7).
 - Never longer than 3 s.
 
 Measured (8 seeds × 18 min, Stamina 50): ~160 wrestles a match averaging 0.63 s; 20 held
@@ -417,9 +421,11 @@ runs dry.
   he has lost** (40% → 70%), gas full (to his legs). Over whole matches even sides now
   end on about 52% legs instead of 35%, and stamina 30 v 80 on 36% / 69% instead of
   23% / 63% (tuning reference §13).
-- **Interchange** — *implemented in BAK-207 2b* (#70): a benched player recovers **5% a
-  minute, up to 90%**, never back to fresh within a match. Taken off at 40% and back on
-  after 4 minutes, he returns at 60%. The coach's rotation (off / standard / heavy) swaps
+- **Interchange** — *implemented in BAK-207 2b* (#70): a benched player recovers **about
+  6.4% a minute** (0.05 × 9/7), **up to 90%**, never back to fresh within a match. The
+  old 5% a minute reached that cap across an 18-minute match; the higher rate reaches
+  it across 14. Taken off at 40%, four minutes later he is back at about 66% (it was
+  60% at 5% a minute). The coach's rotation (off / standard / heavy) swaps
   the most tired men after a try; with a standard bench even sides end on about 71% legs
   instead of 52%, and the Stamina 30 side against Stamina 80 on 60% / 71% instead of
   36% / 69%; on heavy rotation it wins one match in five instead of none (tuning

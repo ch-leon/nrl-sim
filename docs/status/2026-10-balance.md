@@ -1,12 +1,40 @@
 # Match balance — October 2026 (N13)
 
+## Shorter halves (25 Oct)
+
+Halves went from 9:00 to 7:00 so a watched match is shorter. The golden even
+Balanced / Slide match (seed 1, no break rule) moved on purpose, from
+`8-14:495:67db8b634c5a2e73` to `6-7:362:e959099a69ffd994`. The siren comes earlier,
+legs drain and recover ×9/7, and the minute windows (field goal 180 s → 140 s,
+the AI coach's early hold 60 s → 47 s, a penalty shot's "late" 300 s → 233 s,
+sin bin 5 → 4, golden point 5 → 4, a late lead from minute 15 → 12) are a
+different match on the same seed. The pin is the new match, not a slipped hash.
+The sprint tank was left alone: a sprint is still a few seconds.
+
+Count bands in the harness are the old bands ×7/9, rounded (tries 4–7, tackles
+117–163, and the rest in tuning §12). Completion stayed 70–80%. Even 60 v 60
+over 20 seeds scored 6.15 tries a match on 9:00 halves and 4.05 on 7:00 (the
+length alone would suggest about 4.8). That 4.05 sits on the bottom of the new
+band. It was left there: the per-minute rate was not pushed back up.
+
+Screen only, so the golden match does not include them: dead time (ruck and
+play-the-ball, tackle, restart and kick-off, set piece, conversion, try, penalty,
+field goal) plays at twice the chosen speed, eased over 0.4 s; the half-time
+card goes on after 4.5 s at every speed unless it is tapped; the chosen speed
+is kept on the save (v20), and an old save still starts at ×4.
+
+The preset table, the soak and the economy numbers for this cut are filled in
+below once those runs finish.
+
+## N13
+
 The live match sim's knobs, measured with the harness (`npm run balance`, `balance/README.md`).
 N13 item 1 is the presets. N13.5 is the break rule (below). Later items (grubbers, completion,
 the 20-point gap, the home edge, stamina) are still to come.
 
 N15.4 (traits you can see) adds an optional `toSlot` on a cut-out event in `src/match/league/live.ts`
 (this plan's file): the receiver's slot, so the view can draw the line. The sim does not
-read it, no dice changed, and the golden Balanced / Slide match is the same string.
+read it, no dice changed, and that line did not move the golden match. The 25 Oct cut above did.
 
 Every decision taken without a fresh word from Leon is marked **Assumed (needs Leon)**.
 

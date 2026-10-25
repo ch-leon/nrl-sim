@@ -15,6 +15,6 @@
     { "name": "compressed v slide", "seeds": 100, "track": "home", "bothWays": true, "home": { "rating": 60, "tactics": { "defence": "compressed" } }, "away": { "rating": 60 } },
     { "name": "70 v 50", "home": { "rating": 70 }, "away": { "rating": 50 } },
     { "name": "fliers v stayers", "home": { "rating": 60, "stats": { "speed": 85, "stamina": 30 } }, "away": { "rating": 60, "stats": { "speed": 65, "stamina": 80 } } },
-    { "name": "last 8 min on late legs", "home": { "rating": 60 }, "away": { "rating": 60 }, "legs": "late", "minutes": 8 }
+    { "name": "last 6 min on late legs", "home": { "rating": 60 }, "away": { "rating": 60 }, "legs": "late", "minutes": 6 }
   ]
 }
