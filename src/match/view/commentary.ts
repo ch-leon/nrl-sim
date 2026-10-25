@@ -21,11 +21,12 @@ import { CALL_LABEL, isCoachCall } from '../league/calls';
 import { PRESET_LABEL } from '../league/presets';
 
 /**
- * Characters a ticker line holds at 844×390 before its ellipsis: the commentary
- * strip is 34rem (544 px) wide less its padding, border and the Log button, and a
- * line is 0.8rem Courier New, 0.6em a character (measured in Chromium: see
- * docs/status/2026-10-show.md, N15.2). Every line, filled with the longest names
- * the game makes, fits it (a test).
+ * Characters a ticker line stays within. At 844×390 the commentary strip is
+ * 34rem (544 px) wide less its padding and border, and a line is 0.8rem Courier
+ * New, about 0.6em a character (measured in Chromium when the strip also held
+ * the Log button: docs/status/2026-10-show.md, N15.2). The button has moved off
+ * the strip, so the strip holds more; lines are still written to 56. Every line,
+ * filled with the longest names the game makes, fits it (a test).
  */
 export const TICKER_FIT_CHARS = 56;
 
