@@ -24,7 +24,7 @@
 // through `comment()`: the overlay keeps the score from the events and says
 // nothing of its own.
 import { REPLAY_OFFER_MS } from '../../match/view/replay';
-import { el, panel, button, mount, ensureStyles } from '../dom';
+import { el, panel, button, mount, ensureStyles, getRoot } from '../dom';
 import { bus } from '../../core/events';
 import { truncateTicker } from '../../world/readability';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
@@ -259,7 +259,7 @@ export function callsLockedHint(unlocked: number, all: number, seasoned: boolean
 
 // ── DOM overlay ────────────────────────────────────────────────────────────────
 
-/** Lines kept in the full log behind the ticker's Log toggle. */
+/** Lines kept in the full log behind the corner Log toggle. */
 const MAX_LOG = 40;
 
 export interface MatchOverlayHandle {
@@ -441,32 +441,82 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   statsBody.style.display = statsOpen ? '' : 'none';
   const statsPanel = panel({ class: 'nrl-mo-stats' }, statsToggle, statsBody);
 
-  // Commentary: a slim two-line ticker (previous line dimmed, latest bright);
-  // the full log sits behind a toggle so it never covers play unasked (#17).
+  // Commentary: a slim two-line ticker (previous line dimmed, latest bright).
+  // The full log sits behind a corner icon so it never covers play unasked (#17)
+  // and the ticker is not a button tall.
   const tickerPrev = el('div', { class: 'nrl-mo-line nrl-mo-line-prev' });
   const tickerLatest = el('div', { class: 'nrl-mo-line' });
   const log = el('div', { class: 'nrl-mo-feed' });
   const logPanel = panel({ class: 'nrl-mo-log' }, log);
+  logPanel.id = 'nrl-mo-log';
   logPanel.style.display = 'none';
   let logOpen = false;
-  const logToggle = button('Log ▴', () => {
+  const logToggle = button('', () => {
     logOpen = !logOpen;
     logPanel.style.display = logOpen ? '' : 'none';
-    logToggle.textContent = logOpen ? 'Log ▾' : 'Log ▴';
+    logToggle.setAttribute('aria-expanded', String(logOpen));
     if (logOpen) log.scrollTop = log.scrollHeight;
   }, { class: 'nrl-mo-log-toggle' });
+  logToggle.setAttribute('aria-label', 'Log');
+  logToggle.setAttribute('aria-expanded', 'false');
+  logToggle.setAttribute('aria-controls', 'nrl-mo-log');
+  logToggle.title = 'Log';
+  logToggle.append(el('span', { class: 'nrl-mo-log-icon', attrs: { 'aria-hidden': 'true' } }));
   const commentaryPanel = panel(
     { class: 'nrl-mo-commentary' },
+    logPanel,
     el('div', { class: 'nrl-mo-ticker' }, tickerPrev, tickerLatest),
-    logToggle,
   );
 
   // Big centre-screen pop-up for every scoring attempt (who, what, points).
   const banner = el('div', { class: 'nrl-mo-banner', attrs: { role: 'status', 'aria-live': 'polite' } });
   banner.hidden = true;
 
-  root.append(scoreboard, statsPanel, logPanel, commentaryPanel, banner);
+  root.append(scoreboard, statsPanel, commentaryPanel, banner, logToggle);
   mount(root);
+
+  // The ticker sits above whatever of the speed row, the call chips and the corner
+  // buttons actually overlaps it. A fixed offset only clears two rows: a level-2
+  // chip stack and a three-line speed row both climb higher (the checker's 667, 390 and 360).
+  let chromeFrame = 0;
+  const placeChrome = (): void => {
+    chromeFrame = 0;
+    const ticker = commentaryPanel.getBoundingClientRect();
+    let clearance = 0;
+    const consider = (node: Element | null): void => {
+      if (!node) return;
+      const r = node.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return;
+      if (r.left >= ticker.right - 0.5 || r.right <= ticker.left + 0.5) return;
+      clearance = Math.max(clearance, window.innerHeight - r.top);
+    };
+    consider(document.querySelector('.nrl-mo-controls'));
+    consider(document.querySelector('.nrl-mo-calls'));
+    consider(document.querySelector('.nrl-audio-launcher'));
+    consider(logToggle);
+    if (clearance <= 0) return;
+    const bottom = Math.ceil(clearance + 8);
+    root.style.setProperty('--nrl-mo-chrome', `${bottom}px`);
+    root.style.setProperty('--nrl-mo-above', `${bottom + commentaryPanel.offsetHeight + 8}px`);
+  };
+  const scheduleChrome = (): void => {
+    if (chromeFrame) return;
+    chromeFrame = requestAnimationFrame(placeChrome);
+  };
+  const chromeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(scheduleChrome) : null;
+  const chromeSeen = new Set<Element>();
+  const scanChrome = (): void => {
+    document.querySelectorAll('.nrl-mo-controls, .nrl-mo-calls, .nrl-audio-launcher').forEach((node) => {
+      if (chromeSeen.has(node)) return;
+      chromeSeen.add(node);
+      chromeObserver?.observe(node);
+    });
+    scheduleChrome();
+  };
+  const chromeMut = new MutationObserver(scanChrome);
+  chromeMut.observe(getRoot(), { childList: true });
+  window.addEventListener('resize', scheduleChrome);
+  scanChrome();
 
   let replayTimer: ReturnType<typeof setTimeout> | null = null;
   let replayBtn: HTMLButtonElement | null = null;
@@ -592,6 +642,10 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       if (bannerTimer) clearTimeout(bannerTimer);
       clearReplayOffer();
       replayTag?.remove();
+      if (chromeFrame) cancelAnimationFrame(chromeFrame);
+      chromeObserver?.disconnect();
+      chromeMut.disconnect();
+      window.removeEventListener('resize', scheduleChrome);
       queued = null;
       root.remove();
       document.body?.classList.remove(MATCH_ACTIVE_CLASS, MATCH_FINAL_CLASS);
@@ -722,7 +776,7 @@ const OVERLAY_CSS = `
 body.nrl-match-active .nrl-hud,
 body.nrl-match-active .nrl-nav { display: none; }
 body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
-/* Toasts: under the scoreboard, in the overlay's top margin, clear of the ticker and the Log button (finding 3). */
+/* Toasts: under the scoreboard, in the overlay's top margin, clear of the ticker (finding 3). */
 body.nrl-match-active .nrl-toast-stack,
 body.nrl-match-final .nrl-toast-stack {
   top: calc(4.7rem + env(safe-area-inset-top, 0px));
@@ -757,18 +811,39 @@ body.nrl-match-final .nrl-toast-stack {
 .nrl-mo-poss-bar { height: 0.6rem; border: 2px solid #000; background: #b34747; margin: 0.2rem 0; }
 .nrl-mo-poss-fill { display: block; height: 100%; background: #4779b3; width: 50%; }
 .nrl-mo-commentary {
-  position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px)); z-index: 14;
+  position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px));
+  /* --nrl-mo-chrome is the measured top of the speed row and the chip stack (placeChrome). */
+  bottom: var(--nrl-mo-chrome, calc(3.75rem + env(safe-area-inset-bottom, 0px))); z-index: 14;
   max-width: 34rem; margin: 0 auto; padding: 0.25rem 0.5rem;
   display: flex; align-items: center; gap: 0.5rem; box-sizing: border-box;
 }
 .nrl-mo-ticker { flex: 1 1 auto; min-width: 0; }
 .nrl-mo-ticker .nrl-mo-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1.25em; }
 .nrl-mo-line-prev { opacity: 0.55; }
-.nrl-mo-log-toggle { flex: 0 0 auto; }
-/* Full log: opt-in, stacked just above the ticker. */
+/* The log toggle is a 44px icon in the bottom-left corner, on the empty side of
+   the speed row (the ♪ button has the other corner). It used to be a labelled
+   button inside the ticker, which made that strip a button tall and, on a narrow
+   phone, sat under the call chips. */
+.nrl-mo-log-toggle {
+  position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+  z-index: 21; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0;
+  display: grid; place-items: center; line-height: 0;
+}
+/* The open fill wins over .nrl-btn:hover (that rule is an element plus :hover). */
+.nrl-btn.nrl-mo-log-toggle[aria-expanded="true"],
+.nrl-btn.nrl-mo-log-toggle[aria-expanded="true"]:hover:not(:disabled) {
+  background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000;
+}
+.nrl-mo-log-icon {
+  width: 16px; height: 12px; pointer-events: none;
+  background:
+    linear-gradient(#1a1a2e, #1a1a2e) 0 0 / 16px 2px no-repeat,
+    linear-gradient(#1a1a2e, #1a1a2e) 0 5px / 16px 2px no-repeat,
+    linear-gradient(#1a1a2e, #1a1a2e) 0 10px / 16px 2px no-repeat;
+}
+/* Full log: opt-in, stacked just above the ticker (the ticker's own width). */
 .nrl-mo-log {
-  position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); bottom: calc(7rem + env(safe-area-inset-bottom, 0px)); z-index: 14;
-  max-width: 34rem; margin: 0 auto;
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 0.25rem); margin: 0;
 }
 .nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: 8rem; overflow-y: auto; }
 .nrl-mo-line { font-size: clamp(0.6rem, 2.4vw, 0.8rem); line-height: 1.25; }
@@ -810,7 +885,7 @@ body.nrl-match-final .nrl-toast-stack {
 /* Full-time: scoreboard and stats stay put (HUD/nav are still hidden); the
    feed gives way to the Back-to-Club button (MatchScene, bottom-centre where
    the controls were). The result toast stays under the scoreboard, off the ticker. */
-.nrl-mo-final .nrl-mo-commentary, .nrl-mo-final .nrl-mo-log { display: none; }
+.nrl-mo-final .nrl-mo-commentary, .nrl-mo-final .nrl-mo-log, .nrl-mo-final .nrl-mo-log-toggle { display: none; }
 /* Score banner: big, team-coloured, centre-top over the pitch; never blocks taps. */
 .nrl-mo-banner {
   position: fixed; left: 50%; top: 22%; transform: translateX(-50%);
@@ -848,7 +923,7 @@ body.nrl-match-final .nrl-toast-stack {
 @keyframes nrl-mo-chip-scored { 0%, 40% { background: #f4d03f; } 100% { background: transparent; } }
 /* Replay (N15.5): above the ticker, clear of the speed buttons and the calls. */
 .nrl-mo-replay, .nrl-mo-replay-tag {
-  position: fixed; left: 50%; bottom: calc(8rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: var(--nrl-mo-above, calc(8rem + env(safe-area-inset-bottom, 0px))); transform: translateX(-50%);
   z-index: 26; pointer-events: auto; min-height: 44px; min-width: 7rem;
 }
 .nrl-mo-replay-tag {
@@ -865,11 +940,10 @@ body.nrl-match-final .nrl-toast-stack {
   .nrl-mo-stats { top: 4rem; min-width: 8.5rem; padding: 0.3rem 0.5rem; }
   .nrl-mo-stat-line { font-size: 0.62rem; margin: 0.05rem 0; }
   .nrl-mo-feed { max-height: 3.4rem; }
-  .nrl-mo-commentary, .nrl-mo-log { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
+  .nrl-mo-commentary { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
   .nrl-mo-banner { top: 19%; min-width: 14rem; padding: 0.25rem 0.9rem 0.35rem; border-width: 3px; }
   .nrl-mo-banner-score { margin-top: 0.2rem; }
   body.nrl-match-active .nrl-toast-stack,
   body.nrl-match-final .nrl-toast-stack { top: calc(4.7rem + env(safe-area-inset-top, 0px)); }
-  .nrl-mo-replay, .nrl-mo-replay-tag { bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px)); }
 }
 `;
