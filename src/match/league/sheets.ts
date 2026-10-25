@@ -86,7 +86,7 @@ function toRosterEntry(p: Player): RosterEntry {
 }
 
 /**
- * Build a TeamSheet from a squad. Excludes injured players (injuredWeeks > 0),
+ * Build a TeamSheet from a squad. Excludes injured and suspended players,
  * uses the best ON_FIELD by overall rating, and applies a morale modifier. If
  * fewer than ON_FIELD fit players are available, uses all fit players; throws
  * if zero.
@@ -104,7 +104,7 @@ export function teamSheetFromSquad(
   colors: [string, string],
   selection?: Selection,
 ): TeamSheet {
-  const fit = players.filter((p) => p.injuredWeeks <= 0);
+  const fit = players.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0);
   if (fit.length === 0) throw new Error('no fit players');
 
   const ranked = [...fit].sort((a, b) => overallRating(b) - overallRating(a));

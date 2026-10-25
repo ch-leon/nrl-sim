@@ -185,7 +185,7 @@ const LINEUP_CSS = `
 @media (pointer: coarse) { .nrl-lineup-row { min-height: 44px; } }
 .nrl-lineup-row img { width: ${PORTRAIT_PX}px; height: ${PORTRAIT_PX}px; image-rendering: pixelated; image-rendering: crisp-edges; }
 .nrl-lineup-row[data-selected] { outline: 3px solid #f4d03f; }
-.nrl-lineup-row[data-injured] { opacity: 0.55; cursor: default; }
+.nrl-lineup-row[data-injured], .nrl-lineup-row[data-banned] { opacity: 0.55; cursor: default; }
 .nrl-lineup-row-id { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; }
 .nrl-lineup-row-name { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-lineup-row-meta { white-space: nowrap; font-size: 0.6rem; }
@@ -201,7 +201,7 @@ const LINEUP_CSS = `
   white-space: nowrap;
 }
 .nrl-lineup-where[data-bench] { background: #3a6ea5; color: #fff; }
-.nrl-lineup-where[data-injured] { background: #b03a2e; color: #fff; }
+.nrl-lineup-where[data-injured], .nrl-lineup-where[data-banned] { background: #b03a2e; color: #fff; }
 .nrl-lineup-where[data-free] { background: transparent; color: transparent; border-color: transparent; }
 .nrl-lineup-kc { display: flex; gap: 0.3rem; flex-shrink: 0; }
 .nrl-lineup-kc[hidden] { display: none; }
@@ -329,6 +329,10 @@ export function openLineupScreen(): void {
       toast(`${p.name} is injured — out ${p.injuredWeeks}w.`);
       return;
     }
+    if ((p.suspendedWeeks ?? 0) > 0) {
+      toast(`${p.name} is suspended — banned ${p.suspendedWeeks}w.`);
+      return;
+    }
     const lineup = getState().lineup;
     if (selected) {
       const next = placeAt(lineup, selected, p.id);
@@ -349,10 +353,12 @@ export function openLineupScreen(): void {
   const tile = (p: Player | null, spot: Spot, kit: Kit, slotPos: Position | null): HTMLElement => {
     const label = spot.kind === 'starter' ? POSITION_SHORT[slotPos!] : `B${spot.index + 1}`;
     const injured = p !== null && p.injuredWeeks > 0;
+    const banned = p !== null && (p.suspendedWeeks ?? 0) > 0;
     const fit = p && slotPos ? positionFit(p.position, slotPos) : 1;
     const rating = p ? (slotPos ? effectiveRating(p, slotPos) : overallRating(p)) : null;
     const top = el('span', { class: 'nrl-lineup-tile-top' }, `${label} `);
     if (injured) top.append(el('span', { class: 'nrl-lineup-fit-unrelated', text: `OUT ${p.injuredWeeks}w` }));
+    else if (banned) top.append(el('span', { class: 'nrl-lineup-fit-unrelated', text: `BAN ${p.suspendedWeeks}w` }));
     else if (rating !== null) top.append(el('span', { class: fitClass(fit), text: String(rating) }));
     else top.append('—');
     const t = el(
@@ -363,7 +369,7 @@ export function openLineupScreen(): void {
           type: 'button',
           'data-spot': spot.kind === 'starter' ? `s${spot.slot}` : `b${spot.index}`,
           title: p
-            ? `${p.name} · ${positionLabel(p.position)} · OVR ${overallRating(p)}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ${rating} (×${fit})` : ''}${injured ? ` · injured, out ${p.injuredWeeks}w` : ''}`
+            ? `${p.name} · ${positionLabel(p.position)} · OVR ${overallRating(p)}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ${rating} (×${fit})` : ''}${injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`
             : spot.kind === 'starter'
               ? `${positionLabel(slotPos!)}: nobody picked`
               : 'Bench seat: nobody picked',
@@ -417,7 +423,7 @@ export function openLineupScreen(): void {
     tacHint.textContent = `${PRESET_LABEL[tactics.attack]}: ${TACTIC_BLURB[tactics.attack]} ${PRESET_LABEL[tactics.defence]}: ${TACTIC_BLURB[tactics.defence]}`;
     tacHint.title = tacHint.textContent;
 
-    const fit = s.squad.filter((p) => p.injuredWeeks <= 0).length;
+    const fit = s.squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length;
     const picked = lineup.starters.filter((id) => id !== null).length;
     const notes = today.fills.length ? ` · on the day: ${describeFills(today.fills).replace(/^Lineup: /, '')}` : '';
     sub.textContent = `${picked}/${LINEUP_SLOTS.length} picked · nine rated ${lineupAverage(lineup, s.squad)} as they play · ${fit} fit of ${s.squad.length}${notes}`;
@@ -450,11 +456,13 @@ export function openLineupScreen(): void {
     for (const p of rows) {
       const where = spotOf(lineup, p.id);
       const injured = p.injuredWeeks > 0;
+      const banned = (p.suspendedWeeks ?? 0) > 0;
       const whereEl = el('span', {
         class: 'nrl-lineup-where',
-        text: injured ? `OUT ${p.injuredWeeks}w` : where ? (where.kind === 'starter' ? POSITION_SHORT[LINEUP_SLOTS[where.slot]!] : `B${where.index + 1}`) : '·',
+        text: injured ? `OUT ${p.injuredWeeks}w` : banned ? `BAN ${p.suspendedWeeks}w` : where ? (where.kind === 'starter' ? POSITION_SHORT[LINEUP_SLOTS[where.slot]!] : `B${where.index + 1}`) : '·',
       });
       if (injured) whereEl.setAttribute('data-injured', '');
+      else if (banned) whereEl.setAttribute('data-banned', '');
       else if (where?.kind === 'bench') whereEl.setAttribute('data-bench', '');
       else if (!where) whereEl.setAttribute('data-free', '');
       const effText = slotPos ? `${effectiveRating(p, slotPos)}` : `${overallRating(p)}`;
@@ -478,6 +486,7 @@ export function openLineupScreen(): void {
         whereEl,
       );
       if (injured) row.setAttribute('data-injured', '');
+      else if (banned) row.setAttribute('data-banned', '');
       if (occupantId === p.id) row.setAttribute('data-selected', '');
       list.append(row);
     }

@@ -1,7 +1,8 @@
 // src/systems/staff.ts — three hires the facilities don't cover (N14.5).
 //
-// The Welfare Manager halves the odds of the players' grievance cards and takes a
-// tenth off renewal asks. The Assistant Coach (the player's plan changed at the
+// The Welfare Manager halves the odds of the players' grievance cards, halves
+// the chance a risky choice goes wrong (#324, #325), and takes a tenth off
+// renewal asks. The Assistant Coach (the player's plan changed at the
 // break when a match is fast-forwarded, by the rivals' rule) and the Analyst (the
 // rival's plan and its switch on the next-match card) need the break rule (N13.5,
 // N14.1): they can be hired and are paid now, and act once it lands. Each is hired and released from the Staff panel under
@@ -31,7 +32,7 @@ export const STAFF: Record<StaffRole, StaffDef> = {
   },
   welfare: {
     title: 'Welfare Manager', wage: 700,
-    blurb: 'Halves the odds of a player’s grievance card and takes a tenth off renewal asks.',
+    blurb: 'Halves the odds of a player’s grievance card, halves the chance a risky night out or trip goes wrong, and takes a tenth off renewal asks.',
   },
 };
 

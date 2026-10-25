@@ -5,12 +5,17 @@
 //
 // Text placeholders: {player} = the card's subject (a squad player, or a rival's
 // player for 'rivalStar'), {club} = the player's club name; rival-player cards
-// also have {rival}, {ovr}, {position} and {fee}. Money is in dollars; morale and
-// reputation in points.
+// also have {rival}, {ovr}, {position} and {fee}. A chance that picks its own
+// player fills {player} with him. Money is in dollars; morale and reputation
+// in points.
 import type { TraitId } from './traits';
+import { WILDCARDS } from '../config';
 
-/** One thing a choice does. Effects on "the player" target the card's subject. */
-export type EventEffect =
+/** Where a ban came from. #328's Club Lawyer will tell these apart. */
+export type BanSource = 'event' | 'trip' | 'judiciary';
+
+/** A certain effect. "The player" is the card's subject, or the player a chance picked. */
+export type ImmediateEffect =
   | { kind: 'money'; amount: number }
   | { kind: 'reputation'; amount: number }
   | { kind: 'squadMorale'; amount: number }
@@ -21,10 +26,38 @@ export type EventEffect =
   | { kind: 'playerTrait'; trait: TraitId }
   /** Sign the card's rival-player subject for the fee quoted on the card (#74). */
   | { kind: 'signSubject' }
-  /** A temporary modifier: `effects` fire on each matching week for `weeks` weeks. */
-  | { kind: 'modifier'; label: string; trigger: ModifierTrigger; weeks: number; effects: ImmediateEffect[] };
+  /** Unavailable for this many weeks (or a rolled inclusive range). Not an injury. */
+  | { kind: 'suspend'; weeks: number | readonly [number, number]; source: BanSource }
+  /** The board's patience, clamped to 0..MAX. A season review still does the sacking. */
+  | { kind: 'boardPatience'; amount: number }
+  /** Remember this choice so a later card can require it. */
+  | { kind: 'flag'; id: string };
 
-export type ImmediateEffect = Exclude<EventEffect, { kind: 'modifier' }>;
+/** What a temporary modifier may fire. A ban is not one of these. */
+export type ModifierEffect = Exclude<ImmediateEffect, { kind: 'suspend' } | { kind: 'boardPatience' } | { kind: 'flag' }>;
+
+/** A roll on the events deck's own rng. `risk` is halved while a Welfare Manager is hired. */
+export interface ChanceEffect {
+  kind: 'chance';
+  /** Probability in 0..1 before the Welfare Manager. */
+  p: number;
+  /** The Welfare Manager halves this (#324, #325). */
+  risk?: boolean;
+  /** Who it lands on. 'incident' weighs hotheads and low morale, and can be a star. */
+  pick?: 'incident';
+  hit: ImmediateEffect[];
+  /** One line is posted when it hits. {player} is who it landed on. */
+  hitNews: readonly string[];
+  /** Posted when it doesn't. */
+  missNews?: string;
+}
+
+/** One thing a choice does. Effects on "the player" target the card's subject. */
+export type EventEffect =
+  | ImmediateEffect
+  /** A temporary modifier: `effects` fire on each matching week for `weeks` weeks. */
+  | { kind: 'modifier'; label: string; trigger: ModifierTrigger; weeks: number; effects: ModifierEffect[] }
+  | ChanceEffect;
 
 /** When a modifier's effects fire: every week, or only on a week the club wins / loses. */
 export type ModifierTrigger = 'weekly' | 'win' | 'loss';
@@ -56,6 +89,13 @@ export interface EventConditions {
   minFacilities?: number;
   /** The club must have a match next week (and, if set, at home / away). */
   nextMatch?: 'any' | 'home' | 'away';
+  /** Drawn only after a choice set this flag. */
+  flag?: string;
+  /**
+   * 'rollover' cards are offered by the season hook, once, and never by the
+   * weekly draw. Unanswered, the default is taken before that week's match.
+   */
+  offer?: 'rollover';
 }
 
 export interface EventCardDef {
@@ -268,6 +308,215 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
       { label: 'Not interested', effects: [], outcome: '{player} stays at {rival} for now.' },
     ],
     defaultChoice: 1,
+  },
+  {
+    id: 'nightOut',
+    title: 'Night out',
+    text: '{player} wants a night out before the game. The group chat is already picking a karaoke bar.',
+    weight: 5, cooldown: 18, subject: 'star', when: { nextMatch: 'any' },
+    choices: [
+      { label: 'Keep him in', effects: [{ kind: 'playerMorale', amount: -8 }], outcome: '{player} stays in. He is filthy about it.' },
+      {
+        label: 'Let him go',
+        effects: [
+          { kind: 'playerMorale', amount: 10 },
+          { kind: 'flag', id: 'nightOut' },
+          {
+            kind: 'chance', p: WILDCARDS.INCIDENT_CHANCE, risk: true, pick: 'incident',
+            hit: [
+              { kind: 'suspend', weeks: WILDCARDS.BAN_WEEKS, source: 'event' },
+              { kind: 'reputation', amount: -2 },
+            ],
+            hitNews: ['{player} closed the bar with a ballad and a borrowed hat. The clip is everywhere, and the club has stood him down.'],
+            missNews: '{player} was home at a decent hour. The group chat is disappointed.',
+          },
+        ],
+        outcome: '{player} is out for the night.',
+      },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'nightClip',
+    title: 'The clip',
+    text: 'A phone video from the other night is doing the rounds: {player} murdering a karaoke ballad in a borrowed hat. The comments are brutal, and nobody was hurt.',
+    weight: 7, cooldown: 40, subject: 'any', when: { flag: 'nightOut' },
+    choices: [
+      { label: 'Fine $800', effects: [{ kind: 'money', amount: 800 }, { kind: 'playerMorale', amount: -8 }, { kind: 'reputation', amount: 1 }], outcome: '{player} was fined $800 over the clip.' },
+      { label: 'Laugh it off', effects: [{ kind: 'playerMorale', amount: 5 }, { kind: 'reputation', amount: -2 }], outcome: 'The club laughed the clip off. The comments did not.' },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'pressSpray',
+    title: 'Mouthing off',
+    text: 'The coach across town told breakfast radio your side is soft, and that your captain could not organise a sausage sizzle.',
+    weight: 4, cooldown: 16,
+    choices: [
+      { label: 'Rise above', effects: [{ kind: 'reputation', amount: 2 }], outcome: 'The club said nothing. The quote died by Thursday.' },
+      {
+        label: 'Bite back',
+        effects: [
+          { kind: 'squadMorale', amount: 5 },
+          { kind: 'reputation', amount: -1 },
+          {
+            kind: 'chance', p: 0.2, risk: true,
+            hit: [{ kind: 'boardPatience', amount: -1 }, { kind: 'reputation', amount: -1 }],
+            hitNews: ['The reply made the back page, and the board would like a quieter week.'],
+            missNews: 'The reply was sharp and then it was over.',
+          },
+        ],
+        outcome: 'The club bit back on radio.',
+      },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'sponsorJitters',
+    title: 'Sponsor jitters',
+    text: 'The jersey sponsor has seen a headline and wants a word before they talk about next year.',
+    weight: 4, cooldown: 20,
+    choices: [
+      { label: 'Let them stew', effects: [{ kind: 'reputation', amount: -3 }, { kind: 'squadMorale', amount: -2 }], outcome: 'The sponsor is stewing. So is the squad.' },
+      { label: 'Shout lunch ($2,000)', effects: [{ kind: 'money', amount: -2_000 }, { kind: 'reputation', amount: 1 }], outcome: 'Lunch with the sponsor cost $2,000 and smoothed it over.' },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'matchDayStorm',
+    title: 'Storm morning',
+    text: 'A storm is sitting on the ground. The gates can still open. The car park is a creek.',
+    weight: 5, cooldown: 20, when: { nextMatch: 'any' },
+    choices: [
+      { label: 'Play on', effects: [{ kind: 'squadMorale', amount: -3 }, { kind: 'reputation', amount: 1 }], outcome: 'Kickoff is on. The diehards are already in the creek.' },
+      { label: 'Refund ($4,000)', effects: [{ kind: 'money', amount: -4_000 }, { kind: 'squadMorale', amount: 2 }, { kind: 'reputation', amount: 1 }], outcome: 'Members were refunded $4,000 and the storm blew through empty stands.' },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'captainFuming',
+    title: 'Still filthy',
+    text: '{player} is still filthy about the whistle last week and wants to say so at training, loudly, where the cameras are.',
+    weight: 5, cooldown: 18, subject: 'star', when: { nextMatch: 'any' },
+    choices: [
+      { label: 'Calm him', effects: [{ kind: 'playerMorale', amount: 6 }], outcome: '{player} had his say in the sheds and trained like he meant it.' },
+      {
+        label: 'Let him fire up',
+        effects: [
+          { kind: 'playerMorale', amount: 4 },
+          { kind: 'squadMorale', amount: 3 },
+          {
+            kind: 'chance', p: WILDCARDS.INCIDENT_CHANCE, risk: true,
+            hit: [{ kind: 'suspend', weeks: WILDCARDS.BAN_WEEKS, source: 'event' }, { kind: 'reputation', amount: -1 }],
+            hitNews: ['{player} sprayed a sponsor\'s sign on the way out of training. The club has stood him down.'],
+            missNews: '{player} burned it off in the tackling bags.',
+          },
+        ],
+        outcome: '{player} is fired up and not being quiet about it.',
+      },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'jetSki',
+    title: 'Jet-ski photo',
+    text: '{player} posted a jet-ski photo from a day off, club cap on backwards. The comments have found it.',
+    weight: 4, cooldown: 22, subject: 'any',
+    choices: [
+      { label: 'Have a word', effects: [{ kind: 'playerMorale', amount: -4 }, { kind: 'reputation', amount: 1 }], outcome: 'A quiet word, and the photo came down.' },
+      {
+        label: 'Leave it',
+        effects: [
+          { kind: 'playerMorale', amount: 4 },
+          {
+            kind: 'chance', p: WILDCARDS.INCIDENT_CHANCE, risk: true, pick: 'incident',
+            hit: [
+              { kind: 'suspend', weeks: WILDCARDS.BAN_WEEKS, source: 'event' },
+              { kind: 'reputation', amount: -2 },
+              { kind: 'boardPatience', amount: -1 },
+            ],
+            hitNews: ['{player} came off the jet ski on the next day off. The clip is everywhere, and the club has stood him down.'],
+            missNews: 'The photo blew over by Monday.',
+          },
+        ],
+        outcome: 'The photo stays up. The boys love it.',
+      },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'missedCurfew',
+    title: 'Missed curfew',
+    text: '{player} missed curfew and was last seen murdering a ballad at a karaoke bar. He made training. Just.',
+    weight: 5, cooldown: 16, subject: 'youngster',
+    choices: [
+      { label: 'Sit down', effects: [{ kind: 'playerMorale', amount: 6 }], outcome: 'A sit-down, and {player} looked relieved more than anything.' },
+      {
+        label: 'Sideline him',
+        effects: [
+          { kind: 'suspend', weeks: 1, source: 'event' },
+          { kind: 'playerMorale', amount: -8 },
+          { kind: 'reputation', amount: 1 },
+        ],
+        outcome: '{player} is stood down for a week over curfew.',
+      },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'dodgyTattoo',
+    title: 'Upside-down crest',
+    text: '{player} got the club crest tattooed on a shoulder. It is upside down. The group chat will never recover.',
+    weight: 4, cooldown: 24, subject: 'any',
+    choices: [
+      { label: 'Leave it', effects: [{ kind: 'playerMorale', amount: -3 }, { kind: 'squadMorale', amount: 4 }], outcome: 'The tattoo stays. The squad has not stopped laughing.' },
+      { label: 'Fix it ($1,200)', effects: [{ kind: 'money', amount: -1_200 }, { kind: 'playerMorale', amount: 8 }], outcome: 'The crest was fixed for $1,200. {player} can look in a mirror again.' },
+    ],
+    defaultChoice: 0,
+  },
+  {
+    id: 'baliTrip',
+    title: 'Trip to Bali',
+    text: 'The season is done and the squad wants the end-of-season trip to Bali. The group chat is already full of jet skis.',
+    weight: 1, cooldown: 27, when: { offer: 'rollover' },
+    choices: [
+      {
+        label: 'Let them go',
+        effects: [
+          { kind: 'squadMorale', amount: 6 },
+          {
+            kind: 'chance', p: WILDCARDS.INCIDENT_CHANCE, risk: true, pick: 'incident',
+            hit: [
+              { kind: 'suspend', weeks: WILDCARDS.BAN_WEEKS, source: 'trip' },
+              { kind: 'money', amount: -2_500 },
+              { kind: 'reputation', amount: -2 },
+              { kind: 'boardPatience', amount: -1 },
+              { kind: 'flag', id: 'baliIncident' },
+            ],
+            hitNews: [
+              '{player} came off a jet ski on day two. The clip is everywhere, and the club has stood him down.',
+              '{player} missed the flight home. The airport-bar video is doing the rounds, and the club has stood him down.',
+              '{player} came back with the club crest tattooed upside down and a bar tab the sponsor has already seen. The club has stood him down.',
+            ],
+            missNews: 'The trip stayed in the group chat and off the back page.',
+          },
+        ],
+        outcome: 'The squad is off to Bali.',
+      },
+      { label: 'Ban the trip', effects: [{ kind: 'squadMorale', amount: -8 }], outcome: 'The trip is off. The senior players are filthy.' },
+    ],
+    defaultChoice: 1,
+  },
+  {
+    id: 'baliHangover',
+    title: 'The sponsor saw it',
+    text: 'A sponsor has seen the footage from the trip and wants a quieter club this season.',
+    weight: 8, cooldown: 40, when: { flag: 'baliIncident', weeks: [1, 8] },
+    choices: [
+      { label: 'Smooth it ($3,000)', effects: [{ kind: 'money', amount: -3_000 }, { kind: 'reputation', amount: 1 }], outcome: 'A $3,000 lunch, and the sponsor is willing to see how the season starts.' },
+      { label: 'Ride it out', effects: [{ kind: 'reputation', amount: -2 }, { kind: 'boardPatience', amount: -1 }], outcome: 'The club rode it out. The sponsor, and the board, noticed.' },
+    ],
+    defaultChoice: 0,
   },
 ];
 

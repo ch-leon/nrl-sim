@@ -234,6 +234,40 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v19 → v20: settings.playbackSpeed, the match speed last picked. Absent plays at ×4,
   // so an old save is not filled in.
   { from: 19, to: 20, run: (old) => ({ ...old }) },
+  // v20 → v21: bans and event-chain flags (#324, #325). An old save has nobody
+  // suspended and no follow-up waiting. suspendedWeeks stays optional in play
+  // (absent means 0); filling 0 keeps a migrated squad explicit.
+  {
+    from: 20,
+    to: 21,
+    run: (old) => {
+      const fill = (list: unknown): unknown =>
+        Array.isArray(list)
+          ? list.map((p: RawState) => ({ ...p, suspendedWeeks: typeof p.suspendedWeeks === 'number' ? p.suspendedWeeks : 0 }))
+          : list;
+      const league = old.league as RawState | undefined;
+      const deck = (old.eventDeck as RawState | undefined) ?? {};
+      return {
+        ...old,
+        squad: fill(old.squad),
+        freeAgents: fill(old.freeAgents),
+        ...(league
+          ? {
+              league: {
+                ...league,
+                clubs: Array.isArray(league.clubs)
+                  ? league.clubs.map((c: RawState) => ({
+                      ...c,
+                      ...(Array.isArray(c.squad) ? { squad: fill(c.squad) } : {}),
+                    }))
+                  : league.clubs,
+              },
+            }
+          : {}),
+        eventDeck: { ...deck, flags: Array.isArray(deck.flags) ? deck.flags : [] },
+      };
+    },
+  },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

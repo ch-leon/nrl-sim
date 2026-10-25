@@ -150,6 +150,18 @@ export const EVENTS = {
 } as const;
 
 /**
+ * Wildcard cards and the end-of-season trip (#324, #325). A risky choice uses
+ * INCIDENT_CHANCE; a Welfare Manager multiplies it by WELFARE_CHANCE. A bad
+ * outcome's ban is BAN_WEEKS, served from the next match and not shortened by
+ * the medical staff. In-match prompts are not in this cut.
+ */
+export const WILDCARDS = {
+  INCIDENT_CHANCE: 0.25,
+  WELFARE_CHANCE: 0.5,
+  BAN_WEEKS: [2, 3] as const,
+} as const;
+
+/**
  * Feature flags. `cosmeticKits` (GitHub #79) turns on the kit designer; it is on
  * and everything in it is free. It exists only so a future monetisation decision
  * (BAK-205: cosmetics only, never pay-to-win) could gate extra patterns without

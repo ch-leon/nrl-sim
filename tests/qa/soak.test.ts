@@ -52,6 +52,19 @@ describe('soak checks', () => {
     expect(oldSpeed.playbackSpeed).toBeUndefined();
     const kept = migrateState(asOldSave(sped, 19));
     expect(kept.ok && kept.state.settings.playbackSpeed).toBeUndefined();
+    // v20 has no bans and no event-chain flags; v21 fills both (#324).
+    const v20 = asOldSave(getState(), 20);
+    const deck = v20.eventDeck as { flags?: string[] };
+    expect(deck.flags).toBeUndefined();
+    expect((v20.squad as { suspendedWeeks?: number }[])[0]).not.toHaveProperty('suspendedWeeks');
+    const v21 = migrateState(v20);
+    expect(v21.ok).toBe(true);
+    if (v21.ok) {
+      expect(v21.state.version).toBe(21);
+      expect(v21.state.eventDeck.flags).toEqual([]);
+      expect(v21.state.squad.every((p) => p.suspendedWeeks === 0)).toBe(true);
+      expect(v21.state.freeAgents.every((p) => p.suspendedWeeks === 0)).toBe(true);
+    }
   });
 });
 

@@ -57,8 +57,11 @@ describe('the deck', () => {
   it('every dollar figure a card quotes is money one of its choices moves (N12.7)', () => {
     const quoted = (t: string): number[] =>
       [...t.matchAll(/\$(\d[\d,]*)(k?)/g)].map((m) => Number(m[1]!.replace(/,/g, '')) * (m[2] ? 1000 : 1));
-    const moved = (effects: readonly EventEffect[]): number[] => effects.flatMap((e) =>
-      e.kind === 'money' ? [Math.abs(e.amount)] : e.kind === 'modifier' ? moved(e.effects) : []);
+    const moved = (effects: readonly EventEffect[]): number[] => effects.flatMap((e) => {
+      if (e.kind === 'money') return [Math.abs(e.amount)];
+      if (e.kind === 'modifier' || e.kind === 'chance') return moved(e.kind === 'modifier' ? e.effects : e.hit);
+      return [];
+    });
     for (const c of EVENT_CARDS) {
       const amounts = new Set(c.choices.flatMap((ch) => moved(ch.effects)));
       const words = [c.text, ...c.choices.flatMap((ch) => [ch.label, ch.outcome])];
@@ -211,8 +214,9 @@ describe('resolveEvent', () => {
         const s = withPending(s0, { cardId: c.id, id: 'e', subjectId: who.id, subjectName: who.name });
         const r = resolveEvent(s, 'e', i, 1)!;
         const expected = ch.effects.filter((e) => e.kind === 'money').map((e) => (e as { amount: number }).amount);
-        expect(r.money.map((m) => m.amount)).toEqual(expected);
-        expect(r.news).toHaveLength(1);
+        // A chance can add money and a second news line. Certain money is applied first.
+        expect(r.money.map((m) => m.amount).slice(0, expected.length)).toEqual(expected);
+        expect(r.news.length).toBeGreaterThanOrEqual(1);
         const mods = ch.effects.filter((e) => e.kind === 'modifier').length;
         expect(r.state.eventDeck.modifiers).toHaveLength(mods);
       });
@@ -320,15 +324,17 @@ describe('two-season headless run', () => {
     const seeds = [1, 2, 3, 4, 5];
     for (const seed of seeds) {
       const draws = run(seed);
-      total += draws.length;
+      const weekly = draws.filter((d) => card(d.cardId).when?.offer !== 'rollover');
+      total += weekly.length;
       const lastAt = new Map<string, number>();
       for (const d of draws) {
         const prev = lastAt.get(d.cardId);
-        if (prev !== undefined) expect(d.at - prev).toBeGreaterThanOrEqual(card(d.cardId).cooldown);
+        if (prev !== undefined) expect(d.at - prev, d.cardId).toBeGreaterThanOrEqual(card(d.cardId).cooldown);
         lastAt.set(d.cardId, d.at);
       }
-      // At most one per week.
-      expect(new Set(draws.map((d) => d.at)).size).toBe(draws.length);
+      // At most one weekly card a week. The season-end trip is offered as well, on the rollover.
+      expect(new Set(weekly.map((d) => d.at)).size).toBe(weekly.length);
+      expect(draws.filter((d) => d.cardId === 'baliTrip')).toHaveLength(2);
     }
     const weeksPerCard = (seeds.length * 2 * WEEKS_PER_SEASON) / total;
     expect(weeksPerCard).toBeGreaterThanOrEqual(3);

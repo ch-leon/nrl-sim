@@ -161,8 +161,8 @@ export function rivalMatchSheet(rival: RivalClub): TeamSheet {
 }
 
 /** Fit (non-injured) squad size. */
-export function fitSquadCount(injuredWeeks: readonly { injuredWeeks: number }[]): number {
-  return injuredWeeks.filter((p) => p.injuredWeeks <= 0).length;
+export function fitSquadCount(squad: readonly { injuredWeeks: number; suspendedWeeks?: number }[]): number {
+  return squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length;
 }
 
 /**

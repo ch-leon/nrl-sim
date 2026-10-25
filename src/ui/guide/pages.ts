@@ -11,7 +11,7 @@ import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../match/leagu
 import { NINES } from '../../match/league/rules';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { getState, type GameState } from '../../core/state';
-import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, TRAINING_FOCUS } from '../../config';
+import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, TRAINING_FOCUS, WILDCARDS } from '../../config';
 import { STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
 import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
@@ -236,8 +236,9 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         bullets: [
-          'A card waits 2 weeks for your answer, then takes its default choice. At most two wait at once.',
+          'A card waits 2 weeks for your answer, then takes its default choice. At most two wait at once. A season-end card, like the trip away, is answered before the next match or it takes its default.',
           'Money from a choice goes through the ledger like everything else, and the outcome is posted to News. Some choices leave a temporary effect for a few weeks.',
+          `A risky choice says its odds. The sharp ones are a ${Math.round(WILDCARDS.INCIDENT_CHANCE * 100)}% chance of a ${WILDCARDS.BAN_WEEKS[0]}-${WILDCARDS.BAN_WEEKS[1]} week ban, and a Welfare Manager halves that. The ban shows on the squad as BAN, and the lineup leaves him out. After the grand final the squad asks for a trip to Bali.`,
           'A new card stops a multi-week advance, so you never miss one.',
         ],
       },
