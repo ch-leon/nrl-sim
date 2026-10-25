@@ -151,6 +151,12 @@ export const LIVE = {
   dropPressured: 0.18,
   /** Kick chasers this far from the landing point still run flat out at it. */
   chaseThroughM: 2,
+  /** Inside this, the wingers start their run on the second-last tackle, before a grubber is struck. The fullback joins once it is aimed. */
+  grubberChaseFromM: 24,
+  /** The chase does not sit closer than this to the try line until the kick is aimed. */
+  grubberChaseDepthM: 10,
+  /** How far in front of the ball the chase may lead, metres, before the kick is aimed. */
+  grubberChaseLeadM: 3,
   /** On the second-last tackle inside this, the kicker goes early this often (grubber or chip). */
   earlyKickM: 25,
   /** Loose ball picked up within this reach. */
@@ -1614,8 +1620,12 @@ export class LiveSim implements MatchSim {
     const trait = boot0.dist > 1 ? { trait: announce(h.traits.find((t) => t.id === 'bigBoot')) ?? 'Big Boot' } : {};
     switch (kind) {
       case 'grubber': {
-        // Some run on too far and go dead (2d).
-        const t = grubberTarget(h.body.pos, this.dir, this.rng.next());
+        // Aimed for the chase: a winger's lane, pulled back toward the kicker so a
+        // miss sits under the fullback. Some still run on and go dead (2d).
+        const wingers = this.side(this.attacking).filter((p) => ROLES[p.slot]!.name === 'winger' && this.onField(p));
+        const wing = wingers[Math.floor(this.rng.next() * wingers.length)] ?? h;
+        const lane = wing.body.pos.y * (1 - TOUCH.grubberInfield) + h.body.pos.y * TOUCH.grubberInfield;
+        const t = grubberTarget(h.body.pos, this.dir, this.rng.next(), lane, TOUCH.grubberMissM);
         return { ...base, to: { x: t.x + this.dir * this.rng.next() * TOUCH.grubberLongM, y: t.y }, receiver: null, peak: 0.9 };
       }
       case 'chip':
@@ -2628,6 +2638,34 @@ export class LiveSim implements MatchSim {
     return clampToGround({ x: this.mark.x - this.dir * 1.6, y: this.mark.y + 0.4 }, 1);
   }
 
+  /**
+   * The grubber chase (the wingers) starts on the second-last tackle
+   * inside grubberChaseFromM, before the kick is struck, so a well-placed one
+   * is a race and a kicked-dead one still dies.
+   */
+  private anticipatingGrubber(p: Player): boolean {
+    if (p.side !== this.attacking || this.locked(p) || !this.onField(p)) return false;
+    const role = ROLES[p.slot]!.name;
+    // Once it is aimed, the fullback joins the wingers. Until then only the wingers go, so the last line stays.
+    if (this.pendingKick?.kind === 'grubber' && (role === 'winger' || role === 'fullback')) return true;
+    if (role !== 'winger') return false;
+    // From the second-last tackle, through the ruck: a chase that only runs while
+    // the ball is live never arrives. They stay onside of the spot until he kicks.
+    const shaping = this.lastPlay || this.tackles >= SET_TACKLES - 2;
+    const phase = this.phase.kind === 'play' || this.phase.kind === 'tackle' || this.phase.kind === 'ruck';
+    return shaping && phase && this.toLineFor(this.attacking, this.mark) <= LIVE.grubberChaseFromM;
+  }
+
+  /** Where the chase runs: the aimed spot once the kicker has called it, otherwise just in front of the ball, not camped on the line. */
+  private grubberChaseSpot(p: Player): Vec {
+    if (this.pendingKick?.kind === 'grubber') return { ...this.pendingKick.to };
+    const goal = this.dir > 0 ? FIELD_LENGTH : 0;
+    const hold = goal - this.dir * LIVE.grubberChaseDepthM;
+    const withBall = this.mark.x + this.dir * LIVE.grubberChaseLeadM;
+    const x = this.dir > 0 ? Math.min(Math.max(hold, this.mark.x), withBall) : Math.max(Math.min(hold, this.mark.x), withBall);
+    return { x, y: clamp(ROLES[p.slot]!.lane, 3, FIELD_WIDTH - 3) };
+  }
+
   private assignTargets(): void {
     const ph = this.phase;
     const bp = this.ballPos();
@@ -2787,7 +2825,7 @@ export class LiveSim implements MatchSim {
     const supports: Player[] = [];
     if (carrier || (receiver && receiver.side === atk)) {
       const lead = carrier ?? receiver!;
-      const pool = attackers.filter((p) => p !== lead && p !== this.dummyHalf(atk) && !this.locked(p) && this.tick >= p.busyUntil);
+      const pool = attackers.filter((p) => p !== lead && p !== this.dummyHalf(atk) && !this.locked(p) && this.tick >= p.busyUntil && !this.anticipatingGrubber(p));
       pool.sort((a, b) => dist(a.body.pos, lead.body.pos) - dist(b.body.pos, lead.body.pos));
       supports.push(...pool.slice(0, 2));
     }
@@ -2826,13 +2864,18 @@ export class LiveSim implements MatchSim {
         p.wantsSprint = flight!.via === 'kick';
       } else if (p === this.dummyHalf(atk) && (ph.kind === 'tackle' || ph.kind === 'ruck')) {
         p.target = this.dummyHalfSpot();
-      } else if (ph.kind === 'ruck' && ph.stage === 'dh' && !this.locked(p)) {
+      } else if (ph.kind === 'ruck' && ph.stage === 'dh' && !this.locked(p) && !this.anticipatingGrubber(p)) {
         // The ball is heeled: the backline comes onto it, so the first receiver
         // hits the pass at pace instead of standing flat-footed. The forwards
         // standing close to the ruck keep enough depth to stay a pass option.
         const spot = formationTarget(role, anchor, this.dir, true);
         const advance = Math.max(0, Math.min(LIVE.ruckAdvanceM, role.atk - 3));
         p.target = clampToGround({ x: spot.x + this.dir * advance, y: spot.y }, 1);
+      } else if (this.anticipatingGrubber(p)) {
+        // The chase is on before the boot: come up in his lane, then onto the spot once it is aimed.
+        p.target = this.grubberChaseSpot(p);
+        p.wantsSprint = this.pendingKick?.kind === 'grubber' || dist(p.body.pos, p.target) > 8;
+        p.through = true;
       } else if (supports.includes(p)) {
         const s = spots[supports.indexOf(p) as 0 | 1];
         // Take the side he's already on.

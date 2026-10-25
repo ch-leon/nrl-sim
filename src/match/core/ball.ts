@@ -69,7 +69,7 @@ export function kickFlight(from: Vec, to: Vec, t0: number, receiver: number | nu
 }
 
 /** A grubber travels about this fast, m/s. */
-export const GRUBBER_SPEED = 13;
+export const GRUBBER_SPEED = 12;
 
 /** A grubber: stabbed along the ground, skidding and hopping to its spot; nobody is nominated to take it. */
 export function grubberFlight(from: Vec, to: Vec, t0: number): BallState {

@@ -109,11 +109,16 @@ describe('tactics in the live sim', () => {
     const grind = events(sheet('H', 'grind'), away, SEEDS * 4, SECS);
     const wide = events(sheet('H', 'expansive'), away, SEEDS * 4, SECS);
     expect(count(wide, 'offload', 'home')).toBeGreaterThan(count(grind, 'offload', 'home') * 2);
-    expect(count(wide, 'cut-out', 'home')).toBeGreaterThan(count(grind, 'cut-out', 'home'));
+    // Cut-outs need a man more than 12 m wide and behind the ball. The grubber
+    // chase pulls the wingers up in the red zone, so the opening minutes can
+    // pass without one. Over whole matches the wide side still throws them.
+    const grindFull = events(sheet('H', 'grind'), away, 20, 14 * 60);
+    const wideFull = events(sheet('H', 'expansive'), away, 20, 14 * 60);
+    expect(count(wideFull, 'cut-out', 'home')).toBeGreaterThan(count(grindFull, 'cut-out', 'home'));
     const longShare = (es: SimEvent[]): number => count(es, 'kick', 'home', 'long') / Math.max(1, count(es, 'kick', 'home'));
     expect(longShare(grind)).toBeGreaterThan(longShare(wide));
     expect(count(grind, 'step', 'home')).toBeLessThan(count(wide, 'step', 'home'));
-  });
+  }, 60_000);
   it('a Kick-chase side kicks more often and bombs more; All-out offloads most of all', () => {
     // Kick-chase on both sides against Balanced on both, over 10-minute matches: one side's
     // extra kicks in a 2½-minute window are within the noise.

@@ -161,11 +161,17 @@ export function chooseKick(toLine: number, roll: number, bias: Partial<Record<Ki
 const goalLine = (dir: 1 | -1): number => (dir > 0 ? FIELD_LENGTH : 0);
 const towardGoal = (dir: 1 | -1, x: number, limit: number): number => (dir > 0 ? Math.min(x, limit) : Math.max(x, limit));
 
-/** Grubber: stabbed through for the in-goal, a few metres over the line, angled off the kicker's line. */
-export function grubberTarget(kicker: Vec, dir: 1 | -1, jitter01: number): Vec {
+/**
+ * Grubber: stabbed through for the in-goal, a few metres over the line.
+ * `chaseY` is the lane the chase is running (a winger); the miss is either side of it.
+ */
+export function grubberTarget(kicker: Vec, dir: 1 | -1, jitter01: number, chaseY = kicker.y, missM = 12): Vec {
   const goal = goalLine(dir);
-  const x = towardGoal(dir, kicker.x + dir * 30, goal + dir * 3);
-  return { x, y: clamp(kicker.y + (jitter01 - 0.5) * 12, 4, FIELD_WIDTH - 4) };
+  const toLine = dir > 0 ? goal - kicker.x : kicker.x - goal;
+  // Close in, through into the in-goal. From further out, short of the line so the chase can stick it.
+  const past = toLine <= 16 ? 3 : -8;
+  const x = towardGoal(dir, kicker.x + dir * 24, goal + dir * past);
+  return { x, y: clamp(chaseY + (jitter01 - 0.5) * missM, 4, FIELD_WIDTH - 4) };
 }
 
 /** Chip: just over the rushing line for the kicker to run onto, never past the dead-ball line. */

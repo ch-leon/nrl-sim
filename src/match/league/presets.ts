@@ -157,10 +157,18 @@ function hash(s: string): number {
  * units against its own average, so it reads the same at any strength.
  */
 export const RIVAL_STYLE = {
-  /** Backs this much quicker than the side's average → Expansive. */
-  backsPace: 0.5,
-  /** Forwards this much stronger than the side's average → Grind. */
-  packStrength: 2.5,
+  /**
+   * Backs this much quicker than the side's average → Expansive.
+   * 0.5 caught backs who were barely quicker than their own nine, and those
+   * sides lost with an expansive game (N14.2, #322). 1.5 keeps it for a real pace edge.
+   */
+  backsPace: 1.5,
+  /**
+   * Forwards this much stronger than the side's average → Grind.
+   * 2.5 meant only a clearly heavy pack ground it out, so the style's season
+   * record was the pack's (#322). 1.0 lets a milder pack grind too.
+   */
+  packStrength: 1.0,
   /** Contenders (strength at least this) with no other mark go All-out. */
   allOutFrom: 65,
   /** Forwards this much stronger → Rush in defence. */

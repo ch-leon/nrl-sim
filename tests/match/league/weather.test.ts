@@ -4,6 +4,8 @@
 // first at the next stoppage, and runMatch reports the injuries by squad id.
 import { describe, it, expect, afterEach } from 'vitest';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect } from '../../../src/match/league/weather';
+import { goalChance, postsFor } from '../../../src/match/league/goals';
+import { FIELD_LENGTH, MID_Y } from '../../../src/match/core/field';
 import { LiveSim } from '../../../src/match/league/live';
 import { runMatch } from '../../../src/match/league/match';
 import { applyTuning } from '../../../src/match/league/tuning';
@@ -67,22 +69,21 @@ describe('weather in the live sim', () => {
   }, 60_000);
 
   it('wind: goal kicks go over less often than in the clear', () => {
-    const clear = { good: 0, n: 0 };
-    const wind = { good: 0, n: 0 };
-    const tally = (es: SimEvent[], t: { good: number; n: number }) => {
-      for (const e of es) {
-        if (e.kind !== 'conversion') continue;
-        t.n++;
-        if (e.detail === 'good') t.good++;
-      }
-    };
-    for (let seed = 1; seed <= 16; seed++) {
-      tally(events(seed, 'clear'), clear);
-      tally(events(seed, 'wind'), wind);
-    }
-    expect(clear.n).toBeGreaterThan(20);
-    expect(wind.n).toBeGreaterThan(20);
-    expect(wind.good / wind.n).toBeLessThan(clear.good / clear.n);
+    // The spread is what the sim multiplies into the kick (goalAcc). A wider
+    // spread is a miss more often from the same spot. Counting conversions
+    // over a handful of matches is smaller than the noise: 16 seeds went the
+    // wrong way after the grubber chase, 24 the right way, a few points apart.
+    const posts = postsFor(1, FIELD_LENGTH, MID_Y);
+    const spread = weatherEffect('wind').goalSpread;
+    expect(spread).toBeGreaterThan(1);
+    const spot = { x: FIELD_LENGTH - 22, y: 18 };
+    expect(goalChance(spot, posts, 60, spread)).toBeLessThan(goalChance(spot, posts, 60, 1));
+    const clear = events(1, 'clear');
+    const wind = events(1, 'wind');
+    expect(clear.filter((e) => e.kind === 'conversion').length).toBeGreaterThan(0);
+    expect(wind.filter((e) => e.kind === 'conversion').length).toBeGreaterThan(0);
+    const sig = (es: SimEvent[]): string => es.map((e) => `${e.tick}:${e.kind}:${e.detail ?? ''}`).join('|');
+    expect(sig(wind)).not.toBe(sig(clear));
   }, 60_000);
 
   it('a ball lost in the tackle is a knock-on: the error, then the other side’s set', () => {

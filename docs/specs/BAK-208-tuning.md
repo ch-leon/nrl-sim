@@ -103,16 +103,19 @@ Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `KICK_SPEED` / `GRUBBER_SPEED` | `ball.ts` | 20 / 13 m/s | Flight speed; a kick is in the air for max(distance ÷ speed, `hangTime(peak)`). |
+| `KICK_SPEED` / `GRUBBER_SPEED` | `ball.ts` | 20 / 12 m/s | Flight speed; a kick is in the air for max(distance ÷ speed, `hangTime(peak)`). Grubber was 13; 12 gives the chase a step. |
 | `hangTime` | `ball.ts` | 2√(2·peak / 9.81) | Peaks: long 12 (3.1 s), bomb 20 (4 s), cross-field 13, chip 5, kick-off 16, grubber 0.9 (ground). |
 | `RUN_CLOSE_M` / `RUN_IT_ZONE_M` / `RUN_IT_CHANCE` / `ATTACK_KICK_M` | `tactics.ts` | 6 / 40 / 20% / 50 m | Run the last inside 6 m; 1 in 5 inside 40; territory beyond 50. |
 | `kickWeights(toLine)` | `tactics.ts` | table (§4.4) | Long / bomb / cross-field / grubber / chip weights by zone, × preset `kickBias`. |
 | `live.earlyKickM` + preset `earlyKick` | `live.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle. |
-| Targets | `tactics.ts` | grubber +3 m in-goal · chip 10–13 m · cross-field 2 m short, far winger · bomb 22–28 m · long 32 m (× Big Boot) | Where each kick lands. |
+| Targets | `tactics.ts` | grubber: inside 16 m, 3 m into the in-goal, else 8 m short; aimed on a winger's lane · chip 10–13 m · cross-field 2 m short, far winger · bomb 22–28 m · long 32 m (× Big Boot) | Where each kick lands. |
 | `live.kickCatchReach` | `live.ts` | 2.5 m | Whoever is nearest within this takes a kick (nominated man −0.3 m). |
 | `live.dropChance` / `live.dropPressured` | `live.ts` | 6% / 18% − (Skill − 50)/300 | Spill under a kick. |
 | `live.fullbackDeepM` / `live.fullbackLastM` | `live.ts` | 16 / 24 m | Fullback depth behind the line; he goes to the landing spot as the kicker shapes. |
 | `live.chaseThroughM` | `live.ts` | 2 m | Chasers run flat out until this close. |
+| `live.grubberChaseFromM` | `live.ts` | 24 m | Inside this, the wingers start the grubber chase on the second-last tackle. The fullback joins once the kick is aimed. 28 m (25 Oct, first cut) put a try on too many of them. |
+| `live.grubberChaseDepthM` | `live.ts` | 10 m | The chase does not sit closer than this to the try line until the kick is aimed. |
+| `live.grubberChaseLeadM` | `live.ts` | 3 m | How far in front of the ball the chase may lead before the kick is aimed. 4 m (25 Oct, first cut) did the same. |
 | Kick-off target | `tactics.ts` | receiving quarter (x 24), ±12 m | Not chased for a regather. |
 
 Tests: `tests/match/league/kicks.test.ts`.
@@ -286,7 +289,13 @@ by its own error (knock-on, spilt kick, loose pass), an intercept or strip again
 penalty against it; a kick, a try or a handover on the last completes a set, and six-again
 starts a new one (`LiveSim.sets` / `setsCompleted`; counting rolls no dice). Measured
 (standard plan `20261019-174119-standard`): 66–70% across the scenarios, even sides 68.2%,
-a shade under the 70–80% band; left as is (errors are in their band at 12.7). The Balance workflow re-runs `balance/plans/standard.json`
+a shade under the 70–80% band; left as is (errors are in their band at 12.7). After the
+grubber chase, eased to a 24 m start and a 3 m lead (25 Oct,
+`20261025-150020-grubber-ease-confirm`, 80 seeds) even sides complete 70.8%
+and score 5.4 tries (grubber tries 0.25). The longer chase
+(`20261025-140642-loose-ends`) completed 69.3% and scored 5.6, and a 70-rated
+side beat a 50-rated side 69% of the time. Completion
+on the eased even row is 70.8%, and tries are inside 4–7. The Balance workflow re-runs `balance/plans/standard.json`
 on every match-code change to `main`; the Balanced-v-Balanced test in `presets.test.ts`
 still pins the coarse bands so a tuning change that breaks them fails CI.
 
@@ -440,7 +449,9 @@ interchange (§14). All of it is `src/match/league/touch.ts`, played out in `liv
 | `touch.touchRollM` | `touch.ts` | 9 m | A touch-finder rolls on 9–13 m after it lands (other kicks 4–8 m). |
 | `touch.fortyTwenty` / `touch.fortyTwentyTrait` | `touch.ts` | 0.08 / 0.2 | On the last inside his own 40, the 40/20 attempt rate, plus this per level of Big Boot or Playmaker. |
 | `touch.fortyTwentyLandM` / `touch.fortyTwentyInsideM` | `touch.ts` | 26 / 3 m | Where a 40/20 attempt lands: 26 m from the line, 3 m in from touch. |
-| `touch.grubberLongM` | `touch.ts` | 9 m | A grubber runs on up to this far past its spot; past the dead-ball line it is dead. |
+| `touch.grubberLongM` | `touch.ts` | 6 m | A grubber runs on up to this far past its spot; past the dead-ball line it is dead. Was 9; with a spot 3 m into the in-goal, 6 keeps a close-in grubber short of the dead-ball line. |
+| `touch.grubberInfield` | `touch.ts` | 0.4 | Share of the grubber's aim pulled back from the chasing winger toward the kicker (0 = on the winger). |
+| `touch.grubberMissM` | `touch.ts` | 14 m | Scatter either side of that lane. |
 | `touch.restartInM` / `touch.restartFromLineM` | `touch.ts` | 10 / 10 m | Restarts 10 m in from touch and at least 10 m off a try line. |
 | `touch.bundleNearM` / `touch.bundle` / `touch.bundleBigHit` | `touch.ts` | 1.2 m / 0.4 / 0.7 | A carrier held (smashed) this close to the touchline is bundled into touch this often. |
 | `touch.groundNearM` / `touch.groundDeepM` | `touch.ts` | 8 / 3 m | A defender with a kick in his own in-goal grounds it if an attacker is this close or he is this deep; else he runs it out. |
@@ -971,8 +982,8 @@ knobs: the harness sets each scenario's tactics directly, so they are not overri
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `RIVAL_STYLE.backsPace` | `src/match/league/presets.ts` | 0.5 | Backs' mean Speed above the nine's → Expansive. |
-| `RIVAL_STYLE.packStrength` | `presets.ts` | 2.5 | Forwards' mean Strength above the nine's → Grind. |
+| `RIVAL_STYLE.backsPace` | `src/match/league/presets.ts` | 1.5 | Backs' mean Speed above the nine's → Expansive. Was 0.5; that bar caught backs who were barely quicker, and those sides lost (#322). |
+| `RIVAL_STYLE.packStrength` | `presets.ts` | 1.0 | Forwards' mean Strength above the nine's → Grind. Was 2.5; only a clearly heavy pack qualified, so the season record was the pack's (#322). |
 | `RIVAL_STYLE.allOutFrom` | `presets.ts` | 65 | Club strength from which a side with no other mark goes All-out. |
 | `RIVAL_STYLE.rushPack` | `presets.ts` | 2 | Forwards' Strength above the nine's → Rush. |
 | `RIVAL_STYLE.compressedStamina` | `presets.ts` | 1 | The nine's Stamina above the mean of its other four stats → Compressed. |
@@ -1025,6 +1036,14 @@ match. At a level rating Grind +5.7 and Expansive −6.9. Against strength
 Expansive −5.7, Kick-chase +4.5, All-out +5.3. The full table is in
 `docs/status/2026-10-living.md`.
 
+**25 Oct (#322).** Those two were the squad, not the plan: a 0.5 pace bar made
+almost any slightly quicker back line Expansive, and only a pack 2.5 stronger
+than its own nine ground it out. `backsPace` is 1.5 and `packStrength` is 1.0.
+The even-match preset band was not moved to chase the season (Grind and Rush
+were already just under 45% on 7:00 halves, and the grubber chase brought every
+preset inside 45–55% without a table change). The season measure after the
+thresholds is in `docs/status/2026-10-balance.md`.
+
 ## 29. The goal-kicker and the captain (N11)
 
 The coach names a goal-kicker and a captain on the Lineup screen (`Lineup.kicker`,
@@ -1057,7 +1076,10 @@ A side's plan can change at half-time and after a try. The rule lives in
 opens (`endHalf`, and `score` once the phase is the try). It does not run on a
 penalty goal or a field goal. No dice of its own: a match that names no side
 is the match it was. The golden even Balanced / Slide match (seed 1) is
-`6-7:362:e959099a69ffd994`. It was `8-14:495:67db8b634c5a2e73` on 9:00 halves.
+`8-16:346:3436c830c791688a`. It was `14-16:355:a3624c324e9bb503` on the longer
+grubber chase, `6-7:362:e959099a69ffd994` after halves went to 7:00, and
+`8-14:495:67db8b634c5a2e73` on 9:00 halves. Easing the chase moved it; the pin
+is the new match.
 It moved on purpose on 2026-10-25: the siren, the rescaled legs and the rescaled
 windows make seed 1 a different match. See `docs/status/2026-10-balance.md`.
 

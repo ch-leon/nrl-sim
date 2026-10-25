@@ -234,9 +234,12 @@ describe('measuring and reporting', () => {
     const spec = 'node:crypto';
     const { createHash } = await import(spec);
     const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
-    // Deliberately moved when halves went from 9:00 to 7:00 (2026-10-25). The
-    // siren, the rescaled legs and the rescaled windows make seed 1 a different
-    // match from 8-14:495:67db8b634c5a2e73. See docs/status/2026-10-balance.md.
-    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('6-7:362:e959099a69ffd994');
+    // Deliberately moved when the grubber chase was eased (2026-10-25): the
+    // wingers start inside 24 m and lead by at most 3 m. Seed 1's even
+    // Balanced / Slide match was 14-16:355:a3624c324e9bb503 on the longer
+    // chase, 6-7:362:e959099a69ffd994 on the 7:00 halves before any chase
+    // (itself moved from 8-14:495:67db8b634c5a2e73 when halves went to 7:00).
+    // See docs/status/2026-10-balance.md.
+    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('8-16:346:3436c830c791688a');
   });
 });

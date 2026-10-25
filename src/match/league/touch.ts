@@ -27,7 +27,11 @@ export const TOUCH = {
   fortyTwentyLandM: 26,
   fortyTwentyInsideM: 3,
   /** A grubber can run on this far past its spot (some roll dead). */
-  grubberLongM: 9,
+  grubberLongM: 6,
+  /** Share of the aim pulled back from the chasing winger toward the kicker (0 = on the winger). */
+  grubberInfield: 0.4,
+  /** Scatter either side of that lane, metres. */
+  grubberMissM: 14,
   /** A restart after touch is played this far in from the touchline, and never nearer a try line than this. */
   restartInM: 10,
   restartFromLineM: 10,
