@@ -67,11 +67,137 @@ A career in the red finished its last season below zero. Against `1a3b7f0`: idle
 
 A phone (844×390, touch, no taps) watched one match at the default ×4 in 3 min 21 s, siren at 14:00, and one at ×8 in 1 min 38 s. The half-time card went on by itself after 4.5 s both times. The aim was about 3½–4 minutes at ×4; 3:21 is a little under that, and the dead-time pace was not raised to close the gap. Commentary is 12.8px and stays on the screen without an ellipsis. At ×4 a line is the bright one for about half a second (median); at ×8 about a quarter of a second, with the dimmed line above holding the previous one. Held upright, the rotate card covers the match and the clock stays put (00:16, then 00:29 once it is sideways again).
 
+## Grubber chase and season styles (25 Oct)
+
+The grubber is a chase now, and a rival's Grind or Expansive label follows a wider pack and a real pace edge. The golden even Balanced / Slide match (seed 1) moved on purpose, from `6-7:362:e959099a69ffd994` to `14-16:355:a3624c324e9bb503`. Playback pace was left as the shorter-halves cut set it, so a watched match stays about 3:21 at ×4.
+
+### Grubbers
+
+Before this, a grubber was a turnover. The fullback was already on the end spot, the ball often died or was grounded, and the chase started too far back to arrive. Over the kicks close-out that was 0.008 tries a match from about 2.5 grubbers.
+
+What changed (`tactics.ts`, `live.ts`, `touch.ts`, `ball.ts`, tuning §6 and §16):
+
+- Inside 16 m the spot is still about 3 m into the in-goal. Further out it is about 8 m short of the line, so the chase can stick it.
+- The aim is a winger's lane, pulled 40% back toward the kicker, with 14 m of scatter (`touch.grubberInfield` 0.4, `touch.grubberMissM` 14).
+- The wingers start on the second-last tackle inside 28 m, at most 4 m in front of the ball and no closer than 10 m to the try line until the kick is aimed. The fullback joins once it is aimed, so the last line is not abandoned for the whole set.
+- The ball runs on up to 6 m (was 9) at 12 m/s (was 13). A close-in grubber stays short of the dead-ball line. The 20 m restart and the grounding rule are unchanged.
+
+Even 60 v 60, 80 seeds, `balance/runs/20261025-140642-loose-ends`. The four outcomes add up to the grubbers.
+
+| Outcome | A match | Share | Band |
+|---|---:|---:|---|
+| Grubbers | 2.04 | | about 2, as before |
+| Tries | 0.38 | 18% | **0.2–0.5** (the N13 assumption; one in five of them scores) |
+| Repeat sets | 0.08 | 4% | **0.05–0.30**. **Assumed (needs Leon).** The chase regathers and does not score within 12 s. |
+| Drop-outs | 0.00 | 0% | **0–0.15**. **Assumed (needs Leon).** A defender who grounds it, and a kick that dies, are 20 m restarts, counted as turnovers. A drop-out is the ball dead off him. |
+| Turnovers | 1.59 | 78% | the rest. The kick is a gamble. |
+
+About one grubber in four is a try or a repeat set. That is a real option, and it is not how the set usually ends. The plan's "one in six from inside 22 m" was not split out of this run. A fast winger against a slow fullback was tried over 24 seeds and scored 4 home grubber tries against 3 the other way: Speed barely separates them (the range is 6–9 m/s), so that test was not added.
+
+All tries, both sides, went from 4.05 on the 7:00 cut (20 seeds) to 5.6 here (80 seeds, standard error 0.2). The harness band is 4–7. The per-minute rate was not pushed any further. Completion on the same row is 69.3%, still a shade under 70–80%.
+
+### Presets, even matches
+
+`balance/runs/20261025-134843-presets`, 200 seeds both ways (400 matches). Side win. No preset knob was moved; the chase is what moved the column. 45–55% is the band. Standard error is still about 2.5 points.
+
+| Preset | 7:00 before | After the chase | |
+|---|---:|---:|---|
+| Grind | 44.8% | 47.8% | in |
+| Expansive | 50.2% | 47.5% | in |
+| Kick-chase | 53.0% | 46.3% | in |
+| All-out | 47.3% | 49.0% | in |
+| Rush | 44.8% | 51.5% | in |
+| Compressed | 47.8% | 46.5% | in |
+
+Draws after: Grind 7.5%, Expansive 5.3%, Kick-chase 6.8%, All-out 3.8%, Rush 5.0%, Compressed 8.0%. Grind still offloads least (4.6 against Expansive 8.7 and All-out 10.1). A half-time change from Grind to Expansive still offloads more (7.3 against 4.7 over 40 matches). Completion on these rows is 68–72%, under 70 on Expansive (69.3), All-out (67.7), Rush (69.4) and Compressed (69.6).
+
+### Season styles (#322)
+
+N14.2, before this, 10 seeds × 3 seasons, 10,354 rival games: at a level rating Grind 56% (**+5.7**) and Expansive 43% (**−6.9**). Against strength, Expansive **−5.7**, Kick-chase **+4.5**, All-out **+5.3**. A style is also a squad, so the even-match column above does not answer it. Grind was only a pack 2.5 stronger than its own nine, and Expansive was any back line 0.5 quicker.
+
+`RIVAL_STYLE.packStrength` 2.5 → 1.0 and `backsPace` 0.5 → 1.5 (tuning §28). **Assumed (needs Leon):** those two cuts. The even-match tables were not moved to chase the season, because Grind's even matches were the weak side of the band and its seasons were the strong side.
+
+After, 10 seeds × 1 season, idle and managed, Normal, `--live-rivals`, 3,445 rival games. No problems, no forfeits. Break-rule switches 2.26 a match (was 2.51). Mix: attack Balanced 37%, Grind 32%, Kick-chase 15%, Expansive 11%, All-out 5%; defence Slide 57%, Rush 27%, Compressed 15%.
+
+Wins ÷ games when the clubs began within 2 points. A draw is half a win. **Bold** is more than 4 points from even.
+
+| Attack | Sides | Before | After | Off even |
+|---|---:|---:|---:|---:|
+| Balanced | 357 | 49% | 50% | +0.4 |
+| Grind | 295 | 56% | 52% | +1.5 |
+| Kick-chase | 125 | 53% | 53% | +2.8 |
+| Expansive | 107 | 43% | 43% | **−7.5** |
+| All-out | 32 | 52% | 45% | −4.7 |
+
+Defence at the same level rating: Slide 49% (−0.7), Rush 52% (+2.2), Compressed 49% (−1.1). None past 4 points.
+
+Against the strength gap, every game. **Bold** is more than 4 points from that mean.
+
+| Attack | Sides | Score | Expected | Difference | Before |
+|---|---:|---:|---:|---:|---:|
+| Balanced | 2,558 | 46% | 48% | −1.4 | −1.4 |
+| Grind | 2,205 | 50% | 49% | +1.3 | +3.9 |
+| Kick-chase | 1,040 | 59% | 55% | **+4.3** | **+4.5** |
+| Expansive | 730 | 40% | 46% | **−6.4** | **−5.7** |
+| All-out | 357 | 67% | 65% | +2.4 | **+5.3** |
+
+Defence against strength: Slide −1.4, Rush +2.2, Compressed +1.3. None past 4 points.
+
+Grind is inside both measures. Expansive is not. Raising the pace bar did not lift it (the strength gap was −5.7 and is −6.4, standard error 1.8 on 730 sides). A sweep of the Expansive knobs on even matches (`balance/runs/20261025-140349-expansive-buff`, 120 seeds both ways) moved the win rate by about two points, inside luck, and the moves that send more ball to the edges made it worse. The even-match rate is already 47.5% (50% on that sweep's own baseline block). Closing a six-point season gap from here means making Speed worth more in a match, or a change large enough that Expansive stops reading as a wide game. Left for Leon. #322 stays open.
+
+Kick-chase is +4.3 against strength (standard error 1.5) and +2.8 at a level rating. Its even matches are 46.3%, so taking the season edge out of the preset would put the even matches under 45%. The season edge is the half with Big Boot or Playmaker. Left. All-out's level-rating row is 32 sides; the strength measure, on 357 sides, is inside 4 points.
+
+### The other N13 rows, measured and left
+
+`balance/runs/20261025-140642-loose-ends`. Spread, the home edge, the stamina slope and the error knobs were not moved.
+
+| Row | What it says | Left because |
+|---|---|---|
+| Even 60 v 60 (80) | Home wins 49% (5% drawn). Completion 69.3%. Tries 5.6. | Completion is the same shade under 70 as on 9:00 and 7:00. An error-knob change would move the preset win rates that just landed inside 45–55%. **Assumed (needs Leon):** whether to buy the last point of completion. |
+| 70 v 50 (80) | The stronger side wins 69% (3% drawn). Standard error about 5 points. | The plan's "about 70%", and the instruction was not to move `rating.spread`. A bigger block is Leon's if he wants it tighter than 5 points. |
+| Home edge | 49% above, between even sides. | No `rating.homeEdge` was added. The size, and rating points rather than a crowd effect, are still **Assumed (needs Leon)**. The ask was 52–58%. |
+| Stamina 30 v 80 (40) | The tired side wins 38%. | The slope and the cruise knobs were kept. **Assumed (needs Leon):** the target margin. |
+| Fliers v stayers (40) | Fliers win 48% and break the line 22 times to the even row's 16. | Same. The direction is the one the plan describes. |
+| Last 6 min on late legs (40) | A scaled stretch. Home 30%, 25% drawn. | Both sides carry the same legs. Not a reading to tune on. |
+
+The sign-off rewrite and closing #68, #99 and the other tracking issues are still Leon's. The grubber try rate now sits in the 0.2–0.5 band those issues were waiting on.
+
+### Economy
+
+Same command as the shorter-halves soak: `npm run soak -- --difficulties easy,normal,hard --jobs 4`. 20 seeds × 5 seasons × idle and managed × Easy, Normal and Hard, plus the old saves. **139 runs, no problems, forfeits none.** About 16 minutes on 4 jobs. Prize, ticket and the difficulty factors were not moved.
+
+Season 5, clubs still going. Money is the balance at the rollover. "Before" is the shorter-halves soak in the section above.
+
+| | Record | Pos | Top 8 | Prem | Sack | Money | Before |
+|---|---|---:|---:|---:|---:|---:|---:|
+| idle Easy (19) | 15.2-1.4-7.4 | 3.6 | 95% | 32% | 5% | $1,341k | $1,200k (20) |
+| managed Easy (20) | 20.2-0.3-3.5 | 1.1 | 100% | 70% | 5% | $1,073k | $1,040k |
+| idle Normal (12) | 13.1-1.2-9.8 | 6.4 | 67% | 0% | 33% | $762k | $871k (12) |
+| managed Normal (16) | 17.5-0.6-5.9 | 1.7 | 100% | 50% | 19% | $617k | $556k (18) |
+| idle Hard (5) | 14.0-1.8-8.2 | 3.0 | 100% | 20% | 80% | $936k | $792k (4) |
+| managed Hard (10) | 17.1-0.7-6.2 | 3.4 | 80% | 20% | 40% | $218k | $312k (14) |
+
+The season-5 column is the clubs that lasted. Idle Hard's $936k is five clubs. Across all 20 careers, money at the end of the run (a sacked club at the season it stopped) is idle Easy $1,281k, Normal $511k, Hard $174k, and managed Easy $1,073k, Normal $479k, Hard $104k. Easy richer than Normal richer than Hard, both ways.
+
+A career in the red finished its last season below zero.
+
+| | Before | After |
+|---|---:|---:|
+| idle Easy | 0/20 | 0/20 |
+| managed Easy | 1/20 | 1/20 |
+| idle Normal | 2/20 | 3/20 |
+| managed Normal | 2/20 | 7/20 |
+| idle Hard | 14/20 | 13/20 |
+| managed Hard | 8/20 | 10/20 |
+
+Managed Easy is on the cap of 1 in 20. Managed Normal's red share went from 2 to 7. The matches score more (5.6 tries against the 4.05 the shorter halves left), so a career that loses early has a harder hill to climb, and the winners' gate is fatter. Prize and the ticket were left. **Assumed (needs Leon):** whether that 7/20 is a problem to buy back by taking tries out of the grubber.
+
 ## N13
 
 The live match sim's knobs, measured with the harness (`npm run balance`, `balance/README.md`).
-N13 item 1 is the presets. N13.5 is the break rule (below). Later items (grubbers, completion,
-the 20-point gap, the home edge, stamina) are still to come.
+N13 item 1 is the presets. N13.5 is the break rule (below). Grubbers, the season styles,
+completion, the 20-point gap, the home edge and stamina are in "Grubber chase and season
+styles" above: grubbers and Grind's season are in, and the rest is written down for Leon.
 
 N15.4 (traits you can see) adds an optional `toSlot` on a cut-out event in `src/match/league/live.ts`
 (this plan's file): the receiver's slot, so the view can draw the line. The sim does not
@@ -116,10 +242,10 @@ Runs: `20261024-134002-break-rule`, `20261024-135701-kick-chase-step-confirm`,
 `20261024-135245-kick-chase-step`. The plan is `balance/plans/break-rule.json`.
 The golden even match is unchanged, because no side in that match is given the
 rule. N14 turns the rule on for rivals. N14.2's season (10 seeds × 3, Normal,
-10,354 rival games) changed a plan 2.51 times a match. Still more than 4 points
-off, and left for a later sweep: at a level rating Grind +5.7 and Expansive
-−6.9; against strength Expansive −5.7, Kick-chase +4.5, All-out +5.3.
-Compressed, which was +6.4 before the rule, is now +0.1. No preset was moved.
+10,354 rival games) changed a plan 2.51 times a match. At a level rating Grind
+was +5.7 and Expansive −6.9; against strength Expansive −5.7, Kick-chase +4.5,
+All-out +5.3. The 25 Oct section above is the remeasure. Compressed, which was
++6.4 before the rule, is +0.1 here. No preset was moved.
 
 ## N13.1 Presets back in balance (24 Oct)
 

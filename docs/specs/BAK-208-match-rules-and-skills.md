@@ -178,7 +178,7 @@ second-last tackle inside 25 m he goes early 35% of the time (grubber 60 / chip 
 | **Territory** (long) | Beyond 50 m (85%), or 40–50 m (20%) | Distance from Boot; lands in front of the fullback; chase sets the line |
 | **Bomb** | Beyond 50 m (15%), 40–50 m (50%), 22–40 m (30%) | Peak 20 m, 22–28 m long, onto the fullback's patch; catch contest (§4.3) |
 | **Cross-field** | 40–50 m (30%), 22–40 m (35%), inside 22 m (30%) | Peak 13 m, to the far winger, 2 m short of the line; winger vs winger under it |
-| **Grubber** | 22–40 m (20%), inside 22 m (50%) | Skids and hops 3 m into the in-goal; race for the loose ball: try, or the defender runs it out |
+| **Grubber** | 22–40 m (20%), inside 22 m (50%) | From inside 16 m, skids about 3 m into the in-goal; from further out, about 8 m short of the line, aimed at a winger's lane pulled back toward the kicker. The wingers start their run on the second-last. A try or a repeat set sometimes; usually the defence gets it |
 | **Chip** | 22–40 m (15%), inside 22 m (20%) | 10–13 m over the rushing line, the kicker chases his own |
 | **40/20** | Inside own 40, last tackle: 8% of kickers, +20% a level of Big Boot or Playmaker | *Implemented in BAK-207 2d:* lands 26 m out, 3 m in from touch and rolls on; out inside their 20 after a bounce → **40/20!**, a tap restart for the kicking side 10 m in from touch |
 | **Touch-finder** | Territory kick from deep: own 20 60%, own half 50%, midfield 35%, attacking half 15% | *Implemented in BAK-207 2d:* aims to land 4 m in from the nearer touchline (± 5 m × Boot), rolls 9–13 m for the line; out on the full → the other side's play-the-ball level with the kick |
@@ -196,7 +196,7 @@ leaves a skid mark at each hop (`src/match/view/kickLayer.ts`, tuning reference 
 **Touch and dead ball** (BAK-207 2d): the side that touched the ball last loses it. Into
 touch → TOUCH, a play-the-ball 10 m in from touch for the other side (no scrums); a carrier
 held on the touchline can be bundled out (INTO TOUCH!). Dead in-goal or over the dead-ball
-line off the attack (a grubber can run on up to 9 m) → DEAD BALL, a 20 m tap restart for
+line off the attack (a grubber can run on up to 6 m) → DEAD BALL, a 20 m tap restart for
 the defence; a defender who gathers a kick in his own in-goal grounds it for the same when
 pressed or deep, else runs it out; held in his own in-goal, or the ball dead off him →
 DROP-OUT from the middle of his try line (tuning reference §16).

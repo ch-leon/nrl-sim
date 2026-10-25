@@ -106,6 +106,33 @@ describe('kicks in the live sim', () => {
     expect(attacking + byKind('bomb')).toBeGreaterThan(kicks.length * 0.4);
     expect(kicks.every((e) => e.detail !== undefined)).toBe(true);
   });
+  it('a grubber is a chase: some of them score, and most of them do not', () => {
+    // Full matches, so the red-zone chase actually happens. The reward is real
+    // and it is not the way most sets end.
+    let grubbers = 0;
+    let tries = 0;
+    const home = sheet('H');
+    const away = sheet('A');
+    for (let s = 1; s <= 16; s++) {
+      const sim = new LiveSim(home, away, s);
+      let open: { side: string; tick: number } | null = null;
+      while (!sim.finished && sim.tick < 80_000) {
+        sim.step();
+        for (const e of sim.tickEvents) {
+          if (e.kind === 'kick' && e.detail === 'grubber' && e.side) {
+            grubbers++;
+            open = { side: e.side, tick: e.tick };
+          } else if (open && e.kind === 'try' && e.side === open.side && e.tick - open.tick <= 240) {
+            tries++;
+            open = null;
+          } else if (open && (e.kind === 'kick' || e.kind === 'dead-ball' || e.kind === 'half-time' || e.kind === 'full-time')) open = null;
+        }
+      }
+    }
+    expect(grubbers).toBeGreaterThan(16);
+    expect(tries).toBeGreaterThan(1);
+    expect(tries).toBeLessThan(grubbers * 0.45);
+  }, 30_000);
   it('kicks get chased: the kicking side regathers some, and catchers spill some under pressure', () => {
     expect(es.filter((e) => e.kind === 'regather').length).toBeGreaterThan(0);
     expect(es.filter((e) => e.kind === 'drop').length).toBeGreaterThan(0);

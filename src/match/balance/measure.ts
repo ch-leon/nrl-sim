@@ -40,7 +40,7 @@ export const COUNTS = [
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
   'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws',
-  'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'kickTries',
+  'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers', 'kickTries',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -193,7 +193,14 @@ const LATE = (e: SimEvent): boolean => e.kind === 'break-tackle' && e.detail ===
 function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
   const c = Object.fromEntries(COUNTS.map((k) => [k, 0])) as Record<CountKey, number>;
   // The kick in play (#99 close-out): a try by the kicking side within KICK_TRY_TICKS of its kick is a kick try.
+  // A grubber's next act is one of: try, repeat set (the chase regathers), dropout, or turnover.
   let lastKick: { side: string | undefined; detail: string | undefined; tick: number } | null = null;
+  let grubber: { side: string; tick: number; ours: boolean } | null = null;
+  const closeGrubber = (kind: 'grubberTries' | 'grubberRepeats' | 'grubberDropouts' | 'grubberTurnovers'): void => {
+    if (!grubber) return;
+    c[kind]++;
+    grubber = null;
+  };
   for (const e of es) {
     switch (e.kind) {
       case 'tackle':
@@ -238,24 +245,39 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         c.callsPaid++;
         break;
       case 'kick':
+        if (grubber) closeGrubber(grubber.ours ? 'grubberRepeats' : 'grubberTurnovers');
         c.kicks++;
         if (e.detail === 'bomb') c.bombs++;
-        else if (e.detail === 'grubber') c.grubbers++;
+        else if (e.detail === 'grubber' && e.side) {
+          c.grubbers++;
+          grubber = { side: e.side, tick: e.tick, ours: false };
+        }
         lastKick = { side: e.side, detail: e.detail, tick: e.tick };
         break;
       case 'kickoff':
+        if (grubber) closeGrubber(grubber.ours ? 'grubberRepeats' : 'grubberTurnovers');
         lastKick = null;
         break;
       case 'regather':
         if (lastKick?.detail === 'bomb') c.bombsWon++;
+        if (grubber && e.side === grubber.side) grubber.ours = true;
+        break;
+      case 'set-start':
+        if (grubber && e.side) {
+          if (e.side === grubber.side) grubber.ours = true;
+          else closeGrubber('grubberTurnovers');
+        }
+        break;
+      case 'dead-ball':
+        c.deadBalls++;
+        if (grubber) closeGrubber(e.detail === 'drop-out' ? 'grubberDropouts' : 'grubberTurnovers');
         break;
       case 'try':
         c.tries++;
         if (e.detail === 'bonus') c.bonusTries++;
-        if (lastKick && lastKick.side === e.side && e.tick - lastKick.tick <= KICK_TRY_TICKS) {
-          c.kickTries++;
-          if (lastKick.detail === 'grubber') c.grubberTries++;
-        }
+        if (lastKick && lastKick.side === e.side && e.tick - lastKick.tick <= KICK_TRY_TICKS) c.kickTries++;
+        if (grubber && e.side === grubber.side && e.tick - grubber.tick <= KICK_TRY_TICKS) closeGrubber('grubberTries');
+        else if (grubber) closeGrubber(grubber.ours ? 'grubberRepeats' : 'grubberTurnovers');
         lastKick = null;
         break;
       case 'intercept':
@@ -282,22 +304,24 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
       case 'touch':
         if (e.detail === 'kick') c.touchFinds++;
         else if (e.detail === 'bundled') c.bundled++;
+        if (grubber) closeGrubber('grubberTurnovers');
         break;
       case '40-20':
         c.fortyTwenties++;
         c.touchFinds++;
+        if (grubber && e.side === grubber.side) grubber.ours = true;
         break;
       case 'on-full':
         c.onTheFull++;
+        if (grubber) closeGrubber('grubberTurnovers');
         break;
-      case 'dead-ball':
-        c.deadBalls++;
+      case 'half-time':
+      case 'full-time':
+        if (grubber) closeGrubber(grubber.ours ? 'grubberRepeats' : 'grubberTurnovers');
+        if (e.kind === 'full-time' && e.detail === 'golden-point') c.goldenPointWon++;
         break;
       case 'golden-point':
         c.goldenPoint++;
-        break;
-      case 'full-time':
-        if (e.detail === 'golden-point') c.goldenPointWon++;
         break;
       case 'drop-out':
         c.dropOuts++;
@@ -342,6 +366,7 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         break;
     }
   }
+  if (grubber) closeGrubber(grubber.ours ? 'grubberRepeats' : 'grubberTurnovers');
   return c;
 }
 
