@@ -222,14 +222,15 @@ export function pendingDecisionCount(state: GameState): number {
 function decisionCard(view: DecisionView, onChoose: (id: string, index: number) => void): HTMLElement {
   const card = el('div', { class: 'nrl-event-card', attrs: { 'data-event-id': view.id } });
   const defaultLabel = view.choices.find((c) => c.isDefault)?.label ?? '';
-  card.append(
+  const head = el('div', { class: 'nrl-event-head' });
+  head.append(
     el('div', { class: 'nrl-event-title', text: view.title }),
     el('div', {
       class: 'nrl-event-meta',
       text: `${view.stamp} · ${view.weeksLeft === 1 ? 'answer this week' : `${view.weeksLeft} weeks to answer`}, or it's "${defaultLabel}"`,
     }),
-    el('p', { class: 'nrl-event-text', text: view.text }),
   );
+  card.append(head, el('p', { class: 'nrl-event-text', text: view.text }));
   const choices = el('div', { class: 'nrl-event-choices' });
   for (const c of view.choices) {
     const b = button('', () => onChoose(view.id, c.index), { class: 'nrl-event-choice' });

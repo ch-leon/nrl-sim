@@ -762,6 +762,21 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-event-choice-label { font-weight: bold; font-size: 0.95rem; line-height: 1.2; }
 .nrl-event-choice-hint { font-size: 0.78rem; opacity: 0.9; white-space: normal; font-weight: normal; line-height: 1.3; }
+/* A landscape phone (844×390): both choices sit above Close, still a 44px target. */
+@media (max-height: 500px) {
+  .nrl-screen-backdrop .nrl-news-modal { padding: 0.25rem 0.5rem; }
+  .nrl-news h2 { margin-bottom: 0.1rem; font-size: 0.9rem; }
+  .nrl-news-decisions h3 { display: none; }
+  .nrl-event-card { padding: 0.15rem 0.4rem 0.1rem; margin-bottom: 0.25rem; }
+  .nrl-event-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+  .nrl-event-title { flex: 0 0 auto; font-size: 0.95rem; }
+  .nrl-event-meta { flex: 1 1 auto; text-align: right; font-size: 0.68rem; line-height: 1.2; }
+  .nrl-event-text { margin: 0.05rem 0 0.15rem; font-size: 0.78rem; line-height: 1.2; }
+  .nrl-event-choices { gap: 0.2rem; }
+  .nrl-event-choice { padding: 0.1rem 0.45rem; }
+  .nrl-event-choice-hint { font-size: 0.7rem; line-height: 1.2; }
+  .nrl-news-close { margin-top: 0.15rem; }
+}
 .nrl-placebar {
   pointer-events: auto;
   position: fixed;
