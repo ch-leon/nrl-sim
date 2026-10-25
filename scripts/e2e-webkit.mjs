@@ -19,7 +19,10 @@
 // to 844×390 must wake it with the canvas filling the screen. The same turn
 // mid-match freezes the clock and resumes it, and a parked match stays paused
 // until the phone is sideways, including after Continue reopens the page upright.
-// Exits 1 on any failure.
+// With the match up, the full call-chip set (Plan through Hold) is laid in and the
+// ticker is checked at 360×640, 390×844, 667×375 and 844×390: it has to sit clear
+// of the speed row, the chips and the corner buttons, and the open log icon keeps
+// its fill under hover. Exits 1 on any failure.
 //
 //   npm run e2e:webkit
 //   npm run e2e:webkit -- --size 956x330           (or E2E_SIZES="956x330 844x390")
@@ -451,6 +454,69 @@ async function runPortrait(browser) {
     }, before);
     const o = await state();
     rec.notes.push(`clock ${before} → ${o.clock}, canvas ${o.canvas}`);
+  });
+  // The full chip set wraps past a fixed offset (level-2 stack, three-line speed
+  // row). The ticker has to follow the measured chrome at each of those sizes.
+  await step('chip-clearance', async (rec) => {
+    await page.evaluate(() => {
+      let calls = document.querySelector('.nrl-mo-calls');
+      if (!calls) {
+        calls = document.createElement('div');
+        calls.className = 'nrl-mo-calls';
+        document.getElementById('ui-root').append(calls);
+      }
+      const labels = ['Plan', 'Hit-up', 'Shift left', 'Shift right', 'Kick early', 'Run it', 'Bomb', 'Field goal', 'Rush', 'Hold'];
+      calls.replaceChildren();
+      for (const label of labels) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'nrl-btn';
+        b.textContent = label;
+        if (label === 'Plan') b.setAttribute('data-plan', '');
+        calls.append(b);
+      }
+    });
+    const problems = [];
+    const sizes = [[360, 640], [390, 844], [667, 375], [844, 390]];
+    for (const [w, h] of sizes) {
+      await turn(w, h);
+      let found = null;
+      for (let i = 0; i < 12; i++) {
+        await page.waitForTimeout(50);
+        found = await page.evaluate(() => {
+          const ticker = document.querySelector('.nrl-mo-commentary')?.getBoundingClientRect();
+          const log = document.querySelector('.nrl-mo-log-toggle')?.getBoundingClientRect();
+          if (!ticker || ticker.width < 1) return { pending: true, problems: ['ticker not laid out'] };
+          const hits = [];
+          const overlap = (r) => {
+            const w = Math.min(ticker.right, r.right) - Math.max(ticker.left, r.left);
+            const h = Math.min(ticker.bottom, r.bottom) - Math.max(ticker.top, r.top);
+            return w > 1 && h > 1;
+          };
+          for (const el of document.querySelectorAll('.nrl-mo-controls .nrl-btn, .nrl-mo-calls .nrl-btn, .nrl-audio-launcher .nrl-btn, .nrl-mo-log-toggle')) {
+            const r = el.getBoundingClientRect();
+            if (r.width < 1 || r.height < 1) continue;
+            if (overlap(r)) hits.push(el.textContent.trim() || el.getAttribute('aria-label') || 'button');
+          }
+          const score = document.querySelector('.nrl-mo-scoreboard')?.getBoundingClientRect();
+          if (score && overlap(score)) hits.push('scoreboard');
+          if (!log || log.width < 44 || log.height < 44) hits.push(`log icon ${Math.round(log?.width ?? 0)}×${Math.round(log?.height ?? 0)}`);
+          const chips = document.querySelectorAll('.nrl-mo-calls .nrl-btn').length;
+          if (chips < 10) hits.push(`only ${chips} chips`);
+          return { pending: hits.length > 0, problems: hits };
+        });
+        if (!found.pending) break;
+      }
+      if (found?.problems?.length) problems.push(`${w}×${h}: ${found.problems.join(', ')}`);
+      else rec.notes.push(`${w}×${h} clear`);
+    }
+    await turn(844, 390);
+    await page.locator('.nrl-mo-log-toggle').evaluate((el) => el.click());
+    await page.locator('.nrl-mo-log-toggle').hover();
+    const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nrl-mo-log-toggle')).backgroundColor);
+    if (bg !== 'rgb(255, 246, 194)') problems.push(`open log hover fill is ${bg}, want rgb(255, 246, 194)`);
+    else rec.notes.push('open fill holds under hover');
+    return problems;
   });
 
   for (const e of report.errors) log(`  error: ${e}`);
