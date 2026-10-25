@@ -152,11 +152,11 @@ export const LIVE = {
   /** Kick chasers this far from the landing point still run flat out at it. */
   chaseThroughM: 2,
   /** Inside this, the wingers start their run on the second-last tackle, before a grubber is struck. The fullback joins once it is aimed. */
-  grubberChaseFromM: 28,
+  grubberChaseFromM: 24,
   /** The chase does not sit closer than this to the try line until the kick is aimed. */
   grubberChaseDepthM: 10,
   /** How far in front of the ball the chase may lead, metres, before the kick is aimed. */
-  grubberChaseLeadM: 4,
+  grubberChaseLeadM: 3,
   /** On the second-last tackle inside this, the kicker goes early this often (grubber or chip). */
   earlyKickM: 25,
   /** Loose ball picked up within this reach. */

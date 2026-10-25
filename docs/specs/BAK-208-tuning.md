@@ -113,9 +113,9 @@ Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed
 | `live.dropChance` / `live.dropPressured` | `live.ts` | 6% / 18% − (Skill − 50)/300 | Spill under a kick. |
 | `live.fullbackDeepM` / `live.fullbackLastM` | `live.ts` | 16 / 24 m | Fullback depth behind the line; he goes to the landing spot as the kicker shapes. |
 | `live.chaseThroughM` | `live.ts` | 2 m | Chasers run flat out until this close. |
-| `live.grubberChaseFromM` | `live.ts` | 28 m | Inside this, the wingers start the grubber chase on the second-last tackle. The fullback joins once the kick is aimed. |
+| `live.grubberChaseFromM` | `live.ts` | 24 m | Inside this, the wingers start the grubber chase on the second-last tackle. The fullback joins once the kick is aimed. 28 m (25 Oct, first cut) put a try on too many of them. |
 | `live.grubberChaseDepthM` | `live.ts` | 10 m | The chase does not sit closer than this to the try line until the kick is aimed. |
-| `live.grubberChaseLeadM` | `live.ts` | 4 m | How far in front of the ball the chase may lead before the kick is aimed. |
+| `live.grubberChaseLeadM` | `live.ts` | 3 m | How far in front of the ball the chase may lead before the kick is aimed. 4 m (25 Oct, first cut) did the same. |
 | Kick-off target | `tactics.ts` | receiving quarter (x 24), ±12 m | Not chased for a regather. |
 
 Tests: `tests/match/league/kicks.test.ts`.
@@ -290,9 +290,12 @@ penalty against it; a kick, a try or a handover on the last completes a set, and
 starts a new one (`LiveSim.sets` / `setsCompleted`; counting rolls no dice). Measured
 (standard plan `20261019-174119-standard`): 66–70% across the scenarios, even sides 68.2%,
 a shade under the 70–80% band; left as is (errors are in their band at 12.7). After the
-grubber chase (25 Oct, `20261025-140642-loose-ends`, 80 seeds) even sides complete 69.3%
-and score 5.6 tries; a 70-rated side beats a 50-rated side 69% of the time. Completion
-is still a shade under 70, and tries are inside 4–7. The Balance workflow re-runs `balance/plans/standard.json`
+grubber chase, eased to a 24 m start and a 3 m lead (25 Oct,
+`20261025-150020-grubber-ease-confirm`, 80 seeds) even sides complete 70.8%
+and score 5.4 tries (grubber tries 0.25). The longer chase
+(`20261025-140642-loose-ends`) completed 69.3% and scored 5.6, and a 70-rated
+side beat a 50-rated side 69% of the time. Completion
+on the eased even row is 70.8%, and tries are inside 4–7. The Balance workflow re-runs `balance/plans/standard.json`
 on every match-code change to `main`; the Balanced-v-Balanced test in `presets.test.ts`
 still pins the coarse bands so a tuning change that breaks them fails CI.
 
@@ -1073,9 +1076,10 @@ A side's plan can change at half-time and after a try. The rule lives in
 opens (`endHalf`, and `score` once the phase is the try). It does not run on a
 penalty goal or a field goal. No dice of its own: a match that names no side
 is the match it was. The golden even Balanced / Slide match (seed 1) is
-`14-16:355:a3624c324e9bb503`. It was `6-7:362:e959099a69ffd994` after halves
-went to 7:00, and `8-14:495:67db8b634c5a2e73` on 9:00 halves. The grubber chase
-moved it; the pin is the new match.
+`8-16:346:3436c830c791688a`. It was `14-16:355:a3624c324e9bb503` on the longer
+grubber chase, `6-7:362:e959099a69ffd994` after halves went to 7:00, and
+`8-14:495:67db8b634c5a2e73` on 9:00 halves. Easing the chase moved it; the pin
+is the new match.
 It moved on purpose on 2026-10-25: the siren, the rescaled legs and the rescaled
 windows make seed 1 a different match. See `docs/status/2026-10-balance.md`.
 
