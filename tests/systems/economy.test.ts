@@ -196,11 +196,11 @@ describe('gateReceipts: min(seats, demand) (N6, #169)', () => {
       week: 3, reputation: 30, facilities: [],
       league: { clubs: [], fixtures: [homeFixture(3)], ladder: [] },
     });
-    // demand = 300 + 30×30 = 1,200 (under the hill's 2,000) ; gate = 1,200 × $20 = 24,000
+    // demand = 300 + 30×30 = 1,200 (under the hill's 2,000); gate = 1,200 × the ticket.
     expect(gateReceipts(getState())).toBe(1200 * ECON.TICKET_PRICE);
-    expect(ECON.TICKET_PRICE).toBe(20);
+    expect(ECON.TICKET_PRICE).toBe(21);
     const g = homeGate(getState(), homeFixture(3));
-    expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 24_000, soldOut: false });
+    expect(g).toEqual({ capacity: 2000, demand: 1200, attendance: 1200, receipts: 1200 * ECON.TICKET_PRICE, soldOut: false });
   });
 
   it('Easy pays its factor of the same gate; Hard and Normal pay the full gate', () => {
