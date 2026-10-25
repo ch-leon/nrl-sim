@@ -35,7 +35,7 @@ describe('soak checks', () => {
       if (res.ok) expect(checkState(res.state), `v${v}`).toEqual([]);
     }
     // Each version's old save lacks what its migration adds, so the step really runs: v18's board
-    // loan and v19's staff.
+    // loan, v19's staff, and v20's playback speed (left absent, so an old save plays at ×4).
     const owing = { ...getState(), boardLoan: { owed: 12_000 } };
     expect(asOldSave(owing, 17)).not.toHaveProperty('boardLoan');
     expect(asOldSave(owing, 18)).toHaveProperty('boardLoan', { owed: 12_000 });
@@ -47,6 +47,11 @@ describe('soak checks', () => {
     expect(asOldSave(staffed, 19)).toHaveProperty('staff', [welfare]);
     const unstaffed = migrateState(asOldSave(staffed, 18));
     expect(unstaffed.ok && unstaffed.state.staff).toEqual([]);
+    const sped = { ...getState(), settings: { ...getState().settings, playbackSpeed: 8 as const } };
+    const oldSpeed = asOldSave(sped, 19).settings as { playbackSpeed?: number };
+    expect(oldSpeed.playbackSpeed).toBeUndefined();
+    const kept = migrateState(asOldSave(sped, 19));
+    expect(kept.ok && kept.state.settings.playbackSpeed).toBeUndefined();
   });
 });
 

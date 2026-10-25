@@ -3,8 +3,9 @@
 // flat-footed, the lead point allows for their run, and carrying the ball
 // costs a little speed.
 import { describe, it, expect } from 'vitest';
-import { LiveSim, runOn } from '../../../src/match/league/live';
-import { ACCEL } from '../../../src/match/core/body';
+import { LIVE, LiveSim, runOn } from '../../../src/match/league/live';
+import { GAS } from '../../../src/match/league/gas';
+import { ACCEL, maxSpeedFor } from '../../../src/match/core/body';
 import type { TeamSheet } from '../../../src/sim/events';
 
 const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
@@ -93,9 +94,11 @@ describe('passing on the move', () => {
     }
     expect(carrier.length).toBeGreaterThan(50);
     expect(free.length).toBeGreaterThan(50);
-    // Flat-out speeds cluster at the cap; the carrier's cap sits 5% under the free runner's
-    // (the median ignores the short burst after a break).
+    // Most of the carrying is at cruise, and carrying costs LIVE.carrySpeed.
+    // Free runners are not all at the sprint cap (support cruises), so the
+    // carrier's median is cruise × that cost, and still under the free median.
     const median = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
-    expect(median(carrier)).toBeLessThan(median(free) * 0.97);
+    expect(median(carrier)).toBeCloseTo(maxSpeedFor(60) * GAS.cruise * LIVE.carrySpeed, 2);
+    expect(median(carrier)).toBeLessThan(median(free));
   });
 });

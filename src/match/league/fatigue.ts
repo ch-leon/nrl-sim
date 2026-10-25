@@ -5,17 +5,23 @@
 // more. Pure: live.ts keeps the tank and calls these.
 import { traitBoost, type TraitInstance } from '../../data/traits';
 
+/**
+ * Halves went from 9 minutes to 7. Drain and recovery are ×9/7 so the same
+ * share of a half still spends the same legs (a shorter half, the same curve).
+ */
+const FOR_SHORTER_HALF = 9 / 7;
+
 /** The legs knobs (BAK-208 §8; tuning reference §10). Overridable by name in balance experiments (tuning.ts). */
 export const FATIGUE = {
-  /** Energy lost per metre run, at Stamina 50. */
-  runCost: 0.00015,
+  /** Energy lost per metre run, at Stamina 50. Was 0.00015 on a 9-minute half. */
+  runCost: 0.00015 * FOR_SHORTER_HALF,
   /** Energy lost per contact, whatever the outcome: carrier and tackler. */
-  contactCost: { carrier: 0.006, tackler: 0.004 },
+  contactCost: { carrier: 0.006 * FOR_SHORTER_HALF, tackler: 0.004 * FOR_SHORTER_HALF },
   /** Energy lost per second of a wrestle: the carrier pays per man on him, each tackler pays his own. */
-  wrestleCost: { carrierPerMan: 0.008, tackler: 0.006 },
+  wrestleCost: { carrierPerMan: 0.008 * FOR_SHORTER_HALF, tackler: 0.006 * FOR_SHORTER_HALF },
   /** Energy back per second: standing or walking in play, and in a stoppage (after a try, before the restart). */
-  recoverWalk: 0.0002,
-  recoverStop: 0.002,
+  recoverWalk: 0.0002 * FOR_SHORTER_HALF,
+  recoverStop: 0.002 * FOR_SHORTER_HALF,
   /** Slower than this (m/s) counts as standing / walking for recovery. */
   walkSpeed: 1.5,
   /** Workhorse drains this much less per level multiplier (I ×0.9, II ×0.84, III ×0.78). */
@@ -68,7 +74,7 @@ export function afterRun(energy: number, metres: number, rate: number, dt: numbe
   return Math.max(0, Math.min(1, e));
 }
 
-/** Lab: how fresh everyone starts — a kick-off, the last ten minutes, or cooked. */
+/** Lab: how fresh everyone starts — a kick-off, the last eight minutes of a 14-minute match, or cooked. */
 export type Legs = 'fresh' | 'late' | 'spent';
 export const LEGS: readonly Legs[] = ['fresh', 'late', 'spent'];
 export const LEGS_ENERGY: Readonly<Record<Legs, number>> = { fresh: 1, late: 0.38, spent: 0.18 };

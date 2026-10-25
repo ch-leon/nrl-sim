@@ -23,11 +23,11 @@ import { bus } from '../core/events';
 import { button, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
-import { getState, type Fixture } from '../core/state';
-import { callsHintSeasoned, callsLine, callsLockedHint, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
+import { getState, setState, type Fixture } from '../core/state';
+import { callsHintSeasoned, callsLine, callsLockedHint, HALF_TIME_CARD_MS, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
 import {
   LivePlayback,
-  LIVE_DEFAULT_SPEED,
+  playbackSpeedOf,
   PLAYBACK_SPEEDS,
   type PlaybackActor,
   type PlaybackBall,
@@ -481,8 +481,9 @@ export class MatchScene extends Phaser.Scene {
           this.beatZoom = ZOOM_DEFAULT;
           this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
         },
+        speed: this.rememberedSpeed(),
       });
-      this.mountPlaybackControls(LIVE_DEFAULT_SPEED);
+      this.mountPlaybackControls(this.playback.getSpeed());
       if (live.coachSide) {
         const unlocked = live.unlockedCalls ?? COACH_CALLS;
         this.mountCallChips(live.coachSide, unlocked);
@@ -772,10 +773,25 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
+  /** The speed the player last picked, or ×4 for an old save and a match opened with no game loaded. */
+  private rememberedSpeed(): PlaybackSpeed {
+    try {
+      return playbackSpeedOf(getState().settings.playbackSpeed);
+    } catch {
+      return playbackSpeedOf(undefined);
+    }
+  }
+
   private setSpeed(speed: PlaybackSpeed): void {
     this.playback?.setSpeed(speed);
     for (const b of this.speedButtons) {
       b.toggleAttribute('data-active', b.textContent === `×${speed}`);
+    }
+    try {
+      const settings = getState().settings;
+      if (settings.playbackSpeed !== speed) setState({ settings: { ...settings, playbackSpeed: speed } });
+    } catch {
+      // No game loaded. The buttons still change this match.
     }
   }
 
@@ -815,8 +831,8 @@ export class MatchScene extends Phaser.Scene {
       const s = pb.score;
       const pct = (side: 'home' | 'away'): string => `${Math.round(pb.legs(side) * 100)}%`;
       const lines = [`${this.home.name} ${s.home} – ${s.away} ${this.away.name}`, `Legs ${pct('home')} / ${pct('away')}`, callsLine(pb.calls.made, pb.calls.paid)];
-      // At ×4 and above the card goes on by itself after 8 s (a coach who is not watching).
-      this.openPlanCard(pb.half >= 2 ? 'Golden point' : 'Half-time', lines, pb.getSpeed() >= 4 ? 8000 : undefined);
+      // Every speed: the card goes on by itself after a few seconds. A tap holds it.
+      this.openPlanCard(pb.half >= 2 ? 'Golden point' : 'Half-time', lines, HALF_TIME_CARD_MS);
     }
   }
 

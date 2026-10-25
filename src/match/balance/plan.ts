@@ -104,7 +104,7 @@ export interface Plan {
   description?: string;
   /** Matches per cell (seeds seedStart … seedStart + seeds − 1). */
   seeds: number;
-  /** Leave out for whole matches (two 9:00 halves, half-time, full time). A number plays one stretch of that many minutes instead, counts scaled to 18. */
+  /** Leave out for whole matches (two 7:00 halves, half-time, full time). A number plays one stretch of that many minutes instead, counts scaled to 14. */
   minutes?: number;
   seedStart?: number;
   /** Overrides under every variant (the experiment's fixed ground). */

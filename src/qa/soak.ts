@@ -324,6 +324,13 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  if (version < 20) {
+    const settings = out.settings;
+    if (settings && typeof settings === 'object') {
+      const { playbackSpeed: _p, ...rest } = settings as GameState['settings'];
+      out.settings = rest;
+    }
+  }
   if (version < 19) delete out.staff;
   if (version < 18) delete out.boardLoan;
   if (version < 17) out.finance = raw.finance.map(({ overhead: _o, ...lines }) => lines);

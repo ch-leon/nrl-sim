@@ -57,8 +57,35 @@ export interface PlaybackBall {
   place(x: number, y: number, lift: number, depth: number): void;
 }
 
-/** A live match starts at ×4: at ×1 a Nines match takes its full 18 minutes to watch (§5.1 decision 1). */
+/** A live match starts at ×4 when the player has not picked a speed (§5.1 decision 1, then the 7:00 halves). */
 export const LIVE_DEFAULT_SPEED: PlaybackSpeed = 4;
+
+/**
+ * Dead time on screen plays at twice the chosen speed. Open play stays at the
+ * chosen speed. A ruck includes the play-the-ball. A set piece is a tap restart,
+ * a penalty the kick being lined up, a goal the field-goal celebration.
+ */
+const FAST_PHASES: ReadonlySet<string> = new Set(['ruck', 'tackle', 'restart', 'set-piece', 'conversion', 'try', 'penalty', 'goal']);
+
+/** 2 during dead time, 1 while the ball is in play (and through the half-time break, which the card holds). */
+export function playbackPace(phase: string): 1 | 2 {
+  return FAST_PHASES.has(phase) ? 2 : 1;
+}
+
+/** How quickly the pace eases between ×1 and ×2. Most of the gap closes in about 0.4 s, so a phase change does not lurch. */
+export const PACE_BLEND_MS = 400;
+
+/** Move `current` toward `target` over `deltaMs` of real time. A huge frame snaps; a 16 ms frame barely moves. */
+export function blendPace(current: number, target: number, deltaMs: number): number {
+  if (!(deltaMs > 0)) return current;
+  const k = 1 - Math.exp(-deltaMs / PACE_BLEND_MS);
+  return current + (target - current) * k;
+}
+
+/** The speed buttons remember. Anything else (an old save, a bad value) is ×4. */
+export function playbackSpeedOf(raw: unknown): PlaybackSpeed {
+  return raw === 1 || raw === 2 || raw === 4 || raw === 8 ? raw : LIVE_DEFAULT_SPEED;
+}
 /** Pop-ups sit above the name tag (73k) and below the weather (80k), as in the lab. */
 const DEPTH_POPUP = 74_000;
 /** The bonus zone's glow lies on the ground: over the field (−100k), under the shadows (−80k) and every sprite. */
@@ -111,6 +138,8 @@ export interface LivePlaybackOptions {
   breakRuleSides?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
+  /** The speed the player last picked. Absent: ×4. */
+  speed?: PlaybackSpeed;
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
   resumeAt?: number;
   /** A call, a plan change, the periodic write, Save & exit, or the app going to the background. False when the write did not land. */
@@ -146,6 +175,8 @@ export class LivePlayback {
   /** The full-time line of a match skipped here, said once it is over. */
   private finalLine = '';
   private speed: PlaybackSpeed = LIVE_DEFAULT_SPEED;
+  /** 1 in open play, easing toward 2 in dead time. Multiplies `speed` for the runner only. */
+  private pace = 1;
   private finishEmitted = false;
   private skipping = false;
   /** Skip has posted the match elsewhere and waits for its result (N10.4). */
@@ -185,6 +216,7 @@ export class LivePlayback {
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
     this.traits = new TraitLayer(scene, DEPTH_POPUP - 0.5);
     this.contest = new ContestLayer(scene, DEPTH_POPUP - 3);
+    this.speed = playbackSpeedOf(opts.speed);
     this.runner = new Runner(this.factory, opts.seed);
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => {
@@ -347,7 +379,13 @@ export class LivePlayback {
 
   setSpeed(speed: PlaybackSpeed): void {
     this.speed = speed;
-    this.runner.setSpeed(speed);
+    this.runner.setSpeed(speed * this.pace);
+  }
+
+  /** Ease the runner between the chosen speed and twice that, from the phase on screen. */
+  private applyPace(deltaMs: number): void {
+    this.pace = blendPace(this.pace, playbackPace(this.sim.phaseKind), deltaMs);
+    this.runner.setSpeed(this.speed * this.pace);
   }
 
   /**
@@ -440,6 +478,7 @@ export class LivePlayback {
       return;
     }
     const r = this.runner;
+    this.applyPace(deltaMs);
     r.update(deltaMs);
     this.view.draw(r.prev, r.cur, r.alpha, r.playing ? r.speed : 0.001);
     this.showClock();

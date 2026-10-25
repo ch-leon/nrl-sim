@@ -1,12 +1,81 @@
 # Match balance — October 2026 (N13)
 
+## Shorter halves (25 Oct)
+
+Halves went from 9:00 to 7:00 so a watched match is shorter. The golden even
+Balanced / Slide match (seed 1, no break rule) moved on purpose, from
+`8-14:495:67db8b634c5a2e73` to `6-7:362:e959099a69ffd994`. The siren comes earlier,
+legs drain and recover ×9/7, and the minute windows (field goal 180 s → 140 s,
+the AI coach's early hold 60 s → 47 s, a penalty shot's "late" 300 s → 233 s,
+sin bin 5 → 4, golden point 5 → 4, a late lead from minute 15 → 12) are a
+different match on the same seed. The pin is the new match, not a slipped hash.
+The sprint tank was left alone: a sprint is still a few seconds.
+
+Count bands in the harness are the old bands ×7/9, rounded (tries 4–7, tackles
+117–163, and the rest in tuning §12). Completion stayed 70–80%. Even 60 v 60
+over 20 seeds scored 6.15 tries a match on 9:00 halves and 4.05 on 7:00 (the
+length alone would suggest about 4.8). That 4.05 sits on the bottom of the new
+band. It was left there: the per-minute rate was not pushed back up.
+
+Screen only, so the golden match does not include them: dead time (ruck and
+play-the-ball, tackle, restart and kick-off, set piece, conversion, try, penalty,
+field goal) plays at twice the chosen speed, eased over 0.4 s; the half-time
+card goes on after 4.5 s at every speed unless it is tapped; the chosen speed
+is kept on the save (v20), and an old save still starts at ×4.
+
+Presets, `balance/runs/20261025-080627-presets` on `c6770da`, 200 seeds both
+ways (400 matches). Side win, 45–55% is the band:
+
+| Preset | Side win | |
+|---|---:|---|
+| Grind | 44.8% | 0.2 under. Standard error on 400 matches is about 2.5 points, so this is not a miss a knob change can honestly fix. |
+| Expansive | 50.2% | in |
+| Kick-chase | 53.0% | in |
+| All-out | 47.3% | in |
+| Rush | 44.8% | same as Grind |
+| Compressed | 47.8% | in |
+
+No preset knob was moved. Grind's offloads are 4.5, under the new 6–11 band; that is the style (it was already under the old 8–14). Completion sits at 68–72%, a shade under 70 on the expansive, all-out and rush rows, as it did on 9:00 halves. A half-time change from Grind to Expansive still offloads more (6.7 against 4.9 over 40 matches).
+
+The gate is the income line that follows a shorter match. Prize money is a finals cheque, not a payment per point, and the wage, upkeep and running-cost formulas are not per minute, so those stayed. On the soak of `main` at `1a3b7f0` (still 9:00) the gate was about 5% light once halves were 7:00, and a managing club that filled the hill a season later never quite caught the stand it would have built. The ticket is $21 (was $20). Prize stays $15k / $25k / $75k: raising it as well as the ticket put a managing Normal club about $200k past this baseline at season 5. Difficulty factors are unchanged (Easy prize and grant ×0.85, gate ×0.96; Hard prize and grant ×1.2; Normal ×1).
+
+Soak after the ticket, `npm run soak -- --difficulties easy,normal,hard --jobs 4`. 20 seeds × 5 seasons × idle and managed × Easy, Normal and Hard, plus one 2-season managed run of each old save (v1–v19). **139 runs, no problems, forfeits none.** About 20 minutes on 4 jobs. The same command on `1a3b7f0` is the baseline in the table.
+
+Season 5. Money is the balance at the rollover. "9:00" is `1a3b7f0`. "Before" is 7:00 halves with the $20 ticket, measured on `c6770da`.
+
+| | Record | Pos | Top 8 | Prem | Sack | Money | Before | 9:00 |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| idle Easy (20) | 15.3-1.2-7.5 | 3.0 | 90% | 35% | 5% | $1,200k | $1,080k (20) | $1,239k (19) |
+| managed Easy (20) | 21.2-0.4-2.5 | 1.0 | 100% | 70% | 0% | $1,040k | $798k | $966k |
+| idle Normal (12) | 12.8-1.1-10.2 | 7.1 | 58% | 17% | 50% | $871k | $817k (11) | $1,019k (10) |
+| managed Normal (18) | 19.7-0.7-3.7 | 1.0 | 100% | 44% | 0% | $556k | $417k (19) | $443k (19) |
+| idle Hard (4) | 16.3-0.5-7.3 | 2.0 | 100% | 0% | 0% | $792k | $687k (4) | $676k (4) |
+| managed Hard (14) | 18.4-0.5-5.1 | 1.3 | 100% | 43% | 21% | $312k | $209k (13) | $275k (15) |
+
+Income over five seasons (grant + gate + prize + board + events + sponsor, $k, summed across the season means). This is the flow, not the balance.
+
+| | 9:00 | Before ($20) | Ticket $21 |
+|---|---:|---:|---:|
+| idle Easy | 3,165 | 3,046 | 3,167 |
+| managed Easy | 5,555 | 5,240 | 5,613 |
+| idle Normal | 2,873 | 2,807 | 2,909 |
+| managed Normal | 4,847 | 4,863 | 5,145 |
+| idle Hard | 2,733 | 2,708 | 2,804 |
+| managed Hard | 4,301 | 4,256 | 4,652 |
+
+A career in the red finished its last season below zero. Against `1a3b7f0`: idle Easy 0/20 (was 1/20), idle Normal 2/20 (was 6/20), idle Hard 14/20 (was 15/20), managed Easy 1/20 (was 0/20), managed Normal 2/20 (was 3/20), managed Hard 8/20 (was 9/20). Managed Easy is the one share above the 9:00 count, and it is inside 1 in 16. Easy's season-5 balance ($1,200k idle, $1,040k managed) stays above Normal's ($871k, $556k), and Hard stays under both. Managing Normal's balance runs ahead of the 9:00 mean ($556k against $443k) because the extra gate compounds into a stand; the five-season income is about 6% up.
+
+A phone (844×390, touch, no taps) watched one match at the default ×4 in 3 min 21 s, siren at 14:00, and one at ×8 in 1 min 38 s. The half-time card went on by itself after 4.5 s both times. The aim was about 3½–4 minutes at ×4; 3:21 is a little under that, and the dead-time pace was not raised to close the gap. Commentary is 12.8px and stays on the screen without an ellipsis. At ×4 a line is the bright one for about half a second (median); at ×8 about a quarter of a second, with the dimmed line above holding the previous one. Held upright, the rotate card covers the match and the clock stays put (00:16, then 00:29 once it is sideways again).
+
+## N13
+
 The live match sim's knobs, measured with the harness (`npm run balance`, `balance/README.md`).
 N13 item 1 is the presets. N13.5 is the break rule (below). Later items (grubbers, completion,
 the 20-point gap, the home edge, stamina) are still to come.
 
 N15.4 (traits you can see) adds an optional `toSlot` on a cut-out event in `src/match/league/live.ts`
 (this plan's file): the receiver's slot, so the view can draw the line. The sim does not
-read it, no dice changed, and the golden Balanced / Slide match is the same string.
+read it, no dice changed, and that line did not move the golden match. The 25 Oct cut above did.
 
 Every decision taken without a fresh word from Leon is marked **Assumed (needs Leon)**.
 

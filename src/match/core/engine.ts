@@ -40,7 +40,7 @@ export class Runner {
   private _prev: Snapshot;
   private _cur: Snapshot;
   private acc = 0;
-  private _speed: RunSpeed = 1;
+  private _speed = 1;
   private _playing = false;
   private _maxTick = 0;
   /** Slow-motion beat: real ms left and the time factor while it lasts. */
@@ -79,7 +79,7 @@ export class Runner {
   get playing(): boolean {
     return this._playing;
   }
-  get speed(): RunSpeed {
+  get speed(): number {
     return this._speed;
   }
   get finished(): boolean {
@@ -105,8 +105,9 @@ export class Runner {
   toggle(): void {
     this._playing = !this._playing;
   }
-  setSpeed(s: RunSpeed): void {
-    this._speed = s;
+  /** `s` is a multiplier on real time. The buttons offer the RunSpeed steps; smart pace can sit between them. */
+  setSpeed(s: number): void {
+    if (s > 0) this._speed = s;
   }
 
   /** Run at `factor` speed for the next `ms` of real time (a beat of slow-motion). */
@@ -126,7 +127,10 @@ export class Runner {
       this.acc += (slow * this.slowFactor + (ms - slow)) * this._speed;
     } else this.acc += ms * this._speed;
     let n = 0;
-    while (this.acc >= TICK_MS && n < MAX_TICKS_PER_UPDATE) {
+    // Stop on the tick the sim finishes. Another step in this frame would
+    // snapshot the last tick's events again (a tackle, full time) and the
+    // recorder would count them twice. Smart pace makes a fast frame do that.
+    while (this.acc >= TICK_MS && n < MAX_TICKS_PER_UPDATE && !this.sim.finished) {
       this.stepOnce();
       this.acc -= TICK_MS;
       n++;
@@ -179,6 +183,9 @@ export class Runner {
   }
 
   private stepOnce(): void {
+    // A finished sim's step is a no-op that leaves the last tick's events in
+    // place. Stepping it again would hand those events to onEvents a second time.
+    if (this.sim.finished) return;
     this._prev = this._cur;
     this.sim.step();
     this._cur = this.sim.snapshot();

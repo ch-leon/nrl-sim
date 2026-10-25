@@ -77,15 +77,18 @@ export const ECON = {
   SPONSOR_PER_REP: 10,
   SPONSOR_CAP: 1_000,
   REP_GRANT_PER_POINT: 40,        // × reputation, weekly base grant (#176: was 50)
-  TICKET_PRICE: 20,               // $ per attendee (#176: 20 → 18; N12.3: back to 20 with the running costs, Assumed)
+  TICKET_PRICE: 21,               // $ per attendee (#176: 20 → 18; N12.3: back to 20; 25 Oct: 21, so a 7:00 half's gate matches the 9:00 soak)
   // Gates with a roof (N6, #169): attendance = min(capacity, demand), where
   // demand = (ATTEND_BASE + reputation × ATTEND_PER_REP) × form × occasion. Form
   // runs 1 ∓ FORM_SWING across the last FORM_GAMES results (all wins +25%, all
   // losses −25%); the occasion is BIG_MATCH_MULT for a top-eight opponent or
-  // FINALS_MULT for a home final. A new club at reputation 30 draws 1,200 ($24k
-  // a game, about $290k a season against a $490k wage bill: a club has to earn
+  // FINALS_MULT for a home final. A new club at reputation 30 draws 1,200 ($25,200
+  // a game, about $300k a season against a $490k wage bill: a club has to earn
   // its crowd); the hill sells out from reputation 57, a top club at 97 draws
   // 3,200 (4,000 on a winning run) and fills a stand at its second level.
+  // A 7:00 half scores fewer points than a 9:00 one, and the gate followed
+  // (about 5% light on the 1a3b7f0 soak). The ticket is $21 so that line
+  // comes back. The difficulty gate factor is still applied on top.
   ATTEND_BASE: 300,               // demand at reputation 0
   ATTEND_PER_REP: 30,             // × reputation
   FORM_GAMES: 5,

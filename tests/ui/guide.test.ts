@@ -5,6 +5,7 @@ import { GUIDE_PAGES, GUIDE_SCREENS, guidePage } from '../../src/ui/guide/guide'
 import { CLUB_PAGES, sponsorBullet } from '../../src/ui/guide/pages';
 import { NINES_FACTS, NINES_PAGE } from '../../src/ui/guide/nines';
 import { NINES } from '../../src/match/league/rules';
+import { BIN } from '../../src/match/league/sinbin';
 import { GOALS } from '../../src/match/league/goals';
 import { PENALTY } from '../../src/match/league/penalties';
 import { BENCH } from '../../src/match/league/bench';
@@ -40,6 +41,12 @@ describe('GUIDE_PAGES', () => {
     expect(text).toContain(`×${TRAINING_FOCUS.ON}`);
     expect(text).toContain(`×${TRAINING_FOCUS.OFF}`);
     expect(text).toContain('Kicker or Captain');
+  });
+
+  it('the Ladder page quotes golden point from the rule', () => {
+    const ladder = GUIDE_PAGES.find((p) => p.id === 'ladder')!;
+    const text = ladder.sections.flatMap((s) => [s.text ?? '', ...(s.bullets ?? [])]).join(' ');
+    expect(text).toContain(`golden point: ${NINES.goldenPointMinutes} more minutes`);
   });
 
   it('falls back to the first page for an unknown id', () => {
@@ -95,6 +102,8 @@ describe('How Nines works stays true to the live sim', () => {
     expect(NINES_FACTS.fieldGoalLastS).toBe(GOALS.fieldGoalLastS);
     expect(NINES_FACTS.fieldGoalRangeM).toBe(GOALS.fieldGoalRangeM);
     expect(NINES_FACTS.halfTimeLegsBack).toBe(NINES.halfTimeLegsBack);
+    expect(NINES_FACTS.sinBinMinutes).toBe(BIN.minutes);
+    expect(NINES_FACTS.goldenPointMinutes).toBe(NINES.goldenPointMinutes);
     expect(NINES_FACTS.postGapM).toBe(2 * GOALS.halfPosts);
     expect(NINES_FACTS.inGoalM).toBe(IN_GOAL);
   });

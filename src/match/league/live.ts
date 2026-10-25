@@ -749,7 +749,12 @@ export class LiveSim implements MatchSim {
 
   // ── Tick ──────────────────────────────────────────────────────────────────
   step(): void {
-    if (this.finished) return;
+    if (this.finished) {
+      // The last tick's events stay until the next step replaces them. A step
+      // after full time replaces them with nothing, so they cannot be recorded again.
+      this.events = [];
+      return;
+    }
     this.tick++;
     this.events = [];
     // Coach calls due this tick (#73).
@@ -969,7 +974,7 @@ export class LiveSim implements MatchSim {
     if (this.half < this.length.halves) return false;
     const left = this.length.halfMinutes * 60 - this.clockTicks * TICK_S;
     const margin = this.points[side] - this.points[other(side)];
-    return left <= GOALS.fieldGoalLastS + 60 && margin >= GOALS.fieldGoalMargin[0] && margin <= GOALS.fieldGoalMargin[1];
+    return left <= GOALS.fieldGoalLastS + GOALS.fieldGoalSoonExtraS && margin >= GOALS.fieldGoalMargin[0] && margin <= GOALS.fieldGoalMargin[1];
   }
 
   /** Calls each side has made, and how many paid off. */

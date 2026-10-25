@@ -23,8 +23,11 @@ export const PENALTY = {
   goalPoints: 2,
   /** The captain takes the shot at goal when it is this likely to go over… */
   shotMin: 0.6,
-  /** …and either it is late (this many seconds of the match left) with his side at most this far behind and not more than a point ahead… */
-  shotLateS: 300,
+  /**
+   * …and either it is late (this many seconds of the match left) with his side at most this far behind and not more than a point ahead…
+   * Was 300 (the last 5:00 of 18:00). 300 × 7/9 ≈ 233, the same share of a 14-minute match.
+   */
+  shotLateS: 233,
   shotBehind: 6,
   shotAhead: 1,
   /** …or the half is about to end (this many seconds left, or the siren has gone). */

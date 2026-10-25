@@ -1,7 +1,7 @@
 // src/match/league/match.ts — a whole match on the live sim, headless, to full
 // time (BAK-207 §3.5, §5.1 2a). Returns the same MatchResult the old engine
 // does, so the season, ladder, player stats and overlay can take it as is.
-// Event minutes are Nines minutes (0–18) off the match clock.
+// Event minutes are Nines minutes (0–14) off the match clock.
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 import { applyMomentumEvent, decayMomentum } from '../../sim/weather';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';

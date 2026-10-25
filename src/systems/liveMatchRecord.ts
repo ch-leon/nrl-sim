@@ -13,6 +13,7 @@ import { getActiveSlot } from '../core/save';
 import { TICK_S } from '../match/core/engine';
 import type { CallInput } from '../match/league/calls';
 import type { PlanInput } from '../match/league/live';
+import { NINES } from '../match/league/rules';
 
 /**
  * How often a match that is being watched writes this record. Two seconds of
@@ -38,6 +39,17 @@ export interface LiveMatchRecord {
   /** Plan changes at the breaks (N11); absent in a record from before them. */
   plans?: PlanInput[];
   tick: number;
+  /**
+   * Halves this record was written under. Absent on a record from before the
+   * 7:00 cut (a v19 mid-match save): that match is not this one, so resume
+   * starts it again from the kick-off.
+   */
+  halfMinutes?: number;
+}
+
+/** The record was written for the halves the game plays now, so it can carry on. */
+export function liveMatchSameRules(r: Pick<LiveMatchRecord, 'halfMinutes'>): boolean {
+  return r.halfMinutes === NINES.halfMinutes;
 }
 
 /** Key for one slot's record. Export files carry the same object under this field. */

@@ -313,3 +313,11 @@ goes from $1,216k to $1,168k ($403k–$1,907k), 0 of 16 in the red, against mana
 Normal at $542k. Idle Easy goes from $1,422k to $1,249k and every season closes above
 Easy's −$10k solvency line. The gate stays at ×0.96 because ×0.94 closed one idle
 season under that line. The reading is in `docs/status/2026-10-season.md`.
+
+**Shorter halves (25 Oct).** A 7:00 half scores fewer points. On the soak of
+`1a3b7f0` (9:00) the gate was the income line that followed, down about 5% where
+the crowd had been filling the hill; prize money moved with who made the finals,
+not with the points in a match. Costs did not move: nothing in the wage, upkeep
+or running-cost formulas is per minute. The ticket is $21 (was $20). Prize money
+stays $15k / $25k / $75k: lifting it as well as the ticket put a managing Normal
+club about $200k past the 9:00 season-5 mean. The difficulty factors are unchanged.

@@ -258,18 +258,18 @@ describe('financeSummary — what a bigger stand would earn (N12)', () => {
   it('on a sold-out hill: what a stand would seat and earn at the next home game\'s demand', () => {
     const s = at(100, []);
     const f = financeSummary(s);
-    // demand 3,300 on 2,000 seats; a stand seats 3,500 so all 3,300 come: +1,300 × $20
+    // demand 3,300 on 2,000 seats; a stand seats 3,500 so all 3,300 come: +1,300 × the ticket
     expect(f.nextHome?.soldOut).toBe(true);
     expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3300, receipts: 3300 * ECON.TICKET_PRICE, gain: 1300 * ECON.TICKET_PRICE });
     expect(f.nextStand).toEqual(nextStandGate({ ...s, week: 6 }, homeFixture(6)));
-    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$26k a game' });
+    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$27k a game' });
   });
 
   it('demand over the next stand too: it fills it (the +$30k a game example)', () => {
-    // 3,300 × 1.25 on a winning run = 4,125: a stand fills its 3,500, +1,500 × $20
+    // 3,300 × 1.25 on a winning run = 4,125: a stand fills its 3,500, +1,500 × the ticket
     const f = financeSummary(at(100, [], [...winningRun, homeFixture(6)]));
-    expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 3500 * ECON.TICKET_PRICE, gain: 30_000 });
-    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$30k a game' });
+    expect(f.nextStand).toEqual({ level: 1, capacity: 3500, attendance: 3500, receipts: 3500 * ECON.TICKET_PRICE, gain: 1500 * ECON.TICKET_PRICE });
+    expect(fmtStand(f.nextStand!)).toEqual({ label: 'A stand would seat 3,500', value: 'about +$32k a game' });
   });
 
   it('with a stand built, the next level is "a bigger stand"; at the top level nothing', () => {

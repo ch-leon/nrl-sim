@@ -38,8 +38,9 @@ describe('the bench (pure)', () => {
   });
   it('a benched player gets his legs back slowly, up to 90%; a fresh reserve stays fresh', () => {
     expect(benchRecover(0.4, 60)).toBeCloseTo(0.4 + BENCH.recoverPerMin);
-    // Off at 40%, back on four minutes later at 60% (BAK-208 §8.2).
-    expect(benchRecover(0.4, 240)).toBeCloseTo(0.6);
+    // Four minutes on the bench. recoverPerMin was scaled ×9/7 with the shorter
+    // half, so the same spell gives back a little more than the old 20 points.
+    expect(benchRecover(0.4, 240)).toBeCloseTo(0.4 + BENCH.recoverPerMin * 4);
     expect(benchRecover(0.85, 600)).toBe(BENCH.recoverCap);
     expect(benchRecover(1, 60)).toBe(1);
   });

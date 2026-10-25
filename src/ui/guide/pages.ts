@@ -8,6 +8,7 @@
 // match session can update it alone. No Phaser, no DOM.
 
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../match/league/presets';
+import { NINES } from '../../match/league/rules';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { getState, type GameState } from '../../core/state';
 import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, TRAINING_FOCUS } from '../../config';
@@ -102,7 +103,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         // A getter, so the Sponsor Board line quotes the club's reputation each time the page is shown (N12).
         get bullets(): string[] {
           return [
-            `Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are $20. On Easy the gate pays ${percent(DIFFICULTY.easy.gate)} of that; Normal and Hard pay the full gate. A new club draws about 1,200.`,
+            `Home gates: the crowd is your reputation and form, lifted for a top-eight opponent or a final, and capped by the ground (2,000 on the hill; a Grandstand seats 3,500, 5,000 or 6,500). Tickets are ${dollars(ECON.TICKET_PRICE)}. On Easy the gate pays ${percent(DIFFICULTY.easy.gate)} of that; Normal and Hard pay the full gate. A new club draws about 1,200.`,
             'A weekly grant that grows with reputation ($40 a point).',
             sponsorBullet(),
             `Finals prize money at the rollover: ${dollars(PRIZE.PER_FINALS_WEEK)} for every finals week played, ${dollars(PRIZE.GRAND_FINAL)} more for a grand final and ${dollars(PRIZE.PREMIERSHIP)} for the premiership. Easy pays ${percent(DIFFICULTY.easy.prize)} of that and Hard ${percent(DIFFICULTY.hard.prize)}; Normal pays it as written.`,
@@ -194,7 +195,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Changing it in a match',
         bullets: [
-          'At half-time (and before golden point) a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue (at ×4 and faster it goes on by itself after 8 seconds unless you touch it).',
+          'At half-time (and before golden point) a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue. The card goes on by itself after a few seconds at any speed, and a tap holds it.',
           'After a score, the Plan chip beside the call chips opens the same rows until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
           'Coach calls are the moment-to-moment layer on top: one call a set each way.',
         ],
@@ -254,7 +255,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Finals',
         bullets: [
-          'The top eight play quarter finals (1 v 8, 2 v 7, 3 v 6, 4 v 5), the winners are re-seeded for the semis, and the grand final is week 27. A final level at full time goes to golden point: five more minutes, and the next score wins (a try needs no conversion). Still level after that, the higher seed goes through. Finals are night games.',
+          `The top eight play quarter finals (1 v 8, 2 v 7, 3 v 6, 4 v 5), the winners are re-seeded for the semis, and the grand final is week 27. A final level at full time goes to golden point: ${NINES.goldenPointMinutes} more minutes, and the next score wins (a try needs no conversion). Still level after that, the higher seed goes through. Finals are night games.`,
           'Prize money is paid at the rollover; the premiership is worth 15 reputation on top.',
         ],
       },

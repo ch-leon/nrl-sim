@@ -12,8 +12,8 @@ import { createNewGame, getState, setState, type Fixture } from '../../src/core/
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, weekHeld } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
-import { isLiveMatchRecord, LIVE_MATCH_SAVE_SECONDS, LIVE_MATCH_SAVE_TICKS, liveMatchSaveDue, readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
-import { playerMatchPending, resumePlayerMatch } from '../../src/systems/matchday';
+import { isLiveMatchRecord, LIVE_MATCH_SAVE_SECONDS, LIVE_MATCH_SAVE_TICKS, liveMatchSaveDue, liveMatchSameRules, readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
+import { MATCH_RESTARTED_TEXT, playerMatchPending, resumePlayerMatch } from '../../src/systems/matchday';
 import { advanceUntil } from '../../src/core/advance';
 import { MATCH_STILL_ON_TEXT } from '../../src/ui/hud';
 import { MatchRecorder, runMatch } from '../../src/match/league/match';
@@ -183,6 +183,33 @@ describe('live match (beta): the match on screen is the match', () => {
     bus.emit('match:finished', { fixture: again.fixture, result: done.result! });
     expect(readLiveMatch()).toBeNull();
   }, 60_000);
+
+  it('a mid-match save from the old halves restarts from the kick-off', () => {
+    fakeStorage();
+    newGame(42);
+    const saved = JSON.stringify(getState());
+    advanceWeek();
+    const first = started[0]!;
+    expect(readLiveMatch()!.halfMinutes).toBe(NINES.halfMinutes);
+    expect(liveMatchSameRules(readLiveMatch()!)).toBe(true);
+    // A v19 record of this match: a tick in, and no half length.
+    const old = { ...readLiveMatch()! };
+    delete old.halfMinutes;
+    writeLiveMatch({ ...old, tick: 800, calls: [{ tick: 10, side: 'home', call: 'hit-up' }] });
+    expect(liveMatchSameRules(readLiveMatch()!)).toBe(false);
+    clearHeldWeek();
+    setState(JSON.parse(saved));
+    const notes: string[] = [];
+    const offNote = bus.on('ui:notify', ({ text }) => notes.push(text));
+    advanceWeek();
+    offNote();
+    const again = started[1]!;
+    expect(again.live!.seed).toBe(first.live!.seed);
+    expect(again.live!.resumeAt).toBeUndefined();
+    expect(again.live!.calls).toEqual([]);
+    expect(notes).toContain(MATCH_RESTARTED_TEXT);
+    expect(readLiveMatch()).toMatchObject({ tick: 0, halfMinutes: NINES.halfMinutes, calls: [] });
+  });
 
   it('the periodic save falls due every two seconds of match time and not before', () => {
     expect(LIVE_MATCH_SAVE_SECONDS).toBe(2);

@@ -39,7 +39,7 @@ describe('the sin-bin chance (pure)', () => {
     expect(binReason({ high: false, own20: true, prior: 1 })).toBe('repeat');
     expect(binReason({ high: false, own20: false, prior: 4 })).toBe('offside');
     expect(binReasonText('high')).toMatch(/high shot/);
-    expect(BIN.minutes).toBe(5); // Nines
+    expect(BIN.minutes).toBe(4); // the same share of a 14-minute match as five was of 18
   });
 });
 
@@ -65,7 +65,7 @@ describe('sin bins in the live sim', () => {
     restore = null;
   });
 
-  it('with every penalty a bin: the offender goes to the touchline, his side plays eight, and he is back after five minutes of clock', () => {
+  it('with every penalty a bin: the offender goes to the touchline, his side plays eight, and he is back after the bin’s minutes of clock', () => {
     restore = applyTuning({ ...ALWAYS, 'penalty.offside.slide': 0.1 });
     let bins = 0;
     let returns = 0;

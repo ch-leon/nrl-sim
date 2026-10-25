@@ -163,6 +163,13 @@ Phases 0–1 are the point: if the prototype isn't fun to watch, nothing after i
 > match screen defaulting to ×4; Nines drop-kick conversions in 2c, the bonus zone left for
 > Phase 5 (#77) unless asked for; no scrums; the order below with 2g last; headless speed
 > checked on a phone in 2g and made faster in Phase 3.
+>
+> **Updated (Leon, 2026-10-25):** halves are 7:00. Legs drain and recovery, the sin bin,
+> golden point, and the minute windows (field goal, penalty shot, the break rule's late
+> lead) keep the same share of the match. The screen plays rucks, tackles, restarts and
+> kicks at goal at twice the chosen speed, the half-time card goes on after 4.5 s at
+> every speed, and the chosen speed is remembered. The rows below record what shipped
+> in October; the current numbers are in the tuning reference.
 
 **Where the live sim is today** (after BAK-208 A–F2): kick-offs, sets of five, tackles and
 the wrestle, rucks, handovers, passes and knock-ons, five kick types, catches and loose

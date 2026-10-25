@@ -231,6 +231,9 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 17, to: 18, run: (old) => ({ ...old, boardLoan: { owed: 0 } }) },
   // v18 → v19 (N14.5): staff. An older save has hired nobody.
   { from: 18, to: 19, run: (old) => ({ ...old, staff: [] }) },
+  // v19 → v20: settings.playbackSpeed, the match speed last picked. Absent plays at ×4,
+  // so an old save is not filled in.
+  { from: 19, to: 20, run: (old) => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */
