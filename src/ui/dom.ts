@@ -764,36 +764,58 @@ export const CSS = `
    last chip tapped; the selection wins over it. */
 .nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled) { background: #7ec850; }
 
-/* ── Toasts (ui:notify) — below the HUD, above screens, under dialogs ─── */
-.nrl-toast-stack {
+/* ── Toasts (ui:notify, #339): one at a time, in a lane over no control (toasts.ts
+   places it: the top bar's gap at the club, under the scoreboard in a match) ── */
+.nrl-toast-lane {
   pointer-events: none;
   position: fixed;
-  top: calc(var(--nrl-hud-h, 0px) + 0.25rem);
-  left: 0;
-  right: 0;
-  padding: 0 0.5rem;
+  top: calc(0.25rem + var(--nrl-safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(30rem, calc(100vw - 1rem));
   display: flex;
-  flex-direction: column;
-  gap: 6px;
   align-items: center;
   z-index: 60;
 }
-/* #195: a rollover or a ×4 advance drops a stack of toasts over a phone screen; show the newest three. */
-.nrl-toast-stack .nrl-toast:nth-last-child(n+4) { display: none; }
-.nrl-toast {
-  color: #fff;
-  border: 3px solid #000;
-  padding: 6px 14px;
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-  box-shadow: 3px 3px 0 #000;
-  max-width: 100%;
-  box-sizing: border-box;
-  text-align: center;
+.nrl-toast-lane[hidden] { display: none; }
+.nrl-toast-lane[data-lane="hud"] { transform: none; }
+.nrl-toast-lane[data-lane="match"] {
+  transform: none;
+  left: calc(0.5rem + env(safe-area-inset-left, 0px));
+  top: calc(var(--nrl-mo-board, 4rem) + 0.3rem);
+  width: min(26rem, calc(100vw - 12rem));
+  min-height: 44px;
 }
-.nrl-toast-info { background: #3a6ea5; }
-.nrl-toast-success { background: #2e7d32; }
-.nrl-toast-danger { background: #b03a2e; }
+.nrl-toast {
+  pointer-events: auto;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+  padding: 0.2rem 0.5rem;
+  border: 2px solid #000;
+  border-left-width: 6px;
+  box-shadow: 2px 2px 0 #000;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  font-weight: bold;
+  line-height: 1.2;
+}
+.nrl-toast:first-child { display: flex; }
+.nrl-toast-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.nrl-toast-more { flex: 0 0 auto; padding: 0 0.35em; background: #1a1a2e; color: #f4ecd8; border: 1px solid #000; }
+.nrl-toast-more:empty { display: none; }
+/* Red is for real problems only; routine stops and confirmations are neutral; good news is green with a gold edge. */
+.nrl-toast-info { background: #e8e0c8; color: #1a1a2e; border-left-color: #5a6b85; }
+.nrl-toast-success { background: #2e7d32; color: #fff; border-left-color: #f4d03f; }
+.nrl-toast-danger { background: #b03a2e; color: #fff; }
+.nrl-toast-danger .nrl-toast-text::before { content: '! '; }
+.nrl-toast-in { animation: nrl-toast-in 160ms ease-out; }
+@keyframes nrl-toast-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .nrl-toast-in { animation: none; } }
 
 /* ── Update bar (N7, #181): a new build is waiting; never during a match ── */
 .nrl-update-toast {

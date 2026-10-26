@@ -20,7 +20,7 @@ import { cardById } from '../data/events';
 import {
   type AdvanceTarget, type StopReason, MAX_RUN_WEEKS,
   contractAlerts, forfeitRisk, newlyInjuredStarters, postWeekStop,
-  targetLabel, targetReached,
+  stopToastKind, targetLabel, targetReached,
 } from './advanceRules';
 
 /** Outcome of one multi-advance. `stop.kind === 'target'` means it finished normally. */
@@ -101,7 +101,7 @@ export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<v
     const weeks = run.weeksPlayed === 1 ? '1 week' : `${run.weeksPlayed} weeks`;
     bus.emit('ui:notify', {
       text: `Stopped after ${weeks}: ${run.stop.text}`,
-      kind: 'danger',
+      kind: stopToastKind(run.stop.kind),
     });
   }
   return run;

@@ -28,6 +28,8 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const IOS_HINT_KEY = 'nrlsim.iosInstallHintShown';
+/** How long the install hint stays in view (a tap dismisses it sooner). */
+export const IOS_HINT_MS = 8000;
 /** How often a running app asks the server whether a new build is up. */
 export const UPDATE_CHECK_MS = 15 * 60 * 1000;
 
@@ -182,8 +184,10 @@ function maybeShowIosHint(): void {
   } catch {
     // localStorage blocked (private mode) — show the hint anyway, once per load.
   }
+  // A toast like any other (#339): in the lane, never over a screen's header; it stays a while.
   bus.emit('ui:notify', {
     text: 'Tap Share → Add to Home Screen to install',
     kind: 'info',
+    ms: IOS_HINT_MS,
   });
 }

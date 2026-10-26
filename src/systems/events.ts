@@ -507,7 +507,7 @@ export function tickModifiers(state: GameState, now: number): Applied {
       money.push(...a.money);
       // Steady weekly money shows in the ledger; only news-worthy firings are announced.
       if (m.trigger !== 'weekly' || m.effects.some((e) => e.kind !== 'money')) {
-        news.push({ text: `${m.label}: ${describeEffects(m.effects)}.`, kind: m.trigger === 'loss' ? 'danger' : 'success' });
+        news.push({ text: `${m.label}: ${describeEffects(m.effects)}.`, kind: m.trigger === 'loss' ? 'info' : 'success' });
       }
     }
     if (m.weeksLeft > 1) kept.push({ ...m, weeksLeft: m.weeksLeft - 1 });

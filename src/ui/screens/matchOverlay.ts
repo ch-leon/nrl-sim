@@ -12,11 +12,10 @@
 // Layout: while mounted the overlay puts `nrl-match-active` on <body>, which
 // hides the HUD strip and bottom nav (no Advance Week / screen hopping
 // mid-match, and nothing for the scoreboard or the ×1/×2/×4/Skip controls to
-// collide with), moves the sound button to the bottom-right corner and
-// re-anchors toasts under the scoreboard, clear of the ticker (finding 3). It
-// stays on through full-time (GitHub #14: the match view stays clean until
-// "Back to Club"), when `nrl-match-final` is added too: the feed gives way to
-// the Back-to-Club button and the result toast stays under the scoreboard.
+// collide with) and moves the sound button to the bottom-right corner; the toast
+// lane (toasts.ts) moves to the row under the scoreboard. It stays on through
+// full-time (GitHub #14: the match view stays clean until "Back to Club"), when
+// `nrl-match-final` is added too: the feed gives way to the Back-to-Club button.
 // Both are removed on destroy (the
 // scene's teardown when leaving), which hands the HUD/nav back.
 //
@@ -468,6 +467,9 @@ export function statsStartOpen(width: number, height: number): boolean {
 /** How long the try banner holds the middle of the field before it docks under the scoreboard (#348 M7). */
 export const BANNER_DOCK_MS = 1000;
 
+/** The ticker before the first commentary line. */
+export const TICKER_WAIT_TEXT = 'Kick-off soon…';
+
 /** The countdown on the Replay try chip: whole seconds left, never 0 while it shows. */
 export function replayCountdown(leftMs: number): number {
   return Math.max(1, Math.ceil(leftMs / 1000));
@@ -538,7 +540,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   // The full log sits behind the corner Log button so it never covers play unasked (#17)
   // and the ticker is not a button tall. Open, it takes the ticker's place on the left half (#348 M4).
   const tickerPrev = el('div', { class: 'nrl-mo-line nrl-mo-line-prev' });
-  const tickerLatest = el('div', { class: 'nrl-mo-line' });
+  // Until the first line comes, the ticker says what it is waiting for (#339).
+  const tickerLatest = el('div', { class: 'nrl-mo-line nrl-mo-line-wait', text: TICKER_WAIT_TEXT });
   const log = el('div', { class: 'nrl-mo-feed' });
   const logPanel = panel({ class: 'nrl-mo-log' }, log);
   logPanel.id = 'nrl-mo-log';
@@ -678,6 +681,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   let prevLine = '';
   const appendCommentary = (line: string): void => {
     tickerPrev.textContent = truncateTicker(prevLine);
+    tickerLatest.classList.remove('nrl-mo-line-wait');
     tickerLatest.textContent = truncateTicker(line);
     prevLine = line;
     log.append(el('div', { class: 'nrl-mo-line', text: line }));
@@ -934,16 +938,6 @@ export const OVERLAY_CSS = `
 body.nrl-match-active .nrl-hud,
 body.nrl-match-active .nrl-nav { display: none; }
 body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
-/* Toasts: under the scoreboard (and the replay chip's row), in the overlay's top margin, clear of the ticker (finding 3). */
-body.nrl-match-active .nrl-toast-stack,
-body.nrl-match-final .nrl-toast-stack {
-  top: calc(var(--nrl-mo-board, 4rem) + 3.5rem);
-  bottom: auto;
-  right: auto;
-  left: calc(0.5rem + env(safe-area-inset-left, 0px));
-  align-items: flex-start;
-  max-width: min(22rem, calc(100vw - 12rem));
-}
 .nrl-mo-scoreboard {
   position: fixed; top: calc(0.5rem + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 0.75rem; z-index: 15;
@@ -981,6 +975,7 @@ body.nrl-match-final .nrl-toast-stack {
 .nrl-mo-ticker { flex: 1 1 auto; min-width: 0; }
 .nrl-mo-ticker .nrl-mo-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1.25em; }
 .nrl-mo-line-prev { opacity: 0.75; }
+.nrl-mo-line-wait { font-style: italic; opacity: 0.75; }
 /* The Log button sits in the bottom-left corner, on the empty side of the speed
    row (the ♪ button has the other corner). Not inside the ticker, which made that
    strip a button tall; labelled, since three bars alone read as a menu (#348 M4). */
@@ -1083,7 +1078,7 @@ body.nrl-match-final .nrl-toast-stack {
 }
 /* Full-time: scoreboard and stats stay put (HUD/nav are still hidden); the
    feed gives way to the Back-to-Club button (MatchScene, bottom-centre where
-   the controls were). The result toast stays under the scoreboard, off the ticker. */
+   the controls were). */
 .nrl-mo-final .nrl-mo-commentary, .nrl-mo-final .nrl-mo-log, .nrl-mo-final .nrl-mo-log-toggle { display: none; }
 /* Score banner: big, team-coloured, centre-top over the pitch; never blocks taps. */
 .nrl-mo-banner {

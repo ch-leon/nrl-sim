@@ -232,7 +232,8 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   return (): void => {
     bus.emit('ui:notify', {
       text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
-      kind: us > them ? 'success' : us < them ? 'danger' : 'info',
+      // A loss is news, not a problem (#339): red is kept for injuries, debt and errors.
+      kind: us > them ? 'success' : 'info',
     });
     for (const text of injuryToasts) bus.emit('ui:notify', { text, kind: 'danger' });
   };

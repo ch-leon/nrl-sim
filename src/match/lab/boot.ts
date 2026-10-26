@@ -5,7 +5,8 @@
 import Phaser from 'phaser';
 import { bus } from '../../core/events';
 import { initLandscapeGuard, sleepLoopIfPortrait } from '../../ui/orientation';
-import { ensureStyles } from '../../ui/dom';
+import { ensureStyles, getRoot } from '../../ui/dom';
+import { initToasts } from '../../ui/toasts';
 import { LiveSim } from '../league/live';
 import { LabController, labHash, parseLabHash, type LabParams } from './controller';
 import { LabPanel } from './panel';
@@ -31,18 +32,8 @@ export function bootLab(): void {
     },
   });
 
-  const toasts = document.createElement('div');
-  toasts.className = 'nrl-toast-stack';
-  toasts.setAttribute('aria-live', 'polite');
-  document.getElementById('ui-root')?.appendChild(toasts);
-  const notify = (text: string): void => {
-    const t = document.createElement('div');
-    t.className = 'nrl-toast nrl-toast-info';
-    t.textContent = text;
-    toasts.appendChild(t);
-    setTimeout(() => t.remove(), 5000);
-  };
-  bus.on('ui:notify', ({ text }) => notify(text));
+  initToasts(getRoot());
+  const notify = (text: string): void => bus.emit('ui:notify', { text, kind: 'info' });
 
   let panel: LabPanel | null = null;
   const start = (params: LabParams): void => {

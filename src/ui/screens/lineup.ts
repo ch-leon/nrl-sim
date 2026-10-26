@@ -319,7 +319,8 @@ export function openLineupScreen(): void {
   planBtn.setAttribute('data-plan', '');
   planBtn.setAttribute('aria-haspopup', 'dialog');
 
-  const toast = (text: string): void => bus.emit('ui:notify', { text, kind: 'info' });
+  // An injury or a ban keeps the man out of the side: red (#339). A hint is neutral.
+  const toast = (text: string, kind: 'info' | 'danger' = 'info'): void => bus.emit('ui:notify', { text, kind });
 
   /** A tap on a slot or a seat: pick it, unpick it, or swap it with the one picked before. */
   const tapSpot = (spot: Spot): void => {
@@ -336,11 +337,11 @@ export function openLineupScreen(): void {
   /** A tap on a player in the squad list: into the picked spot, or pick his own spot. */
   const tapPlayer = (p: Player): void => {
     if (p.injuredWeeks > 0) {
-      toast(`${p.name} is injured — out ${p.injuredWeeks}w.`);
+      toast(`${p.name} is injured — out ${p.injuredWeeks}w.`, 'danger');
       return;
     }
     if ((p.suspendedWeeks ?? 0) > 0) {
-      toast(`${p.name} is suspended — banned ${p.suspendedWeeks}w.`);
+      toast(`${p.name} is suspended — banned ${p.suspendedWeeks}w.`, 'danger');
       return;
     }
     const lineup = getState().lineup;
