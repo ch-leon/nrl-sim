@@ -1197,6 +1197,8 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     const out = [];
     if ((await page.locator('.nrl-mo-log-toggle').getAttribute('aria-expanded')) !== 'true') await page.locator('.nrl-mo-log-toggle').tap();
     await page.waitForTimeout(300);
+    // A try just scored puts up the Replay try chip, and the lane waits it out; let it go first.
+    await page.waitForFunction(() => !document.querySelector('.nrl-mo-replay:not([hidden])'), null, { timeout: 20000 }).catch(() => {});
     await page.evaluate(() => {
       window.__nrlNotify({ text: 'Sponsor news for the club', kind: 'info' });
       window.__nrlNotify({ text: 'Kai Smith comes in for the injured Jack Taufa at fullback.', kind: 'info', match: true });
