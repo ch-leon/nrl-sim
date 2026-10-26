@@ -813,6 +813,31 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     rec.notes.push(c.note);
     return c.problems;
   });
+  // The More sheet: every row whole, tappable, 44px tall, 12px labels, clear of the unsafe bands.
+  await step('nav-more', async (rec) => {
+    await tap('.nrl-nav [data-nav-more]');
+    await page.waitForSelector('.nrl-nav-sheet:not([hidden])');
+    await page.waitForTimeout(250);
+    const out = await page.evaluate((safe) => {
+      const W = innerWidth, H = innerHeight;
+      const problems = [];
+      if (document.querySelector('.nrl-nav [data-nav-more]')?.getAttribute('aria-expanded') !== 'true') problems.push('More is not aria-expanded');
+      const items = [...document.querySelectorAll('.nrl-nav-sheet .nrl-btn')];
+      for (const b of items) {
+        const r = b.getBoundingClientRect();
+        const t = b.textContent.trim();
+        if (r.left < safe.l - 1 || r.right > W - safe.r + 1 || r.top < safe.t - 1 || r.bottom > H - safe.b + 1) problems.push(`${t} off screen or in the unsafe band`);
+        if (r.height < 44) problems.push(`${t} ${Math.round(r.height)}px tall`);
+        if (parseFloat(getComputedStyle(b).fontSize) < 12) problems.push(`${t} label under 12px`);
+        const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+        if (!hit || !b.contains(hit)) problems.push(`${t} covered`);
+      }
+      return { problems, note: `${items.length} rows: ${items.map((b) => b.textContent.trim()).join(', ')}` };
+    }, safe);
+    rec.notes.push(out.note);
+    return out.problems;
+  });
+  await page.keyboard.press('Escape');
   for (const spec of NAV_SCREENS) {
     await step(`screen-${spec.id}`, async (rec) => {
       await openNav(page, spec.id);
