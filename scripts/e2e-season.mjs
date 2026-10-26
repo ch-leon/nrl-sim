@@ -220,6 +220,33 @@ async function facilitiesDrawn(rec) {
   if (drawn !== want) throw new Error(`grounds draw ${drawn} facilities, the save has ${want}`);
 }
 
+/** A plan card up (the half-time card waits for Continue, #341): play on. */
+async function continueCards() {
+  const go = page.locator('.nrl-mo-plan .nrl-mo-plan-go');
+  if (await go.count()) await press(go.first());
+}
+
+/** Skip to full time: the pause button, then Skip in its sheet (#348 M3). */
+async function skipMatch() {
+  await continueCards();
+  await tap('.nrl-mo-controls [data-pause]');
+  await tap('.nrl-mo-sheet [data-skip]');
+}
+
+/** Why the element's centre does not take a tap (covered, off screen, under 44px on a phone), or null. */
+async function untappable(selector) {
+  return page.evaluate(([sel, phone]) => {
+    const b = document.querySelector(sel);
+    if (!b) return 'missing';
+    const r = b.getBoundingClientRect();
+    if (r.width < 1 || getComputedStyle(b).display === 'none') return 'hidden';
+    if (phone && (r.width < 44 || r.height < 44)) return `${Math.round(r.width)}×${Math.round(r.height)}`;
+    if (r.left < -1 || r.top < -1 || r.right > window.innerWidth + 1 || r.bottom > window.innerHeight + 1) return `off screen (${Math.round(r.left)},${Math.round(r.top)}–${Math.round(r.right)},${Math.round(r.bottom)})`;
+    const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return at === b || b.contains(at) ? null : `covered by "${at?.className || at?.tagName || 'nothing'}"`;
+  }, [selector, PHONE]);
+}
+
 /**
  * At full time: go back to the club. With the Player of the Match card up, Back to
  * Club must take the first tap (#203) and the card must go with the match view.
@@ -256,7 +283,7 @@ async function weekAsTapped(rec) {
   }, at, { timeout: 15000 }).then((h) => h.jsonValue())
     .catch(() => { throw new Error(`Advance Week did nothing within 15 s at ${at.replace(/(\d+):(\d+)/, 'S$1 W$2')}`); });
   if (what === 'match') {
-    await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+    await skipMatch();
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
     await leaveMatch();
   }
@@ -488,7 +515,10 @@ async function play() {
   // Save & exit (mid-match save): the record is written, the club comes back, and
   // Advance Week reads Resume match. The ▾ menu must not skip the week.
   await step('save-exit', async (rec) => {
-    const btn = page.locator('.nrl-mo-controls [data-save-exit]');
+    // Behind the pause button (#348 M3); the sheet holds the match.
+    await tap('.nrl-mo-controls [data-pause]');
+    await page.waitForSelector('.nrl-mo-sheet');
+    const btn = page.locator('.nrl-mo-sheet [data-save-exit]');
     const box = await btn.boundingBox();
     if (!box) throw new Error('no Save & exit control');
     if (PHONE && (box.width < 44 || box.height < 44)) throw new Error(`Save & exit is ${Math.round(box.width)}×${Math.round(box.height)}`);
@@ -500,7 +530,10 @@ async function play() {
       throw new Error(`Save & exit is off-screen (${Math.round(placed.left)}–${Math.round(placed.right)}, ${Math.round(placed.top)}–${Math.round(placed.bottom)})`);
     }
     const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
-    await tap('.nrl-mo-controls [data-save-exit]');
+    await wait(1200);
+    const held = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    if (held !== clock) throw new Error(`the clock ran on under the pause sheet (${clock} → ${held})`);
+    await tap('.nrl-mo-sheet [data-save-exit]');
     await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud', { timeout: 15000 });
     const label = (await page.locator('.nrl-hud-actions > .nrl-btn').first().textContent())?.trim();
     if (label !== 'Resume match') throw new Error(`Advance Week reads "${label}", not Resume match`);
@@ -522,7 +555,7 @@ async function play() {
     rec.notes.push(`resumed at ${clock}`);
   });
   await step('match-fulltime', async () => {
-    await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+    await skipMatch();
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 15000 });
     await wait(500);
   });
@@ -607,15 +640,59 @@ async function play() {
   // Instant replay of a try (N15.5). Additive (N8's playthrough): at ×8, wait for
   // the Replay button, tap it, and check the re-sim did not block the page and
   // the clock is back where the live match left it. Noted in docs/status/2026-10-qa.md.
+  // The half-time card waits for Continue (#341): a first half with no try reaches it
+  // here, and this step plays the card the way half-time-plan does.
+  let halfTimeDone = null;
+  const halfTimeCard = () => page.locator('.nrl-mo-plan', { has: page.locator('.nrl-mo-plan-head', { hasText: 'Half-time' }) });
+  async function playHalfTime(rec) {
+    const card = halfTimeCard();
+    // It stays up by itself: at ×8 it used to go on after 4.5 s while the coach was still reading it.
+    await wait(6000);
+    if (!(await card.count())) throw new Error('the half-time card closed by itself');
+    const go = await untappable('.nrl-mo-plan .nrl-mo-plan-go');
+    if (go) throw new Error(`the half-time card's Continue is not tappable (${go})`);
+    const replay = await page.locator('.nrl-mo-replay:visible').count();
+    if (replay) throw new Error('the Replay chip shows over the half-time card');
+    await press(card.locator('[data-tactic="expansive"]'));
+    if (!(await card.locator('[data-tactic="expansive"][data-active]').count())) throw new Error('Expansive did not light on the half-time card');
+    await press(card.locator('.nrl-mo-plan-go'));
+    await card.waitFor({ state: 'detached', timeout: 5000 });
+    halfTimeDone = 'half-time: waited 6 s, Expansive, Continue';
+    rec.notes.push(halfTimeDone);
+  }
   await step('try-replay', async (rec) => {
     if (!liveOn) return 'skipped';
     const btn = page.locator('.nrl-mo-replay');
-    const seen = await btn.waitFor({ state: 'visible', timeout: 90000 }).then(() => true).catch(() => false);
+    const until = Date.now() + 150000;
+    let seen = false;
+    while (!seen && Date.now() < until) {
+      const got = await Promise.race([
+        btn.waitFor({ state: 'visible', timeout: until - Date.now() }).then(() => 'replay'),
+        halfTimeCard().waitFor({ timeout: until - Date.now() }).then(() => 'half-time'),
+      ]).catch(() => null);
+      if (got === 'half-time' && !halfTimeDone) await playHalfTime(rec);
+      else if (got === 'replay') seen = true;
+      else break;
+    }
     if (!seen) {
       if (await page.locator('.nrl-mo-final').count()) return 'no try before full time';
-      throw new Error('no Replay button within 90s of the live match');
+      throw new Error('no Replay chip within 150 s of the live match');
     }
-    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    // Docked under the scoreboard, its centre takes the tap (the old centred button slid off the finger when pressed).
+    const where = await untappable('.nrl-mo-replay');
+    if (where) throw new Error(`the Replay chip is not tappable (${where})`);
+    // Under a sheet the chip hides and its seconds stop; back on the field it shows again (#341).
+    const count = async () => (await page.locator('.nrl-mo-replay-count').textContent().catch(() => null))?.trim();
+    await tap('.nrl-mo-controls [data-pause]');
+    await page.waitForSelector('.nrl-mo-sheet');
+    await wait(400);
+    const underSheet = await count();
+    if (await btn.isVisible()) throw new Error('the Replay chip shows over the pause sheet');
+    await wait(1500);
+    if ((await count()) !== underSheet) throw new Error(`the Replay chip's seconds ran under the sheet (${underSheet} → ${await count()})`);
+    await tap('.nrl-mo-sheet .nrl-btn:has-text("Resume")');
+    await btn.waitFor({ state: 'visible', timeout: 2000 });
+    rec.notes.push(`chip under the sheet: hidden, held at ${underSheet} s`);
     // Full time used to hide the button (display:none). The class alone must not cover it.
     const covered = await page.evaluate(() => {
       const b = document.querySelector('.nrl-mo-replay');
@@ -629,6 +706,31 @@ async function play() {
       return hidden || !(at === b || b.contains(at)) ? 'covered' : null;
     });
     if (covered) throw new Error(`Replay is not tappable with the full-time class on (${covered})`);
+    // At ×8 the match runs on for a second or more between reading the clock here and the
+    // click arriving, and it is back at the tapped second for only a few frames after the
+    // replay. So both clocks are noted in the page: at the click, and as the replay tag comes off.
+    await page.evaluate(() => {
+      const root = document.querySelector('.nrl-match-overlay');
+      const clock = () => document.querySelector('.nrl-mo-clock')?.textContent?.trim() ?? '';
+      let was = false;
+      window.__replayTap = null;
+      window.__replayEnd = null;
+      const onTap = (e) => {
+        if (!e.target.closest?.('.nrl-mo-replay')) return;
+        window.__replayTap = clock();
+        window.removeEventListener('click', onTap, true);
+      };
+      window.addEventListener('click', onTap, true);
+      const watch = new MutationObserver(() => {
+        const on = root.classList.contains('nrl-mo-replaying');
+        if (was && !on) {
+          window.__replayEnd = clock();
+          watch.disconnect();
+        }
+        was = on;
+      });
+      watch.observe(root, { attributes: true, attributeFilter: ['class'] });
+    });
     await tap('.nrl-mo-replay');
     await page.waitForFunction(() => document.querySelector('.nrl-match-overlay')?.hasAttribute('data-replay-block'), null, { timeout: 15000 });
     const block = Number(await page.locator('.nrl-match-overlay').getAttribute('data-replay-block'));
@@ -636,21 +738,25 @@ async function play() {
     if (block >= 300) throw new Error(`replay blocked the page for ${block} ms`);
     // The overlay root is only a holder for fixed children, so it has no height and a visibility wait on `.nrl-mo-replaying` never sees it. The tag is the thing on screen.
     await page.waitForSelector('.nrl-mo-replay-tag', { timeout: 5000 });
+    const tapped = await page.evaluate(() => window.__replayTap);
+    if (!tapped) throw new Error('the click on Replay was not seen');
     await page.waitForFunction((was) => {
       const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
       return !!t && t !== was;
-    }, before, { timeout: 4000 });
-    await page.waitForFunction((was) => {
-      const playing = document.querySelector('.nrl-mo-replaying');
-      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
-      return !playing && t === was;
-    }, before, { timeout: 14000 });
-    rec.notes.push(`Replay from ${before}; main-thread block ${block} ms`);
+    }, tapped, { timeout: 4000 });
+    // Back where the live match left it: the tapped second, or the next (the pause lands on a tick boundary).
+    await page.waitForFunction(() => window.__replayEnd !== null, null, { timeout: 14000 });
+    const after = await page.evaluate(() => window.__replayEnd);
+    const secs = (c) => { const m = /^(\d+):(\d+)$/.exec(c ?? ''); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+    const d = secs(after) - secs(tapped);
+    if (!(d >= 0 && d <= 1)) throw new Error(`replay ended at ${after}, the live match was tapped at ${tapped}`);
+    rec.notes.push(`Replay tapped at ${tapped}, live again at ${after}; main-thread block ${block} ms`);
   });
   // A hard kill: reload mid-match (no pagehide the game can trust) and Continue.
   // The same match comes back, not kick-off.
   await step('live-kill', async (rec) => {
     if (!liveOn) return 'skipped';
+    if (!halfTimeDone && (await halfTimeCard().count())) await playHalfTime(rec);
     const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
     const tick = await page.evaluate(() => {
       const raw = localStorage.getItem('nrl-live-match-1');
@@ -677,6 +783,7 @@ async function play() {
   // one on offer and see it lit for the set; skipped when there are no chips.
   await step('coach-call', async (rec) => {
     if (!liveOn) return 'skipped';
+    if (!halfTimeDone && (await halfTimeCard().count())) await playHalfTime(rec);
     if (!(await page.locator('.nrl-mo-calls .nrl-btn[data-call]').count())) return 'no coach-call chips on the match screen';
     // At ×8 the chips switch with possession every second or so and are never still
     // long enough for a locator click: call at ×1, tapping the first chip on offer
@@ -704,23 +811,18 @@ async function play() {
     rec.notes.push(`called ${call}${refused.length ? ` (${refused.length} refused first)` : ''}`);
     await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×8' }));
   });
-  // N11: the half-time card comes up by itself; change the attack and play on.
+  // N11: the half-time card comes up by itself and waits for Continue (#341); change the attack and play on.
   await step('half-time-plan', async (rec) => {
     if (!liveOn) return 'skipped';
-    const card = page.locator('.nrl-mo-plan', { has: page.locator('.nrl-mo-plan-head', { hasText: 'Half-time' }) });
+    if (halfTimeDone) return `played during try-replay (${halfTimeDone})`;
     // A 9-minute half at ×8 is about 70 s, but about 105 s on a loaded machine: two runs beside
     // other work ran out of 120 s with the clock at 06:56 and 08:55 of the half. 300 s leaves room.
-    await card.waitFor({ timeout: 300000 });
-    // At ×4 and above the card goes on by itself after 8 s unless it is tapped, so tap at once.
-    await press(card.locator('[data-tactic="expansive"]'));
-    if (!(await card.locator('[data-tactic="expansive"][data-active]').count())) throw new Error('Expansive did not light on the half-time card');
-    await press(card.locator('.nrl-mo-plan-go'));
-    await card.waitFor({ state: 'detached', timeout: 5000 });
-    rec.notes.push('half-time: Expansive');
+    await halfTimeCard().waitFor({ timeout: 300000 });
+    await playHalfTime(rec);
   });
   await step('live-fulltime', async (rec) => {
     if (!liveOn) return 'skipped';
-    await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+    await skipMatch();
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 20000 });
     await wait(500);
     const shown = (await page.locator('.nrl-mo-score').textContent())?.trim();
@@ -943,7 +1045,7 @@ async function play() {
     await wait(1500);
     // A match week opens the match scene; skip it.
     if (await page.locator('.nrl-mo-controls').count()) {
-      await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+      await skipMatch();
       await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 15000 });
       await leaveMatch();
     }
@@ -974,7 +1076,7 @@ async function play() {
       : [...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited \(\d+/.test(t.textContent ?? '')) ? 'forfeit' : null), null, { timeout: 15000 })
       .then((h) => h.jsonValue());
     if (match === 'match') {
-      await tap('.nrl-mo-controls .nrl-btn:has-text("Skip")');
+      await skipMatch();
       await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
       await leaveMatch();
     } else rec.notes.push('the round forfeited (short of 13 fit at a full squad), so only the rivals hold the week');

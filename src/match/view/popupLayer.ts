@@ -28,6 +28,11 @@ const DRIFT = 12;
 /** Two pop-ups closer than this across (screen px) count as on top of each other; a line of text is about this tall. */
 const CLEAR_W = 110;
 const LINE_H = POPUP_LINE_H;
+/** The trait line's size (screen px), under a big shout and a small one: readable on a phone (#348 M9). */
+export const TRAIT_FONT_PX = { big: 16, small: 13 } as const;
+/** Through a pop-up's life (0..1) the shout fades from here, and its trait line from later. */
+const FADE_FROM = 0.66;
+const TRAIT_FADE_FROM = 0.82;
 
 export class PopupLayer {
   private readonly pool: Phaser.GameObjects.Text[] = [];
@@ -71,9 +76,10 @@ export class PopupLayer {
       traitText = this.pool.find((t) => !t.visible) ?? null;
       if (traitText) {
         text.setText(lines.slice(0, -1));
-        traitText.setText(p.trait).setFontSize(p.big ? 14 : 11).setColor(TRAIT_COLOR).setAlpha(1).setVisible(true);
+        const size = p.big ? TRAIT_FONT_PX.big : TRAIT_FONT_PX.small;
+        traitText.setText(p.trait).setFontSize(size).setColor(TRAIT_COLOR).setAlpha(1).setVisible(true);
         // Tucked directly under the word and name (both texts hang from their bottom edge).
-        this.live.push({ text: traitText, side, slot, born: this.now, ms: p.ms, lift: BASE_LIFT + stacked * 18 - (p.big ? 16 : 13), clear: 0, lines: 0, parent: main });
+        this.live.push({ text: traitText, side, slot, born: this.now, ms: p.ms, lift: BASE_LIFT + stacked * 18 - (size + 3), clear: 0, lines: 0, parent: main });
       }
     }
   }
@@ -104,11 +110,13 @@ export class PopupLayer {
       const at = feet(l.side, l.slot);
       if (!at) continue;
       const pop = u < 0.12 ? 0.6 + (u / 0.12) * 0.4 : 1;
-      const alpha = u > 0.66 ? 1 - (u - 0.66) / 0.34 : 1;
+      const alpha = u > FADE_FROM ? 1 - (u - FADE_FROM) / (1 - FADE_FROM) : 1;
       if (l.parent) {
         // The trait line rides with its shout. Clamping it on its own walks it onto another edge.
+        // It fades last, so the skill's name is still whole when the shout has gone pale (#348 M9).
         const dy = l.parent.lift - l.lift;
-        l.text.setPosition(l.parent.text.x, l.parent.text.y + dy).setScale(pop / zoom).setAlpha(alpha);
+        const traitAlpha = u > TRAIT_FADE_FROM ? 1 - (u - TRAIT_FADE_FROM) / (1 - TRAIT_FADE_FROM) : 1;
+        l.text.setPosition(l.parent.text.x, l.parent.text.y + dy).setScale(pop / zoom).setAlpha(traitAlpha);
         continue;
       }
       if (l.clear === null) l.clear = this.clearance(l, at, zoom);

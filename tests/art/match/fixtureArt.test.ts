@@ -1,7 +1,8 @@
 // N10.5 (#154): a fixture's match art, painted in one go so the art worker can paint
 // it ahead. The same pixels as the scene's own painters, and keyed by kit design.
 import { describe, it, expect } from 'vitest';
-import { resolveKits, setKitDesign } from '../../../src/art/match/kit';
+import { setKitDesign } from '../../../src/art/match/kit';
+import { resolveKits } from '../../../src/art/match/kitClash';
 import { clearGroundCache, paintBackground, paintForeground, warmGround } from '../../../src/art/match/stadium';
 import { buildPlayerAtlas } from '../../../src/art/match/players';
 import { buildCrowdAtlas, crowdShirts } from '../../../src/art/match/crowd';

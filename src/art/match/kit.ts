@@ -122,7 +122,8 @@ export function kitFromDesign(primary: string, design: KitDesign, alt = false): 
     : buildKit(hexToInt(primary), hexToInt(design.trim), design.pattern);
 }
 
-function buildKit(jersey: number, trim: number, pattern: KitPattern): Kit {
+/** A kit from a jersey, a trim and a pattern; shades and shorts derived the same way as a club's. */
+export function buildKit(jersey: number, trim: number, pattern: KitPattern): Kit {
   // Shorts: league sides mostly wear dark shorts. Use the trim when it is dark,
   // the trim (lightly shaded) for near-black jerseys so legs don't vanish, and a
   // navy-black otherwise.
@@ -142,23 +143,9 @@ function buildKit(jersey: number, trim: number, pattern: KitPattern): Kit {
   };
 }
 
-/** Jerseys closer than this (RGB distance) are treated as a colour clash. */
-export const CLASH_DISTANCE = 90;
-
 /**
- * Kits for a fixture. If the two jerseys clash, the away side wears its alternate
- * strip (jersey/trim swapped) — whichever of the two reads more distinct.
+ * Jerseys closer than this (RGB distance) read as the same colour: the kit
+ * designer offers alternate jerseys well clear of it. A fixture's clash is judged
+ * on the whole sprite (resolveKits in kitClash.ts).
  */
-export function resolveKits(
-  home: { clubId: string; colors: readonly [string, string] },
-  away: { clubId: string; colors: readonly [string, string] },
-): { home: Kit; away: Kit; awayAlt: boolean } {
-  const homeKit = kitFromColors(home.colors, home.clubId);
-  const awayKit = kitFromColors(away.colors, away.clubId);
-  if (colorDistance(homeKit.jersey, awayKit.jersey) >= CLASH_DISTANCE) {
-    return { home: homeKit, away: awayKit, awayAlt: false };
-  }
-  const alt = kitFromColors(away.colors, away.clubId, true);
-  const useAlt = colorDistance(homeKit.jersey, alt.jersey) > colorDistance(homeKit.jersey, awayKit.jersey);
-  return useAlt ? { home: homeKit, away: alt, awayAlt: true } : { home: homeKit, away: awayKit, awayAlt: false };
-}
+export const CLASH_DISTANCE = 90;

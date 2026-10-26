@@ -24,7 +24,7 @@ import { button, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
-import { callsHintSeasoned, callsLine, callsLockedHint, HALF_TIME_CARD_MS, mountMatchOverlay, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
+import { CALL_WHEN, callCaption, callsHintSeasoned, callsLine, callsLockedHint, cssHex, mountMatchOverlay, showMatchSheet, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
 import {
   LivePlayback,
   playbackSpeedOf,
@@ -37,7 +37,7 @@ import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, COACH_CALLS, chipState, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, COACH_CALLS, chipState, unlockLevel, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
@@ -55,7 +55,7 @@ const CHIP_LABEL: Readonly<Record<CoachCall, string>> = {
 };
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
-import { resolveKits } from '../art/match/kit';
+import { resolveKits } from '../art/match/kitClash';
 import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForPlayer, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
   CROSSBAR_Z,
@@ -137,6 +137,8 @@ function nextFrame(): Promise<void> {
 const TRAIL_MIN_LIFT = 30;
 /** Crowd animation tick (real ms). */
 const CROWD_TICK_MS = 220;
+/** Width (world px) of the team ring under every player (#340); the carrier's ring is 22. */
+const TEAM_RING_W = 15;
 
 export interface MatchSceneData {
   home: TeamSheet;
@@ -148,20 +150,23 @@ export interface MatchSceneData {
   live?: LiveMatchData;
 }
 
-/** A player sprite + ground shadow, driven through PlaybackActor. */
+/** A player sprite + ground shadow + team ring, driven through PlaybackActor. */
 export class MatchActor implements PlaybackActor {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly shadow: Phaser.GameObjects.Image;
+  /** The side's ring at his feet (#340): which team he is on, whatever the kits. */
+  private readonly ring: Phaser.GameObjects.Ellipse;
   private readonly atlas: string;
   private look: number;
   private current = '';
   /** Whose look this is (live sim: a slot's player changes at an interchange). */
   private wearing: string | null = null;
 
-  constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string) {
+  constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string, ringColor: number) {
     this.atlas = atlas;
     this.look = look;
     this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW);
+    this.ring = scene.add.ellipse(0, 0, TEAM_RING_W, TEAM_RING_W / 2).setStrokeStyle(1.5, ringColor, 0.9).setFillStyle(ringColor, 0.28).setDepth(DEPTH_SHADOW + 0.5);
     this.sprite = scene.add.sprite(0, 0, atlas, `${look}-idle-0`);
     this.sprite.setOrigin((CENTER_X + 0.5) / FRAME_W, (BASE_Y + 1) / FRAME_H);
   }
@@ -169,6 +174,7 @@ export class MatchActor implements PlaybackActor {
   place(x: number, y: number, depth: number): void {
     this.sprite.setPosition(x, y).setDepth(depth);
     this.shadow.setPosition(x, y);
+    this.ring.setPosition(x, y);
   }
 
   /** Wear a player's own look (#21) by squad id or name; the next play() switches the sprite to it. */
@@ -383,7 +389,7 @@ export class MatchScene extends Phaser.Scene {
 
     // Players + ball.
     const homeAtlas = this.art.players(`pl-${this.home.clubId}`, art.home);
-    const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayAlt ? '-alt' : ''}`, art.away);
+    const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayStrip === 'home' ? '' : `-${kits.awayStrip}`}`, art.away);
     for (let i = 0; i < ON_FIELD; i++) {
       // #21: each slot wears its player's own look (stable across matches);
       // a slot with no named player falls back to the slot cycle. The live view
@@ -392,11 +398,11 @@ export class MatchScene extends Phaser.Scene {
       const a = this.away.roster?.[i];
       const homeLook = h ? lookForPlayer(h.id ?? h.name) : lookForSlot(i);
       const awayLook = a ? lookForPlayer(a.id ?? a.name) : lookForSlot(i + 5);
-      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow));
-      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow));
+      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow, kits.rings.home));
+      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow, kits.rings.away));
     }
     this.ball = new MatchBall(this, props.ball, props.ballShadow);
-    this.markerColors = { home: kits.home.jersey, away: kits.away.jersey };
+    this.markerColors = { home: kits.rings.home, away: kits.rings.away };
     this.marker = this.add.ellipse(0, 0, 22, 11).setStrokeStyle(2, 0xffffff, 0.95).setFillStyle(0xffffff, 0.22).setVisible(false);
     this.marker.setDepth(DEPTH_SHADOW + 2); // above the ground shadows, under every sprite
     this.tagText = this.add
@@ -456,7 +462,14 @@ export class MatchScene extends Phaser.Scene {
     if (this.live) {
       // The overlay reads Nines halves and the sim's running clock.
       const live = this.live;
-      this.overlay = mountMatchOverlay({ home: this.home, away: this.away, weather: live.weather, halfMinutes: NINES.halfMinutes });
+      this.overlay = mountMatchOverlay({
+        home: this.home,
+        away: this.away,
+        weather: live.weather,
+        halfMinutes: NINES.halfMinutes,
+        worn: { home: cssHex(this.markerColors.home), away: cssHex(this.markerColors.away) },
+        ...(live.coachSide ?? live.planSide ? { mine: live.coachSide ?? live.planSide } : {}),
+      });
       this.playback = new LivePlayback(this, {
         home: this.home,
         away: this.away,
@@ -691,7 +704,7 @@ export class MatchScene extends Phaser.Scene {
     cam.centerOn(c.x, c.y);
   }
 
-  // ── DOM playback controls (speed ×1/×2/×4/×8 + Skip) ────────────────────────────
+  // ── DOM playback controls (speed ×1/×2/×4/×8 + pause) ───────────────────────────
   private mountPlaybackControls(start: PlaybackSpeed = 1): void {
     const wrap = document.createElement('div');
     // Positioned by the overlay stylesheet (bottom-centre; the nav bar is hidden
@@ -702,27 +715,59 @@ export class MatchScene extends Phaser.Scene {
     this.speedButtons = PLAYBACK_SPEEDS.map((s) => {
       const b = button(`×${s}`, () => this.setSpeed(s));
       if (s === start) b.setAttribute('data-active', 'true');
+      b.setAttribute('aria-pressed', String(s === start));
       wrap.append(b);
       return b;
     });
 
-    const skip = button('Skip', () => this.playback?.skip());
-    wrap.append(skip);
-
-    // Save & exit: write the resume record and go back to the club. The week
-    // stays held, so Advance Week reads Resume match and continues this one.
-    const exit = button('Save & exit', () => this.saveAndExit());
-    exit.setAttribute('data-save-exit', '');
-    exit.setAttribute('aria-label', 'Save and exit to club');
-    wrap.append(exit);
+    // Skip (no undo) and Save & exit wait behind the pause button (#348 M3), not
+    // a finger's width from ×8.
+    const pause = button('❚❚', () => this.openPauseSheet(), { class: 'nrl-mo-pause' });
+    pause.setAttribute('aria-label', 'Pause');
+    pause.setAttribute('data-pause', '');
+    wrap.append(pause);
 
     this.controlsEl = wrap;
     mount(wrap);
   }
 
+  /** The sheet over the field (pause menu, calls list): the match holds while it is up. */
+  private sheet: PlanCardHandle | null = null;
+
+  private openSheet(make: (onDone: () => void) => PlanCardHandle): void {
+    const pb = this.playback;
+    if (!(pb instanceof LivePlayback) || this.finished || this.sheet || this.planCard) return;
+    pb.hold();
+    this.sheet = make(() => {
+      this.sheet = null;
+      pb.release();
+    });
+  }
+
+  private openPauseSheet(): void {
+    const pb = this.playback;
+    if (!(pb instanceof LivePlayback)) return;
+    const s = pb.score;
+    const half = pb.half >= 3 ? 'Golden point' : pb.half === 2 ? '2nd half' : '1st half';
+    this.openSheet((onDone) =>
+      showMatchSheet({
+        head: 'Paused',
+        lines: [`${this.home.name} ${s.home} – ${s.away} ${this.away.name}`, half],
+        actions: [
+          { label: 'Resume', onTap: () => {} },
+          { label: 'Skip to full time', onTap: () => this.playback?.skip(), attrs: { 'data-skip': '' } },
+          // Save & exit: write the resume record and go back to the club. The week
+          // stays held, so Advance Week reads Resume match and continues this one.
+          { label: 'Save & exit', onTap: () => this.saveAndExit(), attrs: { 'data-save-exit': '', 'aria-label': 'Save and exit to club' } },
+        ],
+        onDone,
+      }),
+    );
+  }
+
   // ── Coach calls (#73): chips for the player's coach in a live match ─────────
   private callsEl: HTMLDivElement | null = null;
-  private callChips: { call: CoachCall; btn: HTMLButtonElement }[] = [];
+  private callChips: { call: CoachCall; btn: HTMLButtonElement; why: HTMLSpanElement }[] = [];
   private callSide: 'home' | 'away' = 'home';
   /** The call made this set (its chip stays lit until the set ends). */
   private madeCall: CoachCall | null = null;
@@ -736,23 +781,48 @@ export class MatchScene extends Phaser.Scene {
     wrap.className = 'nrl-mo-calls';
     // Only the calls his Coach's Office has unlocked (N9.6).
     this.callChips = COACH_CALLS.filter((c) => unlocked.includes(c)).map((call) => {
+      const why = document.createElement('span');
+      why.className = 'nrl-mo-call-why';
       const btn = button(CHIP_LABEL[call], () => {
         if (!(this.playback instanceof LivePlayback)) return;
-        const why = this.playback.call(side, call);
-        if (why) bus.emit('ui:notify', { text: `${CALL_LABEL[call]}: ${why}`, kind: 'info' });
-        else {
+        // A refusal shows as the chip's caption (refreshCallChips), not a toast over play.
+        if (this.playback.call(side, call) === null) {
           this.madeCall = call;
           this.madeAt = this.playback.tick;
         }
         this.refreshCallChips();
       });
       btn.setAttribute('data-call', call);
+      btn.append(why);
       wrap.append(btn);
-      return { call, btn };
+      return { call, btn, why };
     });
+    // "?": every call, when it can be made, and what unlocks the rest (#348 M6).
+    const help = button('?', () => this.openCallsHelp(unlocked), { class: 'nrl-mo-calls-help' });
+    help.setAttribute('aria-label', 'Calls');
+    help.setAttribute('data-calls-help', '');
+    wrap.append(help);
     this.callsEl = wrap;
     mount(wrap);
     this.refreshCallChips();
+  }
+
+  private openCallsHelp(unlocked: readonly CoachCall[]): void {
+    const list = document.createElement('div');
+    list.className = 'nrl-mo-call-help';
+    for (const call of COACH_CALLS) {
+      const name = document.createElement('b');
+      name.textContent = CALL_LABEL[call];
+      const when = document.createElement('span');
+      const locked = !unlocked.includes(call);
+      when.textContent = locked ? `Coach's Office level ${unlockLevel(call)}` : CALL_WHEN[call];
+      if (locked) {
+        name.className = 'nrl-mo-call-locked';
+        when.className = 'nrl-mo-call-locked';
+      }
+      list.append(name, when);
+    }
+    this.openSheet((onDone) => showMatchSheet({ head: 'Calls', lines: ['One call a set with the ball, one defending.', list], actions: [{ label: 'Back to the match', onTap: () => {} }], onDone }));
   }
 
   /** The chips follow the play (calls.ts chipState): what makes sense now, or the call made this set. */
@@ -764,12 +834,15 @@ export class MatchScene extends Phaser.Scene {
     // The set is over once the call has landed and the side may call again.
     const used = [...why.values()].includes('one call a set');
     if (!used && pb.tick > this.madeAt + 1) this.madeCall = null;
-    for (const { call, btn } of this.callChips) {
-      const st = chipState(call, why.get(call) ?? null, attacking, this.madeCall);
+    for (const { call, btn, why: caption } of this.callChips) {
+      const refusal = why.get(call) ?? null;
+      const st = chipState(call, refusal, attacking, this.madeCall);
       btn.hidden = !st.show;
       btn.disabled = !st.enabled;
       btn.toggleAttribute('data-made', st.lit);
-      btn.title = why.get(call) ?? CALL_LABEL[call];
+      btn.title = refusal ?? CALL_LABEL[call];
+      const text = st.enabled ? '' : callCaption(refusal, st.lit);
+      if (caption.textContent !== text) caption.textContent = text;
     }
   }
 
@@ -785,7 +858,9 @@ export class MatchScene extends Phaser.Scene {
   private setSpeed(speed: PlaybackSpeed): void {
     this.playback?.setSpeed(speed);
     for (const b of this.speedButtons) {
-      b.toggleAttribute('data-active', b.textContent === `×${speed}`);
+      const on = b.textContent === `×${speed}`;
+      b.toggleAttribute('data-active', on);
+      b.setAttribute('aria-pressed', String(on));
     }
     try {
       const settings = getState().settings;
@@ -806,7 +881,7 @@ export class MatchScene extends Phaser.Scene {
 
   private mountPlanChip(side: 'home' | 'away'): void {
     this.planSide = side;
-    const btn = button('Plan', () => this.openPlanCard('Change the plan', ['In force from the kick-off'], undefined));
+    const btn = button('Plan', () => this.openPlanCard('Change the plan', ['In force from the kick-off']));
     btn.setAttribute('data-plan', '');
     btn.hidden = true;
     this.planBtn = btn;
@@ -831,15 +906,16 @@ export class MatchScene extends Phaser.Scene {
       const s = pb.score;
       const pct = (side: 'home' | 'away'): string => `${Math.round(pb.legs(side) * 100)}%`;
       const lines = [`${this.home.name} ${s.home} – ${s.away} ${this.away.name}`, `Legs ${pct('home')} / ${pct('away')}`, callsLine(pb.calls.made, pb.calls.paid)];
-      // Every speed: the card goes on by itself after a few seconds. A tap holds it.
-      this.openPlanCard(pb.half >= 2 ? 'Golden point' : 'Half-time', lines, HALF_TIME_CARD_MS);
+      // Every speed: the card waits for Continue (#341).
+      this.openPlanCard(pb.half >= 2 ? 'Golden point' : 'Half-time', lines);
     }
   }
 
-  private openPlanCard(head: string, lines: string[], autoMs: number | undefined): void {
+  private openPlanCard(head: string, lines: string[]): void {
     const pb = this.playback;
     const side = this.planSide;
     if (!(pb instanceof LivePlayback) || !side || this.planCard) return;
+    this.sheet?.close();
     pb.hold();
     if (this.planBtn) this.planBtn.hidden = true;
     this.planCard = showPlanCard({
@@ -851,7 +927,6 @@ export class MatchScene extends Phaser.Scene {
         this.planCard = null;
         pb.release();
       },
-      ...(autoMs ? { autoMs } : {}),
     });
   }
 
@@ -892,6 +967,7 @@ export class MatchScene extends Phaser.Scene {
     this.callsEl?.remove();
     this.callsEl = null;
     this.closePlan();
+    this.sheet?.close();
     if (this.backBtn) this.backBtn.style.display = '';
     if (this.controlsEl) {
       this.controlsEl.remove();
@@ -909,17 +985,17 @@ export class MatchScene extends Phaser.Scene {
     const pb = this.playback;
     if (!(pb instanceof LivePlayback) || this.finished) return;
     if (!pb.canPark()) {
-      bus.emit('ui:notify', { text: SKIPPING_EXIT_TEXT, kind: 'info' });
+      bus.emit('ui:notify', { text: SKIPPING_EXIT_TEXT, kind: 'info', match: true });
       return;
     }
     // Leave only once the record is actually stored. A failed write would hold
     // the week with nothing for Advance Week to resume.
     if (!pb.saveProgress()) {
-      bus.emit('ui:notify', { text: MATCH_NOT_SAVED_TEXT, kind: 'danger' });
+      bus.emit('ui:notify', { text: MATCH_NOT_SAVED_TEXT, kind: 'danger', match: true });
       return;
     }
     const tick = pb.tick;
-    bus.emit('ui:notify', { text: MATCH_SAVED_TEXT, kind: 'success' });
+    bus.emit('ui:notify', { text: MATCH_SAVED_TEXT, kind: 'success', match: true });
     bus.emit('match:parked', { tick });
     this.scene.start('Grounds');
   }
@@ -958,6 +1034,7 @@ export class MatchScene extends Phaser.Scene {
     this.callsEl?.remove();
     this.callsEl = null;
     this.closePlan();
+    this.sheet?.close();
     this.callChips = [];
     this.speedButtons = [];
     if (this.backBtn) {

@@ -170,6 +170,9 @@ Phases 0–1 are the point: if the prototype isn't fun to watch, nothing after i
 > kicks at goal at twice the chosen speed, the half-time card goes on after 4.5 s at
 > every speed, and the chosen speed is remembered. The rows below record what shipped
 > in October; the current numbers are in the tuning reference.
+>
+> **Updated (Leon, 2026-10-26, #341):** the half-time card waits for Continue at every
+> speed; it no longer goes on by itself.
 
 **Where the live sim is today** (after BAK-208 A–F2): kick-offs, sets of five, tackles and
 the wrestle, rucks, handovers, passes and knock-ons, five kick types, catches and loose

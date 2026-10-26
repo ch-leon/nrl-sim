@@ -203,6 +203,9 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `SLOWMO_MS` / `SLOWMO_FACTOR` | `popups.ts` | 320 ms × 0.3 | Slow-motion beat on big moments (bust, big hit, strip, intercept, regather, try). |
 | `WORDS` / `KICK_WORDS` / `TRAIT_COLOR` | `popups.ts` | table / `#d9a5ff` | What is shouted, and the trait line's colour. |
 | `BASE_LIFT` / `DRIFT` / `POOL` | `src/match/view/popupLayer.ts` | 40 px / 12 px / 6 | Pop-up placement over the player and how many at once. |
+| `TRAIT_FONT_PX` / fade | `popupLayer.ts` | 16 / 13 px (big / small shout); shout fades from 66% of its life, the trait line from 82% | The trait line under a shout ("DON'T ARGUE II"). Was 14 / 11 px, fading with its shout (#348 M9: small and faded on a phone). |
+| `BANNER_MS` / `BANNER_DOCK_MS` | `src/ui/screens/matchOverlay.ts` | try 3200 / kick 2400 ms; docks after 1000 ms | The score banner pops in over the field, then docks as a strip under the scoreboard for the rest of its life (#348 M7). In the colours the side wears on the pitch. |
+| `KIT_CLASH_MIN` / `RING_MIN_DELTA` | `src/art/match/kitClash.ts` | 30 / 30 (CIE76 ΔE) | A fixture's kits are compared colour by colour, each weighted by how much of the player sprite it covers. Under 30 the away side wears its alternate strip, or a generated clash strip when the alternate is no better (#340). Each player stands on a ring (`TEAM_RING_W` 15 px, `MatchScene.ts`) in a kit colour picked to be at least 30 from the other side's ring and clear of the grass. A test plays every club pairing, every player palette and every designer alternate. |
 | `CLOSEUP_MS` | `src/match/lab/scene.ts` | 1500 ms | Camera close-up on a big moment. |
 | `ZOOM_DEFAULT` / `ZOOM_CLOSE` / `ZOOM_WIDE` | `src/world/readability.ts` | 2 / 3 / 2 (integers) | Camera zooms; integers keep the pixels crisp. |
 | Stats strip window | `src/match/lab/stats.ts` `WINDOW_TICKS` | 5 min | `last m:ss · T · Brk · Off · Err · K · Try · Skill`. |
@@ -216,7 +219,7 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `TRAIT_MOVE_MS` | `src/match/view/traitLayer.ts` | 1000 ms (real) | How long a trait's move stays up (N15.4): the fend's arm, the step's cut, the cut-out line, the drive, the shock. It fades over the last 280 ms. At ×4 and ×8 (`TRAIT_FAST_FROM`, `TRAIT_FAST_HOLD` 2) it stays up twice as long, and the match eases for `TRAIT_SLOW_MS` 420 ms at factor `TRAIT_SLOW_FACTOR` 0.4, so the camera does not run past it. **Assumed (needs Leon)**: a second, and the longer hold at the fast speeds. |
 | `CUT_NEAR_M` / `CUT_END_M` | `traitLayer.ts` | 2.5 m / 0.4 m | A Playmaker's line goes through the teammate nearest him who is within 2.5 m of the line and at least 0.4 m clear of either end. The man beside the ball, not a trailer closer to the line. |
 | `trailStyle` | `kickLayer.ts` | plain 5/3 px white; Big Boot 9/5 px `#d9a5ff` | Big Boot's trail is wider and in the trait colour. The kick is already longer in the sim. **Assumed (needs Leon)**: the look. |
-| `REPLAY_SECONDS` / `REPLAY_OFFER_MS` / `REPLAY_TICKS` | `src/match/view/replay.ts` | 8 s / 8000 ms / 160 ticks | A try's replay (N15.5): the button stays up for eight real seconds; tapping re-simulates the 160 ticks before the try and plays them at ×1. One replay per try. **Assumed (needs Leon)**: eight seconds, one each, ×1. |
+| `REPLAY_SECONDS` / `REPLAY_OFFER_MS` / `REPLAY_TICKS` | `src/match/view/replay.ts` | 8 s / 8000 ms / 160 ticks | A try's replay (N15.5): a small **Replay try** chip docked under the scoreboard (#348 M5) counts down eight real seconds; the count stops, and the chip hides, while the half-time card, a sheet or the full-time report is open (#341). Tapping re-simulates the 160 ticks before the try and plays them at ×1. One replay per try. **Assumed (needs Leon)**: eight seconds, one each, ×1. |
 | `REPLAY_ZOOM` | `replay.ts` | 1 | The replay's camera, centred on the ball. Wider than the match's 2; the same floor a kick's framing uses. **Assumed (needs Leon)**: how wide. |
 | `REPLAY_BLOCK_MS` | `replay.ts` | 300 ms | The re-sim on the main thread, when no Worker is there, may block the page this long. The Worker path times only the hand-off. |
 | `POPUP_EDGE` / `POPUP_HALF_W` / `POPUP_LINE_H` / `POPUP_GAP` | `src/match/view/popups.ts` | 8 / 64 / 22 / 2 screen px | A pop-up is clamped inside the camera (N15.6, finding 4). The text hangs up from its anchor; at ×8 a 40 px lift over a man near the top used to leave the screen. Two shouts pulled onto the same edge drop apart by `POPUP_GAP`; a trait line stays on its shout. **Assumed (needs Leon)**: the inset. |
@@ -935,8 +938,8 @@ The player picks his side's attack and defence presets (§5) on the Lineup scree
 (`Lineup.tactics`, save v14; Balanced / Slide by default and for older saves) and the team
 sheet carries them. In a live match he changes them at the breaks: the **half-time card**
 (the score, each side's legs, the calls paid off, the two rows of presets) holds the match
-until Continue, and goes on by itself after 4.5 s at every speed unless it is touched
-(a tap clears the timer and holds the card); the
+until Continue, at every speed (#341, 2026-10-26: it used to go on by itself after 4.5 s,
+often while the coach was still reading it); the
 **Plan** chip shows from a score until the kick-off (and before the opening kick-off). A change
 is an input like a call (`LiveSim.setTactics`, `plans: { tick, side, tactics }[]`), refused
 outside a break ("at the breaks"; never mid-set, never at a goal-line drop-out) and in force
@@ -949,7 +952,7 @@ The screen around that card (2026-10-25; none of these change the sim):
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `HALF_TIME_CARD_MS` | `src/ui/screens/matchOverlay.ts` | 4500 ms | The half-time card goes on by itself after this long, at every speed. A tap clears the timer and holds the card. Was 8 s, and only at ×4 and above. |
+| Half-time card | `src/ui/screens/matchOverlay.ts` | waits for Continue | No timer (#341). It sits above every match control and the toasts (z 65, under a dialog), Continue is pinned to its foot so it stays on screen at 667×375, and the Replay try chip hides under it. Was `HALF_TIME_CARD_MS` 4500 ms; before that 8 s, only at ×4 and above. |
 | `playbackPace` | `src/match/view/livePlayback.ts` | ×2 on ruck, tackle, restart, set-piece, conversion, try, penalty, goal | Dead time plays at twice the chosen speed. Open play, half-time and full time stay at the chosen speed. The ruck includes the play-the-ball; a set piece is a tap restart. |
 | `PACE_BLEND_MS` | `livePlayback.ts` | 400 ms | The pace eases between ×1 and ×2 (exponential). A 16 ms frame barely moves, so a phase change does not lurch. |
 | `LIVE_DEFAULT_SPEED` / `settings.playbackSpeed` | `livePlayback.ts` / `state.ts` | ×4 / saved 1, 2, 4 or 8 | The buttons remember the last speed (save v20). An old save, or any other value, plays at ×4. |
