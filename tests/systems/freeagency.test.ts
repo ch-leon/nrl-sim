@@ -12,6 +12,7 @@ import {
   signPlayer,
   releasePlayer,
   freeAgencyTick,
+  weeksToPoolRefresh,
   registerFreeAgencySystem,
   poolTarget,
   scoutBias,
@@ -459,5 +460,23 @@ describe('registerFreeAgencySystem (tick hook)', () => {
 
   it('registers under the freeagents tick order (60)', () => {
     expect(TICK_ORDER.freeagents).toBe(60);
+  });
+});
+
+describe('weeksToPoolRefresh', () => {
+  it('counts the weeks to advance until a refresh week has been played', () => {
+    expect(weeksToPoolRefresh(1)).toBe(4);
+    expect(weeksToPoolRefresh(4)).toBe(1);
+    expect(weeksToPoolRefresh(5)).toBe(4);
+    expect(weeksToPoolRefresh(24)).toBe(1);
+  });
+  it('agrees with the tick over a season and into the next', () => {
+    for (let week = 1; week <= 27; week++) {
+      const n = weeksToPoolRefresh(week);
+      // The weeks played from here, wrapping 27 → 1; the nth is the first that refreshes.
+      const played = Array.from({ length: n }, (_, i) => ((week - 1 + i) % 27) + 1);
+      expect(played.filter((w) => w % REFRESH_EVERY_WEEKS === 0 && w <= 24)).toEqual([played[n - 1]]);
+    }
+    expect(weeksToPoolRefresh(25)).toBe(7);
   });
 });

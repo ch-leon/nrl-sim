@@ -5,7 +5,7 @@
 // (#336). DOM UI kit only; no Phaser.
 
 import { el, button, openScreen, screenHead } from '../dom';
-import { getState, type Player, type Position } from '../../core/state';
+import { getState, type Player, type Position, type TrainingFocus } from '../../core/state';
 import { bus } from '../../core/events';
 import { save } from '../../core/save';
 import { overallRating } from '../../data/player';
@@ -62,6 +62,13 @@ function onSquadClosed(): void {
  * weekly wage bill. Re-renders on 'state:changed'. Idempotent; shown in the
  * shared screen region (between HUD and nav, see ui/dom.ts openScreen).
  */
+/** What a training focus does to the week's gains. */
+export function focusLine(f: TrainingFocus): string {
+  return f === 'balanced'
+    ? 'Every stat trains at its usual rate. Free to change any week.'
+    : `${focusLabel(f)} trains ×${TRAINING_FOCUS.ON}, every other stat ×${TRAINING_FOCUS.OFF}. Free to change any week.`;
+}
+
 export function openSquadScreen(): void {
   ensureScreenStyles();
 
@@ -76,14 +83,17 @@ export function openSquadScreen(): void {
       save(getState());
     });
     b.setAttribute('data-focus', f);
-    b.title = f === 'balanced' ? 'Every stat trains as it always has' : `${focusLabel(f)} trains ×${TRAINING_FOCUS.ON}, the rest ×${TRAINING_FOCUS.OFF}`;
+    b.title = focusLine(f);
     return b;
   });
+  // S5 (#351): what the picked focus does, beside the chips (under them when the row is full).
+  const focusNote = el('span', { class: 'nrl-squad-focus-note' });
   const focusRow = el(
     'div',
-    { class: 'nrl-squad-focus', attrs: { style: 'display:flex;gap:0.3rem;align-items:center;overflow-x:auto;flex-shrink:0;padding:0 3px 3px 0;margin-bottom:0.3rem;' } },
+    { class: 'nrl-squad-focus' },
     el('span', { class: 'nrl-screen-label', text: 'Training:' }),
     ...focusBtns,
+    focusNote,
   );
 
   const render = (): void => {
@@ -91,6 +101,7 @@ export function openSquadScreen(): void {
     const s = getState();
     const focus = s.training?.focus ?? 'balanced';
     focusBtns.forEach((b, i) => b.classList.toggle('nrl-sort-active', TRAINING_FOCI[i] === focus));
+    focusNote.textContent = focusLine(focus);
     const wageBill = s.squad.reduce((sum, p) => sum + p.wage, 0);
     sub.textContent = `${s.squad.length} players · wages ${money(wageBill)}/wk`;
 

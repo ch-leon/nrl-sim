@@ -9,7 +9,7 @@ import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import {
-  signPlayer, signingFee, signingFeeBasis, FREE_AGENT_POOL_SIZE,
+  signPlayer, signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
 import { SQUAD_CAP } from '../../config';
 import { TRAINING_KIT, PORTRAIT_W, PORTRAIT_H, portraitDataUrl } from '../../art/portrait';
@@ -35,6 +35,8 @@ export function ensureScreenStyles(): void {
 const ROW_PORTRAIT_PX = PORTRAIT_W * 2;
 
 const SCREEN_CSS = `
+.nrl-squad-focus { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; flex-shrink: 0; padding: 0 3px 3px 0; margin-bottom: 0.3rem; }
+.nrl-squad-focus-note { flex: 1 1 14rem; min-width: 0; color: #e8e0c8; font-size: 0.75rem; line-height: 1.25; }
 /* #336: compact rows, two or more across on a phone on its side, so a short
    screen shows four and more instead of one card cut after its stat bars. */
 .nrl-screen-body.nrl-rows {
@@ -244,12 +246,16 @@ export function openRecruitScreen(): void {
     return b;
   });
 
+  const sub = el('div', { class: 'nrl-screen-sub' });
   const render = (): void => {
     body.replaceChildren();
     const s = getState();
+    // R2 (#349): when the pool changes, in Advance Weeks.
+    const n = weeksToPoolRefresh(s.week);
+    sub.textContent = `Pool of ${FREE_AGENT_POOL_SIZE} · new players ${n === 1 ? 'after this week' : `in ${n} weeks`}`;
     for (const [i, b] of sortBtns.entries()) b.classList.toggle('nrl-sort-active', RECRUIT_SORTS[i]!.key === recruitSort);
     if (s.freeAgents.length === 0) {
-      body.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. Check back after the next scouting cycle.' }));
+      body.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. New players arrive when the pool refreshes.' }));
       return;
     }
     const agents = s.freeAgents.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
@@ -277,7 +283,6 @@ export function openRecruitScreen(): void {
     }
   };
 
-  const sub = el('div', { class: 'nrl-screen-sub', text: `Pool of ${FREE_AGENT_POOL_SIZE}, refreshed each scouting cycle` });
   const head = screenHead('Free Agency', { sub, controls: [el('span', { class: 'nrl-screen-label', text: 'Sort:' }), ...sortBtns] });
 
   const screen = el('div', { class: 'nrl-screen' }, head, body);

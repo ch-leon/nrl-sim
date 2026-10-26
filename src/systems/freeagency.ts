@@ -11,7 +11,7 @@ import { spendMoney } from '../data/club';
 import { generateFreeAgent } from '../data/player';
 import { registerTickHook, TICK_ORDER, type TickContext } from '../core/time';
 import { SPECIAL_MAGNITUDE } from '../data/facility';
-import { LEAGUE, SQUAD_CAP, SQUAD_MIN } from '../config';
+import { LEAGUE, SQUAD_CAP, SQUAD_MIN, WEEKS_PER_SEASON } from '../config';
 import { transferFee } from './contracts';
 import { REP_BASELINE } from './league';
 
@@ -200,6 +200,17 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
 export function freeAgencyTick(state: GameState, rng: Rng): GameState {
   if (state.week % REFRESH_EVERY_WEEKS !== 0) return state;
   return refreshFreeAgents(state, rng);
+}
+
+/**
+ * Weeks to advance until the pool is new: the next week played whose number is a
+ * multiple of REFRESH_EVERY_WEEKS, so 1 means the week about to be played. The
+ * last weeks of a season wait for week 4 of the next.
+ */
+export function weeksToPoolRefresh(week: number): number {
+  const next = Math.ceil(week / REFRESH_EVERY_WEEKS) * REFRESH_EVERY_WEEKS;
+  if (next <= WEEKS_PER_SEASON) return next - week + 1;
+  return WEEKS_PER_SEASON - week + 1 + REFRESH_EVERY_WEEKS;
 }
 
 /**
