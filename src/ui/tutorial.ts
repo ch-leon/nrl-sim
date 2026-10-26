@@ -55,13 +55,13 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'build',
     text: 'Open Build (under More) and place a Training Paddock to develop your squad.',
-    anchor: inMore('build'),
+    anchor: `[data-facility="trainingPaddock"], ${inMore('build')}`,
     advanceOn: 'facility:placed',
   },
   {
     id: 'recruit',
     text: 'Open Recruit (under More) and sign your first player from the free-agent pool.',
-    anchor: inMore('recruit'),
+    anchor: `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inMore('recruit')}`,
     advanceOn: 'player:signed',
   },
   {
@@ -273,7 +273,7 @@ function renderStep(): void {
     if (anchorEl) {
       scrollAnchorIntoView(anchorEl);
       renderCutout(a, anchorEl);
-      renderBubble(a, step, { centered: false, forceNext: false });
+      dockClear(renderBubble(a, step, { centered: false, forceNext: false }), anchorEl);
     } else {
       renderBubble(a, step, { centered: true, forceNext: true });
     }
@@ -283,9 +283,14 @@ function renderStep(): void {
   a.retryTimer = setInterval(() => {
     if (active !== a || STEPS[a.index] !== step) return;
     const now = findAnchor(step.anchor!);
-    if (now === shown) return;
-    shown = now;
-    show(now);
+    if (now !== shown) {
+      shown = now;
+      show(now);
+    } else if (now) {
+      // Same anchor: follow it if the layout moved it, without scrolling it back.
+      renderCutout(a, now);
+      dockClear(a.overlay.querySelector('.nrl-tutorial-bubble')!, now);
+    }
   }, ANCHOR_RETRY_MS);
 }
 
@@ -327,12 +332,23 @@ function scrollAnchorIntoView(anchorEl: HTMLElement): void {
 function renderCutout(a: ActiveTutorial, anchorEl: HTMLElement): void {
   const r = anchorEl.getBoundingClientRect();
   const pad = 6;
-  const cutout = el('div', { class: 'nrl-tutorial-cutout' });
+  const cutout = a.overlay.querySelector<HTMLElement>('.nrl-tutorial-cutout') ?? a.overlay.appendChild(el('div', { class: 'nrl-tutorial-cutout' }));
   cutout.style.top = `${r.top - pad}px`;
   cutout.style.left = `${r.left - pad}px`;
   cutout.style.width = `${r.width + pad * 2}px`;
   cutout.style.height = `${r.height + pad * 2}px`;
-  a.overlay.appendChild(cutout);
+}
+
+/** Bubble docks, tried in order until one leaves the anchor uncovered (More's sheet fills the bottom-left dock, #344). */
+const DOCKS = ['', ' nrl-tutorial-top', ' nrl-tutorial-top nrl-tutorial-right', ' nrl-tutorial-right'];
+
+function dockClear(bubble: HTMLElement, anchorEl: HTMLElement): void {
+  const r = anchorEl.getBoundingClientRect();
+  for (const dock of DOCKS) {
+    bubble.className = `nrl-tutorial-bubble${dock}`;
+    const b = bubble.getBoundingClientRect();
+    if (b.right <= r.left || b.left >= r.right || b.bottom <= r.top || b.top >= r.bottom) return;
+  }
 }
 
 /**
@@ -344,7 +360,7 @@ function renderBubble(
   a: ActiveTutorial,
   step: TutorialStep,
   opts: { centered: boolean; forceNext: boolean },
-): void {
+): HTMLElement {
   const wantsNext = step.advanceOn === 'next-button' || opts.forceNext;
 
   const body = el('div', { class: 'nrl-tutorial-text', text: step.text });
@@ -365,6 +381,7 @@ function renderBubble(
     actions,
   );
   a.overlay.appendChild(bubble);
+  return bubble;
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────
@@ -460,6 +477,8 @@ export const TUTORIAL_CSS = `
     max-height: calc(100dvh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
   }
 }
+.nrl-tutorial-bubble.nrl-tutorial-top { top: calc(var(--nrl-hud-h, 0px) + 0.25rem); bottom: auto; }
+.nrl-tutorial-bubble.nrl-tutorial-right { left: auto; right: calc(0.75rem + var(--nrl-safe-r, 0px)); transform: none; }
 `;
 
 // REPLAY (orchestrator wiring): the Guide's footer (ui/guide/guide.ts, under

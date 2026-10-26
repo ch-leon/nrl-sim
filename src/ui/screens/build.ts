@@ -124,7 +124,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
       'div',
       {
         class: affordable ? 'nrl-build-row' : 'nrl-build-row nrl-build-row-disabled',
-        attrs: affordable ? {} : { 'aria-disabled': 'true' },
+        attrs: affordable ? { 'data-facility': def.id } : { 'aria-disabled': 'true' },
       },
       el('div', { class: 'nrl-build-top' }, el('span', { class: 'nrl-build-title', text: def.name }), meta),
       el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation }) }),
