@@ -69,7 +69,7 @@ const SCREEN_CSS = `
 .nrl-row-name { font-weight: bold; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-row-meta { display: flex; gap: 0.3rem; align-items: center; font-size: 0.7rem; white-space: nowrap; overflow: hidden; }
 .nrl-row-meta .nrl-badge { padding: 0 0.2rem; border-width: 1px; }
-.nrl-row-meta button.nrl-badge { font: inherit; font-weight: bold; line-height: inherit; cursor: help; pointer-events: auto; }
+.nrl-row-meta [data-trait] { cursor: help; }
 .nrl-row .nrl-card-ovr { flex: 0 0 auto; }
 .nrl-row .nrl-row-action { flex: 0 0 auto; padding: 0.2rem 0.45rem; font-size: 0.75rem; }
 .nrl-row.nrl-card-open:hover { background: #f4efe0; }
@@ -174,10 +174,9 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
   for (const t of p.traits) {
     if (!(t.id in TRAITS)) continue;
     const b = traitBadge(t);
-    // A tap says what it does, in the toast lane; the rest of the row still opens the player page.
-    const badge = el('button', { class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`, text: b.label, attrs: { type: 'button', title: b.tip, 'data-trait': t.id } });
-    badge.addEventListener('click', (e) => { e.stopPropagation(); bus.emit('ui:notify', { text: b.tip, kind: 'info' }); });
-    meta.append(badge);
+    // Not a button: Chrome on Android snaps a tap near a button onto it, so a tap on
+    // the name would read out the trait. The row's click handler tells them apart.
+    meta.append(el('span', { class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`, text: b.label, attrs: { title: b.tip, 'data-trait': t.id } }));
   }
 
   // Keyed on the squad id, the same key MatchScene uses, so the face matches on the pitch.
@@ -190,6 +189,12 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
     el('div', { class: 'nrl-row-id' }, el('span', { class: 'nrl-row-name', text: p.name }), meta),
     el('span', { class: 'nrl-card-ovr', text: String(overallRating(p)), attrs: { title: 'Overall rating' } }),
   );
+  // A tap on a trait says what it does, in the toast lane; anywhere else opens the player page.
+  row.addEventListener('click', (e) => {
+    const trait = e.target instanceof Element ? e.target.closest('[data-trait]') : null;
+    if (trait) bus.emit('ui:notify', { text: trait.getAttribute('title') ?? '', kind: 'info' });
+    else opts.onOpen?.();
+  });
   if (opts.onOpen) {
     const open = opts.onOpen;
     row.classList.add('nrl-card-open');
@@ -197,7 +202,6 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
     row.setAttribute('tabindex', '0');
     row.setAttribute('aria-label', `${p.name}: player page`);
     row.setAttribute('data-player-open', p.id);
-    row.addEventListener('click', open);
     row.addEventListener('keydown', (e) => {
       if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); }
     });
