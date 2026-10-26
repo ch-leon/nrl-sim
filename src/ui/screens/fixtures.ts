@@ -11,10 +11,9 @@
 // openLadderScreen into the nav bar (main.ts).
 
 import { el, panel, button, openModal, setScreenKey } from '../dom';
-import { getState, setState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
+import { getState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
 import { formGuide, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
-import { save } from '../../core/save';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
 import { rivalStyle } from '../../systems/rivalRound';
@@ -275,7 +274,6 @@ function buildFixturesTab(state: GameState): HTMLElement {
   const wrap = el('div', { class: 'nrl-fixtures' });
 
   if (state.league.fixtures.length > 0) wrap.append(nextMatchCard(state));
-  wrap.append(coachCallsToggle(), liveRivalsToggle());
 
   if (state.league.fixtures.length === 0) {
     wrap.append(panel({}, el('p', { text: 'No fixtures yet — season not started.' })));
@@ -302,38 +300,6 @@ function buildFixturesTab(state: GameState): HTMLElement {
     wrap.append(header, list);
   }
   return wrap;
-}
-
-/** The coach-call chips during your matches (#73): on unless turned off. */
-function coachCallsToggle(): HTMLElement {
-  const box = el('input', { class: 'nrl-toggle-box', attrs: { type: 'checkbox' } });
-  box.checked = getState().settings.coachCalls !== false;
-  box.addEventListener('change', () => {
-    setState({ settings: { ...getState().settings, coachCalls: box.checked } });
-    save(getState());
-  });
-  return el(
-    'label',
-    { class: 'nrl-live-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
-    box,
-    el('span', { text: ' Coach calls — nudge your side during a match (hit-up, shift, kick early, rush…)' }),
-  );
-}
-
-/** Rival-v-rival matches on the live match sim (N9.2): off unless turned on (weeks take longer). */
-function liveRivalsToggle(): HTMLElement {
-  const box = el('input', { class: 'nrl-toggle-box', attrs: { type: 'checkbox' } });
-  box.checked = getState().settings.liveRivals === true;
-  box.addEventListener('change', () => {
-    setState({ settings: { ...getState().settings, liveRivals: box.checked } });
-    save(getState());
-  });
-  return el(
-    'label',
-    { class: 'nrl-live-toggle nrl-rivals-toggle', attrs: { style: 'display:flex;align-items:center;gap:0.4rem;min-height:44px;margin-bottom:0.5rem;cursor:pointer' } },
-    box,
-    el('span', { text: ' Rival matches on the match engine — every result played out, with real stats and injuries; match weeks take longer on a phone' }),
-  );
 }
 
 function buildLadderTab(state: GameState): HTMLElement {

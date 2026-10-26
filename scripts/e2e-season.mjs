@@ -1061,7 +1061,8 @@ async function play() {
   await step('held-week', async (rec) => {
     await closeAny();
     await answerCards(rec);
-    await navTo('fixtures');
+    // The setting is in Settings, behind the gear (#350 X3).
+    await tap('.nrl-audio-gear');
     const toggle = page.locator('.nrl-rivals-toggle input[type="checkbox"]');
     if (!(await toggle.count())) return 'no rival-rounds setting on this build';
     await press(toggle);
@@ -1123,7 +1124,7 @@ async function play() {
     await dumpSave('live-rivals', rec);
     // Back to the default for whatever runs next.
     await page.evaluate(() => { window.__nrlWorkerDelayMs = 0; });
-    await navTo('fixtures');
+    await tap('.nrl-audio-gear');
     await press(page.locator('.nrl-rivals-toggle input[type="checkbox"]'));
     await closeAny();
   }, { quietToasts: true });
@@ -1138,9 +1139,11 @@ async function play() {
     await tap('.nrl-audio-gear');
     // Wait and tap together: a wait started alone rejects unhandled if the tap outlasts it, and
     // Node ends the whole run there (1280×800 under load, 21 Oct 23:10).
+    // Import asks first (#349 E1): the file is chosen from the confirm.
+    await tap('.nrl-audio-settings .nrl-btn:has-text("Import save")');
     const [chooser] = await Promise.all([
       page.waitForEvent('filechooser', { timeout: 15000 }),
-      tap('.nrl-audio-settings .nrl-btn:has-text("Import save")'),
+      tap('.nrl-audio-settings .nrl-settings-import-go'),
     ]);
     await chooser.setFiles(file);
     await page.waitForSelector('[data-nrl-continue-1]', { timeout: 30000 });

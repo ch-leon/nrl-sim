@@ -360,8 +360,8 @@ missing or from another week. Deleting the slot, or starting a
 new game in it, drops the record so the next game does not kick the old match off.
 
 Holds count (N9.2): every hook of the holding order still runs, then the later hooks
-and the week's end wait for one `resumeWeek()` per hold. With *Rival matches on the
-match engine* on (`settings.liveRivals`), the rival round (order 40, beside the
+and the week's end wait for one `resumeWeek()` per hold. With *Rival matches played
+out* on in Settings (`settings.liveRivals`), the rival round (order 40, beside the
 player's match) plays its seven fixtures with `runMatch` in a Web Worker
 (`systems/rivalRound.ts`, `systems/matchWorker.ts`) and holds the week until they are
 in; off, or on fast-forward, it uses the cheap sim, which scores on the live sim's
@@ -402,7 +402,7 @@ Every match the player's club plays is played on the live match sim (BAK-207,
 clock, rugby league Nines rules, the tackle contest, tactics, traits, fatigue,
 weather and coach calls (rules and every knob: BAK-208 and
 `docs/specs/BAK-208-tuning.md`). Rival-vs-rival fixtures stay on the cheap
-score model in `systems/fixtures.ts` unless **Rival matches on the match engine**
+score model in `systems/fixtures.ts` unless **Rival matches played out** (Settings)
 is on (`settings.liveRivals`, off by default, N9.2). With it on, the other games
 of the round run this same sim in a Worker (`systems/rivalRound.ts`) and the week
 waits until they land. A fast-forwarded week keeps the cheap model either way.
