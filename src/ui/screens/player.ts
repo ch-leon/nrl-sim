@@ -355,7 +355,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
         if (a.confirm && armed !== a.id) { armed = a.id; render(); return; }
         armed = null;
         const res = runAction(a.id, p.id);
-        if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'danger' });
+        if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
       }, a.danger ? { class: 'nrl-btn-danger' } : {});
       btn.setAttribute('data-player-action', a.id);
       if (!a.enabled) { btn.disabled = true; btn.title = a.why ?? ''; }

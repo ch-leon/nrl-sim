@@ -22,7 +22,7 @@ const REASONS: Record<string, string> = {
 };
 
 function act(result: { ok: boolean; reason?: string }): void {
-  if (!result.ok) bus.emit('ui:notify', { text: REASONS[result.reason ?? ''] ?? 'Not possible.', kind: 'danger' });
+  if (!result.ok) bus.emit('ui:notify', { text: REASONS[result.reason ?? ''] ?? 'Not possible.', kind: 'info' });
 }
 
 /**

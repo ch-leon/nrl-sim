@@ -275,7 +275,7 @@ export function openRecruitScreen(): void {
           onClick: () => {
             const res = signPlayer(getState(), agent.id);
             if (!res.ok) {
-              bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'danger' });
+              bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'info' });
             }
           },
         },

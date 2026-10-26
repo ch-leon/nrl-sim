@@ -457,7 +457,7 @@ export function resolveEvent(state: GameState, eventId: string, index: number, n
   applied.state = { ...applied.state, eventDeck: { ...applied.state.eventDeck, rng: rng.state() } };
   const ctx = { subjectName: ev.subjectName, clubName: state.clubName, vars: ev.vars };
   if (applied.failed) {
-    applied.news.push({ text: `${card.title}: no deal, ${applied.failed}.`, kind: 'danger' });
+    applied.news.push({ text: `${card.title}: no deal, ${applied.failed}.`, kind: 'info' });
     return applied;
   }
   const text = fillText(choice.outcome, ctx);
