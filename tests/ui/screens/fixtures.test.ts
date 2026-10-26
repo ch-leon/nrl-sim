@@ -108,20 +108,35 @@ describe('fmtSideLine / fmtWeather', () => {
 });
 
 // N14 (#263, QA finding 3): long club names wrapped on the ladder at 844px.
-import { ladderName, LADDER_NAME_MAX } from '../../../src/ui/screens/fixtures';
+// #351 X4: one naming rule for every club on the ladder and the fixtures.
+import { clubLabels, fmtMyFixture, LADDER_NAME_MAX } from '../../../src/ui/screens/fixtures';
 import { RIVAL_CLUBS } from '../../../src/data/league';
 
-describe('ladderName', () => {
-  it('a long name is its short name, as the match report says it; a short one stays whole', () => {
-    expect(ladderName('Woolloomooloo Wolves')).toBe('Wolves');
-    expect(ladderName('Redcliffe Reapers')).toBe('Reapers');
-    expect(ladderName('Ballarat Brumbies')).toBe('Brumbies');
-    expect(ladderName('Phone Test FC')).toBe('Phone Test FC');
-    expect(ladderName('A Very Long Club Name FC')).toBe('A Very Long Club Name FC'); // a bare "FC" is no name
+describe('clubLabels', () => {
+  it('every club is its short name, as the match report says it; a bare "FC" keeps the whole name', () => {
+    const m = clubLabels([
+      { id: 'a', name: 'Woolloomooloo Wolves' }, { id: 'b', name: 'Cairns Cyclones' }, { id: 'p', name: 'Phone Test FC' },
+    ]);
+    expect(m).toEqual({ a: 'Wolves', b: 'Cyclones', p: 'Phone Test FC' });
   });
 
-  it('every rival on the ladder fits the limit or has a short name', () => {
-    for (const { name } of RIVAL_CLUBS) expect(ladderName(name).length, name).toBeLessThanOrEqual(LADDER_NAME_MAX);
+  it('two clubs with the same short name keep their whole names', () => {
+    const m = clubLabels([{ id: 'p', name: 'Review Larrikins' }, { id: 'r', name: 'Launceston Larrikins' }, { id: 'w', name: 'Woolloomooloo Wolves' }]);
+    expect(m).toEqual({ p: 'Review Larrikins', r: 'Launceston Larrikins', w: 'Wolves' });
+  });
+
+  it('every rival on the ladder fits the limit', () => {
+    for (const [id, label] of Object.entries(clubLabels(RIVAL_CLUBS))) expect(label.length, id).toBeLessThanOrEqual(LADDER_NAME_MAX);
+  });
+});
+
+describe('fmtMyFixture (#351 X2)', () => {
+  const names = { player: 'Test FC', w: 'Wolves' };
+  it('says where, and the result with your score first', () => {
+    expect(fmtMyFixture({ round: 3, homeId: 'player', awayId: 'w' } as never, names)).toEqual({ label: 'R3 · v Wolves', result: null, score: '' });
+    expect(fmtMyFixture({ round: 4, homeId: 'w', awayId: 'player', result: { homeScore: 18, awayScore: 12 } } as never, names))
+      .toEqual({ label: 'R4 · at Wolves', result: 'L', score: '12–18' });
+    expect(fmtMyFixture({ round: 25, homeId: 'player', awayId: 'w', result: { homeScore: 10, awayScore: 10 } } as never, names).label).toBe('Quarter final · v Wolves');
   });
 });
 
