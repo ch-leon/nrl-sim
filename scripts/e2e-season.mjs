@@ -706,8 +706,31 @@ async function play() {
       return hidden || !(at === b || b.contains(at)) ? 'covered' : null;
     });
     if (covered) throw new Error(`Replay is not tappable with the full-time class on (${covered})`);
-    // Read just before the tap: the match plays on until the replay takes the picture.
-    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    // At ×8 the match runs on for a second or more between reading the clock here and the
+    // click arriving, and it is back at the tapped second for only a few frames after the
+    // replay. So both clocks are noted in the page: at the click, and as the replay tag comes off.
+    await page.evaluate(() => {
+      const root = document.querySelector('.nrl-match-overlay');
+      const clock = () => document.querySelector('.nrl-mo-clock')?.textContent?.trim() ?? '';
+      let was = false;
+      window.__replayTap = null;
+      window.__replayEnd = null;
+      const onTap = (e) => {
+        if (!e.target.closest?.('.nrl-mo-replay')) return;
+        window.__replayTap = clock();
+        window.removeEventListener('click', onTap, true);
+      };
+      window.addEventListener('click', onTap, true);
+      const watch = new MutationObserver(() => {
+        const on = root.classList.contains('nrl-mo-replaying');
+        if (was && !on) {
+          window.__replayEnd = clock();
+          watch.disconnect();
+        }
+        was = on;
+      });
+      watch.observe(root, { attributes: true, attributeFilter: ['class'] });
+    });
     await tap('.nrl-mo-replay');
     await page.waitForFunction(() => document.querySelector('.nrl-match-overlay')?.hasAttribute('data-replay-block'), null, { timeout: 15000 });
     const block = Number(await page.locator('.nrl-match-overlay').getAttribute('data-replay-block'));
@@ -715,19 +738,19 @@ async function play() {
     if (block >= 300) throw new Error(`replay blocked the page for ${block} ms`);
     // The overlay root is only a holder for fixed children, so it has no height and a visibility wait on `.nrl-mo-replaying` never sees it. The tag is the thing on screen.
     await page.waitForSelector('.nrl-mo-replay-tag', { timeout: 5000 });
+    const tapped = await page.evaluate(() => window.__replayTap);
+    if (!tapped) throw new Error('the click on Replay was not seen');
     await page.waitForFunction((was) => {
       const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
       return !!t && t !== was;
-    }, before, { timeout: 4000 });
-    // Back where the live match left it: the second the clock read before the tap, or the next (at ×8 the tap lands a few ticks on).
-    await page.waitForFunction((was) => {
-      const playing = document.querySelector('.nrl-mo-replaying');
-      const secs = (c) => { const m = /^(\d+):(\d+)$/.exec(c ?? ''); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
-      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
-      const d = secs(t) - secs(was);
-      return !playing && d >= 0 && d <= 1;
-    }, before, { timeout: 14000 });
-    rec.notes.push(`Replay from ${before}; main-thread block ${block} ms`);
+    }, tapped, { timeout: 4000 });
+    // Back where the live match left it: the tapped second, or the next (the pause lands on a tick boundary).
+    await page.waitForFunction(() => window.__replayEnd !== null, null, { timeout: 14000 });
+    const after = await page.evaluate(() => window.__replayEnd);
+    const secs = (c) => { const m = /^(\d+):(\d+)$/.exec(c ?? ''); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+    const d = secs(after) - secs(tapped);
+    if (!(d >= 0 && d <= 1)) throw new Error(`replay ended at ${after}, the live match was tapped at ${tapped}`);
+    rec.notes.push(`Replay tapped at ${tapped}, live again at ${after}; main-thread block ${block} ms`);
   });
   // A hard kill: reload mid-match (no pagehide the game can trust) and Continue.
   // The same match comes back, not kick-off.
