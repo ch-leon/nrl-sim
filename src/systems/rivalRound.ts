@@ -13,7 +13,7 @@ import { canUseWorker, playMatchJob, playMatchesInWorker, type MatchJob } from '
 import { aiCoachSides } from '../match/league/calls';
 import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
 import type { TeamTactics } from '../match/league/presets';
-import { autoPick, resolveLineup } from './lineup';
+import { autoPick, isFieldable, resolveLineup } from './lineup';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
 
@@ -42,7 +42,7 @@ export interface RivalJob {
  * player faces.
  */
 export function rivalSheet(club: RivalClub): TeamSheet {
-  const fit = (club.squad ?? []).filter((p) => p.injuredWeeks <= 0);
+  const fit = (club.squad ?? []).filter(isFieldable);
   if (fit.length >= ON_FIELD) return withRivalStyle(teamSheetFromSquad(fit, club.id, club.name, club.colors, resolveLineup(autoPick(fit), fit)), club);
   return teamSheetFromRival(club);
 }

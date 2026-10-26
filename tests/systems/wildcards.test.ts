@@ -12,7 +12,10 @@ import { clearSeasonHooks, clearTickHooks } from '../../src/core/time';
 import { makeRng, type Rng } from '../../src/utils/rng';
 import { EVENTS, WILDCARDS } from '../../src/config';
 import { reviewSuspension } from '../../src/systems/suspension';
-import { isFieldable, resolveLineup } from '../../src/systems/lineup';
+import { autoPick, isFieldable, resolveLineup } from '../../src/systems/lineup';
+import { rivalMatchSheet } from '../../src/systems/matchday';
+import { rivalSheet } from '../../src/systems/rivalRound';
+import { gateReceipts, homeGate } from '../../src/systems/economy';
 import { applyInjuries } from '../../src/systems/training';
 import { clampMorale } from '../../src/systems/morale';
 import { asOldSave } from '../../src/qa/soak';
@@ -358,6 +361,82 @@ describe('the deck the soak actually takes', () => {
         continue;
       }
       expect(c.choices[0]!.effects.some((e) => e.kind === 'suspend' || e.kind === 'chance')).toBe(false);
+    }
+  });
+});
+
+
+describe('wildcard polish', () => {
+  const pending = (s: GameState, cardId: string): GameState => ({
+    ...s,
+    eventDeck: {
+      ...s.eventDeck, lastDrawn: absWeek(s.season, s.week),
+      pending: [{ id: 'polish', cardId, season: s.season, week: s.week, expiresAt: absWeek(s.season, s.week + 1), subjectId: s.squad[0]!.id }],
+    },
+  });
+
+  it('staying home, explicitly or by expiry, never enables The clip', () => {
+    const s = pending(fresh(), 'nightOut');
+    const home = resolveEvent(s, 'polish', 0, 1)!;
+    const due = eventsTick({ ...s, week: 2 });
+    for (const r of [home, due]) {
+      expect(r.state.eventDeck.flags).not.toContain('nightOut');
+      expect(isEligible(cardById('nightClip')!, r.state, 2)).toBe(false);
+    }
+    // Going out counts even if it was a quiet night with no suspension.
+    for (let seed = 1; seed <= 20; seed++) {
+      const out = resolveEvent({ ...s, eventDeck: { ...s.eventDeck, rng: seed } }, 'polish', 1, 1)!;
+      expect(out.state.eventDeck.flags).toContain('nightOut');
+    }
+  });
+
+  it('an unanswered sponsor follow-up rides it out without spending $3k', () => {
+    const s = pending(fresh(), 'baliHangover');
+    const due = eventsTick({ ...s, week: 2 });
+    expect(due.money).toEqual([]);
+    expect(due.state.eventDeck.pending.some((ev) => ev.id === 'polish')).toBe(false);
+    expect(due.news.some((n) => n.text.includes('No answer') && n.text.includes('rode it out'))).toBe(true);
+    expect(due.state.reputation).toBe(Math.max(1, s.reputation - 2));
+    expect(due.state.boardPatience).toBe(s.boardPatience - 1);
+    expect(resolveEvent(s, 'polish', 0, 1)!.money[0]!.amount).toBe(-3_000);
+  });
+
+  it('refunds close only the storm fixture, including after saving and loading', () => {
+    const s = pending(fresh(), 'matchDayStorm');
+    const fx = { round: 2, homeId: s.clubId, awayId: s.league.clubs.find((c) => c.id !== s.clubId)!.id };
+    const base = { ...s, league: { ...s.league, fixtures: [fx, { ...fx, round: 3 }] } };
+    const open = resolveEvent(base, 'polish', 0, 1)!.state;
+    expect(homeGate(open, fx).receipts).toBeGreaterThan(0);
+    const refund = resolveEvent(base, 'polish', 1, 1)!;
+    expect(refund.money.map((m) => m.amount)).toEqual([-4_000]);
+    // The card targets the same match even if answered a week later.
+    const late = resolveEvent({ ...base, week: 2 }, 'polish', 1, 2)!.state;
+    const saved = new Map<string, string>();
+    __setStorage({ getItem: (k) => saved.get(k) ?? null, setItem: (k, v) => { saved.set(k, v); }, removeItem: (k) => { saved.delete(k); } });
+    try {
+      save(refund.state);
+      const loaded = load()!;
+      for (const closed of [refund.state, late, loaded]) {
+        expect(homeGate(closed, fx)).toMatchObject({ attendance: 0, receipts: 0, soldOut: false });
+        expect(gateReceipts({ ...closed, week: 2 })).toBe(0);
+        expect(gateReceipts({ ...closed, week: 3 })).toBeGreaterThan(0);
+        expect(homeGate({ ...closed, season: 2 }, fx).receipts).toBeGreaterThan(0);
+      }
+    } finally { __setStorage(null); }
+  });
+
+  it('AI and rival sheets omit suspended starters and reserves, then restore them when eligible', () => {
+    const s = fresh();
+    const club = s.league.clubs.find((c) => c.squad?.length)!;
+    const first = autoPick(club.squad!).starters.find((id) => id)!;
+    const banned = { ...club, squad: club.squad!.map((p) => ({ ...p, suspendedWeeks: p.id === first ? 3 : 0 })) };
+    for (const build of [rivalMatchSheet, rivalSheet]) {
+      expect(build(club).roster!.some((p) => p.id === first)).toBe(true);
+      expect(build(banned).roster!.some((p) => p.id === first)).toBe(false);
+      expect(build(banned).bench?.some((p) => p.id === first) ?? false).toBe(false);
+      const sparse = { ...club, squad: club.squad!.map((p, i) => ({ ...p, suspendedWeeks: i < 8 ? 0 : 2 })) };
+      const sheet = build(sparse);
+      expect(sheet.roster!.some((p) => sparse.squad.some((q) => q.id === p.id && q.suspendedWeeks > 0))).toBe(false);
     }
   });
 });

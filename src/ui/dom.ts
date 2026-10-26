@@ -772,8 +772,8 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-event-title { flex: 0 0 auto; font-size: 0.95rem; }
   .nrl-event-meta { flex: 1 1 auto; text-align: right; font-size: 0.68rem; line-height: 1.2; }
   .nrl-event-text { margin: 0.05rem 0 0.15rem; font-size: 0.78rem; line-height: 1.2; }
-  .nrl-event-choices { gap: 0.2rem; }
-  .nrl-event-choice { padding: 0.1rem 0.45rem; }
+  .nrl-event-choices { flex-direction: row; align-items: stretch; gap: 0.4rem; }
+  .nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; padding: 0.1rem 0.45rem; }
   .nrl-event-choice-hint { font-size: 0.7rem; line-height: 1.2; }
   .nrl-news-close { margin-top: 0.15rem; }
 }
