@@ -42,13 +42,38 @@ describe('ScreenRegistry (nav registry logic)', () => {
   });
 });
 
+describe('tabs and More (#344)', () => {
+  const r = new ScreenRegistry();
+  r.set('squad', 'Squad', () => {});
+  r.set('fixtures', 'League', () => {}, { holds: ['ladder'] });
+  r.set('staff', 'Staff', () => {}, { more: true });
+
+  it('lights the tab a screen key belongs to', () => {
+    expect(r.owner('squad')).toBe('squad');
+    expect(r.owner('ladder')).toBe('fixtures');
+    expect(r.owner('kit')).toBeNull();
+    expect(r.owner(null)).toBeNull();
+  });
+
+  it('knows which screens live in the More sheet', () => {
+    expect(r.inMore('staff')).toBe(true);
+    expect(r.inMore('squad')).toBe(false);
+    expect(r.inMore('ladder')).toBe(false);
+    expect(r.list().filter((s) => !s.more).map((s) => s.id)).toEqual(['squad', 'fixtures']);
+  });
+});
+
 import { CSS } from '../../src/ui/dom';
 
 describe('nav layout on landscape phones (QA)', () => {
-  it('fits every item in one row between the portrait and desktop breakpoints', () => {
-    const block = CSS.slice(CSS.indexOf('@media (min-width: 481px) and (max-width: 1000px)'));
-    expect(block.length).toBeLessThan(CSS.length);
-    expect(block).toMatch(/\.nrl-nav \{[^}]*overflow-x: visible/);
-    expect(block).toMatch(/\.nrl-nav \.nrl-btn \{[^}]*flex: 1 1 0/);
+  it('shares one row between equal tabs with labels of 12px or more', () => {
+    expect(CSS).toMatch(/\.nrl-nav > \.nrl-btn \{[^}]*flex: 1 1 0/);
+    expect(CSS).toMatch(/\.nrl-nav > \.nrl-btn \{[^}]*font-size: max\(12px,/);
+    expect(CSS).toMatch(/\.nrl-nav-sheet \.nrl-btn \{[^}]*font-size: max\(12px,/);
+  });
+
+  it('marks the open screen and clears the home bar', () => {
+    expect(CSS).toMatch(/\.nrl-nav \.nrl-btn\[aria-current="page"\]/);
+    expect(CSS).toMatch(/\.nrl-nav \{[^}]*max\(0\.25rem, var\(--nrl-safe-b\)\)/);
   });
 });

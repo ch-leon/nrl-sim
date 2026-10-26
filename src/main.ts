@@ -23,7 +23,7 @@ import { registerStatsSystem } from './systems/stats';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
-import { initBoardUi } from './ui/screens/board';
+import { initBoardUi, openStaffScreen } from './ui/screens/board';
 import { initMatchReport } from './ui/screens/matchReport';
 import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
@@ -31,7 +31,7 @@ import { syncKitDesign } from './ui/screens/kit';
 import { openSquadScreen } from './ui/screens/squad';
 import { openLineupScreen } from './ui/screens/lineup';
 import { openRecruitScreen } from './ui/screens/recruit';
-import { openFixturesScreen, openLadderScreen } from './ui/screens/fixtures';
+import { openFixturesScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
 import { openContractsScreen } from './ui/screens/contracts';
@@ -195,23 +195,27 @@ async function boot(): Promise<void> {
 
   initPlacementBar(); // build/move instructions + Cancel (#78)
 
+  // Four tabs and More (#344): the week-to-week screens are a tap away, the
+  // rest of the club one more.
   const nav = createNav();
   nav.registerScreen('squad', 'Squad', () => openSquadScreen());
   nav.registerScreen('lineup', 'Lineup', () => openLineupScreen()); // the coach's nine (#69)
-  nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen());
-  nav.registerScreen('build', 'Build', () => openBuildScreen());
-  nav.registerScreen('fixtures', 'Fixtures', () => openFixturesScreen());
-  nav.registerScreen('ladder', 'Ladder', () => openLadderScreen());
-  nav.registerScreen('history', 'History', () => openHistoryScreen());
-  nav.registerScreen('finance', 'Finance', () => openFinanceScreen());
-  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen());
+  // Fixtures and the ladder are the League screen's two tabs.
+  nav.registerScreen('fixtures', 'League', () => openFixturesScreen(), { holds: ['ladder'] });
   nav.registerScreen('news', 'News', () => openInboxScreen());
+  nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { more: true });
+  nav.registerScreen('build', 'Build', () => openBuildScreen(), { more: true });
+  nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), { more: true });
+  nav.registerScreen('staff', 'Staff', () => openStaffScreen(), { more: true });
+  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { more: true });
+  nav.registerScreen('history', 'History', () => openHistoryScreen(), { more: true });
+  // The Guide (#188); Replay tutorial is in its footer.
+  nav.registerScreen('help', 'Guide', () => openGuideScreen(), { more: true });
   // News badge: unread messages plus event cards waiting for a choice (#75).
   const refreshNewsBadge = (): void => nav.setBadge('news', newsInbox.unreadCount + pendingDecisionCount(getState()));
   newsInbox.onChange(refreshNewsBadge);
   bus.on('state:changed', refreshNewsBadge);
   refreshNewsBadge();
-  nav.registerScreen('help', '?', () => openGuideScreen()); // the Guide (#188); Replay tutorial is in its footer
 
   initAudio();
   initAudioUi();

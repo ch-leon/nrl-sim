@@ -8,7 +8,7 @@ import { getActiveSlot } from '../../core/save';
 import { BOARD } from '../../config';
 import { objectiveLine, sackedSummary } from '../../systems/board';
 import { STAFF, STAFF_ROLES, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
-import { el, panel, button, openModal, closeScreen } from '../dom';
+import { el, panel, button, openModal, openScreen, closeScreen, screenHead } from '../dom';
 
 /** Objectives + patience as a panel (pure of side effects; rebuilt on refresh). */
 export function buildObjectivesSection(state: GameState): HTMLElement {
@@ -30,12 +30,10 @@ export function buildObjectivesSection(state: GameState): HTMLElement {
 
 /**
  * The club's staff (N14.5): each role with its holder and wage, or what it would
- * cost, and Hire / Release. Under the objectives on the Finance screen (no new nav
- * button); the screen re-renders on the state change a hire makes.
+ * cost, and Hire / Release.
  */
-export function buildStaffSection(state: GameState): HTMLElement {
-  const box = el('div', { class: 'nrl-staff' });
-  box.append(el('h3', { text: 'Staff' }));
+export function staffRows(state: GameState): HTMLElement[] {
+  const rows: HTMLElement[] = [];
   for (const role of STAFF_ROLES) {
     const def = STAFF[role];
     const member = state.staff.find((m) => m.role === role);
@@ -48,9 +46,26 @@ export function buildStaffSection(state: GameState): HTMLElement {
         ? button('Release', () => { releaseStaff(role); })
         : button('Hire', () => { hireStaff(role); }),
     );
-    box.append(row);
+    rows.push(row);
   }
-  return panel({ class: 'nrl-board-panel' }, box);
+  return rows;
+}
+
+/**
+ * The Staff screen (#344): its own place in the nav's More sheet, where it used
+ * to sit at the foot of Finance. Re-renders on the state change a hire makes.
+ */
+export function openStaffScreen(): HTMLElement {
+  const body = el('div', { class: 'nrl-screen-body nrl-staff' });
+  const sub = el('div', { class: 'nrl-screen-sub' });
+  const render = (): void => {
+    const s = getState();
+    sub.textContent = `${s.staff.length} of ${STAFF_ROLES.length} hired · wages paid with the running costs`;
+    body.replaceChildren(...staffRows(s));
+  };
+  render();
+  const off = bus.on('state:changed', render);
+  return openScreen(el('div', { class: 'nrl-screen' }, screenHead('Staff', { sub }), body), off, 'staff');
 }
 
 /** Game-over modal. Stays until "New club"; the save is kept in its slot. */

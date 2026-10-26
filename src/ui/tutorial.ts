@@ -37,7 +37,11 @@ export interface TutorialStep {
  *   - nav buttons carry `data-screen="<id>"` (see ui/nav.ts registerScreen)
  *   - the HUD money tile carries `data-hud="money"` (see ui/hud.ts)
  *   - the Advance Week control is the button inside `.nrl-hud-actions` (ui/hud.ts)
+ * An anchor may list fallbacks: the first on screen wins, so a screen in More's
+ * sheet (#344) is highlighted on the More tab until the sheet is open.
  */
+const inMore = (id: string): string => `.nrl-nav .nrl-btn[data-screen="${id}"], .nrl-nav [data-nav-more]`;
+
 export const STEPS: readonly TutorialStep[] = [
   {
     id: 'welcome',
@@ -50,14 +54,14 @@ export const STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'build',
-    text: 'Open Build and place a Training Paddock to develop your squad.',
-    anchor: '.nrl-nav .nrl-btn[data-screen="build"]',
+    text: 'Open Build (under More) and place a Training Paddock to develop your squad.',
+    anchor: inMore('build'),
     advanceOn: 'facility:placed',
   },
   {
     id: 'recruit',
-    text: 'Open Recruit and sign your first player from the free-agent pool.',
-    anchor: '.nrl-nav .nrl-btn[data-screen="recruit"]',
+    text: 'Open Recruit (under More) and sign your first player from the free-agent pool.',
+    anchor: inMore('recruit'),
     advanceOn: 'player:signed',
   },
   {
@@ -100,8 +104,8 @@ export const STEPS: readonly TutorialStep[] = [
     id: 'finance',
     text:
       'Finance shows where the money comes from and goes: gates, wages, upkeep, ' +
-      "the runway, and the board's goals for the season.",
-    anchor: '.nrl-nav .nrl-btn[data-screen="finance"]',
+      "the runway, and the board's goals for the season. It's under More, with Staff.",
+    anchor: inMore('finance'),
     advanceOn: 'next-button',
   },
   {
@@ -109,14 +113,14 @@ export const STEPS: readonly TutorialStep[] = [
     text:
       'Contracts lists every deal by expiry. Renew early before a player walks, ' +
       'or sell for a fee. Tap any player card for his page.',
-    anchor: '.nrl-nav .nrl-btn[data-screen="contracts"]',
+    anchor: inMore('contracts'),
     advanceOn: 'next-button',
   },
   {
     id: 'wrap',
     text:
       "That's the loop! Keep an eye on your money up top and your position on " +
-      'the ladder. The ? button opens the Guide any time. Good luck, coach.',
+      'the ladder. The Guide under More explains it all any time. Good luck, coach.',
     anchor: null,
     advanceOn: 'next-button',
   },
@@ -255,51 +259,54 @@ function renderStep(): void {
     a.offEvent = bus.on(step.advanceOn, () => advance());
   }
 
-  const anchorEl = step.anchor ? findAnchor(step.anchor) : null;
-
-  if (step.anchor && !anchorEl) {
-    // Anchor not in the DOM yet (screen not open, or the nav hidden by a match).
-    // Render centered for now with a Next escape hatch and keep looking every
-    // ANCHOR_RETRY_MS; once it appears (Back to Club after a match, #188),
-    // re-render anchored. The poll stops with the step.
-    renderBubble(a, step, { centered: true, forceNext: true });
-    a.retryTimer = setInterval(() => {
-      if (active !== a || STEPS[a.index] !== step) return;
-      const retryEl = findAnchor(step.anchor!);
-      if (!retryEl) return;
-      clearInterval(a.retryTimer as ReturnType<typeof setInterval>);
-      a.retryTimer = null;
-      a.overlay.replaceChildren();
-      scrollAnchorIntoView(retryEl);
-      renderCutout(a, retryEl);
-      renderBubble(a, step, { centered: false, forceNext: false });
-    }, ANCHOR_RETRY_MS);
+  if (!step.anchor) {
+    renderBubble(a, step, { centered: true, forceNext: false });
     return;
   }
 
-  if (anchorEl) {
-    scrollAnchorIntoView(anchorEl);
-    renderCutout(a, anchorEl);
-    renderBubble(a, step, { centered: false, forceNext: false });
-  } else {
-    renderBubble(a, step, { centered: true, forceNext: false });
-  }
+  // Draw against the anchor on screen now, then keep looking every
+  // ANCHOR_RETRY_MS: it may not be up yet (screen not open, or the nav hidden by
+  // a match: centered with a Next escape hatch until Back to Club, #188), or a
+  // better one may appear (More's sheet opened, #344). The poll stops with the step.
+  const show = (anchorEl: HTMLElement | null): void => {
+    a.overlay.replaceChildren();
+    if (anchorEl) {
+      scrollAnchorIntoView(anchorEl);
+      renderCutout(a, anchorEl);
+      renderBubble(a, step, { centered: false, forceNext: false });
+    } else {
+      renderBubble(a, step, { centered: true, forceNext: true });
+    }
+  };
+  let shown = findAnchor(step.anchor);
+  show(shown);
+  a.retryTimer = setInterval(() => {
+    if (active !== a || STEPS[a.index] !== step) return;
+    const now = findAnchor(step.anchor!);
+    if (now === shown) return;
+    shown = now;
+    show(now);
+  }, ANCHOR_RETRY_MS);
 }
 
 /**
- * Look up an anchor within the UI overlay (falls back to whole document). An
- * element that is in the DOM but not on screen (the nav is display:none during
- * a match) does not count: a cutout drawn around a zero-size box lands in the
- * corner, so the step keeps polling until the box is real.
+ * Look up an anchor within the UI overlay (falls back to whole document). A
+ * comma-separated anchor is a list of choices, best first. An element that is
+ * in the DOM but not on screen (the nav is display:none during a match, a
+ * closed sheet) does not count: a cutout drawn around a zero-size box lands in
+ * the corner, so the step keeps polling until the box is real.
  */
 function findAnchor(selector: string): HTMLElement | null {
   const root: ParentNode = document.getElementById('ui-root') ?? document;
-  const found =
-    (root.querySelector(selector) as HTMLElement | null) ??
-    (document.querySelector(selector) as HTMLElement | null);
-  if (!found) return null;
-  const r = found.getBoundingClientRect();
-  return r.width > 0 && r.height > 0 ? found : null;
+  for (const choice of selector.split(',')) {
+    const found =
+      (root.querySelector(choice) as HTMLElement | null) ??
+      (document.querySelector(choice) as HTMLElement | null);
+    if (!found) continue;
+    const r = found.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) return found;
+  }
+  return null;
 }
 
 /** Centre the anchor in view before highlighting (mobile-friendly). */
@@ -381,7 +388,7 @@ export const TUTORIAL_CSS = `
   position: fixed;
   inset: 0;
   pointer-events: none; /* backdrop is drawn by the cutout's box-shadow */
-  z-index: 200;         /* above HUD/nav (10) and modals (100) */
+  z-index: 200;         /* above HUD/nav (55) and modals (100) */
   font-family: 'Courier New', monospace;
   image-rendering: pixelated;
 }
@@ -396,7 +403,7 @@ export const TUTORIAL_CSS = `
   pointer-events: auto;
   position: fixed;
   left: 50%;
-  bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); /* clear of the nav and the home bar */
+  bottom: calc(5rem + var(--nrl-safe-b, 0px)); /* clear of the nav and the home bar */
   transform: translateX(-50%);
   max-width: min(90vw, 320px);
   background: #e8e0c8;
@@ -412,8 +419,8 @@ export const TUTORIAL_CSS = `
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 5.75rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
-  max-height: calc(100dvh - 5.75rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
+  max-height: calc(100vh - 5.75rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
+  max-height: calc(100dvh - 5.75rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
 }
 .nrl-tutorial-centered {
   top: 50%;
@@ -442,15 +449,15 @@ export const TUTORIAL_CSS = `
 @media (max-height: 500px) {
   .nrl-tutorial-bubble, .nrl-tutorial-centered {
     top: auto;
-    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
-    left: calc(0.75rem + env(safe-area-inset-left, 0px));
+    bottom: calc(4.5rem + var(--nrl-safe-b, 0px));
+    left: calc(0.75rem + var(--nrl-safe-l, 0px));
     right: auto;
     transform: none;
     /* 300px with border-box is ~265px of copy: every step fits unscrolled at
        750×340 and 956×330 (#208); the height cap below is the backstop. */
     max-width: min(60vw, 300px);
-    max-height: calc(100vh - 5.25rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
-    max-height: calc(100dvh - 5.25rem - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
+    max-height: calc(100vh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
+    max-height: calc(100dvh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
   }
 }
 `;
