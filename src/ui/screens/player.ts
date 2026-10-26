@@ -355,7 +355,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
         if (a.confirm && armed !== a.id) { armed = a.id; render(); return; }
         armed = null;
         const res = runAction(a.id, p.id);
-        if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'danger' });
+        if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
       }, a.danger ? { class: 'nrl-btn-danger' } : {});
       btn.setAttribute('data-player-action', a.id);
       if (!a.enabled) { btn.disabled = true; btn.title = a.why ?? ''; }
@@ -363,7 +363,6 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     }
     const why = m.actions.filter((a) => a.detail || a.why).map((a) => `${a.label.split(' ')[0]}: ${a.why ?? a.detail}`).join(' · ');
     if (why) actions.append(el('div', { class: 'nrl-player-why', text: why }));
-    actions.append(button('Close', finish, { class: 'nrl-player-close' }));
 
     content.replaceChildren(top, el('div', { class: 'nrl-player-grid' }, about, details), actions);
   };

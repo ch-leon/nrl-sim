@@ -2,7 +2,7 @@
 // built from the MatchResult, it agrees with the score and the overlay's tallies.
 import { describe, it, expect } from 'vitest';
 import { runMatch } from '../../../src/match/league/match';
-import { buildMatchReport, planChangeLines, shortName } from '../../../src/ui/screens/matchReport';
+import { buildMatchReport, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
 import { playerOfTheMatch } from '../../../src/systems/stats';
 import { summaryLines } from '../../../src/match/view/commentary';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../../src/sim/events';
@@ -94,5 +94,24 @@ describe('match report (N9.5)', () => {
     };
     expect(buildMatchReport(changed, fixture, names, null).changes).toEqual(['Half-time: Gulls went Expansive · Rush.']);
     expect(buildMatchReport(result, fixture, names, null).changes).toEqual([]);
+  });
+});
+
+describe('the report headline (#351 P2)', () => {
+  it('your result in a word and the margin, home or away', () => {
+    expect(resultHeadline({ id: 'player', score: 24 }, { id: 'rival-gulls', score: 12 })).toEqual({ text: 'WIN by 12', kind: 'win' });
+    expect(resultHeadline({ id: 'rival-gulls', score: 24 }, { id: 'player', score: 20 })).toEqual({ text: 'LOSS by 4', kind: 'loss' });
+    expect(resultHeadline({ id: 'player', score: 10 }, { id: 'rival-gulls', score: 10 })).toEqual({ text: 'DRAW', kind: 'draw' });
+  });
+
+  it('none for a match the player is not in; the built report carries it', () => {
+    expect(resultHeadline({ id: 'rival-a', score: 4 }, { id: 'rival-b', score: 0 })).toBeNull();
+    const result = runMatch(sheet('player', 'Live Test FC'), sheet('rival-gulls', 'Gulls'), { seed: 11 });
+    const r = buildMatchReport(result, fixture, names, null);
+    expect(r.headline?.kind).toBe(result.homeScore > result.awayScore ? 'win' : result.homeScore < result.awayScore ? 'loss' : 'draw');
+  });
+
+  it('the plan changes fold under one line that counts them (#351 P0)', () => {
+    expect(planChangesSummary(2)).toBe('Plan changes (2)');
   });
 });

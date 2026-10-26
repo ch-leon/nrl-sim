@@ -110,7 +110,8 @@ export const NINES_PAGE: GuidePage = {
     {
       heading: 'Watching',
       bullets: [
-        'Live match (beta) on the Fixtures tab plays your matches on this sim as you watch, with ×1 to ×8 speed and Skip. The speed you pick is kept for the next match. Rucks, tackles, restarts and the kick at goal run at twice that speed; open play stays at the speed you picked. The half-time card waits until you tap Continue. Rival-v-rival rounds are simmed from the clubs’ strength either way.',
+        'Your matches play on this sim as you watch, with ×1 to ×8 speed and Skip. The speed you pick is kept for the next match. Rucks, tackles, restarts and the kick at goal run at twice that speed; open play stays at the speed you picked. The half-time card waits until you tap Continue. Rival-v-rival rounds are simmed from the clubs’ strength unless Rival matches played out is on.',
+        'Coach calls and Rival matches played out are switches in Settings, the gear at the top right.',
         'Save & exit writes the match and goes back to the club. Advance Week then reads Resume match and continues it; the menu beside it will not skip the week. Closing the app and choosing Continue does the same, from a couple of seconds back at most. A hire or a build made back at the club is kept if you finish the match, and dropped if the app is killed before full time: a week in the middle of its match is not written into the slot. Export save during that week writes the kick-off save and the match, not the half-played week, and refuses if that kick-off save never landed.',
         'Full time brings the match report (who scored and when, the goals, the numbers side by side and the Player of the Match), the result into the ladder, and the match’s tallies onto your players’ pages.',
       ],

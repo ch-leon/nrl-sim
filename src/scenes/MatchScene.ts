@@ -943,7 +943,7 @@ export class MatchScene extends Phaser.Scene {
   // ── DOM return button (shown only at full-time) ──────────────────────────────
   private mountBackButton(): void {
     // Hidden until full-time; before then, playback + Skip drive the flow.
-    const btn = button('Back to Club', () => this.exitToGrounds());
+    const btn = button('Back to Club', () => this.exitToGrounds(), { class: 'nrl-match-back' });
     btn.style.position = 'fixed';
     // Bottom-centre, taking the playback controls' slot at full-time: the
     // match overlay keeps the HUD/nav hidden until this is pressed (#14). With
@@ -951,7 +951,7 @@ export class MatchScene extends Phaser.Scene {
     btn.style.left = '50%';
     btn.style.transform = 'translateX(-50%)';
     const playing = this.live !== undefined;
-    btn.style.bottom = playing ? '0.5rem' : '3.25rem';
+    btn.style.bottom = playing ? 'calc(0.5rem + var(--nrl-safe-b, 0px))' : '3.25rem';
     btn.style.zIndex = '20';
     // With no match (defensive), keep it visible.
     btn.style.display = playing ? 'none' : '';

@@ -12,7 +12,6 @@ import {
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
-import { buildObjectivesSection } from './board';
 import { openHistoryScreen } from './history';
 import { el, panel, button, openModal, closeScreen } from '../dom';
 
@@ -480,7 +479,6 @@ function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLEleme
   }
   nodes.push(panel({ class: 'nrl-finance-panel' }, weekly));
   nodes.push(panel({ class: 'nrl-finance-panel' }, buildSeasonPnl(state)));
-  nodes.push(buildObjectivesSection(state));
 
   const expiring = el('div', { class: 'nrl-finance-expiring' });
   expiring.append(el('h3', { text: `Contracts ending in ${EXPIRY_WINDOW_WEEKS} wks` }));

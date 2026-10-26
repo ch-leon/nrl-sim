@@ -19,7 +19,10 @@ import { PORTRAIT_W, portraitDataUrl } from '../../art/portrait';
 import type { Kit } from '../../art/match/kit';
 import { BENCH, ROTATIONS, type Rotation } from '../../match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
-import { TACTIC_BLURB } from '../tacticsBlurbs';
+import { TACTIC_BLURB, styleLine } from '../tacticsBlurbs';
+import { nextFixture } from '../../systems/league';
+import { PLAYER_ID } from '../../systems/fixtures';
+import { rivalStyle } from '../../systems/rivalRound';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import {
   LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
@@ -29,27 +32,21 @@ import { ensureScreenStyles } from './recruit';
 import { squadKit } from './squad';
 
 const STYLE_ID = 'nrl-lineup-styles';
-/** Portraits at ×2: the biggest that leaves room for six tiles across a phone on its side. */
+/** Portraits at ×2, shown on a tile only when it is wide enough to keep the surname beside it. */
 const PORTRAIT_PX = PORTRAIT_W * 2;
-const TILE_H = 36;
-const ROW_GAP = 6;
-const FIELD_PAD = 5;
+/** Tiles are at least this tall (a finger's width, #342). */
+const TILE_H = 44;
+const GAP = 4;
 
 /**
- * Where each slot's tile sits on the field panel: a row (0 at the ruck, 1 the
- * line behind it, 2 the fullback deepest) and a lane across (%), roughly the
- * live sim's roles (match/league/roles.ts) spread so the tiles don't touch.
+ * The field's three lines, left to right, by slot (LINEUP_SLOTS order): the
+ * prop and hooker at the ruck, the line behind them, the fullback deepest;
+ * roughly the live sim's roles (match/league/roles.ts).
  */
-const TILE_AT: readonly { row: number; x: number }[] = [
-  { row: 2, x: 50 }, // fullback
-  { row: 1, x: 8 }, // winger
-  { row: 1, x: 92 }, // winger
-  { row: 1, x: 22 }, // centre
-  { row: 1, x: 36 }, // five-eighth
-  { row: 1, x: 64 }, // halfback
-  { row: 0, x: 58 }, // hooker
-  { row: 0, x: 42 }, // prop
-  { row: 1, x: 78 }, // second-row
+const FIELD_LINES: readonly (readonly number[])[] = [
+  [7, 6], // prop, hooker
+  [1, 3, 4, 5, 8, 2], // winger, centre, five-eighth, halfback, second-row, winger
+  [0], // fullback
 ];
 
 const ROTATION_LABEL: Readonly<Record<Rotation, string>> = { off: 'OFF', standard: 'STD', heavy: 'HEAVY' };
@@ -76,37 +73,45 @@ const LINEUP_CSS = `
   gap: 0.5rem;
 }
 .nrl-lineup-left {
-  flex: 0 0 62%;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: ${GAP}px;
   overflow-y: auto;
 }
+/* The pitch fits its box (#342): the lines share its height, the tiles its width. */
 .nrl-lineup-field {
-  position: relative;
-  flex: 0 0 auto;
-  height: ${3 * TILE_H + 2 * ROW_GAP + 2 * FIELD_PAD}px;
+  flex: 1 1 auto;
+  min-height: ${3 * TILE_H + 4 * GAP + 4}px;
+  max-height: 22rem;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: repeat(3, minmax(${TILE_H}px, 1fr));
+  gap: ${GAP}px;
+  padding: ${GAP - 1}px;
   background: #2f7a36;
-  background-image: linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.18));
-  background-size: 100% 2px;
-  background-repeat: no-repeat;
-  background-position: 0 ${FIELD_PAD + TILE_H + ROW_GAP / 2 - 1}px;
   border: 3px solid #000;
   box-shadow: 3px 3px 0 #000;
 }
+.nrl-lineup-line { display: flex; align-items: center; justify-content: center; gap: ${GAP}px; min-width: 0; }
+.nrl-lineup-line[data-line="0"] { border-bottom: 2px solid rgba(255,255,255,0.18); }
+.nrl-lineup-line[data-line="1"] { justify-content: space-between; }
+/* Two lines (#342): the slot and his rating there, his surname under it. */
 .nrl-lineup-tile {
   pointer-events: auto;
   cursor: pointer;
-  position: absolute;
-  transform: translateX(-50%);
-  width: 70px;
+  position: relative;
+  container-type: inline-size;
+  flex: 0 1 calc((100% - ${5 * GAP}px) / 6);
+  min-width: 0;
+  max-width: 120px;
   height: ${TILE_H}px;
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 1px 3px 1px 1px;
+  padding: 1px 3px 1px 2px;
   box-sizing: border-box;
   background: #e8e0c8;
   color: #1a1a2e;
@@ -118,37 +123,44 @@ const LINEUP_CSS = `
 .nrl-lineup-tile[data-selected] { outline: 3px solid #f4d03f; z-index: 2; }
 .nrl-lineup-tile[data-empty] { border-style: dashed; background: rgba(232, 224, 200, 0.6); }
 .nrl-lineup-tile[data-out] { background: #e9a0a0; }
-.nrl-lineup-tile img {
+.nrl-lineup-tile img, .nrl-lineup-tile-blank {
+  display: none;
   flex: 0 0 auto;
   width: ${PORTRAIT_PX}px;
   height: ${PORTRAIT_PX}px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
-.nrl-lineup-tile-blank {
-  flex: 0 0 auto;
-  width: ${PORTRAIT_PX}px;
-  height: ${PORTRAIT_PX}px;
-  border: 2px dashed #555;
-  box-sizing: border-box;
-}
-.nrl-lineup-tile-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.1; }
-.nrl-lineup-tile-top { font-size: 0.62rem; font-weight: bold; white-space: nowrap; }
-.nrl-lineup-tile-name { font-size: 0.6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-lineup-tile-blank { border: 2px dashed #555; box-sizing: border-box; }
+@container (min-width: 80px) { .nrl-lineup-tile img, .nrl-lineup-tile-blank { display: block; } }
+.nrl-lineup-tile-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.nrl-lineup-tile-top { font-size: 0.65rem; font-weight: bold; white-space: nowrap; }
+.nrl-lineup-tile-name { font-size: 0.65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-lineup-fit-related { color: #8a5a00; }
 .nrl-lineup-fit-unrelated { color: #b00020; }
-.nrl-lineup .nrl-screen-head { margin-bottom: 0.3rem; }
+.nrl-lineup .nrl-screen-head { margin-bottom: 0.15rem; }
+/* The bench (#351 L3): a strip across the top of the pitch, not a row under it. */
 .nrl-lineup-bench {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0;
+  gap: ${GAP}px;
+  padding: ${GAP - 1}px;
+  background: #24602a;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
 }
-.nrl-lineup-bench-label { color: #e8e0c8; font-size: 0.65rem; font-weight: bold; min-width: 2.6rem; }
-.nrl-lineup-bench .nrl-lineup-tile { position: static; transform: none; }
+.nrl-lineup-bench-label { color: #e8e0c8; font-size: 0.65rem; font-weight: bold; flex: 0 0 auto; }
+.nrl-lineup-bench .nrl-lineup-tile { flex: 1 1 0; }
+/* Too short for the strip and three lines of 44px tiles (956×330): the bench goes beside the pitch, two by two. */
+@media (max-height: 340px) {
+  .nrl-lineup-left { flex-direction: row; }
+  .nrl-lineup-bench { order: 2; display: grid; grid-template-columns: repeat(2, minmax(64px, 84px)); align-content: center; }
+  .nrl-lineup-bench-label { grid-column: 1 / -1; }
+  .nrl-lineup-bench .nrl-lineup-tile { max-width: none; }
+}
 .nrl-lineup-right {
-  flex: 1 1 auto;
+  flex: 0 0 clamp(200px, 34%, 340px);
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -205,13 +217,24 @@ const LINEUP_CSS = `
 .nrl-lineup-where[data-free] { background: transparent; color: transparent; border-color: transparent; }
 .nrl-lineup-kc { display: flex; gap: 0.3rem; flex-shrink: 0; }
 .nrl-lineup-kc[hidden] { display: none; }
-.nrl-lineup-kc .nrl-btn { min-height: 44px; flex: 1 1 0; }
-.nrl-lineup-role { position: absolute; top: -7px; padding: 0 0.2rem; background: #1a1a2e; color: #f4d03f; border: 1px solid #f4d03f; font-size: 0.55rem; font-weight: bold; line-height: 1.25; pointer-events: none; }
-.nrl-lineup-role-k { right: -5px; }
-.nrl-lineup-role-c { right: 11px; }
+/* Kicker and Captain (#349 L4): a switch for the picked man, naming who holds the job now. */
+.nrl-lineup-kc .nrl-btn {
+  min-height: 44px; flex: 1 1 0; min-width: 0;
+  display: flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.4rem;
+  background: #e8e0c8; text-align: left; font-size: 0.65rem;
+}
+.nrl-lineup-kc .nrl-btn:hover:not(:disabled) { background: #fff6c2; }
+.nrl-lineup-switch { flex: 0 0 auto; position: relative; width: 26px; height: 14px; border: 2px solid #000; background: #8a8a8a; box-sizing: border-box; }
+.nrl-lineup-switch::after { content: ''; position: absolute; top: 1px; left: 1px; width: 8px; height: 8px; background: #fff; border: 1px solid #000; }
+.nrl-lineup-kc .nrl-btn[aria-pressed="true"] .nrl-lineup-switch { background: #7ec850; }
+.nrl-lineup-kc .nrl-btn[aria-pressed="true"] .nrl-lineup-switch::after { left: auto; right: 1px; }
+.nrl-lineup-kc-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.nrl-lineup-kc-text small { font-weight: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-lineup-role { position: absolute; top: 1px; padding: 0 0.15rem; background: #1a1a2e; color: #f4d03f; border: 1px solid #f4d03f; font-size: 0.55rem; font-weight: bold; line-height: 1.2; pointer-events: none; }
+.nrl-lineup-role-k { right: 1px; }
+.nrl-lineup-role-c { right: 13px; }
 .nrl-lineup-rot { display: flex; gap: 0.2rem; align-items: center; }
 .nrl-lineup-rot-label { color: #e8e0c8; font-size: 0.7rem; }
-.nrl-lineup-left > .nrl-screen-sub { margin: 0; font-size: 0.65rem; }
 /* The plan dialog (#342): a row of chips per side, each pick's blurb under them. */
 .nrl-lineup-plan { font-size: 0.8rem; }
 .nrl-lineup-plan h2 { margin: 0 0 0.4rem; font-size: 1rem; }
@@ -220,14 +243,15 @@ const LINEUP_CSS = `
 .nrl-lineup-tac .nrl-btn { min-height: 44px; white-space: nowrap; }
 /* The lit chip stays lit under a finger: a touch leaves :hover on the last chip tapped. */
 .nrl-lineup .nrl-btn.nrl-sort-active, .nrl-lineup .nrl-btn.nrl-sort-active:hover:not(:disabled) { background: #7ec850; }
-.nrl-lineup-tac-hint p { margin: 0.2rem 0 0; line-height: 1.3; }
+.nrl-lineup-tac-hint { margin: 0 0 0.5rem; line-height: 1.3; }
+.nrl-lineup-opp { padding: 0.25rem 0.4rem; background: rgba(0,0,0,0.08); border-left: 3px solid #1a1a2e; }
+.nrl-lineup-opp[hidden] { display: none; }
 .nrl-lineup-plan > .nrl-lineup-rot { margin-top: 0.5rem; }
 .nrl-lineup-plan > .nrl-lineup-rot .nrl-lineup-rot-label { color: #1a1a2e; font-weight: bold; min-width: 4.5rem; }
 .nrl-lineup-plan > .nrl-lineup-rot .nrl-btn { min-height: 44px; padding: 0.3rem 0.6rem; }
 .nrl-lineup-rot .nrl-btn { padding: 0.3rem 0.35rem; font-size: clamp(0.6rem, 2vw, 0.8rem); }
 .nrl-screen-tools [data-plan] { max-width: 15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (min-width: 1000px) {
-  .nrl-lineup-tile { width: 96px; }
   .nrl-lineup-tile-top, .nrl-lineup-tile-name { font-size: 0.72rem; }
   .nrl-lineup-row { font-size: 0.78rem; }
   .nrl-lineup-row-meta { font-size: 0.7rem; }
@@ -276,16 +300,22 @@ export function openLineupScreen(): void {
   const pick = el('div', { class: 'nrl-lineup-pick' });
   // Kicker and captain (N11): for the starter in the selected slot.
   const chosen = (): string | null => (selected && selected.kind === 'starter' ? getState().lineup.starters[selected.slot] ?? null : null);
-  const kBtn = button('Kicker', () => {
+  const kcSwitch = (job: string, onTap: () => void, attr: string): { btn: HTMLButtonElement; holder: HTMLElement } => {
+    const holder = el('small');
+    const btn = button('', onTap);
+    btn.append(el('span', { class: 'nrl-lineup-switch', attrs: { 'aria-hidden': 'true' } }),
+      el('span', { class: 'nrl-lineup-kc-text' }, el('b', { text: job }), holder));
+    btn.setAttribute(attr, '');
+    return { btn, holder };
+  };
+  const { btn: kBtn, holder: kHolder } = kcSwitch('Kicker', () => {
     const id = chosen();
     if (id) setLineup(setKicker(getState().lineup, id));
-  });
-  kBtn.setAttribute('data-make-kicker', '');
-  const cBtn = button('Captain', () => {
+  }, 'data-make-kicker');
+  const { btn: cBtn, holder: cHolder } = kcSwitch('Captain', () => {
     const id = chosen();
     if (id) setLineup(setCaptain(getState().lineup, id));
-  });
-  cBtn.setAttribute('data-make-captain', '');
+  }, 'data-make-captain');
   const kcRow = el('div', { class: 'nrl-lineup-kc' }, kBtn, cBtn);
   kcRow.hidden = true;
   const list = el('div', { class: 'nrl-lineup-list' });
@@ -301,7 +331,10 @@ export function openLineupScreen(): void {
 
   // The coach's presets (N11): attack and defence, each chip with what it does.
   const tacButtons = new Map<AttackPreset | DefencePreset, HTMLButtonElement>();
-  const tacHint = el('div', { class: 'nrl-lineup-tac-hint' });
+  // Each side's pick explained under its own row (#351 L2), and what the next opponent plays.
+  const attackHint = el('p', { class: 'nrl-lineup-tac-hint' });
+  const defenceHint = el('p', { class: 'nrl-lineup-tac-hint' });
+  const oppLine = el('p', { class: 'nrl-lineup-tac-hint nrl-lineup-opp', attrs: { 'data-plan-opponent': '' } });
   const tacRow = (label: string, presets: readonly (AttackPreset | DefencePreset)[], pick: (p: AttackPreset | DefencePreset) => Partial<TeamTactics>): HTMLElement => {
     const row = el('div', { class: 'nrl-lineup-rot nrl-lineup-tac' }, el('span', { class: 'nrl-lineup-rot-label', text: label }));
     for (const p of presets) {
@@ -416,32 +449,30 @@ export function openLineupScreen(): void {
     const byId = new Map(s.squad.map((p) => [p.id, p] as const));
     const at = (id: string | null): Player | null => (id ? byId.get(id) ?? null : null);
 
-    // The field: nine tiles where the formation puts them.
-    field.replaceChildren();
-    LINEUP_SLOTS.forEach((pos, slot) => {
-      const t = tile(at(lineup.starters[slot] ?? null), { kind: 'starter', slot }, kit, pos);
-      const { row, x } = TILE_AT[slot]!;
-      t.style.top = `${FIELD_PAD + row * (TILE_H + ROW_GAP)}px`;
-      t.style.left = `clamp(38px, ${x}%, calc(100% - 38px))`;
-      field.append(t);
-    });
+    // The field: nine tiles in the formation's three lines.
+    field.replaceChildren(...FIELD_LINES.map((slots, i) => el('div', { class: 'nrl-lineup-line', attrs: { 'data-line': String(i) } },
+      ...slots.map((slot) => tile(at(lineup.starters[slot] ?? null), { kind: 'starter', slot }, kit, LINEUP_SLOTS[slot]!)))));
     bench.replaceChildren(el('span', { class: 'nrl-lineup-bench-label', text: 'Bench' }));
     for (let i = 0; i < BENCH.size; i++) bench.append(tile(at(lineup.bench[i] ?? null), { kind: 'bench', index: i }, kit, null));
 
     for (const [r, b] of rotButtons) b.classList.toggle('nrl-sort-active', r === lineup.rotation);
     const tactics = validTactics(lineup.tactics);
     for (const [p, b] of tacButtons) b.classList.toggle('nrl-sort-active', p === tactics.attack || p === tactics.defence);
-    tacHint.replaceChildren(
-      el('p', {}, el('strong', { text: `${PRESET_LABEL[tactics.attack]}: ` }), TACTIC_BLURB[tactics.attack]),
-      el('p', {}, el('strong', { text: `${PRESET_LABEL[tactics.defence]}: ` }), TACTIC_BLURB[tactics.defence]),
-    );
+    attackHint.textContent = TACTIC_BLURB[tactics.attack];
+    defenceHint.textContent = TACTIC_BLURB[tactics.defence];
+    const next = nextFixture(s.league.fixtures, s.week, PLAYER_ID);
+    const opp = next ? s.league.clubs.find((c) => c.id === (next.homeId === PLAYER_ID ? next.awayId : next.homeId)) : undefined;
+    oppLine.hidden = !opp;
+    if (opp) oppLine.replaceChildren(el('strong', { text: `Next: ${opp.name}` }), ` play ${styleLine(rivalStyle(opp))}`);
     planBtn.textContent = `PLAN ${PRESET_LABEL[tactics.attack]} · ${PRESET_LABEL[tactics.defence]}`;
     planBtn.title = `Attack, defence and the bench (${ROTATION_LABEL[lineup.rotation]}): the coach’s plan for the match`;
 
     const fit = s.squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length;
     const picked = lineup.starters.filter((id) => id !== null).length;
     const notes = today.fills.length ? ` · on the day: ${describeFills(today.fills).replace(/^Lineup: /, '')}` : '';
-    sub.textContent = `${picked}/${LINEUP_SLOTS.length} picked · nine rated ${lineupAverage(lineup, s.squad)} as they play · ${fit} fit of ${s.squad.length}${notes}`;
+    const avg = lineupAverage(lineup, s.squad);
+    sub.textContent = `${picked}/${LINEUP_SLOTS.length} picked · rated ${avg} · ${fit}/${s.squad.length} fit${notes}`;
+    sub.title = `${picked}/${LINEUP_SLOTS.length} picked · nine rated ${avg} as they play · ${fit} fit of ${s.squad.length}${notes}`;
 
     // The squad list, best for the picked slot first.
     const slotPos = selected && selected.kind === 'starter' ? LINEUP_SLOTS[selected.slot]! : null;
@@ -449,17 +480,21 @@ export function openLineupScreen(): void {
     const chosenId = selected && selected.kind === 'starter' ? lineup.starters[selected.slot] ?? null : null;
     kcRow.hidden = chosenId === null;
     if (chosenId) {
-      kBtn.toggleAttribute('data-active', roles.kicker === chosenId);
-      cBtn.toggleAttribute('data-active', roles.captain === chosenId);
-      kBtn.classList.toggle('nrl-sort-active', lineup.kicker === chosenId);
-      cBtn.classList.toggle('nrl-sort-active', lineup.captain === chosenId);
+      const holderName = (id: string | undefined): string => {
+        const who = id ? byId.get(id) : undefined;
+        return who ? surname(who.name) : 'nobody';
+      };
+      kBtn.setAttribute('aria-pressed', String(roles.kicker === chosenId));
+      cBtn.setAttribute('aria-pressed', String(roles.captain === chosenId));
+      kHolder.textContent = holderName(roles.kicker);
+      cHolder.textContent = holderName(roles.captain);
       kBtn.title = lineup.kicker === chosenId ? 'Your goal-kicker: tap to go back to the default' : 'Make him the goal-kicker';
       cBtn.title = lineup.captain === chosenId ? 'Your captain: tap to go back to the default' : 'Make him captain';
     }
     pick.textContent = selected
       ? slotPos
-        ? `Pick for ${positionLabel(slotPos)} (tap a player)`
-        : `Pick for bench seat ${(selected as { index: number }).index + 1} (tap a player)`
+        ? `For ${positionLabel(slotPos)}: tap a player`
+        : `For bench seat ${(selected as { index: number }).index + 1}: tap a player`
       : 'Tap a slot, then a player';
     const rows = [...s.squad].sort((a, b) => {
       const ea = slotPos ? effectiveRating(a, slotPos) : overallRating(a);
@@ -519,14 +554,14 @@ export function openLineupScreen(): void {
   // dialog over the screen so the field and the list keep its height (#342).
   // The bench rotation is part of the plan: how hard the four are used.
   const plan = el('div', { class: 'nrl-lineup nrl-lineup-plan' },
-    el('h2', { text: 'Game plan' }), attackRow, defenceRow, tacHint, rotRow);
+    el('h2', { text: 'Game plan' }), oppLine, attackRow, attackHint, defenceRow, defenceHint, rotRow);
   planBtn.onclick = () => openModal(plan, { class: 'nrl-lineup-plan-modal', region: true, closeButton: true });
 
-  const head = screenHead('Lineup', { controls: [planBtn, autoBtn] });
+  const head = screenHead('Lineup', { sub, controls: [planBtn, autoBtn] });
   const body = el(
     'div',
     { class: 'nrl-lineup-body' },
-    el('div', { class: 'nrl-lineup-left' }, field, bench, sub),
+    el('div', { class: 'nrl-lineup-left' }, bench, field),
     el('div', { class: 'nrl-lineup-right' }, pick, kcRow, list),
   );
   const screen = el('div', { class: 'nrl-screen nrl-lineup' }, head, body);

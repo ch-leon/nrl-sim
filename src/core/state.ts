@@ -156,6 +156,12 @@ export interface SeasonReview {
   /** The rivals whose strength moved most at the rollover. */
   movers?: { name: string; from: number; to: number }[];
   reputation?: { from: number; to: number };
+  /**
+   * The club's last finals tie: its round (25 Qualifying, 26 Semi, 27 Grand Final)
+   * and whether it won (#351 E2). Left out when the club missed the finals or its
+   * run was not finished when the season ended; reviews from before it have none.
+   */
+  finals?: { round: number; won: boolean };
 }
 
 /** One completed season. The extended fields are optional for pre-v4 entries. */

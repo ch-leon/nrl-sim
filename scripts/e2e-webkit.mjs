@@ -238,12 +238,12 @@ async function runSize(browser, W, H) {
     return out;
   });
   // #203: the player page (Squad → a player) sits between HUD and nav, with a ✕
-  // and Renew / Sell / Release / Close on screen; the nav stays whole and tappable.
+  // and Renew / Sell / Release on screen; the nav stays whole and tappable.
   const PLAYER = ['.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="renew"]',
-    '[data-player-action="sell"]', '[data-player-action="release"]', '.nrl-player-close']];
+    '[data-player-action="sell"]', '[data-player-action="release"]']];
   await step('player-page', async () => {
     await tap('.nrl-nav .nrl-btn[data-screen="squad"]');
-    await tap('.nrl-card-open');
+    await tap('.nrl-card-open .nrl-row-name');
     await page.waitForSelector('[data-player-page]');
     await page.waitForTimeout(300);
     const out = await reachProblems(page, ...PLAYER);
@@ -269,7 +269,7 @@ async function runSize(browser, W, H) {
     if (await renew.isDisabled()) { rec.notes.push('renew not offered for this player'); return []; }
     await renew.tap();
     await page.waitForTimeout(300);
-    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="sell"]', '.nrl-player-close']);
+    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="sell"]']);
   });
   await step('player-page-closed', async () => {
     await tap('.nrl-player-modal .nrl-screen-x');
@@ -619,7 +619,7 @@ async function runPortrait(browser) {
 // match it keeps off the open log, the scoreboard and every control.
 // WebKit on Linux reports zero safe-area insets, so the iPhone's are simulated
 // through the --nrl-safe-* properties the UI reads env() into (src/ui/dom.ts).
-const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375').split(/\s+/).filter(Boolean).map((s) => {
+const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375 956x330').split(/\s+/).filter(Boolean).map((s) => {
   const [size, insets] = s.split('@');
   const [w, h] = size.split('x').map(Number);
   const [l, t, r, b] = (insets ?? '0,0,0,0').split(',').map(Number);
@@ -630,7 +630,7 @@ const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375
 const NAV_SCREENS = [
   { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-screen-body > *' },
   { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-list > *', card: '.nrl-lineup-field', primary: ['[data-auto-pick]'] },
-  { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-screen-body > *', primary: ['.nrl-screen-body > :first-child button'] },
+  { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-screen-body > *', primary: ['.nrl-screen-body > :first-child .nrl-row-action'] },
   { id: 'fixtures', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-fixture', card: '.nrl-next-match' },
   { id: 'ladder', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-ladder-table tbody tr' },
   { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
@@ -675,7 +675,8 @@ function screenProblems(page, spec, safe) {
       let t = 0, l = 0, b = H, r = W;
       for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
         const cs = getComputedStyle(a);
-        if (/(auto|scroll|hidden|clip)/.test(`${cs.overflowX} ${cs.overflowY}`)) {
+        // A display: contents wrapper (a short screen's two-column layouts) has no box to clip with.
+        if (cs.display !== 'contents' && /(auto|scroll|hidden|clip)/.test(`${cs.overflowX} ${cs.overflowY}`)) {
           const ar = a.getBoundingClientRect();
           t = Math.max(t, ar.top); l = Math.max(l, ar.left); b = Math.min(b, ar.bottom); r = Math.min(r, ar.right);
         }
@@ -723,9 +724,15 @@ function screenProblems(page, spec, safe) {
     }
     const content = `${shown}/${rows.length} rows whole${spec.card ? `, ${cards} whole card(s)` : ''}${spec.prose ? `, ${lines} lines of text` : ''}`;
     if (shown < need && cards < 1 && lines < 8) out.push(`only ${content}`);
-    // Every close in the screen, and its primary action.
+    // Every close in the screen, and its primary action. A screen with one named
+    // exit (the full-time report's Back to Club) has no ✕ of its own: that exit instead.
     const closes = [...box.querySelectorAll('button')].filter((b) => /^(✕|close)$/i.test(b.textContent.trim()) || b.getAttribute('aria-label') === 'Close');
-    if (!closes.length) out.push('no close button');
+    if (spec.exit) {
+      if (closes.length) out.push(`a ✕ besides ${spec.exit} (one exit wanted)`);
+      const exit = document.querySelector(spec.exit);
+      if (!exit) out.push(`exit ${spec.exit} missing`);
+      else { const p = tappable(exit, `exit ${spec.exit}`); if (p) out.push(p); }
+    } else if (!closes.length) out.push('no close button');
     for (const c of closes) {
       const p = tappable(c, `close "${c.textContent.trim()}"`);
       if (p) out.push(p);
@@ -746,6 +753,36 @@ function screenProblems(page, spec, safe) {
     }
     return { problems: out, content };
   }, [spec, safe]);
+}
+
+/**
+ * A view with no frame (the title): every control matching `sels` whole on screen
+ * without scrolling, clear of the unsafe bands, 44px tall and taking a tap at its
+ * middle; and no sideways scroll.
+ */
+function controlsProblems(page, sels, safe) {
+  return page.evaluate(([sels, safe]) => {
+    const W = innerWidth, H = innerHeight;
+    const out = [];
+    const wide = Math.max(document.documentElement.scrollWidth, document.querySelector('.nrl-title')?.scrollWidth ?? 0);
+    if (wide > W + 1) out.push(`scrolls sideways (${wide}px wide)`);
+    for (const sel of sels) {
+      const els = [...document.querySelectorAll(sel)];
+      if (!els.length) { out.push(`${sel} missing`); continue; }
+      for (const e of els) {
+        const r = e.getBoundingClientRect();
+        const what = `${sel}${els.length > 1 ? ` "${e.getAttribute('aria-label') ?? e.textContent.trim()}"` : ''}`;
+        if (r.left < safe.l - 1 || r.right > W - safe.r + 1 || r.top < safe.t - 1 || r.bottom > H - safe.b + 1) {
+          out.push(`${what} off screen or in the unsafe band (${Math.round(r.left)},${Math.round(r.top)}–${Math.round(r.right)},${Math.round(r.bottom)})`);
+          continue;
+        }
+        if (r.height < 43.5) out.push(`${what} ${Math.round(r.height)}px tall`);
+        const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+        if (!hit || !e.contains(hit)) out.push(`${what} covered (a tap hits ${hit?.className || hit?.tagName})`);
+      }
+    }
+    return out;
+  }, [sels, safe]);
 }
 
 /** The chrome: top bar and nav heights, nav tabs, label size and the open tab. */
@@ -814,8 +851,8 @@ function toastReport(page, avoid, safe, tappable = true) {
   }, [avoid, safe, tappable]);
 }
 
-/** What a toast must never touch at the club: the nav, the bar's buttons, an open screen or dialog. */
-const CLUB_AVOID = ['.nrl-nav', '.nrl-hud-actions', '.nrl-audio-launcher', '.nrl-screen-region .nrl-modal', '.nrl-screen-x', '.nrl-screen-head'];
+/** What a toast must never touch at the club: the nav, the bar's buttons (the next-match chip too), an open screen or dialog. */
+const CLUB_AVOID = ['.nrl-nav', '.nrl-hud-actions', '.nrl-hud-next', '.nrl-hud [data-hud="money"]', '.nrl-audio-launcher', '.nrl-screen-region .nrl-modal', '.nrl-screen-x', '.nrl-screen-head'];
 /** …and in a match: the scoreboard, the stats, the ticker or open log, and every control. */
 const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-stats', '.nrl-mo-commentary', '.nrl-mo-log', '.nrl-mo-log-toggle', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay', '.nrl-audio-launcher'];
 /** The burst the check fires: a problem, a routine stop, good news, a confirmation. */
@@ -868,16 +905,21 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     for (const b of document.querySelectorAll('.nrl-modal-backdrop:not(.nrl-screen-backdrop)')) b.remove();
   }).then(() => page.keyboard.press('Escape'));
 
-  await step('hub', async (rec) => {
+  const setInsets = () => page.evaluate((s) => {
+    const st = document.documentElement.style;
+    st.setProperty('--nrl-safe-l', `${s.l}px`); st.setProperty('--nrl-safe-t', `${s.t}px`);
+    st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
+  }, safe);
+  // The title (#350 T1, #347): a fresh install opens on the new club's setup, every
+  // field and Start on screen with no scrolling, clear of the notch.
+  await step('title-setup', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
-    if (safe.l || safe.t || safe.r || safe.b) {
-      await page.evaluate((s) => {
-        const st = document.documentElement.style;
-        st.setProperty('--nrl-safe-l', `${s.l}px`); st.setProperty('--nrl-safe-t', `${s.t}px`);
-        st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
-      }, safe);
-    }
+    await setInsets();
+    await page.waitForTimeout(250);
+    return controlsProblems(page, ['[data-nrl-clubname]', '.nrl-title-swatch', '.nrl-title-pick', '[data-nrl-start]'], safe);
+  });
+  await step('hub', async (rec) => {
     await page.fill('[data-nrl-clubname]', 'Landscape FC');
     await tap('[data-nrl-start]');
     await page.waitForSelector('.nrl-tutorial-skip');
@@ -965,7 +1007,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   // Popups: the player page, the kit designer, a rival's squad, a decision card.
   await step('popup-player', async (rec) => {
     await openNav(page, 'squad');
-    await tap('.nrl-screen-region [data-player-open]');
+    await tap('.nrl-screen-region [data-player-open] .nrl-row-name');
     await page.waitForSelector('[data-player-page]');
     return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats',
       primary: ['[data-player-action="renew"]', '[data-player-action="sell"]', '[data-player-action="release"]'] }, null);
@@ -982,6 +1024,23 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await tap('.nrl-ladder-table .nrl-ladder-club');
     await page.waitForSelector('.nrl-rival-modal');
     return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row' }, null);
+  });
+  // Settings (#349 E1): behind the gear, every switch whole; Import asks on its own row first.
+  await step('popup-settings', async (rec) => {
+    await closeAll();
+    await tap('.nrl-audio-gear');
+    await page.waitForSelector('.nrl-settings-modal');
+    const out = await check(rec, { box: '.nrl-settings-modal', rows: '.nrl-audio-row', primary: ['.nrl-rivals-toggle .nrl-switch', '.nrl-settings-import .nrl-btn'] }, null);
+    await tap('.nrl-settings-import .nrl-btn');
+    await page.waitForSelector('.nrl-settings-ask');
+    const cancel = '.nrl-settings-import .nrl-btn:not(.nrl-settings-import-go)';
+    out.push(...(await check(rec, { box: '.nrl-settings-modal', rows: '.nrl-audio-row', primary: ['.nrl-settings-import-go', cancel] }, null))
+      .map((p) => `import asking: ${p}`));
+    await page.screenshot({ path: join(OUT, 'settings-import-ask.png') });
+    await tap(cancel);
+    if (await page.locator('.nrl-settings-ask').count()) out.push('Cancel left the import question up');
+    await page.locator('.nrl-settings-modal .nrl-screen-x').tap();
+    return out;
   });
   // #345: a waiting card is one row on News, which keeps its feed; Answer opens the card.
   await step('news-decision-banner', async (rec) => {
@@ -1138,6 +1197,8 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     const out = [];
     if ((await page.locator('.nrl-mo-log-toggle').getAttribute('aria-expanded')) !== 'true') await page.locator('.nrl-mo-log-toggle').tap();
     await page.waitForTimeout(300);
+    // A try just scored puts up the Replay try chip, and the lane waits it out; let it go first.
+    await page.waitForFunction(() => !document.querySelector('.nrl-mo-replay:not([hidden])'), null, { timeout: 20000 }).catch(() => {});
     await page.evaluate(() => {
       window.__nrlNotify({ text: 'Sponsor news for the club', kind: 'info' });
       window.__nrlNotify({ text: 'Kai Smith comes in for the injured Jack Taufa at fullback.', kind: 'info', match: true });
@@ -1166,12 +1227,15 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await page.locator('.nrl-mo-log-toggle').tap();
     return out;
   });
-  // The full-time report (#351 P0): its ✕, the result and Player of the Match on screen.
+  // The full-time report (#351 P0, P2): the result and Player of the Match on screen,
+  // Back to Club its one exit, and the plan changes folded into one line.
   await step('popup-fulltime-report', async (rec) => {
     await page.locator('.nrl-mo-controls [data-pause]').tap();
     await page.locator('.nrl-mo-sheet [data-skip]').tap();
     await page.waitForSelector('.nrl-report', { timeout: 60000 });
-    const out = await check(rec, { box: '.nrl-report-modal', rows: '.nrl-report-score, .nrl-report-potm', card: '.nrl-report-head' }, null);
+    const out = await check(rec, { box: '.nrl-report-modal', rows: '.nrl-report-score, .nrl-report-potm', card: '.nrl-report-head', exit: '.nrl-match-back' }, null);
+    if (!(await page.locator('.nrl-report-result').count())) out.push('no WIN / LOSS / DRAW headline');
+    if (await page.locator('.nrl-report > .nrl-report-change').count()) out.push('plan changes shown as loose lines, not folded');
     out.push(...await page.evaluate(() => {
       const potm = document.querySelector('.nrl-report-potm');
       if (!potm) return [];
@@ -1179,6 +1243,29 @@ async function runScreens(browser, { w: W, h: H, safe }) {
       const card = document.querySelector('.nrl-report-modal').getBoundingClientRect();
       return r.bottom <= card.bottom + 1 && r.top >= card.top - 1 ? [] : ['Player of the Match below the fold'];
     }));
+    return out;
+  });
+  // The title with a saved club (#350 T1, T2): a card per slot, Continue on screen;
+  // New game on a slot in use asks before Start replaces it, and Cancel keeps it.
+  await step('title-slots', async (rec) => {
+    await page.reload();
+    await page.waitForSelector('[data-nrl-continue-1]');
+    await setInsets();
+    await page.waitForTimeout(250);
+    rec.notes.push((await page.locator('[data-nrl-slot-label-1]').textContent()) ?? '');
+    return controlsProblems(page, ['[data-nrl-continue-1]', '[data-nrl-new-1]', '[data-nrl-delete-1]', '[data-nrl-new-2]', '[data-nrl-import]'], safe);
+  });
+  await step('title-overwrite-confirm', async () => {
+    await tap('[data-nrl-new-1]');
+    await page.waitForSelector('[data-nrl-start]');
+    await tap('[data-nrl-start]');
+    await page.waitForSelector('[data-nrl-confirm]');
+    await page.waitForTimeout(200);
+    const out = await controlsProblems(page, ['[data-nrl-back]', '[data-nrl-start-confirm]', '[data-nrl-start-cancel]'], safe);
+    await tap('[data-nrl-start-cancel]');
+    if (await page.locator('[data-nrl-confirm]').count()) out.push('Cancel left the overwrite question up');
+    await tap('[data-nrl-back]');
+    await page.waitForSelector('[data-nrl-continue-1]');
     return out;
   });
 

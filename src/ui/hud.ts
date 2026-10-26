@@ -21,6 +21,10 @@ export interface HudOpts {
   onAdvanceUntil?: (target: AdvanceTarget) => unknown;
   /** Called from the next-match chip (#350 H1). Absent => the chip is a plain readout. */
   onNextMatch?: () => void;
+  /** Called from the money tile (#351 H2). Absent => the tile is a plain readout. */
+  onMoney?: () => void;
+  /** Weeks the balance lasts at this week's burn, null when the club is not losing money (#351 H2). */
+  runwayWeeks?: (s: GameState) => number | null;
 }
 
 /** Entries in the "Advance Week" menu, in display order. */
@@ -59,6 +63,29 @@ export const IN_DEBT_TEXT = 'in debt';
  */
 export function moneyTile(balance: number): { text: string; inDebt: boolean } {
   return { text: fmtMoney(balance), inDebt: balance < ECON.BANKRUPTCY_WARN };
+}
+
+/** The money tile turns amber below this many weeks of runway, red below the next (#351 H2). */
+export const RUNWAY_LOW_WEEKS = 20;
+export const RUNWAY_SHORT_WEEKS = 8;
+export const RUNWAY_CLASS = { low: 'nrl-money-low', short: 'nrl-money-short' } as const;
+
+/** How worried the money tile looks: the weeks the balance lasts at this week's burn. */
+export function runwayLevel(weeks: number | null): 'ok' | 'low' | 'short' {
+  if (weeks === null) return 'ok';
+  return weeks < RUNWAY_SHORT_WEEKS ? 'short' : weeks < RUNWAY_LOW_WEEKS ? 'low' : 'ok';
+}
+
+/** The money tile's spoken label and tooltip: the balance, the runway when it is short, the tap. */
+export function moneyTileLabel(balance: number, weeks: number | null, tappable: boolean): string {
+  const tile = moneyTile(balance);
+  const parts = [`Money ${tile.text}${tile.inDebt ? `, ${IN_DEBT_TEXT}` : ''}`];
+  if (!tile.inDebt && weeks !== null && runwayLevel(weeks) !== 'ok') {
+    const n = Math.floor(weeks);
+    parts.push(`Enough for ${n === 1 ? 'about 1 week' : `about ${n} weeks`} at this week's spending`);
+  }
+  if (tappable) parts.push('Tap for Finance');
+  return parts.join('. ');
 }
 
 /** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th, 21st. */
@@ -168,7 +195,11 @@ export function createHud(opts: HudOpts = {}): Hud {
   ensureStyles();
 
   // Readout tiles.
-  const moneyEl = el('div', { class: 'nrl-hud-stat', attrs: { 'data-hud': 'money' } });
+  // #351 H2: the balance, amber or red as the runway shortens; a tap opens Finance.
+  const moneyEl = opts.onMoney
+    ? el('button', { class: 'nrl-hud-stat nrl-hud-money', attrs: { type: 'button', 'data-hud': 'money' }, onClick: () => opts.onMoney?.() })
+    : el('div', { class: 'nrl-hud-stat', attrs: { 'data-hud': 'money' } });
+  let runway: number | null = null;
   const weekEl = el('div', { class: 'nrl-hud-stat', attrs: { 'data-hud': 'week' } });
   const seasonEl = el('div', { class: 'nrl-hud-stat', attrs: { 'data-hud': 'season' } });
 
@@ -271,6 +302,12 @@ export function createHud(opts: HudOpts = {}): Hud {
     // The space keeps the tile's text "-$6,070 in debt" for screen readers (#239).
     if (tile.inDebt) moneyEl.append(' ', el('span', { class: 'nrl-hud-debt', text: IN_DEBT_TEXT }));
     moneyEl.classList.toggle(IN_DEBT_CLASS, tile.inDebt);
+    const level = tile.inDebt ? 'ok' : runwayLevel(runway);
+    moneyEl.classList.toggle(RUNWAY_CLASS.low, level === 'low');
+    moneyEl.classList.toggle(RUNWAY_CLASS.short, level === 'short');
+    const label = moneyTileLabel(balance, runway, !!opts.onMoney);
+    moneyEl.setAttribute('aria-label', label);
+    moneyEl.title = label;
 
     if (lastMoney !== null && balance !== lastMoney) {
       const up = balance > lastMoney;
@@ -285,6 +322,7 @@ export function createHud(opts: HudOpts = {}): Hud {
   }
 
   function render(s: GameState): void {
+    runway = opts.runwayWeeks?.(s) ?? null;
     renderMoney(s.money);
     // "/total" suffix is a separate span so narrow-screen CSS can hide it.
     weekEl.textContent = '';

@@ -4,7 +4,8 @@ import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
-import { enableAutosave, load, showTitleFlow } from './core/save';
+import { enableAutosave, load } from './core/save';
+import { showTitleFlow } from './ui/title';
 import { advanceWeek } from './core/time';
 import { advanceUntil } from './core/advance';
 import { createHud } from './ui/hud';
@@ -24,7 +25,7 @@ import { registerStatsSystem } from './systems/stats';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
-import { initBoardUi, openStaffScreen } from './ui/screens/board';
+import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/board';
 import { initMatchReport } from './ui/screens/matchReport';
 import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
@@ -34,7 +35,7 @@ import { openLineupScreen } from './ui/screens/lineup';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
-import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
+import { financeSummary, initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
 import { openContractsScreen } from './ui/screens/contracts';
 import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
 import { advanceUntilAsked, askBeforeAdvance, pendingDecisionCount } from './ui/decisions';
@@ -165,6 +166,8 @@ async function boot(): Promise<void> {
     onAdvanceWeek: () => askBeforeAdvance(1, () => advanceWeek()),
     onAdvanceUntil: (t) => advanceUntilAsked(t, advanceUntil),
     onNextMatch: () => nav.open('fixtures'),
+    onMoney: () => nav.open('finance'),
+    runwayWeeks: (s) => financeSummary(s).runwayWeeks,
   });
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
@@ -194,7 +197,7 @@ async function boot(): Promise<void> {
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { more: true });
   nav.registerScreen('build', 'Build', () => openBuildScreen(), { more: true });
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), { more: true });
-  nav.registerScreen('staff', 'Staff', () => openStaffScreen(), { more: true });
+  nav.registerScreen('staff', STAFF_SCREEN_TITLE, () => openStaffScreen(), { more: true });
   nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { more: true });
   nav.registerScreen('history', 'History', () => openHistoryScreen(), { more: true });
   // The Guide (#188); Replay tutorial is in its footer.

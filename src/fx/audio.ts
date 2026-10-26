@@ -13,9 +13,9 @@
 //    pointer/key listener that resume()s it on the first user gesture.
 
 import { bus } from '../core/events';
-import { getState, setState } from '../core/state';
-import { el, panel, button, mount, openModal, closeModal } from '../ui/dom';
-import { downloadSave, getActiveSlot, importIntoSlot, pickSaveFile } from '../core/save';
+import { getState, setState, type GameState } from '../core/state';
+import { el, button, mount, openModal, closeModal } from '../ui/dom';
+import { downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, save } from '../core/save';
 import { startTutorial } from '../ui/tutorial';
 import { canInstall, promptInstall } from './pwa';
 
@@ -664,11 +664,17 @@ export function _resetAudioForTest(): void {
   engine = null;
 }
 
+/** The gear on the top bar: drawn on a 16px grid so it stays crisp, the same on every phone. */
+const GEAR_SVG = '<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" shape-rendering="crispEdges">'
+  + '<path fill="currentColor" fill-rule="evenodd" d="M4 3h8v1h1v8h-1v1H4v-1H3V4h1zM6 6h4v4H6zM7 0h2v3H7zM7 13h2v3H7zM0 7h3v2H0zM13 7h3v2h-3zM2 2h2v2H2zM12 2h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z"/></svg>';
+
 /**
- * Mount the settings popup (volume, mute, tutorial Replay, optional PWA Install)
- * into #ui-root. Reads initial control state from getState().settings; changes
- * flow through the engine (which persists via setState). No-op in non-browser
- * envs. GitHub #9 / BAK-202 S6 + BAK-204 Install button.
+ * Mount the Settings dialog and its gear on the top bar (#349 E1): sound, the
+ * match settings (coach calls, rival matches on the engine, #350 X3: they were
+ * on Fixtures), the tutorial's Replay, saves and the PWA Install. Every switch is
+ * read from getState().settings when the dialog opens; sound flows through the
+ * engine (which persists via setState), the match settings are saved at once.
+ * No-op in non-browser envs. GitHub #9 / BAK-202 S6 + BAK-204 Install button.
  */
 export function initAudioUi(): void {
   if (typeof document === 'undefined') return;
@@ -689,13 +695,23 @@ export function initAudioUi(): void {
     eng.setVolume(Number(slider.value) / 100);
   });
 
-  const muteBox = el('input', {
-    attrs: { type: 'checkbox', 'aria-label': 'Mute' },
-  });
-  muteBox.checked = settings.muted;
-  muteBox.addEventListener('change', () => {
-    eng.setMuted(muteBox.checked);
-  });
+  /** A 44px switch with what it does under its name. */
+  const toggle = (name: string, hint: string, get: () => boolean, set: (on: boolean) => void, cls = ''): { row: HTMLElement; sync: () => void } => {
+    const box = el('input', { class: 'nrl-switch', attrs: { type: 'checkbox', 'aria-label': name } });
+    box.addEventListener('change', () => set(box.checked));
+    const row = el('label', { class: `nrl-audio-row nrl-settings-toggle${cls ? ` ${cls}` : ''}` },
+      box, el('span', { class: 'nrl-settings-text' }, el('b', { text: name }), ...(hint ? [el('small', { text: hint })] : [])));
+    return { row, sync: () => { box.checked = get(); } };
+  };
+  const setSetting = (patch: Partial<GameState['settings']>): void => {
+    setState({ settings: { ...getState().settings, ...patch } });
+    save(getState());
+  };
+  const mute = toggle('Mute', '', () => getState().settings.muted, (on) => eng.setMuted(on));
+  const coachCalls = toggle('Coach calls', 'Nudge your side during a match: hit-up, shift, kick early, rush…',
+    () => getState().settings.coachCalls !== false, (on) => setSetting({ coachCalls: on }), 'nrl-live-toggle');
+  const liveRivals = toggle('Rival matches played out', 'Real stats and injuries for every result. Match weeks take longer on a phone.',
+    () => getState().settings.liveRivals === true, (on) => setSetting({ liveRivals: on }), 'nrl-live-toggle nrl-rivals-toggle');
 
   const installBtn = button('Install app', () => {
     void promptInstall().then((outcome) => {
@@ -720,31 +736,52 @@ export function initAudioUi(): void {
   });
 
   const exportBtn = button('Export save', () => downloadSave(getState()));
-  const importBtn = button('Import save', () => {
-    void pickSaveFile().then((text) => {
-      if (text === null) return;
-      // Replaces the active slot, then reload so the title screen picks it up.
-      if (importIntoSlot(text, getActiveSlot()) && typeof location !== 'undefined') {
-        setTimeout(() => location.reload(), 600);
-      }
-    });
-  });
+  // Import replaces the slot being played and reloads, so it asks first, on its own row.
+  const importRow = el('div', { class: 'nrl-audio-row nrl-settings-import' });
+  const importIdle = (): void => {
+    importRow.replaceChildren(button('Import save…', () => {
+      const s = getState();
+      importRow.replaceChildren(
+        el('span', { class: 'nrl-settings-ask', text: `Replace slot ${getActiveSlot()} (${s.clubName}, S${s.season} W${s.week}) with a save file? The game reloads.` }),
+        button('Choose file', () => {
+          void pickSaveFile().then((text) => {
+            if (text === null) return;
+            if (importIntoSlot(text, getActiveSlot()) && typeof location !== 'undefined') {
+              setTimeout(() => location.reload(), 600);
+            }
+          });
+        }, { class: 'nrl-settings-import-go' }),
+        button('Cancel', importIdle),
+      );
+    }));
+  };
 
-  const content = panel(
+  const content = el(
+    'div',
     { class: 'nrl-audio-settings' },
-    el('h3', { text: 'Settings', class: 'nrl-audio-title' }),
-    el('label', { class: 'nrl-audio-row' }, el('span', { text: 'Volume' }), slider),
-    el('label', { class: 'nrl-audio-row' }, muteBox, el('span', { text: 'Mute' })),
-    el('div', { class: 'nrl-audio-row' }, replayBtn),
-    el('div', { class: 'nrl-audio-row' }, exportBtn, importBtn),
-    el('div', { class: 'nrl-audio-row nrl-audio-install-row' }, installBtn),
-    button('Close', () => closeModal()),
+    el('h2', { text: 'Settings', class: 'nrl-audio-title' }),
+    el('div', { class: 'nrl-settings-cols' },
+      el('div', { class: 'nrl-settings-col' },
+        el('label', { class: 'nrl-audio-row' }, el('b', { text: 'Volume' }), slider),
+        mute.row, coachCalls.row, liveRivals.row),
+      el('div', { class: 'nrl-settings-col' },
+        el('div', { class: 'nrl-audio-row' }, replayBtn),
+        el('div', { class: 'nrl-audio-row' }, exportBtn),
+        importRow,
+        el('div', { class: 'nrl-audio-row nrl-audio-install-row' }, installBtn)),
+    ),
   );
 
-  const openBtn = button('♪', () => {
+  const openBtn = button('', () => {
     syncInstallVisibility();
-    openModal(content);
+    for (const t of [mute, coachCalls, liveRivals]) t.sync();
+    slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
+    importIdle();
+    openModal(content, { class: 'nrl-settings-modal', region: true, closeButton: true });
   }, { class: 'nrl-audio-gear' });
+  openBtn.innerHTML = GEAR_SVG;
+  openBtn.setAttribute('aria-label', 'Settings');
+  openBtn.title = 'Settings';
   const holder = el('div', { class: 'nrl-audio-launcher' }, openBtn);
   ensureAudioStyles();
   mount(holder);
@@ -770,19 +807,61 @@ function ensureAudioStyles(): void {
 }
 .nrl-hud { padding-right: calc(3.75rem + var(--nrl-safe-r, 0px)); }
 @media (max-height: 500px) { .nrl-audio-launcher { top: calc(2px + var(--nrl-safe-t, 0px)); } }
-.nrl-audio-gear { pointer-events: auto; font-size: 1.1rem; }
+.nrl-audio-gear { pointer-events: auto; display: flex; align-items: center; justify-content: center; padding: 0.3rem; }
+.nrl-audio-gear svg { display: block; }
 .nrl-audio-settings { min-width: 220px; }
-.nrl-audio-title { margin: 0 0 0.5rem; }
+.nrl-dialog-region .nrl-settings-modal { width: min(96vw, 680px); max-width: none; }
+.nrl-audio-title { margin: 0; font-size: 1rem; min-height: 44px; display: flex; align-items: center; padding-right: 2.75rem; }
+.nrl-settings-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 1rem; }
 .nrl-audio-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0.4rem 0;
+  margin: 0.3rem 0;
+  min-height: 44px;
   pointer-events: auto;
 }
-.nrl-audio-slider { flex: 1 1 auto; pointer-events: auto; }
-/* N14 (#263): the Mute box a finger can hit on a touch screen (was 13px). */
-@media (pointer: coarse) { .nrl-audio-row input[type="checkbox"] { width: 44px; height: 44px; margin: 0; } }
+.nrl-settings-toggle { cursor: pointer; }
+.nrl-settings-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; font-size: 0.8rem; }
+.nrl-settings-text small { font-size: 0.68rem; opacity: 0.85; }
+.nrl-settings-ask { flex: 1 1 100%; font-size: 0.75rem; line-height: 1.25; }
+.nrl-settings-import { flex-wrap: wrap; }
+/* 956x330: three columns of rows, so every switch and the Import question sit on screen unscrolled. */
+@media (max-height: 340px) {
+  .nrl-dialog-region .nrl-settings-modal { width: min(96vw, 940px); }
+  .nrl-settings-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; }
+  .nrl-settings-col { display: contents; }
+  .nrl-audio-row { margin: 0.1rem 0; }
+  .nrl-settings-import { grid-row: span 2; align-self: start; }
+}
+/* A switch a finger can hit (N14, #263; X3): 52×44, the track and its knob drawn in its background. */
+.nrl-switch {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  width: 52px;
+  height: 44px;
+  margin: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  background:
+    linear-gradient(#fff, #fff) no-repeat 11px 50% / 14px 14px,
+    linear-gradient(#8a8a8a, #8a8a8a) no-repeat 50% 50% / 38px 20px,
+    linear-gradient(#000, #000) no-repeat 50% 50% / 44px 26px;
+}
+.nrl-switch:checked {
+  background:
+    linear-gradient(#fff, #fff) no-repeat 27px 50% / 14px 14px,
+    linear-gradient(#7ec850, #7ec850) no-repeat 50% 50% / 38px 20px,
+    linear-gradient(#000, #000) no-repeat 50% 50% / 44px 26px;
+}
+.nrl-switch:focus-visible { outline: 3px solid #f4d03f; }
+/* The volume slider in the kit's colours (#349 E1), 44px tall to take a thumb. */
+.nrl-audio-slider { -webkit-appearance: none; appearance: none; flex: 1 1 auto; min-width: 120px; height: 44px; margin: 0; background: transparent; pointer-events: auto; }
+.nrl-audio-slider::-webkit-slider-runnable-track { height: 10px; background: #1a1a2e; border: 2px solid #000; }
+.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 30px; margin-top: -12px; background: #f4d03f; border: 3px solid #000; box-shadow: 2px 2px 0 #000; }
+.nrl-audio-slider::-moz-range-track { height: 6px; background: #1a1a2e; border: 2px solid #000; }
+.nrl-audio-slider::-moz-range-thumb { width: 16px; height: 24px; border-radius: 0; background: #f4d03f; border: 3px solid #000; }
 `;
   document.head.appendChild(style);
 }

@@ -332,7 +332,7 @@ export class PlacementController {
   /**
    * Re-validate and, if valid, commit: spend money, append the PlacedFacility,
    * block footprint tiles for pathing, and exit. Invalid confirm mutates nothing
-   * and emits a ui:notify danger. Returns the validation result either way.
+   * and emits a neutral ui:notify (a refusal, not a problem: #339). Returns the validation result either way.
    */
   confirm(): PlaceValidation {
     if (this.defId === null) return { ok: false, reason: 'out-of-bounds' };
@@ -343,7 +343,7 @@ export class PlacementController {
     if (!v.ok) {
       bus.emit('ui:notify', {
         text: reasonText(v.reason ?? ''),
-        kind: 'danger',
+        kind: 'info',
       });
       return v;
     }
@@ -366,7 +366,7 @@ export class PlacementController {
   private confirmMove(def: FacilityDef): PlaceValidation {
     const r = moveFacility(this.moving!.id, this.gx, this.gy);
     if (!r.ok) {
-      bus.emit('ui:notify', { text: reasonText(r.reason ?? ''), kind: 'danger' });
+      bus.emit('ui:notify', { text: reasonText(r.reason ?? ''), kind: 'info' });
       return r;
     }
     if (r.fee) bus.emit('ui:notify', { text: `${def.name} moved (−$${r.fee.toLocaleString('en-US')}).`, kind: 'success' });

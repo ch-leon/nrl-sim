@@ -423,6 +423,12 @@ export const CSS = `
 .nrl-hud-stat.nrl-flash-up { background: #7ec850; color: #0a2a00; }
 .nrl-hud-stat.nrl-flash-down { background: #e06666; color: #2a0000; }
 .nrl-hud-stat.nrl-money-negative { color: #b00020; }
+/* #351 H2: under 20 weeks of runway the tile goes amber, under 8 red. */
+.nrl-hud-stat.nrl-money-low { color: #8a4b00; border-color: #d08a00; }
+.nrl-hud-stat.nrl-money-short { color: #b00020; border-color: #b00020; }
+button.nrl-hud-stat { font-family: inherit; line-height: inherit; cursor: pointer; }
+button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 1px; }
+@media (pointer: coarse) { .nrl-hud-readouts .nrl-hud-stat { box-sizing: border-box; min-height: 44px; display: inline-flex; align-items: center; } }
 /* N12.5: "in debt" beside a negative balance, a red tag that reads through the flash. */
 .nrl-hud-debt { padding: 0 0.3em; font-size: 0.75em; background: #b00020; color: #fff; vertical-align: 0.1em; }
 /* #239: below 760px the tag wraps the HUD onto a second row (93px against 60px at
@@ -658,13 +664,21 @@ export const CSS = `
 .nrl-potm-backdrop { pointer-events: none; background: transparent; }
 .nrl-potm-backdrop .nrl-modal { pointer-events: auto; }
 /* The match report (N9.5): as wide as a screen, above Back to Club, scrolling inside. */
-.nrl-report-backdrop { bottom: 3.75rem; align-items: flex-start; padding-top: 0.5rem; }
+.nrl-report-backdrop { bottom: calc(3.75rem + var(--nrl-safe-b)); align-items: flex-start; padding: calc(0.5rem + var(--nrl-safe-t)) var(--nrl-safe-r) 0 var(--nrl-safe-l); }
 .nrl-report-backdrop .nrl-modal { width: min(96vw, 720px); max-width: none; max-height: calc(100% - 0.75rem); padding: 0.6rem 0.8rem; }
 .nrl-report-head { min-height: 44px; }
 .nrl-modal-has-x .nrl-report-head { padding-right: 2.75rem; }
 .nrl-report h2 { margin: 0 0 0.2rem; font-size: 1rem; }
 .nrl-report p { margin: 0.15rem 0; font-size: 0.8rem; }
 .nrl-report .nrl-report-score { font-size: 1.05rem; font-weight: bold; }
+/* #351 P2: a win and a loss look different. Green for a win; a loss is no error, so slate, not red. */
+.nrl-report-result { display: inline-block; padding: 0.05rem 0.4rem; border: 2px solid #000; font-size: 0.9rem; letter-spacing: 1px; }
+.nrl-report-win { background: #2d6a2f; color: #fff; }
+.nrl-report-loss { background: #5a6b85; color: #fff; }
+.nrl-report-draw { background: #e8e0c8; color: #1a1a2e; }
+.nrl-report-changes { margin: 0.15rem 0; font-size: 0.8rem; }
+.nrl-report-changes summary { cursor: pointer; min-height: 1.6rem; line-height: 1.6rem; }
+@media (pointer: coarse) { .nrl-report-changes summary { min-height: 44px; line-height: 44px; } }
 .nrl-report-body { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.3rem 0; }
 .nrl-report-scoring { flex: 1 1 18rem; display: flex; gap: 0.8rem; }
 .nrl-report-side { flex: 1 1 0; min-width: 0; }
@@ -872,18 +886,22 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-books-heading { margin: 0 0 0.5rem; font-weight: bold; }
 .nrl-books-summary { margin: 0.5rem 0; }
 .nrl-books-closing td { font-weight: bold; border-top: 1px solid #c8c0a8; }
-/* Only the table scrolls, so the heading, the summary and Close stay in view at phone height. */
-.nrl-screen-backdrop .nrl-books-modal { display: flex; flex-direction: column; }
+/* Only the table scrolls, so the header row, the heading and the summary stay in view at phone height. */
+.nrl-screen-backdrop .nrl-books-modal { display: flex; flex-direction: column; width: min(96vw, 720px); }
+@media (max-height: 340px) { .nrl-books-heading { font-size: 0.8rem; margin-bottom: 0.25rem; } }
 .nrl-season-books { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-season-books > .nrl-finance-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-season-books h2 { margin: 0 0 0.2rem; }
-.nrl-books-close { align-self: flex-start; }
 .nrl-finance-past { margin-top: 0.4rem; }
 
 /* ── Season review (N7, #190) ──────────────────────────────────────────── */
-.nrl-modal.nrl-review-modal { max-width: min(94vw, 560px); }
-.nrl-season-review { font-size: 0.85rem; }
-.nrl-season-review h2 { margin: 0 0 0.3rem; font-size: 1.1rem; }
+.nrl-modal.nrl-review-modal { max-width: min(96vw, 720px); }
+.nrl-season-review { font-size: 0.85rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-review-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* #351 E2: the review and the books open on one header row (title, the way to
+   History, and the frame's ✕ beside it) that holds still while the rest scrolls. */
+.nrl-review-head { display: flex; align-items: center; gap: 0.5rem; flex: 0 0 auto; min-height: 44px; padding-right: 2.75rem; margin-bottom: 0.3rem; }
+.nrl-review-head h2 { margin: 0; font-size: 1.1rem; min-width: 0; }
+.nrl-review-head .nrl-btn { margin-left: auto; flex: 0 0 auto; padding: 0.25rem 0.6rem; font-size: 0.8rem; }
 .nrl-review-finish {
   font-weight: bold;
   font-size: 1.05rem;
@@ -897,8 +915,6 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-review-objectives { margin: 0 0 0.2rem 1.1rem; padding: 0; font-size: 0.8rem; }
 .nrl-review-good { color: #1f5f24; }
 .nrl-review-bad { color: #b00020; }
-.nrl-review-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
-.nrl-review-actions .nrl-btn { flex: 1 1 8rem; }
 
 /* ── Finance (GitHub #39) ────────────────────────────────────────────── */
 .nrl-finance { font-size: 0.85rem; }
@@ -941,8 +957,17 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-finance-pnl-table { width: 100%; }
 .nrl-finance-pnl-net td { font-weight: bold; border-top: 2px solid #000; }
 .nrl-finance-pnl-sub td { font-size: 0.72rem; color: #555; padding-top: 0; }
-/* N14.5, #344: the Staff screen, one parchment row per role. */
-.nrl-screen-body.nrl-staff { grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); align-content: start; font-size: 0.85rem; }
+/* N14.5, #344, #350 F1: Staff & Board. The board's panel on the left, one
+   parchment row per staff role beside it; one column on a narrow screen. */
+.nrl-screen-body.nrl-staff { grid-template-columns: clamp(12rem, 30%, 17rem) minmax(0, 1fr); align-items: start; font-size: 0.85rem; }
+.nrl-staff .nrl-board-panel { margin: 0; }
+.nrl-staff-list { display: grid; gap: 0.5rem; align-content: start; }
+.nrl-board h3 { margin: 0 0 0.2rem; font-size: 0.9rem; }
+.nrl-board-patience { margin: 0 0 0.3rem; font-size: 0.75rem; }
+.nrl-board-obj { padding: 0.15rem 0; border-top: 1px solid #b8ae92; font-size: 0.78rem; }
+@media (max-width: 600px) {
+  .nrl-screen-body.nrl-staff { grid-template-columns: minmax(0, 1fr); }
+}
 .nrl-staff-row {
   display: flex;
   align-items: center;
@@ -955,6 +980,18 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-staff-info { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 .nrl-staff-blurb { font-size: 0.72rem; color: #555; }
 .nrl-staff-row .nrl-btn { flex: 0 0 auto; margin-right: 3px; } /* clear of the row's edge and its shadow */
+/* 956×330: the head and the board make a left column and the staff rows take the
+   full height beside them, each blurb run on after the role's name. */
+@media (max-height: 340px) {
+  .nrl-screen:has(> .nrl-staff) { position: relative; display: grid; grid-template-columns: clamp(12rem, 30%, 17rem) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); column-gap: 0.5rem; }
+  .nrl-screen:has(> .nrl-staff) > .nrl-screen-head { grid-column: 1; grid-row: 1; min-width: 0; }
+  .nrl-screen:has(> .nrl-staff) .nrl-screen-x { position: absolute; top: 0.35rem; right: calc(0.5rem + var(--nrl-safe-r)); }
+  .nrl-screen-body.nrl-staff { display: contents; }
+  .nrl-staff .nrl-board-panel { grid-column: 1; grid-row: 2; min-height: 0; max-height: 100%; overflow-y: auto; }
+  .nrl-staff-list { grid-column: 2; grid-row: 1 / -1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 3.25rem 3px 0; }
+  .nrl-staff-info { display: block; line-height: 1.2; }
+  .nrl-staff-info strong { margin-right: 0.4em; }
+}
 
 /* ── News inbox (#45) ─────────────────────────────────────────────────── */
 .nrl-nav-badge {
@@ -993,12 +1030,12 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   padding: 0 3px 3px 0;
 }
 .nrl-news-filter { flex: 0 0 auto; }
-.nrl-news-filter.nrl-news-active { background: #3a6ea5; color: #fff; }
+.nrl-news-filter.nrl-news-active, .nrl-news-filter.nrl-news-active:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
 .nrl-news-list { overflow-y: visible; }
 .nrl-news-item {
   padding: 0.2rem 0.4rem;
   margin-bottom: 0.25rem;
-  border-left: 4px solid #3a6ea5;
+  border-left: 4px solid #5a6b85; /* the info toast's edge (#339) */
   overflow-wrap: anywhere;
 }
 .nrl-news-item.nrl-news-success { border-left-color: #2e7d32; }
@@ -1019,6 +1056,16 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-news-decisions[hidden] { display: none; }
 .nrl-news-decisions-text { flex: 1 1 auto; min-width: 0; font-weight: bold; font-size: 0.85rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nrl-news-answer { flex: 0 0 auto; }
+/* 956×330: a waiting decision shares the title's row, so the feed keeps four items. */
+@media (max-height: 340px) {
+  .nrl-screen-backdrop .nrl-news-modal { width: min(96vw, 820px); }
+  .nrl-news { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); column-gap: 0.5rem; }
+  .nrl-news-head { padding-right: 0; }
+  .nrl-news-decisions { margin: 0 2.75rem 0.3rem 0; }
+  .nrl-news-decisions[hidden] + .nrl-news-body { grid-row: 2; }
+  .nrl-news-body { grid-column: 1 / -1; }
+  .nrl-news-head:has(+ .nrl-news-decisions[hidden]) { grid-column: 1 / -1; padding-right: 2.75rem; }
+}
 .nrl-event-card {
   background: #fff8e1;
   border: 3px solid #000;
@@ -1118,7 +1165,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-kit-controls { flex: 1 1 16rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
 .nrl-kit-label { font-size: 0.72rem; font-weight: bold; margin-top: 0.2rem; }
 .nrl-kit-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.nrl-kit-pattern[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
+.nrl-kit-pattern[aria-pressed="true"], .nrl-kit-pattern[aria-pressed="true"]:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
 .nrl-kit-swatch {
   pointer-events: auto;
   width: 44px; height: 44px; /* #194: a tap target */
@@ -1128,7 +1175,19 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-kit-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #000; }
 .nrl-kit-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; flex: 0 0 auto; padding: 0 3px 3px 0; }
 .nrl-screen-backdrop .nrl-kit-modal { width: min(96vw, 760px); }
-@media (max-height: 500px) { .nrl-kit-note { margin-bottom: 0.25rem; } }
+/* S4 (#351): on a landscape phone the title, note, preview and Save make a left
+   column, so the controls scroll beside them at the box's full height. */
+@media (max-height: 500px) {
+  .nrl-kit { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; column-gap: 0.75rem; }
+  .nrl-kit-body { display: contents; }
+  .nrl-kit h2 { grid-column: 1; grid-row: 1; font-size: 0.95rem; line-height: 1.3; }
+  .nrl-kit-note { grid-column: 1; grid-row: 2; max-width: 13.5rem; margin: 0.15rem 0 0.3rem; font-size: 0.7rem; }
+  .nrl-kit-preview { grid-column: 1; grid-row: 3; gap: 0.35rem; }
+  .nrl-kit-sprite { width: 56px; height: 60px; }
+  .nrl-kit-portrait { width: 52px; }
+  .nrl-kit-controls { grid-column: 2; grid-row: 1 / -1; padding-right: 2.75rem; }
+  .nrl-kit-actions { grid-column: 1; grid-row: 4; justify-content: flex-start; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem; }
+}
 /* ── League screen: the next-match card and the form guide (N7, #183) ──── */
 /* A landscape phone has width to spare and no height: let the league use it. */
 .nrl-screen-backdrop .nrl-league-modal { width: min(96vw, 760px); max-width: none; }
@@ -1142,6 +1201,15 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-league-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-ladder-table thead th { position: sticky; top: 0; z-index: 1; background: #e8e0c8; }
 @media (max-height: 500px) { .nrl-ladder-table th, .nrl-rival-table th { padding-top: 0.05rem; padding-bottom: 0.05rem; } }
+/* Too short for a header row above four 44px rows (956×330): the tabs and the note
+   become a rail down the left, and the ✕ keeps the top-right corner over a gutter. */
+@media (max-height: 340px) {
+  .nrl-league { flex-direction: row; gap: 0.5rem; }
+  .nrl-league-tabs { flex-direction: column; align-items: stretch; width: 6.5rem; margin: 0; }
+  .nrl-modal-has-x .nrl-league-tabs { padding-right: 0; }
+  .nrl-league-note { white-space: normal; font-size: 0.68rem; line-height: 1.25; }
+  .nrl-modal-has-x .nrl-league-body { padding-right: 2.75rem; }
+}
 .nrl-next-match {
   background: #fff8e1;
   border: 3px solid #000;
@@ -1191,8 +1259,14 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 /* The next-match card's opponent: the same text link, with a 44px hit area (#194). */
 .nrl-next-side .nrl-ladder-club { padding: 0.9rem 0.25rem; margin: -0.9rem -0.25rem; }
-/* The Fixtures tab's two toggles: a box you can see and hit (#194). */
-.nrl-toggle-box { width: 24px; height: 24px; margin: 0 0.3rem 0 0; flex: 0 0 auto; accent-color: #3a6ea5; }
+/* My season or every game (#351 X2): one row a round, your result's pip and score. */
+.nrl-fixtures-views { display: flex; gap: 0.4rem; margin: 0 0 0.3rem; }
+.nrl-fixture-mine { display: grid; grid-template-columns: minmax(0, 1fr) 1.4rem 3.2rem; align-items: center; gap: 0.4rem; padding: 0.2rem 0.4rem; border-bottom: 1px solid rgba(0,0,0,0.15); }
+.nrl-fixture-mine[data-current] { background: #fff6c2; }
+.nrl-fixture-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrl-fixture-score { text-align: right; }
+.nrl-next-form { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
+.nrl-next-form small { font-size: 0.68rem; color: #555; }
 .nrl-fixtures-round { margin: 0.6rem 0 0.2rem; font-size: 0.95rem; }
 .nrl-fixtures-round[data-current] { color: #b03a2e; }
 .nrl-fixture[data-player] { font-weight: bold; }
@@ -1213,11 +1287,22 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-modal-has-x .nrl-rival-head { padding-right: 2.75rem; }
 .nrl-rival-head h2 { margin: 0; font-size: 1rem; line-height: 1.2; }
 .nrl-rival-head p { margin: 0; font-size: 0.72rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 956×330: the club's block goes down the left, as the League's tabs do, so four rows show. */
+@media (max-height: 340px) {
+  .nrl-dialog-region .nrl-rival-modal { width: min(96vw, 760px); }
+  .nrl-rival-squad { flex-direction: row; gap: 0.5rem; }
+  .nrl-rival-head { flex: 0 0 10.5rem; justify-content: flex-start; margin: 0; }
+  .nrl-modal-has-x .nrl-rival-head { padding-right: 0; }
+  .nrl-rival-head p { white-space: normal; font-size: 0.68rem; }
+  .nrl-modal-has-x .nrl-rival-scroll { padding-right: 2.75rem; }
+}
 .nrl-rival-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .nrl-rival-table { border-collapse: collapse; font-size: 0.75rem; width: 100%; }
 .nrl-rival-table th, .nrl-rival-table td { padding: 0.15rem 0.3rem; text-align: left; white-space: nowrap; }
 .nrl-rival-table thead th { position: sticky; top: 0; background: #e8e0c8; }
 .nrl-rival-traits { font-size: 0.68rem; }
+/* Full trait names (#349 S3) wrap inside the 44px row rather than push the table past its box. */
+.nrl-rival-table td.nrl-rival-traits { white-space: normal; line-height: 1.2; min-width: 8rem; }
 /* Rows are tap targets for the player page (N7, #185). */
 .nrl-rival-table tbody tr.nrl-rival-row { height: 44px; cursor: pointer; }
 .nrl-rival-table tbody tr.nrl-rival-row:hover, .nrl-rival-table tbody tr.nrl-rival-row:focus-visible { background: #f4d03f; outline: none; }
@@ -1262,11 +1347,10 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   z-index: 1;
 }
 .nrl-player-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
-.nrl-player-actions .nrl-player-close { flex: 1 1 100%; }
 .nrl-modal-has-x .nrl-player-top { padding-right: 2.75rem; }
 /* A landscape phone (#336): who he is and his deal on the left, his stats and
-   traits on the right, so the stats show without scrolling; Close joins the
-   row (the ✕ is in the corner too). */
+   traits on the right, so the stats show without scrolling. The ✕ in the
+   corner is the one close (#349 A5). */
 @media (max-height: 500px) {
   .nrl-modal.nrl-player-modal { max-width: min(96vw, 760px); width: min(96vw, 760px); padding: 0.4rem 0.5rem; }
   .nrl-player-panel { padding: 0.35rem 0.5rem; }
@@ -1280,7 +1364,6 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-modal-has-x .nrl-player-about { padding-right: 2.75rem; }
   .nrl-modal-has-x .nrl-player-top { padding-right: 0; }
   .nrl-player-portrait { width: 56px; height: 56px; }
-  .nrl-player-actions .nrl-player-close { flex: 1 1 6rem; }
   .nrl-player-why { order: 1; }
 }
 .nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
@@ -1292,7 +1375,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-guide-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-guide-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
 .nrl-guide-tabs .nrl-btn { flex: 1 1 auto; font-size: clamp(0.6rem, 1.7vw, 0.85rem); padding: 0.4rem 0.45rem; }
-.nrl-guide-tabs .nrl-btn[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
+.nrl-guide-tabs .nrl-btn[aria-pressed="true"], .nrl-guide-tabs .nrl-btn[aria-pressed="true"]:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
 .nrl-guide h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
 .nrl-guide h3 { margin: 0.5rem 0 0.15rem; font-size: 0.88rem; border-bottom: 2px solid #b8ae92; }
 /* N14 (#263): the screen a page describes, one tap away. */
@@ -1316,9 +1399,9 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-modal-has-x .nrl-guide-tabs { padding-right: 2.75rem; }
 /* #206, #336: a landscape phone leaves the Guide little height. One row holds the
    tabs (swipe for more), Replay and the ✕, and the page has the rest, even with
-   Safari's text boost. */
+   Safari's text boost. The build label sits in the frame's bottom edge. */
 @media (max-height: 500px) {
-  .nrl-screen-backdrop .nrl-guide-modal { padding: 0.5rem 0.75rem; }
+  .nrl-screen-backdrop .nrl-guide-modal { padding: 0.5rem 0.75rem 0.85rem; }
   .nrl-guide { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); column-gap: 0.4rem; }
   .nrl-guide-tabs { grid-column: 1; grid-row: 1; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 0.3rem; padding: 0 3px 3px 0; }
   .nrl-modal-has-x .nrl-guide-tabs { padding-right: 3px; }
@@ -1326,7 +1409,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-guide-foot { grid-column: 2; grid-row: 1; align-self: start; flex-wrap: nowrap; margin: 0; padding: 0; border: 0; }
   .nrl-modal-has-x .nrl-guide-foot { margin-right: 2.75rem; }
   .nrl-guide-foot .nrl-btn { flex: 0 0 auto; }
-  .nrl-guide-build { display: none; }
+  .nrl-guide-build { position: absolute; right: 0.75rem; bottom: 0.1rem; font-size: 0.6rem; line-height: 1; pointer-events: none; }
   .nrl-guide-body { grid-column: 1 / -1; grid-row: 2; }
   .nrl-guide { font-size: 0.8rem; }
   .nrl-guide h2 { font-size: 0.95rem; }

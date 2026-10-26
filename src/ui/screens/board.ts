@@ -1,6 +1,6 @@
-// src/ui/screens/board.ts — board objectives section + sacked game-over modal
-// (GitHub #47, part of #49). The section is shown on the Finance screen; the
-// modal reuses the title/slot flow for "New club" by reloading to the title
+// src/ui/screens/board.ts — the Staff & Board screen, board objectives section and
+// sacked game-over modal (GitHub #47, part of #49). The objectives sit beside the
+// staff (#350 F1), out of the Finance screen's scroll; the modal reuses the title/slot flow for "New club" by reloading to the title
 // screen. The save is never deleted: the sacked slot stays and can be reviewed.
 import { bus } from '../../core/events';
 import { getState, type GameState } from '../../core/state';
@@ -51,9 +51,13 @@ export function staffRows(state: GameState): HTMLElement[] {
   return rows;
 }
 
+/** The Staff & Board screen's name, in its head and in the nav's More sheet. */
+export const STAFF_SCREEN_TITLE = 'Staff & Board';
+
 /**
- * The Staff screen (#344): its own place in the nav's More sheet, where it used
- * to sit at the foot of Finance. Re-renders on the state change a hire makes.
+ * The Staff & Board screen (#344, #350 F1): the board's objectives and patience,
+ * and the staff beside them, in the nav's More sheet. Both used to sit down
+ * Finance's scroll. Re-renders on the state change a hire makes.
  */
 export function openStaffScreen(): HTMLElement {
   const body = el('div', { class: 'nrl-screen-body nrl-staff' });
@@ -61,11 +65,11 @@ export function openStaffScreen(): HTMLElement {
   const render = (): void => {
     const s = getState();
     sub.textContent = `${s.staff.length} of ${STAFF_ROLES.length} hired · wages paid with the running costs`;
-    body.replaceChildren(...staffRows(s));
+    body.replaceChildren(buildObjectivesSection(s), el('div', { class: 'nrl-staff-list' }, ...staffRows(s)));
   };
   render();
   const off = bus.on('state:changed', render);
-  return openScreen(el('div', { class: 'nrl-screen' }, screenHead('Staff', { sub }), body), off, 'staff');
+  return openScreen(el('div', { class: 'nrl-screen' }, screenHead(STAFF_SCREEN_TITLE, { sub }), body), off, 'staff');
 }
 
 /** Game-over modal. Stays until "New club"; the save is kept in its slot. */

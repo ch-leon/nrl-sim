@@ -486,14 +486,15 @@ async function play() {
     const open = page.locator('[data-player-open]').first();
     if (!(await open.count())) return 'no player page on this build';
     const id = await open.getAttribute('data-player-open');
-    await press(open);
+    // His name: the row's middle can be a trait chip, which says what the trait does instead (#349 S3).
+    await press(open.locator('.nrl-row-name'));
     await page.waitForSelector(`[data-player-page="${id}"]`);
     const actions = await page.locator(`[data-player-page="${id}"] [data-player-action]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-player-action')));
     rec.notes.push(`player ${id}; actions ${actions.join(', ') || 'none'}`);
   });
   await step('player-page-closed', async () => {
     if (!(await page.locator('[data-player-page]').count())) return 'skipped';
-    await tap('.nrl-player-close');
+    await tap('.nrl-player-modal .nrl-screen-x');
     await page.waitForSelector('[data-player-page]', { state: 'detached', timeout: 5000 });
     await page.waitForSelector('.nrl-squad-kit');
   });
@@ -1025,8 +1026,9 @@ async function play() {
       if (await page.evaluate(() => (window.__nrlState?.().history ?? []).some((h) => h.review))) throw new Error('season 1 has a review but none opened at the rollover');
       return 'no season review on this build';
     }
-    rec.notes.push((await review.textContent())?.trim().replace(/\s+/g, ' ').slice(0, 90));
-    await tap('.nrl-review-close');
+    rec.notes.push((await review.locator('.nrl-review-finish').textContent())?.trim() ?? '');
+    // #351 E2: one header row, title and History beside the frame's ✕, no Close at the bottom.
+    await tap('.nrl-review-modal > .nrl-screen-x');
     await page.waitForSelector('[data-season-review]', { state: 'detached', timeout: 5000 });
   });
   await step('history', async () => { await navTo('history'); await wait(300); });
@@ -1035,8 +1037,9 @@ async function play() {
     if (!(await open.count())) return 'no review link on History';
     await press(open);
     await page.waitForSelector('[data-season-review="1"]');
-    await tap('.nrl-review-close');
-    rec.notes.push('season 1 review reopened from History');
+    await tap('.nrl-review-head .nrl-review-history');
+    await page.waitForSelector('.nrl-history-review');
+    rec.notes.push('season 1 review reopened from History, and back to History from its header');
   });
   await step('season-2-week-2', async (rec) => {
     await closeAny();
@@ -1061,7 +1064,8 @@ async function play() {
   await step('held-week', async (rec) => {
     await closeAny();
     await answerCards(rec);
-    await navTo('fixtures');
+    // The setting is in Settings, behind the gear (#350 X3).
+    await tap('.nrl-audio-gear');
     const toggle = page.locator('.nrl-rivals-toggle input[type="checkbox"]');
     if (!(await toggle.count())) return 'no rival-rounds setting on this build';
     await press(toggle);
@@ -1123,7 +1127,7 @@ async function play() {
     await dumpSave('live-rivals', rec);
     // Back to the default for whatever runs next.
     await page.evaluate(() => { window.__nrlWorkerDelayMs = 0; });
-    await navTo('fixtures');
+    await tap('.nrl-audio-gear');
     await press(page.locator('.nrl-rivals-toggle input[type="checkbox"]'));
     await closeAny();
   }, { quietToasts: true });
@@ -1138,9 +1142,11 @@ async function play() {
     await tap('.nrl-audio-gear');
     // Wait and tap together: a wait started alone rejects unhandled if the tap outlasts it, and
     // Node ends the whole run there (1280×800 under load, 21 Oct 23:10).
+    // Import asks first (#349 E1): the file is chosen from the confirm.
+    await tap('.nrl-audio-settings .nrl-btn:has-text("Import save")');
     const [chooser] = await Promise.all([
       page.waitForEvent('filechooser', { timeout: 15000 }),
-      tap('.nrl-audio-settings .nrl-btn:has-text("Import save")'),
+      tap('.nrl-audio-settings .nrl-settings-import-go'),
     ]);
     await chooser.setFiles(file);
     await page.waitForSelector('[data-nrl-continue-1]', { timeout: 30000 });

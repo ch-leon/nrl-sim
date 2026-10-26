@@ -5,11 +5,11 @@
 
 import { el, button, ensureStyles, openScreen, screenHead } from '../dom';
 import { getState, type Player, type TraitInstance } from '../../core/state';
-import { ROMAN, TRAITS, traitLabel } from '../../data/traits';
+import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import {
-  signPlayer, signingFee, signingFeeBasis, FREE_AGENT_POOL_SIZE,
+  signPlayer, signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
 import { SQUAD_CAP } from '../../config';
 import { TRAINING_KIT, PORTRAIT_W, PORTRAIT_H, portraitDataUrl } from '../../art/portrait';
@@ -35,6 +35,8 @@ export function ensureScreenStyles(): void {
 const ROW_PORTRAIT_PX = PORTRAIT_W * 2;
 
 const SCREEN_CSS = `
+.nrl-squad-focus { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; flex-shrink: 0; padding: 0 3px 3px 0; margin-bottom: 0.3rem; }
+.nrl-squad-focus-note { flex: 1 1 14rem; min-width: 0; color: #e8e0c8; font-size: 0.75rem; line-height: 1.25; }
 /* #336: compact rows, two or more across on a phone on its side, so a short
    screen shows four and more instead of one card cut after its stat bars. */
 .nrl-screen-body.nrl-rows {
@@ -67,6 +69,7 @@ const SCREEN_CSS = `
 .nrl-row-name { font-weight: bold; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-row-meta { display: flex; gap: 0.3rem; align-items: center; font-size: 0.7rem; white-space: nowrap; overflow: hidden; }
 .nrl-row-meta .nrl-badge { padding: 0 0.2rem; border-width: 1px; }
+.nrl-row-meta [data-trait] { cursor: help; }
 .nrl-row .nrl-card-ovr { flex: 0 0 auto; }
 .nrl-row .nrl-row-action { flex: 0 0 auto; padding: 0.2rem 0.45rem; font-size: 0.75rem; }
 .nrl-row.nrl-card-open:hover { background: #f4efe0; }
@@ -134,10 +137,10 @@ function positionLabel(pos: string): string {
   return pos.replace(/(^|-)([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 }
 
-/** Badge label + tooltip for a levelled trait (BAK-208 §3). Traits with a downside render in a warning tint. */
+/** Badge label + tooltip for a levelled trait (BAK-208 §3): its full name (#349 S3). Traits with a downside render in a warning tint. */
 export function traitBadge(t: TraitInstance): { label: string; tip: string; bad: boolean } {
   const def = TRAITS[t.id];
-  return { label: `${def.short} ${ROMAN[t.level]}`, tip: `${traitLabel(t)}: ${def.blurb}`, bad: def.bad ?? false };
+  return { label: traitLabel(t), tip: `${traitLabel(t)}: ${def.blurb}`, bad: def.bad ?? false };
 }
 
 // ── Shared PlayerRow ────────────────────────────────────────────────────────
@@ -171,7 +174,9 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
   for (const t of p.traits) {
     if (!(t.id in TRAITS)) continue;
     const b = traitBadge(t);
-    meta.append(el('span', { class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`, text: b.label, attrs: { title: b.tip } }));
+    // Not a button: Chrome on Android snaps a tap near a button onto it, so a tap on
+    // the name would read out the trait. The row's click handler tells them apart.
+    meta.append(el('span', { class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`, text: b.label, attrs: { title: b.tip, 'data-trait': t.id } }));
   }
 
   // Keyed on the squad id, the same key MatchScene uses, so the face matches on the pitch.
@@ -184,6 +189,12 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
     el('div', { class: 'nrl-row-id' }, el('span', { class: 'nrl-row-name', text: p.name }), meta),
     el('span', { class: 'nrl-card-ovr', text: String(overallRating(p)), attrs: { title: 'Overall rating' } }),
   );
+  // A tap on a trait says what it does, in the toast lane; anywhere else opens the player page.
+  row.addEventListener('click', (e) => {
+    const trait = e.target instanceof Element ? e.target.closest('[data-trait]') : null;
+    if (trait) bus.emit('ui:notify', { text: trait.getAttribute('title') ?? '', kind: 'info' });
+    else opts.onOpen?.();
+  });
   if (opts.onOpen) {
     const open = opts.onOpen;
     row.classList.add('nrl-card-open');
@@ -191,7 +202,6 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
     row.setAttribute('tabindex', '0');
     row.setAttribute('aria-label', `${p.name}: player page`);
     row.setAttribute('data-player-open', p.id);
-    row.addEventListener('click', open);
     row.addEventListener('keydown', (e) => {
       if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); }
     });
@@ -240,12 +250,16 @@ export function openRecruitScreen(): void {
     return b;
   });
 
+  const sub = el('div', { class: 'nrl-screen-sub' });
   const render = (): void => {
     body.replaceChildren();
     const s = getState();
+    // R2 (#349): when the pool changes, in Advance Weeks.
+    const n = weeksToPoolRefresh(s.week);
+    sub.textContent = `Pool of ${FREE_AGENT_POOL_SIZE} · new players ${n === 1 ? 'after this week' : `in ${n} weeks`}`;
     for (const [i, b] of sortBtns.entries()) b.classList.toggle('nrl-sort-active', RECRUIT_SORTS[i]!.key === recruitSort);
     if (s.freeAgents.length === 0) {
-      body.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. Check back after the next scouting cycle.' }));
+      body.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. New players arrive when the pool refreshes.' }));
       return;
     }
     const agents = s.freeAgents.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
@@ -265,7 +279,7 @@ export function openRecruitScreen(): void {
           onClick: () => {
             const res = signPlayer(getState(), agent.id);
             if (!res.ok) {
-              bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'danger' });
+              bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'info' });
             }
           },
         },
@@ -273,7 +287,6 @@ export function openRecruitScreen(): void {
     }
   };
 
-  const sub = el('div', { class: 'nrl-screen-sub', text: `Pool of ${FREE_AGENT_POOL_SIZE}, refreshed each scouting cycle` });
   const head = screenHead('Free Agency', { sub, controls: [el('span', { class: 'nrl-screen-label', text: 'Sort:' }), ...sortBtns] });
 
   const screen = el('div', { class: 'nrl-screen' }, head, body);
