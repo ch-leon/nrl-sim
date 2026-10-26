@@ -826,6 +826,14 @@ function ensureAudioStyles(): void {
 .nrl-settings-text small { font-size: 0.68rem; opacity: 0.85; }
 .nrl-settings-ask { flex: 1 1 100%; font-size: 0.75rem; line-height: 1.25; }
 .nrl-settings-import { flex-wrap: wrap; }
+/* 956x330: three columns of rows, so every switch and the Import question sit on screen unscrolled. */
+@media (max-height: 340px) {
+  .nrl-dialog-region .nrl-settings-modal { width: min(96vw, 940px); }
+  .nrl-settings-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; }
+  .nrl-settings-col { display: contents; }
+  .nrl-audio-row { margin: 0.1rem 0; }
+  .nrl-settings-import { grid-row: span 2; align-self: start; }
+}
 /* A switch a finger can hit (N14, #263; X3): 52×44, the track and its knob drawn in its background. */
 .nrl-switch {
   -webkit-appearance: none;
