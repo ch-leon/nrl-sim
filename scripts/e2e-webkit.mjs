@@ -630,7 +630,7 @@ const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375
 const NAV_SCREENS = [
   { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-screen-body > *' },
   { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-list > *', card: '.nrl-lineup-field', primary: ['[data-auto-pick]'] },
-  { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-screen-body > *', primary: ['.nrl-screen-body > :first-child button'] },
+  { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-screen-body > *', primary: ['.nrl-screen-body > :first-child .nrl-row-action'] },
   { id: 'fixtures', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-fixture', card: '.nrl-next-match' },
   { id: 'ladder', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-ladder-table tbody tr' },
   { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
@@ -675,7 +675,8 @@ function screenProblems(page, spec, safe) {
       let t = 0, l = 0, b = H, r = W;
       for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
         const cs = getComputedStyle(a);
-        if (/(auto|scroll|hidden|clip)/.test(`${cs.overflowX} ${cs.overflowY}`)) {
+        // A display: contents wrapper (a short screen's two-column layouts) has no box to clip with.
+        if (cs.display !== 'contents' && /(auto|scroll|hidden|clip)/.test(`${cs.overflowX} ${cs.overflowY}`)) {
           const ar = a.getBoundingClientRect();
           t = Math.max(t, ar.top); l = Math.max(l, ar.left); b = Math.min(b, ar.bottom); r = Math.min(r, ar.right);
         }
@@ -752,6 +753,36 @@ function screenProblems(page, spec, safe) {
     }
     return { problems: out, content };
   }, [spec, safe]);
+}
+
+/**
+ * A view with no frame (the title): every control matching `sels` whole on screen
+ * without scrolling, clear of the unsafe bands, 44px tall and taking a tap at its
+ * middle; and no sideways scroll.
+ */
+function controlsProblems(page, sels, safe) {
+  return page.evaluate(([sels, safe]) => {
+    const W = innerWidth, H = innerHeight;
+    const out = [];
+    const wide = Math.max(document.documentElement.scrollWidth, document.querySelector('.nrl-title')?.scrollWidth ?? 0);
+    if (wide > W + 1) out.push(`scrolls sideways (${wide}px wide)`);
+    for (const sel of sels) {
+      const els = [...document.querySelectorAll(sel)];
+      if (!els.length) { out.push(`${sel} missing`); continue; }
+      for (const e of els) {
+        const r = e.getBoundingClientRect();
+        const what = `${sel}${els.length > 1 ? ` "${e.getAttribute('aria-label') ?? e.textContent.trim()}"` : ''}`;
+        if (r.left < safe.l - 1 || r.right > W - safe.r + 1 || r.top < safe.t - 1 || r.bottom > H - safe.b + 1) {
+          out.push(`${what} off screen or in the unsafe band (${Math.round(r.left)},${Math.round(r.top)}–${Math.round(r.right)},${Math.round(r.bottom)})`);
+          continue;
+        }
+        if (r.height < 43.5) out.push(`${what} ${Math.round(r.height)}px tall`);
+        const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+        if (!hit || !e.contains(hit)) out.push(`${what} covered (a tap hits ${hit?.className || hit?.tagName})`);
+      }
+    }
+    return out;
+  }, [sels, safe]);
 }
 
 /** The chrome: top bar and nav heights, nav tabs, label size and the open tab. */
@@ -874,16 +905,21 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     for (const b of document.querySelectorAll('.nrl-modal-backdrop:not(.nrl-screen-backdrop)')) b.remove();
   }).then(() => page.keyboard.press('Escape'));
 
-  await step('hub', async (rec) => {
+  const setInsets = () => page.evaluate((s) => {
+    const st = document.documentElement.style;
+    st.setProperty('--nrl-safe-l', `${s.l}px`); st.setProperty('--nrl-safe-t', `${s.t}px`);
+    st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
+  }, safe);
+  // The title (#350 T1, #347): a fresh install opens on the new club's setup, every
+  // field and Start on screen with no scrolling, clear of the notch.
+  await step('title-setup', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
-    if (safe.l || safe.t || safe.r || safe.b) {
-      await page.evaluate((s) => {
-        const st = document.documentElement.style;
-        st.setProperty('--nrl-safe-l', `${s.l}px`); st.setProperty('--nrl-safe-t', `${s.t}px`);
-        st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
-      }, safe);
-    }
+    await setInsets();
+    await page.waitForTimeout(250);
+    return controlsProblems(page, ['[data-nrl-clubname]', '.nrl-title-swatch', '.nrl-title-pick', '[data-nrl-start]'], safe);
+  });
+  await step('hub', async (rec) => {
     await page.fill('[data-nrl-clubname]', 'Landscape FC');
     await tap('[data-nrl-start]');
     await page.waitForSelector('.nrl-tutorial-skip');
@@ -988,6 +1024,23 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await tap('.nrl-ladder-table .nrl-ladder-club');
     await page.waitForSelector('.nrl-rival-modal');
     return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row' }, null);
+  });
+  // Settings (#349 E1): behind the gear, every switch whole; Import asks on its own row first.
+  await step('popup-settings', async (rec) => {
+    await closeAll();
+    await tap('.nrl-audio-gear');
+    await page.waitForSelector('.nrl-settings-modal');
+    const out = await check(rec, { box: '.nrl-settings-modal', rows: '.nrl-audio-row', primary: ['.nrl-rivals-toggle .nrl-switch', '.nrl-settings-import .nrl-btn'] }, null);
+    await tap('.nrl-settings-import .nrl-btn');
+    await page.waitForSelector('.nrl-settings-ask');
+    const cancel = '.nrl-settings-import .nrl-btn:not(.nrl-settings-import-go)';
+    out.push(...(await check(rec, { box: '.nrl-settings-modal', rows: '.nrl-audio-row', primary: ['.nrl-settings-import-go', cancel] }, null))
+      .map((p) => `import asking: ${p}`));
+    await page.screenshot({ path: join(OUT, 'settings-import-ask.png') });
+    await tap(cancel);
+    if (await page.locator('.nrl-settings-ask').count()) out.push('Cancel left the import question up');
+    await page.locator('.nrl-settings-modal .nrl-screen-x').tap();
+    return out;
   });
   // #345: a waiting card is one row on News, which keeps its feed; Answer opens the card.
   await step('news-decision-banner', async (rec) => {
@@ -1188,6 +1241,29 @@ async function runScreens(browser, { w: W, h: H, safe }) {
       const card = document.querySelector('.nrl-report-modal').getBoundingClientRect();
       return r.bottom <= card.bottom + 1 && r.top >= card.top - 1 ? [] : ['Player of the Match below the fold'];
     }));
+    return out;
+  });
+  // The title with a saved club (#350 T1, T2): a card per slot, Continue on screen;
+  // New game on a slot in use asks before Start replaces it, and Cancel keeps it.
+  await step('title-slots', async (rec) => {
+    await page.reload();
+    await page.waitForSelector('[data-nrl-continue-1]');
+    await setInsets();
+    await page.waitForTimeout(250);
+    rec.notes.push((await page.locator('[data-nrl-slot-label-1]').textContent()) ?? '');
+    return controlsProblems(page, ['[data-nrl-continue-1]', '[data-nrl-new-1]', '[data-nrl-delete-1]', '[data-nrl-new-2]', '[data-nrl-import]'], safe);
+  });
+  await step('title-overwrite-confirm', async () => {
+    await tap('[data-nrl-new-1]');
+    await page.waitForSelector('[data-nrl-start]');
+    await tap('[data-nrl-start]');
+    await page.waitForSelector('[data-nrl-confirm]');
+    await page.waitForTimeout(200);
+    const out = await controlsProblems(page, ['[data-nrl-back]', '[data-nrl-start-confirm]', '[data-nrl-start-cancel]'], safe);
+    await tap('[data-nrl-start-cancel]');
+    if (await page.locator('[data-nrl-confirm]').count()) out.push('Cancel left the overwrite question up');
+    await tap('[data-nrl-back]');
+    await page.waitForSelector('[data-nrl-continue-1]');
     return out;
   });
 
