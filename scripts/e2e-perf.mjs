@@ -13,7 +13,7 @@
 // a synchronous handler (the week tick) is measured on its own, without the test
 // driver's overhead; the async moments (scene hand-offs, the first paint, and since
 // N10.2 the multi-week advance, which yields between weeks) are timed from the
-// click to the condition. One "to finals" run also times a tap on the Ladder made
+// click to the condition. One "to finals" run also times a tap on the League tab made
 // while it is under way, from the touch's timestamp to its click handler. Writes
 // e2e-output/perf/perf.json and prints a markdown table (the budget rows in
 // docs/status/2026-10-qa.md come from it).
@@ -182,7 +182,7 @@ async function answerCards() {
     n++;
     await wait(100);
   }
-  await page.evaluate(() => { for (const b of document.querySelectorAll('.nrl-modal .nrl-btn')) if (b.textContent?.trim() === 'Close') { b.click(); break; } });
+  await page.evaluate(() => { for (const b of document.querySelectorAll('.nrl-modal .nrl-btn')) if (/^(close|✕)$/i.test(b.textContent?.trim() ?? '')) { b.click(); break; } });
   await wait(150);
   return n;
 }
@@ -191,7 +191,7 @@ async function answerCards() {
  * One multi-week advance (menu index 0 = ×4, 1 = to finals, 2 = to season end).
  * Since N10.2 the run yields a frame between weeks, so this times the click to the
  * end of the run (the HUD drops data-advancing); the moment's block column is the
- * longest week. With `probe`, a tap on the Ladder while the run is under way is
+ * longest week. With `probe`, a tap on the League tab while the run is under way is
  * timed to its screen (the page answering mid-run) and the progress line read.
  * Returns { ms, weeks, tapMs?, label? }.
  */
@@ -208,7 +208,7 @@ async function advance(index, { probe = false } = {}) {
     label = running;
     // Timed inside the page, from the touch's own timestamp to its click handler:
     // the driver's tap() waits for two steady frames, and a frame now holds a week.
-    const box = await page.locator('.nrl-nav .nrl-btn[data-screen="ladder"]').boundingBox();
+    const box = await page.locator('.nrl-nav .nrl-btn[data-screen="fixtures"]').boundingBox();
     await page.evaluate(() => {
       window.__nrlTapDelay = undefined;
       document.addEventListener('click', (e) => { window.__nrlTapDelay = Math.round(performance.now() - e.timeStamp); }, { capture: true, once: true });
