@@ -424,16 +424,17 @@ function dockClear(bubble: HTMLElement, anchorEl: HTMLElement): void {
   const pad = 6;
   const a = anchorEl.getBoundingClientRect();
   const r = { left: a.left - pad, right: a.right + pad, top: a.top - pad, bottom: a.bottom + pad };
+  const base = bubble.classList.contains('nrl-tutorial-bar') ? 'nrl-tutorial-bubble nrl-tutorial-bar' : 'nrl-tutorial-bubble';
   let best = { dock: DOCKS[0]!, area: Infinity };
   for (const dock of DOCKS) {
-    bubble.className = `nrl-tutorial-bubble${dock}`;
+    bubble.className = `${base}${dock}`;
     const b = bubble.getBoundingClientRect();
     const area = Math.max(0, Math.min(b.right, r.right) - Math.max(b.left, r.left)) *
       Math.max(0, Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top));
     if (area === 0) return;
     if (area < best.area) best = { dock, area };
   }
-  bubble.className = `nrl-tutorial-bubble${best.dock}`;
+  bubble.className = `${base}${best.dock}`;
 }
 
 /**
@@ -456,9 +457,10 @@ function renderBubble(
     actions.appendChild(button('Next', () => advance(), { class: 'nrl-tutorial-next' }));
   }
 
+  // A step that opened its screen keeps to a bar on a landscape phone, so the screen shows under it.
   const bubbleClass = opts.centered
     ? 'nrl-tutorial-bubble nrl-tutorial-centered'
-    : 'nrl-tutorial-bubble';
+    : step.opens ? 'nrl-tutorial-bubble nrl-tutorial-bar' : 'nrl-tutorial-bubble';
   const bubble = el(
     'div',
     { class: bubbleClass, attrs: { 'data-step': step.id } },
@@ -563,6 +565,21 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
     max-height: calc(100vh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
     max-height: calc(100dvh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
   }
+}
+/* The bar: one row above the nav, copy then Skip and Next, over about one row of
+   the screen the step opened instead of half of it. */
+@media (max-height: 500px) {
+  .nrl-tutorial-bubble.nrl-tutorial-bar {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    left: calc(0.75rem + var(--nrl-safe-l, 0px));
+    right: calc(0.75rem + var(--nrl-safe-r, 0px));
+    bottom: calc(var(--nrl-nav-h, 3.5rem) + 0.25rem);
+    max-width: 640px;
+    padding: 0.35rem 0.6rem;
+  }
+  .nrl-tutorial-bar .nrl-tutorial-text { margin: 0; font-size: 0.8rem; line-height: 1.25; }
 }
 .nrl-tutorial-bubble.nrl-tutorial-top { top: calc(var(--nrl-hud-h, 0px) + 0.25rem); bottom: auto; }
 .nrl-tutorial-bubble.nrl-tutorial-right { left: auto; right: calc(0.75rem + var(--nrl-safe-r, 0px)); transform: none; }
