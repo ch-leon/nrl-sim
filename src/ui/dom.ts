@@ -1301,6 +1301,8 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-rival-table th, .nrl-rival-table td { padding: 0.15rem 0.3rem; text-align: left; white-space: nowrap; }
 .nrl-rival-table thead th { position: sticky; top: 0; background: #e8e0c8; }
 .nrl-rival-traits { font-size: 0.68rem; }
+/* Full trait names (#349 S3) wrap inside the 44px row rather than push the table past its box. */
+.nrl-rival-table td.nrl-rival-traits { white-space: normal; line-height: 1.2; min-width: 8rem; }
 /* Rows are tap targets for the player page (N7, #185). */
 .nrl-rival-table tbody tr.nrl-rival-row { height: 44px; cursor: pointer; }
 .nrl-rival-table tbody tr.nrl-rival-row:hover, .nrl-rival-table tbody tr.nrl-rival-row:focus-visible { background: #f4d03f; outline: none; }
