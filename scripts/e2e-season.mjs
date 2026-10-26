@@ -678,7 +678,6 @@ async function play() {
       if (await page.locator('.nrl-mo-final').count()) return 'no try before full time';
       throw new Error('no Replay chip within 150 s of the live match');
     }
-    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
     // Docked under the scoreboard, its centre takes the tap (the old centred button slid off the finger when pressed).
     const where = await untappable('.nrl-mo-replay');
     if (where) throw new Error(`the Replay chip is not tappable (${where})`);
@@ -707,6 +706,8 @@ async function play() {
       return hidden || !(at === b || b.contains(at)) ? 'covered' : null;
     });
     if (covered) throw new Error(`Replay is not tappable with the full-time class on (${covered})`);
+    // Read just before the tap: the match plays on until the replay takes the picture.
+    const before = (await page.locator('.nrl-mo-clock').textContent())?.trim();
     await tap('.nrl-mo-replay');
     await page.waitForFunction(() => document.querySelector('.nrl-match-overlay')?.hasAttribute('data-replay-block'), null, { timeout: 15000 });
     const block = Number(await page.locator('.nrl-match-overlay').getAttribute('data-replay-block'));
@@ -718,10 +719,13 @@ async function play() {
       const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
       return !!t && t !== was;
     }, before, { timeout: 4000 });
+    // Back where the live match left it: the second the clock read before the tap, or the next (at ×8 the tap lands a few ticks on).
     await page.waitForFunction((was) => {
       const playing = document.querySelector('.nrl-mo-replaying');
+      const secs = (c) => { const m = /^(\d+):(\d+)$/.exec(c ?? ''); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
       const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
-      return !playing && t === was;
+      const d = secs(t) - secs(was);
+      return !playing && d >= 0 && d <= 1;
     }, before, { timeout: 14000 });
     rec.notes.push(`Replay from ${before}; main-thread block ${block} ms`);
   });
