@@ -29,8 +29,9 @@
 // With --budget (N10 item 1, #219) the moments are checked against
 // scripts/perf-budget.json (or the file given) and the run fails when one is over;
 // report.json and report.md carry every metric, its budget and the verdict. Exit 1
-// if the game broke on the way, or with --budget if a budget was missed. (With
-// E2E_URL there is no build to measure, so a bundleGzKb budget fails as not reached.)
+// if the game broke on the way, or with --budget if a budget was missed. The rows
+// under `warn` (the bundle's gzipped size) are reported, and annotated as a GitHub
+// warning when over, but never fail the run. (With E2E_URL there is no build to measure.)
 //
 //   npm run e2e:perf
 //   npm run e2e:perf -- --budget              (fail on a missed budget; the nightly QA job)
@@ -39,11 +40,11 @@
 //   CHROMIUM_PATH=/path/to/chrome npm run e2e:perf
 //   E2E_URL=http://localhost:5173/ npm run e2e:perf
 import { spawn } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { gzipSync } from 'node:zlib';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { bundleSize, reportBundle } from './bundle-size.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => (argv.includes(`--${name}`) ? argv[argv.indexOf(`--${name}`) + 1] : dflt);
@@ -88,22 +89,6 @@ async function startServer() {
 }
 function stopServer() {
   if (server) try { process.kill(-server.pid); } catch { /* gone */ }
-}
-
-/** The built bundle: raw and gzipped bytes of everything the page loads. */
-function bundleSize() {
-  if (EXTERNAL) return null;
-  const assets = join(DIST, 'assets');
-  const files = readdirSync(assets).filter((f) => /\.(js|css)$/.test(f));
-  let raw = 0, gz = 0; const biggest = [];
-  for (const f of files) {
-    const buf = readFileSync(join(assets, f));
-    raw += buf.length; gz += gzipSync(buf).length;
-    biggest.push({ file: f, kb: Math.round(buf.length / 1024), gzKb: Math.round(gzipSync(buf).length / 1024) });
-  }
-  biggest.sort((a, b) => b.kb - a.kb);
-  const html = statSync(join(DIST, 'index.html')).size;
-  return { files: files.length, rawKb: Math.round((raw + html) / 1024), gzKb: Math.round(gz / 1024), biggest: biggest.slice(0, 3) };
 }
 
 // ── Measurements ───────────────────────────────────────────────────────────────
@@ -389,7 +374,7 @@ async function run() {
 
 try {
   await startServer();
-  result.bundle = bundleSize(); // after the build
+  if (!EXTERNAL) result.bundle = bundleSize(DIST); // after the build
   await run();
 } catch (err) {
   result.errors.push(`script: ${err.message}`);
@@ -431,8 +416,14 @@ if (budgetFile) {
     // A metric the run never reached (the game broke first) fails its budget.
     return { metric, value, max, ok: value !== null && value <= max };
   });
+  // Warn rows (the bundle): reported beside the budgets, never failing the run.
+  for (const [metric, max] of Object.entries(budgetFile.warn ?? {})) {
+    const value = metrics[metric] ?? null;
+    verdicts.push({ metric, value, max, ok: value === null || value <= max, warn: true });
+  }
 }
-const missed = verdicts.filter((v) => !v.ok);
+const missed = verdicts.filter((v) => !v.ok && !v.warn);
+const warned = verdicts.filter((v) => !v.ok && v.warn);
 const budgetName = BUDGET ? relative(process.cwd(), BUDGET) : null;
 const report = { throttle: THROTTLE, size: `${W}x${H}`, metrics, budget: budgetName, verdicts, ok: !result.errors.length && !missed.length, errors: result.errors };
 writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
@@ -444,10 +435,13 @@ const md = [`| Moment (CPU ×${THROTTLE}, ${W}×${H}) | Time | Longest block | N
 if (b) md.push(`| bundle (${b.files} js/css files) | ${b.rawKb} KB raw, ${b.gzKb} KB gzipped | | ${b.biggest.map((x) => `${x.file} ${x.kb} KB`).join(', ')} |`);
 if (BUDGET) {
   md.push('', `| Budget (${budgetName}) | Value | Max | |`, '|---|---|---|---|');
-  for (const v of verdicts) md.push(`| ${v.metric} | ${v.value ?? 'not reached'} | ${v.max} | ${v.ok ? 'ok' : '**over**'} |`);
+  for (const v of verdicts) md.push(`| ${v.metric}${v.warn ? ' (warning)' : ''} | ${v.value ?? 'not reached'} | ${v.max} | ${v.ok ? 'ok' : v.warn ? '**over** (warning only)' : '**over**'} |`);
   md.push('', missed.length ? `**${missed.length} budget(s) missed:** ${missed.map((v) => v.metric).join(', ')}` : 'Every budget met.');
+  if (warned.length) md.push('', `Over a warning line (not a failure): ${warned.map((v) => `${v.metric} ${v.value} > ${v.max}`).join(', ')}`);
 }
 for (const e of result.errors) md.push(`- error: ${e}`);
 writeFileSync(join(OUT, 'report.md'), `${md.join('\n')}\n`);
 log(`\n${md.join('\n')}`);
+// The size line and, over the warn row, a GitHub warning annotation (scripts/bundle-size.mjs).
+if (b) reportBundle(b, budgetFile?.warn?.bundleGzKb ?? null);
 process.exit(report.ok ? 0 : 1);

@@ -26,6 +26,10 @@ jobs:
         run: npx vitest run
       - name: Production build
         run: npm run build
+      # The gzipped bundle against its line in scripts/perf-budget.json (warn.bundleGzKb).
+      # Over it is a warning annotation and a line in the job summary, never a failure.
+      - name: Bundle size
+        run: node scripts/bundle-size.mjs dist
 
   # #206: the tutorial bubble and the Guide must fit a landscape iPhone in Safari
   # (956×330, 844×390) with Skip / Next / Close on screen, even with Safari's
