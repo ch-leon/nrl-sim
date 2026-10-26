@@ -12,10 +12,11 @@
 
 import { bus } from '../../core/events';
 import {
-  getState, setState, type GameState, type PotmTally, type RivalClub, type SeasonRecord, type SeasonReview,
+  getState, setState, type Fixture, type GameState, type PotmTally, type RivalClub, type SeasonRecord, type SeasonReview,
 } from '../../core/state';
 import { registerSeasonHook } from '../../core/time';
 import { strengthChanges } from '../../systems/league';
+import { isFinalsRound, knockoutWinner } from '../../systems/fixtures';
 import { BOARD, FINALS_WEEKS, SEASON_ROUNDS } from '../../config';
 import { button, closeScreen, el, openModal } from '../dom';
 import { whenNoMatch } from '../updatePrompt';
@@ -31,16 +32,30 @@ export interface RolloverSnapshot {
   squad: { id: string; name: string; age: number }[];
   rivals: RivalClub[];
   reputation: number;
+  /** How the club's finals ended; the fixtures are gone by the time the review is built. */
+  finals?: SeasonReview['finals'];
 }
 
 /** `endedSeason`: the rollover has already moved the counter on when its hooks run, so the hook passes `season - 1`. */
-export function snapshotBeforeRollover(s: Pick<GameState, 'season' | 'squad' | 'league' | 'reputation'>, endedSeason: number = s.season): RolloverSnapshot {
+export function snapshotBeforeRollover(s: Pick<GameState, 'season' | 'squad' | 'league' | 'reputation' | 'clubId'>, endedSeason: number = s.season): RolloverSnapshot {
+  const finals = finalsRun(s.league.fixtures, s.clubId);
   return {
     season: endedSeason,
     squad: s.squad.map((p) => ({ id: p.id, name: p.name, age: p.age })),
     rivals: s.league.clubs.map((c) => ({ id: c.id, name: c.name, colors: c.colors, strength: c.strength })),
     reputation: s.reputation,
+    ...(finals ? { finals } : {}),
   };
+}
+
+/** The club's last played finals tie and whether it won, or undefined when it played none (#351 E2). */
+export function finalsRun(fixtures: readonly Fixture[], clubId: string): SeasonReview['finals'] {
+  let last: Fixture | undefined;
+  for (const f of fixtures) {
+    if (!isFinalsRound(f.round) || !f.result || (f.homeId !== clubId && f.awayId !== clubId)) continue;
+    if (!last || f.round > last.round) last = f;
+  }
+  return last ? { round: last.round, won: knockoutWinner(last) === clubId } : undefined;
 }
 
 /** How many movers the review names. */
@@ -73,6 +88,8 @@ export function potmSummary(tally: PotmTally | undefined, season: number): Seaso
 export function buildSeasonReview(before: RolloverSnapshot, after: GameState): SeasonReview {
   const ended = before.season;
   const review: SeasonReview = {};
+
+  if (before.finals) review.finals = before.finals;
 
   const potm = potmSummary(after.potmTally, ended);
   if (potm) review.potm = potm;
@@ -178,46 +195,57 @@ export function initSeasonReview(): () => void {
 
 const tick = (met: boolean): string => (met ? '✓' : '✗');
 
+/** "6 awards in matches you watched · most: Jack Taufa (3)": awards are given at the full-time report. */
+export function fmtPotmTotal(p: NonNullable<SeasonReview['potm']>): string {
+  return `${p.total} award${p.total === 1 ? '' : 's'} in matches you watched${p.best ? ` · most: ${p.best.name} (${p.best.count})` : ''}`;
+}
+
+/** The money line is a warning only when the season closed in debt, not whenever more went out than came in. */
+export function moneyLineBad(closing: number | undefined): boolean {
+  return closing !== undefined && closing < 0;
+}
+
 /**
  * The review of a season. A nav screen rather than a dialog: the HUD and the
- * nav stay usable over it (the next week can be advanced, History opened),
- * and Close returns to where it came from (`back`, e.g. History).
+ * nav stay usable over it (the next week can be advanced, History opened).
+ * One header row: the title, History (back to it, `back`, when opened from
+ * there) and the frame's ✕, which closes it.
  */
 export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void } = {}): HTMLElement {
   const r = entry.review ?? {};
   const content = el('div', { class: 'nrl-season-review', attrs: { 'data-season-review': String(entry.season) } });
+  const body = el('div', { class: 'nrl-review-body' });
   const line = (label: string, text: string, cls = ''): HTMLElement =>
     el('div', { class: `nrl-review-line ${cls}`.trim() }, el('b', { text: `${label}: ` }), text);
 
-  content.append(el('h2', { text: `Season ${entry.season} review` }));
-  content.append(el('div', { class: `nrl-review-finish${entry.premiership ? ' nrl-review-premiers' : ''}`, text: fmtSeasonSummary(entry).replace(/^Season \d+ — /, '') }));
+  const toHistory = opts.back ?? (() => { openHistoryScreen(); });
+  content.append(el('div', { class: 'nrl-review-head' },
+    el('h2', { text: `Season ${entry.season} review` }),
+    button(opts.back ? '‹ History' : 'History', () => { closeScreen(); toHistory(); }, { class: 'nrl-review-history' }),
+  ));
+  content.append(body);
+  body.append(el('div', { class: `nrl-review-finish${entry.premiership ? ' nrl-review-premiers' : ''}`, text: fmtSeasonSummary(entry).replace(/^Season \d+ — /, '') }));
   const record = fmtRecord(entry);
-  if (record) content.append(line('Record', `${record} (${SEASON_ROUNDS} rounds${entry.ladderPosition > 0 && entry.ladderPosition <= 8 ? `, finals over ${FINALS_WEEKS} weeks` : ''})`));
-  if (entry.topScorer) content.append(line('Top try-scorer', `${entry.topScorer.name} (${entry.topScorer.tries})`));
-  if (r.potm) {
-    content.append(line('Player of the match', `${r.potm.total} award${r.potm.total === 1 ? '' : 's'}${r.potm.best ? ` · most: ${r.potm.best.name} (${r.potm.best.count})` : ''}`));
-  }
+  if (record) body.append(line('Record', `${record} (${SEASON_ROUNDS} rounds${entry.ladderPosition > 0 && entry.ladderPosition <= 8 ? `, finals over ${FINALS_WEEKS} weeks` : ''})`));
+  if (entry.topScorer) body.append(line('Top try-scorer', `${entry.topScorer.name} (${entry.topScorer.tries})`));
+  if (r.potm) body.append(line('Player of the match', fmtPotmTotal(r.potm)));
   if (r.board) {
     const b = r.board;
     const verdict = b.sacked ? 'sacked' : b.missed === 0 ? 'all met' : `${b.met} met, ${b.missed} missed`;
-    content.append(line('Board', `${verdict} · patience ${b.patience}/${BOARD.MAX_PATIENCE}`, b.missed === 0 ? 'nrl-review-good' : 'nrl-review-bad'));
-    content.append(el('ul', { class: 'nrl-review-objectives' }, ...b.objectives.map((o) => el('li', { class: o.met ? 'nrl-review-good' : 'nrl-review-bad', text: `${tick(o.met)} ${o.text}` }))));
+    body.append(line('Board', `${verdict} · patience ${b.patience}/${BOARD.MAX_PATIENCE}`, b.missed === 0 ? 'nrl-review-good' : 'nrl-review-bad'));
+    body.append(el('ul', { class: 'nrl-review-objectives' }, ...b.objectives.map((o) => el('li', { class: o.met ? 'nrl-review-good' : 'nrl-review-bad', text: `${tick(o.met)} ${o.text}` }))));
   }
   if (r.money) {
     // The closing balance from the books (N14, #262), where they were kept.
     const books = seasonBooks(getState(), entry.season);
-    content.append(line('Money', `${fmtMoneyInOut(r.money)}${books ? ` · closed on ${fmtMoney(books.closing)}` : ''}`, r.money.in >= r.money.out ? '' : 'nrl-review-bad'));
+    body.append(line('Money', `${fmtMoneyInOut(r.money)}${books ? ` · closed on ${fmtMoney(books.closing)}` : ''}`, moneyLineBad(books?.closing) ? 'nrl-review-bad' : ''));
   }
-  if (r.retired && r.retired.length > 0) content.append(line('Retired', r.retired.map((p) => `${p.name} (${p.age})`).join(', ')));
-  if (r.juniors) content.append(line('Academy', `${r.juniors} prospect${r.juniors === 1 ? '' : 's'} in the free-agent pool`));
-  if (r.movers && r.movers.length > 0) content.append(line('Rivals', fmtMovers(r.movers)));
+  if (r.retired && r.retired.length > 0) body.append(line('Retired', r.retired.map((p) => `${p.name} (${p.age})`).join(', ')));
+  if (r.juniors) body.append(line('Academy', `${r.juniors} prospect${r.juniors === 1 ? '' : 's'} in the free-agent pool`));
+  if (r.movers && r.movers.length > 0) body.append(line('Rivals', fmtMovers(r.movers)));
   if (r.reputation) {
     const d = r.reputation.to - r.reputation.from;
-    content.append(line('Reputation', `${r.reputation.from} → ${r.reputation.to}${d === 0 ? '' : ` (${d > 0 ? '+' : ''}${d})`}`, d < 0 ? 'nrl-review-bad' : ''));
+    body.append(line('Reputation', `${r.reputation.from} → ${r.reputation.to}${d === 0 ? '' : ` (${d > 0 ? '+' : ''}${d})`}`, d < 0 ? 'nrl-review-bad' : ''));
   }
-  content.append(el('div', { class: 'nrl-review-actions' },
-    button('History', () => { closeScreen(); openHistoryScreen(); }, { class: 'nrl-review-history' }),
-    button('Close', () => { closeScreen(); opts.back?.(); }, { class: 'nrl-review-close' }),
-  ));
   return openModal(content, { class: 'nrl-review-modal', screen: true, key: 'history' });
 }

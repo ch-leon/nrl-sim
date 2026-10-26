@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   fmtSeasonSummary,
+  fmtFinalsOutcome,
   fmtSeasonEndToast,
   seasonEndToastKind,
   historyNewestFirst,
@@ -21,6 +22,19 @@ describe('fmtSeasonSummary', () => {
   it('formats a premiership', () => {
     expect(fmtSeasonSummary({ season: 2, ladderPosition: 1, premiership: true }))
       .toBe('Season 2 — PREMIERS (ladder 1st)');
+  });
+
+  it('says how the season ended past the ladder (#351 E2)', () => {
+    const at = (ladderPosition: number, finals?: { round: number; won: boolean }) =>
+      fmtSeasonSummary({ season: 1, ladderPosition, premiership: false, review: finals ? { finals } : {} });
+    expect(at(4, { round: 25, won: false })).toBe('Season 1 — finished 4th · out in the Qualifying Final');
+    expect(at(2, { round: 26, won: false })).toBe('Season 1 — finished 2nd · out in the Semi Final');
+    expect(at(1, { round: 27, won: false })).toBe('Season 1 — finished 1st · lost the Grand Final');
+    expect(at(11)).toBe('Season 1 — finished 11th · missed the finals');
+    // A run cut short (headless catch-up) and a pre-v12 record say only the ladder.
+    expect(at(6, { round: 25, won: true })).toBe('Season 1 — finished 6th');
+    expect(fmtFinalsOutcome({ season: 1, ladderPosition: 11, premiership: false })).toBe('');
+    expect(fmtFinalsOutcome({ season: 1, ladderPosition: 3, premiership: true, review: { finals: { round: 27, won: true } } })).toBe('');
   });
 });
 

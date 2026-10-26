@@ -886,18 +886,22 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-books-heading { margin: 0 0 0.5rem; font-weight: bold; }
 .nrl-books-summary { margin: 0.5rem 0; }
 .nrl-books-closing td { font-weight: bold; border-top: 1px solid #c8c0a8; }
-/* Only the table scrolls, so the heading, the summary and Close stay in view at phone height. */
-.nrl-screen-backdrop .nrl-books-modal { display: flex; flex-direction: column; }
+/* Only the table scrolls, so the header row, the heading and the summary stay in view at phone height. */
+.nrl-screen-backdrop .nrl-books-modal { display: flex; flex-direction: column; width: min(96vw, 720px); }
+@media (max-height: 340px) { .nrl-books-heading { font-size: 0.8rem; margin-bottom: 0.25rem; } }
 .nrl-season-books { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-season-books > .nrl-finance-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-season-books h2 { margin: 0 0 0.2rem; }
-.nrl-books-close { align-self: flex-start; }
 .nrl-finance-past { margin-top: 0.4rem; }
 
 /* ── Season review (N7, #190) ──────────────────────────────────────────── */
-.nrl-modal.nrl-review-modal { max-width: min(94vw, 560px); }
-.nrl-season-review { font-size: 0.85rem; }
-.nrl-season-review h2 { margin: 0 0 0.3rem; font-size: 1.1rem; }
+.nrl-modal.nrl-review-modal { max-width: min(96vw, 720px); }
+.nrl-season-review { font-size: 0.85rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-review-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* #351 E2: the review and the books open on one header row (title, the way to
+   History, and the frame's ✕ beside it) that holds still while the rest scrolls. */
+.nrl-review-head { display: flex; align-items: center; gap: 0.5rem; flex: 0 0 auto; min-height: 44px; padding-right: 2.75rem; margin-bottom: 0.3rem; }
+.nrl-review-head h2 { margin: 0; font-size: 1.1rem; min-width: 0; }
+.nrl-review-head .nrl-btn { margin-left: auto; flex: 0 0 auto; padding: 0.25rem 0.6rem; font-size: 0.8rem; }
 .nrl-review-finish {
   font-weight: bold;
   font-size: 1.05rem;
@@ -911,8 +915,6 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-review-objectives { margin: 0 0 0.2rem 1.1rem; padding: 0; font-size: 0.8rem; }
 .nrl-review-good { color: #1f5f24; }
 .nrl-review-bad { color: #b00020; }
-.nrl-review-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
-.nrl-review-actions .nrl-btn { flex: 1 1 8rem; }
 
 /* ── Finance (GitHub #39) ────────────────────────────────────────────── */
 .nrl-finance { font-size: 0.85rem; }

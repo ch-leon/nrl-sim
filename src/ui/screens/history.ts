@@ -6,19 +6,38 @@ import { getState, type GameState, type SeasonRecord, type Player } from '../../
 import { el, panel, button, openModal, closeScreen } from '../dom';
 import { initSeasonReview, openSeasonReview } from './seasonReview';
 import { FINANCE_LINE_LABELS, fmtMoney, fmtMoneyCompact, fmtNetClosing, seasonBooks } from './finance';
+import { FINALS_ROUNDS } from '../../systems/fixtures';
+import { roundLabel } from '../../systems/matchday';
+
+/** The top eight make the finals (systems/fixtures finalsSeeds). */
+const FINALS_TEAMS = 8;
 
 export type SeasonHistoryEntry = SeasonRecord;
 
 /**
- * One-line season summary, e.g. "Season 1 — finished 4th" or
- * "Season 2 — PREMIERS (ladder 2nd)".
+ * One-line season summary, e.g. "Season 1 — finished 4th · out in the
+ * Qualifying Final" or "Season 2 — PREMIERS (ladder 2nd)".
  */
 export function fmtSeasonSummary(entry: SeasonHistoryEntry): string {
   const pos = entry.ladderPosition > 0 ? ordinal(entry.ladderPosition) : 'unranked';
   if (entry.premiership) {
     return `Season ${entry.season} — PREMIERS (ladder ${pos})`;
   }
-  return `Season ${entry.season} — finished ${pos}`;
+  const finals = fmtFinalsOutcome(entry);
+  return `Season ${entry.season} — finished ${pos}${finals ? ` · ${finals}` : ''}`;
+}
+
+/**
+ * How the season ended past the ladder (#351 E2): "out in the Qualifying Final",
+ * "lost the Grand Final", "missed the finals". '' for a premiership (the summary
+ * says it) and for seasons without a review (before v12), which kept no finals.
+ */
+export function fmtFinalsOutcome(entry: SeasonHistoryEntry): string {
+  if (entry.premiership || !entry.review) return '';
+  const f = entry.review.finals;
+  if (f && !f.won) return f.round === FINALS_ROUNDS.GF ? 'lost the Grand Final' : `out in the ${roundLabel(f.round)}`;
+  if (entry.ladderPosition > FINALS_TEAMS) return 'missed the finals';
+  return '';
 }
 
 /** Extra detail line for v4+ entries, e.g. "W12 L10 D2 · PF 480 PA 400 · Top try-scorer: X (9)". */
@@ -185,12 +204,16 @@ export function fmtBooksHeading(entry: SeasonHistoryEntry): string {
 /**
  * A past season's books (N14, #262): every line of its P&L, the net and the
  * balance it closed on, under the season's one-line summary. Seasons from before
- * the books were kept (save v10) say so.
+ * the books were kept (save v10) say so. The header row holds the way back to
+ * History; the frame's ✕ closes.
  */
 export function openSeasonBooks(entry: SeasonHistoryEntry, opts: { back?: () => void } = {}): HTMLElement {
   const books = seasonBooks(getState(), entry.season);
   const content = el('div', { class: 'nrl-season-books', attrs: { 'data-season-books': String(entry.season) } });
-  content.append(el('h2', { text: `Season ${entry.season} books` }));
+  content.append(el('div', { class: 'nrl-review-head' },
+    el('h2', { text: `Season ${entry.season} books` }),
+    button('‹ History', () => { closeScreen(); (opts.back ?? openHistoryScreen)(); }, { class: 'nrl-books-back' }),
+  ));
   content.append(el('p', { class: 'nrl-books-heading', text: fmtBooksHeading(entry) }));
   if (!books) {
     content.append(panel({}, el('p', { text: 'No books kept for this season: the club started keeping them in a later version of the game.' })));
@@ -209,7 +232,6 @@ export function openSeasonBooks(entry: SeasonHistoryEntry, opts: { back?: () => 
     content.append(el('div', { class: 'nrl-finance-scroll' }, table));
     content.append(el('p', { class: 'nrl-books-summary', text: fmtNetClosing(books) }));
   }
-  content.append(button('Close', () => { closeScreen(); opts.back?.(); }, { class: 'nrl-books-close' }));
   return openModal(content, { class: 'nrl-books-modal', screen: true, key: 'history' });
 }
 

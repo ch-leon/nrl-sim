@@ -1025,8 +1025,9 @@ async function play() {
       if (await page.evaluate(() => (window.__nrlState?.().history ?? []).some((h) => h.review))) throw new Error('season 1 has a review but none opened at the rollover');
       return 'no season review on this build';
     }
-    rec.notes.push((await review.textContent())?.trim().replace(/\s+/g, ' ').slice(0, 90));
-    await tap('.nrl-review-close');
+    rec.notes.push((await review.locator('.nrl-review-finish').textContent())?.trim() ?? '');
+    // #351 E2: one header row, title and History beside the frame's ✕, no Close at the bottom.
+    await tap('.nrl-review-modal > .nrl-screen-x');
     await page.waitForSelector('[data-season-review]', { state: 'detached', timeout: 5000 });
   });
   await step('history', async () => { await navTo('history'); await wait(300); });
@@ -1035,8 +1036,9 @@ async function play() {
     if (!(await open.count())) return 'no review link on History';
     await press(open);
     await page.waitForSelector('[data-season-review="1"]');
-    await tap('.nrl-review-close');
-    rec.notes.push('season 1 review reopened from History');
+    await tap('.nrl-review-head .nrl-review-history');
+    await page.waitForSelector('.nrl-history-review');
+    rec.notes.push('season 1 review reopened from History, and back to History from its header');
   });
   await step('season-2-week-2', async (rec) => {
     await closeAny();

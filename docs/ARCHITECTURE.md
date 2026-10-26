@@ -199,7 +199,9 @@ export interface SeasonRecord {
   wins?: number; losses?: number; draws?: number; // the extended fields are absent on pre-v4 records
   pointsFor?: number; pointsAgainst?: number;
   topScorer?: { name: string; tries: number };
-  review?: SeasonReview;      // what the season review showed, so History can reopen it (v12+, #190)
+  review?: SeasonReview;      // what the season review showed, so History can reopen it (v12+, #190);
+                              // its optional `finals` (the club's last finals tie, #351 E2) needs no
+                              // migration: a review without it says only the ladder finish
 }
 
 // The club's books by line (#172): Σ money:changed deltas for one season, negative = spent.

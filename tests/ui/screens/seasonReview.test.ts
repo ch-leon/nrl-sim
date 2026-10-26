@@ -3,8 +3,8 @@
 // stamped. The modal itself is not rendered (the vitest env is 'node').
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  addPotm, buildSeasonReview, fmtMoneyInOut, fmtMovers, fmtRecord, initSeasonReview, MOVERS_SHOWN, potmSummary,
-  snapshotBeforeRollover,
+  addPotm, buildSeasonReview, finalsRun, fmtMoneyInOut, fmtMovers, fmtPotmTotal, fmtRecord, initSeasonReview, moneyLineBad,
+  MOVERS_SHOWN, potmSummary, snapshotBeforeRollover,
 } from '../../../src/ui/screens/seasonReview';
 import { initSeasonEndFeedback } from '../../../src/ui/screens/history';
 import { createNewGame, getState, setState, type GameState } from '../../../src/core/state';
@@ -99,7 +99,41 @@ describe('buildSeasonReview', () => {
   });
 });
 
+describe('how the finals ended (#351 E2)', () => {
+  const tie = (round: number, homeId: string, awayId: string, homeScore: number, awayScore: number) =>
+    ({ round, homeId, awayId, result: { homeScore, awayScore } });
+
+  it('is the club’s last finals tie, won or lost; regular rounds and unplayed ties do not count', () => {
+    expect(finalsRun([tie(24, 'player', 'a', 30, 0)], 'player')).toBeUndefined();
+    expect(finalsRun([tie(25, 'a', 'player', 20, 12), tie(25, 'b', 'c', 1, 0)], 'player')).toEqual({ round: 25, won: false });
+    expect(finalsRun([tie(25, 'player', 'a', 20, 12), tie(26, 'b', 'player', 10, 18), { round: 27, homeId: 'player', awayId: 'c' }], 'player'))
+      .toEqual({ round: 26, won: true });
+    // A finals draw goes to the home side, the higher seed.
+    expect(finalsRun([tie(27, 'a', 'player', 16, 16)], 'player')).toEqual({ round: 27, won: false });
+  });
+
+  it('is taken before the rollover replaces the fixtures and lands on the review', () => {
+    bus.clear(); clearTickHooks(); clearSeasonHooks();
+    setState(createNewGame('Finals FC', 5));
+    initLeague(getState());
+    const s = getState();
+    const withFinals: GameState = { ...s, league: { ...s.league, fixtures: [...s.league.fixtures, tie(25, 'a', s.clubId, 24, 6)] } };
+    const before = snapshotBeforeRollover(withFinals);
+    expect(before.finals).toEqual({ round: 25, won: false });
+    expect(buildSeasonReview(before, { ...s, season: 2 }).finals).toEqual({ round: 25, won: false });
+    expect(snapshotBeforeRollover(s).finals).toBeUndefined();
+  });
+});
+
 describe('formatting', () => {
+  it('says where the player-of-the-match awards came from and reds the money only for a season closed in debt', () => {
+    expect(fmtPotmTotal({ total: 6, best: { name: 'Jack Taufa', count: 3 } })).toBe('6 awards in matches you watched · most: Jack Taufa (3)');
+    expect(fmtPotmTotal({ total: 1 })).toBe('1 award in matches you watched');
+    expect(moneyLineBad(200_000)).toBe(false);
+    expect(moneyLineBad(-1)).toBe(true);
+    expect(moneyLineBad(undefined)).toBe(false);
+  });
+
   it('reads the record, the books and the movers', () => {
     expect(fmtRecord({ season: 1, ladderPosition: 3, premiership: false, wins: 14, losses: 9, draws: 1, pointsFor: 480, pointsAgainst: 400 }))
       .toBe('W14 L9 D1 · 480 for, 400 against');
@@ -135,6 +169,9 @@ describe('a season through the real hooks', () => {
     expect(r.board!.objectives.length).toBeGreaterThan(0);
     expect(r.board!.met + r.board!.missed).toBe(r.board!.objectives.length);
     expect(r.board!.patience).toBe(s.boardPatience);
+    // The finals were played out before the rollover, so a finals side's review says how they ended.
+    if (entry.ladderPosition <= 8) expect(r.finals).toEqual({ round: expect.any(Number), won: entry.premiership });
+    else expect(r.finals).toBeUndefined();
     expect(r.money!.in).toBeGreaterThan(0);
     expect(r.money!.out).toBeGreaterThan(0);
     expect(r.juniors).toBeGreaterThanOrEqual(3);
