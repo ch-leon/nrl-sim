@@ -394,7 +394,7 @@ async function runPortrait(browser) {
             const r = b.getBoundingClientRect();
             const out = [];
             if (r.height < 44 || r.width < 44) out.push(`choice ${b.dataset.eventChoice} is ${r.width}×${r.height}`);
-            if (r.top < body.top - 1 || r.bottom > body.bottom + 1) out.push(`choice ${b.dataset.eventChoice} clipped by News body`);
+            if (r.top < body.top - 1 || r.bottom > body.bottom + 1) out.push(`choice ${b.dataset.eventChoice} clipped by News body (${r.top.toFixed(1)}–${r.bottom.toFixed(1)} vs ${body.top.toFixed(1)}–${body.bottom.toFixed(1)})`);
             if (b.scrollHeight > b.clientHeight + 1) out.push(`choice ${b.dataset.eventChoice} clips its text`);
             return out;
           });
@@ -556,10 +556,10 @@ async function runPortrait(browser) {
           const feed = document.querySelector('.nrl-mo-feed');
           if (!panel || panel.height < 1) hits.push('open log not visible');
           else {
-            if (score && panel.top < score.bottom - 1) hits.push('open log behind scoreboard');
+            if (score && panel.top < score.bottom - 1) hits.push(`open log behind scoreboard (${panel.top.toFixed(1)} < ${score.bottom.toFixed(1)})`);
             if (panel.bottom > ticker.top + 1) hits.push('open log overlaps ticker');
             if (panel.left < 0 || panel.right > innerWidth || panel.top < 0) hits.push('open log off screen');
-            if (!feed || feed.clientHeight < 12 || feed.scrollHeight <= feed.clientHeight) hits.push('open log not scrollable');
+            if (!feed || feed.clientHeight < 12 || feed.scrollHeight <= feed.clientHeight) hits.push(`open log not scrollable (${feed?.clientHeight}px, panel ${panel.height.toFixed(1)}px)`);
           }
           const chips = document.querySelectorAll('.nrl-mo-calls .nrl-btn').length;
           if (chips < 10) hits.push(`only ${chips} chips`);

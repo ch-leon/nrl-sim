@@ -711,6 +711,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   flex-direction: column;
   overflow: hidden;
   width: min(96vw, 640px);
+  height: calc(100% - 6px);
   max-width: none;
   padding: 0.55rem 0.65rem;
 }

@@ -852,7 +852,7 @@ body.nrl-match-final .nrl-toast-stack {
 .nrl-mo-log {
   position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); margin: 0;
   max-height: var(--nrl-mo-log-height, 8rem); overflow: hidden;
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: column; padding: 0.15rem 0.5rem;
 }
 .nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: 8rem; min-height: 0; overflow-y: auto; }
 .nrl-mo-line { font-size: clamp(0.6rem, 2.4vw, 0.8rem); line-height: 1.25; }
@@ -866,6 +866,12 @@ body.nrl-match-final .nrl-toast-stack {
 .nrl-mo-calls {
   position: fixed; right: 0.5rem; bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px));
   z-index: 20; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; max-width: 17.5rem; pointer-events: auto;
+}
+/* Three chip rows leave a readable log below the scoreboard on short phones.
+   Give the speed row its content width so it stays beneath the wider chips. */
+@media (min-width: 600px) and (max-height: 400px) {
+  .nrl-mo-calls { max-width: 24rem; }
+  .nrl-mo-controls { width: max-content; }
 }
 .nrl-mo-calls .nrl-btn { min-height: 44px; min-width: 4.6rem; padding: 0.15rem 0.4rem; font-size: 0.78rem; }
 .nrl-mo-calls .nrl-btn[data-made] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; opacity: 1; }
