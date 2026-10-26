@@ -73,7 +73,7 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'lineup',
     text:
-      'Lineup is your nine and your plan: the attack and defence chips, a goal-kicker ' +
+      'Lineup is your nine and your plan: PLAN sets attack, defence and the bench; pick a goal-kicker ' +
       'and a captain (select a starter, then Kicker or Captain). Change the plan at half-time.',
     anchor: '.nrl-nav .nrl-btn[data-screen="lineup"]',
     advanceOn: 'next-button',

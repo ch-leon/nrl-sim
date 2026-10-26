@@ -10,7 +10,7 @@ import {
   contractRows, renewalFee, renewalWeeklyCost, renewEarly, renewsOnLoan, sellPlayer, transferFee,
 } from '../../systems/contracts';
 import { SQUAD_MIN, difficultyMultipliers } from '../../config';
-import { el, panel, button, openModal, closeScreen } from '../dom';
+import { el, panel, button, openModal } from '../dom';
 import { fmtMoney } from './finance';
 import { ensureScreenStyles } from './recruit';
 
@@ -67,7 +67,6 @@ function render(content: HTMLElement): void {
     );
     nodes.push(panel({ class: 'nrl-finance-panel' }, info, actions));
   }
-  nodes.push(button('Close', () => closeScreen()));
   content.replaceChildren(...nodes);
 }
 
@@ -81,5 +80,5 @@ export function openContractsScreen(): HTMLElement {
     if (!content.isConnected) { off(); return; }
     render(content);
   });
-  return openModal(content, { class: 'nrl-finance-modal', screen: true });
+  return openModal(content, { class: 'nrl-finance-modal', screen: true, key: 'contracts' });
 }

@@ -409,7 +409,7 @@ async function runPortrait(browser) {
         await page.screenshot({ path: join(OUT, `bali-${w}x${h}-choice${choice}.png`) });
         await page.locator(`[data-event-choice="${choice}"]`).tap();
         if (await page.locator('.nrl-event-card').count()) problems.push(`${w}×${h}: choice ${choice} did not resolve`);
-        await page.locator('.nrl-news-close').tap();
+        await page.locator('.nrl-screen-region .nrl-screen-x').tap();
       }
       rec.notes.push(`${w}×${h}: both choices tapped`);
     }
@@ -615,10 +615,10 @@ const NAV_SCREENS = [
   { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
   { id: 'build', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-build-list > *', primary: ['.nrl-build-list > :first-child'] },
   { id: 'finance', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-finance-row', card: '.nrl-finance-panel' },
-  { id: 'staff', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-staff-row', primary: ['.nrl-staff-row .nrl-btn'] },
+  { id: 'staff', box: '.nrl-screen-region', rows: '.nrl-staff-row', primary: ['.nrl-staff-row .nrl-btn'] },
   { id: 'contracts', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-contracts .nrl-finance-panel, .nrl-contracts p', card: '.nrl-contracts .nrl-finance-panel' },
   { id: 'history', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-history-row, .nrl-history p', card: '.nrl-history-list' },
-  { id: 'help', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-guide-body :is(p, li, h3)' },
+  { id: 'help', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-guide-body :is(p, li, h3)', prose: '.nrl-guide-body', primary: ['.nrl-guide-replay'] },
 ];
 
 /** Destinations that are a tab inside another screen: the screen, then the tab. */
@@ -686,8 +686,22 @@ function screenProblems(page, spec, safe) {
     const shown = rows.filter(seen).length;
     const cards = spec.card ? [...box.querySelectorAll(spec.card)].filter(seen).length : 0;
     const need = Math.min(4, rows.length);
-    const content = `${shown}/${rows.length} rows whole${spec.card ? `, ${cards} whole card(s)` : ''}`;
-    if (shown < need && cards < 1) out.push(`only ${content}`);
+    // Prose (the Guide): its paragraphs run to any length, so count the lines of
+    // text on show instead, eight being about four short paragraphs.
+    let lines = 0;
+    if (spec.prose) {
+      const body = box.querySelector(spec.prose);
+      const first = body?.querySelector('p, li');
+      if (body && first) {
+        const c = clip(first);
+        const br = body.getBoundingClientRect();
+        const cs = getComputedStyle(first);
+        const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+        lines = Math.floor(Math.max(0, Math.min(br.bottom, c.b) - Math.max(br.top, c.t)) / lh);
+      }
+    }
+    const content = `${shown}/${rows.length} rows whole${spec.card ? `, ${cards} whole card(s)` : ''}${spec.prose ? `, ${lines} lines of text` : ''}`;
+    if (shown < need && cards < 1 && lines < 8) out.push(`only ${content}`);
     // Every close in the screen, and its primary action.
     const closes = [...box.querySelectorAll('button')].filter((b) => /^(✕|close)$/i.test(b.textContent.trim()) || b.getAttribute('aria-label') === 'Close');
     if (!closes.length) out.push('no close button');
@@ -838,7 +852,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   // The full-time report (#351 P0): its ✕, the result and Player of the Match on screen.
   await step('popup-fulltime-report', async (rec) => {
     await page.locator('[data-event-choice="0"]').tap();
-    await page.evaluate(() => document.querySelector('.nrl-screen-region .nrl-screen-x, .nrl-news-close')?.click());
+    await page.evaluate(() => document.querySelector('.nrl-screen-region .nrl-screen-x')?.click());
     await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
     await page.locator('.nrl-mo-controls .nrl-btn', { hasText: 'Skip' }).first().tap();

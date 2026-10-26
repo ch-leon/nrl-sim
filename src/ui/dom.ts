@@ -502,14 +502,14 @@ export const CSS = `
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* The open screen's tab (aria-current): pressed in, dark, so it reads at a glance.
-   A touch leaves :hover on the last tab tapped; the marker wins over it. */
+/* The open screen's tab (aria-current): dark with a gold edge, so it reads at a
+   glance. Not pressed in: that would push it into the home bar's band. A touch
+   leaves :hover on the last tab tapped; the marker wins over it. */
 .nrl-nav .nrl-btn[aria-current="page"],
 .nrl-nav .nrl-btn[aria-current="page"]:hover:not(:disabled) {
   background: #1a1a2e;
   color: #f4d03f;
-  transform: translate(3px, 3px);
-  box-shadow: 0 0 0 #000;
+  box-shadow: inset 0 -3px 0 #f4d03f, 3px 3px 0 #000;
 }
 .nrl-nav .nrl-btn[aria-expanded="true"] { background: #fff6c2; }
 /* More's sheet: the rest of the club's screens, over whatever is open. */
@@ -596,8 +596,11 @@ export const CSS = `
   flex-direction: column;
 }
 @media (max-height: 500px) {
-  .nrl-screen-backdrop, .nrl-dialog-region { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-  .nrl-modal.nrl-modal-framed { padding: 0.5rem 0.65rem; }
+  /* A screen or region dialog runs down to the nav, which sits above it and
+     hides its drop shadow. */
+  .nrl-screen-backdrop, .nrl-dialog-region { padding-top: 0.25rem; padding-bottom: 0; }
+  .nrl-screen-backdrop .nrl-modal, .nrl-dialog-region .nrl-modal { max-height: calc(100% - 0.25rem); }
+  .nrl-modal.nrl-modal-framed { padding: 0.4rem 0.65rem; }
 }
 .nrl-screen-backdrop .nrl-modal {
   /* #195: a landscape phone has width to spare and no height; use it. */
@@ -614,7 +617,9 @@ export const CSS = `
 .nrl-potm-backdrop .nrl-modal { pointer-events: auto; }
 /* The match report (N9.5): as wide as a screen, above Back to Club, scrolling inside. */
 .nrl-report-backdrop { bottom: 3.75rem; align-items: flex-start; padding-top: 0.5rem; }
-.nrl-report-backdrop .nrl-modal { width: min(96vw, 720px); max-width: none; max-height: calc(100% - 0.75rem); overflow-y: auto; padding: 0.6rem 0.8rem; }
+.nrl-report-backdrop .nrl-modal { width: min(96vw, 720px); max-width: none; max-height: calc(100% - 0.75rem); padding: 0.6rem 0.8rem; }
+.nrl-report-head { min-height: 44px; }
+.nrl-modal-has-x .nrl-report-head { padding-right: 2.75rem; }
 .nrl-report h2 { margin: 0 0 0.2rem; font-size: 1rem; }
 .nrl-report p { margin: 0.15rem 0; font-size: 0.8rem; }
 .nrl-report .nrl-report-score { font-size: 1.05rem; font-weight: bold; }
@@ -674,19 +679,21 @@ export const CSS = `
 }
 .nrl-screen-titles .nrl-screen-sub { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* The controls: one row that scrolls sideways when the phone is narrow (padding
-   keeps the buttons' drop shadows inside the scroller). */
+   keeps the buttons' drop shadows inside the scroller). Pushed right with a
+   margin, not justify-content: an overflowing flex-end row spills off its start,
+   where it cannot be scrolled to. */
 .nrl-screen-tools {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 0.35rem;
   overflow-x: auto;
   padding: 0 3px 3px 0;
   scrollbar-width: thin;
 }
 .nrl-screen-tools > * { flex: 0 0 auto; }
+.nrl-screen-tools > :first-child { margin-left: auto; }
 .nrl-screen-tools .nrl-btn { padding: 0.3rem 0.5rem; }
 .nrl-screen-label { color: #e8e0c8; font-size: 0.75rem; }
 .nrl-screen-sub {
@@ -772,10 +779,13 @@ export const CSS = `
 body.nrl-match-active .nrl-update-toast { display: none; }
 
 /* ── History (season-end / past seasons) ─────────────────────────────── */
+.nrl-history { font-size: 0.85rem; }
 .nrl-history h2 {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
   font-size: 1.1rem;
 }
+.nrl-history h3 { margin: 0 0 0.3rem; font-size: 0.9rem; }
+.nrl-history p { margin: 0.15rem 0; }
 .nrl-history-list {
   display: flex;
   flex-direction: column;
@@ -906,7 +916,6 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-news { font-size: 0.9rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-news-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-news-close { flex: 0 0 auto; margin-top: 0.45rem; align-self: stretch; }
 .nrl-news h2 { margin: 0 0 0.4rem; font-size: 1.05rem; flex: 0 0 auto; }
 .nrl-news h3 { margin: 0.6rem 0 0.2rem; font-size: 0.9rem; }
 .nrl-news-filters {
@@ -953,7 +962,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-event-choice-label { font-weight: bold; font-size: 0.95rem; line-height: 1.2; }
 .nrl-event-choice-hint { font-size: 0.78rem; opacity: 0.9; white-space: normal; font-weight: normal; line-height: 1.3; }
 /* Compact cards on short landscape and narrow portrait phones: choices stay
-   above Close, with their hints visible and targets at least 44px tall. */
+   in view, with their hints visible and targets at least 44px tall. */
 @media (max-height: 500px), (max-width: 480px) {
   .nrl-screen-backdrop .nrl-news-modal { padding: 0.25rem 0.5rem; }
   .nrl-news h2 { margin-bottom: 0.1rem; font-size: 0.9rem; }
@@ -966,7 +975,6 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-event-choices { gap: 0.2rem; }
   .nrl-event-choice { padding: 0.1rem 0.45rem; }
   .nrl-event-choice-hint { font-size: 0.7rem; line-height: 1.2; }
-  .nrl-news-close { margin-top: 0.15rem; }
 }
 /* Landscape has room for equal columns; portrait keeps the choices stacked. */
 @media (max-height: 500px) {
@@ -993,16 +1001,17 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   font-size: 0.8rem;
 }
 .nrl-placebar[hidden] { display: none; }
-.nrl-kit h2 { margin: 0; font-size: 1.05rem; }
+.nrl-kit { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-kit h2 { margin: 0; font-size: 1.05rem; line-height: 44px; }
 .nrl-kit h3 { margin: 0.5rem 0 0.2rem; font-size: 0.85rem; }
-.nrl-kit-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
-.nrl-kit-note { margin: 0.2rem 0 0.4rem; font-size: 0.75rem; }
-.nrl-kit-body { display: flex; flex-wrap: wrap; gap: 0.6rem; }
-.nrl-kit-preview { display: flex; gap: 0.5rem; align-items: flex-end; flex: 0 0 auto; }
+.nrl-kit-controls > h3:first-child { margin-top: 0; }
+.nrl-kit-note { margin: 0 0 0.4rem; font-size: 0.75rem; }
+.nrl-kit-body { display: flex; gap: 0.6rem; flex: 1 1 auto; min-height: 0; }
+.nrl-kit-preview { display: flex; gap: 0.5rem; align-items: flex-end; align-self: flex-start; flex: 0 0 auto; }
 .nrl-kit-preview figure { margin: 0; text-align: center; font-size: 0.7rem; }
 .nrl-kit-sprite { width: 84px; height: 90px; image-rendering: pixelated; }
 .nrl-kit-portrait { width: 72px; image-rendering: pixelated; }
-.nrl-kit-controls { flex: 1 1 16rem; min-width: 0; }
+.nrl-kit-controls { flex: 1 1 16rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
 .nrl-kit-label { font-size: 0.72rem; font-weight: bold; margin-top: 0.2rem; }
 .nrl-kit-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .nrl-kit-pattern[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
@@ -1013,17 +1022,22 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   cursor: pointer;
 }
 .nrl-kit-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #000; }
-.nrl-kit-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.6rem; }
+.nrl-kit-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; flex: 0 0 auto; padding: 0 3px 3px 0; }
+.nrl-screen-backdrop .nrl-kit-modal { width: min(96vw, 760px); }
+@media (max-height: 500px) { .nrl-kit-note { margin-bottom: 0.25rem; } }
 /* ── League screen: the next-match card and the form guide (N7, #183) ──── */
 /* A landscape phone has width to spare and no height: let the league use it. */
 .nrl-screen-backdrop .nrl-league-modal { width: min(96vw, 760px); max-width: none; }
-.nrl-league-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
-/* N14 (#263): only the tab's body scrolls, so the tabs and Close stay in view at phone height (as the Guide, #206). */
-.nrl-screen-backdrop .nrl-league-modal { display: flex; flex-direction: column; }
+/* N14 (#263): only the tab's body scrolls, so the tabs and the ✕ stay in view at
+   phone height (as the Guide, #206); one row clear of the ✕ holds them (#336). */
+.nrl-league-tabs { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; min-height: 44px; flex: 0 0 auto; }
+.nrl-modal-has-x .nrl-league-tabs { padding-right: 2.75rem; }
+.nrl-league-tabs .nrl-btn[data-active], .nrl-league-tabs .nrl-btn[data-active]:hover:not(:disabled) { background: #7ec850; }
+.nrl-league-note { flex: 1 1 auto; min-width: 0; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-league { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-.nrl-league-tabs { flex: 0 0 auto; }
 .nrl-league-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-league-close { margin-left: auto; }
+.nrl-ladder-table thead th { position: sticky; top: 0; z-index: 1; background: #e8e0c8; }
+@media (max-height: 500px) { .nrl-ladder-table th, .nrl-rival-table th { padding-top: 0.05rem; padding-bottom: 0.05rem; } }
 .nrl-next-match {
   background: #fff8e1;
   border: 3px solid #000;
@@ -1058,7 +1072,6 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-form-D { background: #7a7a7a; }
 .nrl-form-L { background: #b03a2e; }
 .nrl-form-empty { color: #777; }
-.nrl-ladder-pos { margin: 0 0 0.4rem; font-size: 0.85rem; }
 .nrl-ladder-scroll { overflow-x: auto; }
 .nrl-ladder-table { border-collapse: collapse; font-size: 0.8rem; width: 100%; }
 .nrl-ladder-table th, .nrl-ladder-table td { padding: 0.15rem 0.3rem; text-align: right; white-space: nowrap; }
@@ -1090,9 +1103,13 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   text-decoration: underline dotted;
   cursor: pointer;
 }
-.nrl-rival-squad h2 { margin: 0 0 0.2rem; font-size: 1.05rem; }
-.nrl-rival-squad p { margin: 0 0 0.4rem; font-size: 0.85rem; }
-.nrl-rival-scroll { max-height: 55vh; overflow: auto; margin-bottom: 0.5rem; }
+.nrl-dialog-region .nrl-rival-modal { width: min(96vw, 640px); max-width: none; }
+.nrl-rival-squad { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-rival-head { flex: 0 0 auto; min-height: 44px; margin-bottom: 0.1rem; display: flex; flex-direction: column; justify-content: center; }
+.nrl-modal-has-x .nrl-rival-head { padding-right: 2.75rem; }
+.nrl-rival-head h2 { margin: 0; font-size: 1rem; line-height: 1.2; }
+.nrl-rival-head p { margin: 0; font-size: 0.72rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-rival-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .nrl-rival-table { border-collapse: collapse; font-size: 0.75rem; width: 100%; }
 .nrl-rival-table th, .nrl-rival-table td { padding: 0.15rem 0.3rem; text-align: left; white-space: nowrap; }
 .nrl-rival-table thead th { position: sticky; top: 0; background: #e8e0c8; }
@@ -1126,15 +1143,15 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-player-trait-bad b { color: #8a3a00; }
 .nrl-player-line { margin: 0.1rem 0; overflow-wrap: anywhere; }
 .nrl-player-expiring { color: #b00020; }
-/* #203: the actions stay pinned to the foot of the card while the rest scrolls. */
+/* #203: the actions stay pinned to the foot of the card's scroller while the rest scrolls. */
 .nrl-player-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-top: 0.6rem;
   position: sticky;
-  bottom: -0.6rem; /* over the card's bottom padding, so nothing scrolls under it */
-  padding: 0.4rem 0 0.6rem;
+  bottom: 0;
+  padding: 0.4rem 3px 0.3rem 0;
   background: #e8e0c8;
   border-top: 2px solid #b8ae92;
   z-index: 1;
@@ -1142,15 +1159,29 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-player-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
 .nrl-player-actions .nrl-player-close { flex: 1 1 100%; }
 .nrl-modal-has-x .nrl-player-top { padding-right: 2.75rem; }
-/* A landscape phone: Close joins the row (the ✕ is in the corner too). */
+/* A landscape phone (#336): who he is and his deal on the left, his stats and
+   traits on the right, so the stats show without scrolling; Close joins the
+   row (the ✕ is in the corner too). */
 @media (max-height: 500px) {
+  .nrl-modal.nrl-player-modal { max-width: min(96vw, 760px); width: min(96vw, 760px); padding: 0.4rem 0.5rem; }
+  .nrl-player-panel { padding: 0.35rem 0.5rem; }
+  .nrl-player { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 1rem; grid-template-areas: "top about" "details about" "actions actions"; align-items: start; }
+  .nrl-player-grid { display: contents; }
+  .nrl-player-top { grid-area: top; }
+  .nrl-player-about { grid-area: about; }
+  .nrl-player-details { grid-area: details; }
+  .nrl-player-actions { grid-area: actions; margin-top: 0.3rem; }
+  .nrl-player-about h3:first-child { margin-top: 0; }
+  .nrl-modal-has-x .nrl-player-about { padding-right: 2.75rem; }
+  .nrl-modal-has-x .nrl-player-top { padding-right: 0; }
+  .nrl-player-portrait { width: 56px; height: 56px; }
   .nrl-player-actions .nrl-player-close { flex: 1 1 6rem; }
   .nrl-player-why { order: 1; }
 }
 .nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
-/* ── Guide under "?" (N7, #188) ─────────────────────────────────────────── */
+/* ── Guide, under More (N7, #188, #344) ─────────────────────────────────────────── */
 .nrl-screen-backdrop .nrl-guide-modal { width: min(96vw, 760px); max-width: none; display: flex; flex-direction: column; }
-/* #206: only the page scrolls; the tabs and the foot (Replay, Close) stay in view. */
+/* #206: only the page scrolls; the tabs and the foot (Replay) stay in view. */
 .nrl-guide { font-size: 0.85rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-guide-tabs, .nrl-guide-foot { flex: 0 0 auto; }
 .nrl-guide-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -1177,15 +1208,24 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-guide-build { flex: 1 1 auto; font-size: 0.75rem; color: #555; }
 .nrl-guide-update { background: #7ec850; }
-/* #206: a landscape phone leaves the Guide ~180px; one row of tabs (swipe for
-   more) and a one-line foot leave the page room, even with Safari's text boost. */
+.nrl-modal-has-x .nrl-guide-tabs { padding-right: 2.75rem; }
+/* #206, #336: a landscape phone leaves the Guide little height. One row holds the
+   tabs (swipe for more), Replay and the ✕, and the page has the rest, even with
+   Safari's text boost. */
 @media (max-height: 500px) {
   .nrl-screen-backdrop .nrl-guide-modal { padding: 0.5rem 0.75rem; }
-  .nrl-guide-tabs { flex-wrap: nowrap; overflow-x: auto; margin-bottom: 0.3rem; }
+  .nrl-guide { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); column-gap: 0.4rem; }
+  .nrl-guide-tabs { grid-column: 1; grid-row: 1; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 0.3rem; padding: 0 3px 3px 0; }
+  .nrl-modal-has-x .nrl-guide-tabs { padding-right: 3px; }
   .nrl-guide-tabs .nrl-btn { flex: 0 0 auto; }
-  .nrl-guide-foot { flex-wrap: nowrap; margin-top: 0.3rem; padding-top: 0.3rem; }
+  .nrl-guide-foot { grid-column: 2; grid-row: 1; align-self: start; flex-wrap: nowrap; margin: 0; padding: 0; border: 0; }
+  .nrl-modal-has-x .nrl-guide-foot { margin-right: 2.75rem; }
   .nrl-guide-foot .nrl-btn { flex: 0 0 auto; }
-  .nrl-guide-build { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nrl-guide-build { display: none; }
+  .nrl-guide-body { grid-column: 1 / -1; grid-row: 2; }
+  .nrl-guide { font-size: 0.8rem; }
+  .nrl-guide h2 { font-size: 0.95rem; }
+  .nrl-guide h3 { margin-top: 0.35rem; }
 }
 .nrl-card-open { cursor: pointer; }
 .nrl-card-open:focus-visible { outline: 3px solid #3a6ea5; }

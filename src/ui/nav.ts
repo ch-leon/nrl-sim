@@ -160,6 +160,7 @@ export function createNav(): Nav {
     registry.set(id, label, open, placement);
     const btn = button(label, () => pick(id));
     btn.setAttribute('data-screen', id);
+    if (placement.holds?.length) btn.setAttribute('data-nav-holds', placement.holds.join(' '));
     if (placement.more) btn.setAttribute('role', 'menuitem');
     buttons.set(id, btn);
     paintBadge(id);

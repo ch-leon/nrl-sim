@@ -6,10 +6,11 @@
 // put him there (whoever was there takes his place); tap two slots to swap
 // them. Each tile shows the man's rating as he plays that slot: a man out of
 // position plays below his rating (systems/lineup.ts, tuning reference §21).
-// Auto pick rebuilds today's best side. Saved at once, so a side picked and
+// Auto pick rebuilds today's best side; PLAN opens the attack and defence
+// presets in a dialog over it (#342). Saved at once, so a side picked and
 // then the app closed is not lost. DOM UI kit only; the rules are pure and
 // tested in systems/lineup.ts. No Phaser.
-import { el, button, openScreen, closeScreen } from '../dom';
+import { el, button, openScreen, openModal, screenHead } from '../dom';
 import { getState, setState, type Lineup, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
 import { save } from '../../core/save';
@@ -137,7 +138,6 @@ const LINEUP_CSS = `
 .nrl-lineup-fit-related { color: #8a5a00; }
 .nrl-lineup-fit-unrelated { color: #b00020; }
 .nrl-lineup .nrl-screen-head { margin-bottom: 0.3rem; }
-.nrl-lineup .nrl-screen-sub { margin-bottom: 0.25rem; }
 .nrl-lineup-bench {
   flex: 0 0 auto;
   display: flex;
@@ -211,14 +211,21 @@ const LINEUP_CSS = `
 .nrl-lineup-role-c { right: 11px; }
 .nrl-lineup-rot { display: flex; gap: 0.2rem; align-items: center; }
 .nrl-lineup-rot-label { color: #e8e0c8; font-size: 0.7rem; }
-.nrl-lineup-tacstrip { display: flex; gap: 0.6rem; align-items: center; overflow-x: auto; flex-shrink: 0; scrollbar-width: thin; }
-.nrl-lineup-tac { flex-wrap: nowrap; flex-shrink: 0; }
+.nrl-lineup-left > .nrl-screen-sub { margin: 0; font-size: 0.65rem; }
+/* The plan dialog (#342): a row of chips per side, each pick's blurb under them. */
+.nrl-lineup-plan { font-size: 0.8rem; }
+.nrl-lineup-plan h2 { margin: 0 0 0.4rem; font-size: 1rem; }
+.nrl-lineup-tac { flex-wrap: wrap; margin-bottom: 0.4rem; }
+.nrl-lineup-tac .nrl-lineup-rot-label { color: #1a1a2e; font-weight: bold; min-width: 4.5rem; }
 .nrl-lineup-tac .nrl-btn { min-height: 44px; white-space: nowrap; }
 /* The lit chip stays lit under a finger: a touch leaves :hover on the last chip tapped. */
 .nrl-lineup .nrl-btn.nrl-sort-active, .nrl-lineup .nrl-btn.nrl-sort-active:hover:not(:disabled) { background: #7ec850; }
-.nrl-lineup-tac-hint { color: #e8e0c8; font-size: 0.68rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex-shrink: 0; }
+.nrl-lineup-tac-hint p { margin: 0.2rem 0 0; line-height: 1.3; }
+.nrl-lineup-plan > .nrl-lineup-rot { margin-top: 0.5rem; }
+.nrl-lineup-plan > .nrl-lineup-rot .nrl-lineup-rot-label { color: #1a1a2e; font-weight: bold; min-width: 4.5rem; }
+.nrl-lineup-plan > .nrl-lineup-rot .nrl-btn { min-height: 44px; padding: 0.3rem 0.6rem; }
 .nrl-lineup-rot .nrl-btn { padding: 0.3rem 0.35rem; font-size: clamp(0.6rem, 2vw, 0.8rem); }
-.nrl-lineup-head .nrl-btn { padding: 0.3rem 0.5rem; }
+.nrl-screen-tools [data-plan] { max-width: 15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (min-width: 1000px) {
   .nrl-lineup-tile { width: 96px; }
   .nrl-lineup-tile-top, .nrl-lineup-tile-name { font-size: 0.72rem; }
@@ -308,6 +315,9 @@ export function openLineupScreen(): void {
   };
   const attackRow = tacRow('Attack:', ATTACK_PRESETS, (p) => ({ attack: p as AttackPreset }));
   const defenceRow = tacRow('Defence:', DEFENCE_PRESETS, (p) => ({ defence: p as DefencePreset }));
+  const planBtn = button('PLAN', () => {});
+  planBtn.setAttribute('data-plan', '');
+  planBtn.setAttribute('aria-haspopup', 'dialog');
 
   const toast = (text: string): void => bus.emit('ui:notify', { text, kind: 'info' });
 
@@ -420,8 +430,12 @@ export function openLineupScreen(): void {
     for (const [r, b] of rotButtons) b.classList.toggle('nrl-sort-active', r === lineup.rotation);
     const tactics = validTactics(lineup.tactics);
     for (const [p, b] of tacButtons) b.classList.toggle('nrl-sort-active', p === tactics.attack || p === tactics.defence);
-    tacHint.textContent = `${PRESET_LABEL[tactics.attack]}: ${TACTIC_BLURB[tactics.attack]} ${PRESET_LABEL[tactics.defence]}: ${TACTIC_BLURB[tactics.defence]}`;
-    tacHint.title = tacHint.textContent;
+    tacHint.replaceChildren(
+      el('p', {}, el('strong', { text: `${PRESET_LABEL[tactics.attack]}: ` }), TACTIC_BLURB[tactics.attack]),
+      el('p', {}, el('strong', { text: `${PRESET_LABEL[tactics.defence]}: ` }), TACTIC_BLURB[tactics.defence]),
+    );
+    planBtn.textContent = `PLAN ${PRESET_LABEL[tactics.attack]} · ${PRESET_LABEL[tactics.defence]}`;
+    planBtn.title = `Attack, defence and the bench (${ROTATION_LABEL[lineup.rotation]}): the coach’s plan for the match`;
 
     const fit = s.squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length;
     const picked = lineup.starters.filter((id) => id !== null).length;
@@ -500,24 +514,22 @@ export function openLineupScreen(): void {
   autoBtn.title = 'Today’s best nine by slot and the next four';
   autoBtn.setAttribute('data-auto-pick', '');
 
-  const head = el(
-    'div',
-    { class: 'nrl-screen-head nrl-lineup-head' },
-    el('span', { class: 'nrl-screen-title', text: 'Lineup' }),
-    rotRow,
-    autoBtn,
-    button('CLOSE', closeScreen),
-  );
+  // The plan (N11): attack and defence presets and the picks' blurbs, in a
+  // dialog over the screen so the field and the list keep its height (#342).
+  // The bench rotation is part of the plan: how hard the four are used.
+  const plan = el('div', { class: 'nrl-lineup nrl-lineup-plan' },
+    el('h2', { text: 'Game plan' }), attackRow, defenceRow, tacHint, rotRow);
+  planBtn.onclick = () => openModal(plan, { class: 'nrl-lineup-plan-modal', region: true, closeButton: true });
+
+  const head = screenHead('Lineup', { controls: [planBtn, autoBtn] });
   const body = el(
     'div',
     { class: 'nrl-lineup-body' },
-    el('div', { class: 'nrl-lineup-left' }, field, bench),
+    el('div', { class: 'nrl-lineup-left' }, field, bench, sub),
     el('div', { class: 'nrl-lineup-right' }, pick, kcRow, list),
   );
-  // The plan (N11): attack and defence presets on their own strip, the picks' blurbs under it.
-  const tacStrip = el('div', { class: 'nrl-lineup-tacstrip' }, attackRow, defenceRow);
-  const screen = el('div', { class: 'nrl-screen nrl-lineup' }, head, tacStrip, tacHint, sub, body);
-  openScreen(screen, onLineupClosed);
+  const screen = el('div', { class: 'nrl-screen nrl-lineup' }, head, body);
+  openScreen(screen, onLineupClosed, 'lineup');
   render();
   unsub = bus.on('state:changed', render);
 }

@@ -219,5 +219,5 @@ export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void 
     button('History', () => { closeScreen(); openHistoryScreen(); }, { class: 'nrl-review-history' }),
     button('Close', () => { closeScreen(); opts.back?.(); }, { class: 'nrl-review-close' }),
   ));
-  return openModal(content, { class: 'nrl-review-modal', screen: true });
+  return openModal(content, { class: 'nrl-review-modal', screen: true, key: 'history' });
 }
