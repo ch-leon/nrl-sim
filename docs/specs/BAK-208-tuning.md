@@ -32,7 +32,8 @@ result. Keep it in step with the code: when a constant changes, change the row.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `MIN_SPEED` / `MAX_SPEED` | `src/match/core/body.ts` | 6 / 9 m/s | Top speed from the Speed stat (1 → 6, 100 → 9). |
+| `MIN_SPEED` / `MAX_SPEED` | `src/match/core/body.ts` | 6 / 9 m/s | Bounds on top speed from the Speed stat. |
+| `pace.extraPerStat` | `body.ts` | 0.03 m/s | Added per Speed point away from 60, then clamped to 6–9 m/s. The old slope was 0.03; the middle slope is now 0.06, with Speed 60 unchanged at 7.8 m/s. |
 | `ACCEL` | `body.ts` | 9 m/s² | Acceleration and braking cap. Drives the run-on lead (§5 below). |
 | `BODY_RADIUS` | `body.ts` | 0.9 m | Separation radius (nobody stands inside anyone). |
 | `live.separatePasses` / `live.decideEveryTicks` | `live.ts` | 2 / 1 | How many times a tick bodies are pushed apart, and how often players re-pick targets: speed knobs, §23. |
@@ -143,6 +144,11 @@ showcase) wins 84% (`20261019-172010-traits-whole-match`).
 Tests: `tests/data/traits.test.ts`, `tests/match/league/traits.test.ts`.
 
 ## 8. Tactics (§5)
+
+Current Expansive engagement pass delta (`presets.attack.expansive.base.pass`):
+**−0.10**, was 0. Width 0.28, edges +0.8, cut-out 0.02 (0.01 own 20),
+offload ×1.3 (0.8 own 20) and early kick 0.18 stay fixed. Measurements and
+remaining open items: `docs/status/2026-10-balance.md`.
 
 All in `src/match/league/presets.ts`: `attackPlan(preset, zone)` and `defencePlan(preset)`
 are plain tables (experiments: `presets.attackDefault.*`, `presets.attack.<preset>.base.*` or
@@ -276,6 +282,12 @@ All in `src/match/league/wrestle.ts`; `live.ts` `stepWrestle` runs it (and `live
 Tests: `tests/match/league/fatigue.test.ts`.
 
 ## 12. Balance targets (§7) and how to measure
+
+The 26 Oct tuning pass also checks the neutral 60 v 60 guardrails: about
+5–6 total tries and 0.20–0.30 grubber tries a match. The report exposes
+grubber outcomes and flags those tries, repeat sets at 0.05–0.30, and
+drop-outs at 0–0.15. Repeat/drop-out band edges remain provisional; see
+`docs/status/2026-10-balance.md`. These rare counts print to three decimals.
 
 Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams: tackles
 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 · tries 4–7 ·

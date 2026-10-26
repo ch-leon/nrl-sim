@@ -80,11 +80,13 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
     zones: { own20: { offload: 0.6, pass: -0.05 } },
   },
   expansive: {
+    // Season tuning: pass -0.1 keeps the wide shape but cuts risky passes
+    // at engagement. Width, edges, cut-outs and offloads stay expansive.
     // N13: pass, cut-out and the early kick came down so a wide side wins about half
     // its even matches (was pass +0.15, cut-out 0.08, early kick 0.3, width 0.35).
     // Own 20 stays the careful zone: its cut-out was left at 0.03, above the new
     // base, so a side cut out more from its own 20 than anywhere else.
-    base: { pass: 0, offload: 1.3, cutOut: 0.02, width: 0.28, edges: 0.8, earlyKick: 0.18, kickBias: { 'cross-field': 1.5, long: 0.8 } },
+    base: { pass: -0.1, offload: 1.3, cutOut: 0.02, width: 0.28, edges: 0.8, earlyKick: 0.18, kickBias: { 'cross-field': 1.5, long: 0.8 } },
     zones: { own20: { offload: 0.8, cutOut: 0.01 } },
   },
   'kick-chase': {

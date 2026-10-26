@@ -168,6 +168,12 @@ describe('measuring and reporting', () => {
     expect(bandMark('tackles', 150)).toBe('✓');
     expect(bandMark('tackles', 250)).toBe('↑');
     expect(bandMark('gassed', 4)).toBe('');
+    expect(bandMark('grubberTries', 0.2)).toBe('✓');
+    expect(bandMark('grubberTries', 0.31)).toBe('↑');
+    expect(bandMark('grubberRepeats', 0.04)).toBe('↓');
+    expect(bandMark('grubberRepeats', 0.3)).toBe('✓');
+    expect(bandMark('grubberDropouts', 0)).toBe('✓');
+    expect(bandMark('grubberDropouts', 0.16)).toBe('↑');
     expect(delta({ mean: 10, se: 0.5 }, { mean: 7, se: 0.5 })).toBe('+3.0*');
     expect(delta({ mean: 10, se: 2 }, { mean: 7, se: 2 })).toBe('+3.0');
     expect(delta({ mean: 10, se: 0.5 }, { mean: 7, se: 0.5 }, false)).toBe('+3.0');
@@ -223,8 +229,11 @@ describe('measuring and reporting', () => {
     expect(tuned.homeWin).toBe(plain.homeWin);
     expect(measureCell({ ...even, scenario: { ...even.scenario, track: 'home' } }, 1, 6).trackedWin).toBe(plain.homeWin);
   }, 60_000);
-  it('pins an even Balanced / Slide match (seed 1) so a preset retune cannot move it', async () => {
-    const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 1);
+  it.each([
+    { attack: 'balanced' as const, expected: '8-16:346:3436c830c791688a' },
+    { attack: 'expansive' as const, expected: '14-14:385:97934f5b337f329e' },
+  ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
+    const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
     while (!sim.finished && sim.tick < 100_000) {
       sim.step();
@@ -234,12 +243,10 @@ describe('measuring and reporting', () => {
     const spec = 'node:crypto';
     const { createHash } = await import(spec);
     const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
-    // Deliberately moved when the grubber chase was eased (2026-10-25): the
-    // wingers start inside 24 m and lead by at most 3 m. Seed 1's even
-    // Balanced / Slide match was 14-16:355:a3624c324e9bb503 on the longer
-    // chase, 6-7:362:e959099a69ffd994 on the 7:00 halves before any chase
-    // (itself moved from 8-14:495:67db8b634c5a2e73 when halves went to 7:00).
+    // Balanced stays pinned across a preset-only pass. Expansive also has a
+    // pin so its intentional tuning changes have their own replay evidence.
+    // Expansive was 18-18:341:c5d42c10eb6a4f46 before pass 0 -> -0.1.
     // See docs/status/2026-10-balance.md.
-    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('8-16:346:3436c830c791688a');
+    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
   });
 });

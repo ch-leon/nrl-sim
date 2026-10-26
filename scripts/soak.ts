@@ -3,6 +3,7 @@
 //   npm run soak                         5 seasons × 20 seeds, idle + managed + idle Hard, plus old saves
 //   npm run soak -- --seasons 3 --seeds 5
 //   npm run soak -- --difficulties easy,normal,hard   idle + managed on each difficulty (#148)
+//   npm run soak -- --managed-only --difficulties easy,normal,hard   managed career guardrails
 //   npm run soak -- --json out.json      also write every run's samples to a file
 //   npm run soak -- --jobs 4             split the runs over 4 processes (same results, in order)
 //   npm run soak -- --live-rivals        rival rounds on the live sim too (N9.2's setting; several times slower),
@@ -46,6 +47,7 @@ const jsonOut = str('json');
 // Without --difficulties: idle and managed on Normal plus idle on Hard (the original soak).
 const difficulties = str('difficulties')?.split(',').filter((d): d is Difficulty => DIFFICULTIES.includes(d as Difficulty));
 const liveRivals = args.includes('--live-rivals');
+const modes = args.includes('--managed-only') ? ['managed'] as const : ['idle', 'managed'] as const;
 
 // Child of a --jobs run: play the runs in the given file, write the results, stop.
 const childIn = str('child');
@@ -62,11 +64,11 @@ const specs: SoakOptions[] = [];
 for (let seed = 1; seed <= seeds; seed++) {
   if (difficulties) {
     for (const difficulty of difficulties) {
-      for (const mode of ['idle', 'managed'] as const) specs.push({ seed: seed * 7919, seasons, mode, difficulty, ...live });
+      for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, difficulty, ...live });
     }
   } else {
-    for (const mode of ['idle', 'managed'] as const) specs.push({ seed: seed * 7919, seasons, mode, ...live });
-    specs.push({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard', ...live });
+    for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, ...live });
+    if (!args.includes('--managed-only')) specs.push({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard', ...live });
   }
 }
 for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
