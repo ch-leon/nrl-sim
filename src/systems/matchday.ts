@@ -80,7 +80,7 @@ export function resumePlayerMatch(): boolean {
       live.plans = [];
       delete live.resumeAt;
       writeLiveMatch({ ...rec, calls: [], plans: [], tick: 0, halfMinutes: NINES.halfMinutes });
-      bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info' });
+      bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info', match: true });
     } else {
       live.calls = [...rec.calls];
       live.plans = rec.plans ? [...rec.plans] : [];
@@ -128,7 +128,7 @@ function sheetFor(clubId: string): TeamSheet {
     // replaced in the saved lineup as well.
     const picked = resolveLineup(state.lineup ?? autoPick(state.squad), state.squad);
     if (picked.changed) setState({ lineup: picked.lineup });
-    if (picked.fills.length > 0) bus.emit('ui:notify', { text: describeFills(picked.fills), kind: 'info' });
+    if (picked.fills.length > 0) bus.emit('ui:notify', { text: describeFills(picked.fills), kind: 'info', match: true });
     return teamSheetFromSquad(
       state.squad,
       PLAYER_ID,
@@ -292,7 +292,7 @@ export function registerPlayerMatchSystem(): void {
     // A v19 mid-match save has no half length. Re-simming that tick under 7:00
     // rules is a different match, so it starts again from the kick-off.
     const stale = sameMatch && sameMatch.tick > 0 && !liveMatchSameRules(sameMatch);
-    if (stale) bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info' });
+    if (stale) bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info', match: true });
     const resumed = stale ? null : sameMatch;
     // The match on screen is the match (BAK-207; coach calls #73). The week
     // holds here; the result and the rest of the week come at full time, from

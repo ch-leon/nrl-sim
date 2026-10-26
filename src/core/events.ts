@@ -71,9 +71,10 @@ export interface Events {
   /**
    * A message for the player. `quiet` (N14): it is already on screen elsewhere (the
    * season review shows the rollover's retirements, juniors, verdict, prize and
-   * movers), so the news inbox keeps it but no toast pops.
+   * movers), so the news inbox keeps it but no toast pops. `match`: about the match on
+   * screen; any other toast waits while a live match plays and shows back at the club (#339).
    */
-  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean };
+  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean };
 }
 
 export type EventName = keyof Events;

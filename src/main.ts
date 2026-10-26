@@ -10,7 +10,8 @@ import { advanceUntil } from './core/advance';
 import { createHud } from './ui/hud';
 import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
 import { createNav } from './ui/nav';
-import { closeModal, closeScreen, ensureStyles } from './ui/dom';
+import { closeModal, closeScreen } from './ui/dom';
+import { initToasts } from './ui/toasts';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
 import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
@@ -65,27 +66,6 @@ const config: Phaser.Types.Core.GameConfig = {
 
 const uiRoot = document.getElementById('ui-root') as HTMLElement;
 
-// Minimal toast renderer for 'ui:notify' — the §5 event every system emits;
-// no ticket owns a renderer, so the orchestrator provides one. Placement lives
-// in the shared stylesheet (.nrl-toast-stack: just below the HUD, above open
-// screens); the match overlay re-anchors it clear of the scoreboard/stats.
-function initToasts(): void {
-  ensureStyles();
-  const stack = document.createElement('div');
-  stack.className = 'nrl-toast-stack';
-  // #45: announce toasts to screen readers without stealing focus.
-  stack.setAttribute('aria-live', 'polite');
-  uiRoot.appendChild(stack);
-  bus.on('ui:notify', ({ text, kind, quiet }) => {
-    if (quiet) return; // already on screen (the season review, N14)
-    const toast = document.createElement('div');
-    toast.className = `nrl-toast nrl-toast-${kind}`;
-    toast.textContent = text;
-    stack.appendChild(toast);
-    setTimeout(() => toast.remove(), 4000);
-  });
-}
-
 // Landscape only: on a phone held upright the rotate card covers the game and
 // the Phaser loop sleeps (pausing match playback) until it's turned sideways.
 let game: Phaser.Game | null = null;
@@ -113,7 +93,7 @@ async function boot(): Promise<void> {
       requestAnimationFrame(() => game?.scale.refresh());
     },
   });
-  initToasts();
+  initToasts(uiRoot);
   initSeasonEndFeedback();
   initFinanceLedger();
   initNewsInbox();
