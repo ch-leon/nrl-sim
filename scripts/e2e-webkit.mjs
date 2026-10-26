@@ -815,7 +815,7 @@ function toastReport(page, avoid, safe, tappable = true) {
 }
 
 /** What a toast must never touch at the club: the nav, the bar's buttons (the next-match chip too), an open screen or dialog. */
-const CLUB_AVOID = ['.nrl-nav', '.nrl-hud-actions', '.nrl-hud-next', '.nrl-audio-launcher', '.nrl-screen-region .nrl-modal', '.nrl-screen-x', '.nrl-screen-head'];
+const CLUB_AVOID = ['.nrl-nav', '.nrl-hud-actions', '.nrl-hud-next', '.nrl-hud [data-hud="money"]', '.nrl-audio-launcher', '.nrl-screen-region .nrl-modal', '.nrl-screen-x', '.nrl-screen-head'];
 /** …and in a match: the scoreboard, the stats, the ticker or open log, and every control. */
 const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-stats', '.nrl-mo-commentary', '.nrl-mo-log', '.nrl-mo-log-toggle', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay', '.nrl-audio-launcher'];
 /** The burst the check fires: a problem, a routine stop, good news, a confirmation. */

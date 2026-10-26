@@ -1,7 +1,7 @@
 // src/ui/toasts.ts — the toast lane for 'ui:notify' (the §5 event every system
 // emits). #339: one toast at a time with a "+n" counter for the rest, a tap
 // dismisses it, and it sits where no control is:
-//   - at the club, in the top bar's row between the money tile and Advance Week
+//   - at the club, in the top bar's row between the money tile and the next-match chip
 //     (screens run from the bar to the nav, so anywhere lower sits on their rows
 //     and buttons);
 //   - in a match, in the row under the scoreboard the open log keeps free, and
@@ -80,7 +80,10 @@ export function initToasts(root: HTMLElement): void {
     }
     const money = document.querySelector('.nrl-hud [data-hud="money"]')?.getBoundingClientRect();
     const actions = document.querySelector('.nrl-hud-actions')?.getBoundingClientRect();
-    const gap = money && actions ? Math.floor(actions.left - money.right - 12) : 0;
+    // The next-match chip is a button too: the lane stops short of it.
+    const next = document.querySelector('.nrl-hud .nrl-hud-next')?.getBoundingClientRect();
+    const end = next && next.width > 0 ? next.left : actions?.left ?? 0;
+    const gap = money && actions ? Math.floor(end - money.right - 12) : 0;
     if (money && actions && money.height > 0 && gap >= MIN_LANE_PX) {
       setLane('hud', `left: ${Math.round(money.right + 6)}px; top: ${Math.round(actions.top)}px; width: ${gap}px; height: ${Math.round(actions.height)}px;`);
       return;
