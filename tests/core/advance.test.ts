@@ -119,6 +119,8 @@ describe('advanceUntil — weeks target', () => {
     const run = await advanceUntil({ kind: 'weeks', weeks: 4 });
     expect(run.stop.kind).toBe('contract');
     expect(run.weeksPlayed).toBe(1);
+    // A routine stop is neutral (#339).
+    expect(toasts[toasts.length - 1]?.kind).toBe('info');
   });
 
   it('forfeit risk: stops before playing when fewer than SQUAD_MIN players are fit', async () => {
@@ -249,7 +251,8 @@ describe('advanceUntil — yields between weeks, Stop', () => {
     expect(run.stop).toEqual({ kind: 'stopped', text: STOPPED_BY_YOU });
     expect(run.weeksPlayed).toBe(2);
     expect(getState().week).toBe(start + 2);
-    expect(toasts[toasts.length - 1]).toEqual({ text: `Stopped after 2 weeks: ${STOPPED_BY_YOU}`, kind: 'danger' });
+    // A Stop tap is routine, not a problem (#339): neutral, not red.
+    expect(toasts[toasts.length - 1]).toEqual({ text: `Stopped after 2 weeks: ${STOPPED_BY_YOU}`, kind: 'info' });
   });
 
   it('a second advance while one runs does nothing', async () => {

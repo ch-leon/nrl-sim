@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
-import { bus } from './core/events';
+import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
 import { enableAutosave, load, showTitleFlow } from './core/save';
 import { advanceWeek } from './core/time';
@@ -146,11 +146,13 @@ async function boot(): Promise<void> {
   if (new URLSearchParams(location.search).has('e2e')) {
     const w = window as unknown as {
       __nrlGame?: Phaser.Game; __nrlState?: () => GameState; __nrlTutorialText?: string[];
-      __nrlShowCard?: (cardId: string) => boolean;
+      __nrlShowCard?: (cardId: string) => boolean; __nrlNotify?: (n: Events['ui:notify']) => void;
     };
     w.__nrlGame = g;
     w.__nrlState = () => getState();
     w.__nrlShowCard = plantPending;
+    // scripts/e2e-webkit.mjs fires a burst of toasts at the lane (#339).
+    w.__nrlNotify = (n) => bus.emit('ui:notify', n);
     // Every tutorial step's copy, for scripts/e2e-webkit.mjs's fit check (#208).
     w.__nrlTutorialText = TUTORIAL_STEPS.map((st) => st.text);
   }

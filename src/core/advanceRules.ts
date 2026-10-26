@@ -185,6 +185,14 @@ export function postWeekStop(facts: WeekFacts): StopReason | null {
   return null;
 }
 
+/**
+ * The colour of a stop's toast (#339): red for a real problem (a forfeit, a starter
+ * injured, debt), neutral for a routine stop (a contract, a decision, Stop tapped).
+ */
+export function stopToastKind(kind: StopKind | 'stopped' | 'busy'): 'info' | 'danger' {
+  return kind === 'forfeit' || kind === 'injury' || kind === 'bankruptcy' ? 'danger' : 'info';
+}
+
 // ── Target ─────────────────────────────────────────────────────────────────
 
 /** Progress so far in a run, used to decide whether the target is met. */

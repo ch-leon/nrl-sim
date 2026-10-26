@@ -1096,11 +1096,11 @@ async function play() {
     if (JSON.stringify(slot) !== slotBefore) {
       throw new Error(`a change during the held week wrote it half-ticked: slot 1 at W${slot.week}, ${slot.league.fixtures.filter((f) => f.round === week && f.result).length} of round ${week}'s results in, $${slot.money}`);
     }
-    // Each tap leaves its own message. A toast lasts 4 s and a busy page can take longer than
-    // that between taps, so keep a log of every toast as it is added and count in that.
+    // Each tap leaves its own message. A toast lasts a few seconds and a busy page can take longer than
+    // that between taps, so keep a log of every toast as it is queued and count in that.
     await page.evaluate(() => {
       window.__nrlToastLog = [];
-      const stack = document.querySelector('.nrl-toast-stack');
+      const stack = document.querySelector('.nrl-toast-lane');
       new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) window.__nrlToastLog.push(n.textContent ?? ''); })
         .observe(stack, { childList: true });
     });

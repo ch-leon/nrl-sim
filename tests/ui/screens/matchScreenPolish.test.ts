@@ -51,7 +51,7 @@ describe('the half-time card waits (#341)', () => {
       expect(card, sel).toBeGreaterThan(zIndex(OVERLAY_CSS, sel));
     }
     expect(card).toBeGreaterThan(zIndex(OVERLAY_CSS, '.nrl-mo-replay, .nrl-mo-replay-tag'));
-    expect(card).toBeGreaterThan(zIndex(CSS, '.nrl-toast-stack'));
+    expect(card).toBeGreaterThan(zIndex(CSS, '.nrl-toast-lane'));
     expect(card).toBeLessThan(100); // modals
   });
   it('keeps Continue in view on a short screen: the foot is sticky', () => {

@@ -73,8 +73,11 @@ export interface Events {
    * season review shows the rollover's retirements, juniors, verdict, prize and
    * movers), so the news inbox keeps it but no toast pops. `match`: about the match on
    * screen; any other toast waits while a live match plays and shows back at the club (#339).
+   * `kind` is what it means (#339): `danger` only for a real problem (an error, an injury or
+   * ban that keeps a man out, money in the red), `success` for good news, `info` for the
+   * rest. `ms`: how long its toast stays in view, when not the default for its length.
    */
-  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean };
+  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean; ms?: number };
 }
 
 export type EventName = keyof Events;

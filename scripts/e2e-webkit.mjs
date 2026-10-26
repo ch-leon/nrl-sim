@@ -614,6 +614,9 @@ async function runPortrait(browser) {
 // at least four whole rows of its list or one whole card, keep its ✕ and its
 // primary action on screen and tappable, and stay out of the unsafe bands. The
 // nav has at most five tabs with labels of 12px or more, and marks the open one.
+// The toast lane (#339): a burst shows one toast at a time with a "+n" counter and
+// each kind's colour, clear of the nav, the bar's buttons and the open screen; in a
+// match it keeps off the open log, the scoreboard and every control.
 // WebKit on Linux reports zero safe-area insets, so the iPhone's are simulated
 // through the --nrl-safe-* properties the UI reads env() into (src/ui/dom.ts).
 const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375').split(/\s+/).filter(Boolean).map((s) => {
@@ -771,6 +774,59 @@ function chromeReport(page, openId) {
   }, openId);
 }
 
+/**
+ * The toast lane (#339): what shows, and what the toast in view gets wrong. One
+ * toast at a time; it must be inside the safe area, take a tap at its middle
+ * (`tappable`), and touch none of `avoid` (selectors; every match is checked).
+ */
+function toastReport(page, avoid, safe, tappable = true) {
+  return page.evaluate(([avoid, safe, tappable]) => {
+    const W = innerWidth, H = innerHeight;
+    const out = [];
+    const lane = document.querySelector('.nrl-toast-lane');
+    const all = [...document.querySelectorAll('.nrl-toast')];
+    const shown = all.filter((t) => getComputedStyle(t).display !== 'none' && t.getBoundingClientRect().height > 0);
+    if (shown.length > 1) out.push(`${shown.length} toasts on screen at once`);
+    const t = shown[0];
+    if (!t) return { problems: out, shown: 0, queued: all.length, text: '', kind: '', more: '', bg: '', lane: lane?.dataset.lane ?? '' };
+    const r = t.getBoundingClientRect();
+    if (r.left < safe.l - 1 || r.right > W - safe.r + 1 || r.top < safe.t - 1 || r.bottom > H - safe.b + 1) {
+      out.push(`the toast is off screen or in the unsafe band (${Math.round(r.left)},${Math.round(r.top)}–${Math.round(r.right)},${Math.round(r.bottom)})`);
+    }
+    if (tappable) {
+      const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+      if (!hit || !t.contains(hit)) out.push(`the toast is covered (a tap hits ${hit?.className || hit?.tagName})`);
+    }
+    const meets = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+    for (const sel of avoid) {
+      for (const e of document.querySelectorAll(sel)) {
+        const er = e.getBoundingClientRect();
+        if (er.width < 1 || er.height < 1 || getComputedStyle(e).visibility === 'hidden') continue;
+        if (meets(r, er)) out.push(`the toast overlaps ${sel}`);
+      }
+    }
+    const kind = [...t.classList].find((c) => /^nrl-toast-(info|success|danger)$/.test(c)) ?? '';
+    return {
+      problems: [...new Set(out)], shown: shown.length, queued: all.length - 1,
+      text: t.querySelector('.nrl-toast-text')?.textContent ?? '', kind, more: t.querySelector('.nrl-toast-more')?.textContent ?? '',
+      bg: getComputedStyle(t).backgroundColor, lane: lane?.dataset.lane ?? '',
+    };
+  }, [avoid, safe, tappable]);
+}
+
+/** What a toast must never touch at the club: the nav, the bar's buttons, an open screen or dialog. */
+const CLUB_AVOID = ['.nrl-nav', '.nrl-hud-actions', '.nrl-audio-launcher', '.nrl-screen-region .nrl-modal', '.nrl-screen-x', '.nrl-screen-head'];
+/** …and in a match: the scoreboard, the stats, the ticker or open log, and every control. */
+const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-stats', '.nrl-mo-commentary', '.nrl-mo-log', '.nrl-mo-log-toggle', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay', '.nrl-audio-launcher'];
+/** The burst the check fires: a problem, a routine stop, good news, a confirmation. */
+const TOAST_BURST = [
+  { text: 'Kai Smith injured — out 3w', kind: 'danger' },
+  { text: 'Stopped after 1 week: Decision needed: Homesick youngster.', kind: 'info' },
+  { text: 'Signed Jack Taufa', kind: 'success' },
+  { text: 'Advanced 4 weeks.', kind: 'info' },
+];
+const TOAST_BG = { 'nrl-toast-danger': 'rgb(176, 58, 46)', 'nrl-toast-info': 'rgb(232, 224, 200)', 'nrl-toast-success': 'rgb(46, 125, 50)' };
+
 async function runScreens(browser, { w: W, h: H, safe }) {
   const tag = `${W}x${H}${safe.l || safe.r || safe.b || safe.t ? '-safe' : ''}`;
   const OUT = join(OUT_ROOT, 'webkit', `screens-${tag}`);
@@ -830,6 +886,49 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     const c = await chromeReport(page, null);
     rec.notes.push(c.note);
     return c.problems;
+  });
+  // The toast lane (#339): the install hint goes through it, clear of the screen's header;
+  // a burst shows one toast at a time with a counter, each in its colour, a tap takes the
+  // next, and none touches the nav, the bar's buttons or the open screen and its ✕.
+  await step('toast-lane', async (rec) => {
+    const out = [];
+    await page.waitForSelector('.nrl-toast', { timeout: 5000 }).catch(() => {});
+    await openNav(page, 'news');
+    await page.waitForSelector('.nrl-screen-region .nrl-modal');
+    await page.waitForTimeout(250);
+    const hint = await toastReport(page, CLUB_AVOID, safe);
+    if (!/Add to Home Screen/.test(hint.text)) out.push(`the install hint is not in the lane (it shows "${hint.text}")`);
+    else if (hint.lane !== 'hud') out.push(`the install hint is in the ${hint.lane} lane, not the top bar's`);
+    out.push(...hint.problems.map((p) => `install hint: ${p}`));
+    // Clear whatever is queued, then the burst.
+    for (let i = 0; i < 10 && (await page.locator('.nrl-toast').count()); i++) await page.locator('.nrl-toast').first().tap();
+    await page.evaluate((burst) => { for (const n of burst) window.__nrlNotify(n); }, TOAST_BURST);
+    await page.waitForTimeout(250);
+    const seen = [];
+    for (let i = 0; i < TOAST_BURST.length; i++) {
+      const want = TOAST_BURST[i];
+      const r = await toastReport(page, CLUB_AVOID, safe);
+      seen.push(`${r.kind.replace('nrl-toast-', '')}${r.more ? ` ${r.more}` : ''}`);
+      if (i === 0) await page.screenshot({ path: join(OUT, 'toast-burst.png') });
+      out.push(...r.problems);
+      if (r.text !== want.text) out.push(`toast ${i + 1} reads "${r.text}", want "${want.text}"`);
+      if (r.kind !== `nrl-toast-${want.kind}`) out.push(`toast ${i + 1} ("${want.text}") is ${r.kind || 'unclassed'}, want nrl-toast-${want.kind}`);
+      if (r.bg !== TOAST_BG[`nrl-toast-${want.kind}`]) out.push(`toast ${i + 1} is ${r.bg}, want ${TOAST_BG[`nrl-toast-${want.kind}`]} for ${want.kind}`);
+      const more = TOAST_BURST.length - 1 - i;
+      if (r.more !== (more ? `+${more}` : '')) out.push(`toast ${i + 1}'s counter reads "${r.more}", want "${more ? `+${more}` : ''}"`);
+      if (r.lane !== 'hud') out.push(`toast ${i + 1} is in the ${r.lane} lane, not the top bar's`);
+      if (i < TOAST_BURST.length - 1) {
+        await page.locator('.nrl-toast').first().tap();
+        await page.waitForTimeout(200);
+      }
+    }
+    // The last one goes by itself.
+    const gone = await page.waitForFunction(() => !document.querySelector('.nrl-toast'), null, { timeout: 8000 }).then(() => true).catch(() => false);
+    if (!gone) out.push('the last toast did not go by itself');
+    if (await page.evaluate(() => !document.querySelector('.nrl-toast-lane')?.hidden)) out.push('the empty lane is still shown');
+    rec.notes.push(`shown in turn: ${seen.join(', ')}`);
+    await page.locator('.nrl-screen-region .nrl-screen-x').first().tap();
+    return out;
   });
   // The More sheet: every row whole, tappable, 44px tall, 12px labels, clear of the unsafe bands.
   await step('nav-more', async (rec) => {
@@ -960,8 +1059,12 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   await step('match-cards', async (rec) => {
     await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
-    await page.waitForFunction(() => window.__nrlGame?.scene.getScene('Match')?.playback, null, { timeout: 30000 });
     const out = [];
+    // The ticker is never a blank strip: "Kick-off soon…" until the first line (#339).
+    const ticker = await page.evaluate(() => document.querySelector('.nrl-mo-ticker .nrl-mo-line:last-child')?.textContent?.trim() ?? '');
+    if (!ticker) out.push('the ticker is empty at kick-off');
+    else rec.notes.push(`ticker at kick-off: "${ticker.slice(0, 24)}"`);
+    await page.waitForFunction(() => window.__nrlGame?.scene.getScene('Match')?.playback, null, { timeout: 30000 });
     const clock = () => page.locator('.nrl-mo-clock').textContent().then((t) => t?.trim());
     /** The clock moves on from `from` (the match is playing, not held). */
     const runs = (from) => page.waitForFunction((f) => {
@@ -1026,6 +1129,41 @@ async function runScreens(browser, { w: W, h: H, safe }) {
       await page.waitForSelector('.nrl-mo-sheet', { state: 'detached', timeout: 3000 });
     } else out.push('no "?" on the calls row');
     rec.notes.push(`card held at ${at}; sheet held at ${paused}`);
+    return out;
+  });
+  // A match toast with the log open (#339): under the scoreboard, clear of the log, the
+  // scoreboard, the stats and every control; a club toast fired with it waits for the club;
+  // and the lane gives way to the Replay try chip.
+  await step('match-toast', async (rec) => {
+    const out = [];
+    if ((await page.locator('.nrl-mo-log-toggle').getAttribute('aria-expanded')) !== 'true') await page.locator('.nrl-mo-log-toggle').tap();
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      window.__nrlNotify({ text: 'Sponsor news for the club', kind: 'info' });
+      window.__nrlNotify({ text: 'Kai Smith comes in for the injured Jack Taufa at fullback.', kind: 'info', match: true });
+    });
+    // A score banner holds the lane; wait for the row to be free.
+    const up = await page.waitForFunction(() => {
+      const t = document.querySelector('.nrl-toast');
+      return !!t && getComputedStyle(t).display !== 'none' && t.getBoundingClientRect().height > 0;
+    }, null, { timeout: 12000 }).then(() => true).catch(() => false);
+    if (!up) return ['the match toast never showed'];
+    const r = await toastReport(page, MATCH_AVOID, { l: 0, t: 0, r: 0, b: 0 }, false);
+    await page.screenshot({ path: join(OUT, 'match-toast-log-open.png') });
+    out.push(...r.problems);
+    if (!/comes in for/.test(r.text)) out.push(`the toast in view is "${r.text}", not the match's`);
+    if (r.more) out.push(`a club toast is queued in the match (counter "${r.more}")`);
+    if (r.lane !== 'match') out.push(`the toast is in the ${r.lane} lane in a match`);
+    rec.notes.push(`"${r.text.slice(0, 24)}…" in the ${r.lane} lane`);
+    // The Replay try chip takes the row: the lane steps aside until it goes.
+    await page.evaluate(() => window.__nrlGame.scene.getScene('Match').overlay.offerReplay(() => {}));
+    await page.waitForTimeout(400);
+    const both = await page.evaluate(() => ({
+      chip: !!document.querySelector('.nrl-mo-replay:not([hidden])'),
+      lane: !document.querySelector('.nrl-toast-lane')?.hidden,
+    }));
+    if (both.chip && both.lane) out.push('the toast shows beside the Replay try chip');
+    await page.locator('.nrl-mo-log-toggle').tap();
     return out;
   });
   // The full-time report (#351 P0): its ✕, the result and Player of the Match on screen.

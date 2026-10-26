@@ -195,7 +195,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Changing it in a match',
         bullets: [
-          'At half-time (and before golden point) a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue. The card goes on by itself after a few seconds at any speed, and a tap holds it.',
+          'At half-time (and before golden point) a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue. The match waits for Continue at any speed.',
           'After a score, the Plan chip beside the call chips opens the same rows until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
           'Coach calls are the moment-to-moment layer on top: one call a set each way.',
         ],
