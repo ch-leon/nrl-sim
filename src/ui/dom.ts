@@ -310,6 +310,11 @@ export function openModal(
   return backdrop;
 }
 
+/** Whether a dialog (not a screen) is open. */
+export function dialogOpen(): boolean {
+  return openModalEl !== null && openModalEl.isConnected;
+}
+
 /** Close the currently open (dialog) modal, if any. Screens use closeScreen(). */
 export function closeModal(): void {
   if (openModalEl) {
@@ -426,7 +431,43 @@ export const CSS = `
   .nrl-hud-stat.nrl-money-negative { border-color: #b00020; }
   .nrl-hud-debt { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
-.nrl-hud-spacer { flex: 1 1 auto; }
+.nrl-hud-spacer { flex: 1 1 auto; min-width: 0; display: flex; justify-content: flex-end; }
+/* #350 H1: the next match, beside Advance Week: the opponent over home/away and the ladder place. */
+.nrl-hud .nrl-btn.nrl-hud-next {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  background: #e8e0c8;
+  color: #1a1a2e;
+  font-size: 0.8rem;
+  line-height: 1.15;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+.nrl-hud-next-detail { font-weight: normal; font-size: 0.9em; }
+.nrl-hud .nrl-btn.nrl-hud-next:disabled { opacity: 1; cursor: default; }
+.nrl-hud-next[hidden] { display: none; }
+/* #350 H1: decisions waiting, a red count on Advance Week. */
+.nrl-hud-alert {
+  display: inline-block;
+  min-width: 1.3em;
+  margin-left: 0.4em;
+  padding: 0 0.3em;
+  border: 2px solid #000;
+  border-radius: 1em;
+  background: #b03a2e;
+  color: #fff;
+  font-size: 0.8em;
+  line-height: 1.25em;
+  text-align: center;
+  vertical-align: 0.1em;
+}
 .nrl-hud-actions {
   pointer-events: auto;
   position: relative;
@@ -474,6 +515,7 @@ export const CSS = `
   .nrl-hud-readouts { flex-wrap: nowrap; gap: 0.3rem; }
   .nrl-hud-stat { font-size: 0.8rem; padding: 0.2rem 0.4rem; border-width: 2px; box-shadow: 2px 2px 0 #000; }
   .nrl-hud .nrl-btn { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+  .nrl-hud .nrl-btn.nrl-hud-next { font-size: 0.7rem; padding-left: 0.35rem; padding-right: 0.35rem; }
 }
 
 /* ── Nav ─────────────────────────────────────────────────────────────── */
@@ -916,13 +958,17 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-news { font-size: 0.9rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-news-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-news h2 { margin: 0 0 0.4rem; font-size: 1.05rem; flex: 0 0 auto; }
+/* #345: the title and the filters are one row beside the ✕; the feed gets the rest. */
+.nrl-news-head { display: flex; align-items: center; gap: 0.6rem; flex: 0 0 auto; min-width: 0; padding-right: 2.75rem; margin-bottom: 0.3rem; }
+.nrl-news h2 { margin: 0; font-size: 1.05rem; flex: 0 0 auto; }
 .nrl-news h3 { margin: 0.6rem 0 0.2rem; font-size: 0.9rem; }
 .nrl-news-filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.3rem;
-  margin-bottom: 0.4rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0 3px 3px 0;
 }
 .nrl-news-filter { flex: 0 0 auto; }
 .nrl-news-filter.nrl-news-active { background: #3a6ea5; color: #fff; }
@@ -936,7 +982,21 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-news-item.nrl-news-success { border-left-color: #2e7d32; }
 .nrl-news-item.nrl-news-danger { border-left-color: #b03a2e; }
 .nrl-news-empty { margin: 0.4rem 0; }
-.nrl-news-decisions h3 { margin-top: 0; }
+/* Waiting decisions: one row, however many, with the button to their popup. */
+.nrl-news-decisions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  margin: 0 3px 0.35rem 0;
+  padding: 0.15rem 0.2rem 0.15rem 0.5rem;
+  background: #fff8e1;
+  border: 3px solid #000;
+  border-left: 6px solid #e8a33a;
+}
+.nrl-news-decisions[hidden] { display: none; }
+.nrl-news-decisions-text { flex: 1 1 auto; min-width: 0; font-weight: bold; font-size: 0.85rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrl-news-answer { flex: 0 0 auto; }
 .nrl-event-card {
   background: #fff8e1;
   border: 3px solid #000;
@@ -945,7 +1005,8 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   margin: 0 3px 0.6rem 0;
 }
 .nrl-event-title { font-weight: bold; font-size: 1rem; line-height: 1.25; }
-.nrl-event-meta { font-size: 0.75rem; color: #555; line-height: 1.3; }
+/* The deadline wraps (#345: it was cut off at "…or it's "Ban the t"). */
+.nrl-event-meta { font-size: 0.75rem; color: #555; line-height: 1.3; overflow-wrap: anywhere; }
 .nrl-event-text { margin: 0.35rem 0; overflow-wrap: anywhere; line-height: 1.35; font-size: 0.9rem; }
 .nrl-event-choices { display: flex; flex-direction: column; gap: 0.4rem; }
 .nrl-event-choice {
@@ -961,23 +1022,44 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-event-choice-label { font-weight: bold; font-size: 0.95rem; line-height: 1.2; }
 .nrl-event-choice-hint { font-size: 0.78rem; opacity: 0.9; white-space: normal; font-weight: normal; line-height: 1.3; }
+/* #346: a risk is its own line, marked so it never reads as a sure cost. */
+.nrl-event-choice-risk {
+  font-size: 0.78rem; white-space: normal; font-weight: normal; line-height: 1.3;
+  color: #7a1f14; padding-left: 0.4rem; border-left: 3px solid #b03a2e; margin-top: 0.1rem;
+}
+/* The decisions popup and Advance Week's ask (#338, #345): a region dialog, one card. */
+.nrl-dialog-region .nrl-decisions-modal { width: min(96vw, 640px); max-width: none; }
+.nrl-decisions h2, .nrl-ask h2 { margin: 0 0 0.35rem; font-size: 1.05rem; padding-right: 2.75rem; min-height: 1.4rem; }
+.nrl-decisions .nrl-event-card { margin-bottom: 0.2rem; }
+.nrl-decisions-note { margin: 0 0 0.5rem; font-size: 0.85rem; }
+.nrl-decisions-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 3px 3px 0; }
+.nrl-decisions-actions .nrl-btn { flex: 1 1 12rem; }
+.nrl-ask-answer, .nrl-decisions-go { background: #7ec850; }
+.nrl-ask-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.nrl-ask-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.6rem; padding: 0.25rem 0.45rem; background: #fff8e1; border: 2px solid #000; border-left: 6px solid #3a6ea5; font-size: 0.85rem; }
+.nrl-ask-row.nrl-ask-due { border-left-color: #b03a2e; }
+.nrl-ask-title { font-weight: bold; }
+.nrl-ask-note { color: #444; overflow-wrap: anywhere; }
 /* Compact cards on short landscape and narrow portrait phones: choices stay
    in view, with their hints visible and targets at least 44px tall. */
 @media (max-height: 500px), (max-width: 480px) {
   .nrl-screen-backdrop .nrl-news-modal { padding: 0.25rem 0.5rem; }
-  .nrl-news h2 { margin-bottom: 0.1rem; font-size: 0.9rem; }
-  .nrl-news-decisions h3 { display: none; }
+  .nrl-news h2 { font-size: 0.9rem; }
+  .nrl-decisions h2, .nrl-ask h2 { font-size: 0.9rem; margin-bottom: 0.15rem; min-height: 0; line-height: 44px; }
   .nrl-event-card { padding: 0.15rem 0.4rem 0.1rem; margin-bottom: 0.25rem; }
-  .nrl-event-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-  .nrl-event-title { flex: 0 0 auto; font-size: 0.95rem; }
-  .nrl-event-meta { flex: 1 1 auto; text-align: right; font-size: 0.68rem; line-height: 1.2; }
+  .nrl-event-title { font-size: 0.95rem; }
+  .nrl-event-meta { font-size: 0.68rem; line-height: 1.2; }
   .nrl-event-text { margin: 0.05rem 0 0.15rem; font-size: 0.78rem; line-height: 1.2; }
   .nrl-event-choices { gap: 0.2rem; }
   .nrl-event-choice { padding: 0.1rem 0.45rem; }
-  .nrl-event-choice-hint { font-size: 0.7rem; line-height: 1.2; }
+  .nrl-event-choice-hint, .nrl-event-choice-risk { font-size: 0.7rem; line-height: 1.2; }
+  .nrl-decisions-actions { margin-top: 0.25rem; }
 }
 /* Landscape has room for equal columns; portrait keeps the choices stacked. */
 @media (max-height: 500px) {
+  .nrl-event-head { display: flex; align-items: baseline; gap: 0.6rem; }
+  .nrl-event-title { flex: 0 0 auto; }
+  .nrl-event-meta { flex: 1 1 auto; min-width: 0; }
   .nrl-event-choices { flex-direction: row; align-items: stretch; gap: 0.4rem; }
   .nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; }
 }

@@ -64,7 +64,30 @@ const banPhrase = (weeks: number | readonly [number, number]): string =>
 
 /** Short summary of what effects do, for choice buttons and news lines. */
 export function describeEffects(effects: readonly EventEffect[], opts?: { welfare?: boolean }): string {
-  const parts = effects.flatMap((e): string[] => {
+  const parts = effectParts(effects, opts);
+  return parts.length > 0 ? parts.join(' · ') : 'no effect';
+}
+
+/** A chance as one line: "25% risk: a 2-3 week ban, −$2,500, reputation -2" (#346). */
+function chanceLine(e: Extract<EventEffect, { kind: 'chance' }>, opts?: { welfare?: boolean }): string {
+  const p = effectiveChance(e.p, e.risk, opts?.welfare === true);
+  const hit = effectParts(e.hit, opts);
+  return `${formatPct(p)} ${e.risk ? 'risk' : 'chance'}: ${hit.length > 0 ? hit.join(', ') : 'no effect'}`;
+}
+
+/**
+ * A choice for its card (#346): what is certain, and each chance on a line of its
+ * own, so a risk never reads like a cost that always comes. `sure` is '' when the
+ * choice has only chances.
+ */
+export function describeChoice(effects: readonly EventEffect[], opts?: { welfare?: boolean }): { sure: string; risks: string[] } {
+  const sure = effectParts(effects.filter((e) => e.kind !== 'chance'), opts);
+  const risks = effects.flatMap((e) => (e.kind === 'chance' ? [chanceLine(e, opts)] : []));
+  return { sure: sure.length > 0 ? sure.join(' · ') : risks.length > 0 ? '' : 'no effect', risks };
+}
+
+function effectParts(effects: readonly EventEffect[], opts?: { welfare?: boolean }): string[] {
+  return effects.flatMap((e): string[] => {
     switch (e.kind) {
       case 'money': return [dollars(e.amount)];
       case 'reputation': return [`reputation ${signed(e.amount)}`];
@@ -77,10 +100,7 @@ export function describeEffects(effects: readonly EventEffect[], opts?: { welfar
       case 'boardPatience': return [`board patience ${signed(e.amount)}`];
       case 'flag': return [];
       case 'closeGates': return ['gates closed (no ticket income)'];
-      case 'chance': {
-        const p = effectiveChance(e.p, e.risk, opts?.welfare === true);
-        return [`${formatPct(p)} chance of ${describeEffects(e.hit, opts)}`];
-      }
+      case 'chance': return [chanceLine(e, opts)];
       case 'modifier': {
         const what = describeEffects(e.effects, opts);
         if (e.trigger === 'weekly') return [`${what} a week for ${e.weeks} weeks`];
@@ -89,7 +109,6 @@ export function describeEffects(effects: readonly EventEffect[], opts?: { welfar
       }
     }
   });
-  return parts.length > 0 ? parts.join(' · ') : 'no effect';
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
@@ -262,6 +281,8 @@ export interface Applied {
   failed?: string;
   /** A ban this call actually wrote, so a chance can name the weeks. */
   banned?: { name: string; weeks: number };
+  /** Each chance's roll in order, true for a hit, so the outcome says only what happened (#346). */
+  rolls?: boolean[];
 }
 
 interface EffectCtx {
@@ -298,6 +319,7 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
   const news: Applied['news'] = [];
   let failed: string | undefined;
   let banned: Applied['banned'];
+  const rolls: boolean[] = [];
   const updateSubject = (fn: (p: Player) => Player): void => {
     if (!ctx.subjectId) return;
     s = { ...s, squad: s.squad.map((p) => (p.id === ctx.subjectId ? fn(p) : p)) };
@@ -348,9 +370,11 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
       case 'chance': {
         const p = effectiveChance(e.p, e.risk, hasStaff(s, 'welfare'));
         if (rng.next() >= p) {
+          rolls.push(false);
           if (e.missNews) news.push({ text: fillText(e.missNews, textCtx(ctx)), kind: 'info' });
           break;
         }
+        rolls.push(true);
         let subjectId = ctx.subjectId;
         let subjectName = ctx.subjectName;
         if (e.pick === 'incident') {
@@ -363,12 +387,15 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
         news.push(...inner.news);
         if (inner.banned) banned = inner.banned;
         const story = e.hitNews.length > 0 ? fillText(rng.pick([...e.hitNews]), textCtx(ctx, subjectName)) : '';
+        // The hit's other costs, now that they have happened (the card only said they might).
+        const costs = effectParts(e.hit.filter((h) => h.kind !== 'suspend'), { welfare: false });
+        const also = costs.length > 0 ? ` Also: ${costs.join(', ')}.` : '';
         if (inner.banned) {
-          news.push({ text: `${story}${story ? ' ' : ''}Out ${inner.banned.weeks} weeks.`.trim(), kind: 'danger' });
+          news.push({ text: `${story}${story ? ' ' : ''}Out ${inner.banned.weeks} weeks.${also}`.trim(), kind: 'danger' });
         } else if (e.hit.some((h) => h.kind === 'suspend')) {
-          news.push({ text: `${subjectName ?? 'A player'} was in the news, but the charge didn't stick.`, kind: 'info' });
-        } else if (story) {
-          news.push({ text: story, kind: 'info' });
+          news.push({ text: `${subjectName ?? 'A player'} was in the news, but the charge didn't stick.${also}`, kind: 'info' });
+        } else if (story || also) {
+          news.push({ text: `${story}${also}`.trim(), kind: 'info' });
         }
         break;
       }
@@ -384,7 +411,7 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
       }
     }
   });
-  return { state: s, money, news, ...(failed ? { failed } : {}), ...(banned ? { banned } : {}) };
+  return { state: s, money, news, ...(failed ? { failed } : {}), ...(banned ? { banned } : {}), ...(rolls.length ? { rolls } : {}) };
 }
 
 /**
@@ -434,13 +461,25 @@ export function resolveEvent(state: GameState, eventId: string, index: number, n
     return applied;
   }
   const text = fillText(choice.outcome, ctx);
-  const summary = describeEffects(choice.effects, { welfare: hasStaff(state, 'welfare') });
   const fee = ev.fee && choice.effects.some((e) => e.kind === 'signSubject') ? ` (−$${ev.fee.toLocaleString('en-US')})` : '';
   applied.news.unshift({
-    text: `${auto ? 'No answer, so: ' : ''}${text}${fee || (choice.effects.length > 0 ? ` (${summary})` : '')}`,
+    text: `${auto ? 'No answer, so: ' : ''}${text}${fee || outcomeTail(choice.effects, applied.rolls)}`,
     kind: 'info',
   });
   return applied;
+}
+
+/**
+ * What a choice did, after its rolls (#346): the sure effects only. A risk that
+ * did not come off says so ("No incident: squad morale +6."); one that did posts
+ * its own line with its costs, so they are never listed here as if certain.
+ */
+export function outcomeTail(effects: readonly EventEffect[], rolls: readonly boolean[] = []): string {
+  if (effects.length === 0) return '';
+  const { sure } = describeChoice(effects);
+  const chances = effects.some((e) => e.kind === 'chance');
+  if (chances && rolls.length > 0 && rolls.every((hit) => !hit)) return ` No incident${sure ? `: ${sure}` : ''}.`;
+  return sure ? ` (${sure})` : '';
 }
 
 /** "win" / "loss" / "draw" for the player's fixture this week, or null (bye / unplayed). */

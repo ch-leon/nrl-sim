@@ -95,9 +95,10 @@ export async function promptInstall(): Promise<
 
 /**
  * Idempotently wire install-prompt capture, SW registration and the iOS hint.
- * Safe to call in any environment; no-ops without a DOM.
+ * Safe to call in any environment; no-ops without a DOM. `holdIosHint` defers
+ * the hint (main.ts holds it until the tutorial ends, #337 U4).
  */
-export function initPwa(): void {
+export function initPwa(opts: { holdIosHint?: (show: () => void) => void } = {}): void {
   if (initialised || typeof window === 'undefined') return;
   initialised = true;
 
@@ -116,7 +117,7 @@ export function initPwa(): void {
   // resolved.
   void registerServiceWorker();
 
-  maybeShowIosHint();
+  (opts.holdIosHint ?? ((show) => show()))(maybeShowIosHint);
 
   // `?e2e` (scripts/e2e-season.mjs): let the playthrough raise the update bar
   // without deploying a build, so it can check the bar waits for full time.

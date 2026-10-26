@@ -246,7 +246,7 @@ async function leaveMatch() {
  */
 async function weekAsTapped(rec) {
   const at = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}`; });
-  await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+  await tapAdvanceWeek();
   // The round's own toast ("… Round 9 forfeited (0–24)."), not the stop's "… would be forfeited."
   const what = await page.waitForFunction((a) => {
     if (document.querySelector('.nrl-mo-controls')) return 'match';
@@ -265,10 +265,32 @@ async function weekAsTapped(rec) {
   rec.notes.push(what === 'forfeit' ? 'the round forfeited' : what === 'match' ? 'a match, skipped' : 'no match that week');
 }
 
+/**
+ * Advance Week's questions before it goes (#338, #350 H3): a long run's "Play 22
+ * weeks?", and the decision cards it would take the defaults of. The playthrough
+ * answers its cards first (answerCards), so a card here is one drawn since: go ahead.
+ */
+async function passAdvanceAsks() {
+  for (let i = 0; i < 2; i++) {
+    const which = await page.waitForFunction(() => (document.querySelector('[data-advance-confirm]') ? 'confirm'
+      : document.querySelector('[data-advance-ask]') ? 'ask' : null), null, { timeout: 600 }).then((h) => h.jsonValue()).catch(() => null);
+    if (!which) return;
+    await press(page.locator(which === 'confirm' ? '[data-confirm-advance]' : '[data-ask-proceed]'));
+    await wait(150);
+  }
+}
+
+/** Tap Advance Week and get past its questions. */
+async function tapAdvanceWeek() {
+  await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+  await passAdvanceAsks();
+}
+
 /** Advance with the split-button menu: index 0 = ×4 weeks, 1 = to finals, 2 = to season end. */
 async function advanceMenu(i) {
   await tap('.nrl-hud-menu-toggle');
   await tap(`.nrl-hud-menu-item >> nth=${i}`);
+  await passAdvanceAsks();
   // N10.2: the advance yields between weeks; wait for the run to end.
   await page.waitForFunction(() => !document.querySelector('.nrl-hud[data-advancing]'), null, { timeout: 240000 });
   await wait(400);
@@ -279,7 +301,9 @@ async function answerCards(rec) {
   const s = await save();
   const pending = s?.eventDeck?.pending ?? [];
   if (!pending.length) return 0;
+  // #345: News lists the waiting cards on one row; its Answer opens them one at a time.
   await navTo('news');
+  await tap('[data-decisions-open]');
   await page.waitForSelector('.nrl-event-card');
   let n = 0;
   while (await page.locator('.nrl-event-card').count()) {
@@ -457,7 +481,7 @@ async function play() {
 
   // A match: Advance Week hands over to the match scene (the live sim since BAK-207 Phase 4).
   await step('match-classic', async () => {
-    await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+    await tapAdvanceWeek();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
     await wait(3000);
   });
@@ -572,7 +596,7 @@ async function play() {
   await step('live-match', async (rec) => {
     await tap('.nrl-league-modal .nrl-screen-x');
     if (!liveOn) return 'skipped: no live-match setting';
-    await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+    await tapAdvanceWeek();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
     await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×8' }));
     await wait(6000);
@@ -915,7 +939,7 @@ async function play() {
   await step('season-2-week-2', async (rec) => {
     await closeAny();
     await answerCards(rec);
-    await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+    await tapAdvanceWeek();
     await wait(1500);
     // A match week opens the match scene; skip it.
     if (await page.locator('.nrl-mo-controls').count()) {
@@ -943,7 +967,7 @@ async function play() {
     await page.evaluate(() => { window.__nrlWorkerDelayMs = 30000; });
     const week = await page.evaluate(() => window.__nrlState().week);
     const slotBefore = JSON.stringify(await save());
-    await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+    await tapAdvanceWeek();
     // A match to skip; or, since #285's Academy call-up only past a full squad (SQUAD_CAP with too
     // many hurt), a forfeit: then the rivals alone hold the week and there is no match screen.
     const match = await page.waitForFunction(() => (document.querySelector('.nrl-mo-controls') ? 'match'
@@ -979,7 +1003,7 @@ async function play() {
         .observe(stack, { childList: true });
     });
     const said = (n) => page.waitForFunction((k) => window.__nrlToastLog.filter((t) => /still being played/.test(t)).length >= k, n, { timeout: 10000 });
-    await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+    await tapAdvanceWeek();
     await said(1).catch(() => { throw new Error('Advance Week during the held week said nothing'); });
     if (await page.locator('.nrl-mo-controls').count()) throw new Error('Advance Week started a match while the week was held');
     if (!(await held())) throw new Error('the hold ended before the second tap: the slowed Worker was not slow enough');

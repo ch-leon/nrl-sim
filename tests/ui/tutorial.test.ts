@@ -7,6 +7,8 @@ import {
   startTutorial,
   endTutorial,
   ANCHOR_RETRY_MS,
+  sentenceCount,
+  whenTutorialDone,
   type TutorialStep,
 } from '../../src/ui/tutorial';
 import type { Events } from '../../src/core/events';
@@ -26,10 +28,39 @@ const KNOWN_EVENTS: readonly (keyof Events)[] = [
 ];
 
 describe('STEPS (declarative step list invariants)', () => {
-  it('has the 7 spec steps plus News, Finance and Contracts (#188) and Lineup (N11), in order', () => {
+  it('walks build, place, recruit, squad, lineup and the first week, then News, Finance and Contracts (#337)', () => {
     expect(STEPS.map((s) => s.id)).toEqual([
-      'welcome', 'build', 'recruit', 'squad', 'lineup', 'advance', 'match', 'news', 'finance', 'contracts', 'wrap',
+      'welcome', 'build', 'place', 'recruit', 'squad', 'lineup', 'advance', 'news', 'finance', 'contracts', 'wrap',
     ]);
+  });
+
+  it('has no step for the match: the tutorial stands aside until Back to Club (#337 U1)', () => {
+    for (const step of STEPS) {
+      expect(step.advanceOn).not.toBe('match:started');
+      expect(step.advanceOn).not.toBe('match:finished');
+    }
+  });
+
+  it('keeps every bubble to two sentences (#337 U3)', () => {
+    for (const step of STEPS) expect(sentenceCount(step.text), step.id).toBeLessThanOrEqual(2);
+  });
+
+  it('opens the screen a step explains, and points inside it (#337 U3)', () => {
+    const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
+    for (const [id, screen] of [['build', 'build'], ['recruit', 'recruit'], ['squad', 'squad'], ['lineup', 'lineup'], ['news', 'news'], ['finance', 'finance'], ['contracts', 'contracts']] as const) {
+      expect(byId.get(id)!.opens, id).toBe(screen);
+    }
+    expect(byId.get('build')!.anchor!.split(',')[0]).toContain('[data-screen-key="build"] [data-facility="trainingPaddock"]');
+    expect(byId.get('recruit')!.anchor!.split(',')[0]).toContain('[data-screen-key="recruit"] .nrl-row');
+    // The placement step frames the bar on the grass and moves on once the bar is up.
+    expect(byId.get('build')!.until).toBe('.nrl-placebar:not([hidden])');
+    expect(byId.get('place')!.text).toContain('green spot on the grass');
+  });
+
+  it('copy names the 5-tab nav: screens under More say so', () => {
+    const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
+    expect(byId.get('finance')!.text).toContain('under More');
+    expect(byId.get('wrap')!.text).toContain('under More');
   });
 
   it('gives every step a non-empty id and text', () => {
@@ -56,10 +87,10 @@ describe('advance-on mapping', () => {
     const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
     expect(byId.get('welcome')!.advanceOn).toBe('next-button');
     expect(byId.get('build')!.advanceOn).toBe('facility:placed');
+    expect(byId.get('place')!.advanceOn).toBe('facility:placed');
     expect(byId.get('recruit')!.advanceOn).toBe('player:signed');
     expect(byId.get('squad')!.advanceOn).toBe('next-button');
     expect(byId.get('advance')!.advanceOn).toBe('week:advanced');
-    expect(byId.get('match')!.advanceOn).toBe('match:finished');
     expect(byId.get('wrap')!.advanceOn).toBe('next-button');
   });
 
@@ -80,7 +111,7 @@ describe('advance-on mapping', () => {
   it('classifies the 4 event steps and 7 button steps', () => {
     const eventSteps = STEPS.filter(isEventStep);
     expect(eventSteps.map((s) => s.id)).toEqual([
-      'build', 'recruit', 'advance', 'match',
+      'build', 'place', 'recruit', 'advance',
     ]);
     const buttonSteps = STEPS.filter((s) => !isEventStep(s));
     expect(buttonSteps.map((s) => s.id)).toEqual(['welcome', 'squad', 'lineup', 'news', 'finance', 'contracts', 'wrap']);
@@ -88,18 +119,33 @@ describe('advance-on mapping', () => {
 });
 
 describe('anchors', () => {
-  it('centers welcome/match/wrap and anchors build/recruit/squad/advance', () => {
+  it('centers welcome/wrap and anchors build/place/recruit/squad/lineup/advance', () => {
     const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
     expect(byId.get('welcome')!.anchor).toBeNull();
-    expect(byId.get('match')!.anchor).toBeNull();
     expect(byId.get('wrap')!.anchor).toBeNull();
-    for (const id of ['build', 'recruit', 'squad', 'lineup', 'advance']) {
+    for (const id of ['build', 'place', 'recruit', 'squad', 'lineup', 'advance']) {
       expect(byId.get(id)!.anchor).not.toBeNull();
     }
   });
 
   it('exposes a positive anchor-retry window', () => {
     expect(ANCHOR_RETRY_MS).toBeGreaterThan(0);
+  });
+});
+
+describe('sentenceCount', () => {
+  it('counts sentences, not the dots inside them', () => {
+    expect(sentenceCount('One. Two!')).toBe(2);
+    expect(sentenceCount("That's the loop! The Guide under More explains the rest. Good luck, coach.")).toBe(3);
+    expect(sentenceCount('No stop at the end')).toBe(1);
+  });
+});
+
+describe('whenTutorialDone', () => {
+  it('runs at once when no tutorial is up (the iOS install hint, #337 U4)', () => {
+    let ran = 0;
+    whenTutorialDone(() => ran++);
+    expect(ran).toBe(1);
   });
 });
 

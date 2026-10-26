@@ -84,3 +84,18 @@ force Next.
 
 ## Out of scope
 - Persistent contextual tooltips outside the flow, localisation, analytics on completion.
+
+## Since: UI cleanup chunk 2 (#337)
+
+The shipped list has grown from the 7 steps above (News, Finance, Contracts and Lineup came
+with #188 and N11). Chunk 2 changed how it runs:
+
+- Each step opens its own screen (`opens`) and frames the control inside it, not only its
+  nav tab. Nothing is dimmed: the cutout is a gold frame, and the bubble docks clear of it.
+- Build is two steps: tap the Training Paddock row, then "Tap a green spot on the grass",
+  framed on the placement bar with the grass undimmed. The build step moves on when the
+  bar shows (`until`).
+- There is no match step. From `match:started` until the club is back on screen the
+  tutorial is hidden, so it never dims or covers a match; it picks up on News after.
+- Every bubble is two sentences at most, and the copy names the 5-tab nav (More).
+- The iOS "Add to Home Screen" hint waits until the tutorial ends.

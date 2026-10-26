@@ -211,6 +211,28 @@ export function targetReached(target: AdvanceTarget, p: RunProgress): boolean {
   }
 }
 
+/**
+ * What is left of a target after a run stopped early, or null when the week it
+ * stopped on met it anyway (#350 N4: "Keep advancing" carries on to the same end).
+ */
+export function remainingTarget(target: AdvanceTarget, p: RunProgress): AdvanceTarget | null {
+  if (targetReached(target, p)) return null;
+  if (target.kind === 'weeks') return { kind: 'weeks', weeks: target.weeks - p.weeksPlayed };
+  return target;
+}
+
+/** How many weeks a target plays from `week` (a run with no stops). */
+export function targetSpan(target: AdvanceTarget, week: number): number {
+  switch (target.kind) {
+    case 'weeks':
+      return target.weeks;
+    case 'finals':
+      return week < FINALS_START_WEEK ? FINALS_START_WEEK - week : WEEKS_PER_SEASON - week + FINALS_START_WEEK;
+    case 'seasonEnd':
+      return WEEKS_PER_SEASON - week + 1;
+  }
+}
+
 /** Plain-language label for a target's completion toast. */
 export function targetLabel(target: AdvanceTarget): string {
   switch (target.kind) {

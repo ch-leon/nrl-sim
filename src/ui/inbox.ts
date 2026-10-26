@@ -5,16 +5,13 @@
 // The ring buffer and filtering are pure and unit-tested without the DOM; the
 // DOM part only renders them. No Phaser.
 //
-// Event cards waiting for a choice (GitHub #75) sit at the top as "Decisions".
-// They live in GameState (systems/events.ts); this screen only renders them and
-// passes the tapped choice back through chooseEvent().
+// Event cards waiting for a choice (GitHub #75) are answered in their own popup
+// (ui/decisions.ts, #345). News keeps one row for them at the top, which opens it,
+// so the feed below always has the screen.
 
 import { bus, type Events } from '../core/events';
-import { getState, type GameState } from '../core/state';
-import { cardById } from '../data/events';
-import { absWeek, chooseEvent, describeEffects, fillText } from '../systems/events';
-import { hasStaff } from '../systems/staff';
-import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
+import { getState } from '../core/state';
+import { decisionViews, openDecisions } from './decisions';
 import { el, button, openModal } from './dom';
 
 /** How many messages the ring buffer holds before the oldest is overwritten. */
@@ -170,78 +167,6 @@ export function groupByWeek(items: NewsItem[]): NewsWeekGroup[] {
   return groups;
 }
 
-// ── Decision cards (#75) ───────────────────────────────────────────────────────
-
-export interface DecisionChoiceView {
-  index: number;
-  label: string;
-  hint: string;
-  isDefault: boolean;
-}
-
-export interface DecisionView {
-  id: string;
-  title: string;
-  text: string;
-  /** "S1 · Week 5" when it was drawn. */
-  stamp: string;
-  /** Weeks left before the default choice is taken (≥ 1 between ticks). */
-  weeksLeft: number;
-  choices: DecisionChoiceView[];
-}
-
-/** Pending event cards as plain view data, oldest first. Cards no longer in the deck are skipped. */
-export function decisionViews(state: GameState): DecisionView[] {
-  const now = absWeek(state.season, state.week);
-  const out: DecisionView[] = [];
-  for (const ev of state.eventDeck.pending) {
-    const card = cardById(ev.cardId);
-    if (!card) continue;
-    const ctx = { subjectName: ev.subjectName, clubName: state.clubName, vars: ev.vars };
-    out.push({
-      id: ev.id,
-      title: card.title,
-      text: fillText(card.text, ctx),
-      stamp: `S${ev.season} · Week ${ev.week}`,
-      weeksLeft: Math.max(1, ev.expiresAt - now),
-      choices: card.choices.map((c, index) => ({
-        index, label: c.label, isDefault: index === card.defaultChoice,
-        hint: ev.fee && c.effects.some((e) => e.kind === 'signSubject') ? `−$${ev.fee.toLocaleString('en-US')} fee, ${NEW_CONTRACT_WEEKS}-week deal` : describeEffects(c.effects, { welfare: hasStaff(state, 'welfare') }),
-      })),
-    });
-  }
-  return out;
-}
-
-/** Number of cards waiting for a choice (for the nav badge). */
-export function pendingDecisionCount(state: GameState): number {
-  return state.eventDeck.pending.length;
-}
-
-/** One pixel card with a button per choice. */
-function decisionCard(view: DecisionView, onChoose: (id: string, index: number) => void): HTMLElement {
-  const card = el('div', { class: 'nrl-event-card', attrs: { 'data-event-id': view.id } });
-  const defaultLabel = view.choices.find((c) => c.isDefault)?.label ?? '';
-  const head = el('div', { class: 'nrl-event-head' });
-  head.append(
-    el('div', { class: 'nrl-event-title', text: view.title }),
-    el('div', {
-      class: 'nrl-event-meta',
-      text: `${view.stamp} · ${view.weeksLeft === 1 ? 'answer this week' : `${view.weeksLeft} weeks to answer`}, or it's "${defaultLabel}"`,
-    }),
-  );
-  card.append(head, el('p', { class: 'nrl-event-text', text: view.text }));
-  const choices = el('div', { class: 'nrl-event-choices' });
-  for (const c of view.choices) {
-    const b = button('', () => onChoose(view.id, c.index), { class: 'nrl-event-choice' });
-    b.setAttribute('data-event-choice', String(c.index));
-    b.append(el('span', { class: 'nrl-event-choice-label', text: c.label }), el('span', { class: 'nrl-event-choice-hint', text: c.hint }));
-    choices.append(b);
-  }
-  card.append(choices);
-  return card;
-}
-
 // ── DOM screen ─────────────────────────────────────────────────────────────────
 
 const FILTER_LABELS: Record<NewsFilter, string> = {
@@ -261,17 +186,18 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
   const list = el('div', { class: 'nrl-news-list' });
   const decisions = el('div', { class: 'nrl-news-decisions' });
 
+  // One row however many cards wait: their titles and a button to the popup.
   const renderDecisions = (): void => {
-    decisions.replaceChildren();
     const views = decisionViews(getState());
+    decisions.replaceChildren();
+    decisions.hidden = views.length === 0;
     if (views.length === 0) return;
-    decisions.append(el('h3', { text: views.length === 1 ? 'Decision' : `Decisions (${views.length})` }));
-    for (const v of views) {
-      decisions.append(decisionCard(v, (id, index) => {
-        chooseEvent(id, index);
-        renderDecisions();
-      }));
-    }
+    const answer = button('Answer', () => openDecisions(), { class: 'nrl-news-answer' });
+    answer.setAttribute('data-decisions-open', '');
+    decisions.append(
+      el('span', { class: 'nrl-news-decisions-text', text: `${views.length === 1 ? 'Decision waiting' : `${views.length} decisions waiting`}: ${views.map((v) => v.title).join(', ')}` }),
+      answer,
+    );
   };
 
   const renderList = (): void => {
@@ -315,10 +241,18 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
     filters.append(btn);
   }
 
-  body.append(decisions, filters, list);
-  content.append(el('h2', { text: 'News' }), body);
+  body.append(list);
+  // Title and filters share the header row, beside the ✕.
+  content.append(el('div', { class: 'nrl-news-head' }, el('h2', { text: 'News' }), filters), decisions, body);
   setFilter('all');
   renderDecisions();
+  const offState = bus.on('state:changed', () => {
+    if (!content.isConnected) {
+      offState();
+      return;
+    }
+    renderDecisions();
+  });
 
   // Messages arriving while the screen is open are read on sight.
   const off = bus.on('ui:notify', () => {

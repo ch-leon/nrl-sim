@@ -35,11 +35,12 @@ import { openFixturesScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
 import { openContractsScreen } from './ui/screens/contracts';
-import { initNewsInbox, newsInbox, openInboxScreen, pendingDecisionCount } from './ui/inbox';
+import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
+import { advanceUntilAsked, askBeforeAdvance, pendingDecisionCount } from './ui/decisions';
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
-import { startTutorial, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
+import { setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
 import { openGuideScreen } from './ui/guide/guide';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
@@ -177,7 +178,12 @@ async function boot(): Promise<void> {
   // when it first asked for a pause. Sleep once the loop has actually started
   // (#315). A later turn to portrait still sleeps from onBlock, above.
   sleepLoopIfPortrait(g, () => portraitBlocked);
-  createHud({ onAdvanceWeek: () => advanceWeek(), onAdvanceUntil: (t) => advanceUntil(t) });
+  // #338: neither advance takes a pending card's default unasked.
+  createHud({
+    onAdvanceWeek: () => askBeforeAdvance(1, () => advanceWeek()),
+    onAdvanceUntil: (t) => advanceUntilAsked(t, advanceUntil),
+    onNextMatch: () => nav.open('fixtures'),
+  });
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
   // applied by the matchday tick hook before this fires and the Match scene is
@@ -219,8 +225,9 @@ async function boot(): Promise<void> {
 
   initAudio();
   initAudioUi();
-  initPwa();
+  setTutorialScreens((id) => nav.open(id)); // each step opens its own screen (#337)
   startTutorial(); // self-guards on settings.tutorialDone
+  initPwa({ holdIosHint: whenTutorialDone }); // the install hint waits for the tutorial (#337 U4)
 
   // A live match in progress when the app was closed (#73): the save is from the
   // week before it, so advancing again rebuilds the same match, which picks up

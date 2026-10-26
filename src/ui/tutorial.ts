@@ -1,8 +1,9 @@
 // src/ui/tutorial.ts — onboarding / tutorial flow. See BAK-202 (WU-15),
 // ARCHITECTURE §4 (settings.tutorialDone), §5 (event bus), §6 (DOM overlay).
 // No Phaser imports. A declarative ordered step list drives a pixel-styled
-// speech-bubble panel rendered into #ui-root, with an optional darkened cutout
-// highlight anchored to a real UI element by CSS selector.
+// speech-bubble panel rendered into #ui-root, with a gold frame anchored to a
+// real UI element by CSS selector. Nothing is dimmed: the dim made the build
+// menu look disabled and hid the grass the placement step asks for (#337 U2).
 //
 // Ownership: only the orchestrator (main.ts) decides *when* to auto-start — it
 // calls startTutorial() after newGame; startTutorial() with no force is a no-op
@@ -22,105 +23,105 @@ export type AdvanceOn = 'next-button' | keyof Events;
 export interface TutorialStep {
   /** Stable identifier (also used as a DOM hook + test key). */
   id: string;
-  /** Bubble body copy. */
+  /** Bubble body copy: two short sentences at most (#337). */
   text: string;
   /** CSS selector into #ui-root to highlight, or null for a centered bubble. */
   anchor: string | null;
   /** Advance trigger: 'next-button' or a bus event name. */
   advanceOn: AdvanceOn;
+  /** The nav screen the step opens when it starts, so it explains what is on screen (#337 U3). */
+  opens?: string;
+  /** Also advance once this selector is on screen (the placement bar, which has no bus event). */
+  until?: string;
 }
 
 /**
  * The onboarding steps, in order (BAK-202 spec; News, Finance and Contracts
- * added by N7, #188; Lineup by N11). Anchor selectors reference elements that really exist in
- * the shipped UI:
+ * added by N7, #188; Lineup by N11; tied to their screens by #337). Anchor
+ * selectors reference elements that really exist in the shipped UI:
  *   - nav buttons carry `data-screen="<id>"` (see ui/nav.ts registerScreen)
- *   - the HUD money tile carries `data-hud="money"` (see ui/hud.ts)
+ *   - open screens carry `data-screen-key="<id>"` (see ui/dom.ts openScreen)
  *   - the Advance Week control is the button inside `.nrl-hud-actions` (ui/hud.ts)
  * An anchor may list fallbacks: the first on screen wins, so a screen in More's
- * sheet (#344) is highlighted on the More tab until the sheet is open.
+ * sheet (#344) is highlighted on the More tab until the sheet is open. When only
+ * a fallback is on screen the bubble offers Next, so a closed screen never strands the player.
  */
 const inMore = (id: string): string => `.nrl-nav .nrl-btn[data-screen="${id}"], .nrl-nav [data-nav-more]`;
 
 export const STEPS: readonly TutorialStep[] = [
   {
     id: 'welcome',
-    text:
-      'Welcome to your club! The loop is simple: build facilities, recruit ' +
-      'players, advance the week, play the match, then watch the money and ' +
-      'ladder. Let’s walk through it.',
+    text: 'Welcome, coach! Build, sign players, set your lineup, then play the week’s match.',
     anchor: null,
     advanceOn: 'next-button',
   },
   {
     id: 'build',
-    text: 'Open Build (under More) and place a Training Paddock to develop your squad.',
-    anchor: `[data-facility="trainingPaddock"], ${inMore('build')}`,
+    text: 'Tap Training Paddock to build one. It trains your squad every week.',
+    anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], ${inMore('build')}`,
+    advanceOn: 'facility:placed',
+    opens: 'build',
+    until: '.nrl-placebar:not([hidden])',
+  },
+  {
+    id: 'place',
+    text: 'Tap a green spot on the grass to build it there.',
+    anchor: `.nrl-placebar:not([hidden]), ${inMore('build')}`,
     advanceOn: 'facility:placed',
   },
   {
     id: 'recruit',
-    text: 'Open Recruit (under More) and sign your first player from the free-agent pool.',
-    anchor: `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inMore('recruit')}`,
+    text: 'Pick a free agent and tap Sign to add him to your squad.',
+    anchor:
+      `[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled)), ` +
+      `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inMore('recruit')}`,
     advanceOn: 'player:signed',
+    opens: 'recruit',
   },
   {
     id: 'squad',
-    text: "Here's your squad. Check positions, stats and morale here any time.",
+    text: 'This is your squad. Tap a player for his ratings, form and morale.',
     anchor: '.nrl-nav .nrl-btn[data-screen="squad"]',
     advanceOn: 'next-button',
+    opens: 'squad',
   },
   {
     id: 'lineup',
-    text:
-      'Lineup is your nine and your plan (PLAN: attack and defence), a goal-kicker ' +
-      'and a captain (select a starter, then Kicker or Captain). Change the plan at half-time.',
+    text: 'Lineup sets your nine, kicker, captain and game plan. You can change the plan at half-time.',
     anchor: '.nrl-nav .nrl-btn[data-screen="lineup"]',
     advanceOn: 'next-button',
+    opens: 'lineup',
   },
   {
     id: 'advance',
-    text: 'Advance a week to run training, wages and the next round.',
+    text: 'Tap Advance Week: training and wages run, then your first match kicks off.',
     anchor: '.nrl-hud-actions .nrl-btn',
     advanceOn: 'week:advanced',
   },
   {
-    id: 'match',
-    text:
-      'On match day your team plays out the round. Watch it, or tap the ' +
-      "match's Skip to jump to full time.",
-    anchor: null,
-    advanceOn: 'match:finished',
-  },
-  {
     id: 'news',
-    text:
-      'News keeps results, warnings and decision cards. A card waits two weeks ' +
-      'for your answer, then takes its default; the badge counts what needs you.',
+    text: 'News keeps results and warnings. A decision shows as a banner here and a red count on Advance Week.',
     anchor: '.nrl-nav .nrl-btn[data-screen="news"]',
     advanceOn: 'next-button',
+    opens: 'news',
   },
   {
     id: 'finance',
-    text:
-      'Finance shows where the money comes from and goes: gates, wages, upkeep, ' +
-      "the runway, and the board's goals for the season. It's under More, with Staff.",
+    text: "Finance, under More, shows money in and out and the board's goals for the season.",
     anchor: inMore('finance'),
     advanceOn: 'next-button',
+    opens: 'finance',
   },
   {
     id: 'contracts',
-    text:
-      'Contracts lists every deal by expiry. Renew early before a player walks, ' +
-      'or sell for a fee. Tap any player card for his page.',
+    text: 'Contracts lists every deal by expiry. Renew before a player walks, or sell him for a fee.',
     anchor: inMore('contracts'),
     advanceOn: 'next-button',
+    opens: 'contracts',
   },
   {
     id: 'wrap',
-    text:
-      "That's the loop! Keep an eye on your money up top and your position on " +
-      'the ladder. The Guide under More explains it all any time. Good luck, coach.',
+    text: "That's the loop! The Guide under More explains the rest, coach.",
     anchor: null,
     advanceOn: 'next-button',
   },
@@ -147,6 +148,11 @@ export function isEventStep(
   return step.advanceOn !== 'next-button';
 }
 
+/** Sentences in a step's copy (#337: two at most). */
+export function sentenceCount(text: string): number {
+  return text.split(/[.!?](?:\s|$)/).filter((t) => t.trim().length > 0).length;
+}
+
 /** Milliseconds between looks for a step's anchor while it is not on screen. */
 export const ANCHOR_RETRY_MS = 500;
 
@@ -160,9 +166,27 @@ interface ActiveTutorial {
   offEvent: (() => void) | null;
   /** The anchor poll (an interval), while the step's anchor is not on screen. */
   retryTimer: ReturnType<typeof setTimeout> | null;
+  /** Unsubscribe for the match hold (see holdForMatch). */
+  offMatch: () => void;
 }
 
 let active: ActiveTutorial | null = null;
+let openScreenById: ((id: string) => void) | null = null;
+const afterTutorial: (() => void)[] = [];
+
+/** How a step opens its screen (main.ts passes the nav's opener). */
+export function setTutorialScreens(open: (id: string) => void): void {
+  openScreenById = open;
+}
+
+/** Run `fn` now, or once the tutorial ends (the iOS install hint, #337 U4). */
+export function whenTutorialDone(fn: () => void): void {
+  if (active) afterTutorial.push(fn);
+  else fn();
+}
+
+/** Body class the match overlay sets from kick-off until Back to Club (ui/screens/matchOverlay.ts). */
+const MATCH_BODY_CLASS = 'nrl-match-active';
 
 /** True while a tutorial run is on-screen. Used to guard double-starts. */
 export function isTutorialActive(): boolean {
@@ -193,8 +217,41 @@ export function startTutorial(force = false): void {
     attrs: { 'data-tutorial': 'overlay' },
   });
   mount(overlay);
-  active = { index: 0, overlay, offEvent: null, retryTimer: null };
+  active = { index: 0, overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay) };
   renderStep();
+}
+
+/**
+ * #337 U1: the tutorial stands aside for a match. It hides the moment the match
+ * starts, before the match scene draws, and comes back once the club is on
+ * screen again (the overlay's body class gone). CSS backs this up: nothing of
+ * the tutorial shows under that class. Returns the teardown.
+ */
+function holdForMatch(overlay: HTMLElement): () => void {
+  let seen = false;
+  let timer: ReturnType<typeof setInterval> | null = null;
+  const release = (): void => {
+    if (timer !== null) clearInterval(timer);
+    timer = null;
+    overlay.hidden = false;
+    if (active?.overlay !== overlay) return;
+    clearStepBindings(active);
+    renderStep();
+  };
+  const off = bus.on('match:started', () => {
+    overlay.hidden = true;
+    seen = false;
+    if (timer !== null) clearInterval(timer);
+    timer = setInterval(() => {
+      const on = document.body.classList.contains(MATCH_BODY_CLASS);
+      if (on) seen = true;
+      else if (seen) release();
+    }, ANCHOR_RETRY_MS);
+  });
+  return () => {
+    off();
+    if (timer !== null) clearInterval(timer);
+  };
 }
 
 /**
@@ -204,8 +261,10 @@ export function startTutorial(force = false): void {
 export function endTutorial(): void {
   if (!active) return;
   clearStepBindings(active);
+  active.offMatch();
   active.overlay.remove();
   active = null;
+  for (const fn of afterTutorial.splice(0)) fn();
   // Persist completion (replace the settings object wholesale — setState
   // shallow-merges top-level keys only, see state.ts).
   const s = getState();
@@ -252,6 +311,12 @@ function renderStep(): void {
 
   // Fresh overlay contents each step.
   a.overlay.replaceChildren();
+  // Held for a match: the step draws when the club is back (holdForMatch).
+  if (a.overlay.hidden) {
+    if (isEventStep(step)) a.offEvent = bus.on(step.advanceOn, () => advance());
+    return;
+  }
+  if (step.opens && !document.querySelector(`[data-screen-key="${step.opens}"]`)) openScreenById?.(step.opens);
 
   // Bind the advance trigger. Event steps get exactly one listener (the current
   // step's only) so acting "out of order" earlier does nothing.
@@ -265,27 +330,33 @@ function renderStep(): void {
   }
 
   // Draw against the anchor on screen now, then keep looking every
-  // ANCHOR_RETRY_MS: it may not be up yet (screen not open, or the nav hidden by
-  // a match: centered with a Next escape hatch until Back to Club, #188), or a
-  // better one may appear (More's sheet opened, #344). The poll stops with the step.
-  const show = (anchorEl: HTMLElement | null): void => {
+  // ANCHOR_RETRY_MS: it may not be up yet (centered with a Next escape hatch), a
+  // better one may appear (More's sheet opened, #344), or the step's `until` may
+  // show. The poll stops with the step.
+  const show = (found: { el: HTMLElement; fallback: boolean } | null): void => {
     a.overlay.replaceChildren();
-    if (anchorEl) {
-      scrollAnchorIntoView(anchorEl);
-      renderCutout(a, anchorEl);
-      dockClear(renderBubble(a, step, { centered: false, forceNext: false }), anchorEl);
+    if (found) {
+      scrollAnchorIntoView(found.el);
+      renderCutout(a, found.el);
+      dockClear(renderBubble(a, step, { centered: false, forceNext: found.fallback }), found.el);
     } else {
       renderBubble(a, step, { centered: true, forceNext: true });
     }
   };
-  let shown = findAnchor(step.anchor);
-  show(shown);
+  let found = findAnchor(step.anchor);
+  let shown = found?.el ?? null;
+  show(found);
   a.retryTimer = setInterval(() => {
-    if (active !== a || STEPS[a.index] !== step) return;
-    const now = findAnchor(step.anchor!);
+    if (active !== a || STEPS[a.index] !== step || a.overlay.hidden) return;
+    if (step.until && findAnchor(step.until)) {
+      advance();
+      return;
+    }
+    found = findAnchor(step.anchor!);
+    const now = found?.el ?? null;
     if (now !== shown) {
       shown = now;
-      show(now);
+      show(found);
     } else if (now) {
       // Same anchor: follow it if the layout moved it, without scrolling it back.
       renderCutout(a, now);
@@ -301,15 +372,22 @@ function renderStep(): void {
  * closed sheet) does not count: a cutout drawn around a zero-size box lands in
  * the corner, so the step keeps polling until the box is real.
  */
-function findAnchor(selector: string): HTMLElement | null {
+function findAnchor(selector: string): { el: HTMLElement; fallback: boolean } | null {
   const root: ParentNode = document.getElementById('ui-root') ?? document;
-  for (const choice of selector.split(',')) {
-    const found =
-      (root.querySelector(choice) as HTMLElement | null) ??
-      (document.querySelector(choice) as HTMLElement | null);
+  const choices = selector.split(',');
+  for (const [i, choice] of choices.entries()) {
+    let found: HTMLElement | null;
+    try {
+      found =
+        (root.querySelector(choice) as HTMLElement | null) ??
+        (document.querySelector(choice) as HTMLElement | null);
+    } catch {
+      continue; // a selector this browser can't parse (:has before Safari 15.4)
+    }
     if (!found) continue;
     const r = found.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) return found;
+    // On a nav tab when the step is about something on a screen: the screen was closed.
+    if (r.width > 0 && r.height > 0) return { el: found, fallback: i > 0 && !choices[0]!.trim().startsWith('.nrl-nav') && found.closest('.nrl-nav') !== null };
   }
   return null;
 }
@@ -324,11 +402,7 @@ function scrollAnchorIntoView(anchorEl: HTMLElement): void {
   }
 }
 
-/**
- * Position a `.nrl-tutorial-cutout` over the anchor. A huge box-shadow spread
- * darkens everything *outside* the cutout, drawing the eye to the anchor while
- * leaving it clickable (the cutout itself is pointer-events:none).
- */
+/** Position the `.nrl-tutorial-cutout` frame over the anchor (pointer-events:none, so the anchor stays tappable). */
 function renderCutout(a: ActiveTutorial, anchorEl: HTMLElement): void {
   const r = anchorEl.getBoundingClientRect();
   const pad = 6;
@@ -342,13 +416,24 @@ function renderCutout(a: ActiveTutorial, anchorEl: HTMLElement): void {
 /** Bubble docks, tried in order until one leaves the anchor uncovered (More's sheet fills the bottom-left dock, #344). */
 const DOCKS = ['', ' nrl-tutorial-top', ' nrl-tutorial-top nrl-tutorial-right', ' nrl-tutorial-right'];
 
+/**
+ * Dock the bubble clear of the anchor and its frame (#337 U2). When every dock
+ * overlaps (a big row on a short screen), take the one that covers least.
+ */
 function dockClear(bubble: HTMLElement, anchorEl: HTMLElement): void {
-  const r = anchorEl.getBoundingClientRect();
+  const pad = 6;
+  const a = anchorEl.getBoundingClientRect();
+  const r = { left: a.left - pad, right: a.right + pad, top: a.top - pad, bottom: a.bottom + pad };
+  let best = { dock: DOCKS[0]!, area: Infinity };
   for (const dock of DOCKS) {
     bubble.className = `nrl-tutorial-bubble${dock}`;
     const b = bubble.getBoundingClientRect();
-    if (b.right <= r.left || b.left >= r.right || b.bottom <= r.top || b.top >= r.bottom) return;
+    const area = Math.max(0, Math.min(b.right, r.right) - Math.max(b.left, r.left)) *
+      Math.max(0, Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top));
+    if (area === 0) return;
+    if (area < best.area) best = { dock, area };
   }
+  bubble.className = `nrl-tutorial-bubble${best.dock}`;
 }
 
 /**
@@ -404,7 +489,7 @@ export const TUTORIAL_CSS = `
 .nrl-tutorial {
   position: fixed;
   inset: 0;
-  pointer-events: none; /* backdrop is drawn by the cutout's box-shadow */
+  pointer-events: none; /* only the bubble takes taps */
   z-index: 200;         /* above HUD/nav (55) and modals (100) */
   font-family: 'Courier New', monospace;
   image-rendering: pixelated;
@@ -413,9 +498,11 @@ export const TUTORIAL_CSS = `
   position: fixed;
   pointer-events: none;
   border: 3px solid #f4d03f;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 0 3px #000, 0 0 12px 2px #f4d03f;
   z-index: 200;
 }
+/* #337 U1: never over a match, live or at full time. */
+body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
 .nrl-tutorial-bubble {
   pointer-events: auto;
   position: fixed;

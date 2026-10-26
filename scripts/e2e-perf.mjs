@@ -160,6 +160,7 @@ async function answerCards() {
   const s = await state();
   if (!s?.eventDeck?.pending?.length) return 0;
   await page.locator('.nrl-nav .nrl-btn:has-text("News")').tap();
+  await page.locator('[data-decisions-open]').tap(); // #345: the cards open from News's one-row banner
   await page.waitForSelector('.nrl-event-card');
   let n = 0;
   while (await page.locator('.nrl-event-card').count()) {
@@ -185,6 +186,13 @@ async function advance(index, { probe = false } = {}) {
   await clickTimed('.nrl-hud-menu-toggle');
   const t0 = Date.now();
   await clickTimed('.nrl-hud-menu-item', { nth: index });
+  // A run past ×4 weeks asks first (#350 H3; src/core/advanceRules.ts targetSpan, weeks 25-27
+  // the finals). Cards are answered before each run, so there is no #338 ask.
+  const span = index === 0 ? 4 : index === 1 ? (before.week < 25 ? 25 - before.week : 27 - before.week + 25) : 27 - before.week + 1;
+  if (span > 4) {
+    await page.waitForSelector('[data-confirm-advance]');
+    await clickTimed('[data-confirm-advance]');
+  }
   let tapMs, label, probeMs = 0;
   // Read the progress line in the same breath as checking the run is still going.
   const running = probe ? await page.evaluate(() => (document.querySelector('.nrl-hud[data-advancing]') ? document.querySelector('.nrl-hud-actions .nrl-btn')?.textContent?.trim() || 'running' : null)) : null;

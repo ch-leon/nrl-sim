@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   forfeitRisk, newlyInjuredStarters, regularStarterIds, contractAlerts,
-  postWeekStop, debtStop, targetReached, targetLabel, FINALS_START_WEEK,
+  postWeekStop, debtStop, targetReached, targetLabel, remainingTarget, targetSpan, FINALS_START_WEEK,
   type SquadMember,
 } from '../../src/core/advanceRules';
 import { ECON, ON_FIELD, SEASON_ROUNDS, SQUAD_MIN, WEEKS_PER_SEASON } from '../../src/config';
@@ -235,6 +235,31 @@ describe('targetReached', () => {
   it('seasonEnd: met on rollover (season changes), not mid-season', () => {
     expect(targetReached({ kind: 'seasonEnd' }, { ...base, weeksPlayed: WEEKS_PER_SEASON - 1, week: WEEKS_PER_SEASON })).toBe(false);
     expect(targetReached({ kind: 'seasonEnd' }, { ...base, weeksPlayed: WEEKS_PER_SEASON, week: 1, season: 2 })).toBe(true);
+  });
+});
+
+describe('remainingTarget (#350 N4: Keep advancing)', () => {
+  const base = { weeksPlayed: 0, week: 1, startSeason: 1, season: 1 };
+
+  it('weeks: what is left of the n', () => {
+    expect(remainingTarget({ kind: 'weeks', weeks: 4 }, { ...base, weeksPlayed: 1, week: 2 })).toEqual({ kind: 'weeks', weeks: 3 });
+    expect(remainingTarget({ kind: 'weeks', weeks: 4 }, { ...base, weeksPlayed: 4, week: 5 })).toBeNull();
+  });
+
+  it('finals and season end carry on to the same end, or stop when the week met it', () => {
+    expect(remainingTarget({ kind: 'finals' }, { ...base, weeksPlayed: 3, week: 4 })).toEqual({ kind: 'finals' });
+    expect(remainingTarget({ kind: 'finals' }, { ...base, weeksPlayed: 3, week: FINALS_START_WEEK })).toBeNull();
+    expect(remainingTarget({ kind: 'seasonEnd' }, { ...base, weeksPlayed: 3, week: 4 })).toEqual({ kind: 'seasonEnd' });
+    expect(remainingTarget({ kind: 'seasonEnd' }, { ...base, weeksPlayed: 3, week: 1, season: 2 })).toBeNull();
+  });
+});
+
+describe('targetSpan', () => {
+  it('counts the weeks a run plays with no stops', () => {
+    expect(targetSpan({ kind: 'weeks', weeks: 4 }, 7)).toBe(4);
+    expect(targetSpan({ kind: 'finals' }, 1)).toBe(FINALS_START_WEEK - 1);
+    expect(targetSpan({ kind: 'seasonEnd' }, 1)).toBe(WEEKS_PER_SEASON);
+    expect(targetSpan({ kind: 'seasonEnd' }, WEEKS_PER_SEASON)).toBe(1);
   });
 });
 

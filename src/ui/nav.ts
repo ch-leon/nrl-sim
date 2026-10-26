@@ -41,6 +41,8 @@ export interface Nav {
   registerScreen(id: string, label: string, open: () => void, placement?: NavPlacement): void;
   /** Show a count badge on a registered screen's button; 0 hides it. */
   setBadge(id: string, count: number): void;
+  /** Open a registered screen as its button would (the tutorial and the HUD's next-match chip). */
+  open(id: string): void;
   destroy(): void;
 }
 
@@ -204,6 +206,7 @@ export function createNav(): Nav {
     el: root,
     registerScreen,
     setBadge,
+    open: pick,
     destroy() {
       offInset();
       offScreen();

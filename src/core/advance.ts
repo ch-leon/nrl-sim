@@ -79,7 +79,7 @@ export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<v
   // sit forever with Advance Week disabled. The HUD refuses the tap too.
   if (weekHeld()) {
     const text = playerMatchPending()
-      ? 'Your match is still on. Advance Week resumes it.'
+      ? 'Your match is still on. Tap Resume match to carry on.'
       : 'The other matches are still being played; the week ends when they are in.';
     bus.emit('ui:notify', { text, kind: 'info' });
     return { weeksPlayed: 0, stop: { kind: 'stopped', text } };
