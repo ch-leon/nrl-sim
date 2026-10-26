@@ -463,7 +463,11 @@ export interface MatchResult {
   is a second playback of the same seed (`replayRange`), drawn by these layers. It does not
   step the live runner, and nothing it draws is read back by the sim. `legsLayer` is the lab's.
   The DOM overlay (`matchOverlay.ts`) is the scoreboard, the controls and the
-  final-whistle actions.
+  final-whistle actions. The half-time card and the sheets over the field (the pause
+  menu with Skip and Save & exit, the calls list) hold the match until they are closed;
+  the Replay try chip hides and its count stops under any of them, and under the
+  full-time report (#341, #348). While the overlay is up only toasts flagged
+  `match: true` show; the rest wait for Back to Club (`src/ui/toasts.ts`, #339).
 - **Cost:** a 2 × 9:00 match is 21,600 ticks, about **300 ms** headless in Node after
   N9.1 (BAK-207 §3.5; about 485 ms before that pass). The 0.6 s figure was the
   measurement from before N9.1. Desktop Chromium was about 275 ms after the Phase 3
@@ -509,12 +513,14 @@ export interface MatchResult {
 - Kit designs (GitHub #79): `GameState.kit` (optional) holds the player's pattern, trim
   and alternate strip. `main.ts` registers it with `setKitDesign` in `src/art/match/kit.ts`,
   and `kitFromColors` consults that registry, so matches (including the away clash
-  switch in `resolveKits`), the crowd, grounds characters and card portraits all wear it
+  switch in `resolveKits`, `src/art/match/kitClash.ts`), the crowd, grounds characters and card portraits all wear it
   without knowing about designs. No design = the look derived from the club colours.
   Patterns: plain / v / hoops / sleeves / stripes. Behind `FEATURES.cosmeticKits`.
 - Match textures (generated per match in MatchScene from `src/art/match/`, freed
-  on shutdown): per-team player sheets `pl-<clubId>[-alt]` (kit palette-swapped
-  from club colours; away side switches to its alt strip on a clash), ball,
+  on shutdown): per-team player sheets `pl-<clubId>[-alt|-clash]` (kit palette-swapped
+  from club colours; on a clash the away side switches to its alt strip, or a generated
+  clash strip when the alt clashes too, judged on the colours the sprite actually wears,
+  #340; every player also stands on a ring in a side colour picked to differ), ball,
   shadows, goalpost parts, the stadium background/foreground layers and crowd.
   `particle-square` comes from `src/fx/particles.ts`. The kit-dependent art (stadium
   layers in 512 px chunks, crowd, the two player atlases; `src/art/match/fixtureArt.ts`)

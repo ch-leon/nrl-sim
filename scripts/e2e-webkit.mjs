@@ -464,7 +464,9 @@ async function runPortrait(browser) {
     rec.notes.push(`clock ${before} → ${o.clock}, canvas ${o.canvas}`);
   });
   await step('parked', async (rec) => {
-    await page.locator('[data-save-exit]').tap();
+    // Save & exit is in the pause sheet (#348 M3).
+    await page.locator('.nrl-mo-controls [data-pause]').tap();
+    await page.locator('.nrl-mo-sheet [data-save-exit]').tap();
     await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud');
     const o = await state();
     if (o.advance !== 'Resume match') throw new Error(`Advance Week reads "${o.advance}", not Resume match`);
@@ -568,15 +570,20 @@ async function runPortrait(browser) {
           }
           const score = document.querySelector('.nrl-mo-scoreboard')?.getBoundingClientRect();
           if (score && overlap(score)) hits.push('scoreboard');
-          if (!log || log.width < 44 || log.height < 44) hits.push(`log icon ${Math.round(log?.width ?? 0)}×${Math.round(log?.height ?? 0)}`);
+          if (!log || log.width < 44 || log.height < 44) hits.push(`Log button ${Math.round(log?.width ?? 0)}×${Math.round(log?.height ?? 0)}`);
           const panel = document.querySelector('.nrl-mo-log')?.getBoundingClientRect();
           const feed = document.querySelector('.nrl-mo-feed');
           if (!panel || panel.height < 1) hits.push('open log not visible');
           else {
             if (score && panel.top < score.bottom - 1) hits.push(`open log behind scoreboard (${panel.top.toFixed(1)} < ${score.bottom.toFixed(1)})`);
-            if (panel.bottom > ticker.top + 1) hits.push('open log overlaps ticker');
+            // Open, the log takes the ticker's place on the left half (#348 M4).
+            const lines = document.querySelector('.nrl-mo-ticker');
+            if (lines && lines.getBoundingClientRect().height > 0) hits.push('the ticker still shows under the open log');
+            if (ticker.right > innerWidth / 2 + 1) hits.push(`open log past the left half (${Math.round(ticker.right)} > ${innerWidth / 2})`);
             if (panel.left < 0 || panel.right > innerWidth || panel.top < 0) hits.push('open log off screen');
             if (!feed || feed.clientHeight < 12 || feed.scrollHeight <= feed.clientHeight) hits.push(`open log not scrollable (${feed?.clientHeight}px, panel ${panel.height.toFixed(1)}px)`);
+            // A read, not the ticker's two lines again (#348 M4): four lines at least, even with every chip up.
+            else if (feed.clientHeight < 60) hits.push(`open log only ${feed.clientHeight}px tall`);
           }
           const chips = document.querySelectorAll('.nrl-mo-calls .nrl-btn').length;
           if (chips < 10) hits.push(`only ${chips} chips`);
@@ -947,11 +954,84 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     if ((await page.evaluate(() => window.__nrlState().week)) !== week) out.push('Cancel moved the week');
     return out;
   });
-  // The full-time report (#351 P0): its ✕, the result and Player of the Match on screen.
-  await step('popup-fulltime-report', async (rec) => {
+  // The match's cards (#341, #348): the half-time card, the pause sheet and the calls list
+  // each hold the match with every action on screen and uncovered, and the Replay try
+  // chip hides under them and comes back after.
+  await step('match-cards', async (rec) => {
     await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
-    await page.locator('.nrl-mo-controls .nrl-btn', { hasText: 'Skip' }).first().tap();
+    await page.waitForFunction(() => window.__nrlGame?.scene.getScene('Match')?.playback, null, { timeout: 30000 });
+    const out = [];
+    const clock = () => page.locator('.nrl-mo-clock').textContent().then((t) => t?.trim());
+    /** The clock moves on from `from` (the match is playing, not held). */
+    const runs = (from) => page.waitForFunction((f) => {
+      const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
+      return !!t && t !== f;
+    }, from, { timeout: 15000 });
+    await runs('00:00');
+    /** Each selector whose centre does not take a tap, with why. */
+    const blocked = (sels) => page.evaluate((list) => list.flatMap((sel) => {
+      const b = document.querySelector(sel);
+      if (!b) return [`${sel} missing`];
+      const r = b.getBoundingClientRect();
+      if (r.width < 44 || r.height < 44) return [`${sel} ${Math.round(r.width)}×${Math.round(r.height)}`];
+      if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) return [`${sel} off screen`];
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return at === b || b.contains(at) ? [] : [`${sel} covered by ${at?.className || at?.tagName}`];
+    }), sels);
+    const replayShows = () => page.evaluate(() => {
+      const b = document.querySelector('.nrl-mo-replay');
+      return !!b && getComputedStyle(b).display !== 'none' && b.getBoundingClientRect().height > 0;
+    });
+    // A try's offer, then the half-time card over it (the scene's own calls, as the playback makes them).
+    await page.evaluate(() => {
+      const sc = window.__nrlGame.scene.getScene('Match');
+      sc.overlay.offerReplay(() => {});
+      sc.openPlanCard('Half-time', ['Landscape FC 4 – 0 Rivals', 'Legs 80% / 78%', 'Calls paid off – / –']);
+    });
+    if (!(await page.locator('.nrl-mo-plan').count())) return ['no plan card (no plan side in this match)'];
+    const at = await clock();
+    await page.waitForTimeout(6000);
+    if (!(await page.locator('.nrl-mo-plan').count())) out.push('the half-time card closed by itself');
+    if ((await clock()) !== at) out.push(`the clock ran under the half-time card (${at} → ${await clock()})`);
+    if (await replayShows()) out.push('the Replay chip shows over the half-time card');
+    out.push(...await blocked(['.nrl-mo-plan .nrl-mo-plan-go', '.nrl-mo-plan [data-tactic="expansive"]']));
+    await page.screenshot({ path: join(OUT, 'half-time-card.png') });
+    await page.locator('.nrl-mo-plan .nrl-mo-plan-go').tap();
+    await page.waitForSelector('.nrl-mo-plan', { state: 'detached', timeout: 3000 });
+    if (!(await replayShows())) out.push('the Replay chip did not come back after the card');
+    else out.push(...await blocked(['.nrl-mo-replay']));
+    if (!(await runs(at).then(() => true).catch(() => false))) out.push('the match did not go on after Continue');
+    // The pause sheet: Resume, Skip to full time and Save & exit, the match held.
+    await page.locator('.nrl-mo-controls [data-pause]').tap();
+    await page.waitForSelector('.nrl-mo-sheet');
+    const paused = await clock();
+    await page.waitForTimeout(1500);
+    if ((await clock()) !== paused) out.push(`the clock ran under the pause sheet (${paused} → ${await clock()})`);
+    if (await replayShows()) out.push('the Replay chip shows over the pause sheet');
+    out.push(...await blocked(['.nrl-mo-sheet .nrl-btn:first-of-type', '.nrl-mo-sheet [data-skip]', '.nrl-mo-sheet [data-save-exit]', '.nrl-mo-sheet .nrl-mo-sheet-x']));
+    await page.screenshot({ path: join(OUT, 'pause-sheet.png') });
+    await page.locator('.nrl-mo-sheet .nrl-btn', { hasText: 'Resume' }).tap();
+    await page.waitForSelector('.nrl-mo-sheet', { state: 'detached', timeout: 3000 });
+    if (!(await runs(paused).then(() => true).catch(() => false))) out.push('the match did not go on after Resume');
+    // The calls list behind "?".
+    if (await page.locator('.nrl-mo-calls [data-calls-help]').count()) {
+      await page.locator('.nrl-mo-calls [data-calls-help]').tap();
+      await page.waitForSelector('.nrl-mo-sheet');
+      const rows = await page.locator('.nrl-mo-call-help b').count();
+      if (rows < 9) out.push(`the calls list has ${rows} calls`);
+      out.push(...await blocked(['.nrl-mo-sheet .nrl-mo-sheet-actions .nrl-btn']));
+      await page.screenshot({ path: join(OUT, 'calls-help.png') });
+      await page.locator('.nrl-mo-sheet .nrl-mo-sheet-actions .nrl-btn').tap();
+      await page.waitForSelector('.nrl-mo-sheet', { state: 'detached', timeout: 3000 });
+    } else out.push('no "?" on the calls row');
+    rec.notes.push(`card held at ${at}; sheet held at ${paused}`);
+    return out;
+  });
+  // The full-time report (#351 P0): its ✕, the result and Player of the Match on screen.
+  await step('popup-fulltime-report', async (rec) => {
+    await page.locator('.nrl-mo-controls [data-pause]').tap();
+    await page.locator('.nrl-mo-sheet [data-skip]').tap();
     await page.waitForSelector('.nrl-report', { timeout: 60000 });
     const out = await check(rec, { box: '.nrl-report-modal', rows: '.nrl-report-score, .nrl-report-potm', card: '.nrl-report-head' }, null);
     out.push(...await page.evaluate(() => {
@@ -1138,7 +1218,8 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     return out;
   });
   await step('match-full-time', async (rec) => {
-    await page.locator('.nrl-mo-controls .nrl-btn', { hasText: 'Skip' }).first().tap();
+    await page.locator('.nrl-mo-controls [data-pause]').tap();
+    await page.locator('.nrl-mo-sheet [data-skip]').tap();
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 60000 });
     await page.waitForTimeout(700);
     const out = (await tutorialHidden()) ? [] : ['the tutorial showed over the full-time screen'];

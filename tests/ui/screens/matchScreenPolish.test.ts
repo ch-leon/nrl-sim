@@ -2,7 +2,6 @@
 // (#341, #348, #339). Layout is checked in WebKit by scripts/e2e-webkit.mjs and
 // the season e2e; these pin the pure helpers and the CSS, since vitest has no layout.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import {
   BANNER_DOCK_MS,
   CALL_WHEN,
@@ -17,6 +16,14 @@ import { CSS } from '../../../src/ui/dom';
 import { COACH_CALLS } from '../../../src/match/league/calls';
 import { REPLAY_OFFER_MS } from '../../../src/match/view/replay';
 import { toastWaits } from '../../../src/ui/toasts';
+
+const raw = (glob: Record<string, unknown>): string => Object.values(glob)[0] as string;
+const SRC: Record<string, string> = {
+  'src/ui/screens/matchOverlay.ts': raw(import.meta.glob('../../../src/ui/screens/matchOverlay.ts', { query: '?raw', import: 'default', eager: true })),
+  'src/scenes/MatchScene.ts': raw(import.meta.glob('../../../src/scenes/MatchScene.ts', { query: '?raw', import: 'default', eager: true })),
+  'src/match/league/live.ts': raw(import.meta.glob('../../../src/match/league/live.ts', { query: '?raw', import: 'default', eager: true })),
+};
+const readFileSync = (path: string, _enc: 'utf8'): string => SRC[path]!;
 
 /** The declarations of the first rule whose selector (or selector list) ends with `selector`. */
 function rule(css: string, selector: string): string {
@@ -88,7 +95,7 @@ describe('match screen readability (#348)', () => {
   });
   it('M4: the open log takes the ticker’s place on the left half', () => {
     expect(rule(OVERLAY_CSS, '.nrl-mo-log-on .nrl-mo-ticker')).toContain('display: none');
-    expect(rule(OVERLAY_CSS, '.nrl-match-overlay.nrl-mo-log-on .nrl-mo-commentary')).toContain('50vw');
+    expect(rule(OVERLAY_CSS, '.nrl-match-overlay.nrl-mo-log-on .nrl-mo-commentary')).toMatch(/var\(--nrl-mo-log-w, calc\(50vw/);
   });
   it('M6: every refusal the sim gives has a short caption', () => {
     const live = readFileSync('src/match/league/live.ts', 'utf8');

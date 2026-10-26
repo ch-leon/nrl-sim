@@ -590,6 +590,14 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     // The replay chip, the docked banner and the toasts hang under the scoreboard, however tall it wraps.
     const boardBottom = scoreboard.getBoundingClientRect().bottom;
     document.documentElement.style.setProperty(BOARD_VAR, `${Math.ceil(boardBottom)}px`);
+    if (logOpen) {
+      // The open log stops short of the calls column, so its foot only has to clear the speed row.
+      const calls = document.querySelector('.nrl-mo-calls')?.getBoundingClientRect();
+      const half = window.innerWidth / 2;
+      const edge = calls && calls.width > 0 && calls.height > 0 ? Math.min(half, calls.left - 8) : half;
+      const width = Math.max(LOG_MIN_W, Math.floor(edge - commentaryPanel.getBoundingClientRect().left));
+      if (root.style.getPropertyValue('--nrl-mo-log-w') !== `${width}px`) root.style.setProperty('--nrl-mo-log-w', `${width}px`);
+    }
     if (clearance <= 0) return;
     const bottom = Math.ceil(clearance + 8);
     root.style.setProperty('--nrl-mo-chrome', `${bottom}px`);
@@ -903,6 +911,8 @@ const OVERLAY_STYLE_ID = 'nrl-match-overlay-styles';
 const BOARD_VAR = '--nrl-mo-board';
 /** Room kept under the scoreboard for the docked replay chip (a 44px chip and its gap). */
 const DOCK_ROW_PX = 52;
+/** The open log is never narrower than this, whatever the calls column takes. */
+const LOG_MIN_W = 160;
 /** Body class set while a match overlay is mounted (see header). */
 export const MATCH_ACTIVE_CLASS = 'nrl-match-active';
 /** Body class added at full-time (alongside MATCH_ACTIVE_CLASS) until exit. */
@@ -1002,7 +1012,7 @@ body.nrl-match-final .nrl-toast-stack {
 .nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: var(--nrl-mo-log-height, 8rem); min-height: 0; overflow-y: auto; }
 .nrl-mo-log-on .nrl-mo-ticker { display: none; }
 .nrl-match-overlay.nrl-mo-log-on .nrl-mo-commentary {
-  right: auto; width: calc(50vw - 0.5rem - env(safe-area-inset-left, 0px)); max-width: none; margin: 0;
+  right: auto; width: var(--nrl-mo-log-w, calc(50vw - 0.5rem - env(safe-area-inset-left, 0px))); max-width: none; margin: 0;
 }
 .nrl-mo-line { font-size: clamp(0.6rem, 2.4vw, 0.8rem); line-height: 1.25; }
 /* Playback controls (mounted by MatchScene): bottom-centre, where the nav bar
@@ -1046,7 +1056,9 @@ body.nrl-match-final .nrl-toast-stack {
   position: sticky; bottom: -0.6rem; align-self: stretch; display: flex; justify-content: center;
   margin: 0 -0.8rem -0.6rem; padding: 0.3rem 0.8rem 0.45rem; background: #e8e0c8; border-top: 2px solid #1a1a2e; z-index: 1;
 }
-.nrl-mo-sheet { width: min(26rem, calc(100vw - 1rem)); padding-top: 0.5rem; }
+.nrl-mo-sheet { width: min(28rem, calc(100vw - 1rem)); padding-top: 0.5rem; }
+/* The head and its lines keep clear of the ✕ in the corner. */
+.nrl-mo-sheet > .nrl-mo-plan-head, .nrl-mo-sheet .nrl-mo-plan-line { padding: 0 2.9rem; text-align: center; }
 .nrl-mo-sheet-x { position: absolute; top: 0.25rem; right: 0.25rem; padding: 0; }
 .nrl-mo-sheet-body { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; align-self: stretch; }
 .nrl-mo-sheet-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin-top: 0.25rem; }

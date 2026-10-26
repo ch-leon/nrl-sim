@@ -311,8 +311,11 @@ async function run() {
     return { ms: r.longest, notes: `${r.frames} frames, ${r.over} over 100 ms` };
   });
   await page.screenshot({ path: join(OUT, 'match-play.png') });
+  // Skip is in the pause sheet (#348 M3); the timing starts at the sheet's Skip.
+  await clickTimed('.nrl-mo-controls [data-pause]');
+  await page.waitForSelector('.nrl-mo-sheet [data-skip]');
   await timed('Skip → full time', async () => {
-    await clickTimed('.nrl-mo-controls .nrl-btn', { text: 'Skip' });
+    await clickTimed('.nrl-mo-sheet [data-skip]');
     await page.waitForSelector('.nrl-btn:has-text("Back to Club")');
   });
   await timed('Back to Club → grounds', async () => {
