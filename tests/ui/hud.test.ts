@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fmtMoney, moneyTile, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice } from '../../src/ui/hud';
+import { fmtMoney, moneyTile, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel } from '../../src/ui/hud';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
-import { createNewGame, getState } from '../../src/core/state';
+import { createNewGame, getState, setState } from '../../src/core/state';
+import { initLeague } from '../../src/systems/fixtures';
 import { bus } from '../../src/core/events';
 import { CSS } from '../../src/ui/dom';
 import { ECON } from '../../src/config';
@@ -114,8 +115,9 @@ describe('a parked live match (Save & exit)', () => {
     expect(clubAdvanceChoice(false, false)).toBe('advance');
     expect(clubMenuChoice(false, false)).toBe('advance');
     expect(RESUME_MATCH_LABEL).toBe('Resume match');
-    expect(MATCH_STILL_ON_TEXT).toBe('Your match is still on. Advance Week resumes it.');
-    expect(MATCH_SAVED_TEXT).toBe('Match saved. Advance Week resumes it.');
+    // #349 H4: the toast names the button the player sees.
+    expect(MATCH_STILL_ON_TEXT).toBe('Your match is still on. Tap Resume match to carry on.');
+    expect(MATCH_SAVED_TEXT).toBe('Match saved. Tap Resume match to carry on.');
     expect(MATCH_NOT_SAVED_TEXT).toBe("Couldn't save the match. It is still going.");
     expect(SKIPPING_EXIT_TEXT).toBe('Skipping to full time.');
     expect(HELD_WEEK_TEXT).toMatch(/still being played/);
@@ -125,5 +127,46 @@ describe('a parked live match (Save & exit)', () => {
 describe('advance progress (N10.2)', () => {
   it('labels the Advance button with the week of the season while a run is under way', () => {
     expect(advanceProgressLabel(12)).toBe('Week 12 of 27…');
+  });
+});
+
+describe('the next-match chip (#350 H1)', () => {
+  beforeEach(() => {
+    createNewGame('Test Club', 1);
+    setState({ league: initLeague(getState()) });
+  });
+
+  it('names the next opponent and home or away; no ladder place before a round is in', () => {
+    const s = getState();
+    const f = s.league.fixtures.filter((x) => x.homeId === 'player' || x.awayId === 'player').sort((a, b) => a.round - b.round)[0]!;
+    const home = f.homeId === 'player';
+    const opp = s.league.clubs.find((c) => c.id === (home ? f.awayId : f.homeId))!;
+    const chip = nextMatchChip(s)!;
+    expect(chip.text).toBe(`v ${opp.name} (${home ? 'H' : 'A'})`);
+    expect(chip.label).toBe(`Next match: ${opp.name}, ${home ? 'home' : 'away'}`);
+  });
+
+  it('adds the club\'s ladder place once it has played', () => {
+    const s = getState();
+    const ladder = s.league.ladder.map((r) => (r.clubId === 'player' ? { ...r, played: 1 } : r));
+    const place = ladder.findIndex((r) => r.clubId === 'player') + 1;
+    const chip = nextMatchChip({ ...s, league: { ...s.league, ladder } })!;
+    expect(chip.text.endsWith(` · ${ordinal(place)}`)).toBe(true);
+    expect(chip.label).toContain(`You are ${ordinal(place)} on the ladder`);
+  });
+
+  it('is null with no match left this season', () => {
+    const s = getState();
+    expect(nextMatchChip({ ...s, league: { ...s.league, fixtures: [] } })).toBeNull();
+  });
+
+  it('ordinals', () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111].map(ordinal)).toEqual(
+      ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '101st', '111th']);
+  });
+
+  it('the Advance Week badge says what it counts', () => {
+    expect(decisionsBadgeLabel(1)).toBe('1 decision waiting');
+    expect(decisionsBadgeLabel(3)).toBe('3 decisions waiting');
   });
 });

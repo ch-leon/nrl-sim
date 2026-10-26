@@ -1,8 +1,8 @@
 // tests/systems/wildcards.test.ts — off-field wildcard cards and the Bali trip (#324, #325).
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  absWeek, applyEffects, applySeasonEvents, describeEffects, drawEvent, effectiveChance,
-  eventsTick, incidentWeight, isEligible, resolveDueRollovers, resolveEvent,
+  absWeek, applyEffects, applySeasonEvents, describeChoice, describeEffects, drawEvent, effectiveChance,
+  eventsTick, incidentWeight, isEligible, outcomeTail, resolveDueRollovers, resolveEvent,
 } from '../../src/systems/events';
 import { cardById, EVENT_CARDS } from '../../src/data/events';
 import { initLeague } from '../../src/systems/fixtures';
@@ -70,6 +70,47 @@ describe('wildcard odds', () => {
     expect(describeEffects(bali)).toContain('25%');
     expect(describeEffects(bali, { welfare: true })).toContain('12.5%');
     expect(describeEffects(bali, { welfare: true })).toContain('2-3 week ban');
+  });
+
+  it('keeps the trip\'s sure effect apart from its risk (#346)', () => {
+    const bali = cardById('baliTrip')!.choices[0]!.effects;
+    expect(describeChoice(bali)).toEqual({
+      sure: 'squad morale +6',
+      risks: ['25% risk: a 2-3 week ban, −$2,500, reputation -2, board patience -1'],
+    });
+    expect(describeChoice(bali, { welfare: true }).risks).toEqual(['12.5% risk: a 2-3 week ban, −$2,500, reputation -2, board patience -1']);
+    // A choice with no risk is one line, as before.
+    expect(describeChoice(cardById('baliTrip')!.choices[1]!.effects)).toEqual({ sure: 'squad morale -8', risks: [] });
+    // describeEffects keeps the risk's costs together, never as separate certain costs.
+    expect(describeEffects(bali)).toBe('squad morale +6 · 25% risk: a 2-3 week ban, −$2,500, reputation -2, board patience -1');
+  });
+
+  it('after the roll, the outcome says only what happened (#346)', () => {
+    const base = week2(fresh(3));
+    const play = (seed: number) => {
+      const s: GameState = { ...base, eventDeck: { ...base.eventDeck, rng: seed, pending: [], cooldowns: {}, flags: [] } };
+      const offered = applySeasonEvents(s);
+      const ev = offered.eventDeck.pending.find((p) => p.cardId === 'baliTrip')!;
+      return resolveEvent(offered, ev.id, 0, absWeek(2, 1))!;
+    };
+    const runs = Array.from({ length: 40 }, (_, i) => play(i + 1));
+    const calm = runs.find((r) => r.rolls?.[0] === false)!;
+    const wild = runs.find((r) => r.rolls?.[0] === true && r.banned)!;
+    expect(calm.news[0]!.text).toBe('The squad is off to Bali. No incident: squad morale +6.');
+    expect(calm.news.some((n) => n.text.includes('$2,500') || n.text.includes('ban'))).toBe(false);
+    expect(calm.money).toEqual([]);
+    expect(wild.news[0]!.text).toBe('The squad is off to Bali. (squad morale +6)');
+    const incident = wild.news.find((n) => n.kind === 'danger')!;
+    expect(incident.text).toContain(`Out ${wild.banned!.weeks} weeks. Also: −$2,500, reputation -2, board patience -1.`);
+    expect(wild.money).toEqual([{ amount: -2_500, reason: 'event: Trip to Bali' }]);
+  });
+
+  it('outcomeTail: sure effects in brackets, a missed risk as "No incident"', () => {
+    const night = cardById('nightOut')!.choices[1]!.effects;
+    expect(outcomeTail(night, [false])).toBe(' No incident: morale +10.');
+    expect(outcomeTail(night, [true])).toBe(' (morale +10)');
+    expect(outcomeTail([{ kind: 'money', amount: -2_000 }])).toBe(' (−$2,000)');
+    expect(outcomeTail([])).toBe('');
   });
 
   it('a roll of 0.2 hits without Welfare and misses with them; 0.1 hits either way', () => {

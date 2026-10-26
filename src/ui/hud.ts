@@ -9,6 +9,7 @@ import type { AdvanceTarget } from '../core/advanceRules';
 import { weekHeld } from '../core/time';
 import { advanceInProgress, stopAdvance } from '../core/advance';
 import { playerMatchPending, resumePlayerMatch } from '../systems/matchday';
+import { nextFixture } from '../systems/league';
 import { ECON, WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
 
@@ -18,6 +19,8 @@ export interface HudOpts {
   onAdvanceWeek?: () => void;
   /** Called from the "Advance Week" menu (#44). Absent => menu disabled. */
   onAdvanceUntil?: (target: AdvanceTarget) => unknown;
+  /** Called from the next-match chip (#350 H1). Absent => the chip is a plain readout. */
+  onNextMatch?: () => void;
 }
 
 /** Entries in the "Advance Week" menu, in display order. */
@@ -58,6 +61,37 @@ export function moneyTile(balance: number): { text: string; inDebt: boolean } {
   return { text: fmtMoney(balance), inDebt: balance < ECON.BANKRUPTCY_WARN };
 }
 
+/** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th, 21st. */
+export function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const suffix = teen ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+/**
+ * The hub's next-match chip (#350 H1): "v Darwin Drovers (A) · 5th", the
+ * opponent, home or away, and the club's ladder place once a round is in. Null
+ * with no match left this season. Pure — extracted for unit testing without the DOM.
+ */
+export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { text: string; label: string } | null {
+  const f = nextFixture(s.league.fixtures, s.week, 'player');
+  if (!f) return null;
+  const home = f.homeId === 'player';
+  const opp = s.league.clubs.find((c) => c.id === (home ? f.awayId : f.homeId));
+  if (!opp) return null;
+  const i = s.league.ladder.findIndex((r) => r.clubId === 'player');
+  const row = i < 0 ? undefined : s.league.ladder[i];
+  const place = row && row.played > 0 ? ordinal(i + 1) : '';
+  const text = `v ${opp.name} (${home ? 'H' : 'A'})${place ? ` · ${place}` : ''}`;
+  const label = `Next match: ${opp.name}, ${home ? 'home' : 'away'}${place ? `. You are ${place} on the ladder` : ''}`;
+  return { text, label };
+}
+
+/** The Advance Week badge's spoken label (#350 H1). */
+export function decisionsBadgeLabel(n: number): string {
+  return n === 1 ? '1 decision waiting' : `${n} decisions waiting`;
+}
+
 const FLASH_MS = 450;
 
 /** What the HUD says when a multi-week advance throws mid-run (N10.2). */
@@ -70,7 +104,7 @@ export const HELD_WEEK_TEXT = 'The other matches are still being played; the wee
 export const RESUME_MATCH_LABEL = 'Resume match';
 
 /** What Save & exit tells the player on the way back to the club. */
-export const MATCH_SAVED_TEXT = 'Match saved. Advance Week resumes it.';
+export const MATCH_SAVED_TEXT = 'Match saved. Tap Resume match to carry on.';
 
 /** Save & exit when the record could not be written: stay in the match. */
 export const MATCH_NOT_SAVED_TEXT = "Couldn't save the match. It is still going.";
@@ -79,7 +113,7 @@ export const MATCH_NOT_SAVED_TEXT = "Couldn't save the match. It is still going.
 export const SKIPPING_EXIT_TEXT = 'Skipping to full time.';
 
 /** What the ▾ menu says while that match is still on: it must not skip the week. */
-export const MATCH_STILL_ON_TEXT = 'Your match is still on. Advance Week resumes it.';
+export const MATCH_STILL_ON_TEXT = 'Your match is still on. Tap Resume match to carry on.';
 
 /**
  * What a tap on Advance Week does. A parked live match resumes; a week held for
@@ -132,7 +166,11 @@ export function createHud(opts: HudOpts = {}): Hud {
   const seasonEl = el('div', { class: 'nrl-hud-stat', attrs: { 'data-hud': 'season' } });
 
   const readouts = el('div', { class: 'nrl-hud-readouts' }, moneyEl, weekEl, seasonEl);
-  const spacer = el('div', { class: 'nrl-hud-spacer' });
+  // #350 H1: who is next, a tap from the League screen.
+  const nextEl = button('', () => opts.onNextMatch?.(), { class: 'nrl-hud-next' });
+  nextEl.setAttribute('data-hud', 'next');
+  if (!opts.onNextMatch) nextEl.disabled = true;
+  const spacer = el('div', { class: 'nrl-hud-spacer' }, nextEl);
 
   const advanceBtn = button('Advance Week', () => {
     const choice = clubAdvanceChoice(playerMatchPending(), weekHeld());
@@ -248,6 +286,11 @@ export function createHud(opts: HudOpts = {}): Hud {
       el('span', { class: 'nrl-hud-week-total', text: `/${WEEKS_PER_SEASON}` }),
     );
     seasonEl.textContent = `Season ${s.season}`;
+    const chip = nextMatchChip(s);
+    nextEl.hidden = !chip;
+    nextEl.textContent = chip?.text ?? '';
+    nextEl.setAttribute('aria-label', chip?.label ?? '');
+    nextEl.title = chip?.label ?? '';
     renderAdvancing(s);
   }
 
@@ -257,6 +300,13 @@ export function createHud(opts: HudOpts = {}): Hud {
     root.toggleAttribute('data-advancing', on);
     if (on) setMenuOpen(false);
     advanceBtn.textContent = on ? advanceProgressLabel(s.week) : playerMatchPending() ? RESUME_MATCH_LABEL : 'Advance Week';
+    // #350 H1: a decision waiting shows on the button that would take its default.
+    const waiting = on ? 0 : s.eventDeck.pending.length;
+    if (waiting > 0) {
+      advanceBtn.append(el('span', {
+        class: 'nrl-hud-alert', text: String(waiting), attrs: { 'aria-label': decisionsBadgeLabel(waiting), 'data-hud': 'decisions' },
+      }));
+    }
     advanceBtn.disabled = on || !opts.onAdvanceWeek;
     advanceBtn.classList.toggle('nrl-hud-progress', on);
     menuToggle.hidden = on;
