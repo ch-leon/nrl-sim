@@ -1,10 +1,10 @@
 // src/ui/screens/recruit.ts — free-agency browser screen (BAK-179, WU-9).
-// Renders GameState.freeAgents as pixel PlayerCards with a Sign action. Built on
+// Renders GameState.freeAgents as compact player rows with SIGN inline. Built on
 // the DOM UI kit (src/ui/dom.ts). No Phaser imports. Also exports the shared
-// PlayerCard used by the squad screen.
+// PlayerRow used by the squad screen.
 
-import { el, panel, button, ensureStyles, openScreen, closeScreen } from '../dom';
-import { getState, type Player, type PlayerStats, type TraitInstance } from '../../core/state';
+import { el, button, ensureStyles, openScreen, screenHead } from '../dom';
+import { getState, type Player, type TraitInstance } from '../../core/state';
 import { ROMAN, TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
@@ -12,13 +12,13 @@ import {
   signPlayer, signingFee, signingFeeBasis, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
 import { SQUAD_CAP } from '../../config';
-import { TRAINING_KIT, PORTRAIT_W, PORTRAIT_H, PORTRAIT_SCALE, portraitDataUrl } from '../../art/portrait';
+import { TRAINING_KIT, PORTRAIT_W, PORTRAIT_H, portraitDataUrl } from '../../art/portrait';
 import type { Kit } from '../../art/match/kit';
 import { openPlayerPage } from './player';
 
 // ── Shared screen styling ───────────────────────────────────────────────────
-// Injected once alongside the base kit CSS. Card/stat-bar/screen classes used by
-// both the recruit and squad screens.
+// Injected once alongside the base kit CSS (which holds the screen frame). Row,
+// badge and stat-bar classes used by the recruit, squad and player screens.
 
 const SCREEN_STYLE_ID = 'nrl-wu9-styles';
 
@@ -31,83 +31,45 @@ export function ensureScreenStyles(): void {
   document.head.appendChild(style);
 }
 
+/** Row portraits at ×2: a 32px face keeps a row at the 44px tap height (#336). */
+const ROW_PORTRAIT_PX = PORTRAIT_W * 2;
+
 const SCREEN_CSS = `
-/* Position/insets come from .nrl-screen-region (ui/dom.ts openScreen): the
-   screen sits between the HUD strip and the nav bar (GitHub #14). */
-.nrl-screen {
-  display: flex;
-  flex-direction: column;
-  background: rgba(10, 10, 20, 0.7);
-  padding: 0.5rem;
-  overflow: hidden;
-  font-family: 'Courier New', monospace;
+/* #336: compact rows, two or more across on a phone on its side, so a short
+   screen shows four and more instead of one card cut after its stat bars. */
+.nrl-screen-body.nrl-rows {
+  grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+  gap: 0.3rem;
+  padding: 0 3px 0.5rem 0;
 }
-.nrl-screen-head {
+.nrl-row {
+  pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 1px 4px 1px 1px;
+  box-sizing: border-box;
+  background: #e8e0c8;
+  color: #1a1a2e;
+  border: 2px solid #000;
+  box-shadow: 2px 2px 0 #000;
+  font-family: 'Courier New', monospace;
+}
+.nrl-row-portrait {
   flex: 0 0 auto;
-}
-.nrl-screen-title {
-  font-weight: bold;
-  font-size: clamp(0.9rem, 4vw, 1.3rem);
-  color: #f4d03f;
-  text-shadow: 2px 2px 0 #000;
-  flex: 1 1 auto;
-}
-.nrl-screen-sub {
-  font-size: clamp(0.65rem, 2.5vw, 0.85rem);
-  color: #e8e0c8;
-  margin-bottom: 0.4rem;
-  flex: 0 0 auto;
-}
-.nrl-screen-body {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 0.5rem;
-  align-content: start;
-  padding-bottom: 0.5rem;
-}
-.nrl-screen-empty {
-  color: #e8e0c8;
-  padding: 1rem;
-  text-align: center;
-}
-.nrl-card { padding: 0.5rem 0.6rem; }
-.nrl-card-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
-}
-/* Pixel portrait: integer CSS scale + pixelated so every source pixel stays hard-edged. */
-.nrl-portrait {
-  flex: 0 0 auto;
-  width: ${PORTRAIT_W * PORTRAIT_SCALE}px;
-  height: ${PORTRAIT_H * PORTRAIT_SCALE}px;
+  width: ${ROW_PORTRAIT_PX}px;
+  height: ${ROW_PORTRAIT_PX}px;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
-.nrl-card-id { flex: 1 1 auto; min-width: 0; }
-.nrl-card-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  margin-bottom: 0.3rem;
-}
-.nrl-card-name {
-  font-weight: bold;
-  font-size: clamp(0.8rem, 3vw, 1rem);
-  line-height: 1.1;
-  flex: 1 1 auto;
-  min-width: 0;
-  /* #195: a long name wraps to a second line instead of clipping to "Ezra Kellaw…". */
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
+.nrl-row-id { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.nrl-row-name { font-weight: bold; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-row-meta { display: flex; gap: 0.3rem; align-items: center; font-size: 0.7rem; white-space: nowrap; overflow: hidden; }
+.nrl-row-meta .nrl-badge { padding: 0 0.2rem; border-width: 1px; }
+.nrl-row .nrl-card-ovr { flex: 0 0 auto; }
+.nrl-row .nrl-row-action { flex: 0 0 auto; padding: 0.2rem 0.45rem; font-size: 0.75rem; }
+.nrl-row.nrl-card-open:hover { background: #f4efe0; }
 .nrl-card-ovr {
   font-weight: bold;
   background: #1a1a2e;
@@ -116,6 +78,7 @@ const SCREEN_CSS = `
   padding: 0.05rem 0.35rem;
   min-width: 2.2rem;
   text-align: center;
+  box-sizing: border-box;
 }
 .nrl-card-meta {
   font-size: clamp(0.62rem, 2.4vw, 0.78rem);
@@ -150,33 +113,26 @@ const SCREEN_CSS = `
   position: relative;
 }
 .nrl-statfill { height: 100%; background: #7ec850; }
-.nrl-card-cost {
-  font-size: clamp(0.62rem, 2.4vw, 0.78rem);
-  margin-bottom: 0.4rem;
-}
 .nrl-card-actions { display: flex; gap: 0.4rem; }
 .nrl-card-actions .nrl-btn { flex: 1 1 auto; }
 .nrl-btn-danger { background: #e06666; }
 .nrl-btn-danger:hover:not(:disabled) { background: #ea8a8a; }
-.nrl-sort-active { background: #7ec850; }
 `;
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
 
 const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
 
+/** Short position labels for a row: "FB", "5/8", "2R". */
+const POS_SHORT: Readonly<Record<string, string>> = {
+  fullback: 'FB', winger: 'WG', centre: 'CE', 'five-eighth': '5/8', halfback: 'HB',
+  hooker: 'HK', prop: 'PR', 'second-row': '2R', lock: 'LK',
+};
+
 /** Human label for a position (title-cased, hyphens kept). */
 function positionLabel(pos: string): string {
   return pos.replace(/(^|-)([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 }
-
-const STAT_LABELS: readonly [keyof PlayerStats, string][] = [
-  ['speed', 'SPD'],
-  ['strength', 'STR'],
-  ['stamina', 'STA'],
-  ['skill', 'SKL'],
-  ['footyIQ', 'IQ'],
-];
 
 /** Badge label + tooltip for a levelled trait (BAK-208 §3). Traits with a downside render in a warning tint. */
 export function traitBadge(t: TraitInstance): { label: string; tip: string; bad: boolean } {
@@ -184,118 +140,82 @@ export function traitBadge(t: TraitInstance): { label: string; tip: string; bad:
   return { label: `${def.short} ${ROMAN[t.level]}`, tip: `${traitLabel(t)}: ${def.blurb}`, bad: def.bad ?? false };
 }
 
-// ── Shared PlayerCard ───────────────────────────────────────────────────────
+// ── Shared PlayerRow ────────────────────────────────────────────────────────
 
-export interface PlayerCardOpts {
-  /** Optional action button rendered in the card footer. */
-  action?: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean };
-  /** Show injury "OUT xw" badge when injuredWeeks > 0 (squad screen). */
+export interface PlayerRowOpts {
+  /** Optional action button at the row's right end. */
+  action?: { label: string; onClick: () => void; disabled?: boolean; title?: string };
+  /** Show the "OUT xw" / "BAN xw" badges (squad screen). */
   showInjury?: boolean;
+  /** Words after position and age: wage, morale, fee. */
+  extra?: string[];
   /** Kit the portrait wears: club kit on the squad, TRAINING_KIT by default. */
   kit?: Kit;
-  /** Tapping the portrait / name row opens the player's page (N7, #185). */
+  /** Tapping the row opens the player's page (N7, #185). */
   onOpen?: () => void;
 }
 
 /**
- * Shared pixel PlayerCard used by both the recruit and squad screens. Shows a
- * pixel portrait, name, position, age, overall rating, the 5 stat bars, weekly
- * wage, and (via opts) an action button and/or injury badge.
+ * One player in a compact row (#336): a 32px portrait, name, position, age and
+ * the words the screen passes in, the overall rating, and an optional action at
+ * the right end. The full card is the player page; the row opens it.
  */
-export function PlayerCard(p: Player, opts: PlayerCardOpts = {}): HTMLElement {
-  const ovr = overallRating(p);
-
-  const head = el(
-    'div',
-    { class: 'nrl-card-head' },
-    el('span', { class: 'nrl-card-name', text: p.name }),
-    el('span', { class: 'nrl-card-ovr', text: String(ovr), attrs: { title: 'Overall rating' } }),
+export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
+  const meta = el('div', { class: 'nrl-row-meta' },
+    el('span', { class: 'nrl-badge', text: POS_SHORT[p.position] ?? positionLabel(p.position), attrs: { title: positionLabel(p.position) } }),
+    el('span', { text: `${p.age}y` }),
   );
-
-  const metaChildren: (Node | string)[] = [
-    el('span', { class: 'nrl-badge', text: positionLabel(p.position) }),
-    el('span', { text: `Age ${p.age}` }),
-  ];
-  if (opts.showInjury && p.injuredWeeks > 0) {
-    metaChildren.push(el('span', { class: 'nrl-badge nrl-badge-out', text: `OUT ${p.injuredWeeks}w` }));
-  }
-  if (opts.showInjury && (p.suspendedWeeks ?? 0) > 0) {
-    metaChildren.push(el('span', { class: 'nrl-badge nrl-badge-ban', text: `BAN ${p.suspendedWeeks}w` }));
-  }
+  if (opts.showInjury && p.injuredWeeks > 0) meta.append(el('span', { class: 'nrl-badge nrl-badge-out', text: `OUT ${p.injuredWeeks}w` }));
+  if (opts.showInjury && (p.suspendedWeeks ?? 0) > 0) meta.append(el('span', { class: 'nrl-badge nrl-badge-ban', text: `BAN ${p.suspendedWeeks}w` }));
+  for (const t of opts.extra ?? []) meta.append(el('span', { text: t }));
   for (const t of p.traits) {
     if (!(t.id in TRAITS)) continue;
     const b = traitBadge(t);
-    metaChildren.push(
-      el('span', {
-        class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`,
-        text: b.label,
-        attrs: { title: b.tip },
-      }),
-    );
+    meta.append(el('span', { class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`, text: b.label, attrs: { title: b.tip } }));
   }
-  const meta = el('div', { class: 'nrl-card-meta' }, ...metaChildren);
-
-  const bars = el(
-    'div',
-    { class: 'nrl-statbars' },
-    ...STAT_LABELS.map(([key, label]) => {
-      // Stats train in fractions; the card shows whole numbers.
-      const val = Math.round(p.stats[key]);
-      const fill = el('div', { class: 'nrl-statfill' });
-      fill.style.width = `${Math.max(0, Math.min(100, val))}%`;
-      return el(
-        'div',
-        { class: 'nrl-statrow' },
-        el('span', { text: label }),
-        el('div', { class: 'nrl-stattrack' }, fill),
-        el('span', { text: String(val) }),
-      );
-    }),
-  );
-
-  const cost = el('div', { class: 'nrl-card-cost', text: `Wage ${money(p.wage)}/wk` });
 
   // Keyed on the squad id, the same key MatchScene uses, so the face matches on the pitch.
   const portrait = el('img', {
-    class: 'nrl-portrait',
-    attrs: {
-      src: portraitDataUrl(p.id, opts.kit ?? TRAINING_KIT),
-      alt: '',
-      width: String(PORTRAIT_W * PORTRAIT_SCALE),
-      height: String(PORTRAIT_H * PORTRAIT_SCALE),
-    },
+    class: 'nrl-row-portrait',
+    attrs: { src: portraitDataUrl(p.id, opts.kit ?? TRAINING_KIT), alt: '', width: String(ROW_PORTRAIT_PX), height: String(ROW_PORTRAIT_PX * PORTRAIT_H / PORTRAIT_W) },
   });
-  const top = el('div', { class: 'nrl-card-top' }, portrait, el('div', { class: 'nrl-card-id' }, head, meta));
+  const row = el('div', { class: 'nrl-row', attrs: { 'data-row-player': p.id } },
+    portrait,
+    el('div', { class: 'nrl-row-id' }, el('span', { class: 'nrl-row-name', text: p.name }), meta),
+    el('span', { class: 'nrl-card-ovr', text: String(overallRating(p)), attrs: { title: 'Overall rating' } }),
+  );
   if (opts.onOpen) {
-    // The whole top row (portrait, name, badges) is the tap target: 48px tall.
     const open = opts.onOpen;
-    top.classList.add('nrl-card-open');
-    top.setAttribute('role', 'button');
-    top.setAttribute('tabindex', '0');
-    top.setAttribute('aria-label', `${p.name}: player page`);
-    top.setAttribute('data-player-open', p.id);
-    head.append(el('span', { class: 'nrl-card-more', text: '›', attrs: { 'aria-hidden': 'true' } }));
-    top.addEventListener('click', open);
-    top.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    row.classList.add('nrl-card-open');
+    row.setAttribute('role', 'button');
+    row.setAttribute('tabindex', '0');
+    row.setAttribute('aria-label', `${p.name}: player page`);
+    row.setAttribute('data-player-open', p.id);
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', (e) => {
+      if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); }
     });
   }
-
-  const children: HTMLElement[] = [top, bars, cost];
-
   if (opts.action) {
-    const cls = opts.action.danger ? 'nrl-btn-danger' : undefined;
-    const btn = button(opts.action.label, opts.action.onClick, cls ? { class: cls } : {});
-    if (opts.action.disabled) btn.disabled = true;
-    children.push(el('div', { class: 'nrl-card-actions' }, btn));
+    const a = opts.action;
+    const btn = button(a.label, a.onClick, { class: 'nrl-row-action' });
+    btn.addEventListener('click', (e) => e.stopPropagation());
+    if (a.disabled) btn.disabled = true;
+    if (a.title) btn.title = a.title;
+    row.append(btn);
   }
-
-  return panel({ class: 'nrl-card' }, ...children);
+  return row;
 }
 
 // ── Recruit screen ──────────────────────────────────────────────────────────
 
+type RecruitSort = 'rating' | 'fee' | 'age';
+const RECRUIT_SORTS: readonly { key: RecruitSort; label: string }[] = [
+  { key: 'rating', label: 'OVR' }, { key: 'fee', label: 'Fee' }, { key: 'age', label: 'Age' },
+];
+
 let unsub: (() => void) | null = null;
+let recruitSort: RecruitSort = 'rating';
 
 /** Teardown run by the shared screen slot whenever this screen closes. */
 function onRecruitClosed(): void {
@@ -304,36 +224,44 @@ function onRecruitClosed(): void {
 
 /**
  * Open the recruit / free-agency screen. Renders the current freeAgents as
- * PlayerCards, each with a Sign button that calls signPlayer. The Sign button is
- * disabled when the squad is at SQUAD_CAP or the fee is unaffordable; on a failed
- * sign the reason is surfaced via a 'ui:notify' danger toast. Re-renders on every
- * 'state:changed' so signings drop out of the list live. Idempotent — reopening
- * replaces the existing instance.
+ * PlayerRows, each with SIGN inline that calls signPlayer. SIGN is disabled
+ * when the squad is at SQUAD_CAP or the fee is unaffordable; on a failed sign
+ * the reason is surfaced via a 'ui:notify' danger toast. Sorted by rating, fee
+ * or age. Re-renders on every 'state:changed' so signings drop out of the list
+ * live. Idempotent — reopening replaces the existing instance.
  */
 export function openRecruitScreen(): void {
   ensureScreenStyles();
 
-  const body = el('div', { class: 'nrl-screen-body' });
+  const body = el('div', { class: 'nrl-screen-body nrl-rows' });
+  const sortBtns = RECRUIT_SORTS.map(({ key, label }) => {
+    const b = button(label, () => { recruitSort = key; render(); });
+    b.setAttribute('data-sort', key);
+    return b;
+  });
 
   const render = (): void => {
     body.replaceChildren();
     const s = getState();
+    for (const [i, b] of sortBtns.entries()) b.classList.toggle('nrl-sort-active', RECRUIT_SORTS[i]!.key === recruitSort);
     if (s.freeAgents.length === 0) {
       body.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. Check back after the next scouting cycle.' }));
       return;
     }
-    for (const agent of s.freeAgents) {
-      const fee = signingFee(s, agent);
+    const agents = s.freeAgents.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
+    agents.sort((a, b) => (recruitSort === 'fee' ? a.fee - b.fee : recruitSort === 'age' ? a.p.age - b.p.age : b.ovr - a.ovr) || b.ovr - a.ovr);
+    for (const { p: agent, fee } of agents) {
       const full = s.squad.length >= SQUAD_CAP;
       const broke = s.money < fee;
-      const disabled = full || broke;
-      const label = full ? 'SQUAD FULL' : broke ? 'CANT AFFORD' : `SIGN ${money(fee)}`;
-      const card = PlayerCard(agent, {
+      body.appendChild(PlayerRow(agent, {
         // Free agents wear a neutral training top (TRAINING_KIT, the default).
         onOpen: () => openPlayerPage(agent, { kind: 'freeAgent' }),
+        extra: [`${money(agent.wage)}/wk`],
         action: {
-          label,
-          disabled,
+          // The signing fee: a transfer-style fee by rating and age (#146).
+          label: full ? 'SQUAD FULL' : `SIGN ${money(fee)}`,
+          disabled: full || broke,
+          title: full ? `Squad full (${SQUAD_CAP})` : broke ? `Not enough money for the ${money(fee)} fee` : `Signing fee ${money(fee)} (${signingFeeBasis(s, agent)})`,
           onClick: () => {
             const res = signPlayer(getState(), agent.id);
             if (!res.ok) {
@@ -341,28 +269,16 @@ export function openRecruitScreen(): void {
             }
           },
         },
-      });
-      // Signing fee note under the wage line: a transfer-style fee by rating and age (#146).
-      const feeNote = el('div', { class: 'nrl-card-cost', text: `Signing fee ${money(fee)} (${signingFeeBasis(s, agent)})` });
-      card.insertBefore(feeNote, card.querySelector('.nrl-card-actions'));
-      body.appendChild(card);
+      }));
     }
   };
 
-  const head = el(
-    'div',
-    { class: 'nrl-screen-head' },
-    el('span', { class: 'nrl-screen-title', text: 'Free Agency' }),
-    button('CLOSE', closeScreen),
-  );
-  const sub = el('div', {
-    class: 'nrl-screen-sub',
-    text: `Pool of ${FREE_AGENT_POOL_SIZE} refreshes every scouting cycle — unsigned agents are replaced.`,
-  });
+  const sub = el('div', { class: 'nrl-screen-sub', text: `Pool of ${FREE_AGENT_POOL_SIZE}, refreshed each scouting cycle` });
+  const head = screenHead('Free Agency', { sub, controls: [el('span', { class: 'nrl-screen-label', text: 'Sort:' }), ...sortBtns] });
 
-  const screen = el('div', { class: 'nrl-screen' }, head, sub, body);
+  const screen = el('div', { class: 'nrl-screen' }, head, body);
   // openScreen closes any other open screen (running its teardown) first.
-  openScreen(screen, onRecruitClosed);
+  openScreen(screen, onRecruitClosed, 'recruit');
   render();
   unsub = bus.on('state:changed', render);
 }

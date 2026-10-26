@@ -103,7 +103,13 @@ export function mount(node: HTMLElement): HTMLElement {
 // True dialogs (confirmations, the facility popup, settings) still use
 // openModal() without `screen`, which covers everything at z-index 100.
 //
-// z-order: HUD/nav 10 · ♪ 20 · screens 50 · toasts 60 · modals 100 · tutorial 200.
+// z-order: ♪ 20 · screens 50 · HUD/nav 55 · toasts 60 · modals 100 · tutorial 200.
+// The HUD and nav never overlap a screen; they sit above one so the ▾ menu and
+// the nav's More sheet drop over it.
+//
+// Safe areas (#347): env(safe-area-inset-*) is read once into --nrl-safe-t/r/b/l
+// and everything else uses those, so a check can simulate a notch where the
+// browser reports none (scripts/e2e-webkit.mjs, WebKit on Linux).
 
 /** CSS custom property holding the HUD strip's current height. */
 export const HUD_INSET_VAR = '--nrl-hud-h';
@@ -140,22 +146,36 @@ export class ScreenSlot<T = unknown> {
 }
 
 const screenSlot = new ScreenSlot<HTMLElement>();
+const screenListeners = new Set<(key: string | null) => void>();
+
+/** Attribute naming which nav destination an open screen belongs to (the nav marks that tab). */
+export const SCREEN_KEY_ATTR = 'data-screen-key';
+
+function emitScreenChange(): void {
+  const key = screenKey();
+  for (const fn of screenListeners) fn(key);
+}
 
 /**
  * Show `node` as THE open screen in the screen region (between HUD and nav).
  * Any previously open screen and any open dialog are closed first. `onClose`
  * runs when the screen is closed by any route (its own Close button calling
- * closeScreen(), another screen opening, or a match starting). Returns `node`.
+ * closeScreen(), another screen opening, or a match starting). `key` is the nav
+ * destination it belongs to ('squad', 'finance', …), so the nav can mark it open
+ * (#344). Returns `node`.
  */
-export function openScreen(node: HTMLElement, onClose?: () => void): HTMLElement {
+export function openScreen(node: HTMLElement, onClose?: () => void, key?: string): HTMLElement {
   ensureStyles();
   closeModal();
   node.classList.add('nrl-screen-region');
+  if (key) node.setAttribute(SCREEN_KEY_ATTR, key);
   screenSlot.open(node, () => {
     node.remove();
     onClose?.();
+    if (screenSlot.active === null) emitScreenChange();
   });
   getRoot().appendChild(node);
+  emitScreenChange();
   return node;
 }
 
@@ -167,6 +187,39 @@ export function closeScreen(): void {
 /** The currently open screen element, if any. */
 export function activeScreen(): HTMLElement | null {
   return screenSlot.active;
+}
+
+/** The nav destination of the open screen, or null (no screen, or one with no key). */
+export function screenKey(): string | null {
+  return screenSlot.active?.getAttribute(SCREEN_KEY_ATTR) ?? null;
+}
+
+/** Re-tag the open screen (a tabbed screen switching tabs). */
+export function setScreenKey(key: string): void {
+  const node = screenSlot.active;
+  if (!node || node.getAttribute(SCREEN_KEY_ATTR) === key) return;
+  node.setAttribute(SCREEN_KEY_ATTR, key);
+  emitScreenChange();
+}
+
+/** Call `fn` with the open screen's key whenever a screen opens or closes. Returns unsubscribe. */
+export function onScreenChange(fn: (key: string | null) => void): () => void {
+  screenListeners.add(fn);
+  return () => screenListeners.delete(fn);
+}
+
+/**
+ * The one header row of a screen (#336): title (with an optional one-line
+ * summary under it), the screen's controls, and a 44px ✕ at the right that
+ * closes it. The controls scroll sideways on a narrow phone; the title and the ✕
+ * never move.
+ */
+export function screenHead(title: string, opts: { sub?: HTMLElement; controls?: Node[]; onClose?: () => void } = {}): HTMLElement {
+  const titles = el('div', { class: 'nrl-screen-titles' }, el('span', { class: 'nrl-screen-title', text: title }));
+  if (opts.sub) titles.append(opts.sub);
+  const x = button('✕', opts.onClose ?? (() => closeScreen()), { class: 'nrl-screen-x' });
+  x.setAttribute('aria-label', 'Close');
+  return el('div', { class: 'nrl-screen-head' }, titles, el('div', { class: 'nrl-screen-tools' }, ...(opts.controls ?? [])), x);
 }
 
 /**
@@ -207,35 +260,43 @@ let openModalEl: HTMLElement | null = null;
  * With `region: true` a dialog stays a dialog (it sits over the open screen and
  * closeModal() closes it) but is laid out in the screen region like a screen
  * (#203): the HUD and nav stay whole and tappable, and a nav tap closes it.
+ *
+ * Screens and region dialogs are framed (#336): the box holds still and only
+ * its content scrolls, so the ✕ in the corner never scrolls away. A dialog gets
+ * the ✕ too with `closeButton: true`. `key` is a screen's nav destination (see
+ * openScreen).
  */
 export function openModal(
   content: HTMLElement,
-  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean } = {},
+  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean; key?: string } = {},
 ): HTMLElement {
   ensureStyles();
+  const framed = opts.screen === true || opts.region === true;
   const box = el(
     'div',
-    { class: opts.class ? `nrl-modal ${opts.class}` : 'nrl-modal' },
-    content,
+    { class: `nrl-modal${framed ? ' nrl-modal-framed' : ''}${opts.class ? ` ${opts.class}` : ''}` },
+    framed ? el('div', { class: 'nrl-modal-scroll' }, content) : content,
   );
   // Clicks inside the modal box must not bubble to the backdrop's close handler.
   box.addEventListener('click', (e) => e.stopPropagation());
 
+  // A ✕ in the corner (#195): on a phone a screen's own Close is often below
+  // the fold. Screens with a Close in their header pass closeButton: false.
+  const wantsX = opts.screen ? opts.closeButton !== false : opts.closeButton === true;
+  if (wantsX) {
+    const x = button('✕', () => (opts.screen ? closeScreen() : closeModal()), { class: 'nrl-screen-x' });
+    x.setAttribute('aria-label', 'Close');
+    box.classList.add('nrl-modal-has-x');
+    box.prepend(x);
+  }
+
   if (opts.screen) {
-    // A ✕ in the corner (#195): on a phone a screen's own Close is often below
-    // the fold. Screens with a Close in their header pass closeButton: false.
-    if (opts.closeButton !== false) {
-      const x = button('✕', () => closeScreen(), { class: 'nrl-screen-x' });
-      x.setAttribute('aria-label', 'Close');
-      box.classList.add('nrl-modal-has-x');
-      box.prepend(x);
-    }
     const backdrop = el(
       'div',
       { class: 'nrl-modal-backdrop nrl-screen-backdrop', onClick: () => closeScreen() },
       box,
     );
-    return openScreen(backdrop);
+    return openScreen(backdrop, undefined, opts.key);
   }
 
   closeModal();
@@ -275,6 +336,12 @@ export function ensureStyles(): void {
 // pointer-events (the #ui-root container is pointer-events:none).
 /** The shared stylesheet (exported for tests). */
 export const CSS = `
+:root {
+  --nrl-safe-t: env(safe-area-inset-top, 0px);
+  --nrl-safe-r: env(safe-area-inset-right, 0px);
+  --nrl-safe-b: env(safe-area-inset-bottom, 0px);
+  --nrl-safe-l: env(safe-area-inset-left, 0px);
+}
 .nrl-panel, .nrl-btn, .nrl-modal, .nrl-modal-backdrop, .nrl-hud, .nrl-nav {
   font-family: 'Courier New', monospace;
   image-rendering: pixelated;
@@ -327,8 +394,8 @@ export const CSS = `
   align-items: flex-start;
   gap: 0.5rem;
   /* #18: keep clear of notches / rounded corners. */
-  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
-  z-index: 10;
+  padding: calc(0.5rem + var(--nrl-safe-t)) calc(0.5rem + var(--nrl-safe-r)) 0.5rem calc(0.5rem + var(--nrl-safe-l));
+  z-index: 55;
 }
 .nrl-hud-readouts {
   pointer-events: auto;
@@ -393,6 +460,20 @@ export const CSS = `
 /* Hide the "/total" week suffix on narrow screens. */
 @media (max-width: 480px) {
   .nrl-hud-week-total { display: none; }
+  .nrl-hud .nrl-btn { padding: 0.4rem 0.5rem; }
+}
+/* #336: a phone on its side has height for nothing. One row, 48px: small tiles
+   and the 44px Advance Week, ▾ and ♪ (fx/audio.ts follows this padding). */
+@media (max-height: 500px) {
+  .nrl-hud {
+    align-items: center;
+    gap: 0.35rem;
+    padding-top: calc(2px + var(--nrl-safe-t));
+    padding-bottom: 2px;
+  }
+  .nrl-hud-readouts { flex-wrap: nowrap; gap: 0.3rem; }
+  .nrl-hud-stat { font-size: 0.8rem; padding: 0.2rem 0.4rem; border-width: 2px; box-shadow: 2px 2px 0 #000; }
+  .nrl-hud .nrl-btn { padding-top: 0.25rem; padding-bottom: 0.25rem; }
 }
 
 /* ── Nav ─────────────────────────────────────────────────────────────── */
@@ -403,52 +484,59 @@ export const CSS = `
   left: 0;
   right: 0;
   display: flex;
+  justify-content: center;
   gap: 0.4rem;
-  /* #18: home-bar / side insets; the row scrolls sideways when it overflows. */
-  padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) calc(0.5rem + env(safe-area-inset-bottom, 0px)) calc(0.5rem + env(safe-area-inset-left, 0px));
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
+  /* #18: home-bar / side insets. The home bar's inset is its own margin, so it
+     replaces the bar's bottom padding rather than adding to it. */
+  padding: 0.25rem calc(0.5rem + var(--nrl-safe-r)) max(0.25rem, var(--nrl-safe-b)) calc(0.5rem + var(--nrl-safe-l));
   white-space: nowrap;
-  z-index: 10;
+  z-index: 55;
 }
-/* Narrow phones: tighter buttons so most of the nav fits without scrolling. */
-@media (max-width: 480px) {
-  .nrl-nav { gap: 0.15rem; }
-  /* All seven items fit at 360px; the row still scrolls if a font is wider. */
-  .nrl-nav .nrl-btn {
-    padding: 0.4rem 0.1rem;
-    font-size: 0.58rem;
-    border-width: 2px;
-    box-shadow: 2px 2px 0 #000;
-  }
-  .nrl-hud .nrl-btn { padding: 0.4rem 0.5rem; }
-  /* #45: nine items (News added) don't fit one row at 360px. Wrap to rows of
-     five so every item, badge included, is on screen without sideways scroll. */
+/* #344: five tabs (four screens and More), equal, labels 12px or more at every size. */
+.nrl-nav > .nrl-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 11rem;
+  padding: 0.3rem 0.25rem;
+  font-size: max(12px, min(0.95rem, 2.3vw));
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.nrl-nav .nrl-btn { flex: 0 0 auto; }
-/* #45: nine items (News added) don't fit one row at 360px. Wrap to rows of
-   five so every item, badge included, is on screen without sideways scroll. */
-@media (max-width: 480px) {
-  .nrl-nav { flex-wrap: wrap; justify-content: center; overflow-x: visible; }
-  .nrl-nav .nrl-btn { flex: 0 0 calc(20% - 0.15rem); min-width: 0; }
+/* The open screen's tab (aria-current): pressed in, dark, so it reads at a glance.
+   A touch leaves :hover on the last tab tapped; the marker wins over it. */
+.nrl-nav .nrl-btn[aria-current="page"],
+.nrl-nav .nrl-btn[aria-current="page"]:hover:not(:disabled) {
+  background: #1a1a2e;
+  color: #f4d03f;
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 #000;
 }
-/* Landscape phones (844×390 and up to small laptops): ten items in one row of
-   equal buttons, so Help (?) and News with its badge stay on screen instead of
-   scrolling off the right edge. */
-@media (min-width: 481px) and (max-width: 1000px) {
-  .nrl-nav { gap: 0.25rem; overflow-x: visible; }
-  .nrl-nav .nrl-btn {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 0.4rem 0.05rem;
-    /* #195: eleven labels at 667px ("Contracts") without an ellipsis. */
-    font-size: clamp(0.5rem, 1.3vw, 0.85rem);
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .nrl-nav .nrl-nav-badge { margin-left: 0.15rem; }
+.nrl-nav .nrl-btn[aria-expanded="true"] { background: #fff6c2; }
+/* More's sheet: the rest of the club's screens, over whatever is open. */
+.nrl-nav-sheet {
+  pointer-events: auto;
+  position: fixed;
+  right: calc(0.5rem + var(--nrl-safe-r));
+  bottom: calc(var(--nrl-nav-h, 0px) + 0.25rem);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(8.5rem, 1fr));
+  gap: 0.4rem;
+  max-width: calc(100vw - 1rem - var(--nrl-safe-l) - var(--nrl-safe-r));
+  max-height: calc(100vh - var(--nrl-nav-h, 0px) - var(--nrl-hud-h, 0px) - 0.5rem);
+  max-height: calc(100dvh - var(--nrl-nav-h, 0px) - var(--nrl-hud-h, 0px) - 0.5rem);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem 0.6rem 0.45rem;
+  background: #e8e0c8;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
 }
+.nrl-nav-sheet[hidden] { display: none; }
+.nrl-nav-sheet .nrl-btn { font-size: max(12px, 0.9rem); }
+@media (max-height: 500px) {
+  .nrl-nav-sheet { grid-template-columns: repeat(4, minmax(7.5rem, 1fr)); }
+}
+.nrl-nav .nrl-nav-badge { margin-left: 0.15rem; }
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .nrl-modal-backdrop {
@@ -487,12 +575,29 @@ export const CSS = `
   box-sizing: border-box;
 }
 .nrl-screen-backdrop, .nrl-dialog-region {
-  padding: 0.5rem calc(0.5rem + env(safe-area-inset-right, 0px)) 0.5rem calc(0.5rem + env(safe-area-inset-left, 0px));
+  padding: 0.5rem calc(0.5rem + var(--nrl-safe-r)) 0.5rem calc(0.5rem + var(--nrl-safe-l));
 }
 .nrl-screen-backdrop .nrl-modal, .nrl-dialog-region .nrl-modal {
   /* Fit inside the region (drop-shadow included) rather than the viewport. */
   max-height: calc(100% - 6px);
   position: relative;
+}
+/* #336: a framed box (screens, region dialogs) holds still and only its content
+   scrolls, so the ✕ in its corner is always on screen. A child that sets
+   flex: 1 1 auto and min-height: 0 fills the box and scrolls inside itself
+   (News, League, Guide); anything else scrolls with the box's content. */
+.nrl-modal.nrl-modal-framed { display: flex; flex-direction: column; overflow: hidden; }
+.nrl-modal-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-height: 500px) {
+  .nrl-screen-backdrop, .nrl-dialog-region { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+  .nrl-modal.nrl-modal-framed { padding: 0.5rem 0.65rem; }
 }
 .nrl-screen-backdrop .nrl-modal {
   /* #195: a landscape phone has width to spare and no height; use it. */
@@ -533,7 +638,82 @@ export const CSS = `
   font-size: 1.1rem;
   line-height: 1;
 }
-.nrl-modal-has-x > :not(.nrl-screen-x) > h2:first-child { padding-right: 2.75rem; }
+.nrl-modal-has-x > :not(.nrl-screen-x) > h2:first-child,
+.nrl-modal-has-x > .nrl-modal-scroll > * > h2:first-child { padding-right: 2.75rem; }
+/* In a screen's header row the ✕ sits in line, at the right end. */
+.nrl-screen-head .nrl-screen-x { position: static; flex: 0 0 auto; }
+
+/* ── Screen frame (#336): Squad, Lineup and Recruit ──────────────────────
+   Position comes from .nrl-screen-region (openScreen); the frame pads clear of
+   the notch (#347), and one header row holds title, controls and ✕. */
+.nrl-screen {
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 10, 20, 0.7);
+  padding: 0.35rem calc(0.5rem + var(--nrl-safe-r)) 0.35rem calc(0.5rem + var(--nrl-safe-l));
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+  box-sizing: border-box;
+}
+.nrl-screen-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.nrl-screen-titles { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.nrl-screen-title {
+  font-weight: bold;
+  font-size: clamp(0.9rem, 4vw, 1.3rem);
+  line-height: 1.1;
+  color: #f4d03f;
+  text-shadow: 2px 2px 0 #000;
+  white-space: nowrap;
+}
+.nrl-screen-titles .nrl-screen-sub { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The controls: one row that scrolls sideways when the phone is narrow (padding
+   keeps the buttons' drop shadows inside the scroller). */
+.nrl-screen-tools {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0 3px 3px 0;
+  scrollbar-width: thin;
+}
+.nrl-screen-tools > * { flex: 0 0 auto; }
+.nrl-screen-tools .nrl-btn { padding: 0.3rem 0.5rem; }
+.nrl-screen-label { color: #e8e0c8; font-size: 0.75rem; }
+.nrl-screen-sub {
+  font-size: clamp(0.65rem, 2.5vw, 0.85rem);
+  color: #e8e0c8;
+  margin-bottom: 0.4rem;
+  flex: 0 0 auto;
+}
+.nrl-screen-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.5rem;
+  align-content: start;
+  padding-bottom: 0.5rem;
+}
+.nrl-screen-empty {
+  color: #e8e0c8;
+  padding: 1rem;
+  text-align: center;
+}
+/* One selected-chip colour (sort, focus, filters). A touch leaves :hover on the
+   last chip tapped; the selection wins over it. */
+.nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled) { background: #7ec850; }
 
 /* ── Toasts (ui:notify) — below the HUD, above screens, under dialogs ─── */
 .nrl-toast-stack {
@@ -687,11 +867,20 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-finance-pnl-table { width: 100%; }
 .nrl-finance-pnl-net td { font-weight: bold; border-top: 2px solid #000; }
 .nrl-finance-pnl-sub td { font-size: 0.72rem; color: #555; padding-top: 0; }
-/* N14.5: the Staff panel under the board's objectives. */
-.nrl-staff-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; border-top: 1px solid #d8cfb4; }
+/* N14.5, #344: the Staff screen, one parchment row per role. */
+.nrl-screen-body.nrl-staff { grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); align-content: start; font-size: 0.85rem; }
+.nrl-staff-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: #e8e0c8;
+  border: 3px solid #000;
+  box-shadow: 3px 3px 0 #000;
+}
 .nrl-staff-info { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 .nrl-staff-blurb { font-size: 0.72rem; color: #555; }
-.nrl-staff-row .nrl-btn { flex: 0 0 auto; margin-right: 6px; } /* clear of the panel's edge and its shadow */
+.nrl-staff-row .nrl-btn { flex: 0 0 auto; margin-right: 3px; } /* clear of the row's edge and its shadow */
 
 /* ── News inbox (#45) ─────────────────────────────────────────────────── */
 .nrl-nav-badge {
