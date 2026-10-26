@@ -993,12 +993,12 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   padding: 0 3px 3px 0;
 }
 .nrl-news-filter { flex: 0 0 auto; }
-.nrl-news-filter.nrl-news-active { background: #3a6ea5; color: #fff; }
+.nrl-news-filter.nrl-news-active, .nrl-news-filter.nrl-news-active:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
 .nrl-news-list { overflow-y: visible; }
 .nrl-news-item {
   padding: 0.2rem 0.4rem;
   margin-bottom: 0.25rem;
-  border-left: 4px solid #3a6ea5;
+  border-left: 4px solid #5a6b85; /* the info toast's edge (#339) */
   overflow-wrap: anywhere;
 }
 .nrl-news-item.nrl-news-success { border-left-color: #2e7d32; }
@@ -1019,6 +1019,16 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-news-decisions[hidden] { display: none; }
 .nrl-news-decisions-text { flex: 1 1 auto; min-width: 0; font-weight: bold; font-size: 0.85rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nrl-news-answer { flex: 0 0 auto; }
+/* 956×330: a waiting decision shares the title's row, so the feed keeps four items. */
+@media (max-height: 340px) {
+  .nrl-screen-backdrop .nrl-news-modal { width: min(96vw, 820px); }
+  .nrl-news { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); column-gap: 0.5rem; }
+  .nrl-news-head { padding-right: 0; }
+  .nrl-news-decisions { margin: 0 2.75rem 0.3rem 0; }
+  .nrl-news-decisions[hidden] + .nrl-news-body { grid-row: 2; }
+  .nrl-news-body { grid-column: 1 / -1; }
+  .nrl-news-head:has(+ .nrl-news-decisions[hidden]) { grid-column: 1 / -1; padding-right: 2.75rem; }
+}
 .nrl-event-card {
   background: #fff8e1;
   border: 3px solid #000;
@@ -1118,7 +1128,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-kit-controls { flex: 1 1 16rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
 .nrl-kit-label { font-size: 0.72rem; font-weight: bold; margin-top: 0.2rem; }
 .nrl-kit-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.nrl-kit-pattern[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
+.nrl-kit-pattern[aria-pressed="true"], .nrl-kit-pattern[aria-pressed="true"]:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
 .nrl-kit-swatch {
   pointer-events: auto;
   width: 44px; height: 44px; /* #194: a tap target */
@@ -1142,6 +1152,15 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-league-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-ladder-table thead th { position: sticky; top: 0; z-index: 1; background: #e8e0c8; }
 @media (max-height: 500px) { .nrl-ladder-table th, .nrl-rival-table th { padding-top: 0.05rem; padding-bottom: 0.05rem; } }
+/* Too short for a header row above four 44px rows (956×330): the tabs and the note
+   become a rail down the left, and the ✕ keeps the top-right corner over a gutter. */
+@media (max-height: 340px) {
+  .nrl-league { flex-direction: row; gap: 0.5rem; }
+  .nrl-league-tabs { flex-direction: column; align-items: stretch; width: 6.5rem; margin: 0; }
+  .nrl-modal-has-x .nrl-league-tabs { padding-right: 0; }
+  .nrl-league-note { white-space: normal; font-size: 0.68rem; line-height: 1.25; }
+  .nrl-modal-has-x .nrl-league-body { padding-right: 2.75rem; }
+}
 .nrl-next-match {
   background: #fff8e1;
   border: 3px solid #000;
@@ -1191,8 +1210,14 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 /* The next-match card's opponent: the same text link, with a 44px hit area (#194). */
 .nrl-next-side .nrl-ladder-club { padding: 0.9rem 0.25rem; margin: -0.9rem -0.25rem; }
-/* The Fixtures tab's two toggles: a box you can see and hit (#194). */
-.nrl-toggle-box { width: 24px; height: 24px; margin: 0 0.3rem 0 0; flex: 0 0 auto; accent-color: #3a6ea5; }
+/* My season or every game (#351 X2): one row a round, your result's pip and score. */
+.nrl-fixtures-views { display: flex; gap: 0.4rem; margin: 0 0 0.3rem; }
+.nrl-fixture-mine { display: grid; grid-template-columns: minmax(0, 1fr) 1.4rem 3.2rem; align-items: center; gap: 0.4rem; padding: 0.2rem 0.4rem; border-bottom: 1px solid rgba(0,0,0,0.15); }
+.nrl-fixture-mine[data-current] { background: #fff6c2; }
+.nrl-fixture-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrl-fixture-score { text-align: right; }
+.nrl-next-form { display: flex; align-items: center; gap: 0.3rem; flex: 0 0 auto; }
+.nrl-next-form small { font-size: 0.68rem; color: #555; }
 .nrl-fixtures-round { margin: 0.6rem 0 0.2rem; font-size: 0.95rem; }
 .nrl-fixtures-round[data-current] { color: #b03a2e; }
 .nrl-fixture[data-player] { font-weight: bold; }
@@ -1213,6 +1238,15 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-modal-has-x .nrl-rival-head { padding-right: 2.75rem; }
 .nrl-rival-head h2 { margin: 0; font-size: 1rem; line-height: 1.2; }
 .nrl-rival-head p { margin: 0; font-size: 0.72rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 956×330: the club's block goes down the left, as the League's tabs do, so four rows show. */
+@media (max-height: 340px) {
+  .nrl-dialog-region .nrl-rival-modal { width: min(96vw, 760px); }
+  .nrl-rival-squad { flex-direction: row; gap: 0.5rem; }
+  .nrl-rival-head { flex: 0 0 10.5rem; justify-content: flex-start; margin: 0; }
+  .nrl-modal-has-x .nrl-rival-head { padding-right: 0; }
+  .nrl-rival-head p { white-space: normal; font-size: 0.68rem; }
+  .nrl-modal-has-x .nrl-rival-scroll { padding-right: 2.75rem; }
+}
 .nrl-rival-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .nrl-rival-table { border-collapse: collapse; font-size: 0.75rem; width: 100%; }
 .nrl-rival-table th, .nrl-rival-table td { padding: 0.15rem 0.3rem; text-align: left; white-space: nowrap; }
@@ -1292,7 +1326,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-guide-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-guide-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
 .nrl-guide-tabs .nrl-btn { flex: 1 1 auto; font-size: clamp(0.6rem, 1.7vw, 0.85rem); padding: 0.4rem 0.45rem; }
-.nrl-guide-tabs .nrl-btn[aria-pressed="true"] { background: #3a6ea5; color: #fff; }
+.nrl-guide-tabs .nrl-btn[aria-pressed="true"], .nrl-guide-tabs .nrl-btn[aria-pressed="true"]:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
 .nrl-guide h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
 .nrl-guide h3 { margin: 0.5rem 0 0.15rem; font-size: 0.88rem; border-bottom: 2px solid #b8ae92; }
 /* N14 (#263): the screen a page describes, one tap away. */
