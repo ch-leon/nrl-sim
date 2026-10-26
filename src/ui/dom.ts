@@ -423,6 +423,12 @@ export const CSS = `
 .nrl-hud-stat.nrl-flash-up { background: #7ec850; color: #0a2a00; }
 .nrl-hud-stat.nrl-flash-down { background: #e06666; color: #2a0000; }
 .nrl-hud-stat.nrl-money-negative { color: #b00020; }
+/* #351 H2: under 20 weeks of runway the tile goes amber, under 8 red. */
+.nrl-hud-stat.nrl-money-low { color: #8a4b00; border-color: #d08a00; }
+.nrl-hud-stat.nrl-money-short { color: #b00020; border-color: #b00020; }
+button.nrl-hud-stat { font-family: inherit; line-height: inherit; cursor: pointer; }
+button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 1px; }
+@media (pointer: coarse) { .nrl-hud-readouts .nrl-hud-stat { box-sizing: border-box; min-height: 44px; display: inline-flex; align-items: center; } }
 /* N12.5: "in debt" beside a negative balance, a red tag that reads through the flash. */
 .nrl-hud-debt { padding: 0 0.3em; font-size: 0.75em; background: #b00020; color: #fff; vertical-align: 0.1em; }
 /* #239: below 760px the tag wraps the HUD onto a second row (93px against 60px at

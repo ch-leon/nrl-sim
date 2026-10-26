@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fmtMoney, moneyTile, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel, placeName } from '../../src/ui/hud';
+import { fmtMoney, moneyTile, moneyTileLabel, runwayLevel, RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel, placeName } from '../../src/ui/hud';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
@@ -27,6 +27,24 @@ describe('fmtMoney', () => {
   it('rounds fractional balances', () => {
     expect(fmtMoney(1_234.6)).toBe('$1,235');
     expect(fmtMoney(-1_234.6)).toBe('-$1,235');
+  });
+});
+
+describe('money tile runway (#351 H2)', () => {
+  it('amber under 20 weeks, red under 8, plain when the club is not losing money', () => {
+    expect([RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS]).toEqual([20, 8]);
+    expect(runwayLevel(null)).toBe('ok');
+    expect(runwayLevel(20)).toBe('ok');
+    expect(runwayLevel(19.9)).toBe('low');
+    expect(runwayLevel(8)).toBe('low');
+    expect(runwayLevel(7.9)).toBe('short');
+    expect(runwayLevel(0)).toBe('short');
+  });
+
+  it('the label says how long the money lasts only when it is short, and that a tap opens Finance', () => {
+    expect(moneyTileLabel(200_000, null, true)).toBe('Money $200,000. Tap for Finance');
+    expect(moneyTileLabel(68_000, 12.6, true)).toBe("Money $68,000. Enough for about 12 weeks at this week's spending. Tap for Finance");
+    expect(moneyTileLabel(-4_200, 0, false)).toBe('Money -$4,200, in debt');
   });
 });
 

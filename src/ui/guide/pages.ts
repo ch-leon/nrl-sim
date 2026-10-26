@@ -16,6 +16,7 @@ import { STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
 import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
 import { REP_BASELINE } from '../../systems/league';
+import { RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS } from '../hud';
 
 const dollars = (n: number): string => `$${n.toLocaleString('en-US')}`;
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
@@ -122,7 +123,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         heading: 'The Finance screen',
-        text: `This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, the board’s objectives and patience, and the ledger. Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below −${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player each week (never below 13), and the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time.`,
+        text: `This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, the board’s objectives and patience, and the ledger. Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below −${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player each week (never below 13), and the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time. The balance in the top bar turns amber when the money would last fewer than ${RUNWAY_LOW_WEEKS} weeks at this week’s spending and red under ${RUNWAY_SHORT_WEEKS}; tap it to open this screen.`,
       },
     ],
   },

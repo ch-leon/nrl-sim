@@ -35,7 +35,7 @@ import { openLineupScreen } from './ui/screens/lineup';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
-import { initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
+import { financeSummary, initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
 import { openContractsScreen } from './ui/screens/contracts';
 import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
 import { advanceUntilAsked, askBeforeAdvance, pendingDecisionCount } from './ui/decisions';
@@ -166,6 +166,8 @@ async function boot(): Promise<void> {
     onAdvanceWeek: () => askBeforeAdvance(1, () => advanceWeek()),
     onAdvanceUntil: (t) => advanceUntilAsked(t, advanceUntil),
     onNextMatch: () => nav.open('fixtures'),
+    onMoney: () => nav.open('finance'),
+    runwayWeeks: (s) => financeSummary(s).runwayWeeks,
   });
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
