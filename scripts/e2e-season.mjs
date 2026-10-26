@@ -486,7 +486,8 @@ async function play() {
     const open = page.locator('[data-player-open]').first();
     if (!(await open.count())) return 'no player page on this build';
     const id = await open.getAttribute('data-player-open');
-    await press(open);
+    // His name: the row's middle can be a trait chip, which says what the trait does instead (#349 S3).
+    await press(open.locator('.nrl-row-name'));
     await page.waitForSelector(`[data-player-page="${id}"]`);
     const actions = await page.locator(`[data-player-page="${id}"] [data-player-action]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-player-action')));
     rec.notes.push(`player ${id}; actions ${actions.join(', ') || 'none'}`);

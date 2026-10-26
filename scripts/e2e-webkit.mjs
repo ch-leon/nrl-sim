@@ -243,7 +243,7 @@ async function runSize(browser, W, H) {
     '[data-player-action="sell"]', '[data-player-action="release"]']];
   await step('player-page', async () => {
     await tap('.nrl-nav .nrl-btn[data-screen="squad"]');
-    await tap('.nrl-card-open');
+    await tap('.nrl-card-open .nrl-row-name');
     await page.waitForSelector('[data-player-page]');
     await page.waitForTimeout(300);
     const out = await reachProblems(page, ...PLAYER);
@@ -1007,7 +1007,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   // Popups: the player page, the kit designer, a rival's squad, a decision card.
   await step('popup-player', async (rec) => {
     await openNav(page, 'squad');
-    await tap('.nrl-screen-region [data-player-open]');
+    await tap('.nrl-screen-region [data-player-open] .nrl-row-name');
     await page.waitForSelector('[data-player-page]');
     return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats',
       primary: ['[data-player-action="renew"]', '[data-player-action="sell"]', '[data-player-action="release"]'] }, null);
