@@ -1,8 +1,8 @@
-// src/ui/guide/guide.ts — the Guide screen under "?" (N7, GitHub #188).
+// src/ui/guide/guide.ts — the Guide screen, under More (N7, GitHub #188, #344).
 //
 // A nav screen (it sits between the HUD and the nav like Fixtures) with a row
 // of page tabs, the page, and a footer with the build label, an update button
-// when a new build is waiting, Replay tutorial and Close. Pages are data
+// when a new build is waiting and Replay tutorial; the ✕ closes it. Pages are data
 // (pages.ts for the club, nines.ts for the match) so they can be edited without
 // touching this file. No Phaser.
 
@@ -105,10 +105,9 @@ export function openGuideScreen(pageId?: string): HTMLElement {
       closeScreen();
       startTutorial(true);
     }, { class: 'nrl-guide-replay' }),
-    button('Close', () => closeScreen(), { class: 'nrl-guide-close' }),
   );
 
   content.append(tabs, body, foot);
   show(pageId ?? lastPageId ?? GUIDE_PAGES[0]!.id);
-  return openModal(content, { class: 'nrl-guide-modal', screen: true, closeButton: false });
+  return openModal(content, { class: 'nrl-guide-modal', screen: true, key: 'help' });
 }

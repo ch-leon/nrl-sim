@@ -10,7 +10,7 @@
 // No nav registration here — the orchestrator wires openFixturesScreen /
 // openLadderScreen into the nav bar (main.ts).
 
-import { el, panel, button, openModal, closeScreen } from '../dom';
+import { el, panel, button, openModal, setScreenKey } from '../dom';
 import { getState, setState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
 import { formGuide, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
@@ -137,7 +137,9 @@ function openLeagueScreen(initialTab: Tab): HTMLElement {
   const state = getState();
   const content = el('div', { class: 'nrl-league' });
 
+  // One row (#336): the two tabs, a line about the open one, and the ✕ in the corner.
   const tabBar = el('div', { class: 'nrl-league-tabs' });
+  const note = el('span', { class: 'nrl-league-note' });
   const body = el('div', { class: 'nrl-league-body' });
 
   const render = (tab: Tab): void => {
@@ -145,19 +147,32 @@ function openLeagueScreen(initialTab: Tab): HTMLElement {
     for (const b of tabBar.querySelectorAll('.nrl-btn')) {
       b.toggleAttribute('data-active', b.getAttribute('data-tab') === tab);
     }
+    note.textContent = tab === 'fixtures' ? fixturesNote(state) : ladderNote(state);
+    setScreenKey(tab);
   };
 
   const fixturesBtn = button('Fixtures', () => render('fixtures'));
   fixturesBtn.setAttribute('data-tab', 'fixtures');
   const ladderBtn = button('Ladder', () => render('ladder'));
   ladderBtn.setAttribute('data-tab', 'ladder');
-  const closeBtn = button('Close', () => closeScreen(), { class: 'nrl-league-close' });
 
-  tabBar.append(fixturesBtn, ladderBtn, closeBtn);
+  tabBar.append(fixturesBtn, ladderBtn, note);
   content.append(tabBar, body);
+  const opened = openModal(content, { class: 'nrl-league-modal', screen: true, key: initialTab });
   render(initialTab);
+  return opened;
+}
 
-  return openModal(content, { class: 'nrl-league-modal', screen: true, closeButton: false });
+/** "Round 6 of 16" over the Fixtures tab, or where the season is once the rounds are done. */
+function fixturesNote(state: GameState): string {
+  if (state.league.fixtures.length === 0) return '';
+  return state.week <= SEASON_ROUNDS ? `Round ${state.week} of ${SEASON_ROUNDS}` : 'Finals';
+}
+
+/** "You are 3rd of 10 · tap a club for its squad" over the Ladder tab. */
+function ladderNote(state: GameState): string {
+  const pos = ladderPosition(state, PLAYER_ID);
+  return pos > 0 ? `You: ${pos} of ${state.league.ladder.length} · tap a club for its squad` : '';
 }
 
 /**
@@ -370,11 +385,6 @@ function buildLadderTab(state: GameState): HTMLElement {
     tbody.append(tr);
   }
   table.append(thead, tbody);
-
-  const playerPos = ladderPosition(state, PLAYER_ID);
-  if (playerPos > 0) {
-    wrap.append(el('p', { class: 'nrl-ladder-pos', text: `Your position: ${playerPos} of ${rows.length} · tap a club to see its squad` }));
-  }
   wrap.append(el('div', { class: 'nrl-ladder-scroll' }, table));
   return wrap;
 }

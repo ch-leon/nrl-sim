@@ -764,11 +764,12 @@ function ensureAudioStyles(): void {
 .nrl-audio-launcher {
   pointer-events: none;
   position: fixed;
-  top: calc(0.5rem + env(safe-area-inset-top, 0px));
-  right: calc(0.5rem + env(safe-area-inset-right, 0px));
+  top: calc(0.5rem + var(--nrl-safe-t, 0px));
+  right: calc(0.5rem + var(--nrl-safe-r, 0px));
   z-index: 20;
 }
-.nrl-hud { padding-right: calc(3.75rem + env(safe-area-inset-right, 0px)); }
+.nrl-hud { padding-right: calc(3.75rem + var(--nrl-safe-r, 0px)); }
+@media (max-height: 500px) { .nrl-audio-launcher { top: calc(2px + var(--nrl-safe-t, 0px)); } }
 .nrl-audio-gear { pointer-events: auto; font-size: 1.1rem; }
 .nrl-audio-settings { min-width: 220px; }
 .nrl-audio-title { margin: 0 0 0.5rem; }

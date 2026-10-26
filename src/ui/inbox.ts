@@ -15,7 +15,7 @@ import { cardById } from '../data/events';
 import { absWeek, chooseEvent, describeEffects, fillText } from '../systems/events';
 import { hasStaff } from '../systems/staff';
 import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
-import { el, button, openModal, closeScreen } from './dom';
+import { el, button, openModal } from './dom';
 
 /** How many messages the ring buffer holds before the oldest is overwritten. */
 export const INBOX_CAPACITY = 100;
@@ -316,11 +316,7 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
   }
 
   body.append(decisions, filters, list);
-  content.append(
-    el('h2', { text: 'News' }),
-    body,
-    button('Close', () => closeScreen(), { class: 'nrl-news-close' }),
-  );
+  content.append(el('h2', { text: 'News' }), body);
   setFilter('all');
   renderDecisions();
 
@@ -334,5 +330,5 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
     renderList();
   });
 
-  return openModal(content, { class: 'nrl-news-modal', screen: true });
+  return openModal(content, { class: 'nrl-news-modal', screen: true, key: 'news' });
 }

@@ -12,7 +12,7 @@ import { SEASON_ROUNDS } from '../../config';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { roundLabel } from '../../systems/matchday';
 import { playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
-import { el, button, openModal, closeModal } from '../dom';
+import { el, openModal, closeModal } from '../dom';
 import { MATCH_ACTIVE_CLASS } from './matchOverlay';
 import { fmtPotmLine } from './potm';
 import { addPotm } from './seasonReview';
@@ -156,24 +156,27 @@ export function openMatchReport(r: MatchReport): HTMLElement {
   const table = el('table', { class: 'nrl-report-stats' });
   table.append(el('tr', {}, el('th', { text: '' }), el('th', { text: r.home.short }), el('th', { text: r.away.short })));
   for (const row of r.rows) table.append(el('tr', {}, el('td', { text: row.label }), el('td', { text: row.home }), el('td', { text: row.away })));
+  // The result and the Player of the Match head the card (#351): on a phone held
+  // sideways they are what shows before any scrolling, beside the ✕.
   const content = el(
     'div',
     { class: 'nrl-report' },
-    el('h2', { text: r.title }),
-    el('p', { class: 'nrl-report-score', text: `${r.home.name} ${r.home.score} – ${r.away.score} ${r.away.name}` }),
-    ...(r.note ? [el('p', { class: 'nrl-report-note', text: r.note })] : []),
+    el('div', { class: 'nrl-report-head' },
+      el('h2', { text: r.title }),
+      el('p', { class: 'nrl-report-score', text: `${r.home.name} ${r.home.score} – ${r.away.score} ${r.away.name}` }),
+      ...(r.note ? [el('p', { class: 'nrl-report-note', text: r.note })] : []),
+      ...(r.potm ? [el('p', { class: 'nrl-report-potm', text: `Player of the Match: ${r.potm.who} — ${r.potm.line}` })] : []),
+    ),
     ...(r.summary.length ? [el('p', { class: 'nrl-report-summary', text: r.summary.join(' '), attrs: { style: 'font-style: italic' } })] : []),
     ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })),
     el('div', { class: 'nrl-report-body' }, el('div', { class: 'nrl-report-scoring' }, sideBlock(r.home), sideBlock(r.away)), table),
-    ...(r.potm ? [el('p', { class: 'nrl-report-potm', text: `Player of the Match: ${r.potm.who} — ${r.potm.line}` })] : []),
-    button('Close', () => closeModal()),
   );
-  const backdrop = openModal(content, { class: 'nrl-potm-modal nrl-report-modal', region: true });
+  const backdrop = openModal(content, { class: 'nrl-potm-modal nrl-report-modal', region: true, closeButton: true });
   // #203: the card must not swallow the first tap on Back to Club; it closes with the match view.
   backdrop.classList.add('nrl-potm-backdrop', 'nrl-report-backdrop');
   // The summary drops its last line while the card would scroll with it (a phone held sideways): first lines first.
   const summary = content.querySelector('.nrl-report-summary');
-  const card = backdrop.querySelector('.nrl-modal');
+  const card = backdrop.querySelector('.nrl-modal-scroll');
   if (summary && card) {
     for (let n = r.summary.length; n > 0 && card.scrollHeight > card.clientHeight + 1; n--) {
       if (n === 1) summary.remove();

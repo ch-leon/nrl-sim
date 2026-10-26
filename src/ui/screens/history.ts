@@ -173,8 +173,7 @@ export function openHistoryScreen(): HTMLElement {
     ),
   );
 
-  content.append(button('Close', () => closeScreen()));
-  return openModal(content, { class: 'nrl-history-modal', screen: true });
+  return openModal(content, { class: 'nrl-history-modal', screen: true, key: 'history' });
 }
 
 /** The line at the top of a season's books: "Season 2 — finished 4th · W12 L10 D2 · PF 480 PA 400". */
@@ -211,7 +210,7 @@ export function openSeasonBooks(entry: SeasonHistoryEntry, opts: { back?: () => 
     content.append(el('p', { class: 'nrl-books-summary', text: fmtNetClosing(books) }));
   }
   content.append(button('Close', () => { closeScreen(); opts.back?.(); }, { class: 'nrl-books-close' }));
-  return openModal(content, { class: 'nrl-books-modal', screen: true });
+  return openModal(content, { class: 'nrl-books-modal', screen: true, key: 'history' });
 }
 
 /**

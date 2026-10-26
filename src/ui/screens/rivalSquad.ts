@@ -4,7 +4,7 @@
 import type { RivalClub } from '../../core/state';
 import { overallRating } from '../../data/player';
 import { ROMAN, TRAITS } from '../../data/traits';
-import { button, closeModal, el, openModal, panel } from '../dom';
+import { el, openModal } from '../dom';
 import { rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { getState } from '../../core/state';
@@ -70,15 +70,20 @@ export function openRivalSquad(club: RivalClub): HTMLElement {
   }
   table.append(body);
   const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
-  const content = panel(
+  const line = (text: string, attrs: Record<string, string>): HTMLElement => el('p', { text, attrs: { ...attrs, title: text } });
+  // Between HUD and nav like a screen (#343): the club and how it plays in one
+  // block beside the ✕, and only the squad scrolls.
+  const content = el(
+    'div',
     { class: 'nrl-rival-squad' },
-    el('h2', { text: club.name }),
-    el('p', { text: `Strength ${club.strength} · plays ${tacticsLabel(style)} · ${rows.length} players · tap a player for his page`, attrs: { 'data-style': `${style.attack}/${style.defence}` } }),
-    ...(behind ? [el('p', { text: `When behind: ${behind}`, attrs: { 'data-when-behind': '' } })] : []),
+    el('div', { class: 'nrl-rival-head' },
+      el('h2', { text: club.name }),
+      line(`Strength ${club.strength} · plays ${tacticsLabel(style)} · ${rows.length} players · tap a player for his page`, { 'data-style': `${style.attack}/${style.defence}` }),
+      ...(behind ? [line(`When behind: ${behind}`, { 'data-when-behind': '' })] : []),
+    ),
     rows.length > 0
       ? el('div', { class: 'nrl-rival-scroll' }, table)
       : el('p', { text: 'No squad on record.' }),
-    button('Close', () => closeModal()),
   );
-  return openModal(content, { class: 'nrl-rival-modal' });
+  return openModal(content, { class: 'nrl-rival-modal', region: true, closeButton: true });
 }

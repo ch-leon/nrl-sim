@@ -146,12 +146,13 @@ export function openKitDesigner(): HTMLElement {
     render();
   });
 
+  // #336: the preview holds still beside the controls, which scroll; Save stays at the foot.
   const content = el('div', { class: 'nrl-kit' },
-    el('div', { class: 'nrl-kit-head' }, el('h2', { text: 'Kit designer' }), button('Close', () => closeScreen())),
+    el('h2', { text: 'Kit designer' }),
     el('p', { class: 'nrl-kit-note', text: 'Cosmetic only: kits never change how a match plays.' }),
     el('div', { class: 'nrl-kit-body' }, preview, controls),
     el('div', { class: 'nrl-kit-actions' }, reset, save),
   );
   render();
-  return openModal(content, { class: 'nrl-kit-modal', screen: true, closeButton: false });
+  return openModal(content, { class: 'nrl-kit-modal', screen: true, key: 'squad' });
 }

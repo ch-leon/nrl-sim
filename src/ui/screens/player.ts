@@ -328,7 +328,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     const line = (label: string, text: string, cls = ''): HTMLElement =>
       el('div', { class: `nrl-player-line ${cls}`.trim() }, el('b', { text: `${label}: ` }), text);
 
-    const about = el('div', { class: 'nrl-player-col' },
+    const about = el('div', { class: 'nrl-player-col nrl-player-about' },
       el('h3', { text: 'Stats' }),
       statBars(m.stats, m.trainingFocus),
       el('h3', { text: 'Traits' }),
@@ -337,7 +337,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
         : [el('div', { class: 'nrl-player-line', text: 'None — a solid citizen' })]),
     );
     const moraleText = `${m.morale.word} (${m.morale.value})${m.morale.reasons.length ? ' · ' + m.morale.reasons.join(', ') : ''}`;
-    const details = el('div', { class: 'nrl-player-col' },
+    const details = el('div', { class: 'nrl-player-col nrl-player-details' },
       el('h3', { text: 'Condition' }),
       line('Morale', moraleText),
       line('Injury risk', m.injuryRisk),

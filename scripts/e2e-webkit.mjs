@@ -14,6 +14,9 @@
 //     and Replay brings the tutorial back with its buttons on screen;
 //   - the player page (#203) between HUD and nav: ✕, Renew / Sell / Release / Close
 //     tappable, the nav uncovered; the ✕ closes it back to Squad.
+// Then the landscape screens (#336, #344, #347): every nav screen and the main
+// popups at 844×390 with an iPhone 14's safe areas simulated and at 667×375 (see
+// runScreens). --screens-only runs just those.
 // Screenshots and report.json go to e2e-output/webkit/<WxH>/.
 // Then one portrait boot (390×844): the loop must already be asleep, and turning
 // to 844×390 must wake it with the canvas filling the screen. The same turn
@@ -213,9 +216,9 @@ async function runSize(browser, W, H) {
     await tap('.nrl-tutorial-skip');
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
   });
-  const GUIDE = ['.nrl-guide-modal', ['.nrl-guide-replay', '.nrl-guide-close', '.nrl-guide-tab']];
+  const GUIDE = ['.nrl-guide-modal', ['.nrl-guide-replay', '.nrl-guide-modal .nrl-screen-x', '.nrl-guide-tab']];
   await step('guide', async () => {
-    await tap('.nrl-nav .nrl-btn[data-screen="help"]');
+    await openNav(page, 'help');
     await page.waitForSelector('[data-guide]');
     return reachProblems(page, ...GUIDE);
   });
@@ -252,6 +255,7 @@ async function runSize(browser, W, H) {
       if (box.top < hud.bottom - 1) problems.push(`the player page runs under the HUD (${Math.round(box.top)} < ${Math.round(hud.bottom)})`);
       for (const b of document.querySelectorAll('.nrl-nav .nrl-btn')) {
         const r = b.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) continue; // a More-sheet row while the sheet is shut
         const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
         if (!hit || !b.contains(hit)) problems.push(`nav "${b.textContent.trim()}" covered`);
       }
@@ -405,7 +409,7 @@ async function runPortrait(browser) {
         await page.screenshot({ path: join(OUT, `bali-${w}x${h}-choice${choice}.png`) });
         await page.locator(`[data-event-choice="${choice}"]`).tap();
         if (await page.locator('.nrl-event-card').count()) problems.push(`${w}×${h}: choice ${choice} did not resolve`);
-        await page.locator('.nrl-news-close').tap();
+        await page.locator('.nrl-screen-region .nrl-screen-x').tap();
       }
       rec.notes.push(`${w}×${h}: both choices tapped`);
     }
@@ -587,12 +591,428 @@ async function runPortrait(browser) {
   return report.steps.filter((s) => !s.ok).length + report.errors.length;
 }
 
+// ── Landscape screens (#336, #344, #347, #343, #351) ─────────────────────────
+// Every nav screen and the main popups on a phone held sideways. Each must show
+// at least four whole rows of its list or one whole card, keep its ✕ and its
+// primary action on screen and tappable, and stay out of the unsafe bands. The
+// nav has at most five tabs with labels of 12px or more, and marks the open one.
+// WebKit on Linux reports zero safe-area insets, so the iPhone's are simulated
+// through the --nrl-safe-* properties the UI reads env() into (src/ui/dom.ts).
+const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375').split(/\s+/).filter(Boolean).map((s) => {
+  const [size, insets] = s.split('@');
+  const [w, h] = size.split('x').map(Number);
+  const [l, t, r, b] = (insets ?? '0,0,0,0').split(',').map(Number);
+  return { w, h, safe: { l, t, r, b } };
+});
+
+/** Screens reached from the nav: what shows its content, and what must stay on screen. */
+const NAV_SCREENS = [
+  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-screen-body > *' },
+  { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-list > *', card: '.nrl-lineup-field', primary: ['[data-auto-pick]'] },
+  { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-screen-body > *', primary: ['.nrl-screen-body > :first-child button'] },
+  { id: 'fixtures', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-fixture', card: '.nrl-next-match' },
+  { id: 'ladder', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-ladder-table tbody tr' },
+  { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
+  { id: 'build', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-build-list > *', primary: ['.nrl-build-list > :first-child'] },
+  { id: 'finance', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-finance-row', card: '.nrl-finance-panel' },
+  { id: 'staff', box: '.nrl-screen-region', rows: '.nrl-staff-row', primary: ['.nrl-staff-row .nrl-btn'] },
+  { id: 'contracts', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-contracts .nrl-finance-panel, .nrl-contracts p', card: '.nrl-contracts .nrl-finance-panel' },
+  { id: 'history', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-history-row, .nrl-history p', card: '.nrl-history-list' },
+  { id: 'help', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-guide-body :is(p, li, h3)', prose: '.nrl-guide-body', primary: ['.nrl-guide-replay'] },
+];
+
+/** Destinations that are a tab inside another screen: the screen, then the tab. */
+const NAV_VIA = { ladder: ['fixtures', '.nrl-league-tabs [data-tab="ladder"]'] };
+
+/** Tap a nav destination: its tab, or More and then its row in the sheet. */
+async function openNav(page, id) {
+  const direct = page.locator(`.nrl-nav .nrl-btn[data-screen="${id}"]`);
+  if (await direct.count() && await direct.first().isVisible()) return direct.first().tap();
+  if (NAV_VIA[id]) {
+    await openNav(page, NAV_VIA[id][0]);
+    return page.locator(NAV_VIA[id][1]).first().tap();
+  }
+  const more = page.locator('.nrl-nav [data-nav-more]');
+  if (!(await more.count())) throw new Error(`no nav item for "${id}"`);
+  await more.tap();
+  await page.locator(`.nrl-nav-sheet [data-screen="${id}"]`).tap();
+}
+
+/**
+ * What a landscape screen gets wrong: too little of its list or card on screen,
+ * a ✕ / Close / primary action off screen or covered, or a control in the
+ * simulated unsafe bands. Runs in the page.
+ */
+function screenProblems(page, spec, safe) {
+  return page.evaluate(([spec, safe]) => {
+    const W = innerWidth, H = innerHeight;
+    const out = [];
+    const box = document.querySelector(spec.box);
+    if (!box) return [`${spec.box} not shown`];
+    /** The part of the viewport `el` is not clipped out of by its scrolling ancestors. */
+    const clip = (el) => {
+      let t = 0, l = 0, b = H, r = W;
+      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+        const cs = getComputedStyle(a);
+        if (/(auto|scroll|hidden|clip)/.test(`${cs.overflowX} ${cs.overflowY}`)) {
+          const ar = a.getBoundingClientRect();
+          t = Math.max(t, ar.top); l = Math.max(l, ar.left); b = Math.min(b, ar.bottom); r = Math.min(r, ar.right);
+        }
+      }
+      return { t, l, b, r };
+    };
+    const whole = (el) => {
+      const rr = el.getBoundingClientRect();
+      if (rr.width < 1 || rr.height < 1) return false;
+      const c = clip(el);
+      return rr.top >= c.t - 1 && rr.bottom <= c.b + 1 && rr.left >= c.l - 1 && rr.right <= c.r + 1;
+    };
+    const tappable = (el, what) => {
+      const rr = el.getBoundingClientRect();
+      if (!whole(el)) return `${what} off screen (${Math.round(rr.left)},${Math.round(rr.top)}–${Math.round(rr.right)},${Math.round(rr.bottom)})`;
+      const hit = document.elementFromPoint((rr.left + rr.right) / 2, (rr.top + rr.bottom) / 2);
+      if (!hit || !el.contains(hit)) return `${what} covered (a tap hits ${hit?.className || hit?.tagName})`;
+      return null;
+    };
+    // Seen: whole, and not under something else (a sticky footer, a header) at its middle.
+    const seen = (el) => {
+      if (!whole(el)) return false;
+      const rr = el.getBoundingClientRect();
+      const hit = document.elementFromPoint((rr.left + rr.right) / 2, (rr.top + rr.bottom) / 2);
+      return !!hit && (el.contains(hit) || hit.contains(el));
+    };
+    // Rows: four whole ones (or all of them when there are fewer), or one whole card.
+    const rows = [...box.querySelectorAll(spec.rows)].filter((e) => e.getBoundingClientRect().height > 0);
+    const shown = rows.filter(seen).length;
+    const cards = spec.card ? [...box.querySelectorAll(spec.card)].filter(seen).length : 0;
+    const need = Math.min(4, rows.length);
+    // Prose (the Guide): its paragraphs run to any length, so count the lines of
+    // text on show instead, eight being about four short paragraphs.
+    let lines = 0;
+    if (spec.prose) {
+      const body = box.querySelector(spec.prose);
+      const first = body?.querySelector('p, li');
+      if (body && first) {
+        const c = clip(first);
+        const br = body.getBoundingClientRect();
+        const cs = getComputedStyle(first);
+        const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+        lines = Math.floor(Math.max(0, Math.min(br.bottom, c.b) - Math.max(br.top, c.t)) / lh);
+      }
+    }
+    const content = `${shown}/${rows.length} rows whole${spec.card ? `, ${cards} whole card(s)` : ''}${spec.prose ? `, ${lines} lines of text` : ''}`;
+    if (shown < need && cards < 1 && lines < 8) out.push(`only ${content}`);
+    // Every close in the screen, and its primary action.
+    const closes = [...box.querySelectorAll('button')].filter((b) => /^(✕|close)$/i.test(b.textContent.trim()) || b.getAttribute('aria-label') === 'Close');
+    if (!closes.length) out.push('no close button');
+    for (const c of closes) {
+      const p = tappable(c, `close "${c.textContent.trim()}"`);
+      if (p) out.push(p);
+    }
+    for (const sel of spec.primary ?? []) {
+      const el = box.querySelector(sel);
+      if (!el) { out.push(`primary ${sel} missing`); continue; }
+      const p = tappable(el, `primary ${sel}`);
+      if (p) out.push(p);
+    }
+    // The unsafe bands: no button of the screen or the nav, and no part of the screen, inside one.
+    const inSafe = (rr) => rr.left >= safe.l - 1 && rr.right <= W - safe.r + 1 && rr.top >= safe.t - 1 && rr.bottom <= H - safe.b + 1;
+    if (safe.l || safe.r || safe.t || safe.b) {
+      const unsafe = [...document.querySelectorAll('.nrl-screen-region button, .nrl-nav button, .nrl-hud button, .nrl-screen-title, .nrl-screen-region h2')]
+        .filter((e) => { const rr = e.getBoundingClientRect(); return rr.width > 0 && rr.height > 0 && whole(e) && !inSafe(rr); })
+        .map((e) => (e.textContent.trim() || e.getAttribute('aria-label') || e.tagName).slice(0, 14));
+      if (unsafe.length) out.push(`in the unsafe band: ${[...new Set(unsafe)].slice(0, 6).join(', ')}${unsafe.length > 6 ? '…' : ''}`);
+    }
+    return { problems: out, content };
+  }, [spec, safe]);
+}
+
+/** The chrome: top bar and nav heights, nav tabs, label size and the open tab. */
+function chromeReport(page, openId) {
+  return page.evaluate((openId) => {
+    const hud = document.querySelector('.nrl-hud')?.getBoundingClientRect();
+    const nav = document.querySelector('.nrl-nav')?.getBoundingClientRect();
+    const tabs = [...document.querySelectorAll('.nrl-nav > .nrl-btn, .nrl-nav-tabs > .nrl-btn')].filter((b) => b.getBoundingClientRect().width > 0);
+    const out = [];
+    if (tabs.length > 5) out.push(`${tabs.length} nav tabs (want 5 at most)`);
+    const small = tabs.map((b) => {
+      const label = b.querySelector('.nrl-nav-label') ?? b;
+      return { t: b.textContent.trim(), px: parseFloat(getComputedStyle(label).fontSize) };
+    }).filter((x) => x.px < 12);
+    if (small.length) out.push(`nav labels under 12px: ${small.map((x) => `${x.t} ${x.px.toFixed(1)}px`).slice(0, 3).join(', ')}`);
+    if (openId) {
+      const cur = document.querySelector('.nrl-nav [aria-current="page"]');
+      if (!cur) out.push('no nav tab marked as open (aria-current)');
+      else {
+        const ids = (cur.getAttribute('data-screen') ?? '') + ' ' + (cur.getAttribute('data-nav-holds') ?? '');
+        if (!ids.split(/\s+/).includes(openId)) out.push(`the open tab is "${cur.textContent.trim()}", not ${openId}'s`);
+      }
+    }
+    const note = `top bar ${Math.round(hud?.height ?? 0)}px, nav ${Math.round(nav?.height ?? 0)}px, ${tabs.length} tabs`;
+    return { problems: out, note };
+  }, openId);
+}
+
+async function runScreens(browser, { w: W, h: H, safe }) {
+  const tag = `${W}x${H}${safe.l || safe.r || safe.b || safe.t ? '-safe' : ''}`;
+  const OUT = join(OUT_ROOT, 'webkit', `screens-${tag}`);
+  rmSync(OUT, { recursive: true, force: true });
+  mkdirSync(OUT, { recursive: true });
+  const report = { size: tag, safe, steps: [], errors: [] };
+  const ctx = await browser.newContext({
+    viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
+  });
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(15000);
+  page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
+  let n = 0;
+  const step = async (name, fn) => {
+    n++;
+    const rec = { n, name, ok: true, notes: [] };
+    try {
+      const problems = (await fn(rec)) ?? [];
+      if (problems.length) { rec.ok = false; rec.notes.push(...problems); }
+    } catch (err) {
+      rec.ok = false;
+      rec.notes.push(`threw: ${err.message.split('\n')[0]}`);
+    }
+    rec.file = `${String(n).padStart(2, '0')}-${name}.png`;
+    await page.screenshot({ path: join(OUT, rec.file) }).catch(() => {});
+    report.steps.push(rec);
+    log(`${rec.ok ? 'ok ' : 'FAIL'} screens ${tag} ${rec.file}${rec.notes.length ? ` — ${rec.notes.join('; ')}` : ''}`);
+  };
+  const tap = (sel) => page.locator(sel).first().tap();
+  const check = async (rec, spec, openId) => {
+    await page.waitForTimeout(250);
+    const s = await screenProblems(page, spec, safe);
+    if (Array.isArray(s)) return s;
+    const c = await chromeReport(page, openId);
+    rec.notes.push(s.content, c.note);
+    return [...s.problems, ...c.problems];
+  };
+  const closeAll = () => page.evaluate(() => {
+    for (const b of document.querySelectorAll('.nrl-modal-backdrop:not(.nrl-screen-backdrop)')) b.remove();
+  }).then(() => page.keyboard.press('Escape'));
+
+  await step('hub', async (rec) => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-nrl-start]');
+    if (safe.l || safe.t || safe.r || safe.b) {
+      await page.evaluate((s) => {
+        const st = document.documentElement.style;
+        st.setProperty('--nrl-safe-l', `${s.l}px`); st.setProperty('--nrl-safe-t', `${s.t}px`);
+        st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
+      }, safe);
+    }
+    await page.fill('[data-nrl-clubname]', 'Landscape FC');
+    await tap('[data-nrl-start]');
+    await page.waitForSelector('.nrl-tutorial-skip');
+    await tap('.nrl-tutorial-skip');
+    await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
+    const c = await chromeReport(page, null);
+    rec.notes.push(c.note);
+    return c.problems;
+  });
+  // The More sheet: every row whole, tappable, 44px tall, 12px labels, clear of the unsafe bands.
+  await step('nav-more', async (rec) => {
+    await tap('.nrl-nav [data-nav-more]');
+    await page.waitForSelector('.nrl-nav-sheet:not([hidden])');
+    await page.waitForTimeout(250);
+    const out = await page.evaluate((safe) => {
+      const W = innerWidth, H = innerHeight;
+      const problems = [];
+      if (document.querySelector('.nrl-nav [data-nav-more]')?.getAttribute('aria-expanded') !== 'true') problems.push('More is not aria-expanded');
+      const items = [...document.querySelectorAll('.nrl-nav-sheet .nrl-btn')];
+      for (const b of items) {
+        const r = b.getBoundingClientRect();
+        const t = b.textContent.trim();
+        if (r.left < safe.l - 1 || r.right > W - safe.r + 1 || r.top < safe.t - 1 || r.bottom > H - safe.b + 1) problems.push(`${t} off screen or in the unsafe band`);
+        if (r.height < 44) problems.push(`${t} ${Math.round(r.height)}px tall`);
+        if (parseFloat(getComputedStyle(b).fontSize) < 12) problems.push(`${t} label under 12px`);
+        const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+        if (!hit || !b.contains(hit)) problems.push(`${t} covered`);
+      }
+      return { problems, note: `${items.length} rows: ${items.map((b) => b.textContent.trim()).join(', ')}` };
+    }, safe);
+    rec.notes.push(out.note);
+    return out.problems;
+  });
+  await page.keyboard.press('Escape');
+  for (const spec of NAV_SCREENS) {
+    await step(`screen-${spec.id}`, async (rec) => {
+      await openNav(page, spec.id);
+      await page.waitForSelector(spec.box);
+      return check(rec, spec, spec.id);
+    });
+  }
+  // Popups: the player page, the kit designer, a rival's squad, a decision card.
+  await step('popup-player', async (rec) => {
+    await openNav(page, 'squad');
+    await tap('.nrl-screen-region [data-player-open]');
+    await page.waitForSelector('[data-player-page]');
+    return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats',
+      primary: ['[data-player-action="renew"]', '[data-player-action="sell"]', '[data-player-action="release"]'] }, null);
+  });
+  await step('popup-kit', async (rec) => {
+    await page.locator('.nrl-player-modal .nrl-screen-x').tap().catch(() => {});
+    await openNav(page, 'squad');
+    await tap('.nrl-squad-kit');
+    await page.waitForSelector('.nrl-kit-modal');
+    return check(rec, { box: '.nrl-kit-modal', rows: '.nrl-kit-preview', card: '.nrl-kit-preview', primary: ['.nrl-kit-save'] }, null);
+  });
+  await step('popup-rival-squad', async (rec) => {
+    await openNav(page, 'ladder');
+    await tap('.nrl-ladder-table .nrl-ladder-club');
+    await page.waitForSelector('.nrl-rival-modal');
+    return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row' }, null);
+  });
+  await step('popup-decision-card', async (rec) => {
+    await closeAll();
+    if (!(await page.evaluate(() => window.__nrlShowCard?.('baliTrip')))) throw new Error('card hook failed');
+    await openNav(page, 'news');
+    await page.waitForSelector('.nrl-event-card');
+    return check(rec, { box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item', card: '.nrl-event-card',
+      primary: ['[data-event-choice="0"]', '[data-event-choice="1"]'] }, 'news');
+  });
+  // The full-time report (#351 P0): its ✕, the result and Player of the Match on screen.
+  await step('popup-fulltime-report', async (rec) => {
+    await page.locator('[data-event-choice="0"]').tap();
+    await page.evaluate(() => document.querySelector('.nrl-screen-region .nrl-screen-x')?.click());
+    await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
+    await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
+    await page.locator('.nrl-mo-controls .nrl-btn', { hasText: 'Skip' }).first().tap();
+    await page.waitForSelector('.nrl-report', { timeout: 60000 });
+    const out = await check(rec, { box: '.nrl-report-modal', rows: '.nrl-report-score, .nrl-report-potm', card: '.nrl-report-head' }, null);
+    out.push(...await page.evaluate(() => {
+      const potm = document.querySelector('.nrl-report-potm');
+      if (!potm) return [];
+      const r = potm.getBoundingClientRect();
+      const card = document.querySelector('.nrl-report-modal').getBoundingClientRect();
+      return r.bottom <= card.bottom + 1 && r.top >= card.top - 1 ? [] : ['Player of the Match below the fold'];
+    }));
+    return out;
+  });
+
+  for (const e of report.errors) log(`  error: ${e}`);
+  writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
+  await ctx.close();
+  return report.steps.filter((s) => !s.ok).length + report.errors.length;
+}
+
+// ── The tutorial, followed (#344) ────────────────────────────────────────────
+// Welcome → Build → Recruit done the way the bubble says, never skipped: More, the
+// row in its sheet, a paddock placed, a player signed. Each control the step points
+// at must be whole, out from under the bubble, and take the tap.
+const NO_INSETS = { l: 0, t: 0, r: 0, b: 0 };
+const WALK_RUNS = [{ w: 667, h: 375, safe: NO_INSETS }, { w: 844, h: 390, safe: { l: 47, t: 0, r: 47, b: 21 } }, { w: 956, h: 330, safe: NO_INSETS }];
+
+async function runTutorialWalk(browser, { w: W, h: H, safe }) {
+  const tag = `${W}x${H}${safe.l || safe.r || safe.b || safe.t ? '-safe' : ''}`;
+  const OUT = join(OUT_ROOT, 'webkit', `tutorial-${tag}`);
+  rmSync(OUT, { recursive: true, force: true });
+  mkdirSync(OUT, { recursive: true });
+  const report = { size: tag, safe, steps: [], errors: [] };
+  const ctx = await browser.newContext({
+    viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
+  });
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(10000);
+  page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
+  let n = 0;
+  let stop = false;
+  const step = async (name, fn) => {
+    if (stop) return;
+    n++;
+    const rec = { n, name, ok: true, notes: [] };
+    try {
+      const problems = (await fn(rec)) ?? [];
+      if (problems.length) { rec.ok = false; rec.notes.push(...problems); }
+    } catch (err) {
+      rec.ok = false;
+      rec.notes.push(`threw: ${err.message.split('\n')[0]}`);
+    }
+    rec.file = `${String(n).padStart(2, '0')}-${name}.png`;
+    await page.screenshot({ path: join(OUT, rec.file) }).catch(() => {});
+    report.steps.push(rec);
+    log(`${rec.ok ? 'ok ' : 'FAIL'} tutorial ${tag} ${rec.file}${rec.notes.length ? ` — ${rec.notes.join('; ')}` : ''}`);
+    if (!rec.ok) stop = true; // the steps after this one start from where it left off
+  };
+  /** The step's target (the first on show, with `text` if given): whole on screen, clear of the bubble, and the one a tap at its middle hits. Then tap it. */
+  const tapTarget = async (sel, rec, text = '') => {
+    await page.waitForSelector(sel, { state: 'visible' });
+    await page.waitForTimeout(700); // the tutorial's anchor poll (500 ms) moves the bubble
+    const problem = await page.evaluate(([sel, text]) => {
+      const t = [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().width > 0 && e.textContent.includes(text));
+      if (!t) return `no ${sel} ${text}`;
+      const r = t.getBoundingClientRect();
+      const b = document.querySelector('.nrl-tutorial-bubble')?.getBoundingClientRect();
+      if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) return `${sel} off screen`;
+      if (b && !(b.right <= r.left || b.left >= r.right || b.bottom <= r.top || b.top >= r.bottom)) return `the bubble covers ${sel}`;
+      const c = document.querySelector('.nrl-tutorial-cutout')?.getBoundingClientRect();
+      if (!c || r.left < c.left || r.right > c.right || r.top < c.top || r.bottom > c.bottom) return `the highlight is not round ${sel}`;
+      const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+      return hit && t.contains(hit) ? null : `${sel}: a tap hits ${hit?.className || hit?.tagName}`;
+    }, [sel, text]);
+    if (problem) return [problem];
+    rec.notes.push(`${text || sel} clear`);
+    await page.locator(`${sel} >> visible=true`).filter({ hasText: text }).first().tap();
+    return [];
+  };
+  const atStep = (id) => page.waitForSelector(`.nrl-tutorial-bubble[data-step="${id}"]`);
+
+  await step('welcome', async () => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-nrl-start]');
+    if (safe.l || safe.t || safe.r || safe.b) {
+      await page.evaluate((s) => {
+        const st = document.documentElement.style;
+        st.setProperty('--nrl-safe-l', `${s.l}px`); st.setProperty('--nrl-safe-t', `${s.t}px`);
+        st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
+      }, safe);
+    }
+    await page.fill('[data-nrl-clubname]', 'Tutorial FC');
+    await page.locator('[data-nrl-start]').tap();
+    await atStep('welcome');
+    await page.locator('.nrl-tutorial-next').tap();
+    await atStep('build');
+  });
+  await step('build-more', (rec) => tapTarget('.nrl-nav [data-nav-more]', rec));
+  await step('build-open', (rec) => tapTarget('.nrl-nav-sheet [data-screen="build"]', rec));
+  await step('build-paddock', async (rec) => {
+    const out = await tapTarget('[data-facility="trainingPaddock"]', rec);
+    if (out.length) return out;
+    await page.waitForSelector('.nrl-placebar:not([hidden])');
+    await page.touchscreen.tap(Math.round(W / 2), Math.round(H / 2) + 10);
+    await atStep('recruit');
+    return [];
+  });
+  await step('recruit-more', (rec) => tapTarget('.nrl-nav [data-nav-more]', rec));
+  await step('recruit-open', (rec) => tapTarget('.nrl-nav-sheet [data-screen="recruit"]', rec));
+  await step('recruit-sign', async (rec) => {
+    const out = await tapTarget('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)', rec);
+    if (out.length) return out;
+    await atStep('squad');
+    rec.notes.push('signed: on to the squad step');
+    return [];
+  });
+
+  for (const e of report.errors) log(`  error: ${e}`);
+  writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
+  await ctx.close();
+  return report.steps.filter((s) => !s.ok).length + report.errors.length;
+}
+
+const SCREENS_ONLY = argv.includes('--screens-only');
 let failed = 0;
 try {
   await startServer();
   const browser = await webkit.launch(process.env.WEBKIT_PATH ? { executablePath: process.env.WEBKIT_PATH } : {});
-  for (const [W, H] of SIZES) failed += await runSize(browser, W, H);
-  failed += await runPortrait(browser);
+  if (!SCREENS_ONLY) {
+    for (const [W, H] of SIZES) failed += await runSize(browser, W, H);
+    failed += await runPortrait(browser);
+  }
+  for (const run of WALK_RUNS) failed += await runTutorialWalk(browser, run);
+  for (const run of SCREEN_RUNS) failed += await runScreens(browser, run);
   await browser.close();
 } catch (err) {
   console.error(err);

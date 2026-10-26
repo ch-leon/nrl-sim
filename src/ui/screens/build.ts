@@ -124,10 +124,9 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
       'div',
       {
         class: affordable ? 'nrl-build-row' : 'nrl-build-row nrl-build-row-disabled',
-        attrs: affordable ? {} : { 'aria-disabled': 'true' },
+        attrs: affordable ? { 'data-facility': def.id } : { 'aria-disabled': 'true' },
       },
-      el('div', { class: 'nrl-build-title', text: def.name }),
-      meta,
+      el('div', { class: 'nrl-build-top' }, el('span', { class: 'nrl-build-title', text: def.name }), meta),
       el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation }) }),
       ...(built ? [el('div', { class: 'nrl-build-hint', text: 'Already built — upgrade it instead.' })] : []),
     );
@@ -140,20 +139,14 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
     return row;
   });
 
-  // Close lives in the header (like the other screens) so it is reachable
-  // without scrolling the facility list on short viewports.
-  const content = panel(
+  const content = el(
+    'div',
     { class: 'nrl-build-menu' },
-    el(
-      'div',
-      { class: 'nrl-build-head' },
-      el('h2', { class: 'nrl-build-heading', text: 'Build Facility' }),
-      button('Close', () => closeScreen(), { class: 'nrl-build-close' }),
-    ),
+    el('h2', { class: 'nrl-build-heading', text: 'Build Facility' }),
     el('div', { class: 'nrl-build-list' }, ...rows),
   );
   ensureBuildStyles();
-  openModal(content, { class: 'nrl-build-modal', screen: true, closeButton: false });
+  openModal(content, { class: 'nrl-build-modal', screen: true, key: 'build' });
 }
 
 /**
@@ -270,11 +263,15 @@ const BUILD_CSS = `
   margin: 0 0 0.5rem;
   font-size: clamp(1rem, 4vw, 1.3rem);
 }
+/* #336: tiles side by side, so a landscape phone shows four or more at once. */
+.nrl-screen-backdrop .nrl-build-modal { width: min(96vw, 900px); }
 .nrl-build-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  align-items: start;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
+  padding: 0 3px 3px 0;
 }
 .nrl-build-row {
   pointer-events: auto;
@@ -282,8 +279,9 @@ const BUILD_CSS = `
   border: 3px solid #000;
   box-shadow: 3px 3px 0 #000;
   background: #f4d03f;
-  padding: 0.5rem 0.6rem;
+  padding: 0.35rem 0.5rem;
 }
+.nrl-build-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
 .nrl-build-row:hover:not(.nrl-build-row-disabled) { background: #f7dc6f; }
 .nrl-build-row:active:not(.nrl-build-row-disabled) {
   transform: translate(3px, 3px);
@@ -297,24 +295,15 @@ const BUILD_CSS = `
 .nrl-build-title { font-weight: bold; }
 .nrl-build-meta {
   display: flex;
-  justify-content: space-between;
   gap: 0.5rem;
-  font-size: 0.8rem;
-  margin: 0.15rem 0;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 .nrl-build-cost { font-weight: bold; }
 .nrl-build-upkeep { opacity: 0.85; }
 .nrl-facility-upkeep { font-size: 0.85rem; }
 .nrl-build-blurb { font-size: 0.75rem; line-height: 1.2; }
 .nrl-build-hint { font-size: 0.75rem; font-weight: bold; opacity: 0.85; }
-.nrl-build-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-.nrl-build-head .nrl-build-heading { margin: 0; }
 .nrl-facility-close { margin-top: 0.25rem; }
 .nrl-facility-body { display: flex; flex-direction: column; gap: 0.5rem; }
 .nrl-facility-level { font-weight: bold; }

@@ -1,21 +1,21 @@
 // src/ui/screens/squad.ts — squad list screen (BAK-179, WU-9).
-// Lists GameState.squad using the shared PlayerCard, sortable by position or
-// overall rating, showing injured status and the total weekly wage bill, with a
-// Release action gated behind a confirm modal. DOM UI kit only; no Phaser.
+// Lists GameState.squad as compact rows (the shared PlayerRow), sortable by
+// position or overall rating, showing injured status and the total weekly wage
+// bill. A row opens the player's page, where Renew, Sell and Release live
+// (#336). DOM UI kit only; no Phaser.
 
-import { el, button, openModal, closeModal, openScreen, closeScreen } from '../dom';
+import { el, button, openScreen, screenHead } from '../dom';
 import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
 import { save } from '../../core/save';
 import { overallRating } from '../../data/player';
-import { releasePlayer, RELEASE_PAYOUT_WEEKS } from '../../systems/freeagency';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { DEFAULT_PLAYER_COLORS, FEATURES, TRAINING_FOCUS } from '../../config';
 import { TRAINING_FOCI, focusLabel, setTrainingFocus } from '../../systems/training';
 import { openKitDesigner } from './kit';
 import { kitFromColors, type Kit } from '../../art/match/kit';
-import { PlayerCard, ensureScreenStyles } from './recruit';
-import { openPlayerPage } from './player';
+import { PlayerRow, ensureScreenStyles, openRecruitScreen } from './recruit';
+import { moraleWord, openPlayerPage } from './player';
 
 const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
 
@@ -47,14 +47,6 @@ function sortSquad(squad: readonly Player[], key: SortKey): Player[] {
   return out;
 }
 
-const failureText = (reason?: string): string => {
-  switch (reason) {
-    case 'squad-min': return 'Cannot release — squad at the minimum size.';
-    case 'not-found': return 'That player is not in your squad.';
-    default: return 'Could not release player.';
-  }
-};
-
 let unsub: (() => void) | null = null;
 let sortKey: SortKey = 'position';
 
@@ -64,41 +56,16 @@ function onSquadClosed(): void {
 }
 
 /**
- * Confirm-then-release modal. Shows the payout and warns the move is permanent,
- * then calls releasePlayer on confirm and surfaces any failure via ui:notify.
- */
-function confirmRelease(player: Player): void {
-  const payout = RELEASE_PAYOUT_WEEKS * player.wage;
-  const message = el('div', {}, el('p', {
-    text: `Release ${player.name}? This pays a ${money(payout)} settlement `
-      + `(${RELEASE_PAYOUT_WEEKS}×wage) and returns them to free agency.`,
-  }));
-  const actions = el(
-    'div',
-    { class: 'nrl-card-actions' },
-    button('RELEASE', () => {
-      const res = releasePlayer(getState(), player.id);
-      closeModal();
-      if (!res.ok) {
-        bus.emit('ui:notify', { text: failureText(res.reason), kind: 'danger' });
-      }
-    }, { class: 'nrl-btn-danger' }),
-    button('CANCEL', closeModal),
-  );
-  openModal(el('div', {}, message, actions));
-}
-
-/**
- * Open the squad screen. Lists the current squad via the shared PlayerCard with
- * injury badges and per-player Release buttons (each opens confirmRelease). A
- * sort toggle switches between position and rating order, and the header shows
- * the total weekly wage bill. Re-renders on 'state:changed'. Idempotent; shown
- * in the shared screen region (between HUD and nav, see ui/dom.ts openScreen).
+ * Open the squad screen. Lists the current squad as PlayerRows with injury and
+ * ban badges, wage and morale; a row opens the player page. A sort toggle
+ * switches between position and rating order, and the header shows the total
+ * weekly wage bill. Re-renders on 'state:changed'. Idempotent; shown in the
+ * shared screen region (between HUD and nav, see ui/dom.ts openScreen).
  */
 export function openSquadScreen(): void {
   ensureScreenStyles();
 
-  const body = el('div', { class: 'nrl-screen-body' });
+  const body = el('div', { class: 'nrl-screen-body nrl-rows' });
   const sub = el('div', { class: 'nrl-screen-sub' });
 
   // Training focus (N11): what the squad trains hardest; the player page shows each man's weekly gain under it.
@@ -114,8 +81,8 @@ export function openSquadScreen(): void {
   });
   const focusRow = el(
     'div',
-    { class: 'nrl-squad-focus', attrs: { style: 'display:flex;gap:0.3rem;align-items:center;overflow-x:auto;flex-shrink:0;padding-bottom:0.3rem;' } },
-    el('span', { text: 'Training:', attrs: { style: 'color:#e8e0c8;font-size:0.75rem;' } }),
+    { class: 'nrl-squad-focus', attrs: { style: 'display:flex;gap:0.3rem;align-items:center;overflow-x:auto;flex-shrink:0;padding:0 3px 3px 0;margin-bottom:0.3rem;' } },
+    el('span', { class: 'nrl-screen-label', text: 'Training:' }),
     ...focusBtns,
   );
 
@@ -125,7 +92,7 @@ export function openSquadScreen(): void {
     const focus = s.training?.focus ?? 'balanced';
     focusBtns.forEach((b, i) => b.classList.toggle('nrl-sort-active', TRAINING_FOCI[i] === focus));
     const wageBill = s.squad.reduce((sum, p) => sum + p.wage, 0);
-    sub.textContent = `${s.squad.length} players · wage bill ${money(wageBill)}/wk`;
+    sub.textContent = `${s.squad.length} players · wages ${money(wageBill)}/wk`;
 
     if (s.squad.length === 0) {
       body.appendChild(el('div', { class: 'nrl-screen-empty', text: 'Your squad is empty.' }));
@@ -133,21 +100,19 @@ export function openSquadScreen(): void {
     }
     const kit = squadKit();
     for (const player of sortSquad(s.squad, sortKey)) {
-      body.appendChild(PlayerCard(player, {
+      body.appendChild(PlayerRow(player, {
         showInjury: true,
         kit,
+        extra: [`${money(player.wage)}/wk`, moraleWord(player.morale)],
         onOpen: () => openPlayerPage(player, { kind: 'squad' }),
-        action: {
-          label: 'RELEASE',
-          danger: true,
-          onClick: () => confirmRelease(player),
-        },
       }));
     }
   };
 
-  const sortPos = button('POSITION', () => { sortKey = 'position'; refreshSortButtons(); render(); });
-  const sortRating = button('RATING', () => { sortKey = 'rating'; refreshSortButtons(); render(); });
+  const sortPos = button('POS', () => { sortKey = 'position'; refreshSortButtons(); render(); });
+  sortPos.title = 'By position';
+  const sortRating = button('OVR', () => { sortKey = 'rating'; refreshSortButtons(); render(); });
+  sortRating.title = 'By overall rating';
 
   function refreshSortButtons(): void {
     sortPos.classList.toggle('nrl-sort-active', sortKey === 'position');
@@ -155,21 +120,21 @@ export function openSquadScreen(): void {
   }
   refreshSortButtons();
 
-  const head = el(
-    'div',
-    { class: 'nrl-screen-head' },
-    el('span', { class: 'nrl-screen-title', text: 'Squad' }),
-    el('span', { text: 'Sort:', attrs: { style: 'color:#e8e0c8;font-size:0.75rem;' } }),
-    sortPos,
-    sortRating,
-    // Kit designer (#79), behind the cosmetic-kits flag.
-    ...(FEATURES.cosmeticKits ? [button('KIT', () => openKitDesigner(), { class: 'nrl-squad-kit' })] : []),
-    button('CLOSE', closeScreen),
-  );
+  const head = screenHead('Squad', {
+    sub,
+    controls: [
+      el('span', { class: 'nrl-screen-label', text: 'Sort:' }),
+      sortPos,
+      sortRating,
+      // Kit designer (#79), behind the cosmetic-kits flag.
+      ...(FEATURES.cosmeticKits ? [button('KIT', () => openKitDesigner(), { class: 'nrl-squad-kit' })] : []),
+      button('RECRUIT', () => openRecruitScreen(), { class: 'nrl-squad-recruit' }),
+    ],
+  });
 
-  const screen = el('div', { class: 'nrl-screen' }, head, focusRow, sub, body);
+  const screen = el('div', { class: 'nrl-screen' }, head, focusRow, body);
   // openScreen closes any other open screen (running its teardown) first.
-  openScreen(screen, onSquadClosed);
+  openScreen(screen, onSquadClosed, 'squad');
   render();
   unsub = bus.on('state:changed', render);
 }
