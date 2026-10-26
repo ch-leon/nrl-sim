@@ -150,3 +150,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261026-080940-presets | presets | c10e2f9 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-080940-presets/report.md) |
 | 20261026-104434-standard | standard | 30b85f5 | main | [report](runs/20261026-104434-standard/report.md) |
 | 20261026-173357-standard | standard | 85bd8c9 | main | [report](runs/20261026-173357-standard/report.md) |
+| 20261026-184103-standard | standard | 42d7d4f | main | [report](runs/20261026-184103-standard/report.md) |
