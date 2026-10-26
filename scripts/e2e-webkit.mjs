@@ -723,9 +723,15 @@ function screenProblems(page, spec, safe) {
     }
     const content = `${shown}/${rows.length} rows whole${spec.card ? `, ${cards} whole card(s)` : ''}${spec.prose ? `, ${lines} lines of text` : ''}`;
     if (shown < need && cards < 1 && lines < 8) out.push(`only ${content}`);
-    // Every close in the screen, and its primary action.
+    // Every close in the screen, and its primary action. A screen with one named
+    // exit (the full-time report's Back to Club) has no ✕ of its own: that exit instead.
     const closes = [...box.querySelectorAll('button')].filter((b) => /^(✕|close)$/i.test(b.textContent.trim()) || b.getAttribute('aria-label') === 'Close');
-    if (!closes.length) out.push('no close button');
+    if (spec.exit) {
+      if (closes.length) out.push(`a ✕ besides ${spec.exit} (one exit wanted)`);
+      const exit = document.querySelector(spec.exit);
+      if (!exit) out.push(`exit ${spec.exit} missing`);
+      else { const p = tappable(exit, `exit ${spec.exit}`); if (p) out.push(p); }
+    } else if (!closes.length) out.push('no close button');
     for (const c of closes) {
       const p = tappable(c, `close "${c.textContent.trim()}"`);
       if (p) out.push(p);
@@ -1166,12 +1172,15 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await page.locator('.nrl-mo-log-toggle').tap();
     return out;
   });
-  // The full-time report (#351 P0): its ✕, the result and Player of the Match on screen.
+  // The full-time report (#351 P0, P2): the result and Player of the Match on screen,
+  // Back to Club its one exit, and the plan changes folded into one line.
   await step('popup-fulltime-report', async (rec) => {
     await page.locator('.nrl-mo-controls [data-pause]').tap();
     await page.locator('.nrl-mo-sheet [data-skip]').tap();
     await page.waitForSelector('.nrl-report', { timeout: 60000 });
-    const out = await check(rec, { box: '.nrl-report-modal', rows: '.nrl-report-score, .nrl-report-potm', card: '.nrl-report-head' }, null);
+    const out = await check(rec, { box: '.nrl-report-modal', rows: '.nrl-report-score, .nrl-report-potm', card: '.nrl-report-head', exit: '.nrl-match-back' }, null);
+    if (!(await page.locator('.nrl-report-result').count())) out.push('no WIN / LOSS / DRAW headline');
+    if (await page.locator('.nrl-report > .nrl-report-change').count()) out.push('plan changes shown as loose lines, not folded');
     out.push(...await page.evaluate(() => {
       const potm = document.querySelector('.nrl-report-potm');
       if (!potm) return [];

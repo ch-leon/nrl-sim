@@ -664,13 +664,21 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
 .nrl-potm-backdrop { pointer-events: none; background: transparent; }
 .nrl-potm-backdrop .nrl-modal { pointer-events: auto; }
 /* The match report (N9.5): as wide as a screen, above Back to Club, scrolling inside. */
-.nrl-report-backdrop { bottom: 3.75rem; align-items: flex-start; padding-top: 0.5rem; }
+.nrl-report-backdrop { bottom: calc(3.75rem + var(--nrl-safe-b)); align-items: flex-start; padding: calc(0.5rem + var(--nrl-safe-t)) var(--nrl-safe-r) 0 var(--nrl-safe-l); }
 .nrl-report-backdrop .nrl-modal { width: min(96vw, 720px); max-width: none; max-height: calc(100% - 0.75rem); padding: 0.6rem 0.8rem; }
 .nrl-report-head { min-height: 44px; }
 .nrl-modal-has-x .nrl-report-head { padding-right: 2.75rem; }
 .nrl-report h2 { margin: 0 0 0.2rem; font-size: 1rem; }
 .nrl-report p { margin: 0.15rem 0; font-size: 0.8rem; }
 .nrl-report .nrl-report-score { font-size: 1.05rem; font-weight: bold; }
+/* #351 P2: a win and a loss look different. Green for a win; a loss is no error, so slate, not red. */
+.nrl-report-result { display: inline-block; padding: 0.05rem 0.4rem; border: 2px solid #000; font-size: 0.9rem; letter-spacing: 1px; }
+.nrl-report-win { background: #2d6a2f; color: #fff; }
+.nrl-report-loss { background: #5a6b85; color: #fff; }
+.nrl-report-draw { background: #e8e0c8; color: #1a1a2e; }
+.nrl-report-changes { margin: 0.15rem 0; font-size: 0.8rem; }
+.nrl-report-changes summary { cursor: pointer; min-height: 1.6rem; line-height: 1.6rem; }
+@media (pointer: coarse) { .nrl-report-changes summary { min-height: 44px; line-height: 44px; } }
 .nrl-report-body { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.3rem 0; }
 .nrl-report-scoring { flex: 1 1 18rem; display: flex; gap: 0.8rem; }
 .nrl-report-side { flex: 1 1 0; min-width: 0; }

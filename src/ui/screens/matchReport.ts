@@ -3,6 +3,8 @@
 // with the Player of the Match. Built from the MatchResult (the live sim's
 // events as recorded), so it agrees with the overlay's tallies. A card, not a
 // wall (#203): it sits above Back to Club and lets taps beside it through.
+// Back to Club is its one exit (#351 P2): no ✕, so the report stays until the
+// club is back and can't be closed with no way to see it again.
 // Under the score, a summary in the ticker's voice (N15.2, match/view/commentary.ts):
 // the final whistle, then the story of the tries, as many lines as fit the card.
 import { bus } from '../../core/events';
@@ -45,6 +47,8 @@ export interface ReportRow {
 
 export interface MatchReport {
   title: string;
+  /** Your result (#351 P2): "WIN by 12", "LOSS by 4", "DRAW"; null for a match the player is not in. */
+  headline: { text: string; kind: 'win' | 'loss' | 'draw' } | null;
   home: ReportSide;
   away: ReportSide;
   /** "Won in golden point", "Drawn — through on seeding", or empty. */
@@ -117,6 +121,7 @@ export function buildMatchReport(
   const note = golden ? 'Won in golden point' : result.homeScore === result.awayScore ? (final ? `Drawn — ${home.name} through on seeding` : 'Drawn') : '';
   return {
     title: `${roundLabel(fixture.round)} · Full time`,
+    headline: resultHeadline(home, away),
     home,
     away,
     note,
@@ -125,6 +130,21 @@ export function buildMatchReport(
     rows,
     potm: potm ? { line: fmtPotmLine(potm), who: `${potm.name} (${names[potm.teamId] ?? potm.teamId})` } : null,
   };
+}
+
+/** The player's result in a word and the margin. */
+export function resultHeadline(home: Pick<ReportSide, 'id' | 'score'>, away: Pick<ReportSide, 'id' | 'score'>): MatchReport['headline'] {
+  const mine = home.id === PLAYER_ID ? home : away.id === PLAYER_ID ? away : null;
+  if (!mine) return null;
+  const theirs = mine === home ? away : home;
+  const margin = mine.score - theirs.score;
+  if (margin === 0) return { text: 'DRAW', kind: 'draw' };
+  return margin > 0 ? { text: `WIN by ${margin}`, kind: 'win' } : { text: `LOSS by ${-margin}`, kind: 'loss' };
+}
+
+/** The one line the plan changes fold under (#351 P0). */
+export function planChangesSummary(n: number): string {
+  return `Plan changes (${n})`;
 }
 
 /** One line per plan the restart played. The short name, because both sides can switch. */
@@ -162,16 +182,21 @@ export function openMatchReport(r: MatchReport): HTMLElement {
     'div',
     { class: 'nrl-report' },
     el('div', { class: 'nrl-report-head' },
-      el('h2', { text: r.title }),
+      el('h2', {},
+        ...(r.headline ? [el('span', { class: `nrl-report-result nrl-report-${r.headline.kind}`, text: r.headline.text }), ' '] : []),
+        r.title),
       el('p', { class: 'nrl-report-score', text: `${r.home.name} ${r.home.score} – ${r.away.score} ${r.away.name}` }),
       ...(r.note ? [el('p', { class: 'nrl-report-note', text: r.note })] : []),
       ...(r.potm ? [el('p', { class: 'nrl-report-potm', text: `Player of the Match: ${r.potm.who} — ${r.potm.line}` })] : []),
     ),
     ...(r.summary.length ? [el('p', { class: 'nrl-report-summary', text: r.summary.join(' '), attrs: { style: 'font-style: italic' } })] : []),
-    ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })),
+    // #351 P0: the plan changes fold into one line, so they never push the scorers down.
+    ...(r.changes.length ? [el('details', { class: 'nrl-report-changes' },
+      el('summary', { text: planChangesSummary(r.changes.length) }),
+      ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })))] : []),
     el('div', { class: 'nrl-report-body' }, el('div', { class: 'nrl-report-scoring' }, sideBlock(r.home), sideBlock(r.away)), table),
   );
-  const backdrop = openModal(content, { class: 'nrl-potm-modal nrl-report-modal', region: true, closeButton: true });
+  const backdrop = openModal(content, { class: 'nrl-potm-modal nrl-report-modal', region: true });
   // #203: the card must not swallow the first tap on Back to Club; it closes with the match view.
   backdrop.classList.add('nrl-potm-backdrop', 'nrl-report-backdrop');
   // The summary drops its last line while the card would scroll with it (a phone held sideways): first lines first.
