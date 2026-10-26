@@ -434,8 +434,11 @@ describe('wildcard polish', () => {
       expect(build(club).roster!.some((p) => p.id === first)).toBe(true);
       expect(build(banned).roster!.some((p) => p.id === first)).toBe(false);
       expect(build(banned).bench?.some((p) => p.id === first) ?? false).toBe(false);
+      const cleared = { ...banned, squad: banned.squad.map((p) => ({ ...p, suspendedWeeks: 0 })) };
+      expect(build(cleared).roster!.some((p) => p.id === first)).toBe(true);
       const sparse = { ...club, squad: club.squad!.map((p, i) => ({ ...p, suspendedWeeks: i < 8 ? 0 : 2 })) };
       const sheet = build(sparse);
+      expect(sheet.roster).toHaveLength(9);
       expect(sheet.roster!.some((p) => sparse.squad.some((q) => q.id === p.id && q.suspendedWeeks > 0))).toBe(false);
     }
   });
