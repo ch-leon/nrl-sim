@@ -310,6 +310,11 @@ export function openModal(
   return backdrop;
 }
 
+/** Whether a dialog (not a screen) is open. */
+export function dialogOpen(): boolean {
+  return openModalEl !== null && openModalEl.isConnected;
+}
+
 /** Close the currently open (dialog) modal, if any. Screens use closeScreen(). */
 export function closeModal(): void {
   if (openModalEl) {
@@ -427,20 +432,25 @@ export const CSS = `
   .nrl-hud-debt { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 .nrl-hud-spacer { flex: 1 1 auto; min-width: 0; display: flex; justify-content: flex-end; }
-/* #350 H1: the next match, beside Advance Week. It gives way (ellipsis) before the buttons do. */
+/* #350 H1: the next match, beside Advance Week: the opponent over home/away and the ladder place. */
 .nrl-hud .nrl-btn.nrl-hud-next {
   pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   background: #e8e0c8;
   color: #1a1a2e;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.15;
   padding-left: 0.5rem;
   padding-right: 0.5rem;
 }
+.nrl-hud-next-detail { font-weight: normal; font-size: 0.9em; }
 .nrl-hud .nrl-btn.nrl-hud-next:disabled { opacity: 1; cursor: default; }
 .nrl-hud-next[hidden] { display: none; }
 /* #350 H1: decisions waiting, a red count on Advance Week. */
@@ -505,7 +515,7 @@ export const CSS = `
   .nrl-hud-readouts { flex-wrap: nowrap; gap: 0.3rem; }
   .nrl-hud-stat { font-size: 0.8rem; padding: 0.2rem 0.4rem; border-width: 2px; box-shadow: 2px 2px 0 #000; }
   .nrl-hud .nrl-btn { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-  .nrl-hud .nrl-btn.nrl-hud-next { font-size: 0.75rem; padding-left: 0.4rem; padding-right: 0.4rem; }
+  .nrl-hud .nrl-btn.nrl-hud-next { font-size: 0.7rem; padding-left: 0.35rem; padding-right: 0.35rem; }
 }
 
 /* ── Nav ─────────────────────────────────────────────────────────────── */

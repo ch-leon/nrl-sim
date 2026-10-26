@@ -68,12 +68,19 @@ export function ordinal(n: number): string {
   return `${n}${suffix}`;
 }
 
+/** A club's place name, its name less the nickname: "Broken Hill Brollys" → "Broken Hill". */
+export function placeName(name: string): string {
+  const words = name.trim().split(/\s+/);
+  return words.length > 1 ? words.slice(0, -1).join(' ') : name;
+}
+
 /**
- * The hub's next-match chip (#350 H1): "v Darwin Drovers (A) · 5th", the
- * opponent, home or away, and the club's ladder place once a round is in. Null
- * with no match left this season. Pure — extracted for unit testing without the DOM.
+ * The hub's next-match chip (#350 H1), two short lines that fit beside Advance
+ * Week at 667px: "v Darwin" over "Away · 5th", the ladder place once a round is
+ * in. The full name is in the label. Null with no match left this season. Pure —
+ * extracted for unit testing without the DOM.
  */
-export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { text: string; label: string } | null {
+export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { opponent: string; detail: string; label: string } | null {
   const f = nextFixture(s.league.fixtures, s.week, 'player');
   if (!f) return null;
   const home = f.homeId === 'player';
@@ -82,9 +89,9 @@ export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { text: st
   const i = s.league.ladder.findIndex((r) => r.clubId === 'player');
   const row = i < 0 ? undefined : s.league.ladder[i];
   const place = row && row.played > 0 ? ordinal(i + 1) : '';
-  const text = `v ${opp.name} (${home ? 'H' : 'A'})${place ? ` · ${place}` : ''}`;
+  const detail = `${home ? 'Home' : 'Away'}${place ? ` · ${place}` : ''}`;
   const label = `Next match: ${opp.name}, ${home ? 'home' : 'away'}${place ? `. You are ${place} on the ladder` : ''}`;
-  return { text, label };
+  return { opponent: `v ${placeName(opp.name)}`, detail, label };
 }
 
 /** The Advance Week badge's spoken label (#350 H1). */
@@ -288,7 +295,10 @@ export function createHud(opts: HudOpts = {}): Hud {
     seasonEl.textContent = `Season ${s.season}`;
     const chip = nextMatchChip(s);
     nextEl.hidden = !chip;
-    nextEl.textContent = chip?.text ?? '';
+    nextEl.replaceChildren(
+      el('span', { class: 'nrl-hud-next-opp', text: chip?.opponent ?? '' }),
+      el('span', { class: 'nrl-hud-next-detail', text: chip?.detail ?? '' }),
+    );
     nextEl.setAttribute('aria-label', chip?.label ?? '');
     nextEl.title = chip?.label ?? '';
     renderAdvancing(s);

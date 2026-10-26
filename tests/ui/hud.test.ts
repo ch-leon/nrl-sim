@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fmtMoney, moneyTile, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel } from '../../src/ui/hud';
+import { fmtMoney, moneyTile, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel, placeName } from '../../src/ui/hud';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
@@ -142,7 +142,8 @@ describe('the next-match chip (#350 H1)', () => {
     const home = f.homeId === 'player';
     const opp = s.league.clubs.find((c) => c.id === (home ? f.awayId : f.homeId))!;
     const chip = nextMatchChip(s)!;
-    expect(chip.text).toBe(`v ${opp.name} (${home ? 'H' : 'A'})`);
+    expect(chip.opponent).toBe(`v ${placeName(opp.name)}`);
+    expect(chip.detail).toBe(home ? 'Home' : 'Away');
     expect(chip.label).toBe(`Next match: ${opp.name}, ${home ? 'home' : 'away'}`);
   });
 
@@ -151,13 +152,20 @@ describe('the next-match chip (#350 H1)', () => {
     const ladder = s.league.ladder.map((r) => (r.clubId === 'player' ? { ...r, played: 1 } : r));
     const place = ladder.findIndex((r) => r.clubId === 'player') + 1;
     const chip = nextMatchChip({ ...s, league: { ...s.league, ladder } })!;
-    expect(chip.text.endsWith(` · ${ordinal(place)}`)).toBe(true);
+    expect(chip.detail.endsWith(` · ${ordinal(place)}`)).toBe(true);
     expect(chip.label).toContain(`You are ${ordinal(place)} on the ladder`);
   });
 
   it('is null with no match left this season', () => {
     const s = getState();
     expect(nextMatchChip({ ...s, league: { ...s.league, fixtures: [] } })).toBeNull();
+  });
+
+  it('names the opponent by its place, not its nickname', () => {
+    expect(placeName('Darwin Drovers')).toBe('Darwin');
+    expect(placeName('Broken Hill Brollys')).toBe('Broken Hill');
+    expect(placeName('Woolloomooloo Wolves')).toBe('Woolloomooloo');
+    expect(placeName('Solo')).toBe('Solo');
   });
 
   it('ordinals', () => {

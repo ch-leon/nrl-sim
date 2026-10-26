@@ -20,7 +20,7 @@ import { cardById } from '../data/events';
 import { absWeek, chooseEvent, describeChoice, fillText } from '../systems/events';
 import { hasStaff } from '../systems/staff';
 import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
-import { el, button, openModal, closeModal } from './dom';
+import { el, button, openModal, closeModal, activeScreen, dialogOpen } from './dom';
 import { ADVANCE_FAILED_TEXT } from './hud';
 
 // ── View-model (pure) ─────────────────────────────────────────────────────────
@@ -228,9 +228,11 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
 }
 
 /**
- * A ▾ run that asks first (#338) and, when it stops on a new card (#350 N4),
- * opens that card with Keep advancing to the same end. Errors in the run are
- * posted, as the HUD does for its own runs.
+ * A ▾ run that asks first (#338) and, when it stops on a new card with weeks of
+ * it still to play (#350 N4), opens that card with Keep advancing to the same
+ * end. Not over another screen or dialog (the season review at the rollover):
+ * the badge and News say the card is there. Errors in the run are posted, as
+ * the HUD does for its own runs.
  */
 export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget) => Promise<AdvanceRun>, opts: { confirmed?: boolean } = {}): void {
   const span = targetSpan(target, getState().week);
@@ -245,7 +247,8 @@ export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget)
       if (r.stop.kind !== 'decision') return;
       const s = getState();
       const rest = remainingTarget(target, { weeksPlayed: r.weeksPlayed, week: s.week, startSeason, season: s.season });
-      openDecisions(rest ? { then: { label: keepAdvancingLabel(rest), run: () => advanceUntilAsked(rest, run, { confirmed: true }) } } : {});
+      if (!rest || activeScreen() || dialogOpen()) return;
+      openDecisions({ then: { label: keepAdvancingLabel(rest), run: () => advanceUntilAsked(rest, run, { confirmed: true }) } });
     }).catch((err: unknown) => {
       console.error(err);
       bus.emit('ui:notify', { text: ADVANCE_FAILED_TEXT, kind: 'danger' });
