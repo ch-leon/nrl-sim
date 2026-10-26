@@ -39,12 +39,14 @@ const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'Easy', normal: 'No
 // The overlay scrolls when its content is taller than the screen; the auto
 // margins on .nrl-title-main centre it only while it fits (justify-content:center
 // would push the top of tall content out of reach). Safe-area insets pad every
-// side (#347): with the phone turned either way the notch takes one of them.
+// side (#347): with the phone turned either way the notch takes one of them. The
+// insets come through the frame's --nrl-safe-* (dom.ts) where they are set, env()
+// before the frame's stylesheet is in.
 const TITLE_CSS = `
 .nrl-title { position: absolute; inset: 0; pointer-events: auto; overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; align-items: center; box-sizing: border-box;
-  padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
-    calc(24px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  padding: calc(12px + var(--nrl-safe-t, env(safe-area-inset-top, 0px))) calc(12px + var(--nrl-safe-r, env(safe-area-inset-right, 0px)))
+    calc(24px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))) calc(12px + var(--nrl-safe-l, env(safe-area-inset-left, 0px)));
   background: rgba(26, 26, 46, 0.97); color: #fff; font-family: "Courier New", monospace; }
 .nrl-title * { box-sizing: border-box; }
 .nrl-title-main { margin: auto 0; width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: 12px; }
@@ -66,8 +68,8 @@ const TITLE_CSS = `
 .nrl-title-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .nrl-title-foot .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-notice { color: #ff8a8a; font-size: 13px; max-width: 360px; text-align: center; }
-.nrl-title-build { position: fixed; right: calc(8px + env(safe-area-inset-right, 0px));
-  bottom: calc(4px + env(safe-area-inset-bottom, 0px)); pointer-events: none; color: #8a8aa0; font-size: 11px; }
+.nrl-title-build { position: fixed; right: calc(8px + var(--nrl-safe-r, env(safe-area-inset-right, 0px)));
+  bottom: calc(4px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); pointer-events: none; color: #8a8aa0; font-size: 11px; }
 .nrl-title-head { display: flex; align-items: center; gap: 10px; }
 .nrl-title-head .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-head h2 { margin: 0; font-size: 18px; flex: 1; min-width: 0; }
@@ -95,7 +97,7 @@ const TITLE_CSS = `
   .nrl-title-main { gap: 8px; }
 }
 @media (max-height: 340px) {
-  .nrl-title { padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+  .nrl-title { padding-bottom: calc(18px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
   .nrl-title-main { gap: 6px; }
   .nrl-title-kit img { width: 56px; height: 60px; }
   .nrl-title-form { gap: 6px; }
