@@ -13,7 +13,7 @@ import { advanceInProgress } from '../core/advance';
 import { DEFAULT_PLAYER_COLORS } from '../config';
 import { PLAYER_ID } from '../systems/fixtures';
 import { nextFixture } from '../systems/league';
-import { resolveKits } from '../art/match/kit';
+import { resolveKits } from '../art/match/kitClash';
 import { PixelBuffer, toTexture, type TextureHost } from '../art/pixel';
 import type { IdleSlice } from '../art/grounds';
 import { fixtureArtKey, fixtureArtPieces, paintFixtureArt, reviveFixtureArt, type FixtureArt, type FixtureKits } from '../art/match/fixtureArt';

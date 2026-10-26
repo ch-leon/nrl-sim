@@ -55,7 +55,7 @@ const CHIP_LABEL: Readonly<Record<CoachCall, string>> = {
 };
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
-import { resolveKits } from '../art/match/kit';
+import { resolveKits } from '../art/match/kitClash';
 import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForPlayer, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
   CROSSBAR_Z,
@@ -137,6 +137,8 @@ function nextFrame(): Promise<void> {
 const TRAIL_MIN_LIFT = 30;
 /** Crowd animation tick (real ms). */
 const CROWD_TICK_MS = 220;
+/** Width (world px) of the team ring under every player (#340); the carrier's ring is 22. */
+const TEAM_RING_W = 15;
 
 export interface MatchSceneData {
   home: TeamSheet;
@@ -148,20 +150,23 @@ export interface MatchSceneData {
   live?: LiveMatchData;
 }
 
-/** A player sprite + ground shadow, driven through PlaybackActor. */
+/** A player sprite + ground shadow + team ring, driven through PlaybackActor. */
 export class MatchActor implements PlaybackActor {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly shadow: Phaser.GameObjects.Image;
+  /** The side's ring at his feet (#340): which team he is on, whatever the kits. */
+  private readonly ring: Phaser.GameObjects.Ellipse;
   private readonly atlas: string;
   private look: number;
   private current = '';
   /** Whose look this is (live sim: a slot's player changes at an interchange). */
   private wearing: string | null = null;
 
-  constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string) {
+  constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string, ringColor: number) {
     this.atlas = atlas;
     this.look = look;
     this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW);
+    this.ring = scene.add.ellipse(0, 0, TEAM_RING_W, TEAM_RING_W / 2).setStrokeStyle(1.5, ringColor, 0.9).setFillStyle(ringColor, 0.28).setDepth(DEPTH_SHADOW + 0.5);
     this.sprite = scene.add.sprite(0, 0, atlas, `${look}-idle-0`);
     this.sprite.setOrigin((CENTER_X + 0.5) / FRAME_W, (BASE_Y + 1) / FRAME_H);
   }
@@ -169,6 +174,7 @@ export class MatchActor implements PlaybackActor {
   place(x: number, y: number, depth: number): void {
     this.sprite.setPosition(x, y).setDepth(depth);
     this.shadow.setPosition(x, y);
+    this.ring.setPosition(x, y);
   }
 
   /** Wear a player's own look (#21) by squad id or name; the next play() switches the sprite to it. */
@@ -383,7 +389,7 @@ export class MatchScene extends Phaser.Scene {
 
     // Players + ball.
     const homeAtlas = this.art.players(`pl-${this.home.clubId}`, art.home);
-    const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayAlt ? '-alt' : ''}`, art.away);
+    const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayStrip === 'home' ? '' : `-${kits.awayStrip}`}`, art.away);
     for (let i = 0; i < ON_FIELD; i++) {
       // #21: each slot wears its player's own look (stable across matches);
       // a slot with no named player falls back to the slot cycle. The live view
@@ -392,11 +398,11 @@ export class MatchScene extends Phaser.Scene {
       const a = this.away.roster?.[i];
       const homeLook = h ? lookForPlayer(h.id ?? h.name) : lookForSlot(i);
       const awayLook = a ? lookForPlayer(a.id ?? a.name) : lookForSlot(i + 5);
-      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow));
-      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow));
+      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow, kits.rings.home));
+      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow, kits.rings.away));
     }
     this.ball = new MatchBall(this, props.ball, props.ballShadow);
-    this.markerColors = { home: kits.home.jersey, away: kits.away.jersey };
+    this.markerColors = { home: kits.rings.home, away: kits.rings.away };
     this.marker = this.add.ellipse(0, 0, 22, 11).setStrokeStyle(2, 0xffffff, 0.95).setFillStyle(0xffffff, 0.22).setVisible(false);
     this.marker.setDepth(DEPTH_SHADOW + 2); // above the ground shadows, under every sprite
     this.tagText = this.add

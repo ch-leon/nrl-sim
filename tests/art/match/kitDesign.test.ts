@@ -2,9 +2,10 @@
 // the alternate strip handles clashes, and kits never touch the match result.
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  defaultKitDesign, defaultPattern, kitFromColors, kitFromDesign, resolveKits, setKitDesign, kitDesignFor,
+  defaultKitDesign, defaultPattern, kitFromColors, kitFromDesign, setKitDesign, kitDesignFor,
   KIT_PATTERNS, type KitDesign,
 } from '../../../src/art/match/kit';
+import { resolveKits } from '../../../src/art/match/kitClash';
 import { drawPlayerFrame, LOOKS } from '../../../src/art/match/players';
 import { teamSheetFromSquad } from '../../../src/match/league/sheets';
 import { runMatch } from '../../../src/match/league/match';
