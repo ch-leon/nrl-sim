@@ -283,6 +283,12 @@ Tests: `tests/match/league/fatigue.test.ts`.
 
 ## 12. Balance targets (§7) and how to measure
 
+The 26 Oct tuning pass also checks the neutral 60 v 60 guardrails: about
+5–6 total tries and 0.20–0.30 grubber tries a match. The report exposes
+grubber outcomes and flags those tries, repeat sets at 0.05–0.30, and
+drop-outs at 0–0.15. Repeat/drop-out band edges remain provisional; see
+`docs/status/2026-10-balance.md`. These rare counts print to three decimals.
+
 Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams: tackles
 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 · tries 4–7 ·
 completion 70–80%; stronger team wins ~70% at a 20-point rating gap. The count bands

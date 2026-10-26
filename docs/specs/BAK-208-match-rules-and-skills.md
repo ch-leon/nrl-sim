@@ -275,6 +275,10 @@ kicks, tries) so balance is seen, not guessed.
 Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams:
 tackles 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 ·
 tries 4–7 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
+
+The October tuning guardrails on neutral 60 v 60 matches are about 5–6 tries
+and 0.20–0.30 grubber tries a match. Grubber repeat sets 0.05–0.30 and
+drop-outs 0–0.15 are provisional bands, displayed by the harness (tuning §12).
 The count bands are the 9:00-half bands ×7/9, rounded (2026-10-25). Completion is a
 rate and stayed.
 *Phase 3 (2026-10-19, assumed — needs Leon):* tackles, line breaks and kicks were first

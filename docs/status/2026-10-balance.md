@@ -1,5 +1,168 @@
 # Match balance — October 2026 (N13)
 
+## Match tuning pass (26 Oct)
+
+Controlled baseline: shipped `e75e140`; tuned match engine: `c10e2f9`.
+Some runs began before the tuning commit; exact source and replay overrides
+are retained in the [replay notes](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-074735-open-items/replay.md).
+Main advanced to `b2a1c2d` during validation and was merged. The final career
+checks use `2d7abdb`, with that main and the same tuned engine. Wildcard events
+stay on.
+The grubber chase, economy prices, difficulty factors and rival-style selection
+thresholds are unchanged.
+
+### Changes and replay pins
+
+| Knob | Before | After |
+|---|---:|---:|
+| `presets.attack.expansive.base.pass` | 0 | −0.10 |
+| `pace.extraPerStat` | 0 (original linear mapping) | +0.03 m/s per Speed point away from 60 |
+| Top speed at Speed 50 / 60 / 70 | 7.5 / 7.8 / 8.1 m/s | 7.2 / 7.8 / 8.4 m/s |
+| Top-speed limits | 6–9 m/s | 6–9 m/s |
+
+Expansive passes less often when engaged, while its width 0.28, edges +0.8,
+cut-out 0.02 (0.01 own 20), offloads ×1.3 (0.8 own 20) and early kick 0.18
+stay fixed. Speed has twice the slope in the middle of its range; both ends
+remain capped. This tests the open item's suggestion to make quick backs worth
+more in the match, rather than changing which squads get the Expansive label.
+
+The Balanced / Slide seed-1 golden is reverified, unchanged:
+`8-16:346:3436c830c791688a`. An Expansive / Slide seed-1 golden now covers the
+preset being tuned: `18-18:341:c5d42c10eb6a4f46` →
+`14-14:385:97934f5b337f329e`. Both pins pass.
+
+### Presets and seasons
+
+200 seeds each way (400 matches); calls and break rule off, even 60-rated
+sides. Wins exclude draws. One standard error is about 2.5 percentage points.
+These are point estimates; the Expansive change is not established beyond two
+standard errors by this block alone.
+
+| Preset | Side win before | After | Completion before | After |
+|---|---:|---:|---:|---:|
+| Grind | 50.0% | 50.0% | 71.0% | 71.0% |
+| Expansive | 45.0% | 48.3% | 69.4% | 70.1% |
+| Kick-chase | 52.3% | 52.3% | 70.6% | 70.6% |
+| All-out | 50.5% | 50.5% | 68.7% | 68.7% |
+| Rush | 51.5% | 51.5% | 69.0% | 69.0% |
+| Compressed | 51.7% | 51.7% | 69.4% | 69.4% |
+
+The selected pass variant's 400-match measurement completes 70.1% of sets
+(was 69.4%), scores 5.29 tries (5.15), and offloads 8.7 times (9.0).
+Grind's shipped offload rate is 4.6. The half-time change check moves from
+6.6 versus 5.5 offloads to 7.0 versus 5.5 (switching versus staying on Grind,
+40 matches each). Full preset report: [20261026-080940-presets](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-080940-presets/report.md).
+
+A new baseline was necessary: the doc's −6.4 Expansive strength gap was the
+longer grubber chase, not the shipped eased chase. On shipped main, 10 seeds ×
+one season × idle and managed Normal with `--live-rivals` produces 3,450 rival
+games and an Expansive gap of **−9.2** (744 sides, SE 1.8), with 41% at a level
+rating (117 sides, −9.4 points from even). The tuned run has **3,451 rival
+games** and an Expansive strength gap of
+**−3.9** (711 sides, SE 1.9; score 43%, expected 47%). At a level rating
+it scores **44%** (108 sides, −6.5 points from even).
+The season measure counts a draw as half a win, unlike the even-preset table.
+#322 remains open: the requested strength criterion is met, but the
+issue also tracks the level-rating gap, which is still outside four points.
+Break-rule switches are 2.16 → 2.12 a match.
+
+Strength-adjusted attack gaps, before → after: Balanced −1.3 → −2.2,
+Grind +2.2 → +1.2, Kick-chase +5.7 → +5.2, Expansive −9.2 → −3.9,
+All-out −1.7 → +1.6. Kick-chase is still above four points; its knobs were
+kept as the earlier acceptance specified. Defence: Slide −0.8 → −1.5,
+Rush +2.0 → +2.3, Compressed −0.4 → +1.6; all remain within four.
+Both season runs have no problems or forfeits in 40 runs, including old saves.
+
+### Open items and try guardrails
+
+The fresh baseline is [20261026-061548-open-items-baseline](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-061548-open-items-baseline/report.md); after is
+[20261026-074735-open-items](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-074735-open-items/report.md). Neutral counts use 200 seeds. The strength and
+stamina side rates use 200 seeds each way (400 matches), so home advantage is
+not mistaken for the rating or stamina slope.
+
+| Item | Historical doc | Fresh main → after | Status |
+|---|---|---|---|
+| Completion | 69.3% longer chase; 70.8% eased, 80 seeds | 69.790% → 69.790% neutral; Expansive 69.4% → 70.1% | Neutral remains just under 70–80%. A global catch-error reduction was rejected below. Open. |
+| Home wins | 49% longer chase; 53% eased | 51.0% → 51.0% (draws 3.5% → 3.5%) | Under 52–58%, within sampling uncertainty. The tested global home/handling combination failed the economy cap; kept open. |
+| Stronger side, 70 v 50 | 69%, 80 seeds | 67.0% → 74.3% (draws 4.25% → 3.75%) | Crosses the approximate 70% target; after is about two standard errors above it. Spread stays 0.2 to avoid another change to career strength gaps. Monitor/open. |
+| Stamina 30 v 80, low-stamina side wins | 38%, 40 seeds | 40.8% → 40.8% (draws 6.75% → 6.75%) | Slope unchanged. The doc supplies no numeric target margin; open. |
+| Grubber repeat sets | 0.08/match, 80 seeds | 0.045 → 0.045/match | Under provisional 0.05–0.30 by one event in 200 matches. No chase change to seek one rare event; open. |
+| Grubber drop-outs | 0.00/match | 0.000 → 0.000/match | Inside provisional 0–0.15. Groundings/dead grubbers remain 20 m restarts. Band sign-off remains open. |
+| Grubber tries | 0.25/match, 80 seeds | 0.265 → 0.265/match | Inside the requested 0.2–0.3 guardrail. |
+| All tries, neutral | 5.4/match, 80 seeds | 5.085 → 5.085/match | Inside about 5–6. |
+
+The matched fliers test ([20261026-074559-pace-slope](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-074559-pace-slope/report.md), 120 seeds each way)
+changes their side win 47.9% → 49.6%, line breaks 20.2 → 25.4, completion
+69.8% → 69.1%, and tries 6.57 → 7.36. Those tries exceed the harness's 4–7
+band; the fast/low-stamina stress matchup was already above the neutral
+5–6 guardrail on main. The open-item plan's 100-seed-each-way row gives
+51.0% side wins, 25.7 line breaks and 7.50 tries. The fliers' try rate remains
+an open tradeoff: global cruise pace is kept fixed because the neutral match
+is already near the bottom of its 5–6 guardrail.
+
+The harness report now includes grubber counts, tries, repeats, drop-outs and
+turnovers, with bands 0.20–0.30, 0.05–0.30 and 0–0.15 on the three outcomes.
+Rare counts print to three decimals so a 0.045 repeat rate is visible.
+The repeat/drop-out band edges remain provisional.
+
+### Economy with wildcard events
+
+Final integrated source `2d7abdb` (main `b2a1c2d` plus the tuning):
+`npm run soak -- --managed-only --difficulties easy,normal,hard --jobs 4`.
+20 seeds × five seasons per difficulty, plus 20 old-save runs: **80 runs,
+no problems, no forfeits**. Wildcard cards are on. The baseline below is the
+shipped, wildcard-on table in the 25 Oct section, not the rejected global trial.
+
+Money is the mean terminal balance across **all 20** careers, including clubs
+stopped early; it is not the season-five survivor mean. Dollars are rounded to
+$k consistently with the earlier table.
+
+| Managed difficulty | In red before | After | Cap | End money before | After |
+|---|---:|---:|---:|---:|---:|
+| Easy | 1/20 | **0/20** | ≤1/20 | $723k | **$1,090k** |
+| Normal | 3/20 | **3/20** | ≤3/20 | $494k | **$644k** |
+| Hard | 8/20 | **5/20** | ≤8/20 | $131k | **$271k** |
+
+Easy remains richer than Normal, and Normal richer than Hard. Normal is still
+on its cap. Its three red careers finish at −$88,141 (seed 7919, season 3),
+−$95,714 (55433, season 4) and −$75,739 (118785, season 4); the mean does not
+make those clubs safe. The price, prize, grant and difficulty factors were not
+changed to obtain these counts. The old pre-integration broad soak was
+superseded when main advanced; the final table uses the completed integrated
+managed sample. The new `--managed-only` switch selects these same seeded
+managers without adding idle careers and retains all old-save checks.
+
+The final live-rival repeat on this integrated source reproduces all 40
+pre-integration outcomes exactly, apart from runtime: 3,451 rival games,
+Expansive −3.9 against strength and −6.5 off even at a level rating.
+
+### Rejected global trial and validation
+
+The first trial reduced the global catch-error base 4% → 3.5% and added a
++0.5 home rating edge. It lifted neutral completion 69.8% → 70.6%, but left
+Expansive at 46.5% even wins and −8.8 against season strength, with managed
+Normal **4/20** careers in the red (cap **3/20**). Managed Easy was 0/20 and
+Hard 8/20. It was reverted. Its golden `4-24:401:6e496a01799595b9` is a
+rejected-trial result, not the shipped pin. Reports:
+[20261026-062746-presets](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-062746-presets/report.md), [20261026-062752-open-items](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-062752-open-items/report.md), and the career JSON.
+
+Expansive sweeps are retained in [20261026-061533-expansive-tuning](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-061533-expansive-tuning/report.md) and
+[20261026-074225-expansive-risk](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-074225-expansive-risk/report.md). On the latter 400-match blocks, pass
+−0.05 / −0.10 / −0.15 gives 45.3% / 48.3% / 41.8%; cut-out 0.01 gives 44.0%;
+edges +0.4 gives 51.5% but completion stays 69.0%. The chosen −0.10 keeps
+width and edge preference and puts completion inside its band. The handling
+and home trials are [20261026-061654-handling-tuning](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-061654-handling-tuning/report.md) and
+[20261026-062144-home-edge-tuning](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-062144-home-edge-tuning/report.md).
+
+Local validation on the tuned sim: `npx tsc --noEmit`, all **1,730 tests in
+140 files**, and `npm run build` pass. After merging newer main, typecheck,
+all 19 wildcard tests and the production build pass. The 104-test targeted
+set also passes. The final merged head runs the full `check` CI job. WebKit is
+executed by the PR CI job (`npm run e2e:webkit`); the local browser install
+was blocked by unavailable root dependency installation and denied Playwright
+download hosts. PR CI is the WebKit result to review. Full raw balance reports and [career JSON, commands and logs](https://github.com/ch-leon/nrl-sim/tree/balance-log/runs/20261026-074735-open-items/career)
+are retained on `balance-log`; the [local full-check log](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261026-074735-open-items/validation/check.log) records the completed 1,730-test run.
+
 ## Shorter halves (25 Oct)
 
 Halves went from 9:00 to 7:00 so a watched match is shorter. The golden even
@@ -239,8 +402,10 @@ Managed Easy is on the cap of 1 in 20. Managed Normal is on the cap of 3 in 20 (
 The live match sim's knobs, measured with the harness (`npm run balance`, `balance/README.md`).
 N13 item 1 is the presets. N13.5 is the break rule (below). Grubbers, the season styles,
 the economy and the rows left open are in "Grubber chase and season styles" above.
-Grubbers and Grind's season are in. Expansive's season rate stays on #322. The
-rest is under "Open tuning items".
+Grubbers and Grind's season are in. The 26 Oct follow-up above brings Expansive's
+strength-adjusted rate inside four points; #322 remains open for its level-rating
+row. The remaining items are recorded in that follow-up and the historical
+"Open tuning items" table.
 
 N15.4 (traits you can see) adds an optional `toSlot` on a cut-out event in `src/match/league/live.ts`
 (this plan's file): the receiver's slot, so the view can draw the line. The sim does not

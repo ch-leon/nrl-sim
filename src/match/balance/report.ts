@@ -93,7 +93,7 @@ export function reportMarkdown(r: ReportInput): string {
         const v = row.counts[k];
         const mark = bandMark(k, v.mean);
         const d = row === base ? '' : ` (${delta(v, base.counts[k], Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})`;
-        return `${v.mean.toFixed(k.startsWith('grubber') ? 2 : 1)}${mark ? ` ${mark}` : ''}${d}`;
+        return `${v.mean.toFixed(k.startsWith('grubber') ? 3 : 1)}${mark ? ` ${mark}` : ''}${d}`;
       });
       const side = tracked
         ? ` ${row.trackedWin === undefined ? '—' : `${pct1(row.trackedWin)}${row.trackedDraw ? ` (${pct1(row.trackedDraw)} drawn)` : ''}`} |`
