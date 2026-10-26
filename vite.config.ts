@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { formatBuildLabel } from './src/ui/buildInfo';
 import { claudeDirIgnored } from './src/utils/devWatch';
+import { minifyCssConsts } from './src/utils/cssMinify';
 
 // BAK-204 (WU-16): installable, offline-capable PWA via generateSW.
 // The Phaser chunk is large, so the Workbox precache size cap is raised to ~6MB.
@@ -33,6 +34,16 @@ export default defineConfig({
   base,
   define: { __NRL_BUILD__: JSON.stringify(BUILD_LABEL) },
   plugins: [
+    // The UI's stylesheets without their comments and indents (about 5 KB gzipped);
+    // build only, so tests and the dev server read them as written.
+    {
+      name: 'nrl-css-minify',
+      apply: 'build',
+      transform(code, id) {
+        if (!/[\\/]src[\\/]ui[\\/].*\.ts$/.test(id) || !code.includes('CSS = `')) return null;
+        return { code: minifyCssConsts(code), map: null };
+      },
+    },
     VitePWA({
       // 'prompt' (N7, #181): a new build waits for the player to tap Reload on
       // the update bar (src/fx/pwa.ts, src/ui/updatePrompt.ts) instead of
