@@ -711,6 +711,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   flex-direction: column;
   overflow: hidden;
   width: min(96vw, 640px);
+  height: calc(100% - 6px);
   max-width: none;
   padding: 0.55rem 0.65rem;
 }
@@ -762,8 +763,9 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-event-choice-label { font-weight: bold; font-size: 0.95rem; line-height: 1.2; }
 .nrl-event-choice-hint { font-size: 0.78rem; opacity: 0.9; white-space: normal; font-weight: normal; line-height: 1.3; }
-/* A landscape phone (844×390): both choices sit above Close, still a 44px target. */
-@media (max-height: 500px) {
+/* Compact cards on short landscape and narrow portrait phones: choices stay
+   above Close, with their hints visible and targets at least 44px tall. */
+@media (max-height: 500px), (max-width: 480px) {
   .nrl-screen-backdrop .nrl-news-modal { padding: 0.25rem 0.5rem; }
   .nrl-news h2 { margin-bottom: 0.1rem; font-size: 0.9rem; }
   .nrl-news-decisions h3 { display: none; }
@@ -776,6 +778,11 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-event-choice { padding: 0.1rem 0.45rem; }
   .nrl-event-choice-hint { font-size: 0.7rem; line-height: 1.2; }
   .nrl-news-close { margin-top: 0.15rem; }
+}
+/* Landscape has room for equal columns; portrait keeps the choices stacked. */
+@media (max-height: 500px) {
+  .nrl-event-choices { flex-direction: row; align-items: stretch; gap: 0.4rem; }
+  .nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; }
 }
 .nrl-placebar {
   pointer-events: auto;

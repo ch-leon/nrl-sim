@@ -14,7 +14,7 @@ import { earnMoney } from '../data/club';
 import { overallRating } from '../data/player';
 import { TRAITS, traitLevel, withTrait, type TraitLevel } from '../data/traits';
 import {
-  cardById, EVENT_CARDS, type EventCardDef, type EventEffect, type SubjectRule,
+  cardById, closedGatesFlag, EVENT_CARDS, type EventCardDef, type EventEffect, type SubjectRule,
 } from '../data/events';
 import { BOARD, EVENTS, ON_FIELD, SQUAD_CAP, WEEKS_PER_SEASON, WILDCARDS } from '../config';
 import { marketWage, withDerivedStrength } from './rivals';
@@ -76,6 +76,7 @@ export function describeEffects(effects: readonly EventEffect[], opts?: { welfar
       case 'suspend': return [banPhrase(e.weeks)];
       case 'boardPatience': return [`board patience ${signed(e.amount)}`];
       case 'flag': return [];
+      case 'closeGates': return ['gates closed (no ticket income)'];
       case 'chance': {
         const p = effectiveChance(e.p, e.risk, opts?.welfare === true);
         return [`${formatPct(p)} chance of ${describeEffects(e.hit, opts)}`];
@@ -265,6 +266,7 @@ export interface Applied {
 
 interface EffectCtx {
   cardId: string;
+  match?: { season: number; round: number };
   reason: string; // ledger reason for money
   subjectId?: string | undefined;
   subjectName?: string | undefined;
@@ -332,6 +334,12 @@ export function applyEffects(state: GameState, effects: readonly EventEffect[], 
         break;
       }
       case 'boardPatience': s = { ...s, boardPatience: clampPatience(s.boardPatience + e.amount) }; break;
+      case 'closeGates': {
+        const match = ctx.match ?? { season: s.season, round: s.week + 1 };
+        const flag = closedGatesFlag(match.season, match.round);
+        if (!s.eventDeck.flags.includes(flag)) s = { ...s, eventDeck: { ...s.eventDeck, flags: [...s.eventDeck.flags, flag] } };
+        break;
+      }
       case 'flag': {
         const flags = s.eventDeck.flags ?? [];
         if (!flags.includes(e.id)) s = { ...s, eventDeck: { ...s.eventDeck, flags: [...flags, e.id] } };
@@ -416,7 +424,7 @@ export function resolveEvent(state: GameState, eventId: string, index: number, n
   if (!choice) return null;
   const rng = makeRng(without.eventDeck.rng);
   const applied = applyEffects(without, choice.effects, {
-    cardId: card.id, reason: `event: ${card.title}`, subjectId: ev.subjectId, subjectName: ev.subjectName,
+    cardId: card.id, match: { season: ev.season, round: ev.week + 1 }, reason: `event: ${card.title}`, subjectId: ev.subjectId, subjectName: ev.subjectName,
     rivalId: ev.rivalId, fee: ev.fee, now, clubName: state.clubName, vars: ev.vars,
   }, rng);
   applied.state = { ...applied.state, eventDeck: { ...applied.state.eventDeck, rng: rng.state() } };

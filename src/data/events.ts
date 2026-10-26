@@ -31,10 +31,12 @@ export type ImmediateEffect =
   /** The board's patience, clamped to 0..MAX. A season review still does the sacking. */
   | { kind: 'boardPatience'; amount: number }
   /** Remember this choice so a later card can require it. */
-  | { kind: 'flag'; id: string };
+  | { kind: 'flag'; id: string }
+  /** No crowd or ticket income at the fixture this card was drawn for. */
+  | { kind: 'closeGates' };
 
 /** What a temporary modifier may fire. A ban is not one of these. */
-export type ModifierEffect = Exclude<ImmediateEffect, { kind: 'suspend' } | { kind: 'boardPatience' } | { kind: 'flag' }>;
+export type ModifierEffect = Exclude<ImmediateEffect, { kind: 'suspend' } | { kind: 'boardPatience' } | { kind: 'flag' } | { kind: 'closeGates' }>;
 
 /** A roll on the events deck's own rng. `risk` is halved while a Welfare Manager is hired. */
 export interface ChanceEffect {
@@ -389,7 +391,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
     weight: 5, cooldown: 20, when: { nextMatch: 'any' },
     choices: [
       { label: 'Play on', effects: [{ kind: 'squadMorale', amount: -3 }, { kind: 'reputation', amount: 1 }], outcome: 'Kickoff is on. The diehards are already in the creek.' },
-      { label: 'Refund ($4,000)', effects: [{ kind: 'money', amount: -4_000 }, { kind: 'squadMorale', amount: 2 }, { kind: 'reputation', amount: 1 }], outcome: 'Members were refunded $4,000 and the storm blew through empty stands.' },
+      { label: 'Refund ($4,000)', effects: [{ kind: 'closeGates' }, { kind: 'money', amount: -4_000 }, { kind: 'squadMorale', amount: 2 }, { kind: 'reputation', amount: 1 }], outcome: 'Members were refunded $4,000 and the storm blew through empty stands.' },
     ],
     defaultChoice: 0,
   },
@@ -516,7 +518,7 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
       { label: 'Smooth it ($3,000)', effects: [{ kind: 'money', amount: -3_000 }, { kind: 'reputation', amount: 1 }], outcome: 'A $3,000 lunch, and the sponsor is willing to see how the season starts.' },
       { label: 'Ride it out', effects: [{ kind: 'reputation', amount: -2 }, { kind: 'boardPatience', amount: -1 }], outcome: 'The club rode it out. The sponsor, and the board, noticed.' },
     ],
-    defaultChoice: 0,
+    defaultChoice: 1,
   },
 ];
 
@@ -524,3 +526,6 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
 export function cardById(id: string): EventCardDef | undefined {
   return EVENT_CARDS.find((c) => c.id === id);
 }
+
+/** Match-specific marker in the existing deck flags; safe across saves and season rollovers. */
+export const closedGatesFlag = (season: number, round: number): string => `gatesClosed:s${season}w${round}`;
