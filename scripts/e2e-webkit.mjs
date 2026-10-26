@@ -21,8 +21,10 @@
 // until the phone is sideways, including after Continue reopens the page upright.
 // With the match up, the full call-chip set (Plan through Hold) is laid in and the
 // ticker is checked at 360×640, 390×844, 667×375 and 844×390: it has to sit clear
-// of the speed row, the chips and the corner buttons, and the open log icon keeps
-// its fill under hover. Exits 1 on any failure.
+// of the speed row, the chips and the corner buttons. The open log must scroll
+// fully between the scoreboard and ticker, and its icon keeps its hover fill.
+// Both Bali choices must fit, retain 44px targets and accept taps at these same
+// four sizes. Exits 1 on any failure.
 //
 //   npm run e2e:webkit
 //   npm run e2e:webkit -- --size 956x330           (or E2E_SIZES="956x330 844x390")
