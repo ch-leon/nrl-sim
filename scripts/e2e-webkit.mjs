@@ -899,6 +899,109 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   return report.steps.filter((s) => !s.ok).length + report.errors.length;
 }
 
+// ── The tutorial, followed (#344) ────────────────────────────────────────────
+// Welcome → Build → Recruit done the way the bubble says, never skipped: More, the
+// row in its sheet, a paddock placed, a player signed. Each control the step points
+// at must be whole, out from under the bubble, and take the tap.
+const NO_INSETS = { l: 0, t: 0, r: 0, b: 0 };
+const WALK_RUNS = [{ w: 667, h: 375, safe: NO_INSETS }, { w: 844, h: 390, safe: { l: 47, t: 0, r: 47, b: 21 } }, { w: 956, h: 330, safe: NO_INSETS }];
+
+async function runTutorialWalk(browser, { w: W, h: H, safe }) {
+  const tag = `${W}x${H}${safe.l || safe.r || safe.b || safe.t ? '-safe' : ''}`;
+  const OUT = join(OUT_ROOT, 'webkit', `tutorial-${tag}`);
+  rmSync(OUT, { recursive: true, force: true });
+  mkdirSync(OUT, { recursive: true });
+  const report = { size: tag, safe, steps: [], errors: [] };
+  const ctx = await browser.newContext({
+    viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
+  });
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(10000);
+  page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
+  let n = 0;
+  let stop = false;
+  const step = async (name, fn) => {
+    if (stop) return;
+    n++;
+    const rec = { n, name, ok: true, notes: [] };
+    try {
+      const problems = (await fn(rec)) ?? [];
+      if (problems.length) { rec.ok = false; rec.notes.push(...problems); }
+    } catch (err) {
+      rec.ok = false;
+      rec.notes.push(`threw: ${err.message.split('\n')[0]}`);
+    }
+    rec.file = `${String(n).padStart(2, '0')}-${name}.png`;
+    await page.screenshot({ path: join(OUT, rec.file) }).catch(() => {});
+    report.steps.push(rec);
+    log(`${rec.ok ? 'ok ' : 'FAIL'} tutorial ${tag} ${rec.file}${rec.notes.length ? ` — ${rec.notes.join('; ')}` : ''}`);
+    if (!rec.ok) stop = true; // the steps after this one start from where it left off
+  };
+  /** The step's target (the first on show, with `text` if given): whole on screen, clear of the bubble, and the one a tap at its middle hits. Then tap it. */
+  const tapTarget = async (sel, rec, text = '') => {
+    await page.waitForSelector(sel, { state: 'visible' });
+    await page.waitForTimeout(700); // the tutorial's anchor poll (500 ms) moves the bubble
+    const problem = await page.evaluate(([sel, text]) => {
+      const t = [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().width > 0 && e.textContent.includes(text));
+      if (!t) return `no ${sel} ${text}`;
+      const r = t.getBoundingClientRect();
+      const b = document.querySelector('.nrl-tutorial-bubble')?.getBoundingClientRect();
+      if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) return `${sel} off screen`;
+      if (b && !(b.right <= r.left || b.left >= r.right || b.bottom <= r.top || b.top >= r.bottom)) return `the bubble covers ${sel}`;
+      const c = document.querySelector('.nrl-tutorial-cutout')?.getBoundingClientRect();
+      if (!c || r.left < c.left || r.right > c.right || r.top < c.top || r.bottom > c.bottom) return `the highlight is not round ${sel}`;
+      const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+      return hit && t.contains(hit) ? null : `${sel}: a tap hits ${hit?.className || hit?.tagName}`;
+    }, [sel, text]);
+    if (problem) return [problem];
+    rec.notes.push(`${text || sel} clear`);
+    await page.locator(`${sel} >> visible=true`).filter({ hasText: text }).first().tap();
+    return [];
+  };
+  const atStep = (id) => page.waitForSelector(`.nrl-tutorial-bubble[data-step="${id}"]`);
+
+  await step('welcome', async () => {
+    await page.goto(BASE);
+    await page.waitForSelector('[data-nrl-start]');
+    if (safe.l || safe.t || safe.r || safe.b) {
+      await page.evaluate((s) => {
+        const st = document.documentElement.style;
+        st.setProperty('--nrl-safe-l', `${s.l}px`); st.setProperty('--nrl-safe-t', `${s.t}px`);
+        st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
+      }, safe);
+    }
+    await page.fill('[data-nrl-clubname]', 'Tutorial FC');
+    await page.locator('[data-nrl-start]').tap();
+    await atStep('welcome');
+    await page.locator('.nrl-tutorial-next').tap();
+    await atStep('build');
+  });
+  await step('build-more', (rec) => tapTarget('.nrl-nav [data-nav-more]', rec));
+  await step('build-open', (rec) => tapTarget('.nrl-nav-sheet [data-screen="build"]', rec));
+  await step('build-paddock', async (rec) => {
+    const out = await tapTarget('[data-facility="trainingPaddock"]', rec);
+    if (out.length) return out;
+    await page.waitForSelector('.nrl-placebar:not([hidden])');
+    await page.touchscreen.tap(Math.round(W / 2), Math.round(H / 2) + 10);
+    await atStep('recruit');
+    return [];
+  });
+  await step('recruit-more', (rec) => tapTarget('.nrl-nav [data-nav-more]', rec));
+  await step('recruit-open', (rec) => tapTarget('.nrl-nav-sheet [data-screen="recruit"]', rec));
+  await step('recruit-sign', async (rec) => {
+    const out = await tapTarget('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)', rec);
+    if (out.length) return out;
+    await atStep('squad');
+    rec.notes.push('signed: on to the squad step');
+    return [];
+  });
+
+  for (const e of report.errors) log(`  error: ${e}`);
+  writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
+  await ctx.close();
+  return report.steps.filter((s) => !s.ok).length + report.errors.length;
+}
+
 const SCREENS_ONLY = argv.includes('--screens-only');
 let failed = 0;
 try {
@@ -908,6 +1011,7 @@ try {
     for (const [W, H] of SIZES) failed += await runSize(browser, W, H);
     failed += await runPortrait(browser);
   }
+  for (const run of WALK_RUNS) failed += await runTutorialWalk(browser, run);
   for (const run of SCREEN_RUNS) failed += await runScreens(browser, run);
   await browser.close();
 } catch (err) {
