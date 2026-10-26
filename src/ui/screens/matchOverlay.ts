@@ -498,6 +498,11 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     const bottom = Math.ceil(clearance + 8);
     root.style.setProperty('--nrl-mo-chrome', `${bottom}px`);
     root.style.setProperty('--nrl-mo-above', `${bottom + commentaryPanel.offsetHeight + 8}px`);
+    // The open log must fit between the scoreboard and the ticker, even when
+    // all call chips wrap into several rows on a small landscape phone.
+    const logBottom = window.innerHeight - bottom - commentaryPanel.offsetHeight - 4;
+    const logHeight = Math.max(0, Math.floor(logBottom - scoreboard.getBoundingClientRect().bottom - 8));
+    root.style.setProperty('--nrl-mo-log-height', `${logHeight}px`);
   };
   const scheduleChrome = (): void => {
     if (chromeFrame) return;
@@ -516,6 +521,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const chromeMut = new MutationObserver(scanChrome);
   chromeMut.observe(getRoot(), { childList: true });
   window.addEventListener('resize', scheduleChrome);
+  chromeObserver?.observe(scoreboard);
+  chromeObserver?.observe(commentaryPanel);
   scanChrome();
 
   let replayTimer: ReturnType<typeof setTimeout> | null = null;
@@ -843,9 +850,11 @@ body.nrl-match-final .nrl-toast-stack {
 }
 /* Full log: opt-in, stacked just above the ticker (the ticker's own width). */
 .nrl-mo-log {
-  position: absolute; left: 0; right: 0; bottom: calc(100% + 0.25rem); margin: 0;
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); margin: 0;
+  max-height: var(--nrl-mo-log-height, 8rem); overflow: hidden;
+  display: flex; flex-direction: column; padding: 0.15rem 0.5rem;
 }
-.nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: 8rem; overflow-y: auto; }
+.nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: 8rem; min-height: 0; overflow-y: auto; }
 .nrl-mo-line { font-size: clamp(0.6rem, 2.4vw, 0.8rem); line-height: 1.25; }
 /* Playback controls (mounted by MatchScene): bottom-centre, where the nav bar
    sits outside a match; the commentary feed stacks above them. */
@@ -857,6 +866,12 @@ body.nrl-match-final .nrl-toast-stack {
 .nrl-mo-calls {
   position: fixed; right: 0.5rem; bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px));
   z-index: 20; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; max-width: 17.5rem; pointer-events: auto;
+}
+/* Three chip rows leave a readable log below the scoreboard on short phones.
+   Give the speed row its content width so it stays beneath the wider chips. */
+@media (min-width: 600px) and (max-height: 400px) {
+  .nrl-mo-calls { max-width: 24rem; }
+  .nrl-mo-controls { width: max-content; }
 }
 .nrl-mo-calls .nrl-btn { min-height: 44px; min-width: 4.6rem; padding: 0.15rem 0.4rem; font-size: 0.78rem; }
 .nrl-mo-calls .nrl-btn[data-made] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; opacity: 1; }

@@ -21,7 +21,7 @@ import { hasStaff } from './staff';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { ON_FIELD } from '../config';
-import { autoPick, describeFills, resolveLineup } from './lineup';
+import { autoPick, isFieldable, describeFills, resolveLineup } from './lineup';
 
 /**
  * Who changes plan at the breaks. The rival always. The player's side too when
@@ -153,7 +153,7 @@ function sheetFor(clubId: string): TeamSheet {
  * his edge after the rating spread (N12.2, `rivalEdge`).
  */
 export function rivalMatchSheet(rival: RivalClub): TeamSheet {
-  const fit = (rival.squad ?? []).filter((p) => p.injuredWeeks <= 0);
+  const fit = (rival.squad ?? []).filter(isFieldable);
   if (fit.length >= ON_FIELD) {
     return withRivalStyle(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), rival);
   }

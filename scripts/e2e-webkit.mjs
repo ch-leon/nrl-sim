@@ -21,8 +21,10 @@
 // until the phone is sideways, including after Continue reopens the page upright.
 // With the match up, the full call-chip set (Plan through Hold) is laid in and the
 // ticker is checked at 360×640, 390×844, 667×375 and 844×390: it has to sit clear
-// of the speed row, the chips and the corner buttons, and the open log icon keeps
-// its fill under hover. Exits 1 on any failure.
+// of the speed row, the chips and the corner buttons. The open log must scroll
+// fully between the scoreboard and ticker, and its icon keeps its hover fill.
+// Both Bali choices must fit, retain 44px targets and accept taps at these same
+// four sizes. Exits 1 on any failure.
 //
 //   npm run e2e:webkit
 //   npm run e2e:webkit -- --size 956x330           (or E2E_SIZES="956x330 844x390")
@@ -375,6 +377,47 @@ async function runPortrait(browser) {
     await skip.tap();
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
   });
+  // Inspect the event UI in both orientations. Hide only the rotate prompt:
+  // portrait gameplay is still paused, but DOM choices must fit and accept taps.
+  await step('bali-choices-fit', async (rec) => {
+    await page.addStyleTag({ content: '.nrl-rotate { display: none !important; }' });
+    const problems = [];
+    for (const [w, h] of [[360, 640], [390, 844], [667, 375], [844, 390]]) {
+      for (const choice of [0, 1]) {
+        await turn(w, h);
+        if (!(await page.evaluate(() => window.__nrlShowCard?.('baliTrip')))) throw new Error('Bali hook failed');
+        await page.locator('.nrl-nav .nrl-btn[data-screen="news"]').tap();
+        await page.waitForSelector('.nrl-event-card');
+        await page.waitForTimeout(100);
+        const found = await reachProblems(page, '.nrl-event-card', ['[data-event-choice="0"]', '[data-event-choice="1"]']);
+        found.push(...await page.evaluate(() => {
+          const body = document.querySelector('.nrl-news-body').getBoundingClientRect();
+          return [...document.querySelectorAll('.nrl-event-choice')].flatMap((b) => {
+            const r = b.getBoundingClientRect();
+            const out = [];
+            if (r.height < 44 || r.width < 44) out.push(`choice ${b.dataset.eventChoice} is ${r.width}×${r.height}`);
+            if (r.top < body.top - 1 || r.bottom > body.bottom + 1) out.push(`choice ${b.dataset.eventChoice} clipped by News body (${r.top.toFixed(1)}–${r.bottom.toFixed(1)} vs ${body.top.toFixed(1)}–${body.bottom.toFixed(1)})`);
+            if (b.scrollHeight > b.clientHeight + 1) out.push(`choice ${b.dataset.eventChoice} clips its text`);
+            return out;
+          });
+        }));
+        problems.push(...found.map((p) => `${w}×${h}: ${p}`));
+        await page.screenshot({ path: join(OUT, `bali-${w}x${h}-choice${choice}.png`) });
+        await page.locator(`[data-event-choice="${choice}"]`).tap();
+        if (await page.locator('.nrl-event-card').count()) problems.push(`${w}×${h}: choice ${choice} did not resolve`);
+        await page.locator('.nrl-news-close').tap();
+      }
+      rec.notes.push(`${w}×${h}: both choices tapped`);
+    }
+    // Restore the real portrait prompt for the remaining orientation checks.
+    await page.evaluate(() => {
+      for (const style of document.querySelectorAll('style')) {
+        if (style.textContent === '.nrl-rotate { display: none !important; }') style.remove();
+      }
+    });
+    await turn(844, 390);
+    return problems;
+  });
   await step('match-running', async (rec) => {
     await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
     await page.waitForSelector('.nrl-mo-controls');
@@ -476,6 +519,16 @@ async function runPortrait(browser) {
         calls.append(b);
       }
     });
+    await page.locator('.nrl-mo-log-toggle').evaluate((el) => el.click());
+    await page.evaluate(() => {
+      const feed = document.querySelector('.nrl-mo-feed');
+      for (let i = 0; i < 80; i++) {
+        const line = document.createElement('div');
+        line.className = 'nrl-mo-line';
+        line.textContent = `Layout regression commentary line ${i}`;
+        feed.append(line);
+      }
+    });
     const problems = [];
     const sizes = [[360, 640], [390, 844], [667, 375], [844, 390]];
     for (const [w, h] of sizes) {
@@ -501,17 +554,26 @@ async function runPortrait(browser) {
           const score = document.querySelector('.nrl-mo-scoreboard')?.getBoundingClientRect();
           if (score && overlap(score)) hits.push('scoreboard');
           if (!log || log.width < 44 || log.height < 44) hits.push(`log icon ${Math.round(log?.width ?? 0)}×${Math.round(log?.height ?? 0)}`);
+          const panel = document.querySelector('.nrl-mo-log')?.getBoundingClientRect();
+          const feed = document.querySelector('.nrl-mo-feed');
+          if (!panel || panel.height < 1) hits.push('open log not visible');
+          else {
+            if (score && panel.top < score.bottom - 1) hits.push(`open log behind scoreboard (${panel.top.toFixed(1)} < ${score.bottom.toFixed(1)})`);
+            if (panel.bottom > ticker.top + 1) hits.push('open log overlaps ticker');
+            if (panel.left < 0 || panel.right > innerWidth || panel.top < 0) hits.push('open log off screen');
+            if (!feed || feed.clientHeight < 12 || feed.scrollHeight <= feed.clientHeight) hits.push(`open log not scrollable (${feed?.clientHeight}px, panel ${panel.height.toFixed(1)}px)`);
+          }
           const chips = document.querySelectorAll('.nrl-mo-calls .nrl-btn').length;
           if (chips < 10) hits.push(`only ${chips} chips`);
           return { pending: hits.length > 0, problems: hits };
         });
         if (!found.pending) break;
       }
+      await page.screenshot({ path: join(OUT, `open-log-${w}x${h}.png`) });
       if (found?.problems?.length) problems.push(`${w}×${h}: ${found.problems.join(', ')}`);
       else rec.notes.push(`${w}×${h} clear`);
     }
     await turn(844, 390);
-    await page.locator('.nrl-mo-log-toggle').evaluate((el) => el.click());
     await page.locator('.nrl-mo-log-toggle').hover();
     const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nrl-mo-log-toggle')).backgroundColor);
     if (bg !== 'rgb(255, 246, 194)') problems.push(`open log hover fill is ${bg}, want rgb(255, 246, 194)`);

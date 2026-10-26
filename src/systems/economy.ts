@@ -16,7 +16,7 @@ import { earnMoney } from '../data/club';
 import { ECON, SEASON_ROUNDS, SQUAD_MIN, WEEKS_PER_SEASON, difficultyMultipliers, scaledMoney } from '../config';
 import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep, levelMult } from '../data/facility';
-import { EVENT_CARDS } from '../data/events';
+import { closedGatesFlag, EVENT_CARDS } from '../data/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks } from './contracts';
@@ -160,11 +160,12 @@ export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
   const occasion = fixture.round > SEASON_ROUNDS ? ECON.FINALS_MULT : topEight(state, opponent) ? ECON.BIG_MATCH_MULT : 1;
   const demand = Math.round(base * form * occasion);
   const capacity = groundCapacity(state);
-  const attendance = Math.min(capacity, demand);
+  const closed = state.eventDeck.flags.includes(closedGatesFlag(state.season, fixture.round));
+  const attendance = closed ? 0 : Math.min(capacity, demand);
   // Easy pays a little less at the gate (DIFFICULTY.easy.gate). Normal and Hard
   // are ×1, so the crowd, the form and the occasion still decide the receipt.
   const receipts = scaledMoney(attendance * ECON.TICKET_PRICE, difficultyMultipliers(state.settings.difficulty).gate);
-  return { capacity, demand, attendance, receipts, soldOut: demand > capacity };
+  return { capacity, demand, attendance, receipts, soldOut: !closed && demand > capacity };
 }
 
 /** What the next Grandstand level would draw and pay at a sold-out fixture's demand. */
