@@ -45,9 +45,11 @@ describe('field', () => {
 
 describe('body steering', () => {
   it('maps the speed stat onto a 6–9 m/s range', () => {
-    expect(maxSpeedFor(1)).toBeCloseTo(MIN_SPEED + 0.03, 1);
+    expect(maxSpeedFor(1)).toBe(MIN_SPEED);
     expect(maxSpeedFor(100)).toBe(MAX_SPEED);
-    expect(maxSpeedFor(50)).toBeCloseTo((MIN_SPEED + MAX_SPEED) / 2);
+    expect(maxSpeedFor(50)).toBeCloseTo(7.2);
+    expect(maxSpeedFor(60)).toBeCloseTo(7.8); // neutral pace is unchanged
+    expect(maxSpeedFor(70)).toBeCloseTo(8.4);
     expect(maxSpeedFor(500)).toBe(MAX_SPEED);
   });
 

@@ -32,7 +32,8 @@ result. Keep it in step with the code: when a constant changes, change the row.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `MIN_SPEED` / `MAX_SPEED` | `src/match/core/body.ts` | 6 / 9 m/s | Top speed from the Speed stat (1 → 6, 100 → 9). |
+| `MIN_SPEED` / `MAX_SPEED` | `src/match/core/body.ts` | 6 / 9 m/s | Bounds on top speed from the Speed stat. |
+| `pace.extraPerStat` | `body.ts` | 0.03 m/s | Added per Speed point away from 60, then clamped to 6–9 m/s. The old slope was 0.03; the middle slope is now 0.06, with Speed 60 unchanged at 7.8 m/s. |
 | `ACCEL` | `body.ts` | 9 m/s² | Acceleration and braking cap. Drives the run-on lead (§5 below). |
 | `BODY_RADIUS` | `body.ts` | 0.9 m | Separation radius (nobody stands inside anyone). |
 | `live.separatePasses` / `live.decideEveryTicks` | `live.ts` | 2 / 1 | How many times a tick bodies are pushed apart, and how often players re-pick targets: speed knobs, §23. |
@@ -71,7 +72,7 @@ Baselines at even stats, one-on-one, square — `src/match/league/contest.ts`:
 | Momentum | ±1 pt bust per m/s, cap ±4 | Carrier speed − tackler speed. |
 | Last tackle | big hit +3 | The defence is set. |
 | `stepChance` | 10% + (footwork − defence)/200, side +5, behind −5, cap 0.7 | Pre-contact step, one-on-one only. |
-| `handling.catchBase` / `handling.catchPressured` | 3.5% / +4% | Pass catch errors (`knockOnChance`): base + (50 − Skill)/1000, pressure, rain +6, cap 0.5…40%. Base was 4%; completion tuning in `docs/status/2026-10-balance.md`. |
+| `knockOnChance` | 4% + (50 − Skill)/1000, pressured +4, rain +6, cap 0.5…40% | Catch on a pass. |
 | `interceptChance` | 6% + (IQ − 50)/1000, cut-out ×2, cap 1…60% | Defender inside `live.laneM` of the pass line. |
 
 Geometry that feeds it — `live.ts`: `live.engageM` 4.5 (carrier decides), `live.tackleReach` 1.2,
@@ -143,6 +144,11 @@ showcase) wins 84% (`20261019-172010-traits-whole-match`).
 Tests: `tests/data/traits.test.ts`, `tests/match/league/traits.test.ts`.
 
 ## 8. Tactics (§5)
+
+Current Expansive engagement pass delta (`presets.attack.expansive.base.pass`):
+**−0.10**, was 0. Width 0.28, edges +0.8, cut-out 0.02 (0.01 own 20),
+offload ×1.3 (0.8 own 20) and early kick 0.18 stay fixed. Measurements and
+remaining open items: `docs/status/2026-10-balance.md`.
 
 All in `src/match/league/presets.ts`: `attackPlan(preset, zone)` and `defencePlan(preset)`
 are plain tables (experiments: `presets.attackDefault.*`, `presets.attack.<preset>.base.*` or
@@ -561,7 +567,6 @@ even sides home then won only a third of matches (80 matches with away receiving
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `rating.spread` | `src/match/league/spread.ts` | 0.2 | Share of the gap between the sides' average stats that is kept (1: as written). |
-| `rating.homeEdge` | `spread.ts` | +0.5 | Rating points on every stat of the home starters and bench, after spread and before the difficulty edge. Clamped to 1–100; seeded opening kick-off unchanged. Target: home wins 52–58% of even matches. |
 
 Measured (run `20261019-135855-spread-confirm`, 80 whole matches a row; before: `20261019-134245-gaps`):
 
@@ -821,7 +826,7 @@ of 10.5 (were 30.2 and 10.6), so `CHEAP` stays.
 |---|---|---|---|
 | `CHEAP.base` | `src/systems/fixtures.ts` | 0.5 | A side's score before the dice. |
 | `CHEAP.gap` | `fixtures.ts` | 0.17 | Points per point of strength over the other side (75% at a 25-point gap). |
-| `CHEAP.home` | `fixtures.ts` | 0 | Home side's extra points in the cheap sim; the live sim uses `rating.homeEdge` (§19). |
+| `CHEAP.home` | `fixtures.ts` | 0 | Home side's extra points (the live sim has none). |
 | `CHEAP.spread` | `fixtures.ts` | 29 | Each side adds a whole number 0..this (mean 14.5; a margin of about 10). |
 
 **On the live sim.** With *Rival matches on the match engine* on (`settings.liveRivals`, off by

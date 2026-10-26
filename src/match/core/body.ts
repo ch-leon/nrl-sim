@@ -19,6 +19,8 @@ export interface Body {
 /** Slowest and fastest players, m/s (a 1–100 speed stat maps between them). */
 export const MIN_SPEED = 6.0;
 export const MAX_SPEED = 9.0;
+/** Extra pace per Speed point away from 60, within the existing human speed limits. */
+export const PACE = { extraPerStat: 0.03 };
 /** How hard a player can accelerate / brake, m/s². */
 export const ACCEL = 9;
 /** Two bodies closer than this are pushed apart. */
@@ -32,7 +34,8 @@ const PASS_THROUGH_DIST = 1.0;
 /** Top speed for a 1–100 speed stat. */
 export function maxSpeedFor(speedStat: number): number {
   const s = Math.max(1, Math.min(100, speedStat)) / 100;
-  return MIN_SPEED + (MAX_SPEED - MIN_SPEED) * s;
+  const base = MIN_SPEED + (MAX_SPEED - MIN_SPEED) * s;
+  return Math.max(MIN_SPEED, Math.min(MAX_SPEED, base + (s * 100 - 60) * PACE.extraPerStat));
 }
 
 export function makeBody(pos: Vec, maxSpeed: number, heading: Vec = { x: 1, y: 0 }, accel = ACCEL): Body {

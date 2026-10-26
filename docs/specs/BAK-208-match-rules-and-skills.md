@@ -144,7 +144,7 @@ at 60%. A step is tried at most once per defender per possession, when he is ins
 2.6 m and no second defender is within 3.5 m. *Implemented in B (#96).*
 
 ### 4.2 Pass
-Completion by receiver Skill and pressure: base 96.5% at Skill 50 (was 96%),
+Completion by passer Skill and pressure (defender inside 2 m when thrown): base 96%,
 −4% under pressure; in rain the knock-on chance is ×1.6 (BAK-207 2f, tuning §18). Failure = knock-on (turnover). **Intercept**: a defender
 within 1.5 m of the pass line has 6% (+trait) to pick it off — shown and often a try.
 Cut-out passes (Playmaker) skip a receiver: higher reward, 2× intercept exposure.
@@ -215,7 +215,7 @@ sim's defaults (`src/match/league/presets.ts`).
 |---|---|---|---|---|---|---|---|
 | **Grind** | −15% (−25% own 20) | never (½ in the attacking half, 0.7 red zone) | tries 60% | — | hit-ups +1.0 | territory 25% from deep (40% own 20); red zone 20% | long ×1.6, bomb ×0.7, chip/cross ×0.5 |
 | **Balanced** (default) | 0 | normal (0.6 own 20) | always | — | halves first, forwards early | red zone 35% | — |
-| **Expansive** | 0 (N13: was +15%) | ×1.3 (0.8 own 20) | always | width 0.28, cut-out 2% (1% own 20), reach +3 m (N13: was 0.35 / 8%) | edges +0.8 | red zone 18% (N13: was 30%) | cross-field ×1.5, long ×0.8 |
+| **Expansive** | −10% (was 0) | ×1.3 (0.8 own 20) | always | width 0.28, cut-out 2% (1% own 20), reach +3 m (N13: was 0.35 / 8%) | edges +0.8 | red zone 18% (N13: was 30%) | cross-field ×1.5, long ×0.8 |
 | **Kick-chase** | −5% | ×0.6 | tries 90% | — | — | territory 35% from deep (bomb 40% of those); red zone 55% | bomb ×1.8, grubber ×1.3, long ×1.2 |
 | **All-out** | 0 (N13: was +15%; Phase 3 had cut +20% to +15%) | ×1.5 (1.2 own 20; N13: was ×1.6) | always | width 0.35, cut-out 3% (N13: was 0.45 / 12%) | edges +0.5 | red zone 15% (N13: was 30%) | chip ×1.6, cross ×1.3, grubber ×1.2, long ×0.6 |
 
@@ -275,11 +275,6 @@ kicks, tries) so balance is seen, not guessed.
 Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams:
 tackles 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 ·
 tries 4–7 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
-Home wins target 52–58% for even sides: +0.5 rating points on all home starters
-and bench stats after spread, before the difficulty edge (tuning §19).
-For this pass, grubber tries 0.20–0.30 a match; repeat sets 0.05–0.30 and
-drop-outs 0–0.15 remain provisional bands. Groundings and dead grubbers are
-20 m restarts, not drop-outs.
 The count bands are the 9:00-half bands ×7/9, rounded (2026-10-25). Completion is a
 rate and stayed.
 *Phase 3 (2026-10-19, assumed — needs Leon):* tackles, line breaks and kicks were first
@@ -358,7 +353,10 @@ effort into two bars so that pace is something a player *spends* (`src/match/lea
 - **Legs** (long-term, F's bar): drains over the match and is the **ceiling** on gas.
   At 60% legs the gas tank only fills to 60%, and refills more slowly.
 
-**Pace.** A player runs at **cruise**, 94% of his top speed, unless he is sprinting.
+**Pace.** Speed maps to 6–9 m/s with a steeper middle: Speed 50 / 60 / 70
+gives 7.2 / 7.8 / 8.4 m/s (was 7.5 / 7.8 / 8.1). Pace at 60 and the
+6–9 m/s limits stay fixed; tuning §2 names `pace.extraPerStat`.
+A player runs at **cruise**, 94% of his top speed, unless he is sprinting.
 **Sprinting** is top speed (the Speed stat, 6–9 m/s) and burns gas. With the gas gone he
 is **blown**: 75% of top speed until gas is back to a quarter, then cruise again. The
 old break burst (×1.15 for 0.8 s) is retired: after beating a man the carrier simply
