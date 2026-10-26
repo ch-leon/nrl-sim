@@ -390,26 +390,37 @@ async function runPortrait(browser) {
       for (const choice of [0, 1]) {
         await turn(w, h);
         if (!(await page.evaluate(() => window.__nrlShowCard?.('baliTrip')))) throw new Error('Bali hook failed');
+        // #345: News keeps its feed and shows the card as one row; Answer opens it in its own popup.
         await page.locator('.nrl-nav .nrl-btn[data-screen="news"]').tap();
-        await page.waitForSelector('.nrl-event-card');
+        await page.waitForSelector('[data-decisions-open]');
+        if (await page.locator('.nrl-news .nrl-event-card').count()) problems.push(`${w}×${h}: the decision card is in the News feed`);
+        await page.locator('[data-decisions-open]').tap();
+        await page.waitForSelector('.nrl-decisions-modal .nrl-event-card');
         await page.waitForTimeout(100);
-        const found = await reachProblems(page, '.nrl-event-card', ['[data-event-choice="0"]', '[data-event-choice="1"]']);
+        const found = await reachProblems(page, '.nrl-decisions-modal', ['[data-event-choice="0"]', '[data-event-choice="1"]', '.nrl-decisions-modal .nrl-screen-x']);
         found.push(...await page.evaluate(() => {
-          const body = document.querySelector('.nrl-news-body').getBoundingClientRect();
-          return [...document.querySelectorAll('.nrl-event-choice')].flatMap((b) => {
+          const box = document.querySelector('.nrl-decisions-modal').getBoundingClientRect();
+          const out = [...document.querySelectorAll('.nrl-event-choice')].flatMap((b) => {
             const r = b.getBoundingClientRect();
             const out = [];
             if (r.height < 44 || r.width < 44) out.push(`choice ${b.dataset.eventChoice} is ${r.width}×${r.height}`);
-            if (r.top < body.top - 1 || r.bottom > body.bottom + 1) out.push(`choice ${b.dataset.eventChoice} clipped by News body (${r.top.toFixed(1)}–${r.bottom.toFixed(1)} vs ${body.top.toFixed(1)}–${body.bottom.toFixed(1)})`);
+            if (r.top < box.top - 1 || r.bottom > box.bottom + 1) out.push(`choice ${b.dataset.eventChoice} clipped by the popup (${r.top.toFixed(1)}–${r.bottom.toFixed(1)} vs ${box.top.toFixed(1)}–${box.bottom.toFixed(1)})`);
             if (b.scrollHeight > b.clientHeight + 1) out.push(`choice ${b.dataset.eventChoice} clips its text`);
             return out;
           });
+          // #346: "Let them go" says what is sure and, on its own line, what is risked.
+          const go = document.querySelector('[data-event-choice="0"]');
+          if (!/^Sure: squad morale \+6/.test(go?.querySelector('.nrl-event-choice-hint')?.textContent ?? '')) out.push('Let them go has no "Sure:" line');
+          if (!/% risk: a 2-3 week ban/.test(go?.querySelector('.nrl-event-choice-risk')?.textContent ?? '')) out.push('Let them go has no risk line');
+          return out;
         }));
         problems.push(...found.map((p) => `${w}×${h}: ${p}`));
         await page.screenshot({ path: join(OUT, `bali-${w}x${h}-choice${choice}.png`) });
         await page.locator(`[data-event-choice="${choice}"]`).tap();
+        await page.waitForTimeout(150);
         if (await page.locator('.nrl-event-card').count()) problems.push(`${w}×${h}: choice ${choice} did not resolve`);
-        await page.locator('.nrl-screen-region .nrl-screen-x').tap();
+        if (await page.evaluate(() => window.__nrlState().eventDeck.pending.length)) problems.push(`${w}×${h}: choice ${choice} left the card pending`);
+        await page.locator('.nrl-screen-region .nrl-screen-x').first().tap();
       }
       rec.notes.push(`${w}×${h}: both choices tapped`);
     }
@@ -866,18 +877,78 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await page.waitForSelector('.nrl-rival-modal');
     return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row' }, null);
   });
-  await step('popup-decision-card', async (rec) => {
+  // #345: a waiting card is one row on News, which keeps its feed; Answer opens the card.
+  await step('news-decision-banner', async (rec) => {
     await closeAll();
     if (!(await page.evaluate(() => window.__nrlShowCard?.('baliTrip')))) throw new Error('card hook failed');
     await openNav(page, 'news');
-    await page.waitForSelector('.nrl-event-card');
-    return check(rec, { box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item', card: '.nrl-event-card',
-      primary: ['[data-event-choice="0"]', '[data-event-choice="1"]'] }, 'news');
+    await page.waitForSelector('[data-decisions-open]');
+    const out = await check(rec, { box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', primary: ['[data-decisions-open]'] }, 'news');
+    if (await page.locator('.nrl-news .nrl-event-card').count()) out.push('the decision card is in the News feed');
+    return out;
+  });
+  await step('popup-decision-card', async (rec) => {
+    await tap('[data-decisions-open]');
+    await page.waitForSelector('.nrl-decisions-modal .nrl-event-card');
+    return check(rec, { box: '.nrl-decisions-modal', rows: '.nrl-event-choice', card: '.nrl-event-card',
+      primary: ['[data-event-choice="0"]', '[data-event-choice="1"]'] }, null);
+  });
+  // #338: with a card waiting, Advance Week asks: it lists the card and takes no default.
+  // #350 H1: the button wears the count, and the hub names the next match.
+  await step('advance-asks', async (rec) => {
+    await tap('.nrl-decisions-modal .nrl-screen-x');
+    await page.evaluate(() => document.querySelector('.nrl-screen-region .nrl-screen-x')?.click());
+    const before = await page.evaluate(() => { const s = window.__nrlState(); return { week: s.week, pending: s.eventDeck.pending.map((p) => p.id) }; });
+    if (!before.pending.length) throw new Error('no card waiting to ask about');
+    const out = [];
+    const badge = (await page.locator('[data-hud="decisions"]').textContent().catch(() => ''))?.trim();
+    if (badge !== String(before.pending.length)) out.push(`Advance Week's badge reads "${badge}", want ${before.pending.length}`);
+    const chip = page.locator('[data-hud="next"]');
+    if (!(await chip.isVisible())) out.push('no next-match chip on the hub');
+    else rec.notes.push(`chip "${(await chip.textContent()).trim()}"`);
+    await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
+    await page.waitForSelector('[data-advance-ask]');
+    await page.waitForTimeout(600);
+    const after = await page.evaluate(() => { const s = window.__nrlState(); return { week: s.week, pending: s.eventDeck.pending.map((p) => p.id) }; });
+    if (after.week !== before.week) out.push(`the week moved on (W${before.week} → W${after.week}) before the ask was answered`);
+    if (after.pending.join() !== before.pending.join()) out.push(`a default was taken without asking (${before.pending} → ${after.pending})`);
+    if (await page.locator('.nrl-mo-controls').count()) out.push('the match started without asking');
+    const rows = await page.locator('[data-ask-row]').count();
+    if (rows !== before.pending.length) out.push(`the ask lists ${rows} of ${before.pending.length} cards`);
+    out.push(...await check(rec, { box: '.nrl-decisions-modal', rows: '.nrl-ask-row', primary: ['[data-ask-answer]', '[data-ask-proceed]'] }, null));
+    return out;
+  });
+  // Answer now: the card, then Keep advancing (#350 N4) once it is answered.
+  await step('advance-answer-keep', async (rec) => {
+    await tap('[data-ask-answer]');
+    await page.waitForSelector('.nrl-decisions-modal .nrl-event-card');
+    await tap('[data-event-choice="1"]');
+    await page.waitForSelector('[data-keep-advancing]');
+    const out = await check(rec, { box: '.nrl-decisions-modal', rows: '[data-keep-advancing]', primary: ['[data-keep-advancing]'] }, null);
+    const s = await page.evaluate(() => window.__nrlState().eventDeck.pending.length);
+    if (s) out.push(`${s} card(s) still pending after answering`);
+    return out;
+  });
+  // The ▾ menu's long runs confirm first (#350 H3); Cancel plays nothing.
+  await step('advance-long-confirm', async (rec) => {
+    await closeAll();
+    await page.keyboard.press('Escape');
+    const week = await page.evaluate(() => window.__nrlState().week);
+    await tap('.nrl-hud-menu-toggle');
+    await page.locator('.nrl-hud-menu-item', { hasText: 'To season end' }).tap();
+    await page.waitForSelector('[data-advance-confirm]');
+    const q = (await page.locator('[data-advance-confirm] h2').textContent()).trim();
+    rec.notes.push(`"${q}"`);
+    const out = await check(rec, { box: '.nrl-decisions-modal', rows: '[data-confirm-advance]', primary: ['[data-confirm-advance]'] }, null);
+    if (!/^Play \d+ weeks\? It stops for decisions\.$/.test(q)) out.push(`the confirm asks "${q}"`);
+    await page.locator('[data-advance-confirm] .nrl-btn', { hasText: 'Cancel' }).tap();
+    await page.waitForTimeout(400);
+    if (await page.evaluate(() => !!document.querySelector('.nrl-hud[data-advancing]'))) out.push('Cancel started the run');
+    if ((await page.evaluate(() => window.__nrlState().week)) !== week) out.push('Cancel moved the week');
+    return out;
   });
   // The full-time report (#351 P0): its ✕, the result and Player of the Match on screen.
   await step('popup-fulltime-report', async (rec) => {
-    await page.locator('[data-event-choice="0"]').tap();
-    await page.evaluate(() => document.querySelector('.nrl-screen-region .nrl-screen-x')?.click());
     await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
     await page.locator('.nrl-mo-controls .nrl-btn', { hasText: 'Skip' }).first().tap();
@@ -899,10 +970,12 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   return report.steps.filter((s) => !s.ok).length + report.errors.length;
 }
 
-// ── The tutorial, followed (#344) ────────────────────────────────────────────
-// Welcome → Build → Recruit done the way the bubble says, never skipped: More, the
-// row in its sheet, a paddock placed, a player signed. Each control the step points
-// at must be whole, out from under the bubble, and take the tap.
+// ── The tutorial, followed (#344, #337) ──────────────────────────────────────
+// Every step done the way the bubble says, never skipped: the paddock placed on
+// the grass, a player signed, Squad and Lineup, then Advance Week into the first
+// match, played to full time with no tutorial over it, and back to the club for
+// News, Finance, Contracts and the wrap. Each step opens its own screen; each
+// control it points at must be whole, out from under the bubble, and take the tap.
 const NO_INSETS = { l: 0, t: 0, r: 0, b: 0 };
 const WALK_RUNS = [{ w: 667, h: 375, safe: NO_INSETS }, { w: 844, h: 390, safe: { l: 47, t: 0, r: 47, b: 21 } }, { w: 956, h: 330, safe: NO_INSETS }];
 
@@ -976,24 +1049,132 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     await page.locator('.nrl-tutorial-next').tap();
     await atStep('build');
   });
-  await step('build-more', (rec) => tapTarget('.nrl-nav [data-nav-more]', rec));
-  await step('build-open', (rec) => tapTarget('.nrl-nav-sheet [data-screen="build"]', rec));
+  /** The bubble's step: it opened its own screen (#337 U3), and nothing of the tutorial dims the page (U2). */
+  const onItsScreen = (key) => page.evaluate((key) => {
+    const out = [];
+    if (key && !document.querySelector(`[data-screen-key="${key}"]`)) out.push(`the step did not open ${key}`);
+    const cut = document.querySelector('.nrl-tutorial-cutout');
+    if (cut && /9999px/.test(getComputedStyle(cut).boxShadow)) out.push('the tutorial dims the page');
+    return out;
+  }, key);
+  /** No tutorial on screen: no bubble, frame or overlay box that draws. */
+  const tutorialHidden = () => page.evaluate(() => {
+    const o = document.querySelector('.nrl-tutorial');
+    if (!o) return true;
+    const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
+    return ![...o.querySelectorAll('.nrl-tutorial-bubble, .nrl-tutorial-cutout')].some(vis);
+  });
+  const next = async (id) => {
+    await page.locator(`.nrl-tutorial-bubble[data-step="${id}"] .nrl-tutorial-next`).tap();
+  };
+
+  // Build: the step opens Build itself and frames the Training Paddock row.
   await step('build-paddock', async (rec) => {
-    const out = await tapTarget('[data-facility="trainingPaddock"]', rec);
-    if (out.length) return out;
+    const out = await onItsScreen('build');
+    out.push(...await tapTarget('[data-screen-key="build"] [data-facility="trainingPaddock"]', rec));
+    return out;
+  });
+  // Placement: the grass is not dimmed and the bubble leaves the placement bar clear.
+  await step('place-on-grass', async (rec) => {
     await page.waitForSelector('.nrl-placebar:not([hidden])');
+    await atStep('place');
+    await page.waitForTimeout(700);
+    const out = await onItsScreen(null);
+    const text = (await page.locator('.nrl-tutorial-bubble .nrl-tutorial-text').textContent()).trim();
+    if (!/green spot on the grass/.test(text)) out.push(`placement copy reads "${text}"`);
+    out.push(...await page.evaluate(() => {
+      const bar = document.querySelector('.nrl-placebar').getBoundingClientRect();
+      const b = document.querySelector('.nrl-tutorial-bubble').getBoundingClientRect();
+      return b.right <= bar.left || b.left >= bar.right || b.bottom <= bar.top || b.top >= bar.bottom ? [] : ['the bubble covers the placement bar'];
+    }));
     await page.touchscreen.tap(Math.round(W / 2), Math.round(H / 2) + 10);
     await atStep('recruit');
-    return [];
+    rec.notes.push('paddock placed');
+    return out;
   });
-  await step('recruit-more', (rec) => tapTarget('.nrl-nav [data-nav-more]', rec));
-  await step('recruit-open', (rec) => tapTarget('.nrl-nav-sheet [data-screen="recruit"]', rec));
+  // Recruit: opened by the step, the first free agent's row framed and clear of the bubble.
   await step('recruit-sign', async (rec) => {
-    const out = await tapTarget('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)', rec);
+    await page.waitForSelector('[data-screen-key="recruit"]');
+    const out = await onItsScreen('recruit');
+    out.push(...await tapTarget('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)', rec));
     if (out.length) return out;
     await atStep('squad');
     rec.notes.push('signed: on to the squad step');
-    return [];
+    return out;
+  });
+  await step('squad', async () => {
+    await page.waitForTimeout(300);
+    const out = await onItsScreen('squad');
+    out.push(...await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next', '.nrl-tutorial-skip']));
+    await next('squad');
+    await atStep('lineup');
+    return out;
+  });
+  await step('lineup', async () => {
+    await page.waitForTimeout(300);
+    const out = await onItsScreen('lineup');
+    out.push(...await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next', '.nrl-tutorial-skip']));
+    await next('lineup');
+    await atStep('advance');
+    return out;
+  });
+  // Advance Week: framed and clear; tapping it starts the first match, and the
+  // tutorial is gone before the match draws and stays gone until Back to Club (#337 U1).
+  await step('advance-to-match', async (rec) => {
+    const out = await tapTarget('.nrl-hud-actions > .nrl-btn', rec, 'Advance Week');
+    if (out.length) return out;
+    await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
+    if (!(await tutorialHidden())) out.push('the tutorial is up as the match starts');
+    return out;
+  });
+  await step('match-plays-clear', async (rec) => {
+    const out = [];
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(500);
+      if (!(await tutorialHidden())) { out.push(`the tutorial showed over the match after ${(i + 1) * 0.5}s`); break; }
+    }
+    const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
+    rec.notes.push(`clock ${clock}, no tutorial over the match`);
+    return out;
+  });
+  await step('match-full-time', async (rec) => {
+    await page.locator('.nrl-mo-controls .nrl-btn', { hasText: 'Skip' }).first().tap();
+    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 60000 });
+    await page.waitForTimeout(700);
+    const out = (await tutorialHidden()) ? [] : ['the tutorial showed over the full-time screen'];
+    rec.notes.push('match played to full time (the match\'s Skip, not the tutorial\'s)');
+    return out;
+  });
+  // Back at the club the tutorial picks up on News, with the screen open.
+  await step('back-to-club-news', async (rec) => {
+    await page.locator('.nrl-btn:has-text("Back to Club")').first().evaluate((b) => b.click());
+    await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud');
+    await atStep('news').catch(async () => { throw new Error(`no News step after the match (step ${await page.locator('.nrl-tutorial-bubble').getAttribute('data-step').catch(() => 'none')})`); });
+    await page.waitForTimeout(700);
+    const out = await onItsScreen('news');
+    out.push(...await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next', '.nrl-tutorial-skip']));
+    rec.notes.push(`week ${await page.evaluate(() => window.__nrlState().week)}`);
+    await next('news');
+    return out;
+  });
+  for (const id of ['finance', 'contracts']) {
+    await step(id, async () => {
+      await atStep(id);
+      await page.waitForTimeout(700);
+      const out = await onItsScreen(id);
+      out.push(...await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next', '.nrl-tutorial-skip']));
+      await next(id);
+      return out;
+    });
+  }
+  await step('wrap-done', async (rec) => {
+    await atStep('wrap');
+    const out = await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next']);
+    await next('wrap');
+    await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
+    if (!(await page.evaluate(() => window.__nrlState().settings.tutorialDone))) out.push('tutorialDone not set at the end');
+    rec.notes.push('every step followed, none skipped');
+    return out;
   });
 
   for (const e of report.errors) log(`  error: ${e}`);

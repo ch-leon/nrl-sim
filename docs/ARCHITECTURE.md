@@ -300,9 +300,13 @@ about 3.2 players of 65+, down from 6.4.
 
 Random events (GitHub #75): the deck draws at most one card a week (tick order 58,
 after morale) from its own seeded stream `eventDeck.rng`, so it never moves `rngSeed`.
-A card waits in the News screen for `EVENTS.ANSWER_WEEKS`, then takes its default
-choice. Money effects go through `earnMoney` (the finance ledger); the outcome of every
-choice is posted to the news. A new card stops a multi-week advance.
+A card waits for `EVENTS.ANSWER_WEEKS`, then takes its default choice. Money effects go
+through `earnMoney` (the finance ledger); the outcome of every choice is posted to the
+news. A new card stops a multi-week advance. `ui/decisions.ts` presents them (UI cleanup
+chunk 2): News shows a one-row banner and the cards open in their own popup, each choice
+split into its sure line and its risks (`describeChoice`); Advance Week and the ▾ runs ask
+before an advance with a card pending (never a default unasked), runs past ×4 weeks
+confirm, and a run stopped by a new card opens it with Keep advancing.
 
 Store API (WU-3): `getState(): GameState`, `setState(patch)`, `newGame(clubName, seed?)`,
 `resetForNewSeason()`. `setState` publishes `state:changed`.
