@@ -166,10 +166,13 @@ export function angleFrom(cosApproach: number): Angle {
 
 // ── Passing (§4.2) ───────────────────────────────────────────────────────────
 
-/** Chance a pass is spilled on the catch: 4% base, +4% under pressure, −/+ by Skill, +6% rain, + a wild offload's extra. */
+/** Pass handling probabilities (tuning §4), exposed separately from tackle outcomes. */
+export const HANDLING = { catchBase: 0.035, catchPressured: 0.04 };
+
+/** Chance a pass is spilled on the catch: base, pressure, −/+ by Skill, +6% rain, + a wild offload's extra. */
 export function knockOnChance(receiverSkill: number, pressured: boolean, rain = false, extra = 0): number {
-  let p = 0.04 + (50 - receiverSkill) / 1000;
-  if (pressured) p += 0.04;
+  let p = HANDLING.catchBase + (50 - receiverSkill) / 1000;
+  if (pressured) p += HANDLING.catchPressured;
   if (rain) p += 0.06;
   p += extra;
   return Math.max(0.005, Math.min(0.4, p));

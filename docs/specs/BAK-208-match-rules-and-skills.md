@@ -144,7 +144,7 @@ at 60%. A step is tried at most once per defender per possession, when he is ins
 2.6 m and no second defender is within 3.5 m. *Implemented in B (#96).*
 
 ### 4.2 Pass
-Completion by passer Skill and pressure (defender inside 2 m when thrown): base 96%,
+Completion by receiver Skill and pressure: base 96.5% at Skill 50 (was 96%),
 −4% under pressure; in rain the knock-on chance is ×1.6 (BAK-207 2f, tuning §18). Failure = knock-on (turnover). **Intercept**: a defender
 within 1.5 m of the pass line has 6% (+trait) to pick it off — shown and often a try.
 Cut-out passes (Playmaker) skip a receiver: higher reward, 2× intercept exposure.
@@ -275,6 +275,11 @@ kicks, tries) so balance is seen, not guessed.
 Per full Nines match (two 7:00 halves), both sides combined, 60-rated teams:
 tackles 117–163 · line breaks 10–19 · offloads 6–11 · errors 8–12 · kicks 16–25 ·
 tries 4–7 · completion 70–80%. Stronger team wins ~70% at a 20-point rating gap.
+Home wins target 52–58% for even sides: +0.5 rating points on all home starters
+and bench stats after spread, before the difficulty edge (tuning §19).
+For this pass, grubber tries 0.20–0.30 a match; repeat sets 0.05–0.30 and
+drop-outs 0–0.15 remain provisional bands. Groundings and dead grubbers are
+20 m restarts, not drop-outs.
 The count bands are the 9:00-half bands ×7/9, rounded (2026-10-25). Completion is a
 rate and stayed.
 *Phase 3 (2026-10-19, assumed — needs Leon):* tackles, line breaks and kicks were first

@@ -1,0 +1,64 @@
+{
+  "name": "open-items",
+  "description": "Completion (70\u201380%), home wins (52\u201358%), 20-point strength gap (about 70%), stamina slope, fliers and grubber outcomes; whole matches at the current defaults. Legs margin remains an open design target.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "stamina 30 v 80",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "stats": {
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "stamina": 80
+        }
+      }
+    },
+    {
+      "name": "fliers v stayers",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "stats": {
+          "speed": 85,
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "speed": 65,
+          "stamina": 80
+        }
+      }
+    }
+  ]
+}

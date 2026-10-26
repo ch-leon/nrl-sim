@@ -117,10 +117,10 @@ describe('contest', () => {
     expect(angleFrom(-1)).toBe('behind');
   });
   it('passes: knock-ons rise under pressure and in rain; intercepts double for cut-outs', () => {
-    expect(knockOnChance(50, false)).toBeCloseTo(0.04);
-    expect(knockOnChance(50, true)).toBeCloseTo(0.08);
+    expect(knockOnChance(50, false)).toBeCloseTo(0.035);
+    expect(knockOnChance(50, true)).toBeCloseTo(0.075);
     expect(knockOnChance(90, false)).toBeLessThan(knockOnChance(30, false));
-    expect(knockOnChance(50, true, true)).toBeCloseTo(0.14);
+    expect(knockOnChance(50, true, true)).toBeCloseTo(0.135);
     expect(interceptChance(50, false)).toBeCloseTo(0.06);
     expect(interceptChance(50, true)).toBeCloseTo(0.12);
     expect(interceptChance(90, false)).toBeGreaterThan(interceptChance(30, false));

@@ -18,10 +18,13 @@ export const BANDS: Partial<Record<CountKey, readonly [number, number]>> = {
   kicks: [16, 25],
   tries: [4, 7],
   completion: [70, 80],
+  grubberTries: [0.2, 0.3],
+  grubberRepeats: [0.05, 0.3],
+  grubberDropouts: [0, 0.15],
 };
 
 /** The columns of the summary table. */
-const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'sinBins', 'shortMin', 'binSwing', 'lostInContact', 'injuries', 'completion'];
+const COLUMNS: readonly CountKey[] = ['tackles', 'lineBreaks', 'breaks', 'lateBusts', 'offloads', 'errors', 'kicks', 'tries', 'bonusTries', 'bigHits', 'runDowns', 'gassed', 'subs', 'goals', 'fieldGoals', 'touchFinds', 'fortyTwenties', 'deadBalls', 'kickMetres', 'penalties', 'sixAgains', 'penaltyGoals', 'sinBins', 'shortMin', 'binSwing', 'lostInContact', 'injuries', 'completion', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers'];
 
 /** ✓ inside the §7 band, ↑ above, ↓ below, '' when the metric has no band. */
 export function bandMark(key: CountKey, v: number): string {
@@ -90,7 +93,7 @@ export function reportMarkdown(r: ReportInput): string {
         const v = row.counts[k];
         const mark = bandMark(k, v.mean);
         const d = row === base ? '' : ` (${delta(v, base.counts[k], Math.min(row.seeds, base.seeds) >= MIN_SEEDS_TO_FLAG)})`;
-        return `${v.mean.toFixed(1)}${mark ? ` ${mark}` : ''}${d}`;
+        return `${v.mean.toFixed(k.startsWith('grubber') ? 2 : 1)}${mark ? ` ${mark}` : ''}${d}`;
       });
       const side = tracked
         ? ` ${row.trackedWin === undefined ? '—' : `${pct1(row.trackedWin)}${row.trackedDraw ? ` (${pct1(row.trackedDraw)} drawn)` : ''}`} |`

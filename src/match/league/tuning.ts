@@ -5,7 +5,7 @@
 // ("wrestle.gripBase", "presets.defence.rush.lineSpeed") and applies a set of
 // overrides with a way back. Overrides are module state: apply, run, restore
 // — one experiment at a time, never in the game.
-import { BASE } from './contest';
+import { BASE, HANDLING } from './contest';
 import { TOUCH } from './touch';
 import { PENALTY } from './penalties';
 import { FATIGUE } from './fatigue';
@@ -47,6 +47,7 @@ const DIFFICULTY_EDGE = Object.fromEntries(
 export const KNOBS = {
   live: LIVE,
   contest: BASE,
+  handling: HANDLING,
   fatigue: FATIGUE,
   gas: GAS,
   wrestle: WRESTLE,

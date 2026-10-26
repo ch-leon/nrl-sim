@@ -59,7 +59,7 @@ import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
 import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, offsideChance, type CaptainRead } from './penalties';
-import { edgeSheets, spreadSheets, type DifficultyEdge } from './spread';
+import { RATING, edgeSheets, spreadSheets, type DifficultyEdge } from './spread';
 import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsDefence, callIsPlay, paidOffText, withAttackCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
@@ -513,8 +513,9 @@ export class LiveSim implements MatchSim {
 
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
     // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average;
-    // then the difficulty's edge to the player's rival (N12.2), which the spread would mostly cancel.
-    [home, away] = edgeSheets(...spreadSheets(home, away), opts.difficultyEdge);
+    // then home advantage and the difficulty's edge, which the spread would mostly cancel.
+    [home, away] = edgeSheets(...spreadSheets(home, away), { side: 'home', points: RATING.homeEdge });
+    [home, away] = edgeSheets(home, away, opts.difficultyEdge);
     this.rng = makeRng(seed);
     this.firstReceiver = this.rng.next() < 0.5 ? 'home' : 'away';
     this.callList = opts.calls ?? [];

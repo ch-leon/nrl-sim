@@ -168,6 +168,12 @@ describe('measuring and reporting', () => {
     expect(bandMark('tackles', 150)).toBe('✓');
     expect(bandMark('tackles', 250)).toBe('↑');
     expect(bandMark('gassed', 4)).toBe('');
+    expect(bandMark('grubberTries', 0.2)).toBe('✓');
+    expect(bandMark('grubberTries', 0.31)).toBe('↑');
+    expect(bandMark('grubberRepeats', 0.04)).toBe('↓');
+    expect(bandMark('grubberRepeats', 0.3)).toBe('✓');
+    expect(bandMark('grubberDropouts', 0)).toBe('✓');
+    expect(bandMark('grubberDropouts', 0.16)).toBe('↑');
     expect(delta({ mean: 10, se: 0.5 }, { mean: 7, se: 0.5 })).toBe('+3.0*');
     expect(delta({ mean: 10, se: 2 }, { mean: 7, se: 2 })).toBe('+3.0');
     expect(delta({ mean: 10, se: 0.5 }, { mean: 7, se: 0.5 }, false)).toBe('+3.0');
@@ -240,6 +246,6 @@ describe('measuring and reporting', () => {
     // chase, 6-7:362:e959099a69ffd994 on the 7:00 halves before any chase
     // (itself moved from 8-14:495:67db8b634c5a2e73 when halves went to 7:00).
     // See docs/status/2026-10-balance.md.
-    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('8-16:346:3436c830c791688a');
+    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe('4-24:401:6e496a01799595b9');
   });
 });

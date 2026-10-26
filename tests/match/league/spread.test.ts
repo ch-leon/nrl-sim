@@ -7,6 +7,7 @@ import { RATING, edgeSheets, rivalEdge, spreadSheets } from '../../../src/match/
 import { DIFFICULTY } from '../../../src/config';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { teamSheetFromRival } from '../../../src/match/league/sheets';
+import { LiveSim } from '../../../src/match/league/live';
 
 describe('rating spread (pure)', () => {
   it('draws both sides toward the match average: a 20-point gap at k = 0.5 plays as 10', () => {
@@ -84,6 +85,29 @@ describe('the difficulty’s edge after the spread (N12.2, pure)', () => {
       expect(rivalEdge('home', 'hard')).toEqual({ side: 'home', points: 2 });
     } finally {
       DIFFICULTY.hard.rivalEdge = was;
+    }
+  });
+});
+
+describe('home advantage in the live match', () => {
+  it('adds after the spread and stacks with a home rival’s difficulty edge', () => {
+    const previous = RATING.homeEdge;
+    const home = sideSheet('H', { rating: 70 });
+    const away = sideSheet('A', { rating: 50 });
+    const sheetsBefore = JSON.stringify([home, away]);
+    try {
+      RATING.homeEdge = 1;
+      const withHomeEdge = new LiveSim(home, away, 7, { difficultyEdge: { side: 'home', points: 2 } });
+      RATING.homeEdge = 0;
+      const withEquivalentEdge = new LiveSim(home, away, 7, { difficultyEdge: { side: 'home', points: 3 } });
+      for (let tick = 0; tick < 300; tick++) {
+        withHomeEdge.step();
+        withEquivalentEdge.step();
+      }
+      expect(withHomeEdge.snapshot()).toEqual(withEquivalentEdge.snapshot());
+      expect(JSON.stringify([home, away])).toBe(sheetsBefore);
+    } finally {
+      RATING.homeEdge = previous;
     }
   });
 });

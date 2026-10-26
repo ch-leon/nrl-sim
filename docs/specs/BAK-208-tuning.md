@@ -71,7 +71,7 @@ Baselines at even stats, one-on-one, square — `src/match/league/contest.ts`:
 | Momentum | ±1 pt bust per m/s, cap ±4 | Carrier speed − tackler speed. |
 | Last tackle | big hit +3 | The defence is set. |
 | `stepChance` | 10% + (footwork − defence)/200, side +5, behind −5, cap 0.7 | Pre-contact step, one-on-one only. |
-| `knockOnChance` | 4% + (50 − Skill)/1000, pressured +4, rain +6, cap 0.5…40% | Catch on a pass. |
+| `handling.catchBase` / `handling.catchPressured` | 3.5% / +4% | Pass catch errors (`knockOnChance`): base + (50 − Skill)/1000, pressure, rain +6, cap 0.5…40%. Base was 4%; completion tuning in `docs/status/2026-10-balance.md`. |
 | `interceptChance` | 6% + (IQ − 50)/1000, cut-out ×2, cap 1…60% | Defender inside `live.laneM` of the pass line. |
 
 Geometry that feeds it — `live.ts`: `live.engageM` 4.5 (carrier decides), `live.tackleReach` 1.2,
@@ -561,6 +561,7 @@ even sides home then won only a third of matches (80 matches with away receiving
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `rating.spread` | `src/match/league/spread.ts` | 0.2 | Share of the gap between the sides' average stats that is kept (1: as written). |
+| `rating.homeEdge` | `spread.ts` | +0.5 | Rating points on every stat of the home starters and bench, after spread and before the difficulty edge. Clamped to 1–100; seeded opening kick-off unchanged. Target: home wins 52–58% of even matches. |
 
 Measured (run `20261019-135855-spread-confirm`, 80 whole matches a row; before: `20261019-134245-gaps`):
 
@@ -820,7 +821,7 @@ of 10.5 (were 30.2 and 10.6), so `CHEAP` stays.
 |---|---|---|---|
 | `CHEAP.base` | `src/systems/fixtures.ts` | 0.5 | A side's score before the dice. |
 | `CHEAP.gap` | `fixtures.ts` | 0.17 | Points per point of strength over the other side (75% at a 25-point gap). |
-| `CHEAP.home` | `fixtures.ts` | 0 | Home side's extra points (the live sim has none). |
+| `CHEAP.home` | `fixtures.ts` | 0 | Home side's extra points in the cheap sim; the live sim uses `rating.homeEdge` (§19). |
 | `CHEAP.spread` | `fixtures.ts` | 29 | Each side adds a whole number 0..this (mean 14.5; a margin of about 10). |
 
 **On the live sim.** With *Rival matches on the match engine* on (`settings.liveRivals`, off by

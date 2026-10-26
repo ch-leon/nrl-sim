@@ -20,6 +20,8 @@ import { STAT_MAX, difficultyMultipliers, type Difficulty } from '../../config';
 export const RATING = {
   /** Share of the gap between the sides' average stats that is kept: 1 plays the sheets as written, 0 makes the sides level (each player keeps his edge over his teammates). */
   spread: 0.2,
+  /** Rating points for the home side after the spread, before the difficulty edge. */
+  homeEdge: 0.5,
 };
 
 const KEYS: readonly (keyof RosterStats)[] = ['speed', 'strength', 'stamina', 'skill', 'footyIQ'];
