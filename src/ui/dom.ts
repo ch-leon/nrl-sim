@@ -1134,6 +1134,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 }
 .nrl-player-id { flex: 1 1 auto; min-width: 0; }
 .nrl-player-name { display: flex; gap: 0.4rem; align-items: baseline; font-weight: bold; font-size: 1.05rem; overflow-wrap: anywhere; }
+.nrl-player-name .nrl-card-ovr { flex: 0 0 auto; white-space: nowrap; overflow-wrap: normal; }
 .nrl-player-where { font-size: 0.75rem; color: #555; }
 .nrl-player-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.2rem 1rem; }
 .nrl-player h3 { margin: 0.4rem 0 0.15rem; font-size: 0.82rem; border-bottom: 2px solid #b8ae92; }

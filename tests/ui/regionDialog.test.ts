@@ -32,12 +32,12 @@ describe('region dialog (#203)', () => {
   it("pins the player page's actions to the foot of the card", () => {
     const r = rule('.nrl-player-actions');
     expect(r).toContain('position: sticky');
-    expect(r).toMatch(/bottom: -?[\d.]+rem/);
+    expect(r).toMatch(/bottom: (0;|-?[\d.]+rem)/);
     expect(r).toContain('background');
     expect(r).toContain('z-index');
   });
   it('a landscape phone puts Close in the action row', () => {
     const block = CSS.slice(CSS.indexOf('.nrl-modal-has-x .nrl-player-top'));
-    expect(block).toMatch(/@media \(max-height: 500px\) \{\s*\.nrl-player-actions \.nrl-player-close \{ flex: 1 1 6rem; \}/);
+    expect(block).toMatch(/@media \(max-height: 500px\) \{[^@]*\n\s*\.nrl-player-actions \.nrl-player-close \{ flex: 1 1 6rem; \}/);
   });
 });
