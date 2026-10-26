@@ -619,7 +619,7 @@ async function runPortrait(browser) {
 // match it keeps off the open log, the scoreboard and every control.
 // WebKit on Linux reports zero safe-area insets, so the iPhone's are simulated
 // through the --nrl-safe-* properties the UI reads env() into (src/ui/dom.ts).
-const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375').split(/\s+/).filter(Boolean).map((s) => {
+const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375 956x330').split(/\s+/).filter(Boolean).map((s) => {
   const [size, insets] = s.split('@');
   const [w, h] = size.split('x').map(Number);
   const [l, t, r, b] = (insets ?? '0,0,0,0').split(',').map(Number);
@@ -814,8 +814,8 @@ function toastReport(page, avoid, safe, tappable = true) {
   }, [avoid, safe, tappable]);
 }
 
-/** What a toast must never touch at the club: the nav, the bar's buttons, an open screen or dialog. */
-const CLUB_AVOID = ['.nrl-nav', '.nrl-hud-actions', '.nrl-audio-launcher', '.nrl-screen-region .nrl-modal', '.nrl-screen-x', '.nrl-screen-head'];
+/** What a toast must never touch at the club: the nav, the bar's buttons (the next-match chip too), an open screen or dialog. */
+const CLUB_AVOID = ['.nrl-nav', '.nrl-hud-actions', '.nrl-hud-next', '.nrl-audio-launcher', '.nrl-screen-region .nrl-modal', '.nrl-screen-x', '.nrl-screen-head'];
 /** …and in a match: the scoreboard, the stats, the ticker or open log, and every control. */
 const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-stats', '.nrl-mo-commentary', '.nrl-mo-log', '.nrl-mo-log-toggle', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay', '.nrl-audio-launcher'];
 /** The burst the check fires: a problem, a routine stop, good news, a confirmation. */
