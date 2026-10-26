@@ -30,6 +30,7 @@ import { truncateTicker } from '../../world/readability';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
+import type { CoachCall } from '../../match/league/calls';
 
 // ── Pure accumulator (unit-tested independent of the DOM) ─────────────────────
 
@@ -283,6 +284,38 @@ export interface MatchOverlayHandle {
   showLiveScore(): void;
 }
 
+/** The caption under a grey call chip (#348 M6): the sim's reason, short enough for the chip. */
+const CALL_CAPTION: Readonly<Record<string, string>> = {
+  'not now': 'wait for play',
+  'one call a set': 'one a set',
+  'not while you have the ball': 'when defending',
+  'not your ball': 'with the ball',
+  'tackles 3–4': 'tackles 3–4',
+  'late in the set': 'tackle 4+',
+  'not in range': 'not in range',
+  'full time': 'full time',
+};
+
+/** What a call chip says under its name: why it is grey, "called" once made this set, nothing while it can be made. */
+export function callCaption(why: string | null, made: boolean): string {
+  if (made) return 'called';
+  if (why === null) return '';
+  return CALL_CAPTION[why] ?? why;
+}
+
+/** When each call can be made, for the calls list behind the "?" chip (coach-calls.md §3). */
+export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
+  'hit-up': 'with the ball: the forwards take the next carry',
+  'shift-left': 'with the ball: the next play goes wide left',
+  'shift-right': 'with the ball: the next play goes wide right',
+  'kick-early': 'tackles 3–4: kick on the next tackle',
+  'run-it': 'tackle 4+: run the last, no kick',
+  bomb: 'tackle 4+: the last-tackle kick is a bomb',
+  'field-goal': 'late, close and in range: drop for goal',
+  rush: 'defending: rush up for the next set',
+  hold: 'defending: hold the line for the next set',
+};
+
 /** "2/5" for a side's calls paid off of made, "–" when it made none. */
 export function callsLine(made: Readonly<Record<'home' | 'away', number>>, paid: Readonly<Record<'home' | 'away', number>>): string {
   const one = (s: 'home' | 'away'): string => (made[s] > 0 ? `${paid[s]}/${made[s]}` : '–');
@@ -299,10 +332,8 @@ export interface PlanCardOptions {
   tactics: TeamTactics;
   /** A chip was tapped: the new plan (in force from the restart). Returns why not, or null. */
   onPick: (t: TeamTactics) => string | null;
-  /** Continue (or the card timed out): the match goes on. */
+  /** Continue: the match goes on. */
   onDone: () => void;
-  /** Go on by itself after this long. A tap on the card holds it. */
-  autoMs?: number;
 }
 
 export interface PlanCardHandle {
@@ -310,10 +341,10 @@ export interface PlanCardHandle {
   close(): void;
 }
 
-/** The half-time card goes on by itself after this long, at every speed. A tap holds it. */
-export const HALF_TIME_CARD_MS = 4500;
-
-/** Show the plan card over the field until Continue (or `autoMs`). */
+/**
+ * Show the plan card over the field until Continue (#341: it waits for the coach
+ * at every speed; it used to go on by itself while he was still reading it).
+ */
 export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
   ensureStyles();
   let current: TeamTactics = { ...o.tactics };
@@ -338,12 +369,10 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
     }
     return r;
   };
-  let timer: ReturnType<typeof setTimeout> | null = null;
   let closed = false;
   const close = (): void => {
     if (closed) return;
     closed = true;
-    if (timer) clearTimeout(timer);
     card.remove();
     o.onDone();
   };
@@ -356,20 +385,58 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
     row('Attack', ATTACK_PRESETS, (p) => ({ attack: p as AttackPreset })),
     row('Defence', DEFENCE_PRESETS, (p) => ({ defence: p as DefencePreset })),
     hint,
-    go,
+    el('div', { class: 'nrl-mo-plan-foot' }, go),
   );
   render();
   mount(card);
-  // Any tap on the card holds it: the auto-continue is for a coach who isn't watching.
-  if (o.autoMs) {
-    timer = setTimeout(close, o.autoMs);
-    card.addEventListener('pointerdown', () => {
-      if (timer) clearTimeout(timer);
-      timer = null;
-    });
-  }
   return { el: card, close };
 }
+
+/** A sheet over the field (the pause menu, the calls list): a head, some lines, a row of actions. */
+export interface MatchSheetOptions {
+  head: string;
+  lines?: (string | HTMLElement)[];
+  actions: { label: string; onTap: () => void; attrs?: Record<string, string> }[];
+  /** The sheet went, by any action or ✕: the match goes on. */
+  onDone: () => void;
+}
+
+/** Show a sheet until one of its actions (each closes it first) or its ✕. */
+export function showMatchSheet(o: MatchSheetOptions): PlanCardHandle {
+  ensureStyles();
+  injectOverlayStyles();
+  let closed = false;
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    sheet.remove();
+    o.onDone();
+  };
+  const x = button('✕', close, { class: 'nrl-mo-sheet-x' });
+  x.setAttribute('aria-label', 'Close');
+  const actions = o.actions.map((a) => {
+    const b = button(a.label, () => {
+      close();
+      a.onTap();
+    });
+    for (const [k, v] of Object.entries(a.attrs ?? {})) b.setAttribute(k, v);
+    return b;
+  });
+  const sheet = panel(
+    { class: 'nrl-mo-sheet' },
+    el('div', { class: 'nrl-mo-plan-head' }, o.head),
+    x,
+    el('div', { class: 'nrl-mo-sheet-body' }, ...(o.lines ?? []).map((l) => (typeof l === 'string' ? el('div', { class: 'nrl-mo-plan-line' }, l) : l))),
+    el('div', { class: 'nrl-mo-sheet-actions' }, ...actions),
+  );
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-label', o.head);
+  mount(sheet);
+  return { el: sheet, close };
+}
+
+/** Anything the coach is reading over the field: the plan card, a sheet, the full-time report. The replay offer waits under it (#341). */
+export const CARD_SELECTOR = '.nrl-mo-plan, .nrl-mo-sheet, .nrl-modal';
 
 let active: MatchOverlayHandle | null = null;
 
@@ -382,6 +449,28 @@ export interface MatchOverlayOptions {
   weather?: WeatherKind;
   /** Minutes in a half: 40 for the old engine's log (default), NINES.halfMinutes for a live match (BAK-207 2g). */
   halfMinutes?: number;
+  /** The colours the sides show on the pitch (their rings, #340): swatches, possession and the try banner. Default: each club's first colour. */
+  worn?: { home: string; away: string };
+  /** The coach's side: his club is starred on the scoreboard (#348 M8). */
+  mine?: 'home' | 'away';
+}
+
+/** A 0xRRGGBB colour as CSS. */
+export function cssHex(n: number): string {
+  return `#${(n & 0xffffff).toString(16).padStart(6, '0')}`;
+}
+
+/** Stats start open only on a screen with room beside the field; a phone opens them (#348 M7). */
+export function statsStartOpen(width: number, height: number): boolean {
+  return width > 600 && height > 480;
+}
+
+/** How long the try banner holds the middle of the field before it docks under the scoreboard (#348 M7). */
+export const BANNER_DOCK_MS = 1000;
+
+/** The countdown on the Replay try chip: whole seconds left, never 0 while it shows. */
+export function replayCountdown(leftMs: number): number {
+  return Math.max(1, Math.ceil(leftMs / 1000));
 }
 
 /**
@@ -397,6 +486,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   const { home, away, result } = opts;
   const homeId = home.clubId;
+  const worn = opts.worn ?? { home: home.colors[0], away: away.colors[0] };
   const halfMinutes = opts.halfMinutes ?? 40;
   /** Set once the live sim drives the clock: events then only move the score and stats. */
   let liveClock = false;
@@ -411,8 +501,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const halfEl = el('span', { class: 'nrl-mo-half', text: '1st' });
   const weatherEl = el('span', { class: 'nrl-mo-weather', text: weatherBadge(opts.weather ?? result?.weather ?? 'clear') });
 
-  const homeChip = teamChip(home);
-  const awayChip = teamChip(away);
+  const homeChip = teamChip(home, worn.home, opts.mine === 'home');
+  const awayChip = teamChip(away, worn.away, opts.mine === 'away');
 
   const scoreboard = panel(
     { class: 'nrl-mo-scoreboard' },
@@ -422,7 +512,10 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   );
 
   // Stats panel (collapsible).
-  const possBar = el('div', { class: 'nrl-mo-poss-bar' }, el('span', { class: 'nrl-mo-poss-fill' }));
+  const possFill = el('span', { class: 'nrl-mo-poss-fill' });
+  possFill.style.background = worn.home;
+  const possBar = el('div', { class: 'nrl-mo-poss-bar' }, possFill);
+  possBar.style.background = worn.away;
   const possLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Possession 50% / 50%' });
   const tackleLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Tackles 0 / 0' });
   const errorLabel = el('div', { class: 'nrl-mo-stat-line', text: 'Errors 0 / 0' });
@@ -431,8 +524,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   // Possession and the tackle count stay on the live match while a replay rewinds the scoreboard.
   const statsNote = el('div', { class: 'nrl-mo-stat-note', text: 'Live match', attrs: { hidden: '' } });
   const statsBody = el('div', { class: 'nrl-mo-stats-body' }, statsNote, possLabel, possBar, tackleLabel, errorLabel, callsLabel);
-  // #18: stats start collapsed on phones so the pitch stays clear.
-  let statsOpen = typeof window === 'undefined' || window.innerWidth > 600;
+  // #18, #348 M7: stats start collapsed on phones, portrait or landscape, so the pitch stays clear.
+  let statsOpen = typeof window === 'undefined' || statsStartOpen(window.innerWidth, window.innerHeight);
   const statsToggle = button(statsOpen ? 'Stats ▾' : 'Stats ▸', () => {
     statsOpen = !statsOpen;
     statsBody.style.display = statsOpen ? '' : 'none';
@@ -442,8 +535,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const statsPanel = panel({ class: 'nrl-mo-stats' }, statsToggle, statsBody);
 
   // Commentary: a slim two-line ticker (previous line dimmed, latest bright).
-  // The full log sits behind a corner icon so it never covers play unasked (#17)
-  // and the ticker is not a button tall.
+  // The full log sits behind the corner Log button so it never covers play unasked (#17)
+  // and the ticker is not a button tall. Open, it takes the ticker's place on the left half (#348 M4).
   const tickerPrev = el('div', { class: 'nrl-mo-line nrl-mo-line-prev' });
   const tickerLatest = el('div', { class: 'nrl-mo-line' });
   const log = el('div', { class: 'nrl-mo-feed' });
@@ -454,14 +547,14 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const logToggle = button('', () => {
     logOpen = !logOpen;
     logPanel.style.display = logOpen ? '' : 'none';
+    root.classList.toggle('nrl-mo-log-on', logOpen);
     logToggle.setAttribute('aria-expanded', String(logOpen));
     if (logOpen) log.scrollTop = log.scrollHeight;
+    scheduleChrome();
   }, { class: 'nrl-mo-log-toggle' });
-  logToggle.setAttribute('aria-label', 'Log');
   logToggle.setAttribute('aria-expanded', 'false');
   logToggle.setAttribute('aria-controls', 'nrl-mo-log');
-  logToggle.title = 'Log';
-  logToggle.append(el('span', { class: 'nrl-mo-log-icon', attrs: { 'aria-hidden': 'true' } }));
+  logToggle.append(el('span', { class: 'nrl-mo-log-icon', attrs: { 'aria-hidden': 'true' } }), el('span', { class: 'nrl-mo-log-label', text: 'Log' }));
   const commentaryPanel = panel(
     { class: 'nrl-mo-commentary' },
     logPanel,
@@ -494,14 +587,15 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     consider(document.querySelector('.nrl-mo-calls'));
     consider(document.querySelector('.nrl-audio-launcher'));
     consider(logToggle);
+    // The replay chip, the docked banner and the toasts hang under the scoreboard, however tall it wraps.
+    const boardBottom = scoreboard.getBoundingClientRect().bottom;
+    document.documentElement.style.setProperty(BOARD_VAR, `${Math.ceil(boardBottom)}px`);
     if (clearance <= 0) return;
     const bottom = Math.ceil(clearance + 8);
     root.style.setProperty('--nrl-mo-chrome', `${bottom}px`);
-    root.style.setProperty('--nrl-mo-above', `${bottom + commentaryPanel.offsetHeight + 8}px`);
-    // The open log must fit between the scoreboard and the ticker, even when
-    // all call chips wrap into several rows on a small landscape phone.
-    const logBottom = window.innerHeight - bottom - commentaryPanel.offsetHeight - 4;
-    const logHeight = Math.max(0, Math.floor(logBottom - scoreboard.getBoundingClientRect().bottom - 8));
+    // The open log fills the left half from the ticker's foot to just under the scoreboard and the
+    // replay chip, even when all call chips wrap into several rows on a small landscape phone.
+    const logHeight = Math.max(0, Math.floor(window.innerHeight - bottom - boardBottom - DOCK_ROW_PX - 20));
     root.style.setProperty('--nrl-mo-log-height', `${logHeight}px`);
   };
   const scheduleChrome = (): void => {
@@ -518,21 +612,44 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     });
     scheduleChrome();
   };
-  const chromeMut = new MutationObserver(scanChrome);
+  const chromeMut = new MutationObserver(() => {
+    scanChrome();
+    tickReplay();
+  });
   chromeMut.observe(getRoot(), { childList: true });
   window.addEventListener('resize', scheduleChrome);
   chromeObserver?.observe(scoreboard);
   chromeObserver?.observe(commentaryPanel);
   scanChrome();
 
-  let replayTimer: ReturnType<typeof setTimeout> | null = null;
+  // The replay offer runs down only while nothing is open over the field: under the
+  // half-time card, a sheet or the full-time report it hides and waits (#341).
+  let replayTimer: ReturnType<typeof setInterval> | null = null;
   let replayBtn: HTMLButtonElement | null = null;
+  let replayCount: HTMLElement | null = null;
+  let replayLeft = 0;
+  let replayAt = 0;
   let replayTag: HTMLElement | null = null;
   const clearReplayOffer = (): void => {
-    if (replayTimer) clearTimeout(replayTimer);
+    if (replayTimer) clearInterval(replayTimer);
     replayTimer = null;
     replayBtn?.remove();
     replayBtn = null;
+    replayCount = null;
+  };
+  const cardOpen = (): boolean => document.querySelector(CARD_SELECTOR) !== null;
+  const tickReplay = (): void => {
+    if (!replayBtn) return;
+    const now = performance.now();
+    const covered = cardOpen();
+    if (!covered) replayLeft -= now - replayAt;
+    replayAt = now;
+    if (replayLeft <= 0) {
+      clearReplayOffer();
+      return;
+    }
+    replayBtn.hidden = covered;
+    if (replayCount) replayCount.textContent = String(replayCountdown(replayLeft));
   };
   document.body?.classList.add(MATCH_ACTIVE_CLASS);
 
@@ -564,6 +681,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   // ── Score banner ──
   let bannerTimer: ReturnType<typeof setTimeout> | null = null;
+  let dockTimer: ReturnType<typeof setTimeout> | null = null;
   let bannerWasTry = false;
   /** Built during a burst of events (Skip) and shown once the burst ends. */
   let queued: { b: ScoreBanner; score: string } | null = null;
@@ -571,7 +689,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   const hideBanner = (): void => {
     banner.hidden = true;
-    banner.classList.remove('nrl-mo-banner-in');
+    if (dockTimer) clearTimeout(dockTimer);
+    dockTimer = null;
+    banner.classList.remove('nrl-mo-banner-in', 'nrl-mo-banner-docked');
     bannerWasTry = false;
     bannerTimer = null;
   };
@@ -594,14 +714,20 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
         el('div', { class: 'nrl-mo-banner-sub', text: `${b.team}${pts ? `  ${pts}` : ''}` }),
         scoreLine,
       );
-      banner.style.background = sheet.colors[0];
-      banner.style.color = inkFor(sheet.colors[0]);
+      const colour = b.side === 0 ? worn.home : worn.away;
+      banner.style.background = colour;
+      banner.style.color = inkFor(colour);
       banner.style.borderColor = sheet.colors[1];
       banner.classList.toggle('nrl-mo-banner-miss', b.points === 0);
-      // Restart the pop-in animation.
-      banner.classList.remove('nrl-mo-banner-in');
+      // Restart the pop-in animation, in the middle of the field; then it docks out of the way.
+      banner.classList.remove('nrl-mo-banner-in', 'nrl-mo-banner-docked');
       void banner.offsetWidth;
       banner.classList.add('nrl-mo-banner-in');
+      if (dockTimer) clearTimeout(dockTimer);
+      dockTimer = setTimeout(() => {
+        dockTimer = null;
+        banner.classList.add('nrl-mo-banner-docked');
+      }, BANNER_DOCK_MS);
       bannerWasTry = b.headline === 'TRY!' || b.headline === 'BONUS TRY!'; // a bonus try's conversion folds in too (#77)
     }
     banner.hidden = false;
@@ -647,8 +773,10 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       offEvent();
       offFinished();
       if (bannerTimer) clearTimeout(bannerTimer);
+      if (dockTimer) clearTimeout(dockTimer);
       clearReplayOffer();
       replayTag?.remove();
+      document.documentElement.style.removeProperty(BOARD_VAR);
       if (chromeFrame) cancelAnimationFrame(chromeFrame);
       chromeObserver?.disconnect();
       chromeMut.disconnect();
@@ -679,12 +807,19 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     offerReplay(onTap: () => void): void {
       clearReplayOffer();
       // Still offered after the siren: at ×8 the last try's eight seconds often include full time.
-      replayBtn = button('Replay', () => {
+      // A small chip docked under the scoreboard (#348 M5), not a big button over play.
+      replayBtn = button('Replay try', () => {
         clearReplayOffer();
         onTap();
       }, { class: 'nrl-mo-replay' });
+      replayCount = el('span', { class: 'nrl-mo-replay-count', attrs: { 'aria-hidden': 'true' } });
+      replayBtn.append(replayCount);
+      replayBtn.setAttribute('aria-label', 'Replay try');
       root.append(replayBtn);
-      replayTimer = setTimeout(clearReplayOffer, REPLAY_OFFER_MS);
+      replayLeft = REPLAY_OFFER_MS;
+      replayAt = performance.now();
+      tickReplay();
+      replayTimer = setInterval(tickReplay, 250);
     },
     noteReplayBlock(ms: number): void {
       root.setAttribute('data-replay-block', String(Math.max(0, Math.round(ms))));
@@ -744,10 +879,12 @@ function surnameOf(name: string): string {
   return parts[parts.length - 1] ?? name;
 }
 
-function teamChip(sheet: TeamSheet): HTMLElement {
+function teamChip(sheet: TeamSheet, colour: string, mine: boolean): HTMLElement {
   const swatch = el('span', { class: 'nrl-mo-swatch' });
-  swatch.style.background = sheet.colors[0];
-  return el('div', { class: 'nrl-mo-chip' }, swatch, el('span', { class: 'nrl-mo-name', text: sheet.name }));
+  swatch.style.background = colour;
+  const chip = el('div', { class: mine ? 'nrl-mo-chip nrl-mo-mine' : 'nrl-mo-chip' }, swatch, el('span', { class: 'nrl-mo-name', text: sheet.name }));
+  if (mine) chip.title = 'Your club';
+  return chip;
 }
 
 function weatherBadge(w: WeatherKind): string {
@@ -762,6 +899,10 @@ function weatherBadge(w: WeatherKind): string {
 }
 
 const OVERLAY_STYLE_ID = 'nrl-match-overlay-styles';
+/** The scoreboard's foot (px from the top), on <html>, for what docks under it: the replay chip, the banner, the toasts. */
+const BOARD_VAR = '--nrl-mo-board';
+/** Room kept under the scoreboard for the docked replay chip (a 44px chip and its gap). */
+const DOCK_ROW_PX = 52;
 /** Body class set while a match overlay is mounted (see header). */
 export const MATCH_ACTIVE_CLASS = 'nrl-match-active';
 /** Body class added at full-time (alongside MATCH_ACTIVE_CLASS) until exit. */
@@ -776,17 +917,17 @@ function injectOverlayStyles(): void {
   document.head.appendChild(style);
 }
 
-const OVERLAY_CSS = `
+export const OVERLAY_CSS = `
 .nrl-match-overlay { font-family: 'Courier New', monospace; }
 /* Match mode (live AND full-time, until Back to Club): the HUD strip and nav
    bar step aside; the sound button moves to the bottom-right corner. */
 body.nrl-match-active .nrl-hud,
 body.nrl-match-active .nrl-nav { display: none; }
 body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
-/* Toasts: under the scoreboard, in the overlay's top margin, clear of the ticker (finding 3). */
+/* Toasts: under the scoreboard (and the replay chip's row), in the overlay's top margin, clear of the ticker (finding 3). */
 body.nrl-match-active .nrl-toast-stack,
 body.nrl-match-final .nrl-toast-stack {
-  top: calc(4.7rem + env(safe-area-inset-top, 0px));
+  top: calc(var(--nrl-mo-board, 4rem) + 3.5rem);
   bottom: auto;
   right: auto;
   left: calc(0.5rem + env(safe-area-inset-left, 0px));
@@ -805,18 +946,21 @@ body.nrl-match-final .nrl-toast-stack {
   font-size: clamp(0.65rem, 2.5vw, 0.9rem);
   max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* The coach's club (#348 M8): starred and underlined. */
+.nrl-mo-mine .nrl-mo-name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 2px; }
+.nrl-mo-mine::before { content: '★'; font-size: 0.8rem; line-height: 1; }
 .nrl-mo-centre { text-align: center; min-width: 5.5rem; flex: 0 0 auto; }
 .nrl-mo-score { font-size: clamp(1rem, 4vw, 1.4rem); font-weight: bold; display: block; }
 .nrl-mo-meta { display: flex; gap: 0.4rem; justify-content: center; font-size: clamp(0.55rem, 2vw, 0.7rem); white-space: nowrap; }
 .nrl-mo-stats {
-  position: fixed; top: calc(4.5rem + env(safe-area-inset-top, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px)); z-index: 15; min-width: 9.5rem;
+  position: fixed; top: calc(var(--nrl-mo-board, 4rem) + 0.3rem); right: calc(0.5rem + env(safe-area-inset-right, 0px)); z-index: 15; min-width: 9.5rem;
 }
 .nrl-mo-stats-toggle { width: 100%; margin-bottom: 0.35rem; }
 .nrl-mo-stat-line { font-size: 0.7rem; margin: 0.15rem 0; }
 .nrl-mo-stat-note { font-size: 0.62rem; font-weight: bold; letter-spacing: 0.04em; margin: 0 0 0.15rem; }
 .nrl-mo-stat-note[hidden] { display: none; }
 .nrl-mo-poss-bar { height: 0.6rem; border: 2px solid #000; background: #b34747; margin: 0.2rem 0; }
-.nrl-mo-poss-fill { display: block; height: 100%; background: #4779b3; width: 50%; }
+.nrl-mo-poss-fill { display: block; height: 100%; background: #4779b3; width: 50%; border-right: 2px solid #000; box-sizing: border-box; }
 .nrl-mo-commentary {
   position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); right: calc(0.5rem + env(safe-area-inset-right, 0px));
   /* --nrl-mo-chrome is the measured top of the speed row and the chip stack (placeChrome). */
@@ -826,15 +970,14 @@ body.nrl-match-final .nrl-toast-stack {
 }
 .nrl-mo-ticker { flex: 1 1 auto; min-width: 0; }
 .nrl-mo-ticker .nrl-mo-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1.25em; }
-.nrl-mo-line-prev { opacity: 0.55; }
-/* The log toggle is a 44px icon in the bottom-left corner, on the empty side of
-   the speed row (the ♪ button has the other corner). It used to be a labelled
-   button inside the ticker, which made that strip a button tall and, on a narrow
-   phone, sat under the call chips. */
+.nrl-mo-line-prev { opacity: 0.75; }
+/* The Log button sits in the bottom-left corner, on the empty side of the speed
+   row (the ♪ button has the other corner). Not inside the ticker, which made that
+   strip a button tall; labelled, since three bars alone read as a menu (#348 M4). */
 .nrl-mo-log-toggle {
   position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
-  z-index: 21; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0;
-  display: grid; place-items: center; line-height: 0;
+  z-index: 21; height: 44px; min-width: 44px; min-height: 44px; padding: 0 0.5rem;
+  display: flex; align-items: center; gap: 0.3rem; font-size: 0.78rem;
 }
 /* The open fill wins over .nrl-btn:hover (that rule is an element plus :hover). */
 .nrl-btn.nrl-mo-log-toggle[aria-expanded="true"],
@@ -842,19 +985,25 @@ body.nrl-match-final .nrl-toast-stack {
   background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000;
 }
 .nrl-mo-log-icon {
-  width: 16px; height: 12px; pointer-events: none;
+  width: 12px; height: 10px; pointer-events: none; flex: 0 0 auto;
   background:
-    linear-gradient(#1a1a2e, #1a1a2e) 0 0 / 16px 2px no-repeat,
-    linear-gradient(#1a1a2e, #1a1a2e) 0 5px / 16px 2px no-repeat,
-    linear-gradient(#1a1a2e, #1a1a2e) 0 10px / 16px 2px no-repeat;
+    linear-gradient(#1a1a2e, #1a1a2e) 0 0 / 12px 2px no-repeat,
+    linear-gradient(#1a1a2e, #1a1a2e) 0 4px / 9px 2px no-repeat,
+    linear-gradient(#1a1a2e, #1a1a2e) 0 8px / 12px 2px no-repeat;
 }
-/* Full log: opt-in, stacked just above the ticker (the ticker's own width). */
+.nrl-mo-log-label { pointer-events: none; }
+/* Full log (#348 M4): opt-in; open, it takes the ticker's place and the left half,
+   up to just under the scoreboard, so it is a read and not three lines that repeat the ticker. */
 .nrl-mo-log {
-  position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); margin: 0;
+  margin: 0; border: 0; box-shadow: none; background: transparent; padding: 0;
   max-height: var(--nrl-mo-log-height, 8rem); overflow: hidden;
-  display: flex; flex-direction: column; padding: 0.15rem 0.5rem;
+  display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0;
 }
-.nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: 8rem; min-height: 0; overflow-y: auto; }
+.nrl-mo-feed { display: flex; flex-direction: column; gap: 0.15rem; max-height: var(--nrl-mo-log-height, 8rem); min-height: 0; overflow-y: auto; }
+.nrl-mo-log-on .nrl-mo-ticker { display: none; }
+.nrl-match-overlay.nrl-mo-log-on .nrl-mo-commentary {
+  right: auto; width: calc(50vw - 0.5rem - env(safe-area-inset-left, 0px)); max-width: none; margin: 0;
+}
 .nrl-mo-line { font-size: clamp(0.6rem, 2.4vw, 0.8rem); line-height: 1.25; }
 /* Playback controls (mounted by MatchScene): bottom-centre, where the nav bar
    sits outside a match; the commentary feed stacks above them. */
@@ -873,16 +1022,38 @@ body.nrl-match-final .nrl-toast-stack {
   .nrl-mo-calls { max-width: 24rem; }
   .nrl-mo-controls { width: max-content; }
 }
-.nrl-mo-calls .nrl-btn { min-height: 44px; min-width: 4.6rem; padding: 0.15rem 0.4rem; font-size: 0.78rem; }
+.nrl-mo-calls .nrl-btn { min-height: 44px; min-width: 4.6rem; padding: 0.15rem 0.4rem; font-size: 0.78rem; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; }
 .nrl-mo-calls .nrl-btn[data-made] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; opacity: 1; }
+/* Why a chip is grey, on the chip (#348 M6): a touch never shows the title. */
+.nrl-mo-call-why { display: block; font-size: 0.6rem; font-weight: normal; line-height: 1.05; max-width: 6.5rem; overflow: hidden; text-overflow: ellipsis; }
+.nrl-mo-call-why:empty { display: none; }
+.nrl-mo-calls .nrl-btn:disabled:not([data-made]) { opacity: 0.8; }
+.nrl-mo-calls .nrl-btn.nrl-mo-calls-help { min-width: 44px; background: #e8e0c8; }
 .nrl-mo-final .nrl-mo-calls, body.nrl-match-final .nrl-mo-calls { display: none; }
-.nrl-mo-controls .nrl-btn[data-active] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; }
-/* The plan card (N11): over the field at half-time or from the Plan chip; above the controls. */
-.nrl-mo-plan {
-  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 25;
+/* The speed playing now, unmistakably (#348 M3). */
+.nrl-mo-controls .nrl-btn[data-active], .nrl-mo-controls .nrl-btn[data-active]:hover:not(:disabled) {
+  background: #1a1a2e; color: #f4d03f; box-shadow: inset 0 0 0 2px #f4d03f, 3px 3px 0 #000;
+}
+.nrl-mo-controls .nrl-mo-pause { background: #e8e0c8; }
+/* The plan card (N11) and the sheets: over the field, above every match control and the toasts, under a dialog.
+   The card waits for Continue (#341), and Continue stays in view however short the screen. */
+.nrl-mo-plan, .nrl-mo-sheet {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 65;
   display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
   width: min(42rem, calc(100vw - 1rem)); max-height: calc(100vh - 1rem); overflow-y: auto; box-sizing: border-box; padding: 0.6rem 0.8rem;
 }
+.nrl-mo-plan-foot {
+  position: sticky; bottom: -0.6rem; align-self: stretch; display: flex; justify-content: center;
+  margin: 0 -0.8rem -0.6rem; padding: 0.3rem 0.8rem 0.45rem; background: #e8e0c8; border-top: 2px solid #1a1a2e; z-index: 1;
+}
+.nrl-mo-sheet { width: min(26rem, calc(100vw - 1rem)); padding-top: 0.5rem; }
+.nrl-mo-sheet-x { position: absolute; top: 0.25rem; right: 0.25rem; padding: 0; }
+.nrl-mo-sheet-body { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; align-self: stretch; }
+.nrl-mo-sheet-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin-top: 0.25rem; }
+.nrl-mo-sheet-actions .nrl-btn:first-child { min-width: 7rem; }
+.nrl-mo-call-help { display: grid; grid-template-columns: max-content 1fr; gap: 0.15rem 0.6rem; font-size: clamp(0.62rem, 2vw, 0.8rem); text-align: left; align-self: stretch; }
+.nrl-mo-call-help b { white-space: nowrap; }
+.nrl-mo-call-help .nrl-mo-call-locked { opacity: 0.7; }
 .nrl-mo-plan-head { font-size: clamp(1rem, 3.5vw, 1.4rem); font-weight: bold; letter-spacing: 0.06em; }
 .nrl-mo-plan-line { font-size: clamp(0.65rem, 2.2vw, 0.85rem); }
 .nrl-mo-plan-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.3rem; }
@@ -893,7 +1064,8 @@ body.nrl-match-final .nrl-toast-stack {
 .nrl-mo-plan-go { min-width: 9rem; }
 .nrl-mo-calls .nrl-btn[data-plan] { background: #d6e8ff; }
 @media (max-height: 480px) {
-  .nrl-mo-plan { gap: 0.2rem; padding: 0.35rem 0.6rem; }
+  .nrl-mo-plan, .nrl-mo-sheet { gap: 0.2rem; padding: 0.35rem 0.6rem; }
+  .nrl-mo-plan-foot { bottom: -0.35rem; margin: 0 -0.6rem -0.35rem; padding: 0.25rem 0.6rem 0.3rem; }
   .nrl-mo-plan-head { font-size: 1rem; }
   .nrl-mo-plan-row .nrl-btn { padding: 0.1rem 0.35rem; font-size: 0.72rem; }
 }
@@ -911,6 +1083,16 @@ body.nrl-match-final .nrl-toast-stack {
   font-family: 'Courier New', monospace; text-shadow: none;
 }
 .nrl-mo-banner[hidden] { display: none; }
+/* After a moment the banner docks: a strip under the scoreboard, off the play (#348 M7). */
+.nrl-mo-banner.nrl-mo-banner-docked {
+  top: calc(var(--nrl-mo-board, 4rem) + 0.3rem); min-width: 0; max-width: min(24rem, calc(100vw - 22rem));
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0.6rem; border-width: 3px; box-shadow: 3px 3px 0 #000;
+}
+.nrl-mo-banner-docked .nrl-mo-banner-head { font-size: 0.95rem; letter-spacing: 0.04em; }
+.nrl-mo-banner-docked .nrl-mo-banner-who { font-size: 0.78rem; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.nrl-mo-banner-docked .nrl-mo-banner-sub { display: none; }
+.nrl-mo-banner-docked .nrl-mo-banner-extra { font-size: 0.72rem; margin: 0; padding: 0 0 0 0.4rem; border-top: 0; border-left: 2px dashed currentColor; white-space: nowrap; }
+.nrl-mo-banner-docked .nrl-mo-banner-score { margin: 0; font-size: 0.78rem; white-space: nowrap; }
 .nrl-mo-banner-head { font-size: clamp(1.4rem, min(7vw, 10vh), 3rem); font-weight: bold; letter-spacing: 0.08em; line-height: 1.05; }
 .nrl-mo-banner-who { font-size: clamp(0.9rem, min(3.6vw, 5vh), 1.5rem); font-weight: bold; margin-top: 0.15rem; }
 .nrl-mo-banner-sub { font-size: clamp(0.75rem, 2.6vw, 1rem); opacity: 0.9; }
@@ -936,14 +1118,20 @@ body.nrl-match-final .nrl-toast-stack {
 }
 .nrl-mo-chip.nrl-mo-scored { animation: nrl-mo-chip-scored 1.2s ease-out; }
 @keyframes nrl-mo-chip-scored { 0%, 40% { background: #f4d03f; } 100% { background: transparent; } }
-/* Replay (N15.5): above the ticker, clear of the speed buttons and the calls. */
+/* Replay (N15.5, #348 M5): a small chip docked under the scoreboard, top-left, with
+   its seconds left; not a big button over play. No centring transform: the pressed
+   nudge (.nrl-btn:active) would replace it and slide the button off the finger. */
 .nrl-mo-replay, .nrl-mo-replay-tag {
-  position: fixed; left: 50%; bottom: var(--nrl-mo-above, calc(8rem + env(safe-area-inset-bottom, 0px))); transform: translateX(-50%);
-  z-index: 26; pointer-events: auto; min-height: 44px; min-width: 7rem;
+  position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); top: calc(var(--nrl-mo-board, 4rem) + 0.3rem);
+  z-index: 26; pointer-events: auto; min-height: 44px;
 }
-/* The pressed nudge has to keep the centring, or the button jumps half its width off the finger and the tap never clicks. */
-.nrl-btn.nrl-mo-replay:active:not(:disabled) { transform: translateX(-50%) translate(3px, 3px); }
-.nrl-mo-replay-tag {
+.nrl-mo-replay { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.5rem; font-size: 0.78rem; }
+.nrl-mo-replay[hidden] { display: none; }
+.nrl-mo-replay-count {
+  display: inline-grid; place-items: center; min-width: 1.3rem; height: 1.3rem; padding: 0 0.15rem; box-sizing: border-box;
+  background: #1a1a2e; color: #f4d03f; font-size: 0.72rem;
+}
+.nrl-mo-replay-tag { display: grid; place-items: center; box-sizing: border-box;
   pointer-events: none; padding: 0.35rem 0.8rem; background: #1a1a2e; color: #fff; border: 3px solid #000;
   font-weight: bold; letter-spacing: 0.08em; box-shadow: 3px 3px 0 #000;
 }
@@ -954,13 +1142,10 @@ body.nrl-match-final .nrl-toast-stack {
 @media (max-height: 480px) {
   .nrl-mo-controls { gap: 0.25rem; }
   .nrl-mo-controls .nrl-btn { padding: 0.2rem 0.4rem; font-size: 0.72rem; }
-  .nrl-mo-stats { top: 4rem; min-width: 8.5rem; padding: 0.3rem 0.5rem; }
+  .nrl-mo-stats { min-width: 8.5rem; padding: 0.3rem 0.5rem; }
   .nrl-mo-stat-line { font-size: 0.62rem; margin: 0.05rem 0; }
-  .nrl-mo-feed { max-height: 3.4rem; }
   .nrl-mo-commentary { max-width: min(34rem, calc(100vw - 13rem)); margin: 0; }
   .nrl-mo-banner { top: 19%; min-width: 14rem; padding: 0.25rem 0.9rem 0.35rem; border-width: 3px; }
   .nrl-mo-banner-score { margin-top: 0.2rem; }
-  body.nrl-match-active .nrl-toast-stack,
-  body.nrl-match-final .nrl-toast-stack { top: calc(4.7rem + env(safe-area-inset-top, 0px)); }
 }
 `;

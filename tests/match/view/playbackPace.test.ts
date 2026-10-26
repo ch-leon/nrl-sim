@@ -1,7 +1,6 @@
 // Smart speed is screen-only: dead time eases toward twice the chosen speed,
 // open play stays at it, and a single frame does not jump the whole way.
 import { describe, it, expect } from 'vitest';
-import { HALF_TIME_CARD_MS } from '../../../src/ui/screens/matchOverlay';
 import { blendPace, playbackPace, playbackSpeedOf, PACE_BLEND_MS } from '../../../src/match/view/livePlayback';
 
 describe('smart playback pace', () => {
@@ -31,10 +30,5 @@ describe('smart playback pace', () => {
     expect(playbackSpeedOf(undefined)).toBe(4);
     expect(playbackSpeedOf(3)).toBe(4);
     expect(playbackSpeedOf('8')).toBe(4);
-  });
-
-  it('the half-time card auto-continues in 4–5 seconds', () => {
-    expect(HALF_TIME_CARD_MS).toBeGreaterThanOrEqual(4000);
-    expect(HALF_TIME_CARD_MS).toBeLessThanOrEqual(5000);
   });
 });
