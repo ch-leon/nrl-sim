@@ -216,7 +216,7 @@ async function runSize(browser, W, H) {
     await tap('.nrl-tutorial-skip');
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
   });
-  const GUIDE = ['.nrl-guide-modal', ['.nrl-guide-replay', '.nrl-guide-close', '.nrl-guide-tab']];
+  const GUIDE = ['.nrl-guide-modal', ['.nrl-guide-replay', '.nrl-guide-modal .nrl-screen-x', '.nrl-guide-tab']];
   await step('guide', async () => {
     await openNav(page, 'help');
     await page.waitForSelector('[data-guide]');
