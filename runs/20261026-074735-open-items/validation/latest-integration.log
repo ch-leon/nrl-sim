@@ -1,0 +1,61 @@
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+
+ RUN  v2.1.9 /workspace/nrl-sim
+
+ ✓ tests/systems/wildcards.test.ts (19 tests) 991ms
+   ✓ wildcard odds > letting them go lands on about a quarter of trips, and half of that with Welfare 503ms
+
+ Test Files  1 passed (1)
+      Tests  19 passed (19)
+   Start at  08:53:15
+   Duration  4.59s (transform 2.13s, setup 0ms, collect 2.69s, tests 991ms, environment 0ms, prepare 247ms)
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+
+> nrl-sim@0.0.0 prebuild
+> node scripts/gen-icons.mjs
+
+[gen-icons] wrote /workspace/nrl-sim/public/icons/icon-192.png (966 bytes)
+[gen-icons] wrote /workspace/nrl-sim/public/icons/icon-512.png (3823 bytes)
+
+> nrl-sim@0.0.0 build
+> tsc --noEmit && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 165 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/manifest.webmanifest                            0.35 kB
+dist/index.html                                      2.12 kB │ gzip:   1.07 kB
+dist/assets/artWorker-BXbna-Cy.js                   26.18 kB
+dist/assets/matchWorker-BtDpBYJq.js                 98.50 kB
+dist/assets/virtual_pwa-register-4RDNFMM9.js         0.99 kB │ gzip:   0.56 kB
+dist/assets/workbox-window.prod.es5-BqEJf4Xk.js      5.71 kB │ gzip:   2.34 kB
+dist/assets/index-D7V5FtHu.js                    2,097.46 kB │ gzip: 554.31 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 39.48s
+
+PWA v1.3.0
+mode      generateSW
+precache  11 entries (2185.05 KiB)
+files generated
+  dist/sw.js
+  dist/workbox-2fbc6a65.js
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice

@@ -1,0 +1,95 @@
+
+> nrl-sim@0.0.0 soak
+> vite-node scripts/soak.ts -- --seasons 1 --seeds 10 --difficulties normal --live-rivals --jobs 3 --json work/season-pace-pass.json
+
+Rival rounds on the live sim (--live-rivals) in the fresh-game runs.
+   seed      mode from seasons     money  minMoney squad  pool     KB  rivals  rep   record margin pos forf  fin      near  nine rmean   gap       signed     ms problems
+   7919      idle    -       1    125432     84654    19    13    149   41-67   38   15-1-8   +3.6   4    0  1/1   40% (5)  56.0  55.9  +0.1            - 484301 0
+   7919   managed    -       1    -29564    -96678    20    12    151   44-67   40   18-0-6   +8.3   2    0  1/1   50% (4)  74.2  55.9 +18.3            - 498390 0
+  15838      idle    -       1     35385     35385    18    13    146   43-67   29  10-1-13   +1.7  11    0  0/1   25% (4)  54.0  55.9  -1.9            - 465412 0
+  15838   managed    -       1    131827     50536    18    13    146   43-66   42   19-2-3  +16.6   2    0  1/1   33% (3)  70.4  55.9 +14.5            - 362065 0
+  23757      idle    -       1    402360    154730    19    10    147   48-66   56   21-0-3  +15.3   1    0  1/1  100% (4)  54.9  55.8  -0.9            - 367894 0
+  23757   managed    -       1    278548     38683    20    11    147   45-67   62   21-0-3  +16.2   1    0  1/1  100% (4)  70.9  55.8 +15.1            - 399728 0
+  31676      idle    -       1    126261     44978    18    12    148   45-68   41  13-1-10   +1.3   5    0  1/1   60% (5)  55.6  55.8  -0.2            - 294176 0
+  31676   managed    -       1    201328     38739    18    12    151   44-68   47   18-0-6  +14.5   2    0  1/1   75% (4)  71.2  55.9 +15.3            - 346171 0
+  39595      idle    -       1    216124     59589    18    13    148   44-67   52  13-0-11   +7.5   8    0  1/1   33% (6)  54.1  55.9  -1.8            - 429626 0
+  39595   managed    -       1    244841     10769    20    11    150   46-68   64   20-0-4  +19.4   1    0  1/1   50% (4)  69.9  55.8 +14.1            - 290475 0
+  47514      idle    -       1     69273     67453    16     9    148   44-67   35  11-1-12   +0.4   9    0  0/1    0% (4)  54.9  55.9  -1.0            - 416650 0
+  47514   managed    -       1     91481     63081    16     9    148   43-68   46   20-0-4  +15.5   1    0  1/1   50% (4)  70.4  55.9 +14.5            - 403074 0
+  55433      idle    -       1    131877    104088    20    13    148   48-65   40   17-1-6   +8.4   1    0  1/1   40% (5)  55.1  56.0  -0.9            - 370096 0
+  55433   managed    -       1    -51156    -63105    21    12    146   43-66   38   16-0-8   +9.1   3    0  1/1   50% (4)  71.9  55.9 +16.0            - 256766 0
+  63352      idle    -       1    184723    152899    18    11    149   44-67   41   21-0-3  +14.0   1    0  1/1   83% (6)  54.9  56.0  -1.1            - 404151 0
+  63352   managed    -       1     70980     47112    18     9    147   46-67   47   22-0-2  +23.1   1    0  1/1  100% (4)  71.6  56.2 +15.4            - 357716 0
+  71271      idle    -       1    317509    114782    18     9    145   45-67   52   17-0-7   +5.3   3    0  1/1   80% (5)  55.0  55.9  -0.9            - 277525 0
+  71271   managed    -       1    284869     46749    18    12    153   44-67   57   19-0-5  +10.7   1    0  1/1   50% (4)  71.3  55.8 +15.5            - 228206 0
+  79190      idle    -       1    139054    103991    19    10    144   44-67   38   19-0-5   +9.8   1    0  1/1   80% (5)  54.4  56.1  -1.7            - 275723 0
+  79190   managed    -       1     16252      5580    17    12    149   46-67   35   19-1-4  +12.8   2    0  1/1   75% (4)  71.4  56.1 +15.3            - 313853 0
+   4243   managed    1       2    -95746   -105791    16    11    134   42-64   43   21-1-2  +13.3   1    0  2/2   29% (7)  70.9  56.6 +14.3            -  74569 0
+   4244   managed    2       2     85652    -67224    17    11    133   49-65   48   19-0-5  +10.0   1    0  2/2   63% (8)  73.1  56.3 +16.8    1×52 $14k  68269 0
+   4245   managed    3       2     79191   -143248    12    11    132   49-64   46   18-1-5   +9.8   2    0  2/2   50% (8)  67.8  56.3 +11.5            -  79545 0
+   4246   managed    4       2    237882    -62508    19    11    129   45-65   70   22-0-2  +19.9   1    0  2/2   50% (8)  75.4  56.1 +19.3            -  84144 0
+   4247   managed    5       2    -78612   -101439    15    12    129   48-63   45   22-0-2  +14.0   1    0  2/2   88% (8)  72.1  56.2 +15.9            -  78427 0
+   4248   managed    6       2    279433     30189    18    10    131   47-65   69   20-3-1  +17.4   1    0  2/2  100% (7)  75.1  56.1 +19.0    1×73 $69k  80106 0
+   4249   managed    7       2    134215    -57481    16    12    128   46-63   61   22-0-2  +22.7   1    0  2/2   88% (8)  75.1  56.2 +18.9            -  52407 0
+   4250   managed    8       2    477140     17775    19    11    130   45-66   78   20-2-2  +19.6   1    0  2/2   75% (8)  75.9  56.1 +19.8    1×71 $66k  88992 0
+   4251   managed    9       2    175413    -20260    18    11    127   48-65   68   20-0-4  +17.0   1    0  2/2   50% (8)  73.1  56.4 +16.7   3×59 $100k  83376 0
+   4252   managed   10       2    255279     54252    19     9    131   47-65   69   22-0-2  +27.6   1    0  2/2   75% (8)  74.4  56.4 +18.0            -  74220 0
+   4253   managed   11       2    253079     28388    18    10    132   47-66   73   20-0-4  +14.0   1    0  2/2   38% (8)  73.3  56.2 +17.1            -  88950 0
+   4254   managed   12       2    455655     -4285    15    11    128   46-68   80   18-0-6  +12.8   1    0  2/2   43% (7)  73.9  56.1 +17.8    1×57 $42k  88784 0
+   4255   managed   13       2    428815    -48494    19    11    131   46-67   82   19-2-3  +19.4   1    0  2/2   71% (7)  76.0  56.2 +19.8            -  74560 0
+   4256   managed   14       2    198940    -25623    15    12    131   45-63   65   22-0-2  +22.0   1    0  2/2   57% (7)  75.0  56.2 +18.8            -  63304 0
+   4257   managed   15       2    238687    -68543    17    10    131   48-64   77   23-1-0  +27.6   1    0  2/2  100% (6)  75.6  55.9 +19.7            - 100412 0
+   4258   managed   16       2    274645     11235    19    12    131   45-64   69   20-0-4  +17.9   1    0  2/2   38% (8)  75.0  56.3 +18.7            -  49611 0
+   4259   managed   17       2    488683     33197    18    12    133   47-64   83   22-1-1  +20.9   1    0  2/2   86% (7)  75.4  55.9 +19.5            -  76453 0
+   4260   managed   18       2    493690    -45906    19    12    132   45-64   80   21-0-3  +18.4   1    0  2/2   75% (8)  76.3  56.3 +20.0            -  64091 0
+   4261   managed   19       2    -23750    -23750    18    11    137   47-64   49   20-0-4  +15.1   1    0  2/2   75% (8)  72.9  56.5 +16.4            -  46525 0
+   4262   managed   20       2    420378     20003    16    13    127   48-64   75   17-0-7  +12.0   1    0  2/2   38% (8)  74.6  56.4 +18.2            -  51395 0
+
+Per season, averaged over 10 seeds of the fresh-game runs (record, margin a game, ladder finish, share in the top eight / premiers / sacked, rounds forfeited, finals appearances per run so far, the win rate against the three nearest-rated rivals (games in brackets), the player's best nine v the rival mean, rival range, money, managed signings, distinct attack/defence styles). Start gap = best nine − rival mean at week 1.
+     mode season runs         record margin  pos top8 prem sack forf  fin       near  nine rmean   gap   range   money           signings start  styles
+     idle      1   10   15.7-0.5-7.8   +6.7  4.4  80%  30%   0%  0.0  0.8   55% (49)  54.9  55.9  -1.0   42-68   $175k                  -  +0.2 4.9/3.0
+  managed      1   10   19.2-0.3-4.5  +14.6  1.6 100%  30%   0%  0.0  1.0   64% (39)  71.3  55.9 +15.4   41-68   $124k                  -  +0.2 4.9/3.0
+
+Season P&L, averaged over 10 seeds ($k a season; negative = spent). sponsor = Sponsor Board, grant = the reputation grant, board = objective grants, transfers = signing fees and sales, contracts = renewals and releases, facilities = build / upgrade / move / demolish. Net = Σ lines; money = the balance at the rollover.
+     mode season      wages     upkeep   overhead    sponsor      grant      gates      prize      board     events  transfers  contracts facilities      other     net   money
+     idle      1      -492k          0       -41k          0       +32k      +386k       +58k       +27k        +5k          0          0          0          0    -25k   $175k
+  managed      1      -504k       -13k       -97k          0       +35k      +474k       +63k       +27k       -12k          0          0       -48k          0    -76k   $124k
+
+Rival styles in 3451 rival-v-rival games on the live sim (#249, N14.2).
+Break-rule switches: 7310 in 3451 games (2.12 a match).
+Attack mix: balanced 37%, grind 32%, kick-chase 15%, expansive 10%, all-out 5%
+Defence mix: slide 58%, rush 27%, compressed 15%
+
+Wins ÷ games at a level rating (clubs within 2 points as the week began). A draw is half a win. ! = more than 4 points from even; logged for N13, not tuned here.
+     attack  games  score    off
+   balanced    373    49%   -0.5
+      grind    306    53%   +3.1
+ kick-chase    127    50%   +0.4
+  expansive    108    44%  -6.5!
+    all-out     34    47%   -2.9
+Logged for N13 (attack, level rating): expansive 44% over 108 sides (-6.5 pts).
+    defence  games  score    off
+      slide    564    49%   -1.2
+       rush    255    52%   +2.2
+ compressed    129    51%   +1.2
+Logged for N13 (defence, level rating): none more than 4 points from even.
+
+Against strength, every game (#249): each side's score against the score its strength gap predicts (the mean of every side with the same gap, in 2-point bands). * = beyond two standard errors. A difference over 4 points is logged for N13 too.
+     attack  games  score expect   diff    se
+   balanced   2587    45%    48%  -2.2*   1.0
+      grind   2196    50%    49%   +1.2   1.1
+ kick-chase   1049    60%    55%  +5.2*   1.5
+  expansive    711    43%    47%  -3.9*   1.9
+    all-out    359    66%    64%   +1.6   2.5
+Logged for N13 (attack, against strength): kick-chase +5.2 over 1049 sides.
+    defence  games  score expect   diff    se
+      slide   3991    48%    50%   -1.5   0.8
+       rush   1850    52%    50%   +2.3   1.2
+ compressed   1061    53%    51%   +1.6   1.5
+Logged for N13 (defence, against strength): none more than 4 points from the strength-adjusted mean.
+
+Wrote work/season-pace-pass.json
+
+Forfeits: none in 40 runs.
+
+No problems.

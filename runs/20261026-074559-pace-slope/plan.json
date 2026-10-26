@@ -1,0 +1,41 @@
+{
+  "name": "pace-slope",
+  "description": "Make Speed count more around the unchanged 60-rated pace while retaining 6–9 m/s limits: fliers and a neutral control.",
+  "seeds": 120,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "fliers v stayers",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "stats": {
+          "speed": 85,
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "speed": 65,
+          "stamina": 80
+        }
+      }
+    }
+  ],
+  "sweep": {
+    "pace.extraPerStat": [
+      0.015,
+      0.03
+    ]
+  }
+}

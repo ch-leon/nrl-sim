@@ -1,0 +1,426 @@
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+
+ RUN  v2.1.9 /workspace/nrl-sim
+
+ ✓ tests/core/save.test.ts (57 tests) 1845ms
+   ✓ migrateState > a v7 save gains rival squads matching each rival's strength (#74) 1361ms
+ ✓ tests/systems/economy.test.ts (59 tests) 719ms
+ ✓ tests/ui/screens/finance.test.ts (46 tests) 579ms
+ ✓ tests/systems/fixtures.test.ts (39 tests) 62439ms
+   ✓ playable finals via the week tick > pre-generates each finals round, plays it, and records history at rollover 61742ms
+ ✓ tests/match/view/kickLayer.test.ts (18 tests) 6174ms
+   ✓ kicks in real matches > every kick comes down before the next, lands where the view read it would, and its framing holds the landing in a whole-number zoom 6046ms
+ ✓ tests/systems/events.test.ts (27 tests) 1307ms
+   ✓ two-season headless run > deals a card every 3–4 weeks on average and never repeats one inside its cooldown 413ms
+ ✓ tests/match/league/live.test.ts (26 tests) 65264ms
+   ✓ LiveSim > replays identically from a seed 1618ms
+   ✓ LiveSim > every carry ends in a tackle, a break, an error or a kick — and a tackle always plays the ball 1057ms
+   ✓ LiveSim > the ruck runs tackled → down → play-the-ball → dummy-half, in that order, with the ball 701ms
+   ✓ LiveSim > a set is five tackles: the fifth brings a handover unless a kick came first 1719ms
+   ✓ LiveSim > the ball is always held, in flight or loose-and-collected within a couple of seconds 1583ms
+   ✓ LiveSim > pace is continuous (#85): while the ball is in play nobody stands still for more than a second 3416ms
+   ✓ LiveSim > nobody teleports, overlaps or leaves the ground; speeds stay human 34277ms
+   ✓ LiveSim > tries get scored and the game restarts with a kick-off by the side scored against 1148ms
+   ✓ LiveSim > steps, strips and intercepts all happen across seeds, and are announced 5153ms
+   ✓ LiveSim > a strip or intercept hands the ball over where it happened 624ms
+   ✓ LiveSim > the try scorer stays where he grounded it until the restart (no dragging along the ground) 821ms
+   ✓ LiveSim > the hooker does not make the tackles from marker: the line does (middles lead, as in league) 1944ms
+   ✓ LiveSim > the stronger side scores more over many seeds 10252ms
+   ✓ headless reads (Phase 3 speed) > wrestleMen and tickEvents agree with the snapshot every tick 758ms
+ ✓ tests/systems/matchday.test.ts (15 tests) 54151ms
+   ✓ player matchday result toast > holds the result until playback finishes 4002ms
+   ✓ player matchday result toast > announces immediately when fast-forwarding (no playback) 2705ms
+   ✓ player matchday injuries (GitHub #7) > applies sim injuries onto squad players and notifies 8829ms
+   ✓ player matchday injuries (GitHub #7) > holds injury toasts until playback finishes (no spoilers) 6887ms
+   ✓ player matchday injuries (GitHub #7) > still plays when some (not all) players are injured 2204ms
+   ✓ the coach’s lineup is the side that runs out (#69) > fields the nine picked, in their slots, with the bench and rotation; the result credits them a game 2354ms
+   ✓ the coach’s lineup is the side that runs out (#69) > an injured starter is covered for the match and the news says by whom; his slot is kept 2526ms
+   ✓ the coach’s lineup is the side that runs out (#69) > a starter who has left the club is replaced in the saved lineup 2397ms
+   ✓ difficulty plays in the match: the rival’s edge after the spread (N12.2) > the live sim plays the roster, not the aggregates: the rival multiplier N12.2 retired (×1.1 / ×0.92 on attack, defence, kicking and fitness) changed no match 11420ms
+   ✓ difficulty plays in the match: the rival’s edge after the spread (N12.2) > the rival runs out as he is; after the spread Hard’s plays stronger, Easy’s weaker, Normal’s untouched, and the live sim reads it 3926ms
+   ✓ difficulty plays in the match: the rival’s edge after the spread (N12.2) > a fast-forwarded match plays with the same edge as the one on screen 6849ms
+ ✓ tests/systems/liveMatch.test.ts (14 tests) 97864ms
+   ✓ live match (beta): the match on screen is the match > the week holds at kick-off; the watched match is the result, applied with the rest of the week at full time 7896ms
+   ✓ live match (beta): the match on screen is the match > the coach’s calls change the match, and the match with its calls is what counts 9600ms
+   ✓ live match (beta): the match on screen is the match > a killed app resumes the same match where it was, with the calls already made 6645ms
+   ✓ live match (beta): the match on screen is the match > a kill between coach calls resumes from the last periodic save, at most one interval behind, and matches playing straight through 5884ms
+   ✓ live match (beta): the match on screen is the match > Save & exit leaves the week held, and resuming continues the same match with the same sheets and calls 6383ms
+   ✓ live match (beta): the match on screen is the match > a change of plan at half-time (N11) changes the match, and the match with its plan is what counts 9332ms
+   ✓ live match (beta): the match on screen is the match > a killed app resumes after half-time with the plan change already made 9637ms
+   ✓ live match (beta): the match on screen is the match > fast-forward plays headless, and a whole season plays end to end 42326ms
+ ✓ tests/systems/training.test.ts (42 tests) 605ms
+   ✓ adjacencyMult > moving a facility breaks or creates the bonus (#78) 479ms
+ ✓ tests/systems/freeagency.test.ts (32 tests) 458ms
+ ✓ tests/match/view/commentary.test.ts (17 tests) 16419ms
+   ✓ the voice is seeded, never rolled > says a catch where the sim has the kick taken and a scoop where it has the ball scooped up 10424ms
+   ✓ the voice is seeded, never rolled > reads a match the same way twice with the same seed, and differently with another 5952ms
+ ✓ tests/match/balance/balance.test.ts (15 tests) 19400ms
+   ✓ plans > checks plan changes at the breaks (N11), and a change after a try plays a different match 3908ms
+   ✓ plans > plays a rival with the difficulty’s edge (N12.2), swept by name as difficulty.<d>.rivalEdge 1641ms
+   ✓ measuring and reporting > a cell is deterministic, feels its overrides, and puts the knobs back 2775ms
+   ✓ measuring and reporting > writes a report with a row per variant and what moved since a previous run 1038ms
+   ✓ measuring and reporting > tracks a side both ways, and another preset's numbers leave a Balanced / Slide match unchanged 6893ms
+   ✓ measuring and reporting > pins an even 'balanced' / Slide match (seed 1) 1488ms
+   ✓ measuring and reporting > pins an even 'expansive' / Slide match (seed 1) 1517ms
+ ✓ tests/systems/wildcards.test.ts (15 tests) 1456ms
+   ✓ wildcard odds > letting them go lands on about a quarter of trips, and half of that with Welfare 774ms
+ ✓ tests/match/core/core.test.ts (27 tests) 105ms
+ ✓ tests/core/advance.test.ts (24 tests) 557ms
+ ✓ tests/qa/soak.test.ts (15 tests) 409971ms
+   ✓ soak checks > every old save version migrates 599ms
+   ✓ soak > plays two seasons idle and managed with no problems, reporting the record and the gap (#138) 203726ms
+   ✓ soak > plays on from a v1 save and a v7 save 108139ms
+   ✓ soak columns (N12.1) > counts the rounds forfeited short of 13 fit, per season and in the summary (finding 20) 42626ms
+   ✓ soak columns (N12.1) > --live-rivals: a tapped week plays the rival round on the live sim and the player's match headless 19474ms
+   ✓ soak columns (N12.1) > a tapped week plays the player's match as fast-forward plays it, the rival's AI coach included 17106ms
+   ✓ rival styles over a season (#249, N11) > a --live-rivals soak records every rival-v-rival game with the styles it was played with 18068ms
+ ✓ tests/systems/lineup.test.ts (18 tests) 6559ms
+   ✓ the sheet the sim gets > the live sim puts the picked man in his slot, and the same lineup and seed give the same match 6420ms
+ ✓ tests/fx/audio.test.ts (29 tests) 180ms
+ ✓ tests/systems/rivals.test.ts (16 tests) 89631ms
+   ✓ five-season headless league > keeps rival strength in the band, crowns different champions, and signs 1–3 a season 89087ms
+ ✓ tests/ui/guide.test.ts (18 tests) 62ms
+ ✓ tests/core/advanceRules.test.ts (32 tests) 32ms
+ ✓ tests/match/league/fatigue.test.ts (15 tests) 22730ms
+   ✓ legs and the wrestle in the live sim > legs drain over a match, and a Stamina-80 squad outlasts a Stamina-40 one over ten minutes (#100) 5908ms
+   ✓ legs and the wrestle in the live sim > a side on spent legs is slower and busts, fends and steps less 12686ms
+   ✓ legs and the wrestle in the live sim > a held tackle is a wrestle: the bar runs down, more men end it sooner, and the tackle comes when he is held 1505ms
+   ✓ legs and the wrestle in the live sim > a strong carrier against weak tacklers sometimes breaks free; quick and slow play-the-balls are announced 2314ms
+ ✓ tests/match/league/sinbin.test.ts (9 tests) 103396ms
+   ✓ sin bins in the live sim > with every penalty a bin: the offender goes to the touchline, his side plays eight, and he is back after the bin’s minutes of clock 12346ms
+   ✓ sin bins in the live sim > never two men from one side at once; the match plays to full time whoever is binned 28955ms
+   ✓ sin bins in the live sim > a stand-in takes the binned man’s duties: the kick-off and the dummy-half pass come from someone on the field 4759ms
+   ✓ sin bins in the live sim > bins off plays the same match as default until a bin would have happened, and the same seed replays exactly 7235ms
+   ✓ sin bins in the live sim > the binned side’s scoring margin over its spells a man short is worse than even 50066ms
+ ✓ tests/core/autosave.test.ts (10 tests) 146ms
+ ✓ tests/systems/contracts.test.ts (21 tests) 290ms
+ ✓ tests/match/league/traits.test.ts (13 tests) 75628ms
+   ✓ traits in the live sim > a side of Dancing Feet III steps far more often, and the steps name the trait 6288ms
+   ✓ traits in the live sim > Hitmen make more big hits; Wrecking Balls bust more and drive through held tackles 12935ms
+   ✓ traits in the live sim > the double-edged ones cut both ways: Gamblers pick off more and get burned; Razzle Dazzle offloads more and spills 36098ms
+   ✓ traits in the live sim > a Playmaker throws cut-out balls; a Big Boot is named on the kick 18660ms
+   ✓ traits in the live sim > replays identically with traits, and an empty trait list is the same as none 1617ms
+ ✓ tests/systems/league.test.ts (13 tests) 254ms
+ ✓ tests/match/league/calls.test.ts (11 tests) 50395ms
+   ✓ coach calls in the live sim > no calls plays exactly as runMatch; the same seed and calls give the same match 4292ms
+   ✓ coach calls in the live sim > each call is announced and moves its play: rush hits harder and is busted more; run it kicks less; kick early kicks more 35753ms
+   ✓ coach calls in the live sim > judges every call it makes, and some pay off 10253ms
+ ✓ tests/match/league/match.test.ts (7 tests) 16092ms
+   ✓ runMatch > is deterministic, starts with a kick-off, ends at full time, and its stats agree with the overlay count 4344ms
+ ✓ tests/world/placement.test.ts (21 tests) 85ms
+ ✓ tests/world/groundsLife.test.ts (16 tests) 100ms
+ ✓ tests/systems/rivalRound.test.ts (9 tests) 74279ms
+   ✓ rival rounds on the live sim (N9.2) > on: the rival fixtures are played on the live sim, with their players’ games, stats and injuries 27372ms
+   ✓ rival rounds on the live sim (N9.2) > the scores sit on the cheap sim’s scale: about 30 a match 6317ms
+   ✓ rival rounds on the live sim (N9.2) > off (the default) and fast-forward: the cheap sim 1673ms
+   ✓ the rival round worker falls back to the main thread > a worker that never answers: played here after the timeout, same results 2578ms
+   ✓ the rival round worker falls back to the main thread > a worker that fails: played here, same results 2292ms
+   ✓ the rival round worker falls back to the main thread > postMessage throwing (a DataCloneError): played here, same results 2136ms
+   ✓ the rival round worker falls back to the main thread > a worker answering with no results: every rival fixture is still played, and the week resumes 31872ms
+ ✓ tests/world/camera.test.ts (23 tests) 35ms
+ ✓ tests/art/match/atmosphere.test.ts (17 tests) 1387ms
+   ✓ floodlight lamps > one lamp per tower, on the painted light bank 1189ms
+ ✓ tests/core/time.test.ts (19 tests) 456ms
+ ✓ tests/match/league/goals.test.ts (7 tests) 24821ms
+   ✓ conversions in the live sim > every try is followed by a conversion by the scoring side, with the clock stopped; good ones are worth two 6004ms
+   ✓ field goals in the live sim > the kicker drops for goal in range late in the set: a point if it goes over, a 20 m restart for the defence if not 3433ms
+   ✓ field goals in the live sim > with the real window, field goals only come in the last minutes of the second half 1507ms
+   ✓ bonus-zone tries (Nines) > a carrier clear over the line goes round under the posts: a five-point try, grounded in the zone 13859ms
+ ✓ tests/systems/board.test.ts (17 tests) 38501ms
+   ✓ generateObjectives > may name a rival that exists in the league 477ms
+   ✓ season rollover integration > reviews the finished season and sets fresh objectives for the next 37748ms
+ ✓ tests/match/league/kicks.test.ts (8 tests) 37147ms
+   ✓ kicks in the live sim > a grubber is a chase: some of them score, and most of them do not 37025ms
+ ✓ tests/ui/screens/player.test.ts (10 tests) 365ms
+ ✓ tests/scenes/matchfield.test.ts (19 tests) 1354ms
+   ✓ matchField.bonusZone > has exactly the bounds of the rule file: inside it is where inBonusZone says five, inside the in-goal 1314ms
+ ✓ tests/match/league/breaks.test.ts (10 tests) 11213ms
+   ✓ the hook fires at the breaks only (N13.5) > a rule is asked at half-time and after a try, and nowhere else 2190ms
+   ✓ the hook fires at the breaks only (N13.5) > the plan it returns is in force from the restart, and the same plan again changes nothing 2547ms
+   ✓ the hook fires at the breaks only (N13.5) > a coach who has already chosen this break is not overwritten 1261ms
+   ✓ the hook fires at the breaks only (N13.5) > with no rule a match is the match it was, including the result’s shape 5185ms
+ ✓ tests/match/league/presets.test.ts (9 tests) 248015ms
+   ✓ tactics in the live sim > Grind and Expansive look different: offloads and cut-outs for the wide side, long kicks and fewer offloads for the grinders 81839ms
+   ✓ tactics in the live sim > a Kick-chase side kicks more often and bombs more; All-out offloads most of all 128089ms
+   ✓ tactics in the live sim > a Rush defence makes more big hits but concedes more busts and steps than Slide 33163ms
+   ✓ tactics in the live sim > Balanced v Balanced stays in the §7 bands per three minutes 4901ms
+ ✓ tests/systems/matchWorker.test.ts (9 tests) 115763ms
+   ✓ the fast-forwarded match in the Worker (N10.3) > the Worker's result equals runMatch in place, byte for byte, on 20 seeds 82338ms
+   ✓ the fast-forwarded match in the Worker (N10.3) > an async advance that plays each match in the Worker ends exactly where one in place does 11301ms
+   ✓ the fast-forwarded match in the Worker (N10.3) > a failing Worker: the match is played here, the same state 4949ms
+   ✓ the fast-forwarded match in the Worker (N10.3) > playMatchesInWorker without a Worker plays in place 3223ms
+   ✓ one worker for the session (N10.3) > requests share one worker and each gets its own answer, in order 7324ms
+   ✓ one worker for the session (N10.3) > a worker that fails is dropped: its request is played here and the next one gets a new worker 4273ms
+   ✓ one worker for the session (N10.3) > a Skip has its own lane (N10.4): it doesn't wait behind a rival round still being played 2333ms
+ ✓ tests/match/league/gas.test.ts (6 tests) 7408ms
+   ✓ sprint and gas in the live sim > most of the time players cruise; they sprint when it matters, and gas never tops the legs 3074ms
+   ✓ sprint and gas in the live sim > low-Stamina fliers run dry more often and get run down; carriers caught from behind after a break are announced 4315ms
+ ✓ tests/scenes/matchArtAhead.test.ts (7 tests) 6863ms
+   ✓ the next fixture painted ahead (N10.5) > keeps one painting by kit key: asked twice it paints once; taken, it is gone 1315ms
+   ✓ the next fixture painted ahead (N10.5) > the worker's painting equals painting here, byte for byte 716ms
+   ✓ the next fixture painted ahead (N10.5) > a different opponent paints again, after the first, on the same worker 540ms
+   ✓ the next fixture painted ahead (N10.5) > a failing worker: the art is painted here, the same pixels 1002ms
+   ✓ the next fixture painted ahead (N10.5) > looks up the player's next fixture and paints it once the week is in 587ms
+   ✓ the next fixture painted ahead (N10.5) > uploads the painting one texture per slice, never under a match; another fixture frees them 1367ms
+   ✓ the next fixture painted ahead (N10.5) > after a match, nothing goes up until the club screens have settled 1325ms
+ ✓ tests/ui/screens/seasonReview.test.ts (7 tests) 77221ms
+   ✓ a season through the real hooks > stamps the review on the season’s record and, headless, still ends the season with the toast 51407ms
+   ✓ a season through the real hooks > initSeasonReview registers its hooks only once per call and the listener unsubscribes 25702ms
+ ✓ tests/sim/events.test.ts (14 tests) 25ms
+ ✓ tests/fx/pwa.test.ts (14 tests) 802ms
+   ✓ gen-icons.mjs > emits valid 192 and 512 PNGs with correct signature and IHDR dims 504ms
+ ✓ tests/systems/kickerCaptain.test.ts (6 tests) 302966ms
+   ✓ the goal-kicker and the captain (N11) > a sheet naming the slot-5 kicker and a neutral captain plays exactly as one naming neither 9440ms
+   ✓ the goal-kicker and the captain (N11) > the named kicker takes the goal kicks while he is on, and his Skill moves the conversion rate (40 seeds) 215252ms
+   ✓ the goal-kicker and the captain (N11) > kicks in play stay with the slot-5 kicker when another man is named; field goals still come 78176ms
+ ✓ tests/match/league/bench.test.ts (6 tests) 11229ms
+   ✓ interchanges in the live sim > at half-time tired men are swapped in the sheds, after the break gives everyone legs back 438ms
+ ✓ tests/match/league/weather.test.ts (8 tests) 34794ms
+   ✓ weather in the live sim > rain: more errors than the same sides in the clear, over many seeds 23500ms
+   ✓ weather in the live sim > wind: goal kicks go over less often than in the clear 2219ms
+   ✓ weather in the live sim > a ball lost in the tackle is a knock-on: the error, then the other side’s set 537ms
+   ✓ injuries in the live sim > a hurt man comes off at the next stoppage, for a bench man, and does not come back on 1084ms
+   ✓ injuries in the live sim > runMatch reports injuries by squad id, 1–3 weeks, and the same seed gives the same injuries 7419ms
+ ✓ tests/match/view/popups.test.ts (9 tests) 44ms
+ ✓ tests/art/match/crowd.test.ts (13 tests) 142ms
+ ✓ tests/systems/staff.test.ts (10 tests) 548ms
+   ✓ the Welfare Manager > makes a grievance card the less likely draw over many weeks 460ms
+ ✓ tests/art/match/fixtureArt.test.ts (7 tests) 6025ms
+   ✓ fixture art (N10.5) > paints the same pixels as the scene's painters 509ms
+   ✓ fixture art (N10.5) > survives a Worker's transfer: cloned with its buffers moved, then revived 417ms
+   ✓ fixture art (N10.5) > chunks a layer into pieces of at most LAYER_CHUNK (+1 px overlap), leaving out the transparent ones, every opaque pixel kept 1794ms
+   ✓ fixture art (N10.5) > the ground is painted once and copied: a background from the cache is the same pixels as one painted fresh 2927ms
+   ✓ fixture art (N10.5) > the chunks put back together are the layer, byte for byte, wherever a chunk was kept 370ms
+ ✓ tests/ui/screens/matchReport.test.ts (7 tests) 36ms
+ ✓ tests/match/view/traitLayer.test.ts (5 tests) 37ms
+ ✓ tests/ui/screens/fixtures.test.ts (13 tests) 30ms
+ ✓ tests/data/facility.test.ts (16 tests) 19ms
+ ✓ tests/art/match/stadium.test.ts (10 tests) 1003ms
+   ✓ paintBackground / paintForeground > is deterministic 852ms
+ ✓ tests/match/league/touch.test.ts (6 tests) 29341ms
+   ✓ touch and dead ball in the live sim > a ball into touch goes to the side that did not touch it last, as a play-the-ball 10 m in from touch 6681ms
+   ✓ touch and dead ball in the live sim > a set can end every way: a tackle on the last, a kick, touch, dead ball, a drop-out, a try, an error 14156ms
+   ✓ touch and dead ball in the live sim > the 40/20: kicked from inside his own 40 into touch inside their 20 — the kicking side taps and keeps it 4194ms
+   ✓ touch and dead ball in the live sim > kick metres are counted and sensible; the same seed gives the same match 4300ms
+ ✓ tests/art/grounds/index.test.ts (8 tests) 16981ms
+   ✓ grounds art registration > texture keys are unique and cover every key other modules use 3297ms
+   ✓ grounds art registration > uploads every texture and registers walk-<dir> anims 7006ms
+   ✓ lazy facility art (N10.6) > with a facility list, the boot paints every non-facility texture and only those facilities 4136ms
+   ✓ lazy facility art (N10.6) > idle painting fills in the rest, one texture per slice, skipping what is there 2378ms
+ ✓ tests/ui/screens/matchOverlayAccumulator.test.ts (10 tests) 30496ms
+   ✓ reduceEvent — parity with MatchResult > final score, tries, errors match exactly across many seeds 18320ms
+   ✓ reduceEvent — parity with MatchResult > possession and tackles land within rounding of MatchResult 9931ms
+   ✓ reduceEvent — parity with MatchResult > half flips to 2 after half-time 2203ms
+ ✓ tests/match/lab/controller.test.ts (6 tests) 26ms
+ ✓ tests/art/match/players.test.ts (11 tests) 369ms
+ ✓ tests/ui/hud.test.ts (12 tests) 62ms
+ ✓ tests/systems/aging.test.ts (14 tests) 35ms
+ ✓ tests/data/player.test.ts (14 tests) 1164ms
+   ✓ generatePlayer — shape & bounds > all stats within 1..STAT_MAX across 1000 generations per quality 1069ms
+ ✓ tests/qa/devServerWatch.test.ts (3 tests) 3509ms
+   ✓ dev server watch > does not reload the game when a worktree under .claude/ changes 1555ms
+ ✓ tests/match/league/penalties.test.ts (7 tests) 101408ms
+   ✓ penalties and six-again in the live sim > every penalty is followed by the call, shown, and the call is played out 7533ms
+   ✓ penalties and six-again in the live sim > a shot at goal from a penalty is worth two when it goes over 4373ms
+   ✓ penalties and six-again in the live sim > six again puts the tackle count back to zero 688ms
+   ✓ penalties and six-again in the live sim > Rush pays for its line speed: it concedes more offside penalties than Slide 88796ms
+ ✓ tests/systems/morale.test.ts (10 tests) 93ms
+ ✓ tests/ui/tutorial.test.ts (13 tests) 70ms
+ ✓ tests/core/state.test.ts (11 tests) 450ms
+ ✓ tests/data/traits.test.ts (9 tests) 1293ms
+   ✓ generation > most average players have none, stars have several, and nobody repeats a trait 1191ms
+ ✓ tests/match/league/spread.test.ts (9 tests) 45ms
+ ✓ tests/data/club.test.ts (15 tests) 72ms
+ ✓ tests/systems/difficulty.test.ts (17 tests) 193ms
+ ✓ tests/systems/callup.test.ts (6 tests) 384ms
+ ✓ tests/match/league/flow.test.ts (3 tests) 7588ms
+   ✓ passing on the move > receivers, the first receiver off the ruck included, take the ball at pace and the pass still finds them 6961ms
+   ✓ passing on the move > the carrier runs a touch slower than a free runner of the same speed stat 619ms
+ ✓ tests/match/view/liveView.test.ts (4 tests) 14ms
+ ✓ tests/ui/screens/scoreBanner.test.ts (10 tests) 24785ms
+   ✓ scoreBanner > every point in a simulated match comes with a banner 24739ms
+ ✓ tests/systems/rivalStyles.test.ts (6 tests) 221ms
+ ✓ tests/match/league/aiCalls.test.ts (6 tests) 11652ms
+   ✓ the AI coach (N9.6) > makes shift, rush and field-goal calls for its own side only, the same every time on a seed 9404ms
+   ✓ the AI coach (N9.6) > no AI coach, no calls: the match is runMatch’s (the golden rule holds) 2245ms
+ ✓ tests/art/grounds/facilities.test.ts (7 tests) 22646ms
+   ✓ facility art > covers all 12 catalog facilities x 3 levels with non-empty facility-<defId>-<level> textures 1398ms
+   ✓ facility art > textures are exactly as wide as the footprint diamond and rise above it 1099ms
+   ✓ facility art > origin puts the footprint top vertex at (h·TILE_W/2, lift) 1036ms
+   ✓ facility art > the base fills the footprint diamond exactly (nothing hangs below it) 15982ms
+   ✓ facility art > is deterministic 333ms
+   ✓ facility art > L1, L2 and L3 art differ for every facility, with the footprint origin unchanged 2791ms
+ ✓ tests/systems/trainingFocus.test.ts (7 tests) 56ms
+ ✓ tests/match/league/goldenPoint.test.ts (3 tests) 44000ms
+   ✓ golden point (N9.4) > a drawn final plays on from full time: the same match up to then, then the next score wins 30876ms
+   ✓ golden point (N9.4) > a final that is not drawn plays exactly as before 13122ms
+ ✓ tests/world/buildFeedback.test.ts (12 tests) 48ms
+ ✓ tests/ui/inbox.test.ts (13 tests) 53ms
+ ✓ tests/systems/tactics.test.ts (6 tests) 13162ms
+   ✓ team tactics (N11.1) > the sheet carries the pick, and the pick changes the match 8697ms
+   ✓ team tactics (N11.1) > Balanced / Slide on the sheet is the same match as no tactics at all (old behaviour) 4388ms
+ ✓ tests/world/path.test.ts (14 tests) 45ms
+ ✓ tests/art/portrait.test.ts (13 tests) 82ms
+ ✓ tests/match/league/plans.test.ts (4 tests) 7177ms
+   ✓ changing the plan at the breaks (N11) > is refused in open play and taken at half-time, in force from the second-half kick-off 2588ms
+   ✓ changing the plan at the breaks (N11) > after a try the change waits for the restart 775ms
+   ✓ changing the plan at the breaks (N11) > the same plan again changes nothing; no change plays exactly as runMatch 2105ms
+   ✓ changing the plan at the breaks (N11) > a change at half-time gives a different match, the same one every time with the same changes 1708ms
+ ✓ tests/systems/youth.test.ts (7 tests) 222ms
+ ✓ tests/match/view/skipFromRecord.test.ts (2 tests) 413225ms
+   ✓ Skip from the record (N10.4) > runMatch from the record equals playing on, at any skip point (20 seeds × 3 points) 382155ms
+   ✓ Skip from the record (N10.4) > a change of plan at half-time goes with the record (N11): skipped after it, the same match as playing on 31057ms
+ ✓ tests/ui/screens/seasonBooks.test.ts (35 tests) 102ms
+ ✓ tests/world/readability.test.ts (13 tests) 16ms
+ ✓ tests/ui/screens/history.test.ts (26 tests) 69ms
+ ✓ tests/art/grounds/tiles.test.ts (9 tests) 1418ms
+   ✓ ground tiles > base tiles are TILE_W×TILE_H and fill exactly the iso diamond 436ms
+   ✓ ground tiles > is deterministic (no Math.random) 347ms
+ ✓ tests/match/view/watchedResult.test.ts (2 tests) 57093ms
+   ✓ a watched result does not depend on playback speed > ×1, ×4 and ×8 with smart pace, and Skip, match runMatch 55684ms
+   ✓ a watched result does not depend on playback speed > a step after full time keeps no events to record again 1407ms
+ ✓ tests/art/match/kitDesign.test.ts (5 tests) 1510ms
+   ✓ kit designs > is purely cosmetic: the kit never changes the match 1450ms
+ ✓ tests/ui/orientation.test.ts (7 tests) 15ms
+ ✓ tests/fx/particles.test.ts (10 tests) 13ms
+ ✓ tests/systems/forecast.test.ts (3 tests) 368ms
+   ✓ the forecast (N14) > the match plays in the weather the card forecast, over 40 seeds 332ms
+ ✓ tests/ui/fitViewport.test.ts (8 tests) 11ms
+ ✓ tests/utils/rng.test.ts (13 tests) 1342ms
+   ✓ rng.next range > always returns a float in [0, 1) 793ms
+   ✓ rng.int > is inclusive at both ends 522ms
+ ✓ tests/art/grounds/manager.test.ts (6 tests) 56ms
+ ✓ tests/art/pixel.test.ts (9 tests) 39ms
+ ✓ tests/match/view/replay.test.ts (2 tests) 390ms
+   ✓ replay window > re-simulates the same ticks the live match played 385ms
+ ✓ tests/systems/finalsGoldenPoint.test.ts (2 tests) 36ms
+ ✓ tests/sim/weather.test.ts (8 tests) 11ms
+ ✓ tests/art/grounds/decor.test.ts (6 tests) 132ms
+ ✓ tests/match/view/contestLayer.test.ts (3 tests) 10ms
+ ✓ tests/systems/stats.test.ts (4 tests) 24ms
+ ✓ tests/match/league/lineBreak.test.ts (2 tests) 6166ms
+   ✓ line breaks in the live sim > the carrier is goal-side of every defender but one, and it is one a stretch of play 2424ms
+   ✓ line breaks in the live sim > is a `break` to the contract, counted as line breaks; the matches are the same as before 3741ms
+ ✓ tests/match/view/zoneLayer.test.ts (3 tests) 20ms
+ ✓ tests/world/iso.test.ts (7 tests) 38ms
+ ✓ tests/art/grounds/people.test.ts (4 tests) 794ms
+   ✓ people art > is deterministic and shares one atlas per look 438ms
+   ✓ people art > keeps the manager silhouette: same opaque pixels per frame 329ms
+ ✓ tests/ui/screens/build.test.ts (5 tests) 11ms
+ ✓ tests/match/view/sprintLayer.test.ts (2 tests) 10ms
+ ✓ tests/match/view/legsLayer.test.ts (3 tests) 249ms
+ ✓ tests/ui/nav.test.ts (5 tests) 10ms
+ ✓ tests/match/league/events.test.ts (3 tests) 34ms
+ ✓ tests/ui/updatePrompt.test.ts (4 tests) 10ms
+ ✓ tests/ui/kit.test.ts (3 tests) 69ms
+ ✓ tests/core/events.test.ts (6 tests) 11ms
+ ✓ tests/world/viewport.test.ts (7 tests) 36ms
+ ✓ tests/art/match/kit.test.ts (6 tests) 11ms
+ ✓ tests/ui/regionDialog.test.ts (5 tests) 9ms
+ ✓ tests/match/lab/stats.test.ts (4 tests) 10ms
+ ✓ tests/ui/screenSlot.test.ts (5 tests) 10ms
+ ✓ tests/match/league/completion.test.ts (1 test) 2777ms
+   ✓ set completion > counts each side’s sets; the lost ones are at least its own errors’ worth and no more than its sets 2775ms
+ ✓ tests/match/view/playbackPace.test.ts (4 tests) 12ms
+ ✓ tests/config.test.ts (2 tests) 8ms
+ ✓ tests/ui/rivalSquad.test.ts (1 test) 44ms
+ ✓ tests/ui/buildInfo.test.ts (3 tests) 9ms
+ ✓ tests/match/view/wrestleBar.test.ts (1 test) 9ms
+ ✓ tests/ui/placementBar.test.ts (1 test) 63ms
+ ✓ tests/smoke.test.ts (1 test) 3ms
+ ✓ tests/qa/corpus.test.ts (121 tests) 538542ms
+   ✓ save corpus > v10-after-rollover.json > plays 4 weeks headless with no problems 13009ms
+   ✓ save corpus > v10-after-tutorial.json > plays 4 weeks headless with no problems 6995ms
+   ✓ save corpus > v10-mid-season.json > plays 4 weeks headless with no problems 6698ms
+   ✓ save corpus > v11-after-rollover.json > plays 4 weeks headless with no problems 4993ms
+   ✓ save corpus > v11-after-tutorial.json > plays 4 weeks headless with no problems 6037ms
+   ✓ save corpus > v11-mid-season.json > plays 4 weeks headless with no problems 6441ms
+   ✓ save corpus > v12-after-rollover.json > plays 4 weeks headless with no problems 6260ms
+   ✓ save corpus > v12-after-tutorial.json > plays 4 weeks headless with no problems 5748ms
+   ✓ save corpus > v12-mid-season.json > plays 4 weeks headless with no problems 5966ms
+   ✓ save corpus > v13-after-rollover.json > plays 4 weeks headless with no problems 6706ms
+   ✓ save corpus > v13-after-tutorial.json > plays 4 weeks headless with no problems 5813ms
+   ✓ save corpus > v13-live-rivals.json > plays 4 weeks headless with no problems 6285ms
+   ✓ save corpus > v13-mid-season.json > plays 4 weeks headless with no problems 6096ms
+   ✓ save corpus > v14-after-rollover.json > plays 4 weeks headless with no problems 6280ms
+   ✓ save corpus > v14-after-tutorial.json > plays 4 weeks headless with no problems 6381ms
+   ✓ save corpus > v14-live-rivals.json > plays 4 weeks headless with no problems 6445ms
+   ✓ save corpus > v14-mid-season.json > plays on past the rollover headless with no problems 27292ms
+   ✓ save corpus > v15-after-rollover.json > plays 4 weeks headless with no problems 6061ms
+   ✓ save corpus > v15-after-tutorial.json > plays 4 weeks headless with no problems 5917ms
+   ✓ save corpus > v15-live-rivals.json > plays 4 weeks headless with no problems 5731ms
+   ✓ save corpus > v15-mid-season.json > plays 4 weeks headless with no problems 6041ms
+   ✓ save corpus > v16-after-rollover.json > plays 4 weeks headless with no problems 6184ms
+   ✓ save corpus > v16-after-tutorial.json > plays 4 weeks headless with no problems 6697ms
+   ✓ save corpus > v16-live-rivals.json > plays 4 weeks headless with no problems 6386ms
+   ✓ save corpus > v16-mid-season.json > plays 4 weeks headless with no problems 5598ms
+   ✓ save corpus > v17-after-rollover.json > plays 4 weeks headless with no problems 6552ms
+   ✓ save corpus > v17-after-tutorial.json > plays 4 weeks headless with no problems 6419ms
+   ✓ save corpus > v17-live-rivals.json > plays 4 weeks headless with no problems 6469ms
+   ✓ save corpus > v17-mid-season.json > plays 4 weeks headless with no problems 6060ms
+   ✓ save corpus > v18-after-rollover.json > plays 4 weeks headless with no problems 6219ms
+   ✓ save corpus > v18-after-tutorial.json > plays 4 weeks headless with no problems 5996ms
+   ✓ save corpus > v18-live-rivals.json > plays 4 weeks headless with no problems 6126ms
+   ✓ save corpus > v18-mid-season.json > plays 4 weeks headless with no problems 6107ms
+   ✓ save corpus > v19-after-rollover.json > plays a season headless with no problems 45282ms
+   ✓ save corpus > v19-after-tutorial.json > plays a season headless with no problems 40179ms
+   ✓ save corpus > v19-live-rivals.json > plays a season headless with no problems 45864ms
+   ✓ save corpus > v19-mid-season.json > plays a season headless with no problems 45987ms
+   ✓ save corpus > v9-after-rollover.json > plays a season headless with no problems 46500ms
+   ✓ save corpus > v9-after-tutorial.json > plays a season headless with no problems 36514ms
+   ✓ save corpus > v9-mid-season.json > plays a season headless with no problems 45803ms
+
+ Test Files  140 passed (140)
+      Tests  1730 passed (1730)
+   Start at  07:58:51
+   Duration  2076.13s (transform 26.87s, setup 0ms, collect 245.75s, tests 3450.01s, environment 94ms, prepare 36.25s)
+
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+
+> nrl-sim@0.0.0 prebuild
+> node scripts/gen-icons.mjs
+
+[gen-icons] wrote /workspace/nrl-sim/public/icons/icon-192.png (966 bytes)
+[gen-icons] wrote /workspace/nrl-sim/public/icons/icon-512.png (3823 bytes)
+
+> nrl-sim@0.0.0 build
+> tsc --noEmit && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 165 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/manifest.webmanifest                            0.35 kB
+dist/index.html                                      2.12 kB │ gzip:   1.07 kB
+dist/assets/artWorker-BXbna-Cy.js                   26.18 kB
+dist/assets/matchWorker-BtDpBYJq.js                 98.50 kB
+dist/assets/virtual_pwa-register-B5Ecu4Oh.js         0.99 kB │ gzip:   0.56 kB
+dist/assets/workbox-window.prod.es5-BqEJf4Xk.js      5.71 kB │ gzip:   2.34 kB
+dist/assets/index-DL2tihOe.js                    2,096.07 kB │ gzip: 553.83 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 35.76s
+
+PWA v1.3.0
+mode      generateSW
+precache  11 entries (2183.69 KiB)
+files generated
+  dist/sw.js
+  dist/workbox-2fbc6a65.js
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice

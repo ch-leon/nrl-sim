@@ -1,0 +1,44 @@
+{
+  "name": "handling-tuning",
+  "description": "Can a small reduction in catch errors lift completion without excessive tries or changing preset shape?",
+  "seeds": 80,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "catch 3.5 percent",
+      "tuning": {
+        "handling.catchBase": 0.035
+      }
+    },
+    {
+      "name": "pressure 3 percent",
+      "tuning": {
+        "handling.catchPressured": 0.03
+      }
+    }
+  ]
+}

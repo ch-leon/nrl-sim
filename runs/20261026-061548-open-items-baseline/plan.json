@@ -1,0 +1,44 @@
+{
+  "name": "open-items-baseline",
+  "description": "Current eased chase: completion, home edge, spread, legs and rare kick outcomes.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "stamina 30 v 80",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "stats": {
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "stamina": 80
+        }
+      }
+    }
+  ]
+}

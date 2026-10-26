@@ -138,3 +138,13 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261025-144946-standard | standard | beea9e9 | main | [report](runs/20261025-144946-standard/report.md) |
 | 20261025-161512-standard | standard | e75e140 | main | [report](runs/20261025-161512-standard/report.md) |
 | 20261026-064927-standard | standard | b2a1c2d | main | [report](runs/20261026-064927-standard/report.md) |
+| 20261026-061533-expansive-tuning | expansive-tuning | e75e140 | tuning/expansive-balance-open-items | [report](runs/20261026-061533-expansive-tuning/report.md) |
+| 20261026-061548-open-items-baseline | open-items-baseline | e75e140 | tuning/expansive-balance-open-items | [report](runs/20261026-061548-open-items-baseline/report.md) |
+| 20261026-061654-handling-tuning | handling-tuning | e75e140 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-061654-handling-tuning/report.md) |
+| 20261026-062144-home-edge-tuning | home-edge-tuning | e75e140 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-062144-home-edge-tuning/report.md) |
+| 20261026-062746-presets | presets | e75e140 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-062746-presets/report.md) |
+| 20261026-062752-open-items | open-items | e75e140 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-062752-open-items/report.md) |
+| 20261026-074225-expansive-risk | expansive-risk | acaa569 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-074225-expansive-risk/report.md) |
+| 20261026-074559-pace-slope | pace-slope | acaa569 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-074559-pace-slope/report.md) |
+| 20261026-074735-open-items | open-items | acaa569 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-074735-open-items/report.md) |
+| 20261026-080940-presets | presets | c10e2f9 (uncommitted changes) | tuning/expansive-balance-open-items | [report](runs/20261026-080940-presets/report.md) |

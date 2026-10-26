@@ -1,0 +1,22 @@
+{
+  "name": "home-edge-tuning",
+  "description": "A small home rating edge after spread: target 52–58% wins, without changing the rating-gap slope.",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "sweep": {
+    "rating.homeEdge": [
+      0.5,
+      1
+    ]
+  }
+}

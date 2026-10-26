@@ -1,0 +1,53 @@
+{
+  "name": "expansive-risk",
+  "description": "Reduce Expansive pass and cut-out risk while preserving width, edges and offloads; shipped global handling and no home edge.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "pass -0.05",
+      "tuning": {
+        "presets.attack.expansive.base.pass": -0.05
+      }
+    },
+    {
+      "name": "pass -0.1",
+      "tuning": {
+        "presets.attack.expansive.base.pass": -0.1
+      }
+    },
+    {
+      "name": "pass -0.15",
+      "tuning": {
+        "presets.attack.expansive.base.pass": -0.15
+      }
+    },
+    {
+      "name": "cut-out 1 percent",
+      "tuning": {
+        "presets.attack.expansive.base.cutOut": 0.01
+      }
+    },
+    {
+      "name": "edges 0.4",
+      "tuning": {
+        "presets.attack.expansive.base.edges": 0.4
+      }
+    }
+  ]
+}

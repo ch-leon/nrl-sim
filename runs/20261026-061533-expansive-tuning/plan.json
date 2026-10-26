@@ -1,0 +1,59 @@
+{
+  "name": "expansive-tuning",
+  "description": "Isolate Expansive early kicks and offload risk while retaining its wide shape.",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "early kick 0.05",
+      "tuning": {
+        "presets.attack.expansive.base.earlyKick": 0.05
+      }
+    },
+    {
+      "name": "early kick 0.35",
+      "tuning": {
+        "presets.attack.expansive.base.earlyKick": 0.35
+      }
+    },
+    {
+      "name": "early kick 0.5",
+      "tuning": {
+        "presets.attack.expansive.base.earlyKick": 0.5
+      }
+    },
+    {
+      "name": "offload 1",
+      "tuning": {
+        "presets.attack.expansive.base.offload": 1
+      }
+    },
+    {
+      "name": "offload 1.1",
+      "tuning": {
+        "presets.attack.expansive.base.offload": 1.1
+      }
+    },
+    {
+      "name": "offload 1.5",
+      "tuning": {
+        "presets.attack.expansive.base.offload": 1.5
+      }
+    }
+  ]
+}
