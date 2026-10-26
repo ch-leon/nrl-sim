@@ -5,7 +5,7 @@
 
 import { el, button, ensureStyles, openScreen, screenHead } from '../dom';
 import { getState, type Player, type TraitInstance } from '../../core/state';
-import { ROMAN, TRAITS, traitLabel } from '../../data/traits';
+import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import {
@@ -67,6 +67,7 @@ const SCREEN_CSS = `
 .nrl-row-name { font-weight: bold; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-row-meta { display: flex; gap: 0.3rem; align-items: center; font-size: 0.7rem; white-space: nowrap; overflow: hidden; }
 .nrl-row-meta .nrl-badge { padding: 0 0.2rem; border-width: 1px; }
+.nrl-row-meta button.nrl-badge { font: inherit; font-weight: bold; line-height: inherit; cursor: help; pointer-events: auto; }
 .nrl-row .nrl-card-ovr { flex: 0 0 auto; }
 .nrl-row .nrl-row-action { flex: 0 0 auto; padding: 0.2rem 0.45rem; font-size: 0.75rem; }
 .nrl-row.nrl-card-open:hover { background: #f4efe0; }
@@ -134,10 +135,10 @@ function positionLabel(pos: string): string {
   return pos.replace(/(^|-)([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 }
 
-/** Badge label + tooltip for a levelled trait (BAK-208 §3). Traits with a downside render in a warning tint. */
+/** Badge label + tooltip for a levelled trait (BAK-208 §3): its full name (#349 S3). Traits with a downside render in a warning tint. */
 export function traitBadge(t: TraitInstance): { label: string; tip: string; bad: boolean } {
   const def = TRAITS[t.id];
-  return { label: `${def.short} ${ROMAN[t.level]}`, tip: `${traitLabel(t)}: ${def.blurb}`, bad: def.bad ?? false };
+  return { label: traitLabel(t), tip: `${traitLabel(t)}: ${def.blurb}`, bad: def.bad ?? false };
 }
 
 // ── Shared PlayerRow ────────────────────────────────────────────────────────
@@ -171,7 +172,10 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
   for (const t of p.traits) {
     if (!(t.id in TRAITS)) continue;
     const b = traitBadge(t);
-    meta.append(el('span', { class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`, text: b.label, attrs: { title: b.tip } }));
+    // A tap says what it does, in the toast lane; the rest of the row still opens the player page.
+    const badge = el('button', { class: `nrl-badge ${b.bad ? 'nrl-badge-trait-bad' : 'nrl-badge-trait'}`, text: b.label, attrs: { type: 'button', title: b.tip, 'data-trait': t.id } });
+    badge.addEventListener('click', (e) => { e.stopPropagation(); bus.emit('ui:notify', { text: b.tip, kind: 'info' }); });
+    meta.append(badge);
   }
 
   // Keyed on the squad id, the same key MatchScene uses, so the face matches on the pitch.

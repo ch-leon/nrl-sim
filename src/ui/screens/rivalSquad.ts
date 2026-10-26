@@ -3,7 +3,7 @@
 // unit-tested without the DOM. No Phaser.
 import type { RivalClub } from '../../core/state';
 import { overallRating } from '../../data/player';
-import { ROMAN, TRAITS } from '../../data/traits';
+import { traitLabel } from '../../data/traits';
 import { el, openModal } from '../dom';
 import { rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
@@ -18,7 +18,7 @@ export interface RivalSquadRow {
   position: string;
   age: number;
   overall: number;
-  traits: string; // e.g. "HIT II · FIN I"
+  traits: string; // e.g. "Hitman II · Finisher I"
   injuredWeeks: number;
 }
 
@@ -31,7 +31,7 @@ export function rivalSquadRows(club: RivalClub): RivalSquadRow[] {
       position: p.position,
       age: p.age,
       overall: overallRating(p),
-      traits: p.traits.map((t) => `${TRAITS[t.id].short} ${ROMAN[t.level]}`).join(' · '),
+      traits: p.traits.map(traitLabel).join(' · '),
       injuredWeeks: p.injuredWeeks,
     }))
     .sort((a, b) => b.overall - a.overall || a.name.localeCompare(b.name));

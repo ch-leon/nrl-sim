@@ -10,7 +10,7 @@ describe('rivalSquadRows (#74)', () => {
     expect(rows).toHaveLength(squad.length);
     for (let i = 1; i < rows.length; i++) expect(rows[i - 1]!.overall).toBeGreaterThanOrEqual(rows[i]!.overall);
     const hurt = rows.find((r) => r.id === squad[0]!.id)!;
-    expect(hurt.traits).toBe('HIT II');
+    expect(hurt.traits).toBe('Hitman II');
     expect(hurt.injuredWeeks).toBe(2);
     expect(rivalSquadRows({ id: 'p', name: 'P', colors: ['#000000', '#ffffff'], strength: 55 })).toEqual([]);
   });
