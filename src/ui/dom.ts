@@ -1138,7 +1138,19 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-kit-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #000; }
 .nrl-kit-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; flex: 0 0 auto; padding: 0 3px 3px 0; }
 .nrl-screen-backdrop .nrl-kit-modal { width: min(96vw, 760px); }
-@media (max-height: 500px) { .nrl-kit-note { margin-bottom: 0.25rem; } }
+/* S4 (#351): on a landscape phone the title, note, preview and Save make a left
+   column, so the controls scroll beside them at the box's full height. */
+@media (max-height: 500px) {
+  .nrl-kit { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; column-gap: 0.75rem; }
+  .nrl-kit-body { display: contents; }
+  .nrl-kit h2 { grid-column: 1; grid-row: 1; font-size: 0.95rem; line-height: 1.3; }
+  .nrl-kit-note { grid-column: 1; grid-row: 2; max-width: 13.5rem; margin: 0.15rem 0 0.3rem; font-size: 0.7rem; }
+  .nrl-kit-preview { grid-column: 1; grid-row: 3; gap: 0.35rem; }
+  .nrl-kit-sprite { width: 56px; height: 60px; }
+  .nrl-kit-portrait { width: 52px; }
+  .nrl-kit-controls { grid-column: 2; grid-row: 1 / -1; padding-right: 2.75rem; }
+  .nrl-kit-actions { grid-column: 1; grid-row: 4; justify-content: flex-start; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem; }
+}
 /* ── League screen: the next-match card and the form guide (N7, #183) ──── */
 /* A landscape phone has width to spare and no height: let the league use it. */
 .nrl-screen-backdrop .nrl-league-modal { width: min(96vw, 760px); max-width: none; }
