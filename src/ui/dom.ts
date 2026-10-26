@@ -1350,9 +1350,9 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-modal-has-x .nrl-guide-tabs { padding-right: 2.75rem; }
 /* #206, #336: a landscape phone leaves the Guide little height. One row holds the
    tabs (swipe for more), Replay and the ✕, and the page has the rest, even with
-   Safari's text boost. */
+   Safari's text boost. The build label sits in the frame's bottom edge. */
 @media (max-height: 500px) {
-  .nrl-screen-backdrop .nrl-guide-modal { padding: 0.5rem 0.75rem; }
+  .nrl-screen-backdrop .nrl-guide-modal { padding: 0.5rem 0.75rem 0.85rem; }
   .nrl-guide { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); column-gap: 0.4rem; }
   .nrl-guide-tabs { grid-column: 1; grid-row: 1; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 0.3rem; padding: 0 3px 3px 0; }
   .nrl-modal-has-x .nrl-guide-tabs { padding-right: 3px; }
@@ -1360,7 +1360,7 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-guide-foot { grid-column: 2; grid-row: 1; align-self: start; flex-wrap: nowrap; margin: 0; padding: 0; border: 0; }
   .nrl-modal-has-x .nrl-guide-foot { margin-right: 2.75rem; }
   .nrl-guide-foot .nrl-btn { flex: 0 0 auto; }
-  .nrl-guide-build { display: none; }
+  .nrl-guide-build { position: absolute; right: 0.75rem; bottom: 0.1rem; font-size: 0.6rem; line-height: 1; pointer-events: none; }
   .nrl-guide-body { grid-column: 1 / -1; grid-row: 2; }
   .nrl-guide { font-size: 0.8rem; }
   .nrl-guide h2 { font-size: 0.95rem; }
