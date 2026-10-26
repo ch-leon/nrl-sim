@@ -941,6 +941,8 @@ body.nrl-match-final .nrl-toast-stack {
   position: fixed; left: 50%; bottom: var(--nrl-mo-above, calc(8rem + env(safe-area-inset-bottom, 0px))); transform: translateX(-50%);
   z-index: 26; pointer-events: auto; min-height: 44px; min-width: 7rem;
 }
+/* The pressed nudge has to keep the centring, or the button jumps half its width off the finger and the tap never clicks. */
+.nrl-btn.nrl-mo-replay:active:not(:disabled) { transform: translateX(-50%) translate(3px, 3px); }
 .nrl-mo-replay-tag {
   pointer-events: none; padding: 0.35rem 0.8rem; background: #1a1a2e; color: #fff; border: 3px solid #000;
   font-weight: bold; letter-spacing: 0.08em; box-shadow: 3px 3px 0 #000;
