@@ -107,7 +107,7 @@ export const STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'finance',
-    text: "Finance, under More, shows money in and out and the board's goals for the season.",
+    text: "Finance, under More, shows money in and out. The board's goals for the season are on Staff & Board, also under More.",
     anchor: inMore('finance'),
     advanceOn: 'next-button',
     opens: 'finance',

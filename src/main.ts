@@ -25,7 +25,7 @@ import { registerStatsSystem } from './systems/stats';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
-import { initBoardUi, openStaffScreen } from './ui/screens/board';
+import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/board';
 import { initMatchReport } from './ui/screens/matchReport';
 import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
@@ -197,7 +197,7 @@ async function boot(): Promise<void> {
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { more: true });
   nav.registerScreen('build', 'Build', () => openBuildScreen(), { more: true });
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), { more: true });
-  nav.registerScreen('staff', 'Staff', () => openStaffScreen(), { more: true });
+  nav.registerScreen('staff', STAFF_SCREEN_TITLE, () => openStaffScreen(), { more: true });
   nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { more: true });
   nav.registerScreen('history', 'History', () => openHistoryScreen(), { more: true });
   // The Guide (#188); Replay tutorial is in its footer.

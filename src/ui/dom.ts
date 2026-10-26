@@ -947,8 +947,17 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-finance-pnl-table { width: 100%; }
 .nrl-finance-pnl-net td { font-weight: bold; border-top: 2px solid #000; }
 .nrl-finance-pnl-sub td { font-size: 0.72rem; color: #555; padding-top: 0; }
-/* N14.5, #344: the Staff screen, one parchment row per role. */
-.nrl-screen-body.nrl-staff { grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); align-content: start; font-size: 0.85rem; }
+/* N14.5, #344, #350 F1: Staff & Board. The board's panel on the left, one
+   parchment row per staff role beside it; one column on a narrow screen. */
+.nrl-screen-body.nrl-staff { grid-template-columns: clamp(12rem, 30%, 17rem) minmax(0, 1fr); align-items: start; font-size: 0.85rem; }
+.nrl-staff .nrl-board-panel { margin: 0; }
+.nrl-staff-list { display: grid; gap: 0.5rem; align-content: start; }
+.nrl-board h3 { margin: 0 0 0.2rem; font-size: 0.9rem; }
+.nrl-board-patience { margin: 0 0 0.3rem; font-size: 0.75rem; }
+.nrl-board-obj { padding: 0.15rem 0; border-top: 1px solid #b8ae92; font-size: 0.78rem; }
+@media (max-width: 600px) {
+  .nrl-screen-body.nrl-staff { grid-template-columns: minmax(0, 1fr); }
+}
 .nrl-staff-row {
   display: flex;
   align-items: center;
@@ -961,6 +970,18 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-staff-info { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
 .nrl-staff-blurb { font-size: 0.72rem; color: #555; }
 .nrl-staff-row .nrl-btn { flex: 0 0 auto; margin-right: 3px; } /* clear of the row's edge and its shadow */
+/* 956×330: the head and the board make a left column and the staff rows take the
+   full height beside them, each blurb run on after the role's name. */
+@media (max-height: 340px) {
+  .nrl-screen:has(> .nrl-staff) { position: relative; display: grid; grid-template-columns: clamp(12rem, 30%, 17rem) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); column-gap: 0.5rem; }
+  .nrl-screen:has(> .nrl-staff) > .nrl-screen-head { grid-column: 1; grid-row: 1; min-width: 0; }
+  .nrl-screen:has(> .nrl-staff) .nrl-screen-x { position: absolute; top: 0.35rem; right: calc(0.5rem + var(--nrl-safe-r)); }
+  .nrl-screen-body.nrl-staff { display: contents; }
+  .nrl-staff .nrl-board-panel { grid-column: 1; grid-row: 2; min-height: 0; max-height: 100%; overflow-y: auto; }
+  .nrl-staff-list { grid-column: 2; grid-row: 1 / -1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 3.25rem 3px 0; }
+  .nrl-staff-info { display: block; line-height: 1.2; }
+  .nrl-staff-info strong { margin-right: 0.4em; }
+}
 
 /* ── News inbox (#45) ─────────────────────────────────────────────────── */
 .nrl-nav-badge {
