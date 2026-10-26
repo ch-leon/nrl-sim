@@ -1345,11 +1345,10 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   z-index: 1;
 }
 .nrl-player-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
-.nrl-player-actions .nrl-player-close { flex: 1 1 100%; }
 .nrl-modal-has-x .nrl-player-top { padding-right: 2.75rem; }
 /* A landscape phone (#336): who he is and his deal on the left, his stats and
-   traits on the right, so the stats show without scrolling; Close joins the
-   row (the ✕ is in the corner too). */
+   traits on the right, so the stats show without scrolling. The ✕ in the
+   corner is the one close (#349 A5). */
 @media (max-height: 500px) {
   .nrl-modal.nrl-player-modal { max-width: min(96vw, 760px); width: min(96vw, 760px); padding: 0.4rem 0.5rem; }
   .nrl-player-panel { padding: 0.35rem 0.5rem; }
@@ -1363,7 +1362,6 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-modal-has-x .nrl-player-about { padding-right: 2.75rem; }
   .nrl-modal-has-x .nrl-player-top { padding-right: 0; }
   .nrl-player-portrait { width: 56px; height: 56px; }
-  .nrl-player-actions .nrl-player-close { flex: 1 1 6rem; }
   .nrl-player-why { order: 1; }
 }
 .nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }

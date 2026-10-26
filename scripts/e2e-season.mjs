@@ -493,7 +493,7 @@ async function play() {
   });
   await step('player-page-closed', async () => {
     if (!(await page.locator('[data-player-page]').count())) return 'skipped';
-    await tap('.nrl-player-close');
+    await tap('.nrl-player-modal .nrl-screen-x');
     await page.waitForSelector('[data-player-page]', { state: 'detached', timeout: 5000 });
     await page.waitForSelector('.nrl-squad-kit');
   });

@@ -36,8 +36,7 @@ describe('region dialog (#203)', () => {
     expect(r).toContain('background');
     expect(r).toContain('z-index');
   });
-  it('a landscape phone puts Close in the action row', () => {
-    const block = CSS.slice(CSS.indexOf('.nrl-modal-has-x .nrl-player-top'));
-    expect(block).toMatch(/@media \(max-height: 500px\) \{[^@]*\n\s*\.nrl-player-actions \.nrl-player-close \{ flex: 1 1 6rem; \}/);
+  it('has one close, the ✕ in the corner, and no Close in the action row (#349 A5)', () => {
+    expect(CSS).not.toContain('.nrl-player-close');
   });
 });

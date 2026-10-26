@@ -363,7 +363,6 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     }
     const why = m.actions.filter((a) => a.detail || a.why).map((a) => `${a.label.split(' ')[0]}: ${a.why ?? a.detail}`).join(' · ');
     if (why) actions.append(el('div', { class: 'nrl-player-why', text: why }));
-    actions.append(button('Close', finish, { class: 'nrl-player-close' }));
 
     content.replaceChildren(top, el('div', { class: 'nrl-player-grid' }, about, details), actions);
   };

@@ -238,9 +238,9 @@ async function runSize(browser, W, H) {
     return out;
   });
   // #203: the player page (Squad → a player) sits between HUD and nav, with a ✕
-  // and Renew / Sell / Release / Close on screen; the nav stays whole and tappable.
+  // and Renew / Sell / Release on screen; the nav stays whole and tappable.
   const PLAYER = ['.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="renew"]',
-    '[data-player-action="sell"]', '[data-player-action="release"]', '.nrl-player-close']];
+    '[data-player-action="sell"]', '[data-player-action="release"]']];
   await step('player-page', async () => {
     await tap('.nrl-nav .nrl-btn[data-screen="squad"]');
     await tap('.nrl-card-open');
@@ -269,7 +269,7 @@ async function runSize(browser, W, H) {
     if (await renew.isDisabled()) { rec.notes.push('renew not offered for this player'); return []; }
     await renew.tap();
     await page.waitForTimeout(300);
-    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="sell"]', '.nrl-player-close']);
+    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="sell"]']);
   });
   await step('player-page-closed', async () => {
     await tap('.nrl-player-modal .nrl-screen-x');
