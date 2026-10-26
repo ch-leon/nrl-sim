@@ -82,6 +82,7 @@ src/
   ui/
     dom.ts                   # DOM helpers: panel(), button(), mount  (WU-5)
     hud.ts                   # money/week/season HUD                  (WU-5 / BAK-163)
+    title.ts                 # title screen: three slot cards, the new-club step (#350 T1)
     nav.ts                   # bottom nav bar; screens register here via main.ts (WU-5)
     screens/
       squad.ts               # squad list screen                      (WU-9)
