@@ -360,6 +360,5 @@ export class CallJudge {
 
 /** The commentary line for a call that paid off. */
 export function paidOffText(team: string, c: CoachCall): string {
-  if (callIsBench(c)) return `Fresh legs pay off for ${team}`;
   return `${CALL_LABEL[c]} pays off for ${team}`;
 }

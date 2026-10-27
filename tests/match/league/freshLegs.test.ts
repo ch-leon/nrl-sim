@@ -107,7 +107,7 @@ describe('Fresh legs, the call (pure)', () => {
     const [l] = j.lapsed('home');
     expect(l).toMatchObject({ paid: false, note: 'nobody tired' });
     expect(callResultText(l!)).toBe('Fresh legs: nobody tired');
-    expect(paidOffText('Larrikins', 'fresh-legs')).toBe('Fresh legs pay off for Larrikins');
+    expect(paidOffText('Larrikins', 'fresh-legs')).toBe('Fresh legs pays off for Larrikins');
   });
   it('a balance plan with a fresh-legs call validates', () => {
     const plan: Plan = { name: 'p', seeds: 2, minutes: 2, scenarios: [{ name: 'even', home: { rating: 60 }, away: { rating: 60 }, calls: { home: [{ call: 'fresh-legs' }] } }] };
