@@ -7,7 +7,8 @@
 // #338: Advance Week, and the ▾ runs, never take a default unasked: with a card
 // waiting they list what is pending and let the player answer or take the
 // defaults. #350 (N4): a long advance that stops on a new card opens it here,
-// with Keep advancing once it is answered.
+// with Keep advancing once it is answered. #362: at the demo's end neither asks;
+// the advance goes straight to the gate, which says the demo is over.
 //
 // The cards live in GameState (systems/events.ts); this module renders them and
 // passes the tapped choice back through chooseEvent(). No Phaser.
@@ -22,6 +23,7 @@ import { hasStaff } from '../systems/staff';
 import { NEW_CONTRACT_WEEKS } from '../systems/freeagency';
 import { el, button, openModal, closeModal, activeScreen, dialogOpen } from './dom';
 import { ADVANCE_FAILED_TEXT } from './hud';
+import { demoBlocked } from '../commercial/demo';
 
 // ── View-model (pure) ─────────────────────────────────────────────────────────
 
@@ -205,7 +207,7 @@ export function openDecisions(opts: { then?: { label: string; run: () => void } 
  * Keep advancing) or going ahead, which takes the defaults that fall due.
  */
 export function askBeforeAdvance(span: number, proceed: () => void): void {
-  const ask = advanceAsk(getState(), span);
+  const ask = demoBlocked() ? null : advanceAsk(getState(), span);
   if (!ask) {
     proceed();
     return;
@@ -236,7 +238,7 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
  */
 export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget) => Promise<AdvanceRun>, opts: { confirmed?: boolean } = {}): void {
   const span = targetSpan(target, getState().week);
-  const question = pendingDecisionCount(getState()) === 0 && !opts.confirmed ? longAdvanceQuestion(span) : null;
+  const question = pendingDecisionCount(getState()) === 0 && !opts.confirmed && !demoBlocked() ? longAdvanceQuestion(span) : null;
   if (question) {
     confirmLongAdvance(question, () => advanceUntilAsked(target, run, { confirmed: true }));
     return;
