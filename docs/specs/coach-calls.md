@@ -58,12 +58,15 @@ scope. No new mechanics.
 | **Field goal** | Only when 2c's field-goal rule is on (last minutes, close, in range) | This set | The kicker drops for goal on the next tackle he has it | Over |
 | **Rush** | Defending | Next set | Defence plan = Rush for one set | Tackle behind the advantage line, intercept, strip or error |
 | **Hold** | Defending | Next set | Defence plan = Compressed for one set | Set ends with < 25 m gained |
+| **Fresh legs** (#367) | Either way, once a half, while a man on the field is under 0.40 legs and the bench has someone with 0.40 or more | Until the swap | The most tired man (ties by slot) comes off for the freshest bench man, his position group first: at the next play-the-ball where he is free (swapped where he stands), else the next stoppage (he jogs off, as a Rotation swap), else in the sheds at half-time. No dice | The swap is made. Lapses unpaid (and the half's call comes back) if nobody is tired by then; a call still waiting at full time stays unpaid |
 
 40/20 joins the list when 2d brings touch. Calls for the defence never stop a defender
 tackling; they change the line, not the contest.
 
 **Limits** (proposed): **one call per set** for the side in possession and one per set
-when defending; a call left unused at the end of a set lapses. A chip greys out with the
+when defending; a call left unused at the end of a set lapses. Fresh legs (#367) is a
+bench call: it uses up neither, and is limited to once a half (`calls.freshLegs.perHalf`).
+The AI coach never makes it. A chip greys out with the
 reason when it can't apply ("not your ball", "field goal: not in range").
 
 ## 4. On screen
@@ -141,3 +144,6 @@ the golden test below; AI calls as a later balance lever.
 | 5 | Results applied at full time instead of kick-off | Yes, when calls ship |
 | 6 | Quit / killed mid-match | Resume from `{ seed, calls, tick }` |
 | 7 | Are calls free, or unlocked (coaching staff, facilities)? | Free for v1; unlocks later |
+| 8 | Fresh legs (#367): how often? | Once a half per side (the alternative was once a match) |
+| 9 | Fresh legs: unlocked when? | Level 0, with Hit-up and Hold (the alternative was Coach's Office level 1) |
+| 10 | Fresh legs: where does it land? | The next play-the-ball where the man is free, else the next stoppage, else the sheds; the Rotation's own swaps at that stoppage skip both men |

@@ -2,16 +2,18 @@
 // docs/specs/coach-calls.md). A call is a nudge on top of the side's presets,
 // not a joystick: it changes the odds of the next play or set and the players
 // still decide with their stats. One call a set each way: one while his side
-// has the ball, one while it defends. Pure: live.ts applies them.
+// has the ball, one while it defends; Fresh legs (#367), a bench call, any time
+// once a half. Pure: live.ts applies them.
 import type { Side, SimEvent } from '../core/snapshot';
 import type { AttackPlan, DefencePreset } from './presets';
 
 export type CoachCall =
   | 'hit-up' | 'shift-left' | 'shift-right' // attack, the next play
   | 'kick-early' | 'run-it' | 'bomb' | 'field-goal' // attack, this set's kick
-  | 'rush' | 'hold'; // defence, the next set
+  | 'rush' | 'hold' // defence, the next set
+  | 'fresh-legs'; // the bench (#367): either way, once a half
 
-export const COACH_CALLS: readonly CoachCall[] = ['hit-up', 'shift-left', 'shift-right', 'kick-early', 'run-it', 'bomb', 'field-goal', 'rush', 'hold'];
+export const COACH_CALLS: readonly CoachCall[] = ['hit-up', 'shift-left', 'shift-right', 'kick-early', 'run-it', 'bomb', 'field-goal', 'rush', 'hold', 'fresh-legs'];
 
 export function isCoachCall(v: unknown): v is CoachCall {
   return COACH_CALLS.includes(v as CoachCall);
@@ -44,10 +46,16 @@ export const CALLS = {
    */
   ai: { on: 0, overlap: 2, rushOwnM: 20 },
   /**
+   * Fresh legs (#367): on offer while a man on the field has legs under `offBelow`
+   * and an uninjured bench man has at least `onAtLeast`; `perHalf` calls a side a
+   * half (0 = never). The AI coach never makes it.
+   */
+  freshLegs: { offBelow: 0.4, onAtLeast: 0.4, perHalf: 1 },
+  /**
    * Calls the player's chips offer by Coach's Office level (N9.6): with none built, these;
    * each level adds its own. Index = level (0–3).
    */
-  unlocks: [['hit-up', 'hold'], ['shift-left', 'shift-right', 'rush'], ['kick-early', 'run-it'], ['bomb', 'field-goal']] as CoachCall[][],
+  unlocks: [['hit-up', 'hold', 'fresh-legs'], ['shift-left', 'shift-right', 'rush'], ['kick-early', 'run-it'], ['bomb', 'field-goal']] as CoachCall[][],
 };
 
 /** The sides with an AI coach (N9.6): the rivals' (not the player's) when `calls.ai.on`, else none. */
@@ -76,6 +84,11 @@ export function callIsDefence(c: CoachCall): boolean {
   return c === 'rush' || c === 'hold';
 }
 
+/** A bench call (#367): neither attack nor defence, made with or without the ball, and it uses up neither of the set's calls. */
+export function callIsBench(c: CoachCall): boolean {
+  return c === 'fresh-legs';
+}
+
 /** Scope: a play (until the next tackle) or the set. */
 export function callIsPlay(c: CoachCall): boolean {
   return c === 'hit-up' || c === 'shift-left' || c === 'shift-right';
@@ -102,8 +115,11 @@ export function withAttackCall(plan: AttackPlan, c: CoachCall | null): AttackPla
  * sense now — attack calls while his side has the ball (a late-set kick once it is
  * allowed), Rush and Hold while it defends; once a call is made this set, only its
  * chip, lit, until the set ends. `why` is the sim's refusal for the call now.
+ * Fresh legs (#367) always shows, either way, lit while its swap is `pending`;
+ * a call made this set doesn't hide it.
  */
-export function chipState(call: CoachCall, why: string | null, attacking: boolean, made: CoachCall | null): { show: boolean; enabled: boolean; lit: boolean } {
+export function chipState(call: CoachCall, why: string | null, attacking: boolean, made: CoachCall | null, pending = false): { show: boolean; enabled: boolean; lit: boolean } {
+  if (callIsBench(call)) return { show: true, enabled: why === null, lit: pending };
   if (made) return { show: call === made, enabled: false, lit: call === made };
   const role = callIsDefence(call) ? !attacking : attacking;
   const notYet = why === 'tackles 3–4' || why === 'late in the set' || why === 'not in range';
@@ -121,6 +137,7 @@ export const CALL_LABEL: Readonly<Record<CoachCall, string>> = {
   'field-goal': 'Field goal',
   rush: 'Rush',
   hold: 'Hold',
+  'fresh-legs': 'Fresh legs',
 };
 
 /** How long a call's result shows by the chips (#366), in real ms. A new result replaces the one up. */
@@ -174,6 +191,7 @@ export const CALL_RESULT: Readonly<Record<CoachCall, (v: CallVerdict) => string>
   'field-goal': (v) => joinResult('field-goal', v.how === 'field-goal' ? (v.paid ? 'over!' : 'missed') : v.how === 'try' && !v.paid ? 'try against' : 'not taken'),
   rush: (v) => joinResult('rush', defenceResult(v)),
   hold: (v) => joinResult('hold', defenceResult(v)),
+  'fresh-legs': (v) => joinResult('fresh-legs', v.note ?? (v.paid ? 'swapped' : 'no swap')),
 };
 
 /** "Shift left +18m" (a gain follows the name), "Bomb: regathered" (anything else after a colon). */
@@ -201,6 +219,8 @@ export interface CallVerdict {
   /** The ground it made, rounded (#366): the furthest tackle from where it was made, toward the side attacking then; a kick call's kick gain. */
   metres: number;
   how: CallHow;
+  /** Fresh legs (#367): who came off and who went on, "Smith off, Jones on". */
+  note?: string;
 }
 
 /** A call being judged: the side the ball was with when it was made, which way they attack, where the ball was, the furthest tackle since, and for a kick call whether it has gone. */
@@ -245,6 +265,16 @@ export class CallJudge {
     return this.settle((w) => (w.kicked && w.side === side && (w.call === 'kick-early' || w.call === 'bomb') ? gainM >= CALLS.paid.kickM : null), () => 'kick', gainM);
   }
 
+  /** Fresh legs (#367): `side`'s bench call landed, `off` for `on`. Paid. */
+  swapped(side: Side, off: string, on: string): CallVerdict[] {
+    return this.settle((w) => (w.side === side && callIsBench(w.call) ? true : null), () => 'interchange', undefined, `${off} off, ${on} on`);
+  }
+
+  /** Fresh legs (#367): `side`'s bench call found nobody tired by the time it could land (his man went to the bin, or got his legs back). Not paid. */
+  lapsed(side: Side): CallVerdict[] {
+    return this.settle((w) => (w.side === side && callIsBench(w.call) ? false : null), () => 'lapsed', undefined, 'nobody tired');
+  }
+
   /** The end of a tick: its events, the ball's x (the tackle's spot when a play has ended), and whether a play (a tackle in the set) and the set have ended. */
   observe(events: readonly SimEvent[], x: number, playEnded: boolean, setEnded: boolean): CallVerdict[] {
     const out: CallVerdict[] = [];
@@ -265,6 +295,8 @@ export class CallJudge {
   private onEvent(w: Watch, e: SimEvent): boolean | null {
     const by = e.side;
     if (by === undefined) return null;
+    // A bench call is settled only by its swap (swapped), never by the play.
+    if (callIsBench(w.call)) return null;
     const theirs = by !== w.atk;
     if (e.kind === 'try') return by === w.atk ? !callIsDefence(w.call) : callIsDefence(w.call) ? false : w.kicked ? false : null;
     switch (w.call) {
@@ -304,6 +336,8 @@ export class CallJudge {
       case 'bomb':
         if (!w.kicked) return false;
         return --w.setsLeft <= 0 ? false : null;
+      case 'fresh-legs':
+        return null;
       default:
         // A play call whose play ended with the set (tackled on the last), run it, a field goal not taken.
         return w.call === 'hit-up' ? w.bestM >= CALLS.paid.hitUpM : w.call === 'shift-left' || w.call === 'shift-right' ? w.bestM >= CALLS.paid.shiftM : false;
@@ -311,13 +345,13 @@ export class CallJudge {
   }
 
   /** Close every open call the rule decides (true paid, false not), with what decided it and its ground (a kick's gain when given); leave the rest open. */
-  private settle(rule: (w: Watch) => boolean | null, how: (w: Watch) => CallHow, gainM?: number): CallVerdict[] {
+  private settle(rule: (w: Watch) => boolean | null, how: (w: Watch) => CallHow, gainM?: number, note?: string): CallVerdict[] {
     const out: CallVerdict[] = [];
     this.open = this.open.filter((w) => {
       const v = rule(w);
       if (v === null) return true;
       if (v) this.paid[w.side]++;
-      out.push({ side: w.side, call: w.call, paid: v, metres: Math.round(gainM ?? w.bestM), how: how(w) });
+      out.push({ side: w.side, call: w.call, paid: v, metres: Math.round(gainM ?? w.bestM), how: how(w), ...(note !== undefined ? { note } : {}) });
       return false;
     });
     return out;

@@ -1,0 +1,14 @@
+{
+  "name": "fresh-legs",
+  "description": "Fresh legs (#367): how often is the call on offer (coachCalls: the home coach makes it whenever callRefusal allows), does every call land (callsPaid), and what does it do to subs, legs and the home win, on rotation standard and off? The 0.55 variant asks whether the 0.40 line should move (decision D6).",
+  "seeds": 40,
+  "scenarios": [
+    { "name": "standard, no call", "home": { "rating": 60, "rotation": "standard" }, "away": { "rating": 60 } },
+    { "name": "standard, fresh legs", "home": { "rating": 60, "rotation": "standard" }, "away": { "rating": 60 }, "calls": { "home": [{ "call": "fresh-legs" }] } },
+    { "name": "off, no call", "home": { "rating": 60, "rotation": "off" }, "away": { "rating": 60 } },
+    { "name": "off, fresh legs", "home": { "rating": 60, "rotation": "off" }, "away": { "rating": 60 }, "calls": { "home": [{ "call": "fresh-legs" }] } }
+  ],
+  "variants": [
+    { "name": "off below 0.55", "tuning": { "calls.freshLegs.offBelow": 0.55 } }
+  ]
+}

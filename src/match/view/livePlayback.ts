@@ -20,7 +20,7 @@ import { replayRange, Runner, TICK_MS, type SimFactory } from '../core/engine';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { MatchRecorder, type RunMatchOptions } from '../league/match';
-import type { CallInput, CallVerdict, CoachCall } from '../league/calls';
+import { callIsBench, type CallInput, type CallVerdict, type CoachCall } from '../league/calls';
 import type { DifficultyEdge } from '../league/spread';
 import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
@@ -328,7 +328,19 @@ export class LivePlayback {
   /** Why `side`'s coach can't make `call` now, or null (#73). */
   callRefusal(side: Side, call: CoachCall): string | null {
     if (this.finishEmitted || this.awaitingSkip) return 'full time';
+    // Fresh legs (#367) tapped, and the sim takes it on the next tick: not twice.
+    if (callIsBench(call) && this.queuedCall(side, call)) return 'used this half';
     return this.sim.callRefusal(side, call);
+  }
+
+  /** Fresh legs (#367) called and its swap still to come: tapped this tick, or waiting in the sim. */
+  freshLegsPending(side: Side): boolean {
+    return this.queuedCall(side, 'fresh-legs') || this.sim.freshLegsPending(side);
+  }
+
+  /** A call made for a tick the sim hasn't reached yet. */
+  private queuedCall(side: Side, call: CoachCall): boolean {
+    return this.opts.calls.some((c) => c.tick > this.runner.tick && c.side === side && c.call === call);
   }
 
   /** The coach makes a call: it takes effect on the next tick. Returns why not, or null. */

@@ -66,7 +66,7 @@ export const NINES_PAGE: GuidePage = {
       heading: 'Kick-offs and interchange',
       bullets: [
         'A coin toss decides who kicks off. After a try the side that conceded kicks off (as shipped; real Nines has the scorer restart).',
-        `Interchange is unlimited from a bench of ${F.benchSize}. After a try and at half-time the coach swaps the most tired men for fresher ones (standard rotation: anyone under about half his legs, two at a time; heavy rotates sooner and three at a time). A benched player gets his legs back slowly, never all the way.`,
+        `Interchange is unlimited from a bench of ${F.benchSize}. After a try and at half-time the coach swaps the most tired men for fresher ones (standard rotation: anyone under about half his legs, two at a time; heavy rotates sooner and three at a time). A benched player gets his legs back slowly, never all the way. Once a half you can call Fresh legs: your most tired man comes off for the freshest on the bench at the next play-the-ball or stoppage.`,
       ],
     },
     {
@@ -104,7 +104,7 @@ export const NINES_PAGE: GuidePage = {
       bullets: [
         'Each side plays an attack preset (Grind, Balanced, Expansive, Kick-chase, All-out) and a defence preset (Slide, Rush, Compressed) by zone of the field.',
         'Traits fire in their moment and are announced when they do: a step, a fend, an offload, a big hit, a strip, an intercept.',
-        'In a live match the chips along the bottom are coach calls for the next play: with the ball Hit-up, Shift left or right, Kick early, Run it, Bomb and Field goal; defending Rush or Hold. One call a set; the stats strip counts the calls that paid off. With no Coach’s Office you have Hit-up and Hold; each level of it adds calls: Shift and Rush, then Kick early and Run it, then Bomb and Field goal.',
+        'In a live match the chips along the bottom are coach calls for the next play: with the ball Hit-up, Shift left or right, Kick early, Run it, Bomb and Field goal; defending Rush or Hold. One call a set; the stats strip counts the calls that paid off. Fresh legs (your most tired man off for the freshest on the bench) is any time, once a half, and doesn’t use up the set’s call. With no Coach’s Office you have Hit-up, Hold and Fresh legs; each level of it adds calls: Shift and Rush, then Kick early and Run it, then Bomb and Field goal.',
       ],
     },
     {
