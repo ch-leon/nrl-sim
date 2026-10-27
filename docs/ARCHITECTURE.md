@@ -28,8 +28,13 @@
    `Math.random`.
 6. **DOM overlay UI.** Menus, HUD, panels and screens are HTML/CSS in a `#ui-root`
    overlay div (decision for BAK-163, applies everywhere). Phaser canvas renders
-   the world; DOM renders UI. Pixel styling via CSS (`image-rendering: pixelated`,
-   monospace pixel font, chunky borders). Helpers in `src/ui/dom.ts`.
+   the world; DOM renders UI. The look is "Broadcast Quiet"
+   (`docs/specs/ui-broadcast-quiet.md`): navy sheets over the always-visible
+   grounds or pitch, one dock at the bottom as the only navigation, Barlow
+   Condensed for labels, IBM Plex Sans for text, IBM Plex Mono for numbers
+   (self-hosted, `src/ui/fonts.ts`), one yellow primary action a screen. The
+   world's art stays pixel art (`image-rendering: pixelated`). Tokens and helpers
+   in `src/ui/dom.ts`.
 
 ## 2. Directory layout & file ownership
 
@@ -81,9 +86,10 @@ src/
     placement.ts             # facility placement controller          (WU-8 / BAK-178)
   ui/
     dom.ts                   # DOM helpers: panel(), button(), mount  (WU-5)
-    hud.ts                   # money/week/season HUD                  (WU-5 / BAK-163)
+    hud.ts                   # the dock's status + PLAY WEEK, the decisions chip (WU-5 / BAK-163)
+    fonts.ts                 # the UI's three typefaces, self-hosted (Broadcast Quiet)
     title.ts                 # title screen: three slot cards, the new-club step (#350 T1)
-    nav.ts                   # bottom nav bar; screens register here via main.ts (WU-5)
+    nav.ts                   # the dock's tabs and Office's tiles; screens register here via main.ts (WU-5)
     screens/
       squad.ts               # squad list screen                      (WU-9)
       lineup.ts              # pick the nine and the bench            (GitHub #69)
