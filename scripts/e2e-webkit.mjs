@@ -41,6 +41,16 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { webkit } from 'playwright-core';
 
+/**
+ * The weekly summary card (#368) opens after each advance once the club is back.
+ * This probe measures other screens, so every page closes the card as it opens.
+ */
+function closeWeekSummary() {
+  new MutationObserver(() => {
+    document.querySelector('[data-week-summary] [data-summary-close]')?.click();
+  }).observe(document, { childList: true, subtree: true });
+}
+
 const argv = process.argv.slice(2);
 const sizeArg = argv.includes('--size') ? argv[argv.indexOf('--size') + 1] : process.env.E2E_SIZES;
 const SIZES = (sizeArg ?? '956x330 844x390').split(/\s+/).filter(Boolean).map((s) => s.split('x').map(Number));
@@ -142,6 +152,7 @@ async function runSize(browser, W, H) {
   const ctx = await browser.newContext({
     viewport: { width: W, height: H }, deviceScaleFactor: 3, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
   });
+  await ctx.addInitScript(closeWeekSummary);
   const page = await ctx.newPage();
   page.setDefaultTimeout(10000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
@@ -294,6 +305,7 @@ async function runPortrait(browser) {
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
   });
+  await ctx.addInitScript(closeWeekSummary);
   const page = await ctx.newPage();
   page.setDefaultTimeout(20000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
@@ -873,6 +885,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   const ctx = await browser.newContext({
     viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
   });
+  await ctx.addInitScript(closeWeekSummary);
   const page = await ctx.newPage();
   page.setDefaultTimeout(15000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
@@ -1293,6 +1306,7 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   const ctx = await browser.newContext({
     viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
   });
+  await ctx.addInitScript(closeWeekSummary);
   const page = await ctx.newPage();
   page.setDefaultTimeout(10000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
