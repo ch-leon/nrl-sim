@@ -136,6 +136,11 @@ export class KeyMoments {
   }
 }
 
+/** Slow down for big moments (#366): on unless turned off, so a save from before the setting has it on. */
+export function keyMomentsOn(settings: { keyMoments?: boolean }): boolean {
+  return settings.keyMoments !== false;
+}
+
 /** The speed buttons remember. Anything else (an old save, a bad value) is ×4. */
 export function playbackSpeedOf(raw: unknown): PlaybackSpeed {
   return raw === 1 || raw === 2 || raw === 4 || raw === 8 ? raw : LIVE_DEFAULT_SPEED;

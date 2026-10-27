@@ -71,12 +71,15 @@ export function momentumLabel(samples: readonly MomentumSample[], names: { home:
   return `Momentum: ${side}, ${trend}`;
 }
 
+/** Momentum that fills the line's half-height: a try's worth or two is most of a match, and a few px show ±100 as a sliver. */
+export const MOMENTUM_DRAW_FULL = 50;
+
 /** The sparkline's two filled shapes, in a `width` × `height` box with even across the middle: home's above, away's below (SVG points). */
 export function momentumShapes(samples: readonly MomentumSample[], width: number, height: number): { home: string; away: string } {
   const mid = height / 2;
   const n = samples.length;
   const x = (k: number): number => (n <= 1 ? width : (k / (n - 1)) * width);
-  const y = (v: number): number => mid - (v / MOMENTUM_MAX) * mid;
+  const y = (v: number): number => mid - (Math.max(-1, Math.min(1, v / MOMENTUM_DRAW_FULL))) * mid;
   const shape = (pick: (v: number) => number): string => {
     const pts = samples.map((s, k) => `${round(x(k))},${round(y(pick(s.value)))}`);
     return [`0,${round(mid)}`, ...pts, `${round(width)},${round(mid)}`].join(' ');

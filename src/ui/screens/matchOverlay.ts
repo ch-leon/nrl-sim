@@ -1025,7 +1025,7 @@ body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env
 .nrl-mo-score { font-size: clamp(1rem, 4vw, 1.4rem); font-weight: bold; display: block; }
 .nrl-mo-momentum {
   display: block; width: 100%; height: var(--nrl-mo-momentum-h, 6px); overflow: visible;
-  background: var(--nrl-mo-momentum-bg, rgba(26, 26, 46, 0.08));
+  background: var(--nrl-mo-momentum-bg, rgba(26, 26, 46, 0.16));
 }
 .nrl-mo-momentum-fill { stroke: var(--nrl-mo-momentum-edge, #1a1a2e); stroke-width: 0.75px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
 .nrl-mo-momentum-axis { stroke: var(--nrl-mo-momentum-axis, rgba(26, 26, 46, 0.45)); stroke-width: 1px; vector-effect: non-scaling-stroke; }

@@ -28,6 +28,7 @@ import { CALL_WHEN, callCaption, callsHintSeasoned, callsLine, callsLockedHint, 
 import {
   LivePlayback,
   playbackSpeedOf,
+  keyMomentsOn,
   PLAYBACK_SPEEDS,
   type PlaybackActor,
   type PlaybackBall,
@@ -884,7 +885,7 @@ export class MatchScene extends Phaser.Scene {
   /** Slow down for big moments: on unless the player turned it off (an old save has no setting). */
   private keyMomentsOn(): boolean {
     try {
-      return getState().settings.keyMoments !== false;
+      return keyMomentsOn(getState().settings);
     } catch {
       return true;
     }

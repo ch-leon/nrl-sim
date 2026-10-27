@@ -4,7 +4,9 @@
 // at ×2 at most. An override on screen only: the chosen speed and the saved
 // setting are never rewritten, a speed tap ends the moment, Skip ignores it.
 import { describe, it, expect } from 'vitest';
-import { KEY_MOMENT_LATE_MIN, KeyMoments, LivePlayback, type LivePlaybackScene } from '../../../src/match/view/livePlayback';
+import { KEY_MOMENT_LATE_MIN, KeyMoments, LivePlayback, keyMomentsOn, type LivePlaybackScene } from '../../../src/match/view/livePlayback';
+import { migrateState } from '../../../src/core/save';
+import { SAVE_VERSION } from '../../../src/core/state';
 import { NINES } from '../../../src/match/league/rules';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { createNewGame, getState, setState } from '../../../src/core/state';
@@ -12,6 +14,25 @@ import type Phaser from 'phaser';
 
 const H = NINES.halfMinutes;
 const early = { half: 1, seconds: 60 };
+
+// The tsconfig has no Node types: the saves are read with Vite's JSON import.
+const saves = import.meta.glob('../../fixtures/saves/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
+
+describe('the setting (#366)', () => {
+  it('is on when absent: every old save in the corpus migrates to v21 with no keyMoments and slows down', () => {
+    expect(SAVE_VERSION).toBe(21);
+    const files = Object.keys(saves);
+    expect(files.length).toBeGreaterThan(10);
+    for (const f of files) {
+      const r = migrateState(structuredClone(saves[f]));
+      if (!r.ok) throw new Error(`${f}: ${r.message}`);
+      expect(r.state.settings.keyMoments, f).toBeUndefined();
+      expect(keyMomentsOn(r.state.settings), f).toBe(true);
+    }
+    expect(keyMomentsOn({ keyMoments: false })).toBe(false);
+    expect(keyMomentsOn({ keyMoments: true })).toBe(true);
+  });
+});
 
 describe('KeyMoments (#366)', () => {
   it('a line break plays at ×1 until the tackle, then the cap lifts', () => {
