@@ -1,15 +1,17 @@
 // #203: on a landscape phone the player page was a viewport dialog centred over
 // the nav, with Renew / Sell / Close below the screen. It is now a region dialog
-// (between HUD and nav) with a ✕ and its actions pinned. Layout is checked in
+// (between HUD and nav) and, since Broadcast Quiet (3f), a full sheet with ◂ back
+// and its actions pinned at the foot of its right column. Layout is checked in
 // WebKit by scripts/e2e-webkit.mjs; these pin the CSS, since vitest has no layout.
 import { describe, it, expect } from 'vitest';
 import { CSS } from '../../src/ui/dom';
+import { PLAYER_CSS } from '../../src/ui/screens/player';
 
 /** The declarations of the first rule whose selector (or selector list) ends with `selector`. */
-function rule(selector: string): string {
-  const i = CSS.indexOf(`${selector} {`);
+function rule(selector: string, css = CSS): string {
+  const i = css.indexOf(`${selector} {`);
   expect(i, `${selector} rule`).toBeGreaterThanOrEqual(0);
-  return CSS.slice(i, CSS.indexOf('}', i));
+  return css.slice(i, css.indexOf('}', i));
 }
 
 describe('Player of the Match card (#203)', () => {
@@ -29,14 +31,21 @@ describe('region dialog (#203)', () => {
   it('caps the card to the region', () => {
     expect(rule('.nrl-dialog-region .nrl-modal')).toContain('max-height: 100%');
   });
-  it("pins the player page's actions to the foot of the card", () => {
-    const r = rule('.nrl-player-actions');
+  it("pins the player page's actions to the foot of its column, on screen without scrolling (3f)", () => {
+    const r = rule('.nrl-player-actions', PLAYER_CSS);
     expect(r).toContain('position: sticky');
     expect(r).toMatch(/bottom: (0;|-?[\d.]+rem)/);
     expect(r).toContain('background');
     expect(r).toContain('z-index');
+    expect(r).toContain('margin-top: auto'); // pushed to the column's foot
+    expect(r).toContain('flex: 0 0 auto'); // never squeezed out
+    // The column holding them does not scroll (only the middle one does), so they are always in view.
+    const side = rule('.nrl-player-card, .nrl-player-side', PLAYER_CSS);
+    expect(side).toContain('overflow: hidden');
+    expect(side).toContain('min-height: 0');
+    expect(rule('.nrl-player-about', PLAYER_CSS)).toContain('overflow-y: auto');
   });
-  it('has one close, the ✕ in the corner, and no Close in the action row (#349 A5)', () => {
-    expect(CSS).not.toContain('.nrl-player-close');
+  it('has one close, ◂ back, and no Close in the action row (#349 A5)', () => {
+    expect(CSS + PLAYER_CSS).not.toContain('.nrl-player-close');
   });
 });

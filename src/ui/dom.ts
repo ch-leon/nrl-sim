@@ -1458,92 +1458,6 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   text-decoration: underline dotted;
   cursor: pointer;
 }
-.nrl-dialog-region .nrl-rival-modal { width: min(96vw, 640px); max-width: none; }
-.nrl-rival-squad { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-.nrl-rival-head { flex: 0 0 auto; min-height: 44px; margin-bottom: 0.1rem; display: flex; flex-direction: column; justify-content: center; }
-.nrl-modal-has-x .nrl-rival-head { padding-right: 2.75rem; }
-.nrl-rival-head h2 { margin: 0; font-size: 1rem; line-height: 1.2; }
-.nrl-rival-head p { margin: 0; font-size: 0.72rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* 956×330: the club's block goes down the left, as the League's tabs do, so four rows show. */
-@media (max-height: 340px) {
-  .nrl-dialog-region .nrl-rival-modal { width: min(96vw, 760px); }
-  .nrl-rival-squad { flex-direction: row; gap: 0.5rem; }
-  .nrl-rival-head { flex: 0 0 10.5rem; justify-content: flex-start; margin: 0; }
-  .nrl-modal-has-x .nrl-rival-head { padding-right: 0; }
-  .nrl-rival-head p { white-space: normal; font-size: 0.68rem; }
-  .nrl-modal-has-x .nrl-rival-scroll { padding-right: 2.75rem; }
-}
-.nrl-rival-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.nrl-rival-table { border-collapse: collapse; font-size: 0.75rem; width: 100%; }
-.nrl-rival-table th, .nrl-rival-table td { padding: 0.15rem 0.3rem; text-align: left; white-space: nowrap; }
-.nrl-rival-table thead th { position: sticky; top: 0; background: #e8e0c8; }
-.nrl-rival-traits { font-size: 0.68rem; }
-/* Full trait names (#349 S3) wrap inside the 44px row rather than push the table past its box. */
-.nrl-rival-table td.nrl-rival-traits { white-space: normal; line-height: 1.2; min-width: 8rem; }
-/* Rows are tap targets for the player page (N7, #185). */
-.nrl-rival-table tbody tr.nrl-rival-row { height: 44px; cursor: pointer; }
-.nrl-rival-table tbody tr.nrl-rival-row:hover, .nrl-rival-table tbody tr.nrl-rival-row:focus-visible { background: #f4d03f; outline: none; }
-
-/* ── Player page (N7, #185) ──────────────────────────────────────────────── */
-.nrl-modal.nrl-player-modal { max-width: min(94vw, 680px); padding: 0.6rem; }
-.nrl-player-panel { padding: 0.5rem 0.7rem; }
-.nrl-player { font-size: 0.82rem; }
-.nrl-player-top { display: flex; gap: 0.6rem; align-items: flex-start; margin-bottom: 0.3rem; }
-.nrl-player-portrait {
-  flex: 0 0 auto;
-  width: 96px;
-  height: 96px;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-  border: 3px solid #000;
-  background: #cfc9b4;
-}
-.nrl-player-id { flex: 1 1 auto; min-width: 0; }
-.nrl-player-name { display: flex; gap: 0.4rem; align-items: baseline; font-weight: bold; font-size: 1.05rem; overflow-wrap: anywhere; }
-.nrl-player-name .nrl-card-ovr { flex: 0 0 auto; white-space: nowrap; overflow-wrap: normal; }
-.nrl-player-where { font-size: 0.75rem; color: #555; }
-.nrl-player-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.2rem 1rem; }
-.nrl-player h3 { margin: 0.4rem 0 0.15rem; font-size: 0.82rem; border-bottom: 2px solid #b8ae92; }
-.nrl-player-stats .nrl-statrow { grid-template-columns: 4.6rem 1fr 1.8rem; }
-.nrl-player-trait { margin: 0.1rem 0; overflow-wrap: anywhere; }
-.nrl-player-trait b { margin-right: 0.3rem; }
-.nrl-player-trait-bad b { color: #8a3a00; }
-.nrl-player-line { margin: 0.1rem 0; overflow-wrap: anywhere; }
-.nrl-player-expiring { color: #b00020; }
-/* #203: the actions stay pinned to the foot of the card's scroller while the rest scrolls. */
-.nrl-player-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
-  position: sticky;
-  bottom: 0;
-  padding: 0.4rem 3px 0.3rem 0;
-  background: #e8e0c8;
-  border-top: 2px solid #b8ae92;
-  z-index: 1;
-}
-.nrl-player-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
-.nrl-modal-has-x .nrl-player-top { padding-right: 2.75rem; }
-/* A landscape phone (#336): who he is and his deal on the left, his stats and
-   traits on the right, so the stats show without scrolling. The ✕ in the
-   corner is the one close (#349 A5). */
-@media (max-height: 500px) {
-  .nrl-modal.nrl-player-modal { max-width: min(96vw, 760px); width: min(96vw, 760px); padding: 0.4rem 0.5rem; }
-  .nrl-player-panel { padding: 0.35rem 0.5rem; }
-  .nrl-player { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 1rem; grid-template-areas: "top about" "details about" "actions actions"; align-items: start; }
-  .nrl-player-grid { display: contents; }
-  .nrl-player-top { grid-area: top; }
-  .nrl-player-about { grid-area: about; }
-  .nrl-player-details { grid-area: details; }
-  .nrl-player-actions { grid-area: actions; margin-top: 0.3rem; }
-  .nrl-player-about h3:first-child { margin-top: 0; }
-  .nrl-modal-has-x .nrl-player-about { padding-right: 2.75rem; }
-  .nrl-modal-has-x .nrl-player-top { padding-right: 0; }
-  .nrl-player-portrait { width: 56px; height: 56px; }
-  .nrl-player-why { order: 1; }
-}
-.nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
 /* ── Guide, under Office (N7, #188, #344) ─────────────────────────────────── */
 /* #206: only the page scrolls; the tabs and the foot (Replay) stay in view. */
 .nrl-guide { font-size: 13px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
@@ -1566,7 +1480,4 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-guide-foot { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .nrl-guide-build { font-family: var(--nrl-f-num); font-size: 11px; color: var(--nrl-muted); white-space: nowrap; }
 @media (max-width: 760px) { .nrl-guide-build { display: none; } }
-.nrl-card-open { cursor: pointer; }
-.nrl-card-open:focus-visible { outline: 3px solid #3a6ea5; }
-.nrl-card-more { color: #555; font-weight: bold; font-size: 1.1rem; line-height: 1; }
 `;
