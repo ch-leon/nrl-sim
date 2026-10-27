@@ -1393,6 +1393,7 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   /** The Undo toast's button, once it is on show: whole, 44px, and the one a tap at its middle hits. Then tap it. */
   const tapUndo = async () => {
     await page.waitForSelector('.nrl-toast-action .nrl-toast-btn', { state: 'visible' });
+    await page.waitForTimeout(300); // past the toast's 160 ms entry slide, which starts 4px up
     const problem = await page.evaluate(() => {
       const t = document.querySelector('.nrl-toast-action .nrl-toast-btn');
       const r = t.getBoundingClientRect();
