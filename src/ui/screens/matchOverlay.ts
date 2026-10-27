@@ -317,7 +317,7 @@ export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
   'field-goal': 'late, close and in range: drop for goal',
   rush: 'defending: rush up for the next set',
   hold: 'defending: hold the line for the next set',
-  'fresh-legs': 'any time, once a half: your most tired man off for the freshest on the bench',
+  'fresh-legs': 'once a half: tired man off, fresh man on',
 };
 
 /** "2/5" for a side's calls paid off of made, "–" when it made none. */

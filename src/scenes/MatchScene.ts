@@ -828,7 +828,7 @@ export class MatchScene extends Phaser.Scene {
       }
       list.append(name, when);
     }
-    this.openSheet((onDone) => showMatchSheet({ head: 'Calls', lines: ['One call a set with the ball, one defending; Fresh legs any time, once a half.', list], actions: [{ label: 'Back to the match', onTap: () => {} }], onDone }));
+    this.openSheet((onDone) => showMatchSheet({ head: 'Calls', lines: ['One call a set with the ball, one defending.', list], actions: [{ label: 'Back to the match', onTap: () => {} }], onDone }));
   }
 
   /** The chips follow the play (calls.ts chipState): what makes sense now, or the call made this set. */
