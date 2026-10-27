@@ -1,9 +1,11 @@
-// src/ui/screens/finance.ts — Finance nav screen (GitHub #39, part of #49).
-// Weekly P&L, runway and the next home gate, plus contracts expiring soon and a
-// short in-memory ledger built from 'money:changed' (stamped and classified as
-// the season books are, N12). The numbers come from a pure view-model
-// (financeSummary / FinanceLedger) that is unit-tested without the DOM; the DOM
-// part only renders it. No Phaser.
+// src/ui/screens/finance.ts — Finance nav screen (GitHub #39, part of #49;
+// Broadcast Quiet 3j). Three key tiles on the left (net weekly with the runway,
+// the next home gate, the contracts ending soon and the way to Contracts); on
+// the right THIS WEEK's line items, the SEASON P&L, and a short in-memory LEDGER
+// built from 'money:changed' (stamped and classified as the season books are,
+// N12). The numbers come from a pure view-model (financeSummary /
+// FinanceLedger) that is unit-tested without the DOM; the DOM part only
+// renders it. No Phaser.
 
 import { bus } from '../../core/events';
 import { getState, FINANCE_LINES, type FinanceLine, type GameState, type SeasonFinance } from '../../core/state';
@@ -13,7 +15,8 @@ import {
 } from '../../systems/economy';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
 import { openHistoryScreen } from './history';
-import { el, panel, button, openModal, closeScreen } from '../dom';
+import { openContractsScreen } from './contracts';
+import { el, button, openScreen, closeScreen, segmented, ensureStyles } from '../dom';
 
 /** Contracts whose remaining weeks are at most this are listed as expiring. */
 export const EXPIRY_WINDOW_WEEKS = 8;
@@ -393,17 +396,30 @@ export function fmtFireSale(weeks: number): string {
   return `in about ${weeks} ${weeks === 1 ? 'week' : 'weeks'} at this burn`;
 }
 
-// ── DOM screen ─────────────────────────────────────────────────────────────────
-
-/** One label/value line inside a panel. `neg` colours negatives red. */
-function statRow(label: string, value: string, neg = false): HTMLElement {
-  return el(
-    'div',
-    { class: neg ? 'nrl-finance-row nrl-finance-neg' : 'nrl-finance-row' },
-    el('span', { class: 'nrl-finance-label', text: label }),
-    el('span', { class: 'nrl-finance-value', text: value }),
-  );
+/** Signed for a line item (3j): +$4,200, −$28,400 (a true minus), $0. */
+export function fmtSigned(n: number): string {
+  const r = Math.round(n);
+  if (r === 0) return '$0';
+  return `${r > 0 ? '+' : '−'}${fmtMoney(Math.abs(r))}`;
 }
+
+/**
+ * The line under NET WEEKLY (3j): "No burn · you're making money", or the runway
+ * ("Runway 12 weeks"). In debt the fire sale is the line that matters (N12.5).
+ */
+export function fmtNetNote(s: Pick<FinanceSummary, 'runwayWeeks' | 'weeksToFloor'>): string {
+  if (s.weeksToFloor !== null) return `Fire sale ${fmtFireSale(s.weeksToFloor)}`;
+  if (s.runwayWeeks === null) return 'No burn · you\'re making money';
+  return `Runway ${fmtRunway(s.runwayWeeks)}`;
+}
+
+/** The contracts tile's line (3j): "2 contracts end within 8 wks", or that none do. */
+export function fmtExpiring(n: number): string {
+  if (n === 0) return `No contracts end within ${EXPIRY_WINDOW_WEEKS} wks`;
+  return `${n} contract${n === 1 ? '' : 's'} end${n === 1 ? 's' : ''} within ${EXPIRY_WINDOW_WEEKS} wks`;
+}
+
+// ── DOM screen ─────────────────────────────────────────────────────────────────
 
 /** The running costs' label: it names the staff once any are hired (N14.5), since their wages are paid there. */
 export function overheadLabel(state: Pick<GameState, 'staff'>): string {
@@ -415,135 +431,256 @@ export function boardLoanNote(owed: number): string {
   return `↳ incl. board loan ${fmtMoneyCompact(owed)}, repaid at the season's end`;
 }
 
-/** The season P&L panel: this season v last, biggest lines first, a net row at the foot (#172). */
+/** The right column's views (3j). */
+type FinanceView = 'week' | 'pnl' | 'ledger';
+/** The view Finance last showed; holds while the game is open. */
+let financeView: FinanceView = 'week';
+
+/** A key tile on the left (3j): a small caps label, a big Mono number, a line under it. */
+function keyTile(label: string, value: string, note: string, cls = ''): HTMLElement {
+  return el('div', { class: `nrl-finance-tile ${cls}`.trim() },
+    el('span', { class: 'nrl-label', text: label }),
+    el('span', { class: 'nrl-finance-big nrl-num', text: value }),
+    el('span', { class: 'nrl-finance-note', text: note }));
+}
+
+/** One line item (3j THIS WEEK): label left, the signed Mono value right, green in / red out. */
+function lineItem(label: string, value: number, opts: { signed?: boolean; cls?: string } = {}): HTMLElement {
+  const signed = opts.signed !== false;
+  const tone = value < 0 ? ' nrl-neg' : signed && value > 0 ? ' nrl-pos' : '';
+  return el('div', { class: `nrl-finance-row${opts.cls ? ` ${opts.cls}` : ''}` },
+    el('span', { class: 'nrl-finance-label', text: label }),
+    el('span', { class: `nrl-finance-value nrl-num${tone}`, text: signed ? fmtSigned(value) : fmtMoney(value) }));
+}
+
+/**
+ * THIS WEEK (3j): the bank, then every weekly line in and out, and the net at
+ * the foot, which holds still while a short phone scrolls the lines above it.
+ */
+function buildThisWeek(state: GameState, s: FinanceSummary): HTMLElement {
+  return el('div', { class: 'nrl-finance-weekly' },
+    el('div', { class: 'nrl-finance-lines' },
+      lineItem('Bank balance', s.money, { signed: false }),
+      lineItem('Wage bill', -s.wagesWeekly),
+      lineItem('Facility upkeep', -s.upkeepWeekly),
+      lineItem(overheadLabel(state), -s.overheadWeekly),
+      lineItem('Sponsor', s.sponsorWeekly),
+      lineItem('Grant', s.grantWeekly),
+      lineItem('Home gates (avg/wk)', s.gateWeekly)),
+    lineItem('Net', s.netWeekly, { cls: 'nrl-finance-net' }),
+  );
+}
+
+/** A Mono money cell, red when negative; a dash for no season. */
+function moneyCell(v: number | null): HTMLElement {
+  const td = el('td', { class: 'nrl-num', text: v === null ? '—' : fmtMoneyCompact(v) });
+  if (v !== null && v < 0) td.classList.add('nrl-neg');
+  return td;
+}
+
+/** SEASON P&L (#172): this season v last, biggest lines first, a net row at the foot. */
 function buildSeasonPnl(state: GameState): HTMLElement {
   const pnl = seasonPnl(state);
   const box = el('div', { class: 'nrl-finance-pnl' });
-  box.append(el('h3', { text: `Season P&L · S${pnl.season}${pnl.lastSeason !== null ? ` v S${pnl.lastSeason}` : ''}` }));
   if (pnl.rows.length === 0) {
-    box.append(el('p', { text: 'Nothing booked yet this season. Advance a week to see the books.' }));
+    box.append(el('p', { class: 'nrl-finance-empty', text: 'Nothing booked yet this season. Advance a week to see the books.' }));
     return box;
   }
-  const table = el('table', { class: 'nrl-finance-table nrl-finance-pnl-table' });
-  const head = el('tr');
-  for (const h of ['', `S${pnl.season}`, pnl.lastSeason !== null ? `S${pnl.lastSeason}` : 'Last']) head.append(el('th', { text: h }));
-  table.append(el('thead', {}, head));
+  const table = el('table', { class: 'nrl-table nrl-finance-table nrl-finance-pnl-table' });
+  table.append(el('thead', {}, el('tr', {},
+    el('th', { text: 'Season P&L' }),
+    el('th', { class: 'nrl-num', text: `S${pnl.season}` }),
+    el('th', { class: 'nrl-num', text: pnl.lastSeason !== null ? `S${pnl.lastSeason}` : 'Last' }))));
   const tbody = el('tbody');
-  const cell = (v: number | null): HTMLElement => {
-    const td = el('td', { text: v === null ? '—' : fmtMoneyCompact(v) });
-    if (v !== null && v < 0) td.classList.add('nrl-finance-neg');
-    return td;
-  };
   for (const r of pnl.rows) {
-    tbody.append(el('tr', {}, el('td', { text: r.line === 'overhead' ? overheadLabel(state) : r.label }), cell(r.thisSeason), cell(r.lastSeason)));
+    tbody.append(el('tr', {}, el('td', { text: r.line === 'overhead' ? overheadLabel(state) : r.label }), moneyCell(r.thisSeason), moneyCell(r.lastSeason)));
     // The board loan (N14.3) is board money moved, not a line of its own: a note under the board's row.
     if (r.line === 'boardGrant' && state.boardLoan.owed > 0) {
       tbody.append(el('tr', { class: 'nrl-finance-pnl-sub' },
         el('td', { text: boardLoanNote(state.boardLoan.owed), attrs: { colspan: '3' } })));
     }
   }
-  const net = el('tr', { class: 'nrl-finance-pnl-net' }, el('td', { text: 'Net' }), cell(pnl.net), cell(pnl.lastNet));
-  tbody.append(net);
+  tbody.append(el('tr', { class: 'nrl-finance-pnl-net' }, el('td', { text: 'Net' }), moneyCell(pnl.net), moneyCell(pnl.lastNet)));
   table.append(tbody);
-  box.append(el('div', { class: 'nrl-finance-scroll' }, table));
+  box.append(table);
   // Every closed season's books are in History (N14, #262).
-  if (state.history.length > 0) box.append(button('Past seasons', () => { closeScreen(); openHistoryScreen(); }, { class: 'nrl-finance-past' }));
+  if (state.history.length > 0) box.append(button('Past seasons ▸', () => { closeScreen(); openHistoryScreen(); }, { class: 'nrl-finance-past' }));
   return box;
 }
 
-/** Build the screen body from the current state and ledger rows. */
-function buildFinanceBody(state: GameState, ledgerRows: LedgerWeek[]): HTMLElement[] {
-  const s = financeSummary(state);
-  const nodes: HTMLElement[] = [el('h2', { text: 'Finance' })];
+/** LEDGER: the last weeks' money by line, compact Mono, sideways scroll on a narrow phone. */
+function buildLedger(ledgerRows: LedgerWeek[]): HTMLElement {
+  const ledger = el('div', { class: 'nrl-finance-ledger' });
+  if (ledgerRows.length === 0) {
+    ledger.append(el('p', { class: 'nrl-finance-empty', text: 'No weeks recorded yet. Advance a week to see the books.' }));
+    return ledger;
+  }
+  const table = el('table', { class: 'nrl-table nrl-finance-table' });
+  const head = el('tr');
+  ['Wk', 'Wages', 'Upkeep', 'Running', 'Income', 'Gate', 'Other', 'Net'].forEach((h, i) => head.append(el('th', { class: i > 0 ? 'nrl-num' : '', text: h })));
+  table.append(el('thead', {}, head));
+  const tbody = el('tbody');
+  for (const r of ledgerRows) {
+    const tr = el('tr', {}, el('td', { class: 'nrl-num nrl-finance-wk', text: `S${r.season} W${r.week}` }));
+    for (const v of [r.wages, r.upkeep, r.overhead, r.income, r.gate, r.other, r.net]) tr.append(moneyCell(v));
+    tbody.append(tr);
+    // What "Other" was, in the P&L's words (prize money, a signing, the grounds).
+    const note = ledgerNote(r);
+    if (note) tbody.append(el('tr', { class: 'nrl-finance-pnl-sub' }, el('td', { text: `Other: ${note}`, attrs: { colspan: '8' } })));
+  }
+  table.append(tbody);
+  ledger.append(el('div', { class: 'nrl-finance-scroll' }, table), el('p', { class: 'nrl-finance-foot', text: `The last ${LEDGER_WEEKS} weeks, newest first` }));
+  return ledger;
+}
 
-  const weekly = el('div', { class: 'nrl-finance-weekly' },
-    statRow('Bank balance', fmtMoney(s.money), s.money < 0),
-    statRow('Wage bill', fmtMoney(-s.wagesWeekly)),
-    statRow('Upkeep', fmtMoney(-s.upkeepWeekly)),
-    statRow(overheadLabel(state), fmtMoney(-s.overheadWeekly)),
-    statRow('Sponsor', fmtMoney(s.sponsorWeekly)),
-    statRow('Grant', fmtMoney(s.grantWeekly)),
-    statRow('Home gates (avg/wk)', fmtMoney(s.gateWeekly)),
-    statRow('Net weekly (avg)', fmtMoney(s.netWeekly), s.netWeekly < 0),
-    statRow('Runway', fmtRunway(s.runwayWeeks), s.runwayWeeks === 0),
-    ...(s.weeksToFloor !== null ? [statRow('Fire sale', fmtFireSale(s.weeksToFloor), true)] : []),
-    statRow(
-      'Next home gate',
-      s.nextHome ? `R${s.nextHome.round} · ${fmtMoney(s.nextHome.projectedGate)}` : 'None left',
-    ),
-    statRow('Crowd', s.nextHome ? fmtCrowd(s.nextHome) : `${groundCapacity(state).toLocaleString('en-US')} seats`),
-  );
+/** The left column (3j): net weekly, the next home gate, and the way to Contracts. */
+function buildKeyTiles(state: GameState, s: FinanceSummary): HTMLElement {
+  const net = keyTile('Net weekly (avg)', fmtSigned(s.netWeekly), fmtNetNote(s), s.netWeekly < 0 ? 'nrl-finance-losing' : 'nrl-finance-making');
+  if (s.weeksToFloor !== null || s.runwayWeeks === 0) net.classList.add('nrl-finance-warn');
+  const gate = s.nextHome
+    ? keyTile(`Next home gate · ${s.nextHome.round > SEASON_ROUNDS ? 'final' : `R${s.nextHome.round}`}`, fmtMoney(s.nextHome.projectedGate), fmtCrowd(s.nextHome))
+    : keyTile('Next home gate', 'None left', `${groundCapacity(state).toLocaleString('en-US')} seats`);
+  gate.classList.add('nrl-finance-gate');
+  // Sold out: what a bigger stand would earn (N12, #169).
   if (s.nextStand) {
     const stand = fmtStand(s.nextStand);
-    weekly.append(statRow(stand.label, stand.value));
+    gate.append(el('span', { class: 'nrl-finance-note nrl-finance-stand', text: `${stand.label}: ${stand.value}` }));
   }
-  nodes.push(panel({ class: 'nrl-finance-panel' }, weekly));
-  nodes.push(panel({ class: 'nrl-finance-panel' }, buildSeasonPnl(state)));
-
-  const expiring = el('div', { class: 'nrl-finance-expiring' });
-  expiring.append(el('h3', { text: `Contracts ending in ${EXPIRY_WINDOW_WEEKS} wks` }));
-  if (s.expiring.length === 0) {
-    expiring.append(el('p', { text: 'No contracts expiring soon.' }));
-  } else {
-    for (const p of s.expiring) {
-      expiring.append(el('div', {
-        class: 'nrl-finance-contract',
-        text: `${p.name} · ${p.contractWeeks} wk${p.contractWeeks === 1 ? '' : 's'} · ${fmtMoney(p.wage)}/wk`,
-      }));
-    }
-  }
-  nodes.push(panel({ class: 'nrl-finance-panel' }, expiring));
-
-  const ledger = el('div', { class: 'nrl-finance-ledger' });
-  ledger.append(el('h3', { text: `Ledger · last ${LEDGER_WEEKS} weeks` }));
-  if (ledgerRows.length === 0) {
-    ledger.append(el('p', { text: 'No weeks recorded yet. Advance a week to see the books.' }));
-  } else {
-    const table = el('table', { class: 'nrl-finance-table' });
-    const head = el('tr');
-    for (const h of ['Wk', 'Wages', 'Upkeep', 'Running', 'Income', 'Gate', 'Other', 'Net']) head.append(el('th', { text: h }));
-    table.append(el('thead', {}, head));
-    const tbody = el('tbody');
-    for (const r of ledgerRows) {
-      const tr = el('tr');
-      tr.append(el('td', { text: `S${r.season} W${r.week}` }));
-      for (const v of [r.wages, r.upkeep, r.overhead, r.income, r.gate, r.other, r.net]) {
-        const td = el('td', { text: fmtMoneyCompact(v) });
-        if (v < 0) td.classList.add('nrl-finance-neg');
-        tr.append(td);
-      }
-      tbody.append(tr);
-      // What "Other" was, in the P&L's words (prize money, a signing, the grounds).
-      const note = ledgerNote(r);
-      if (note) {
-        tbody.append(el('tr', {}, el('td', { text: `Other: ${note}`, attrs: { colspan: '8', style: 'font-size:0.7rem;opacity:0.85' } })));
-      }
-    }
-    table.append(tbody);
-    ledger.append(el('div', { class: 'nrl-finance-scroll' }, table));
-  }
-  nodes.push(panel({ class: 'nrl-finance-panel' }, ledger));
-  return nodes;
+  // Contracts live under Finance (3j): the tile says how many end soon and opens them.
+  const n = s.expiring.length;
+  const contracts = el('button', {
+    class: `nrl-finance-tile nrl-finance-contracts${n > 0 ? ' nrl-finance-contracts-due' : ''}`,
+    attrs: { type: 'button', 'data-finance-contracts': '' },
+    onClick: () => openContractsScreen(),
+  }, el('span', { class: 'nrl-finance-contracts-text', text: fmtExpiring(n) }), el('span', { class: 'nrl-finance-view', text: 'View ▸' }));
+  return el('div', { class: 'nrl-finance-keys' }, el('span', { class: 'nrl-screen-title', text: 'Finance' }), net, gate, contracts);
 }
 
-/** Open the Finance screen in the nav screen region. Re-renders on state/money changes. */
+/** Open the Finance sheet (3j). Re-renders on state/money changes. */
 export function openFinanceScreen(): HTMLElement {
-  const content = el('div', { class: 'nrl-finance' });
+  ensureFinanceStyles();
+  const keys = el('div', { class: 'nrl-finance-left' });
+  const body = el('div', { class: 'nrl-finance-body' });
   const render = (): void => {
-    content.replaceChildren(...buildFinanceBody(getState(), financeLedger.rows()));
+    const state = getState();
+    const s = financeSummary(state);
+    keys.replaceChildren(buildKeyTiles(state, s));
+    body.replaceChildren(financeView === 'week' ? buildThisWeek(state, s) : financeView === 'pnl' ? buildSeasonPnl(state) : buildLedger(financeLedger.rows()));
   };
+  const seg = segmented<FinanceView>(
+    [{ id: 'week', label: 'This week' }, { id: 'pnl', label: 'Season P&L' }, { id: 'ledger', label: 'Ledger' }],
+    financeView,
+    (id) => { financeView = id; seg.set(id); render(); body.scrollTop = 0; },
+    { label: 'Finance view' },
+  );
   render();
+  const sheet = el('div', { class: 'nrl-screen nrl-finance' }, keys, el('div', { class: 'nrl-finance-right' }, seg.el, body));
 
-  const unsubs: Array<() => void> = [];
   const refresh = (): void => {
-    // Screen closed (its node left the DOM): stop listening.
-    if (!content.isConnected) {
-      for (const off of unsubs) off();
-      return;
-    }
-    render();
+    if (sheet.isConnected) render();
   };
-  unsubs.push(bus.on('state:changed', refresh), bus.on('money:changed', refresh));
-
-  return openModal(content, { class: 'nrl-finance-modal', screen: true, key: 'finance' });
+  const unsubs = [bus.on('state:changed', refresh), bus.on('money:changed', refresh)];
+  return openScreen(sheet, () => { for (const off of unsubs) off(); }, 'finance');
 }
+
+// ── Styles (Finance, Contracts and the History books' tables share them) ─────
+
+const FINANCE_STYLE_ID = 'nrl-finance-styles';
+
+/** Inject the Office screens' stylesheet once (Finance, Contracts, History's books). */
+export function ensureFinanceStyles(): void {
+  if (typeof document === 'undefined') return;
+  ensureStyles();
+  if (document.getElementById(FINANCE_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = FINANCE_STYLE_ID;
+  style.textContent = FINANCE_CSS;
+  document.head.appendChild(style);
+}
+
+export const FINANCE_CSS = `
+/* 3j: the three numbers that matter on the left; the detail in views on the right. */
+.nrl-screen.nrl-finance { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; }
+.nrl-finance-left { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-finance-keys { display: flex; flex-direction: column; gap: 6px; }
+.nrl-finance-keys > .nrl-screen-title { line-height: 30px; letter-spacing: 0.04em; }
+.nrl-finance-tile { display: flex; flex-direction: column; background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; }
+.nrl-finance-tile .nrl-label { font-size: 12px; }
+.nrl-finance-big { font-size: 20px; line-height: 1.25; }
+.nrl-finance-making .nrl-finance-big { font-size: 22px; color: var(--nrl-pos); }
+.nrl-finance-losing .nrl-finance-big { font-size: 22px; color: var(--nrl-neg); }
+.nrl-finance-note { font-size: 12px; color: var(--nrl-text-2); }
+.nrl-finance-warn .nrl-finance-note { color: var(--nrl-neg); }
+.nrl-finance-stand { color: var(--nrl-accent); }
+button.nrl-finance-contracts {
+  pointer-events: auto; cursor: pointer; border: 0; color: var(--nrl-text); text-align: left;
+  flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px;
+  font-family: var(--nrl-f-body);
+}
+button.nrl-finance-contracts:hover { background: #22305c; }
+button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
+.nrl-finance-contracts-text { font-size: 12px; color: var(--nrl-muted); }
+.nrl-finance-contracts-due .nrl-finance-contracts-text { color: var(--nrl-accent); }
+.nrl-finance-view { font-family: var(--nrl-f-label); font-size: 14px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.nrl-finance-right { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+.nrl-finance-right > .nrl-seg { align-self: flex-start; }
+.nrl-finance-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+.nrl-finance-weekly { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.nrl-finance-lines { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-finance-pnl, .nrl-finance-ledger { flex: 0 0 auto; }
+/* THIS WEEK: 28px line items, Mono values, the net under a 2px rule. */
+.nrl-finance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; border-top: 1px solid var(--nrl-button); font-size: 13px; }
+.nrl-finance-label { color: var(--nrl-text-2); min-width: 0; }
+.nrl-finance-value { text-align: right; white-space: nowrap; }
+.nrl-finance-row.nrl-finance-net { min-height: 32px; border-top: 2px solid var(--nrl-line); font-size: 14px; font-weight: 600; }
+.nrl-finance-weekly .nrl-finance-net { flex: 0 0 auto; }
+.nrl-finance-row.nrl-finance-net .nrl-finance-label { color: var(--nrl-text); }
+.nrl-finance-empty { color: var(--nrl-muted); margin: 8px 0; }
+.nrl-finance-foot { font-size: 11px; color: var(--nrl-muted); margin: 4px 0 0; }
+/* SEASON P&L and LEDGER: compact Mono tables. */
+.nrl-finance-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+.nrl-table.nrl-finance-table td { height: 28px; }
+.nrl-table.nrl-finance-table th { background: var(--nrl-navy); }
+.nrl-finance-table td.nrl-num { font-weight: 500; }
+.nrl-finance-table td.nrl-finance-wk { text-align: left; color: var(--nrl-muted); }
+.nrl-finance-pnl-net td { border-top: 2px solid var(--nrl-line); font-weight: 600; }
+.nrl-finance-table .nrl-finance-pnl-net td.nrl-num { font-weight: 600; }
+.nrl-table .nrl-finance-pnl-sub td { height: auto; padding-bottom: 4px; border-top: 0; font-size: 11px; color: var(--nrl-muted); white-space: normal; }
+.nrl-btn.nrl-finance-past { margin-top: 8px; min-height: 36px; font-size: 14px; }
+@media (pointer: coarse) { .nrl-btn.nrl-finance-past { min-height: 44px; } }
+/* A narrow phone (667px): a slimmer left column. */
+@media (max-width: 700px) { .nrl-screen.nrl-finance { grid-template-columns: 210px minmax(0, 1fr); gap: 12px; } }
+/* A short landscape phone: tighter tiles, so all three fit without scrolling. */
+@media (max-height: 400px) {
+  .nrl-finance-keys { gap: 5px; }
+  .nrl-finance-keys > .nrl-screen-title { line-height: 26px; }
+  .nrl-finance-tile { padding: 6px 10px; }
+  .nrl-finance-big, .nrl-finance-making .nrl-finance-big, .nrl-finance-losing .nrl-finance-big { font-size: 19px; line-height: 1.2; }
+  .nrl-finance-note { line-height: 1.3; }
+}
+
+/* Contracts (under Finance): one row a player, soonest to end first. */
+.nrl-screen.nrl-contracts { display: flex; flex-direction: column; }
+.nrl-contracts-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.nrl-table.nrl-contracts-table { min-width: 660px; }
+.nrl-contracts-table td { height: 44px; }
+.nrl-contracts-table td.nrl-num { font-weight: 500; }
+.nrl-contract-who { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.nrl-contract-name { font-weight: 600; }
+.nrl-contract-meta { font-size: 11px; color: var(--nrl-muted); }
+.nrl-contracts-table td.nrl-contract-soon { color: var(--nrl-neg); }
+.nrl-contract-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.nrl-contract-actions .nrl-btn { min-height: 36px; padding: 0 10px; font-size: 14px; border-radius: 8px; text-transform: none; }
+@media (pointer: coarse) { .nrl-contract-actions .nrl-btn { min-height: 44px; } }
+.nrl-contract-actions .nrl-btn.nrl-contract-armed, .nrl-contract-actions .nrl-btn.nrl-contract-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
+.nrl-contract-gone td { color: var(--nrl-muted); }
+/* A narrow phone (667px): the table fits without a sideways scroll; who he is goes to the name's tooltip. */
+@media (max-width: 700px) {
+  .nrl-table.nrl-contracts-table { min-width: 0; }
+  .nrl-contract-meta { display: none; }
+  .nrl-contracts-table th, .nrl-contracts-table td { padding: 0 4px; }
+  .nrl-contract-actions { gap: 4px; }
+  .nrl-contract-actions .nrl-btn { padding: 0 7px; font-size: 13px; }
+}
+`;
+

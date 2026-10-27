@@ -41,3 +41,25 @@ describe('the scouting blurbs (N12)', () => {
     expect(facilityBlurb(FACILITY_CATALOG.academy)).toContain('Better free-agent pool (+2.5 overall per level)');
   });
 });
+
+// Broadcast Quiet 3c: the Build menu's categories and why a tile can't be built.
+import { buildBlocker, facilityCategory } from '../../../src/ui/screens/build';
+
+describe('the Build menu (3c)', () => {
+  it('TRAINING is every facility that trains a stat; CLUB the rest', () => {
+    expect(facilityCategory(FACILITY_CATALOG.trainingPaddock)).toBe('training');
+    expect(facilityCategory(FACILITY_CATALOG.academy)).toBe('training');
+    expect(facilityCategory(FACILITY_CATALOG.canteen)).toBe('club');
+    expect(facilityCategory(FACILITY_CATALOG.grandstand)).toBe('club');
+  });
+
+  it('says why a tile is out of reach: the money short, or a one-only facility already built', () => {
+    const paddock = FACILITY_CATALOG.trainingPaddock;
+    expect(buildBlocker(paddock, { money: paddock.cost, facilities: [] })).toBeNull();
+    expect(buildBlocker(paddock, { money: paddock.cost - 2500, facilities: [] })).toBe('Need $2,500 more');
+    expect(buildBlocker(paddock, { money: -1000, facilities: [] })).toBe(`Need $${paddock.cost.toLocaleString('en-US')} more`);
+    expect(buildBlocker(board, { money: 1e7, facilities: [{ defId: 'sponsorBoard' }] })).toBe('Built: upgrade it on the grounds');
+    // A second paddock is fine.
+    expect(buildBlocker(paddock, { money: 1e7, facilities: [{ defId: 'trainingPaddock' }] })).toBeNull();
+  });
+});
