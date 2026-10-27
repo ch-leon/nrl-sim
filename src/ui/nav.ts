@@ -41,6 +41,11 @@ export interface Nav {
   registerScreen(id: string, label: string, open: () => void, placement?: NavPlacement): void;
   /** Show a count badge on a registered screen's button; 0 hides it. */
   setBadge(id: string, count: number): void;
+  /**
+   * Show a red dot, no number, on a registered screen's button (#369), read out
+   * as `label`; off hides it. Unlike a count it never rolls up into More.
+   */
+  setDot(id: string, on: boolean, label?: string): void;
   /** Open a registered screen as its button would (the tutorial and the HUD's next-match chip). */
   open(id: string): void;
   destroy(): void;
@@ -95,6 +100,30 @@ export class ScreenRegistry {
   }
 }
 
+/** What a nav button's marks show (#369): the count's text, whether a dot shows, and what it reads out. */
+export interface BadgeView {
+  count: string | null;
+  dot: boolean;
+  ariaLabel: string | null;
+}
+
+/** A button's count badge and dot, as shown and read out. Pure. */
+export function badgeView(label: string, count: number, dot: string | null = null): BadgeView {
+  const unread = count > 0 ? `${label}, ${count} unread` : null;
+  return {
+    count: count > 0 ? (count > 99 ? '99+' : String(count)) : null,
+    dot: dot !== null,
+    ariaLabel: unread && dot ? `${unread}; ${dot}` : unread ?? dot,
+  };
+}
+
+/** More's count: the sheet's screens' counts. Dots stay on their own buttons (#369). Pure. */
+export function moreBadgeCount(screens: readonly NavScreen[], counts: ReadonlyMap<string, number>): number {
+  let total = 0;
+  for (const s of screens) if (s.more) total += counts.get(s.id) ?? 0;
+  return total;
+}
+
 /**
  * Build the bottom nav bar, mount it into #ui-root, and return a handle.
  * registerScreen(id,label,open) adds a pixel button that calls open() on
@@ -108,6 +137,8 @@ export function createNav(): Nav {
   // Live map of id -> its rendered button, so replacement can swap in place.
   const buttons = new Map<string, HTMLButtonElement>();
   const counts = new Map<string, number>();
+  // A dot's read-out label by screen id (#369); absent means no dot.
+  const dots = new Map<string, string>();
   const root = document.createElement('div');
   root.className = 'nrl-nav';
 
@@ -171,19 +202,25 @@ export function createNav(): Nav {
 
   function paintBadge(id: string): void {
     const btn = buttons.get(id);
-    if (btn) paint(btn, counts.get(id) ?? 0, registry.get(id)?.label ?? id);
+    if (btn) paint(btn, badgeView(registry.get(id)?.label ?? id, counts.get(id) ?? 0, dots.get(id) ?? null));
   }
 
   function paintMoreBadge(): void {
-    let total = 0;
-    for (const s of registry.list()) if (s.more) total += counts.get(s.id) ?? 0;
-    paint(more, total, 'More');
+    paint(more, badgeView('More', moreBadgeCount(registry.list(), counts)));
   }
 
   function setBadge(id: string, count: number): void {
     counts.set(id, count);
     paintBadge(id);
     if (registry.get(id)?.more) paintMoreBadge();
+  }
+
+  function setDot(id: string, on: boolean, label?: string): void {
+    const next = on ? label ?? registry.get(id)?.label ?? id : null;
+    if ((dots.get(id) ?? null) === next) return;
+    if (next === null) dots.delete(id);
+    else dots.set(id, next);
+    paintBadge(id);
   }
 
   mount(root);
@@ -206,6 +243,7 @@ export function createNav(): Nav {
     el: root,
     registerScreen,
     setBadge,
+    setDot,
     open: pick,
     destroy() {
       offInset();
@@ -217,18 +255,25 @@ export function createNav(): Nav {
   };
 }
 
-function paint(btn: HTMLButtonElement, count: number, label: string): void {
+function paint(btn: HTMLButtonElement, v: BadgeView): void {
   let badge = btn.querySelector<HTMLElement>('.nrl-nav-badge');
-  if (count <= 0) {
-    badge?.remove();
-    btn.removeAttribute('aria-label');
-    return;
+  if (v.count === null) badge?.remove();
+  else {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nrl-nav-badge';
+      btn.appendChild(badge);
+    }
+    badge.textContent = v.count;
   }
-  if (!badge) {
-    badge = document.createElement('span');
-    badge.className = 'nrl-nav-badge';
-    btn.appendChild(badge);
+  let dot = btn.querySelector<HTMLElement>('.nrl-nav-dot');
+  if (!v.dot) dot?.remove();
+  else if (!dot) {
+    dot = document.createElement('span');
+    dot.className = 'nrl-nav-dot';
+    dot.setAttribute('aria-hidden', 'true');
+    btn.appendChild(dot);
   }
-  badge.textContent = count > 99 ? '99+' : String(count);
-  btn.setAttribute('aria-label', `${label}, ${count} unread`);
+  if (v.ariaLabel === null) btn.removeAttribute('aria-label');
+  else btn.setAttribute('aria-label', v.ariaLabel);
 }

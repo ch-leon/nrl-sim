@@ -26,6 +26,7 @@ import { registerStatsSystem } from './systems/stats';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
+import { contractsEndingSoon, endingSoonLabel } from './systems/contracts';
 import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/board';
 import { initMatchReport } from './ui/screens/matchReport';
 import { openBuildScreen } from './ui/screens/build';
@@ -218,6 +219,13 @@ async function boot(): Promise<void> {
   newsInbox.onChange(refreshNewsBadge);
   bus.on('state:changed', refreshNewsBadge);
   refreshNewsBadge();
+  // Squad's red dot (#369): a contract ends within 4 weeks. Looking doesn't clear it; renewing, selling or releasing does.
+  const refreshSquadDot = (): void => {
+    const n = contractsEndingSoon(getState()).length;
+    nav.setDot('squad', n > 0, endingSoonLabel(n));
+  };
+  bus.on('state:changed', refreshSquadDot);
+  refreshSquadDot();
 
   initAudio();
   initAudioUi();

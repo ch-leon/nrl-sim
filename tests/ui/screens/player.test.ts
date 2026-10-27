@@ -157,3 +157,76 @@ describe('lineupSlotText', () => {
     expect(cover!.id).not.toBe(fb.id);
   });
 });
+
+// #369: the projected peak and the age curve, from the club's facilities today.
+import { curveXY, playerOutlook } from '../../../src/ui/screens/player';
+import { projectCareer } from '../../../src/systems/potential';
+import type { PlacedFacility } from '../../../src/core/state';
+
+describe('the player page outlook (#369)', () => {
+  const BUILT: PlacedFacility[] = [
+    { id: 'f1', defId: 'trainingPaddock', x: 0, y: 0, level: 1 },
+    { id: 'f2', defId: 'weightsRoom', x: 10, y: 0, level: 1 },
+    { id: 'f3', defId: 'videoRoom', x: 0, y: 10, level: 1 },
+  ];
+  const flat = (v: number) => ({ speed: v, strength: v, stamina: v, skill: v, footyIQ: v });
+
+  beforeEach(() => {
+    bus.clear();
+    setState(createNewGame('Test FC', 11));
+    initLeague(getState());
+  });
+
+  it('a 19-year-old: Developing, a rising curve, a peak in his twenties, at your club', () => {
+    const s = { ...getState(), facilities: BUILT };
+    const kid = { ...s.squad[0]!, age: 19, traits: [], stats: flat(55) };
+    const m = playerPageModel(kid, { kind: 'squad' }, s);
+    expect(m.outlook.stage).toBe('Developing');
+    expect(m.outlook.points[0]).toEqual({ age: 19, rating: overallRating(kid) });
+    expect(m.outlook.points[1]!.rating).toBeGreaterThan(m.outlook.points[0]!.rating);
+    expect(m.outlook.peak.age).toBeGreaterThanOrEqual(22);
+    expect(m.outlook.peak.age).toBeLessThanOrEqual(26);
+    expect(m.outlook.peakText).toBe(`Projected peak: ${m.outlook.peak.rating} at ${m.outlook.peak.age}`);
+    expect(m.outlook.retirement).toBeNull();
+    // A free agent or a rival's man is projected at your club, and says so.
+    expect(playerOutlook(kid, { kind: 'freeAgent' }, s).peakText).toBe(`${m.outlook.peakText} (at your club)`);
+    const club = s.league.clubs.find((c) => c.squad)!;
+    expect(playerOutlook(kid, { kind: 'rival', club }, s).peakText).toMatch(/\(at your club\)$/);
+  });
+
+  it('a 32-year-old: Declining, his peak is now, and a retirement note from 33', () => {
+    const s = { ...getState(), facilities: BUILT.slice(0, 1) };
+    const vet = { ...s.squad[0]!, age: 32, traits: [], stats: flat(80) };
+    const m = playerPageModel(vet, { kind: 'squad' }, s);
+    expect(m.outlook.stage).toBe('Declining');
+    expect(m.outlook.peakText).toBe(`Projected peak: ${overallRating(vet)} now`);
+    expect(m.outlook.points[m.outlook.points.length - 1]!.rating).toBeLessThan(overallRating(vet));
+    expect(m.outlook.retirement).toBeNull();
+    expect(playerOutlook({ ...vet, age: 33 }, { kind: 'squad' }, s).retirement).toBe("Retirement risk: 20% at the season's end");
+  });
+
+  it('moves when a training facility is built, from the week the season is in', () => {
+    const s = getState();
+    const kid = { ...s.squad[0]!, age: 19, traits: [], stats: flat(55) };
+    const none = playerOutlook(kid, { kind: 'squad' }, { ...s, facilities: [] });
+    const built = playerOutlook(kid, { kind: 'squad' }, { ...s, facilities: BUILT });
+    expect(none.peakText).toBe(`Projected peak: ${overallRating(kid)} now`);
+    expect(built.peak.rating).toBeGreaterThan(none.peak.rating);
+    const late = { ...s, facilities: BUILT, week: 20 };
+    expect(playerOutlook(kid, { kind: 'squad' }, late).points)
+      .toEqual(projectCareer(kid, BUILT, s.training?.focus ?? 'balanced', undefined, 20).points);
+  });
+
+  it('draws the curve inside its box, older to the right and better higher', () => {
+    const xy = curveXY([{ age: 20, rating: 50 }, { age: 21, rating: 70 }, { age: 22, rating: 60 }], 160, 36);
+    expect(xy[0]!.x).toBeLessThan(xy[1]!.x);
+    expect(xy[1]!.y).toBeLessThan(xy[2]!.y);
+    expect(xy[2]!.y).toBeLessThan(xy[0]!.y);
+    for (const q of xy) {
+      expect(q.x).toBeGreaterThanOrEqual(0); expect(q.x).toBeLessThanOrEqual(160);
+      expect(q.y).toBeGreaterThanOrEqual(0); expect(q.y).toBeLessThanOrEqual(36);
+    }
+    expect(curveXY([{ age: 35, rating: 70 }])).toHaveLength(1); // one point, no NaN
+    expect(Number.isFinite(curveXY([{ age: 35, rating: 70 }])[0]!.x)).toBe(true);
+  });
+});
