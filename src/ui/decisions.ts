@@ -52,7 +52,7 @@ export interface DecisionView {
 /**
  * How many advances a card survives unanswered: the tick of week `expiresAt`
  * takes its default, so 1 means the next Advance Week does. A season-end card
- * (the Bali trip) expires in the week it is offered: 1 from the start.
+ * (the season-end trip) expires in the week it is offered: 1 from the start.
  */
 export function advancesLeft(ev: Pick<PendingEvent, 'expiresAt'>, state: Pick<GameState, 'season' | 'week'>): number {
   return Math.max(1, ev.expiresAt - absWeek(state.season, state.week) + 1);

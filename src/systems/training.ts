@@ -9,6 +9,7 @@
 import { getState, setState, type GameState, type Player, type PlacedFacility, type PlayerStats, type TrainingFocus } from '../core/state';
 import { FACILITY_CATALOG, levelMult, type FacilityDef, type FacilityDefId } from '../data/facility';
 import { STAT_MAX, TRAINING_CURVE, TRAINING_FOCUS } from '../config';
+import { activePack } from '../content';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { hasTrait, traitBoost } from '../data/traits';
 
@@ -110,7 +111,7 @@ export function headroom(stat: number): number {
 export const TRAINING_FOCI: readonly TrainingFocus[] = ['balanced', 'speed', 'strength', 'stamina', 'skill', 'footyIQ'];
 
 const LABEL: Readonly<Record<TrainingFocus, string>> = {
-  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', skill: 'Skill', footyIQ: 'Footy IQ',
+  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', skill: 'Skill', footyIQ: activePack().vocab.iqStat,
 };
 
 export function focusLabel(f: TrainingFocus): string {

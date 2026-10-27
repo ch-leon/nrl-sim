@@ -25,6 +25,7 @@ import type { PlayerStats, PlacedFacility } from '../../core/state';
 import { getState, setState } from '../../core/state';
 import { spendMoney } from '../../data/club';
 import { ECON } from '../../config';
+import { activePack } from '../../content';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
 import { POOL_POINTS_PER_BIAS, SCOUT_BIAS_PER_LEVEL, SCOUT_FEE_DISCOUNT_PER_LEVEL } from '../../systems/freeagency';
@@ -45,7 +46,7 @@ const STAT_LABEL: Record<keyof PlayerStats, string> = {
   strength: 'Strength',
   stamina: 'Stamina',
   skill: 'Skill',
-  footyIQ: 'Footy IQ',
+  footyIQ: activePack().vocab.iqStat,
 };
 
 /** The free-agent pool's lift a level, in overall points (freeagency.poolTarget). */
