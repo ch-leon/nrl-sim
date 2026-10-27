@@ -83,6 +83,14 @@ export function decisionViews(state: GameState): DecisionView[] {
   return out;
 }
 
+/** The decisions chip's list (3a): soonest due first, each with when it is due. Pure. */
+export function decisionChipItems(state: GameState): { title: string; note: string }[] {
+  return decisionViews(state)
+    .slice()
+    .sort((a, b) => a.advancesLeft - b.advancesLeft)
+    .map((v) => ({ title: v.title, note: v.advancesLeft === 1 ? 'due now' : `${v.advancesLeft} wks left` }));
+}
+
 /** Number of cards waiting for a choice (the News and Advance Week badges). */
 export function pendingDecisionCount(state: GameState): number {
   return state.eventDeck.pending.length;

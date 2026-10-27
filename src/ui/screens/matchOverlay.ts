@@ -935,9 +935,7 @@ export const OVERLAY_CSS = `
 .nrl-match-overlay { font-family: 'Courier New', monospace; }
 /* Match mode (live AND full-time, until Back to Club): the HUD strip and nav
    bar step aside; the sound button moves to the bottom-right corner. */
-body.nrl-match-active .nrl-hud,
-body.nrl-match-active .nrl-nav { display: none; }
-body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
+body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-scoreboard {
   position: fixed; top: calc(0.5rem + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 0.75rem; z-index: 15;

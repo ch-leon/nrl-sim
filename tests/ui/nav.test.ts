@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ScreenRegistry } from '../../src/ui/nav';
+import { ScreenRegistry, tabText } from '../../src/ui/nav';
 
 // DOM tests (createNav / button rendering) are skipped: jsdom is not installed
 // and the vitest environment is 'node' (see vite.config.ts). The registry that
@@ -65,15 +65,33 @@ describe('tabs and More (#344)', () => {
 
 import { CSS } from '../../src/ui/dom';
 
-describe('nav layout on landscape phones (QA)', () => {
-  it('shares one row between equal tabs with labels of 12px or more', () => {
-    expect(CSS).toMatch(/\.nrl-nav > \.nrl-btn \{[^}]*flex: 1 1 0/);
-    expect(CSS).toMatch(/\.nrl-nav > \.nrl-btn \{[^}]*font-size: max\(12px,/);
-    expect(CSS).toMatch(/\.nrl-nav-sheet \.nrl-btn \{[^}]*font-size: max\(12px,/);
+describe('the dock on landscape phones (Broadcast Quiet)', () => {
+  it('is one 64px row: status, tabs, PLAY WEEK, with tab labels of 14px or more', () => {
+    expect(CSS).toMatch(/\.nrl-dock \{[^}]*height: 64px/);
+    expect(CSS).toMatch(/\.nrl-dock-tabs > \.nrl-btn \{[^}]*height: 44px[^}]*font-size: 16px/);
+    const narrow = CSS.slice(CSS.indexOf('@media (max-width: 760px)'));
+    expect(narrow).toMatch(/\.nrl-dock-tabs > \.nrl-btn \{[^}]*font-size: 14px/);
   });
 
   it('marks the open screen and clears the home bar', () => {
-    expect(CSS).toMatch(/\.nrl-nav \.nrl-btn\[aria-current="page"\]/);
-    expect(CSS).toMatch(/\.nrl-nav \{[^}]*max\(0\.25rem, var\(--nrl-safe-b\)\)/);
+    expect(CSS).toMatch(/\.nrl-dock-tabs > \.nrl-btn\[aria-current="page"\]/);
+    expect(CSS).toMatch(/\.nrl-dock-wrap \{[^}]*max\(12px, var\(--nrl-safe-b\)\)/);
+  });
+
+  it('shows the open tab with ▴ (not CLUB, home has nothing to close)', () => {
+    expect(tabText('Squad', true)).toBe('SQUAD ▴');
+    expect(tabText('Squad', false)).toBe('SQUAD');
+    expect(tabText('Club', true, true)).toBe('CLUB');
+  });
+});
+
+describe('hidden entries (Lineup, Recruit: Squad segments)', () => {
+  const r = new ScreenRegistry();
+  r.set('squad', 'Squad', () => {}, { holds: ['lineup', 'recruit'] });
+  r.set('lineup', 'Lineup', () => {}, { hidden: true });
+  it('light the tab that holds them, not their own', () => {
+    expect(r.owner('lineup')).toBe('squad');
+    expect(r.owner('squad')).toBe('squad');
+    expect(r.get('lineup')?.hidden).toBe(true);
   });
 });

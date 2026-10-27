@@ -1,4 +1,4 @@
-// src/ui/dom.ts — dependency-free DOM helper kit + injected pixel-UI stylesheet.
+// src/ui/dom.ts — dependency-free DOM helper kit + the injected UI stylesheet.
 // See ARCHITECTURE §1.6 (DOM-overlay decision) and BAK-163. No Phaser imports.
 //
 // The #ui-root container is `pointer-events: none` (index.html / BAK-157) so the
@@ -87,25 +87,23 @@ export function mount(node: HTMLElement): HTMLElement {
   return node;
 }
 
-// ── Layering rule (GitHub #14) ──────────────────────────────────────────────
-// One rule for every nav screen (Squad, Recruit, Build, Fixtures, Ladder,
-// History): a screen occupies the *screen region* — the band between the
-// bottom edge of the HUD strip and the top edge of the nav bar — so it never
-// sits under/over the HUD readouts, Advance Week, the ♪ button or the nav, and
-// those stay clickable while a screen is open. Only one screen is open at a
-// time (opening another, e.g. from the nav, replaces it).
+// ── Layering rule (GitHub #14, Broadcast Quiet) ─────────────────────────────
+// The grounds (or the pitch) are always visible. The dock at the bottom is the
+// only navigation and never moves; every nav screen opens as a navy *sheet*
+// above it (top 12, sides 12, bottom = the dock's height + 12), so the dock
+// stays whole and tappable while a screen is open. Only one screen is open at a
+// time (opening another, e.g. from the dock, replaces it). Tapping the open
+// screen's tab, or CLUB, closes it.
 //
-// The HUD and nav publish their live heights as CSS custom properties
-// (--nrl-hud-h / --nrl-nav-h, see trackChromeInset) which `.nrl-screen-region`
-// uses for its top/bottom insets, so it follows wrapping on narrow screens and
-// collapses to the full viewport when the chrome is hidden (match mode).
+// The dock publishes its live height as a CSS custom property (--nrl-nav-h, see
+// trackChromeInset) which `.nrl-screen-region` uses for its bottom inset, so it
+// collapses to the full viewport when the dock is hidden (match mode).
+// --nrl-hud-h is kept for the top inset and stays 0: there is no top bar.
 //
-// True dialogs (confirmations, the facility popup, settings) still use
+// True dialogs (confirmations, the facility card, settings) still use
 // openModal() without `screen`, which covers everything at z-index 100.
 //
-// z-order: ♪ 20 · screens 50 · HUD/nav 55 · toasts 60 · modals 100 · tutorial 200.
-// The HUD and nav never overlap a screen; they sit above one so the ▾ menu and
-// the nav's More sheet drop over it.
+// z-order: decisions chip 45 · sheets 50 · dock 55 · Office 56 · toasts 60 · modals 100 · tutorial 200.
 //
 // Safe areas (#347): env(safe-area-inset-*) is read once into --nrl-safe-t/r/b/l
 // and everything else uses those, so a check can simulate a notch where the
@@ -209,17 +207,109 @@ export function onScreenChange(fn: (key: string | null) => void): () => void {
 }
 
 /**
- * The one header row of a screen (#336): title (with an optional one-line
- * summary under it), the screen's controls, and a 44px ✕ at the right that
- * closes it. The controls scroll sideways on a narrow phone; the title and the ✕
- * never move.
+ * The one header row of a sheet (#336): title (with an optional one-line
+ * summary beside it), the sheet's controls pushed right. Sheets close from the
+ * dock (their tab, or CLUB); `close: true` adds a ✕ at the right end for a
+ * screen the dock does not hold.
  */
-export function screenHead(title: string, opts: { sub?: HTMLElement; controls?: Node[]; onClose?: () => void } = {}): HTMLElement {
-  const titles = el('div', { class: 'nrl-screen-titles' }, el('span', { class: 'nrl-screen-title', text: title }));
+export function screenHead(
+  title: string,
+  opts: { sub?: HTMLElement; controls?: Node[]; onClose?: () => void; close?: boolean; lead?: Node[] } = {},
+): HTMLElement {
+  const titles = el('div', { class: 'nrl-screen-titles' }, ...(opts.lead ?? []));
+  if (title) titles.append(el('span', { class: 'nrl-screen-title', text: title }));
   if (opts.sub) titles.append(opts.sub);
-  const x = button('✕', opts.onClose ?? (() => closeScreen()), { class: 'nrl-screen-x' });
-  x.setAttribute('aria-label', 'Close');
-  return el('div', { class: 'nrl-screen-head' }, titles, el('div', { class: 'nrl-screen-tools' }, ...(opts.controls ?? [])), x);
+  const head = el('div', { class: 'nrl-screen-head' }, titles, el('div', { class: 'nrl-screen-tools' }, ...(opts.controls ?? [])));
+  if (opts.close || opts.onClose) {
+    const x = button('✕', opts.onClose ?? (() => closeScreen()), { class: 'nrl-screen-x' });
+    x.setAttribute('aria-label', 'Close');
+    head.append(x);
+  }
+  return head;
+}
+
+/** One choice in a {@link segmented} control. */
+export interface SegItem<T extends string> {
+  id: T;
+  label: string;
+  title?: string;
+}
+
+/** Handle to a segmented control: its element, and a setter for the selected item. */
+export interface Segmented<T extends string> {
+  el: HTMLElement;
+  buttons: Map<T, HTMLButtonElement>;
+  set(id: T): void;
+}
+
+/**
+ * The sub-navigation inside a sheet: a #1b264a track of choices, the selected
+ * one yellow. `onPick` runs on a tap of an unselected item (and of the selected
+ * one with `repeat: true`); the caller re-renders and calls set().
+ */
+export function segmented<T extends string>(
+  items: readonly SegItem<T>[],
+  selected: T | null,
+  onPick: (id: T) => void,
+  opts: { class?: string; label?: string; repeat?: boolean } = {},
+): Segmented<T> {
+  const track = el('div', { class: opts.class ? `nrl-seg ${opts.class}` : 'nrl-seg', attrs: { role: 'group' } });
+  if (opts.label) track.setAttribute('aria-label', opts.label);
+  const buttons = new Map<T, HTMLButtonElement>();
+  let current = selected;
+  for (const it of items) {
+    const b = button(it.label, () => {
+      if (it.id === current && !opts.repeat) return;
+      onPick(it.id);
+    });
+    b.setAttribute('data-seg', it.id);
+    if (it.title) b.title = it.title;
+    buttons.set(it.id, b);
+    track.append(b);
+  }
+  const set = (id: T | null): void => {
+    current = id;
+    for (const [k, b] of buttons) b.setAttribute('aria-pressed', String(k === id));
+  };
+  set(selected);
+  return { el: track, buttons, set };
+}
+
+/** A "◂ SQUAD" button back to the screen this one was opened from. */
+export function backButton(label: string, onClick: () => void): HTMLButtonElement {
+  const b = button(`◂ ${label}`, onClick, { class: 'nrl-back' });
+  b.setAttribute('data-back', '');
+  return b;
+}
+
+/** The dock's three parts, created on first use (the HUD fills status and play, the nav the tabs). */
+export interface DockParts {
+  wrap: HTMLElement;
+  dock: HTMLElement;
+  status: HTMLElement;
+  tabs: HTMLElement;
+  play: HTMLElement;
+}
+
+let dockParts: DockParts | null = null;
+
+/**
+ * The dock: the only navigation, bottom 12 / sides 12, 64 tall. Left the
+ * status block (money, week), then the tabs, then PLAY WEEK. Its height
+ * (plus the 12px under it) is published as --nrl-nav-h, so sheets sit above it.
+ */
+export function dock(): DockParts {
+  if (dockParts && dockParts.wrap.isConnected) return dockParts;
+  ensureStyles();
+  const status = el('div', { class: 'nrl-dock-status' });
+  const tabs = el('div', { class: 'nrl-dock-tabs nrl-nav', attrs: { role: 'navigation', 'aria-label': 'Club' } });
+  const play = el('div', { class: 'nrl-dock-play' });
+  const d = el('div', { class: 'nrl-dock' }, status, tabs, el('div', { class: 'nrl-dock-spacer' }), play);
+  const wrap = el('div', { class: 'nrl-dock-wrap' }, d);
+  mount(wrap);
+  trackChromeInset(wrap, NAV_INSET_VAR);
+  dockParts = { wrap, dock: d, status, tabs, play };
+  return dockParts;
 }
 
 /**
@@ -262,8 +352,8 @@ let openModalEl: HTMLElement | null = null;
  * (#203): the HUD and nav stay whole and tappable, and a nav tap closes it.
  *
  * Screens and region dialogs are framed (#336): the box holds still and only
- * its content scrolls, so the ✕ in the corner never scrolls away. A dialog gets
- * the ✕ too with `closeButton: true`. `key` is a screen's nav destination (see
+ * its content scrolls, so a header row never scrolls away. A dialog (or a
+ * sheet) gets a ✕ in its corner with `closeButton: true`. `key` is a screen's nav destination (see
  * openScreen).
  */
 export function openModal(
@@ -280,9 +370,9 @@ export function openModal(
   // Clicks inside the modal box must not bubble to the backdrop's close handler.
   box.addEventListener('click', (e) => e.stopPropagation());
 
-  // A ✕ in the corner (#195): on a phone a screen's own Close is often below
-  // the fold. Screens with a Close in their header pass closeButton: false.
-  const wantsX = opts.screen ? opts.closeButton !== false : opts.closeButton === true;
+  // A ✕ in the corner (#195) for a dialog that asks for one. Sheets close from
+  // the dock (their tab, or CLUB), so they take one only with closeButton: true.
+  const wantsX = opts.closeButton === true;
   if (wantsX) {
     const x = button('✕', () => (opts.screen ? closeScreen() : closeModal()), { class: 'nrl-screen-x' });
     x.setAttribute('aria-label', 'Close');
@@ -335,10 +425,11 @@ export function ensureStyles(): void {
   document.head.appendChild(style);
 }
 
-// Chunky borders (3px solid #000 + 3px hard drop shadow), dark-on-parchment
-// panels, monospace, pixelated rendering. Font sizes use clamp() so the HUD and
-// nav stay legible on mobile. Every interactive/visible element opts back into
-// pointer-events (the #ui-root container is pointer-events:none).
+// Broadcast Quiet (docs/specs/ui-broadcast-quiet.md): navy sheets over the
+// grounds, Barlow Condensed caps for labels and buttons, IBM Plex Sans for body
+// text, IBM Plex Mono for every number, one yellow primary a screen. Every
+// interactive/visible element opts back into pointer-events (the #ui-root
+// container is pointer-events:none).
 /** The shared stylesheet (exported for tests). */
 export const CSS = `
 :root {
@@ -346,252 +437,365 @@ export const CSS = `
   --nrl-safe-r: env(safe-area-inset-right, 0px);
   --nrl-safe-b: env(safe-area-inset-bottom, 0px);
   --nrl-safe-l: env(safe-area-inset-left, 0px);
+  /* Broadcast Quiet tokens (docs/specs/ui-broadcast-quiet.md). */
+  --nrl-navy: #0e1630;
+  --nrl-panel: #141d3a;
+  --nrl-raised: #1b264a;
+  --nrl-button: #1f2b55;
+  --nrl-line: #26325c;
+  --nrl-me: #24346b;
+  --nrl-sheet: rgba(14, 22, 48, 0.97);
+  --nrl-text: #ffffff;
+  --nrl-text-2: #c9d1ea;
+  --nrl-muted: #9aa6c7;
+  --nrl-accent: #f4d03f;
+  --nrl-on-accent: #0e1630;
+  --nrl-pos: #6fd896;
+  --nrl-neg: #f0a39b;
+  --nrl-alert: #e0574a;
+  --nrl-win: #2d8a4a;
+  --nrl-injured: #5a2430;
+  --nrl-bench: #3a6ea5;
+  --nrl-out: #b03a2e;
+  --nrl-fit-good: #3fbf6a;
+  --nrl-fit-ok: #e8a33a;
+  --nrl-fit-bad: #d9534f;
+  --nrl-home: #f4d03f;
+  --nrl-away: #2f8a46;
+  --nrl-shadow-chip: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --nrl-shadow-tray: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --nrl-shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.4);
+  --nrl-f-label: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --nrl-f-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --nrl-f-num: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 }
-.nrl-panel, .nrl-btn, .nrl-modal, .nrl-modal-backdrop, .nrl-hud, .nrl-nav {
-  font-family: 'Courier New', monospace;
-  image-rendering: pixelated;
+.nrl-panel, .nrl-btn, .nrl-modal, .nrl-modal-backdrop, .nrl-dock, .nrl-screen {
+  font-family: var(--nrl-f-body);
   box-sizing: border-box;
 }
+#ui-root input, #ui-root select, #ui-root textarea { font: inherit; }
+/* Every number in Plex Mono: money, scores, ratings, the clock. */
+.nrl-num { font-family: var(--nrl-f-num); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* A raised tile inside a sheet. */
 .nrl-panel {
   pointer-events: auto;
-  background: #e8e0c8;
-  color: #1a1a2e;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  padding: 0.5rem 0.75rem;
+  background: var(--nrl-raised);
+  color: var(--nrl-text);
+  border-radius: 10px;
+  padding: 8px 10px;
 }
+/* Buttons: secondary by default (#1f2b55, white); one yellow primary a screen
+   (.nrl-btn-primary); destructive keeps the secondary fill with a red label. */
 .nrl-btn {
   pointer-events: auto;
   cursor: pointer;
-  font-weight: bold;
-  font-size: clamp(0.7rem, 2.5vw, 0.95rem);
-  color: #1a1a2e;
-  background: #f4d03f;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  padding: 0.4rem 0.7rem;
+  font-family: var(--nrl-f-label);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nrl-text);
+  background: var(--nrl-button);
+  border: 0;
+  border-radius: 10px;
+  padding: 0 14px;
   margin: 0;
   min-height: 44px; /* #18: phone tap target */
   min-width: 44px;
   line-height: 1.1;
   white-space: nowrap;
-  image-rendering: pixelated;
+  transition: background 0.12s ease, transform 0.08s ease;
 }
-.nrl-btn:hover:not(:disabled) { background: #f7dc6f; }
-.nrl-btn:active:not(:disabled) {
-  transform: translate(3px, 3px);
-  box-shadow: 0 0 0 #000;
+.nrl-btn:hover:not(:disabled) { background: #283669; }
+.nrl-btn:active:not(:disabled) { transform: translateY(1px); }
+.nrl-btn:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
+.nrl-btn.nrl-btn-primary { background: var(--nrl-accent); color: var(--nrl-on-accent); }
+.nrl-btn.nrl-btn-primary:hover:not(:disabled) { background: #f7da5e; }
+.nrl-btn.nrl-btn-danger { background: var(--nrl-button); color: var(--nrl-neg); }
+.nrl-btn.nrl-btn-danger:hover:not(:disabled) { background: #283669; }
+/* Disabled stays visible and says why (the reason is the label or the title). */
+.nrl-btn:disabled { cursor: default; opacity: 0.55; }
+.nrl-btn.nrl-btn-primary:disabled { background: var(--nrl-raised); color: var(--nrl-muted); opacity: 1; }
+/* One selected-chip look everywhere (sorts, filters, tabs, presets): yellow, navy text.
+   A touch leaves :hover on the last chip tapped; the selection wins over it. */
+.nrl-btn.nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled),
+.nrl-btn[data-active], .nrl-btn[data-active]:hover:not(:disabled),
+.nrl-seg > .nrl-btn[aria-pressed="true"], .nrl-seg > .nrl-btn[aria-pressed="true"]:hover:not(:disabled),
+.nrl-seg > .nrl-btn[aria-selected="true"], .nrl-seg > .nrl-btn[aria-selected="true"]:hover:not(:disabled) {
+  background: var(--nrl-accent);
+  color: var(--nrl-on-accent);
 }
-.nrl-btn:disabled {
-  cursor: default;
-  opacity: 0.5;
-  background: #cfc9b4;
+/* Segmented control: the sub-navigation inside a sheet. */
+.nrl-seg {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  background: var(--nrl-raised);
+  border-radius: 10px;
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.nrl-seg::-webkit-scrollbar { display: none; }
+.nrl-seg > .nrl-btn {
+  flex: 0 0 auto;
+  min-height: 38px;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--nrl-text);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.nrl-seg > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+@media (pointer: coarse) { .nrl-seg > .nrl-btn { min-height: 44px; } }
+/* A small caps label (column heads, section titles). */
+.nrl-label {
+  font-family: var(--nrl-f-label);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nrl-muted);
+}
+.nrl-pos { color: var(--nrl-pos); }
+.nrl-neg { color: var(--nrl-neg); }
+.nrl-attn { color: var(--nrl-accent); }
+.nrl-muted { color: var(--nrl-muted); }
 
-/* ── HUD ─────────────────────────────────────────────────────────────── */
-.nrl-hud {
-  pointer-events: none; /* strip is transparent; children opt in */
+/* ── Dock (the only navigation): status · tabs · PLAY WEEK ───────────────── */
+.nrl-dock-wrap {
+  pointer-events: none;
   position: fixed;
-  top: 0;
   left: 0;
   right: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  /* #18: keep clear of notches / rounded corners. */
-  padding: calc(0.5rem + var(--nrl-safe-t)) calc(0.5rem + var(--nrl-safe-r)) 0.5rem calc(0.5rem + var(--nrl-safe-l));
+  bottom: 0;
+  padding: 0 calc(12px + var(--nrl-safe-r)) max(12px, var(--nrl-safe-b)) calc(12px + var(--nrl-safe-l));
   z-index: 55;
 }
-.nrl-hud-readouts {
+.nrl-dock {
   pointer-events: auto;
+  position: relative;
+  height: 64px;
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
   align-items: center;
+  gap: 2px;
+  padding: 0 8px 0 14px;
+  border-radius: 16px;
+  background: var(--nrl-sheet);
+  box-shadow: var(--nrl-shadow-chip);
+  color: var(--nrl-text);
+  box-sizing: border-box;
 }
-.nrl-hud-stat {
-  background: #e8e0c8;
-  color: #1a1a2e;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  padding: 0.3rem 0.6rem;
-  font-size: clamp(0.75rem, 3vw, 1.05rem);
-  font-weight: bold;
-  white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-.nrl-hud-stat.nrl-flash-up { background: #7ec850; color: #0a2a00; }
-.nrl-hud-stat.nrl-flash-down { background: #e06666; color: #2a0000; }
-.nrl-hud-stat.nrl-money-negative { color: #b00020; }
-/* #351 H2: under 20 weeks of runway the tile goes amber, under 8 red. */
-.nrl-hud-stat.nrl-money-low { color: #8a4b00; border-color: #d08a00; }
-.nrl-hud-stat.nrl-money-short { color: #b00020; border-color: #b00020; }
-button.nrl-hud-stat { font-family: inherit; line-height: inherit; cursor: pointer; }
-button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 1px; }
-@media (pointer: coarse) { .nrl-hud-readouts .nrl-hud-stat { box-sizing: border-box; min-height: 44px; display: inline-flex; align-items: center; } }
-/* N12.5: "in debt" beside a negative balance, a red tag that reads through the flash. */
-.nrl-hud-debt { padding: 0 0.3em; font-size: 0.75em; background: #b00020; color: #fff; vertical-align: 0.1em; }
-/* #239: below 760px the tag wraps the HUD onto a second row (93px against 60px at
-   667×375), so the tile wears a red border instead; the words stay for screen readers. */
-@media (max-width: 759px) {
-  .nrl-hud-stat.nrl-money-negative { border-color: #b00020; }
-  .nrl-hud-debt { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-}
-.nrl-hud-spacer { flex: 1 1 auto; min-width: 0; display: flex; justify-content: flex-end; }
-/* #350 H1: the next match, beside Advance Week: the opponent over home/away and the ladder place. */
-.nrl-hud .nrl-btn.nrl-hud-next {
-  pointer-events: auto;
+.nrl-dock-status { display: flex; align-items: center; flex: 0 0 auto; }
+.nrl-dock-status:empty { display: none; }
+.nrl-dock-statusbox {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: flex-start;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  background: #e8e0c8;
-  color: #1a1a2e;
-  font-size: 0.8rem;
-  line-height: 1.15;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
+  padding: 0 14px 0 0;
+  min-height: 44px;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: default;
 }
-.nrl-hud-next-detail { font-weight: normal; font-size: 0.9em; }
-.nrl-hud .nrl-btn.nrl-hud-next:disabled { opacity: 1; cursor: default; }
-.nrl-hud-next[hidden] { display: none; }
-/* #350 H1: decisions waiting, a red count on Advance Week. */
+button.nrl-dock-statusbox { cursor: pointer; }
+button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; border-radius: 8px; }
+.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 15px; font-weight: 600; line-height: 1.2; white-space: nowrap; transition: color 0.15s ease; }
+.nrl-dock-week { font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); white-space: nowrap; }
+/* #351 H2: under 20 weeks of runway the money goes amber, under 8 red; N12.5 in debt is red with its tag. */
+.nrl-dock-money.nrl-money-low { color: var(--nrl-fit-ok); }
+.nrl-dock-money.nrl-money-short, .nrl-dock-money.nrl-money-negative { color: var(--nrl-neg); }
+.nrl-dock-money.nrl-flash-up { color: var(--nrl-pos); }
+.nrl-dock-money.nrl-flash-down { color: var(--nrl-neg); }
+.nrl-hud-debt { margin-left: 4px; padding: 0 4px; border-radius: 4px; font-family: var(--nrl-f-label); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; background: var(--nrl-out); color: #fff; vertical-align: 1px; }
+.nrl-dock-divider { width: 1px; height: 36px; background: var(--nrl-line); margin-right: 6px; flex: 0 0 auto; }
+.nrl-dock-tabs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 0 1 auto; }
+.nrl-dock-tabs > .nrl-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--nrl-text-2);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+.nrl-dock-tabs > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+/* The open sheet's tab (aria-current); a touch leaves :hover on it, the marker wins. */
+.nrl-dock-tabs > .nrl-btn[aria-current="page"], .nrl-dock-tabs > .nrl-btn[aria-current="page"]:hover:not(:disabled),
+.nrl-dock-tabs > .nrl-btn[aria-expanded="true"], .nrl-dock-tabs > .nrl-btn[aria-expanded="true"]:hover:not(:disabled) {
+  background: var(--nrl-button);
+  color: var(--nrl-accent);
+  font-weight: 700;
+}
+/* An alert: an 8px dot after the label (the count is in its spoken label). */
+.nrl-nav-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); flex: 0 0 auto; }
+.nrl-dock-spacer { flex: 1 1 auto; min-width: 4px; }
+.nrl-dock-play { position: relative; display: flex; align-items: stretch; flex: 0 0 auto; height: 50px; }
+.nrl-dock-play:empty { display: none; }
+.nrl-dock-play-group { display: flex; align-items: stretch; border-radius: 12px; overflow: hidden; background: var(--nrl-accent); color: var(--nrl-on-accent); }
+.nrl-dock-play-group > .nrl-btn {
+  min-height: 50px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--nrl-on-accent);
+}
+.nrl-dock-play-group > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+.nrl-dock-advance { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 16px; max-width: 15rem; }
+.nrl-dock-advance-label { font-family: var(--nrl-f-label); font-size: 19px; font-weight: 700; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
+.nrl-dock-advance-sub { font-family: var(--nrl-f-body); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.3; }
+.nrl-dock-advance-sub:empty { display: none; }
+.nrl-btn.nrl-hud-menu-toggle { width: 40px; min-width: 40px; padding: 0; font-size: 14px; border-left: 1px solid rgba(14, 22, 48, 0.25); }
+.nrl-btn.nrl-hud-stop { width: auto; padding: 0 14px; border-left: 1px solid rgba(14, 22, 48, 0.25); font-size: 16px; }
+.nrl-hud-stop[hidden], .nrl-hud-menu-toggle[hidden] { display: none; }
+/* N10.2: while a multi-week advance runs the button is a progress line, not a faded button. */
+.nrl-dock-play-group > .nrl-btn.nrl-hud-progress:disabled { opacity: 1; cursor: default; }
+/* #350 H1: decisions waiting, a count on the play button (the chip top-left says what they are). */
 .nrl-hud-alert {
   display: inline-block;
-  min-width: 1.3em;
-  margin-left: 0.4em;
-  padding: 0 0.3em;
-  border: 2px solid #000;
-  border-radius: 1em;
-  background: #b03a2e;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--nrl-alert);
   color: #fff;
-  font-size: 0.8em;
-  line-height: 1.25em;
+  font-family: var(--nrl-f-num);
+  font-size: 12px;
+  line-height: 18px;
   text-align: center;
-  vertical-align: 0.1em;
+  vertical-align: 2px;
 }
-.nrl-hud-actions {
-  pointer-events: auto;
-  position: relative;
-  display: flex;
-  gap: 0.25rem;
-  align-items: stretch;
-}
-/* #44: "Advance Week" menu. Tap targets stay ≥44px (.nrl-btn min-height). */
-.nrl-hud-menu-toggle { min-width: 44px; padding: 0.4rem 0.5rem; }
-/* N10.2: Stop beside the progress line while a multi-week advance runs. */
-.nrl-hud-stop { min-width: 44px; padding: 0.4rem 0.6rem; background: #e8a33a; }
-.nrl-hud-stop[hidden], .nrl-hud-menu-toggle[hidden] { display: none; }
-/* The progress line reads like a HUD tile, not a faded button. */
-.nrl-hud .nrl-btn.nrl-hud-progress:disabled { opacity: 1; background: #e8e0c8; color: #1a1a2e; cursor: default; }
+/* #44: the ▾ menu: multi-week advances, over the dock's right end. */
 .nrl-hud-menu {
   position: absolute;
-  top: calc(100% + 0.25rem);
+  bottom: calc(100% + 8px);
   right: 0;
   z-index: 11;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  min-width: 10rem;
-  padding: 0.35rem;
-  background: #e8e0c8;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
+  gap: 4px;
+  min-width: 11rem;
+  padding: 6px;
+  background: var(--nrl-navy);
+  border-radius: 12px;
+  box-shadow: var(--nrl-shadow-tray);
 }
 .nrl-hud-menu[hidden] { display: none; }
 .nrl-hud-menu-item { width: 100%; text-align: left; }
-/* Hide the "/total" week suffix on narrow screens. */
-@media (max-width: 480px) {
-  .nrl-hud-week-total { display: none; }
-  .nrl-hud .nrl-btn { padding: 0.4rem 0.5rem; }
+/* A narrow phone (667px): tighter tabs, the sub-line goes. */
+@media (max-width: 760px) {
+  .nrl-dock { padding: 0 6px 0 10px; }
+  .nrl-dock-statusbox { padding-right: 8px; }
+  .nrl-dock-tabs > .nrl-btn { padding: 0 8px; font-size: 14px; letter-spacing: 0.04em; }
+  .nrl-dock-advance { padding: 0 10px; }
+  .nrl-dock-advance-label { font-size: 16px; }
+  .nrl-btn.nrl-hud-menu-toggle { width: 34px; min-width: 34px; }
 }
-/* #336: a phone on its side has height for nothing. One row, 48px: small tiles
-   and the 44px Advance Week, ▾ and ♪ (fx/audio.ts follows this padding). */
-@media (max-height: 500px) {
-  .nrl-hud {
-    align-items: center;
-    gap: 0.35rem;
-    padding-top: calc(2px + var(--nrl-safe-t));
-    padding-bottom: 2px;
-  }
-  .nrl-hud-readouts { flex-wrap: nowrap; gap: 0.3rem; }
-  .nrl-hud-stat { font-size: 0.8rem; padding: 0.2rem 0.4rem; border-width: 2px; box-shadow: 2px 2px 0 #000; }
-  .nrl-hud .nrl-btn { padding-top: 0.25rem; padding-bottom: 0.25rem; }
-  .nrl-hud .nrl-btn.nrl-hud-next { font-size: 0.7rem; padding-left: 0.35rem; padding-right: 0.35rem; }
+@media (max-width: 620px) {
+  .nrl-dock-advance-sub, .nrl-dock-week-total { display: none; }
 }
 
-/* ── Nav ─────────────────────────────────────────────────────────────── */
-.nrl-nav {
-  pointer-events: none;
+/* ── Office: the pop-up sheet over a dimmed grounds view ─────────────────── */
+.nrl-office-dim {
+  pointer-events: auto;
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  gap: 0.4rem;
-  /* #18: home-bar / side insets. The home bar's inset is its own margin, so it
-     replaces the bar's bottom padding rather than adding to it. */
-  padding: 0.25rem calc(0.5rem + var(--nrl-safe-r)) max(0.25rem, var(--nrl-safe-b)) calc(0.5rem + var(--nrl-safe-l));
-  white-space: nowrap;
-  z-index: 55;
+  inset: 0;
+  background: rgba(5, 9, 22, 0.35);
+  z-index: 54;
 }
-/* #344: five tabs (four screens and More), equal, labels 12px or more at every size. */
-.nrl-nav > .nrl-btn {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 11rem;
-  padding: 0.3rem 0.25rem;
-  font-size: max(12px, min(0.95rem, 2.3vw));
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* The open screen's tab (aria-current): dark with a gold edge, so it reads at a
-   glance. Not pressed in: that would push it into the home bar's band. A touch
-   leaves :hover on the last tab tapped; the marker wins over it. */
-.nrl-nav .nrl-btn[aria-current="page"],
-.nrl-nav .nrl-btn[aria-current="page"]:hover:not(:disabled) {
-  background: #1a1a2e;
-  color: #f4d03f;
-  box-shadow: inset 0 -3px 0 #f4d03f, 3px 3px 0 #000;
-}
-.nrl-nav .nrl-btn[aria-expanded="true"] { background: #fff6c2; }
-/* More's sheet: the rest of the club's screens, over whatever is open. */
+.nrl-office-dim[hidden], .nrl-nav-sheet[hidden] { display: none; }
 .nrl-nav-sheet {
   pointer-events: auto;
   position: fixed;
-  right: calc(0.5rem + var(--nrl-safe-r));
-  bottom: calc(var(--nrl-nav-h, 0px) + 0.25rem);
+  left: calc(12px + var(--nrl-safe-l));
+  right: calc(12px + var(--nrl-safe-r));
+  bottom: calc(var(--nrl-nav-h, 0px) + 8px);
+  max-width: 1180px;
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(2, minmax(8.5rem, 1fr));
-  gap: 0.4rem;
-  max-width: calc(100vw - 1rem - var(--nrl-safe-l) - var(--nrl-safe-r));
-  max-height: calc(100vh - var(--nrl-nav-h, 0px) - var(--nrl-hud-h, 0px) - 0.5rem);
-  max-height: calc(100dvh - var(--nrl-nav-h, 0px) - var(--nrl-hud-h, 0px) - 0.5rem);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  max-height: calc(100vh - var(--nrl-nav-h, 0px) - 20px);
+  max-height: calc(100dvh - var(--nrl-nav-h, 0px) - 20px);
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 0.45rem 0.6rem 0.6rem 0.45rem;
-  background: #e8e0c8;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
+  padding: 10px 12px;
+  background: var(--nrl-sheet);
+  border-radius: 16px;
+  box-shadow: var(--nrl-shadow-tray);
+  z-index: 56;
+  animation: nrl-sheet-up 180ms ease-out;
 }
-.nrl-nav-sheet[hidden] { display: none; }
-.nrl-nav-sheet .nrl-btn { font-size: max(12px, 0.9rem); }
-@media (max-height: 500px) {
-  .nrl-nav-sheet { grid-template-columns: repeat(4, minmax(7.5rem, 1fr)); }
+.nrl-nav-sheet > .nrl-btn {
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 12px;
+  background: var(--nrl-raised);
+  border-radius: 10px;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  overflow: hidden;
 }
-.nrl-nav .nrl-nav-badge { margin-left: 0.15rem; }
+.nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: #22305c; }
+.nrl-nav-sheet > .nrl-btn[aria-current="page"] { box-shadow: inset 0 0 0 2px var(--nrl-accent); }
+.nrl-office-name { font-family: var(--nrl-f-label); font-size: 18px; font-weight: 700; letter-spacing: 0.02em; color: var(--nrl-text); }
+.nrl-office-status { font-family: var(--nrl-f-body); font-size: 12px; font-weight: 400; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.nrl-office-status[data-attn] { color: var(--nrl-accent); }
+.nrl-office-status:empty { display: none; }
+@media (max-width: 560px) { .nrl-nav-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { .nrl-nav-sheet, .nrl-screen-region { animation: none !important; } }
+
+/* ── Decisions chip: the club home's one thing on the grounds ───────────── */
+.nrl-decisions-chip {
+  pointer-events: auto;
+  position: fixed;
+  top: calc(12px + var(--nrl-safe-t));
+  left: calc(16px + var(--nrl-safe-l));
+  height: 44px;
+  max-width: calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 0 14px;
+  border-radius: 12px;
+  background: rgba(14, 22, 48, 0.95);
+  box-shadow: var(--nrl-shadow-chip);
+  color: var(--nrl-text);
+  z-index: 45;
+  box-sizing: border-box;
+}
+.nrl-decisions-chip[hidden] { display: none; }
+.nrl-decisions-chip-count { font-family: var(--nrl-f-label); font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: var(--nrl-accent); white-space: nowrap; }
+.nrl-decisions-chip-top { font-size: 13px; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.nrl-decisions-chip .nrl-btn { min-height: 34px; height: 34px; border-radius: 8px; padding: 0 12px; font-size: 15px; flex: 0 0 auto; }
+body.nrl-match-active .nrl-decisions-chip { display: none; }
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .nrl-modal-backdrop {
   pointer-events: auto;
   position: fixed;
   inset: 0;
-  background: rgba(10, 10, 20, 0.6);
+  background: rgba(5, 9, 22, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -599,41 +803,67 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
 }
 .nrl-modal {
   pointer-events: auto;
-  background: #e8e0c8;
-  color: #1a1a2e;
-  border: 4px solid #000;
-  box-shadow: 6px 6px 0 #000;
-  padding: 1rem;
+  position: relative;
+  background: var(--nrl-navy);
+  color: var(--nrl-text);
+  border-radius: 18px;
+  box-shadow: var(--nrl-shadow-modal);
+  padding: 14px 16px;
   max-width: min(90vw, 480px);
   max-height: 85vh;
   max-height: 85dvh; /* #206: Safari's toolbars */
   overflow: auto;
+  box-sizing: border-box;
+  font-size: 14px;
 }
+.nrl-modal h2 { font-family: var(--nrl-f-label); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.15; }
+.nrl-modal h3 { font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 
-/* ── Screen region (see the layering rule above openScreen in dom.ts) ── */
+/* ── Sheets (the layering rule above openScreen in dom.ts) ───────────────
+   A screen is a navy sheet above the dock: top 12, sides 12, bottom 88 on a
+   phone. Long lists scroll inside it; its header row holds still. */
 :root { --nrl-hud-h: 0px; --nrl-nav-h: 0px; }
 .nrl-screen-region {
   pointer-events: auto;
   position: fixed;
-  left: 0;
-  right: 0;
-  top: var(--nrl-hud-h, 0px);
-  bottom: var(--nrl-nav-h, 0px);
+  left: calc(12px + var(--nrl-safe-l));
+  right: calc(12px + var(--nrl-safe-r));
+  top: calc(var(--nrl-hud-h, 0px) + 12px + var(--nrl-safe-t));
+  bottom: calc(var(--nrl-nav-h, 0px) + 12px);
+  max-width: 1180px;
+  margin: 0 auto;
   z-index: 50;
   box-sizing: border-box;
+  animation: nrl-sheet-up 180ms ease-out;
 }
-.nrl-screen-backdrop, .nrl-dialog-region {
-  padding: 0.5rem calc(0.5rem + var(--nrl-safe-r)) 0.5rem calc(0.5rem + var(--nrl-safe-l));
+.nrl-screen-backdrop { background: transparent; padding: 0; display: flex; align-items: stretch; justify-content: stretch; }
+.nrl-screen-backdrop .nrl-modal {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border-radius: 16px;
+  background: var(--nrl-sheet);
+  box-shadow: var(--nrl-shadow-tray);
+  padding: 10px 14px;
 }
-.nrl-screen-backdrop .nrl-modal, .nrl-dialog-region .nrl-modal {
-  /* Fit inside the region (drop-shadow included) rather than the viewport. */
-  max-height: calc(100% - 6px);
-  position: relative;
+/* A region dialog (#203): above the sheets, the dock still whole and tappable below it. */
+.nrl-dialog-region {
+  top: var(--nrl-hud-h, 0px);
+  bottom: var(--nrl-nav-h, 0px);
+  padding: calc(12px + var(--nrl-safe-t)) calc(12px + var(--nrl-safe-r)) 12px calc(12px + var(--nrl-safe-l));
+  background: rgba(5, 9, 22, 0.35);
 }
-/* #336: a framed box (screens, region dialogs) holds still and only its content
-   scrolls, so the ✕ in its corner is always on screen. A child that sets
-   flex: 1 1 auto and min-height: 0 fills the box and scrolls inside itself
-   (News, League, Guide); anything else scrolls with the box's content. */
+.nrl-dialog-region .nrl-modal {
+  /* Fit inside the region rather than the viewport. */
+  max-height: 100%;
+  width: min(100%, 640px);
+  max-width: none;
+  border-radius: 16px;
+}
+/* #336: a framed box (sheets, region dialogs) holds still and only its content
+   scrolls, so the header row is always on screen. A child that sets
+   flex: 1 1 auto and min-height: 0 fills the box and scrolls inside itself. */
 .nrl-modal.nrl-modal-framed { display: flex; flex-direction: column; overflow: hidden; }
 .nrl-modal-scroll {
   flex: 1 1 auto;
@@ -643,121 +873,90 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
   display: flex;
   flex-direction: column;
 }
-@media (max-height: 500px) {
-  /* A screen or region dialog runs down to the nav, which sits above it and
-     hides its drop shadow. */
-  .nrl-screen-backdrop, .nrl-dialog-region { padding-top: 0.25rem; padding-bottom: 0; }
-  .nrl-screen-backdrop .nrl-modal, .nrl-dialog-region .nrl-modal { max-height: calc(100% - 0.25rem); }
-  .nrl-modal.nrl-modal-framed { padding: 0.4rem 0.65rem; }
-}
-.nrl-screen-backdrop .nrl-modal {
-  /* #195: a landscape phone has width to spare and no height; use it. */
-  width: min(96vw, 640px);
-  max-width: none;
-}
-/* A region dialog (#203): between HUD and nav like a screen, above it like a dialog. */
-.nrl-dialog-region {
-  top: var(--nrl-hud-h, 0px);
-  bottom: var(--nrl-nav-h, 0px);
-}
 /* Player of the Match (#203): a card, not a wall; taps beside it reach Back to Club. */
 .nrl-potm-backdrop { pointer-events: none; background: transparent; }
 .nrl-potm-backdrop .nrl-modal { pointer-events: auto; }
-/* The match report (N9.5): as wide as a screen, above Back to Club, scrolling inside. */
-.nrl-report-backdrop { bottom: calc(3.75rem + var(--nrl-safe-b)); align-items: flex-start; padding: calc(0.5rem + var(--nrl-safe-t)) var(--nrl-safe-r) 0 var(--nrl-safe-l); }
-.nrl-report-backdrop .nrl-modal { width: min(96vw, 720px); max-width: none; max-height: calc(100% - 0.75rem); padding: 0.6rem 0.8rem; }
-.nrl-report-head { min-height: 44px; }
-.nrl-modal-has-x .nrl-report-head { padding-right: 2.75rem; }
-.nrl-report h2 { margin: 0 0 0.2rem; font-size: 1rem; }
-.nrl-report p { margin: 0.15rem 0; font-size: 0.8rem; }
-.nrl-report .nrl-report-score { font-size: 1.05rem; font-weight: bold; }
-/* #351 P2: a win and a loss look different. Green for a win; a loss is no error, so slate, not red. */
-.nrl-report-result { display: inline-block; padding: 0.05rem 0.4rem; border: 2px solid #000; font-size: 0.9rem; letter-spacing: 1px; }
-.nrl-report-win { background: #2d6a2f; color: #fff; }
-.nrl-report-loss { background: #5a6b85; color: #fff; }
-.nrl-report-draw { background: #e8e0c8; color: #1a1a2e; }
-.nrl-report-changes { margin: 0.15rem 0; font-size: 0.8rem; }
-.nrl-report-changes summary { cursor: pointer; min-height: 1.6rem; line-height: 1.6rem; }
-@media (pointer: coarse) { .nrl-report-changes summary { min-height: 44px; line-height: 44px; } }
-.nrl-report-body { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.3rem 0; }
-.nrl-report-scoring { flex: 1 1 18rem; display: flex; gap: 0.8rem; }
-.nrl-report-side { flex: 1 1 0; min-width: 0; }
-.nrl-report-side h3 { margin: 0 0 0.1rem; font-size: 0.85rem; }
-.nrl-report-stats { flex: 1 1 14rem; border-collapse: collapse; font-size: 0.75rem; }
-.nrl-report-stats th, .nrl-report-stats td { padding: 0.05rem 0.35rem; text-align: center; }
-.nrl-report-stats td:first-child { text-align: left; white-space: nowrap; }
-.nrl-report-stats th { font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 8rem; }
+/* The ✕: 36×36 on #1f2b55, top-right of a dialog (sheets close from the dock). */
 .nrl-screen-x {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 10px;
+  right: 10px;
   z-index: 1;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
-  font-size: 1.1rem;
+  border-radius: 8px;
+  font-family: var(--nrl-f-body);
+  font-size: 15px;
   line-height: 1;
 }
+.nrl-screen-x::after { content: ''; position: absolute; inset: -4px; } /* a 44px hit area */
 .nrl-modal-has-x > :not(.nrl-screen-x) > h2:first-child,
-.nrl-modal-has-x > .nrl-modal-scroll > * > h2:first-child { padding-right: 2.75rem; }
+.nrl-modal-has-x > .nrl-modal-scroll > * > h2:first-child { padding-right: 44px; }
 /* In a screen's header row the ✕ sits in line, at the right end. */
-.nrl-screen-head .nrl-screen-x { position: static; flex: 0 0 auto; }
+.nrl-screen-head .nrl-screen-x { position: relative; top: auto; right: auto; flex: 0 0 auto; }
 
-/* ── Screen frame (#336): Squad, Lineup and Recruit ──────────────────────
-   Position comes from .nrl-screen-region (openScreen); the frame pads clear of
-   the notch (#347), and one header row holds title, controls and ✕. */
+/* ── Screen frame (#336): the sheet itself, for screens built on screenHead ── */
 .nrl-screen {
   display: flex;
   flex-direction: column;
-  background: rgba(10, 10, 20, 0.7);
-  padding: 0.35rem calc(0.5rem + var(--nrl-safe-r)) 0.35rem calc(0.5rem + var(--nrl-safe-l));
+  background: var(--nrl-sheet);
+  color: var(--nrl-text);
+  border-radius: 16px;
+  box-shadow: var(--nrl-shadow-tray);
+  padding: 10px 14px;
   overflow: hidden;
-  font-family: 'Courier New', monospace;
   box-sizing: border-box;
+  font-size: 13px;
 }
 .nrl-screen-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
+  gap: 12px;
+  margin-bottom: 8px;
   flex: 0 0 auto;
   min-width: 0;
+  min-height: 44px;
 }
-.nrl-screen-titles { flex: 0 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.nrl-screen-titles { flex: 0 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .nrl-screen-title {
-  font-weight: bold;
-  font-size: clamp(0.9rem, 4vw, 1.3rem);
+  font-family: var(--nrl-f-label);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   line-height: 1.1;
-  color: #f4d03f;
-  text-shadow: 2px 2px 0 #000;
+  color: var(--nrl-text);
   white-space: nowrap;
 }
-.nrl-screen-titles .nrl-screen-sub { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* The controls: one row that scrolls sideways when the phone is narrow (padding
-   keeps the buttons' drop shadows inside the scroller). Pushed right with a
-   margin, not justify-content: an overflowing flex-end row spills off its start,
-   where it cannot be scrolled to. */
+.nrl-screen-sub {
+  font-size: 13px;
+  color: var(--nrl-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.nrl-screen-titles .nrl-screen-sub { margin: 0; }
+/* The controls: one row that scrolls sideways when the phone is narrow. Pushed
+   right with a margin, not justify-content: an overflowing flex-end row spills
+   off its start, where it cannot be scrolled to. */
 .nrl-screen-tools {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 8px;
   overflow-x: auto;
-  padding: 0 3px 3px 0;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
+.nrl-screen-tools::-webkit-scrollbar { display: none; }
 .nrl-screen-tools > * { flex: 0 0 auto; }
 .nrl-screen-tools > :first-child { margin-left: auto; }
-.nrl-screen-tools .nrl-btn { padding: 0.3rem 0.5rem; }
-.nrl-screen-label { color: #e8e0c8; font-size: 0.75rem; }
-.nrl-screen-sub {
-  font-size: clamp(0.65rem, 2.5vw, 0.85rem);
-  color: #e8e0c8;
-  margin-bottom: 0.4rem;
-  flex: 0 0 auto;
-}
+.nrl-screen-label { color: var(--nrl-muted); font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .nrl-screen-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -765,39 +964,59 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
   overscroll-behavior: contain;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 0.5rem;
+  gap: 8px;
   align-content: start;
-  padding-bottom: 0.5rem;
 }
 .nrl-screen-empty {
-  color: #e8e0c8;
-  padding: 1rem;
+  color: var(--nrl-muted);
+  padding: 24px;
   text-align: center;
 }
-/* One selected-chip colour (sort, focus, filters). A touch leaves :hover on the
-   last chip tapped; the selection wins over it. */
-.nrl-sort-active, .nrl-btn.nrl-sort-active:hover:not(:disabled) { background: #7ec850; }
+/* A table in a sheet: Barlow column heads, 1px #1f2b55 row rules, numbers in Mono. */
+.nrl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.nrl-table th {
+  font-family: var(--nrl-f-label);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nrl-muted);
+  text-align: left;
+  padding: 4px 6px;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--nrl-navy);
+  z-index: 1;
+}
+.nrl-table td { padding: 0 6px; height: 30px; border-top: 1px solid var(--nrl-button); white-space: nowrap; }
+.nrl-table td.nrl-num, .nrl-table th.nrl-num { text-align: right; }
+/* Back to the screen this one opened from: "◂ SQUAD". */
+.nrl-btn.nrl-back { min-height: 36px; padding: 0 10px; font-size: 14px; border-radius: 8px; }
+@media (pointer: coarse) { .nrl-btn.nrl-back { min-height: 44px; } }
 
 /* ── Toasts (ui:notify, #339): one at a time, in a lane over no control (toasts.ts
-   places it: the top bar's gap at the club, under the scoreboard in a match) ── */
+   places it: just above the dock at the club, under the score bug in a match) ── */
 .nrl-toast-lane {
   pointer-events: none;
   position: fixed;
-  top: calc(0.25rem + var(--nrl-safe-t));
+  top: calc(12px + var(--nrl-safe-t));
   left: 50%;
   transform: translateX(-50%);
-  width: min(30rem, calc(100vw - 1rem));
+  width: min(30rem, calc(100vw - 2rem));
   display: flex;
+  justify-content: center;
   align-items: center;
   z-index: 60;
 }
 .nrl-toast-lane[hidden] { display: none; }
-.nrl-toast-lane[data-lane="hud"] { transform: none; }
+.nrl-toast-lane[data-lane="dock"] { top: auto; bottom: calc(var(--nrl-nav-h, 0px) + 20px); }
 .nrl-toast-lane[data-lane="match"] {
   transform: none;
-  left: calc(0.5rem + env(safe-area-inset-left, 0px));
-  top: calc(var(--nrl-mo-board, 4rem) + 0.3rem);
-  width: min(26rem, calc(100vw - 12rem));
+  justify-content: flex-start;
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  top: calc(var(--nrl-mo-board, 4rem) + 10px);
+  width: min(26rem, calc(100vw - 2rem));
   min-height: 44px;
 }
 .nrl-toast {
@@ -805,29 +1024,29 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
   cursor: pointer;
   display: none;
   align-items: center;
-  gap: 0.4rem;
+  gap: 8px;
   max-width: 100%;
   max-height: 100%;
   box-sizing: border-box;
-  padding: 0.2rem 0.5rem;
-  border: 2px solid #000;
-  border-left-width: 6px;
-  box-shadow: 2px 2px 0 #000;
-  font-family: 'Courier New', monospace;
-  font-size: 0.8rem;
-  font-weight: bold;
-  line-height: 1.2;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border-left: 4px solid var(--nrl-muted);
+  box-shadow: var(--nrl-shadow-chip);
+  font-family: var(--nrl-f-body);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
 }
 .nrl-toast:first-child { display: flex; }
 .nrl-toast-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.nrl-toast-more { flex: 0 0 auto; padding: 0 0.35em; background: #1a1a2e; color: #f4ecd8; border: 1px solid #000; }
+.nrl-toast-more { flex: 0 0 auto; padding: 0 6px; border-radius: 6px; background: var(--nrl-button); color: var(--nrl-text-2); font-family: var(--nrl-f-num); font-size: 12px; }
 .nrl-toast-more:empty { display: none; }
 /* Red is for real problems only; routine stops and confirmations are neutral; good news is green with a gold edge. */
-.nrl-toast-info { background: #e8e0c8; color: #1a1a2e; border-left-color: #5a6b85; }
-.nrl-toast-success { background: #2e7d32; color: #fff; border-left-color: #f4d03f; }
-.nrl-toast-danger { background: #b03a2e; color: #fff; }
-.nrl-toast-danger .nrl-toast-text::before { content: '! '; }
-.nrl-toast-in { animation: nrl-toast-in 160ms ease-out; }
+.nrl-toast-info { background: rgba(14, 22, 48, 0.97); color: var(--nrl-text); border-left-color: var(--nrl-muted); }
+.nrl-toast-success { background: #1d5a33; color: #fff; border-left-color: var(--nrl-accent); }
+.nrl-toast-danger { background: #7a2a24; color: #fff; border-left-color: var(--nrl-alert); }
+.nrl-toast-danger .nrl-toast-text::before { content: '! '; font-weight: 700; }
+.nrl-toast-in { animation: nrl-toast-in 150ms ease-out; }
 @keyframes nrl-toast-in { from { opacity: 0; transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .nrl-toast-in { animation: none; } }
 
@@ -837,20 +1056,22 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--nrl-nav-h, 0px) + 0.5rem + env(safe-area-inset-bottom, 0px));
+  top: calc(12px + env(safe-area-inset-top, 0px));
   z-index: 60;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  max-width: min(94vw, 440px);
-  background: #e8e0c8;
-  color: #1a1a2e;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  padding: 0.3rem 0.4rem 0.3rem 0.7rem;
-  font-family: 'Courier New', monospace;
-  font-weight: bold;
-  font-size: 0.85rem;
+  gap: 10px;
+  max-width: min(94vw, 460px);
+  background: rgba(14, 22, 48, 0.97);
+  color: var(--nrl-text);
+  border-radius: 12px;
+  box-shadow: var(--nrl-shadow-chip);
+  padding: 4px 4px 4px 14px;
+  font-family: var(--nrl-f-label);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 .nrl-update-toast .nrl-btn { flex: 0 0 auto; }

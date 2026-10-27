@@ -1,12 +1,11 @@
 // src/ui/toasts.ts — the toast lane for 'ui:notify' (the §5 event every system
 // emits). #339: one toast at a time with a "+n" counter for the rest, a tap
 // dismisses it, and it sits where no control is:
-//   - at the club, in the top bar's row between the money tile and the next-match chip
-//     (screens run from the bar to the nav, so anywhere lower sits on their rows
-//     and buttons);
+//   - at the club, just above the dock, centred (the decisions chip has the
+//     top-left corner and a sheet's header row its top edge);
 //   - in a match, in the row under the scoreboard the open log keeps free, and
 //     not while the Replay try chip or a score banner is in that row;
-//   - with neither (the title, the lab), centred at the top.
+//   - with no dock (the title, the lab), centred at the top.
 // A toast's time only runs while it can be seen: under a dialog, a match card
 // or the rotate card it waits.
 //
@@ -26,7 +25,7 @@ export const TOAST_BUSY_MS = 3500;
 /** Body class the match overlay sets while it is up (matchOverlay.ts MATCH_ACTIVE_CLASS). */
 const MATCH_ON_CLASS = 'nrl-match-active';
 const TICK_MS = 200;
-/** Below this the top bar's gap is too narrow to read, and the toast goes to the top centre. */
+/** The match lane is never narrower than this. */
 const MIN_LANE_PX = 140;
 
 /** A toast that waits for the club: anything not about the match while a match is on screen. */
@@ -78,19 +77,8 @@ export function initToasts(root: HTMLElement): void {
       if (stats && stats.width > 0) setLane('match', `width: ${Math.max(MIN_LANE_PX, Math.floor(stats.left - 8 - lane.getBoundingClientRect().left))}px;`);
       return;
     }
-    const money = document.querySelector('.nrl-hud [data-hud="money"]')?.getBoundingClientRect();
-    const actions = document.querySelector('.nrl-hud-actions')?.getBoundingClientRect();
-    // The next-match chip is a button too: the lane stops short of it.
-    const next = document.querySelector('.nrl-hud .nrl-hud-next')?.getBoundingClientRect();
-    const end = next && next.width > 0 ? next.left : actions?.left ?? 0;
-    const gap = money && actions ? Math.floor(end - money.right - 12) : 0;
-    if (money && actions && money.height > 0 && gap >= MIN_LANE_PX) {
-      setLane('hud', `left: ${Math.round(money.right + 6)}px; top: ${Math.round(actions.top)}px; width: ${gap}px; height: ${Math.round(actions.height)}px;`);
-      return;
-    }
-    setLane('top', '');
+    setLane(document.querySelector('.nrl-dock') ? 'dock' : 'top', '');
   };
-
   /** The toast in view, under nothing: its middle takes a tap. */
   const seen = (t: Element): boolean => {
     const r = t.getBoundingClientRect();

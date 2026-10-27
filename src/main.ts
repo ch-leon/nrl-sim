@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
+import './ui/fonts';
 import { BootScene } from './scenes/BootScene';
 import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
-import { enableAutosave, load } from './core/save';
+import { enableAutosave, getActiveSlot, load, save } from './core/save';
 import { showTitleFlow } from './ui/title';
 import { advanceWeek } from './core/time';
 import { advanceUntil } from './core/advance';
@@ -26,20 +27,21 @@ import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
 import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/board';
+import { BOARD, FEATURES } from './config';
+import { fmtMoney } from './ui/hud';
 import { initMatchReport } from './ui/screens/matchReport';
 import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
-import { syncKitDesign } from './ui/screens/kit';
+import { openKitDesigner, syncKitDesign } from './ui/screens/kit';
 import { openSquadScreen } from './ui/screens/squad';
 import { openLineupScreen } from './ui/screens/lineup';
 import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { financeSummary, initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
-import { openContractsScreen } from './ui/screens/contracts';
 import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
-import { advanceUntilAsked, askBeforeAdvance, pendingDecisionCount } from './ui/decisions';
-import { initAudio, initAudioUi } from './fx/audio';
+import { advanceUntilAsked, askBeforeAdvance, decisionChipItems, openDecisions, pendingDecisionCount } from './ui/decisions';
+import { initAudio, initAudioUi, soundStatus } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
 import { setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
@@ -167,6 +169,8 @@ async function boot(): Promise<void> {
     onAdvanceUntil: (t) => advanceUntilAsked(t, advanceUntil),
     onNextMatch: () => nav.open('fixtures'),
     onMoney: () => nav.open('finance'),
+    onDecisions: () => void openDecisions(),
+    decisions: decisionChipItems,
     runwayWeeks: (s) => financeSummary(s).runwayWeeks,
   });
 
@@ -186,30 +190,62 @@ async function boot(): Promise<void> {
 
   initPlacementBar(); // build/move instructions + Cancel (#78)
 
-  // Four tabs and More (#344): the week-to-week screens are a tap away, the
-  // rest of the club one more.
+  // The dock (Broadcast Quiet): CLUB · SQUAD · LEAGUE · BUILD · OFFICE. Lineup
+  // and Recruit are Squad's segments, the ladder is in League; the rest of the
+  // club is Office's tiles, each with a status line.
+  initAudio();
+  const openSettings = initAudioUi();
   const nav = createNav();
-  nav.registerScreen('squad', 'Squad', () => openSquadScreen());
-  nav.registerScreen('lineup', 'Lineup', () => openLineupScreen()); // the coach's nine (#69)
-  // Fixtures and the ladder are the League screen's two tabs.
+  nav.registerScreen('squad', 'Squad', () => openSquadScreen(), { holds: ['lineup', 'recruit'] });
   nav.registerScreen('fixtures', 'League', () => openFixturesScreen(), { holds: ['ladder'] });
-  nav.registerScreen('news', 'News', () => openInboxScreen());
-  nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { more: true });
-  nav.registerScreen('build', 'Build', () => openBuildScreen(), { more: true });
-  nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), { more: true });
-  nav.registerScreen('staff', STAFF_SCREEN_TITLE, () => openStaffScreen(), { more: true });
-  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { more: true });
-  nav.registerScreen('history', 'History', () => openHistoryScreen(), { more: true });
+  nav.registerScreen('build', 'Build', () => openBuildScreen());
+  nav.registerScreen('lineup', 'Lineup', () => openLineupScreen(), { hidden: true }); // the coach's nine (#69)
+  nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { hidden: true });
+  nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), {
+    more: true,
+    holds: ['contracts'],
+    status: () => {
+      const net = Math.round(financeSummary(getState()).netWeekly);
+      return { text: `${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))} / week`, attn: net < 0 };
+    },
+  });
+  nav.registerScreen('staff', STAFF_SCREEN_TITLE, () => openStaffScreen(), {
+    more: true,
+    status: () => {
+      const p = getState().boardPatience;
+      return { text: `Board patience ${p}/${BOARD.MAX_PATIENCE}`, attn: p <= 2 };
+    },
+  });
+  nav.registerScreen('news', 'News', () => openInboxScreen(), {
+    more: true,
+    status: () => {
+      const n = newsInbox.unreadCount + pendingDecisionCount(getState());
+      return n > 0 ? { text: `${n} unread`, attn: true } : { text: 'All read' };
+    },
+  });
+  nav.registerScreen('history', 'History', () => openHistoryScreen(), {
+    more: true,
+    status: () => {
+      const n = getState().history.length;
+      return { text: n === 0 ? 'No seasons yet' : `${n} past season${n === 1 ? '' : 's'}` };
+    },
+  });
+  // Kit designer (#79), behind the cosmetic-kits flag.
+  if (FEATURES.cosmeticKits) nav.registerScreen('kit', 'Kit & colours', () => openKitDesigner(), { more: true, status: () => ({ text: 'Home / away' }) });
   // The Guide (#188); Replay tutorial is in its footer.
-  nav.registerScreen('help', 'Guide', () => openGuideScreen(), { more: true });
+  nav.registerScreen('help', 'Guide', () => openGuideScreen(), { more: true, status: () => ({ text: 'How to play' }) });
+  nav.registerScreen('settings', 'Settings', openSettings, { more: true, status: () => ({ text: soundStatus(getState().settings) }) });
+  // Save & quit: write the slot and go back to the title's slots (#34's reload).
+  nav.registerScreen('quit', 'Save & quit', () => {
+    save(getState());
+    location.reload();
+  }, { more: true, status: () => ({ text: `Slot ${getActiveSlot()}` }) });
   // News badge: unread messages plus event cards waiting for a choice (#75).
   const refreshNewsBadge = (): void => nav.setBadge('news', newsInbox.unreadCount + pendingDecisionCount(getState()));
   newsInbox.onChange(refreshNewsBadge);
   bus.on('state:changed', refreshNewsBadge);
   refreshNewsBadge();
 
-  initAudio();
-  initAudioUi();
   setTutorialScreens((id) => nav.open(id)); // each step opens its own screen (#337)
   startTutorial(); // self-guards on settings.tutorialDone
   initPwa({ holdIosHint: whenTutorialDone }); // the install hint waits for the tutorial (#337 U4)

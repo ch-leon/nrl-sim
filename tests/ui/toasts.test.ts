@@ -59,9 +59,9 @@ describe('colour by meaning (#339)', () => {
     expect(stopToastKind('target')).toBe('info');
   });
   it('info is neutral, success green, danger red', () => {
-    expect(rule(CSS, '.nrl-toast-info')).toContain('background: #e8e0c8');
-    expect(rule(CSS, '.nrl-toast-success')).toContain('background: #2e7d32');
-    expect(rule(CSS, '.nrl-toast-danger')).toContain('background: #b03a2e');
+    expect(rule(CSS, '.nrl-toast-info')).toContain('background: rgba(14, 22, 48, 0.97)');
+    expect(rule(CSS, '.nrl-toast-success')).toContain('background: #1d5a33');
+    expect(rule(CSS, '.nrl-toast-danger')).toContain('background: #7a2a24');
   });
 });
 

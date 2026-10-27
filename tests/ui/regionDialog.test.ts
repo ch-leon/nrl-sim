@@ -20,14 +20,14 @@ describe('Player of the Match card (#203)', () => {
 });
 
 describe('region dialog (#203)', () => {
-  it('sits between the HUD and the nav', () => {
+  it('sits above the dock, the dock whole below it', () => {
     // Its own rule, not the padding it shares with the screen backdrop.
     const r = rule('\n.nrl-dialog-region');
     expect(r).toContain('top: var(--nrl-hud-h');
     expect(r).toContain('bottom: var(--nrl-nav-h');
   });
   it('caps the card to the region', () => {
-    expect(rule('.nrl-dialog-region .nrl-modal')).toContain('max-height: calc(100% - 6px)');
+    expect(rule('.nrl-dialog-region .nrl-modal')).toContain('max-height: 100%');
   });
   it("pins the player page's actions to the foot of the card", () => {
     const r = rule('.nrl-player-actions');

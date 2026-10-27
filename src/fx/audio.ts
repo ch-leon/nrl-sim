@@ -14,7 +14,7 @@
 
 import { bus } from '../core/events';
 import { getState, setState, type GameState } from '../core/state';
-import { el, button, mount, openModal, closeModal } from '../ui/dom';
+import { el, button, openModal, closeModal } from '../ui/dom';
 import { downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, save } from '../core/save';
 import { startTutorial } from '../ui/tutorial';
 import { canInstall, promptInstall } from './pwa';
@@ -664,20 +664,17 @@ export function _resetAudioForTest(): void {
   engine = null;
 }
 
-/** The gear on the top bar: drawn on a 16px grid so it stays crisp, the same on every phone. */
-const GEAR_SVG = '<svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" shape-rendering="crispEdges">'
-  + '<path fill="currentColor" fill-rule="evenodd" d="M4 3h8v1h1v8h-1v1H4v-1H3V4h1zM6 6h4v4H6zM7 0h2v3H7zM7 13h2v3H7zM0 7h3v2H0zM13 7h3v2h-3zM2 2h2v2H2zM12 2h2v2h-2zM2 12h2v2H2zM12 12h2v2h-2z"/></svg>';
-
 /**
- * Mount the Settings dialog and its gear on the top bar (#349 E1): sound, the
+ * Build the Settings dialog (#349 E1) and return its opener, for Office's
+ * Settings tile and the match's pause sheet: sound, the
  * match settings (coach calls, rival matches on the engine, #350 X3: they were
  * on Fixtures), the tutorial's Replay, saves and the PWA Install. Every switch is
  * read from getState().settings when the dialog opens; sound flows through the
  * engine (which persists via setState), the match settings are saved at once.
  * No-op in non-browser envs. GitHub #9 / BAK-202 S6 + BAK-204 Install button.
  */
-export function initAudioUi(): void {
-  if (typeof document === 'undefined') return;
+export function initAudioUi(): () => void {
+  if (typeof document === 'undefined') return () => {};
   const eng = engine ?? initAudio();
   const settings = getState().settings;
 
@@ -772,19 +769,19 @@ export function initAudioUi(): void {
     ),
   );
 
-  const openBtn = button('', () => {
+  ensureAudioStyles();
+  return () => {
     syncInstallVisibility();
     for (const t of [mute, coachCalls, liveRivals]) t.sync();
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
     importIdle();
     openModal(content, { class: 'nrl-settings-modal', region: true, closeButton: true });
-  }, { class: 'nrl-audio-gear' });
-  openBtn.innerHTML = GEAR_SVG;
-  openBtn.setAttribute('aria-label', 'Settings');
-  openBtn.title = 'Settings';
-  const holder = el('div', { class: 'nrl-audio-launcher' }, openBtn);
-  ensureAudioStyles();
-  mount(holder);
+  };
+}
+
+/** Office's Settings tile: "Sound on", "Muted". */
+export function soundStatus(settings: Pick<GameState['settings'], 'muted' | 'volume'>): string {
+  return settings.muted || clampVolume(settings.volume) === 0 ? 'Muted' : 'Sound on';
 }
 
 /** Inject the small popup-specific stylesheet once. */
@@ -794,21 +791,6 @@ function ensureAudioStyles(): void {
   const style = document.createElement('style');
   style.id = 'nrl-audio-styles';
   style.textContent = `
-/* Docked in the HUD strip's top-right corner: the HUD reserves room for it
-   (padding-right below), so it never overlaps Advance Week or the screen
-   region beneath the HUD (GitHub #14). In a match the HUD is hidden and the
-   overlay moves it to the bottom-right corner. */
-.nrl-audio-launcher {
-  pointer-events: none;
-  position: fixed;
-  top: calc(0.5rem + var(--nrl-safe-t, 0px));
-  right: calc(0.5rem + var(--nrl-safe-r, 0px));
-  z-index: 20;
-}
-.nrl-hud { padding-right: calc(3.75rem + var(--nrl-safe-r, 0px)); }
-@media (max-height: 500px) { .nrl-audio-launcher { top: calc(2px + var(--nrl-safe-t, 0px)); } }
-.nrl-audio-gear { pointer-events: auto; display: flex; align-items: center; justify-content: center; padding: 0.3rem; }
-.nrl-audio-gear svg { display: block; }
 .nrl-audio-settings { min-width: 220px; }
 .nrl-dialog-region .nrl-settings-modal { width: min(96vw, 680px); max-width: none; }
 .nrl-audio-title { margin: 0; font-size: 1rem; min-height: 44px; display: flex; align-items: center; padding-right: 2.75rem; }
