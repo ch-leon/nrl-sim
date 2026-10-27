@@ -19,7 +19,7 @@ import {
 } from '../../config';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { bus } from '../../core/events';
-import { button, closeScreen, el, openModal } from '../dom';
+import { button, closeScreen, el, openModal, segmented } from '../dom';
 
 export const PATTERN_LABELS: Record<KitPattern, string> = {
   plain: 'Plain', v: 'V', hoops: 'Hoops', sleeves: 'Sleeves', stripes: 'Stripes',
@@ -94,14 +94,12 @@ export function openKitDesigner(): HTMLElement {
   };
 
   const patternRow = (current: KitPattern, pick: (p: KitPattern) => void, attr: string): HTMLElement => {
-    const row = el('div', { class: 'nrl-kit-row' });
-    for (const p of KIT_PATTERNS) {
-      const b = button(PATTERN_LABELS[p], () => { pick(p); render(); }, { class: 'nrl-kit-pattern' });
+    const seg = segmented(KIT_PATTERNS.map((p) => ({ id: p, label: PATTERN_LABELS[p] })), current, (p) => { pick(p); render(); }, { label: 'Pattern' });
+    for (const [p, b] of seg.buttons) {
+      b.classList.add('nrl-kit-pattern');
       b.setAttribute(attr, p);
-      b.setAttribute('aria-pressed', String(p === current));
-      row.append(b);
     }
-    return row;
+    return el('div', { class: 'nrl-kit-row' }, seg.el);
   };
 
   const swatchRow = (options: readonly string[], current: string, pick: (c: string) => void, attr: string): HTMLElement => {
@@ -140,19 +138,21 @@ export function openKitDesigner(): HTMLElement {
     setState({ kit: draft });
     bus.emit('ui:notify', { text: 'New kit saved. It will be worn from the next match.', kind: 'success' });
     closeScreen();
-  }, { class: 'nrl-kit-save' });
+  }, { class: 'nrl-kit-save nrl-btn-primary' });
   const reset = button('Club default', () => {
     draft = defaultKitDesign(clubColors(getState()), PLAYER_ID);
     render();
   });
 
-  // #336: the preview holds still beside the controls, which scroll; Save stays at the foot.
+  // #336: the preview and Save hold still beside the controls, which scroll.
   const content = el('div', { class: 'nrl-kit' },
-    el('h2', { text: 'Kit designer' }),
-    el('p', { class: 'nrl-kit-note', text: 'Cosmetic only: kits never change how a match plays.' }),
-    el('div', { class: 'nrl-kit-body' }, preview, controls),
-    el('div', { class: 'nrl-kit-actions' }, reset, save),
+    el('div', { class: 'nrl-kit-head' },
+      el('h2', { text: 'Kit & colours' }),
+      el('p', { class: 'nrl-kit-note', text: 'Cosmetic only: kits never change how a match plays.' })),
+    el('div', { class: 'nrl-kit-body' },
+      el('div', { class: 'nrl-kit-side' }, preview, el('div', { class: 'nrl-kit-actions' }, reset, save)),
+      controls),
   );
   render();
-  return openModal(content, { class: 'nrl-kit-modal', screen: true, key: 'squad' });
+  return openModal(content, { class: 'nrl-kit-modal', screen: true, key: 'kit' });
 }

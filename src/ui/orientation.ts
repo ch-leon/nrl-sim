@@ -52,21 +52,22 @@ function ensureRotateStyles(): void {
   .nrl-rotate {
     display: flex; position: fixed; inset: 0; z-index: 10000;
     align-items: center; justify-content: center; padding: 1.5rem;
-    background: #1a1a2e; font-family: "Courier New", monospace;
+    background: #0e1630; font-family: "IBM Plex Sans", system-ui, sans-serif;
   }
 }
 .nrl-rotate-card {
-  background: #f4ecd8; color: #1a1a2e; border: 3px solid #000;
-  box-shadow: 4px 4px 0 #000; padding: 1.25rem 1.5rem; max-width: 18rem;
-  text-align: center; line-height: 1.4;
+  background: #141d3a; color: #fff; border-radius: 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4); padding: 24px 22px; max-width: 18rem;
+  text-align: center; line-height: 1.45;
 }
 .nrl-rotate-phone {
-  width: 2.2rem; height: 3.6rem; margin: 0 auto 1rem; border: 3px solid #000;
-  border-radius: 0.35rem; background: #f4d03f; box-shadow: 3px 3px 0 #000;
+  width: 2.2rem; height: 3.6rem; margin: 0 auto 1rem; border: 3px solid #f4d03f;
+  border-radius: 0.45rem; background: #1f2b55;
   animation: nrl-rotate-turn 2.4s ease-in-out infinite;
 }
-.nrl-rotate-title { font-weight: bold; font-size: 1.1rem; margin: 0 0 0.4rem; }
-.nrl-rotate-text { margin: 0; font-size: 0.9rem; }
+.nrl-rotate-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 22px;
+  letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 6px; }
+.nrl-rotate-text { margin: 0; font-size: 14px; color: #c9d1ea; }
 @keyframes nrl-rotate-turn {
   0%, 20% { transform: rotate(0deg); }
   50%, 80% { transform: rotate(-90deg); }

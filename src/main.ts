@@ -39,6 +39,7 @@ import { openRecruitScreen } from './ui/screens/recruit';
 import { openFixturesScreen } from './ui/screens/fixtures';
 import { initSeasonEndFeedback, openHistoryScreen } from './ui/screens/history';
 import { financeSummary, initFinanceLedger, openFinanceScreen } from './ui/screens/finance';
+import { openContractsScreen } from './ui/screens/contracts';
 import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
 import { advanceUntilAsked, askBeforeAdvance, decisionChipItems, openDecisions, pendingDecisionCount } from './ui/decisions';
 import { initAudio, initAudioUi, soundStatus } from './fx/audio';
@@ -209,6 +210,7 @@ async function boot(): Promise<void> {
       return { text: `${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))} / week`, attn: net < 0 };
     },
   });
+  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { hidden: true }); // from Finance's VIEW ▸
   nav.registerScreen('staff', STAFF_SCREEN_TITLE, () => openStaffScreen(), {
     more: true,
     status: () => {

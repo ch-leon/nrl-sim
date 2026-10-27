@@ -39,14 +39,17 @@ export interface TutorialStep {
  * The onboarding steps, in order (BAK-202 spec; News, Finance and Contracts
  * added by N7, #188; Lineup by N11; tied to their screens by #337). Anchor
  * selectors reference elements that really exist in the shipped UI:
- *   - nav buttons carry `data-screen="<id>"` (see ui/nav.ts registerScreen)
+ *   - the dock's tabs carry `data-screen="<id>"` (see ui/nav.ts registerScreen),
+ *     Office's tiles too, in `.nrl-nav-sheet`
  *   - open screens carry `data-screen-key="<id>"` (see ui/dom.ts openScreen)
- *   - the Advance Week control is the button inside `.nrl-hud-actions` (ui/hud.ts)
- * An anchor may list fallbacks: the first on screen wins, so a screen in More's
- * sheet (#344) is highlighted on the More tab until the sheet is open. When only
- * a fallback is on screen the bubble offers Next, so a closed screen never strands the player.
+ *   - PLAY WEEK is the first button inside `.nrl-hud-actions` (ui/hud.ts)
+ * An anchor may list fallbacks: the first on screen wins, so a screen in Office's
+ * sheet is highlighted on the OFFICE tab until the sheet is open. When only a
+ * fallback is on screen the bubble offers Next, so a closed screen never strands the player.
  */
-const inMore = (id: string): string => `.nrl-nav .nrl-btn[data-screen="${id}"], .nrl-nav [data-nav-more]`;
+const inMore = (id: string): string => `.nrl-nav-sheet .nrl-btn[data-screen="${id}"], .nrl-nav [data-nav-more]`;
+/** A screen reached through Squad's segments (Lineup, Recruit): its segment, else the SQUAD tab. */
+const inSquad = (id: string): string => `[data-seg="${id}"], .nrl-nav .nrl-btn[data-screen="squad"]`;
 
 export const STEPS: readonly TutorialStep[] = [
   {
@@ -58,7 +61,7 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'build',
     text: 'Tap Training Paddock to build one. It trains your squad every week.',
-    anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], ${inMore('build')}`,
+    anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], .nrl-nav .nrl-btn[data-screen="build"]`,
     advanceOn: 'facility:placed',
     opens: 'build',
     until: '.nrl-placebar:not([hidden])',
@@ -66,7 +69,7 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'place',
     text: 'Tap a green spot on the grass to build it there.',
-    anchor: `.nrl-placebar:not([hidden]), ${inMore('build')}`,
+    anchor: '.nrl-placebar:not([hidden]), .nrl-nav .nrl-btn[data-screen="build"]',
     advanceOn: 'facility:placed',
   },
   {
@@ -74,7 +77,7 @@ export const STEPS: readonly TutorialStep[] = [
     text: 'Pick a free agent and tap Sign to add him to your squad.',
     anchor:
       `[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled)), ` +
-      `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inMore('recruit')}`,
+      `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inSquad('recruit')}`,
     advanceOn: 'player:signed',
     opens: 'recruit',
   },
@@ -88,26 +91,26 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'lineup',
     text: 'Lineup sets your nine, kicker, captain and game plan. You can change the plan at half-time.',
-    anchor: '.nrl-nav .nrl-btn[data-screen="lineup"]',
+    anchor: inSquad('lineup'),
     advanceOn: 'next-button',
     opens: 'lineup',
   },
   {
     id: 'advance',
-    text: 'Tap Advance Week: training and wages run, then your first match kicks off.',
+    text: 'Tap Play Week: training and wages run, then your first match kicks off.',
     anchor: '.nrl-hud-actions .nrl-btn',
     advanceOn: 'week:advanced',
   },
   {
     id: 'news',
-    text: 'News keeps results and warnings. A decision shows as a banner here and a red count on Advance Week.',
-    anchor: '.nrl-nav .nrl-btn[data-screen="news"]',
+    text: 'News, in Office, keeps results and warnings. A decision shows as a chip on the grounds and a red count on Play Week.',
+    anchor: inMore('news'),
     advanceOn: 'next-button',
     opens: 'news',
   },
   {
     id: 'finance',
-    text: "Finance, under More, shows money in and out. The board's goals for the season are on Staff & Board, also under More.",
+    text: "Finance, in Office, shows money in and out. The board's goals for the season are on Staff & Board, also in Office.",
     anchor: inMore('finance'),
     advanceOn: 'next-button',
     opens: 'finance',
@@ -115,13 +118,13 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'contracts',
     text: 'Contracts lists every deal by expiry. Renew before a player walks, or sell him for a fee.',
-    anchor: inMore('contracts'),
+    anchor: `[data-screen-key="contracts"], ${inMore('finance')}`,
     advanceOn: 'next-button',
     opens: 'contracts',
   },
   {
     id: 'wrap',
-    text: "That's the loop! The Guide under More explains the rest, coach.",
+    text: "That's the loop! The Guide in Office explains the rest, coach.",
     anchor: null,
     advanceOn: 'next-button',
   },
@@ -454,7 +457,7 @@ function renderBubble(
   const actions = el('div', { class: 'nrl-tutorial-actions' });
   actions.appendChild(button('Skip', () => endTutorial(), { class: 'nrl-tutorial-skip' }));
   if (wantsNext) {
-    actions.appendChild(button('Next', () => advance(), { class: 'nrl-tutorial-next' }));
+    actions.appendChild(button('Next', () => advance(), { class: 'nrl-tutorial-next nrl-btn-primary' }));
   }
 
   // A step that opened its screen keeps to a bar on a landscape phone, so the screen shows under it.
@@ -473,8 +476,8 @@ function renderBubble(
 
 // ── Styles ───────────────────────────────────────────────────────────────
 // Injected once, lazily, from startTutorial. Kept out of dom.ts (owned by WU-5)
-// so this ticket edits only files it owns. Pixel-art styling to match the kit:
-// chunky borders, hard drop shadow, monospace, pixelated rendering.
+// so this ticket edits only files it owns. Broadcast Quiet: a navy card with a
+// yellow edge pointing at the one thing to tap, ringed in yellow.
 
 const TUTORIAL_STYLE_ID = 'nrl-tutorial-styles';
 
@@ -493,14 +496,14 @@ export const TUTORIAL_CSS = `
   inset: 0;
   pointer-events: none; /* only the bubble takes taps */
   z-index: 200;         /* above HUD/nav (55) and modals (100) */
-  font-family: 'Courier New', monospace;
-  image-rendering: pixelated;
+  font-family: var(--nrl-f-body, 'IBM Plex Sans', sans-serif);
 }
 .nrl-tutorial-cutout {
   position: fixed;
   pointer-events: none;
-  border: 3px solid #f4d03f;
-  box-shadow: 0 0 0 3px #000, 0 0 12px 2px #f4d03f;
+  border: 2px solid #f4d03f;
+  border-radius: 12px;
+  box-shadow: 0 0 0 4px rgba(244, 208, 63, 0.25), 0 0 18px 2px rgba(244, 208, 63, 0.45);
   z-index: 200;
 }
 /* #337 U1: never over a match, live or at full time. */
@@ -512,11 +515,12 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   bottom: calc(5rem + var(--nrl-safe-b, 0px)); /* clear of the nav and the home bar */
   transform: translateX(-50%);
   max-width: min(90vw, 320px);
-  background: #e8e0c8;
-  color: #1a1a2e;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  padding: 0.75rem 0.9rem;
+  background: rgba(14, 22, 48, 0.97);
+  color: #fff;
+  border-radius: 14px;
+  border-left: 4px solid #f4d03f;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  padding: 12px 14px;
   z-index: 201;
   /* #206: never taller than the room above its dock. The copy scrolls inside the
      bubble and Skip / Next stay pinned at its foot, so however big the text gets
@@ -536,9 +540,10 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   max-height: calc(100dvh - 1.5rem);
 }
 .nrl-tutorial-text {
-  font-size: clamp(0.8rem, 3vw, 1rem);
-  line-height: 1.35;
-  margin-bottom: 0.7rem;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: 10px;
+  color: #c9d1ea;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -547,16 +552,18 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
 .nrl-tutorial-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: 8px;
   flex: 0 0 auto;
 }
+.nrl-tutorial-actions .nrl-btn { min-height: 40px; }
+@media (pointer: coarse) { .nrl-tutorial-actions .nrl-btn { min-height: 44px; } }
 /* A landscape phone (#195): the bubble docks bottom-left, clear of the tile the
    player has to tap, the match's speed buttons and the home bar. */
 @media (max-height: 500px) {
   .nrl-tutorial-bubble, .nrl-tutorial-centered {
     top: auto;
-    bottom: calc(4.5rem + var(--nrl-safe-b, 0px));
-    left: calc(0.75rem + var(--nrl-safe-l, 0px));
+    bottom: calc(var(--nrl-nav-h, 4.5rem) + 12px);
+    left: calc(12px + var(--nrl-safe-l, 0px));
     right: auto;
     transform: none;
     /* 300px with border-box is ~265px of copy: every step fits unscrolled at
@@ -575,12 +582,12 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
     gap: 0.6rem;
     left: calc(0.75rem + var(--nrl-safe-l, 0px));
     right: calc(0.75rem + var(--nrl-safe-r, 0px));
-    bottom: calc(var(--nrl-nav-h, 3.5rem) + 0.25rem);
+    bottom: calc(var(--nrl-nav-h, 3.5rem) + 4px);
     max-width: 640px;
-    padding: 0.35rem 0.6rem;
+    padding: 6px 6px 6px 14px;
   }
   /* Capped in rem, which a text boost leaves alone: boosted copy scrolls (#206) instead of growing the bar over the screen. */
-  .nrl-tutorial-bar .nrl-tutorial-text { margin: 0; font-size: 0.8rem; line-height: 1.25; max-height: 5rem; }
+  .nrl-tutorial-bar .nrl-tutorial-text { margin: 0; font-size: 13px; line-height: 1.3; max-height: 5rem; }
 }
 .nrl-tutorial-bubble.nrl-tutorial-top { top: calc(var(--nrl-hud-h, 0px) + 0.25rem); bottom: auto; }
 .nrl-tutorial-bubble.nrl-tutorial-right { left: auto; right: calc(0.75rem + var(--nrl-safe-r, 0px)); transform: none; }

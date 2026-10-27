@@ -289,39 +289,39 @@ function ensureLabStyles(): void {
   position: fixed; left: calc(0.5rem + env(safe-area-inset-left, 0px)); top: calc(0.5rem + env(safe-area-inset-top, 0px));
   z-index: 30; width: min(22rem, calc(100vw - 1rem)); box-sizing: border-box; padding: 0.4rem 0.5rem;
   font-size: 0.72rem; display: flex; flex-direction: column; gap: 0.3rem; pointer-events: auto;
+  background: rgba(14, 22, 48, 0.97); color: #fff; border-radius: 14px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   /* Never taller than the screen: scroll inside it (a phone on its side is short). */
   max-height: calc(100vh - 1rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   max-height: calc(100dvh - 1rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-y: auto; overscroll-behavior: contain;
 }
-.nrl-lab-title { font-weight: bold; font-size: 0.78rem; flex: 1 1 auto; }
+.nrl-lab-title { font-family: var(--nrl-f-label); font-weight: 700; font-size: 1rem; letter-spacing: 0.04em; text-transform: uppercase; flex: 1 1 auto; }
 .nrl-lab-head { flex-wrap: nowrap; }
 .nrl-lab .nrl-lab-collapse { padding: 0 0.4rem; line-height: 1.1; }
 .nrl-lab[data-collapsed] .nrl-lab-more { display: none; }
 .nrl-lab[data-collapsed] { width: auto; max-width: min(22rem, calc(100vw - 1rem)); }
 .nrl-lab-row { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
 .nrl-lab-select, .nrl-lab-seed, .nrl-lab-code {
-  font: inherit; border: 2px solid #000; background: #fff6c2; color: #1a1a2e; padding: 0.15rem 0.25rem; min-width: 0;
+  font: inherit; border: 1px solid #26325c; border-radius: 6px; background: #1b264a; color: #fff; padding: 0.2rem 0.3rem; min-width: 0;
 }
 .nrl-lab-select { flex: 1 1 5rem; max-width: 8rem; }
 .nrl-lab-traits { flex: 0 1 auto; }
 .nrl-lab-preset { flex: 1 1 4rem; max-width: 6.5rem; }
 .nrl-lab-seed { width: 4.5rem; }
 .nrl-lab-code { flex: 1 1 6rem; }
-.nrl-lab .nrl-btn { padding: 0.2rem 0.45rem; font-size: 0.72rem; }
+.nrl-lab .nrl-btn { padding: 0.2rem 0.55rem; font-size: 0.8rem; border-radius: 8px; }
 .nrl-lab .nrl-lab-mini { padding: 0.15rem 0.4rem; }
-.nrl-lab .nrl-btn[data-active] { background: #fff6c2; box-shadow: inset 0 0 0 2px #1a1a2e, 3px 3px 0 #000; }
-.nrl-lab-readout { margin-left: auto; font-variant-numeric: tabular-nums; }
+.nrl-lab-readout { margin-left: auto; font-family: var(--nrl-f-num); font-variant-numeric: tabular-nums; }
 .nrl-lab-scrub { width: 100%; margin: 0; accent-color: #f4d03f; }
-.nrl-lab-label { opacity: 0.85; }
+.nrl-lab-label { color: #9aa6c7; }
 .nrl-lab-log { display: flex; flex-direction: column; gap: 0.1rem; min-height: 1.2em; max-height: 7.5em; overflow-y: auto; }
 .nrl-lab-line {
   font: inherit; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background: transparent; border: 0; border-left: 3px solid #f4d03f; padding: 0 0.3rem; color: inherit; cursor: pointer;
 }
-.nrl-lab-line:hover { background: #fff6c2; }
-.nrl-lab-stats { font-variant-numeric: tabular-nums; opacity: 0.85; }
-.nrl-lab-hint { opacity: 0.65; font-size: 0.66rem; }
+.nrl-lab-line:hover { background: #1f2b55; }
+.nrl-lab-stats { font-family: var(--nrl-f-num); font-variant-numeric: tabular-nums; color: #c9d1ea; }
+.nrl-lab-hint { color: #9aa6c7; font-size: 0.66rem; }
 @media (max-height: ${SHORT_SCREEN_PX}px) {
   .nrl-lab { width: min(19rem, calc(100vw - 1rem)); padding: 0.3rem 0.4rem; gap: 0.2rem; font-size: 0.66rem; }
   .nrl-lab-log { max-height: 3.8em; }

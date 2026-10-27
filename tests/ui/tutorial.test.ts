@@ -59,8 +59,8 @@ describe('STEPS (declarative step list invariants)', () => {
 
   it('copy names the 5-tab nav: screens under More say so', () => {
     const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
-    expect(byId.get('finance')!.text).toContain('under More');
-    expect(byId.get('wrap')!.text).toContain('under More');
+    expect(byId.get('finance')!.text).toContain('in Office');
+    expect(byId.get('wrap')!.text).toContain('in Office');
   });
 
   it('gives every step a non-empty id and text', () => {

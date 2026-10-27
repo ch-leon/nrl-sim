@@ -1214,201 +1214,157 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-staff-info strong { margin-right: 0.4em; }
 }
 
-/* ── News inbox (#45) ─────────────────────────────────────────────────── */
-.nrl-nav-badge {
-  display: inline-block;
-  margin-left: 0.25rem;
-  min-width: 1.1em;
-  padding: 0 0.2em;
-  background: #b03a2e;
-  color: #fff;
-  border: 2px solid #000;
-  font-size: 0.85em;
-  line-height: 1.2;
-  text-align: center;
-}
-.nrl-screen-backdrop .nrl-news-modal {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  width: min(96vw, 640px);
-  height: calc(100% - 6px);
-  max-width: none;
-  padding: 0.55rem 0.65rem;
-}
-.nrl-news { font-size: 0.9rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+/* ── News (#45), under Office ───────────────────────────────────────────── */
+.nrl-news { font-size: 13px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-news-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-/* #345: the title and the filters are one row beside the ✕; the feed gets the rest. */
-.nrl-news-head { display: flex; align-items: center; gap: 0.6rem; flex: 0 0 auto; min-width: 0; padding-right: 2.75rem; margin-bottom: 0.3rem; }
-.nrl-news h2 { margin: 0; font-size: 1.05rem; flex: 0 0 auto; }
-.nrl-news h3 { margin: 0.6rem 0 0.2rem; font-size: 0.9rem; }
-.nrl-news-filters {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.3rem;
-  min-width: 0;
-  overflow-x: auto;
-  padding: 0 3px 3px 0;
-}
-.nrl-news-filter { flex: 0 0 auto; }
-.nrl-news-filter.nrl-news-active, .nrl-news-filter.nrl-news-active:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
+/* #345: the title and the filters are one row; the feed gets the rest. */
+.nrl-news-head { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-width: 0; min-height: 44px; margin-bottom: 8px; }
+.nrl-news h2 { margin: 0; flex: 0 0 auto; }
+.nrl-news-filters { margin-left: auto; }
+.nrl-news h3 { margin: 10px 0 4px; }
+.nrl-news-week:first-child h3 { margin-top: 0; }
 .nrl-news-list { overflow-y: visible; }
 .nrl-news-item {
-  padding: 0.2rem 0.4rem;
-  margin-bottom: 0.25rem;
-  border-left: 4px solid #5a6b85; /* the info toast's edge (#339) */
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  background: var(--nrl-panel);
+  border-left: 3px solid var(--nrl-muted); /* the info toast's edge (#339) */
+  color: var(--nrl-text);
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
-.nrl-news-item.nrl-news-success { border-left-color: #2e7d32; }
-.nrl-news-item.nrl-news-danger { border-left-color: #b03a2e; }
-.nrl-news-empty { margin: 0.4rem 0; }
+.nrl-news-item.nrl-news-success { border-left-color: var(--nrl-pos); }
+.nrl-news-item.nrl-news-danger { border-left-color: var(--nrl-alert); }
+.nrl-news-empty { margin: 24px 0; text-align: center; color: var(--nrl-muted); }
 /* Waiting decisions: one row, however many, with the button to their popup. */
 .nrl-news-decisions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 10px;
   flex: 0 0 auto;
-  margin: 0 3px 0.35rem 0;
-  padding: 0.15rem 0.2rem 0.15rem 0.5rem;
-  background: #fff8e1;
-  border: 3px solid #000;
-  border-left: 6px solid #e8a33a;
+  margin: 0 0 8px;
+  padding: 0 6px 0 12px;
+  min-height: 48px;
+  background: var(--nrl-raised);
+  border-radius: 10px;
 }
 .nrl-news-decisions[hidden] { display: none; }
-.nrl-news-decisions-text { flex: 1 1 auto; min-width: 0; font-weight: bold; font-size: 0.85rem; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nrl-news-answer { flex: 0 0 auto; }
-/* 956×330: a waiting decision shares the title's row, so the feed keeps four items. */
-@media (max-height: 340px) {
-  .nrl-screen-backdrop .nrl-news-modal { width: min(96vw, 820px); }
-  .nrl-news { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); column-gap: 0.5rem; }
-  .nrl-news-head { padding-right: 0; }
-  .nrl-news-decisions { margin: 0 2.75rem 0.3rem 0; }
-  .nrl-news-decisions[hidden] + .nrl-news-body { grid-row: 2; }
-  .nrl-news-body { grid-column: 1 / -1; }
-  .nrl-news-head:has(+ .nrl-news-decisions[hidden]) { grid-column: 1 / -1; padding-right: 2.75rem; }
-}
-.nrl-event-card {
-  background: #fff8e1;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  padding: 0.4rem 0.5rem;
-  margin: 0 3px 0.6rem 0;
-}
-.nrl-event-title { font-weight: bold; font-size: 1rem; line-height: 1.25; }
+.nrl-news-decisions-text { flex: 1 1 auto; min-width: 0; color: var(--nrl-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nrl-news-decisions-text b { font-family: var(--nrl-f-label); font-size: 15px; letter-spacing: 0.06em; color: var(--nrl-accent); margin-right: 8px; }
+.nrl-news-answer { flex: 0 0 auto; min-height: 36px; }
+
+/* ── A decision card (#75, #338, #346): the story, its deadline, a row per choice ── */
+.nrl-event-card { margin: 0 0 8px; }
+.nrl-event-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; padding-right: 44px; }
+.nrl-event-title { font-family: var(--nrl-f-label); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; }
 /* The deadline wraps (#345: it was cut off at "…or it's "Ban the t"). */
-.nrl-event-meta { font-size: 0.75rem; color: #555; line-height: 1.3; overflow-wrap: anywhere; }
-.nrl-event-text { margin: 0.35rem 0; overflow-wrap: anywhere; line-height: 1.35; font-size: 0.9rem; }
-.nrl-event-choices { display: flex; flex-direction: column; gap: 0.4rem; }
-.nrl-event-choice {
+.nrl-event-meta { font-size: 12px; color: var(--nrl-accent); line-height: 1.3; overflow-wrap: anywhere; }
+.nrl-event-text { margin: 6px 0 10px; overflow-wrap: anywhere; line-height: 1.45; font-size: 14px; color: var(--nrl-text-2); }
+.nrl-event-choices { display: flex; flex-direction: column; gap: 6px; }
+.nrl-btn.nrl-event-choice {
   flex: 1 1 auto;
   width: 100%;
   height: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--nrl-raised);
   text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
   white-space: normal;
-  min-height: 44px;
+  min-height: 48px;
 }
-.nrl-event-choice-label { font-weight: bold; font-size: 0.95rem; line-height: 1.2; }
-.nrl-event-choice-hint { font-size: 0.78rem; opacity: 0.9; white-space: normal; font-weight: normal; line-height: 1.3; }
+.nrl-btn.nrl-event-choice:hover:not(:disabled) { background: #22305c; }
+.nrl-event-choice-label { font-family: var(--nrl-f-label); font-size: 17px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; color: var(--nrl-text); }
+.nrl-event-choice-hint { font-family: var(--nrl-f-body); font-size: 12px; font-weight: 400; line-height: 1.35; color: var(--nrl-text-2); }
 /* #346: a risk is its own line, marked so it never reads as a sure cost. */
 .nrl-event-choice-risk {
-  font-size: 0.78rem; white-space: normal; font-weight: normal; line-height: 1.3;
-  color: #7a1f14; padding-left: 0.4rem; border-left: 3px solid #b03a2e; margin-top: 0.1rem;
+  font-family: var(--nrl-f-body); font-size: 12px; font-weight: 400; line-height: 1.35;
+  color: var(--nrl-neg); padding-left: 8px; border-left: 2px solid var(--nrl-alert); margin-top: 2px;
 }
 /* The decisions popup and Advance Week's ask (#338, #345): a region dialog, one card. */
-.nrl-dialog-region .nrl-decisions-modal { width: min(96vw, 640px); max-width: none; }
-.nrl-decisions h2, .nrl-ask h2 { margin: 0 0 0.35rem; font-size: 1.05rem; padding-right: 2.75rem; min-height: 1.4rem; }
-.nrl-decisions .nrl-event-card { margin-bottom: 0.2rem; }
-.nrl-decisions-note { margin: 0 0 0.5rem; font-size: 0.85rem; }
-.nrl-decisions-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.4rem 3px 3px 0; }
+.nrl-dialog-region .nrl-decisions-modal { width: min(100%, 680px); }
+.nrl-decisions h2, .nrl-ask h2 { margin: 0 0 8px; padding-right: 44px; min-height: 36px; display: flex; align-items: center; }
+.nrl-decisions-count { font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); margin: 0 0 2px; }
+.nrl-decisions-note { margin: 0 0 12px; color: var(--nrl-text-2); }
+.nrl-decisions-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .nrl-decisions-actions .nrl-btn { flex: 1 1 12rem; }
-.nrl-ask-answer, .nrl-decisions-go { background: #7ec850; }
-.nrl-ask-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.nrl-ask-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.6rem; padding: 0.25rem 0.45rem; background: #fff8e1; border: 2px solid #000; border-left: 6px solid #3a6ea5; font-size: 0.85rem; }
-.nrl-ask-row.nrl-ask-due { border-left-color: #b03a2e; }
-.nrl-ask-title { font-weight: bold; }
-.nrl-ask-note { color: #444; overflow-wrap: anywhere; }
-/* Compact cards on short landscape and narrow portrait phones: choices stay
-   in view, with their hints visible and targets at least 44px tall. */
-@media (max-height: 500px), (max-width: 480px) {
-  .nrl-screen-backdrop .nrl-news-modal { padding: 0.25rem 0.5rem; }
-  .nrl-news h2 { font-size: 0.9rem; }
-  .nrl-decisions h2, .nrl-ask h2 { font-size: 0.9rem; margin-bottom: 0.15rem; min-height: 0; line-height: 44px; }
-  .nrl-event-card { padding: 0.15rem 0.4rem 0.1rem; margin-bottom: 0.25rem; }
-  .nrl-event-title { font-size: 0.95rem; }
-  .nrl-event-meta { font-size: 0.68rem; line-height: 1.2; }
-  .nrl-event-text { margin: 0.05rem 0 0.15rem; font-size: 0.78rem; line-height: 1.2; }
-  .nrl-event-choices { gap: 0.2rem; }
-  .nrl-event-choice { padding: 0.1rem 0.45rem; }
-  .nrl-event-choice-hint, .nrl-event-choice-risk { font-size: 0.7rem; line-height: 1.2; }
-  .nrl-decisions-actions { margin-top: 0.25rem; }
-}
-/* Landscape has room for equal columns; portrait keeps the choices stacked. */
+.nrl-ask-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.nrl-ask-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 12px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 13px; }
+.nrl-ask-row.nrl-ask-due { border-left-color: var(--nrl-accent); }
+.nrl-ask-title { font-family: var(--nrl-f-label); font-size: 17px; font-weight: 700; }
+.nrl-ask-note { color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-ask-due .nrl-ask-note { color: var(--nrl-accent); }
+/* Short landscape phones: the choices side by side, so all of them show with their hints. */
 @media (max-height: 500px) {
-  .nrl-event-head { display: flex; align-items: baseline; gap: 0.6rem; }
-  .nrl-event-title { flex: 0 0 auto; }
-  .nrl-event-meta { flex: 1 1 auto; min-width: 0; }
-  .nrl-event-choices { flex-direction: row; align-items: stretch; gap: 0.4rem; }
-  .nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; }
+  .nrl-event-title { font-size: 20px; }
+  .nrl-event-text { margin: 4px 0 8px; font-size: 13px; line-height: 1.35; }
+  .nrl-event-choices { flex-direction: row; align-items: stretch; }
+  .nrl-btn.nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; justify-content: flex-start; }
+  .nrl-decisions h2, .nrl-ask h2 { margin-bottom: 4px; }
 }
+@media (max-width: 480px) {
+  .nrl-event-choices { flex-direction: column; }
+}
+
+/* ── Placement bar (#78): what to do while placing or moving, and Cancel ── */
 .nrl-placebar {
   pointer-events: auto;
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  top: calc(var(--nrl-hud-h, 0px) + 0.4rem);
-  z-index: 40;
+  top: calc(12px + var(--nrl-safe-t));
+  z-index: 46;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 12px;
   width: max-content;
-  max-width: min(94vw, 560px);
-  background: #e8e0c8;
-  color: #1a1a2e;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  padding: 0.3rem 0.4rem 0.3rem 0.6rem;
-  font-size: 0.8rem;
+  max-width: min(94vw, 600px);
+  min-height: 52px;
+  box-sizing: border-box;
+  background: rgba(14, 22, 48, 0.95);
+  color: var(--nrl-text);
+  border-radius: 12px;
+  box-shadow: var(--nrl-shadow-chip);
+  padding: 4px 4px 4px 14px;
+  font-size: 13px;
 }
 .nrl-placebar[hidden] { display: none; }
+.nrl-placebar-text { flex: 1 1 auto; line-height: 1.35; }
+.nrl-placebar-text b { font-family: var(--nrl-f-label); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); margin-right: 6px; }
+.nrl-placebar-cancel { flex: 0 0 auto; }
+
+/* ── Kit & colours (#79), under Office ───────────────────────────────────── */
 .nrl-kit { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-.nrl-kit h2 { margin: 0; font-size: 1.05rem; line-height: 44px; }
-.nrl-kit h3 { margin: 0.5rem 0 0.2rem; font-size: 0.85rem; }
+.nrl-kit-head { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-height: 44px; margin-bottom: 8px; }
+.nrl-kit h2 { margin: 0; }
+.nrl-kit h3 { margin: 10px 0 4px; }
 .nrl-kit-controls > h3:first-child { margin-top: 0; }
-.nrl-kit-note { margin: 0 0 0.4rem; font-size: 0.75rem; }
-.nrl-kit-body { display: flex; gap: 0.6rem; flex: 1 1 auto; min-height: 0; }
-.nrl-kit-preview { display: flex; gap: 0.5rem; align-items: flex-end; align-self: flex-start; flex: 0 0 auto; }
-.nrl-kit-preview figure { margin: 0; text-align: center; font-size: 0.7rem; }
-.nrl-kit-sprite { width: 84px; height: 90px; image-rendering: pixelated; }
-.nrl-kit-portrait { width: 72px; image-rendering: pixelated; }
-.nrl-kit-controls { flex: 1 1 16rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
-.nrl-kit-label { font-size: 0.72rem; font-weight: bold; margin-top: 0.2rem; }
-.nrl-kit-row { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-.nrl-kit-pattern[aria-pressed="true"], .nrl-kit-pattern[aria-pressed="true"]:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
+.nrl-kit-note { margin: 0; font-size: 12px; color: var(--nrl-muted); }
+.nrl-kit-body { display: flex; gap: 16px; flex: 1 1 auto; min-height: 0; }
+.nrl-kit-side { display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
+.nrl-kit-preview { display: flex; gap: 8px; align-items: flex-end; padding: 8px 10px; border-radius: 10px; background: var(--nrl-panel); }
+.nrl-kit-preview figure { margin: 0; text-align: center; font-family: var(--nrl-f-label); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-kit-sprite { width: 72px; height: 77px; image-rendering: pixelated; }
+.nrl-kit-portrait { width: 60px; image-rendering: pixelated; }
+.nrl-kit-controls { flex: 1 1 16rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-kit-label { font-family: var(--nrl-f-label); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); margin: 6px 0 4px; }
+.nrl-kit-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.nrl-kit-row .nrl-seg { flex-wrap: wrap; }
 .nrl-kit-swatch {
   pointer-events: auto;
   width: 44px; height: 44px; /* #194: a tap target */
-  border: 3px solid #555;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
   cursor: pointer;
 }
-.nrl-kit-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #000; }
-.nrl-kit-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; flex: 0 0 auto; padding: 0 3px 3px 0; }
-.nrl-screen-backdrop .nrl-kit-modal { width: min(96vw, 760px); }
-/* S4 (#351): on a landscape phone the title, note, preview and Save make a left
-   column, so the controls scroll beside them at the box's full height. */
-@media (max-height: 500px) {
-  .nrl-kit { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; column-gap: 0.75rem; }
-  .nrl-kit-body { display: contents; }
-  .nrl-kit h2 { grid-column: 1; grid-row: 1; font-size: 0.95rem; line-height: 1.3; }
-  .nrl-kit-note { grid-column: 1; grid-row: 2; max-width: 13.5rem; margin: 0.15rem 0 0.3rem; font-size: 0.7rem; }
-  .nrl-kit-preview { grid-column: 1; grid-row: 3; gap: 0.35rem; }
-  .nrl-kit-sprite { width: 56px; height: 60px; }
-  .nrl-kit-portrait { width: 52px; }
-  .nrl-kit-controls { grid-column: 2; grid-row: 1 / -1; padding-right: 2.75rem; }
-  .nrl-kit-actions { grid-column: 1; grid-row: 4; justify-content: flex-start; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem; }
-}
+.nrl-kit-swatch[aria-pressed="true"] { border-color: var(--nrl-navy); box-shadow: 0 0 0 2px var(--nrl-accent); }
+.nrl-kit-actions { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; }
+.nrl-kit-actions .nrl-btn { flex: 1 1 auto; }
 /* ── League screen: the next-match card and the form guide (N7, #183) ──── */
 /* A landscape phone has width to spare and no height: let the league use it. */
 .nrl-screen-backdrop .nrl-league-modal { width: min(96vw, 760px); max-width: none; }
@@ -1588,57 +1544,29 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-player-why { order: 1; }
 }
 .nrl-player-why { flex: 1 1 100%; font-size: 0.72rem; color: #555; }
-/* ── Guide, under More (N7, #188, #344) ─────────────────────────────────────────── */
-.nrl-screen-backdrop .nrl-guide-modal { width: min(96vw, 760px); max-width: none; display: flex; flex-direction: column; }
+/* ── Guide, under Office (N7, #188, #344) ─────────────────────────────────── */
 /* #206: only the page scrolls; the tabs and the foot (Replay) stay in view. */
-.nrl-guide { font-size: 0.85rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-guide { font-size: 13px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-guide-tabs, .nrl-guide-foot { flex: 0 0 auto; }
-.nrl-guide-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-guide-tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
-.nrl-guide-tabs .nrl-btn { flex: 1 1 auto; font-size: clamp(0.6rem, 1.7vw, 0.85rem); padding: 0.4rem 0.45rem; }
-.nrl-guide-tabs .nrl-btn[aria-pressed="true"], .nrl-guide-tabs .nrl-btn[aria-pressed="true"]:hover:not(:disabled) { background: #7ec850; color: #1a1a2e; }
-.nrl-guide h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
-.nrl-guide h3 { margin: 0.5rem 0 0.15rem; font-size: 0.88rem; border-bottom: 2px solid #b8ae92; }
+.nrl-guide-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+/* One row: the page tabs (a segmented control that swipes sideways), then Replay. */
+.nrl-guide-top { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-width: 0; margin-bottom: 10px; }
+.nrl-guide-top .nrl-guide-tabs { flex: 0 1 auto; min-width: 0; }
+.nrl-guide-tabs > .nrl-btn { padding: 0 12px; font-size: 15px; }
+.nrl-guide h2 { margin: 0; }
+.nrl-guide h3 { margin: 12px 0 4px; }
 /* N14 (#263): the screen a page describes, one tap away. */
-.nrl-guide-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem 0.75rem; margin: 0 0 0.3rem; }
-.nrl-guide-head h2 { margin: 0; }
-.nrl-guide-link { font-size: 0.78rem; padding: 0.3rem 0.6rem; }
-.nrl-guide p { margin: 0.2rem 0; overflow-wrap: anywhere; }
-.nrl-guide ul { margin: 0.2rem 0 0.2rem 1.1rem; padding: 0; }
-.nrl-guide li { margin: 0.15rem 0; overflow-wrap: anywhere; }
-.nrl-guide-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
-  padding-top: 0.5rem;
-  border-top: 2px solid #b8ae92;
-}
-.nrl-guide-build { flex: 1 1 auto; font-size: 0.75rem; color: #555; }
-.nrl-guide-update { background: #7ec850; }
-.nrl-modal-has-x .nrl-guide-tabs { padding-right: 2.75rem; }
-/* #206, #336: a landscape phone leaves the Guide little height. One row holds the
-   tabs (swipe for more), Replay and the ✕, and the page has the rest, even with
-   Safari's text boost. The build label sits in the frame's bottom edge. */
-@media (max-height: 500px) {
-  .nrl-screen-backdrop .nrl-guide-modal { padding: 0.5rem 0.75rem 0.85rem; }
-  .nrl-guide { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); column-gap: 0.4rem; }
-  .nrl-guide-tabs { grid-column: 1; grid-row: 1; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 0.3rem; padding: 0 3px 3px 0; }
-  .nrl-modal-has-x .nrl-guide-tabs { padding-right: 3px; }
-  .nrl-guide-tabs .nrl-btn { flex: 0 0 auto; }
-  .nrl-guide-foot { grid-column: 2; grid-row: 1; align-self: start; flex-wrap: nowrap; margin: 0; padding: 0; border: 0; }
-  .nrl-modal-has-x .nrl-guide-foot { margin-right: 2.75rem; }
-  .nrl-guide-foot .nrl-btn { flex: 0 0 auto; }
-  .nrl-guide-build { position: absolute; right: 0.75rem; bottom: 0.1rem; font-size: 0.6rem; line-height: 1; pointer-events: none; }
-  .nrl-guide-body { grid-column: 1 / -1; grid-row: 2; }
-  .nrl-guide { font-size: 0.8rem; }
-  .nrl-guide h2 { font-size: 0.95rem; }
-  .nrl-guide h3 { margin-top: 0.35rem; }
-}
+.nrl-guide-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 6px; }
+.nrl-btn.nrl-guide-link { min-height: 36px; padding: 0 12px; font-size: 14px; border-radius: 8px; }
+.nrl-guide p { margin: 4px 0; line-height: 1.5; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-guide ul { margin: 4px 0 4px 18px; padding: 0; color: var(--nrl-text-2); }
+.nrl-guide li { margin: 3px 0; line-height: 1.45; overflow-wrap: anywhere; }
+.nrl-guide b, .nrl-guide strong { color: var(--nrl-text); }
+.nrl-guide-figure { border-radius: 10px; overflow: hidden; background: var(--nrl-panel); padding: 6px; }
+.nrl-guide-foot { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.nrl-guide-build { font-family: var(--nrl-f-num); font-size: 11px; color: var(--nrl-muted); white-space: nowrap; }
+@media (max-width: 760px) { .nrl-guide-build { display: none; } }
 .nrl-card-open { cursor: pointer; }
 .nrl-card-open:focus-visible { outline: 3px solid #3a6ea5; }
 .nrl-card-more { color: #555; font-weight: bold; font-size: 1.1rem; line-height: 1; }
-.nrl-placebar-text { flex: 1 1 auto; }
-.nrl-placebar-cancel { flex: 0 0 auto; }
 `;

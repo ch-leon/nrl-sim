@@ -142,7 +142,7 @@ export function keepAdvancingLabel(rest: AdvanceTarget): string {
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 
-/** One pixel card: the story, its deadline, and a big button per choice with its sure line and risks. */
+/** One decision card: the story, its deadline, and a big button per choice with its sure line and risks. */
 export function decisionCard(view: DecisionView, onChoose: (id: string, index: number) => void): HTMLElement {
   const card = el('div', { class: 'nrl-event-card', attrs: { 'data-event-id': view.id } });
   card.append(
@@ -182,7 +182,7 @@ export function openDecisions(opts: { then?: { label: string; run: () => void } 
         return;
       }
       const then = opts.then;
-      const go = button(then.label, () => { closeModal(); then.run(); }, { class: 'nrl-decisions-go' });
+      const go = button(then.label, () => { closeModal(); then.run(); }, { class: 'nrl-decisions-go nrl-btn-primary' });
       go.setAttribute('data-keep-advancing', '');
       content.append(
         el('h2', { text: 'All answered' }),
@@ -193,7 +193,7 @@ export function openDecisions(opts: { then?: { label: string; run: () => void } 
     }
     const v = views[0]!;
     content.append(
-      el('h2', { text: views.length > 1 ? `Decision · 1 of ${views.length}` : 'Decision' }),
+      el('p', { class: 'nrl-decisions-count', text: views.length > 1 ? `Decision · 1 of ${views.length}` : 'Decision' }),
       decisionCard(v, (id, index) => {
         chooseEvent(id, index);
         render();
@@ -223,7 +223,7 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
     list.append(el('li', { class: `nrl-ask-row${r.due ? ' nrl-ask-due' : ''}`, attrs: { 'data-ask-row': r.id } },
       el('span', { class: 'nrl-ask-title', text: r.title }), el('span', { class: 'nrl-ask-note', text: r.note })));
   }
-  const answer = button('Answer now', () => openDecisions({ then: { label: 'Keep advancing', run: () => askBeforeAdvance(span, proceed) } }), { class: 'nrl-ask-answer' });
+  const answer = button('Answer now', () => openDecisions({ then: { label: 'Keep advancing', run: () => askBeforeAdvance(span, proceed) } }), { class: 'nrl-ask-answer nrl-btn-primary' });
   answer.setAttribute('data-ask-answer', '');
   const go = button(ask.proceed, () => { closeModal(); proceed(); }, { class: 'nrl-ask-proceed' });
   go.setAttribute('data-ask-proceed', '');
@@ -266,7 +266,7 @@ export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget)
 
 /** #350 H3: one slip on the ▾ menu must not play out a season. */
 function confirmLongAdvance(question: string, go: () => void): void {
-  const yes = button('Play', () => { closeModal(); go(); }, { class: 'nrl-ask-answer' });
+  const yes = button('Play', () => { closeModal(); go(); }, { class: 'nrl-ask-answer nrl-btn-primary' });
   yes.setAttribute('data-confirm-advance', '');
   const no = button('Cancel', () => closeModal());
   const content = el('div', { class: 'nrl-ask', attrs: { 'data-advance-confirm': '' } },

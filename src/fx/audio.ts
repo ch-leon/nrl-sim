@@ -716,8 +716,9 @@ export function initAudioUi(): () => void {
     });
   });
   installBtn.classList.add('nrl-audio-install');
+  const installRow = el('div', { class: 'nrl-audio-row nrl-audio-btnrow nrl-audio-install-row' }, installBtn);
   const syncInstallVisibility = (): void => {
-    installBtn.style.display = canInstall() ? '' : 'none';
+    installRow.style.display = canInstall() ? '' : 'none';
   };
   syncInstallVisibility();
   if (typeof window !== 'undefined') {
@@ -762,10 +763,10 @@ export function initAudioUi(): () => void {
         el('label', { class: 'nrl-audio-row' }, el('b', { text: 'Volume' }), slider),
         mute.row, coachCalls.row, liveRivals.row),
       el('div', { class: 'nrl-settings-col' },
-        el('div', { class: 'nrl-audio-row' }, replayBtn),
-        el('div', { class: 'nrl-audio-row' }, exportBtn),
+        el('div', { class: 'nrl-audio-row nrl-audio-btnrow' }, replayBtn),
+        el('div', { class: 'nrl-audio-row nrl-audio-btnrow' }, exportBtn),
         importRow,
-        el('div', { class: 'nrl-audio-row nrl-audio-install-row' }, installBtn)),
+        installRow),
     ),
   );
 
@@ -792,31 +793,41 @@ function ensureAudioStyles(): void {
   style.id = 'nrl-audio-styles';
   style.textContent = `
 .nrl-audio-settings { min-width: 220px; }
-.nrl-dialog-region .nrl-settings-modal { width: min(96vw, 680px); max-width: none; }
-.nrl-audio-title { margin: 0; font-size: 1rem; min-height: 44px; display: flex; align-items: center; padding-right: 2.75rem; }
-.nrl-settings-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 1rem; }
+.nrl-dialog-region .nrl-settings-modal { width: min(100%, 720px); }
+.nrl-audio-title { margin: 0 0 4px; min-height: 32px; display: flex; align-items: center; padding-right: 44px; }
+.nrl-settings-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 12px; }
+.nrl-settings-col { display: flex; flex-direction: column; gap: 4px; }
 .nrl-audio-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0.3rem 0;
+  gap: 10px;
   min-height: 44px;
+  padding: 0 10px 0 4px;
+  border-radius: 10px;
+  background: var(--nrl-raised);
   pointer-events: auto;
 }
+.nrl-audio-row > b { font-family: var(--nrl-f-label); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-audio-row > .nrl-btn { flex: 1 1 auto; }
+.nrl-audio-btnrow { padding: 0; background: none; }
+.nrl-audio-btnrow > .nrl-btn { min-height: 44px; }
 .nrl-settings-toggle { cursor: pointer; }
-.nrl-settings-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; font-size: 0.8rem; }
-.nrl-settings-text small { font-size: 0.68rem; opacity: 0.85; }
-.nrl-settings-ask { flex: 1 1 100%; font-size: 0.75rem; line-height: 1.25; }
-.nrl-settings-import { flex-wrap: wrap; }
+.nrl-settings-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; font-size: 13px; }
+.nrl-settings-text b { font-family: var(--nrl-f-label); font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.nrl-settings-text small { font-size: 11px; color: var(--nrl-muted); }
+.nrl-settings-ask { flex: 1 1 100%; font-size: 13px; line-height: 1.35; color: var(--nrl-text-2); padding-top: 6px; }
+.nrl-settings-import { flex-wrap: wrap; padding: 0; background: none; }
+.nrl-settings-import:has(.nrl-settings-ask) { padding: 0 10px 8px; background: var(--nrl-raised); }
+.nrl-settings-import > .nrl-btn { flex: 1 1 auto; min-height: 44px; }
 /* 956x330: three columns of rows, so every switch and the Import question sit on screen unscrolled. */
 @media (max-height: 340px) {
-  .nrl-dialog-region .nrl-settings-modal { width: min(96vw, 940px); }
-  .nrl-settings-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; }
+  .nrl-dialog-region .nrl-settings-modal { width: min(100%, 940px); }
+  .nrl-settings-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; gap: 6px 12px; }
   .nrl-settings-col { display: contents; }
-  .nrl-audio-row { margin: 0.1rem 0; }
   .nrl-settings-import { grid-row: span 2; align-self: start; }
 }
-/* A switch a finger can hit (N14, #263; X3): 52×44, the track and its knob drawn in its background. */
+/* A switch a finger can hit (N14, #263; X3): 52×44, the 28×16 track and its knob drawn in its background
+   (the match LOG toggle's look: yellow on, #26325c off). */
 .nrl-switch {
   -webkit-appearance: none;
   appearance: none;
@@ -827,23 +838,22 @@ function ensureAudioStyles(): void {
   cursor: pointer;
   pointer-events: auto;
   background:
-    linear-gradient(#fff, #fff) no-repeat 11px 50% / 14px 14px,
-    linear-gradient(#8a8a8a, #8a8a8a) no-repeat 50% 50% / 38px 20px,
-    linear-gradient(#000, #000) no-repeat 50% 50% / 44px 26px;
+    radial-gradient(circle, #fff 5px, transparent 5.5px) no-repeat 13px 50% / 16px 16px,
+    linear-gradient(#26325c, #26325c) no-repeat 50% 50% / 32px 18px;
+  border-radius: 10px;
 }
 .nrl-switch:checked {
   background:
-    linear-gradient(#fff, #fff) no-repeat 27px 50% / 14px 14px,
-    linear-gradient(#7ec850, #7ec850) no-repeat 50% 50% / 38px 20px,
-    linear-gradient(#000, #000) no-repeat 50% 50% / 44px 26px;
+    radial-gradient(circle, #0e1630 5px, transparent 5.5px) no-repeat 25px 50% / 16px 16px,
+    linear-gradient(#f4d03f, #f4d03f) no-repeat 50% 50% / 32px 18px;
 }
-.nrl-switch:focus-visible { outline: 3px solid #f4d03f; }
-/* The volume slider in the kit's colours (#349 E1), 44px tall to take a thumb. */
+.nrl-switch:focus-visible { outline: 2px solid #f4d03f; outline-offset: -2px; }
+/* The volume slider (#349 E1), 44px tall to take a thumb. */
 .nrl-audio-slider { -webkit-appearance: none; appearance: none; flex: 1 1 auto; min-width: 120px; height: 44px; margin: 0; background: transparent; pointer-events: auto; }
-.nrl-audio-slider::-webkit-slider-runnable-track { height: 10px; background: #1a1a2e; border: 2px solid #000; }
-.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 30px; margin-top: -12px; background: #f4d03f; border: 3px solid #000; box-shadow: 2px 2px 0 #000; }
-.nrl-audio-slider::-moz-range-track { height: 6px; background: #1a1a2e; border: 2px solid #000; }
-.nrl-audio-slider::-moz-range-thumb { width: 16px; height: 24px; border-radius: 0; background: #f4d03f; border: 3px solid #000; }
+.nrl-audio-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: #26325c; }
+.nrl-audio-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 11px; background: #f4d03f; }
+.nrl-audio-slider::-moz-range-track { height: 6px; border-radius: 3px; background: #26325c; }
+.nrl-audio-slider::-moz-range-thumb { width: 22px; height: 22px; border: 0; border-radius: 11px; background: #f4d03f; }
 `;
   document.head.appendChild(style);
 }
