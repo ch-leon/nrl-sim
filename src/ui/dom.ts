@@ -585,6 +585,17 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
   .nrl-nav-sheet { grid-template-columns: repeat(4, minmax(7.5rem, 1fr)); }
 }
 .nrl-nav .nrl-nav-badge { margin-left: 0.15rem; }
+/* A contract ending soon (#369): a dot, no number, until it is dealt with. */
+.nrl-nav-dot, .nrl-row-dot {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-left: 0.3rem;
+  vertical-align: 0.1em;
+  border-radius: 50%;
+  background: var(--nrl-alert-dot, #d32f2f);
+  border: 1px solid #000;
+}
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .nrl-modal-backdrop {
@@ -1333,6 +1344,11 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-player-trait-bad b { color: #8a3a00; }
 .nrl-player-line { margin: 0.1rem 0; overflow-wrap: anywhere; }
 .nrl-player-expiring { color: #b00020; }
+/* The age curve and projected peak (#369), under the stat bars. */
+.nrl-player-outlook { margin: -0.1rem 0 0.2rem; font-size: 0.72rem; line-height: 1.25; }
+.nrl-player-outlook-body { display: flex; gap: 0.4rem; align-items: center; margin-top: 0.1rem; }
+.nrl-player-curve { flex: 0 0 auto; width: 5.5rem; height: 1.6rem; background: var(--nrl-curve-bg, #f3edd9); border: 1px solid #b8ae92; }
+.nrl-player-outlook-note { min-width: 0; color: #555; font-size: 0.66rem; line-height: 1.2; }
 /* #203: the actions stay pinned to the foot of the card's scroller while the rest scrolls. */
 .nrl-player-actions {
   display: flex;

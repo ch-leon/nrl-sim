@@ -16,6 +16,7 @@ import { openKitDesigner } from './kit';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PlayerRow, ensureScreenStyles, openRecruitScreen } from './recruit';
 import { moraleWord, openPlayerPage } from './player';
+import { contractsEndingSoon, endsInTag } from '../../systems/contracts';
 
 const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
 
@@ -110,10 +111,13 @@ export function openSquadScreen(): void {
       return;
     }
     const kit = squadKit();
+    // The dock's red dot leads here (#369): the same dot and "ends in N wk" on each of those rows.
+    const ending = new Set(contractsEndingSoon(s).map((p) => p.id));
     for (const player of sortSquad(s.squad, sortKey)) {
       body.appendChild(PlayerRow(player, {
         showInjury: true,
         kit,
+        ...(ending.has(player.id) ? { alert: { tag: endsInTag(player), label: `contract ${endsInTag(player)}` } } : {}),
         extra: [`${money(player.wage)}/wk`, moraleWord(player.morale)],
         onOpen: () => openPlayerPage(player, { kind: 'squad' }),
       }));

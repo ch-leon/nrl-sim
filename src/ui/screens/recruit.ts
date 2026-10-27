@@ -99,6 +99,7 @@ const SCREEN_CSS = `
 }
 .nrl-badge-out { background: #e06666; color: #2a0000; }
 .nrl-badge-ban { background: #6b2d5b; color: #fff; }
+.nrl-badge-alert { background: var(--nrl-alert-tag, #f4c7c3); color: #5a0000; white-space: nowrap; }
 .nrl-badge-trait { background: #9fc5e8; color: #0b1d33; }
 .nrl-badge-trait-bad { background: #f0b27a; color: #2a1400; }
 .nrl-statbars { display: grid; gap: 0.15rem; margin-bottom: 0.4rem; }
@@ -156,6 +157,8 @@ export interface PlayerRowOpts {
   kit?: Kit;
   /** Tapping the row opens the player's page (N7, #185). */
   onOpen?: () => void;
+  /** A red dot by the name and this tag (#369: "ends in 3 wk"), read out as `label`. */
+  alert?: { tag: string; label: string };
 }
 
 /**
@@ -170,6 +173,7 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
   );
   if (opts.showInjury && p.injuredWeeks > 0) meta.append(el('span', { class: 'nrl-badge nrl-badge-out', text: `OUT ${p.injuredWeeks}w` }));
   if (opts.showInjury && (p.suspendedWeeks ?? 0) > 0) meta.append(el('span', { class: 'nrl-badge nrl-badge-ban', text: `BAN ${p.suspendedWeeks}w` }));
+  if (opts.alert) meta.append(el('span', { class: 'nrl-badge nrl-badge-alert', text: opts.alert.tag, attrs: { title: opts.alert.label, 'data-row-alert': '' } }));
   for (const t of opts.extra ?? []) meta.append(el('span', { text: t }));
   for (const t of p.traits) {
     if (!(t.id in TRAITS)) continue;
@@ -186,7 +190,9 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
   });
   const row = el('div', { class: 'nrl-row', attrs: { 'data-row-player': p.id } },
     portrait,
-    el('div', { class: 'nrl-row-id' }, el('span', { class: 'nrl-row-name', text: p.name }), meta),
+    el('div', { class: 'nrl-row-id' },
+      el('span', { class: 'nrl-row-name' }, p.name, ...(opts.alert ? [el('span', { class: 'nrl-row-dot', attrs: { title: opts.alert.label, 'aria-hidden': 'true' } })] : [])),
+      meta),
     el('span', { class: 'nrl-card-ovr', text: String(overallRating(p)), attrs: { title: 'Overall rating' } }),
   );
   // A tap on a trait says what it does, in the toast lane; anywhere else opens the player page.
@@ -200,7 +206,7 @@ export function PlayerRow(p: Player, opts: PlayerRowOpts = {}): HTMLElement {
     row.classList.add('nrl-card-open');
     row.setAttribute('role', 'button');
     row.setAttribute('tabindex', '0');
-    row.setAttribute('aria-label', `${p.name}: player page`);
+    row.setAttribute('aria-label', `${p.name}${opts.alert ? `, ${opts.alert.label}` : ''}: player page`);
     row.setAttribute('data-player-open', p.id);
     row.addEventListener('keydown', (e) => {
       if (e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); }

@@ -152,3 +152,27 @@ export function sellPlayer(state: GameState, playerId: string): SignResult {
 export function contractRows(state: GameState): Player[] {
   return state.squad.slice().sort((a, b) => a.contractWeeks - b.contractWeeks || a.name.localeCompare(b.name));
 }
+
+/**
+ * The Squad tab's red dot (#369): a squad contract ending within this many
+ * weeks. Finance and the Contracts screen look further ahead (finance.ts
+ * EXPIRY_WINDOW_WEEKS); this is the one that needs dealing with now.
+ */
+export const CONTRACT_DOT_WEEKS = 4;
+
+/** Squad players whose contracts end within `weeks` (juniors and departed players aside), soonest first. Pure. */
+export function contractsEndingSoon(state: Pick<GameState, 'squad'>, weeks = CONTRACT_DOT_WEEKS): Player[] {
+  return state.squad
+    .filter((p) => !p.departed && !p.junior && p.contractWeeks <= weeks)
+    .sort((a, b) => a.contractWeeks - b.contractWeeks || a.name.localeCompare(b.name));
+}
+
+/** What the dot reads out: "Squad — 2 contracts end within 4 weeks". */
+export function endingSoonLabel(count: number, weeks = CONTRACT_DOT_WEEKS): string {
+  return `Squad — ${count} contract${count === 1 ? ' ends' : 's end'} within ${weeks} weeks`;
+}
+
+/** A Squad row's tag (#369): "ends in 3 wk". */
+export function endsInTag(p: Pick<Player, 'contractWeeks'>): string {
+  return `ends in ${p.contractWeeks} wk`;
+}

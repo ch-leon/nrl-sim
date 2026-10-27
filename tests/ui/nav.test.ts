@@ -77,3 +77,30 @@ describe('nav layout on landscape phones (QA)', () => {
     expect(CSS).toMatch(/\.nrl-nav \{[^}]*max\(0\.25rem, var\(--nrl-safe-b\)\)/);
   });
 });
+
+// #369: Squad's red dot when a contract ends within 4 weeks: no number, a label, never in More.
+import { badgeView, moreBadgeCount } from '../../src/ui/nav';
+
+describe('the dot (#369)', () => {
+  it('shows a dot with no number, read out by its label', () => {
+    const v = badgeView('Squad', 0, 'Squad — 2 contracts end within 4 weeks');
+    expect(v).toEqual({ count: null, dot: true, ariaLabel: 'Squad — 2 contracts end within 4 weeks' });
+  });
+
+  it('off, nothing shows and nothing is read out; a count still reads as before', () => {
+    expect(badgeView('Squad', 0)).toEqual({ count: null, dot: false, ariaLabel: null });
+    expect(badgeView('News', 3)).toEqual({ count: '3', dot: false, ariaLabel: 'News, 3 unread' });
+    expect(badgeView('News', 120).count).toBe('99+');
+    expect(badgeView('News', 2, 'a dot').ariaLabel).toBe('News, 2 unread; a dot');
+  });
+
+  it("doesn't add to More: only the sheet's counts do", () => {
+    const r = new ScreenRegistry();
+    r.set('squad', 'Squad', () => {});
+    r.set('contracts', 'Contracts', () => {}, { more: true });
+    r.set('finance', 'Finance', () => {}, { more: true });
+    // Squad has a dot (and no count); the dot lives on its own button.
+    expect(moreBadgeCount(r.list(), new Map())).toBe(0);
+    expect(moreBadgeCount(r.list(), new Map([['squad', 4], ['finance', 2]]))).toBe(2);
+  });
+});
