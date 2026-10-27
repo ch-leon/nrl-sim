@@ -151,3 +151,46 @@ describe('guardTap', () => {
     expect(guardTap('sell:a', 'sell:b')).toEqual({ armed: 'sell:b', run: false });
   });
 });
+
+// Broadcast Quiet 3h: the League sheet's ladder heading and the club's fixtures.
+import { FINALS_PLACES, ladderHasDraws, ladderHeading, myFixtureRows, roundShort } from '../../../src/ui/screens/fixtures';
+import { SEASON_ROUNDS } from '../../../src/config';
+
+describe('the League sheet (3h)', () => {
+  const row = (played: number): LadderRow => ({ clubId: 'x', played, wins: 0, draws: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, points: 0 });
+
+  it('heads the ladder with the round it stands after', () => {
+    expect(ladderHeading({ week: 1, league: { ladder: [row(0)] } } as never)).toBe('Ladder');
+    expect(ladderHeading({ week: 3, league: { ladder: [row(2), row(1)] } } as never)).toBe('Ladder · after R2');
+    expect(ladderHeading({ week: SEASON_ROUNDS + 1, league: { ladder: [row(SEASON_ROUNDS)] } } as never)).toBe('Ladder · final');
+  });
+
+  it('shows the draws column only once a club has drawn; the top eight make the finals', () => {
+    expect(ladderHasDraws([{ draws: 0 }, { draws: 0 }])).toBe(false);
+    expect(ladderHasDraws([{ draws: 0 }, { draws: 1 }])).toBe(true);
+    expect(FINALS_PLACES).toBe(8);
+  });
+
+  it('shortens the finals rounds for the fixtures column', () => {
+    expect([1, SEASON_ROUNDS, SEASON_ROUNDS + 1, SEASON_ROUNDS + 2, SEASON_ROUNDS + 3].map(roundShort))
+      .toEqual(['R1', `R${SEASON_ROUNDS}`, 'QF', 'SF', 'GF']);
+  });
+
+  it('lists the club’s rounds: results your score first, NEXT for the coming match, the week for the rest', () => {
+    const names = { player: 'Test FC', w: 'Wolves', r: 'Reapers', c: 'Cyclones' };
+    const fixtures: Fixture[] = [
+      { round: 1, homeId: 'player', awayId: 'w', result: { homeScore: 22, awayScore: 16 } },
+      { round: 1, homeId: 'r', awayId: 'c', result: { homeScore: 10, awayScore: 12 } },
+      { round: 2, homeId: 'r', awayId: 'player', result: { homeScore: 18, awayScore: 12 } },
+      { round: 3, homeId: 'c', awayId: 'player' },
+      { round: 4, homeId: 'player', awayId: 'r' },
+    ];
+    const rows = myFixtureRows({ week: 3, league: { fixtures } } as never, names);
+    expect(rows.map((r) => [r.rd, r.opponent, r.home, r.tone, r.res])).toEqual([
+      ['R1', 'Wolves', true, 'W', 'W 22–16'],
+      ['R2', 'Reapers', false, 'L', 'L 12–18'],
+      ['R3', 'Cyclones', false, 'next', 'NEXT'],
+      ['R4', 'Reapers', true, 'later', 'Wk 4'],
+    ]);
+  });
+});

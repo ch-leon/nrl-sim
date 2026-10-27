@@ -23,3 +23,14 @@ describe('heldRows (#350 F3)', () => {
     expect(rows.map((r) => r.kind === 'player' && r.player.id)).toEqual(['a', 'n']);
   });
 });
+
+// Broadcast Quiet: the Contracts sheet's summary line.
+import { contractsSummary } from '../../../src/ui/screens/contracts';
+
+describe('contractsSummary', () => {
+  it('counts the squad, the deals ending within the window and the wage bill as paid', () => {
+    const squad = [{ contractWeeks: 3, wage: 1000 }, { contractWeeks: 8, wage: 1500 }, { contractWeeks: 30, wage: 2000 }];
+    expect(contractsSummary(squad)).toBe('3 players · 2 end within 8 wks · wages $4,500/wk');
+    expect(contractsSummary(squad, 1.5)).toBe('3 players · 2 end within 8 wks · wages $6,750/wk');
+  });
+});

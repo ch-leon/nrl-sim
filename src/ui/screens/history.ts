@@ -1,11 +1,14 @@
 // src/ui/screens/history.ts — season-end feedback + past-seasons History screen
-// (GitHub #3 / BAK-206 backlog S2). Pure helpers are exported for node tests;
-// DOM open/init follow the fixtures.ts / hud.ts conventions (no Phaser).
+// (GitHub #3 / BAK-206 backlog S2; Broadcast Quiet 3l). A sheet with a one-line
+// summary, a table of the seasons (finish, record, points, the player of the
+// season, the net, and each one's review and books) and the club's Records &
+// Leaders beside it on a segmented control. Pure helpers are exported for node
+// tests; DOM open/init follow the fixtures.ts / hud.ts conventions (no Phaser).
 
 import { getState, type GameState, type SeasonRecord, type Player } from '../../core/state';
-import { el, panel, button, openModal, closeScreen } from '../dom';
+import { el, button, openScreen, closeScreen, screenHead, segmented, backButton } from '../dom';
 import { initSeasonReview, openSeasonReview } from './seasonReview';
-import { FINANCE_LINE_LABELS, fmtMoney, fmtMoneyCompact, fmtNetClosing, seasonBooks } from './finance';
+import { FINANCE_LINE_LABELS, ensureFinanceStyles, fmtMoney, fmtMoneyCompact, fmtNetClosing, seasonBooks } from './finance';
 import { FINALS_ROUNDS } from '../../systems/fixtures';
 import { roundLabel } from '../../systems/matchday';
 
@@ -146,53 +149,136 @@ export function historyNewestFirst(
   return history.slice().reverse();
 }
 
-/** Open the History modal listing past seasons from GameState.history. */
-export function openHistoryScreen(): HTMLElement {
-  const state = getState();
-  const content = el('div', { class: 'nrl-history' });
-  content.append(el('h2', { text: 'Season History' }));
+/** The head's summary (3l): "3 seasons · 0 premierships · best finish 3rd". */
+export function fmtHistorySummary(history: readonly SeasonHistoryEntry[]): string {
+  const r = computeRecords({ history: [...history], squad: [], season: 0 });
+  const n = history.length;
+  const best = r.bestFinish ? ` · best finish ${ordinal(r.bestFinish)}` : '';
+  return `${n} season${n === 1 ? '' : 's'} · ${r.premierships} premiership${r.premierships === 1 ? '' : 's'}${best}`;
+}
 
+/** One row of the History table (3l), every column as text. Pure. */
+export interface HistoryRowView {
+  season: string;
+  finish: string;
+  /** The club's best finish (yellow), or a premiership. */
+  best: boolean;
+  premiers: boolean;
+  /** "15–8", or "12–1–10" (W–D–L) when any season had a draw. */
+  wl: string;
+  /** "480–400": points for and against. */
+  pfpa: string;
+  /** Ladder points: two a win, one a draw. */
+  pts: string;
+  /** The player of the season: most player-of-the-match awards, else the top try-scorer. */
+  player: string;
+  /** The rest of the season in a line: how it ended past the ladder, the top try-scorer, the rules it was played under. */
+  note: string;
+  /** The season's net from its books, or null where none were kept. */
+  net: number | null;
+}
+
+export function historyRowView(entry: SeasonHistoryEntry, state: Pick<GameState, 'finance' | 'money' | 'history'>): HistoryRowView {
+  const best = computeRecords({ history: state.history, squad: [], season: 0 }).bestFinish;
+  const potm = entry.review?.potm?.best;
+  const top = entry.topScorer;
+  const player = potm ? potm.name : top ? top.name : '—';
+  const notes: string[] = [];
+  const out = fmtFinalsOutcome(entry);
+  if (out) notes.push(out[0]!.toUpperCase() + out.slice(1));
+  if (potm) notes.push(`${potm.count} player-of-the-match award${potm.count === 1 ? '' : 's'}`);
+  if (top && (potm || top.tries > 0)) notes.push(`top try-scorer ${top.name} (${top.tries})`);
+  const rules = fmtRulesNote(entry);
+  if (rules) notes.push(rules);
+  const w = entry.wins;
+  const d = entry.draws ?? 0;
+  // One shape down the column: W–D–L once any season had a draw.
+  const draws = state.history.some((h) => (h.draws ?? 0) > 0);
+  const l = entry.losses ?? 0;
+  return {
+    season: `S${entry.season}`,
+    finish: entry.ladderPosition > 0 ? ordinal(entry.ladderPosition) : '—',
+    best: entry.premiership || (best !== null && entry.ladderPosition === best),
+    premiers: entry.premiership,
+    wl: w === undefined ? '—' : draws ? `${w}–${d}–${l}` : `${w}–${l}`,
+    pfpa: entry.pointsFor === undefined ? '' : `${entry.pointsFor}–${entry.pointsAgainst ?? 0}`,
+    pts: w === undefined ? '—' : String(w * 2 + d),
+    player,
+    note: notes.join(' · '),
+    net: seasonBooks(state, entry.season)?.net ?? null,
+  };
+}
+
+/** SEASONS or RECORDS (3l); the choice holds while the game is open. */
+let historyView: 'seasons' | 'records' = 'seasons';
+
+/** The seasons table (3l): one row a season, newest first, with its review and books. */
+function buildSeasonsTable(state: GameState): HTMLElement {
   if (state.history.length === 0) {
-    content.append(panel({}, el('p', { text: 'No completed seasons yet — finish a season to see results here.' })));
-  } else {
-    const list = el('div', { class: 'nrl-history-list' });
-    for (const entry of historyNewestFirst(state.history)) {
-      const line = el('div', {
-        class: entry.premiership ? 'nrl-history-row nrl-history-premiers' : 'nrl-history-row',
-        text: fmtSeasonSummary(entry),
-      });
-      const detail = fmtSeasonDetail(entry);
-      if (detail) line.append(el('div', { class: 'nrl-history-detail', text: detail }));
-      const rules = fmtRulesNote(entry);
-      if (rules) line.append(el('div', { class: 'nrl-history-detail nrl-history-rules', text: rules }));
-      // The season review (#190), for seasons that have one (v12+), and its books (N14, #262).
-      const actions = el('div', { class: 'nrl-history-actions' });
-      if (entry.review) {
-        actions.append(button('Review', () => openSeasonReview(entry, { back: () => { openHistoryScreen(); } }), { class: 'nrl-history-review' }));
-      }
-      actions.append(button('Books', () => openSeasonBooks(entry, { back: () => { openHistoryScreen(); } }), { class: 'nrl-history-books' }));
-      line.append(actions);
-      list.append(line);
-    }
-    content.append(list);
+    return el('div', { class: 'nrl-screen-empty nrl-history-empty', text: 'No completed seasons yet — finish a season to see results here.' });
   }
+  const draws = state.history.some((h) => (h.draws ?? 0) > 0);
+  // The column heads hold still above the rows, which scroll.
+  const rows = el('div', { class: 'nrl-history-rows', attrs: { role: 'rowgroup' } });
+  const grid = el('div', { class: 'nrl-history-table', attrs: { role: 'table' } });
+  grid.append(el('div', { class: 'nrl-history-row nrl-history-headrow', attrs: { role: 'row' } },
+    ...['Season', 'Finish', draws ? 'W–D–L' : 'W–L', 'Pts', 'Player of the season', 'Net', ''].map((h) => el('span', { class: 'nrl-label', text: h, attrs: { role: 'columnheader' } }))));
+  for (const entry of historyNewestFirst(state.history)) {
+    const v = historyRowView(entry, state);
+    // The season review (#190), for seasons that have one (v12+), and its books (N14, #262).
+    const actions = el('span', { class: 'nrl-history-actions' });
+    if (entry.review) actions.append(button('Review', () => openSeasonReview(entry, { back: () => { openHistoryScreen(); } }), { class: 'nrl-history-review' }));
+    actions.append(button('Books', () => openSeasonBooks(entry, { back: () => { openHistoryScreen(); } }), { class: 'nrl-history-books' }));
+    const net = v.net === null ? '—' : `${v.net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(v.net))}`;
+    rows.append(el('div', { class: `nrl-history-row${v.premiers ? ' nrl-history-premiers' : ''}`, attrs: { role: 'row', 'data-history-season': String(entry.season) } },
+      el('span', { class: 'nrl-num nrl-history-season', text: v.season }),
+      el('span', { class: `nrl-history-finish${v.best ? ' nrl-history-best' : ''}` }, v.finish, ...(v.premiers ? [el('small', { text: '★ Premiers' })] : [])),
+      el('span', { class: 'nrl-num nrl-history-wl', attrs: v.pfpa ? { title: `Points for–against ${v.pfpa}` } : {} }, v.wl, ...(v.pfpa ? [el('small', { text: v.pfpa })] : [])),
+      el('span', { class: 'nrl-num', text: v.pts }),
+      el('span', { class: 'nrl-history-player', attrs: v.note ? { title: v.note } : {} }, v.player, ...(v.note ? [el('small', { text: v.note })] : [])),
+      el('span', { class: `nrl-num nrl-history-net${v.net === null ? '' : v.net < 0 ? ' nrl-neg' : ' nrl-pos'}`, text: net }),
+      actions,
+    ));
+  }
+  grid.append(rows);
+  return grid;
+}
 
+/** Records & Leaders: the club's bests and the squad's leaders, label and value a row. */
+function buildRecords(state: GameState): HTMLElement {
   const r = computeRecords(state);
-  const fmt = (x: { name: string; value: number } | null) => (x ? `${x.name} (${x.value})` : '—');
-  content.append(
-    el('h3', { text: 'Records & Leaders' }),
-    panel({},
-      el('p', { text: `Premierships: ${r.premierships} · Best finish: ${r.bestFinish ? ordinal(r.bestFinish) : '—'}` }),
-      el('p', { text: `Most points in a season: ${r.mostPoints ? `${r.mostPoints.points} (Season ${r.mostPoints.season})` : '—'}` }),
-      el('p', { text: `Most tries in a season: ${r.mostTries ? `${r.mostTries.name} (${r.mostTries.tries}, Season ${r.mostTries.season})` : '—'}` }),
-      el('p', { text: `This season's try leader: ${fmt(r.seasonTries)}` }),
-      el('p', { text: `Career tries: ${fmt(r.careerTries)}` }),
-      el('p', { text: `Career tackles: ${fmt(r.careerTackles)}` }),
-      el('p', { text: `Career line breaks: ${fmt(r.careerLineBreaks)}` }),
-    ),
-  );
+  const fmt = (x: { name: string; value: number } | null): string => (x ? `${x.name} (${x.value})` : '—');
+  const rows: [string, string][] = [
+    ['Premierships', String(r.premierships)],
+    ['Best finish', r.bestFinish ? ordinal(r.bestFinish) : '—'],
+    ['Most points in a season', r.mostPoints ? `${r.mostPoints.points} (Season ${r.mostPoints.season})` : '—'],
+    ['Most tries in a season', r.mostTries ? `${r.mostTries.name} (${r.mostTries.tries}, Season ${r.mostTries.season})` : '—'],
+    ['This season\'s try leader', fmt(r.seasonTries)],
+    ['Career tries', fmt(r.careerTries)],
+    ['Career tackles', fmt(r.careerTackles)],
+    ['Career line breaks', fmt(r.careerLineBreaks)],
+  ];
+  return el('div', { class: 'nrl-history-records' },
+    ...rows.map(([label, value]) => el('div', { class: 'nrl-history-record' }, el('span', { class: 'nrl-label', text: label }), el('span', { text: value }))));
+}
 
-  return openModal(content, { class: 'nrl-history-modal', screen: true, key: 'history' });
+/** Open the History sheet (3l): past seasons from GameState.history, and the club's records. */
+export function openHistoryScreen(): HTMLElement {
+  ensureHistoryStyles();
+  const state = getState();
+  const body = el('div', { class: 'nrl-history-body' });
+  const render = (): void => { body.replaceChildren(historyView === 'seasons' ? buildSeasonsTable(state) : buildRecords(state)); };
+  const seg = segmented<'seasons' | 'records'>(
+    [{ id: 'seasons', label: 'Seasons' }, { id: 'records', label: 'Records' }],
+    historyView,
+    (id) => { historyView = id; seg.set(id); render(); },
+    { label: 'History view' },
+  );
+  render();
+  const sheet = el('div', { class: 'nrl-screen nrl-history' },
+    screenHead('History', { sub: el('span', { class: 'nrl-screen-sub', text: fmtHistorySummary(state.history) }), controls: [seg.el] }),
+    body);
+  return openScreen(sheet, undefined, 'history');
 }
 
 /** The line at the top of a season's books: "Season 2 — finished 4th · W12 L10 D2 · PF 480 PA 400". */
@@ -208,31 +294,39 @@ export function fmtBooksHeading(entry: SeasonHistoryEntry): string {
  * History; the frame's ✕ closes.
  */
 export function openSeasonBooks(entry: SeasonHistoryEntry, opts: { back?: () => void } = {}): HTMLElement {
+  ensureHistoryStyles();
   const books = seasonBooks(getState(), entry.season);
-  const content = el('div', { class: 'nrl-season-books', attrs: { 'data-season-books': String(entry.season) } });
-  content.append(el('div', { class: 'nrl-review-head' },
-    el('h2', { text: `Season ${entry.season} books` }),
-    button('‹ History', () => { closeScreen(); (opts.back ?? openHistoryScreen)(); }, { class: 'nrl-books-back' }),
-  ));
-  content.append(el('p', { class: 'nrl-books-heading', text: fmtBooksHeading(entry) }));
+  const back = backButton('History', () => { closeScreen(); (opts.back ?? openHistoryScreen)(); });
+  back.classList.add('nrl-books-back');
+  const sheet = el('div', { class: 'nrl-screen nrl-season-books', attrs: { 'data-season-books': String(entry.season) } },
+    screenHead(`Season ${entry.season} books`, { lead: [back], sub: el('span', { class: 'nrl-screen-sub nrl-books-heading', text: fmtBooksHeading(entry) }) }));
   if (!books) {
-    content.append(panel({}, el('p', { text: 'No books kept for this season: the club started keeping them in a later version of the game.' })));
+    sheet.append(el('div', { class: 'nrl-screen-empty', text: 'No books kept for this season: the club started keeping them in a later version of the game.' }));
   } else {
-    const table = el('table', { class: 'nrl-finance-table nrl-books-table' });
+    const table = el('table', { class: 'nrl-table nrl-finance-table nrl-books-table' });
+    table.append(el('thead', {}, el('tr', {}, el('th', { text: 'Line' }), el('th', { class: 'nrl-num', text: `S${entry.season}` }))));
     const tbody = el('tbody');
     const cell = (v: number): HTMLElement => {
-      const td = el('td', { text: v === 0 ? '—' : fmtMoneyCompact(v) });
-      if (v < 0) td.classList.add('nrl-finance-neg');
+      const td = el('td', { class: 'nrl-num', text: v === 0 ? '—' : fmtMoneyCompact(v) });
+      if (v < 0) td.classList.add('nrl-neg');
       return td;
     };
     for (const r of books.rows) tbody.append(el('tr', {}, el('td', { text: FINANCE_LINE_LABELS[r.line] }), cell(r.amount)));
     tbody.append(el('tr', { class: 'nrl-finance-pnl-net' }, el('td', { text: 'Net' }), cell(books.net)));
-    tbody.append(el('tr', { class: 'nrl-books-closing' }, el('td', { text: 'Closing balance' }), el('td', { text: fmtMoney(books.closing), class: books.closing < 0 ? 'nrl-finance-neg' : '' })));
+    tbody.append(el('tr', { class: 'nrl-books-closing' }, el('td', { text: 'Closing balance' }), el('td', { text: fmtMoney(books.closing), class: `nrl-num${books.closing < 0 ? ' nrl-neg' : ''}` })));
     table.append(tbody);
-    content.append(el('div', { class: 'nrl-finance-scroll' }, table));
-    content.append(el('p', { class: 'nrl-books-summary', text: fmtNetClosing(books) }));
+    // The two numbers that matter beside the table, which scrolls.
+    const tile = (label: string, value: string, cls: string): HTMLElement =>
+      el('div', { class: 'nrl-finance-tile' }, el('span', { class: 'nrl-label', text: label }), el('span', { class: `nrl-finance-big nrl-num ${cls}`, text: value }));
+    const net = Math.round(books.net);
+    sheet.append(el('div', { class: 'nrl-books-body' },
+      el('div', { class: 'nrl-books-scroll' }, table),
+      el('div', { class: 'nrl-books-keys' },
+        tile('Net', `${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))}`, net < 0 ? 'nrl-neg' : 'nrl-pos'),
+        tile('Closing balance', fmtMoney(books.closing), books.closing < 0 ? 'nrl-neg' : ''),
+        el('p', { class: 'nrl-books-summary', text: fmtNetClosing(books) }))));
   }
-  return openModal(content, { class: 'nrl-books-modal', screen: true, key: 'history' });
+  return openScreen(sheet, undefined, 'history');
 }
 
 /**
@@ -250,3 +344,85 @@ export function latestHistoryEntry(state: GameState): SeasonHistoryEntry | undef
     ? state.history[state.history.length - 1]
     : undefined;
 }
+
+// ── Styles (History, a season's books and the season review) ─────────────────
+
+const HISTORY_STYLE_ID = 'nrl-history-styles';
+
+/** Inject History's stylesheet once (with Finance's, whose tiles and tables the books use). */
+export function ensureHistoryStyles(): void {
+  if (typeof document === 'undefined') return;
+  ensureFinanceStyles();
+  if (document.getElementById(HISTORY_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = HISTORY_STYLE_ID;
+  style.textContent = HISTORY_CSS;
+  document.head.appendChild(style);
+}
+
+export const HISTORY_CSS = `
+/* 3l: one row a season, newest first; only the rows scroll. */
+.nrl-history-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+.nrl-history-table { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-history-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-history-row {
+  display: grid;
+  grid-template-columns: 52px 80px 70px 44px minmax(0, 1fr) 104px 150px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 44px;
+  padding: 4px 0;
+  border-top: 1px solid var(--nrl-button);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.nrl-history-row.nrl-history-headrow { min-height: 22px; padding: 0; border-top: 0; flex: 0 0 auto; }
+.nrl-history-row > span { min-width: 0; }
+.nrl-history-row .nrl-num { font-weight: 500; }
+.nrl-history-row small { display: block; font-family: var(--nrl-f-body); font-size: 11px; font-weight: 400; color: var(--nrl-muted); line-height: 1.3; letter-spacing: 0; text-transform: none; }
+.nrl-history-finish { font-family: var(--nrl-f-label); font-size: 16px; font-weight: 700; }
+.nrl-history-finish.nrl-history-best { color: var(--nrl-accent); }
+.nrl-history-finish small { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-history-player { overflow-wrap: anywhere; }
+.nrl-history-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.nrl-history-actions .nrl-btn { min-height: 34px; padding: 0 12px; font-size: 14px; border-radius: 8px; }
+@media (pointer: coarse) { .nrl-history-actions .nrl-btn { min-height: 44px; } }
+.nrl-history-empty { padding: 32px 16px; }
+/* A narrow phone (667px): slimmer columns, and the season's note to two lines (the whole of it in its tooltip). */
+@media (max-width: 700px) {
+  .nrl-history-row { grid-template-columns: 48px 58px 62px 30px minmax(0, 1fr) 92px 128px; column-gap: 6px; }
+  .nrl-history-player small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .nrl-history-actions { gap: 4px; }
+  .nrl-history-actions .nrl-btn { padding: 0 8px; font-size: 13px; }
+}
+.nrl-history-records { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); column-gap: 24px; }
+.nrl-history-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; border-top: 1px solid var(--nrl-button); font-size: 13px; }
+.nrl-history-record > span:last-child { text-align: right; }
+
+/* A season's books: the table scrolls, the net and the closing balance beside it. */
+.nrl-books-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 460px) minmax(180px, 240px); gap: 16px; }
+.nrl-books-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-books-keys { display: flex; flex-direction: column; gap: 6px; }
+.nrl-books-summary { font-size: 12px; color: var(--nrl-muted); margin: 0; }
+.nrl-books-closing td { border-top: 1px solid var(--nrl-line); font-weight: 600; }
+
+/* The season review (N7, #190): the finish, then the season in labelled lines, two columns. */
+.nrl-review-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-review-finish {
+  font-family: var(--nrl-f-label); font-size: 20px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--nrl-raised); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px;
+}
+.nrl-review-finish.nrl-review-premiers { background: var(--nrl-accent); color: var(--nrl-on-accent); }
+.nrl-review-lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); column-gap: 20px; align-items: start; }
+.nrl-review-col { display: flex; flex-direction: column; }
+.nrl-review-line { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--nrl-button); font-size: 13px; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-review-line > .nrl-label { font-size: 12px; }
+.nrl-review-objectives { list-style: none; margin: 0 0 4px 120px; padding: 0; font-size: 12px; }
+.nrl-review-objectives li { padding: 1px 0; }
+.nrl-review-good, .nrl-review-line.nrl-review-good > span:last-child { color: var(--nrl-pos); }
+.nrl-review-bad, .nrl-review-line.nrl-review-bad > span:last-child { color: var(--nrl-neg); }
+@media (max-width: 700px) {
+  .nrl-review-line { grid-template-columns: 96px minmax(0, 1fr); }
+  .nrl-review-objectives { margin-left: 104px; }
+}
+`;

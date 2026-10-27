@@ -610,3 +610,27 @@ describe('seasonPnl (N6, #172)', () => {
     expect(p.net).toBe(-60_000);
   });
 });
+
+// Broadcast Quiet 3j: the key tiles' lines and the line items' signs.
+import { fmtSigned, fmtNetNote, fmtExpiring } from '../../../src/ui/screens/finance';
+
+describe('Finance key tiles (3j)', () => {
+  it('signs a line item with a true minus', () => {
+    expect(fmtSigned(4200)).toBe('+$4,200');
+    expect(fmtSigned(-28400)).toBe('−$28,400');
+    expect(fmtSigned(0.4)).toBe('$0');
+  });
+
+  it('says under the net whether the club burns cash, and the fire sale first when in debt', () => {
+    expect(fmtNetNote({ runwayWeeks: null, weeksToFloor: null })).toBe('No burn · you\'re making money');
+    expect(fmtNetNote({ runwayWeeks: 12.7, weeksToFloor: null })).toBe('Runway 12 weeks');
+    expect(fmtNetNote({ runwayWeeks: 0, weeksToFloor: 6 })).toBe('Fire sale in about 6 weeks at this burn');
+    expect(fmtNetNote({ runwayWeeks: 0, weeksToFloor: 0 })).toBe('Fire sale below the floor now');
+  });
+
+  it('counts the contracts ending within the window', () => {
+    expect(fmtExpiring(0)).toBe(`No contracts end within ${EXPIRY_WINDOW_WEEKS} wks`);
+    expect(fmtExpiring(1)).toBe(`1 contract ends within ${EXPIRY_WINDOW_WEEKS} wks`);
+    expect(fmtExpiring(2)).toBe(`2 contracts end within ${EXPIRY_WINDOW_WEEKS} wks`);
+  });
+});
