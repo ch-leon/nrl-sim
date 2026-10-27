@@ -43,7 +43,7 @@ export class PopupLayer {
     for (let i = 0; i < POOL; i++) {
       const t = scene.add
         .text(0, 0, '', {
-          fontFamily: '"Courier New", monospace',
+          fontFamily: '"Barlow Condensed", "Arial Narrow", sans-serif',
           fontStyle: 'bold',
           fontSize: '16px',
           color: '#ffffff',

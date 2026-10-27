@@ -2,7 +2,8 @@
 // built from the MatchResult, it agrees with the score and the overlay's tallies.
 import { describe, it, expect } from 'vitest';
 import { runMatch } from '../../../src/match/league/match';
-import { buildMatchReport, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
+import { buildMatchReport, initials, injuryChip, ladderMove, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
+import { fmtPotmLine, fmtPotmShort } from '../../../src/ui/screens/potm';
 import { playerOfTheMatch } from '../../../src/systems/stats';
 import { summaryLines } from '../../../src/match/view/commentary';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../../src/sim/events';
@@ -49,6 +50,9 @@ describe('match report (N9.5)', () => {
 
   it('names the Player of the Match with his club', () => {
     expect(r.potm?.who).toMatch(/\((Live Test FC|Gulls)\)$/);
+    expect(r.potm?.who.startsWith(r.potm.name)).toBe(true);
+    expect(['Live Test FC', 'Gulls']).toContain(r.potm?.short);
+    expect(r.round).toBe('Round 3');
   });
 
   it('carries the commentary’s summary (N15.2): the final whistle with the score, then the tries', () => {
@@ -113,5 +117,25 @@ describe('the report headline (#351 P2)', () => {
 
   it('the plan changes fold under one line that counts them (#351 P0)', () => {
     expect(planChangesSummary(2)).toBe('Plan changes (2)');
+  });
+});
+
+describe('the full-time card (3s)', () => {
+  it('a two-letter badge for the Player of the Match', () => {
+    expect(initials('Brayden Naden')).toBe('BN');
+    expect(initials('Jett Van Der Berg')).toBe('JB');
+    expect(initials('Madonna')).toBe('MA');
+    expect(initials('  ')).toBe('?');
+  });
+  it('his line leaves out the noughts', () => {
+    const p = { name: 'Brayden Naden', teamId: 'player', score: 9, tries: 1, tackles: 31, lineBreaks: 0 };
+    expect(fmtPotmShort(p)).toBe('1 try, 31 tackles');
+    expect(fmtPotmShort({ ...p, tries: 0, tackles: 0 })).toBe('0 tackles');
+    expect(fmtPotmLine(p)).toBe('1 try · 31 tackles · 0 line breaks');
+  });
+  it('an injury chip by surname, and the ladder move', () => {
+    expect(injuryChip('Dane Webb', 2)).toBe('Webb injured 2 wk');
+    expect(ladderMove(5, 4)).toEqual({ from: '5th', to: '4th' });
+    expect(ladderMove(3, 3)).toEqual({ held: '3rd' });
   });
 });
