@@ -4,7 +4,7 @@
 // of Phaser scenes; call destroy() to unsubscribe and remove it.
 
 import { bus } from '../core/events';
-import { getState, type GameState } from '../core/state';
+import { getState, type GameState, type Objective } from '../core/state';
 import type { AdvanceTarget } from '../core/advanceRules';
 import { weekHeld } from '../core/time';
 import { advanceInProgress, stopAdvance } from '../core/advance';
@@ -13,6 +13,7 @@ import { nextFixture } from '../systems/league';
 import { RISK_WORD, ladderStanding, worstObjective, type ObjectiveRisk } from '../systems/board';
 import { ECON, WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
+import { MIN_LANE_PX } from './toasts';
 
 /** Options for {@link createHud}. */
 export interface HudOpts {
@@ -132,13 +133,23 @@ export function fmtMoneyShort(n: number): string {
 }
 
 /**
+ * The board chip's second line under 760px (#368): "Board" over one word. There
+ * the bar has room for the money, the toast lane (140px), the next match and
+ * Advance Week, and about 55px more.
+ */
+const BOARD_SHORT: Readonly<Record<Objective['kind'], (target: number) => string>> = {
+  finals: (target) => `top ${target}`, beatRival: () => 'rival', solvent: () => 'cash', build: () => 'build',
+};
+
+/**
  * The hub's board chip (#368), beside the next-match chip: the single worst
  * objective at risk or worse, in two short lines ("Board: top 8" over "You're
- * 11th"), each about 14 characters at most so both chips fit at 667px; the
- * objective in full is in the label. Null when every objective is on track.
- * `runwayWeeks` is the money tile's. Pure — extracted for unit testing without the DOM.
+ * 11th"), each about 14 characters at most; under 760px, "Board" over `short`
+ * ("top 8"). The objective in full is in the label. Null when every objective
+ * is on track. `runwayWeeks` is the money tile's. Pure — extracted for unit
+ * testing without the DOM.
  */
-export function boardChip(s: GameState, runwayWeeks: number | null): { title: string; detail: string; label: string; risk: ObjectiveRisk } | null {
+export function boardChip(s: GameState, runwayWeeks: number | null): { title: string; detail: string; short: string; label: string; risk: ObjectiveRisk } | null {
   const worst = worstObjective(s, runwayWeeks);
   if (!worst) return null;
   const { objective: o, risk } = worst;
@@ -168,7 +179,7 @@ export function boardChip(s: GameState, runwayWeeks: number | null): { title: st
       break;
     }
   }
-  return { title, detail, risk, label: `Board objective ${RISK_WORD[risk].toLowerCase()}: ${o.text}. ${detail}` };
+  return { title, detail, short: BOARD_SHORT[o.kind](o.target), risk, label: `Board objective ${RISK_WORD[risk].toLowerCase()}: ${o.text}. ${detail}` };
 }
 
 /** The board chip's class for each risk it shows (#368). */
@@ -356,6 +367,7 @@ export function createHud(opts: HudOpts = {}): Hud {
 
   const root = el('div', { class: 'nrl-hud' }, readouts, spacer, actions);
 
+  let board: ReturnType<typeof boardChip> = null;
   let lastMoney: number | null = null;
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -402,12 +414,13 @@ export function createHud(opts: HudOpts = {}): Hud {
     );
     nextEl.setAttribute('aria-label', chip?.label ?? '');
     nextEl.title = chip?.label ?? '';
-    const board = boardChip(s, runway);
-    boardEl.hidden = !board;
-    root.toggleAttribute('data-board', !!board);
+    board = boardChip(s, runway);
+    // Both forms; the stylesheet shows the short one under 760px.
+    const wide = (text: string): HTMLElement => el('span', { class: 'nrl-hud-board-wide', text });
+    const narrow = (text: string): HTMLElement => el('span', { class: 'nrl-hud-board-narrow', text });
     boardEl.replaceChildren(
-      el('span', { class: 'nrl-hud-next-opp', text: board?.title ?? '' }),
-      el('span', { class: 'nrl-hud-next-detail', text: board?.detail ?? '' }),
+      el('span', { class: 'nrl-hud-next-opp' }, wide(board?.title ?? ''), narrow('Board')),
+      el('span', { class: 'nrl-hud-next-detail' }, wide(board?.detail ?? ''), narrow(board?.short ?? '')),
     );
     boardEl.classList.toggle(BOARD_RISK_CLASS['at-risk'], board?.risk === 'at-risk');
     boardEl.classList.toggle(BOARD_RISK_CLASS['off-track'], board?.risk === 'off-track');
@@ -415,6 +428,28 @@ export function createHud(opts: HudOpts = {}): Hud {
     boardEl.setAttribute('aria-label', boardLabel);
     boardEl.title = boardLabel;
     renderAdvancing(s);
+    fitBoard();
+  }
+
+  /**
+   * Show the board chip where it fits (#368). Under 760px a decision badge on
+   * Advance Week and a long next-match name can leave no room: the chip gives way
+   * rather than clip either chip or squeeze the toast lane under its 140px
+   * between the money and the chips (toasts.ts). Staff & Board and the weekly
+   * summary still say how the objective stands.
+   */
+  function fitBoard(): void {
+    const show = (on: boolean): void => {
+      boardEl.hidden = !on;
+      root.toggleAttribute('data-board', on);
+    };
+    show(!!board);
+    if (!board) return;
+    const money = moneyEl.getBoundingClientRect();
+    const chip = boardEl.getBoundingClientRect();
+    if (money.width === 0 || chip.width === 0) return; // not laid out: the HUD is hidden in a match
+    const clipped = (b: HTMLElement): boolean => b.scrollWidth > b.clientWidth + 1;
+    if (chip.left - money.right - 12 < MIN_LANE_PX || clipped(boardEl) || (!nextEl.hidden && clipped(nextEl))) show(false);
   }
 
   /** Progress and Stop while a multi-week advance runs; the usual controls after it. */
@@ -452,6 +487,9 @@ export function createHud(opts: HudOpts = {}): Hud {
   mount(root);
   // Screens sit below the HUD (GitHub #14): publish our live height.
   const offInset = trackChromeInset(root, HUD_INSET_VAR);
+  // The board chip is measured again when the bar's size changes: back from a match, or turned (#368).
+  const sized = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => fitBoard());
+  sized?.observe(root);
 
   return {
     el: root,
@@ -461,6 +499,7 @@ export function createHud(opts: HudOpts = {}): Hud {
       offParked();
       offFinished();
       offInset();
+      sized?.disconnect();
       setMenuOpen(false);
       if (flashTimer) clearTimeout(flashTimer);
       root.remove();

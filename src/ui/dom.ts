@@ -465,8 +465,16 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
 .nrl-hud .nrl-btn.nrl-hud-board { flex: 0 1 auto; border-color: var(--nrl-risk-amber, #d08a00); color: var(--nrl-risk-amber-ink, #8a4b00); }
 .nrl-hud .nrl-btn.nrl-hud-board.nrl-hud-board-off { border-color: var(--nrl-risk-red, #b00020); color: var(--nrl-risk-red, #b00020); }
 .nrl-hud .nrl-btn.nrl-hud-next:not(.nrl-hud-board) { flex: 0 1 auto; }
-/* Below 760px both chips only fit with the Season tile and the week's "/27" out of the way while the board chip is up. */
-@media (max-width: 759px) { .nrl-hud[data-board] .nrl-hud-stat[data-hud="season"], .nrl-hud[data-board] .nrl-hud-week-total { display: none; } }
+/* Below 760px the chip is "Board" over one word, so the toast lane keeps its 140px
+   between the money and the chips; the week's "/27" makes room for it. */
+.nrl-hud-board-narrow { display: none; }
+@media (max-width: 759px) {
+  .nrl-hud-board-wide { display: none; }
+  .nrl-hud-board-narrow { display: inline; }
+  .nrl-hud[data-board] .nrl-hud-week-total { display: none; }
+  .nrl-hud[data-board] .nrl-hud-spacer { gap: 0.25rem; }
+  .nrl-hud[data-board] .nrl-btn.nrl-hud-next { padding-left: 0.25rem; padding-right: 0.25rem; }
+}
 /* #350 H1: decisions waiting, a red count on Advance Week. */
 .nrl-hud-alert {
   display: inline-block;

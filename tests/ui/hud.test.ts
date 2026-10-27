@@ -221,7 +221,7 @@ describe('the board chip (#368)', () => {
   it('shows the worst objective at risk: the target over where the club is', () => {
     const chip = boardChip({ ...eleventh(4), objectives: [finals(8), solvent(0)] }, null)!;
     expect(chip).toEqual({
-      title: 'Board: top 8', detail: "You're 11th", risk: 'at-risk',
+      title: 'Board: top 8', detail: "You're 11th", short: 'top 8', risk: 'at-risk',
       label: "Board objective at risk: Finish in the top 8. You're 11th",
     });
   });
@@ -244,7 +244,7 @@ describe('the board chip (#368)', () => {
     const name = s0.league.clubs.find((c) => c.id === top)!.name;
     const rival: Objective = { id: 'r', kind: 'beatRival', text: `Finish above ${name}`, target: 0, rivalId: top, status: 'pending' };
     const chip = boardChip({ ...s0, objectives: [rival] }, null)!;
-    expect(chip).toMatchObject({ title: 'Board: rival', detail: '11th v 1st', risk: 'off-track' });
+    expect(chip).toMatchObject({ title: 'Board: rival', detail: '11th v 1st', short: 'rival', risk: 'off-track' });
     expect(chip.label).toContain(name);
     for (const c of [chip, boardChip({ ...s0, money: 5_000, objectives: [solvent(0)] }, 2)!]) {
       expect(c.title.length).toBeLessThanOrEqual(14);
@@ -268,5 +268,7 @@ describe('the board chip (#368)', () => {
   it('the chip sits beside the next match and its risk colours are themable', () => {
     expect(CSS).toContain('.nrl-hud .nrl-btn.nrl-hud-board');
     expect(CSS).toContain('var(--nrl-risk-amber, #d08a00)');
+    // Under 760px the short form, so the toast lane keeps its room.
+    expect(CSS).toMatch(/@media \(max-width: 759px\) \{\s*\.nrl-hud-board-wide \{ display: none; \}/);
   });
 });
