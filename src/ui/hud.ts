@@ -298,7 +298,9 @@ export function createHud(opts: HudOpts = {}): Hud {
     }
   }
   function onOutsidePointer(e: Event): void {
-    if (!actions.contains(e.target as Node)) setMenuOpen(false);
+    // The menu sits beside the button group in the dock, not inside it: a tap on an item must reach it.
+    const t = e.target as Node;
+    if (!actions.contains(t) && !menu.contains(t)) setMenuOpen(false);
   }
   function onMenuKey(e: KeyboardEvent): void {
     if (e.key === 'Escape') setMenuOpen(false);

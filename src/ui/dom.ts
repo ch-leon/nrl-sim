@@ -1077,6 +1077,20 @@ body.nrl-match-active .nrl-decisions-chip { display: none; }
 .nrl-update-toast .nrl-btn { flex: 0 0 auto; }
 body.nrl-match-active .nrl-update-toast { display: none; }
 
+/* ── Short screens ──────────────────────────────────────────────────────
+   Shorter than the design's 390 (667×375, Safari's 956×330 with its toolbars): a
+   56px dock and 8px gaps, so a sheet keeps four 44px rows. 844×390 is untouched. */
+@media (max-height: 380px) {
+  .nrl-dock-wrap { padding-bottom: max(8px, var(--nrl-safe-b)); }
+  .nrl-dock { height: 56px; }
+  .nrl-dock-play { height: 46px; }
+  .nrl-dock-play-group > .nrl-btn { min-height: 46px; }
+  .nrl-screen-region { top: calc(var(--nrl-hud-h, 0px) + 8px + var(--nrl-safe-t)); bottom: calc(var(--nrl-nav-h, 0px) + 8px); }
+  .nrl-screen, .nrl-screen-backdrop .nrl-modal { padding: 6px 12px; }
+  .nrl-screen-head { margin-bottom: 4px; }
+  .nrl-nav-sheet { bottom: calc(var(--nrl-nav-h, 0px) + 6px); }
+}
+
 /* ── News (#45), under Office ───────────────────────────────────────────── */
 .nrl-news { font-size: 13px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-news-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -1228,6 +1242,14 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-kit-swatch[aria-pressed="true"] { border-color: var(--nrl-navy); box-shadow: 0 0 0 2px var(--nrl-accent); }
 .nrl-kit-actions { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; }
 .nrl-kit-actions .nrl-btn { flex: 1 1 auto; }
+/* 956×330: smaller figures, so the preview and Save fit beside the controls. */
+@media (max-height: 340px) {
+  .nrl-kit-head { margin-bottom: 4px; }
+  .nrl-kit-side { gap: 6px; }
+  .nrl-kit-preview { padding: 4px 8px; }
+  .nrl-kit-sprite { width: 48px; height: 52px; }
+  .nrl-kit-portrait { width: 42px; }
+}
 /* ── Guide, under Office (N7, #188, #344) ─────────────────────────────────── */
 /* #206: only the page scrolls; the tabs and the foot (Replay) stay in view. */
 .nrl-guide { font-size: 13px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }

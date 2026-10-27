@@ -19,6 +19,7 @@ import {
   ensureStyles,
   activeScreen,
   closeScreen,
+  closeModal,
   screenKey,
   setScreenKey,
   onScreenChange,
@@ -156,6 +157,7 @@ export function createNav(): Nav {
   // Office over the grounds: one sheet at a time, so an open screen closes first.
   const more = tabButton(OFFICE_LABEL, () => {
     if (!sheet.hidden) return setSheet(false);
+    closeModal(); // a dialog left open (a decision) would sit over the tiles
     closeScreen();
     setSheet(true);
   });

@@ -113,6 +113,12 @@ const TITLE_CSS = `
   .nrl-title h1::after { margin-top: 4px; font-size: 11px; }
   .nrl-title-main { gap: 10px; }
 }
+@media (max-height: 500px) {
+  /* Start over? and its two buttons in a row, so Cancel stays on screen under the kit. */
+  .nrl-title-go:has(.nrl-title-confirm) { flex-direction: row; flex-wrap: wrap; }
+  .nrl-title-go .nrl-title-confirm { flex: 1 1 100%; }
+  .nrl-title-go:has(.nrl-title-confirm) .nrl-title-btn { flex: 1 1 0; padding: 0 8px; }
+}
 @media (max-height: 340px) {
   .nrl-title { padding-bottom: calc(18px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
   .nrl-title-main { gap: 6px; }

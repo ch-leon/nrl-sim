@@ -512,7 +512,7 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   pointer-events: auto;
   position: fixed;
   left: 50%;
-  bottom: calc(5rem + var(--nrl-safe-b, 0px)); /* clear of the nav and the home bar */
+  bottom: calc(var(--nrl-nav-h, 5rem) + 12px); /* clear of the dock (its height includes the home bar) */
   transform: translateX(-50%);
   max-width: min(90vw, 320px);
   background: rgba(14, 22, 48, 0.97);
@@ -529,8 +529,8 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 5.75rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
-  max-height: calc(100dvh - 5.75rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
+  max-height: calc(100vh - var(--nrl-nav-h, 5rem) - 24px - var(--nrl-safe-t, 0px));
+  max-height: calc(100dvh - var(--nrl-nav-h, 5rem) - 24px - var(--nrl-safe-t, 0px));
 }
 .nrl-tutorial-centered {
   top: 50%;
@@ -569,8 +569,9 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
     /* 300px with border-box is ~265px of copy: every step fits unscrolled at
        750×340 and 956×330 (#208); the height cap below is the backstop. */
     max-width: min(60vw, 300px);
-    max-height: calc(100vh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
-    max-height: calc(100dvh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
+    /* From the dock's top (its height plus the 12px gap) to 12px under the top edge. */
+    max-height: calc(100vh - var(--nrl-nav-h, 4.5rem) - 24px - var(--nrl-safe-t, 0px));
+    max-height: calc(100dvh - var(--nrl-nav-h, 4.5rem) - 24px - var(--nrl-safe-t, 0px));
   }
 }
 /* The bar: one row above the nav, copy then Skip and Next, over about one row of

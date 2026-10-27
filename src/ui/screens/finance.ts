@@ -661,7 +661,7 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 
 /* Contracts (under Finance): one row a player, soonest to end first. */
 .nrl-screen.nrl-contracts { display: flex; flex-direction: column; }
-.nrl-contracts-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.nrl-contracts-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; container-type: inline-size; }
 .nrl-table.nrl-contracts-table { min-width: 660px; }
 .nrl-contracts-table td { height: 44px; }
 .nrl-contracts-table td.nrl-num { font-weight: 500; }
@@ -674,8 +674,9 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 @media (pointer: coarse) { .nrl-contract-actions .nrl-btn { min-height: 44px; } }
 .nrl-contract-actions .nrl-btn.nrl-contract-armed, .nrl-contract-actions .nrl-btn.nrl-contract-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 .nrl-contract-gone td { color: var(--nrl-muted); }
-/* A narrow phone (667px): the table fits without a sideways scroll; who he is goes to the name's tooltip. */
-@media (max-width: 700px) {
+/* A narrow sheet (667px, or 844px between a notch's insets): the table fits without a sideways
+   scroll; who he is goes to the name's tooltip. On the sheet's own width, not the screen's. */
+@container (max-width: 760px) {
   .nrl-table.nrl-contracts-table { min-width: 0; }
   .nrl-contract-meta { display: none; }
   .nrl-contracts-table th, .nrl-contracts-table td { padding: 0 4px; }

@@ -1369,6 +1369,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   pointer-events: auto; animation: nrl-mo-up 180ms ease-out;
 }
 .nrl-mo-tray[hidden] { display: none; }
+/* The tray and the full log side by side: the log gives way on a narrow phone (667px) rather than sit under the tray. */
+.nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 360px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
 .nrl-mo-tray-list { display: flex; flex-direction: column; gap: 6px; }
 .nrl-mo-tray-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .nrl-mo-tray-title { font-family: var(--nrl-f-label); font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }

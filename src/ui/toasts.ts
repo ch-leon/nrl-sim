@@ -2,7 +2,8 @@
 // emits). #339: one toast at a time with a "+n" counter for the rest, a tap
 // dismisses it, and it sits where no control is:
 //   - at the club, just above the dock, centred (the decisions chip has the
-//     top-left corner and a sheet's header row its top edge);
+//     top-left corner and a sheet's header row its top edge); at the top while
+//     Office's tiles take that place;
 //   - in a match, in the row under the score bug, short of the full log, and
 //     not while the Replay try chip, a key-moment banner or the stats are in that row;
 //   - with no dock (the title, the lab), centred at the top.
@@ -77,7 +78,9 @@ export function initToasts(root: HTMLElement): void {
       if (log && log.width > 0) setLane('match', `width: ${Math.max(MIN_LANE_PX, Math.floor(log.left - 8 - lane.getBoundingClientRect().left))}px;`);
       return;
     }
-    setLane(document.querySelector('.nrl-dock') ? 'dock' : 'top', '');
+    // Office's tiles sit where the dock lane is: while the sheet is up the toast goes to the top.
+    const office = document.querySelector('.nrl-nav-sheet:not([hidden])');
+    setLane(document.querySelector('.nrl-dock') && !office ? 'dock' : 'top', '');
   };
   /** The toast in view, under nothing: its middle takes a tap. */
   const seen = (t: Element): boolean => {
