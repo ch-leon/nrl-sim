@@ -44,7 +44,8 @@ import { advanceUntilAsked, askBeforeAdvance, pendingDecisionCount } from './ui/
 import { initAudio, initAudioUi } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
-import { setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
+import { initFirstVisitHints, setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
+import { commitUndo, initUndo } from './systems/undo';
 import { openGuideScreen } from './ui/guide/guide';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
@@ -99,6 +100,7 @@ async function boot(): Promise<void> {
     },
   });
   initToasts(uiRoot);
+  initUndo(); // a match starting ends the 5-second Undo (#370)
   initSeasonEndFeedback();
   initFinanceLedger();
   initNewsInbox();
@@ -168,12 +170,19 @@ async function boot(): Promise<void> {
   // when it first asked for a pause. Sleep once the loop has actually started
   // (#315). A later turn to portrait still sleeps from onBlock, above.
   sleepLoopIfPortrait(g, () => portraitBlocked);
-  // #338: neither advance takes a pending card's default unasked.
-  const advanceOneWeek = (): void => askBeforeAdvance(1, () => advanceWeek());
+  // #338: neither advance takes a pending card's default unasked. #370: each first
+  // keeps whatever an open Undo would take back, so the decisions confirm is unchanged.
+  const advanceOneWeek = (): void => {
+    commitUndo();
+    askBeforeAdvance(1, () => advanceWeek());
+  };
   const runwayWeeks = (s: GameState): number | null => financeSummary(s).runwayWeeks;
   createHud({
     onAdvanceWeek: advanceOneWeek,
-    onAdvanceUntil: (t) => advanceUntilAsked(t, advanceUntil),
+    onAdvanceUntil: (t) => {
+      commitUndo();
+      advanceUntilAsked(t, advanceUntil);
+    },
     onNextMatch: () => nav.open('fixtures'),
     onMoney: () => nav.open('finance'),
     onBoard: () => nav.open('staff'), // the objective at risk (#368)
@@ -231,6 +240,7 @@ async function boot(): Promise<void> {
   initAudioUi();
   setTutorialScreens((id) => nav.open(id)); // each step opens its own screen (#337)
   startTutorial(); // self-guards on settings.tutorialDone
+  initFirstVisitHints(); // a line atop Lineup, News, Finance and Contracts the first time each opens (#370)
   initPwa({ holdIosHint: whenTutorialDone }); // the install hint waits for the tutorial (#337 U4)
 
   // A live match in progress when the app was closed (#73): the save is from the

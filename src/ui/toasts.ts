@@ -10,11 +10,17 @@
 // A toast's time only runs while it can be seen: under a dialog, a match card
 // or the rotate card it waits.
 //
+// #370: a toast with an action (the 5-second Undo) jumps the queue, keeps its own
+// time with toasts queued behind it, counts down even while something covers it
+// (so it ends with the offer it carries), and closes only on its ✕ or its timer:
+// a stray tap on it does nothing. One at a time: a new one replaces the last. A
+// match never has one (starting one ends the offer), so it is dropped, not kept.
+//
 // While a match is on screen (live, and full time until Back to Club) only the
 // match's own toasts show. A club toast waits, and they all show once the club
 // is back; the news inbox has every one either way.
 import { bus, type Events } from '../core/events';
-import { el, ensureStyles } from './dom';
+import { button, el, ensureStyles } from './dom';
 
 type Notice = Events['ui:notify'];
 
@@ -28,6 +34,28 @@ const MATCH_ON_CLASS = 'nrl-match-active';
 const TICK_MS = 200;
 /** Below this the top bar's gap is too narrow to read, and the toast goes to the top centre. */
 export const MIN_LANE_PX = 140;
+/** An action toast needs this much of the gap for its line, its button and its ✕ (#370); short of it, the top centre. */
+export const ACTION_LANE_PX = 200;
+
+/** Whether `n` carries an action button (the Undo, #370). */
+export function isActionToast(n: Notice): boolean {
+  return n.action !== undefined;
+}
+
+/** Where `n` joins the lane: an action toast goes to the front, the rest to the back (#370). */
+export function laneIndex(n: Notice, queued: number): number {
+  return isActionToast(n) ? 0 : queued;
+}
+
+/** Whether a tap on the toast's body closes it: not an action toast's (#370), only its ✕ or its time. */
+export function dismissOnBodyTap(n: Notice): boolean {
+  return !isActionToast(n);
+}
+
+/** The narrowest top-bar gap `n` can sit in. */
+export function laneMinPx(n: Notice | undefined): number {
+  return n && isActionToast(n) ? ACTION_LANE_PX : MIN_LANE_PX;
+}
 
 /** A toast that waits for the club: anything not about the match while a match is on screen. */
 export function toastWaits(n: Notice, matchOn: boolean): boolean {
@@ -36,6 +64,7 @@ export function toastWaits(n: Notice, matchOn: boolean): boolean {
 
 /** How long `n` stays in view: longer for more words and for a problem, shorter with a queue behind it. */
 export function toastMs(n: Notice, queued: number): number {
+  if (isActionToast(n)) return n.ms ?? TOAST_MAX_MS; // its offer's time, whatever waits behind it (#370)
   const read = 1500 + 45 * n.text.length + (n.kind === 'danger' ? 1000 : 0);
   const ms = n.ms ?? Math.min(TOAST_MAX_MS, Math.max(TOAST_MIN_MS, read));
   return queued > 0 ? Math.min(ms, TOAST_BUSY_MS) : ms;
@@ -84,7 +113,8 @@ export function initToasts(root: HTMLElement): void {
     const chips = [...document.querySelectorAll('.nrl-hud .nrl-hud-next')].map((c) => c.getBoundingClientRect()).filter((r) => r.width > 0);
     const end = chips.length > 0 ? Math.min(...chips.map((r) => r.left)) : actions?.left ?? 0;
     const gap = money && actions ? Math.floor(end - money.right - 12) : 0;
-    if (money && actions && money.height > 0 && gap >= MIN_LANE_PX) {
+    const first = lane.firstElementChild;
+    if (money && actions && money.height > 0 && gap >= laneMinPx(first ? notices.get(first) : undefined)) {
       setLane('hud', `left: ${Math.round(money.right + 6)}px; top: ${Math.round(actions.top)}px; width: ${gap}px; height: ${Math.round(actions.height)}px;`);
       return;
     }
@@ -111,7 +141,11 @@ export function initToasts(root: HTMLElement): void {
     if (first) {
       const more = first.querySelector('.nrl-toast-more');
       if (more) more.textContent = queueBadge(queued);
-      if (queued > 0) left = Math.min(left, TOAST_BUSY_MS);
+      const n = notices.get(first);
+      if (queued > 0 && !(n && isActionToast(n))) left = Math.min(left, TOAST_BUSY_MS);
+      // An action that can no longer be taken hides its button (#370).
+      const act = first.querySelector<HTMLElement>('.nrl-toast-btn');
+      if (act && n?.action?.enabled) act.hidden = !n.action.enabled();
     }
     lane.hidden = !first || rowTaken();
     if (!lane.hidden) place();
@@ -129,27 +163,47 @@ export function initToasts(root: HTMLElement): void {
     // A tab in the background throttles timers: count at most one tick of it.
     const dt = Math.min(now - last, 2 * TICK_MS);
     last = now;
-    if (shown && !lane.hidden && seen(shown)) left -= dt;
+    const n = shown ? notices.get(shown) : undefined;
+    // An action toast's time is its offer's: it runs even while covered (#370).
+    if (shown && ((n && isActionToast(n)) || (!lane.hidden && seen(shown)))) left -= dt;
     if (shown && left <= 0) shown.remove();
     render();
   }
 
+  const close = (toast: Element): void => {
+    toast.remove();
+    render();
+  };
   const show = (n: Notice): void => {
     const more = el('span', { class: 'nrl-toast-more', attrs: { 'aria-hidden': 'true' } });
     const toast = el('div', { class: `nrl-toast nrl-toast-${n.kind}` }, el('span', { class: 'nrl-toast-text', text: n.text }), more);
-    toast.title = 'Tap to dismiss';
-    toast.addEventListener('click', () => {
-      toast.remove();
-      render();
-    });
+    if (dismissOnBodyTap(n)) {
+      toast.title = 'Tap to dismiss';
+      toast.addEventListener('click', () => close(toast));
+    }
+    if (n.action) {
+      const { run } = n.action;
+      toast.classList.add('nrl-toast-action');
+      const act = button(n.action.label, () => {
+        close(toast);
+        run();
+      }, { class: 'nrl-toast-btn' });
+      const x = button('✕', () => close(toast), { class: 'nrl-toast-x' });
+      x.setAttribute('aria-label', 'Close');
+      toast.append(act, x);
+      // One at a time: the last offer's toast goes (its offer has been replaced).
+      for (const t of [...lane.children]) if (notices.get(t)?.action) t.remove();
+    }
     notices.set(toast, n);
-    lane.appendChild(toast);
+    const before = lane.children[laneIndex(n, lane.childElementCount)] ?? null;
+    lane.insertBefore(toast, before);
     render();
   };
 
   let waiting: Notice[] = [];
   bus.on('ui:notify', (n) => {
     if (n.quiet) return; // already on screen (the season review, N14)
+    if (n.action && matchOn()) return; // its offer ended with the kick-off (#370)
     if (toastWaits(n, matchOn())) waiting.push(n);
     else show(n);
   });
@@ -163,7 +217,7 @@ export function initToasts(root: HTMLElement): void {
       for (const t of [...lane.children]) {
         const n = notices.get(t);
         if (n && toastWaits(n, true)) {
-          waiting.push(n);
+          if (!n.action) waiting.push(n); // an Undo ends with the kick-off (#370)
           t.remove();
         }
       }

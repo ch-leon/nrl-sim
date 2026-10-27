@@ -99,3 +99,34 @@ with #188 and N11). Chunk 2 changed how it runs:
   tutorial is hidden, so it never dims or covers a match; it picks up on News after.
 - Every bubble is two sentences at most, and the copy names the 5-tab nav (More).
 - The iOS "Add to Home Screen" hint waits until the tutorial ends.
+
+## Since #370: three guided taps and first-visit hints
+
+The 11-step tour is now three guided taps (DECISION (Leon)): build a Training Paddock, sign
+a player, Advance Week. Each bubble is one sentence with a "1 of 3" counter.
+
+| Old step | Now |
+|---|---|
+| `welcome` | Dropped: the first tap is the welcome |
+| `build`, `place` | Tap 1 (the row in Build, then a green spot on the grass) |
+| `recruit` | Tap 2 (the first enabled SIGN under the default rating sort: the best player the club can afford) |
+| `squad` | Dropped: the Guide's Squad page covers it |
+| `lineup`, `news`, `finance`, `contracts` | A one-line hint the first time each screen opens (`HINTS`) |
+| `advance` | Tap 3; the run ends on `week:advanced`, after full time, so nothing draws over the match |
+| `wrap` | A club toast when the run completes ("That's the loop…"), not on Skip |
+
+- **Hints** live in `settings.hintsSeen?: string[]` (optional, no save bump). Absent means
+  no hints, so every save from before #370 (and any with `tutorialDone: true`) sees nothing
+  new. `startTutorial()` writes `[]` (armed); a screen's key is added as its hint shows, so
+  each shows once. No hint shows while a guided tap is up.
+- **Where a run starts**: `firstStepIndex` skips tap 1 when a Training Paddock already
+  stands (a save written mid-run, a replay).
+- **Replay tutorial** (Settings, the Guide) runs the three taps again, resets `hintsSeen`
+  to `[]`, and offers Next on every tap, since a tap may not be doable in that save.
+- **Undo during a tap** (the 5-second Undo, `systems/undo.ts`): `build` and `recruit`
+  carry `revertOn` (`facility:removed`, `player:unsigned`). Undoing the paddock or the
+  signing brings the run back to that tap. An undone build of something else, with the
+  paddock still up, leaves tap 1 done (`tapUndone`).
+- **Demo gate (#362)**: tap 3 also ends on `commercial:demoEnded`, so a demo that stops the
+  first advance hands the screen to the paywall. With the commercial flag off nothing changes.
+- **Install hint**: still waits for the run to end (`whenTutorialDone`), now after week 1.

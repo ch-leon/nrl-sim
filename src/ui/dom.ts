@@ -1487,4 +1487,33 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-card-more { color: #555; font-weight: bold; font-size: 1.1rem; line-height: 1; }
 .nrl-placebar-text { flex: 1 1 auto; }
 .nrl-placebar-cancel { flex: 0 0 auto; }
+
+/* ── #370: the Undo toast and the first-visit hints. New colours are tokens with
+   today's values, so the theme takes them over in one place. ── */
+.nrl-toast.nrl-toast-action { cursor: default; max-height: none; padding-top: 0; padding-bottom: 0; gap: 0.3rem; }
+/* Three short lines in the top bar's row, so a narrow phone's gap still reads the line. */
+.nrl-toast-action .nrl-toast-text { flex: 1 1 auto; min-width: 0; font-size: 0.72rem; line-height: 1.1; -webkit-line-clamp: 3; overflow-wrap: anywhere; }
+/* The 44px buttons run over the toast's own top and bottom edge, so the toast is 44px too and fits the top bar's row. */
+.nrl-toast-action .nrl-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; margin: -2px 0; padding: 0 0.5rem; box-shadow: none; border-width: 2px; font-size: 0.8rem; }
+.nrl-toast-btn { background: var(--nrl-toast-action-bg, #f4d03f); color: var(--nrl-toast-action-ink, #1a1a2e); }
+.nrl-toast-btn[hidden] { display: none; }
+.nrl-toast-x { width: 44px; padding: 0; background: var(--nrl-toast-x-bg, #e8e0c8); color: var(--nrl-toast-x-ink, #1a1a2e); }
+.nrl-hint {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.35rem;
+  padding: 0 0 0 0.6rem;
+  background: var(--nrl-hint-bg, #e8e0c8);
+  color: var(--nrl-hint-ink, #1a1a2e);
+  border: 2px solid var(--nrl-hint-border, #000);
+  border-left: 6px solid var(--nrl-hint-edge, #f4d03f);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+.nrl-hint-text { flex: 1 1 auto; min-width: 0; }
+/* A framed screen's ✕ sits in the corner over its scroll: the hint stops short of it. */
+.nrl-modal-has-x .nrl-modal-scroll > .nrl-hint { margin-right: 2.75rem; }
+.nrl-hint .nrl-hint-x { flex: 0 0 auto; width: 44px; min-height: 44px; padding: 0; box-shadow: none; border-width: 0 0 0 2px; }
 `;

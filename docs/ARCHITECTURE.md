@@ -229,6 +229,7 @@ export interface GameState {
     difficulty: Difficulty;   // easy | normal | hard (#48)
     coachCalls?: boolean;     // the call chips in your matches (#73); on when absent
     liveRivals?: boolean;     // rival rounds played on the live sim (N9.2, #212); off when absent
+    hintsSeen?: string[];     // first-visit hints shown (#370); absent = no hints (a save from before the three taps)
   };
   history: SeasonRecord[];    // one per completed season, oldest first
   boardPatience: number;      // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
@@ -327,13 +328,15 @@ export interface Events {
   'season:ended': { season: number; ladderPosition: number; premiership: boolean };
   'money:changed': { delta: number; reason: string; balance: number };
   'facility:placed': PlacedFacility;
+  'facility:removed': { facility: PlacedFacility; undo: boolean }; // a build taken back by the Undo (#370)
   'player:signed': Player;
+  'player:unsigned': { player: Player }; // a signing taken back by the Undo (#370)
   'match:started': { fixture: Fixture; sim?: MatchResult; live?: LiveMatchData }; // live: no result until full time
   'match:event': MatchEvent;          // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
   'match:parked': { tick: number }; // Save & exit: the week stays held; Advance Week resumes the match
   'bankruptcy:warning': { balance: number; forcedSales?: string[] }; // after the week's forced sales, naming them (N12.5)
-  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger' };
+  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger'; action?: { label: string; run: () => void } }; // action: the 5s Undo (#370)
 }
 ```
 

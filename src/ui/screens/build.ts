@@ -28,10 +28,11 @@ import { ECON } from '../../config';
 import { activePack } from '../../content';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
+import { demolishWithUndo } from '../../systems/undo';
 import { POOL_POINTS_PER_BIAS, SCOUT_BIAS_PER_LEVEL, SCOUT_FEE_DISCOUNT_PER_LEVEL } from '../../systems/freeagency';
 import { REP_BASELINE } from '../../systems/league';
 import {
-  activeGroundsScene, demolishFacility, demolishRefund, moveFee, type GroundsSceneLike,
+  activeGroundsScene, demolishRefund, moveFee, type GroundsSceneLike,
 } from '../../world/placement';
 
 /** Format a money value for display (local; mirrors hud.fmtMoney conventions). */
@@ -134,7 +135,8 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
     if (affordable) {
       row.addEventListener('click', () => {
         closeScreen();
-        scene?.enterPlacementMode(def.id);
+        // The scene as it is now: the first tap (#370) can open Build before the grounds are up.
+        (scene ?? activeGroundsScene())?.enterPlacementMode(def.id);
       });
     }
     return row;
@@ -223,18 +225,10 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
   }, { class: 'nrl-facility-move' });
   if (money < fee || !activeGroundsScene()) moveBtn.disabled = true;
 
-  // Two taps so a stray one never knocks a building down.
-  let armed = false;
+  // One tap: the toast's 5-second Undo puts it back (#370; it replaced the "Really demolish?" tap).
   const demoBtn = button(`Demolish (+${fmtMoney(refund)})`, () => {
-    if (!armed) {
-      armed = true;
-      demoBtn.textContent = `Really demolish? +${fmtMoney(refund)} back`;
-      demoBtn.classList.add('nrl-facility-armed');
-      return;
-    }
-    const got = demolishFacility(facility.id);
+    demolishWithUndo(facility.id);
     closeModal();
-    if (got !== null) bus.emit('ui:notify', { text: `${def.name} demolished. ${fmtMoney(got)} refunded.`, kind: 'info' });
   }, { class: 'nrl-facility-demolish' });
 
   container.append(
@@ -313,6 +307,4 @@ const BUILD_CSS = `
 .nrl-facility-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .nrl-facility-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
 .nrl-btn.nrl-facility-demolish, .nrl-btn.nrl-facility-demolish:hover { background: #e8a598; }
-.nrl-btn.nrl-facility-demolish.nrl-facility-armed,
-.nrl-btn.nrl-facility-demolish.nrl-facility-armed:hover { background: #b03a2e; color: #fff; }
 `;

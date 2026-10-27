@@ -21,6 +21,7 @@ import { FACILITY_CATALOG, upgradeCost, type FacilityDef, type FacilityDefId } f
 import { GROUNDS } from '../config';
 import type { WalkGrid } from './path';
 import { GhostPreview } from './ghostPreview';
+import { offerBuild } from '../systems/undo';
 
 export interface PlaceValidation {
   ok: boolean;
@@ -356,7 +357,7 @@ export class PlacementController {
       for (const t of footprintTiles(def, this.gx, this.gy)) {
         this.path.setBlocked(t.x, t.y, true);
       }
-      bus.emit('ui:notify', { text: `${def.name} built!`, kind: 'success' });
+      offerBuild(placed, def.cost); // "built!" with a 5-second Undo (#370)
     }
     this.exit();
     return v;

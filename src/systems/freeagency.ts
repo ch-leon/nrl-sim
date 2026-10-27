@@ -129,9 +129,10 @@ export function signingFeeBasis(state: Pick<GameState, 'facilities'>, agent: Pla
  *
  * Reasons: 'not-found' (id absent), 'squad-full' (squad at SQUAD_CAP),
  * 'insufficient-funds' (money < fee). On success emits 'player:signed' and a
- * 'ui:notify' success.
+ * 'ui:notify' success, unless `opts.toast` is false (the Recruit screen and the
+ * player page show the Undo toast instead, #370).
  */
-export function signPlayer(state: GameState, playerId: string): SignResult {
+export function signPlayer(state: GameState, playerId: string, opts: { toast?: boolean } = {}): SignResult {
   const s = state;
   const agent = s.freeAgents.find((p) => p.id === playerId);
   if (!agent) return { ok: false, reason: 'not-found' };
@@ -153,7 +154,7 @@ export function signPlayer(state: GameState, playerId: string): SignResult {
   });
 
   bus.emit('player:signed', signed);
-  bus.emit('ui:notify', { text: `Signed ${signed.name}`, kind: 'success' });
+  if (opts.toast !== false) bus.emit('ui:notify', { text: `Signed ${signed.name}`, kind: 'success' });
   return { ok: true };
 }
 

@@ -5,13 +5,13 @@
 // Safari's address bar and tab strip) and 844×390 checks:
 //   - the page pins text-size-adjust to 100% (iOS Safari's landscape text boost off);
 //   - at the authored text size, every tutorial step's copy fits its bubble unscrolled (#208);
-//   - the welcome tutorial bubble sits inside the viewport with Skip and Next on
-//     screen and tappable; Next and Skip work;
+//   - the first guided tap's bubble (#370) sits inside the viewport with Skip on
+//     screen and tappable; Skip works;
 //   - the same with every font in the bubble boosted 2.17× (what Safari's boost did
 //     on Leon's phone, issue #206; WebKit on Linux never boosts by itself): the copy
 //     scrolls inside the bubble and Skip / Next stay reachable;
 //   - the Guide boosted the same way: the page scrolls, Replay and Close reachable,
-//     and Replay brings the tutorial back with its buttons on screen;
+//     and Replay brings the tutorial back with Skip and Next on screen;
 //   - the player page (#203) between HUD and nav: ✕, Renew / Sell / Release / Close
 //     tappable, the nav uncovered; the ✕ closes it back to Squad.
 // Then the landscape screens (#336, #344, #347): every nav screen and the main
@@ -143,6 +143,16 @@ function scrolls(page, sel) {
   }, sel);
 }
 
+/** The copy fits its box unscrolled, or scrolls inside it when it doesn't (#206; one short sentence a tap fits boosted, #370). */
+function fitsOrScrolls(page, sel) {
+  return page.evaluate((sel) => {
+    const e = document.querySelector(sel);
+    if (!e) return false;
+    const oy = getComputedStyle(e).overflowY;
+    return e.scrollHeight <= e.clientHeight + 1 || oy === 'auto' || oy === 'scroll';
+  }, sel);
+}
+
 // ── One size ─────────────────────────────────────────────────────────────────
 async function runSize(browser, W, H) {
   const OUT = join(OUT_ROOT, 'webkit', `${W}x${H}`);
@@ -173,24 +183,26 @@ async function runSize(browser, W, H) {
     log(`${rec.ok ? 'ok ' : 'FAIL'} ${W}x${H} ${rec.file}${rec.notes.length ? ` — ${rec.notes.join('; ')}` : ''}`);
   };
   const tap = (sel) => page.locator(sel).first().tap();
-  const TUT = ['.nrl-tutorial-bubble', ['.nrl-tutorial-skip', '.nrl-tutorial-next']];
+  // #370: a new game's first tap is anchored and offers Skip; a replay also offers Next.
+  const TUT = ['.nrl-tutorial-bubble', ['.nrl-tutorial-skip']];
+  const REPLAY = ['.nrl-tutorial-bubble', ['.nrl-tutorial-skip', '.nrl-tutorial-next']];
 
   await step('new-game', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
     await page.fill('[data-nrl-clubname]', 'Safari FC');
     await tap('[data-nrl-start]');
-    await page.waitForSelector('.nrl-tutorial-bubble[data-step="welcome"]');
-    await page.waitForTimeout(500);
+    await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
+    await page.waitForTimeout(700);
     // WebKit on Linux has no text autosizer and drops the property from computed
     // style, so read what the page's own <style> asks for.
     const adjust = await page.evaluate(() =>
       [...document.querySelectorAll('style')].some((st) => /html\s*\{[^}]*-webkit-text-size-adjust:\s*100%/.test(st.textContent ?? '')));
     return adjust ? [] : ['the page does not set html { -webkit-text-size-adjust: 100% }'];
   });
-  await step('tutorial-welcome', () => reachProblems(page, ...TUT));
+  await step('tutorial-first-tap', () => reachProblems(page, ...TUT));
   // #208: at the authored text size every step's copy fits without scrolling. Each
-  // step's text is put in the welcome bubble in turn (one rule sizes them all here).
+  // step's text is put in the first tap's bubble in turn (one rule sizes them all here).
   await step('tutorial-every-step-fits', () => page.evaluate(() => {
     const text = document.querySelector('.nrl-tutorial-text');
     const steps = window.__nrlTutorialText ?? [];
@@ -208,19 +220,7 @@ async function runSize(browser, W, H) {
     const px = await boostFonts(page, '.nrl-tutorial-bubble', BOOST);
     rec.notes.push(`copy at ${Math.round(px)}px`);
     const out = await reachProblems(page, ...TUT);
-    if (!(await scrolls(page, '.nrl-tutorial-text'))) out.push('the copy does not scroll inside the bubble');
-    return out;
-  });
-  await step('tutorial-next', async () => {
-    await tap('.nrl-tutorial-next');
-    await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
-    return reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-skip']);
-  });
-  // The build step is anchored (cutout round the Build tab): the docked bubble, boosted.
-  await step('tutorial-anchored-boosted', async () => {
-    await boostFonts(page, '.nrl-tutorial-bubble', BOOST);
-    const out = await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-skip']);
-    if (!(await scrolls(page, '.nrl-tutorial-text'))) out.push('the copy does not scroll inside the bubble');
+    if (!(await fitsOrScrolls(page, '.nrl-tutorial-text'))) out.push('the copy overflows the bubble without scrolling');
     return out;
   });
   await step('tutorial-skipped', async () => {
@@ -241,9 +241,9 @@ async function runSize(browser, W, H) {
   });
   await step('replay-boosted', async () => {
     await tap('.nrl-guide-replay');
-    await page.waitForSelector('.nrl-tutorial-bubble[data-step="welcome"]');
+    await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
     await boostFonts(page, '.nrl-tutorial-bubble', BOOST);
-    const out = await reachProblems(page, ...TUT);
+    const out = await reachProblems(page, ...REPLAY);
     await tap('.nrl-tutorial-skip');
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
     return out;
@@ -1014,6 +1014,11 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await step(`screen-${spec.id}`, async (rec) => {
       await openNav(page, spec.id);
       await page.waitForSelector(spec.box);
+      // #370: a first visit's hint line is checked in the tutorial walk; the screen is measured without it.
+      if (await page.locator('.nrl-hint-x').count()) {
+        await page.locator('.nrl-hint-x').tap();
+        rec.notes.push('first-visit hint dismissed');
+      }
       return check(rec, spec, spec.id);
     });
   }
@@ -1288,12 +1293,14 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   return report.steps.filter((s) => !s.ok).length + report.errors.length;
 }
 
-// ── The tutorial, followed (#344, #337) ──────────────────────────────────────
-// Every step done the way the bubble says, never skipped: the paddock placed on
-// the grass, a player signed, Squad and Lineup, then Advance Week into the first
-// match, played to full time with no tutorial over it, and back to the club for
-// News, Finance, Contracts and the wrap. Each step opens its own screen; each
-// control it points at must be whole, out from under the bubble, and take the tap.
+// ── The tutorial, followed (#344, #337, #370) ────────────────────────────────
+// The three guided taps done the way the bubble says, never skipped: the paddock
+// placed on the grass, a player signed (then the Undo taken, which brings the run
+// back to tap 2, and signed again), then Advance Week into the first match, played
+// to full time with no tutorial over it, and back to the club with the run over.
+// Each tap opens its own screen; each control it points at must be whole, out
+// from under the bubble, and take the tap. Then the first-visit hints: Lineup's
+// shows once, with a 44px ✕; and a build's Undo puts the money back.
 const NO_INSETS = { l: 0, t: 0, r: 0, b: 0 };
 const WALK_RUNS = [{ w: 667, h: 375, safe: NO_INSETS }, { w: 844, h: 390, safe: { l: 47, t: 0, r: 47, b: 21 } }, { w: 956, h: 330, safe: NO_INSETS }];
 
@@ -1352,7 +1359,7 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   };
   const atStep = (id) => page.waitForSelector(`.nrl-tutorial-bubble[data-step="${id}"]`);
 
-  await step('welcome', async () => {
+  await step('new-game', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
     if (safe.l || safe.t || safe.r || safe.b) {
@@ -1364,9 +1371,9 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     }
     await page.fill('[data-nrl-clubname]', 'Tutorial FC');
     await page.locator('[data-nrl-start]').tap();
-    await atStep('welcome');
-    await page.locator('.nrl-tutorial-next').tap();
     await atStep('build');
+    const count = (await page.locator('.nrl-tutorial-count').textContent())?.trim();
+    return count === '1 of 3' ? [] : [`the first tap reads "${count}"`];
   });
   /** The bubble's step: it opened its own screen (#337 U3), and nothing of the tutorial dims the page (U2). */
   const onItsScreen = (key) => page.evaluate((key) => {
@@ -1383,9 +1390,23 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== 'hidden'; };
     return ![...o.querySelectorAll('.nrl-tutorial-bubble, .nrl-tutorial-cutout')].some(vis);
   });
-  const next = async (id) => {
-    await page.locator(`.nrl-tutorial-bubble[data-step="${id}"] .nrl-tutorial-next`).tap();
+  /** The Undo toast's button, once it is on show: whole, 44px, and the one a tap at its middle hits. Then tap it. */
+  const tapUndo = async () => {
+    await page.waitForSelector('.nrl-toast-action .nrl-toast-btn', { state: 'visible' });
+    await page.waitForTimeout(300); // past the toast's 160 ms entry slide, which starts 4px up
+    const problem = await page.evaluate(() => {
+      const t = document.querySelector('.nrl-toast-action .nrl-toast-btn');
+      const r = t.getBoundingClientRect();
+      if (r.width < 44 || r.height < 44) return `Undo is ${Math.round(r.width)}×${Math.round(r.height)}px`;
+      if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) return 'Undo off screen';
+      const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+      return hit && t.contains(hit) ? null : `Undo: a tap hits ${hit?.className || hit?.tagName}`;
+    });
+    if (problem) return [problem];
+    await page.locator('.nrl-toast-action .nrl-toast-btn').tap();
+    return [];
   };
+  const money = () => page.evaluate(() => window.__nrlState().money);
 
   // Build: the step opens Build itself and frames the Training Paddock row.
   await step('build-paddock', async (rec) => {
@@ -1417,23 +1438,20 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     const out = await onItsScreen('recruit');
     out.push(...await tapTarget('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)', rec));
     if (out.length) return out;
-    await atStep('squad');
-    rec.notes.push('signed: on to the squad step');
+    await atStep('advance');
+    rec.notes.push('signed: on to tap 3');
     return out;
   });
-  await step('squad', async () => {
-    await page.waitForTimeout(300);
-    const out = await onItsScreen('squad');
-    out.push(...await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next', '.nrl-tutorial-skip']));
-    await next('squad');
-    await atStep('lineup');
-    return out;
-  });
-  await step('lineup', async () => {
-    await page.waitForTimeout(300);
-    const out = await onItsScreen('lineup');
-    out.push(...await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next', '.nrl-tutorial-skip']));
-    await next('lineup');
+  // #370: Undo the signing inside 5 s: the fee comes back and the run returns to tap 2.
+  await step('undo-sign', async (rec) => {
+    const squad = await page.evaluate(() => window.__nrlState().squad.length);
+    const out = await tapUndo();
+    if (out.length) return out;
+    await atStep('recruit');
+    const after = await page.evaluate(() => window.__nrlState().squad.length);
+    if (after !== squad - 1) out.push(`squad ${squad} → ${after} after Undo`);
+    rec.notes.push('signing undone: back to tap 2');
+    out.push(...await tapTarget('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)', rec));
     await atStep('advance');
     return out;
   });
@@ -1465,35 +1483,48 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     rec.notes.push('match played to full time (the match\'s Skip, not the tutorial\'s)');
     return out;
   });
-  // Back at the club the tutorial picks up on News, with the screen open.
-  await step('back-to-club-news', async (rec) => {
+  // Back at the club the run is over: three taps, none skipped (#370).
+  await step('back-to-club-done', async (rec) => {
     await page.locator('.nrl-btn:has-text("Back to Club")').first().evaluate((b) => b.click());
     await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud');
-    await atStep('news').catch(async () => { throw new Error(`no News step after the match (step ${await page.locator('.nrl-tutorial-bubble').getAttribute('data-step').catch(() => 'none')})`); });
     await page.waitForTimeout(700);
-    const out = await onItsScreen('news');
-    out.push(...await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next', '.nrl-tutorial-skip']));
-    rec.notes.push(`week ${await page.evaluate(() => window.__nrlState().week)}`);
-    await next('news');
+    const out = [];
+    if (await page.locator('.nrl-tutorial').count()) out.push('the tutorial is still up after the first match');
+    if (!(await page.evaluate(() => window.__nrlState().settings.tutorialDone))) out.push('tutorialDone not set at the end');
+    rec.notes.push(`week ${await page.evaluate(() => window.__nrlState().week)}, every tap followed, none skipped`);
     return out;
   });
-  for (const id of ['finance', 'contracts']) {
-    await step(id, async () => {
-      await atStep(id);
-      await page.waitForTimeout(700);
-      const out = await onItsScreen(id);
-      out.push(...await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next', '.nrl-tutorial-skip']));
-      await next(id);
-      return out;
-    });
-  }
-  await step('wrap-done', async (rec) => {
-    await atStep('wrap');
-    const out = await reachProblems(page, '.nrl-tutorial-bubble', ['.nrl-tutorial-next']);
-    await next('wrap');
-    await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
-    if (!(await page.evaluate(() => window.__nrlState().settings.tutorialDone))) out.push('tutorialDone not set at the end');
-    rec.notes.push('every step followed, none skipped');
+  // First-visit hints (#370): Lineup's line shows the first time, with a 44px ✕, and not again.
+  await step('lineup-hint-once', async (rec) => {
+    await openNav(page, 'lineup');
+    await page.waitForSelector('[data-screen-key="lineup"] [data-hint="lineup"]');
+    const out = await reachProblems(page, '[data-hint="lineup"]', ['.nrl-hint-x']);
+    const x = await page.locator('.nrl-hint-x').boundingBox();
+    if (!x || x.width < 44 || x.height < 44) out.push(`the hint's ✕ is ${x?.width}×${x?.height}px`);
+    await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-lineup-hint-first.png`) }).catch(() => {});
+    await page.locator('.nrl-hint-x').tap();
+    await page.locator('[data-screen-key="lineup"] .nrl-screen-head .nrl-screen-x').tap();
+    await openNav(page, 'lineup');
+    await page.waitForTimeout(400);
+    if (await page.locator('[data-hint]').count()) out.push('the Lineup hint showed twice');
+    rec.notes.push('shown once');
+    return out;
+  });
+  // #370: a build's Undo inside 5 s takes the facility away and gives every dollar back.
+  await step('undo-build', async (rec) => {
+    const before = await money();
+    const built = await page.evaluate(() => window.__nrlState().facilities.length);
+    await openNav(page, 'build');
+    await page.locator('[data-screen-key="build"] [data-facility="trainingPaddock"]').tap();
+    await page.waitForSelector('.nrl-placebar:not([hidden])');
+    await page.touchscreen.tap(Math.round(W / 2) - 60, Math.round(H / 2) + 40);
+    await page.waitForFunction((n) => window.__nrlState().facilities.length === n + 1, built);
+    const out = await tapUndo();
+    await page.waitForTimeout(300);
+    const after = await money();
+    if (after !== before) out.push(`money ${before} → ${after} after Undo`);
+    if ((await page.evaluate(() => window.__nrlState().facilities.length)) !== built) out.push('the facility is still there');
+    rec.notes.push(`built and undone, money back to $${after}`);
     return out;
   });
 
