@@ -10,6 +10,8 @@
 // time, and on Save & exit, so a kill that never fires pagehide loses at most
 // that much. A few hundred bytes, kept next to the save slot; cleared at full time.
 import { getActiveSlot } from '../core/save';
+import { browserStorage, type StorageLike } from '../core/storage/local';
+import { liveMatchKey } from '../core/storageKeys';
 import { TICK_S } from '../match/core/engine';
 import type { CallInput } from '../match/league/calls';
 import type { PlanInput } from '../match/league/live';
@@ -55,16 +57,11 @@ export function liveMatchSameRules(r: Pick<LiveMatchRecord, 'halfMinutes'>): boo
 /** Key for one slot's record. Export files carry the same object under this field. */
 export const LIVE_MATCH_EXPORT_FIELD = 'nrlLiveMatch';
 
-export function liveMatchKey(slot: number): string {
-  return `nrl-live-match-${slot}`;
-}
+/** The slot's key, frozen in src/core/storageKeys.ts (#360). */
+export { liveMatchKey };
 
-function store(): Storage | null {
-  try {
-    return typeof localStorage === 'undefined' ? null : localStorage;
-  } catch {
-    return null;
-  }
+function store(): StorageLike | null {
+  return browserStorage();
 }
 
 /** A record this game can resume: a bad or partial one is ignored, not spread. */

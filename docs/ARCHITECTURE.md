@@ -40,7 +40,9 @@ src/
   core/
     events.ts                # EventBus + typed event names          (WU-3)
     state.ts                 # GameState type, createNewGame(), store accessors (WU-3)
-    save.ts                  # SaveManager: localStorage persistence  (WU-4)
+    save.ts                  # SaveManager: persistence, through the save store (WU-4; store: #360)
+    storageKeys.ts           # every browser-storage key, frozen whatever the game is called (#360)
+    storage/                 # SaveStore seam: LocalSaveStore, MemorySaveStore, SaveMeta, resolveSaveConflict (#360)
     time.ts                  # TimeSystem: week/season tick pipeline  (WU-4)
   data/
     player.ts                # Player model + generator               (WU-3 / BAK-166)
