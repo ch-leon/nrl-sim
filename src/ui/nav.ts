@@ -153,7 +153,12 @@ export function createNav(): Nav {
   dim.hidden = true;
   dim.addEventListener('click', () => setSheet(false));
 
-  const more = tabButton(OFFICE_LABEL, () => setSheet(sheet.hidden));
+  // Office over the grounds: one sheet at a time, so an open screen closes first.
+  const more = tabButton(OFFICE_LABEL, () => {
+    if (!sheet.hidden) return setSheet(false);
+    closeScreen();
+    setSheet(true);
+  });
   more.setAttribute('data-nav-more', '');
   more.setAttribute('data-screen', 'office');
   more.setAttribute('aria-haspopup', 'menu');
