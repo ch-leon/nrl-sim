@@ -294,6 +294,9 @@ const CALL_CAPTION: Readonly<Record<string, string>> = {
   'late in the set': 'tackle 4+',
   'not in range': 'not in range',
   'full time': 'full time',
+  'used this half': 'used this half',
+  'no one’s tired yet': 'nobody tired',
+  'bench is spent': 'bench spent',
 };
 
 /** What a call chip says under its name: why it is grey, "called" once made this set, nothing while it can be made. */
@@ -314,6 +317,7 @@ export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
   'field-goal': 'late, close and in range: drop for goal',
   rush: 'defending: rush up for the next set',
   hold: 'defending: hold the line for the next set',
+  'fresh-legs': 'any time, once a half: your most tired man off for the freshest on the bench',
 };
 
 /** "2/5" for a side's calls paid off of made, "–" when it made none. */

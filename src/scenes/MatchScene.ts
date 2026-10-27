@@ -38,7 +38,7 @@ import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callResultText, chipState, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callResultText, chipState, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
@@ -53,6 +53,7 @@ const CHIP_LABEL: Readonly<Record<CoachCall, string>> = {
   'field-goal': 'Field goal',
   rush: 'Rush',
   hold: 'Hold',
+  'fresh-legs': 'Fresh legs',
 };
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
@@ -790,7 +791,8 @@ export class MatchScene extends Phaser.Scene {
       const btn = button(CHIP_LABEL[call], () => {
         if (!(this.playback instanceof LivePlayback)) return;
         // A refusal shows as the chip's caption (refreshCallChips), not a toast over play.
-        if (this.playback.call(side, call) === null) {
+        // Fresh legs (#367) isn't the set's call: it lights only itself, until the swap.
+        if (this.playback.call(side, call) === null && !callIsBench(call)) {
           this.madeCall = call;
           this.madeAt = this.playback.tick;
         }
@@ -826,7 +828,7 @@ export class MatchScene extends Phaser.Scene {
       }
       list.append(name, when);
     }
-    this.openSheet((onDone) => showMatchSheet({ head: 'Calls', lines: ['One call a set with the ball, one defending.', list], actions: [{ label: 'Back to the match', onTap: () => {} }], onDone }));
+    this.openSheet((onDone) => showMatchSheet({ head: 'Calls', lines: ['One call a set with the ball, one defending; Fresh legs any time, once a half.', list], actions: [{ label: 'Back to the match', onTap: () => {} }], onDone }));
   }
 
   /** The chips follow the play (calls.ts chipState): what makes sense now, or the call made this set. */
@@ -840,7 +842,7 @@ export class MatchScene extends Phaser.Scene {
     if (!used && pb.tick > this.madeAt + 1) this.madeCall = null;
     for (const { call, btn, why: caption } of this.callChips) {
       const refusal = why.get(call) ?? null;
-      const st = chipState(call, refusal, attacking, this.madeCall);
+      const st = chipState(call, refusal, attacking, this.madeCall, pb.freshLegsPending(this.callSide));
       btn.hidden = !st.show;
       btn.disabled = !st.enabled;
       btn.toggleAttribute('data-made', st.lit);

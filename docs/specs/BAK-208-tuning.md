@@ -386,6 +386,10 @@ sheds after the break's recovery. A tired start finds the bench rested at `recov
 
 Rival benches are rolled 3 points under the club's starters (`teamSheetFromRival`).
 
+Swaps happen only at a stoppage, with one exception: the coach's Fresh legs call (#367,
+§20) may swap a man where he stands at a play-the-ball. A man brought on by it counts as
+already swapped at that stoppage, so the rotation's own swaps there skip him and his bench man.
+
 Measured (20 whole matches a row, flat 60-rated squads): legs at full time 52% with no
 benches, 71% on standard (about 6.5 swaps a match, both sides), 68% on heavy (about 10:
 it swaps men who are only a little tired, for bench men only a little fresher); heavy
@@ -693,7 +697,7 @@ when `calls.ai.on`).
 | `calls.ai.on` | `calls.ts` | 0 | 1 gives every rival coach (both in a rival-v-rival match, the player's opponent) his own calls. |
 | `calls.ai.overlap` | `calls.ts` | 2 | Shift when the attack has this many more men than the defence on one side of the ball. |
 | `calls.ai.rushOwnM` | `calls.ts` | 20 m | Rush when defending this close to his own line. |
-| `CALLS.unlocks` | `calls.ts` | Hit-up, Hold · +Shift ×2, Rush · +Kick early, Run it · +Bomb, Field goal | The calls each Coach's Office level adds (index = level). Not a number, so not a harness knob. |
+| `CALLS.unlocks` | `calls.ts` | Hit-up, Hold, Fresh legs · +Shift ×2, Rush · +Kick early, Run it · +Bomb, Field goal | The calls each Coach's Office level adds (index = level). Not a number, so not a harness knob. |
 
 Measured (`20261020-021804-ai-coach-calls`, 120 whole matches a row, one side's coach on the AI):
 about 23 calls a match, 5 of them paying off; between even sides the AI side wins 51% (no AI:
@@ -723,9 +727,44 @@ never kicking costs); Kick early 20.8 → 32.4; Rush big hits 26 → 32.6 and bu
 22.9 → 30.9; Hold busts conceded 22.9 → 17.4 and line breaks 19.8 → 16.5; Hit-up fewer steps
 and offloads and line breaks 19.8 → 17.3; Field goal is rarely available (0.1 a match).
 
+**Fresh legs (#367).** A bench call: neither attack nor defence, made with or without the
+ball, and it uses up neither of the set's calls. Once a half per side (golden point gets its
+own), unlocked at level 0, never made by the AI coach. It is on offer while a man on the
+field (not in the bin, not already going off) has legs under `offBelow` and an uninjured bench
+man has at least `onAtLeast`; refused, it says "no one’s tired yet", "bench is spent" or "used
+this half". The pick (`pickFreshLegs` in `bench.ts`), made when it lands: the man with the
+fewest legs under the line (ties by slot) for the freshest bench man at or above it, from his
+position group first (forwards: hooker, prop, second-row, lock; halves; outside backs), ties
+by bench index. Where it lands: the next play-the-ball where that man is free (not playing the
+ball, the tackler, a marker, the dummy-half, holding it or locked), swapped where he stands;
+else the next stoppage, where he jogs off as a rotation swap does and the rotation's own swaps
+skip him and his bench man; else in the sheds at half-time, picked on first-half legs. It pays
+off when the swap is made (`interchange` with detail `fresh-legs`, then `call-paid`). If
+nobody is tired any more when it could land (his man went to the bin, or got his legs back),
+it lapses unpaid and the half's call comes back; a call still waiting at full time stays
+unpaid. It rolls no dice, and with no call made nothing about the match changes (both
+fingerprint pins hold).
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `calls.freshLegs.offBelow` | `calls.ts` | 0.4 | On offer while a man on the field has fewer legs than this (the same line as `fatigue.tiredAt`, but its own number, so moving it leaves the contest alone). |
+| `calls.freshLegs.onAtLeast` | `calls.ts` | 0.4 | …and an uninjured bench man has at least this. |
+| `calls.freshLegs.perHalf` | `calls.ts` | 1 | Calls a side may make a half (0 switches it off: "used this half"). |
+
+Measured (`balance/plans/fresh-legs.json`, run `20261027-173315-fresh-legs`, 40 whole matches
+a row, even 60 v 60, the home coach calling it whenever he may; and run
+`20261027-173402-fresh-legs-squads`, game-built player v rival squads). How often it is on
+offer, out of two halves a match: at 0.40, **0.23 calls a match on standard rotation** (0.33
+with game squads) and 0.75 with rotation off (0.85); at 0.55, about 1.45 on either (1.65).
+Standard rotation already takes men off under 0.55 at every stoppage, so a man under 0.40 is
+rare. Paid: 0.15 of 0.23 and 0.60 of 0.75 at 0.40, 1.38 of 1.45 at 0.55 (the rest made in
+the last seconds of the match). Subs a match (both sides) 3.02 → 3.40 on rotation off, 4.78 →
+4.67 on standard (it gets in ahead of a rotation swap). No starred change to tries, legs or
+the home win; with no call every row is identical to its no-call twin.
+
 The harness takes calls per scenario (`"calls": { "home": [{ "call": "rush" }] }`, optionally
 `"tackle": 2`) and counts `coachCalls`; the lab shows chips for either coach with `#lab?calls=1`.
-Tests: `tests/match/league/calls.test.ts`.
+Tests: `tests/match/league/calls.test.ts`, `tests/match/league/freshLegs.test.ts`.
 
 ## 21. Positional fit and the lineup (#69)
 
