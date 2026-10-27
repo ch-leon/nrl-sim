@@ -22,12 +22,15 @@ import { boardChip, fmtMoney, fmtMoneyShort } from './hud';
 import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
 import { FINANCE_LINE_LABELS } from './screens/finance';
 import { isTutorialActive } from './tutorial';
+import { activePack } from '../content';
+import { inlineIqStat } from '../content/pack';
 
 // ── Snapshot and view-model (pure) ─────────────────────────────────────────────
 
 const STAT_KEYS: readonly (keyof PlayerStats)[] = ['speed', 'strength', 'stamina', 'skill', 'footyIQ'];
+// The IQ stat's name comes from the content pack (#361), as on the player page.
 const STAT_WORD: Readonly<Record<keyof PlayerStats, string>> = {
-  speed: 'speed', strength: 'strength', stamina: 'stamina', skill: 'skill', footyIQ: 'footy IQ',
+  speed: 'speed', strength: 'strength', stamina: 'stamina', skill: 'skill', footyIQ: inlineIqStat(activePack()),
 };
 
 /** What the card compares: the club as it stood at one moment. Plain data, kept in memory only. */
