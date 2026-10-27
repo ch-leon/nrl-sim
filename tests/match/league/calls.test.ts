@@ -67,7 +67,7 @@ describe('calls that paid off (spec §3, last column)', () => {
   it('a hit-up pays off on a carry that makes its metres; a shift on a line break', () => {
     const j = new CallJudge();
     j.make('home', 'hit-up', 'home', 1, 40);
-    expect(j.observe([], 42, true, false)).toEqual([{ side: 'home', call: 'hit-up', paid: false }]);
+    expect(j.observe([], 42, true, false)).toEqual([{ side: 'home', call: 'hit-up', paid: false, metres: 2, how: 'gain' }]);
     j.make('home', 'hit-up', 'home', 1, 43);
     expect(j.observe([], 43 + CALLS.paid.hitUpM, true, false)[0]!.paid).toBe(true);
     j.make('home', 'shift-left', 'home', 1, 50);

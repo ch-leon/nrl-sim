@@ -470,6 +470,12 @@ export class LiveSim implements MatchSim {
   private callAtk: Side | null = null;
   /** Which calls paid off (spec §3's last column). */
   private readonly judge = new CallJudge();
+  /**
+   * Every call judged so far, paid or not, with its ground (#366): the match screen
+   * reads the new ones after each tick for the result tag by the chips. A view-side
+   * channel, not events, so the event stream and every recorded match stay as they are.
+   */
+  readonly verdicts: CallVerdict[] = [];
   /** Sets each side has had and how many it completed (§7 completion: a set not ended by its own error, a turnover or a penalty against it). */
   readonly sets: Record<Side, number> = { home: 0, away: 0 };
   readonly setsCompleted: Record<Side, number> = { home: 0, away: 0 };
@@ -991,9 +997,10 @@ export class LiveSim implements MatchSim {
     return this.judge.paid;
   }
 
-  /** A call that paid off goes in the commentary (no player: the coach's). */
+  /** A call that paid off goes in the commentary (no player: the coach's). Every verdict is kept for the match screen. */
   private announcePaid(vs: readonly CallVerdict[]): void {
     for (const v of vs) {
+      this.verdicts.push(v);
       if (v.paid) this.events.push({ tick: this.tick, kind: 'call-paid', text: paidOffText(this.names[v.side], v.call), side: v.side, detail: v.call });
     }
   }

@@ -30,6 +30,7 @@ import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import type { CoachCall } from '../../match/league/calls';
+import { MOMENTUM_STEP_MIN, momentumLabel, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
 
 // ── Pure accumulator (unit-tested independent of the DOM) ─────────────────────
 
@@ -505,13 +506,26 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   const homeChip = teamChip(home, worn.home, opts.mine === 'home');
   const awayChip = teamChip(away, worn.away, opts.mine === 'away');
+  const momentum = momentumLine(worn);
 
   const scoreboard = panel(
     { class: 'nrl-mo-scoreboard' },
     homeChip,
-    el('div', { class: 'nrl-mo-centre' }, scoreEl, el('div', { class: 'nrl-mo-meta' }, clockEl, halfEl, weatherEl)),
+    el('div', { class: 'nrl-mo-centre' }, scoreEl, momentum.svg, el('div', { class: 'nrl-mo-meta' }, clockEl, halfEl, weatherEl)),
     awayChip,
   );
+
+  // The momentum line (#366): the events that move it, at the match-minute they were seen.
+  const momentumSeen: MomentumEvent[] = [];
+  /** The live clock in match-minutes (golden point after the 14), and the furthest it has been (a replay winds the clock back, not the line). */
+  let clockMin = 0;
+  let nowMin = 0;
+  let drawnAt = -Infinity;
+  const drawMomentum = (): void => {
+    drawnAt = nowMin;
+    const samples = momentumWindow(momentumSeen, homeId, nowMin);
+    momentum.draw(samples, momentumLabel(samples, { home: home.name, away: away.name }));
+  };
 
   // Stats panel (collapsible).
   const possFill = el('span', { class: 'nrl-mo-poss-fill' });
@@ -763,6 +777,17 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     if (burst++ === 0) setTimeout(() => (burst = 0), 0);
     state = reduceEvent(state, ev, homeId, halfMinutes);
     render();
+    if (ev.kind === 'try' || ev.kind === 'big-hit' || ev.kind === 'error' || ev.kind === 'set-start') {
+      // Seen this frame: the live clock's minute, kept inside the event's own (a resumed match's catch-up has no clock yet).
+      const prev = momentumSeen[momentumSeen.length - 1]?.at ?? 0;
+      const at = Math.max(prev, Math.min(ev.t + 0.999, Math.max(ev.t, clockMin)));
+      momentumSeen.push({ at, kind: ev.kind, teamId: ev.teamId });
+      nowMin = Math.max(nowMin, at);
+      drawMomentum();
+    } else if (!liveClock && ev.t > nowMin) {
+      nowMin = ev.t;
+      drawMomentum();
+    }
     const b = scoreBanner(ev, homeId, [home.name, away.name]);
     if (b) {
       queued = { b, score: `${state.homeScore} – ${state.awayScore}` };
@@ -807,6 +832,11 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     },
     setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void {
       liveClock = true;
+      clockMin = (half === 'gp' ? 2 * halfMinutes * 60 + matchSeconds : matchSeconds) / 60;
+      if (clockMin > nowMin) {
+        nowMin = clockMin;
+        if (nowMin - drawnAt >= MOMENTUM_STEP_MIN) drawMomentum();
+      }
       // Golden point (N9.4): its own clock from 00:00.
       clockEl.textContent = formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes);
       // Full time keeps its label, except while a replay is showing an earlier half.
@@ -876,6 +906,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   active = handle;
   render();
+  drawMomentum();
   return handle;
 }
 
@@ -897,6 +928,43 @@ function teamChip(sheet: TeamSheet, colour: string, mine: boolean): HTMLElement 
   const chip = el('div', { class: mine ? 'nrl-mo-chip nrl-mo-mine' : 'nrl-mo-chip' }, swatch, el('span', { class: 'nrl-mo-name', text: sheet.name }));
   if (mine) chip.title = 'Your club';
   return chip;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/** The sparkline's drawing box; CSS stretches it to the centre's width and a few px tall. */
+const MOMENTUM_BOX = { width: 100, height: 12 };
+
+/** The momentum line under the score (#366): home's share filled above the middle in its colour, away's below in its. */
+function momentumLine(worn: { home: string; away: string }): { svg: SVGSVGElement; draw: (samples: Parameters<typeof momentumShapes>[0], label: string) => void } {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'nrl-mo-momentum');
+  svg.setAttribute('viewBox', `0 0 ${MOMENTUM_BOX.width} ${MOMENTUM_BOX.height}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('role', 'img');
+  const shape = (fill: string): SVGPolygonElement => {
+    const p = document.createElementNS(SVG_NS, 'polygon');
+    p.setAttribute('fill', fill);
+    p.setAttribute('class', 'nrl-mo-momentum-fill');
+    return p;
+  };
+  const homeShape = shape(worn.home);
+  const awayShape = shape(worn.away);
+  const axis = document.createElementNS(SVG_NS, 'line');
+  axis.setAttribute('class', 'nrl-mo-momentum-axis');
+  axis.setAttribute('x1', '0');
+  axis.setAttribute('x2', String(MOMENTUM_BOX.width));
+  axis.setAttribute('y1', String(MOMENTUM_BOX.height / 2));
+  axis.setAttribute('y2', String(MOMENTUM_BOX.height / 2));
+  svg.append(homeShape, awayShape, axis);
+  return {
+    svg,
+    draw(samples, label): void {
+      const s = momentumShapes(samples, MOMENTUM_BOX.width, MOMENTUM_BOX.height);
+      homeShape.setAttribute('points', s.home);
+      awayShape.setAttribute('points', s.away);
+      if (svg.getAttribute('aria-label') !== label) svg.setAttribute('aria-label', label);
+    },
+  };
 }
 
 function weatherBadge(w: WeatherKind): string {
@@ -955,6 +1023,12 @@ body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env
 .nrl-mo-mine::before { content: '★'; font-size: 0.8rem; line-height: 1; }
 .nrl-mo-centre { text-align: center; min-width: 5.5rem; flex: 0 0 auto; }
 .nrl-mo-score { font-size: clamp(1rem, 4vw, 1.4rem); font-weight: bold; display: block; }
+.nrl-mo-momentum {
+  display: block; width: 100%; height: var(--nrl-mo-momentum-h, 6px); overflow: visible;
+  background: var(--nrl-mo-momentum-bg, rgba(26, 26, 46, 0.08));
+}
+.nrl-mo-momentum-fill { stroke: var(--nrl-mo-momentum-edge, #1a1a2e); stroke-width: 0.75px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.nrl-mo-momentum-axis { stroke: var(--nrl-mo-momentum-axis, rgba(26, 26, 46, 0.45)); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .nrl-mo-meta { display: flex; gap: 0.4rem; justify-content: center; font-size: clamp(0.55rem, 2vw, 0.7rem); white-space: nowrap; }
 .nrl-mo-stats {
   position: fixed; top: calc(var(--nrl-mo-board, 4rem) + 0.3rem); right: calc(0.5rem + env(safe-area-inset-right, 0px)); z-index: 15; min-width: 9.5rem;
@@ -1040,6 +1114,24 @@ body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env
   background: #1a1a2e; color: #f4d03f; box-shadow: inset 0 0 0 2px #f4d03f, 3px 3px 0 #000;
 }
 .nrl-mo-controls .nrl-mo-pause { background: #e8e0c8; }
+/* Key moments (#366): the speed a break, a try or the last minutes hold the match at pulses; the chosen one stays lit. */
+.nrl-mo-controls .nrl-btn[data-slow] {
+  outline: 2px dashed var(--nrl-mo-slow-ring, #1a1a2e); outline-offset: -6px;
+  animation: nrl-mo-slow 0.9s ease-in-out infinite alternate;
+}
+@keyframes nrl-mo-slow {
+  from { background: var(--nrl-mo-slow-bg, #e8e0c8); box-shadow: 3px 3px 0 #000; }
+  to { background: var(--nrl-mo-slow-pulse, #f4d03f); box-shadow: inset 0 0 0 2px var(--nrl-mo-slow-ring, #1a1a2e), 3px 3px 0 #000; }
+}
+/* What a call did (#366): a tag over the chips for two seconds; it never takes a tap or moves the chips. */
+.nrl-mo-call-result {
+  position: absolute; right: 0; bottom: calc(100% + 0.3rem); pointer-events: none; white-space: nowrap;
+  padding: 0.15rem 0.5rem; font-size: 0.78rem; font-weight: bold;
+  background: var(--nrl-mo-result-bg, #1a1a2e); color: var(--nrl-mo-result-ink, #f4ecd8);
+  border: 2px solid var(--nrl-mo-result-edge, #000); box-shadow: 3px 3px 0 #000;
+  animation: nrl-mo-extra-in 200ms ease-out;
+}
+.nrl-mo-call-result[data-paid] { color: var(--nrl-mo-result-paid, #f4d03f); }
 /* The plan card (N11) and the sheets: over the field, above every match control and the toasts, under a dialog.
    The card waits for Continue (#341), and Continue stays in view however short the screen. */
 .nrl-mo-plan, .nrl-mo-sheet {
@@ -1143,7 +1235,8 @@ body.nrl-match-active .nrl-audio-launcher { top: auto; bottom: calc(0.5rem + env
   font-weight: bold; letter-spacing: 0.08em; box-shadow: 3px 3px 0 #000;
 }
 @media (prefers-reduced-motion: reduce) {
-  .nrl-mo-banner-in, .nrl-mo-scored, .nrl-mo-chip.nrl-mo-scored, .nrl-mo-banner-extra { animation: none; }
+  .nrl-mo-banner-in, .nrl-mo-scored, .nrl-mo-chip.nrl-mo-scored, .nrl-mo-banner-extra, .nrl-mo-call-result { animation: none; }
+  .nrl-mo-controls .nrl-btn[data-slow] { animation: none; background: var(--nrl-mo-slow-pulse, #f4d03f); }
 }
 /* Short (landscape phone) viewports: keep stats and commentary apart. */
 @media (max-height: 480px) {

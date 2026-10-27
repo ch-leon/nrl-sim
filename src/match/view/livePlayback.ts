@@ -20,7 +20,7 @@ import { replayRange, Runner, TICK_MS, type SimFactory } from '../core/engine';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { MatchRecorder, type RunMatchOptions } from '../league/match';
-import type { CallInput, CoachCall } from '../league/calls';
+import type { CallInput, CallVerdict, CoachCall } from '../league/calls';
 import type { DifficultyEdge } from '../league/spread';
 import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
@@ -82,6 +82,60 @@ export function blendPace(current: number, target: number, deltaMs: number): num
   return current + (target - current) * k;
 }
 
+/**
+ * Key moments (#366): the last this-many minutes of the second half, and golden
+ * point, play at no more than ×2. Leon asked for the last five; that is over a
+ * third of a 14-minute Nines match, so it is two.
+ */
+export const KEY_MOMENT_LATE_MIN = 2;
+/** The fastest a line break or a try plays while it lasts; the fastest late in the match. */
+export const KEY_MOMENT_SPEED = 1;
+export const KEY_MOMENT_LATE_SPEED = 2;
+
+/**
+ * Key moments (#366), screen-only: from a line break to the next tackle or
+ * play-the-ball (or the try it becomes), and from a try to its conversion,
+ * the match plays at ×1; the last two minutes and golden point at ×2 at most.
+ * An override: the chosen speed is never changed, and a tap on a speed button
+ * ends the moment it is in. Pure, so the playback's tests drive it directly.
+ */
+export class KeyMoments {
+  private moment: 'break' | 'try' | null = null;
+  /** The half whose late cap a speed tap ended (golden point is a moment of its own). */
+  private lateWaived = 0;
+
+  /** A sim event on screen (not a skipped or resumed stretch). */
+  note(e: { kind: string }): void {
+    if (e.kind === 'line-break') this.moment ??= 'break';
+    else if (e.kind === 'try') this.moment = 'try';
+    else if (this.moment === 'try' && (e.kind === 'conversion' || e.kind === 'full-time' || e.kind === 'half-time')) this.moment = null;
+  }
+
+  /** The phase on screen: a break is over once the carrier is tackled (a tackle, the play-the-ball, a restart). */
+  phase(kind: string): void {
+    if (this.moment === 'break' && kind !== 'play') this.moment = kind === 'try' ? 'try' : null;
+  }
+
+  /** The cap now, or null: ×1 in a break or a try, ×2 late in the second half and in golden point. */
+  cap(clock: { half: number; seconds: number; finished?: boolean } | undefined, halfMinutes: number): number | null {
+    if (this.moment) return KEY_MOMENT_SPEED;
+    if (!clock || clock.finished || this.lateWaived === clock.half) return null;
+    const late = clock.half >= 3 || (clock.half === 2 && clock.seconds >= (halfMinutes - KEY_MOMENT_LATE_MIN) * 60);
+    return late ? KEY_MOMENT_LATE_SPEED : null;
+  }
+
+  /** A speed button was tapped: the moment it is in plays at the chosen speed (a break or try, and the late minutes if it is in them). */
+  waive(clock: { half: number; seconds: number; finished?: boolean } | undefined, halfMinutes: number): void {
+    this.moment = null;
+    if (clock && this.cap(clock, halfMinutes) !== null) this.lateWaived = clock.half;
+  }
+
+  /** Skip, and anything else that jumps the match on: no moment carries over. */
+  clear(): void {
+    this.moment = null;
+  }
+}
+
 /** The speed buttons remember. Anything else (an old save, a bad value) is ×4. */
 export function playbackSpeedOf(raw: unknown): PlaybackSpeed {
   return raw === 1 || raw === 2 || raw === 4 || raw === 8 ? raw : LIVE_DEFAULT_SPEED;
@@ -140,6 +194,10 @@ export interface LivePlaybackOptions {
   goldenPoint?: boolean;
   /** The speed the player last picked. Absent: ×4. */
   speed?: PlaybackSpeed;
+  /** Slow down for big moments (#366), read as the match plays so the setting can change mid-match. Absent: off. */
+  keyMoments?: () => boolean;
+  /** A call was judged, paid or not (#366): every side's, as it happens on screen. */
+  onCallResult?: (v: CallVerdict) => void;
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
   resumeAt?: number;
   /** A call, a plan change, the periodic write, Save & exit, or the app going to the background. False when the write did not land. */
@@ -177,6 +235,11 @@ export class LivePlayback {
   private speed: PlaybackSpeed = LIVE_DEFAULT_SPEED;
   /** 1 in open play, easing toward 2 in dead time. Multiplies `speed` for the runner only. */
   private pace = 1;
+  /** Key moments (#366), and the speed one holds the runner at, easing to its cap and back (null: not held, `speed * pace` as ever). */
+  private readonly keyMoments = new KeyMoments();
+  private keySpeed: number | null = null;
+  /** Verdicts already passed on (LiveSim.verdicts, #366). */
+  private verdictsSeen = 0;
   private finishEmitted = false;
   private skipping = false;
   /** Skip has posted the match elsewhere and waits for its result (N10.4). */
@@ -226,6 +289,9 @@ export class LivePlayback {
       // The commentator watches the ball land: a kick picked up off the ground is a scoop, not a catch.
       this.commentator.ball(this.runner.cur.ball, this.runner.cur.tick);
       if (!this.skipping) this.kicks.tick(this.runner.cur);
+      // Every tick, so a break ends on its tackle however many ticks a frame steps.
+      if (!this.skipping) this.keyMoments.phase(this.sim.phaseKind);
+      this.passVerdicts();
     };
     this.runner.setSpeed(this.speed);
     // A resumed match plays on, silently, to where it was.
@@ -377,15 +443,53 @@ export class LivePlayback {
     return this.speed;
   }
 
+  /** A speed button: the chosen speed, and the key moment it was tapped in is over (#366). */
   setSpeed(speed: PlaybackSpeed): void {
+    this.keyMoments.waive(this.runner.cur.clock, NINES.halfMinutes);
+    this.keySpeed = null;
     this.speed = speed;
     this.runner.setSpeed(speed * this.pace);
   }
 
-  /** Ease the runner between the chosen speed and twice that, from the phase on screen. */
+  /** The speed the runner is playing at now: the chosen one, its dead-time pace and any key moment's cap. */
+  get runSpeed(): number {
+    return this.runner.speed;
+  }
+
+  /** A key moment is slowing the match to this speed now (the speed row shows it, #366), or null. */
+  get slowedTo(): number | null {
+    const cap = this.keyCap();
+    return cap !== null && cap < this.speed * playbackPace(this.sim.phaseKind) ? cap : null;
+  }
+
+  /** The key moment's cap, when the setting is on and the match is playing on screen. */
+  private keyCap(): number | null {
+    if (this.skipping || this.awaitingSkip || this.finishEmitted || !this.opts.keyMoments?.()) return null;
+    return this.keyMoments.cap(this.runner.cur.clock, NINES.halfMinutes);
+  }
+
+  /** Ease the runner between the chosen speed and twice that, from the phase on screen, and down to a key moment's cap (#366). */
   private applyPace(deltaMs: number): void {
     this.pace = blendPace(this.pace, playbackPace(this.sim.phaseKind), deltaMs);
-    this.runner.setSpeed(this.speed * this.pace);
+    const free = this.speed * this.pace;
+    const cap = this.keyCap();
+    if (cap !== null || this.keySpeed !== null) {
+      // Eased from the speed on screen to the cap, never above the speed it would play at anyway; then back up to it.
+      const held = Math.min(this.keySpeed ?? free, free);
+      this.keySpeed = blendPace(held, cap === null ? free : Math.min(cap, free), deltaMs);
+      if (cap === null && this.keySpeed > free * 0.995) this.keySpeed = null;
+    }
+    this.runner.setSpeed(this.keySpeed ?? free);
+  }
+
+  /** The calls judged since the last tick go to the screen; a skipped or resumed stretch shows none. */
+  private passVerdicts(): void {
+    const vs = this.sim.verdicts;
+    if (this.skipping) {
+      this.verdictsSeen = vs.length;
+      return;
+    }
+    while (this.verdictsSeen < vs.length) this.opts.onCallResult?.(vs[this.verdictsSeen++]!);
   }
 
   /**
@@ -397,6 +501,7 @@ export class LivePlayback {
   skip(): void {
     if (this.finishEmitted || this.awaitingSkip) return;
     this.abortReplay();
+    this.keyMoments.clear();
     // A kill while Skip is away resumes here, not from the previous interval.
     this.persistProgress();
     const elsewhere = this.opts.skipElsewhere;
@@ -580,6 +685,7 @@ export class LivePlayback {
         // At ×4 and ×8 a one-second move is gone before it can be read. Ease the match; the mark also holds longer.
         if (this.traits.note(e, cur) && this.runner.speed >= TRAIT_FAST_FROM) this.runner.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
         this.contest.note(e, cur);
+        if (this.opts.keyMoments?.()) this.keyMoments.note(e);
       }
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
       const line = this.commentator.line(e, cur.score);
