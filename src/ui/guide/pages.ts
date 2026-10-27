@@ -12,6 +12,8 @@ import { NINES } from '../../match/league/rules';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { getState, type GameState } from '../../core/state';
 import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, TRAINING_FOCUS, WILDCARDS } from '../../config';
+import { activePack } from '../../content';
+import { inlineIqStat } from '../../content/pack';
 import { STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
 import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
@@ -20,6 +22,9 @@ import { RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS } from '../hud';
 
 const dollars = (n: number): string => `$${n.toLocaleString('en-US')}`;
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
+/** The `footyIQ` stat as the content pack names it (#361): "Footy IQ", and "footy IQ" mid-sentence. */
+const IQ = activePack().vocab.iqStat;
+const IQ_INLINE = inlineIqStat(activePack());
 
 /** The club the page is read for; null before a game is loaded (the Guide's text then quotes a new club). */
 function clubNow(): Pick<GameState, 'reputation' | 'facilities'> | null {
@@ -134,7 +139,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'squad',
     sections: [
       {
-        text: 'Between 13 and 30 players (you need 13 fit to field a side). A player’s overall is skill and footy IQ (25% each), speed (20%), strength and stamina (15% each). Tap any player card for his page: stats, traits and tips, morale, contract, tallies and the actions that apply.',
+        text: `Between 13 and 30 players (you need 13 fit to field a side). A player’s overall is skill and ${IQ_INLINE} (25% each), speed (20%), strength and stamina (15% each). Tap any player card for his page: stats, traits and tips, morale, contract, tallies and the actions that apply.`,
       },
       {
         heading: 'Training and age',
@@ -206,8 +211,8 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         bullets: [
           'On the Lineup screen select a starter and tap Kicker or Captain (tap again for the default). K and C mark them on the field.',
           'Your goal-kicker takes the conversions and penalty goals, and a field goal when he has the ball; his Skill (and Big Boot) is what goes over. Unpicked, or off the field, your best-kicking half takes them. Kicks in play stay with the halfback.',
-          'Your captain makes the penalty call: a smart one (Footy IQ) takes the points on a slimmer chance; a Hothead taps and runs from further out.',
-          'Leave them unpicked and the best-kicking half kicks and the starter with the best Footy IQ captains.',
+          `Your captain makes the penalty call: a smart one (${IQ}) takes the points on a slimmer chance; a Hothead taps and runs from further out.`,
+          `Leave them unpicked and the best-kicking half kicks and the starter with the best ${IQ} captains.`,
         ],
       },
       {
@@ -240,7 +245,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
           'A card waits 2 weeks for your answer. At most two wait at once. A season-end card, like the trip away, is due before the next match.',
           'Advance Week never takes a default without asking: with a card waiting it lists what is pending, and you answer now or take the defaults and go.',
           'Money from a choice goes through the ledger like everything else, and the outcome is posted to News. Some choices leave a temporary effect for a few weeks.',
-          `A risky choice says its odds. The sharp ones are a ${Math.round(WILDCARDS.INCIDENT_CHANCE * 100)}% chance of a ${WILDCARDS.BAN_WEEKS[0]}-${WILDCARDS.BAN_WEEKS[1]} week ban, and a Welfare Manager halves that. The ban shows on the squad as BAN, and the lineup leaves him out. After the grand final the squad asks for a trip to Bali.`,
+          `A risky choice says its odds. The sharp ones are a ${Math.round(WILDCARDS.INCIDENT_CHANCE * 100)}% chance of a ${WILDCARDS.BAN_WEEKS[0]}-${WILDCARDS.BAN_WEEKS[1]} week ban, and a Welfare Manager halves that. The ban shows on the squad as BAN, and the lineup leaves him out. After the grand final the squad asks for a trip to ${activePack().events.trip.destination}.`,
           'A new card stops a multi-week advance and opens; once it is answered, Keep advancing carries on to the same end.',
         ],
       },
@@ -287,7 +292,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'What each one does',
         bullets: [
-          'Training Paddock ($8,000): speed and stamina. Weights Room ($15,000): strength. Team Gym ($40,000): strength, speed and stamina. Video Room ($18,000): footy IQ. Coach’s Office ($30,000): IQ and skill, and morale.',
+          `Training Paddock ($8,000): speed and stamina. Weights Room ($15,000): strength. Team Gym ($40,000): strength, speed and stamina. Video Room ($18,000): ${IQ_INLINE}. Coach’s Office ($30,000): IQ and skill, and morale.`,
           'Physio Centre ($22,000): stamina, and injuries heal a week faster. Medical Bay ($35,000): injuries heal faster by its level.',
           `Canteen ($12,000): morale. Sponsor Board ($10,000, one only): ${dollars(ECON.SPONSOR_BASE)} a week plus ${dollars(ECON.SPONSOR_PER_REP)} a reputation point (up to ${dollars(ECON.SPONSOR_CAP)}), more at levels 2 and 3. Grandstand ($120,000, one only): seats 3,500, 5,000 or 6,500.`,
           'Academy ($60,000): skill and IQ, more and better juniors each pre-season. Scout Office ($25,000): a better free-agent pool and signing fees 10% cheaper per level.',

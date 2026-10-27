@@ -18,6 +18,7 @@ import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } fr
 import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis, signPlayer } from '../../systems/freeagency';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
+import { activePack } from '../../content';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PORTRAIT_H, PORTRAIT_W, TRAINING_KIT, portraitDataUrl } from '../../art/portrait';
 import { button, closeModal, el, openModal, panel } from '../dom';
@@ -79,7 +80,7 @@ export interface PlayerPageModel {
 }
 
 const STAT_LABELS: readonly [keyof PlayerStats, string][] = [
-  ['speed', 'Speed'], ['strength', 'Strength'], ['stamina', 'Stamina'], ['skill', 'Skill'], ['footyIQ', 'Footy IQ'],
+  ['speed', 'Speed'], ['strength', 'Strength'], ['stamina', 'Stamina'], ['skill', 'Skill'], ['footyIQ', activePack().vocab.iqStat],
 ];
 
 /** Morale in a word: 70+ happy, 50+ content, 30+ unsettled, else unhappy. */

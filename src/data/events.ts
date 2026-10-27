@@ -10,6 +10,11 @@
 // in points.
 import type { TraitId } from './traits';
 import { WILDCARDS } from '../config';
+import { activePack } from '../content';
+import type { CardText } from '../content/pack';
+
+/** The season-end trip's text is the content pack's (#361); its id and flag stay here. */
+const TRIP = activePack().events.trip;
 
 /** Where a ban came from. #328's Club Lawyer will tell these apart. */
 export type BanSource = 'event' | 'trip' | 'judiciary';
@@ -116,7 +121,7 @@ export interface EventCardDef {
 }
 
 /** The starter deck. Order is irrelevant; ids must be unique and stable (saves keep them). */
-export const EVENT_CARDS: readonly EventCardDef[] = [
+const DECK: readonly EventCardDef[] = [
   {
     id: 'billboardSponsor',
     title: 'Billboard offer',
@@ -478,8 +483,8 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
   },
   {
     id: 'baliTrip',
-    title: 'Trip to Bali',
-    text: 'The season is done and the squad wants the end-of-season trip to Bali. The group chat is already full of jet skis.',
+    title: TRIP.title,
+    text: TRIP.text,
     weight: 1, cooldown: 27, when: { offer: 'rollover' },
     choices: [
       {
@@ -495,15 +500,11 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
               { kind: 'boardPatience', amount: -1 },
               { kind: 'flag', id: 'baliIncident' },
             ],
-            hitNews: [
-              '{player} came off a jet ski on day two. The clip is everywhere, and the club has stood him down.',
-              '{player} missed the flight home. The airport-bar video is doing the rounds, and the club has stood him down.',
-              '{player} came back with the club crest tattooed upside down and a bar tab the sponsor has already seen. The club has stood him down.',
-            ],
-            missNews: 'The trip stayed in the group chat and off the back page.',
+            hitNews: TRIP.hitNews,
+            missNews: TRIP.missNews,
           },
         ],
-        outcome: 'The squad is off to Bali.',
+        outcome: TRIP.outcome,
       },
       { label: 'Ban the trip', effects: [{ kind: 'squadMorale', amount: -8 }], outcome: 'The trip is off. The senior players are filthy.' },
     ],
@@ -521,6 +522,18 @@ export const EVENT_CARDS: readonly EventCardDef[] = [
     defaultChoice: 1,
   },
 ];
+
+/** A deck with the pack's text in place of the cards' own; the same deck when the pack changes none. */
+export function withCardText(deck: readonly EventCardDef[], text: Readonly<Record<string, CardText>>): readonly EventCardDef[] {
+  if (Object.keys(text).length === 0) return deck;
+  return deck.map((c) => {
+    const t = text[c.id];
+    return t ? { ...c, ...(t.title !== undefined ? { title: t.title } : {}), ...(t.text !== undefined ? { text: t.text } : {}) } : c;
+  });
+}
+
+/** The deck the game draws from: the starter deck in the active pack's words. */
+export const EVENT_CARDS: readonly EventCardDef[] = withCardText(DECK, activePack().events.cardText);
 
 /** Card by id (undefined for an id no longer in the deck, e.g. from an old save). */
 export function cardById(id: string): EventCardDef | undefined {

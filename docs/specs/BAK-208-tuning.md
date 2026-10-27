@@ -348,13 +348,16 @@ or a man still down from the tackle when the siren goes. Half-time swaps the end
 side that received the opening kick-off kicks off the second half. The measurements in
 this section were taken on 9:00 halves.
 
+The rules are the content pack's (#361): the AU pack's values are in `src/content/au.ts`,
+and `NINES` in `src/match/league/rules.ts` is that same object, so the knob names are as they were.
+
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `rules.halfMinutes` | `src/match/league/rules.ts` | 7 | Length of each half (minutes of sim time). Was 9. |
-| `rules.tryPoints` / `rules.conversionPoints` / `rules.fieldGoalPoints` | `rules.ts` | 4 / 2 / 1 | Points for a try, a conversion and a field goal (penalty goals come with 2e). |
-| `rules.halfTimeTicks` | `rules.ts` | 60 (3 s) | The break on screen before the second-half kick-off. |
-| `rules.halfTimeLegsBack` | `rules.ts` | 0.5 | At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2); his gas tank is filled to his legs. |
-| `rules.playOnMaxS` | `rules.ts` | 60 s | After the siren, the half ends at the next dead ball or after this long, whichever is first. |
+| `rules.halfMinutes` | `src/content/au.ts` (`NINES`, `rules.ts`) | 7 | Length of each half (minutes of sim time). Was 9. |
+| `rules.tryPoints` / `rules.conversionPoints` / `rules.fieldGoalPoints` | `au.ts` | 4 / 2 / 1 | Points for a try, a conversion and a field goal (penalty goals come with 2e). |
+| `rules.halfTimeTicks` | `au.ts` | 60 (3 s) | The break on screen before the second-half kick-off. |
+| `rules.halfTimeLegsBack` | `au.ts` | 0.5 | At half-time each player gets back this share of the legs he has lost (BAK-208 §8.2); his gas tank is filled to his legs. |
+| `rules.playOnMaxS` | `au.ts` | 60 s | After the siren, the half ends at the next dead ball or after this long, whichever is first. |
 
 Measured over the standard plan, 20 whole matches a row (against single 18-minute
 stretches with no half-time): even sides end on 52% legs (35%); stamina 30 v 80 ends
@@ -421,7 +424,7 @@ until 2d's dead-ball restarts).
 | `goals.fieldGoalChance` | `goals.ts` | 0.7 | How often he goes for it when it is on (once a set). |
 | `goals.chargeDown` | `goals.ts` | 8% | A field goal charged down: a loose ball. |
 | `goals.goalTicks` | `goals.ts` | 30 | The celebration after a field goal before the restart. |
-| `rules.bonusTryPoints` | `rules.ts` | 5 | A try grounded in the **bonus zone**, the in-goal between the posts (Nines; the line counts). |
+| `rules.bonusTryPoints` | `au.ts` | 5 | A try grounded in the **bonus zone**, the in-goal between the posts (Nines; the line counts). |
 | `goals.bonusClearM` | `goals.ts` | 5 m | Over the line, the carrier goes round under the posts while no defender is this close; with one closer he grounds it where he is. |
 | `goals.bonusMaxTicks` / `goals.bonusDeadM` | `goals.ts` | 50 (2.5 s) / 2 m | …for at most this long, and grounds it before he is this close to the dead-ball line. |
 
@@ -917,8 +920,8 @@ higher-seed rule. Who kicks off after a try is unchanged (Leon's call).
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `rules.goldenPointMinutes` | `src/match/league/rules.ts` | 4 | Length of golden point; play runs on after its siren to the next dead ball. 0 = no golden point. Was 5; 4/14 is the same share as 5/18. The "still level after 5 minutes" row below was measured on the old length. |
-| `rules.goldenPointBreakTicks` | `rules.ts` | 40 (2 s) | The break between full time and golden point. |
+| `rules.goldenPointMinutes` | `src/content/au.ts` (`NINES`, `rules.ts`) | 4 | Length of golden point; play runs on after its siren to the next dead ball. 0 = no golden point. Was 5; 4/14 is the same share as 5/18. The "still level after 5 minutes" row below was measured on the old length. |
+| `rules.goldenPointBreakTicks` | `au.ts` | 40 (2 s) | The break between full time and golden point. |
 
 Measured (`20261020-014632-golden-point`, 120 whole finals a row; the harness's `finals`
 scenario flag, counts `goldenPoint`, `goldenPointWon`, `draws`):

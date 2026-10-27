@@ -592,7 +592,7 @@ export function chooseEvent(eventId: string, index: number): boolean {
 }
 
 /**
- * Offer season-end cards (the Bali trip) once the new season's week 1 has
+ * Offer season-end cards (the season-end trip) once the new season's week 1 has
  * begun. An unanswered trip expires the same week, and the pre-match hook
  * takes its default before that match.
  */
