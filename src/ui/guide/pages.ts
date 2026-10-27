@@ -183,7 +183,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'lineup',
     sections: [
       {
-        text: 'Your side plays a plan: an attack and a defence, picked on the Lineup screen (the chips under the header). It stays the plan for the match until you change it at a break.',
+        text: 'Your side plays a plan: an attack and a defence, picked on the Lineup screen (PLAN in its header). It stays the plan for the match until you change it at a break.',
       },
       {
         heading: 'Attack',
@@ -196,8 +196,8 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Changing it in a match',
         bullets: [
-          'At half-time (and before golden point) a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue. The match waits for Continue at any speed.',
-          'After a score, the Plan chip beside the call chips opens the same rows until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
+          'At half-time (and before golden point) a sheet comes up from the bottom with the score, possession and the calls that paid off, and the attack and defence rows: change the plan, then Start 2nd half. The match waits for Start 2nd half at any speed.',
+          'After a score, the Plan chip opens the same sheet until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
           'Coach calls are the moment-to-moment layer on top: one call a set each way.',
         ],
       },

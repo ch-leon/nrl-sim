@@ -30,6 +30,7 @@ import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/b
 import { BOARD, FEATURES } from './config';
 import { fmtMoney } from './ui/hud';
 import { initMatchReport } from './ui/screens/matchReport';
+import { setMatchSettingsOpener } from './ui/screens/matchOverlay';
 import { openBuildScreen } from './ui/screens/build';
 import { initPlacementBar } from './ui/placementBar';
 import { openKitDesigner, syncKitDesign } from './ui/screens/kit';
@@ -196,6 +197,7 @@ async function boot(): Promise<void> {
   // club is Office's tiles, each with a status line.
   initAudio();
   const openSettings = initAudioUi();
+  setMatchSettingsOpener(openSettings); // the pause sheet's Settings
   const nav = createNav();
   nav.registerScreen('squad', 'Squad', () => openSquadScreen(), { holds: ['lineup', 'recruit'] });
   nav.registerScreen('fixtures', 'League', () => openFixturesScreen(), { holds: ['ladder'] });

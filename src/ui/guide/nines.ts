@@ -104,13 +104,13 @@ export const NINES_PAGE: GuidePage = {
       bullets: [
         'Each side plays an attack preset (Grind, Balanced, Expansive, Kick-chase, All-out) and a defence preset (Slide, Rush, Compressed) by zone of the field.',
         'Traits fire in their moment and are announced when they do: a step, a fend, an offload, a big hit, a strip, an intercept.',
-        'In a live match the chips along the bottom are coach calls for the next play: with the ball Hit-up, Shift left or right, Kick early, Run it, Bomb and Field goal; defending Rush or Hold. One call a set; the stats strip counts the calls that paid off. With no Coach’s Office you have Hit-up and Hold; each level of it adds calls: Shift and Rush, then Kick early and Run it, then Bomb and Field goal.',
+        'In a live match COACH, bottom left, opens the coach calls for the next play (only the ones you can make now; the match keeps playing): with the ball Hit-up, Shift left or right, Kick early, Run it, Bomb and Field goal; defending Rush or Hold. One call a set; the stats (tap the score) count the calls that paid off. With no Coach’s Office you have Hit-up and Hold; each level of it adds calls: Shift and Rush, then Kick early and Run it, then Bomb and Field goal.',
       ],
     },
     {
       heading: 'Watching',
       bullets: [
-        'Your matches play on this sim as you watch, with ×1 to ×8 speed and Skip. The speed you pick is kept for the next match. Rucks, tackles, restarts and the kick at goal run at twice that speed; open play stays at the speed you picked. The half-time card waits until you tap Continue. Rival-v-rival rounds are simmed from the clubs’ strength unless Rival matches played out is on.',
+        'Your matches play on this sim as you watch, with 1× to 8× speed and Skip. The speed you pick is kept for the next match. Rucks, tackles, restarts and the kick at goal run at twice that speed; open play stays at the speed you picked. The half-time sheet waits until you tap Start 2nd half. Rival-v-rival rounds are simmed from the clubs’ strength unless Rival matches played out is on.',
         'Coach calls and Rival matches played out are switches in Settings, the gear at the top right.',
         'Save & exit writes the match and goes back to the club. Play Week then reads Resume match and continues it; the menu beside it will not skip the week. Closing the app and choosing Continue does the same, from a couple of seconds back at most. A hire or a build made back at the club is kept if you finish the match, and dropped if the app is killed before full time: a week in the middle of its match is not written into the slot. Export save during that week writes the kick-off save and the match, not the half-played week, and refuses if that kick-off save never landed.',
         'Full time brings the match report (who scored and when, the goals, the numbers side by side and the Player of the Match), the result into the ladder, and the match’s tallies onto your players’ pages.',

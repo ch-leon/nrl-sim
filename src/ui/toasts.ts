@@ -3,8 +3,8 @@
 // dismisses it, and it sits where no control is:
 //   - at the club, just above the dock, centred (the decisions chip has the
 //     top-left corner and a sheet's header row its top edge);
-//   - in a match, in the row under the scoreboard the open log keeps free, and
-//     not while the Replay try chip or a score banner is in that row;
+//   - in a match, in the row under the score bug, short of the full log, and
+//     not while the Replay try chip, a key-moment banner or the stats are in that row;
 //   - with no dock (the title, the lab), centred at the top.
 // A toast's time only runs while it can be seen: under a dialog, a match card
 // or the rotate card it waits.
@@ -63,7 +63,7 @@ export function initToasts(root: HTMLElement): void {
     return !!e && !e.hidden && e.getBoundingClientRect().height > 0;
   };
   /** The under-scoreboard row is the Replay try chip's and the score banner's while they are up. */
-  const rowTaken = (): boolean => matchOn() && (visible('.nrl-mo-replay') || visible('.nrl-mo-banner'));
+  const rowTaken = (): boolean => matchOn() && (visible('.nrl-mo-replay') || visible('.nrl-mo-banner') || visible('.nrl-mo-statsheet'));
 
   const setLane = (mode: string, css: string): void => {
     if (lane.dataset.lane !== mode) lane.dataset.lane = mode;
@@ -71,10 +71,10 @@ export function initToasts(root: HTMLElement): void {
   };
   const place = (): void => {
     if (matchOn()) {
-      // From the left inset (CSS) up to the stats panel on the right.
+      // From the left inset (CSS) up to the full log on the right, while it is open.
       setLane('match', '');
-      const stats = document.querySelector('.nrl-mo-stats')?.getBoundingClientRect();
-      if (stats && stats.width > 0) setLane('match', `width: ${Math.max(MIN_LANE_PX, Math.floor(stats.left - 8 - lane.getBoundingClientRect().left))}px;`);
+      const log = document.querySelector('.nrl-mo-full')?.getBoundingClientRect();
+      if (log && log.width > 0) setLane('match', `width: ${Math.max(MIN_LANE_PX, Math.floor(log.left - 8 - lane.getBoundingClientRect().left))}px;`);
       return;
     }
     setLane(document.querySelector('.nrl-dock') ? 'dock' : 'top', '');
