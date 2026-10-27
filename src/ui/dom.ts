@@ -1493,7 +1493,8 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-toast.nrl-toast-action { cursor: default; max-height: none; padding-top: 0; padding-bottom: 0; gap: 0.3rem; }
 /* Three short lines in the top bar's row, so a narrow phone's gap still reads the line. */
 .nrl-toast-action .nrl-toast-text { flex: 1 1 auto; min-width: 0; font-size: 0.72rem; line-height: 1.1; -webkit-line-clamp: 3; overflow-wrap: anywhere; }
-.nrl-toast-action .nrl-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0 0.5rem; box-shadow: none; border-width: 2px; font-size: 0.8rem; }
+/* The 44px buttons run over the toast's own top and bottom edge, so the toast is 44px too and fits the top bar's row. */
+.nrl-toast-action .nrl-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; margin: -2px 0; padding: 0 0.5rem; box-shadow: none; border-width: 2px; font-size: 0.8rem; }
 .nrl-toast-btn { background: var(--nrl-toast-action-bg, #f4d03f); color: var(--nrl-toast-action-ink, #1a1a2e); }
 .nrl-toast-btn[hidden] { display: none; }
 .nrl-toast-x { width: 44px; padding: 0; background: var(--nrl-toast-x-bg, #e8e0c8); color: var(--nrl-toast-x-ink, #1a1a2e); }

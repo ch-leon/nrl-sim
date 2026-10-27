@@ -1014,6 +1014,11 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await step(`screen-${spec.id}`, async (rec) => {
       await openNav(page, spec.id);
       await page.waitForSelector(spec.box);
+      // #370: a first visit's hint line is checked in the tutorial walk; the screen is measured without it.
+      if (await page.locator('.nrl-hint-x').count()) {
+        await page.locator('.nrl-hint-x').tap();
+        rec.notes.push('first-visit hint dismissed');
+      }
       return check(rec, spec, spec.id);
     });
   }
