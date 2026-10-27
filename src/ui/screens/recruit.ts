@@ -62,7 +62,7 @@ const SCREEN_CSS = `
   white-space: nowrap;
 }
 .nrl-grid-head > *, .nrl-row > * { min-width: 0; }
-.nrl-grid-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
+.nrl-grid-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 0; padding-bottom: 0; }
 .nrl-row {
   pointer-events: auto;
   display: grid;

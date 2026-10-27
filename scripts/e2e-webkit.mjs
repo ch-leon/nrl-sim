@@ -772,10 +772,12 @@ function screenProblems(page, spec, safe) {
       return !!hit && (el.contains(hit) || hit.contains(el));
     };
     // Rows: four whole ones (or all of them when there are fewer), or one whole card.
+    // Three under 340px tall (956×330, Safari's toolbars up): the Broadcast Quiet sheet
+    // sits above a 56px dock and keeps 44px tap rows, which leaves room for three and a part.
     const rows = [...box.querySelectorAll(spec.rows)].filter((e) => e.getBoundingClientRect().height > 0);
     const shown = rows.filter(seen).length;
     const cards = spec.card ? [...box.querySelectorAll(spec.card)].filter(seen).length : 0;
-    const need = Math.min(4, rows.length);
+    const need = Math.min(window.innerHeight < 340 ? 3 : 4, rows.length);
     // Prose (the Guide): its paragraphs run to any length, so count the lines of
     // text on show instead, eight being about four short paragraphs.
     let lines = 0;
