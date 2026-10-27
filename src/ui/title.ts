@@ -122,9 +122,16 @@ const TITLE_CSS = `
 @media (max-height: 340px) {
   .nrl-title { padding-bottom: calc(18px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
   .nrl-title-main { gap: 6px; }
+  .nrl-title-kit { padding: 6px; }
   .nrl-title-kit img { width: 56px; height: 60px; }
+  /* The caption gives its height to Start over / Cancel, which must clear Safari's bottom band. */
+  .nrl-title-kit-note { display: none; }
   .nrl-title-form { gap: 6px; }
-  .nrl-title-setup { padding: 10px; }
+  .nrl-title-setup { padding: 10px; gap: 6px 16px; }
+  .nrl-title-confirm { font-size: 12px; line-height: 1.25; }
+  /* While Start over asks, the jersey makes room for the question and both buttons. */
+  .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "start form"; }
+  .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
 }
 @media (max-width: 520px) {
   .nrl-title-setup { grid-template-columns: minmax(0, 1fr); grid-template-areas: "kit" "form" "start"; }
