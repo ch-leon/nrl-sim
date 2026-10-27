@@ -28,6 +28,7 @@ import { CALL_WHEN, callCaption, callsHintSeasoned, callsLine, callsLockedHint, 
 import {
   LivePlayback,
   playbackSpeedOf,
+  keyMomentsOn,
   PLAYBACK_SPEEDS,
   type PlaybackActor,
   type PlaybackBall,
@@ -37,7 +38,7 @@ import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, COACH_CALLS, chipState, unlockLevel, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callResultText, chipState, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
@@ -495,6 +496,8 @@ export class MatchScene extends Phaser.Scene {
           this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
         },
         speed: this.rememberedSpeed(),
+        keyMoments: () => this.keyMomentsOn(),
+        onCallResult: (v) => this.showCallResult(v),
       });
       this.mountPlaybackControls(this.playback.getSpeed());
       if (live.coachSide) {
@@ -537,6 +540,7 @@ export class MatchScene extends Phaser.Scene {
     this.kickFrame = cameraFrame(replayFrame, kick, this.autoZoom === null);
     if (this.kickFrame) this.kickBackUntil = time + KICK_RETURN_MS;
     this.kickBack = !this.kickFrame && time < this.kickBackUntil;
+    this.showSlowed();
     // The coach's chips follow the play a few times a second (#73).
     if ((this.callsEl || this.planBtn) && time - this.chipsAt > 150) {
       this.chipsAt = time;
@@ -846,6 +850,57 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
+  // ── What each call did (#366): a tag over the chips for two seconds ───────
+  private callResultEl: HTMLDivElement | null = null;
+  private callResultTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Only the coach's own calls get a tag; the rival's stay in the log. A new result replaces the one up. */
+  private showCallResult(v: CallVerdict): void {
+    if (!this.callsEl || v.side !== this.callSide || this.finished) return;
+    let tag = this.callResultEl;
+    if (!tag) {
+      tag = document.createElement('div');
+      tag.className = 'nrl-mo-call-result';
+      tag.setAttribute('role', 'status');
+      this.callResultEl = tag;
+    }
+    if (tag.parentElement !== this.callsEl) this.callsEl.append(tag);
+    tag.textContent = callResultText(v);
+    tag.toggleAttribute('data-paid', v.paid);
+    tag.hidden = false;
+    if (this.callResultTimer) clearTimeout(this.callResultTimer);
+    this.callResultTimer = setTimeout(() => this.clearCallResult(), CALL_RESULT_MS);
+  }
+
+  private clearCallResult(): void {
+    if (this.callResultTimer) clearTimeout(this.callResultTimer);
+    this.callResultTimer = null;
+    this.callResultEl?.remove();
+    this.callResultEl = null;
+  }
+
+  // ── Key moments (#366): the speed row shows the match slowed for one ──────
+  private slowShown: number | null = null;
+
+  /** Slow down for big moments: on unless the player turned it off (an old save has no setting). */
+  private keyMomentsOn(): boolean {
+    try {
+      return keyMomentsOn(getState().settings);
+    } catch {
+      return true;
+    }
+  }
+
+  /** The button of the speed a key moment holds the match at pulses; the chosen one stays lit. */
+  private showSlowed(): void {
+    const pb = this.playback;
+    const to = pb instanceof LivePlayback && !this.finished ? pb.slowedTo : null;
+    if (to === this.slowShown) return;
+    this.slowShown = to;
+    for (const b of this.speedButtons) b.toggleAttribute('data-slow', to !== null && b.textContent === `×${to}`);
+    this.controlsEl?.toggleAttribute('data-slowed', to !== null);
+  }
+
   /** The speed the player last picked, or ×4 for an old save and a match opened with no game loaded. */
   private rememberedSpeed(): PlaybackSpeed {
     try {
@@ -963,6 +1018,7 @@ export class MatchScene extends Phaser.Scene {
   private onFinished = ({ result }: { result: { homeScore: number; awayScore: number } }): void => {
     if (this.finished) return;
     this.finished = true;
+    this.clearCallResult();
     if (result.homeScore !== result.awayScore) this.hype(result.homeScore > result.awayScore ? 'home' : 'away', 0.9, 60_000);
     this.callsEl?.remove();
     this.callsEl = null;
@@ -1031,6 +1087,8 @@ export class MatchScene extends Phaser.Scene {
       this.controlsEl.remove();
       this.controlsEl = null;
     }
+    this.clearCallResult();
+    this.slowShown = null;
     this.callsEl?.remove();
     this.callsEl = null;
     this.closePlan();

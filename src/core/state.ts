@@ -249,9 +249,10 @@ export interface GameState {
    * coachCalls: the call chips during your matches (#73); on when absent.
    * liveRivals: rival-v-rival matches on the live sim (N9.2); off when absent.
    * playbackSpeed: the ×1 / ×2 / ×4 / ×8 last picked. Absent (an old save) plays at ×4.
+   * keyMoments: slow the match for line breaks, tries and the last two minutes (#366); on when absent.
    * (An old save's liveMatch flag is ignored: every match is live since BAK-207 Phase 4.)
    */
-  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean; liveRivals?: boolean; playbackSpeed?: 1 | 2 | 4 | 8 };
+  settings: { muted: boolean; volume: number; tutorialDone: boolean; difficulty: Difficulty; coachCalls?: boolean; liveRivals?: boolean; playbackSpeed?: 1 | 2 | 4 | 8; keyMoments?: boolean };
   history: SeasonRecord[];
   boardPatience: number; // 0..BOARD.MAX_PATIENCE; zero = sacked (#47)
   objectives: Objective[]; // this season's board objectives (#47)

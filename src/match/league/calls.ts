@@ -123,11 +123,84 @@ export const CALL_LABEL: Readonly<Record<CoachCall, string>> = {
   hold: 'Hold',
 };
 
+/** How long a call's result shows by the chips (#366), in real ms. A new result replaces the one up. */
+export const CALL_RESULT_MS = 2000;
+
+/** "+18m", or null for no ground. */
+const gain = (m: number): string | null => (m > 0 ? `+${m}m` : null);
+
+/** An attack play (hit-up, shift): its ground, a break, a try, or the ball lost. */
+const playResult = (v: CallVerdict): string => {
+  if (v.how === 'try') return v.paid ? 'try!' : 'try against';
+  if (v.how === 'line-break') return 'line break!';
+  if (v.how === 'intercept') return 'intercepted';
+  if (v.how === 'strip') return 'ball stripped';
+  if (v.how === 'error' || v.how === 'drop' || v.how === 'loose') return 'lost the ball';
+  return gain(v.metres) ?? 'no gain';
+};
+
+/** A kick call (kick early, bomb): what came of the kick. */
+const kickResult = (v: CallVerdict): string => {
+  if (v.how === 'regather') return 'regathered';
+  if (v.how === '40-20') return '40/20!';
+  if (v.how === 'drop') return 'forced an error';
+  if (v.how === 'drop-out') return 'won a drop-out';
+  if (v.how === 'try') return v.paid ? 'try!' : 'try against';
+  // Taken by the other side: the kick's gain. A set that ran out with no kick, or a kick that came to nothing, gained nothing.
+  return v.how === 'kick' ? gain(v.metres) ?? 'no gain' : 'no gain';
+};
+
+/** A defence call (rush, hold): the ball won, an error forced, or the ground the set made. */
+const defenceResult = (v: CallVerdict): string => {
+  if (v.how === 'intercept' || v.how === 'strip') return 'won the ball';
+  if (v.how === 'error' || v.how === 'drop' || v.how === 'loose') return 'forced an error';
+  if (v.how === 'try') return 'try against';
+  if (v.paid) return v.metres > 0 ? `held them to +${v.metres}m` : 'held them';
+  return gain(v.metres) ? `they made +${v.metres}m` : 'no reward';
+};
+
+/**
+ * What a call did, for the tag by the chips (#366): "Shift left +18m", "Hit-up +6m",
+ * "Bomb: regathered", "Rush: forced an error", "Kick early: no gain". The judge's
+ * verdict says how it was decided; this only words it.
+ */
+export const CALL_RESULT: Readonly<Record<CoachCall, (v: CallVerdict) => string>> = {
+  'hit-up': (v) => joinResult('hit-up', playResult(v)),
+  'shift-left': (v) => joinResult('shift-left', playResult(v)),
+  'shift-right': (v) => joinResult('shift-right', playResult(v)),
+  'kick-early': (v) => joinResult('kick-early', kickResult(v)),
+  bomb: (v) => joinResult('bomb', kickResult(v)),
+  'run-it': (v) => joinResult('run-it', v.how === 'penalty' ? 'won a penalty' : v.how === 'try' ? (v.paid ? 'try!' : 'try against') : gain(v.metres) ?? 'no gain'),
+  'field-goal': (v) => joinResult('field-goal', v.how === 'field-goal' ? (v.paid ? 'over!' : 'missed') : v.how === 'try' && !v.paid ? 'try against' : 'not taken'),
+  rush: (v) => joinResult('rush', defenceResult(v)),
+  hold: (v) => joinResult('hold', defenceResult(v)),
+};
+
+/** "Shift left +18m" (a gain follows the name), "Bomb: regathered" (anything else after a colon). */
+function joinResult(c: CoachCall, what: string): string {
+  return what.startsWith('+') ? `${CALL_LABEL[c]} ${what}` : `${CALL_LABEL[c]}: ${what}`;
+}
+
+/** The tag's line for a verdict. */
+export function callResultText(v: CallVerdict): string {
+  return CALL_RESULT[v.call](v);
+}
+
+/**
+ * What decided a call: the sim event that settled it ('line-break', 'intercept',
+ * 'regather', 'field-goal'…), 'gain' for a play judged by its ground, 'kick' for a
+ * kick the other side took, or 'set-end' for a set that ran out (#366).
+ */
+export type CallHow = 'gain' | 'kick' | 'set-end' | (string & {});
+
 /** A call that paid off or didn't, when its judge decides. */
 export interface CallVerdict {
   side: Side;
   call: CoachCall;
   paid: boolean;
+  /** The ground it made, rounded (#366): the furthest tackle from where it was made, toward the side attacking then; a kick call's kick gain. */
+  metres: number;
+  how: CallHow;
 }
 
 /** A call being judged: the side the ball was with when it was made, which way they attack, where the ball was, the furthest tackle since, and for a kick call whether it has gone. */
@@ -169,13 +242,13 @@ export class CallJudge {
 
   /** `side`'s kick in play was taken by the other side `gainM` metres on from where it was kicked. */
   kicked(side: Side, gainM: number): CallVerdict[] {
-    return this.settle((w) => (w.kicked && w.side === side && (w.call === 'kick-early' || w.call === 'bomb') ? gainM >= CALLS.paid.kickM : null));
+    return this.settle((w) => (w.kicked && w.side === side && (w.call === 'kick-early' || w.call === 'bomb') ? gainM >= CALLS.paid.kickM : null), () => 'kick', gainM);
   }
 
   /** The end of a tick: its events, the ball's x (the tackle's spot when a play has ended), and whether a play (a tackle in the set) and the set have ended. */
   observe(events: readonly SimEvent[], x: number, playEnded: boolean, setEnded: boolean): CallVerdict[] {
     const out: CallVerdict[] = [];
-    for (const e of events) out.push(...this.settle((w) => this.onEvent(w, e)));
+    for (const e of events) out.push(...this.settle((w) => this.onEvent(w, e), () => e.kind));
     if (playEnded) {
       for (const w of this.open) {
         w.bestM = Math.max(w.bestM, (x - w.fromX) * w.dir);
@@ -183,9 +256,9 @@ export class CallJudge {
       }
     }
     if (playEnded && !setEnded) {
-      out.push(...this.settle((w) => (w.call === 'hit-up' ? w.bestM >= CALLS.paid.hitUpM : w.call === 'shift-left' || w.call === 'shift-right' ? w.bestM >= CALLS.paid.shiftM : null)));
+      out.push(...this.settle((w) => (w.call === 'hit-up' ? w.bestM >= CALLS.paid.hitUpM : w.call === 'shift-left' || w.call === 'shift-right' ? w.bestM >= CALLS.paid.shiftM : null), () => 'gain'));
     }
-    if (setEnded) out.push(...this.settle((w) => this.onSetEnd(w)));
+    if (setEnded) out.push(...this.settle((w) => this.onSetEnd(w), (w) => (callIsPlay(w.call) ? 'gain' : 'set-end')));
     return out;
   }
 
@@ -237,14 +310,14 @@ export class CallJudge {
     }
   }
 
-  /** Close every open call the rule decides (true paid, false not); leave the rest open. */
-  private settle(rule: (w: Watch) => boolean | null): CallVerdict[] {
+  /** Close every open call the rule decides (true paid, false not), with what decided it and its ground (a kick's gain when given); leave the rest open. */
+  private settle(rule: (w: Watch) => boolean | null, how: (w: Watch) => CallHow, gainM?: number): CallVerdict[] {
     const out: CallVerdict[] = [];
     this.open = this.open.filter((w) => {
       const v = rule(w);
       if (v === null) return true;
       if (v) this.paid[w.side]++;
-      out.push({ side: w.side, call: w.call, paid: v });
+      out.push({ side: w.side, call: w.call, paid: v, metres: Math.round(gainM ?? w.bestM), how: how(w) });
       return false;
     });
     return out;
