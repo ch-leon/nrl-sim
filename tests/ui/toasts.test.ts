@@ -3,7 +3,10 @@
 // placement is checked in WebKit (scripts/e2e-webkit.mjs, `toast-lane`); the
 // vitest env has no DOM, so these pin the pure helpers and the CSS.
 import { describe, it, expect } from 'vitest';
-import { TOAST_BUSY_MS, TOAST_MAX_MS, TOAST_MIN_MS, queueBadge, toastMs } from '../../src/ui/toasts';
+import {
+  ACTION_LANE_PX, MIN_LANE_PX, TOAST_BUSY_MS, TOAST_MAX_MS, TOAST_MIN_MS, dismissOnBodyTap, isActionToast, laneIndex, laneMinPx, queueBadge, toastMs,
+} from '../../src/ui/toasts';
+import { UNDO_MS } from '../../src/systems/undo';
 import { stopToastKind } from '../../src/core/advanceRules';
 import { CSS } from '../../src/ui/dom';
 import { OVERLAY_CSS, TICKER_WAIT_TEXT } from '../../src/ui/screens/matchOverlay';
@@ -90,5 +93,44 @@ describe('small feedback', () => {
     const text = JSON.stringify([...CLUB_PAGES, NINES_PAGE]);
     expect(text).not.toMatch(/by itself|a tap holds it/);
     expect(text).toMatch(/waits (for|until you tap) Continue/);
+  });
+});
+
+describe('the Undo toast (#370)', () => {
+  const undo = { text: 'Training Paddock built!', kind: 'success' as const, ms: UNDO_MS, action: { label: 'Undo', run: () => {} } };
+  const plain = { text: 'Signed Jo', kind: 'success' as const };
+
+  it('is an action toast; a plain one is not', () => {
+    expect(isActionToast(undo)).toBe(true);
+    expect(isActionToast(plain)).toBe(false);
+  });
+  it('jumps the queue: it joins at the front, the rest at the back', () => {
+    expect(laneIndex(undo, 3)).toBe(0);
+    expect(laneIndex(plain, 3)).toBe(3);
+  });
+  it('keeps exactly UNDO_MS, even with toasts queued behind it', () => {
+    expect(UNDO_MS).toBe(5000);
+    expect(toastMs(undo, 0)).toBe(UNDO_MS);
+    expect(toastMs(undo, 4)).toBe(UNDO_MS);
+    expect(UNDO_MS).toBeGreaterThan(TOAST_BUSY_MS);
+  });
+  it('is not dismissed by a tap on its body; a plain one is', () => {
+    expect(dismissOnBodyTap(undo)).toBe(false);
+    expect(dismissOnBodyTap(plain)).toBe(true);
+  });
+  it('needs a wider gap in the top bar than a plain toast, else it takes the top centre', () => {
+    expect(laneMinPx(undo)).toBe(ACTION_LANE_PX);
+    expect(laneMinPx(plain)).toBe(MIN_LANE_PX);
+    expect(ACTION_LANE_PX).toBeGreaterThan(MIN_LANE_PX);
+  });
+  it('its Undo and ✕ are 44px targets and take taps', () => {
+    const btns = rule(CSS, '.nrl-toast-action .nrl-btn');
+    expect(btns).toContain('min-height: 44px');
+    expect(btns).toContain('min-width: 44px');
+    expect(rule(CSS, '.nrl-toast-x')).toContain('width: 44px');
+    expect(rule(CSS, '.nrl-toast-btn')).toContain('var(--nrl-toast-action-bg');
+    // The base toast rule keeps taps; the action toast only drops the pointer cursor.
+    expect(rule(CSS, '.nrl-toast')).toContain('pointer-events: auto');
+    expect(rule(CSS, '.nrl-toast.nrl-toast-action')).not.toContain('pointer-events: none');
   });
 });

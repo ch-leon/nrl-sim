@@ -15,7 +15,8 @@ import { marketWage, overallRating } from '../../data/player';
 import { ROMAN, TRAITS, traitTip } from '../../data/traits';
 import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } from '../../systems/contracts';
-import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis, signPlayer } from '../../systems/freeagency';
+import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
+import { signWithUndo } from '../../systems/undo';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
 import { activePack } from '../../content';
@@ -283,7 +284,7 @@ const FAILURE: Record<string, string> = {
 function runAction(id: PlayerActionId, playerId: string): { ok: boolean; reason?: string } {
   const s = getState();
   switch (id) {
-    case 'sign': return signPlayer(s, playerId);
+    case 'sign': return signWithUndo(playerId); // with a 5-second Undo (#370)
     case 'renew': return renewEarly(s, playerId);
     case 'sell': return sellPlayer(s, playerId);
     case 'release': return releasePlayer(s, playerId);

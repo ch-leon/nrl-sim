@@ -9,8 +9,9 @@ import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import {
-  signPlayer, signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
+  signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
+import { signWithUndo } from '../../systems/undo';
 import { SQUAD_CAP } from '../../config';
 import { TRAINING_KIT, PORTRAIT_W, PORTRAIT_H, portraitDataUrl } from '../../art/portrait';
 import type { Kit } from '../../art/match/kit';
@@ -283,7 +284,7 @@ export function openRecruitScreen(): void {
           disabled: full || broke,
           title: full ? `Squad full (${SQUAD_CAP})` : broke ? `Not enough money for the ${money(fee)} fee` : `Signing fee ${money(fee)} (${signingFeeBasis(s, agent)})`,
           onClick: () => {
-            const res = signPlayer(getState(), agent.id);
+            const res = signWithUndo(agent.id); // "Signed …" with a 5-second Undo (#370)
             if (!res.ok) {
               bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'info' });
             }

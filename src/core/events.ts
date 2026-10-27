@@ -54,7 +54,11 @@ export interface Events {
   'season:ended': { season: number; ladderPosition: number; premiership: boolean };
   'money:changed': { delta: number; reason: string; balance: number };
   'facility:placed': PlacedFacility;
+  /** A facility taken off the grounds by an Undo (#370); `undo` is always true today. */
+  'facility:removed': { facility: PlacedFacility; undo: boolean };
   'player:signed': Player;
+  /** A signing taken back by an Undo (#370): he is a free agent again. */
+  'player:unsigned': { player: Player };
   // home/away sheets ride along so the Match scene can render kits/names
   // without re-deriving them (wave-4 integration extension).
   // `live` (BAK-207, coach calls #73): no result yet — the Match scene plays the
@@ -76,8 +80,13 @@ export interface Events {
    * `kind` is what it means (#339): `danger` only for a real problem (an error, an injury or
    * ban that keeps a man out, money in the red), `success` for good news, `info` for the
    * rest. `ms`: how long its toast stays in view, when not the default for its length.
+   * `action` (#370): a button in the toast (the 5-second Undo). Such a toast jumps the
+   * queue, keeps its `ms` and closes only on its ✕ or its timer; `enabled` false hides the button.
    */
-  'ui:notify': { text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean; ms?: number };
+  'ui:notify': {
+    text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean; ms?: number;
+    action?: { label: string; run: () => void; enabled?: () => boolean };
+  };
   /** The demo stopped an advance at the week the club is on (#362; commercial flag on only). Task 05 opens the paywall on it. */
   'commercial:demoEnded': { season: number; week: number };
 }
