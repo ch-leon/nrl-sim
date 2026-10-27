@@ -7,14 +7,17 @@
 // club is back and can't be closed with no way to see it again.
 // Under the score, a summary in the ticker's voice (N15.2, match/view/commentary.ts):
 // the final whistle, then the story of the tries, as many lines as fit the card.
+// On a loss, "Why did I lose?" (#368) folds 2–3 reasons under the plan changes,
+// each with a button that goes back to the club and opens the screen that fixes it.
 import { bus } from '../../core/events';
 import { getState, setState } from '../../core/state';
-import type { MatchEvent, MatchResult } from '../../sim/events';
+import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { SEASON_ROUNDS } from '../../config';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { roundLabel } from '../../systems/matchday';
 import { playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
-import { el, openModal, closeModal } from '../dom';
+import { lossReasons, type LossReason, type ReasonScreen } from '../../systems/lossReasons';
+import { el, button, openModal, closeModal } from '../dom';
 import { MATCH_ACTIVE_CLASS } from './matchOverlay';
 import { fmtPotmLine } from './potm';
 import { addPotm } from './seasonReview';
@@ -59,6 +62,8 @@ export interface MatchReport {
   changes: string[];
   rows: ReportRow[];
   potm: { line: string; who: string } | null;
+  /** "Why did I lose?" (#368): on a loss only, most telling first. */
+  reasons: LossReason[];
 }
 
 const minute = (e: MatchEvent): string => `${Math.max(1, Math.ceil(e.t))}'`;
@@ -95,6 +100,7 @@ export function buildMatchReport(
   fixture: { round: number; homeId: string; awayId: string },
   names: Record<string, string>,
   potm: PlayerOfMatch | null,
+  reasons: readonly LossReason[] = [],
 ): MatchReport {
   const home = side(result, fixture.homeId, names[fixture.homeId] ?? fixture.homeId, result.homeScore);
   const away = side(result, fixture.awayId, names[fixture.awayId] ?? fixture.awayId, result.awayScore);
@@ -129,7 +135,32 @@ export function buildMatchReport(
     changes: planChangeLines(result.planChanges, { home: home.short, away: away.short }),
     rows,
     potm: potm ? { line: fmtPotmLine(potm), who: `${potm.name} (${names[potm.teamId] ?? potm.teamId})` } : null,
+    reasons: [...reasons],
   };
+}
+
+/** The line "Why did I lose?" folds under (#368). */
+export const WHY_LOST_TEXT = 'Why did I lose?';
+
+/**
+ * Close the report, go back to the club (the match's own Back to Club), then
+ * run `then` once the club is on screen (#368). Away from a match it runs at once.
+ */
+export function backToClubThen(then: () => void): void {
+  closeModal();
+  const body = typeof document === 'undefined' ? null : document.body;
+  const back = body?.classList.contains(MATCH_ACTIVE_CLASS) ? document.querySelector<HTMLButtonElement>('.nrl-match-back') : null;
+  if (!body || !back || typeof MutationObserver === 'undefined') {
+    then();
+    return;
+  }
+  const watch = new MutationObserver(() => {
+    if (body.classList.contains(MATCH_ACTIVE_CLASS)) return;
+    watch.disconnect();
+    then();
+  });
+  watch.observe(body, { attributes: true, attributeFilter: ['class'] });
+  back.click();
 }
 
 /** The player's result in a word and the margin. */
@@ -172,10 +203,24 @@ function sideBlock(s: ReportSide): HTMLElement {
   return el('div', { class: 'nrl-report-side' }, el('h3', { text: `${s.short} ${s.score}` }), ...lines.map((t) => el('p', { text: t })));
 }
 
-export function openMatchReport(r: MatchReport): HTMLElement {
+/** "Why did I lose?" (#368): each reason with the button that goes back to the club and opens its screen. */
+function whyLost(reasons: readonly LossReason[], onReason?: (screen: ReasonScreen) => void): HTMLElement {
+  return el('details', { class: 'nrl-report-changes nrl-report-why', attrs: { 'data-why-lost': '' } },
+    el('summary', { text: WHY_LOST_TEXT }),
+    ...reasons.map((why) => {
+      const go = button(why.cta, () => backToClubThen(() => onReason?.(why.screen)), { class: 'nrl-report-why-go' });
+      go.setAttribute('data-why-screen', why.screen);
+      return el('div', { class: 'nrl-report-why-row' }, el('span', { text: why.text }), go);
+    }));
+}
+
+export function openMatchReport(r: MatchReport, opts: { onReason?: (screen: ReasonScreen) => void } = {}): HTMLElement {
   const table = el('table', { class: 'nrl-report-stats' });
   table.append(el('tr', {}, el('th', { text: '' }), el('th', { text: r.home.short }), el('th', { text: r.away.short })));
   for (const row of r.rows) table.append(el('tr', {}, el('td', { text: row.label }), el('td', { text: row.home }), el('td', { text: row.away })));
+  const changes = r.changes.length ? [el('details', { class: 'nrl-report-changes' },
+    el('summary', { text: planChangesSummary(r.changes.length) }),
+    ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })))] : [];
   // The result and the Player of the Match head the card (#351): on a phone held
   // sideways they are what shows before any scrolling, beside the ✕.
   const content = el(
@@ -191,9 +236,9 @@ export function openMatchReport(r: MatchReport): HTMLElement {
     ),
     ...(r.summary.length ? [el('p', { class: 'nrl-report-summary', text: r.summary.join(' '), attrs: { style: 'font-style: italic' } })] : []),
     // #351 P0: the plan changes fold into one line, so they never push the scorers down.
-    ...(r.changes.length ? [el('details', { class: 'nrl-report-changes' },
-      el('summary', { text: planChangesSummary(r.changes.length) }),
-      ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })))] : []),
+    // #368: on a loss "Why did I lose?" folds beside them, so the result and the Player of
+    // the Match stay above the fold; a win or a draw keeps the plan changes as they were.
+    ...(r.reasons.length ? [el('div', { class: 'nrl-report-folds' }, ...changes, whyLost(r.reasons, opts.onReason))] : changes),
     el('div', { class: 'nrl-report-body' }, el('div', { class: 'nrl-report-scoring' }, sideBlock(r.home), sideBlock(r.away)), table),
   );
   const backdrop = openModal(content, { class: 'nrl-potm-modal nrl-report-modal', region: true });
@@ -227,12 +272,24 @@ export function clubNames(): Record<string, string> {
   return out;
 }
 
-/** The report on every full time (with the Player of the Match, counted for the season review, #190). Returns unsubscribe. */
-export function initMatchReport(): () => void {
-  return bus.on('match:finished', ({ fixture, result }: { fixture: { round: number; homeId: string; awayId: string }; result: MatchResult }) => {
+/**
+ * The report on every full time (with the Player of the Match, counted for the
+ * season review, #190). The sheets from kick-off feed "Why did I lose?" (#368);
+ * `onReason` opens a reason's screen once the club is back. Returns unsubscribe.
+ */
+export function initMatchReport(opts: { onReason?: (screen: ReasonScreen) => void } = {}): () => void {
+  let kickOff: { fixture: { round: number; homeId: string }; home: TeamSheet; away: TeamSheet } | null = null;
+  const offStarted = bus.on('match:started', ({ fixture, home, away }) => { kickOff = { fixture, home, away }; });
+  const offFinished = bus.on('match:finished', ({ fixture, result }: { fixture: { round: number; homeId: string; awayId: string }; result: MatchResult }) => {
     const p = playerOfTheMatch(result, fixture.homeId, fixture.awayId);
     const s = getState();
     if (p && p.teamId === PLAYER_ID) setState({ potmTally: addPotm(s.potmTally, s.season, p.name) });
-    openMatchReport(buildMatchReport(result, fixture, clubNames(), p));
+    const sheets = kickOff && kickOff.fixture.round === fixture.round && kickOff.fixture.homeId === fixture.homeId ? kickOff : null;
+    const reasons = sheets ? lossReasons(result, fixture, sheets, getState()) : [];
+    openMatchReport(buildMatchReport(result, fixture, clubNames(), p, reasons), opts);
   });
+  return () => {
+    offStarted();
+    offFinished();
+  };
 }

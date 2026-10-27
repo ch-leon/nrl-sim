@@ -7,7 +7,7 @@ import { bus } from '../core/events';
 import { registerSeasonHook } from '../core/time';
 import { earnMoney } from '../data/club';
 import { makeRng } from '../utils/rng';
-import { BOARD, PRIZE, difficultyMultipliers, scaledMoney } from '../config';
+import { BOARD, PRIZE, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers, scaledMoney } from '../config';
 import { repayBoardLoan } from './contracts';
 
 /** Facts about the season just played, supplied by the fixtures season hook. */
@@ -189,6 +189,12 @@ export function ensureObjectives(): void {
   setState({ objectives: generateObjectives(s) });
 }
 
+/** The ladder in order: points, then points difference. */
+function ladderOrder(state: Pick<GameState, 'league'>): GameState['league']['ladder'] {
+  return [...state.league.ladder].sort((a, b) => b.points - a.points
+    || (b.pointsFor - b.pointsAgainst) - (a.pointsFor - a.pointsAgainst));
+}
+
 /** One-line status for UI, e.g. "Finish in the top 8 — pending". */
 export function objectiveLine(o: Objective, state: GameState): string {
   if (o.status !== 'pending') return `${o.text} — ${o.status === 'met' ? 'met' : 'missed'}`;
@@ -196,13 +202,108 @@ export function objectiveLine(o: Objective, state: GameState): string {
     case 'solvent': return `${o.text} — now $${state.money.toLocaleString()}`;
     case 'build': return `${o.text} — ${state.facilities.length} now`;
     case 'finals': {
-      const rank = [...state.league.ladder].sort((a, b) => b.points - a.points
-        || (b.pointsFor - b.pointsAgainst) - (a.pointsFor - a.pointsAgainst))
-        .findIndex((r) => r.clubId === state.clubId) + 1;
+      const rank = ladderOrder(state).findIndex((r) => r.clubId === state.clubId) + 1;
       return `${o.text} — ${state.league.ladder.some((r) => r.played > 0) && rank > 0 ? `currently ${ordinal(rank)}` : 'season not started'}`;
     }
     default: return `${o.text} — pending`;
   }
+}
+
+// ── Objective risk (#368) ────────────────────────────────────────────────────
+// How each pending objective stands mid-season, for the hub's board chip and the
+// Staff & Board screen. A read only: objectives are still judged at season end.
+
+export type ObjectiveRisk = 'on-track' | 'at-risk' | 'off-track';
+
+/** The word the hub and Staff & Board show for each risk. */
+export const RISK_WORD: Readonly<Record<ObjectiveRisk, string>> = {
+  'on-track': 'On track', 'at-risk': 'At risk', 'off-track': 'Off track',
+};
+
+/** Below the finals target (or the rival) with this many rounds or fewer left: at risk. */
+export const RISK_ROUNDS_LEFT = 8;
+/** Short of the build target with this many weeks or fewer left: at risk, and off track at the next. */
+export const BUILD_RISK_WEEKS = 10;
+export const BUILD_OFF_WEEKS = 3;
+
+/** Where the club and the clubs around it stand, and the regular-season rounds it has left. */
+export interface LadderStanding {
+  /** 1 = top; 0 before a round is in. */
+  rank: number;
+  points: number;
+  /** Points of the club at ladder place `n` (1-based), or 0. */
+  pointsAt(n: number): number;
+  roundsLeft: number;
+}
+
+export function ladderStanding(state: Pick<GameState, 'league' | 'clubId'>, clubId: string = state.clubId): LadderStanding {
+  const order = ladderOrder(state);
+  const started = state.league.ladder.some((r) => r.played > 0);
+  const i = order.findIndex((r) => r.clubId === clubId);
+  return {
+    rank: started && i >= 0 ? i + 1 : 0,
+    points: i >= 0 ? order[i]!.points : 0,
+    pointsAt: (n) => order[n - 1]?.points ?? 0,
+    roundsLeft: state.league.fixtures.filter((f) => !f.result && f.round <= SEASON_ROUNDS
+      && (f.homeId === clubId || f.awayId === clubId)).length,
+  };
+}
+
+/** Behind on the ladder by `gap` points: off track when the rounds left can't make it up (2 a win), at risk late or when it needs more than every other win. */
+function ladderRisk(gap: number, roundsLeft: number): ObjectiveRisk {
+  if (gap > roundsLeft * 2) return 'off-track';
+  return roundsLeft <= RISK_ROUNDS_LEFT || gap > roundsLeft ? 'at-risk' : 'on-track';
+}
+
+/**
+ * How a pending objective stands now (#368). Finals and the rival read the ladder
+ * against the rounds left; the solvency floor reads the money against the HUD's
+ * runway (`runwayWeeks`, null when the club is not losing money) over the weeks
+ * left before the season is judged; the build target reads the facilities built
+ * against the weeks left. A judged objective is on track (there is nothing left to do).
+ */
+export function objectiveRisk(o: Objective, state: GameState, runwayWeeks: number | null = null): ObjectiveRisk {
+  if (o.status !== 'pending') return 'on-track';
+  const weeksLeft = Math.max(0, WEEKS_PER_SEASON - state.week + 1);
+  switch (o.kind) {
+    case 'finals': {
+      const me = ladderStanding(state);
+      if (me.rank === 0 || me.rank <= o.target) return 'on-track';
+      return ladderRisk(me.pointsAt(o.target) - me.points, me.roundsLeft);
+    }
+    case 'beatRival': {
+      if (!o.rivalId) return 'on-track';
+      const me = ladderStanding(state);
+      const them = ladderStanding(state, o.rivalId);
+      if (me.rank === 0 || them.rank === 0 || me.rank < them.rank) return 'on-track';
+      // Level on points still counts: he has to finish above.
+      return ladderRisk(them.points - me.points, me.roundsLeft);
+    }
+    case 'solvent': {
+      const burning = runwayWeeks !== null;
+      if (state.money < o.target) return burning ? 'off-track' : 'at-risk';
+      if (!burning) return 'on-track';
+      // The runway is the balance over the weekly burn: project the season's end.
+      const burn = runwayWeeks > 0 ? Math.max(0, state.money) / runwayWeeks : Infinity;
+      return state.money - burn * weeksLeft < o.target ? 'at-risk' : 'on-track';
+    }
+    case 'build': {
+      if (state.facilities.length >= o.target) return 'on-track';
+      return weeksLeft <= BUILD_OFF_WEEKS ? 'off-track' : weeksLeft <= BUILD_RISK_WEEKS ? 'at-risk' : 'on-track';
+    }
+  }
+}
+
+const RISK_RANK: Readonly<Record<ObjectiveRisk, number>> = { 'on-track': 0, 'at-risk': 1, 'off-track': 2 };
+
+/** The single worst objective that is at risk or worse, or null when every one is on track. Earlier objectives win ties. */
+export function worstObjective(state: GameState, runwayWeeks: number | null = null): { objective: Objective; risk: ObjectiveRisk } | null {
+  let worst: { objective: Objective; risk: ObjectiveRisk } | null = null;
+  for (const o of state.objectives) {
+    const risk = objectiveRisk(o, state, runwayWeeks);
+    if (risk !== 'on-track' && (!worst || RISK_RANK[risk] > RISK_RANK[worst.risk])) worst = { objective: o, risk };
+  }
+  return worst;
 }
 
 /** Register the new-season hook (after fixtures-season at order 10). */

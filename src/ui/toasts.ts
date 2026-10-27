@@ -27,7 +27,7 @@ export const TOAST_BUSY_MS = 3500;
 const MATCH_ON_CLASS = 'nrl-match-active';
 const TICK_MS = 200;
 /** Below this the top bar's gap is too narrow to read, and the toast goes to the top centre. */
-const MIN_LANE_PX = 140;
+export const MIN_LANE_PX = 140;
 
 /** A toast that waits for the club: anything not about the match while a match is on screen. */
 export function toastWaits(n: Notice, matchOn: boolean): boolean {
@@ -80,9 +80,9 @@ export function initToasts(root: HTMLElement): void {
     }
     const money = document.querySelector('.nrl-hud [data-hud="money"]')?.getBoundingClientRect();
     const actions = document.querySelector('.nrl-hud-actions')?.getBoundingClientRect();
-    // The next-match chip is a button too: the lane stops short of it.
-    const next = document.querySelector('.nrl-hud .nrl-hud-next')?.getBoundingClientRect();
-    const end = next && next.width > 0 ? next.left : actions?.left ?? 0;
+    // The next-match chip is a button too, and so is the board chip beside it (#368): the lane stops short of the first shown.
+    const chips = [...document.querySelectorAll('.nrl-hud .nrl-hud-next')].map((c) => c.getBoundingClientRect()).filter((r) => r.width > 0);
+    const end = chips.length > 0 ? Math.min(...chips.map((r) => r.left)) : actions?.left ?? 0;
     const gap = money && actions ? Math.floor(end - money.right - 12) : 0;
     if (money && actions && money.height > 0 && gap >= MIN_LANE_PX) {
       setLane('hud', `left: ${Math.round(money.right + 6)}px; top: ${Math.round(actions.top)}px; width: ${gap}px; height: ${Math.round(actions.height)}px;`);
