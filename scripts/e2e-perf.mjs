@@ -159,8 +159,15 @@ const clickTimed = async (selector, { nth = 0, text } = {}) => {
 async function answerCards() {
   const s = await state();
   if (!s?.eventDeck?.pending?.length) return 0;
-  await page.locator('.nrl-nav .nrl-btn:has-text("News")').tap();
-  await page.locator('[data-decisions-open]').tap(); // #345: the cards open from News's one-row banner
+  // 3a: the decisions chip's REVIEW on the bare grounds; with a sheet up, Office → News's one-row banner (#345).
+  // An advance stopped for a card may have opened it already.
+  const chip = page.locator('[data-decisions-chip]:not([hidden]) .nrl-decisions-review');
+  if (await page.locator('.nrl-event-card').count()) { /* the card is up */ } else if (await chip.count()) await chip.first().tap();
+  else {
+    await page.locator('.nrl-nav [data-nav-more]').tap();
+    await page.locator('.nrl-nav-sheet .nrl-btn[data-screen="news"]').tap();
+    await page.locator('[data-decisions-open]').tap();
+  }
   await page.waitForSelector('.nrl-event-card');
   let n = 0;
   while (await page.locator('.nrl-event-card').count()) {
@@ -176,7 +183,7 @@ async function answerCards() {
 /**
  * One multi-week advance (menu index 0 = ×4, 1 = to finals, 2 = to season end).
  * Since N10.2 the run yields a frame between weeks, so this times the click to the
- * end of the run (the HUD drops data-advancing); the moment's block column is the
+ * end of the run (the dock drops data-advancing); the moment's block column is the
  * longest week. With `probe`, a tap on the League tab while the run is under way is
  * timed to its screen (the page answering mid-run) and the progress line read.
  * Returns { ms, weeks, tapMs?, label? }.
@@ -195,7 +202,7 @@ async function advance(index, { probe = false } = {}) {
   }
   let tapMs, label, probeMs = 0;
   // Read the progress line in the same breath as checking the run is still going.
-  const running = probe ? await page.evaluate(() => (document.querySelector('.nrl-hud[data-advancing]') ? document.querySelector('.nrl-hud-actions .nrl-btn')?.textContent?.trim() || 'running' : null)) : null;
+  const running = probe ? await page.evaluate(() => (document.querySelector('.nrl-dock[data-advancing]') ? document.querySelector('.nrl-dock-advance-label')?.textContent?.trim() || 'running' : null)) : null;
   if (running !== null) {
     const p0 = Date.now();
     label = running;
@@ -213,9 +220,10 @@ async function advance(index, { probe = false } = {}) {
     await page.screenshot({ path: join(OUT, 'advancing.png') });
     probeMs = Date.now() - p0; // the probe's own driver time is not the run's
   }
-  await page.waitForFunction(() => !document.querySelector('.nrl-hud[data-advancing]'), null, { timeout: 240000 });
+  await page.waitForFunction(() => !document.querySelector('.nrl-dock[data-advancing]'), null, { timeout: 240000 });
   const ms = Date.now() - t0 - probeMs;
-  if (probe) await page.evaluate(() => { for (const b of document.querySelectorAll('.nrl-screen-region .nrl-btn')) if (/^(close|✕)$/i.test(b.textContent?.trim() ?? '')) { b.click(); break; } });
+  // A sheet has no ✕ (Broadcast Quiet): CLUB in the dock closes the League sheet the probe opened.
+  if (probe) await page.evaluate(() => document.querySelector('.nrl-nav [data-nav-home]')?.click());
   const after = await state();
   return { ms, weeks: (after.season - before.season) * 27 + (after.week - before.week), ...(tapMs !== undefined ? { tapMs, label } : {}) };
 }
@@ -267,7 +275,7 @@ async function run() {
   await timed('Start → grounds (textures painted, HUD up)', async () => {
     await page.fill('[data-nrl-clubname]', 'Budget FC');
     await clickTimed('[data-nrl-start]');
-    await page.waitForFunction(() => document.querySelector('.nrl-hud') && window.__nrlGame?.scene.isActive('Grounds'));
+    await page.waitForFunction(() => document.querySelector('.nrl-dock') && window.__nrlGame?.scene.isActive('Grounds'));
   });
   if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
   await wait(500);
@@ -285,7 +293,7 @@ async function run() {
   // A week advance: the match week hands over to the match scene.
   let tickMs = 0;
   await timed('Advance Week → match scene (hand-off)', async () => {
-    tickMs = await clickTimed('.nrl-hud .nrl-btn', { text: 'Advance Week' });
+    tickMs = await clickTimed('.nrl-dock [data-hud="advance"]'); // PLAY WEEK
     await page.waitForSelector('.nrl-mo-controls');
     return `of which the tick itself ${tickMs} ms`;
   });
@@ -316,13 +324,12 @@ async function run() {
   await page.waitForSelector('.nrl-mo-sheet [data-skip]');
   await timed('Skip → full time', async () => {
     await clickTimed('.nrl-mo-sheet [data-skip]');
-    await page.waitForSelector('.nrl-btn:has-text("Back to Club")');
+    await page.waitForSelector('[data-back-to-club]');
   });
+  // The full-time card (3s) carries Player of the Match and Back to Club; the report stays shut.
   await timed('Back to Club → grounds', async () => {
-    const potm = page.locator('.nrl-modal .nrl-btn:has-text("Close")');
-    if (await potm.count()) await potm.first().tap();
-    await clickTimed('.nrl-btn', { text: 'Back to Club' });
-    await page.waitForFunction(() => document.querySelector('.nrl-hud .nrl-btn') && window.__nrlGame?.scene.isActive('Grounds'));
+    await clickTimed('.nrl-mo-ft [data-back-to-club]');
+    await page.waitForFunction(() => document.querySelector('body:not(.nrl-match-active) .nrl-dock [data-hud="advance"]') && window.__nrlGame?.scene.isActive('Grounds'));
   });
   await toastsGone();
 
