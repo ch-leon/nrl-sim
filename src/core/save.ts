@@ -1,14 +1,16 @@
-// src/core/save.ts — localStorage persistence, migration, slots + title flow
-// (BAK-174, WU-4; migration/export/import/slots: GitHub #34).
+// src/core/save.ts — persistence, migration, slots + title flow
+// (BAK-174, WU-4; migration/export/import/slots: GitHub #34; storage seam: #360).
 //
 // Serialises the whole GameState (plain JSON per ARCHITECTURE §1.2) to one of
-// three localStorage slots, loads & migrates & validates on boot, falls back to
+// three save slots, loads & migrates & validates on boot, falls back to
 // null when absent, and degrades gracefully on corrupt saves or storage errors.
 // Also provides the autosave subscriber (on 'week:advanced') and a minimal DOM
 // title flow.
 //
-// No Phaser. Pure TS + optional DOM. localStorage is accessed through an
-// injectable abstraction so Node-env unit tests can pass a Map-backed fake.
+// No Phaser. Pure TS + optional DOM. Storage is reached only through the save
+// store (src/core/storage/, docs/specs/commercial-saves.md): LocalSaveStore over
+// localStorage, or over a Map-backed fake a Node-env unit test injects. Every key
+// comes from src/core/storageKeys.ts, frozen whatever the game is called.
 
 import type { GameState } from './state';
 import { emptyFinance, getState, SAVE_VERSION } from './state';
@@ -18,31 +20,28 @@ import { autoPick } from '../systems/lineup';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld } from './time';
-import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, liveMatchKey, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
+import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
+import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY } from './storageKeys';
+import { browserStorage, LocalSaveStore, type StorageLike } from './storage/local';
+import { nextMeta } from './storage/meta';
+import type { SaveMeta, SlotListing } from './storage/types';
+
+export { slotKey } from './storageKeys';
+export type { StorageLike } from './storage/local';
 
 /** Legacy single-save key (pre-slots). Kept until its data is safely in slot 1. */
-export const SAVE_KEY = 'nrl-sim-save-v1';
-export const CORRUPT_KEY = 'nrl-sim-save-corrupt';
+export const SAVE_KEY = LEGACY_SAVE_KEY;
+export const CORRUPT_KEY = CORRUPT_SAVE_KEY;
 export const SLOT_COUNT = 3;
-const SLOT_PREFIX = 'nrl-sim-save-slot-';
 
-export function slotKey(slot: number): string {
-  return `${SLOT_PREFIX}${slot}`;
-}
-
-// ── Storage abstraction ─────────────────────────────────────────────────────
+// ── Storage ─────────────────────────────────────────────────────────────────
 //
-// Only the subset of the Web Storage API we use. Tests inject a Map-backed fake
-// via __setStorage; production resolves the real `localStorage` when present
-// (guarded for privacy mode / SSR / Node where it is undefined).
-
-export interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
+// Tests inject a fake StorageLike via __setStorage; production resolves the real
+// `localStorage` when present (guarded for privacy mode / SSR / Node where it is
+// undefined). Either way save.ts talks to it through one LocalSaveStore.
 
 let injectedStorage: StorageLike | null = null;
+let activeStore: LocalSaveStore | null = null;
 
 /** Test hook: inject a fake storage (pass null to clear and fall back to real). */
 export function __setStorage(s: StorageLike | null): void {
@@ -51,13 +50,15 @@ export function __setStorage(s: StorageLike | null): void {
 }
 
 /**
- * Resolve the active storage: injected fake first, else the real `localStorage`
- * if the environment provides it, else null (in-memory-only, no persistence).
+ * The store over the active storage: injected fake first, else the real
+ * `localStorage` if the environment provides it, else null (in-memory-only, no
+ * persistence). One store per storage, so its queued meta and device id persist.
  */
-function getStorage(): StorageLike | null {
-  if (injectedStorage) return injectedStorage;
-  if (typeof localStorage !== 'undefined') return localStorage;
-  return null;
+function getStore(): LocalSaveStore | null {
+  const storage = injectedStorage ?? browserStorage();
+  if (!storage) return null;
+  if (activeStore?.storage !== storage) activeStore = new LocalSaveStore(storage, SLOT_COUNT);
+  return activeStore;
 }
 
 // ── Migration ────────────────────────────────────────────────────────────────
@@ -361,37 +362,6 @@ export function setActiveSlot(slot: number): void {
   activeSlot = slot;
 }
 
-/** Raw payload for a slot. Slot 1 falls back to the legacy single-save key, so a
- *  pre-slots save is always visible even if copying it into slot 1 failed. */
-function readSlotRaw(storage: StorageLike, slot: number): string | null {
-  const own = storage.getItem(slotKey(slot));
-  if (own !== null) return own;
-  return slot === 1 ? storage.getItem(SAVE_KEY) : null;
-}
-
-/**
- * Migrate the legacy single save into slot 1. The legacy key is removed only
- * after the slot write succeeded and reads back identically — a failed or
- * partial write leaves the legacy save untouched. Never overwrites slot 1.
- */
-function migrateLegacySave(storage: StorageLike): void {
-  try {
-    const legacy = storage.getItem(SAVE_KEY);
-    if (legacy === null) return;
-    const slot1 = storage.getItem(slotKey(1));
-    if (slot1 === null) {
-      storage.setItem(slotKey(1), legacy);
-      if (storage.getItem(slotKey(1)) !== legacy) return;
-      storage.removeItem(SAVE_KEY);
-    } else if (slot1 === legacy) {
-      storage.removeItem(SAVE_KEY);
-    }
-    // else: slot 1 holds different data — keep the legacy key rather than risk it.
-  } catch (err) {
-    console.warn('nrl-sim: legacy save migration failed, legacy save kept', err);
-  }
-}
-
 export type SlotStatus = 'empty' | 'ok' | 'future' | 'corrupt';
 
 export interface SlotSummary {
@@ -406,11 +376,11 @@ export interface SlotSummary {
 
 /** Describe every slot for the title screen. Read-only (never marks corrupt). */
 export function getSlotSummaries(): SlotSummary[] {
-  const storage = getStorage();
+  const store = getStore();
   const out: SlotSummary[] = [];
-  if (storage) migrateLegacySave(storage);
+  store?.migrateLegacy();
   for (let slot = 1; slot <= SLOT_COUNT; slot++) {
-    const raw = storage ? readSlotRaw(storage, slot) : null;
+    const raw = store ? store.read(slot) : null;
     if (raw === null) {
       out.push({ slot, status: 'empty' });
       continue;
@@ -432,24 +402,49 @@ export function getSlotSummaries(): SlotSummary[] {
 
 /** Write `state` to `slot`. Returns false (after warning + ui:notify) on failure. */
 export function writeSlot(slot: number, state: GameState): boolean {
-  const storage = getStorage();
-  if (!storage) {
+  const store = getStore();
+  if (!store) {
     console.warn('nrl-sim: no storage available, save skipped');
     bus.emit('ui:notify', { text: 'Save failed: storage unavailable', kind: 'danger' });
     return false;
   }
   try {
-    storage.setItem(slotKey(slot), JSON.stringify(state));
+    const payload = JSON.stringify(state);
+    const facts = { saveVersion: state.version, club: String(state.clubName), season: state.season, week: state.week };
+    store.write(slot, payload, nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now()));
   } catch (err) {
     console.warn('nrl-sim: save failed', err);
     bus.emit('ui:notify', { text: 'Save failed: storage full', kind: 'danger' });
     return false;
   }
-  // Slot 1 now holds current data; the stale legacy copy must not resurface.
-  if (slot === 1) {
-    try { storage.removeItem(SAVE_KEY); } catch { /* best effort */ }
-  }
   return true;
+}
+
+/**
+ * Every slot with its meta (#360): what a cloud sync compares through
+ * resolveSaveConflict. A save from before meta describes itself with its time
+ * unknown. Never throws; empty with no storage.
+ */
+export function listSlotMeta(): SlotListing[] {
+  const store = getStore();
+  if (!store) return [];
+  try {
+    store.migrateLegacy();
+    return store.list();
+  } catch (err) {
+    console.warn('nrl-sim: could not list saves', err);
+    return [];
+  }
+}
+
+/** One slot's meta (null when empty). See listSlotMeta. */
+export function getSlotMeta(slot: number): SaveMeta | null {
+  return listSlotMeta().find((l) => l.slot === slot)?.meta ?? null;
+}
+
+/** Test hook: write any queued save meta now instead of after the current task. */
+export function __flushSaveMeta(): void {
+  getStore()?.flush();
 }
 
 /** The state save() last wrote to the active slot: any later one holds a change not saved yet. */
@@ -467,8 +462,7 @@ let lastSaved: GameState | null = null;
  */
 export function save(state: GameState): void {
   if (weekHeld() || slotImported) return;
-  const storage = getStorage();
-  if (storage) migrateLegacySave(storage);
+  getStore()?.migrateLegacy();
   if (writeSlot(activeSlot, state)) lastSaved = state;
 }
 
@@ -481,11 +475,11 @@ export function save(state: GameState): void {
  *    untouched, return null.
  */
 export function load(): GameState | null {
-  const storage = getStorage();
-  if (!storage) return null;
-  migrateLegacySave(storage);
+  const store = getStore();
+  if (!store) return null;
+  store.migrateLegacy();
 
-  const raw = readSlotRaw(storage, activeSlot);
+  const raw = store.read(activeSlot);
   if (raw === null) return null;
 
   const res = parseSave(raw);
@@ -495,35 +489,30 @@ export function load(): GameState | null {
     bus.emit('ui:notify', { text: res.message, kind: 'danger' });
     return null;
   }
-  return markCorrupt(storage, raw);
+  return markCorrupt(store, raw);
 }
 
 /** Shared corrupt path: preserve raw under CORRUPT_KEY, drop the slot, warn. */
-function markCorrupt(storage: StorageLike, raw: string): null {
+function markCorrupt(store: LocalSaveStore, raw: string): null {
   console.warn('nrl-sim: corrupt save, ignoring');
   try {
-    storage.setItem(CORRUPT_KEY, raw);
+    store.keepCorrupt(raw);
   } catch (err) {
     // Preserving forensics is best-effort; never let it block recovery.
     console.warn('nrl-sim: could not preserve corrupt save', err);
   }
-  removeSlot(storage, activeSlot);
+  store.remove(activeSlot);
   return null;
-}
-
-function removeSlot(storage: StorageLike, slot: number): void {
-  storage.removeItem(slotKey(slot));
-  if (slot === 1) storage.removeItem(SAVE_KEY);
 }
 
 /** Delete a slot (leaves CORRUPT_KEY intact) and the live-match record beside it. */
 export function deleteSlot(slot: number): void {
-  const storage = getStorage();
-  if (storage) {
-    removeSlot(storage, slot);
+  const store = getStore();
+  if (store) {
+    store.remove(slot);
     // The record lives in localStorage next to the slot. Drop it there, and on the
     // injected store too when a test is not using the real localStorage.
-    try { storage.removeItem(liveMatchKey(slot)); } catch { /* best effort */ }
+    store.removeLiveMatch(slot);
   }
   clearLiveMatch(slot);
 }
@@ -536,10 +525,10 @@ export function clearSave(): void {
 /** Presence check for the active slot (or `slot`). A corrupt save still reads as
  *  present here; load() is where corruption is handled. */
 export function hasSave(slot: number = activeSlot): boolean {
-  const storage = getStorage();
-  if (!storage) return false;
-  migrateLegacySave(storage);
-  return readSlotRaw(storage, slot) !== null;
+  const store = getStore();
+  if (!store) return false;
+  store.migrateLegacy();
+  return store.read(slot) !== null;
 }
 
 // ── Export / import ──────────────────────────────────────────────────────────
