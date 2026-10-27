@@ -458,7 +458,15 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
 }
 .nrl-hud-next-detail { font-weight: normal; font-size: 0.9em; }
 .nrl-hud .nrl-btn.nrl-hud-next:disabled { opacity: 1; cursor: default; }
-.nrl-hud-next[hidden] { display: none; }
+/* As specific as the rule above, or a hidden chip (no match left; #368's board chip with all on track) shows as an empty box. */
+.nrl-hud .nrl-btn.nrl-hud-next[hidden] { display: none; }
+/* #368: the board objective at risk, beside the next match. Amber at risk, red off track. */
+.nrl-hud-spacer { gap: 0.35rem; }
+.nrl-hud .nrl-btn.nrl-hud-board { flex: 0 1 auto; border-color: var(--nrl-risk-amber, #d08a00); color: var(--nrl-risk-amber-ink, #8a4b00); }
+.nrl-hud .nrl-btn.nrl-hud-board.nrl-hud-board-off { border-color: var(--nrl-risk-red, #b00020); color: var(--nrl-risk-red, #b00020); }
+.nrl-hud .nrl-btn.nrl-hud-next:not(.nrl-hud-board) { flex: 0 1 auto; }
+/* Below 760px both chips only fit with the Season tile and the week's "/27" out of the way while the board chip is up. */
+@media (max-width: 759px) { .nrl-hud[data-board] .nrl-hud-stat[data-hud="season"], .nrl-hud[data-board] .nrl-hud-week-total { display: none; } }
 /* #350 H1: decisions waiting, a red count on Advance Week. */
 .nrl-hud-alert {
   display: inline-block;
@@ -679,6 +687,14 @@ button.nrl-hud-stat:focus-visible { outline: 3px solid #3a6ea5; outline-offset: 
 .nrl-report-changes { margin: 0.15rem 0; font-size: 0.8rem; }
 .nrl-report-changes summary { cursor: pointer; min-height: 1.6rem; line-height: 1.6rem; }
 @media (pointer: coarse) { .nrl-report-changes summary { min-height: 44px; line-height: 44px; } }
+/* #368: "Why did I lose?" sits beside the plan changes, one line between them until opened. */
+.nrl-report-folds { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 1rem; margin: 0.15rem 0; }
+.nrl-report-folds > details { flex: 1 1 14rem; min-width: 0; margin: 0; }
+.nrl-report-folds > details[open] { flex-basis: 100%; }
+.nrl-report-why summary { font-weight: bold; }
+.nrl-report-why-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; border-top: 1px solid #b8ae92; }
+.nrl-report-why-row > span { flex: 1 1 auto; min-width: 0; }
+.nrl-report-why-go { flex: 0 0 auto; font-size: 0.75rem; }
 .nrl-report-body { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.3rem 0; }
 .nrl-report-scoring { flex: 1 1 18rem; display: flex; gap: 0.8rem; }
 .nrl-report-side { flex: 1 1 0; min-width: 0; }
@@ -965,6 +981,11 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 .nrl-board h3 { margin: 0 0 0.2rem; font-size: 0.9rem; }
 .nrl-board-patience { margin: 0 0 0.3rem; font-size: 0.75rem; }
 .nrl-board-obj { padding: 0.15rem 0; border-top: 1px solid #b8ae92; font-size: 0.78rem; }
+/* #368: the hub chip's risk word on each pending objective. */
+.nrl-board-risk { font-weight: bold; white-space: nowrap; }
+.nrl-board-on-track .nrl-board-risk { color: var(--nrl-risk-green, #2f6b1f); }
+.nrl-board-at-risk .nrl-board-risk { color: var(--nrl-risk-amber-ink, #8a4b00); }
+.nrl-board-off-track .nrl-board-risk { color: var(--nrl-risk-red, #b00020); }
 @media (max-width: 600px) {
   .nrl-screen-body.nrl-staff { grid-template-columns: minmax(0, 1fr); }
 }
@@ -1131,6 +1152,28 @@ body.nrl-match-active .nrl-update-toast { display: none; }
   .nrl-event-meta { flex: 1 1 auto; min-width: 0; }
   .nrl-event-choices { flex-direction: row; align-items: stretch; gap: 0.4rem; }
   .nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; }
+}
+/* #368: the weekly summary card. Two columns (the squad; the money and the
+   board) so a typical week fits a phone on its side without scrolling. */
+.nrl-dialog-region .nrl-summary-modal { width: min(96vw, 640px); max-width: none; }
+.nrl-summary h2 { margin: 0 0 0.3rem; font-size: 1.05rem; padding-right: 2.75rem; min-height: 1.4rem; }
+.nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.35rem 0.75rem; }
+.nrl-summary-col { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.nrl-summary-sec { padding: 0.2rem 0.45rem; background: var(--nrl-card-bg, #fff8e1); border: 2px solid #000; border-left: 6px solid var(--nrl-info, #3a6ea5); font-size: 0.82rem; }
+.nrl-summary-sec h3 { margin: 0; font-size: 0.85rem; }
+.nrl-summary-sec p { margin: 0.05rem 0 0; line-height: 1.25; overflow-wrap: anywhere; }
+.nrl-summary-none { color: #555; font-style: italic; }
+.nrl-summary-up { color: var(--nrl-risk-green, #2f6b1f); }
+.nrl-summary-down { color: var(--nrl-risk-red, #b00020); }
+.nrl-summary-board.nrl-summary-happy { border-left-color: var(--nrl-risk-green, #2f6b1f); }
+.nrl-summary-board.nrl-summary-watching { border-left-color: var(--nrl-risk-amber, #d08a00); }
+.nrl-summary-board.nrl-summary-worried { border-left-color: var(--nrl-risk-red, #b00020); }
+.nrl-summary-advance { background: var(--nrl-go, #7ec850); }
+@media (max-height: 500px), (max-width: 480px) {
+  .nrl-summary h2 { font-size: 0.9rem; margin-bottom: 0.1rem; min-height: 0; line-height: 44px; }
+  .nrl-summary-sec { font-size: 0.74rem; padding: 0.1rem 0.4rem; }
+  .nrl-summary-sec h3 { font-size: 0.78rem; }
+  .nrl-summary-col { gap: 0.2rem; }
 }
 .nrl-placebar {
   pointer-events: auto;

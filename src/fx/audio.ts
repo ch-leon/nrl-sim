@@ -715,6 +715,9 @@ export function initAudioUi(): void {
   // #366: on when absent, so an old save slows down for big moments too.
   const keyMoments = toggle('Slow down for big moments', 'Line breaks, tries and the last two minutes',
     () => getState().settings.keyMoments !== false, (on) => setSetting({ keyMoments: on }), 'nrl-live-toggle nrl-moments-toggle');
+  // #368: the weekly summary card after each advance; on unless switched off.
+  const weekSummary = toggle('Show weekly summary', 'Training, injuries, money and the board after each advance.',
+    () => getState().settings.weekSummary !== false, (on) => setSetting({ weekSummary: on }), 'nrl-summary-toggle');
 
   const installBtn = button('Install app', () => {
     void promptInstall().then((outcome) => {
@@ -771,15 +774,16 @@ export function initAudioUi(): void {
         el('div', { class: 'nrl-audio-row' }, replayBtn),
         el('div', { class: 'nrl-audio-row' }, exportBtn),
         importRow,
-        // In this column: the toggles' column is full on a 375px-tall phone (#366).
+        // In this column: the toggles' column is full on a 375px-tall phone (#366, #368).
         keyMoments.row,
+        weekSummary.row,
         el('div', { class: 'nrl-audio-row nrl-audio-install-row' }, installBtn)),
     ),
   );
 
   const openBtn = button('', () => {
     syncInstallVisibility();
-    for (const t of [mute, coachCalls, keyMoments, liveRivals]) t.sync();
+    for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary]) t.sync();
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
     importIdle();
     openModal(content, { class: 'nrl-settings-modal', region: true, closeButton: true });

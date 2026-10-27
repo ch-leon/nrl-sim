@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { fmtMoney, moneyTile, moneyTileLabel, runwayLevel, RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel, placeName } from '../../src/ui/hud';
+import { fmtMoney, moneyTile, moneyTileLabel, runwayLevel, RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel, placeName, boardChip, fmtMoneyShort, BOARD_RISK_CLASS } from '../../src/ui/hud';
+import type { GameState, Objective } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import { createNewGame, getState, setState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
@@ -194,5 +195,78 @@ describe('the next-match chip (#350 H1)', () => {
   it('the Advance Week badge says what it counts', () => {
     expect(decisionsBadgeLabel(1)).toBe('1 decision waiting');
     expect(decisionsBadgeLabel(3)).toBe('3 decisions waiting');
+  });
+});
+
+describe('the board chip (#368)', () => {
+  beforeEach(() => {
+    createNewGame('Test Club', 1);
+    setState({ league: initLeague(getState()) });
+  });
+
+  /** The club 11th on 14 points behind ten rivals on 20, with `left` rounds to play. */
+  const eleventh = (left: number): GameState => {
+    const s = getState();
+    const rivals = s.league.clubs.filter((c) => c.id !== 'player');
+    const row = (clubId: string, points: number) => ({ clubId, played: 1, wins: 0, draws: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, points });
+    const ladder = [row('player', 14), ...rivals.map((c, i) => row(c.id, i < 10 ? 20 : 0))];
+    const fixtures = Array.from({ length: 24 }, (_, i) => ({
+      round: i + 1, homeId: 'player', awayId: rivals[i % rivals.length]!.id, ...(i < 24 - left ? { result: { homeScore: 0, awayScore: 0 } } : {}),
+    }));
+    return { ...s, week: 25 - left, money: 100_000, league: { ...s.league, ladder, fixtures } };
+  };
+  const finals = (target: number): Objective => ({ id: 'f', kind: 'finals', text: `Finish in the top ${target}`, target, status: 'pending' });
+  const solvent = (target: number): Objective => ({ id: 's', kind: 'solvent', text: `Finish the season with at least $${target.toLocaleString()}`, target, status: 'pending' });
+
+  it('shows the worst objective at risk: the target over where the club is', () => {
+    const chip = boardChip({ ...eleventh(4), objectives: [finals(8), solvent(0)] }, null)!;
+    expect(chip).toEqual({
+      title: 'Board: top 8', detail: "You're 11th", risk: 'at-risk',
+      label: "Board objective at risk: Finish in the top 8. You're 11th",
+    });
+  });
+
+  it('the worse of two wins: money under the floor while burning is off track', () => {
+    const s = { ...eleventh(4), money: 12_000, objectives: [finals(8), solvent(20_000)] };
+    const chip = boardChip(s, 3)!;
+    expect(chip).toMatchObject({ title: 'Board: $20k', detail: 'You have $12k', risk: 'off-track' });
+    expect(BOARD_RISK_CLASS[chip.risk as 'off-track']).toBe('nrl-hud-board-off');
+  });
+
+  it('above the floor but the runway ends before the season does: how long the cash lasts', () => {
+    const s = { ...eleventh(20), money: 40_000, objectives: [solvent(20_000)] };
+    expect(boardChip(s, 6.4)).toMatchObject({ title: 'Board: $20k', detail: 'Cash: 6 wks', risk: 'at-risk' });
+  });
+
+  it('the rival: both places, the rival named in the label; every line short enough for 667px', () => {
+    const s0 = eleventh(2);
+    const top = s0.league.ladder.find((r) => r.points === 20)!.clubId;
+    const name = s0.league.clubs.find((c) => c.id === top)!.name;
+    const rival: Objective = { id: 'r', kind: 'beatRival', text: `Finish above ${name}`, target: 0, rivalId: top, status: 'pending' };
+    const chip = boardChip({ ...s0, objectives: [rival] }, null)!;
+    expect(chip).toMatchObject({ title: 'Board: rival', detail: '11th v 1st', risk: 'off-track' });
+    expect(chip.label).toContain(name);
+    for (const c of [chip, boardChip({ ...s0, money: 5_000, objectives: [solvent(0)] }, 2)!]) {
+      expect(c.title.length).toBeLessThanOrEqual(14);
+      expect(c.detail.length).toBeLessThanOrEqual(14);
+    }
+  });
+
+  it('hides when every objective is on track', () => {
+    expect(boardChip({ ...eleventh(4), objectives: [finals(12), solvent(0)] }, null)).toBeNull();
+    expect(boardChip({ ...eleventh(16), objectives: [finals(8)] }, null)).toBeNull(); // plenty of rounds to catch up
+    expect(boardChip({ ...getState(), objectives: [] }, null)).toBeNull();
+  });
+
+  it('short money on the chip', () => {
+    expect(fmtMoneyShort(20_000)).toBe('$20k');
+    expect(fmtMoneyShort(-4_400)).toBe('-$4k');
+    expect(fmtMoneyShort(1_250_000)).toBe('$1.3m');
+    expect(fmtMoneyShort(800)).toBe('$800');
+  });
+
+  it('the chip sits beside the next match and its risk colours are themable', () => {
+    expect(CSS).toContain('.nrl-hud .nrl-btn.nrl-hud-board');
+    expect(CSS).toContain('var(--nrl-risk-amber, #d08a00)');
   });
 });

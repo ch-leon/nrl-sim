@@ -6,7 +6,8 @@ import { bus } from '../../core/events';
 import { getState, type GameState } from '../../core/state';
 import { getActiveSlot } from '../../core/save';
 import { BOARD } from '../../config';
-import { objectiveLine, sackedSummary } from '../../systems/board';
+import { RISK_WORD, objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board';
+import { financeSummary } from './finance';
 import { STAFF, STAFF_ROLES, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
 import { el, panel, button, openModal, openScreen, closeScreen, screenHead } from '../dom';
 
@@ -21,8 +22,13 @@ export function buildObjectivesSection(state: GameState): HTMLElement {
   if (state.objectives.length === 0) {
     box.append(el('p', { text: 'The board will set goals once the season is under way.' }));
   } else {
+    // #368: each pending objective with the hub chip's risk word, from the same runway as the money tile.
+    const runway = financeSummary(state).runwayWeeks;
     for (const o of state.objectives) {
-      box.append(el('div', { class: `nrl-board-obj nrl-board-${o.status}`, text: objectiveLine(o, state) }));
+      const risk = o.status === 'pending' ? objectiveRisk(o, state, runway) : null;
+      box.append(el('div', { class: `nrl-board-obj nrl-board-${o.status}${risk ? ` nrl-board-${risk}` : ''}`, attrs: risk ? { 'data-risk': risk } : {} },
+        objectiveLine(o, state),
+        ...(risk ? [' ', el('span', { class: 'nrl-board-risk', text: `· ${RISK_WORD[risk]}` })] : [])));
     }
   }
   return panel({ class: 'nrl-board-panel' }, box);

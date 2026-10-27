@@ -10,6 +10,7 @@ import { weekHeld } from '../core/time';
 import { advanceInProgress, stopAdvance } from '../core/advance';
 import { playerMatchPending, resumePlayerMatch } from '../systems/matchday';
 import { nextFixture } from '../systems/league';
+import { RISK_WORD, ladderStanding, worstObjective, type ObjectiveRisk } from '../systems/board';
 import { ECON, WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, trackChromeInset, HUD_INSET_VAR } from './dom';
 
@@ -23,6 +24,8 @@ export interface HudOpts {
   onNextMatch?: () => void;
   /** Called from the money tile (#351 H2). Absent => the tile is a plain readout. */
   onMoney?: () => void;
+  /** Called from the board chip (#368). Absent => the chip is a plain readout. */
+  onBoard?: () => void;
   /** Weeks the balance lasts at this week's burn, null when the club is not losing money (#351 H2). */
   runwayWeeks?: (s: GameState) => number | null;
 }
@@ -121,6 +124,56 @@ export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { opponent
   return { opponent: `v ${placeName(opp.name)}`, detail, label };
 }
 
+/** "$32k", "-$4k", "$1.2m": money short enough for the board chip's second line. */
+export function fmtMoneyShort(n: number): string {
+  const abs = Math.abs(Math.round(n));
+  const body = abs >= 1_000_000 ? `${(abs / 1_000_000).toFixed(1).replace(/\.0$/, '')}m` : abs >= 1000 ? `${Math.round(abs / 1000)}k` : String(abs);
+  return `${n < 0 && abs > 0 ? '-' : ''}$${body}`;
+}
+
+/**
+ * The hub's board chip (#368), beside the next-match chip: the single worst
+ * objective at risk or worse, in two short lines ("Board: top 8" over "You're
+ * 11th"), each about 14 characters at most so both chips fit at 667px; the
+ * objective in full is in the label. Null when every objective is on track.
+ * `runwayWeeks` is the money tile's. Pure — extracted for unit testing without the DOM.
+ */
+export function boardChip(s: GameState, runwayWeeks: number | null): { title: string; detail: string; label: string; risk: ObjectiveRisk } | null {
+  const worst = worstObjective(s, runwayWeeks);
+  if (!worst) return null;
+  const { objective: o, risk } = worst;
+  let title: string;
+  let detail: string;
+  switch (o.kind) {
+    case 'finals': {
+      title = `Board: top ${o.target}`;
+      detail = `You're ${ordinal(ladderStanding(s).rank)}`;
+      break;
+    }
+    case 'beatRival': {
+      // The rival by name in the label only: a place name would not fit beside the next match.
+      title = 'Board: rival';
+      detail = `${ordinal(ladderStanding(s).rank)} v ${ordinal(ladderStanding(s, o.rivalId).rank)}`;
+      break;
+    }
+    case 'solvent': {
+      title = o.target === 0 ? 'Board: solvent' : `Board: ${fmtMoneyShort(o.target)}`;
+      const weeks = runwayWeeks === null ? null : Math.floor(runwayWeeks);
+      detail = s.money < o.target || weeks === null ? `You have ${fmtMoneyShort(s.money)}` : `Cash: ${weeks} wk${weeks === 1 ? '' : 's'}`;
+      break;
+    }
+    case 'build': {
+      title = `Board: ${o.target} built`;
+      detail = `You have ${s.facilities.length}`;
+      break;
+    }
+  }
+  return { title, detail, risk, label: `Board objective ${RISK_WORD[risk].toLowerCase()}: ${o.text}. ${detail}` };
+}
+
+/** The board chip's class for each risk it shows (#368). */
+export const BOARD_RISK_CLASS = { 'at-risk': 'nrl-hud-board-risk', 'off-track': 'nrl-hud-board-off' } as const;
+
 /** The Advance Week badge's spoken label (#350 H1). */
 export function decisionsBadgeLabel(n: number): string {
   return n === 1 ? '1 decision waiting' : `${n} decisions waiting`;
@@ -179,6 +232,23 @@ export function weekStillFinishing(): boolean {
 }
 
 /**
+ * Advance Week from the club: the HUD's button, and the weekly summary's (#368).
+ * A parked match resumes, a held week says so, otherwise `onAdvanceWeek` runs.
+ */
+export function advanceFromClub(onAdvanceWeek?: () => void): void {
+  const choice = clubAdvanceChoice(playerMatchPending(), weekHeld());
+  if (choice === 'resume') {
+    resumePlayerMatch();
+    return;
+  }
+  if (choice === 'wait') {
+    weekStillFinishing();
+    return;
+  }
+  onAdvanceWeek?.();
+}
+
+/**
  * The Advance button's label while a multi-week advance runs (N10.2): the
  * season's current week. Pure — extracted for unit testing without the DOM.
  */
@@ -208,20 +278,13 @@ export function createHud(opts: HudOpts = {}): Hud {
   const nextEl = button('', () => opts.onNextMatch?.(), { class: 'nrl-hud-next' });
   nextEl.setAttribute('data-hud', 'next');
   if (!opts.onNextMatch) nextEl.disabled = true;
-  const spacer = el('div', { class: 'nrl-hud-spacer' }, nextEl);
+  // #368: the board objective most at risk, beside the next match; a tap opens Staff & Board.
+  const boardEl = button('', () => opts.onBoard?.(), { class: 'nrl-hud-next nrl-hud-board' });
+  boardEl.setAttribute('data-hud', 'board');
+  if (!opts.onBoard) boardEl.disabled = true;
+  const spacer = el('div', { class: 'nrl-hud-spacer' }, boardEl, nextEl);
 
-  const advanceBtn = button('Advance Week', () => {
-    const choice = clubAdvanceChoice(playerMatchPending(), weekHeld());
-    if (choice === 'resume') {
-      resumePlayerMatch();
-      return;
-    }
-    if (choice === 'wait') {
-      weekStillFinishing();
-      return;
-    }
-    opts.onAdvanceWeek?.();
-  });
+  const advanceBtn = button('Advance Week', () => advanceFromClub(opts.onAdvanceWeek));
   if (!opts.onAdvanceWeek) advanceBtn.disabled = true;
 
   // #44: split-button menu. The toggle is a 44px square beside Advance Week; the
@@ -339,6 +402,18 @@ export function createHud(opts: HudOpts = {}): Hud {
     );
     nextEl.setAttribute('aria-label', chip?.label ?? '');
     nextEl.title = chip?.label ?? '';
+    const board = boardChip(s, runway);
+    boardEl.hidden = !board;
+    root.toggleAttribute('data-board', !!board);
+    boardEl.replaceChildren(
+      el('span', { class: 'nrl-hud-next-opp', text: board?.title ?? '' }),
+      el('span', { class: 'nrl-hud-next-detail', text: board?.detail ?? '' }),
+    );
+    boardEl.classList.toggle(BOARD_RISK_CLASS['at-risk'], board?.risk === 'at-risk');
+    boardEl.classList.toggle(BOARD_RISK_CLASS['off-track'], board?.risk === 'off-track');
+    const boardLabel = board ? `${board.label}${opts.onBoard ? '. Tap for Staff & Board' : ''}` : '';
+    boardEl.setAttribute('aria-label', boardLabel);
+    boardEl.title = boardLabel;
     renderAdvancing(s);
   }
 

@@ -8,7 +8,8 @@ import { enableAutosave, getActiveSlot, getSlotSummaries, load } from './core/sa
 import { showTitleFlow } from './ui/title';
 import { advanceWeek } from './core/time';
 import { advanceUntil } from './core/advance';
-import { createHud } from './ui/hud';
+import { advanceFromClub, createHud } from './ui/hud';
+import { initWeekSummary } from './ui/weekSummary';
 import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
 import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
@@ -139,7 +140,7 @@ async function boot(): Promise<void> {
   registerBoardSystem();
   registerEventsSystem();
   registerRivalsSystem();
-  initMatchReport();
+  initMatchReport({ onReason: (screen) => nav.open(screen) }); // "Why did I lose?" (#368)
   initBoardUi();
   // The next fixture's match art, painted in a Worker during the week and uploaded in idle slices (N10.5).
   initMatchArtAhead({ textures: () => game?.textures ?? null, busy: () => game?.scene.isActive('Match') ?? false });
@@ -167,13 +168,18 @@ async function boot(): Promise<void> {
   // (#315). A later turn to portrait still sleeps from onBlock, above.
   sleepLoopIfPortrait(g, () => portraitBlocked);
   // #338: neither advance takes a pending card's default unasked.
+  const advanceOneWeek = (): void => askBeforeAdvance(1, () => advanceWeek());
+  const runwayWeeks = (s: GameState): number | null => financeSummary(s).runwayWeeks;
   createHud({
-    onAdvanceWeek: () => askBeforeAdvance(1, () => advanceWeek()),
+    onAdvanceWeek: advanceOneWeek,
     onAdvanceUntil: (t) => advanceUntilAsked(t, advanceUntil),
     onNextMatch: () => nav.open('fixtures'),
     onMoney: () => nav.open('finance'),
-    runwayWeeks: (s) => financeSummary(s).runwayWeeks,
+    onBoard: () => nav.open('staff'), // the objective at risk (#368)
+    runwayWeeks,
   });
+  // #368: the weekly summary, from the club as it stands now; its Advance Week is the HUD's.
+  initWeekSummary({ onAdvance: () => advanceFromClub(advanceOneWeek), runwayWeeks });
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
   // applied by the matchday tick hook before this fires and the Match scene is
