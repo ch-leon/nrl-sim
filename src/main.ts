@@ -4,7 +4,7 @@ import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
-import { enableAutosave, load } from './core/save';
+import { enableAutosave, getActiveSlot, getSlotSummaries, load } from './core/save';
 import { showTitleFlow } from './ui/title';
 import { advanceWeek } from './core/time';
 import { advanceUntil } from './core/advance';
@@ -47,6 +47,8 @@ import { openGuideScreen } from './ui/guide/guide';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
 import { bootLab } from './match/lab/boot';
+import { commercialEnabled } from './commercial/flags';
+import { initCommercial, recordFirstRun } from './commercial/demo';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
@@ -99,6 +101,8 @@ async function boot(): Promise<void> {
   initFinanceLedger();
   initNewsInbox();
   warmMatchArt(); // the match ground painted in the art worker while the title is up (N10.5)
+  // #362: the careers already here before the first commercial run keep the full game.
+  if (commercialEnabled()) recordFirstRun(getSlotSummaries());
   const choice = await showTitleFlow(uiRoot);
   if (choice.mode === 'continue') {
     const saved = load();
@@ -114,6 +118,7 @@ async function boot(): Promise<void> {
     createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
+  if (commercialEnabled()) initCommercial(getActiveSlot()); // the demo gate's slot and its end toast (#362)
   // The player's kit design (#79) feeds every kit drawn from here on.
   syncKitDesign(getState());
   bus.on('state:changed', (s) => syncKitDesign(s));

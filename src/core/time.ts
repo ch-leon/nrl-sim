@@ -12,6 +12,7 @@
 import { getState, setState, resetForNewSeason } from './state';
 import { bus } from './events';
 import { WEEKS_PER_SEASON } from '../config';
+import { demoStops } from '../commercial/demo';
 
 // ── Public hook contracts ──────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
 export function advanceWeek(): void {
   if (getState().sacked) return; // game over (#47): the save stays, time stops
   if (held) return; // a held week finishes first (resumeWeek)
+  if (demoStops()) return; // the demo's last week is played (#362; never with the commercial flag off)
   const { week, season } = getState();
   let holding = 0;
   const canHold = !fastForwardFlag || fastForwardHolds;
@@ -255,6 +257,7 @@ export function advanceWeeks(n: number): void {
   if (n <= 0) return;
   withFastForward(() => {
     for (let i = 0; i < n; i++) {
+      if (demoStops()) return; // once, not once per week left (#362)
       advanceWeek();
     }
   });

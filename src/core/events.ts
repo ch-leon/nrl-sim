@@ -78,6 +78,8 @@ export interface Events {
    * rest. `ms`: how long its toast stays in view, when not the default for its length.
    */
   'ui:notify': { text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean; ms?: number };
+  /** The demo stopped an advance at the week the club is on (#362; commercial flag on only). Task 05 opens the paywall on it. */
+  'commercial:demoEnded': { season: number; week: number };
 }
 
 export type EventName = keyof Events;
