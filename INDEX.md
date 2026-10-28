@@ -176,3 +176,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-145438-kickoff-depth | kickoff depth | cf43d1f | claude/kickoffs-397 | [report](runs/20261028-145438-kickoff-depth/report.md) |
 | 20261028-153154-standard | standard | bf18d7b | main | [report](runs/20261028-153154-standard/report.md) |
 | 20261028-171554-standard | standard | 91ef9d2 | main | [report](runs/20261028-171554-standard/report.md) |
+| 20261028-172235-kick-contest | kick-contest | 91ef9d2 | claude/kick-types-99 | [report](runs/20261028-172235-kick-contest/report.md) |
+| 20261028-180218-kick-contest | kick-contest | 91ef9d2 (uncommitted changes) | claude/kick-types-99 | [report](runs/20261028-180218-kick-contest/report.md) |

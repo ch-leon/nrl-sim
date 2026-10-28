@@ -1,0 +1,40 @@
+{
+  "name": "kick-contest",
+  "description": "#99 (balance/plans/kick-contest.md): bombs a real contest, grubbers that race into the in-goal, scrambles you can read. Between even sides: about 1 bomb in 5 contested (won back 6–10%, spilled 10–14%), 0.2–0.4 grubber tries a match, and tries, points, completion and penalties inside §7. A Kick-chase side (both ways) shows the chase pays more often; a rating gap checks the stronger side still wins about 70%. Run on main for the before and on the branch for the after. No coach calls.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "seeds": 400,
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    }
+  ]
+}
