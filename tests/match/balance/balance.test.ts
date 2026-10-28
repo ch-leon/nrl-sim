@@ -254,11 +254,14 @@ describe('measuring and reporting', () => {
     expect(measureCell({ ...even, scenario: { ...even.scenario, track: 'home' } }, 1, 6).trackedWin).toBe(plain.homeWin);
   }, 60_000);
   it.each([
-    // Re-pinned for the deeper default kick-off (#397: kickoff.deepDefault 0 -> 1, the
-    // receivers' 15–8 m line instead of their 24 m line; balance/plans/kickoff-depth.md).
-    // They were 8-16:346:3436c830c791688a and 14-14:385:97934f5b337f329e.
-    { attack: 'balanced' as const, expected: '18-4:374:cbf9fa3d4aa0c5c7' },
-    { attack: 'expansive' as const, expected: '14-10:369:df1ab5c448c16159' },
+    // Re-pinned for the kick contests (#99: a contested bomb is one draw, won back, spilled or
+    // caught; a forward spill is a knock-on; a grubber at rest in the in-goal is a race;
+    // balance/plans/kick-contest.md). They were 18-4:374:cbf9fa3d4aa0c5c7 and
+    // 14-10:369:df1ab5c448c16159, re-pinned for the deeper default kick-off (#397: the
+    // receivers' 15–8 m line instead of their 24 m line; balance/plans/kickoff-depth.md),
+    // and before that 8-16:346:3436c830c791688a and 14-14:385:97934f5b337f329e.
+    { attack: 'balanced' as const, expected: '10-26:350:34ab09d37c3de210' },
+    { attack: 'expansive' as const, expected: '8-10:377:e051c574b7fe72b5' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
