@@ -771,7 +771,21 @@ export const CARD_SELECTOR = '.nrl-mo-plan, .nrl-mo-sheet, .nrl-mo-ft, .nrl-moda
 // ── DOM overlay ────────────────────────────────────────────────────────────────
 
 /** Lines kept in the full log (newest first). */
-const MAX_LOG = 80;
+export const MAX_LOG = 80;
+
+/**
+ * The line that goes when the full log passes MAX_LOG (#414): the oldest untagged
+ * one, so a call or a score from the first minutes is still under its filter at
+ * full time; the oldest of all once every line is tagged. `kinds` is each line's
+ * data-kind, newest first.
+ */
+export function logLineToDrop(kinds: readonly (string | undefined)[]): number {
+  for (let i = kinds.length - 1; i >= 0; i--) if (!kinds[i]) return i;
+  return kinds.length - 1;
+}
+
+/** What a filter of the full log says when it has nothing to list (#414). */
+export const LOG_EMPTY_TEXT = { scoring: 'No scores yet.', calls: 'No calls yet.' } as const;
 
 let active: MatchOverlayHandle | null = null;
 
@@ -987,6 +1001,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   full.append(
     el('div', { class: 'nrl-mo-full-head' }, el('span', { class: 'nrl-mo-full-title', text: 'Match log' }), closeLog),
     el('div', { class: 'nrl-mo-filters' }, ...filterBtns),
+    ...Object.entries(LOG_EMPTY_TEXT).map(([f, text]) => el('div', { class: 'nrl-mo-log-empty', text, attrs: { 'data-for': f } })),
     feed,
   );
 
@@ -1098,7 +1113,10 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     const line = el('div', { class: 'nrl-mo-line' }, el('span', { class: 'nrl-mo-line-t', text: clockEl.textContent ?? '' }), el('span', { class: 'nrl-mo-line-text', text }));
     if (kind) line.dataset.kind = kind;
     feed.prepend(line);
-    while (feed.childElementCount > MAX_LOG) feed.lastElementChild?.remove();
+    while (feed.childElementCount > MAX_LOG) {
+      const lines = [...feed.children] as HTMLElement[];
+      lines[logLineToDrop(lines.map((l) => l.dataset.kind))]?.remove();
+    }
     stripText.classList.remove('nrl-mo-line-wait');
     stripText.textContent = text;
     if (eventSince) {
@@ -1539,6 +1557,10 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-line[data-kind~="call"] .nrl-mo-line-text { color: var(--nrl-pos); font-weight: 500; }
 .nrl-mo-full[data-filter="scoring"] .nrl-mo-line:not([data-kind~="score"]),
 .nrl-mo-full[data-filter="calls"] .nrl-mo-line:not([data-kind~="call"]) { display: none; }
+/* A filter with nothing under it says so (#414). */
+.nrl-mo-log-empty { display: none; padding: 5px 0; border-top: 1px solid var(--nrl-button); font-size: 0.75rem; line-height: 1.35; color: var(--nrl-muted); }
+.nrl-mo-full[data-filter="scoring"]:not(:has(.nrl-mo-line[data-kind~="score"])) .nrl-mo-log-empty[data-for="scoring"],
+.nrl-mo-full[data-filter="calls"]:not(:has(.nrl-mo-line[data-kind~="call"])) .nrl-mo-log-empty[data-for="calls"] { display: block; }
 /* Bottom row (3m): COACH · LOG · Plan · … · the speed pill. It never shifts. */
 .nrl-mo-bar {
   position: fixed; left: calc(16px + var(--nrl-safe-l)); right: calc(16px + var(--nrl-safe-r)); bottom: calc(12px + var(--nrl-safe-b)); z-index: 20;

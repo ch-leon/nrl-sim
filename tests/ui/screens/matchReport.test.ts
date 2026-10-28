@@ -2,7 +2,7 @@
 // built from the MatchResult, it agrees with the score and the overlay's tallies.
 import { describe, it, expect } from 'vitest';
 import { runMatch } from '../../../src/match/league/match';
-import { buildMatchReport, initials, injuryChip, ladderMove, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
+import { BONUS_TRY_MARK, buildMatchReport, initials, injuryChip, ladderMove, planChangeLines, planChangesSummary, resultHeadline, shortName } from '../../../src/ui/screens/matchReport';
 import { fmtPotmLine, fmtPotmShort } from '../../../src/ui/screens/potm';
 import { playerOfTheMatch } from '../../../src/systems/stats';
 import { summaryLines } from '../../../src/match/view/commentary';
@@ -30,14 +30,23 @@ describe('match report (N9.5)', () => {
     expect(r.title).toBe('Round 3 · Full time');
     expect([r.home.score, r.away.score]).toEqual([result.homeScore, result.awayScore]);
     // A line per scorer, a minute per try.
-    const marks = (s: typeof r.home) => s.tries.flatMap((t) => t.match(/\d+'( \(5\))?/g) ?? []);
+    const marks = (s: typeof r.home) => s.tries.flatMap((t) => t.match(/\d+'( \(bonus\))?/g) ?? []);
     expect([marks(r.home).length, marks(r.away).length]).toEqual(result.stats.tries);
     const goals = (id: string) => result.events.filter((e) => e.teamId === id && (e.kind === 'conversion' || e.kind === 'penalty-goal'));
     expect(r.home.goals).toEqual({ made: goals('player').filter((e) => e.detail === 'good').length, taken: goals('player').length });
     // The points add up: tries (4 or 5), goals 2, field goals 1.
-    const pts = (s: typeof r.home) => marks(s).reduce((a, t) => a + (t.endsWith('(5)') ? 5 : 4), 0) + 2 * s.goals.made + s.fieldGoals;
+    const pts = (s: typeof r.home) => marks(s).reduce((a, t) => a + (t.endsWith(BONUS_TRY_MARK) ? 5 : 4), 0) + 2 * s.goals.made + s.fieldGoals;
     expect(pts(r.home)).toBe(result.homeScore);
     expect(pts(r.away)).toBe(result.awayScore);
+  });
+
+  it('marks a bonus-zone try by what it is, never a bare "(5)" that reads as a try count (#423)', () => {
+    const ev = (t: number, detail?: string): MatchEvent => ({ t, kind: 'try', teamId: 'player', player: 'Deakin Whitbread', ...(detail ? { detail } : {}) });
+    const four: MatchResult = { ...result, homeScore: 17, awayScore: 0, events: [ev(3), ev(7), ev(8), ev(9, 'bonus')] };
+    const line = buildMatchReport(four, fixture, names, null).home.tries[0];
+    expect(line).toMatch(/9' \(bonus\)$/);
+    expect(line).not.toContain('(5)');
+    expect(line.match(/\d+'/g)).toHaveLength(4);
   });
 
   it('the numbers match the overlay’s tallies, side by side', () => {

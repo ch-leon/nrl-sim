@@ -21,6 +21,12 @@
 // While a match is on screen (live, and full time until Back to Club) only the
 // match's own toasts show. A club toast waits, and they all show once the club
 // is back; the news inbox has every one either way.
+//
+// #411: a long run (▾ To finals) queues a toast for every week while its summary
+// and decision cards hold the lane, and they used to replay one by one for minutes
+// after it. When a run ends, or the queue passes TOAST_CAP, the plain lines (all
+// in News already) go but for the newest few, folded into one "+n more in News";
+// an Undo and a problem always stay.
 import { bus, type Events } from '../core/events';
 import { NAV_INSET_VAR, button, el, ensureStyles } from './dom';
 
@@ -170,13 +176,66 @@ export function toastMs(n: Notice, queued: number): number {
   return queued > 0 ? Math.min(ms, TOAST_BUSY_MS) : ms;
 }
 
+/** Most toasts queued (in the lane, or waiting for the club) before the plain ones are trimmed (#411). */
+export const TOAST_CAP = 8;
+/** Plain toasts a trim keeps: the newest few, the stop line of a run among them (#411). */
+export const TRIM_KEEP = 3;
+
+/** The "+n more in News" line a trim leaves, by its count (#411). */
+const moreCounts = new WeakMap<Notice, number>();
+
+/** The line standing in for `count` trimmed toasts; News has every one of them. */
+export function moreInNews(count: number): Notice {
+  const n: Notice = { text: `+${count} more in News`, kind: 'info' };
+  moreCounts.set(n, count);
+  return n;
+}
+
+/** Whether a trim may drop `n`: a plain club line (News keeps it), not an Undo, a problem or a match's own. */
+export function trimmable(n: Notice): boolean {
+  return !isActionToast(n) && n.kind !== 'danger' && n.match !== true;
+}
+
+/**
+ * The queue after a trim (#411): every Undo, problem and match toast, the newest
+ * `keep` plain ones, and in place of the first dropped one a single "+n more in
+ * News" (an earlier such line folds into it). A line said twice keeps only its
+ * newest. Order is kept. Unchanged when it would only swap one toast for another.
+ */
+export function trimQueue(queue: readonly Notice[], keep = TRIM_KEEP): Notice[] {
+  const seen = new Set<string>();
+  const again = new Set<Notice>();
+  for (let i = queue.length - 1; i >= 0; i--) {
+    const n = queue[i]!;
+    if (isActionToast(n) || n.match === true) continue;
+    if (seen.has(n.text)) again.add(n);
+    seen.add(n.text);
+  }
+  const plain = queue.filter((n) => trimmable(n) && !moreCounts.has(n) && !again.has(n));
+  const drop = new Set([...again, ...plain.slice(0, Math.max(0, plain.length - keep))]);
+  for (const n of queue) if (moreCounts.has(n)) drop.add(n);
+  let count = 0;
+  for (const n of drop) count += moreCounts.get(n) ?? 1;
+  if (count < 2 || drop.size < 2) return [...queue];
+  const out: Notice[] = [];
+  let more: Notice | null = null;
+  for (const n of queue) {
+    if (!drop.has(n)) out.push(n);
+    else if (!more) out.push((more = moreInNews(count)));
+  }
+  return out;
+}
+
 /** The counter on the toast in view: how many wait behind it. */
 export function queueBadge(queued: number): string {
   return queued > 0 ? `+${queued}` : '';
 }
 
-/** Mount the toast lane in `root` and show 'ui:notify' through it. */
-export function initToasts(root: HTMLElement): void {
+/**
+ * Mount the toast lane in `root` and show 'ui:notify' through it. `advancing` says
+ * whether a multi-week run is under way (the club's advanceInProgress; the lab has none).
+ */
+export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean } = {}): void {
   ensureStyles();
   // Every queued toast is a child; only the first shows (#45: announced without stealing focus).
   const lane = el('div', { class: 'nrl-toast-lane', attrs: { 'aria-live': 'polite', 'data-lane': 'top' } });
@@ -320,7 +379,7 @@ export function initToasts(root: HTMLElement): void {
     toast.remove();
     render();
   };
-  const show = (n: Notice): void => {
+  const build = (n: Notice): Element => {
     const more = el('span', { class: 'nrl-toast-more', attrs: { 'aria-hidden': 'true' } });
     const toast = el('div', { class: `nrl-toast nrl-toast-${n.kind}` }, el('span', { class: 'nrl-toast-text', text: n.text }), more);
     if (dismissOnBodyTap(n)) {
@@ -337,12 +396,29 @@ export function initToasts(root: HTMLElement): void {
       const x = button('✕', () => close(toast), { class: 'nrl-toast-x' });
       x.setAttribute('aria-label', 'Close');
       toast.append(act, x);
-      // One at a time: the last offer's toast goes (its offer has been replaced).
-      for (const t of [...lane.children]) if (notices.get(t)?.action) t.remove();
     }
     notices.set(toast, n);
+    return toast;
+  };
+  const show = (n: Notice): void => {
+    const toast = build(n);
+    // One at a time: the last offer's toast goes (its offer has been replaced).
+    if (n.action) for (const t of [...lane.children]) if (t !== toast && notices.get(t)?.action) t.remove();
     const before = lane.children[laneIndex(n, lane.childElementCount)] ?? null;
     lane.insertBefore(toast, before);
+    render();
+  };
+
+  /** Trim the lane to trimQueue's pick (#411); the toast in view stays put if it is kept. */
+  const trimLane = (): void => {
+    const els = [...lane.children];
+    const queue = els.map((t) => notices.get(t)).filter((n): n is Notice => n !== undefined);
+    const kept = trimQueue(queue);
+    if (kept.length === queue.length) return;
+    const byNotice = new Map(els.map((t) => [notices.get(t), t]));
+    const stay = new Set(kept);
+    for (const t of els) if (!stay.has(notices.get(t) as Notice)) t.remove();
+    for (const n of kept) lane.appendChild(byNotice.get(n) ?? build(n));
     render();
   };
 
@@ -350,8 +426,27 @@ export function initToasts(root: HTMLElement): void {
   bus.on('ui:notify', (n) => {
     if (n.quiet) return; // already on screen (the season review, N14)
     if (n.action && matchOn()) return; // its offer ended with the kick-off (#370)
-    if (toastWaits(n, matchOn())) waiting.push(n);
-    else show(n);
+    if (toastWaits(n, matchOn())) {
+      waiting.push(n);
+      if (waiting.length > TOAST_CAP) waiting = trimQueue(waiting);
+    } else {
+      show(n);
+      if (lane.childElementCount > TOAST_CAP) trimLane();
+    }
+  });
+  // #411: when a run ends, trim what it queued. After its stop line has joined (it
+  // is emitted just after the run's last state:changed), so that line is kept.
+  const advancing = opts.advancing ?? ((): boolean => false);
+  let wasAdvancing = false;
+  bus.on('state:changed', () => {
+    const on = advancing();
+    if (wasAdvancing && !on) {
+      queueMicrotask(() => {
+        trimLane();
+        waiting = trimQueue(waiting);
+      });
+    }
+    wasAdvancing = on;
   });
   let wasOn = matchOn();
   new MutationObserver(() => {

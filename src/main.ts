@@ -8,7 +8,7 @@ import { createNewGame, getState, loadState, type GameState } from './core/state
 import { enableAutosave, getActiveSlot, getSlotSummaries, load, save } from './core/save';
 import { showTitleFlow } from './ui/title';
 import { advanceWeek } from './core/time';
-import { advanceUntil } from './core/advance';
+import { advanceInProgress, advanceUntil } from './core/advance';
 import { advanceFromClub, createHud } from './ui/hud';
 import { initWeekSummary } from './ui/weekSummary';
 import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
@@ -106,7 +106,7 @@ async function boot(): Promise<void> {
       requestAnimationFrame(() => game?.scale.refresh());
     },
   });
-  initToasts(uiRoot);
+  initToasts(uiRoot, { advancing: advanceInProgress });
   initUndo(); // a match starting ends the 5-second Undo (#370)
   initSeasonEndFeedback();
   initFinanceLedger();

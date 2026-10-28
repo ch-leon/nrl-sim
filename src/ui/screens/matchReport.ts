@@ -29,13 +29,16 @@ import { PRESET_LABEL, isAttackPreset, isDefencePreset } from '../../match/leagu
 
 export { shortName };
 
+/** The mark after a bonus-zone try's minute (#423). */
+export const BONUS_TRY_MARK = '(bonus)';
+
 export interface ReportSide {
   id: string;
   name: string;
   /** The club's last word ("Larrikins"), for the narrow stats columns. */
   short: string;
   score: number;
-  /** "Name 4', 11' (5)" per try scorer, in order of his first; a bonus-zone try is marked. */
+  /** "Name 4', 11' (bonus)" per try scorer, in order of his first; a bonus-zone try (5 points) is marked by what it is, not "(5)", which read as a try count (#423). */
   tries: string[];
   /** Conversions and penalty goals kicked / taken. */
   goals: { made: number; taken: number };
@@ -91,7 +94,7 @@ function side(result: MatchResult, id: string, name: string, score: number): Rep
     name,
     short: shortName(name),
     score,
-    tries: byPlayer(mine.filter((e) => e.kind === 'try'), (e) => `${minute(e)}${e.detail === 'bonus' ? ' (5)' : ''}`),
+    tries: byPlayer(mine.filter((e) => e.kind === 'try'), (e) => `${minute(e)}${e.detail === 'bonus' ? ` ${BONUS_TRY_MARK}` : ''}`),
     goals: { made: goals.filter((e) => e.detail === 'good').length, taken: goals.length },
     fieldGoals: mine.filter((e) => e.kind === 'field-goal' && e.detail === 'good').length,
     sinBins: byPlayer(mine.filter((e) => e.kind === 'sin-bin'), minute),
