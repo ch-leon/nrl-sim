@@ -174,3 +174,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-124128-kickoff-depth-confirm | kickoff depth confirm | b2ebadf | claude/kickoffs-397 | [report](runs/20261028-124128-kickoff-depth-confirm/report.md) |
 | 20261028-135316-kickoff-depth-gap | kickoff depth gap | b2ebadf | claude/kickoffs-397 | [report](runs/20261028-135316-kickoff-depth-gap/report.md) |
 | 20261028-145438-kickoff-depth | kickoff depth | cf43d1f | claude/kickoffs-397 | [report](runs/20261028-145438-kickoff-depth/report.md) |
+| 20261028-153154-standard | standard | bf18d7b | main | [report](runs/20261028-153154-standard/report.md) |
