@@ -122,13 +122,55 @@ const RIVAL_CSS = `
 }
 `;
 
+/** The club editor's draft (#398): what is typed and the two colours picked so far. */
+export interface ClubDraft { name: string; colors: [string, string] }
+
+/**
+ * The club editor in the squad table's place (#398): the name (Save keeps the
+ * colours with it), the jersey and the trim. A swatch changes `d` and calls
+ * `changed`, which draws the editor again; the name box never takes focus
+ * itself, so a phone's keyboard comes up only when the box is tapped and never
+ * covers the swatches (as the Kit's club name).
+ */
+export function rivalClubEditor(
+  club: RivalClub,
+  d: ClubDraft,
+  on: { changed: () => void; cancel: () => void; save: (name: string, colors: [string, string]) => string | null },
+): HTMLElement {
+  const opts = rivalColorOptions(club.colors, d.colors[0]);
+  const swatches = (options: readonly string[], current: string, pick: (c: string) => void, attr: string): HTMLElement =>
+    el('div', { class: 'nrl-kit-row' }, ...options.map((c) => el('button', {
+      class: 'nrl-kit-swatch',
+      attrs: { type: 'button', [attr]: c, 'aria-label': c, 'aria-pressed': String(c === current), style: `background:${c}` },
+      onClick: () => { pick(c); on.changed(); },
+    })));
+  return el('div', { class: 'nrl-rival-editor' },
+    el('div', {},
+      el('div', { class: 'nrl-kit-label', text: 'Club name' }),
+      nameField({
+        value: d.name,
+        label: 'Club name',
+        attr: 'data-rival-rename',
+        focus: false,
+        onDraft: (text) => { d.name = text; },
+        onCancel: on.cancel,
+        onSave: (name) => on.save(name, d.colors),
+      })),
+    el('div', {},
+      el('div', { class: 'nrl-kit-label', text: 'Jersey' }),
+      swatches(opts.jerseys, d.colors[0], (c) => { d.colors = withJersey(d.colors, c, club.colors); }, 'data-rival-jersey'),
+      el('div', { class: 'nrl-kit-label', text: 'Trim' }),
+      swatches(opts.trims, d.colors[1], (c) => { d.colors = [d.colors[0], c]; }, 'data-rival-trim')),
+  );
+}
+
 /** Open the squad sheet for `club` (over the League screen). */
 export function openRivalSquad(opened: RivalClub): HTMLElement {
   ensureRivalStyles();
   // The club as the league has it now: a rename replaces the object (#398).
   const live = (): RivalClub => getState().league.clubs.find((c) => c.id === opened.id) ?? opened;
   // Edit club (#398): the draft name and colours while the editor is open.
-  let draft: { name: string; colors: [string, string] } | null = null;
+  let draft: ClubDraft | null = null;
   const content = el('div', { class: 'nrl-rival-squad', attrs: { 'data-rival-squad': opened.id } });
 
   const squadTable = (club: RivalClub, rows: RivalSquadRow[]): HTMLElement => {
@@ -169,52 +211,6 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
       : el('p', { class: 'nrl-screen-empty', text: 'No squad on record.' });
   };
 
-  const swatches = (options: readonly string[], current: string, pick: (c: string) => void, attr: string): HTMLElement =>
-    el('div', { class: 'nrl-kit-row' }, ...options.map((c) => el('button', {
-      class: 'nrl-kit-swatch',
-      attrs: { type: 'button', [attr]: c, 'aria-label': c, 'aria-pressed': String(c === current), style: `background:${c}` },
-      onClick: () => { pick(c); render(); },
-    })));
-
-  /** The editor in the table's place: the name (Save keeps the colours with it), the jersey and the trim. */
-  const editor = (club: RivalClub, d: { name: string; colors: [string, string] }): HTMLElement => {
-    const opts = rivalColorOptions(club.colors, d.colors[0]);
-    return el('div', { class: 'nrl-rival-editor' },
-      el('div', {},
-        el('div', { class: 'nrl-kit-label', text: 'Club name' }),
-        nameField({
-          value: d.name,
-          label: 'Club name',
-          attr: 'data-rival-rename',
-          onDraft: (text) => { d.name = text; },
-          onCancel: () => { draft = null; render(); },
-          onSave: (name) => {
-            const res = renameClub(getState(), club.id, name, d.colors);
-            if (!res.ok) return res.why;
-            draft = null;
-            if (res.patch) {
-              setState(res.patch);
-              save(getState());
-              // The League sheet under this one is drawn once: draw it again with the new name, then this sheet over it.
-              const key = screenKey();
-              if (key === 'fixtures' || key === 'ladder') {
-                (key === 'ladder' ? openLadderScreen : openFixturesScreen)();
-                openRivalSquad(live());
-                return null;
-              }
-            }
-            render();
-            return null;
-          },
-        })),
-      el('div', {},
-        el('div', { class: 'nrl-kit-label', text: 'Jersey' }),
-        swatches(opts.jerseys, d.colors[0], (c) => { d.colors = withJersey(d.colors, c, club.colors); }, 'data-rival-jersey'),
-        el('div', { class: 'nrl-kit-label', text: 'Trim' }),
-        swatches(opts.trims, d.colors[1], (c) => { d.colors = [d.colors[0], c]; }, 'data-rival-trim')),
-    );
-  };
-
   const render = (): void => {
     const club = live();
     const rows = rivalSquadRows(club);
@@ -227,7 +223,10 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
       chip.style.background = `linear-gradient(90deg, ${draft.colors[0]} 60%, ${draft.colors[1]} 60%)`;
       title.append(chip);
     }
-    const edit = button('Edit club', () => { draft = { name: club.name, colors: [club.colors[0], club.colors[1]] }; render(); }, { class: 'nrl-rival-edit' });
+    const edit = button('Edit club', () => {
+      draft = { name: club.name, colors: [club.colors[0], club.colors[1]] };
+      render();
+    }, { class: 'nrl-rival-edit' });
     edit.setAttribute('data-rival-edit', '');
     // Between the top and the dock like a sheet (#343): the club and how it plays
     // in one header row beside the ✕, and only the squad (or the editor) scrolls.
@@ -242,7 +241,28 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
         ),
         ...(draft ? [] : [edit]),
       ),
-      draft ? editor(club, draft) : squadTable(club, rows),
+      draft ? rivalClubEditor(club, draft, {
+        changed: render,
+        cancel: () => { draft = null; render(); },
+        save: (name, colors) => {
+          const res = renameClub(getState(), club.id, name, colors);
+          if (!res.ok) return res.why;
+          draft = null;
+          if (res.patch) {
+            setState(res.patch);
+            save(getState());
+            // The League sheet under this one is drawn once: draw it again with the new name, then this sheet over it.
+            const key = screenKey();
+            if (key === 'fixtures' || key === 'ladder') {
+              (key === 'ladder' ? openLadderScreen : openFixturesScreen)();
+              openRivalSquad(live());
+              return null;
+            }
+          }
+          render();
+          return null;
+        },
+      }) : squadTable(club, rows),
     );
   };
   render();

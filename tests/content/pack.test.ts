@@ -77,16 +77,16 @@ describe('AU pack', () => {
       'Taj', 'Toby', 'Wiremu', 'Sully', 'Tama',
     ]);
     expect(AU_PACK.names.last).toEqual([
-      'Pembrook', 'Tackleford', 'Matagi', 'Thornwell', 'Bumpus', 'Faleupolu',
-      'Gallagan', 'Hardcastle', 'Fonoti', 'Wexbury', 'Grubberton', 'Vaitohi',
-      'Cobbleton', 'Scrumworth', 'Pulotu', 'Kellaway', 'Kickworth', 'Lefaga',
+      'Pembrook', 'Tackleford', 'Mauafetu', 'Thornwell', 'Bumpus', 'Faleupolu',
+      'Gallagan', 'Chargeworth', 'Fonoti', 'Wexbury', 'Grubberton', 'Vaitohi',
+      'Cobbleton', 'Scrumworth', 'Tavaleosa', 'Brackenby', 'Kickworth', 'Lefaga',
       'Quartermaine', 'Bootle', 'Moengaroa', 'Radbourne', 'Steplock', 'Haumate',
       'Whitbread', 'Draymore', 'Whakarua', 'Yeomans', 'Muddock', 'Ngatoro',
-      'Zullo', 'Binnington', 'Tamihana', 'Iliffe', 'Fullbrook', 'Kahutia',
-      'Edmunds', 'Tryhorn', 'Hetaraka', 'Vaughan', 'Ironbark', 'Maunga',
+      'Wolstenby', 'Binnington', 'Tamihana', 'Iliffe', 'Fullbrook', 'Kahutia',
+      'Edmunds', 'Tryhorn', 'Hetaraka', 'Kestwick', 'Ironbark', 'Sefoleva',
       'Addison', 'Ballantry', 'Paewai', 'Ashgrove', 'Wingfield', 'Rewiti',
-      'Dunmore', 'Halfpenny', 'Faleolo', 'Pickering', 'Goalby', 'Nofa',
-      'Wardrop', 'Stampton', 'Penhallow', 'Leggett', 'Treloar', 'Calderwood',
+      'Dunmore', 'Sidestepney', 'Faleolo', 'Bombscombe', 'Goalby', 'Fenuamea',
+      'Wardrop', 'Stampton', 'Penhallow', 'Leggett', 'Trylingham', 'Mudsworth',
     ]);
   });
 

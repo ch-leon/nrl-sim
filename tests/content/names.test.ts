@@ -109,6 +109,9 @@ const BLOCKED_SURNAMES: readonly string[] = [
   'Cronk', 'Thurston', 'Slater', 'Johns', 'Lockyer', 'Inglis', 'Hayne', 'Meninga', 'Fittler', 'Gasnier', 'Minichiello',
   'Webcke', 'Tallis', 'Langer', 'Sterling', 'Beetson', 'Raper', 'Gallen', 'Lomax', 'Dearden', 'Trbojevic', 'Turbo',
   'Munster', 'Cleary', 'Tedesco', 'Ponga', 'Papenhuyzen', 'Haas', 'Hetherington',
+  // The checker's sweep of #401: past NRL, Super League and Test players, and other codes' names.
+  'Vaughan', 'Halfpenny', 'Kellaway', 'Zullo', 'Nofa', 'Nofoaluma', 'Matagi', 'Treloar', 'Calderwood',
+  'Hardcastle', 'Maunga', "Mo'unga", 'Pulotu', 'Tuipulotu', 'Pickering', 'Leota',
 ];
 
 /** The 17 NRL clubs' nicknames, and the Bears who join in 2027. */
@@ -149,6 +152,7 @@ function realProblem(surname: string): string | null {
   for (const r of REAL) {
     if (r.length < 5) continue;
     if (s.includes(r)) return `contains ${r}`;
+    if (s.length >= 5 && r.includes(s)) return `is a clip of ${r}`;
     if (distance(s, r) <= 1) return `is one letter from ${r}`;
   }
   return null;
@@ -182,6 +186,9 @@ describe('the name pools (#398)', () => {
     expect(realProblem('Saifiti')).not.toBeNull();
     expect(realProblem('Munsterman')).not.toBeNull();
     expect(realProblem('Hetheringtom')).not.toBeNull();
+    expect(realProblem('Vaughan')).not.toBeNull();
+    expect(realProblem('Halfpenny')).not.toBeNull();
+    expect(realProblem('Papenhuy')).not.toBeNull(); // a clip of Papenhuyzen
     expect(realProblem('Cronky')).not.toBeNull();
     expect(realProblem('Tackleford')).toBeNull();
   });

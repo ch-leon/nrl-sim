@@ -14,7 +14,7 @@
 
 import { bus } from '../core/events';
 import { getState, setState, type GameState } from '../core/state';
-import { el, button, openModal, closeModal, segmented } from '../ui/dom';
+import { el, button, openModal, closeModal, screenKey, segmented } from '../ui/dom';
 import { TEXT_SIZES, textSizeOf } from '../ui/textSize';
 import { applyNamesFile, downloadNames, downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, save } from '../core/save';
 import { BRAND } from '../brand';
@@ -764,8 +764,18 @@ export function initAudioUi(): () => void {
       }),
       button('Export names', () => { downloadNames(getState()); importIdle(); }, { class: 'nrl-settings-names-export' }),
       button('Import names', () => {
-        void pickSaveFile().then((text) => {
-          if (text !== null) namesAsk(applyNamesFile(text));
+        void pickSaveFile().then(async (text) => {
+          if (text === null) return;
+          const said = applyNamesFile(text);
+          namesAsk(said);
+          // The League sheet is drawn once: if it is open under Settings, an import draws it again
+          // with the new names and puts Settings back over it (#401 review).
+          const key = screenKey();
+          if (said.ok && (key === 'fixtures' || key === 'ladder')) {
+            const league = await import('../ui/screens/fixtures');
+            (key === 'ladder' ? league.openLadderScreen : league.openFixturesScreen)();
+            openModal(content, SETTINGS_MODAL);
+          }
         });
       }, { class: 'nrl-settings-names-import' }),
       button(said?.ok ? 'Done' : 'Cancel', importIdle, { class: 'nrl-settings-names-cancel' }),
@@ -818,9 +828,11 @@ export function initAudioUi(): () => void {
     textSize.set(textSizeOf(getState().settings.textSize));
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
     importIdle();
-    openModal(content, { class: 'nrl-settings-modal', region: true, closeButton: true });
+    openModal(content, SETTINGS_MODAL);
   };
 }
+
+const SETTINGS_MODAL = { class: 'nrl-settings-modal', region: true, closeButton: true };
 
 /** Office's Settings tile: "Sound on", "Muted". */
 export function soundStatus(settings: Pick<GameState['settings'], 'muted' | 'volume'>): string {

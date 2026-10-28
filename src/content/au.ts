@@ -108,9 +108,10 @@ export const AU_PACK: ContentPack = {
   ],
 
   // Fictional name pools (BAK-166; #398). Invented surnames only: Anglo-Australian,
-  // Pacific- and Māori-sounding, and a footy-flavoured twenty for fun. None is a
-  // current NRL or NRLW player's surname, a pun on one, or a well-known name from
-  // the game's past (tests/content/names.test.ts holds the block list). Order
+  // Pacific- and Māori-sounding, and footy-flavoured ones for fun. None is a
+  // current NRL or NRLW player's surname, a pun or a clip of one, or a well-known
+  // sporting name, past or from another code (tests/content/names.test.ts holds
+  // the block list; replace a name in its place, so no other name moves). Order
   // matters: the seeded picker indexes into them, so reordering renames every
   // generated player in a new career (a save keeps the names it has).
   names: {
@@ -125,16 +126,16 @@ export const AU_PACK: ContentPack = {
       'Taj', 'Toby', 'Wiremu', 'Sully', 'Tama',
     ],
     last: [
-      'Pembrook', 'Tackleford', 'Matagi', 'Thornwell', 'Bumpus', 'Faleupolu',
-      'Gallagan', 'Hardcastle', 'Fonoti', 'Wexbury', 'Grubberton', 'Vaitohi',
-      'Cobbleton', 'Scrumworth', 'Pulotu', 'Kellaway', 'Kickworth', 'Lefaga',
+      'Pembrook', 'Tackleford', 'Mauafetu', 'Thornwell', 'Bumpus', 'Faleupolu',
+      'Gallagan', 'Chargeworth', 'Fonoti', 'Wexbury', 'Grubberton', 'Vaitohi',
+      'Cobbleton', 'Scrumworth', 'Tavaleosa', 'Brackenby', 'Kickworth', 'Lefaga',
       'Quartermaine', 'Bootle', 'Moengaroa', 'Radbourne', 'Steplock', 'Haumate',
       'Whitbread', 'Draymore', 'Whakarua', 'Yeomans', 'Muddock', 'Ngatoro',
-      'Zullo', 'Binnington', 'Tamihana', 'Iliffe', 'Fullbrook', 'Kahutia',
-      'Edmunds', 'Tryhorn', 'Hetaraka', 'Vaughan', 'Ironbark', 'Maunga',
+      'Wolstenby', 'Binnington', 'Tamihana', 'Iliffe', 'Fullbrook', 'Kahutia',
+      'Edmunds', 'Tryhorn', 'Hetaraka', 'Kestwick', 'Ironbark', 'Sefoleva',
       'Addison', 'Ballantry', 'Paewai', 'Ashgrove', 'Wingfield', 'Rewiti',
-      'Dunmore', 'Halfpenny', 'Faleolo', 'Pickering', 'Goalby', 'Nofa',
-      'Wardrop', 'Stampton', 'Penhallow', 'Leggett', 'Treloar', 'Calderwood',
+      'Dunmore', 'Sidestepney', 'Faleolo', 'Bombscombe', 'Goalby', 'Fenuamea',
+      'Wardrop', 'Stampton', 'Penhallow', 'Leggett', 'Trylingham', 'Mudsworth',
     ],
   },
 

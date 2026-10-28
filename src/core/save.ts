@@ -611,7 +611,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
  * Read a names file against `state`: the patch that applies it, and how many
  * players and clubs it renames. All or nothing: a file that isn't a names file,
  * a name that breaks the rename rule or colours that don't read apart refuse the
- * whole file. Ids from another career are skipped; a file with none of this
+ * whole file. Ids from another career are skipped unread; a file with none of this
  * career's ids is refused. A name already in the save passes as it is (a club
  * named before the rule, up to 32 characters). Your own club's colours stay.
  * Pure: never throws, never touches state or storage.
@@ -636,9 +636,9 @@ export function importNames(state: GameState, text: string): NamesImportResult {
   let matched = Object.keys(raw.players).filter((id) => current.has(id)).length;
   for (const [id, value] of Object.entries(raw.clubs)) {
     if (!isRecord(value) || typeof value.name !== 'string') return { ok: false, message: `club ${id} has no name.` };
-    if (value.colors !== undefined && !validClubColors(value.colors)) return { ok: false, message: `${value.name.slice(0, 32)}'s colours don't read apart.` };
     const club = known.get(id);
-    if (!club) continue;
+    if (!club) continue; // another career's club: skipped, whatever it holds
+    if (value.colors !== undefined && !validClubColors(value.colors)) return { ok: false, message: `${value.name.slice(0, 32)}'s colours don't read apart.` };
     matched++;
     const own = id === state.clubId;
     const name = value.name === (own ? state.clubName : club.name) ? null : cleanName(value.name);

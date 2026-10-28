@@ -188,6 +188,17 @@ describe('the names file', () => {
     const res = importNames(s, JSON.stringify({ players: { [id]: 'Kobi Hardcastle', 'p-elsewhere': 'Some One' }, clubs: {} }));
     expect(res.ok && res.players).toBe(1);
   });
+
+  it("skips another career's club unread, even with colours that would be refused here", () => {
+    const s = career();
+    const good = namesFile(s);
+    const res = importNames(s, JSON.stringify({
+      ...good,
+      players: { ...good.players, [s.squad[0]!.id]: 'Kobi Hardcastle' },
+      clubs: { ...good.clubs, 'rival-elsewhere': { name: 'Elsewhere', colors: ['#ffffff', '#ffffff'] } },
+    }));
+    expect(res.ok && res.players).toBe(1);
+  });
 });
 
 /** The save file's text, for the refusal test. */
