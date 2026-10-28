@@ -1615,7 +1615,9 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     await page.waitForSelector('[data-screen-key="lineup"] [data-hint="lineup"]');
     const out = await reachProblems(page, '[data-hint="lineup"]', ['.nrl-hint-x']);
     const x = await page.locator('.nrl-hint-x').boundingBox();
-    if (!x || x.width < 44 || x.height < 44) out.push(`the hint's ✕ is ${x?.width}×${x?.height}px`);
+    // To the hundredth: on a sheet at a fractional y (the notch's inset) WebKit measures 44px as 43.99999.
+    const px = (v) => Math.round(v * 100) / 100;
+    if (!x || px(x.width) < 44 || px(x.height) < 44) out.push(`the hint's ✕ is ${x?.width}×${x?.height}px`);
     await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-lineup-hint-first.png`) }).catch(() => {});
     await page.locator('.nrl-hint-x').tap();
     await page.locator('.nrl-nav [data-nav-home]').tap();

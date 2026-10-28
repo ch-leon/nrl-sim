@@ -519,12 +519,19 @@ async function play() {
     const s = await save();
     rec.notes.push(`money ${s?.money ?? '(not saved yet)'}`);
   }, { quietToasts: true });
-  await step('demolish-confirm', async () => {
+  // One tap demolishes; the toast's Undo is the way back (#370 replaced the "Really demolish?" tap).
+  await step('demolish-undo-toast', async () => {
     await tapAt(...spotB);
     await page.waitForSelector('.nrl-facility-popup');
     await tap('.nrl-facility-demolish');
+    await page.waitForSelector('.nrl-toast-action .nrl-toast-btn');
   });
-  await step('demolished', async () => { await tap('.nrl-facility-demolish'); await wait(2000); }, { quietToasts: true });
+  await step('demolished', async (rec) => {
+    await page.waitForSelector('.nrl-toast-action', { state: 'detached', timeout: 10000 });
+    const n = await page.evaluate(() => window.__nrlState?.().facilities.length);
+    if (n !== 1) throw new Error(`want 1 facility after the demolish, have ${n}`);
+    return '1 facility left once the Undo lapsed';
+  }, { quietToasts: true });
 
   // Recruit: sign the best affordable free agent.
   // Recruit is Squad's third segment (Broadcast Quiet), not a tab.

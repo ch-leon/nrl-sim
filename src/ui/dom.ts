@@ -1069,9 +1069,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-update-toast {
   pointer-events: auto;
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + var(--nrl-safe-r));
+  top: calc(12px + var(--nrl-safe-t));
   z-index: 60;
   display: flex;
   align-items: center;
@@ -1091,6 +1090,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 }
 .nrl-update-toast .nrl-btn { flex: 0 0 auto; }
 body.nrl-match-active .nrl-update-toast { display: none; }
+/* Top-right, clear of the decisions and board chips: while it shows, they stop short of it. */
+body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310px - var(--nrl-safe-l) - var(--nrl-safe-r)); }
 
 /* ── Short screens ──────────────────────────────────────────────────────
    Shorter than the design's 390 (667×375, Safari's 956×330 with its toolbars): a
