@@ -74,6 +74,12 @@ const SCREEN_CSS = `
   color: var(--nrl-text);
   white-space: nowrap;
 }
+/* 956×330: the segments' track hugs its 44px buttons, the gaps close up and the column heads are 20, so four rows show (dom.ts). */
+@media (max-height: 340px) {
+  .nrl-sq .nrl-screen-head { margin-bottom: 4px; }
+  .nrl-seg.nrl-sq-tabs { padding: 0; }
+  .nrl-grid-head { height: 20px; }
+}
 .nrl-row.nrl-card-open { cursor: pointer; }
 .nrl-row.nrl-card-open:hover { background: rgba(255, 255, 255, 0.04); }
 .nrl-card-open:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
@@ -123,7 +129,8 @@ const SCREEN_CSS = `
 .nrl-recruit .nrl-row { min-height: 44px; }
 /* Written in caps already, so a sum keeps its small k ("NEED $18k"). */
 .nrl-row .nrl-row-action { min-height: 36px; min-width: 0; width: 100%; padding: 0 6px; border-radius: 8px; font-size: 0.875rem; text-transform: none; }
-@media (pointer: coarse) { .nrl-row .nrl-row-action { min-height: 40px; } }
+/* #389: a finger's height on a touch screen; the row is 44 tall already. */
+@media (pointer: coarse) { .nrl-row .nrl-row-action { min-height: 44px; } }
 /* Can't sign: the label says why (NEED $18k, SQUAD FULL), raised and muted, not faded. */
 .nrl-row .nrl-row-action:disabled { background: var(--nrl-raised); color: var(--nrl-muted); opacity: 1; }
 /* The ▾ menus (sort, training): a tray under their button, over the table. */

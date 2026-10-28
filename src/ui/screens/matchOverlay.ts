@@ -1466,8 +1466,9 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   pointer-events: auto; height: 56px; display: flex; align-items: center; gap: 2px; padding: 0 6px; box-sizing: border-box;
   border-radius: 28px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-chip);
 }
+/* Every button a 44×44 target (#389: the speeds were 40 wide, 36 on a narrow phone and 34 at Larger text). */
 .nrl-mo-controls .nrl-btn {
-  width: 40px; min-width: 40px; height: 44px; min-height: 44px; padding: 0; border-radius: 22px; background: transparent;
+  width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 22px; background: transparent;
   color: var(--nrl-text-2); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0; text-transform: none;
 }
 .nrl-mo-controls .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
@@ -1481,13 +1482,16 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-btn.nrl-mo-planchip { height: 56px; min-height: 56px; padding: 0 16px; border-radius: 14px; background: var(--nrl-navy); color: var(--nrl-accent); font-size: 1.1875rem; box-shadow: var(--nrl-shadow-chip); }
 .nrl-mo-planchip[hidden] { display: none; }
 @media (max-width: 720px) {
-  .nrl-mo-controls .nrl-btn { width: 36px; min-width: 36px; }
   .nrl-mo-controls .nrl-btn.nrl-mo-skip { padding: 0 8px; }
+  /* The speeds keep 44 (#389): while the Plan chip is up after a try, the pill shows only the speed
+     playing, as with the coach tray open, so the row stays one line with the longest badge. */
+  .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-controls .nrl-mo-speed:not([aria-pressed="true"]),
+  .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-pill-div { display: none; }
   .nrl-mo-coach { padding: 0 6px 0 12px; gap: 8px; }
   .nrl-mo-log-toggle { padding: 0 12px; }
 }
 /* Large and Larger text (#371) on a narrow phone: the row keeps to one line with the Plan chip up,
-   on tighter padding; at Larger a smaller LOG switch, coach badge and speed buttons too. */
+   on tighter padding; at Larger a smaller LOG switch and coach badge too (the speeds keep 44, #389). */
 @media (max-width: 720px) {
   html[data-text-size] .nrl-mo-bar, html[data-text-size] .nrl-mo-slot { gap: 6px; }
   html[data-text-size] .nrl-mo-coach { padding: 0 4px 0 10px; gap: 6px; }
@@ -1502,7 +1506,6 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   html[data-text-size="larger"] .nrl-mo-switch { width: 22px; height: 14px; }
   html[data-text-size="larger"] .nrl-mo-switch > i { width: 10px; height: 10px; }
   html[data-text-size="larger"] .nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch > i { transform: translateX(8px); }
-  html[data-text-size="larger"] .nrl-mo-controls .nrl-btn.nrl-mo-speed { width: 34px; min-width: 34px; }
 }
 /* Key-moment banner (3n): under the score bug, about three seconds; never blocks taps. */
 .nrl-mo-banner {
