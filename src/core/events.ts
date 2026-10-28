@@ -87,7 +87,7 @@ export interface Events {
     text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean; ms?: number;
     action?: { label: string; run: () => void; enabled?: () => boolean };
   };
-  /** The demo stopped an advance at the week the club is on (#362; commercial flag on only). Task 05 opens the paywall on it. */
+  /** The demo stopped an advance at the week the club is on (#362; commercial flag on only). The paywall opens on it (#364). */
   'commercial:demoEnded': { season: number; week: number };
 }
 

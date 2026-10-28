@@ -56,6 +56,7 @@ import { isLabHash } from './match/lab/controller';
 import { bootLab } from './match/lab/boot';
 import { commercialEnabled } from './commercial/flags';
 import { initCommercial, recordFirstRun } from './commercial/demo';
+import { openPaywall } from './ui/screens/paywall';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
@@ -126,7 +127,8 @@ async function boot(): Promise<void> {
     createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
-  if (commercialEnabled()) initCommercial(getActiveSlot()); // the demo gate's slot and its end toast (#362)
+  // The demo gate's slot (#362), and the paywall at the demo's end (#364).
+  if (commercialEnabled()) initCommercial(getActiveSlot(), () => void openPaywall({ reason: 'demo' }));
   // The player's kit design (#79) feeds every kit drawn from here on.
   syncKitDesign(getState());
   bus.on('state:changed', (s) => syncKitDesign(s));

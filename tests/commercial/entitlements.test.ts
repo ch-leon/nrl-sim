@@ -103,8 +103,35 @@ function scripted(answers: (Entitlements | null)[]): EntitlementProvider {
     if (!a) throw new Error('offline');
     return a;
   };
-  return { current: next, refresh: next, restore: next, onChange: () => () => {} };
+  return { current: next, refresh: next, restore: next, purchase: next, onChange: () => () => {} };
 }
+
+describe('purchase (#364)', () => {
+  it("the stub's purchase switches the tier at once, through the service, and tells its listeners", async () => {
+    __setCommercial(true);
+    const service = getEntitlementService();
+    const heard: Tier[] = [];
+    service.onChange((e) => heard.push(e.tier));
+    expect(service.snapshot().tier).toBe('demo');
+    expect(await service.purchase('allPlatforms')).toMatchObject({ tier: 'allPlatforms', source: 'stub' });
+    expect(service.snapshot().tier).toBe('allPlatforms');
+    expect(heard).toContain('allPlatforms');
+    expect(storage.map.get(STUB_KEY)).toBe('allPlatforms');
+  });
+
+  it("RevenueCat's purchase is not wired yet, and the service fails open on it", async () => {
+    const client: RcPurchasesClient = {
+      logIn: async () => ({ customerInfo: info(), created: true }),
+      getCustomerInfo: async () => info('standard_web'),
+      restorePurchases: async () => info(),
+    };
+    const rc = new RevenueCatProvider(client);
+    await expect(rc.purchase('standard')).rejects.toThrow(/not wired/);
+    const service = new EntitlementService(rc);
+    await service.current();
+    expect((await service.purchase('allPlatforms')).tier).toBe('standard');
+  });
+});
 
 describe('EntitlementService fail-open cache (#362)', () => {
   it('answers a failed ask with the last good answer, never re-locking', async () => {

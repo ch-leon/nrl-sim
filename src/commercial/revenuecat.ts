@@ -6,7 +6,7 @@
 // replies into this shape. The app user id will be the Supabase account's.
 // Nothing in the game imports this file yet, so it is not in the bundle.
 
-import { type Entitlements, type EntitlementProvider, type Platform, PLATFORMS } from './entitlements';
+import { type Entitlements, type EntitlementProvider, type Platform, type Tier, PLATFORMS } from './entitlements';
 
 /** One entitlement in CustomerInfo.entitlements.active (the fields we read). */
 export interface RcEntitlementInfo {
@@ -72,6 +72,11 @@ export class RevenueCatProvider implements EntitlementProvider {
 
   async restore(): Promise<Entitlements> {
     return entitlementsFromCustomerInfo(await this.client.restorePurchases(), this.now());
+  }
+
+  /** Not wired yet: buying needs the SDK's offerings and packages (#364 leaves it out). The service fails open. */
+  purchase(tier: Tier): Promise<Entitlements> {
+    return Promise.reject(new Error(`RevenueCat purchase of ${tier} is not wired yet`));
   }
 
   onChange(cb: (ent: Entitlements) => void): () => void {
