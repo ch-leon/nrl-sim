@@ -31,7 +31,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { levelWinRates, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
+import { fieldedTable, levelWinRates, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 import { applyTuning } from '../src/match/league/tuning';
 
@@ -223,6 +223,13 @@ if (liveRivals) {
     console.log(wide.length
       ? `Logged for N13 (${key}, against strength): ${wide.join('; ')}.`
       : `Logged for N13 (${key}, against strength): none more than 4 points from the strength-adjusted mean.`);
+  }
+  console.log(`\nThe nine each side fielded (#322): strength is the best nine of the whole squad, injured men too; the fielded nine is the one the coach picks from his fit men, and the style is read from it. Short = strength − fielded, a side's mean. Level = wins ÷ games when the two fielded nines were within ${STYLE_GAP_BAND} points.`);
+  for (const key of ['attack', 'defence'] as const) {
+    console.log(`${pad(key, 11)} ${pad('sides', 6)} ${pad('short', 6)} ${pad('level', 6)} ${pad('score', 6)}`);
+    for (const row of fieldedTable(games, key)) {
+      console.log([pad(row.style, 11), pad(row.sides, 6), pad(row.shortfall.toFixed(2), 6), pad(row.level, 6), pad(pct(row.levelScore), 6)].join(' '));
+    }
   }
 }
 
