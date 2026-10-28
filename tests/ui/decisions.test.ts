@@ -84,6 +84,13 @@ describe('advanceAsk (#338)', () => {
     plantPending('fanDay');
     expect(advanceAsk(getState(), 22)!.proceed).toBe('Take the defaults and advance');
   });
+
+  it('says how long a run past ×4 weeks is, since it stands in for the long-run confirm (#350 H3)', () => {
+    plantPending('fanDay');
+    expect(advanceAsk(getState(), 1)!.question).toBeNull();
+    expect(advanceAsk(getState(), CONFIRM_SPAN)!.question).toBeNull();
+    expect(advanceAsk(getState(), 22)!.question).toBe('Play 22 weeks? It stops for decisions.');
+  });
 });
 
 describe('long advances (#350 H3) and Keep advancing (N4)', () => {

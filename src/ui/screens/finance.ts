@@ -667,7 +667,8 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-contracts-table td.nrl-num { font-weight: 500; }
 .nrl-contract-who { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .nrl-contract-name { font-weight: 600; }
-.nrl-contract-meta { font-size: 0.6875rem; color: var(--nrl-muted); }
+.nrl-contract-meta, .nrl-contract-pos { font-size: 0.6875rem; color: var(--nrl-muted); }
+.nrl-contract-pos { display: none; }
 .nrl-contracts-table td.nrl-contract-soon { color: var(--nrl-neg); }
 .nrl-contract-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .nrl-contract-actions .nrl-btn { min-height: 36px; padding: 0 10px; font-size: 0.875rem; border-radius: 8px; text-transform: none; }
@@ -676,8 +677,9 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-contract-gone td { color: var(--nrl-muted); }
 /* A narrow sheet (667px, or 844px between a notch's insets): the table fits without a sideways
    scroll; who he is goes to the name's tooltip, and the name column takes what the others leave,
-   a long name ending in "…". On the sheet's own width, not the screen's. */
-@container (max-width: 760px) {
+   a long name ending in "…". On the sheet's own width, not the screen's, and in rem (760px at
+   Normal) so a larger Text size (#371) takes the narrow table sooner (#350: SELL ran off the sheet). */
+@container (max-width: 47.5rem) {
   .nrl-table.nrl-contracts-table { min-width: 0; }
   .nrl-contracts-table td.nrl-contract-info { max-width: 0; width: 100%; }
   .nrl-contract-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -686,5 +688,19 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
   .nrl-contract-actions { gap: 4px; }
   .nrl-contract-actions .nrl-btn { padding: 0 7px; font-size: 0.8125rem; }
 }
+/* Narrower still for the text (667px at Large or Larger): the position moves under the name. */
+@container (max-width: 38rem) {
+  .nrl-contracts-table col:nth-child(2) { width: 0 !important; }
+  .nrl-contracts-table tr:not(.nrl-contract-gone) > :is(th, td):nth-child(2) { display: none; }
+  .nrl-contract-pos { display: block; }
+}
+/* Narrowest (568px at Larger): each action's label over its amount ("RENEW" over "$1,466",
+   "REALLY" over "SELL?"), two short lines inside the 44px button, so the three fit the sheet. */
+@container (max-width: 27rem) {
+  .nrl-contract-actions { gap: 3px; }
+  .nrl-contract-actions .nrl-btn { padding: 0 5px; white-space: normal; line-height: 1.05; }
+}
+/* The header (#350): ◂ FINANCE keeps its width at a larger text, and the summary line gives way. */
+.nrl-contracts .nrl-screen-titles > .nrl-back { flex: 0 0 auto; }
 `;
 

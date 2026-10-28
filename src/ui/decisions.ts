@@ -111,6 +111,8 @@ export interface AdvanceAsk {
   due: number;
   /** The button that goes ahead without answering. */
   proceed: string;
+  /** A run longer than ×4 weeks says how long it is here too (#350 H3), since the ask stands in for its confirm. */
+  question: string | null;
 }
 
 export function advanceAsk(state: GameState, span: number): AdvanceAsk | null {
@@ -122,7 +124,7 @@ export function advanceAsk(state: GameState, span: number): AdvanceAsk | null {
   });
   const due = rows.filter((r) => r.due).length;
   const proceed = due === 0 ? 'Advance, answer later' : due === 1 ? 'Take the default and advance' : 'Take the defaults and advance';
-  return { rows, due, proceed };
+  return { rows, due, proceed, question: longAdvanceQuestion(span) };
 }
 
 /** Runs longer than this confirm first (#350 H3); ×4 weeks never does. */
@@ -233,6 +235,7 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
   const content = el('div', { class: 'nrl-ask', attrs: { 'data-advance-ask': '' } },
     el('h2', { text: n === 1 ? 'A decision is waiting' : `${n} decisions are waiting` }),
     list,
+    ...(ask.question ? [el('p', { class: 'nrl-decisions-note', text: ask.question, attrs: { 'data-ask-question': '' } })] : []),
     el('div', { class: 'nrl-decisions-actions' }, answer, go));
   openModal(content, { class: 'nrl-decisions-modal', region: true, closeButton: true });
 }
@@ -246,6 +249,7 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
  */
 export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget) => Promise<AdvanceRun>, opts: { confirmed?: boolean } = {}): void {
   const span = targetSpan(target, getState().week);
+  // With a card waiting, the ask below puts this question instead (one dialog, not two).
   const question = pendingDecisionCount(getState()) === 0 && !opts.confirmed && !demoBlocked() ? longAdvanceQuestion(span) : null;
   if (question) {
     confirmLongAdvance(question, () => advanceUntilAsked(target, run, { confirmed: true }));

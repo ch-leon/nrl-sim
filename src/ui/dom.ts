@@ -735,6 +735,9 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 }
 .nrl-hud-menu[hidden] { display: none; }
 .nrl-hud-menu-item { width: 100%; text-align: left; }
+/* #350: the menu rises into the screen region, so while it is open the dock goes above a
+   region dialog (100): over a decision card, a tap on ×4 weeks must not answer it. */
+.nrl-dock-wrap:has(.nrl-hud-menu:not([hidden])) { z-index: 101; }
 /* Large and Larger text (#371): the tabs close up so all five, ▴ and an alert dot stay whole.
    Up to 900px, not 760 (#344): at 844×390 with the notch's insets Large clipped them too.
    Larger: no gap and no tracking between them, 18px more. */

@@ -49,3 +49,12 @@ describe('region dialog (#203)', () => {
     expect(CSS + PLAYER_CSS).not.toContain('.nrl-player-close');
   });
 });
+
+describe('the ▾ menu over a region dialog (#350)', () => {
+  const z = (r: string): number => Number(/z-index: (\d+)/.exec(r)?.[1]);
+  it('lifts the dock above the dialog while the menu is open, and only then', () => {
+    // The dock's wrap is a stacking context below dialogs: the menu's own z-index cannot climb out of it.
+    expect(z(rule('\n.nrl-dock-wrap'))).toBeLessThan(z(rule('\n.nrl-modal-backdrop')));
+    expect(z(rule('.nrl-dock-wrap:has(.nrl-hud-menu:not([hidden]))'))).toBeGreaterThan(z(rule('\n.nrl-modal-backdrop')));
+  });
+});
