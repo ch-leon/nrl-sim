@@ -5,6 +5,16 @@ Wave 3, bundle 03. Leon gave the go-ahead for an engine change on 28 Oct
 **The style thresholds (`RIVAL_STYLE`, tuning §28) stay frozen.** This file
 is the plan. Nothing in `src/` changes until Leon signs it off.
 
+> **Outcome (28 Oct).** Leon signed the plan off as written. **No variant
+> passed, so nothing shipped**: no knob default moved, and both pins are
+> unchanged. Making Speed count for more moved Expansive the wrong way. The
+> strongest variant took it from −6.8 to −8.1 against strength in the season
+> soak, and broke the 70 v 50 guard (69% → up to 88%). A fresh Expansive rival
+> is already even against a level rival (50.7%), so the season gap is not
+> about what Speed is worth in a match. The full write-up, with the checks
+> that ruled out the strength label and the weather, is in
+> `docs/status/2026-10-balance.md` ("Speed and the Expansive gap").
+
 ## Where it stands
 
 - **Season (N14.2, #321, and the 25 Oct re-soak after the thresholds moved).**
