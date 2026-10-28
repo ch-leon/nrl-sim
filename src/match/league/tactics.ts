@@ -195,9 +195,12 @@ export function bombTarget(kicker: Vec, dir: 1 | -1, fullback: Vec, jitter01: nu
   return { x, y: clamp(fullback.y * 0.5 + MID_Y * 0.5 + (jitter01 - 0.5) * 10, 5, FIELD_WIDTH - 5) };
 }
 
-/** Kick-off: into the receiving side's quarter. */
-export function kickoffTarget(receivingDir: 1 | -1, jitter01: number): Vec {
-  // The receiving side attacks in receivingDir, so its own quarter is behind halfway.
-  const x = receivingDir > 0 ? 24 : FIELD_LENGTH - 24;
+/**
+ * Kick-off: onto the receivers' `lineM` line (metres from their own try line;
+ * their quarter unless kickoff.ts says deeper or shorter, #397), ±12 m across.
+ */
+export function kickoffTarget(receivingDir: 1 | -1, jitter01: number, lineM = 24): Vec {
+  // The receiving side attacks in receivingDir, so its own half is behind halfway.
+  const x = receivingDir > 0 ? lineM : FIELD_LENGTH - lineM;
   return { x, y: clamp(MID_Y + (jitter01 - 0.5) * 24, 8, FIELD_WIDTH - 8) };
 }

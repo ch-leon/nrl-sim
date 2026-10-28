@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { shownPossession } from '../../../src/match/view/livePlayback';
 import { LiveSim } from '../../../src/match/league/live';
-import { COACH_CALLS, callIsBench, callIsDefence } from '../../../src/match/league/calls';
+import { COACH_CALLS, callIsBench, callIsDefence, callIsKickoff } from '../../../src/match/league/calls';
 import type { Side } from '../../../src/match/core/snapshot';
 import type { TeamSheet } from '../../../src/sim/events';
 
@@ -34,7 +34,7 @@ const ball = (holder: Side | null) => ({ ball: { x: 0, y: 0, lift: 0, holder: ho
 /** The tray's rule (MatchScene.refreshCallChips): calls for the play on screen that the sim takes now. */
 function trayCalls(sim: LiveSim, side: Side): string[] {
   const attacking = shownPossession(sim.snapshot(), sim.inPossession) === side;
-  return COACH_CALLS.filter((c) => !callIsBench(c) && callIsDefence(c) !== attacking && sim.callRefusal(side, c) === null);
+  return COACH_CALLS.filter((c) => !callIsBench(c) && !callIsKickoff(c) && callIsDefence(c) !== attacking && sim.callRefusal(side, c) === null);
 }
 
 describe('shownPossession (#348)', () => {

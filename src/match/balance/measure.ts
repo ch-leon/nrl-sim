@@ -39,7 +39,7 @@ export const COUNTS = [
   'touchFinds', 'fortyTwenties', 'onTheFull', 'bundled', 'deadBalls', 'dropOuts', 'kickMetres',
   'penalties', 'sixAgains', 'penaltyGoals', 'penGoalMisses', 'offsides', 'highShots', 'penTaps', 'penTouch', 'penShots', 'penConcededHome', 'penConcededAway',
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
-  'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws',
+  'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws', 'possession',
   'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers', 'kickTries',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
@@ -534,6 +534,8 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
         // Completion is a share (%), not a count: not scaled to 18 minutes.
         const sets = sim.sets.home + sim.sets.away;
         c.completion = sets > 0 ? (100 * (sim.setsCompleted.home + sim.setsCompleted.away)) / sets : 0;
+        // Possession (#397): the home side's share of the sets (%), a share like completion.
+        c.possession = sets > 0 ? (100 * sim.sets.home) / sets : 50;
         // The score: both sides' points, the winning margin, and the home side's (signed).
         c.points = sim.points.home + sim.points.away;
         c.margin = Math.abs(sim.points.home - sim.points.away);
@@ -560,7 +562,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       noteTracked(playOne(sides.home, sides.away, s, false), false);
       if (bothWays) noteTracked(playOne(sides.away, sides.home, s, true), true);
     }
-    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' ? 1 : scale)))])) as Record<CountKey, Stat>;
+    const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' || k === 'possession' ? 1 : scale)))])) as Record<CountKey, Stat>;
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {
       variant: cell.variant.name,

@@ -30,7 +30,7 @@ import { bus } from '../../core/events';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
-import { CALL_LABEL, callIsBench, callIsDefence, callIsPenalty, type CoachCall } from '../../match/league/calls';
+import { CALL_LABEL, callIsBench, callIsDefence, callIsKickoff, callIsPenalty, type CoachCall } from '../../match/league/calls';
 import { teamTags } from '../teamTag';
 import { MOMENTUM_STEP_MIN, momentumLabel, momentumLeader, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
 
@@ -425,6 +425,8 @@ export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
   'forty-twenty': 'tackle 4+, behind your 40 and in reach of their 20: kick the last for touch inside their 20',
   'take-two': 'a penalty won, in range: a shot at goal for two',
   'tap-go': 'a penalty won, in range: tap it and run',
+  'kickoff-short': 'your kick-off: short and high, the chase tries to win it back',
+  'kickoff-long': 'your kick-off: deep for the in-goal, pins them in (can go dead)',
 };
 
 /** What a call does, in plain English, on its row in the coach tray (3o): CALL_WHEN less its "when". */
@@ -452,6 +454,8 @@ export const CALL_TILE: Readonly<Record<CoachCall, string>> = {
   'forty-twenty': 'kick for touch in their 20',
   'take-two': 'a shot at goal for two',
   'tap-go': 'tap it and run',
+  'kickoff-short': 'high, chase to win it',
+  'kickoff-long': 'deep, pin them in',
 };
 
 /** When a call that is not on yet comes on, from the sim's refusal (the coach tray's footer). */
@@ -525,6 +529,7 @@ export const TRAY_MAX_BUTTONS = 6;
 const TRAY_PAIRS: readonly (readonly [string, CoachCall, CoachCall])[] = [
   ['shift', 'shift-left', 'shift-right'],
   ['penalty', 'take-two', 'tap-go'],
+  ['kickoff', 'kickoff-short', 'kickoff-long'],
 ];
 
 /** A refusal that still shows a pair's other half, greyed: it says why that half is not on (#396). */
@@ -541,9 +546,9 @@ const TRAY_PRIORITY: readonly string[] = ['kickoff', 'penalty', 'field-goal', 'g
 /** The order the rows show in: a restart or a penalty, the next play, the set's kick, defence, the bench. */
 const TRAY_ORDER: readonly string[] = ['kickoff', 'penalty', 'hit-up', 'shift', 'offload', 'kick-early', 'run-it', 'bomb', 'grubber', 'forty-twenty', 'field-goal', 'rush', 'hold', 'gang-tackle', 'fresh-legs'];
 
-/** Is the call one for this side now: attack calls with the ball, defence calls without it; the bench and a penalty won either way. */
+/** Is the call one for this side now: attack calls with the ball, defence calls without it; the bench, a penalty won and its kick-off (#397) either way. */
 export function callForRole(call: CoachCall, attacking: boolean): boolean {
-  return callIsBench(call) || callIsPenalty(call) || callIsDefence(call) !== attacking;
+  return callIsBench(call) || callIsPenalty(call) || callIsKickoff(call) || callIsDefence(call) !== attacking;
 }
 
 /**

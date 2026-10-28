@@ -6,6 +6,7 @@
 // once a half; Take the two / Tap and go (#396), once a penalty won. Pure:
 // live.ts applies them.
 import type { Side, SimEvent } from '../core/snapshot';
+import type { KickoffCall } from './kickoff';
 import type { AttackPlan, DefencePlan, DefencePreset } from './presets';
 
 export type CoachCall =
@@ -16,11 +17,13 @@ export type CoachCall =
   | 'rush' | 'hold' // defence, the next set
   | 'gang-tackle' // defence, the next two tackles (#396)
   | 'take-two' | 'tap-go' // a penalty won (#396): the captain's choice overruled
-  | 'fresh-legs'; // the bench (#367): either way, once a half
+  | 'fresh-legs' // the bench (#367): either way, once a half
+  | 'kickoff-short' | 'kickoff-long'; // the kick-off (#397): the kicking side, in the break before it
 
 export const COACH_CALLS: readonly CoachCall[] = [
   'hit-up', 'shift-left', 'shift-right', 'kick-early', 'run-it', 'bomb', 'field-goal', 'rush', 'hold', 'fresh-legs',
   'offload', 'gang-tackle', 'grubber', 'take-two', 'tap-go', 'forty-twenty',
+  'kickoff-short', 'kickoff-long',
 ];
 
 export function isCoachCall(v: unknown): v is CoachCall {
@@ -86,10 +89,10 @@ export const CALLS = {
   /**
    * Calls the player's chips offer by Coach's Office level (N9.6): with none built, these;
    * each level adds its own. Index = level (0–3). #396 added Offload and Gang tackle at 1,
-   * Grubber and the penalty pair at 2, 40/20 at 3.
+   * Grubber and the penalty pair at 2, 40/20 at 3; #397 the kick-off pair at 0.
    */
   unlocks: [
-    ['hit-up', 'hold', 'fresh-legs'],
+    ['hit-up', 'hold', 'fresh-legs', 'kickoff-short', 'kickoff-long'],
     ['shift-left', 'shift-right', 'rush', 'offload', 'gang-tackle'],
     ['kick-early', 'run-it', 'grubber', 'take-two', 'tap-go'],
     ['bomb', 'field-goal', 'forty-twenty'],
@@ -135,6 +138,11 @@ export function callIsPenalty(c: CoachCall): boolean {
 /** The penalty choice a penalty call makes (#396): a shot at goal, or a tap. */
 export function penaltyChoiceOf(c: CoachCall): 'goal' | 'tap' {
   return c === 'take-two' ? 'goal' : 'tap';
+}
+
+/** A kick-off call (#397): the kicking side's, in the break before its kick-off; it uses up neither of the set's calls. */
+export function callIsKickoff(c: CoachCall): c is KickoffCall {
+  return c === 'kickoff-short' || c === 'kickoff-long';
 }
 
 /** Scope: a play (until the next tackle; Offload the next two) or the set. */
@@ -185,6 +193,8 @@ export function chipState(call: CoachCall, why: string | null, attacking: boolea
   if (callIsBench(call)) return { show: true, enabled: why === null, lit: pending };
   // A penalty call (#396) shows only while it can be made, whatever the set's call.
   if (callIsPenalty(call)) return { show: why === null, enabled: why === null, lit: false };
+  // A kick-off call (#397) shows only while the kicking side may make it.
+  if (callIsKickoff(call)) return { show: why === null, enabled: why === null, lit: false };
   if (made) return { show: call === made, enabled: false, lit: call === made };
   const role = callIsDefence(call) ? !attacking : attacking;
   const notYet = why === 'tackles 3–4' || why === 'late in the set' || why === 'not in range' || why === 'not inside their 25' || why === 'not behind your 40' || why === 'out of reach of their 20';
@@ -209,6 +219,9 @@ export const CALL_LABEL: Readonly<Record<CoachCall, string>> = {
   'forty-twenty': '40/20',
   'take-two': 'Take the two',
   'tap-go': 'Tap and go',
+  // "Short kick", not "Short kick-off": the commentary ticker's longest line must fit (shift right is as long).
+  'kickoff-short': 'Short kick',
+  'kickoff-long': 'Long kick',
 };
 
 /** How long a call's result shows by the chips (#366), in real ms. A new result replaces the one up. */
@@ -293,6 +306,8 @@ export const CALL_RESULT: Readonly<Record<CoachCall, (v: CallVerdict) => string>
   'forty-twenty': (v) => joinResult('forty-twenty', fortyTwentyResult(v)),
   'take-two': (v) => joinResult('take-two', v.how === 'penalty-goal' ? (v.paid ? 'over!' : 'missed') : 'not taken'),
   'tap-go': (v) => joinResult('tap-go', v.how === 'penalty' ? 'won a penalty' : v.how === 'try' ? (v.paid ? 'try!' : 'try against') : v.how === 'intercept' || v.how === 'strip' || v.how === 'error' || v.how === 'drop' || v.how === 'loose' ? 'lost the ball' : gain(v.metres) ? `no try, +${v.metres}m` : 'no try'),
+  'kickoff-short': (v) => joinResult('kickoff-short', v.how === 'lapsed' ? 'no kick-off' : v.paid ? 'regathered!' : 'they took it'),
+  'kickoff-long': (v) => joinResult('kickoff-long', v.how === 'lapsed' ? 'no kick-off' : v.how === 'dead-on-full' ? 'dead on the full' : v.paid ? 'pinned them deep' : gain(v.metres) ?? 'no gain'),
 };
 
 /** "Shift left +18m" (a gain follows the name), "Bomb: regathered" (anything else after a colon). */
@@ -380,6 +395,11 @@ export class CallJudge {
     return this.settle((w) => (w.side === side && callIsBench(w.call) ? false : null), () => 'lapsed', undefined, 'nobody tired');
   }
 
+  /** `side`'s kick-off call (#397) came down `metres` from halfway: paid or not, and how ('regather', 'kick', 'dead-on-full'; 'lapsed' when the half ended first). */
+  kickoff(side: Side, paid: boolean, how: CallHow, metres: number): CallVerdict[] {
+    return this.settle((w) => (w.side === side && callIsKickoff(w.call) ? paid : null), () => how, metres);
+  }
+
   /** The end of a tick: its events, the ball's x (the tackle's spot when a play has ended), and whether a play (a tackle in the set) and the set have ended. */
   observe(events: readonly SimEvent[], x: number, playEnded: boolean, setEnded: boolean): CallVerdict[] {
     const out: CallVerdict[] = [];
@@ -407,8 +427,8 @@ export class CallJudge {
   private onEvent(w: Watch, e: SimEvent): boolean | null {
     const by = e.side;
     if (by === undefined) return null;
-    // A bench call is settled only by its swap (swapped), never by the play.
-    if (callIsBench(w.call)) return null;
+    // A bench call is settled only by its swap (swapped), a kick-off call where its kick comes down (kickoff), never by the play.
+    if (callIsBench(w.call) || callIsKickoff(w.call)) return null;
     const theirs = by !== w.atk;
     if (e.kind === 'try') return by === w.atk ? !callIsDefence(w.call) : callIsDefence(w.call) ? false : w.kicked ? false : null;
     switch (w.call) {
@@ -472,6 +492,8 @@ export class CallJudge {
         if (!w.kicked) return false;
         return --w.setsLeft <= 0 ? false : null;
       case 'fresh-legs':
+      case 'kickoff-short':
+      case 'kickoff-long':
         return null;
       default:
         // A play call whose play ended with the set (tackled on the last), run it, a field goal not taken.

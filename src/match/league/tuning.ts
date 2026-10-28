@@ -21,6 +21,7 @@ import { WEATHER } from './weather';
 import { RATING } from './spread';
 import { BREAKS } from './breaks';
 import { CALLS } from './calls';
+import { KICKOFF } from './kickoff';
 import { WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
 import { DIFFICULTIES, DIFFICULTY } from '../../config';
@@ -63,6 +64,7 @@ export const KNOBS = {
   weather: WEATHER,
   rating: RATING,
   calls: CALLS,
+  kickoff: KICKOFF,
   breaks: BREAKS,
   goals: GOALS,
   bin: BIN,

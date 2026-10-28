@@ -117,7 +117,10 @@ Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed
 | `live.grubberChaseFromM` | `live.ts` | 24 m | Inside this, the wingers start the grubber chase on the second-last tackle. The fullback joins once the kick is aimed. 28 m (25 Oct, first cut) put a try on too many of them. |
 | `live.grubberChaseDepthM` | `live.ts` | 10 m | The chase does not sit closer than this to the try line until the kick is aimed. |
 | `live.grubberChaseLeadM` | `live.ts` | 3 m | How far in front of the ball the chase may lead before the kick is aimed. 4 m (25 Oct, first cut) did the same. |
-| Kick-off target | `tactics.ts` | receiving quarter (x 24), ±12 m | Not chased for a regather. |
+| Kick-off target | `tactics.ts` / `kickoff.ts` | receiving quarter (x 24), ±12 m, peak 16 | Not chased for a regather. `kickoff.deepDefault` 0 keeps this; 1 is the deeper default (#397, row below). |
+| `kickoff.deepDefault` / `kickoff.deep` (#397) | `kickoff.ts` | 0 (off) · receivers' 15 m line at Skill ≤ 30 to 8 m at ≥ 90, peak 18 | The deeper default kick-off: 35–42 m from halfway (a real one goes 35–45 m), the kicker's Skill picking the depth, the same one draw across. Off until stage 2 of #397 re-pins the match fingerprints. |
+| `kickoff.short` (#397) | `kickoff.ts` | 12 m past halfway, peak 20 · regather 25% + 0.5%/pt (best of the 3 nearest chasers' Speed − the catcher's Skill), 15–40% | The Short kick-off call. One draw, only when called. A regather is the kicking side's ball near halfway; a miss is theirs about 12 m from halfway. Measured: 25% over 1,000 even kicks (`kickoff.test.ts`). |
+| `kickoff.long` (#397) | `kickoff.ts` | receivers' 5 m line at Skill ≤ 30 to the try line at ≥ 90, peak 20 · dead on the full 10% (3 m past the dead-ball line) · paid off inside 10 m | The Long kick-off call. One draw, only when called. Dead on the full is a penalty to the receivers at halfway (no sin bin). |
 
 Tests: `tests/match/league/kicks.test.ts`.
 
