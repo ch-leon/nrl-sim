@@ -1684,7 +1684,7 @@ export class LiveSim implements MatchSim {
     const chaser = under(kicking);
     // The man it was kicked to, if he is under it; else the receiving side's nearest.
     const nominated = b.receiver !== null ? this.players[b.receiver] : undefined;
-    const mine = nominated && nominated.side === this.attacking && !this.locked(nominated) && dist(nominated.body.pos, b.to) <= KICK_CONTEST.bomb.contestM;
+    const mine = nominated && nominated.side === this.attacking && !this.locked(nominated) && this.onField(nominated) && dist(nominated.body.pos, b.to) <= KICK_CONTEST.bomb.contestM;
     const catcher = mine ? nominated : under(this.attacking);
     if (!chaser || !catcher) return null;
     const odds = highBall(chaser.stats.speed, catcher.stats.skill, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling);
@@ -1761,7 +1761,11 @@ export class LiveSim implements MatchSim {
         .sort((p, q) => secs(p) - secs(q))[0];
     const a = first(kicking);
     const d = first(this.attacking);
-    if (!a || dist(a.body.pos, at) > KICK_CONTEST.grubber.raceM) return;
+    if (!a || dist(a.body.pos, at) > KICK_CONTEST.grubber.raceM) {
+      // No race: the defence's to gather (grounded, or run out, as for any kick in-goal).
+      this.looseFor = this.attacking;
+      return;
+    }
     const attackerWins = !d || this.rng.next() < grubberRace(secs(a), secs(d), this.tactics[kicking].attack === 'kick-chase');
     this.raceFor = attackerWins ? kicking : this.attacking;
     this.scramble = true;

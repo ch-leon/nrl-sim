@@ -41,8 +41,11 @@ whenever a chaser was within 4 m of the catcher, won back 30% (a chaser is
 under almost every bomb). The odds came down to about the targets; then the
 contest was made the same whoever is a step nearer, so the kicking side's
 uncontested regathers (about 4% of bombs) stopped adding to it. The race's
-bounce (0.3, 0.45, 0.6 s) and reach (10, 14 m) moved grubber tries only
-within luck (0.31–0.33 over 300 matches).
+bounce (0.3, 0.45, 0.6 s) moved grubber tries only within luck (0.31–0.33
+over 300 matches). A reach of 10 m measured the same, but that run was before
+the reach decided who may take the ball (an attacker beyond it could still
+gather it; fixed in review, so the defence alone gathers it), so it says
+nothing about the reach.
 
 ## Results
 
@@ -93,6 +96,12 @@ fall because a contested bomb now ends nearer where it was kicked.
 | home win | 83% | 76% |
 | tries | 6.1 | 6.3 |
 | contested | 17.8% | 23.3% |
+
+After review (28 Oct) a grubber in-goal with no attacker within the race's
+reach is the defence's alone, and a sin-binned catcher is never under a
+contested bomb. The plan re-run on that head gave the same counts, match for
+match, as the after run above (neither case came up in these 1,000 matches),
+and the fingerprints did not move.
 
 **Outcome (28 Oct).** On. Both match fingerprints were re-pinned once, in
 their own commit. Grubber tries (0.345) are inside #99's default band

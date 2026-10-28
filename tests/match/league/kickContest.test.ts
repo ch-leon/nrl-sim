@@ -201,3 +201,49 @@ describe('kick contests in the live sim (#99)', () => {
     expect(again.map((e) => `${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`)).toEqual(matches[0]!.es.map((e) => `${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`));
   });
 });
+
+describe('a grubber in-goal with no attacker in the race (#99)', () => {
+  /** The sim's insides, for setting the moment up by hand. */
+  type Inside = {
+    players: { side: 'home' | 'away'; body: { pos: { x: number; y: number }; vel: { x: number; y: number } }; lockUntil: number }[];
+    attacking: 'home' | 'away';
+    dir: 1 | -1;
+    lastKicker: number;
+    phase: { kind: string };
+    ball: { kind: string; by?: number };
+    raceForGrubber(at: { x: number; y: number }): void;
+  };
+
+  it('an attacker just outside raceM cannot take it; the defender gathers it', () => {
+    const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 1);
+    while (!sim.tickEvents.some((e) => e.kind === 'set-start')) sim.step();
+    const s = sim as unknown as Inside;
+    const def = s.attacking; // the side whose in-goal it is (a kick has just handed it the ball)
+    const kick = def === 'home' ? 'away' : 'home';
+    const line = s.dir > 0 ? 0 : 100;
+    const at = { x: line - s.dir * 4, y: 34 };
+    // The quickest attacker just outside the race, the rest well back; the nearest defender further off than him.
+    const out = (m: number): { x: number; y: number } => ({ x: at.x + s.dir * m, y: 34 });
+    const atk = s.players.filter((p) => p.side === kick);
+    const dfn = s.players.filter((p) => p.side === def);
+    atk.forEach((p, i) => (p.body.pos = i === 0 ? out(KICK_CONTEST.grubber.raceM + 1) : out(45)));
+    dfn.forEach((p, i) => (p.body.pos = i === 0 ? out(25) : out(50)));
+    for (const p of s.players) {
+      p.body.vel = { x: 0, y: 0 };
+      p.lockUntil = 0;
+    }
+    s.lastKicker = s.players.indexOf(atk[0]!);
+    s.phase = { kind: 'play' };
+    s.raceForGrubber(at);
+    const said: SimEvent[] = [];
+    for (let i = 0; i < 400 && s.ball.kind === 'loose'; i++) {
+      sim.step();
+      said.push(...sim.tickEvents);
+    }
+    expect(said.some((e) => e.kind === 'loose-ball')).toBe(false); // no race was run
+    expect(said.some((e) => e.kind === 'try')).toBe(false);
+    const grounded = said.find((e) => e.kind === 'dead-ball');
+    expect(grounded?.side).toBe(def);
+    expect(grounded?.detail).toBe('20m');
+  });
+});
