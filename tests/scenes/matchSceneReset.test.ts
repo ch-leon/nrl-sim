@@ -24,4 +24,14 @@ describe('MatchScene between matches', () => {
   it('the half-time card is gated on that half', () => {
     expect(body('  private refreshPlan(): void {')).toContain('this.planCardHalf !== pb.half');
   });
+
+  it('init() clears the last match\'s call, so the COACH badge starts fresh (#431)', () => {
+    const init = body('  init(data: MatchSceneData): void {');
+    expect(init).toMatch(/this\.madeCall = null;/);
+    expect(init).toMatch(/this\.madeAt = 0;/);
+  });
+
+  it('the badge holds a made call only until the tick after it was made', () => {
+    expect(body('  private refreshCallChips(): void {')).toContain('pb.tick > this.madeAt + 1) this.madeCall = null');
+  });
 });
