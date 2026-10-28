@@ -2166,8 +2166,8 @@ async function runPlaytest(browser) {
 }
 
 // ── The flow fixes, end to end (#350) ────────────────────────────────────────
-// At 667×375 with Settings › Text size on Larger (E2E_FLOW="844x390@normal …" for
-// others), a career played the way #350 found it awkward:
+// At 667×375 and at an iPhone SE's 568×320, with Settings › Text size on Larger
+// (E2E_FLOW="844x390@normal …" for others), a career played the way #350 found it awkward:
 //   - T1: the new club's setup with Start whole and the build label clear of it;
 //   - X3: Coach calls and Rival matches in Settings, 44px rows;
 //   - H1: "v Darwin · away" under PLAY WEEK and the decisions badge;
@@ -2178,11 +2178,12 @@ async function runPlaytest(browser) {
 //     answered, Keep advancing (whole, with a toast up) carries on to the same end;
 //   - F1: Staff & Board from Office, objectives beside the staff;
 //   - F3: Renew leaves the rows where they were, "Renewed ✓" in place, and a
-//     second tap on the same spot renews nobody else;
+//     second tap on the same spot renews nobody else; the table fits the sheet,
+//     with SELL armed ("Really sell?") too, and ◂ FINANCE stays clear of the title;
 //   - T2: after a reload, New game on the slot asks "Start over? This replaces …"
 //     and Cancel keeps it. The title is at Normal whatever the save says: the text
 //     size is a save's setting, put on the page once a slot is picked.
-const FLOW_RUNS = (process.env.E2E_FLOW ?? '667x375@larger').split(/\s+/).filter(Boolean).map((s) => {
+const FLOW_RUNS = (process.env.E2E_FLOW ?? '667x375@larger 568x320@larger').split(/\s+/).filter(Boolean).map((s) => {
   const [size, text] = s.split('@');
   const [w, h] = size.split('x').map(Number);
   return { w, h, text: text ?? 'larger' };
@@ -2474,6 +2475,28 @@ async function runFlow(browser, { w: W, h: H, text }) {
     await page.touchscreen.tap(first.btn.x, first.btn.y);
     await page.waitForTimeout(300);
     if ((await renewed()) !== 1) out.push('a second tap on the same spot renewed another player');
+    // The header: ◂ FINANCE whole, and clear of CONTRACTS.
+    out.push(...await page.evaluate(() => {
+      const back = document.querySelector('.nrl-contracts .nrl-back');
+      const title = document.querySelector('.nrl-contracts .nrl-screen-title');
+      if (!back || !title) return ['no ◂ FINANCE or title on Contracts'];
+      const out = [];
+      if (back.scrollWidth > back.clientWidth + 1) out.push(`◂ FINANCE's label is ${back.scrollWidth - back.clientWidth}px wider than its button`);
+      if (back.getBoundingClientRect().right > title.getBoundingClientRect().left + 1) out.push('◂ FINANCE runs into the title');
+      return out;
+    }));
+    // SELL armed on the next row: "Really sell?" whole, and still no sideways scroll.
+    const next = after.find((r) => r.btn && r.id !== first.id);
+    if (next) {
+      const sell = `[data-contract="${next.id}"] .nrl-contract-actions .nrl-btn:last-child`;
+      await tap(sell);
+      await page.waitForTimeout(200);
+      if (!(await page.locator('.nrl-contract-armed').count())) out.push('SELL did not arm');
+      out.push(...await flowReach(page, ['.nrl-contract-armed']));
+      const armedWide = await page.evaluate(() => { const e = document.querySelector('.nrl-contracts-scroll'); return e.scrollWidth - e.clientWidth; });
+      if (armedWide > 1) out.push(`with SELL armed the table is ${armedWide}px wider than the sheet`);
+      await shot('f3-armed');
+    }
     await club();
     return out;
   });

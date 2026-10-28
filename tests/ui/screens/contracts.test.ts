@@ -51,4 +51,15 @@ describe('the table at a larger Text size (#350, #371)', () => {
     expect(block).toContain('.nrl-contract-pos { display: block; }');
     expect(FINANCE_CSS).toContain('.nrl-contract-pos { display: none; }');
   });
+
+  it("puts each action's label over its amount at the narrowest (568px at Larger), armed labels too", () => {
+    const i = FINANCE_CSS.indexOf('@container (max-width: 27rem)');
+    expect(i).toBeGreaterThan(FINANCE_CSS.indexOf('@container (max-width: 38rem)'));
+    const block = FINANCE_CSS.slice(i, FINANCE_CSS.indexOf('\n}', i));
+    expect(block).toMatch(/\.nrl-contract-actions \.nrl-btn \{[^}]*white-space: normal/);
+  });
+
+  it('keeps ◂ FINANCE its full width, so its label never runs into the title', () => {
+    expect(FINANCE_CSS).toContain('.nrl-contracts .nrl-screen-titles > .nrl-back { flex: 0 0 auto; }');
+  });
 });

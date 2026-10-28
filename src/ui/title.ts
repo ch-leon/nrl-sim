@@ -46,7 +46,7 @@ const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'Easy', normal: 'No
 // side (#347): with the phone turned either way the notch takes one of them. The
 // insets come through the frame's --nrl-safe-* (dom.ts) where they are set, env()
 // before the frame's stylesheet is in.
-const TITLE_CSS = `
+export const TITLE_CSS = `
 .nrl-title { position: absolute; inset: 0; pointer-events: auto; overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; align-items: center; box-sizing: border-box;
   padding: calc(12px + var(--nrl-safe-t, env(safe-area-inset-top, 0px))) calc(12px + var(--nrl-safe-r, env(safe-area-inset-right, 0px)))
@@ -140,6 +140,11 @@ const TITLE_CSS = `
   /* While Start over asks, the jersey makes room for the question and both buttons. */
   .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "start form"; }
   .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
+}
+/* An iPhone SE on its side (568×320, #350 T1): the setup scrolls, so the build label follows it
+   instead of sitting in the corner over the panel. Landscape only: portrait is #350 P1's. */
+@media (max-width: 600px) and (orientation: landscape) {
+  .nrl-title-build { position: static; align-self: flex-end; margin-top: 8px; }
 }
 @media (max-width: 520px) {
   .nrl-title-setup { grid-template-columns: minmax(0, 1fr); grid-template-areas: "kit" "form" "start"; }

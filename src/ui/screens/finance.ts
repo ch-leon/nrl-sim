@@ -694,5 +694,13 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
   .nrl-contracts-table tr:not(.nrl-contract-gone) > :is(th, td):nth-child(2) { display: none; }
   .nrl-contract-pos { display: block; }
 }
+/* Narrowest (568px at Larger): each action's label over its amount ("RENEW" over "$1,466",
+   "REALLY" over "SELL?"), two short lines inside the 44px button, so the three fit the sheet. */
+@container (max-width: 27rem) {
+  .nrl-contract-actions { gap: 3px; }
+  .nrl-contract-actions .nrl-btn { padding: 0 5px; white-space: normal; line-height: 1.05; }
+}
+/* The header (#350): ◂ FINANCE keeps its width at a larger text, and the summary line gives way. */
+.nrl-contracts .nrl-screen-titles > .nrl-back { flex: 0 0 auto; }
 `;
 
