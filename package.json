@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/gen-icons.mjs",
+    "predev": "vite-node scripts/gen-icons.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/gen-icons.mjs",
+    "prebuild": "vite-node scripts/gen-icons.mjs",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "preview": "vite preview",

@@ -6,6 +6,8 @@
 // created here opt back in with `pointer-events: auto` (see the injected CSS),
 // so only real buttons/panels capture input and taps fall through the gaps.
 
+import { COLOR_TOKENS as T } from './tokens';
+
 const STYLE_ID = 'nrl-ui-styles';
 const ROOT_ID = 'ui-root';
 
@@ -437,31 +439,31 @@ export const CSS = `
   --nrl-safe-r: env(safe-area-inset-right, 0px);
   --nrl-safe-b: env(safe-area-inset-bottom, 0px);
   --nrl-safe-l: env(safe-area-inset-left, 0px);
-  /* Broadcast Quiet tokens (docs/specs/ui-broadcast-quiet.md). */
-  --nrl-navy: #0e1630;
-  --nrl-panel: #141d3a;
-  --nrl-raised: #1b264a;
-  --nrl-button: #1f2b55;
-  --nrl-line: #26325c;
-  --nrl-me: #24346b;
-  --nrl-sheet: rgba(14, 22, 48, 0.97);
-  --nrl-text: #ffffff;
-  --nrl-text-2: #c9d1ea;
-  --nrl-muted: #9aa6c7;
-  --nrl-accent: #f4d03f;
-  --nrl-on-accent: #0e1630;
-  --nrl-pos: #6fd896;
-  --nrl-neg: #f0a39b;
-  --nrl-alert: #e0574a;
-  --nrl-win: #2d8a4a;
-  --nrl-injured: #5a2430;
-  --nrl-bench: #3a6ea5;
-  --nrl-out: #b03a2e;
-  --nrl-fit-good: #3fbf6a;
-  --nrl-fit-ok: #e8a33a;
-  --nrl-fit-bad: #d9534f;
-  --nrl-home: #f4d03f;
-  --nrl-away: #2f8a46;
+  /* Broadcast Quiet tokens (docs/specs/ui-broadcast-quiet.md); the colours are tokens.ts's. */
+  --nrl-navy: ${T.navy};
+  --nrl-panel: ${T.panel};
+  --nrl-raised: ${T.raised};
+  --nrl-button: ${T.button};
+  --nrl-line: ${T.line};
+  --nrl-me: ${T.me};
+  --nrl-sheet: ${T.sheet};
+  --nrl-text: ${T.text};
+  --nrl-text-2: ${T.text2};
+  --nrl-muted: ${T.muted};
+  --nrl-accent: ${T.accent};
+  --nrl-on-accent: ${T.onAccent};
+  --nrl-pos: ${T.pos};
+  --nrl-neg: ${T.neg};
+  --nrl-alert: ${T.alert};
+  --nrl-win: ${T.win};
+  --nrl-injured: ${T.injured};
+  --nrl-bench: ${T.bench};
+  --nrl-out: ${T.out};
+  --nrl-fit-good: ${T.fitGood};
+  --nrl-fit-ok: ${T.fitOk};
+  --nrl-fit-bad: ${T.fitBad};
+  --nrl-home: ${T.home};
+  --nrl-away: ${T.away};
   --nrl-shadow-chip: 0 4px 14px rgba(0, 0, 0, 0.35);
   --nrl-shadow-tray: 0 6px 20px rgba(0, 0, 0, 0.4);
   --nrl-shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.4);

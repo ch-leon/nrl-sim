@@ -22,6 +22,7 @@ import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld } from './time';
 import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY } from './storageKeys';
+import { BRAND } from '../brand';
 import { browserStorage, LocalSaveStore, type StorageLike } from './storage/local';
 import { nextMeta } from './storage/meta';
 import type { SaveMeta, SlotListing } from './storage/types';
@@ -302,7 +303,7 @@ export function migrateState(raw: unknown): MigrateResult {
     return {
       ok: false,
       reason: 'future',
-      message: `This save is from a newer version of NRL Sim (save v${version}, this game supports v${SAVE_VERSION}). Update the game to load it.`,
+      message: `This save is from a newer version of ${BRAND.name} (save v${version}, this game supports v${SAVE_VERSION}). Update the game to load it.`,
     };
   }
   while (version < SAVE_VERSION) {
@@ -571,10 +572,13 @@ export function importSave(text: string): ImportResult {
   return res.ok ? res : { ok: false, message: res.message };
 }
 
-/** Suggested filename for an exported save. */
+/**
+ * Suggested filename for an exported save, led by the brand's slug (#363). Import
+ * reads the file's content, never its name, so a file from before a rename still loads.
+ */
 export function exportFilename(state: GameState): string {
   const club = String(state.clubName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `nrl-sim-${club || 'save'}-s${state.season}w${state.week}.json`;
+  return `${BRAND.exportSlug}-${club || 'save'}-s${state.season}w${state.week}.json`;
 }
 
 /** What Export says when the week is held and no week-start save landed. */

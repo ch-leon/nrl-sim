@@ -25,6 +25,7 @@ import { Canvas3D, isoProject, isoUnproject, noiseTile, sampleTile, whiteTile, t
 import { drawText, textWidth } from './font';
 import type { Kit } from './kit';
 import { activeVocab } from '../../content';
+import { BRAND, signText } from '../../brand';
 
 // ── Geometry (grid units, z in px) ──────────────────────────────────────────
 
@@ -316,20 +317,23 @@ function paintGround(cv: Canvas3D): void {
 
 // ── Hoardings ───────────────────────────────────────────────────────────────
 
-interface Panel {
+export interface Panel {
   bg: number;
   fg: number;
   text: string;
 }
 
-/** The hoardings' panels. The words are the content pack's (#361); the colours are the art's. */
-function panelsFor(home: Kit, away: Kit): Panel[] {
+/**
+ * The hoardings' panels. The words are the content pack's (#361) and the game's own
+ * sign is the brand's (#363); the colours are the art's. Exported for tests.
+ */
+export function panelsFor(home: Kit, away: Kit): Panel[] {
   const signs = activeVocab().stadiumSigns;
   return [
     { bg: 0xd8443a, fg: 0xffffff, text: signs.food },
     { bg: 0x2b5fd9, fg: 0xffe14d, text: signs.sport },
     { bg: home.jersey, fg: home.trim, text: signs.home },
-    { bg: 0xffe14d, fg: 0x1c1424, text: 'NRL SIM' },
+    { bg: 0xffe14d, fg: 0x1c1424, text: brandSign() },
     { bg: 0x1c1424, fg: 0x7be05a, text: signs.snack },
     { bg: 0xffffff, fg: 0xd8443a, text: signs.score },
     { bg: away.jersey, fg: away.trim, text: signs.away },
@@ -338,6 +342,11 @@ function panelsFor(home: Kit, away: Kit): Panel[] {
 }
 
 const PANEL_PX = 112;
+
+/** The brand's sign: its title text, or its short name when the title will not fit a panel. */
+export function brandSign(brand = BRAND): string {
+  return signText(brand, textWidth, PANEL_PX - 4);
+}
 
 /** Render a flat (unsheared) hoarding strip `w` px long. */
 function hoardingStrip(w: number, panels: readonly Panel[], seed: number): { w: number; h: number; px: (x: number, y: number) => number } {

@@ -6,6 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { formatBuildLabel } from './src/ui/buildInfo';
 import { claudeDirIgnored } from './src/utils/devWatch';
 import { minifyCssConsts } from './src/utils/cssMinify';
+import { PWA_MANIFEST, brandIndexHtml } from './src/brandBuild';
 
 // BAK-204 (WU-16): installable, offline-capable PWA via generateSW.
 // The Phaser chunk is large, so the Workbox precache size cap is raised to ~6MB.
@@ -44,29 +45,18 @@ export default defineConfig({
         return { code: minifyCssConsts(code), map: null };
       },
     },
+    // The brand (#363): index.html's %BRAND_*% placeholders, for the dev server and the build.
+    {
+      name: 'nrl-brand-html',
+      transformIndexHtml: { order: 'pre', handler: (html) => brandIndexHtml(html) },
+    },
     VitePWA({
       // 'prompt' (N7, #181): a new build waits for the player to tap Reload on
       // the update bar (src/fx/pwa.ts, src/ui/updatePrompt.ts) instead of
       // swapping itself in mid-session, which could reload a match in progress.
       registerType: 'prompt',
       strategies: 'generateSW',
-      manifest: {
-        name: 'NRL Sim',
-        short_name: 'NRLSim',
-        display: 'standalone',
-        orientation: 'landscape',
-        theme_color: '#1a1a2e',
-        background_color: '#1a1a2e',
-        icons: [
-          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          {
-            src: 'icons/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
-        ],
-      },
+      manifest: PWA_MANIFEST,
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,woff2}'],
         maximumFileSizeToCacheInBytes: 6_000_000,
