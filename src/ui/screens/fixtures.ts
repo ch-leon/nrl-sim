@@ -492,7 +492,8 @@ export const LEAGUE_CSS = `
 .nrl-league-foot { flex: 0 0 auto; margin-top: 4px; font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-ladder-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-table.nrl-ladder-table { table-layout: fixed; border-collapse: separate; border-spacing: 0; }
-.nrl-ladder-col-pos { width: 24px; }
+/* rem, not px: 24px at Normal, and room for "10" at Large and Larger text, where it read "1…" (#410). */
+.nrl-ladder-col-pos { width: 1.5rem; }
 .nrl-ladder-col-n { width: 30px; }
 .nrl-ladder-col-diff { width: 44px; }
 .nrl-ladder-col-pts { width: 38px; }

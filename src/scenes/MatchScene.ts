@@ -333,6 +333,9 @@ export class MatchScene extends Phaser.Scene {
     this.crowdBobs = [];
     this.finished = false;
     this.built = false;
+    // Phaser keeps this scene between matches: the last match's half-time sheet must
+    // not count for this one, or no half-time card shows after a session's first match (#408).
+    this.planCardHalf = 0;
   }
 
   create(): void {
