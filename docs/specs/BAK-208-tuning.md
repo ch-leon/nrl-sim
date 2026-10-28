@@ -69,7 +69,7 @@ Baselines at even stats, one-on-one, square — `src/match/league/contest.ts`:
 | Stat swing | bust ±8, fend ±4.5, offload ±5, big hit ∓7, strip ∓1 pts | Over edge 0…1. |
 | Two defenders | bust −6, fend −4, offload −3, big hit +4 | Three: −9 / −6 / −5 / +6. |
 | Angle | side: fend +5, big hit −4 · behind: bust +4, fend +3, big hit −6 | From `angleFrom` (cos ±0.5). |
-| Momentum | ±1 pt bust per m/s, cap ±4 | Carrier speed − tackler speed. |
+| `momentum.perMs` / `momentum.cap` | ±1 pt bust per m/s, cap ±4 | Carrier speed − tackler speed (`MOMENTUM`). Named knobs since #322. |
 | Last tackle | big hit +3 | The defence is set. |
 | `stepChance` | 10% + (footwork − defence)/200, side +5, behind −5, cap 0.7 | Pre-contact step, one-on-one only. |
 | `knockOnChance` | 4% + (50 − Skill)/1000, pressured +4, rain +6, cap 0.5…40% | Catch on a pass. |

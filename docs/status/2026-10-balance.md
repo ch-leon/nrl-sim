@@ -1,5 +1,72 @@
 # Match balance — October 2026 (N13)
 
+## Speed and the Expansive gap (28 Oct, #322)
+
+Leon gave the go-ahead (28 Oct) to make Speed count for more in a match so that
+Expansive comes back into the season band, with the style thresholds frozen.
+The plan is `balance/plans/expansive-speed.md`. **Nothing on the grid passed,
+so no knob default moved and both pins are unchanged** (`8-16:346:3436c830c791688a`,
+`14-14:385:97934f5b337f329e`). #322 stays open.
+
+**Baseline**, `main` at `bc20536`, `npm run soak -- --live-rivals --seasons 3
+--seeds 10 --difficulties normal --jobs 4`, 10,346 rival-v-rival games:
+Expansive is 44% at a level rating (−5.9, 526 sides) and **−6.8** against
+strength (2,476 sides, standard error 1.0). The 26 Oct pace slope had not
+closed it (−6.4 before).
+
+**Stage A** ([20261028-091624-expansive-speed](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261028-091624-expansive-speed/report.md),
+`balance/plans/expansive-speed.json`): `pace.extraPerStat` 0.03 / 0.045 / 0.06
+crossed with momentum at contact 1 / 2 / 3 bust points per m/s, capped at
+4 / 6 / 8 (`momentum.perMs`, `momentum.cap`, named for this pass at their old
+values). The rows below are Side win over 400 matches (200 each way), except
+70 v 50 (home win over 80).
+
+| Row | Baseline | Speed variants (8) |
+|---|---:|---:|
+| Expansive rival v level rival | 50.7% | 39.0–49.0% |
+| Pace for power, matched rating (Speed 70 / Strength 47 v flat 60) | 55.8% | 48.8–59.5% |
+| 70 v 50, stronger side wins | 69% | 74–88% |
+| Even 60 v 60, tries | 5.1 | 5.1–5.2 |
+
+Three things came out of it. A freshly generated Expansive rival is already
+even against a level rival, so the harness cannot reproduce the season gap.
+Trading Strength for Speed at the same overall already wins more than half,
+so the rating does not overpay for pace. And every Speed variant moves the
+Expansive rival down and the 70 v 50 gap up: a stronger Speed rewards the
+quicker side, and a flat 70 is also the quicker side.
+
+**Stage B**, the strongest Speed variant on the grid soaked as the baseline
+was (`--tune pace.extraPerStat=0.06 --tune momentum.perMs=0.03 --tune momentum.cap=0.08`):
+Expansive −6.8 → **−8.1** against strength and 44% → 43% at a level rating.
+Balanced (−4.4 at a level rating) and All-out (+6.6 against strength) leave
+the band, and Rush goes from +4.3 / +4.0 to +5.3 / +4.8. It fails every line
+of the pass bar.
+
+**Where the gap is not.** These checks also play no part in the match:
+
+- *The strength label.* The soak now records each side's fielded nine.
+  Expansive's sits 1.30 below its strength, the same as every other style
+  (1.07–1.54), and between level fielded nines it still wins 44%. Injuries
+  and out-of-position men do not explain it.
+- *The weather* (a season is 25% rain and 15% wind;
+  [20261028-110421-expansive-weather](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261028-110421-expansive-weather/report.md),
+  [20261028-110727-expansive-weather-controls](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261028-110727-expansive-weather-controls/report.md)).
+  An Expansive rival wins 47.8% in rain and 45.5% in wind (800 matches),
+  level with a Balanced rival (46.8%, 45.3%) and a Grind rival in wind (46.5%).
+- *The first season.* Expansive is behind in every season of the soak. Season
+  1's level row (48.5%) is 102 sides, inside luck.
+
+So the gap sits in the squads that read as Expansive over a career, not in
+what Speed is worth in a match, and not in a fresh squad of that shape. A
+next step would compare those season squads with fresh ones. That would mean
+recording each Expansive nine's shape in the soak (backs' pace margin, the
+pack, ages), or playing saved season squads in the harness. Neither is done
+here.
+
+**Kept from this pass** (tooling only, no match change): the `momentum.*`
+knobs, `"style"` on a harness rival squad, `npm run soak -- --tune`, and the
+fielded-nine table in the soak.
+
 ## Match tuning pass (26 Oct)
 
 Controlled baseline: shipped `e75e140`; tuned match engine: `c10e2f9`.

@@ -28,7 +28,7 @@ import { chooseEvent, registerEventsSystem } from '../systems/events';
 import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { BENCH } from '../match/league/bench';
-import { onRivalPlanChanges, rivalStyle } from '../systems/rivalRound';
+import { onRivalPlanChanges, rivalSheet } from '../systems/rivalRound';
 import type { TeamTactics } from '../match/league/presets';
 import { runMatch } from '../match/league/match';
 import { overallRating } from '../data/player';
@@ -181,6 +181,13 @@ export interface StyleGame {
   homeScore: number;
   /** Break-rule plan changes in this game (N14.2). 0 when the result carried none. */
   switches: number;
+  /**
+   * Each side's fielded nine as the week began (mean overall of the nine its coach
+   * picks from its fit men), beside the strength, which is the best nine of the
+   * whole squad, injured men too (#322). Absent on games recorded before it.
+   */
+  homeFielded?: number;
+  awayFielded?: number;
 }
 
 export interface SoakResult {
@@ -745,15 +752,24 @@ export function runSoak(opts: SoakOptions): SoakResult {
 
 interface RivalStylesNow {
   /** Each rival's style and strength as the week begins. */
-  clubs: Map<string, { tactics: TeamTactics; strength: number }>;
+  clubs: Map<string, { tactics: TeamTactics; strength: number; fielded: number }>;
   /** The rival-v-rival fixtures still to be played, by index. */
   open: number[];
 }
 
 /** The rivals' styles and the unplayed rival-v-rival fixtures, before a week is played (#249). */
 function rivalStylesNow(s: GameState): RivalStylesNow {
-  const clubs = new Map<string, { tactics: TeamTactics; strength: number }>();
-  for (const c of s.league.clubs) if (c.id !== s.clubId) clubs.set(c.id, { tactics: rivalStyle(c), strength: c.strength });
+  const clubs = new Map<string, { tactics: TeamTactics; strength: number; fielded: number }>();
+  for (const c of s.league.clubs) {
+    if (c.id === s.clubId) continue;
+    const sheet = rivalSheet(c);
+    const nine = (sheet.roster ?? []).filter((e) => e.stats).map((e) => overallRating({ stats: e.stats! }));
+    clubs.set(c.id, {
+      tactics: sheet.tactics ?? { attack: 'balanced', defence: 'slide' },
+      strength: c.strength,
+      fielded: nine.length ? nine.reduce((t, x) => t + x, 0) / nine.length : c.strength,
+    });
+  }
   const open: number[] = [];
   s.league.fixtures.forEach((f, i) => {
     if (!f.result && f.homeId !== s.clubId && f.awayId !== s.clubId) open.push(i);
@@ -774,6 +790,7 @@ function newStyleGames(was: RivalStylesNow, s: GameState, planChanges: ReadonlyM
       home: home.tactics, away: away.tactics, homeStrength: home.strength, awayStrength: away.strength,
       homeScore: h > a ? 1 : h === a ? 0.5 : 0,
       switches: planChanges.get(`${f.round}:${f.homeId}`) ?? 0,
+      homeFielded: home.fielded, awayFielded: away.fielded,
     });
   }
   return out;
@@ -884,6 +901,38 @@ export function levelWinRates(games: readonly StyleGame[], key: keyof TeamTactic
 
 /** More than 4 points from even. Logged for N13's owner; not tuned in this pass. */
 export const LEVEL_OFF_MEAN = 0.04;
+
+/** One style's fielded nine against its strength, and its wins ÷ games when the fielded nines were level (#322). */
+export interface FieldedStyleRow {
+  style: string;
+  sides: number;
+  /** Mean strength − fielded nine: how much of the rating the side leaves out (injured or out of position men). */
+  shortfall: number;
+  level: number;
+  levelScore: number;
+}
+
+/** Per style, the strength its fielded nine leaves out, and wins ÷ games between level fielded nines (#322). Games without fielded nines are skipped. */
+export function fieldedTable(games: readonly StyleGame[], key: keyof TeamTactics, within = STYLE_GAP_BAND): FieldedStyleRow[] {
+  const by = new Map<string, { sides: number; short: number; level: number; score: number }>();
+  for (const g of games) {
+    if (g.homeFielded === undefined || g.awayFielded === undefined) continue;
+    for (const [style, strength, me, op, score] of [
+      [g.home[key], g.homeStrength, g.homeFielded, g.awayFielded, g.homeScore],
+      [g.away[key], g.awayStrength, g.awayFielded, g.homeFielded, 1 - g.homeScore],
+    ] as const) {
+      const a = by.get(style) ?? { sides: 0, short: 0, level: 0, score: 0 };
+      a.sides++;
+      a.short += strength - me;
+      if (Math.abs(me - op) <= within) {
+        a.level++;
+        a.score += score;
+      }
+      by.set(style, a);
+    }
+  }
+  return [...by].map(([style, a]) => ({ style, sides: a.sides, shortfall: a.short / a.sides, level: a.level, levelScore: a.level ? a.score / a.level : 0.5 })).sort((x, y) => y.sides - x.sides);
+}
 
 /** Styles whose level-rated win rate sits more than LEVEL_OFF_MEAN from 0.5. */
 export function offTheLevelMean(rows: readonly LevelStyleRow[]): LevelStyleRow[] {

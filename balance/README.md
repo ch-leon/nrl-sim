@@ -44,6 +44,12 @@ Other options: `--seeds N` overrides the plan (more seeds, less luck); `--minute
 plays an M-minute stretch instead of whole matches; `--out <dir>` puts the run
 somewhere else.
 
+A season measure the harness can't give (each rival style's record against its
+strength gap, and at a level rating) is the soak's: `npm run soak -- --live-rivals
+--seasons 3 --seeds 20 --difficulties normal --jobs 4`. `--tune knob=value`
+(repeatable, the same names as here) soaks a candidate value before its default
+moves (#322).
+
 ## Writing a plan
 
 ```json
@@ -90,7 +96,10 @@ somewhere else.
   margin (`homeMargin`). `"rivalOf": "hard"` on a side plays it as the rival of a player
   on that difficulty: with the difficulty's edge after the spread
   (`difficulty.hard.rivalEdge`), as the game gives it. `balance/plans/difficulty.json`
-  and `level-rating.json` use them.
+  and `level-rating.json` use them. `"style": "expansive"` (any attack) on a rival
+  squad draws, each seed, rival squads until one's nine reads as that attack
+  under the style thresholds (tuning §28), so a style's own squads can be played
+  against a level rival (#322; `expansive-speed.json`).
 - **Scenario extras**: `legs` (`fresh`, `late`, `spent` or 0..1), its own `minutes`
   (a stretch instead of a whole match, e.g. the last 8 minutes on tired legs) and
   `weather` (`clear`, `rain` or `wind`; clear unless given) and `calls`, coach calls each side
