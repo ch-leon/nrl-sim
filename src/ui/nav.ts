@@ -10,7 +10,7 @@
 // line (yellow when it wants attention). The open screen's tab carries
 // aria-current="page" (its screen key, see openScreen in dom.ts); a screen in
 // Office marks OFFICE and its own tile. The mark is a fill and a bar under the
-// label, so it reads without its colour, and a tab says "current" (#344).
+// label, so it reads without its colour (#344).
 
 import {
   button,
@@ -181,14 +181,11 @@ export function navMarks(registry: ScreenRegistry, key: string | null, sheetUp: 
 }
 
 /**
- * What a tab or tile reads out (#344): its name, "current" while it is marked, then its
- * alerts (#369). A dot's label that starts with the name ("Squad — 2 contracts…") keeps
- * it once: "Squad, current — 2 contracts end within 4 weeks". Pure.
+ * What a tab or tile reads out (#344): its name (not the caps or ▴), then its alerts (#369).
+ * aria-current="page" says it is open, so the name doesn't. Pure.
  */
-export function navSpeech(label: string, current: boolean, badge: BadgeView): string {
-  const said = badge.ariaLabel ?? label;
-  if (!current) return said;
-  return said.startsWith(label) ? `${label}, current${said.slice(label.length)}` : `${label}, current; ${said}`;
+export function navSpeech(label: string, badge: BadgeView): string {
+  return badge.ariaLabel ?? label;
 }
 
 /** A tab's text: the label in caps, "▴" after it while it is open (not CLUB: home has nothing to close). */
@@ -219,6 +216,7 @@ export function createNav(): Nav {
   });
   club.setAttribute('data-screen', HOME_ID);
   club.setAttribute('data-nav-home', '');
+  club.setAttribute('aria-label', 'Club');
 
   const sheet = el('div', { class: 'nrl-nav-sheet', attrs: { id: 'nrl-nav-sheet', role: 'menu', 'aria-label': 'Office' } });
   sheet.hidden = true;
@@ -250,7 +248,10 @@ export function createNav(): Nav {
     const label = b.getAttribute('data-label') ?? '';
     const text = tabText(label, open, b === club);
     const span = b.querySelector('.nrl-nav-label');
-    if (span && span.textContent !== text) span.textContent = text;
+    if (!span || span.textContent === text) return;
+    // ▴ in a span of its own, so a narrow dock can drop it (#344: the bar marks the open tab).
+    const name = label.toUpperCase();
+    span.replaceChildren(name, ...(text === name ? [] : [el('span', { class: 'nrl-nav-caret', text: text.slice(name.length) })]));
   }
 
   function setSheet(open: boolean): void {
@@ -295,9 +296,6 @@ export function createNav(): Nav {
       else btn.removeAttribute('aria-current');
       if (!registry.get(id)?.more) setLabel(btn, m.open.includes(id));
     }
-    for (const id of buttons.keys()) paintBadge(id);
-    paintMoreBadge();
-    say(club, 'Club', badgeView('Club', 0));
   }
 
   function registerScreen(id: string, label: string, open: () => void, placement: NavPlacement = {}): void {
@@ -341,7 +339,7 @@ export function createNav(): Nav {
     const v = badgeView(sc.label, counts.get(id) ?? 0, dots.get(id) ?? null);
     paint(btn, v, !sc.more);
     // A tile with nothing to add reads its name and status line as they show.
-    if (sc.more && v.ariaLabel === null && !btn.hasAttribute('aria-current')) btn.removeAttribute('aria-label');
+    if (sc.more && v.ariaLabel === null) btn.removeAttribute('aria-label');
     else say(btn, sc.label, v);
   }
 
@@ -351,9 +349,9 @@ export function createNav(): Nav {
     say(more, OFFICE_LABEL, v);
   }
 
-  /** A button's spoken label: its name (not the caps or ▴), "current", its alerts (#344). */
+  /** A button's spoken label: its name (not the caps or ▴), then its alerts (#344). */
   function say(btn: HTMLButtonElement, label: string, v: BadgeView): void {
-    const text = navSpeech(label, btn.hasAttribute('aria-current'), v);
+    const text = navSpeech(label, v);
     if (btn.getAttribute('aria-label') !== text) btn.setAttribute('aria-label', text);
   }
 

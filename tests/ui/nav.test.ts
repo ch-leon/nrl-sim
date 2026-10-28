@@ -157,23 +157,17 @@ describe('the marker (#344)', () => {
 });
 
 describe('what a tab says (#344)', () => {
-  it('its name, then "current" when open', () => {
-    expect(navSpeech('Squad', false, badgeView('Squad', 0))).toBe('Squad');
-    expect(navSpeech('Squad', true, badgeView('Squad', 0))).toBe('Squad, current');
-    expect(navSpeech('Club', true, badgeView('Club', 0))).toBe('Club, current');
+  it('its name, not the caps or ▴; aria-current says it is open, so the name never does', () => {
+    expect(navSpeech('Squad', badgeView('Squad', 0))).toBe('Squad');
+    expect(navSpeech('Club', badgeView('Club', 0))).toBe('Club');
+    expect(navSpeech('Squad', badgeView('Squad', 0))).not.toMatch(/current|▴|SQUAD/);
   });
 
   it('then its alerts: a count, a dot (#369), both', () => {
-    expect(navSpeech('Office', false, badgeView('Office', 2))).toBe('Office, 2 unread');
-    expect(navSpeech('Office', true, badgeView('Office', 2))).toBe('Office, current, 2 unread');
+    expect(navSpeech('Office', badgeView('Office', 2))).toBe('Office, 2 unread');
     const dot = 'Squad — 2 contracts end within 4 weeks';
-    expect(navSpeech('Squad', false, badgeView('Squad', 0, dot))).toBe(dot);
-    expect(navSpeech('Squad', true, badgeView('Squad', 0, dot))).toBe('Squad, current — 2 contracts end within 4 weeks');
-    expect(navSpeech('News', true, badgeView('News', 1, 'a dot'))).toBe('News, current, 1 unread; a dot');
-  });
-
-  it("keeps the name once even when a dot's label doesn't start with it", () => {
-    expect(navSpeech('Squad', true, badgeView('Squad', 0, '2 contracts end soon'))).toBe('Squad, current; 2 contracts end soon');
+    expect(navSpeech('Squad', badgeView('Squad', 0, dot))).toBe(dot);
+    expect(navSpeech('News', badgeView('News', 1, 'a dot'))).toBe('News, 1 unread; a dot');
   });
 });
 
@@ -192,10 +186,21 @@ describe('the dock at every text size (#344)', () => {
     expect(tile).toMatch(/background: var\(--nrl-accent\)/);
   });
 
-  it("never shrinks the tabs (PLAY WEEK's sub-line gives way) and closes them up at Large and Larger to 900px", () => {
-    expect(rule('.nrl-dock-tabs > .nrl-btn')).toMatch(/flex: 0 0 auto/);
-    expect(rule('.nrl-dock-play')).toMatch(/flex: 0 1 auto; min-width: 0/);
+  it("gives way PLAY WEEK's sub-line first, never its label, and closes the tabs up at Large and Larger to 900px", () => {
+    expect(rule('.nrl-dock-play')).toMatch(/flex: 0 100 auto/);
+    expect(rule('.nrl-dock-play')).not.toMatch(/min-width: 0/);
+    expect(rule('.nrl-dock-advance-sub')).toMatch(/overflow: hidden;\s*white-space: normal;[^\n]*\n\s*overflow-wrap: anywhere/);
+    expect(rule('.nrl-nav-label')).toMatch(/text-overflow: ellipsis/);
     const wide = CSS.slice(CSS.indexOf('@media (max-width: 900px)'));
     expect(wide).toMatch(/^@media \(max-width: 900px\) \{\s*html\[data-text-size\] \.nrl-dock-tabs > \.nrl-btn \{ padding: 0 5px/);
+  });
+
+  it('stacks into two rows in a narrow window, and to 620px at Large and Larger: money and PLAY WEEK over the five tabs', () => {
+    expect(CSS).toMatch(/html\[data-text-size\] \.nrl-dock \{ height: auto; flex-wrap: wrap/);
+    expect(CSS.slice(CSS.indexOf('@media (max-width: 560px)'))).toMatch(/html \.nrl-dock \{ height: auto; flex-wrap: wrap/);
+    expect(CSS).toMatch(/html\[data-text-size\] \.nrl-dock-tabs \{ order: 1; flex: 1 1 100%/);
+    const narrow = CSS.slice(CSS.indexOf('@media (max-width: 560px)'));
+    expect(narrow).toMatch(/\.nrl-dock-tabs \{ order: 1; flex: 1 1 100%/);
+    expect(narrow).toMatch(/\.nrl-nav-caret \{ display: none; \}/);
   });
 });
