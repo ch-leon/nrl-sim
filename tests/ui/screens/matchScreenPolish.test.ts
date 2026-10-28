@@ -86,6 +86,9 @@ describe('the half-time sheet waits (#341)', () => {
     expect(CARD_SELECTOR).toContain('.nrl-modal');
     expect(rule(OVERLAY_CSS, '.nrl-mo-replay[hidden]')).toContain('display: none');
   });
+  it('the replay offer steps out from over the open coach tray (#348)', () => {
+    expect(rule(OVERLAY_CSS, '.nrl-mo-tray-open .nrl-mo-replay')).toContain('display: none');
+  });
 });
 
 describe('Replay try chip (#348 M5, the try-replay e2e)', () => {

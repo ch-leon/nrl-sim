@@ -10,9 +10,11 @@ import {
   REPLAY_SECONDS,
   REPLAY_TICKS,
   REPLAY_ZOOM,
+  newReplayOffer,
   offerOpen,
   replayFrame,
   replayFrom,
+  stepReplayOffer,
 } from '../../../src/match/view/replay';
 
 const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
@@ -71,5 +73,42 @@ describe('replay window', () => {
     // The copy is the replay's own: a later sim step cannot wipe a stored tick's events.
     const again = replayRange(factory, 9, to, to);
     expect(again[0]?.events.map((e) => e.kind)).toEqual(range[range.length - 1]?.events.map((e) => e.kind));
+  });
+});
+
+describe('the Replay try offer under the coach tray (#348)', () => {
+  it('runs down in the open: eight seconds, then gone', () => {
+    let o = stepReplayOffer(newReplayOffer(), 3000, null);
+    expect(o).toMatchObject({ leftMs: 5000, show: true, gone: false });
+    o = stepReplayOffer(o, 5000, null);
+    expect(o.gone).toBe(true);
+    expect(o.show).toBe(false);
+  });
+
+  it('hides while the tray is open and holds its countdown; closing the tray brings it back with the time it had', () => {
+    let o = stepReplayOffer(newReplayOffer(), 3000, null);
+    o = stepReplayOffer(o, 4000, 'tray');
+    expect(o).toMatchObject({ leftMs: 5000, show: false, gone: false });
+    o = stepReplayOffer(o, 250, null);
+    expect(o).toMatchObject({ leftMs: 4750, show: true, gone: false });
+  });
+
+  it('is gone once the tray has hidden it for eight seconds in all, open or shut in between', () => {
+    let o = stepReplayOffer(newReplayOffer(), 1000, null);
+    o = stepReplayOffer(o, 5000, 'tray');
+    o = stepReplayOffer(o, 1000, null);
+    expect(o.show).toBe(true);
+    o = stepReplayOffer(o, 2999, 'tray');
+    expect(o.gone).toBe(false);
+    o = stepReplayOffer(o, 1, 'tray');
+    expect(o.gone).toBe(true);
+    expect(o.show).toBe(false);
+  });
+
+  it('a card over the field holds it for as long as it is up (#341), and does not spend the tray\'s time', () => {
+    let o = stepReplayOffer(newReplayOffer(), 60_000, 'card');
+    expect(o).toMatchObject({ leftMs: REPLAY_OFFER_MS, trayMs: REPLAY_OFFER_MS, show: false, gone: false });
+    o = stepReplayOffer(o, -50, null);
+    expect(o.leftMs).toBe(REPLAY_OFFER_MS);
   });
 });

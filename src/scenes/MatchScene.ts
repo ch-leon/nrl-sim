@@ -534,10 +534,13 @@ export class MatchScene extends Phaser.Scene {
     this.kickFrame = cameraFrame(replayFrame, kick, this.autoZoom === null);
     if (this.kickFrame) this.kickBackUntil = time + KICK_RETURN_MS;
     this.kickBack = !this.kickFrame && time < this.kickBackUntil;
-    // The coach's badge and tray follow the play a few times a second (#73).
+    // The coach's badge and tray follow the play a few times a second (#73), and at once
+    // when the ball changes hands on screen (#348): at ×8 a sixth of a second is two seconds of play.
     this.showSlowed();
-    if ((this.coachBtn || this.planBtn) && time - this.chipsAt > 150) {
+    const ball = this.playback instanceof LivePlayback ? this.playback.inPossession : null;
+    if ((this.coachBtn || this.planBtn) && (time - this.chipsAt > 150 || ball !== this.chipsBall)) {
       this.chipsAt = time;
+      this.chipsBall = ball;
       this.refreshCallChips();
       this.refreshPlan();
     }
@@ -844,6 +847,8 @@ export class MatchScene extends Phaser.Scene {
   /** The tick the call was made on (it takes effect on the next). */
   private madeAt = 0;
   private chipsAt = 0;
+  /** The side with the ball on screen when the chips last looked (#348). */
+  private chipsBall: 'home' | 'away' | null = null;
 
   private mountCoach(side: 'home' | 'away', unlocked: readonly CoachCall[]): void {
     this.callSide = side;
