@@ -664,7 +664,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-dock-advance-label { font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
 .nrl-dock-advance-sub { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.3; }
 .nrl-dock-advance-sub:empty { display: none; }
-.nrl-btn.nrl-hud-menu-toggle { width: 40px; min-width: 40px; padding: 0; font-size: 0.875rem; border-left: 1px solid rgba(14, 22, 48, 0.25); }
+/* 44 wide, a finger's width on every phone (#371, from #381's check: it was 40, and 34 at 667). */
+.nrl-btn.nrl-hud-menu-toggle { width: 44px; min-width: 44px; padding: 0; font-size: 0.875rem; border-left: 1px solid rgba(14, 22, 48, 0.25); }
 .nrl-btn.nrl-hud-stop { width: auto; padding: 0 14px; border-left: 1px solid rgba(14, 22, 48, 0.25); font-size: 1rem; }
 .nrl-hud-stop[hidden], .nrl-hud-menu-toggle[hidden] { display: none; }
 /* N10.2: while a multi-week advance runs the button is a progress line, not a faded button. */
@@ -708,8 +709,6 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   .nrl-dock-tabs > .nrl-btn { padding: 0 8px; font-size: 0.875rem; letter-spacing: 0.04em; }
   .nrl-dock-advance { padding: 0 10px; }
   .nrl-dock-advance-label { font-size: 1rem; }
-  /* 44 wide, a finger's width (#371, from #381's check: it was 34). */
-  .nrl-btn.nrl-hud-menu-toggle { width: 44px; min-width: 44px; }
   /* Large and Larger text (#371): the tabs close up so all five and an alert dot stay whole. */
   html[data-text-size] .nrl-dock-tabs > .nrl-btn { padding: 0 5px; gap: 3px; letter-spacing: 0.02em; }
   html[data-text-size] .nrl-dock-advance { padding: 0 8px; }
