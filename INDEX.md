@@ -167,3 +167,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-121151-more-calls-gang2 | more-calls-gang2 | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-121151-more-calls-gang2/report.md) |
 | 20261028-121503-more-calls-4020b | more-calls-4020b | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-121503-more-calls-4020b/report.md) |
 | 20261028-121735-more-calls | more-calls | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-121735-more-calls/report.md) |
+| 20261028-130228-standard | standard | 13b03fb | main | [report](runs/20261028-130228-standard/report.md) |
