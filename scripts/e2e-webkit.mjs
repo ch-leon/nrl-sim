@@ -407,6 +407,10 @@ async function runPortrait(browser) {
     if (!(await skip.count())) return [];
     await skip.tap();
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
+    // The tour's first step opened Build (#370); back to the grounds, where the decisions chip shows.
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.nrl-screen-region', { state: 'detached', timeout: 5000 }).catch(() => {});
+    if (await page.locator('.nrl-screen-region').count()) throw new Error('Build stayed open after the tour was skipped');
   });
   // Inspect the event UI in both orientations. Hide only the rotate prompt:
   // portrait gameplay is still paused, but DOM choices must fit and accept taps.
