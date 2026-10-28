@@ -66,10 +66,10 @@ const RIVAL_CSS = `
 .nrl-rival-squad { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 /* The header row: the club, how it plays (and, with an Analyst, when behind), beside the ✕. */
 .nrl-rival-head { flex: 0 0 auto; min-height: 44px; display: flex; align-items: center; gap: 12px; margin-bottom: 6px; padding-right: 48px; min-width: 0; }
-.nrl-rival-head h2 { flex: 0 0 auto; margin: 0; font-family: var(--nrl-f-label); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; }
+.nrl-rival-head h2 { flex: 0 0 auto; margin: 0; font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; }
 .nrl-rival-lines { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
-.nrl-rival-head p { margin: 0; font-size: 13px; line-height: 1.3; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-rival-head p[data-when-behind] { font-size: 12px; color: var(--nrl-muted); }
+.nrl-rival-head p { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-rival-head p[data-when-behind] { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-rival-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 /* The squad: PLAYER · POS · AGE · OVR · SKILLS, rows open the player page (N7, #185). */
 .nrl-rival-table th:nth-child(n+2):nth-child(-n+4), .nrl-rival-table td:nth-child(n+2):nth-child(-n+4) { width: 48px; }
@@ -80,11 +80,11 @@ const RIVAL_CSS = `
 @media (pointer: coarse) { .nrl-rival-table td { height: 44px; } }
 .nrl-rival-name { font-weight: 500; }
 .nrl-rival-table .nrl-row-note { margin-left: 6px; }
-.nrl-rival-table .nrl-row-pos { font-size: 15px; }
+.nrl-rival-table .nrl-row-pos { font-size: 0.9375rem; }
 /* Full trait names (#349 S3) wrap inside the row rather than push the table past its box. */
-.nrl-rival-table td.nrl-rival-traits { white-space: normal; line-height: 1.25; font-size: 12px; color: var(--nrl-text-2); min-width: 8rem; }
+.nrl-rival-table td.nrl-rival-traits { white-space: normal; line-height: 1.25; font-size: 0.75rem; color: var(--nrl-text-2); min-width: 8rem; }
 /* 956×330: the club's lines tighter so five rows show. */
-@media (max-height: 340px) { .nrl-rival-head h2 { font-size: 19px; } .nrl-rival-head p { font-size: 12px; } }
+@media (max-height: 340px) { .nrl-rival-head h2 { font-size: 1.1875rem; } .nrl-rival-head p { font-size: 0.75rem; } }
 `;
 
 /** Open the squad sheet for `club` (over the League screen). */

@@ -41,12 +41,12 @@ const SCREEN_CSS = `
 .nrl-sq .nrl-screen-titles { align-items: center; flex: 1 1 auto; }
 .nrl-sq .nrl-screen-tools { flex: 0 0 auto; max-width: 60%; }
 @media (max-width: 760px) {
-  .nrl-sq .nrl-screen-sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 12px; line-height: 1.3; }
-  .nrl-sq-tabs > .nrl-btn { padding: 0 10px; font-size: 15px; }
-  .nrl-sq .nrl-screen-tools > .nrl-btn { padding: 0 10px; font-size: 14px; }
+  .nrl-sq .nrl-screen-sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 0.75rem; line-height: 1.3; }
+  .nrl-sq-tabs > .nrl-btn { padding: 0 10px; font-size: 0.9375rem; }
+  .nrl-sq .nrl-screen-tools > .nrl-btn { padding: 0 10px; font-size: 0.875rem; }
 }
 .nrl-sq-tabs > .nrl-btn { padding: 0 14px; }
-.nrl-sq .nrl-screen-tools > .nrl-btn { min-height: 38px; padding: 0 12px; border-radius: 8px; font-size: 15px; }
+.nrl-sq .nrl-screen-tools > .nrl-btn { min-height: 38px; padding: 0 12px; border-radius: 8px; font-size: 0.9375rem; }
 @media (pointer: coarse) { .nrl-sq .nrl-screen-tools > .nrl-btn { min-height: 44px; } }
 /* A table in a sheet: a column-head row that holds still, and rows that scroll. */
 .nrl-grid-head {
@@ -55,7 +55,7 @@ const SCREEN_CSS = `
   align-items: center;
   height: 22px;
   font-family: var(--nrl-f-label);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -70,7 +70,7 @@ const SCREEN_CSS = `
   align-items: center;
   min-height: 30px;
   border-top: 1px solid var(--nrl-button);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--nrl-text);
   white-space: nowrap;
 }
@@ -82,12 +82,12 @@ const SCREEN_CSS = `
 /* The name, then a knock or a ban in red, then the traits as chips; the name gives way first. */
 .nrl-row-who { display: flex; align-items: center; gap: 6px; overflow: hidden; padding-right: 6px; }
 .nrl-row-name { flex: 0 1 auto; min-width: 3em; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
-.nrl-row-note { flex: 0 0 auto; font-size: 11px; color: var(--nrl-neg); }
+.nrl-row-note { flex: 0 0 auto; font-size: 0.6875rem; color: var(--nrl-neg); }
 .nrl-row-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); }
 .nrl-chip {
   flex: 0 0 auto;
   font-family: var(--nrl-f-label);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 16px;
@@ -99,17 +99,17 @@ const SCREEN_CSS = `
 }
 .nrl-chip-bad { color: var(--nrl-neg); }
 .nrl-chip-academy { color: var(--nrl-accent); }
-.nrl-row-pos { font-family: var(--nrl-f-label); font-size: 15px; font-weight: 600; }
+.nrl-row-pos { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 600; }
 .nrl-row .nrl-num { font-weight: 500; }
 .nrl-row .nrl-row-ovr { font-weight: 600; }
-.nrl-row-dim { color: var(--nrl-text-2); font-size: 12px; }
+.nrl-row-dim { color: var(--nrl-text-2); font-size: 0.75rem; }
 .nrl-row-attn { color: var(--nrl-accent); }
 .nrl-row-bad { color: var(--nrl-neg); }
 /* Fitness: a 72×5 bar and the %, green 85+, amber 65+, else red. */
 .nrl-fit { display: flex; align-items: center; gap: 8px; }
 .nrl-fit-bar { flex: 0 0 auto; width: 72px; height: 5px; border-radius: 3px; background: var(--nrl-button); overflow: hidden; }
 .nrl-fit-bar > span { display: block; height: 100%; }
-.nrl-fit-pct { font-family: var(--nrl-f-num); font-size: 12px; }
+.nrl-fit-pct { font-family: var(--nrl-f-num); font-size: 0.75rem; }
 /* 3d Squad: # · PLAYER · POS · OVR · FITNESS · TO, then wage and morale where the sheet has room. */
 .nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 52px 44px 130px 64px 84px 84px; }
 @media (max-width: 760px) {
@@ -122,7 +122,7 @@ const SCREEN_CSS = `
 @media (max-width: 760px) { .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 40px 34px 38px 80px 72px 92px; } }
 .nrl-recruit .nrl-row { min-height: 44px; }
 /* Written in caps already, so a sum keeps its small k ("NEED $18k"). */
-.nrl-row .nrl-row-action { min-height: 36px; min-width: 0; width: 100%; padding: 0 6px; border-radius: 8px; font-size: 14px; text-transform: none; }
+.nrl-row .nrl-row-action { min-height: 36px; min-width: 0; width: 100%; padding: 0 6px; border-radius: 8px; font-size: 0.875rem; text-transform: none; }
 @media (pointer: coarse) { .nrl-row .nrl-row-action { min-height: 40px; } }
 /* Can't sign: the label says why (NEED $18k, SQUAD FULL), raised and muted, not faded. */
 .nrl-row .nrl-row-action:disabled { background: var(--nrl-raised); color: var(--nrl-muted); opacity: 1; }
@@ -139,9 +139,9 @@ const SCREEN_CSS = `
   max-width: calc(100% - 28px);
   box-sizing: border-box;
 }
-.nrl-pop > .nrl-btn { min-height: 40px; border-radius: 8px; font-size: 15px; padding: 0 12px; text-align: left; }
+.nrl-pop > .nrl-btn { min-height: 40px; border-radius: 8px; font-size: 0.9375rem; padding: 0 12px; text-align: left; }
 @media (pointer: coarse) { .nrl-pop > .nrl-btn { min-height: 44px; } }
-.nrl-pop-note { grid-column: 1 / -1; font-size: 12px; line-height: 1.35; color: var(--nrl-text-2); padding: 2px 4px 0; white-space: normal; }
+.nrl-pop-note { grid-column: 1 / -1; font-size: 0.75rem; line-height: 1.35; color: var(--nrl-text-2); padding: 2px 4px 0; white-space: normal; }
 `;
 
 // ── Formatting helpers ──────────────────────────────────────────────────────

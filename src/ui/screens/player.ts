@@ -356,7 +356,7 @@ export const PLAYER_CSS = `
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr) 200px;
   gap: 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .nrl-player.nrl-player-rival { grid-template-columns: 230px minmax(0, 1fr); }
 .nrl-player-card, .nrl-player-side { min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
@@ -372,42 +372,44 @@ export const PLAYER_CSS = `
   image-rendering: crisp-edges;
 }
 .nrl-player-id { min-width: 0; }
-.nrl-player-name { font-family: var(--nrl-f-label); font-size: 22px; font-weight: 700; line-height: 1; overflow-wrap: anywhere; }
-.nrl-player-meta { margin-top: 4px; font-size: 12px; color: var(--nrl-text-2); }
-.nrl-player-where { font-size: 12px; color: var(--nrl-muted); }
+.nrl-player-name { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; line-height: 1; overflow-wrap: anywhere; }
+.nrl-player-meta { margin-top: 4px; font-size: 0.75rem; color: var(--nrl-text-2); }
+.nrl-player-where { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-player-out { color: var(--nrl-neg); }
 .nrl-player-tiles { display: flex; gap: 6px; }
 .nrl-player-tile { flex: 1 1 0; min-width: 0; border-radius: 8px; background: var(--nrl-raised); padding: 6px 8px; display: flex; flex-direction: column; }
-.nrl-player-tile b { font-family: var(--nrl-f-num); font-size: 20px; font-weight: 600; line-height: 1.2; }
-.nrl-player-tile span { font-size: 11px; color: var(--nrl-muted); }
-.nrl-player-deal { font-size: 12px; line-height: 1.35; color: var(--nrl-text-2); }
+.nrl-player-tile b { font-family: var(--nrl-f-num); font-size: 1.25rem; font-weight: 600; line-height: 1.2; }
+.nrl-player-tile span { font-size: 0.6875rem; color: var(--nrl-muted); }
+.nrl-player-deal { font-size: 0.75rem; line-height: 1.35; color: var(--nrl-text-2); }
 .nrl-player-expiring { color: var(--nrl-neg); }
-/* The middle column scrolls on its own; the left and the actions hold still. */
+/* The middle column scrolls on its own; the left and the actions hold still. The outlook's
+   words go under the curve when the column is narrow (667, or a larger text size). */
 .nrl-player-about { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-right: 4px; }
-.nrl-player h3 { flex: 0 0 auto; margin: 10px 0 4px; font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-player h3 { flex: 0 0 auto; margin: 10px 0 4px; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-player h3:first-child { margin-top: 0; }
-.nrl-player-outlook { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 8px; background: var(--nrl-panel); }
+.nrl-player-outlook { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 10px; border-radius: 8px; background: var(--nrl-panel); }
 .nrl-player-curve { flex: 0 0 auto; width: 132px; height: 38px; }
-.nrl-player-outlook-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 12px; line-height: 1.35; color: var(--nrl-text-2); }
+.nrl-player-outlook-text { flex: 1 1 9em; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 0.75rem; line-height: 1.35; color: var(--nrl-text-2); }
 .nrl-player-outlook-text b { color: var(--nrl-text); }
-.nrl-player-outlook-text small { font-size: 11px; color: var(--nrl-muted); }
+.nrl-player-outlook-text small { font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-player-stats { display: flex; flex-direction: column; flex: 0 0 auto; }
-.nrl-statrow { display: grid; grid-template-columns: 72px minmax(0, 1fr) 30px 56px; align-items: center; gap: 8px; height: 28px; }
+/* Label and number columns in em, so a larger text size widens them with the words (#371). */
+.nrl-statrow { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) 2.3em 4.3em; align-items: center; gap: 8px; min-height: 28px; }
 .nrl-stattrack { height: 6px; border-radius: 3px; background: var(--nrl-button); overflow: hidden; }
 .nrl-statfill { height: 100%; background: var(--nrl-accent); }
 .nrl-stat-val { font-family: var(--nrl-f-num); font-weight: 600; }
-.nrl-stat-gain { font-family: var(--nrl-f-num); font-size: 12px; color: var(--nrl-pos); white-space: nowrap; }
+.nrl-stat-gain { font-family: var(--nrl-f-num); font-size: 0.75rem; color: var(--nrl-pos); white-space: nowrap; }
 .nrl-stat-gain.nrl-stat-loss { color: var(--nrl-neg); }
-.nrl-player-trait, .nrl-player-line { flex: 0 0 auto; margin: 2px 0; font-size: 12px; line-height: 1.4; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-player-trait, .nrl-player-line { flex: 0 0 auto; margin: 2px 0; font-size: 0.75rem; line-height: 1.4; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-player-trait b { color: var(--nrl-text); font-weight: 600; margin-right: 6px; }
 .nrl-player-trait-bad b { color: var(--nrl-neg); }
 .nrl-player-line b { color: var(--nrl-muted); font-weight: 500; }
 /* Roles (N11): a row per job, ON in yellow, OFF muted. */
-.nrl-btn.nrl-player-role { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; font-size: 16px; }
+.nrl-btn.nrl-player-role { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; font-size: 1rem; }
 .nrl-player-role-state { color: var(--nrl-muted); }
 .nrl-player-role[aria-pressed="true"] .nrl-player-role-state { color: var(--nrl-accent); }
 /* What each deal costs, and why one is shut (in yellow): just above the buttons. */
-.nrl-player-why { flex: 0 1 auto; min-height: 0; overflow: hidden; margin-top: auto; font-size: 11px; line-height: 1.35; color: var(--nrl-muted); }
+.nrl-player-why { flex: 0 1 auto; min-height: 0; overflow: hidden; margin-top: auto; font-size: 0.6875rem; line-height: 1.35; color: var(--nrl-muted); }
 .nrl-player-why > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* #203: the actions are pinned to the foot of the column, on screen without scrolling. */
 .nrl-player-actions {
@@ -422,20 +424,28 @@ export const PLAYER_CSS = `
   z-index: 1;
 }
 .nrl-player-why + .nrl-player-actions { margin-top: 0; }
-.nrl-player-actions .nrl-btn { min-width: 0; padding: 0 6px; white-space: normal; font-size: 15px; }
-.nrl-player-actions .nrl-btn-primary { grid-column: 1 / -1; font-size: 17px; }
+.nrl-player-actions .nrl-btn { min-width: 0; padding: 0 6px; white-space: normal; font-size: 0.9375rem; }
+.nrl-player-actions .nrl-btn-primary { grid-column: 1 / -1; font-size: 1.0625rem; }
 /* Short sheets (667×375, 956×330): tighter, so the jobs and the deals still fit. */
 @media (max-height: 400px) {
   .nrl-player-card, .nrl-player-side { gap: 6px; }
-  .nrl-statrow { height: 26px; }
+  .nrl-statrow { min-height: 26px; }
   .nrl-player-tile { padding: 4px 8px; }
-  .nrl-player-tile b { font-size: 18px; }
+  .nrl-player-tile b { font-size: 1.125rem; }
 }
 /* A narrow phone (667): the side columns give a little. */
 @media (max-width: 760px) {
   .nrl-player { grid-template-columns: 196px minmax(0, 1fr) 176px; gap: 12px; }
   .nrl-player.nrl-player-rival { grid-template-columns: 196px minmax(0, 1fr); }
-  .nrl-statrow { grid-template-columns: 60px minmax(0, 1fr) 26px 52px; gap: 6px; }
+  .nrl-statrow { grid-template-columns: 4.6em minmax(0, 1fr) 2em 4em; gap: 6px; }
+}
+/* Large and Larger text (#371): the name keeps to whole words in the narrow card, and on a
+   narrow phone the side columns give the stats' bars some room back. */
+html[data-text-size] .nrl-player-name { font-size: 1.125rem; overflow-wrap: break-word; }
+@media (max-width: 760px) {
+  html[data-text-size] .nrl-player { grid-template-columns: 180px minmax(0, 1fr) 164px; }
+  html[data-text-size] .nrl-player.nrl-player-rival { grid-template-columns: 180px minmax(0, 1fr); }
+  html[data-text-size] .nrl-statrow { grid-template-columns: 4.4em minmax(1.5em, 1fr) 1.8em 3.6em; gap: 4px; }
 }
 `;
 

@@ -72,9 +72,9 @@ function ensureRotateStyles(): void {
   border-radius: 0.45rem; background: #1f2b55;
   animation: nrl-rotate-turn 2.4s ease-in-out infinite;
 }
-.nrl-rotate-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 22px;
+.nrl-rotate-title { font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 1.375rem;
   letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 6px; }
-.nrl-rotate-text { margin: 0; font-size: 14px; color: #c9d1ea; }
+.nrl-rotate-text { margin: 0; font-size: 0.875rem; color: #c9d1ea; }
 @keyframes nrl-rotate-turn {
   0%, 20% { transform: rotate(0deg); }
   50%, 80% { transform: rotate(-90deg); }

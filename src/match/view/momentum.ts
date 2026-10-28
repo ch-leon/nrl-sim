@@ -59,12 +59,20 @@ const EVEN_BELOW = 8;
 /** A change across the window smaller than this is holding, not building or fading. */
 const TREND_MIN = 5;
 
+/** The side the line leans to now, or null while it reads as even: its tag goes at the line's end (#371). */
+export function momentumLeader(samples: readonly MomentumSample[]): 'home' | 'away' | null {
+  const last = samples[samples.length - 1]?.value ?? 0;
+  if (Math.abs(last) < EVEN_BELOW) return null;
+  return last > 0 ? 'home' : 'away';
+}
+
 /** The line's label for a screen reader: "Momentum: Larrikins, building", "Momentum: even". */
 export function momentumLabel(samples: readonly MomentumSample[], names: { home: string; away: string }): string {
+  const leader = momentumLeader(samples);
+  if (!leader) return 'Momentum: even';
   const last = samples[samples.length - 1]?.value ?? 0;
-  if (Math.abs(last) < EVEN_BELOW) return 'Momentum: even';
   const first = samples[0]?.value ?? 0;
-  const side = last > 0 ? names.home : names.away;
+  const side = names[leader];
   // Toward the side that has it: more of it is building.
   const swing = (last - first) * Math.sign(last);
   const trend = swing >= TREND_MIN ? 'building' : swing <= -TREND_MIN ? 'fading' : 'holding';

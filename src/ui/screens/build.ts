@@ -346,10 +346,10 @@ export const BUILD_CSS = `
 .nrl-build-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-build-row-disabled { cursor: default; opacity: 0.55; }
 .nrl-build-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
-.nrl-build-title { font-family: var(--nrl-f-label); font-size: 17px; font-weight: 700; letter-spacing: 0.03em; line-height: 1.15; min-width: 0; }
-.nrl-build-cost { font-size: 13px; color: var(--nrl-accent); white-space: nowrap; }
-.nrl-build-blurb { font-size: 12px; line-height: 1.3; color: var(--nrl-text-2); overflow-wrap: anywhere; }
-.nrl-build-meta { font-size: 11px; color: var(--nrl-muted); }
+.nrl-build-title { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.03em; line-height: 1.15; min-width: 0; }
+.nrl-build-cost { font-size: 0.8125rem; color: var(--nrl-accent); white-space: nowrap; }
+.nrl-build-blurb { font-size: 0.75rem; line-height: 1.3; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-build-meta { font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-build-meta.nrl-build-why { color: var(--nrl-accent); }
 
 /* 3b: the facility card, on the right so the building stays in view. No dim and
@@ -376,26 +376,27 @@ export const BUILD_CSS = `
 .nrl-facility-popup { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-facility-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }
 .nrl-facility-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 auto; }
-.nrl-modal .nrl-facility-name { margin: 0; font-size: 22px; letter-spacing: 0.04em; min-width: 0; }
+.nrl-modal .nrl-facility-name { margin: 0; font-size: 1.375rem; letter-spacing: 0.04em; min-width: 0; }
 .nrl-facility-head .nrl-screen-x { position: relative; top: auto; right: auto; flex: 0 0 auto; }
 .nrl-facility-level { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 .nrl-facility-pips { display: inline-flex; gap: 6px; }
 .nrl-facility-pips i { width: 28px; height: 6px; border-radius: 3px; background: var(--nrl-line); }
 .nrl-facility-pips i.nrl-facility-pip-on { background: var(--nrl-accent); }
-.nrl-facility-level .nrl-num { font-size: 13px; font-weight: 500; }
+.nrl-facility-level .nrl-num { font-size: 0.8125rem; font-weight: 500; }
 /* What it does and its upkeep scroll if a long blurb meets a short phone. */
 .nrl-facility-info { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; }
-.nrl-facility-blurb { font-size: 13px; line-height: 1.4; color: var(--nrl-text-2); margin: 0; }
-.nrl-facility-upkeep { font-size: 12px; color: var(--nrl-muted); }
+.nrl-facility-blurb { font-size: 0.8125rem; line-height: 1.4; color: var(--nrl-text-2); margin: 0; }
+.nrl-facility-upkeep { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-facility-actions { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
-.nrl-btn.nrl-facility-upgrade { width: 100%; min-height: 48px; font-size: 18px; }
+.nrl-btn.nrl-facility-upgrade { width: 100%; min-height: 48px; font-size: 1.125rem; }
 .nrl-facility-max {
   min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 10px;
   background: var(--nrl-raised); color: var(--nrl-pos);
-  font-family: var(--nrl-f-label); font-size: 18px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
 }
-.nrl-facility-why { font-size: 12px; color: var(--nrl-accent); text-align: center; }
-.nrl-facility-row { display: flex; gap: 6px; }
-.nrl-facility-row .nrl-btn { flex: 1 1 0; min-width: 0; font-size: 16px; padding: 0 8px; }
+.nrl-facility-why { font-size: 0.75rem; color: var(--nrl-accent); text-align: center; }
+.nrl-facility-row { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Side by side while both labels fit; a larger text size (#371) puts DEMOLISH under MOVE rather than cut it. */
+.nrl-facility-row .nrl-btn { flex: 1 1 auto; min-width: 0; font-size: 1rem; padding: 0 8px; white-space: nowrap; }
 .nrl-btn.nrl-facility-demolish { text-transform: none; }
 `;

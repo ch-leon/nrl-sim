@@ -11,7 +11,9 @@
 //
 // Then the away side wears its alternate strip, or failing that a clash strip
 // built here from the club's colours, and each side gets a ring colour for the
-// marks under its players. Pure and Phaser-free (tests/art/match/kitClash.test.ts).
+// marks under its players, drawn solid for home and dashed for away (#371) so the
+// sides differ in shape as well as colour. Pure and Phaser-free
+// (tests/art/match/kitClash.test.ts).
 import { shade } from '../pixel';
 import { buildKit, kitFromColors, type Kit, type KitPattern } from './kit';
 import { LOOKS, drawPlayerFrame, type PlayerAnim } from './players';
@@ -160,6 +162,30 @@ export function ringColors(home: Kit, away: Kit): { home: number; away: number }
   return { home: best.home, away: best.away };
 }
 
+/** How a side's ring is drawn (#371): home's a solid line, away's dashed, whatever the colours (greyscale, two close kits). */
+export type RingStyle = 'solid' | 'dashed';
+export const RING_STYLES: Readonly<{ home: RingStyle; away: RingStyle }> = { home: 'solid', away: 'dashed' };
+/** Dashes round a dashed ring, and the share of each dash-and-gap the dash takes: few and bold, so they read at the default zoom. */
+export const RING_DASHES = 6;
+export const RING_DASH_SHARE = 0.6;
+
+/**
+ * A ring's outline as polylines, centred on (0, 0), `w` × `h` world px: a solid ring is
+ * one closed loop, a dashed one RING_DASHES arcs with gaps between, the first gap
+ * straddling the right-hand end so the dashes sit symmetric under the player.
+ */
+export function ringOutline(style: RingStyle, w: number, h: number, steps = 32): { x: number; y: number }[][] {
+  const at = (t: number): { x: number; y: number } => ({ x: (w / 2) * Math.cos(t), y: (h / 2) * Math.sin(t) });
+  if (style === 'solid') return [Array.from({ length: steps + 1 }, (_, i) => at((i / steps) * 2 * Math.PI))];
+  const span = (2 * Math.PI) / RING_DASHES;
+  const dash = span * RING_DASH_SHARE;
+  const per = Math.max(2, Math.ceil(steps / RING_DASHES));
+  return Array.from({ length: RING_DASHES }, (_, d) => {
+    const from = d * span + (span - dash) / 2;
+    return Array.from({ length: per + 1 }, (_, i) => at(from + (i / per) * dash));
+  });
+}
+
 export interface FixtureKitChoice {
   home: Kit;
   away: Kit;
@@ -168,6 +194,8 @@ export interface FixtureKitChoice {
   awayStrip: AwayStrip;
   /** The rings under each side's players (and the carrier's). */
   rings: { home: number; away: number };
+  /** How each side's rings are drawn (#371). */
+  ringStyles: { home: RingStyle; away: RingStyle };
 }
 
 /**
@@ -187,6 +215,7 @@ export function resolveKits(
     awayAlt: strip !== 'home',
     awayStrip: strip,
     rings: ringColors(homeKit, kit),
+    ringStyles: { ...RING_STYLES },
   });
   const own = kitFromColors(away.colors, away.clubId);
   if (kitContrast(homeKit, own) >= KIT_CLASH_MIN) return pick(own, 'home');

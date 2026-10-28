@@ -46,6 +46,7 @@ import { openContractsScreen } from './ui/screens/contracts';
 import { initNewsInbox, newsInbox, openInboxScreen } from './ui/inbox';
 import { advanceUntilAsked, askBeforeAdvance, decisionChipItems, openDecisions, pendingDecisionCount } from './ui/decisions';
 import { initAudio, initAudioUi, soundStatus } from './fx/audio';
+import { textSizeSync } from './ui/textSize';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
 import { initFirstVisitHints, setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
@@ -130,6 +131,10 @@ async function boot(): Promise<void> {
   // The player's kit design (#79) feeds every kit drawn from here on.
   syncKitDesign(getState());
   bus.on('state:changed', (s) => syncKitDesign(s));
+  // #371: the save's text size on <html>, on load and whenever Settings (or an import) changes it.
+  const syncTextSize = textSizeSync();
+  syncTextSize(getState().settings);
+  bus.on('state:changed', (s) => syncTextSize(s.settings));
   enableAutosave();
 
   // Week-tick pipeline (ARCHITECTURE §5): training/injuries → economy →

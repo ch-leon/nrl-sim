@@ -107,6 +107,17 @@ export function initToasts(root: HTMLElement): void {
       if (log && log.width > 0) setLane('match', `width: ${Math.max(MIN_LANE_PX, Math.floor(log.left - 8 - lane.getBoundingClientRect().left))}px;`);
       return;
     }
+    // A dialog up (a facility's popup over the grounds): the toast goes in the room beside it, so
+    // an Undo is neither hidden under the dialog nor over its MOVE and DEMOLISH (#371, from #381's check).
+    const dialog = document.querySelector('.nrl-modal')?.getBoundingClientRect();
+    if (dialog && dialog.width > 0) {
+      const leftRoom = Math.floor(dialog.left - 24);
+      const rightRoom = Math.floor(window.innerWidth - dialog.right - 24);
+      if (Math.max(leftRoom, rightRoom) >= MIN_LANE_PX) {
+        setLane('beside', leftRoom >= rightRoom ? `width: ${leftRoom}px;` : `left: ${Math.ceil(dialog.right + 12)}px; width: ${rightRoom}px;`);
+        return;
+      }
+    }
     // Office's tiles sit where the dock lane is: while the sheet is up the toast goes to the top.
     const office = document.querySelector('.nrl-nav-sheet:not([hidden])');
     setLane(document.querySelector('.nrl-dock') && !office ? 'dock' : 'top', '');

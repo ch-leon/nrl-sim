@@ -181,7 +181,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
 
 ### 3s Full time
 - Centred card, 540 wide, #0e1630, radius 18.
-- **Header**: "FULL TIME · ROUND 2" with a result tag (WIN BY 6 in #2d8a4a).
+- **Header**: "FULL TIME · ROUND 2" with a result tag (WIN BY 6 in #2a8346).
 - **Score**: 42 Mono, then "v Opponent".
 - **Effect chips**: ladder move, gate, injuries (injuries in #f0a39b).
 - **Player of the match**: a row with a 44px initials badge.
@@ -215,7 +215,7 @@ In code the colours are `src/ui/tokens.ts` (`COLOR_TOKENS`); `src/ui/dom.ts` wri
 - **Text**: #ffffff · secondary #c9d1ea · muted #9aa6c7
 - **Accent**: #f4d03f, with #0e1630 text on it
 - **Team colours**: home #f4d03f · away #2f8a46
-- **Status**: positive #6fd896 · negative #f0a39b · alert dot #e0574a · win tag #2d8a4a · injured tile #5a2430 · bench chip #3a6ea5
+- **Status**: positive #6fd896 · negative #f0a39b · alert dot #e0574a · win tag #2a8346 (white on it 4.7:1, AA; #371) · injured tile #5a2430 · bench chip #3a6ea5
 - **Fitness**: #3fbf6a · #e8a33a · #d9534f
 - **Overlays**: sheet `rgba(14,22,48,.97)` · dim `rgba(5,9,22,.35–.55)`
 - **Shadows**: `0 4px 14px rgba(0,0,0,.35)` for floating chips/HUD · `0 6px 20px rgba(0,0,0,.4)` for trays/popovers · `0 12px 40px rgba(0,0,0,.4)` for modals

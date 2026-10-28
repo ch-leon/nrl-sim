@@ -14,7 +14,8 @@
 
 import { bus } from '../core/events';
 import { getState, setState, type GameState } from '../core/state';
-import { el, button, openModal, closeModal } from '../ui/dom';
+import { el, button, openModal, closeModal, segmented } from '../ui/dom';
+import { TEXT_SIZES, textSizeOf } from '../ui/textSize';
 import { downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, save } from '../core/save';
 import { startTutorial } from '../ui/tutorial';
 import { canInstall, promptInstall } from './pwa';
@@ -715,6 +716,15 @@ export function initAudioUi(): () => void {
   // #368: the weekly summary card after each advance; on unless switched off.
   const weekSummary = toggle('Show weekly summary', 'Training, injuries, money and the board after each advance.',
     () => getState().settings.weekSummary !== false, (on) => setSetting({ weekSummary: on }), 'nrl-summary-toggle');
+  // #371: a letter over each side's players, so the sides read apart without their colours; off when absent.
+  const teamLetters = toggle('Team letters on players', 'Each side’s letter over its players in a match.',
+    () => getState().settings.teamLetters === true, (on) => setSetting({ teamLetters: on }), 'nrl-letters-toggle');
+  // #371: Normal, Large, Larger: main.ts puts the save's size on <html> when it changes.
+  const textSize = segmented(TEXT_SIZES.map((t) => ({ id: t.id, label: t.label })), textSizeOf(settings.textSize), (id) => {
+    textSize.set(id);
+    setSetting({ textSize: id });
+  }, { class: 'nrl-settings-seg', label: 'Text size' });
+  const textSizeRow = el('div', { class: 'nrl-audio-row nrl-settings-textsize' }, el('b', { text: 'Text size' }), textSize.el);
 
   const installBtn = button('Install app', () => {
     void promptInstall().then((outcome) => {
@@ -767,8 +777,9 @@ export function initAudioUi(): () => void {
     el('div', { class: 'nrl-settings-cols' },
       el('div', { class: 'nrl-settings-col' },
         el('label', { class: 'nrl-audio-row' }, el('b', { text: 'Volume' }), slider),
-        mute.row, coachCalls.row, liveRivals.row),
+        mute.row, coachCalls.row, liveRivals.row, teamLetters.row),
       el('div', { class: 'nrl-settings-col' },
+        textSizeRow,
         // One row for the two, so the key-moments and weekly-summary switches (#366, #368) cost no height.
         el('div', { class: 'nrl-audio-row nrl-audio-btnrow nrl-settings-pair' }, replayBtn, exportBtn),
         importRow,
@@ -781,7 +792,8 @@ export function initAudioUi(): () => void {
   ensureAudioStyles();
   return () => {
     syncInstallVisibility();
-    for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary]) t.sync();
+    for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary, teamLetters]) t.sync();
+    textSize.set(textSizeOf(getState().settings.textSize));
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
     importIdle();
     openModal(content, { class: 'nrl-settings-modal', region: true, closeButton: true });
@@ -815,17 +827,22 @@ function ensureAudioStyles(): void {
   background: var(--nrl-raised);
   pointer-events: auto;
 }
-.nrl-audio-row > b { font-family: var(--nrl-f-label); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-audio-row > b { font-family: var(--nrl-f-label); font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; }
 .nrl-audio-row > .nrl-btn { flex: 1 1 auto; }
 .nrl-audio-btnrow { padding: 0; background: none; }
 .nrl-audio-btnrow > .nrl-btn { min-height: 44px; }
 .nrl-settings-pair { gap: 4px; }
 .nrl-settings-pair > .nrl-btn { flex: 1 1 0; padding: 0 8px; }
 .nrl-settings-toggle { cursor: pointer; }
-.nrl-settings-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; font-size: 13px; }
-.nrl-settings-text b { font-family: var(--nrl-f-label); font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-.nrl-settings-text small { font-size: 11px; color: var(--nrl-muted); }
-.nrl-settings-ask { flex: 1 1 100%; font-size: 13px; line-height: 1.35; color: var(--nrl-text-2); padding-top: 6px; }
+/* Text size (#371): the label, then Normal / Large / Larger sharing the rest of the row. */
+.nrl-settings-textsize { padding: 0 0 0 10px; gap: 8px; }
+.nrl-settings-textsize > b { white-space: nowrap; }
+.nrl-settings-textsize > .nrl-seg { flex: 1 1 auto; background: var(--nrl-button); }
+.nrl-settings-seg > .nrl-btn { flex: 1 1 0; min-height: 44px; padding: 0 4px; font-size: 0.875rem; letter-spacing: 0.02em; }
+.nrl-settings-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; font-size: 0.8125rem; }
+.nrl-settings-text b { font-family: var(--nrl-f-label); font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.nrl-settings-text small { font-size: 0.6875rem; color: var(--nrl-muted); }
+.nrl-settings-ask { flex: 1 1 100%; font-size: 0.8125rem; line-height: 1.35; color: var(--nrl-text-2); padding-top: 6px; }
 .nrl-settings-import { flex-wrap: wrap; padding: 0; background: none; }
 .nrl-settings-import:has(.nrl-settings-ask) { padding: 0 10px 8px; background: var(--nrl-raised); }
 .nrl-settings-import > .nrl-btn { flex: 1 1 auto; min-height: 44px; }
@@ -837,6 +854,11 @@ function ensureAudioStyles(): void {
   .nrl-settings-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; gap: 6px 12px; }
   .nrl-settings-col { display: contents; }
   .nrl-settings-import { grid-row: span 2; align-self: start; }
+  /* A quarter of the width: the three sizes take the row (the group keeps its "Text size" label for a
+     screen reader), and the two buttons close up so REPLAY TUTORIAL fits. */
+  .nrl-settings-textsize { padding: 0; background: none; }
+  .nrl-settings-textsize > b { display: none; }
+  .nrl-settings-pair > .nrl-btn { padding: 0 4px; letter-spacing: 0.02em; white-space: normal; line-height: 1.05; }
 }
 /* A switch a finger can hit (N14, #263; X3): 52×44, the 28×16 track and its knob drawn in its background
    (the match LOG toggle's look: yellow on, #26325c off). */

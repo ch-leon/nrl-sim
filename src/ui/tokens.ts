@@ -20,7 +20,7 @@ export const COLOR_TOKENS = {
   pos: '#6fd896',
   neg: '#f0a39b',
   alert: '#e0574a',
-  win: '#2d8a4a',
+  win: '#2a8346', // white text on it passes AA (4.7:1; #371's contrast check: #2d8a4a was 4.3)
   injured: '#5a2430',
   bench: '#3a6ea5',
   out: '#b03a2e',
