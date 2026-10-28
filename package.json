@@ -8,6 +8,7 @@
     "dev": "vite",
     "prebuild": "vite-node scripts/gen-icons.mjs",
     "build": "tsc --noEmit && vite build",
+    "build:android": "vite-node scripts/gen-icons.mjs && tsc --noEmit && NRL_NATIVE=1 vite build && node scripts/obfuscate-dist.mjs",
     "test": "vitest run",
     "preview": "vite preview",
     "balance": "vite-node scripts/balance.ts --",
@@ -23,6 +24,10 @@
     "phaser": "^3.80.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "javascript-obfuscator": "^4.1.1",
     "playwright-core": "^1.56.1",
     "typescript": "^5.5.0",
     "vite": "^5.4.0",

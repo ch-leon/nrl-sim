@@ -18,6 +18,12 @@
 
 /// <reference types="vite-plugin-pwa/vanillajs" />
 
+// #89: set to true in the native Android build (vite.config.ts define). There the
+// app is served from the APK, so registering a service worker would only add a
+// cache-first copy that could go stale; `typeof` guards the Vitest/node env where
+// the define is absent.
+declare const __NRL_NATIVE__: boolean | undefined;
+
 import { bus } from '../core/events';
 import { domUpdateHooks, scheduleUpdatePrompt } from '../ui/updatePrompt';
 import { browserStorage } from '../core/storage/local';
@@ -163,6 +169,8 @@ export function startUpdateChecks(
 }
 
 async function registerServiceWorker(): Promise<void> {
+  // #89: never register a SW inside the native Android app.
+  if (typeof __NRL_NATIVE__ !== 'undefined' && __NRL_NATIVE__) return;
   try {
     const { registerSW } = await import('virtual:pwa-register');
     const update = registerSW({
