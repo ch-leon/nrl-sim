@@ -59,9 +59,9 @@ import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, t
 import { NINES, clockText, fullMatch, type MatchLength } from './rules';
 import { BENCH, DEFAULT_ROTATION, benchRecover, pickFreshLegs, pickSwaps, type Rotation } from './bench';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
-import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, offsideChance, type CaptainRead } from './penalties';
+import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, offsideChance, type CaptainRead, type PenaltyChoice } from './penalties';
 import { edgeSheets, spreadSheets, type DifficultyEdge } from './spread';
-import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsBench, callIsDefence, callIsPlay, paidOffText, withAttackCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
+import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsBench, callIsDefence, callIsPenalty, callIsPlay, callScope, paidOffText, penaltyChoiceOf, withAttackCall, withDefenceCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
@@ -467,10 +467,17 @@ export class LiveSim implements MatchSim {
   /** Plan changes the restart actually played (the match report's line). */
   readonly planChanges: PlanChange[] = [];
   private callRead = 0;
-  private readonly callState: Record<Side, { attack: CoachCall | null; defence: CoachCall | null; usedAttack: boolean; usedDefence: boolean }> = {
-    home: { attack: null, defence: null, usedAttack: false, usedDefence: false },
-    away: { attack: null, defence: null, usedAttack: false, usedDefence: false },
+  /** `attackLeft` / `defenceLeft`: tackles left for a call that lasts a number of them (callScope; #396: Offload, Gang tackle), 0 for one that lasts the set. */
+  private readonly callState: Record<Side, { attack: CoachCall | null; defence: CoachCall | null; usedAttack: boolean; usedDefence: boolean; attackLeft: number; defenceLeft: number }> = {
+    home: { attack: null, defence: null, usedAttack: false, usedDefence: false, attackLeft: 0, defenceLeft: 0 },
+    away: { attack: null, defence: null, usedAttack: false, usedDefence: false, attackLeft: 0, defenceLeft: 0 },
   };
+  /**
+   * A penalty won and not yet taken (#396): the captain's choice, how likely the shot is, and the
+   * phase it set, which is the window for the coach's Take the two / Tap and go. Set by every
+   * penalty, read only by those calls, so a match with none plays as before.
+   */
+  private penaltyUp: { side: Side; mark: Vec; choice: PenaltyChoice; shot: number; phase: Phase; called: boolean } | null = null;
   /** Fresh legs (#367): a swap waiting for the next play-the-ball or stoppage, and the calls made this half. */
   private readonly freshLegs: Record<Side, { pending: boolean; usedThisHalf: number }> = {
     home: { pending: false, usedThisHalf: 0 },
@@ -691,7 +698,8 @@ export class LiveSim implements MatchSim {
   }
   /** How the defending side's line is set. */
   private defPlan(): DefencePlan {
-    return defencePlan(this.defencePreset(other(this.attacking)));
+    const def = other(this.attacking);
+    return withDefenceCall(defencePlan(this.defencePreset(def)), this.callState[def].defence);
   }
   /** How a side defends now: its preset, or the coach's call for the set (#73) — Rush pays in offside penalties either way. */
   private defencePreset(side: Side): DefencePreset {
@@ -864,6 +872,16 @@ export class LiveSim implements MatchSim {
   /** Why a side can't make this call now, or null when it can. */
   callRefusal(side: Side, call: CoachCall): string | null {
     const k = this.phase.kind;
+    // Take the two / Tap and go (#396): only on a penalty his side has won and not yet taken, with the shot on.
+    if (callIsPenalty(call)) {
+      const pen = this.penaltyOpen();
+      if (this.finished || !pen || pen.side !== side) return 'no penalty';
+      if (pen.called) return 'one call a penalty';
+      if (pen.shot < CALLS.penaltyShotMin) return 'too far out';
+      if (pen.choice === penaltyChoiceOf(call)) return 'the captain’s call';
+      if (call === 'tap-go' && this.siren) return 'the siren’s gone';
+      return null;
+    }
     if (this.finished || k === 'half-time' || k === 'conversion' || k === 'goal' || k === 'try') return 'not now';
     if (callIsBench(call)) {
       const fl = this.freshLegs[side];
@@ -880,12 +898,26 @@ export class LiveSim implements MatchSim {
     if (this.attacking !== side) return 'not your ball';
     if (st.usedAttack) return 'one call a set';
     if (call === 'kick-early' && (this.tackles < CALLS.kickEarlyFrom || this.tackles >= SET_TACKLES - 1)) return 'tackles 3–4';
-    if ((call === 'run-it' || call === 'bomb') && this.tackles < CALLS.lastFrom) return 'late in the set';
+    if (call === 'offload' && this.tackles >= CALLS.offload.beforeTackle) return 'tackles 1–4';
+    if ((call === 'run-it' || call === 'bomb' || call === 'grubber' || call === 'forty-twenty') && this.tackles < CALLS.lastFrom) return 'late in the set';
+    // Grubber and 40/20 (#396): not once the set's kick is struck, and from where the ball is now (the mark at a ruck).
+    if ((call === 'grubber' || call === 'forty-twenty') && this.pendingKick) return 'the kick’s away';
+    if (call === 'grubber' && this.toLineFor(side, this.ballPos()) > CALLS.grubberInsideM) return 'not inside their 25';
+    if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) < CALLS.fortyTwentyFromM) return 'not behind your 40';
+    if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) > this.fortyTwentyReach(side)) return 'out of reach of their 20';
     if (call === 'field-goal') {
       const h = this.holder();
       if (!this.fieldGoalOn(h && h.side === side ? h : this.goalKicker(side))) return 'not in range';
     }
     return null;
+  }
+
+  /**
+   * How far from their line a 40/20 can be kicked from (#396): the kick's reach (calls.fortyTwenty.reachM × his
+   * kicker's Big Boot and the wind, without its gusts), the shortest roll on (touchRollM), and their 20 (isFortyTwenty's).
+   */
+  private fortyTwentyReach(side: Side): number {
+    return 20 + TOUCH.touchRollM + CALLS.fortyTwenty.reachM * bootMult(this.kicker(side).traits).dist * this.wx.kickDistance;
   }
 
   /** Why a side can't change its plan now (N11), or null: only at the breaks — half-time, or a score until the kick-off is taken (not a drop-out). */
@@ -959,6 +991,18 @@ export class LiveSim implements MatchSim {
   call(side: Side, call: CoachCall): string | null {
     const why = this.callRefusal(side, call);
     if (why) return why;
+    if (callIsPenalty(call)) {
+      // Neither of the set's calls (#396): the captain's choice is overruled and the penalty taken the coach's way.
+      const pen = this.penaltyUp!;
+      pen.called = true;
+      const choice = penaltyChoiceOf(call);
+      const taker = choice === 'goal' ? this.goalKicker(side) : this.kicker(side);
+      this.emit('coach-call', `${this.names[side]} coach calls: ${CALL_LABEL[call].toLowerCase()}`, taker);
+      this.events[this.events.length - 1]!.detail = call;
+      this.judge.make(side, call, side, this.dirOf(side), pen.mark.x);
+      this.takePenalty(side, pen.mark, choice);
+      return null;
+    }
     if (callIsBench(call)) {
       // Neither of the set's calls: the swap waits for the next play-the-ball or stoppage.
       const fl = this.freshLegs[side];
@@ -974,9 +1018,11 @@ export class LiveSim implements MatchSim {
     if (callIsDefence(call)) {
       st.defence = call;
       st.usedDefence = true;
+      st.defenceLeft = callScope(call);
     } else {
       st.attack = call;
       st.usedAttack = true;
+      st.attackLeft = callScope(call);
     }
     const h = this.holder();
     const by = h && h.side === side ? h : this.kicker(side);
@@ -1091,10 +1137,14 @@ export class LiveSim implements MatchSim {
       for (const st of [this.callState.home, this.callState.away]) {
         st.attack = st.defence = null;
         st.usedAttack = st.usedDefence = false;
+        st.attackLeft = st.defenceLeft = 0;
       }
     } else if (tackled) {
+      // A play call lasts its tackles (one; Offload two, #396), and so does Gang tackle on the other side.
       const st = this.callState[this.attacking];
-      if (st.attack && callIsPlay(st.attack)) st.attack = null;
+      if (st.attack && callIsPlay(st.attack) && --st.attackLeft <= 0) st.attack = null;
+      const def = this.callState[other(this.attacking)];
+      if (def.defence && def.defenceLeft > 0 && --def.defenceLeft <= 0) def.defence = null;
     }
     this.callAtk = this.attacking;
     this.callTackles = this.tackles;
@@ -1627,10 +1677,14 @@ export class LiveSim implements MatchSim {
         return;
       }
     }
-    const early = this.tackles === SET_TACKLES - 2 && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
+    // Grubber and 40/20 (#396) are for the last tackle: the kicker keeps it till then.
+    const forLast = called === 'grubber' || called === 'forty-twenty';
+    const early = this.tackles === SET_TACKLES - 2 && !forLast && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
     const kickEarly = called === 'kick-early' && !this.lastPlay;
     if ((this.lastPlay || early || kickEarly) && isKicker) {
-      if (this.kickCall === null) {
+      // Grubber or 40/20 (#396) sets the last-tackle kick even when it comes after his own choice, till the kick is struck.
+      if (this.lastPlay && forLast) this.kickCall = called === 'grubber' ? 'grubber' : 'long';
+      else if (this.kickCall === null) {
         if (kickEarly) this.kickCall = toLine <= LIVE.earlyKickM ? (this.rng.next() < 0.6 ? 'grubber' : 'chip') : 'long';
         else if (this.lastPlay && called === 'run-it') this.kickCall = 'run';
         else if (this.lastPlay && called === 'bomb') this.kickCall = 'bomb';
@@ -1756,6 +1810,14 @@ export class LiveSim implements MatchSim {
         // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch; else to the fullback.
         const toLine = this.toLine(h);
         const lever = traitBoost(h.traits, 'bigBoot') + traitBoost(h.traits, 'playmaker');
+        // The coach's 40/20 call (#396) goes for it without the roll, as far as calls.fortyTwenty.reachM goes. It is only
+        // offered in reach (fortyTwentyReach); if the last carry took him out of it, it falls short and is said as the
+        // kick for touch it is (in reach: the shortest roll on, touchRollM, gets it inside their 20).
+        if (this.lastPlay && this.callState[this.attacking].attack === 'forty-twenty') {
+          const land = Math.max(TOUCH.fortyTwentyLandM, toLine - CALLS.fortyTwenty.reachM * boot.dist);
+          const aim = land - TOUCH.touchRollM <= 20 ? '40-20' : 'touch';
+          return { ...base, to: this.touchTarget(h, land, TOUCH.fortyTwentyInsideM, boot.acc * CALLS.fortyTwenty.scatter), receiver: this.indexOf(fb), peak: 11, aim, ...trait };
+        }
         if (this.lastPlay && toLine >= FIELD_LENGTH - 40 && this.rng.next() < TOUCH.fortyTwenty + TOUCH.fortyTwentyTrait * lever) {
           return { ...base, to: this.touchTarget(h, TOUCH.fortyTwentyLandM, TOUCH.fortyTwentyInsideM, boot.acc * 0.6), receiver: this.indexOf(fb), peak: 11, aim: '40-20', ...trait };
         }
@@ -1834,7 +1896,8 @@ export class LiveSim implements MatchSim {
     this.lineX = this.mark.x + this.dir * LIVE.onsideM;
     // How long he fought sets the ruck: a quick wrestle is a quick play-the-ball, a long one lets the defence set.
     const secs = w ? (this.tick - w.t0) * TICK_S : 0;
-    const down = w ? ruckTicks(secs) : LIVE.downTicks;
+    // Gang tackle (#396): the extra men lie on, and the play-the-ball is slower.
+    const down = (w ? ruckTicks(secs) : LIVE.downTicks) + (this.callState[other(this.attacking)].defence === 'gang-tackle' ? CALLS.gang.downTicks : 0);
     const pace = !w || handover ? null : secs <= WRESTLE.quickS ? 'quick' : secs >= WRESTLE.slowS ? 'slow' : null;
     this.lock(c, 'down', down);
     for (const i of w ? w.men : [ph.tackler]) this.lock(this.players[i]!, 'down', down);
@@ -1899,8 +1962,10 @@ export class LiveSim implements MatchSim {
       const k = this.kicker(this.attacking);
       if (!this.locked(k) && this.tick >= k.busyUntil) receiver = this.indexOf(k);
     }
+    // The coach's Grubber or 40/20 (#396): the dummy-half finds the kicker rather than dart (no roll for it).
+    const toKicker = this.lastPlay && receiver !== null && (this.callState[this.attacking].attack === 'grubber' || this.callState[this.attacking].attack === 'forty-twenty');
     if (receiver === null) receiver = pickReceiver(h.body.pos, this.dir, this.candidates(h));
-    if (receiver === null || this.rng.next() < LIVE.dartChance) {
+    if (receiver === null || (!toKicker && this.rng.next() < LIVE.dartChance)) {
       // Dummy-half dart.
       h.catchTick = this.tick;
       h.decided = false;
@@ -2197,8 +2262,9 @@ export class LiveSim implements MatchSim {
     const kicker = this.goalKicker(award);
     const halfS = (this.golden ? NINES.goldenPointMinutes : this.length.halfMinutes) * 60;
     const halfLeftS = Math.max(0, halfS - this.clockTicks * TICK_S);
+    const shot = goalChance(mark, postsFor(dir, FIELD_LENGTH, MID_Y), kicker.stats.skill, this.goalAcc(kicker));
     const choice = choosePenalty({
-      shotChance: goalChance(mark, postsFor(dir, FIELD_LENGTH, MID_Y), kicker.stats.skill, this.goalAcc(kicker)),
+      shotChance: shot,
       toLine: this.toLineFor(award, mark),
       matchLeftS: this.golden ? halfLeftS : (this.length.halves - this.half) * halfS + halfLeftS,
       halfLeftS,
@@ -2210,6 +2276,14 @@ export class LiveSim implements MatchSim {
       this.endHalf();
       return;
     }
+    this.penaltyUp = { side: award, mark, choice, shot, phase: this.phase, called: false };
+    this.takePenalty(award, mark, choice);
+  }
+
+  /** The penalty is taken: the captain's choice, or the coach's over it (#396). Each is said and shown. */
+  private takePenalty(award: Side, mark: Vec, choice: PenaltyChoice): void {
+    const dir = this.dirOf(award);
+    const kicker = this.goalKicker(award);
     const say = { goal: `${this.names[award]} take the shot at goal`, tap: `${this.names[award]} tap and go`, touch: `${this.names[award]} kick for touch` } as const;
     // The named goal-kicker (N11) takes the shot; a kick for touch is the slot-5 kicker's, as before.
     const taker = choice === 'goal' ? kicker : this.kicker(award);
@@ -2222,14 +2296,28 @@ export class LiveSim implements MatchSim {
     this.kickCall = this.fgCall = null;
     this.looseFor = null;
     this.markers = [];
-    if (choice === 'tap') {
-      this.startSetPiece(award, mark, 'tap');
-      return;
+    if (choice === 'tap') this.startSetPiece(award, mark, 'tap');
+    else {
+      this.ball = { kind: 'held', by: this.indexOf(taker) };
+      this.phase = choice === 'goal'
+        ? { kind: 'conversion', t0: this.tick, side: award, kicker: this.indexOf(taker), spot: mark, readyAt: 0, good: null, what: 'penalty' }
+        : { kind: 'penalty', t0: this.tick, side: award, spot: mark, kicker: this.indexOf(taker), kicked: false };
     }
-    this.ball = { kind: 'held', by: this.indexOf(taker) };
-    this.phase = choice === 'goal'
-      ? { kind: 'conversion', t0: this.tick, side: award, kicker: this.indexOf(taker), spot: mark, readyAt: 0, good: null, what: 'penalty' }
-      : { kind: 'penalty', t0: this.tick, side: award, spot: mark, kicker: this.indexOf(taker), kicked: false };
+    // The coach's window (#396) follows the penalty to the phase that takes it.
+    if (this.penaltyUp) {
+      this.penaltyUp.choice = choice;
+      this.penaltyUp.phase = this.phase;
+    }
+  }
+
+  /** The penalty won and not yet taken (#396): the tap not yet played, the shot not yet struck, the kick for touch not yet gone. */
+  private penaltyOpen(): { side: Side; mark: Vec; choice: PenaltyChoice; shot: number; called: boolean } | null {
+    const pen = this.penaltyUp;
+    const ph = this.phase;
+    if (!pen || ph !== pen.phase) return null;
+    if (ph.kind === 'conversion' && ph.good !== null) return null;
+    if (ph.kind === 'penalty' && ph.kicked) return null;
+    return pen;
   }
 
   /** A penalty kicked for touch: the kicker to the mark, then the ball out 25-odd metres downfield. */
@@ -2488,8 +2576,8 @@ export class LiveSim implements MatchSim {
         const r = pickReceiver(c.body.pos, this.dir, cands) ?? cands.find((k) => !k.busy)?.idx ?? null;
         if (r !== null) {
           this.emit('offload', `${c.name} gets the offload away to ${this.players[r]!.name}`, c, credit);
-          // A Razzle Dazzle offload is the miracle ball — and the one that gets spilled.
-          this.pass(c, this.players[r]!, tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0);
+          // A Razzle Dazzle offload is the miracle ball — and the one that gets spilled; so is one the coach called for (#396).
+          this.pass(c, this.players[r]!, (tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0) + (this.playCall() === 'offload' ? CALLS.offload.spill : 0));
           this.lock(c, 'tackled', LIVE.contactTicks + LIVE.downTicks);
           this.lock(t, 'tackle', LIVE.contactTicks + LIVE.downTicks);
           c.busyUntil = this.tick + LIVE.contactTicks + LIVE.downTicks + 10;

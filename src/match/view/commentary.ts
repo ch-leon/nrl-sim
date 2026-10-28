@@ -17,7 +17,7 @@
 // The match report's summary (matchReport.ts) takes its first lines from here too.
 import type { Side, SimEvent } from '../core/snapshot';
 import type { MatchEvent, MatchResult } from '../../sim/events';
-import { CALL_LABEL, isCoachCall } from '../league/calls';
+import { CALL_LABEL, callIsPenalty, isCoachCall } from '../league/calls';
 import { PRESET_LABEL } from '../league/presets';
 
 /**
@@ -128,7 +128,10 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'field-goal:missed': ["{player}'s field goal goes wide.", 'The field goal misses.', '{player} pushes the field goal wide.'],
   // ── The coach (#73, N11) ──
   'coach-call': ['{team} coach calls: {call}.', 'Call from the {team} box: {call}.', '{team} make a call: {call}.'],
-  'call-paid': ['{call} pays off for {team}.', 'It works! The {call} pays off for {team}.', 'The call comes off: {call}.'],
+  'call-paid': ['{call} pays off for {team}.', 'Yes! The {call} pays off for {team}.', 'The call comes off: {call}.'],
+  // The coach overrules the captain on a penalty (#396).
+  'coach-call:penalty': ['{team} coach steps in: {call}.', 'From the {team} box: {call}.', 'The coach overrules: {call}.'],
+  'call-paid:penalty': ['{call} pays off for {team}.', 'The {call} call comes off for {team}.', 'The call comes off: {call}.'],
   plan: ['{team} switch to {plan}.', 'New plan for {team}: {plan}.', '{team} go {plan}.'],
   // ── The whistles ──
   siren: ["There's the siren — play on till it's dead.", 'The siren goes. Play on until the ball is dead.', 'Siren! The ball has to go dead first.'],
@@ -198,6 +201,9 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
       return d && LINES[`${e.kind}:${d}`] ? `${e.kind}:${d}` : e.kind;
     case 'penalty-choice':
       return `penalty-choice:${d === 'goal' || d === 'touch' ? d : 'tap'}`;
+    case 'coach-call':
+    case 'call-paid':
+      return isCoachCall(d) && callIsPenalty(d) ? `${e.kind}:penalty` : e.kind;
     case 'try':
       return d === 'bonus' ? 'try:bonus' : 'try';
     case 'conversion':

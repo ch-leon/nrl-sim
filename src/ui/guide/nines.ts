@@ -104,7 +104,9 @@ export const NINES_PAGE: GuidePage = {
       bullets: [
         'Each side plays an attack preset (Grind, Balanced, Expansive, Kick-chase, All-out) and a defence preset (Slide, Rush, Compressed) by zone of the field.',
         'Traits fire in their moment and are announced when they do: a step, a fend, an offload, a big hit, a strip, an intercept.',
-        'In a live match COACH, bottom left, opens the coach calls for the next play (only the ones you can make now; the match keeps playing): with the ball Hit-up, Shift left or right, Kick early, Run it, Bomb and Field goal; defending Rush or Hold. One call a set; the stats (tap the score) count the calls that paid off. Fresh legs (your most tired man off for the freshest on the bench) is any time, once a half, and doesn’t use up the set’s call. With no Coach’s Office you have Hit-up, Hold and Fresh legs; each level of it adds calls: Shift and Rush, then Kick early and Run it, then Bomb and Field goal.',
+        'In a live match COACH, bottom left, opens the coach calls for the next play (only the ones you can make now, five at most; the match keeps playing): with the ball Hit-up, Shift left or right, Offload (the next two carries look for it, tackles 1–4), Kick early, Run it, Bomb, Grubber (inside their 25), 40/20 (from behind your 40, in reach of their 20) and Field goal; defending Rush, Hold or Gang tackle (an extra man in the next two tackles, but more room out wide). One call a set; the stats (tap the score) count the calls that paid off. Fresh legs (your most tired man off for the freshest on the bench) is any time, once a half, and doesn’t use up the set’s call.',
+        'Win a penalty within kicking range and the tray offers Take the two or Tap and go, over your captain’s choice (his own shows greyed). It doesn’t use up the set’s call.',
+        'With no Coach’s Office you have Hit-up, Hold and Fresh legs; each level of it adds calls: Shift, Rush, Offload and Gang tackle; then Kick early, Run it, Grubber and the penalty calls; then Bomb, Field goal and 40/20.',
       ],
     },
     {

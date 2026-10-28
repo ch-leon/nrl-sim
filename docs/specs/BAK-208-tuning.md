@@ -688,7 +688,8 @@ rules roll no dice, and the same refusals as the player's chips apply: a field g
 on (and in the last minutes of a close match he saves his attack call for it); a shift toward
 an overlap; Rush when defending near his own line. The player's chips are unlocked by his
 Coach's Office (the best one built): none built, Hit-up and Hold; level 1 adds Shift left /
-right and Rush; level 2 Kick early and Run it; level 3 Bomb and Field goal. The lab's `ai=1`
+right and Rush; level 2 Kick early and Run it; level 3 Bomb and Field goal (#396 added Offload and
+Gang tackle at 1, Grubber, Take the two and Tap and go at 2, 40/20 at 3: "More calls" below). The lab's `ai=1`
 gives both coaches the AI; the harness's `aiCoach` scenario field names the sides (absent, both
 when `calls.ai.on`).
 
@@ -697,7 +698,7 @@ when `calls.ai.on`).
 | `calls.ai.on` | `calls.ts` | 0 | 1 gives every rival coach (both in a rival-v-rival match, the player's opponent) his own calls. |
 | `calls.ai.overlap` | `calls.ts` | 2 | Shift when the attack has this many more men than the defence on one side of the ball. |
 | `calls.ai.rushOwnM` | `calls.ts` | 20 m | Rush when defending this close to his own line. |
-| `CALLS.unlocks` | `calls.ts` | Hit-up, Hold, Fresh legs · +Shift ×2, Rush · +Kick early, Run it · +Bomb, Field goal | The calls each Coach's Office level adds (index = level). Not a number, so not a harness knob. |
+| `CALLS.unlocks` | `calls.ts` | Hit-up, Hold, Fresh legs · +Shift ×2, Rush, Offload, Gang tackle · +Kick early, Run it, Grubber, Take the two, Tap and go · +Bomb, Field goal, 40/20 | The calls each Coach's Office level adds (index = level; #396's calls in "More calls" below). Not a number, so not a harness knob. |
 
 Measured (`20261020-021804-ai-coach-calls`, 120 whole matches a row, one side's coach on the AI):
 about 23 calls a match, 5 of them paying off; between even sides the AI side wins 51% (no AI:
@@ -765,6 +766,67 @@ the home win; with no call every row is identical to its no-call twin.
 The harness takes calls per scenario (`"calls": { "home": [{ "call": "rush" }] }`, optionally
 `"tackle": 2`) and counts `coachCalls`; the lab shows chips for either coach with `#lab?calls=1`.
 Tests: `tests/match/league/calls.test.ts`, `tests/match/league/freshLegs.test.ts`.
+
+**More calls (#396; spec `coach-calls.md` §10).** Offload (level 1, with the ball on tackles 1–4,
+the next two carries), Gang tackle (level 1, defending, the next two tackles), Grubber (level 2,
+from tackle 4 inside their 25), Take the two / Tap and go (level 2, a penalty won in range, over
+the captain's choice; neither of the set's calls) and 40/20 (level 3, from tackle 4 behind his own
+40 and in reach of their 20). Refusals: "tackles 1–4", "not inside their 25", "not behind your
+40", "out of reach of their 20", "the kick’s away", "no penalty", "one call a penalty", "too far
+out", "the captain’s call", "the siren’s gone". None rolls a die it would not
+roll anyway, and no state they add is read without a call: no calls plays as before (both
+fingerprints unchanged). The AI coach doesn't make them.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `calls.offload.offload` / `.spill` | `calls.ts` | +0.5 / +0.04 | Offload: the plan's `offload` becomes at least 1 plus this (about +6 points on a 12% contest, even in a plan that tucks it, offload 0), and an offload pass is spilled this much more often. |
+| `calls.offload.plays` / `.beforeTackle` | `calls.ts` | 2 / 4 | Offload lasts this many carries, and is made with fewer than this many tackles done (tackles 1–4). |
+| `calls.gang.commit` | `calls.ts` | +1 | Gang tackle: one more defender commits to the carrier (the defence plan's `commit`). |
+| `calls.gang.downTicks` | `calls.ts` | 6 ticks | …the ruck takes this much longer to clear (a slower play-the-ball; the tacklers lie on too). |
+| `calls.gang.stepAgainst` | `calls.ts` | +0.2 | …and with a man more in the tackle the edges are thin: a carrier one-on-one steps his man this much more often (the defence plan's `stepAgainst`, as Rush). |
+| `calls.gang.tackles` | `calls.ts` | 2 | Gang tackle lasts this many tackles. |
+| `calls.grubberInsideM` | `calls.ts` | 25 m | Grubber is on with the ball this close to their line (from tackle 4, `calls.lastFrom`); the last-tackle kick is a grubber. |
+| `calls.fortyTwentyFromM` | `calls.ts` | 60 m | 40/20 is on with the ball at least this far from their line (behind his own 40), from tackle 4. |
+| `calls.fortyTwenty.reachM` / `.scatter` | `calls.ts` | 35 m / 0.6 | The called 40/20 lands `touch.fortyTwentyLandM` (26 m) from their line, but no further from the kicker than this (× Big Boot distance × the wind); scattered this much × his accuracy (the sim's own 40/20 attempt: 0.6). It is offered only in reach: the ball no further from their line than 20 + `touch.touchRollM` (the shortest roll on) + this, 64 m for a kicker with no Big Boot in no wind. A kick the last carry took out of reach is said as a kick for touch. |
+| `calls.penaltyShotMin` | `calls.ts` | 0.35 | Take the two / Tap and go are offered on a penalty won when the shot at goal from the mark is at least this likely ("too far out"). |
+| `calls.paid.gangM` | `calls.ts` | 10 m | Gang tackle paid off when its two tackles give up less than this (or the defence wins the ball). Display only. |
+| `CALLS.unlocks` | `calls.ts` | +Offload, Gang tackle · +Grubber, Take the two, Tap and go · +40/20 | #396's calls by Coach's Office level (1, 2, 3), in the full list in the row above. Not a number, so not a harness knob. |
+
+With Grubber or 40/20 called, the kicker keeps the ball for the last tackle (no early kick on
+tackle 4), the dummy-half gives it to him when he is free instead of rolling for a dart, and the
+call sets his kick even when it comes after his own choice, until the kick is struck ("the kick’s
+away"). A 40/20 pays off only on touch inside their 20 (not a regather, a drop or a drop-out off
+it).
+
+**Sized by** `balance/plans/experiments/20261028-more-calls*.json` (balance log), even sides,
+200 seeds both ways round (400 matches a row), the home coach making the one call whenever he
+may. First drawn, Gang tackle won **62.3%** (run `20261028-115519-more-calls`; no calls 48.3%)
+and 40/20 **63.0%**. Gang tackle's strength is the extra man (without it 51.2%; one tackle
+instead of two 57.5%; no slower ruck 59.3%, run `20261028-120334-more-calls-gang`), and bunching
+its line (`pull` ×1.2 → 2) made it stronger, 68–70%, so "more space out wide" became the edge
+step: +0.16 57.0%, +0.25 43.5% (run `20261028-121151-more-calls-gang2`). 40/20 aimed 26 m out
+from anywhere behind his own 40 is a 60 m kick from deep; capped at 32 m it won 45.8% but found
+the 40/20 on 2% of calls, at 38 m 54.8%, at 44 m 58.0% (runs `20261028-120027-more-calls-4020`,
+`20261028-121503-more-calls-4020b`). At 35 m (run `20261028-121735-more-calls`) it won 54.8%, offered
+anywhere behind his own 40 (7.3 calls a match, most of them out of reach); offered only in reach
+(review of #405), it is on half as often.
+
+At the defaults (run `20261028-133951-more-calls`; Offload, Gang tackle and the penalty pair play
+exactly as in `20261028-121735-more-calls`):
+
+| Called whenever he may | Calls a match | Paid off | His side wins | Moved (both sides, a match) |
+|---|---:|---:|---:|---|
+| No calls | – | – | 48.3% | – |
+| Offload | 24.9 | 7.7 | 47.3% | offloads 7.4 → 8.9 |
+| Gang tackle | 24.3 | 18.0 | 51.2% | line breaks 14.9 → 13.7, steps 14.3 → 21.5, tries 5.1 → 4.8 |
+| Grubber | 4.1 | 1.1 | 42.3% | grubbers 2.0 → 3.3, dead balls 1.2 → 1.7 |
+| 40/20 | 3.7 | 0.09 | 52.5% | touch finds 1.9 → 2.7, 40/20s 0.1 → 0.2 |
+| Take the two | 0.13 | 0.06 | 46.3% | – (on offer about once in eight matches) |
+| Tap and go | 0.07 | 0.01 | 48.5% | – |
+
+None is a free win beyond Hold's 55% (above); spamming Grubber costs. The penalty pair is rarely
+on: most penalties are not in range, or the captain already took the choice the coach would.
+Tests: `tests/match/league/moreCalls.test.ts`.
 
 ## 21. Positional fit and the lineup (#69)
 

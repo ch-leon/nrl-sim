@@ -20,7 +20,7 @@ import { replayRange, Runner, TICK_MS, type SimFactory } from '../core/engine';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { MatchRecorder, type RunMatchOptions } from '../league/match';
-import { callIsBench, type CallInput, type CallVerdict, type CoachCall } from '../league/calls';
+import { callIsBench, callIsPenalty, type CallInput, type CallVerdict, type CoachCall } from '../league/calls';
 import type { DifficultyEdge } from '../league/spread';
 import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
@@ -340,6 +340,8 @@ export class LivePlayback {
     if (this.finishEmitted || this.awaitingSkip) return 'full time';
     // Fresh legs (#367) tapped, and the sim takes it on the next tick: not twice.
     if (callIsBench(call) && this.queuedCall(side, call)) return 'used this half';
+    // A penalty call (#396) tapped: one a penalty, whichever.
+    if (callIsPenalty(call) && (this.queuedCall(side, 'take-two') || this.queuedCall(side, 'tap-go'))) return 'one call a penalty';
     return this.sim.callRefusal(side, call);
   }
 

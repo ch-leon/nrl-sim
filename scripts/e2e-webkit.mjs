@@ -23,11 +23,11 @@
 // to 844×390 must wake it with the canvas filling the screen. The same turn
 // mid-match freezes the clock and resumes it, and a parked match stays paused
 // until the phone is sideways, including after Continue reopens the page upright.
-// With the match up, the coach tray is filled with every call (Hit-up through Hold)
-// and the commentary checked: the line (log = line) clear of the bottom row and the
+// With the match up, the coach tray is filled with the most it shows (#396: six
+// calls in five rows), which must not scroll, and the commentary checked: the line (log = line) clear of the bottom row and the
 // score bug at 360×640, 390×844, 667×375 and 844×390; the full log (log = full) clear
 // of them and of the open tray, and scrolling, at 667×375 and 844×390; and the LOG
-// switch keeps its fill under hover.
+// switch keeps its fill under hover. The full tray is checked once more, alone, at 956×330.
 // Both Bali choices must fit, retain 44px targets and accept taps at these same
 // four sizes. Exits 1 on any failure.
 //
@@ -549,7 +549,8 @@ async function runPortrait(browser) {
   });
   // The coach calls were a row of chips that wrapped past a fixed offset; since Broadcast
   // Quiet they are a tray over the COACH button (3o) listing the calls legal now. The
-  // tray is filled with every call, the log given 80 lines, and at each size: the
+  // tray is filled with the most it shows (#396: six, Shift as a pair) and must not
+  // scroll, the log given 80 lines, and at each size: the
   // commentary line (log = line, tray shut) clear of the bottom row and the score bug;
   // then the full log (log = full, tray open) clear of the score bug, the bottom row and
   // the tray, scrolling, at least four lines tall (sideways only). The LOG switch keeps its fill under hover.
@@ -560,9 +561,7 @@ async function runPortrait(browser) {
       sc.refreshCallChips = () => {};
       sc.toggleTray(true);
       const list = document.querySelector('.nrl-mo-tray-list');
-      const calls = [['hitUp', 'Hit-up'], ['shiftLeft', 'Shift left'], ['shiftRight', 'Shift right'], ['kickEarly', 'Kick early'], ['runIt', 'Run it'],
-        ['bomb', 'Bomb'], ['fieldGoal', 'Field goal'], ['rush', 'Rush'], ['hold', 'Hold']];
-      list.replaceChildren(...calls.map(([id, label]) => {
+      const tile = ([id, label]) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'nrl-btn nrl-mo-tray-call';
@@ -573,7 +572,12 @@ async function runPortrait(browser) {
         what.textContent = 'What the call does, in plain words';
         b.append(name, what);
         return b;
-      }));
+      };
+      const pair = document.createElement('div');
+      pair.className = 'nrl-mo-tray-pair';
+      pair.append(tile(['shiftLeft', 'Shift left']), tile(['shiftRight', 'Shift right']));
+      list.replaceChildren(tile(['hitUp', 'Hit-up']), pair, tile(['offload', 'Offload']), tile(['kickEarly', 'Kick early']), tile(['freshLegs', 'Fresh legs']));
+      document.querySelector('.nrl-mo-tray-foot').textContent = 'Run it, Bomb, Grubber, 40/20 from tackle 4 · Field goal when in range · Take the two, Tap and go at Coach’s Office level 2, more above';
       sc.toggleTray(false);
       const feed = document.querySelector('.nrl-mo-feed');
       for (let i = 0; i < 80; i++) {
@@ -610,7 +614,9 @@ async function runPortrait(browser) {
         if (!feed || feed.clientHeight < 12 || feed.scrollHeight <= feed.clientHeight) hits.push(`full log not scrollable (${feed?.clientHeight}px, panel ${what.height.toFixed(1)}px)`);
         else if (feed.clientHeight < 60) hits.push(`full log only ${feed.clientHeight}px tall`);
         const rows = document.querySelectorAll('.nrl-mo-calls [data-call]').length;
-        if (rows < 9) hits.push(`only ${rows} calls in the tray`);
+        if (rows < 6) hits.push(`only ${rows} calls in the tray`);
+        const t = document.querySelector('.nrl-mo-calls');
+        if (t.scrollHeight > t.clientHeight + 1) hits.push(`the coach tray scrolls (${t.scrollHeight} > ${t.clientHeight}px)`);
       }
       return { pending: hits.length > 0, problems: hits };
     }, mode);
@@ -641,6 +647,32 @@ async function runPortrait(browser) {
         if (found?.problems?.length) problems.push(`${mode} ${w}×${h}: ${found.problems.join(', ')}`);
         else rec.notes.push(`${mode} ${w}×${h} clear`);
       }
+    }
+    // The tray at its fullest on the shortest phone (#396): 956×330 lays it three a line and
+    // it must not scroll either (the full log is not checked here: its four lines are for 375+).
+    for (const [w, h] of [[956, 330]]) {
+      await turn(w, h);
+      await page.waitForTimeout(300);
+      const tray = await page.evaluate(() => {
+        const t = document.querySelector('.nrl-mo-calls');
+        const r = t?.getBoundingClientRect();
+        if (!t || !r || r.height < 1) return ['the coach tray is not open'];
+        const out = [];
+        if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) out.push('the coach tray is off screen');
+        if (t.scrollHeight > t.clientHeight + 1) out.push(`the coach tray scrolls (${t.scrollHeight} > ${t.clientHeight}px)`);
+        const rows = [...t.querySelectorAll('[data-call]')];
+        if (rows.length < 6) out.push(`only ${rows.length} calls in the tray`);
+        for (const b of rows) {
+          const q = b.getBoundingClientRect();
+          if (q.height < 44) out.push(`call ${b.dataset.call} is ${Math.round(q.height)}px tall`);
+          const at = document.elementFromPoint((q.left + q.right) / 2, (q.top + q.bottom) / 2);
+          if (!(at && b.contains(at))) out.push(`call ${b.dataset.call} covered by ${at?.className || at?.tagName}`);
+        }
+        return out;
+      });
+      await page.screenshot({ path: join(OUT, `tray-full-${w}x${h}.png`) });
+      if (tray.length) problems.push(`tray ${w}×${h}: ${tray.join(', ')}`);
+      else rec.notes.push(`tray ${w}×${h} clear`);
     }
     await turn(844, 390);
     await setMode('line');

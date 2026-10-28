@@ -24,7 +24,7 @@ import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
-import { SKIP_ARM_MS, callEffect, callsHintSeasoned, callsLockedHint, callsUnlockLine, coachBadge, cssHex, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
+import { CALL_TILE, SKIP_ARM_MS, callCaption, callEffect, callForRole, callsHintSeasoned, callsLockedHint, callsUnlockLine, coachBadge, cssHex, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayRows, type MatchOverlayHandle, type PlanCardHandle, type TrayButton } from '../ui/screens/matchOverlay';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
 import { styleLine } from '../ui/tacticsBlurbs';
 import {
@@ -40,7 +40,7 @@ import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callIsDefence, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callIsPenalty, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
@@ -967,38 +967,52 @@ export class MatchScene extends Phaser.Scene {
     // The set is over once the call has landed and the side may call again.
     const used = [...why.values()].includes('one call a set');
     if (!used && pb.tick > this.madeAt + 1) this.madeCall = null;
-    // His calls for the play now: attack calls with the ball, Rush and Hold without it; Fresh legs (#367) either way.
-    const role = this.unlocked.filter((c) => callIsBench(c) || callIsDefence(c) !== attacking);
-    const legal = role.filter((c) => why.get(c) === null);
-    const badge = coachBadge(legal.length, attacking, this.madeCall);
+    // His calls for the play now: attack calls with the ball, defence calls without it; Fresh legs (#367) and a penalty won (#396) either way.
+    const role = this.unlocked.filter((c) => callForRole(c, attacking));
+    // The rows the tray shows (#396): at most five, so it never scrolls.
+    const buttons = role.map((call) => ({ call, why: why.get(call) ?? null }));
+    const rows = trayRows(buttons, attacking);
+    const badge = coachBadge(trayCallsOn(rows), attacking, this.madeCall);
     if (this.coachBadgeEl && this.coachBadgeEl.textContent !== badge.text) this.coachBadgeEl.textContent = badge.text;
     if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
     if (!this.trayOpen() || !this.trayList || !this.trayTitle || !this.trayFoot) return;
     const title = attacking ? 'Your ball' : 'Their ball';
     if (this.trayTitle.textContent !== title) this.trayTitle.textContent = title;
-    const key = `${title}:${legal.join(',')}`;
+    const key = `${title}:${rows.map((r) => r.buttons.map((b) => `${b.call}${b.why === null ? '' : '-'}`).join('+')).join(',')}`;
     if (key !== this.trayKey) {
       this.trayKey = key;
-      const rows: HTMLElement[] = legal.map((call) => {
+      const tile = ({ call, why: off }: TrayButton): HTMLButtonElement => {
         const b = button('', () => this.makeCall(call), { class: 'nrl-mo-tray-call' });
         const name = document.createElement('b');
         name.textContent = CALL_LABEL[call];
         const what = document.createElement('span');
-        what.textContent = callEffect(call);
+        // A pair's greyed half (#396) says why it is off: "captain’s call". The tile's text is short; the whole line is its title.
+        what.textContent = off === null ? CALL_TILE[call] : callCaption(off, false);
         b.replaceChildren(name, what);
+        b.title = `${CALL_LABEL[call]}: ${callEffect(call)}`;
         b.setAttribute('data-call', call);
+        b.disabled = off !== null;
         return b;
+      };
+      const els: HTMLElement[] = rows.map((r) => {
+        if (r.buttons.length === 1) return tile(r.buttons[0]!);
+        const pair = document.createElement('div');
+        pair.className = 'nrl-mo-tray-pair';
+        pair.setAttribute('data-row', r.id);
+        pair.append(...r.buttons.map(tile));
+        return pair;
       });
-      if (rows.length === 0) {
+      if (els.length === 0) {
         const none = document.createElement('div');
         none.className = 'nrl-mo-tray-none';
         none.textContent = 'Nothing to call right now.';
-        rows.push(none);
+        els.push(none);
       }
-      this.trayList.replaceChildren(...rows);
+      this.trayList.replaceChildren(...els);
     }
-    const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && (callIsBench(c) || callIsDefence(c) !== attacking)).map((call) => ({ call, level: unlockLevel(call) }));
-    const foot = callsUnlockLine(role.map((call) => ({ call, why: why.get(call) ?? null })), locked);
+    // The penalty pair (#396) only ever shows on a penalty won, so the footer doesn't list it as locked.
+    const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && callForRole(c, attacking) && !callIsPenalty(c)).map((call) => ({ call, level: unlockLevel(call) }));
+    const foot = callsUnlockLine(buttons, locked, trayHidden(buttons, attacking, rows));
     if (this.trayFoot.textContent !== foot) this.trayFoot.textContent = foot;
   }
 
@@ -1007,8 +1021,8 @@ export class MatchScene extends Phaser.Scene {
     const pb = this.playback;
     if (!(pb instanceof LivePlayback)) return;
     if (pb.call(this.callSide, call) === null) {
-      // Fresh legs (#367) isn't the set's call: the badge keeps the set's own.
-      if (!callIsBench(call)) {
+      // Fresh legs (#367) and a penalty call (#396) aren't the set's call: the badge keeps the set's own.
+      if (!callIsBench(call) && !callIsPenalty(call)) {
         this.madeCall = call;
         this.madeAt = pb.tick;
       }
