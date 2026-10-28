@@ -18,6 +18,10 @@
 // Then the landscape screens (#336, #344, #347): every nav screen and the main
 // popups at 844×390 with an iPhone 14's safe areas simulated and at 667×375 (see
 // runScreens). --screens-only runs just those.
+// Then the dock at Normal, Large and Larger text at the same three sizes (#344, see
+// runDockTextSize): five tabs and PLAY WEEK on one row, no label clipped, 44px tabs,
+// the open tab marked by its fill and a bar that reads in greyscale, and each tab's
+// spoken name with "current" and its alert.
 // Screenshots and report.json go to e2e-output/webkit/<WxH>/.
 // Then one portrait boot (390×844): the loop must already be asleep, and turning
 // to 844×390 must wake it with the canvas filling the screen. The same turn
@@ -1742,6 +1746,249 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   return report.steps.filter((s) => !s.ok).length + report.errors.length;
 }
 
+// ── The dock at every text size (#344) ──────────────────────────────────────
+/** The sizes the dock phase runs at: 844×390 with an iPhone 14's insets, 667×375, 956×330. */
+const DOCK_RUNS = [{ w: 844, h: 390, safe: { l: 47, t: 0, r: 47, b: 21 } }, { w: 667, h: 375, safe: NO_INSETS }, { w: 956, h: 330, safe: NO_INSETS }];
+/** What the phase opens at each text size: home, each tab's sheet, Office's sheet up, a screen from a tile. */
+const DOCK_STATES = [
+  { name: 'home', open: null, marked: 'club' },
+  { name: 'squad', open: 'squad', marked: 'squad' },
+  { name: 'league', open: 'fixtures', marked: 'fixtures' },
+  { name: 'build', open: 'build', marked: 'build' },
+  { name: 'office-up', open: 'office', marked: 'office' },
+  { name: 'staff-tile', open: 'staff', marked: 'office' },
+];
+
+/**
+ * What the dock gets wrong (#344): the five tabs and PLAY WEEK not on one row, a label
+ * clipped or under 12px, a tab under 44×44, the dock in the unsafe bands, the open
+ * tab (`marked`) without its fill and its 3px bar, or a bar that doesn't read in
+ * greyscale (3:1 against the fill, WCAG 1.4.11). Runs in the page.
+ */
+function dockProblems(page, marked, safe) {
+  return page.evaluate(([marked, safe]) => {
+    const W = innerWidth, H = innerHeight;
+    const out = [];
+    const tabs = [...document.querySelectorAll('.nrl-nav > .nrl-btn')];
+    const play = document.querySelector('.nrl-dock-play-group');
+    if (tabs.length !== 5) out.push(`${tabs.length} tabs (want 5)`);
+    if (!play) out.push('no PLAY WEEK');
+    const name = (b) => b.getAttribute('data-label') ?? b.textContent.trim();
+    const rs = [...tabs, play].filter(Boolean).map((e) => e.getBoundingClientRect());
+    const mids = rs.map((r) => (r.top + r.bottom) / 2);
+    if (Math.max(...mids) - Math.min(...mids) > 4) out.push('the tabs and PLAY WEEK are not on one row');
+    for (let i = 1; i < rs.length; i++) if (rs[i].left < rs[i - 1].right - 0.5) out.push(`${i === tabs.length ? 'PLAY WEEK' : name(tabs[i])} overlaps the item before it`);
+    for (const b of tabs) {
+      const r = b.getBoundingClientRect();
+      const label = b.querySelector('.nrl-nav-label');
+      // To the hundredth: WebKit measures 44px as 43.99999 at a fractional x.
+      if (Math.round(r.width * 100) < 4400 || Math.round(r.height * 100) < 4400) out.push(`${name(b)} is ${r.width.toFixed(1)}×${r.height.toFixed(1)}px`);
+      if (b.scrollWidth > b.clientWidth + 0.5) out.push(`${name(b)} clipped (${b.scrollWidth} in ${b.clientWidth}px)`);
+      const lr = label.getBoundingClientRect();
+      if (lr.left < r.left - 0.5 || lr.right > r.right + 0.5) out.push(`${name(b)}'s label runs out of its tab`);
+      if (getComputedStyle(label).textOverflow === 'ellipsis') out.push(`${name(b)}'s label ellipsises`);
+      const dot = b.querySelector('.nrl-nav-dot')?.getBoundingClientRect();
+      if (dot && (dot.right > r.right + 0.5 || dot.width < 7.5)) out.push(`${name(b)}'s dot clipped`);
+      const px = parseFloat(getComputedStyle(label).fontSize);
+      if (px < 12) out.push(`${name(b)} ${px.toFixed(1)}px`);
+    }
+    // PLAY WEEK's label stays whole, clear of ▾ (or STOP while a run of weeks goes).
+    const adv = document.querySelector('.nrl-dock-advance-label');
+    const next = adv && [...play.querySelectorAll(':scope > .nrl-btn')].find((b) => !b.contains(adv) && b.getBoundingClientRect().width > 0);
+    const over = adv && next ? adv.getBoundingClientRect().right - next.getBoundingClientRect().left : 0;
+    if (over > 0.5) out.push(`the PLAY WEEK label runs ${Math.round(over)}px under ${next.textContent.trim()}`);
+    const dock = document.querySelector('.nrl-dock').getBoundingClientRect();
+    if (dock.left < safe.l - 0.5 || dock.right > W - safe.r + 0.5 || dock.bottom > H - safe.b + 0.5) out.push(`the dock is in the unsafe band (${Math.round(dock.left)}–${Math.round(dock.right)}, bottom ${Math.round(dock.bottom)})`);
+    // The marker: aria-current (or, for OFFICE with its sheet up, aria-expanded), the fill and the bar.
+    const lit = tabs.filter((b) => b.getAttribute('aria-current') === 'page' || b.getAttribute('aria-expanded') === 'true');
+    const want = tabs.find((b) => b.getAttribute('data-screen') === marked);
+    let contrast = 0;
+    if (lit.length !== 1 || lit[0] !== want) out.push(`marked: ${lit.map(name).join(', ') || 'nothing'} (want ${marked})`);
+    else {
+      const b = want, label = b.querySelector('.nrl-nav-label');
+      const bar = getComputedStyle(label, '::after');
+      const fill = getComputedStyle(b).backgroundColor;
+      if (bar.content === 'none' || bar.height !== '3px') out.push(`${name(b)} has no 3px bar (${bar.content} ${bar.height})`);
+      if (/rgba\(0, 0, 0, 0\)|transparent/.test(fill)) out.push(`${name(b)} has no fill`);
+      if (label.getBoundingClientRect().bottom + 5 > b.getBoundingClientRect().bottom + 0.5) out.push(`${name(b)}'s bar sits below the tab`);
+      // Greyscale: the bar's luminance against the fill's.
+      const lum = (c) => {
+        const [r, g, bl] = c.match(/[\d.]+/g).slice(0, 3).map(Number).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+      };
+      const [a, z] = [lum(bar.backgroundColor), lum(fill)].sort((x, y) => y - x);
+      contrast = (a + 0.05) / (z + 0.05);
+      if (contrast < 3) out.push(`${name(b)}'s bar is ${contrast.toFixed(1)}:1 on its fill in greyscale (want 3)`);
+    }
+    const slack = Math.round((play?.getBoundingClientRect().left ?? W) - rs[tabs.length - 1].right);
+    const px = parseFloat(getComputedStyle(tabs[0].querySelector('.nrl-nav-label')).fontSize);
+    return { problems: out, note: `labels ${px.toFixed(1)}px, ${slack}px to PLAY WEEK${contrast ? `, bar ${contrast.toFixed(1)}:1` : ''}` };
+  }, [marked, safe]);
+}
+
+/**
+ * The dock at Normal, Large and Larger (#344, after #371's text size) at 844×390, 667×375
+ * and 956×330. A contract ending (Squad's dot) and the welcome news (OFFICE's count) are
+ * real alerts. At each size, set from Settings as a player would: CLUB, each tab's sheet,
+ * Office's sheet up and Staff & Board from its tile, each checked by dockProblems, and
+ * each tab's spoken name (the accessibility tree): its name, "current" when open, its alert.
+ * Then a stress at Larger: RESUME MATCH, a decisions count and a long opponent, which must
+ * cost PLAY WEEK's sub-line, not a tab. Staff & Board and Coach calls: two taps from Office.
+ * A greyscale screenshot of the open tab at each size is kept as greyscale-<size>.png.
+ */
+async function runDockTextSize(browser) {
+  let failed = 0;
+  for (const { w: W, h: H, safe } of DOCK_RUNS) {
+    const tag = `${W}x${H}${safe.l || safe.r || safe.b || safe.t ? '-safe' : ''}`;
+    const OUT = join(OUT_ROOT, 'webkit', `dock-${tag}`);
+    rmSync(OUT, { recursive: true, force: true });
+    mkdirSync(OUT, { recursive: true });
+    const report = { size: tag, safe, steps: [], errors: [] };
+    const ctx = await browser.newContext({
+      viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
+    });
+    await ctx.addInitScript(closeWeekSummary);
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(15000);
+    page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
+    let n = 0;
+    const step = async (name, fn) => {
+      n++;
+      const rec = { n, name, ok: true, notes: [] };
+      try {
+        const problems = (await fn(rec)) ?? [];
+        if (problems.length) { rec.ok = false; rec.notes.push(...problems); }
+      } catch (err) {
+        rec.ok = false;
+        rec.notes.push(`threw: ${err.message.split('\n')[0]}`);
+      }
+      rec.file = `${String(n).padStart(2, '0')}-${name}.png`;
+      await page.screenshot({ path: join(OUT, rec.file) }).catch(() => {});
+      report.steps.push(rec);
+      log(`${rec.ok ? 'ok ' : 'FAIL'} dock ${tag} ${rec.file}${rec.notes.length ? ` — ${rec.notes.join('; ')}` : ''}`);
+    };
+    const home = async () => {
+      await page.keyboard.press('Escape');
+      if (await page.locator('.nrl-nav-sheet:not([hidden])').count()) await page.locator('.nrl-nav [data-nav-more]').tap();
+      await page.locator(SHEET_EXIT).tap();
+      await page.waitForTimeout(200);
+    };
+    const tabNames = () => page.locator('.nrl-nav').ariaSnapshot();
+
+    await step('setup', async (rec) => {
+      await page.goto(BASE);
+      await page.waitForSelector('[data-nrl-start]');
+      await page.evaluate((s) => {
+        const st = document.documentElement.style;
+        for (const k of ['l', 't', 'r', 'b']) st.setProperty(`--nrl-safe-${k}`, `${s[k]}px`);
+      }, safe);
+      await page.fill('[data-nrl-clubname]', 'Dock FC');
+      await page.locator('[data-nrl-start]').tap();
+      await page.waitForSelector('.nrl-tutorial-skip');
+      await page.locator('.nrl-tutorial-skip').tap();
+      await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
+      // A contract inside 4 weeks: Squad's dot (#369) shows on the next state change (the text size, below).
+      const who = await page.evaluate(() => {
+        const p = window.__nrlState().squad.find((x) => !x.junior && !x.departed);
+        p.contractWeeks = 2;
+        return p.name;
+      });
+      rec.notes.push(`${who}'s contract ends in 2 weeks`);
+      return [];
+    });
+
+    for (const size of ['normal', 'large', 'larger']) {
+      await step(`${size}-set`, async (rec) => {
+        await home();
+        await page.locator('.nrl-nav [data-nav-more]').tap();
+        await page.locator('.nrl-nav-sheet [data-screen="settings"]').tap();
+        await page.waitForSelector('.nrl-settings-modal');
+        // Pick it the way a player would: the segment, then ✕. Normal is already picked: Large first, so the
+        // state changes (that change is what shows Squad's dot).
+        const seg = page.locator(`.nrl-settings-textsize [data-seg="${size}"]`);
+        if ((await seg.getAttribute('aria-pressed')) === 'true') await page.locator('.nrl-settings-textsize [data-seg="large"]').tap();
+        await seg.tap();
+        await page.waitForTimeout(250);
+        // Coach calls (#350 X3) on screen and tappable with Settings open: two taps from Office's tab.
+        // At Normal that must hold; at Large and Larger the popup may scroll to it, which is noted.
+        const reach = await reachProblems(page, '.nrl-settings-modal', ['.nrl-switch[aria-label="Coach calls"]']);
+        const out = size === 'normal' ? reach : [];
+        rec.notes.push(reach.length ? `Coach calls: ${reach.join('; ')}` : 'Coach calls on screen, two taps from OFFICE');
+        await page.screenshot({ path: join(OUT, `settings-${size}.png`) }).catch(() => {});
+        await page.locator('.nrl-settings-modal .nrl-screen-x').tap();
+        await page.waitForTimeout(250);
+        const attr = await page.evaluate(() => document.documentElement.getAttribute('data-text-size'));
+        if ((attr ?? 'normal') !== size) out.push(`<html data-text-size> is ${attr}`);
+        if (!(await page.locator('.nrl-nav [data-screen="squad"] .nrl-nav-dot').count())) out.push("Squad's dot not showing");
+        rec.notes.push(`text size ${size}`);
+        return out;
+      });
+      for (const st of DOCK_STATES) {
+        await step(`${size}-${st.name}`, async (rec) => {
+          await home();
+          if (st.open === 'office') await page.locator('.nrl-nav [data-nav-more]').tap();
+          else if (st.open === 'staff') {
+            // Staff & Board (#359): two taps, OFFICE then its tile.
+            await page.locator('.nrl-nav [data-nav-more]').tap();
+            await page.locator('.nrl-nav-sheet [data-screen="staff"]').tap();
+            await page.waitForSelector('.nrl-screen-region[data-screen-key="staff"]');
+          } else if (st.open) await openNav(page, st.open);
+          await page.waitForTimeout(300);
+          const d = await dockProblems(page, st.marked, safe);
+          const out = [...d.problems];
+          rec.notes.push(d.note);
+          // Spoken names (the accessibility tree): "current" on the marked tab, and the alerts.
+          const tree = await tabNames();
+          const label = { club: 'Club', squad: 'Squad', fixtures: 'League', build: 'Build', office: 'Office' }[st.marked];
+          // The snapshot is `- button "<name>": <its text>`; only the quoted names are what a screen reader says.
+          const names = [...tree.matchAll(/button "([^"]*)"/g)].map((m) => m[1]);
+          if (st.open !== 'office' && !names.some((x) => x.startsWith(`${label}, current`))) out.push(`no "${label}, current" in ${tree.replace(/\s+/g, ' ')}`);
+          if (st.open === 'office' && !/"Office[^"]*" \[expanded\]/.test(tree)) out.push('OFFICE not expanded with its sheet up');
+          if (!names.some((x) => /^Squad\b.*contracts? ends? within 4 weeks$/.test(x))) out.push("Squad's spoken name doesn't carry its dot");
+          if (names.some((x) => /▴|[A-Z]{4}/.test(x))) out.push(`a tab reads out its caps or ▴: ${names.join(' | ')}`);
+          if (st.open === 'staff' && (await page.locator('.nrl-nav-sheet [data-screen="staff"]').getAttribute('aria-current')) !== 'page') out.push("Staff & Board's tile isn't marked");
+          return out;
+        });
+        if (st.name === 'squad') {
+          await page.evaluate(() => { document.documentElement.style.filter = 'grayscale(1)'; });
+          await page.screenshot({ path: join(OUT, `greyscale-${size}.png`) }).catch(() => {});
+          await page.evaluate(() => { document.documentElement.style.filter = ''; });
+        }
+      }
+    }
+    // The longest PLAY WEEKs there are, beside the widest tab (OFFICE ▴ with its count): a parked match
+    // with decisions waiting and a long opponent (the sub-line gives way, never a tab), and a run of
+    // weeks with STOP. Drawn the way hud.ts draws them; the next state change puts the real one back.
+    for (const [name, label, sub, stop] of [
+      ['larger-resume', 'RESUME MATCH ▸<span class="nrl-hud-alert">3</span>', 'v Wentworthville Wanderers · away', false],
+      ['larger-advancing', 'WEEK 27 OF 27…', '', true],
+    ]) {
+      await step(name, async (rec) => {
+        await home();
+        await page.locator('.nrl-nav [data-nav-more]').tap();
+        await page.evaluate(([label, sub, stop]) => {
+          document.querySelector('.nrl-dock-advance-label').innerHTML = label;
+          const s = document.querySelector('.nrl-dock-advance-sub');
+          s.textContent = sub;
+          s.hidden = stop;
+          document.querySelector('.nrl-hud-menu-toggle').hidden = stop;
+          document.querySelector('.nrl-hud-stop').hidden = !stop;
+        }, [label, sub, stop]);
+        await page.waitForTimeout(300);
+        const d = await dockProblems(page, 'office', safe);
+        rec.notes.push(d.note);
+        return d.problems;
+      });
+    }
+
+    for (const e of report.errors) log(`  error: ${e}`);
+    writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
+    await ctx.close();
+    failed += report.steps.filter((s) => !s.ok).length + report.errors.length;
+  }
+  return failed;
+}
+
 const SCREENS_ONLY = argv.includes('--screens-only');
 let failed = 0;
 try {
@@ -1753,6 +2000,7 @@ try {
   }
   for (const run of WALK_RUNS) failed += await runTutorialWalk(browser, run);
   for (const run of SCREEN_RUNS) failed += await runScreens(browser, run);
+  failed += await runDockTextSize(browser);
   await browser.close();
 } catch (err) {
   console.error(err);

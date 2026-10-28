@@ -122,3 +122,80 @@ describe('the dot (#369)', () => {
     expect(moreBadgeCount(r.list(), new Map([['squad', 4], ['finance', 2]]))).toBe(2);
   });
 });
+
+// #344: the open-tab marker (a fill and a bar, so it reads without colour) and what each button says.
+import { navMarks, navSpeech, HOME_ID, OFFICE_ID } from '../../src/ui/nav';
+
+describe('the marker (#344)', () => {
+  const r = new ScreenRegistry();
+  r.set('squad', 'Squad', () => {}, { holds: ['lineup'] });
+  r.set('fixtures', 'League', () => {}, { holds: ['ladder'] });
+  r.set('lineup', 'Lineup', () => {}, { hidden: true });
+  r.set('staff', 'Staff & Board', () => {}, { more: true });
+
+  it('marks CLUB, and only CLUB, with nothing over the grounds', () => {
+    expect(navMarks(r, null, false, false)).toEqual({ current: [HOME_ID], open: [] });
+  });
+
+  it("marks an open tab with ▴, and the tab that holds a sheet's segment", () => {
+    expect(navMarks(r, 'squad', false, true)).toEqual({ current: ['squad'], open: ['squad'] });
+    expect(navMarks(r, 'lineup', false, true)).toEqual({ current: ['squad'], open: ['squad'] });
+    expect(navMarks(r, 'ladder', false, true)).toEqual({ current: ['fixtures'], open: ['fixtures'] });
+  });
+
+  it('marks both OFFICE and the tile for a screen opened from Office', () => {
+    expect(navMarks(r, 'staff', false, true)).toEqual({ current: ['staff', OFFICE_ID], open: [OFFICE_ID] });
+  });
+
+  it("while Office's sheet is up: OFFICE shows ▴, no tab is current and CLUB isn't lit", () => {
+    expect(navMarks(r, null, true, false)).toEqual({ current: [], open: [OFFICE_ID] });
+  });
+
+  it('a screen with no tab (the kit) marks nothing, not CLUB', () => {
+    expect(navMarks(r, 'kit', false, true)).toEqual({ current: [], open: [] });
+  });
+});
+
+describe('what a tab says (#344)', () => {
+  it('its name, then "current" when open', () => {
+    expect(navSpeech('Squad', false, badgeView('Squad', 0))).toBe('Squad');
+    expect(navSpeech('Squad', true, badgeView('Squad', 0))).toBe('Squad, current');
+    expect(navSpeech('Club', true, badgeView('Club', 0))).toBe('Club, current');
+  });
+
+  it('then its alerts: a count, a dot (#369), both', () => {
+    expect(navSpeech('Office', false, badgeView('Office', 2))).toBe('Office, 2 unread');
+    expect(navSpeech('Office', true, badgeView('Office', 2))).toBe('Office, current, 2 unread');
+    const dot = 'Squad — 2 contracts end within 4 weeks';
+    expect(navSpeech('Squad', false, badgeView('Squad', 0, dot))).toBe(dot);
+    expect(navSpeech('Squad', true, badgeView('Squad', 0, dot))).toBe('Squad, current — 2 contracts end within 4 weeks');
+    expect(navSpeech('News', true, badgeView('News', 1, 'a dot'))).toBe('News, current, 1 unread; a dot');
+  });
+
+  it("keeps the name once even when a dot's label doesn't start with it", () => {
+    expect(navSpeech('Squad', true, badgeView('Squad', 0, '2 contracts end soon'))).toBe('Squad, current; 2 contracts end soon');
+  });
+});
+
+describe('the dock at every text size (#344)', () => {
+  const rule = (sel: string): string => {
+    const i = CSS.indexOf(`${sel} {`);
+    return i < 0 ? '' : CSS.slice(i, CSS.indexOf('}', i));
+  };
+
+  it("puts a 3px accent bar (the token, not a colour) under the open tab's label and an open tile's name", () => {
+    const tab = rule('.nrl-dock-tabs > .nrl-btn[aria-current="page"] .nrl-nav-label::after, .nrl-dock-tabs > .nrl-btn[aria-expanded="true"] .nrl-nav-label::after');
+    expect(tab).toMatch(/height: 3px/);
+    expect(tab).toMatch(/background: var\(--nrl-accent\)/);
+    const tile = rule('.nrl-nav-sheet > .nrl-btn[aria-current="page"] .nrl-office-name::after');
+    expect(tile).toMatch(/height: 3px/);
+    expect(tile).toMatch(/background: var\(--nrl-accent\)/);
+  });
+
+  it("never shrinks the tabs (PLAY WEEK's sub-line gives way) and closes them up at Large and Larger to 900px", () => {
+    expect(rule('.nrl-dock-tabs > .nrl-btn')).toMatch(/flex: 0 0 auto/);
+    expect(rule('.nrl-dock-play')).toMatch(/flex: 0 1 auto; min-width: 0/);
+    const wide = CSS.slice(CSS.indexOf('@media (max-width: 900px)'));
+    expect(wide).toMatch(/^@media \(max-width: 900px\) \{\s*html\[data-text-size\] \.nrl-dock-tabs > \.nrl-btn \{ padding: 0 5px/);
+  });
+});
