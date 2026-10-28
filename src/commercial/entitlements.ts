@@ -85,6 +85,8 @@ export interface EntitlementProvider {
   refresh(): Promise<Entitlements>;
   /** Restore purchases (the store's own Restore button). */
   restore(): Promise<Entitlements>;
+  /** Buy `tier` through the store (the paywall's Buy, #364). */
+  purchase(tier: Tier): Promise<Entitlements>;
   /** Called with each new answer the provider learns of by itself. Returns an unsubscribe. */
   onChange(cb: (ent: Entitlements) => void): () => void;
 }
@@ -118,6 +120,12 @@ export class LocalStubProvider implements EntitlementProvider {
   current(): Promise<Entitlements> { return Promise.resolve(this.read()); }
   refresh(): Promise<Entitlements> { return this.current(); }
   restore(): Promise<Entitlements> { return this.current(); }
+
+  /** The stand-in purchase: the tier changes at once, no payment (#364). */
+  purchase(tier: Tier): Promise<Entitlements> {
+    this.set(tier);
+    return this.current();
+  }
 
   onChange(cb: (ent: Entitlements) => void): () => void {
     this.listeners.add(cb);
@@ -161,6 +169,7 @@ export class EntitlementService {
   current(): Promise<Entitlements> { return this.ask(() => this.provider.current()); }
   refresh(): Promise<Entitlements> { return this.ask(() => this.provider.refresh()); }
   restore(): Promise<Entitlements> { return this.ask(() => this.provider.restore()); }
+  purchase(tier: Tier): Promise<Entitlements> { return this.ask(() => this.provider.purchase(tier)); }
 
   onChange(cb: (ent: Entitlements) => void): () => void {
     this.listeners.add(cb);

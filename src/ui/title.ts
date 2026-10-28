@@ -21,6 +21,8 @@ import { encodeCanvas } from '../art/portrait';
 import { PLAYER_ID } from '../systems/fixtures';
 import { BRAND, type Brand } from '../brand';
 import { COLOR_TOKENS } from './tokens';
+import { commercialEnabled } from '../commercial/flags';
+import { openLoginDialog, openPaywall } from './screens/paywall';
 
 export interface TitleChoice {
   mode: 'continue' | 'new';
@@ -146,6 +148,12 @@ const TITLE_CSS = `
 }
 `;
 
+// The commercial entries' row (#364), added to the sheet with the commercial flag on only.
+const TITLE_COMMERCIAL_CSS = `
+.nrl-title-buy { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.nrl-title-buy .nrl-title-btn { flex: 0 0 auto; }
+`;
+
 function mk<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   e.setAttribute('class', cls);
@@ -202,7 +210,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
     const overlay = mk('div', 'nrl-title');
     overlay.setAttribute('data-nrl-title', '');
     const style = document.createElement('style');
-    style.textContent = TITLE_CSS;
+    style.textContent = commercialEnabled() ? TITLE_CSS + TITLE_COMMERCIAL_CSS : TITLE_CSS;
     overlay.appendChild(style);
 
     const main = mk('div', 'nrl-title-main');
@@ -288,6 +296,17 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         });
       });
       foot.appendChild(importBtn);
+      // #364: the full game and "Already bought? Log in", with the commercial flag on only.
+      if (commercialEnabled()) {
+        const buy = mk('div', 'nrl-title-buy');
+        const full = mkButton('Get the full game', 'data-nrl-full-game');
+        full.addEventListener('click', () => void openPaywall({ reason: 'title' }));
+        buy.appendChild(full);
+        const login = mkButton('Already bought? Log in', 'data-nrl-login');
+        login.addEventListener('click', () => void openLoginDialog());
+        buy.appendChild(login);
+        foot.appendChild(buy);
+      }
       if (notice) {
         const n = mk('div', 'nrl-title-notice', notice);
         n.setAttribute('data-nrl-notice', '');

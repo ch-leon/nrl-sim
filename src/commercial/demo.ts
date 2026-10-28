@@ -4,8 +4,8 @@
 // Week, the ▾ runs and fast forward all end there. The gate is one check at the
 // top of advanceWeek (core/time.ts), after a held week has had its chance to
 // finish, so it never stops mid-match; the ▾ run (core/advance.ts) stops before
-// the week it would refuse. Blocked, it emits commercial:demoEnded, which task 05
-// will answer with the paywall; until then a plain toast.
+// the week it would refuse. Blocked, it emits commercial:demoEnded, which the
+// game answers with the paywall (#364, src/ui/screens/paywall.ts).
 //
 // Everything here returns at once with the flag off: no state read, no key written.
 
@@ -117,11 +117,17 @@ export function demoStops(): boolean {
   return true;
 }
 
-/** Start the commercial side for the page (main.ts, flag on only): the toast at the demo's end until task 05's paywall. */
-export function initCommercial(slot: number): void {
+/**
+ * Start the commercial side for the page (main.ts, flag on only). `onDemoEnded`
+ * answers the demo's end: the paywall in the game (#364), a plain toast without one.
+ */
+export function initCommercial(
+  slot: number,
+  onDemoEnded: () => void = () => bus.emit('ui:notify', { text: DEMO_ENDED_TEXT, kind: 'info' }),
+): void {
   setDemoSlot(slot);
   getEntitlementService();
-  bus.on('commercial:demoEnded', () => bus.emit('ui:notify', { text: DEMO_ENDED_TEXT, kind: 'info' }));
+  bus.on('commercial:demoEnded', onDemoEnded);
 }
 
 /** Test hook: forget the first-run record read and the slot. */
