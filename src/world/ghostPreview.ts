@@ -64,6 +64,15 @@ export class GhostPreview {
     }
   }
 
+  /** Is world point (x, y) on an opaque pixel of the building (a tap on the ghost, #395)? */
+  hits(x: number, y: number): boolean {
+    const s = this.sprite;
+    const px = Math.floor(x - (s.x - s.displayOriginX));
+    const py = Math.floor(y - (s.y - s.displayOriginY));
+    if (px < 0 || py < 0 || px >= s.width || py >= s.height) return false;
+    return (s.scene.textures.getPixelAlpha(px, py, s.texture.key) ?? 0) > 0;
+  }
+
   destroy(): void {
     this.sprite.destroy();
     this.gfx.destroy();

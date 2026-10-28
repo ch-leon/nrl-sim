@@ -1282,7 +1282,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-hint-text { flex: 1 1 auto; min-width: 0; }
 .nrl-btn.nrl-hint-x { flex: 0 0 auto; width: 44px; min-height: 44px; padding: 0; background: transparent; font-family: var(--nrl-f-body); }
 
-/* ── Placement bar (#78): what to do while placing or moving, and Cancel ── */
+/* ── Placement bar (#78): what to do while placing or moving, Build here (#395) and Cancel ── */
 .nrl-placebar {
   pointer-events: auto;
   position: fixed;
@@ -1308,6 +1308,12 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-placebar-text { flex: 1 1 auto; line-height: 1.35; }
 .nrl-placebar-text b { font-family: var(--nrl-f-label); font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); margin-right: 6px; }
 .nrl-placebar-cancel { flex: 0 0 auto; }
+/* Build here · $cost, with the reason underneath when the spot is bad (#395). */
+.nrl-btn.nrl-placebar-go { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 44px; line-height: 1.15; white-space: nowrap; }
+.nrl-placebar-go-why { font-family: var(--nrl-f-body); font-size: 0.6875rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--nrl-neg); }
+.nrl-placebar-go-why[hidden] { display: none; }
+/* The bar spans the top while placing; the HUD's top chips (board, decisions) wait under it. */
+body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; }
 
 /* ── Kit & colours (#79), under Office ───────────────────────────────────── */
 .nrl-kit { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }

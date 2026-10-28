@@ -1608,15 +1608,33 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     await page.waitForTimeout(700);
     const out = await onItsScreen(null);
     const text = (await page.locator('.nrl-tutorial-bubble .nrl-tutorial-text').textContent()).trim();
-    if (!/green spot on the grass/.test(text)) out.push(`placement copy reads "${text}"`);
+    if (!/green spot, then Build here/.test(text)) out.push(`placement copy reads "${text}"`);
     out.push(...await page.evaluate(() => {
       const bar = document.querySelector('.nrl-placebar').getBoundingClientRect();
       const b = document.querySelector('.nrl-tutorial-bubble').getBoundingClientRect();
       return b.right <= bar.left || b.left >= bar.right || b.bottom <= bar.top || b.top >= bar.bottom ? [] : ['the bubble covers the placement bar'];
     }));
-    await page.touchscreen.tap(Math.round(W / 2), Math.round(H / 2) + 10);
+    // Aim, then build (#395): a tap on the grass moves the ghost and spends nothing.
+    const cash = await money();
+    await page.touchscreen.tap(Math.round(W / 2) + 70, Math.round(H / 2) + 30);
+    await page.waitForTimeout(300);
+    if ((await page.evaluate(() => window.__nrlState().facilities.length)) !== 0 || (await money()) !== cash) {
+      out.push('a tap on the grass built before Build here');
+    }
+    const go = page.locator('.nrl-placebar [data-place-go]');
+    const box = await go.boundingBox();
+    if (!box || box.height < 44) out.push(`Build here is ${box ? Math.round(box.height) : 0}px tall`);
+    // If that tap aimed at a bad spot, Cancel and start again: the ghost starts on a free spot.
+    if (await go.isDisabled()) {
+      rec.notes.push(`aimed at a bad spot: ${(await go.textContent()).trim()}`);
+      await page.locator('.nrl-placebar-cancel').tap();
+      await openNav(page, 'build');
+      await page.locator('[data-screen-key="build"] [data-facility="trainingPaddock"]').tap();
+      await page.waitForSelector('.nrl-placebar:not([hidden])');
+    }
+    await go.tap();
     await atStep('recruit');
-    rec.notes.push('paddock placed');
+    rec.notes.push('paddock placed with Build here');
     return out;
   });
   // Recruit: opened by the step, the first free agent's row framed and clear of the bubble.
@@ -1707,7 +1725,7 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     await openNav(page, 'build');
     await page.locator('[data-screen-key="build"] [data-facility="trainingPaddock"]').tap();
     await page.waitForSelector('.nrl-placebar:not([hidden])');
-    await page.touchscreen.tap(Math.round(W / 2) - 60, Math.round(H / 2) + 40);
+    await page.locator('.nrl-placebar [data-place-go]').tap(); // the ghost starts on a free spot (#395)
     await page.waitForFunction((k) => window.__nrlState().facilities.length === k + 1, built);
     const out = await tapUndo();
     await page.waitForTimeout(300);

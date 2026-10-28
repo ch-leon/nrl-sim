@@ -123,6 +123,8 @@ export class CameraController {
   private startScrollX = 0;
   private startScrollY = 0;
   private dragging = false;
+  // While held, a one-finger drag doesn't pan (it is dragging the placement ghost, #395).
+  private panHeld = false;
 
   // Pinch state.
   private pinchPrevDist = 0;
@@ -168,6 +170,15 @@ export class CameraController {
 
     // Apply an initial clamp in case the world is smaller than the view.
     this.handleResize();
+  }
+
+  /**
+   * Hold (or release) one-finger panning for the current press: the grounds hold
+   * it while a drag that started on the placement ghost moves the ghost (#395).
+   * The drag is still detected, so wasDragging() reports it as usual.
+   */
+  holdPan(held: boolean): void {
+    this.panHeld = held;
   }
 
   /** True if the just-ended interaction exceeded the drag threshold. */
@@ -238,7 +249,7 @@ export class CameraController {
     if (!this.dragging && isDrag(totalDx, totalDy, this.threshold)) {
       this.dragging = true;
     }
-    if (this.dragging) {
+    if (this.dragging && !this.panHeld) {
       // 1:1 drag in world space (account for zoom).
       const nx = this.startScrollX - totalDx / this.cam.zoom;
       const ny = this.startScrollY - totalDy / this.cam.zoom;

@@ -2,12 +2,13 @@ import Phaser from 'phaser';
 import { GRID_W, GRID_H, TILE_W, TILE_H } from '../config';
 import { gridToScreen, screenToGrid, depth, inBounds } from '../world/iso';
 import { CameraController } from '../world/camera';
-import { WalkGrid, findPath, nearestWalkable, type PathNode } from '../world/path';
+import { WalkGrid, findPath, nearestWalkable, autoPaths, onWalkway, type PathNode } from '../world/path';
 import {
   PlacementController,
   footprintTiles,
   onPlacementMode,
   setActiveGroundsScene,
+  suggestSpot,
 } from '../world/placement';
 import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
 import { getState, type PlacedFacility } from '../core/state';
@@ -81,6 +82,14 @@ export class GroundsScene extends Phaser.Scene {
   private tiles: Tile[][] = [];
   // Paved cells outside the grid (walkway ring + entrance road), as "gx,gy" keys.
   private pavedSurround = new Set<string>();
+  // Floor images of the grid and the walkway ring (tiles + curbs), redrawn when
+  // the footpaths change (#395); and the facility layout the footpaths were made for.
+  private floorImages: Phaser.GameObjects.Image[] = [];
+  private pathsFor = '';
+  // The facilities the placement tint was computed against (re-tint if they change, #395).
+  private placedFor: readonly PlacedFacility[] | null = null;
+  // A press that started on the placement ghost drags the ghost, not the camera (#395).
+  private draggingGhost = false;
   // X offset applied to every rendered tile so negative-screenX cells stay on canvas.
   private offsetX = GRID_H * (TILE_W / 2);
   private camController!: CameraController;
@@ -119,6 +128,8 @@ export class GroundsScene extends Phaser.Scene {
     // sprites the last run destroyed, and the facilities would never be redrawn.
     this.facilitySprites.clear();
     this.facilitySpots.clear();
+    this.floorImages = [];
+    this.pathsFor = '';
     this.dimmedId = null;
     this.path = [];
     // The last run's BuildFx is detached from the update loop: with it, the first
@@ -166,10 +177,44 @@ export class GroundsScene extends Phaser.Scene {
     });
   }
 
-  /** Enter facility placement mode (called from the DOM build menu via the registry). */
+  /**
+   * Enter facility placement mode (called from the DOM build menu via the
+   * registry). The ghost starts on the free spot nearest the middle of the screen
+   * and the camera eases there if it is off screen (#395).
+   */
   enterPlacementMode(defId: FacilityDefId): void {
     this.undim();
-    this.placement.enterPlacementMode(defId);
+    const spot = suggestSpot(getState(), defId, this.viewCentreCell()) ?? { x: 0, y: 0 };
+    this.placedFor = getState().facilities;
+    this.placement.enterPlacementMode(defId, spot);
+    this.easeToFootprint(spot.x, spot.y, FACILITY_CATALOG[defId].footprint);
+  }
+
+  /** Build or move at the aimed spot: the placement bar's Build here button (#395). */
+  confirmPlacement(): void {
+    this.placement.confirm();
+  }
+
+  /** The grid point (fractional) under the middle of the camera view. */
+  private viewCentreCell(): { x: number; y: number } {
+    const mid = this.cameras.main.midPoint;
+    const a = (mid.x - this.offsetX) / (TILE_W / 2);
+    const b = (mid.y - TILE_H / 2) / (TILE_H / 2);
+    return { x: (a + b) / 2, y: (b - a) / 2 };
+  }
+
+  /** Pan the camera (eased) to a footprint if it isn't comfortably on screen (#395). */
+  private easeToFootprint(gx: number, gy: number, fp: { w: number; h: number }): void {
+    const cam = this.cameras.main;
+    const top = this.cellToWorld(gx, gy);
+    const centre = { x: top.x + ((fp.w - fp.h) * TILE_W) / 4, y: top.y + ((fp.w + fp.h) * TILE_H) / 4 };
+    const view = cam.worldView;
+    // Keep clear of the placement bar on top and the dock along the bottom.
+    const mx = view.width * 0.15;
+    const my = view.height * 0.25;
+    const inside =
+      centre.x > view.x + mx && centre.x < view.right - mx && centre.y > view.y + my && centre.y < view.bottom - my;
+    if (!inside) cam.pan(centre.x, centre.y, 350, 'Sine.easeInOut');
   }
 
   /** Pick up a placed facility to move it (#78): the original fades until it lands. */
@@ -177,6 +222,7 @@ export class GroundsScene extends Phaser.Scene {
     const f = getState().facilities.find((x) => x.id === facilityId);
     if (!f) return;
     this.undim();
+    this.placedFor = getState().facilities;
     this.placement.enterMoveMode(f);
     this.dimmedId = f.id;
     this.facilitySprites.get(f.id)?.setAlpha(0.35);
@@ -224,22 +270,43 @@ export class GroundsScene extends Phaser.Scene {
   }
 
   private setupTapToMove(): void {
-    // While in placement mode the ghost follows the pointer (grid-snapped).
+    // Aim, then build (#395). While placing, a press on the ghost can drag it;
+    // a tap elsewhere aims it there; a tap on the ghost (or the bar's Build here)
+    // builds. A mouse hovering only previews: the ghost stays where it was aimed.
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.draggingGhost = false;
+      if (!this.placement.active || this.input.manager.pointers.filter((p) => p.isDown).length > 1) return;
+      const cell = this.pointerCell(pointer);
+      if (this.placement.hitsGhost(cell.gx, cell.gy, pointer.worldX, pointer.worldY)) {
+        this.draggingGhost = true;
+        this.camController.holdPan(true);
+      }
+    });
+
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!this.placement.active) return;
       const cell = this.pointerCell(pointer);
-      this.placement.moveGhost(cell.gx, cell.gy);
+      if (this.draggingGhost && pointer.isDown) {
+        const aim = this.placement.aim;
+        if (aim.x !== cell.gx || aim.y !== cell.gy) this.placement.moveGhost(cell.gx, cell.gy);
+        return;
+      }
+      if (!pointer.isDown && !pointer.wasTouch) this.placement.hover(cell.gx, cell.gy);
     });
+    this.input.on('gameout', () => this.placement.clearHover());
 
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      // BAK-159 contract: ignore taps that were actually pans.
+      const onGhost = this.draggingGhost;
+      this.draggingGhost = false;
+      this.camController.holdPan(false);
+      // BAK-159 contract: ignore taps that were actually pans (or ghost drags).
       if (this.camController.wasDragging()) return;
       const cell = this.pointerCell(pointer);
 
-      // Placement mode: a tap snaps to and confirms the current cell.
+      // Placement mode: a tap on the ghost builds; anywhere else it aims.
       if (this.placement.active) {
-        this.placement.moveGhost(cell.gx, cell.gy);
-        this.placement.confirm(); // commits if valid; notifies + stays on ghost logic if not
+        if (onGhost) this.placement.confirm(); // refuses with a notice if the spot is bad
+        else this.placement.moveGhost(cell.gx, cell.gy);
         return;
       }
 
@@ -332,6 +399,26 @@ export class GroundsScene extends Phaser.Scene {
     if (this.dimmedId !== null && !this.facilitySprites.has(this.dimmedId)) this.dimmedId = null;
 
     this.syncWalkGrid(facilities);
+    this.syncFootpaths(facilities);
+    // Facilities changed under the ghost (an Undo, a demolish): re-tint the valid spots.
+    if (this.placement.active && this.placedFor !== facilities) {
+      this.placedFor = facilities;
+      this.placement.refresh();
+    }
+  }
+
+  /**
+   * Lay the footpaths for the current facilities (#395): derived, never saved,
+   * so a move, demolish or load all redraw them the same way. Only redraws the
+   * floor when the layout changed (state:changed fires far more often).
+   */
+  private syncFootpaths(facilities: readonly PlacedFacility[]): void {
+    const layout = facilities.map((f) => `${f.defId}@${f.x},${f.y}`).join('|');
+    if (layout === this.pathsFor && this.floorImages.length > 0) return;
+    this.pathsFor = layout;
+    const paths = new Set(autoPaths(facilities).map((c) => `${c.x},${c.y}`));
+    this.tiles = this.buildTileArray(paths);
+    this.renderFloor();
   }
 
   /**
@@ -456,13 +543,13 @@ export class GroundsScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(ROUGH.mid);
   }
 
-  /** Default Grass with a single Path column from the entrance gate to the front walkway. */
-  private buildTileArray(): Tile[][] {
+  /** Grass with a Path column from the entrance gate to the front walkway, plus any footpaths (#395). */
+  private buildTileArray(footpaths: ReadonlySet<string> = new Set()): Tile[][] {
     const tiles: Tile[][] = [];
     for (let gy = 0; gy < GRID_H; gy++) {
       const row: Tile[] = [];
       for (let gx = 0; gx < GRID_W; gx++) {
-        row.push(Tile.Grass);
+        row.push(footpaths.has(`${gx},${gy}`) ? Tile.Path : Tile.Grass);
       }
       tiles.push(row);
     }
@@ -491,13 +578,11 @@ export class GroundsScene extends Phaser.Scene {
     this.pavedSurround = new Set(surroundPaths(GRID_W, GRID_H).map((c) => `${c.gx},${c.gy}`));
     this.renderSurroundFill();
 
-    for (let gy = 0; gy < GRID_H; gy++) {
-      for (let gx = 0; gx < GRID_W; gx++) {
-        const t = this.tiles[gy]![gx]!;
-        this.placeTile(gx, gy, t === Tile.Grass ? grassVariantKey(gx, gy) : KEY[t]);
-      }
+    // The grid and the walkway ring are drawn by renderFloor (their curbs follow
+    // the footpaths); the entrance road beyond the ring never changes.
+    for (const c of surroundPaths(GRID_W, GRID_H)) {
+      if (!onWalkway(c.gx, c.gy)) this.placeTile(c.gx, c.gy, KEY[Tile.Path]);
     }
-    for (const c of surroundPaths(GRID_W, GRID_H)) this.placeTile(c.gx, c.gy, KEY[Tile.Path]);
 
     for (const d of decorLayout(GRID_W, GRID_H)) {
       const w = this.cellToWorld(d.gx, d.gy);
@@ -508,10 +593,27 @@ export class GroundsScene extends Phaser.Scene {
     }
   }
 
-  /** One floor tile (top vertex at the projected point) plus any edge overlays. */
-  private placeTile(gx: number, gy: number, key: string): void {
+  /** (Re)draw the grid's floor and the walkway ring around it, footpaths included (#395). */
+  private renderFloor(): void {
+    for (const img of this.floorImages) img.destroy();
+    this.floorImages = [];
+    for (let gy = -1; gy <= GRID_H; gy++) {
+      for (let gx = -1; gx <= GRID_W; gx++) {
+        if (!inBounds(gx, gy)) {
+          if (onWalkway(gx, gy)) this.placeTile(gx, gy, KEY[Tile.Path], this.floorImages);
+          continue;
+        }
+        const t = this.tiles[gy]![gx]!;
+        this.placeTile(gx, gy, t === Tile.Grass ? grassVariantKey(gx, gy) : KEY[t], this.floorImages);
+      }
+    }
+  }
+
+  /** One floor tile (top vertex at the projected point) plus any edge overlays; `into` collects them. */
+  private placeTile(gx: number, gy: number, key: string, into?: Phaser.GameObjects.Image[]): void {
     const w = this.cellToWorld(gx, gy);
     const img = this.add.image(w.x, w.y, key);
+    into?.push(img);
     img.setOrigin(0.5, 0); // diamond top vertex anchors at the projected point
     img.setDepth(depth(gx, gy));
 
@@ -524,6 +626,7 @@ export class GroundsScene extends Phaser.Scene {
       else if (m === Tile.Dirt && n === Tile.Grass) edge = dirtEdgeKey(side);
       if (!edge) continue;
       const e = this.add.image(w.x, w.y, edge);
+      into?.push(e);
       e.setOrigin(0.5, 0);
       e.setDepth(depth(gx, gy) + 0.5); // above its own tile, below anything standing on it
     }

@@ -11,6 +11,7 @@ import { TILE_W, TILE_H } from '../../config';
 import { PixelBuffer, noise2, bayer, mix } from '../pixel';
 import { IsoPainter, UNIT, valueNoise, pmod, ramp } from './iso3d';
 import { GRASS, ROUGH, DIRT, STONE, WHITE } from './palette';
+import { COLOR_TOKENS } from '../../ui/tokens';
 
 /** Cell sides, named by grid direction: n = -gy, e = +gx, s = +gy, w = -gx. */
 export type Side = 'n' | 'e' | 's' | 'w';
@@ -313,6 +314,26 @@ export function highlightTile(ok: boolean): PixelBuffer {
   return buf;
 }
 
+/** The valid-spot tint colour (#395): the theme's positive token (src/ui/tokens.ts). */
+export const VALID_TINT = parseInt(COLOR_TOKENS.pos.slice(1), 16);
+
+/**
+ * Soft tint on a cell where the footprint being placed fits (#395): a light
+ * dithered wash with a faint rim, quiet enough that the ghost still reads first.
+ */
+export function validTile(): PixelBuffer {
+  const buf = new PixelBuffer(TILE_W, TILE_H);
+  const mask = tileMask();
+  for (let y = 0; y < TILE_H; y++) {
+    for (let x = 0; x < TILE_W; x++) {
+      if (mask.get(x, y).alpha === 0) continue;
+      const edge = mask.get(x - 1, y).alpha === 0 || mask.get(x + 1, y).alpha === 0 || mask.get(x, y - 1).alpha === 0 || mask.get(x, y + 1).alpha === 0;
+      buf.set(x, y, VALID_TINT, edge ? 0.75 : bayer(x, y) < 0.5 ? 0.4 : 0.24);
+    }
+  }
+  return buf;
+}
+
 // ── Surround ────────────────────────────────────────────────────────────────
 
 /** Size of the seamless rough-grass texture tiled behind the whole grounds. */
@@ -356,6 +377,7 @@ export function tileTextures(): { key: string; buf: PixelBuffer }[] {
     { key: 'tile-path', buf: pathTile() },
     { key: 'tile-highlight-ok', buf: highlightTile(true) },
     { key: 'tile-highlight-bad', buf: highlightTile(false) },
+    { key: 'tile-valid', buf: validTile() },
     { key: SURROUND_KEY, buf: surroundTexture() },
     ...SIDES.map((s) => ({ key: pathEdgeKey(s), buf: pathEdge(s) })),
     ...SIDES.map((s) => ({ key: dirtEdgeKey(s), buf: dirtEdge(s) })),
