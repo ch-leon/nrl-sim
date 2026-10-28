@@ -276,7 +276,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         heading: 'Rivals',
-        text: 'Every rival keeps a real squad: it signs from the free-agent pool (the news reports anyone rated 65 or better), its players develop and age, juniors arrive, and its strength is the mean of its best nine. On Hard every rival you play is a little better on the day than that rating says, on Easy a little worse.',
+        text: 'Every rival keeps a real squad: it signs from the free-agent pool when a position is thin or the squad is short (the news reports signings from the top of the pool), its players develop and age, juniors arrive, and its strength is the mean of its best nine. On Hard every rival you play is a little better on the day than that rating says, on Easy a little worse.',
       },
     ],
   },
