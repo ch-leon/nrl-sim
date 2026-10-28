@@ -12,19 +12,31 @@ import {
   unlockLevel, unlockedCalls, withAttackCall, withDefenceCall, type CallInput, type CallVerdict, type CoachCall,
 } from '../../../src/match/league/calls';
 import { attackPlan, defencePlan } from '../../../src/match/league/presets';
-import { CALL_TILE, TRAY_MAX_BUTTONS, TRAY_MAX_ROWS, callCaption, trayCallsOn, trayRows, type TrayButton } from '../../../src/ui/screens/matchOverlay';
+import { TOUCH } from '../../../src/match/league/touch';
+import { CALL_TILE, TRAY_MAX_BUTTONS, TRAY_MAX_ROWS, callCaption, callsUnlockLine, trayHidden, trayCallsOn, trayRows, type TrayButton } from '../../../src/ui/screens/matchOverlay';
 import type { SimEvent } from '../../../src/match/core/snapshot';
 
 const H = sideSheet('H', { rating: 60 });
 const A = sideSheet('A', { rating: 60 });
 const NEW: readonly CoachCall[] = ['offload', 'gang-tackle', 'grubber', 'forty-twenty', 'take-two', 'tap-go'];
 
+/** The sim's own reading of the field, for checking it (private: the tests only read). */
+interface Inside {
+  dirOf(s: 'home' | 'away'): 1 | -1;
+  fortyTwentyReach(s: 'home' | 'away'): number;
+  pendingKick: { to: { x: number; y: number }; aim?: 'touch' | '40-20'; kind: string; kickoff: boolean; kicker: number } | null;
+  callState: Record<'home' | 'away', { attack: CoachCall | null }>;
+}
+const inside = (sim: LiveSim): Inside => sim as unknown as Inside;
+/** Metres from `x` to the line `side` attacks. */
+const toLine = (sim: LiveSim, side: 'home' | 'away', x: number): number => (inside(sim).dirOf(side) > 0 ? 100 - x : x);
+
 interface Played {
   sim: LiveSim;
   events: SimEvent[];
   calls: CallInput[];
-  /** Each tick the call could be made: the tackle count and the ball's x then. */
-  legal: { tick: number; tackles: number; x: number }[];
+  /** Each tick the call could be made: the tackle count, and the ball's metres from the line he attacks then. */
+  legal: { tick: number; tackles: number; toLine: number }[];
   /** Every refusal the sim gave the call. */
   refusals: Set<string>;
 }
@@ -40,7 +52,7 @@ function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 
     if (call) {
       const why = sim.callRefusal(side, call);
       if (why === null) {
-        legal.push({ tick: sim.tick, tackles: sim.tackleCount, x: sim.snapshot().ball.x });
+        legal.push({ tick: sim.tick, tackles: sim.tackleCount, toLine: toLine(sim, side, sim.snapshot().ball.x) });
         calls.push({ tick: sim.tick + 1, side, call });
       } else refusals.add(why);
     }
@@ -117,7 +129,7 @@ describe('five more calls (#396): when the sim takes them', () => {
     expect(p.refusals).toContain('not while you have the ball');
   });
 
-  it('Grubber from tackle 4, inside their 25; 40/20 from tackle 4, behind his own 40', () => {
+  it('Grubber from tackle 4, inside their 25; 40/20 from tackle 4, behind his own 40 and in reach of their 20', () => {
     let grub = 0;
     let ftw = 0;
     const refused = new Set<string>();
@@ -126,12 +138,15 @@ describe('five more calls (#396): when the sim takes them', () => {
       const f = play(seed, 'forty-twenty');
       for (const l of g.legal) {
         expect(l.tackles).toBeGreaterThanOrEqual(CALLS.lastFrom);
-        // Within 25 m of a try line (the one he attacks: the other is his own in-goal, where no set is played).
-        expect(Math.min(l.x, 100 - l.x)).toBeLessThanOrEqual(CALLS.grubberInsideM);
+        expect(l.toLine).toBeLessThanOrEqual(CALLS.grubberInsideM);
       }
+      // A flat side's kicker (no Big Boot) in no wind: their 20, the shortest roll, and the kick's reach.
+      const reach = inside(f.sim).fortyTwentyReach('home');
+      expect(reach).toBeCloseTo(20 + TOUCH.touchRollM + CALLS.fortyTwenty.reachM);
       for (const l of f.legal) {
         expect(l.tackles).toBeGreaterThanOrEqual(CALLS.lastFrom);
-        expect(Math.min(l.x, 100 - l.x)).toBeLessThanOrEqual(100 - CALLS.fortyTwentyFromM);
+        expect(l.toLine).toBeGreaterThanOrEqual(CALLS.fortyTwentyFromM);
+        expect(l.toLine).toBeLessThanOrEqual(reach);
       }
       grub += g.legal.length;
       ftw += f.legal.length;
@@ -142,6 +157,7 @@ describe('five more calls (#396): when the sim takes them', () => {
     expect(refused).toContain('late in the set');
     expect(refused).toContain('not inside their 25');
     expect(refused).toContain('not behind your 40');
+    expect(refused).toContain('out of reach of their 20');
   });
 
   it('the penalty pair only on a penalty his side has won, in range, and not the captain’s own choice', () => {
@@ -178,20 +194,50 @@ describe('five more calls (#396): each does what it says', () => {
     expect(grubbers).toBe(kicks);
   });
 
-  it('40/20: the last-tackle kick goes for touch inside their 20', () => {
+  it('40/20: the last-tackle kick is aimed at touch inside their 20, and finds it', () => {
     let kicks = 0;
-    let aimed = 0;
-    for (const seed of [1, 2, 3, 4, 5, 6]) {
-      const p = play(seed, 'forty-twenty');
-      for (const after of afterCalls(p, 'forty-twenty')) {
-        const k = after.find((e) => e.kind === 'kick' && e.side === 'home');
-        if (!k) continue;
-        kicks++;
-        if (/goes for the 40\/20/.test(k.text)) aimed++;
+    let inReach = 0;
+    let found = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const calls: CallInput[] = [];
+      const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
+      let aimed = false;
+      let prev = sim.snapshot().ball;
+      let before = inside(sim).pendingKick;
+      while (!sim.finished) {
+        if (sim.callRefusal('home', 'forty-twenty') === null) calls.push({ tick: sim.tick + 1, side: 'home', call: 'forty-twenty' });
+        sim.step();
+        const k = inside(sim).pendingKick;
+        // The kick he called, as it is planned (in force for the set when it is): 26 m out or a little more, a few
+        // metres in from touch, so the shortest roll on takes it inside their 20. A last carry that lost ground can
+        // leave him out of reach: then it is the kick for touch it is, and said so.
+        const own = k && k !== before && !k.kickoff && sim.snapshot().players[k.kicker]!.side === 'home' && sim.inPossession === 'home';
+        if (k && own && inside(sim).callState.home.attack === 'forty-twenty') {
+          kicks++;
+          expect(k.kind).toBe('long');
+          const land = toLine(sim, 'home', k.to.x);
+          expect(land).toBeGreaterThanOrEqual(TOUCH.fortyTwentyLandM - 1e-6);
+          expect(k.aim).toBe(land - TOUCH.touchRollM <= 20 ? '40-20' : 'touch');
+          expect(Math.min(k.to.y, 68 - k.to.y)).toBeLessThan(TOUCH.fortyTwentyInsideM + TOUCH.touchScatterM);
+          if (k.aim === '40-20') inReach++;
+          aimed = true;
+        }
+        for (const e of sim.tickEvents) {
+          // Touch in their 20, from the ball's last spot in the field: what the 40/20 rule says.
+          if (e.kind === '40-20' && aimed) {
+            found++;
+            expect(toLine(sim, 'home', prev.x)).toBeLessThanOrEqual(20 + 1);
+            expect(Math.min(prev.y, 68 - prev.y)).toBeLessThanOrEqual(2);
+          }
+        }
+        if (sim.tickEvents.some((e) => e.kind === '40-20' || e.kind === 'touch' || e.kind === 'set-start' || e.kind === 'on-full')) aimed = false;
+        before = k;
+        prev = sim.snapshot().ball;
       }
     }
-    expect(kicks).toBeGreaterThan(0);
-    expect(aimed).toBe(kicks);
+    expect(kicks).toBeGreaterThan(5);
+    expect(inReach / kicks).toBeGreaterThan(0.75);
+    expect(found).toBeGreaterThan(0);
   });
 
   it('Take the two: the captain’s call is overruled and the goal is attempted', () => {
@@ -307,6 +353,22 @@ describe('five more calls (#396): the verdicts', () => {
     expect(callResultText(none!)).toBe('Grubber: no kick');
   });
 
+  it('40/20 pays only on touch inside their 20: a regather, a drop or a drop-out off it is no 40/20', () => {
+    const j = new CallJudge();
+    for (const [e, side] of [['regather', 'home'], ['drop', 'away'], ['drop-out', 'away']] as const) {
+      j.make('home', 'forty-twenty', 'home', 1, 36);
+      j.observe([ev('kick', 'home', 'long')], 36, false, false);
+      const [v] = j.observe([ev(e, side)], 70, false, false);
+      expect(v, e).toMatchObject({ paid: false, how: e });
+      expect(callResultText(v!)).toBe('40/20: no 40/20');
+    }
+    expect([j.made.home, j.paid.home]).toEqual([3, 0]);
+    // Grubber keeps them: a regather or a drop-out is what it is for.
+    j.make('home', 'grubber', 'home', 1, 80);
+    j.observe([ev('kick', 'home', 'grubber')], 80, false, false);
+    expect(j.observe([ev('regather', 'home')], 98, false, false)[0]!.paid).toBe(true);
+  });
+
   it('40/20: found touch, or missed', () => {
     const j = new CallJudge();
     j.make('home', 'forty-twenty', 'home', 1, 25);
@@ -375,8 +437,16 @@ describe('the coach tray’s rows (#396)', () => {
     const rows = trayRows(all, true);
     expect(rows.length).toBeLessThanOrEqual(TRAY_MAX_ROWS);
     expect(rows.reduce((n, r) => n + r.buttons.length, 0)).toBeLessThanOrEqual(TRAY_MAX_BUTTONS);
-    expect(rows.map((r) => r.id)).toEqual(['run-it', 'bomb', 'forty-twenty', 'field-goal', 'fresh-legs']);
+    expect(rows.map((r) => r.id)).toEqual(['kick-early', 'run-it', 'bomb', 'forty-twenty', 'field-goal']);
     expect(trayCallsOn(rows)).toBe(5);
+    // The calls on that lost the cap are named in the footer, first, so none just vanishes.
+    const hidden = trayHidden(all, true, rows);
+    expect(hidden).toEqual(['hit-up', 'shift-left', 'shift-right', 'offload', 'fresh-legs']);
+    expect(callsUnlockLine(all, [], hidden)).toBe('+5 more: Hit-up, Shift left, Shift right, Offload, Fresh legs');
+    expect(callsUnlockLine([{ call: 'bomb', why: 'late in the set' }], [], ['fresh-legs'])).toBe('+1 more: Fresh legs · Bomb from tackle 4');
+    // Nothing left out, nothing said.
+    const few = on('hit-up', 'fresh-legs');
+    expect(trayHidden(few, true, trayRows(few, true))).toEqual([]);
   });
 
   it('early in the set: Hit-up, the shift as one row of two, Offload, Fresh legs', () => {
@@ -415,7 +485,7 @@ describe('the coach tray’s rows (#396)', () => {
   });
 
   it('every refusal the new calls give has a short caption', () => {
-    for (const why of ['tackles 1–4', 'not inside their 25', 'not behind your 40', 'no penalty', 'one call a penalty', 'too far out', 'the captain’s call', 'the siren’s gone']) {
+    for (const why of ['tackles 1–4', 'not inside their 25', 'not behind your 40', 'out of reach of their 20', 'the kick’s away', 'no penalty', 'one call a penalty', 'too far out', 'the captain’s call', 'the siren’s gone']) {
       const c = callCaption(why, false);
       expect(c.length, why).toBeGreaterThan(0);
       expect(c.length, why).toBeLessThanOrEqual(14);

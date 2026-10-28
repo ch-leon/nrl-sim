@@ -391,6 +391,8 @@ const CALL_CAPTION: Readonly<Record<string, string>> = {
   'tackles 1–4': 'tackles 1–4',
   'not inside their 25': 'in their 25',
   'not behind your 40': 'behind your 40',
+  'out of reach of their 20': 'out of reach',
+  'the kick’s away': 'kick’s away',
   'no penalty': 'no penalty',
   'one call a penalty': 'one a penalty',
   'too far out': 'too far out',
@@ -420,7 +422,7 @@ export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
   offload: 'tackles 1–4: the next two carries look to offload',
   'gang-tackle': 'defending: an extra man in the next two tackles',
   grubber: 'tackle 4+, inside their 25: grubber the last for the line',
-  'forty-twenty': 'tackle 4+, behind your 40: kick the last for touch in their 20',
+  'forty-twenty': 'tackle 4+, behind your 40 and in reach of their 20: kick the last for touch inside their 20',
   'take-two': 'a penalty won, in range: a shot at goal for two',
   'tap-go': 'a penalty won, in range: tap it and run',
 };
@@ -462,6 +464,7 @@ const UNLOCK_WHEN: Readonly<Record<string, string>> = {
   'no one’s tired yet': 'once someone tires',
   'not inside their 25': 'inside their 25',
   'not behind your 40': 'behind your 40',
+  'out of reach of their 20': 'in reach of their 20',
 };
 
 /**
@@ -469,12 +472,16 @@ const UNLOCK_WHEN: Readonly<Record<string, string>> = {
  * ("Kick early from tackle 3 · Bomb, Run it from tackle 4"), that the set's call
  * is made, and what the Coach's Office still has to unlock. `waiting` is this
  * side's calls for the play now (attack or defence) with the sim's refusal.
+ * `hidden`: calls on now that the five-row cap left out of the tray (#396),
+ * said first ("+2 more: Hit-up, Offload") so a legal call never just vanishes.
  */
 export function callsUnlockLine(
   waiting: readonly { call: CoachCall; why: string | null }[],
   locked: readonly { call: CoachCall; level: number }[],
+  hidden: readonly CoachCall[] = [],
 ): string {
   const parts: string[] = [];
+  if (hidden.length > 0) parts.push(`+${hidden.length} more: ${hidden.map((c) => CALL_LABEL[c]).join(', ')}`);
   const groups = new Map<string, string[]>();
   let called = false;
   for (const { call, why } of waiting) {
@@ -510,7 +517,11 @@ export interface TrayRow {
 export const TRAY_MAX_ROWS = 5;
 export const TRAY_MAX_BUTTONS = 6;
 
-/** Calls that share a row, side by side. */
+/**
+ * Calls that share a row, side by side. The kick-off calls (#397) join as one more pair,
+ * `['kickoff', <short>, <long>]`, which TRAY_PRIORITY and TRAY_ORDER already rank first: a
+ * restart is over in seconds, and nothing else is on while it waits.
+ */
 const TRAY_PAIRS: readonly (readonly [string, CoachCall, CoachCall])[] = [
   ['shift', 'shift-left', 'shift-right'],
   ['penalty', 'take-two', 'tap-go'],
@@ -520,14 +531,15 @@ const TRAY_PAIRS: readonly (readonly [string, CoachCall, CoachCall])[] = [
 const PAIR_SHOWS = new Set(['the captain’s call', 'the siren’s gone']);
 
 /**
- * Which rows win when more are on than fit (#396): the penalty (it is gone in seconds),
- * the last-tackle kicks, Fresh legs, Kick early, then the next play's calls. Defending,
- * four rows at most are ever on.
+ * Which rows win when more are on than fit (#396): a kick-off (#397) or a penalty (gone
+ * in seconds), the last-tackle kicks, Kick early (on two tackles only), Fresh legs, then
+ * the next play's calls. Defending, four rows at most are ever on. The rest are named in
+ * the footer ("+2 more").
  */
-const TRAY_PRIORITY: readonly string[] = ['penalty', 'field-goal', 'grubber', 'forty-twenty', 'bomb', 'run-it', 'fresh-legs', 'kick-early', 'hit-up', 'shift', 'offload', 'rush', 'hold', 'gang-tackle'];
+const TRAY_PRIORITY: readonly string[] = ['kickoff', 'penalty', 'field-goal', 'grubber', 'forty-twenty', 'bomb', 'run-it', 'kick-early', 'fresh-legs', 'hit-up', 'shift', 'offload', 'rush', 'hold', 'gang-tackle'];
 
-/** The order the rows show in: the penalty, the next play, the set's kick, defence, the bench. */
-const TRAY_ORDER: readonly string[] = ['penalty', 'hit-up', 'shift', 'offload', 'kick-early', 'run-it', 'bomb', 'grubber', 'forty-twenty', 'field-goal', 'rush', 'hold', 'gang-tackle', 'fresh-legs'];
+/** The order the rows show in: a restart or a penalty, the next play, the set's kick, defence, the bench. */
+const TRAY_ORDER: readonly string[] = ['kickoff', 'penalty', 'hit-up', 'shift', 'offload', 'kick-early', 'run-it', 'bomb', 'grubber', 'forty-twenty', 'field-goal', 'rush', 'hold', 'gang-tackle', 'fresh-legs'];
 
 /** Is the call one for this side now: attack calls with the ball, defence calls without it; the bench and a penalty won either way. */
 export function callForRole(call: CoachCall, attacking: boolean): boolean {
@@ -563,6 +575,12 @@ export function trayRows(calls: readonly TrayButton[], attacking: boolean): Tray
     buttons += r.buttons.length;
   }
   return shown.sort((p, q) => rank(p, TRAY_ORDER) - rank(q, TRAY_ORDER));
+}
+
+/** The calls on now that the tray's rows leave out (#396): the footer names them. */
+export function trayHidden(calls: readonly TrayButton[], attacking: boolean, rows: readonly TrayRow[]): CoachCall[] {
+  const shown = new Set(rows.flatMap((r) => r.buttons.map((b) => b.call)));
+  return calls.filter((c) => c.why === null && callForRole(c.call, attacking) && !shown.has(c.call)).map((c) => c.call);
 }
 
 /** The calls the tray's rows offer now (for the COACH badge's count). */

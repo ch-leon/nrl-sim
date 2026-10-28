@@ -187,7 +187,7 @@ export function chipState(call: CoachCall, why: string | null, attacking: boolea
   if (callIsPenalty(call)) return { show: why === null, enabled: why === null, lit: false };
   if (made) return { show: call === made, enabled: false, lit: call === made };
   const role = callIsDefence(call) ? !attacking : attacking;
-  const notYet = why === 'tackles 3–4' || why === 'late in the set' || why === 'not in range' || why === 'not inside their 25' || why === 'not behind your 40';
+  const notYet = why === 'tackles 3–4' || why === 'late in the set' || why === 'not in range' || why === 'not inside their 25' || why === 'not behind your 40' || why === 'out of reach of their 20';
   return { show: role && !notYet, enabled: why === null, lit: false };
 }
 
@@ -248,6 +248,14 @@ const lastKickResult = (v: CallVerdict): string => {
   return v.how === 'no-kick' ? 'no kick' : 'missed, their ball';
 };
 
+/** 40/20 (#396): touch for the 40/20, or not; a kick kept or won back some other way is still a miss. */
+const fortyTwentyResult = (v: CallVerdict): string => {
+  if (v.how === '40-20') return 'found touch';
+  if (v.how === 'try') return v.paid ? 'try!' : 'try against';
+  if (v.how === 'no-kick') return 'no kick';
+  return v.how === 'regather' || v.how === 'drop' || v.how === 'drop-out' ? 'no 40/20' : 'missed, their ball';
+};
+
 /** Gang tackle (#396): a defence call's result, in fewer words (its name is long). */
 const gangResult = (v: CallVerdict): string => {
   const r = defenceResult(v);
@@ -282,7 +290,7 @@ export const CALL_RESULT: Readonly<Record<CoachCall, (v: CallVerdict) => string>
   offload: (v) => joinResult('offload', v.how === 'offload' ? 'got it away' : v.how === 'gain' || v.how === 'set-end' ? 'no offload' : playResult(v)),
   'gang-tackle': (v) => joinResult('gang-tackle', gangResult(v)),
   grubber: (v) => joinResult('grubber', lastKickResult(v)),
-  'forty-twenty': (v) => joinResult('forty-twenty', lastKickResult(v)),
+  'forty-twenty': (v) => joinResult('forty-twenty', fortyTwentyResult(v)),
   'take-two': (v) => joinResult('take-two', v.how === 'penalty-goal' ? (v.paid ? 'over!' : 'missed') : 'not taken'),
   'tap-go': (v) => joinResult('tap-go', v.how === 'penalty' ? 'won a penalty' : v.how === 'try' ? (v.paid ? 'try!' : 'try against') : v.how === 'intercept' || v.how === 'strip' || v.how === 'error' || v.how === 'drop' || v.how === 'loose' ? 'lost the ball' : gain(v.metres) ? `no try, +${v.metres}m` : 'no try'),
 };
@@ -426,10 +434,17 @@ export class CallJudge {
         return e.kind === 'penalty' && theirs ? true : null;
       case 'field-goal':
         return e.kind === 'field-goal' && !theirs ? e.detail === 'good' : null;
+      case 'forty-twenty':
+        // Only touch for the 40/20 pays (#396): a regather, a dropped ball or a drop-out off it is not what was called.
+        if (!w.kicked) {
+          if (e.kind === 'kick' && !theirs) w.kicked = true;
+          return null;
+        }
+        if (e.kind === '40-20' && !theirs) return true;
+        return (e.kind === 'regather' && !theirs) || ((e.kind === 'drop' || e.kind === 'drop-out') && theirs) ? false : null;
       case 'kick-early':
       case 'bomb':
       case 'grubber':
-      case 'forty-twenty':
         if (!w.kicked) {
           if (e.kind === 'kick' && !theirs) w.kicked = true;
           return null;

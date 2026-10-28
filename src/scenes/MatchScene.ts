@@ -24,7 +24,7 @@ import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
-import { CALL_TILE, SKIP_ARM_MS, callCaption, callEffect, callForRole, callsHintSeasoned, callsLockedHint, callsUnlockLine, coachBadge, cssHex, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, trayCallsOn, trayRows, type MatchOverlayHandle, type PlanCardHandle, type TrayButton } from '../ui/screens/matchOverlay';
+import { CALL_TILE, SKIP_ARM_MS, callCaption, callEffect, callForRole, callsHintSeasoned, callsLockedHint, callsUnlockLine, coachBadge, cssHex, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayRows, type MatchOverlayHandle, type PlanCardHandle, type TrayButton } from '../ui/screens/matchOverlay';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
 import { styleLine } from '../ui/tacticsBlurbs';
 import {
@@ -970,7 +970,8 @@ export class MatchScene extends Phaser.Scene {
     // His calls for the play now: attack calls with the ball, defence calls without it; Fresh legs (#367) and a penalty won (#396) either way.
     const role = this.unlocked.filter((c) => callForRole(c, attacking));
     // The rows the tray shows (#396): at most five, so it never scrolls.
-    const rows = trayRows(role.map((call) => ({ call, why: why.get(call) ?? null })), attacking);
+    const buttons = role.map((call) => ({ call, why: why.get(call) ?? null }));
+    const rows = trayRows(buttons, attacking);
     const badge = coachBadge(trayCallsOn(rows), attacking, this.madeCall);
     if (this.coachBadgeEl && this.coachBadgeEl.textContent !== badge.text) this.coachBadgeEl.textContent = badge.text;
     if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
@@ -1011,7 +1012,7 @@ export class MatchScene extends Phaser.Scene {
     }
     // The penalty pair (#396) only ever shows on a penalty won, so the footer doesn't list it as locked.
     const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && callForRole(c, attacking) && !callIsPenalty(c)).map((call) => ({ call, level: unlockLevel(call) }));
-    const foot = callsUnlockLine(role.map((call) => ({ call, why: why.get(call) ?? null })), locked);
+    const foot = callsUnlockLine(buttons, locked, trayHidden(buttons, attacking, rows));
     if (this.trayFoot.textContent !== foot) this.trayFoot.textContent = foot;
   }
 

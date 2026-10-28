@@ -900,14 +900,24 @@ export class LiveSim implements MatchSim {
     if (call === 'kick-early' && (this.tackles < CALLS.kickEarlyFrom || this.tackles >= SET_TACKLES - 1)) return 'tackles 3–4';
     if (call === 'offload' && this.tackles >= CALLS.offload.beforeTackle) return 'tackles 1–4';
     if ((call === 'run-it' || call === 'bomb' || call === 'grubber' || call === 'forty-twenty') && this.tackles < CALLS.lastFrom) return 'late in the set';
-    // Grubber and 40/20 (#396): where the ball is now (the mark at a ruck).
+    // Grubber and 40/20 (#396): not once the set's kick is struck, and from where the ball is now (the mark at a ruck).
+    if ((call === 'grubber' || call === 'forty-twenty') && this.pendingKick) return 'the kick’s away';
     if (call === 'grubber' && this.toLineFor(side, this.ballPos()) > CALLS.grubberInsideM) return 'not inside their 25';
     if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) < CALLS.fortyTwentyFromM) return 'not behind your 40';
+    if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) > this.fortyTwentyReach(side)) return 'out of reach of their 20';
     if (call === 'field-goal') {
       const h = this.holder();
       if (!this.fieldGoalOn(h && h.side === side ? h : this.goalKicker(side))) return 'not in range';
     }
     return null;
+  }
+
+  /**
+   * How far from their line a 40/20 can be kicked from (#396): the kick's reach (calls.fortyTwenty.reachM × his
+   * kicker's Big Boot and the wind, without its gusts), the shortest roll on (touchRollM), and their 20 (isFortyTwenty's).
+   */
+  private fortyTwentyReach(side: Side): number {
+    return 20 + TOUCH.touchRollM + CALLS.fortyTwenty.reachM * bootMult(this.kicker(side).traits).dist * this.wx.kickDistance;
   }
 
   /** Why a side can't change its plan now (N11), or null: only at the breaks — half-time, or a score until the kick-off is taken (not a drop-out). */
@@ -1672,12 +1682,12 @@ export class LiveSim implements MatchSim {
     const early = this.tackles === SET_TACKLES - 2 && !forLast && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
     const kickEarly = called === 'kick-early' && !this.lastPlay;
     if ((this.lastPlay || early || kickEarly) && isKicker) {
-      if (this.kickCall === null) {
+      // Grubber or 40/20 (#396) sets the last-tackle kick even when it comes after his own choice, till the kick is struck.
+      if (this.lastPlay && forLast) this.kickCall = called === 'grubber' ? 'grubber' : 'long';
+      else if (this.kickCall === null) {
         if (kickEarly) this.kickCall = toLine <= LIVE.earlyKickM ? (this.rng.next() < 0.6 ? 'grubber' : 'chip') : 'long';
         else if (this.lastPlay && called === 'run-it') this.kickCall = 'run';
         else if (this.lastPlay && called === 'bomb') this.kickCall = 'bomb';
-        else if (this.lastPlay && called === 'grubber') this.kickCall = 'grubber';
-        else if (this.lastPlay && called === 'forty-twenty') this.kickCall = 'long';
         else this.kickCall = this.lastPlay ? this.callLastPlay(toLine, plan) : this.callEarlyKick(toLine, plan);
       }
       if (this.kickCall !== 'run' && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
@@ -1800,10 +1810,13 @@ export class LiveSim implements MatchSim {
         // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch; else to the fullback.
         const toLine = this.toLine(h);
         const lever = traitBoost(h.traits, 'bigBoot') + traitBoost(h.traits, 'playmaker');
-        // The coach's 40/20 call (#396) goes for it without the roll, as far as a touch-finder goes: from deep it falls short of their 20.
+        // The coach's 40/20 call (#396) goes for it without the roll, as far as calls.fortyTwenty.reachM goes. It is only
+        // offered in reach (fortyTwentyReach); if the last carry took him out of it, it falls short and is said as the
+        // kick for touch it is (in reach: the shortest roll on, touchRollM, gets it inside their 20).
         if (this.lastPlay && this.callState[this.attacking].attack === 'forty-twenty') {
           const land = Math.max(TOUCH.fortyTwentyLandM, toLine - CALLS.fortyTwenty.reachM * boot.dist);
-          return { ...base, to: this.touchTarget(h, land, TOUCH.fortyTwentyInsideM, boot.acc * CALLS.fortyTwenty.scatter), receiver: this.indexOf(fb), peak: 11, aim: '40-20', ...trait };
+          const aim = land - TOUCH.touchRollM <= 20 ? '40-20' : 'touch';
+          return { ...base, to: this.touchTarget(h, land, TOUCH.fortyTwentyInsideM, boot.acc * CALLS.fortyTwenty.scatter), receiver: this.indexOf(fb), peak: 11, aim, ...trait };
         }
         if (this.lastPlay && toLine >= FIELD_LENGTH - 40 && this.rng.next() < TOUCH.fortyTwenty + TOUCH.fortyTwentyTrait * lever) {
           return { ...base, to: this.touchTarget(h, TOUCH.fortyTwentyLandM, TOUCH.fortyTwentyInsideM, boot.acc * 0.6), receiver: this.indexOf(fb), peak: 11, aim: '40-20', ...trait };

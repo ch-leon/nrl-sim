@@ -164,20 +164,21 @@ the runs that sized them.
 |---|---|---|---|---|---|
 | **Offload** | With the ball, tackles 1–4 ("tackles 1–4" on the last) | The next two carries | The attack plan's `offload` becomes at least 1, +0.5 (about +6 points on a 12% contest, even in a plan that tucks it), and an offload is spilled 4 points more often | It gets away, or the play breaks the line or scores. Not if two carries go by without one, or the ball is lost | 1 |
 | **Gang tackle** | Defending | The next two tackles | One more defender commits to the carrier (`commit` +1) and the ruck takes 6 ticks longer to clear (a slower play-the-ball); with a man more in the tackle the edges are thin, so a carrier one-on-one out wide steps his man more often (`stepAgainst` +0.2) | Their two carries make under 10 m, or the defence wins the ball | 1 |
-| **Grubber** | With the ball, from tackle 4 ("late in the set"), the ball inside their 25 ("not inside their 25") | This set's last tackle | The last-tackle kick is a grubber for the line or the in-goal; the kicker keeps it for the last (no early kick) and the dummy-half finds him rather than dart | A goal-line drop-out (a repeat set), the ball regathered, dropped, or a try. Not if the ball goes to them (taken, into touch, dead off the attack) or no kick comes | 2 |
+| **Grubber** | With the ball, from tackle 4 ("late in the set"), the ball inside their 25 ("not inside their 25"), until the kick is struck ("the kick’s away") | This set's last tackle | The last-tackle kick is a grubber for the line or the in-goal; the kicker keeps it for the last (no early kick), the dummy-half finds him rather than dart, and the call sets his kick even after his own choice | A goal-line drop-out (a repeat set), the ball regathered, dropped, or a try. Not if the ball goes to them (taken, into touch, dead off the attack) or no kick comes | 2 |
 | **Take the two / Tap and go** | A penalty his side has won and not yet taken, with the shot at goal at least 35% likely ("too far out"); not the captain's own choice ("the captain's call"); no tap once the siren has gone | This penalty | Overrules the captain: the goal-kicker takes the shot at goal, or the penalty is tapped. One row, two buttons; the captain's own choice shows greyed. Uses neither of the set's calls; one a penalty | Take the two: the goal is over. Tap and go: the set ends in a try or another penalty | 2 |
-| **40/20** | With the ball, from tackle 4, the ball behind his own 40 ("not behind your 40") | This set's last tackle | The last-tackle kick goes for touch inside their 20 (the 2d 40/20 aim, without its dice), as far as 35 m goes: from deep it is a kick for touch that falls short. The kicker keeps it for the last and the dummy-half finds him | It finds touch for the 40/20. Not if the ball goes to them or no kick comes | 3 |
+| **40/20** | With the ball, from tackle 4, the ball behind his own 40 ("not behind your 40") and in reach of their 20 ("out of reach of their 20": no more than 20 m + the shortest roll on + 35 m × Big Boot × wind from their line, 64 m for a plain kicker), until the kick is struck ("the kick’s away") | This set's last tackle | The last-tackle kick goes for touch inside their 20 (the 2d 40/20 aim, without its dice), 26 m out or as near as 35 m gets it. The kicker keeps it for the last, the dummy-half finds him, and the call sets his kick even after his own choice. If the last carry took him out of reach it falls short, and is said as a kick for touch | It finds touch inside their 20 (the `40-20` event). Not on a regather, a drop or a drop-out off it, if the ball goes to them, or if no kick comes | 3 |
 
 The issue asked for Grubber on "the last tackle". With five tackles a set, the last tackle's
 ruck is under a second at ×4, so Grubber is on from tackle 4, as Bomb and Run it are, and is
-always the last tackle's kick. A call made only after the kicker has the ball on the last may be
-too late (his choice is made as he takes it), as for Bomb.
+always the last tackle's kick (Leon, review of #405: keep it). Grubber and 40/20 made after the
+kicker has the ball on the last still set his kick, until it is struck.
 
 Two of the five were too strong as first drawn, measured with one side calling them whenever
 it may (tuning reference §20): Gang tackle won 62% (its bunched line helped the defence, so
 "more space out wide" became the edge defender who is easier to step), and 40/20 won 63% (an
 aim 26 m from their line from anywhere behind his own 40 is a 60 m kick from deep, so it now
-goes as far as 35 m). At the defaults no call wins more than Hold's 55%.
+goes as far as 35 m, and is offered only where that still reaches their 20). At the defaults no
+call wins more than Hold's 55% (40/20 52.5%, Gang tackle 51.2%).
 
 The verdicts read "Grubber: repeat set", "40/20: found touch", "Grubber: missed, their ball",
 "Offload: got it away", "Gang tackle: held to +6m", "Take the two: over!", "Tap and go: try!".
@@ -186,9 +187,12 @@ The verdicts read "Grubber: repeat set", "40/20: found touch", "Grubber: missed,
 than 5 rows or 6 buttons, so it fits 667×375, 844×390 and 956×330 without scrolling: the calls
 are tiles, two a line (three a line in a wider tray on a short wide phone). Shift left and right
 share a row, and so do Take the two and Tap and go. When more are on than fit, the penalty comes
-first (it is gone in seconds), then Field goal, Grubber, 40/20, Bomb, Run it, Fresh legs, Kick
-early, Hit-up, Shift, Offload, and defending Rush, Hold, Gang tackle. They show in play order.
-A later row kind (the kick-off calls, #397) is a new id in that order and priority.
+first (it is gone in seconds), then Field goal, Grubber, 40/20, Bomb, Run it, Kick early (on two
+tackles only), Fresh legs, Hit-up, Shift, Offload, and defending Rush, Hold, Gang tackle. They
+show in play order. A call on that the cap leaves out is named first in the footer ("+2 more:
+Hit-up, Offload"), so none just vanishes. The kick-off calls (#397) take the `kickoff` id, already
+first in the priority and the order: one more pair (Short / Long) in `TRAY_PAIRS`, under the same
+cap, not a second list.
 
 **Decisions (Leon; defaults used).**
 

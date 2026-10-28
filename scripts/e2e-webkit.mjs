@@ -27,7 +27,7 @@
 // calls in five rows), which must not scroll, and the commentary checked: the line (log = line) clear of the bottom row and the
 // score bug at 360×640, 390×844, 667×375 and 844×390; the full log (log = full) clear
 // of them and of the open tray, and scrolling, at 667×375 and 844×390; and the LOG
-// switch keeps its fill under hover.
+// switch keeps its fill under hover. The full tray is checked once more, alone, at 956×330.
 // Both Bali choices must fit, retain 44px targets and accept taps at these same
 // four sizes. Exits 1 on any failure.
 //
@@ -647,6 +647,32 @@ async function runPortrait(browser) {
         if (found?.problems?.length) problems.push(`${mode} ${w}×${h}: ${found.problems.join(', ')}`);
         else rec.notes.push(`${mode} ${w}×${h} clear`);
       }
+    }
+    // The tray at its fullest on the shortest phone (#396): 956×330 lays it three a line and
+    // it must not scroll either (the full log is not checked here: its four lines are for 375+).
+    for (const [w, h] of [[956, 330]]) {
+      await turn(w, h);
+      await page.waitForTimeout(300);
+      const tray = await page.evaluate(() => {
+        const t = document.querySelector('.nrl-mo-calls');
+        const r = t?.getBoundingClientRect();
+        if (!t || !r || r.height < 1) return ['the coach tray is not open'];
+        const out = [];
+        if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) out.push('the coach tray is off screen');
+        if (t.scrollHeight > t.clientHeight + 1) out.push(`the coach tray scrolls (${t.scrollHeight} > ${t.clientHeight}px)`);
+        const rows = [...t.querySelectorAll('[data-call]')];
+        if (rows.length < 6) out.push(`only ${rows.length} calls in the tray`);
+        for (const b of rows) {
+          const q = b.getBoundingClientRect();
+          if (q.height < 44) out.push(`call ${b.dataset.call} is ${Math.round(q.height)}px tall`);
+          const at = document.elementFromPoint((q.left + q.right) / 2, (q.top + q.bottom) / 2);
+          if (!(at && b.contains(at))) out.push(`call ${b.dataset.call} covered by ${at?.className || at?.tagName}`);
+        }
+        return out;
+      });
+      await page.screenshot({ path: join(OUT, `tray-full-${w}x${h}.png`) });
+      if (tray.length) problems.push(`tray ${w}×${h}: ${tray.join(', ')}`);
+      else rec.notes.push(`tray ${w}×${h} clear`);
     }
     await turn(844, 390);
     await setMode('line');
