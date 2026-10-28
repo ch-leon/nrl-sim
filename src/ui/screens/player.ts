@@ -10,7 +10,8 @@
 // where the player is (sign a free agent; renew, sell or release one of yours)
 // through the same system functions the Recruit, Squad and Contracts screens
 // call. The view-model (playerPageModel) is pure and unit-tested; the DOM
-// renders it. No Phaser.
+// renders it. Rename (#398), beside ◂ back, swaps the name for a name field
+// for any player: yours, a free agent or a rival's. No Phaser.
 
 import { bus } from '../../core/events';
 import { getState, setState, type GameState, type Player, type PlayerStats, type RivalClub, type StatTally } from '../../core/state';
@@ -33,6 +34,8 @@ import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
 import { LINEUP_SLOTS, resolveLineup, setCaptain, setKicker, statsAt } from '../../systems/lineup';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import { RETIREMENT_NOTE_AGE, careerStage, projectCareer, retirementRisk, type CareerPoint, type CareerStage } from '../../systems/potential';
+import { renamePlayer } from '../../systems/rename';
+import { nameField, renameButton } from '../rename';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
 
@@ -361,6 +364,9 @@ export const PLAYER_CSS = `
 .nrl-player.nrl-player-rival { grid-template-columns: 230px minmax(0, 1fr); }
 .nrl-player-card, .nrl-player-side { min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
 .nrl-player-card .nrl-back { align-self: flex-start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* ◂ back and Rename (#398) share the card's top row; back gives way when the club's name is long. */
+.nrl-player-headrow { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.nrl-player-headrow .nrl-back { flex: 0 1 auto; min-width: 0; }
 .nrl-player-top { display: flex; align-items: center; gap: 10px; }
 .nrl-player-portrait {
   flex: 0 0 auto;
@@ -478,7 +484,9 @@ function kitFor(ctx: PlayerContext, state: GameState): Kit {
 
 /** Where the player is now, by id, or null once he has moved on. */
 function findPlayer(id: string, ctx: PlayerContext, state: GameState): Player | null {
-  const list = ctx.kind === 'squad' ? state.squad : ctx.kind === 'freeAgent' ? state.freeAgents : (ctx.club.squad ?? []);
+  // A rival's club as the league has it now: a rename (#398) replaces the object the page opened with.
+  const club = ctx.kind === 'rival' ? state.league.clubs.find((c) => c.id === ctx.club.id) ?? ctx.club : null;
+  const list = ctx.kind === 'squad' ? state.squad : ctx.kind === 'freeAgent' ? state.freeAgents : (club?.squad ?? []);
   return list.find((p) => p.id === id) ?? null;
 }
 
@@ -562,6 +570,8 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   const content = el('div', { class: `nrl-player${ctx.kind === 'rival' ? ' nrl-player-rival' : ''}`, attrs: { 'data-player-page': player.id } });
   let armed: PlayerActionId | null = null;
   let closed = false;
+  // Rename (#398): the field's open, and what's typed survives a re-render.
+  let renaming: string | null = null;
 
   const finish = (): void => {
     if (closed) return;
@@ -587,14 +597,39 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     const meta = [m.position, `age ${m.age}`, ...(m.number !== null ? [`#${m.number}`] : [])].join(' · ');
     const fit = el('b', { text: p.injuredWeeks > 0 ? 'OUT' : `${m.fitnessPct}%` });
     fit.style.color = fitColour(m.fitnessPct);
+    const rename = renaming === null
+      ? null
+      : nameField({
+        value: renaming,
+        label: 'Player name',
+        attr: 'data-player-rename',
+        onDraft: (text) => { renaming = text; },
+        onCancel: () => { renaming = null; render(); },
+        onSave: (name) => {
+          const res = renamePlayer(getState(), p.id, name);
+          if (!res.ok) return res.why;
+          renaming = null;
+          if (res.patch) {
+            // The page draws again with the new name: no toast.
+            setState(res.patch);
+            save(getState());
+          } else render();
+          return null;
+        },
+      });
     const card = el('div', { class: 'nrl-player-card' },
-      back,
+      el('div', { class: 'nrl-player-headrow' }, back,
+        ...(rename ? [] : [renameButton(() => { renaming = m.name; render(); })])),
       el('div', { class: 'nrl-player-top' }, portrait,
         el('div', { class: 'nrl-player-id' },
-          el('div', { class: 'nrl-player-name', text: m.name }),
+          ...(rename ? [] : [el('div', { class: 'nrl-player-name', text: m.name })]),
           el('div', { class: 'nrl-player-meta', text: meta }))),
+      // While renaming, the field takes the room the tiles and the deal had (667×375).
+      ...(rename ? [rename] : []),
       el('div', { class: 'nrl-player-where', text: m.where }),
       ...(m.fitness !== 'Fit' ? [el('div', { class: 'nrl-player-where nrl-player-out', text: m.fitness })] : []),
+    );
+    if (!rename) card.append(
       el('div', { class: 'nrl-player-tiles' },
         el('div', { class: 'nrl-player-tile', attrs: { title: 'Overall rating' } }, el('b', { text: String(m.overall) }), el('span', { text: 'overall' })),
         el('div', { class: 'nrl-player-tile', attrs: { title: `Fitness: 100 less his injury risk (${p.injuryRisk}); 0 while injured` } }, fit, el('span', { text: 'fitness' }))),

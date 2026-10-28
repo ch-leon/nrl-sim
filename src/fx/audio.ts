@@ -16,7 +16,8 @@ import { bus } from '../core/events';
 import { getState, setState, type GameState } from '../core/state';
 import { el, button, openModal, closeModal, segmented } from '../ui/dom';
 import { TEXT_SIZES, textSizeOf } from '../ui/textSize';
-import { downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, save } from '../core/save';
+import { applyNamesFile, downloadNames, downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, save } from '../core/save';
+import { BRAND } from '../brand';
 import { startTutorial } from '../ui/tutorial';
 import { canInstall, promptInstall } from './pwa';
 
@@ -751,7 +752,25 @@ export function initAudioUi(): () => void {
 
   const exportBtn = button('Export save', () => downloadSave(getState()));
   // Import replaces the slot being played and reloads, so it asks first, on its own row.
+  // The names file (#398) shares the row: every player's and club's name, out or in.
   const importRow = el('div', { class: 'nrl-audio-row nrl-settings-import' });
+  // A toast waits under the dialog, so what the import did is said in the row as well.
+  const namesAsk = (said?: { ok: boolean; text: string }): void => {
+    importRow.replaceChildren(
+      el('span', {
+        class: `nrl-settings-ask${said && !said.ok ? ' nrl-attn' : ''}`,
+        text: said?.text ?? 'Every name in this career, as a file for another save of it.',
+        attrs: { 'data-names-said': said ? String(said.ok) : '' },
+      }),
+      button('Export names', () => { downloadNames(getState()); importIdle(); }, { class: 'nrl-settings-names-export' }),
+      button('Import names', () => {
+        void pickSaveFile().then((text) => {
+          if (text !== null) namesAsk(applyNamesFile(text));
+        });
+      }, { class: 'nrl-settings-names-import' }),
+      button(said?.ok ? 'Done' : 'Cancel', importIdle, { class: 'nrl-settings-names-cancel' }),
+    );
+  };
   const importIdle = (): void => {
     importRow.replaceChildren(button('Import save…', () => {
       const s = getState();
@@ -767,13 +786,16 @@ export function initAudioUi(): () => void {
         }, { class: 'nrl-settings-import-go' }),
         button('Cancel', importIdle),
       );
-    }));
+    }), button('Names file…', () => namesAsk(), { class: 'nrl-settings-names' }));
   };
 
   const content = el(
     'div',
     { class: 'nrl-audio-settings' },
-    el('h2', { text: 'Settings', class: 'nrl-audio-title' }),
+    el('div', { class: 'nrl-audio-title nrl-settings-head' },
+      el('h2', { text: 'Settings' }),
+      // #398: text only, beside the heading, so it costs the popup no row.
+      el('p', { class: 'nrl-settings-disclaimer', text: BRAND.disclaimer })),
     el('div', { class: 'nrl-settings-cols' },
       el('div', { class: 'nrl-settings-col' },
         el('label', { class: 'nrl-audio-row' }, el('b', { text: 'Volume' }), slider),
@@ -846,6 +868,13 @@ function ensureAudioStyles(): void {
 .nrl-settings-import { flex-wrap: wrap; padding: 0; background: none; }
 .nrl-settings-import:has(.nrl-settings-ask) { padding: 0 10px 8px; background: var(--nrl-raised); }
 .nrl-settings-import > .nrl-btn { flex: 1 1 auto; min-height: 44px; }
+/* The heading and the not-affiliated line (#398) share the title row. */
+.nrl-settings-head { gap: 12px; min-width: 0; }
+.nrl-settings-head h2 { flex: 0 0 auto; margin: 0; }
+.nrl-settings-disclaimer { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 0.6875rem; line-height: 1.25; color: var(--nrl-muted); }
+/* Import save and the names file side by side; asking, Export / Import names / Cancel share a row. */
+.nrl-settings-import > .nrl-btn { flex-basis: 0; padding: 0 6px; white-space: normal; line-height: 1.05; }
+.nrl-settings-ask.nrl-attn { color: var(--nrl-accent); }
 /* 956x330: columns of three rows, so every switch and the Import question sit on screen unscrolled.
    Four since the key-moments and weekly-summary switches (#366, #368); the hints go, which no longer fit. */
 @media (max-height: 340px) {

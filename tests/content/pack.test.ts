@@ -51,8 +51,8 @@ describe('AU pack', () => {
       { id: 'rival-wolves', name: 'Woolloomooloo Wolves', colors: ['#37474f', '#b0bec5'], strength: 68 },
       { id: 'rival-thunder', name: 'Toowoomba Thunder', colors: ['#1a237e', '#ffd54f'], strength: 63 },
       { id: 'rival-cyclones', name: 'Cairns Cyclones', colors: ['#00695c', '#e0f2f1'], strength: 61 },
-      { id: 'rival-brumbies', name: 'Ballarat Brumbies', colors: ['#4e342e', '#d7a86e'], strength: 56 },
-      { id: 'rival-mariners', name: 'Mackay Mariners', colors: ['#01579b', '#4fc3f7'], strength: 52 },
+      { id: 'rival-brumbies', name: 'Ballarat Bushrangers', colors: ['#4e342e', '#d7a86e'], strength: 56 },
+      { id: 'rival-mariners', name: 'Mackay Marlins', colors: ['#01579b', '#4fc3f7'], strength: 52 },
       { id: 'rival-diggers', name: 'Dubbo Diggers', colors: ['#5d4037', '#a1887f'], strength: 48 },
       { id: 'rival-scorpions', name: 'Shellharbour Scorpions', colors: ['#212121', '#ff7043'], strength: 46 },
       { id: 'rival-crocs', name: 'Katherine Crocs', colors: ['#33691e', '#aed581'], strength: 59 },
@@ -65,23 +65,28 @@ describe('AU pack', () => {
     ]);
   });
 
-  it("holds today's name pools, in order", () => {
+  it("holds today's name pools, in order (#398: invented, 60 × 60)", () => {
     expect(AU_PACK.names.first).toEqual([
       'Jarrah', 'Kobi', 'Reece', 'Tane', 'Bailey', 'Cooper', 'Kade', 'Jaxon',
       'Ryder', 'Hayden', 'Brayden', 'Lachie', 'Beau', 'Digger', 'Macca',
       'Nash', 'Zane', 'Corey', 'Blake', 'Darcy', 'Flynn', 'Hunter', 'Jett',
       'Kane', 'Levi', 'Marley', 'Nate', 'Ollie', 'Rhys', 'Sonny', 'Tyrese',
       'Wade', 'Xavier', 'Zeke', 'Angus', 'Bodhi', 'Cruz', 'Deakin', 'Ezra',
-      'Finn',
+      'Finn', 'Archie', 'Brodie', 'Cash', 'Dane', 'Eli', 'Fletcher', 'Harley',
+      'Isaac', 'Jed', 'Koa', 'Lenny', 'Mitch', 'Rafe', 'Rocco', 'Sione',
+      'Taj', 'Toby', 'Wiremu', 'Sully', 'Tama',
     ]);
     expect(AU_PACK.names.last).toEqual([
-      'Waratah', 'Kavanagh', 'Fifield', 'Tuilagi', 'Boyd', 'Cronky', 'Hansen',
-      'Iongi', 'Jurbo', 'Kellaway', 'Lomax', 'Munsterman', 'Naden', 'Ofa',
-      'Peachey', 'Quartermaine', 'Radbourne', 'Saifiti', 'Trescothick', 'Utoi',
-      'Vaughan', 'Whitbread', 'Xerling', 'Yeomans', 'Zullo', 'Addison', 'Brimson',
-      'Cotric', 'Dearden', 'Edmunds', 'Ferguson', 'Grantley', 'Hetherton',
-      'Iliffe', 'Jennings', 'Koro', 'Leilua', 'Mbyerson', 'Nofa',
-      'Papworth',
+      'Pembrook', 'Tackleford', 'Matagi', 'Thornwell', 'Bumpus', 'Faleupolu',
+      'Gallagan', 'Hardcastle', 'Fonoti', 'Wexbury', 'Grubberton', 'Vaitohi',
+      'Cobbleton', 'Scrumworth', 'Pulotu', 'Kellaway', 'Kickworth', 'Lefaga',
+      'Quartermaine', 'Bootle', 'Moengaroa', 'Radbourne', 'Steplock', 'Haumate',
+      'Whitbread', 'Draymore', 'Whakarua', 'Yeomans', 'Muddock', 'Ngatoro',
+      'Zullo', 'Binnington', 'Tamihana', 'Iliffe', 'Fullbrook', 'Kahutia',
+      'Edmunds', 'Tryhorn', 'Hetaraka', 'Vaughan', 'Ironbark', 'Maunga',
+      'Addison', 'Ballantry', 'Paewai', 'Ashgrove', 'Wingfield', 'Rewiti',
+      'Dunmore', 'Halfpenny', 'Faleolo', 'Pickering', 'Goalby', 'Nofa',
+      'Wardrop', 'Stampton', 'Penhallow', 'Leggett', 'Treloar', 'Calderwood',
     ]);
   });
 

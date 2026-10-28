@@ -13,7 +13,7 @@
 // comes from src/core/storageKeys.ts, frozen whatever the game is called.
 
 import type { GameState } from './state';
-import { emptyFinance, getState, SAVE_VERSION } from './state';
+import { emptyFinance, getState, SAVE_VERSION, setState } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
 import { autoPick } from '../systems/lineup';
@@ -23,6 +23,8 @@ import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld } from './ti
 import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
 import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY } from './storageKeys';
 import { BRAND } from '../brand';
+import { cleanName } from '../data/names';
+import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
 import { browserStorage, LocalSaveStore, type StorageLike } from './storage/local';
 import { nextMeta } from './storage/meta';
 import type { SaveMeta, SlotListing } from './storage/types';
@@ -572,6 +574,93 @@ export function importSave(text: string): ImportResult {
   return res.ok ? res : { ok: false, message: res.message };
 }
 
+// ── Names file (#398) ───────────────────────────────────────────────────────
+// Every player's and club's name in a career, as a small JSON file the player
+// keeps and applies to another save of the same career (ids match). Local only:
+// the game never ships one. It is not a save: nothing else in the state is in it.
+
+/** The names file: player id → name, club id → name and kit colours. */
+export interface NamesFile {
+  players: Record<string, string>;
+  clubs: Record<string, { name: string; colors: [string, string] }>;
+}
+
+/** Every name in the career as a names file. Pure. */
+export function namesFile(state: GameState): NamesFile {
+  const players: Record<string, string> = {};
+  for (const p of allPlayers(state)) players[p.id] = p.name;
+  const clubs: NamesFile['clubs'] = {};
+  for (const c of state.league.clubs) {
+    clubs[c.id] = { name: c.id === state.clubId ? state.clubName : c.name, colors: [c.colors[0], c.colors[1]] };
+  }
+  return { players, clubs };
+}
+
+/** Serialise the career's names to the names file's text. */
+export function exportNames(state: GameState): string {
+  return JSON.stringify(namesFile(state), null, 2);
+}
+
+export type NamesImportResult =
+  | { ok: true; patch: Partial<GameState> | null; players: number; clubs: number }
+  | { ok: false; message: string };
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Read a names file against `state`: the patch that applies it, and how many
+ * players and clubs it renames. All or nothing: a file that isn't a names file,
+ * a name that breaks the rename rule or colours that don't read apart refuse the
+ * whole file. Ids from another career are skipped; a file with none of this
+ * career's ids is refused. A name already in the save passes as it is (a club
+ * named before the rule, up to 32 characters). Your own club's colours stay.
+ * Pure: never throws, never touches state or storage.
+ */
+export function importNames(state: GameState, text: string): NamesImportResult {
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch { return { ok: false, message: 'this is not a names file.' }; }
+  if (!isRecord(raw) || !isRecord(raw.players) || !isRecord(raw.clubs)) return { ok: false, message: 'this is not a names file.' };
+
+  const current = new Map(allPlayers(state).map((p) => [p.id, p.name]));
+  const players = new Map<string, string>();
+  for (const [id, value] of Object.entries(raw.players)) {
+    if (typeof value !== 'string') return { ok: false, message: `player ${id} has no name.` };
+    if (!current.has(id) || value === current.get(id)) continue;
+    const check = cleanName(value);
+    if (!check.ok) return { ok: false, message: `"${value.slice(0, 32)}": ${check.why.toLowerCase()}.` };
+    players.set(id, check.name);
+  }
+
+  const known = new Map(state.league.clubs.map((c) => [c.id, c]));
+  const clubs = new Map<string, ClubEdit>();
+  let matched = Object.keys(raw.players).filter((id) => current.has(id)).length;
+  for (const [id, value] of Object.entries(raw.clubs)) {
+    if (!isRecord(value) || typeof value.name !== 'string') return { ok: false, message: `club ${id} has no name.` };
+    if (value.colors !== undefined && !validClubColors(value.colors)) return { ok: false, message: `${value.name.slice(0, 32)}'s colours don't read apart.` };
+    const club = known.get(id);
+    if (!club) continue;
+    matched++;
+    const own = id === state.clubId;
+    const name = value.name === (own ? state.clubName : club.name) ? null : cleanName(value.name);
+    if (name && !name.ok) return { ok: false, message: `"${value.name.slice(0, 32)}": ${name.why.toLowerCase()}.` };
+    const colors = !own && value.colors !== undefined ? value.colors as [string, string] : null;
+    const recolour = colors !== null && (colors[0] !== club.colors[0] || colors[1] !== club.colors[1]);
+    if (!name && !recolour) continue;
+    clubs.set(id, { name: name ? name.name : club.name, ...(colors ? { colors } : {}) });
+  }
+  if (matched === 0) return { ok: false, message: 'none of these names belong to this career.' };
+
+  const playerPatch = renamePlayersPatch(state, players);
+  const clubPatch = renameClubsPatch(playerPatch ? { ...state, ...playerPatch } : state, clubs);
+  const patch = playerPatch || clubPatch ? { ...playerPatch, ...clubPatch } : null;
+  return { ok: true, patch, players: players.size, clubs: clubs.size };
+}
+
+/** The names file's suggested filename. */
+export function exportNamesFilename(state: GameState): string {
+  return exportFilename(state).replace(/\.json$/, '-names.json');
+}
+
 /**
  * Suggested filename for an exported save, led by the brand's slug (#363). Import
  * reads the file's content, never its name, so a file from before a rename still loads.
@@ -621,6 +710,39 @@ export function pickSaveFile(): Promise<string | null> {
     input.addEventListener('cancel', () => resolve(null));
     input.click();
   });
+}
+
+/** Browser: download the career's names file (#398). No-op outside a browser. */
+export function downloadNames(state: GameState): void {
+  if (typeof document === 'undefined' || typeof Blob === 'undefined') return;
+  const url = URL.createObjectURL(new Blob([exportNames(state)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = exportNamesFilename(state);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  bus.emit('ui:notify', { text: 'Names exported.', kind: 'success' });
+}
+
+/**
+ * Apply a names file's text to the game being played and save it. Notifies
+ * either way (the news keeps it), and returns what it said so an open dialog
+ * can say it too; a refused file changes nothing.
+ */
+export function applyNamesFile(text: string): { ok: boolean; text: string } {
+  const res = importNames(getState(), text);
+  const say = (ok: boolean, msg: string, kind: 'success' | 'info' | 'danger'): { ok: boolean; text: string } => {
+    bus.emit('ui:notify', { text: msg, kind });
+    return { ok, text: msg };
+  };
+  if (!res.ok) return say(false, `Names not imported: ${res.message}`, 'danger');
+  if (!res.patch) return say(true, 'Every name already matches this file.', 'info');
+  setState(res.patch);
+  save(getState());
+  const n = (v: number, one: string): string => `${v} ${one}${v === 1 ? '' : 's'}`;
+  return say(true, `Names imported: ${n(res.players, 'player')}, ${n(res.clubs, 'club')}.`, 'success');
 }
 
 /**

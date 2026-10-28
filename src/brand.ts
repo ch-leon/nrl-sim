@@ -2,7 +2,8 @@
 // Everything a player sees of the brand reads from here: the tab title and the
 // home-screen name (index.html, filled in at build time by vite.config.ts), the PWA
 // manifest, the title screen's heading, the rotate card, the stadium sign, the
-// newer-save message, the export file name and the icons (scripts/gen-icons.mjs).
+// newer-save message, the export file name, the icons (scripts/gen-icons.mjs) and
+// the not-affiliated line in Settings (#398).
 // Renaming the game is a change to this file and a rebuild.
 //
 // The colours point at the Broadcast Quiet tokens (src/ui/tokens.ts); the brand adds
@@ -48,6 +49,11 @@ export interface Brand {
   exportSlug: string;
   /** Where a player asks for help, once there is somewhere. */
   supportUrl?: string | undefined;
+  /**
+   * The not-affiliated line (#398): in Settings, and the store listing's copy takes
+   * it from here. Text only: no mark, logo or "official" wording anywhere in the game.
+   */
+  disclaimer: string;
 }
 
 export const BRAND: Brand = {
@@ -69,6 +75,7 @@ export const BRAND: Brand = {
   iconLetters: '', // DECISION (Leon): game name
   exportSlug: 'nrl-sim', // DECISION (Leon): game name
   supportUrl: undefined,
+  disclaimer: 'Not affiliated with or endorsed by the NRL, its clubs or players.',
 };
 
 /**
