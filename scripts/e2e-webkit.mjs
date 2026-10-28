@@ -2379,6 +2379,7 @@ async function runFlow(browser, { w: W, h: H, text }) {
   await step('f1-staff-board', async () => {
     await openNav(page, 'staff');
     await page.waitForSelector('.nrl-board');
+    await page.waitForTimeout(400); // the sheet slides in
     const out = [];
     if (!(await page.locator('.nrl-board-obj, .nrl-board-empty').count())) out.push('no board objectives on Staff & Board');
     if (!(await page.locator('.nrl-staff-row').count())) out.push('no staff rows on Staff & Board');
@@ -2454,7 +2455,10 @@ async function runFlow(browser, { w: W, h: H, text }) {
     const before = await rows();
     const first = before.find((r) => r.btn);
     if (!first) return ['no Renew on Contracts'];
-    const out = await flowReach(page, [`[data-contract-renew="${first.id}"]`]);
+    // The table fits the sheet at this text size: SELL whole, no sideways scroll (#350, #371).
+    const out = await flowReach(page, [`[data-contract-renew="${first.id}"]`, '.nrl-contracts-table tbody tr:first-child .nrl-contract-actions .nrl-btn:last-child']);
+    const wide = await page.evaluate(() => { const e = document.querySelector('.nrl-contracts-scroll'); return e.scrollWidth - e.clientWidth; });
+    if (wide > 1) out.push(`the table is ${wide}px wider than the sheet`);
     const renewed = () => page.locator('[data-contract-renew]:disabled').count();
     await page.touchscreen.tap(first.btn.x, first.btn.y);
     await page.waitForTimeout(300);

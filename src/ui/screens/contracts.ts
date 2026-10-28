@@ -102,11 +102,13 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     const p = row.player;
     const weeks = p.contractWeeks;
     const onLoan = renewsOnLoan(s, p);
-    // Who he is, and what a renewal would pay him (the button says what it costs now).
+    // Who he is, and what a renewal would pay him (the button says what it costs now). His
+    // position under his name too, for the narrowest sheet, which drops the Pos column (#350).
     const meta = `age ${p.age} · morale ${p.morale} · renews at ${fmtMoney(renewalWeeklyCost(s, p))}/wk${onLoan ? ' on a board loan' : ''}`;
     const who = el('td', { class: 'nrl-contract-info', attrs: { title: meta } }, el('div', { class: 'nrl-contract-who' },
       el('span', { class: 'nrl-contract-name', text: p.name }),
-      el('span', { class: 'nrl-contract-meta', text: meta })));
+      el('span', { class: 'nrl-contract-meta', text: meta }),
+      el('span', { class: 'nrl-contract-pos', text: p.position })));
 
     let renew: HTMLButtonElement;
     if (renewed.has(p.id)) {
