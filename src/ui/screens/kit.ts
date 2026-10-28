@@ -4,7 +4,8 @@
 // on. Purely cosmetic: a design only changes what kitFromColors draws.
 //
 // The option lists and draft edits are pure and unit-tested; the DOM part only
-// renders them and saves the draft to GameState.kit. No Phaser.
+// renders them and saves the draft to GameState.kit. The club's name is edited
+// here too (#398), saved on its own: clubName and the club's league entry. No Phaser.
 import { getState, setState, type GameState } from '../../core/state';
 import {
   CLASH_DISTANCE, KIT_PATTERNS, colorDistance, defaultKitDesign, kitFromDesign, setKitDesign,
@@ -20,6 +21,9 @@ import {
 import { PLAYER_ID } from '../../systems/fixtures';
 import { bus } from '../../core/events';
 import { button, closeScreen, el, openModal, segmented } from '../dom';
+import { renameClub } from '../../systems/rename';
+import { save as saveGame } from '../../core/save';
+import { nameField } from '../rename';
 
 export const PATTERN_LABELS: Record<KitPattern, string> = {
   plain: 'Plain', v: 'V', hoops: 'Hoops', sleeves: 'Sleeves', stripes: 'Stripes',
@@ -81,6 +85,29 @@ export function openKitDesigner(): HTMLElement {
 
   const preview = el('div', { class: 'nrl-kit-preview' });
   const controls = el('div', { class: 'nrl-kit-controls' });
+  // The club's name (#398): its own Save, kept across the designer's re-renders.
+  let clubDraft = state.clubName;
+  const clubNameRow = (): HTMLElement => nameField({
+    value: clubDraft,
+    label: 'Club name',
+    attr: 'data-club-rename',
+    saveLabel: 'Rename',
+    inline: true,
+    focus: false,
+    onDraft: (text) => { clubDraft = text; },
+    onSave: (name) => {
+      const res = renameClub(getState(), PLAYER_ID, name);
+      if (!res.ok) return res.why;
+      clubDraft = name;
+      if (res.patch) {
+        setState(res.patch);
+        saveGame(getState());
+        bus.emit('ui:notify', { text: `The club is now ${name}.`, kind: 'success' });
+      }
+      render();
+      return null;
+    },
+  });
 
   const renderPreview = (): void => {
     const home = kitFromDesign(primary, draft);
@@ -117,6 +144,8 @@ export function openKitDesigner(): HTMLElement {
 
   const render = (): void => {
     controls.replaceChildren(
+      el('h3', { text: 'Club name' }),
+      clubNameRow(),
       el('h3', { text: 'Home kit' }),
       el('div', { class: 'nrl-kit-label', text: 'Pattern' }),
       patternRow(draft.pattern, (p) => { draft = { ...draft, pattern: p }; }, 'data-kit-pattern'),

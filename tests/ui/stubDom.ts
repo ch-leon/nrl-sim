@@ -77,5 +77,8 @@ export function stubDocument(): void {
   vi.stubGlobal('document', {
     createElement: (tag: string) => new StubNode(tag),
     createTextNode: (text: string) => new StubNode('#text', text),
+    // A screen's own stylesheet (ensure…Styles): never found, so injected into head.
+    getElementById: () => null,
+    head: new StubNode('head'),
   });
 }
