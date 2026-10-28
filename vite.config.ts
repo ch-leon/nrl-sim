@@ -37,8 +37,29 @@ function shortSha(): string | null {
 }
 const BUILD_LABEL = formatBuildLabel(new Date(), shortSha());
 
-export default defineConfig({
+// #400: the build's Phaser is src/vendor/phaser-slim.js, Phaser's own source cut to
+// what the game draws with (no physics, tilemaps, tweens or Phaser sound), not the
+// package's prebuilt full bundle. Phaser's source asks its build for these flags as
+// `typeof FLAG`, which a `define` cannot replace, so a small transform sets them the
+// way Phaser's own dist config does: both renderers (Phaser.AUTO), and no 3D
+// camera, Facebook Instant Games, WebGL debug, experimental code or sound manager
+// (src/fx/audio.ts plays its own WebAudio). Build only: the dev server and vitest
+// keep the full package build, so nothing there changes.
+const PHASER_FLAGS: Record<string, boolean> = {
+  CANVAS_RENDERER: true,
+  WEBGL_RENDERER: true,
+  WEBGL_DEBUG: false,
+  EXPERIMENTAL: false,
+  PLUGIN_3D: false,
+  PLUGIN_CAMERA3D: false,
+  PLUGIN_FBINSTANT: false,
+  FEATURE_SOUND: false,
+};
+const PHASER_SLIM = fileURLToPath(new URL('./src/vendor/phaser-slim.js', import.meta.url));
+
+export default defineConfig(({ command }) => ({
   base,
+  resolve: command === 'build' ? { alias: [{ find: /^phaser$/, replacement: PHASER_SLIM }] } : {},
   // No source maps in any build (the APK must not ship them, #89); this is Vite's
   // default, set here so the native build can never regress it.
   build: { sourcemap: false },
@@ -48,6 +69,15 @@ export default defineConfig({
     __NRL_NATIVE__: JSON.stringify(native),
   },
   plugins: [
+    {
+      name: 'nrl-phaser-flags',
+      apply: 'build',
+      enforce: 'pre',
+      transform(code, id) {
+        if (!/[\\/]node_modules[\\/]phaser[\\/](src|plugins)[\\/]/.test(id) || !code.includes('typeof ')) return null;
+        return { code: code.replace(/typeof (\w+)/g, (m, flag: string) => (Object.hasOwn(PHASER_FLAGS, flag) ? String(PHASER_FLAGS[flag]) : m)), map: null };
+      },
+    },
     // The UI's stylesheets without their comments and indents (about 5 KB gzipped);
     // build only, so tests and the dev server read them as written.
     {
@@ -87,4 +117,4 @@ export default defineConfig({
   // that is itself one of those worktrees still watches its own files.
   server: { watch: { ignored: [claudeDirIgnored(fileURLToPath(new URL('.', import.meta.url)))] } },
   test: { globals: true, environment: 'node', include: ['tests/**/*.test.ts'] },
-});
+}));

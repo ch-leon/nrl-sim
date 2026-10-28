@@ -28,6 +28,8 @@ jobs:
         run: npm run build
       # The gzipped bundle against its line in scripts/perf-budget.json (warn.bundleGzKb).
       # Over it is a warning annotation and a line in the job summary, never a failure.
+      # A second summary line is the initial load (index.html's script, preloads and
+      # css; #400), reported only.
       - name: Bundle size
         run: node scripts/bundle-size.mjs dist
 
