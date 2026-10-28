@@ -41,7 +41,7 @@ jobs:
   # WebKit, so this job fetches Playwright's (the only job that downloads a browser).
   webkit:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
