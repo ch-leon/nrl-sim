@@ -675,9 +675,12 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-contract-actions .nrl-btn.nrl-contract-armed, .nrl-contract-actions .nrl-btn.nrl-contract-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 .nrl-contract-gone td { color: var(--nrl-muted); }
 /* A narrow sheet (667px, or 844px between a notch's insets): the table fits without a sideways
-   scroll; who he is goes to the name's tooltip. On the sheet's own width, not the screen's. */
+   scroll; who he is goes to the name's tooltip, and the name column takes what the others leave,
+   a long name ending in "…". On the sheet's own width, not the screen's. */
 @container (max-width: 760px) {
   .nrl-table.nrl-contracts-table { min-width: 0; }
+  .nrl-contracts-table td.nrl-contract-info { max-width: 0; width: 100%; }
+  .nrl-contract-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nrl-contract-meta { display: none; }
   .nrl-contracts-table th, .nrl-contracts-table td { padding: 0 4px; }
   .nrl-contract-actions { gap: 4px; }
