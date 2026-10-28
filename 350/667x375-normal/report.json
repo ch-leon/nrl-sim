@@ -1,0 +1,90 @@
+{
+  "size": "667x375-normal",
+  "steps": [
+    {
+      "n": 1,
+      "name": "t1-setup",
+      "ok": true,
+      "notes": [],
+      "file": "01-t1-setup.png"
+    },
+    {
+      "n": 2,
+      "name": "x3-settings",
+      "ok": true,
+      "notes": [
+        "root font 16px"
+      ],
+      "file": "02-x3-settings.png"
+    },
+    {
+      "n": 3,
+      "name": "h1-next-match",
+      "ok": true,
+      "notes": [
+        "\"v Launceston · home\""
+      ],
+      "file": "03-h1-next-match.png"
+    },
+    {
+      "n": 4,
+      "name": "menu-over-card",
+      "ok": true,
+      "notes": [],
+      "file": "04-menu-over-card.png"
+    },
+    {
+      "n": 5,
+      "name": "h3-ask-says-length",
+      "ok": true,
+      "notes": [
+        "\"Play 27 weeks? It stops for decisions.\""
+      ],
+      "file": "05-h3-ask-says-length.png"
+    },
+    {
+      "n": 6,
+      "name": "h3-confirm",
+      "ok": true,
+      "notes": [
+        "\"Play 27 weeks? It stops for decisions.\""
+      ],
+      "file": "06-h3-confirm.png"
+    },
+    {
+      "n": 7,
+      "name": "f1-staff-board",
+      "ok": true,
+      "notes": [],
+      "file": "07-f1-staff-board.png"
+    },
+    {
+      "n": 8,
+      "name": "n4-card-in-place",
+      "ok": true,
+      "notes": [
+        "W1 → stopped at W4 on \"Night out\"",
+        "Keep advancing → W5"
+      ],
+      "file": "08-n4-card-in-place.png"
+    },
+    {
+      "n": 9,
+      "name": "f3-contracts-hold",
+      "ok": true,
+      "notes": [],
+      "file": "09-f3-contracts-hold.png"
+    },
+    {
+      "n": 10,
+      "name": "t2-overwrite-confirm",
+      "ok": true,
+      "notes": [
+        "\"Start over? This replaces Flow FC (S1 W5).\"",
+        "root font 16px"
+      ],
+      "file": "10-t2-overwrite-confirm.png"
+    }
+  ],
+  "errors": []
+}
