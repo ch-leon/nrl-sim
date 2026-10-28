@@ -1,0 +1,62 @@
+{
+  "name": "more-calls-gang2",
+  "description": "Gang tackle (#396): the extra man is its strength (62% spammed, 51% without it) and bunching the line helps the defence here, so 'more space out wide' needs another cost. With the line not bunched (pull 1), how much easier must an isolated edge defender be to step (stepAgainst, as Rush) to bring it near Rush's 53%?",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "gang tackle",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "gang-tackle"
+          }
+        ]
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "pull 1",
+      "tuning": {
+        "calls.gang.pull": 1
+      }
+    },
+    {
+      "name": "pull 1, step +0.08",
+      "tuning": {
+        "calls.gang.pull": 1,
+        "calls.gang.stepAgainst": 0.08
+      }
+    },
+    {
+      "name": "pull 1, step +0.16",
+      "tuning": {
+        "calls.gang.pull": 1,
+        "calls.gang.stepAgainst": 0.16
+      }
+    },
+    {
+      "name": "pull 1, step +0.16, no slower ruck",
+      "tuning": {
+        "calls.gang.pull": 1,
+        "calls.gang.stepAgainst": 0.16,
+        "calls.gang.downTicks": 0
+      }
+    },
+    {
+      "name": "pull 1, step +0.25",
+      "tuning": {
+        "calls.gang.pull": 1,
+        "calls.gang.stepAgainst": 0.25
+      }
+    }
+  ]
+}

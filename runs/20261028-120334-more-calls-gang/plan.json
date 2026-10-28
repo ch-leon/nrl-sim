@@ -1,0 +1,64 @@
+{
+  "name": "more-calls-gang",
+  "description": "Gang tackle (#396) won 62% when spammed (no calls 48%). Which of its three parts (the extra man, the slower ruck, the bunched line) carries that, and what sizes bring it near Rush's 53%?",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "gang tackle",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "gang-tackle"
+          }
+        ]
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "no slower ruck",
+      "tuning": {
+        "calls.gang.downTicks": 0
+      }
+    },
+    {
+      "name": "pull 1.6",
+      "tuning": {
+        "calls.gang.pull": 1.6
+      }
+    },
+    {
+      "name": "pull 2",
+      "tuning": {
+        "calls.gang.pull": 2
+      }
+    },
+    {
+      "name": "no slower ruck, pull 1.6",
+      "tuning": {
+        "calls.gang.downTicks": 0,
+        "calls.gang.pull": 1.6
+      }
+    },
+    {
+      "name": "no extra man",
+      "tuning": {
+        "calls.gang.commit": 0
+      }
+    },
+    {
+      "name": "one tackle",
+      "tuning": {
+        "calls.gang.tackles": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "name": "more-calls-4020",
+  "description": "40/20 (#396) won 63% when spammed with the kick always landing 26 m out. With the kick capped at a touch-finder's 32 m, and wider scatter, how close to the no-call 48% does it come?",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "40/20",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "forty-twenty"
+          }
+        ]
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "scatter 1",
+      "tuning": {
+        "calls.fortyTwenty.scatter": 1
+      }
+    },
+    {
+      "name": "scatter 1.5",
+      "tuning": {
+        "calls.fortyTwenty.scatter": 1.5
+      }
+    },
+    {
+      "name": "reach 26",
+      "tuning": {
+        "calls.fortyTwenty.reachM": 26
+      }
+    }
+  ]
+}

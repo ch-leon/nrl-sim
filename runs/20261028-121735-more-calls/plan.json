@@ -1,0 +1,127 @@
+{
+  "name": "more-calls",
+  "description": "Five more coach calls (#396): even sides, the home coach makes one call whenever callRefusal allows. Is any of them a free win (home win against no calls), how often does it pay off (callsPaid / callsMade), and what does it move (offloads, errors, kicks, tries)?",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "no calls",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "offload",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "offload"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gang tackle",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "gang-tackle"
+          }
+        ]
+      }
+    },
+    {
+      "name": "grubber",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "grubber"
+          }
+        ]
+      }
+    },
+    {
+      "name": "40/20",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "forty-twenty"
+          }
+        ]
+      }
+    },
+    {
+      "name": "take the two",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "take-two"
+          }
+        ]
+      }
+    },
+    {
+      "name": "tap and go",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "tap-go"
+          }
+        ]
+      }
+    }
+  ],
+  "variants": []
+}

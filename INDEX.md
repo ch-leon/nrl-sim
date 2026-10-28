@@ -161,3 +161,9 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-110421-expansive-weather | expansive weather | 9d0f242 | claude/expansive-speed-322 | [report](runs/20261028-110421-expansive-weather/report.md) |
 | 20261028-110727-expansive-weather-controls | expansive weather controls | 9d0f242 | claude/expansive-speed-322 | [report](runs/20261028-110727-expansive-weather-controls/report.md) |
 | 20261028-121705-standard | standard | 9915e11 | main | [report](runs/20261028-121705-standard/report.md) |
+| 20261028-115519-more-calls | more-calls | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-115519-more-calls/report.md) |
+| 20261028-120027-more-calls-4020 | more-calls-4020 | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-120027-more-calls-4020/report.md) |
+| 20261028-120334-more-calls-gang | more-calls-gang | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-120334-more-calls-gang/report.md) |
+| 20261028-121151-more-calls-gang2 | more-calls-gang2 | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-121151-more-calls-gang2/report.md) |
+| 20261028-121503-more-calls-4020b | more-calls-4020b | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-121503-more-calls-4020b/report.md) |
+| 20261028-121735-more-calls | more-calls | c74592d (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-121735-more-calls/report.md) |

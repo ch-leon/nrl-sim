@@ -1,0 +1,39 @@
+{
+  "name": "more-calls-4020b",
+  "description": "40/20 (#396): capped at 32 m it wins 46% spammed but finds touch 2% of the time; uncapped 63%. Where between does it find the 40/20 sometimes and stay near the no-call 48%?",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "40/20",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true,
+      "calls": {
+        "home": [
+          {
+            "call": "forty-twenty"
+          }
+        ]
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "reach 38",
+      "tuning": {
+        "calls.fortyTwenty.reachM": 38
+      }
+    },
+    {
+      "name": "reach 44",
+      "tuning": {
+        "calls.fortyTwenty.reachM": 44
+      }
+    }
+  ]
+}
