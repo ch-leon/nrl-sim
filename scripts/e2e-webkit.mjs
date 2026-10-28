@@ -1281,8 +1281,11 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     // (it is not a card), its rows take a tap, and COACH again shuts it.
     if (await page.locator('.nrl-mo-bar [data-coach]').count()) {
       out.push(...await blocked(['.nrl-mo-bar [data-coach]']));
+      // A try's offer is up as the tray opens (#348): the chip steps out from over the tray and waits.
+      await page.evaluate(() => window.__nrlGame.scene.getScene('Match').overlay.offerReplay(() => {}));
       await page.locator('.nrl-mo-bar [data-coach]').tap();
       await page.waitForSelector('.nrl-mo-calls:not([hidden])', { timeout: 3000 });
+      const trayAt = Date.now();
       const traying = await clock();
       if (!(await runs(traying).then(() => true).catch(() => false))) out.push('the match stopped under the coach tray');
       const tray = await page.evaluate(() => {
@@ -1303,9 +1306,24 @@ async function runScreens(browser, { w: W, h: H, safe }) {
         return { problems, rows: rows.length };
       });
       out.push(...tray.problems);
+      const overTray = await page.evaluate(() => {
+        const c = document.querySelector('.nrl-mo-replay');
+        const t = document.querySelector('.nrl-mo-calls').getBoundingClientRect();
+        if (!c || getComputedStyle(c).display === 'none') return null;
+        const r = c.getBoundingClientRect();
+        return r.width > 0 && r.left < t.right && r.right > t.left && r.top < t.bottom && r.bottom > t.top ? 'over' : 'beside';
+      });
+      if (overTray === 'over') out.push('the Replay try chip sits over the coach tray');
+      else if (overTray === 'beside') out.push('the Replay try chip shows while the coach tray is open');
       await page.screenshot({ path: join(OUT, 'coach-tray.png') });
       await page.locator('.nrl-mo-bar [data-coach]').tap();
       if (!(await page.locator('.nrl-mo-calls[hidden]').count())) out.push('COACH did not shut its tray');
+      // Shut inside its eight seconds, the tray hands the chip back with the time it had.
+      const back = await page.waitForFunction(() => {
+        const c = document.querySelector('.nrl-mo-replay');
+        return !!c && getComputedStyle(c).display !== 'none' && c.getBoundingClientRect().height > 0;
+      }, null, { timeout: 1500 }).then(() => true).catch(() => false);
+      if (!back && Date.now() - trayAt < 7000) out.push('the Replay try chip did not come back when the tray shut');
       rec.notes.push(`tray: ${tray.rows} call(s) on, the match playing under it`);
     } else out.push('no COACH button in the bottom row');
     rec.notes.push(`card held at ${at}; sheet held at ${paused}`);

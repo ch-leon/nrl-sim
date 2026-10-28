@@ -72,6 +72,16 @@ export function playbackPace(phase: string): 1 | 2 {
   return FAST_PHASES.has(phase) ? 2 : 1;
 }
 
+/**
+ * The side with the ball on screen (#348): whoever holds it on the tick drawn,
+ * else (a kick in the air, a loose ball) the side the sim has attacking. The sim
+ * hands a kick-off or drop-out to the receivers as the kicker lines it up, so
+ * through a restart the two differ: the coach tray goes by the picture.
+ */
+export function shownPossession(shown: Pick<Snapshot, 'ball'>, simAttacking: Side): Side {
+  return shown.ball.holder?.side ?? simAttacking;
+}
+
 /** How quickly the pace eases between ×1 and ×2. Most of the gap closes in about 0.4 s, so a phase change does not lurch. */
 export const PACE_BLEND_MS = 400;
 
@@ -408,9 +418,9 @@ export class LivePlayback {
     if (this.holds === 0 && this.replayGate === 'off' && !this.finishEmitted && !this.awaitingSkip) this.runner.play();
   }
 
-  /** Who has the ball (the chips show attack or defence calls). */
+  /** Who has the ball in the picture on screen, the replay's while one plays (the coach tray shows attack or defence calls, #348). */
   get inPossession(): Side {
-    return this.sim.inPossession;
+    return shownPossession(this.replay ? this.replay.snaps[this.replay.index]! : this.runner.cur, this.sim.inPossession);
   }
 
   /** The tick the match is at (for the resume record). */

@@ -24,7 +24,7 @@
 // The commentary's lines come from the live playback (match/view/commentary.ts,
 // N15.2) through `comment()`: the overlay keeps the score from the events and
 // only says something of its own when a score or a call came with no line.
-import { REPLAY_OFFER_MS } from '../../match/view/replay';
+import { newReplayOffer, stepReplayOffer, type ReplayOffer } from '../../match/view/replay';
 import { el, button, mount, ensureStyles, getRoot, segmented, type Segmented } from '../dom';
 import { bus } from '../../core/events';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
@@ -932,10 +932,11 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   // The replay offer runs down only while nothing is open over the field: under the
   // half-time sheet, the pause sheet or the full-time card it hides and waits (#341).
+  // Under the open coach tray it hides and waits too, for a while (#348, stepReplayOffer).
   let replayTimer: ReturnType<typeof setInterval> | null = null;
   let replayBtn: HTMLButtonElement | null = null;
   let replayCount: HTMLElement | null = null;
-  let replayLeft = 0;
+  let replayOffer: ReplayOffer = newReplayOffer();
   let replayAt = 0;
   let replayTag: HTMLElement | null = null;
   const clearReplayOffer = (): void => {
@@ -949,15 +950,15 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const tickReplay = (): void => {
     if (!replayBtn) return;
     const now = performance.now();
-    const covered = cardOpen();
-    if (!covered) replayLeft -= now - replayAt;
+    const step = stepReplayOffer(replayOffer, now - replayAt, cardOpen() ? 'card' : root.classList.contains('nrl-mo-tray-open') ? 'tray' : null);
+    replayOffer = step;
     replayAt = now;
-    if (replayLeft <= 0) {
+    if (step.gone) {
       clearReplayOffer();
       return;
     }
-    replayBtn.hidden = covered;
-    if (replayCount) replayCount.textContent = String(replayCountdown(replayLeft));
+    replayBtn.hidden = !step.show;
+    if (replayCount) replayCount.textContent = String(replayCountdown(step.leftMs));
   };
   const cardWatch = new MutationObserver(tickReplay);
   cardWatch.observe(getRoot(), { childList: true });
@@ -1180,7 +1181,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       replayBtn.append(replayCount);
       replayBtn.setAttribute('aria-label', 'Replay try');
       root.append(replayBtn);
-      replayLeft = REPLAY_OFFER_MS;
+      replayOffer = newReplayOffer();
       replayAt = performance.now();
       tickReplay();
       replayTimer = setInterval(tickReplay, 250);
@@ -1216,6 +1217,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     },
     setTrayOpen(on: boolean): void {
       root.classList.toggle('nrl-mo-tray-open', on);
+      // The Replay try chip steps out from over the tray at once, and back when it shuts (#348).
+      tickReplay();
     },
     possession(): [number, number] {
       return possessionPct(state);
@@ -1526,6 +1529,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-btn.nrl-mo-replay { display: inline-flex; align-items: center; gap: 8px; padding: 0 8px 0 14px; border-radius: 12px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-chip); }
 .nrl-mo-replay[hidden] { display: none; }
+/* Never over the open coach tray (#348): it waits, hidden, for the tray to shut. */
+.nrl-mo-tray-open .nrl-mo-replay { display: none; }
 .nrl-mo-replay-count {
   display: inline-grid; place-items: center; min-width: 26px; height: 26px; border-radius: 6px; box-sizing: border-box;
   background: var(--nrl-raised); color: var(--nrl-accent); font-family: var(--nrl-f-num); font-size: 13px; font-weight: 600;
