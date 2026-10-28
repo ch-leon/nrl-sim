@@ -1,0 +1,95 @@
+name: Android test APK
+
+# Builds the sideloadable Android test APK (#89, docs/android-test-build.md): the Vite
+# build wrapped by Capacitor, signed with the debug key for sideloading. No secrets.
+#
+# - On a push to main and on manual dispatch it builds the APK, uploads it as the
+#   `nrl-sim-test-apk` artifact, and replaces the asset on the `android-test-latest`
+#   GitHub Release so testers always have one stable download link.
+# - On a pull request that touches the app or the native project it builds and uploads
+#   the APK (so the build stays green) but does NOT publish a release.
+#
+# This is separate from the web/PWA build: the GitHub Pages deploy (pages.yml) and CI
+# (ci.yml) are untouched. The web app build here runs with NRL_NATIVE=1 (base '/', no
+# service worker, obfuscated bundle — vite.config.ts, scripts/obfuscate-dist.mjs).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'src/**'
+      - 'scripts/obfuscate-dist.mjs'
+      - 'scripts/gen-icons.mjs'
+      - 'vite.config.ts'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android-apk.yml'
+
+# The release job writes a release and its asset; the PR build needs no write.
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # AGP 8.13 (android/build.gradle) builds on JDK 17+; 21 is what the APK was
+      # verified with.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      # packages: '' — the action's default package set includes the long-removed
+      # `tools` package, which makes sdkmanager exit 1 ("Failed to find package
+      # tools"). Install only cmdline-tools here, then the packages the build needs.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install the SDK packages the build needs
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - run: npm ci
+      - name: Build the web app for the APK (native config, no SW, obfuscated)
+        run: npm run build:android
+      - name: Sync Capacitor and assemble the debug APK
+        run: |
+          npx cap sync android
+          ./android/gradlew -p android assembleDebug
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk nrl-sim-test.apk
+      - name: Upload the APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nrl-sim-test-apk
+          path: nrl-sim-test.apk
+          if-no-files-found: error
+      # Publish only for main pushes and manual runs — never from a pull request.
+      - name: Publish to the android-test-latest release
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Latest sideloadable Android **test** build for play-testing (debug-signed).
+          How to install: docs/android-test-build.md. Built from ${GITHUB_SHA}."
+          if gh release view android-test-latest >/dev/null 2>&1; then
+            gh release upload android-test-latest nrl-sim-test.apk --clobber
+          else
+            gh release create android-test-latest nrl-sim-test.apk \
+              --title "Android test build (latest)" \
+              --notes "$notes" \
+              --prerelease
+          fi
