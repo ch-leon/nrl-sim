@@ -168,6 +168,17 @@ and goes to the landing spot the moment the kicker shapes to kick. Drop: 6% alon
 side getting there first is a **regather** (fresh set, or a try next tick if he is over
 the line). Rain and the Skill-vs-pressure table above wait for E.
 
+*E (#99, 28 Oct):* **a bomb is a contest.** With a chaser and a catcher both within 3 m as it
+comes down, whoever is a step nearer, one draw decides it: **won back** (the chaser taps it
+back, TAPS IT BACK!), **spilled**, or caught. The chaser's Speed against the catcher's Skill
+sets the odds (11% won back and 16% of the rest spilled at even ratings, ±0.2% a point), the
+same contest as the Short kick-off's regather (#397). A higher kick (Big Boot, +2 m a level)
+and a Kick-chase side win more back; rain makes the catcher spill more. A spill that goes
+forward is a **knock-on**, the kicking side's ball; back or sideways it is loose. A loose
+ball both sides are near is a **scramble**: LOOSE BALL!, the winner named on the ticker and
+counted in the match report. Between even sides about one bomb in five is contested (8% won
+back, 12% spilled). Tuning §31.
+
 ### 4.4 Kicks — *first slice implemented: long, bomb, grubber, chip, cross-field*
 The kicker makes **one call** for the last tackle: inside 6 m he runs it; inside 40 m he
 runs it one time in five; otherwise a kick by zone, each announced by type. On the
@@ -200,6 +211,11 @@ line off the attack (a grubber can run on up to 6 m) → DEAD BALL, a 20 m tap r
 the defence; a defender who gathers a kick in his own in-goal grounds it for the same when
 pressed or deep, else runs it out; held in his own in-goal, or the ball dead off him →
 DROP-OUT from the middle of his try line (tuning reference §16).
+**The grubber race** (E #99, 28 Oct): a grubber that comes to rest in the in-goal is raced
+for by each side's quickest man to it. His time to the ball decides it and the bounce adds up
+to 0.45 s of luck either way; only the winner's side can take it. The attacker first is a
+regather and the try; the defender grounds it for a 20 m restart. One that runs dead is
+unchanged. About 0.35 grubber tries a match between even sides (tuning §31).
 
 ## 5. Tactics by zone — *implemented in D (#98)*
 
@@ -451,7 +467,7 @@ makes the break but can't finish it, the workhorse who is never quick and never 
 | B | Contest v2: situation modifiers, Step, Strip, Intercept | §4.1–4.2 |
 | C | Traits with levels in the data model and the sim, shown when they fire | §3 |
 | D | Zone tactics and presets | §5 |
-| E | Kick types, catches, scrambles | §4.3–4.4 |
+| E | Kick types, catches, scrambles — *shipped* (the bomb contest, the grubber race and scrambles, #99). Tuning §31 | §4.3–4.4 |
 | F | Fatigue and the wrestle — *shipped* | §8 |
 | F2 | Sprint and gas; legs as their ceiling — *shipped* (half-time shipped with BAK-207 2a, the bench with 2b) | §8.2 |
 | F2+ | Sprint follow-ups (kick chase, line speed on cruise, lab legs bar, stamina knobs) — *shipped* (N9.3) | §8.2, §11 |
