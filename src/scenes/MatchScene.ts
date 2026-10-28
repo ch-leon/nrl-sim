@@ -336,6 +336,10 @@ export class MatchScene extends Phaser.Scene {
     // Phaser keeps this scene between matches: the last match's half-time sheet must
     // not count for this one, or no half-time card shows after a session's first match (#408).
     this.planCardHalf = 0;
+    // …nor the last match's call: the badge read it as made from the kick-off, until this
+    // match's ticks passed the tick it was made on, and never offered a call (#431).
+    this.madeCall = null;
+    this.madeAt = 0;
   }
 
   create(): void {

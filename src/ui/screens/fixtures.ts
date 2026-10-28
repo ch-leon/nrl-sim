@@ -497,7 +497,10 @@ export const LEAGUE_CSS = `
 .nrl-ladder-col-n { width: 30px; }
 .nrl-ladder-col-diff { width: 44px; }
 .nrl-ladder-col-pts { width: 38px; }
-.nrl-ladder-col-form { width: 84px; }
+/* Five 14px pips, four 2px gaps, 4px padding a side and 2px spare. The pips are px at every text
+   size, so the column is too: at 84px the fifth ran 2px past the cell and showed cut (#426). A rem
+   width would grow past the pips and cost the heading its room at Larger. */
+.nrl-ladder-col-form { width: 88px; }
 .nrl-ladder-table th { height: 24px; padding: 0 4px; }
 .nrl-ladder-table th.nrl-ladder-heading { overflow: hidden; text-overflow: ellipsis; }
 .nrl-ladder-table td { height: 25px; padding: 0 4px; border-top: 0; overflow: hidden; text-overflow: ellipsis; }
