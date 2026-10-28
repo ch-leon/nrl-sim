@@ -4,8 +4,8 @@
 // vitest env has no DOM, so these pin the pure helpers and the CSS.
 import { describe, it, expect } from 'vitest';
 import {
-  ACTION_LANE_PX, DOCK_GAP_PX, MIN_LANE_PX, RESERVE_CLASS, RESERVE_GAP_PX, RESERVE_VAR, TOAST_BUSY_MS, TOAST_MAX_MS, TOAST_MIN_MS,
-  dismissOnBodyTap, dockLane, holdReserve, isActionToast, isLongInfo, laneIndex, laneMinPx, listReserve, queueBadge, toastMs,
+  ACTION_LANE_PX, DOCK_GAP_PX, TOAST_CAP, TRIM_KEEP, MIN_LANE_PX, RESERVE_CLASS, RESERVE_GAP_PX, RESERVE_VAR, TOAST_BUSY_MS, TOAST_MAX_MS, TOAST_MIN_MS,
+  dismissOnBodyTap, dockLane, moreInNews, trimQueue, trimmable, holdReserve, isActionToast, isLongInfo, laneIndex, laneMinPx, listReserve, queueBadge, toastMs,
   type ReserveList,
 } from '../../src/ui/toasts';
 import { UNDO_MS } from '../../src/systems/undo';
@@ -250,5 +250,62 @@ describe('the reserve comes off when the toast goes (holdReserve)', () => {
     expect(a.writes).toBe(1);
     holdReserve(held, new Map([[a, 50]]));
     expect(a.writes).toBe(2);
+  });
+});
+
+describe('a long run leaves a short tail, not minutes of stale toasts (#411)', () => {
+  type N = Parameters<typeof trimQueue>[0][number];
+  const info = (text: string): N => ({ text, kind: 'info' });
+  const texts = (q: readonly N[]): string[] => q.map((n) => n.text);
+  // What a run from week 8 to the finals queued while its cards held the lane (the play-test's 47).
+  const run: N[] = [
+    ...Array.from({ length: 17 }, (_, i) => info(`Round ${9 + i}: WIN`)),
+    ...Array.from({ length: 5 }, (_, i) => ({ text: `Player ${i}'s contract expires in 8 weeks`, kind: 'success' as const })),
+    { text: 'Squad short: forfeit risk', kind: 'danger' },
+    ...Array.from({ length: 23 }, (_, i) => info(`Rival signing ${i}`)),
+    info('Advanced to finals.'),
+  ];
+
+  it('keeps the newest few plain lines, the stop line among them, and one "+n more in News" for the rest', () => {
+    const out = trimQueue(run);
+    const plain = out.filter((n) => n.kind !== 'danger');
+    expect(texts(plain)).toEqual(['+43 more in News', 'Rival signing 21', 'Rival signing 22', 'Advanced to finals.']);
+    expect(plain.length - 1).toBe(TRIM_KEEP);
+    expect(out.length).toBeLessThanOrEqual(TOAST_CAP);
+    // Every toast dropped is counted: the kept ones plus the count make the whole run.
+    expect(out.length - 1 + 43).toBe(run.length);
+  });
+
+  it('never drops a problem, an Undo or a match toast, and keeps the order', () => {
+    const undo: N = { text: 'Built the gym', kind: 'success', action: { label: 'Undo', run: () => {} } };
+    const q: N[] = [undo, info('a'), { text: 'Over budget', kind: 'danger' }, info('b'), info('c'), { text: 'Try!', kind: 'info', match: true }, info('d'), info('e'), info('f')];
+    expect([trimmable(undo), trimmable(q[2]), trimmable(q[5]), trimmable(q[1])]).toEqual([false, false, false, true]);
+    expect(texts(trimQueue(q))).toEqual(['Built the gym', '+3 more in News', 'Over budget', 'Try!', 'd', 'e', 'f']);
+  });
+
+  it('a later trim folds the earlier "+n more" into its own count', () => {
+    const first = trimQueue([info('a'), info('b'), info('c'), info('d'), info('e')]);
+    expect(texts(first)).toEqual(['+2 more in News', 'c', 'd', 'e']);
+    const second = trimQueue([...first, info('f'), info('g'), info('h')]);
+    expect(texts(second)).toEqual(['+5 more in News', 'f', 'g', 'h']);
+  });
+
+  it('a line said twice keeps only its newest, a problem too', () => {
+    const fill: N = { text: 'Lineup: Goalby fills in at hooker.', kind: 'danger' };
+    const q: N[] = [{ ...fill }, info('a'), { ...fill }, info('b'), info('c'), info('d')];
+    expect(texts(trimQueue(q))).toEqual(['+2 more in News', 'Lineup: Goalby fills in at hooker.', 'b', 'c', 'd']);
+  });
+
+  it('leaves a short queue alone, and never swaps one toast for a "+1 more"', () => {
+    const short = [info('a'), info('b'), info('c')];
+    expect(trimQueue(short)).toEqual(short);
+    const four = [info('a'), info('b'), info('c'), info('d')];
+    expect(trimQueue(four)).toEqual(four);
+    expect(texts(trimQueue([...four, info('e')]))).toEqual(['+2 more in News', 'c', 'd', 'e']);
+  });
+
+  it('the "+n more" line is a plain info line, short enough for the match lane', () => {
+    expect(moreInNews(43)).toEqual({ text: '+43 more in News', kind: 'info' });
+    expect(TOAST_CAP).toBeGreaterThan(TRIM_KEEP + 1);
   });
 });

@@ -849,24 +849,33 @@ export class MatchScene extends Phaser.Scene {
     );
   }
 
-  /** Watches the Settings dialog opened from the pause sheet; the match goes on when it closes. */
+  /**
+   * Watches the Settings dialog opened from the pause sheet. Closing it goes back to
+   * the sheet, still paused (#421): only the sheet's Resume plays on. The sheet is
+   * built again, so a text size picked in Settings lays it out afresh.
+   */
   private settingsWatch: MutationObserver | null = null;
 
   private openSettings(open: () => void): void {
     const pb = this.playback;
     if (!(pb instanceof LivePlayback) || this.finished) return;
     pb.hold();
+    // The sheet takes its own hold before this one goes, so the clock never runs between.
+    const back = (): void => {
+      this.openPauseSheet();
+      pb.release();
+    };
     open();
     const dialog = document.querySelector('.nrl-settings-modal')?.closest('.nrl-modal-backdrop') ?? null;
     if (!dialog) {
-      pb.release();
+      back();
       return;
     }
     const watch = new MutationObserver(() => {
       if (dialog.isConnected) return;
       watch.disconnect();
       this.settingsWatch = null;
-      pb.release();
+      back();
     });
     watch.observe(getRoot(), { childList: true });
     this.settingsWatch = watch;
