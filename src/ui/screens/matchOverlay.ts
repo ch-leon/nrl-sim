@@ -1609,6 +1609,20 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   .nrl-mo-tray-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 540px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
 }
+/* A short narrow phone (568×320, 640×360; #403 review): three a line as well, the tray as wide as the
+   screen allows, so a full tray (a pair and four, at Larger text) is two lines and never scrolls. No
+   room for the full log beside it: the log gives way while the tray is open. */
+@media (max-height: 360px) and (max-width: 759px) {
+  .nrl-mo-tray { width: min(540px, calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
+  .nrl-mo-tray-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .nrl-mo-tray-open .nrl-mo-full { display: none; }
+}
+/* Any short phone (#403 review): a little less padding, and the footer one line that never shrinks
+   away (its "+2 more" comes first), so at Larger text a full tray keeps its footer as well. */
+@media (max-height: 360px) {
+  .nrl-mo-tray { gap: 4px; padding: 6px 12px; }
+  .nrl-mo-tray-foot { flex-shrink: 0; -webkit-line-clamp: 1; }
+}
 /* The speed pill (MatchScene): pause, the speeds (the one playing a yellow circle), SKIP. */
 .nrl-mo-controls {
   pointer-events: auto; height: 56px; display: flex; align-items: center; gap: 2px; padding: 0 6px; box-sizing: border-box;

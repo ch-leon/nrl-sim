@@ -1,7 +1,7 @@
 // tests/ui/screens/kickoffTray.test.ts — the kick-off pair in the coach tray (#397):
 // one more trayRows pair (#396), under the same five-row, six-button cap.
 import { describe, it, expect } from 'vitest';
-import { CALL_TILE, CALL_WHEN, TRAY_MAX_BUTTONS, TRAY_MAX_ROWS, callEffect, trayHidden, trayRows, type TrayButton } from '../../../src/ui/screens/matchOverlay';
+import { CALL_TILE, CALL_WHEN, OVERLAY_CSS, TRAY_MAX_BUTTONS, TRAY_MAX_ROWS, callEffect, trayHidden, trayRows, type TrayButton } from '../../../src/ui/screens/matchOverlay';
 import { CALL_LABEL, unlockedCalls, type CoachCall } from '../../../src/match/league/calls';
 
 const on = (...calls: CoachCall[]): TrayButton[] => calls.map((call) => ({ call, why: null }));
@@ -29,6 +29,13 @@ describe('the kick-off pair in the coach tray (#397)', () => {
     expect(rows.reduce((n, r) => n + r.buttons.length, 0)).toBeLessThanOrEqual(TRAY_MAX_BUTTONS);
     expect(rows[0]!.id).toBe('kickoff');
     expect(trayHidden(all, false, rows)).toEqual([]);
+  });
+
+  it('fits a short narrow phone (568×320 at Larger text, #403 review): three a line, the footer kept to one', () => {
+    // A pair and four singles is three lines two a line, more than a 320-high screen has room for.
+    const block = (head: string): string => OVERLAY_CSS.match(new RegExp(`${head.replace(/[()]/g, '\\$&')} \\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+    expect(block('@media (max-height: 360px) and (max-width: 759px)')).toContain('.nrl-mo-tray-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }');
+    expect(block('@media (max-height: 360px)')).toContain('.nrl-mo-tray-foot { flex-shrink: 0; -webkit-line-clamp: 1; }');
   });
 
   it('is on from Office level 0, with short tile words', () => {

@@ -934,17 +934,18 @@ export class LiveSim implements MatchSim {
    * Why `side` can't call its kick-off now (#397): the kicking side only, once,
    * in the break before it (as the plan, N11): after a try until the conversion
    * is taken (the side that conceded kicks off), and the restart until the
-   * kicker is on his way (not a drop-out). Not at the siren or in golden point,
-   * where the score ends the half or the match.
+   * kicker is on his way (not a drop-out). Never with the siren up or in golden
+   * point, its own kick-off included: there the next score ends the half or the
+   * match, and a Short kick would be a quarter-chance at winning it straight back.
    */
   private kickoffRefusal(side: Side): string | null {
     const ph = this.phase;
-    const after = !this.siren && !this.golden;
+    if (this.siren || this.golden) return 'at the kick-off';
     const kicking = ph.kind === 'restart' && ph.from === undefined && !this.pendingKick
       ? ph.kicking
-      : after && ph.kind === 'try'
+      : ph.kind === 'try'
         ? other(this.players[ph.scorer]!.side)
-        : after && ph.kind === 'conversion' && ph.what === undefined
+        : ph.kind === 'conversion' && ph.what === undefined
           ? other(ph.side)
           : null;
     if (!kicking) return 'at the kick-off';

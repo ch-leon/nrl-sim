@@ -204,6 +204,30 @@ describe('kick-off calls in the match (#397)', () => {
     expect(sim.verdicts[0]!.how).not.toBe('lapsed');
   });
 
+  it('are never on at golden point’s kick-off, or a restart with the siren up (#403 review)', () => {
+    // A drawn final over a one-minute half: golden point, then its kick-off.
+    let seen = 0;
+    for (let seed = 1; seed <= 40 && seen < 3; seed++) {
+      const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), seed, { goldenPoint: true, length: { halves: 1, halfMinutes: 1 } });
+      while (!sim.finished && !sim.tickEvents.some((e) => e.kind === 'golden-point')) sim.step();
+      if (sim.finished) continue;
+      while (sim.phaseKind !== 'restart') sim.step();
+      seen++;
+      for (const side of ['home', 'away'] as const) {
+        expect(sim.callRefusal(side, 'kickoff-short')).toBe('at the kick-off');
+        expect(sim.callRefusal(side, 'kickoff-long')).toBe('at the kick-off');
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+    // The siren can go while a restart waits (the clock runs): no call either. Set by hand, as the clock would.
+    const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 3);
+    const kicking = other(sim.inPossession);
+    expect(sim.callRefusal(kicking, 'kickoff-short')).toBeNull();
+    (sim as unknown as { siren: boolean }).siren = true;
+    expect(sim.callRefusal(kicking, 'kickoff-short')).toBe('at the kick-off');
+    expect(sim.callRefusal(kicking, 'kickoff-long')).toBe('at the kick-off');
+  });
+
   it('are deterministic per seed, and a refused one changes nothing', () => {
     const play = (calls: { tick: number; side: Side; call: 'kickoff-short' | 'kickoff-long' }[]): string => {
       const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 5, { calls });
