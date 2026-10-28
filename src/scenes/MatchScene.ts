@@ -40,7 +40,7 @@ import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callIsPenalty, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callIsKickoff, callIsPenalty, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
@@ -988,7 +988,8 @@ export class MatchScene extends Phaser.Scene {
     if (this.coachBadgeEl && this.coachBadgeEl.textContent !== badge.text) this.coachBadgeEl.textContent = badge.text;
     if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
     if (!this.trayOpen() || !this.trayList || !this.trayTitle || !this.trayFoot) return;
-    const title = attacking ? 'Your ball' : 'Their ball';
+    // The kick-off pair (#397) is up: the break before his side's kick-off.
+    const title = rows.some((r) => r.id === 'kickoff') ? 'Kick-off' : attacking ? 'Your ball' : 'Their ball';
     if (this.trayTitle.textContent !== title) this.trayTitle.textContent = title;
     const key = `${title}:${rows.map((r) => r.buttons.map((b) => `${b.call}${b.why === null ? '' : '-'}`).join('+')).join(',')}`;
     if (key !== this.trayKey) {
@@ -1033,8 +1034,8 @@ export class MatchScene extends Phaser.Scene {
     const pb = this.playback;
     if (!(pb instanceof LivePlayback)) return;
     if (pb.call(this.callSide, call) === null) {
-      // Fresh legs (#367) and a penalty call (#396) aren't the set's call: the badge keeps the set's own.
-      if (!callIsBench(call) && !callIsPenalty(call)) {
+      // Fresh legs (#367), a penalty call (#396) and a kick-off call (#397) aren't the set's call: the badge keeps the set's own.
+      if (!callIsBench(call) && !callIsPenalty(call) && !callIsKickoff(call)) {
         this.madeCall = call;
         this.madeAt = pb.tick;
       }

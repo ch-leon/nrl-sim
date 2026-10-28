@@ -30,7 +30,7 @@ import { bus } from '../../core/events';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
-import { CALL_LABEL, callIsBench, callIsDefence, callIsPenalty, type CoachCall } from '../../match/league/calls';
+import { CALL_LABEL, callIsBench, callIsDefence, callIsKickoff, callIsPenalty, type CoachCall } from '../../match/league/calls';
 import { teamTags } from '../teamTag';
 import { MOMENTUM_STEP_MIN, momentumLabel, momentumLeader, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
 
@@ -425,6 +425,8 @@ export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
   'forty-twenty': 'tackle 4+, behind your 40 and in reach of their 20: kick the last for touch inside their 20',
   'take-two': 'a penalty won, in range: a shot at goal for two',
   'tap-go': 'a penalty won, in range: tap it and run',
+  'kickoff-short': 'your kick-off: short and high, the chase tries to win it back',
+  'kickoff-long': 'your kick-off: deep for the in-goal, pins them in (can go dead)',
 };
 
 /** What a call does, in plain English, on its row in the coach tray (3o): CALL_WHEN less its "when". */
@@ -452,6 +454,8 @@ export const CALL_TILE: Readonly<Record<CoachCall, string>> = {
   'forty-twenty': 'kick for touch in their 20',
   'take-two': 'a shot at goal for two',
   'tap-go': 'tap it and run',
+  'kickoff-short': 'high, chase to win it',
+  'kickoff-long': 'deep, pin them in',
 };
 
 /** When a call that is not on yet comes on, from the sim's refusal (the coach tray's footer). */
@@ -525,6 +529,7 @@ export const TRAY_MAX_BUTTONS = 6;
 const TRAY_PAIRS: readonly (readonly [string, CoachCall, CoachCall])[] = [
   ['shift', 'shift-left', 'shift-right'],
   ['penalty', 'take-two', 'tap-go'],
+  ['kickoff', 'kickoff-short', 'kickoff-long'],
 ];
 
 /** A refusal that still shows a pair's other half, greyed: it says why that half is not on (#396). */
@@ -541,9 +546,9 @@ const TRAY_PRIORITY: readonly string[] = ['kickoff', 'penalty', 'field-goal', 'g
 /** The order the rows show in: a restart or a penalty, the next play, the set's kick, defence, the bench. */
 const TRAY_ORDER: readonly string[] = ['kickoff', 'penalty', 'hit-up', 'shift', 'offload', 'kick-early', 'run-it', 'bomb', 'grubber', 'forty-twenty', 'field-goal', 'rush', 'hold', 'gang-tackle', 'fresh-legs'];
 
-/** Is the call one for this side now: attack calls with the ball, defence calls without it; the bench and a penalty won either way. */
+/** Is the call one for this side now: attack calls with the ball, defence calls without it; the bench, a penalty won and its kick-off (#397) either way. */
 export function callForRole(call: CoachCall, attacking: boolean): boolean {
-  return callIsBench(call) || callIsPenalty(call) || callIsDefence(call) !== attacking;
+  return callIsBench(call) || callIsPenalty(call) || callIsKickoff(call) || callIsDefence(call) !== attacking;
 }
 
 /**
@@ -1625,6 +1630,20 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   .nrl-mo-tray { width: min(540px, calc(100vw - 32px)); }
   .nrl-mo-tray-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 540px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
+}
+/* A short narrow phone (568×320, 640×360; #403 review): three a line as well, the tray as wide as the
+   screen allows, so a full tray (a pair and four, at Larger text) is two lines and never scrolls. No
+   room for the full log beside it: the log gives way while the tray is open. */
+@media (max-height: 360px) and (max-width: 759px) {
+  .nrl-mo-tray { width: min(540px, calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
+  .nrl-mo-tray-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .nrl-mo-tray-open .nrl-mo-full { display: none; }
+}
+/* Any short phone (#403 review): a little less padding, and the footer one line that never shrinks
+   away (its "+2 more" comes first), so at Larger text a full tray keeps its footer as well. */
+@media (max-height: 360px) {
+  .nrl-mo-tray { gap: 4px; padding: 6px 12px; }
+  .nrl-mo-tray-foot { flex-shrink: 0; -webkit-line-clamp: 1; }
 }
 /* The speed pill (MatchScene): pause, the speeds (the one playing a yellow circle), SKIP. */
 .nrl-mo-controls {

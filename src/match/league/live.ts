@@ -47,7 +47,7 @@ import { AVERAGE, BASE, angleFrom, interceptChance, knockOnChance, resolveContes
 import { FULLBACK, HOOKER, KICKER, PLAYERS, ROLES, formationTarget } from './roles';
 import {
   MAX_LAT_M, RUN_CLOSE_M, RUN_IT_CHANCE, RUN_IT_ZONE_M, bombTarget, chipTarget, chooseKick, crossFieldTarget, gapTarget, grubberTarget, intercept,
-  kickTarget, kickoffTarget, pickReceiver, supportSpots, type Candidate, type KickChoice,
+  kickTarget, pickReceiver, supportSpots, type Candidate, type KickChoice,
 } from './tactics';
 import { DEFAULT_TACTICS, PRESET_LABEL, attackPlan, defencePlan, zoneOf, type AttackPlan, type DefencePlan, type DefencePreset, type TeamTactics } from './presets';
 import { defaultBreakRule, type BreakRule, type PlanChange } from './breaks';
@@ -62,6 +62,7 @@ import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goal
 import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, offsideChance, type CaptainRead, type PenaltyChoice } from './penalties';
 import { edgeSheets, spreadSheets, type DifficultyEdge } from './spread';
 import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsBench, callIsDefence, callIsPenalty, callIsPlay, callScope, paidOffText, penaltyChoiceOf, withAttackCall, withDefenceCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
+import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall } from './kickoff';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
@@ -487,6 +488,9 @@ export class LiveSim implements MatchSim {
   private callAtk: Side | null = null;
   /** Which calls paid off (spec §3's last column). */
   private readonly judge = new CallJudge();
+  /** The kicking side's kick-off call (#397), made in the restart break and taken by the kick; then what the kick will do, settled where it comes down. */
+  private kickoffCall: { side: Side; call: KickoffCall } | null = null;
+  private kickoffPlay: { side: Side; call: KickoffCall; outcome: 'regather' | 'taken' | 'dead' } | null = null;
   /**
    * Every call judged so far, paid or not, with its ground (#366): the match screen
    * reads the new ones after each tick for the result tag by the chips. A view-side
@@ -582,6 +586,11 @@ export class LiveSim implements MatchSim {
 
   /** Ball to the kicking side's kicker and everyone on his kick-off spot (the start of each half). */
   private setForKickoff(kicking: Side): void {
+    // A kick-off call (#397) the half ended on (the siren went during the conversion) lapses, unpaid.
+    if (this.kickoffCall) {
+      this.announcePaid(this.judge.kickoff(this.kickoffCall.side, false, 'lapsed', 0));
+      this.kickoffCall = null;
+    }
     this.ball = { kind: 'held', by: this.indexOf(this.kicker(kicking)) };
     this.phase = { kind: 'restart', t0: this.tick, kicking };
     this.attacking = other(kicking);
@@ -872,6 +881,7 @@ export class LiveSim implements MatchSim {
   /** Why a side can't make this call now, or null when it can. */
   callRefusal(side: Side, call: CoachCall): string | null {
     const k = this.phase.kind;
+    if (!this.finished && (call === 'kickoff-short' || call === 'kickoff-long')) return this.kickoffRefusal(side);
     // Take the two / Tap and go (#396): only on a penalty his side has won and not yet taken, with the shot on.
     if (callIsPenalty(call)) {
       const pen = this.penaltyOpen();
@@ -918,6 +928,29 @@ export class LiveSim implements MatchSim {
    */
   private fortyTwentyReach(side: Side): number {
     return 20 + TOUCH.touchRollM + CALLS.fortyTwenty.reachM * bootMult(this.kicker(side).traits).dist * this.wx.kickDistance;
+  }
+
+  /**
+   * Why `side` can't call its kick-off now (#397): the kicking side only, once,
+   * in the break before it (as the plan, N11): after a try until the conversion
+   * is taken (the side that conceded kicks off), and the restart until the
+   * kicker is on his way (not a drop-out). Never with the siren up or in golden
+   * point, its own kick-off included: there the next score ends the half or the
+   * match, and a Short kick would be a quarter-chance at winning it straight back.
+   */
+  private kickoffRefusal(side: Side): string | null {
+    const ph = this.phase;
+    if (this.siren || this.golden) return 'at the kick-off';
+    const kicking = ph.kind === 'restart' && ph.from === undefined && !this.pendingKick
+      ? ph.kicking
+      : ph.kind === 'try'
+        ? other(this.players[ph.scorer]!.side)
+        : ph.kind === 'conversion' && ph.what === undefined
+          ? other(ph.side)
+          : null;
+    if (!kicking) return 'at the kick-off';
+    if (kicking !== side) return 'their kick-off';
+    return this.kickoffCall ? 'called' : null;
   }
 
   /** Why a side can't change its plan now (N11), or null: only at the breaks — half-time, or a score until the kick-off is taken (not a drop-out). */
@@ -1001,6 +1034,14 @@ export class LiveSim implements MatchSim {
       this.events[this.events.length - 1]!.detail = call;
       this.judge.make(side, call, side, this.dirOf(side), pen.mark.x);
       this.takePenalty(side, pen.mark, choice);
+      return null;
+    }
+    if (call === 'kickoff-short' || call === 'kickoff-long') {
+      // Neither of the set's calls: the kick takes it (stepRestart).
+      this.kickoffCall = { side, call };
+      this.emit('coach-call', `${this.names[side]} coach calls: ${CALL_LABEL[call].toLowerCase()}`, this.kicker(side));
+      this.events[this.events.length - 1]!.detail = call;
+      this.judge.make(side, call, this.attacking, this.dirOf(this.attacking), this.ballPos().x);
       return null;
     }
     if (callIsBench(call)) {
@@ -1478,6 +1519,8 @@ export class LiveSim implements MatchSim {
         this.ball = { kind: 'loose', pos: { ...b.to }, vel: { x: 0, y: 0 } };
         return;
       }
+      // A called kick-off (#397) settles itself first.
+      if (b.via === 'kick' && this.kickoffUp && this.kickoffPlay && this.landKickoff(b.to, b.receiver)) return;
       // A kick landing out of the field: on the full (2d).
       if (b.via === 'kick' && outOfPlay(b.to)) {
         this.outOnTheFull(b.from, b.to);
@@ -1618,19 +1661,78 @@ export class LiveSim implements MatchSim {
     this.lock(kicker, 'kick', LIVE.kickLockTicks);
     const kd = this.dirOf(ph.kicking);
     const r1 = this.rng.next();
-    const to = ph.from === 'goal-line'
-      ? { x: ownLineX(kd) + kd * (TOUCH.dropOutM + (r1 - 0.5) * TOUCH.dropOutSpreadM), y: clamp(MID_Y + (this.rng.next() - 0.5) * 24, 8, FIELD_WIDTH - 8) }
-      : kickoffTarget(rd, r1);
+    // The kick-off call (#397) is the kicking side's own; its dice are drawn only when one is made.
+    const kc = ph.from === undefined && this.kickoffCall?.side === ph.kicking ? this.kickoffCall.call : null;
+    this.kickoffCall = null;
+    const land = ph.from === 'goal-line' ? null : kickoffLanding(kc, rd, r1, kicker.stats.skill);
+    const called = kc && land ? this.kickoffRoll(kc, ph.kicking, land.to, rd, r1, kicker.stats.skill) : null;
+    const to = land
+      ? called?.to ?? land.to
+      : { x: ownLineX(kd) + kd * (TOUCH.dropOutM + (r1 - 0.5) * TOUCH.dropOutSpreadM), y: clamp(MID_Y + (this.rng.next() - 0.5) * 24, 8, FIELD_WIDTH - 8) };
     this.pendingKick = {
       at: this.tick + LIVE.kickContactTicks,
       kicker: this.indexOf(kicker),
       to,
-      receiver: this.indexOf(this.fullback(receiving)),
-      peak: 16,
+      receiver: called ? called.receiver : this.indexOf(this.fullback(receiving)),
+      peak: land?.peak ?? 16,
       kickoff: true,
       kind: 'long',
       ...(ph.from === 'goal-line' ? { dropOut: true } : {}),
     };
+  }
+
+  /**
+   * A called kick-off (#397), as it leaves the boot: one more draw, and only for
+   * a call. Short: regathered on the best chaser's Speed against the catcher's
+   * Skill, and the man who will take it goes under it. Long: dead on the full,
+   * or for the fullback deep.
+   */
+  private kickoffRoll(call: KickoffCall, kicking: Side, to: Vec, rd: 1 | -1, r1: number, skill: number): { to: Vec; receiver: number } {
+    const receiving = other(kicking);
+    const near = (ps: readonly Player[]): Player[] => ps.filter((p) => this.onField(p) && p !== this.kicker(kicking)).sort((a, b) => dist(a.body.pos, to) - dist(b.body.pos, to));
+    if (call === 'kickoff-short') {
+      const chaser = near(this.side(kicking)).slice(0, KICKOFF.short.chasers).sort((a, b) => b.stats.speed - a.stats.speed)[0] ?? this.kicker(kicking);
+      const catcher = near(this.side(receiving))[0] ?? this.fullback(receiving);
+      const regather = this.rng.next() < regatherChance(chaser.stats.speed, catcher.stats.skill);
+      this.kickoffPlay = { side: kicking, call, outcome: regather ? 'regather' : 'taken' };
+      return { to, receiver: this.indexOf(regather ? chaser : catcher) };
+    }
+    const dead = this.rng.next() < KICKOFF.long.deadOnFull;
+    this.kickoffPlay = { side: kicking, call, outcome: dead ? 'dead' : 'taken' };
+    return { to: dead ? kickoffLanding(call, rd, r1, skill, true).to : to, receiver: this.indexOf(this.fullback(receiving)) };
+  }
+
+  /**
+   * A called kick-off comes down (#397). Dead on the full: a penalty at halfway.
+   * A short one regathered: the chaser under it takes it, the kicking side's ball.
+   * Anything else plays on as any kick-off. The call is judged here. Returns true
+   * when it settled the ball.
+   */
+  private landKickoff(at: Vec, receiver: number | null): boolean {
+    const k = this.kickoffPlay!;
+    this.kickoffPlay = null;
+    const kd = this.dirOf(k.side);
+    const metres = Math.round((at.x - FIELD_LENGTH / 2) * kd);
+    if (k.outcome === 'dead') {
+      this.announcePaid(this.judge.kickoff(k.side, false, 'dead-on-full', metres));
+      this.penalize(k.side, { x: FIELD_LENGTH / 2, y: MID_Y }, 'the kick-off is dead on the full', this.players[this.lastKicker]!, 'kickoff', undefined, false);
+      return true;
+    }
+    if (k.outcome === 'regather' && receiver !== null) {
+      const r = this.players[receiver]!;
+      this.ball = { kind: 'held', by: receiver };
+      r.catchTick = this.tick;
+      r.decided = false;
+      r.steppedOn = -1;
+      this.lock(r, 'catch', 3);
+      this.emit('regather', `${r.name} regathers the short kick-off!`, r);
+      this.turnover();
+      this.announcePaid(this.judge.kickoff(k.side, true, 'regather', metres));
+      return true;
+    }
+    const lineM = this.toLineFor(k.side, at);
+    this.announcePaid(this.judge.kickoff(k.side, k.call === 'kickoff-long' && pinnedDeep(lineM), 'kick', metres));
+    return false;
   }
 
   private stepPlay(): void {
@@ -2247,12 +2349,13 @@ export class LiveSim implements MatchSim {
    * The captain's call (penalties.ts): the shot at goal, a tap, or a kick for
    * touch — each said and shown. After the siren only the shot keeps the half alive.
    */
-  private penalize(offender: Side, spot: Vec, why: string, culprit: Player, kind: string, trait?: string): void {
+  private penalize(offender: Side, spot: Vec, why: string, culprit: Player, kind: string, trait?: string, bin = true): void {
     const award = other(offender);
     const dir = this.dirOf(award);
     this.emit('penalty', `Penalty to ${this.names[award]} — ${why}`, culprit, trait);
     this.events[this.events.length - 1]!.detail = kind;
-    this.maybeBin(offender, culprit, spot, kind);
+    // No sin bin for a kick-off dead on the full (#397).
+    if (bin) this.maybeBin(offender, culprit, spot, kind);
     this.pendingKick = null;
     this.kickFrom = null;
     this.outPending = null;

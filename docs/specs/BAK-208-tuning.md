@@ -105,7 +105,7 @@ Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | `KICK_SPEED` / `GRUBBER_SPEED` | `ball.ts` | 20 / 12 m/s | Flight speed; a kick is in the air for max(distance ÷ speed, `hangTime(peak)`). Grubber was 13; 12 gives the chase a step. |
-| `hangTime` | `ball.ts` | 2√(2·peak / 9.81) | Peaks: long 12 (3.1 s), bomb 20 (4 s), cross-field 13, chip 5, kick-off 16, grubber 0.9 (ground). |
+| `hangTime` | `ball.ts` | 2√(2·peak / 9.81) | Peaks: long 12 (3.1 s), bomb 20 (4 s), cross-field 13, chip 5, kick-off 18 (16 before #397; Short and Long kick-offs 20), grubber 0.9 (ground). |
 | `RUN_CLOSE_M` / `RUN_IT_ZONE_M` / `RUN_IT_CHANCE` / `ATTACK_KICK_M` | `tactics.ts` | 6 / 40 / 20% / 50 m | Run the last inside 6 m; 1 in 5 inside 40; territory beyond 50. |
 | `kickWeights(toLine)` | `tactics.ts` | table (§4.4) | Long / bomb / cross-field / grubber / chip weights by zone, × preset `kickBias`. |
 | `live.earlyKickM` + preset `earlyKick` | `live.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle. |
@@ -117,7 +117,10 @@ Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed
 | `live.grubberChaseFromM` | `live.ts` | 24 m | Inside this, the wingers start the grubber chase on the second-last tackle. The fullback joins once the kick is aimed. 28 m (25 Oct, first cut) put a try on too many of them. |
 | `live.grubberChaseDepthM` | `live.ts` | 10 m | The chase does not sit closer than this to the try line until the kick is aimed. |
 | `live.grubberChaseLeadM` | `live.ts` | 3 m | How far in front of the ball the chase may lead before the kick is aimed. 4 m (25 Oct, first cut) did the same. |
-| Kick-off target | `tactics.ts` | receiving quarter (x 24), ±12 m | Not chased for a regather. |
+| Kick-off target | `tactics.ts` / `kickoff.ts` | the receivers' 15–8 m line by the kicker's Skill (#397; was their 24 m line, about 26 m from halfway, peak 16), ±12 m across | Not chased for a regather. The old kick-off is `kickoff.deepDefault` 0 (`kickoff.today`). |
+| `kickoff.deepDefault` / `kickoff.deep` (#397) | `kickoff.ts` | 1 (on) · receivers' 15 m line at Skill ≤ 30 to 8 m at ≥ 90, peak 18 | The deeper default kick-off: 35–42 m from halfway (a real one goes 35–45 m), the kicker's Skill picking the depth, the same one draw across. On since 28 Oct; it re-pinned the match fingerprints. Before → after (`balance/plans/kickoff-depth.md`; runs `20261028-123504-kickoff-depth`, `20261028-124128-kickoff-depth-confirm`, `20261028-135316-kickoff-depth-gap`), even 60 v 60 over 1,000 matches: **points 25.5 → 28.6, tries 5.0 → 5.5** (+0.5 a match, beyond luck, inside 4–7), completion 69.5% → 69.7% (unchanged, the band's low edge as before), possession 50% → 50%. Every preset row gains 0.6–0.8 tries; the 45–55% preset wins hold or move in (Rush 48.5% → 51.7%, Compressed 48.5% → 54.0%, Grind 47.8% → 49.0%, All-out 39.3% → 46.0% on seeds 10001+); 70 v 50 76% → 73% (400 matches; ~70% target). |
+| `kickoff.short` (#397) | `kickoff.ts` | 12 m past halfway, peak 20 · regather 25% + 0.5%/pt (best of the 3 nearest chasers' Speed − the catcher's Skill), 15–40% | The Short kick-off call. One draw, only when called. A regather is the kicking side's ball near halfway; a miss is theirs about 12 m from halfway. Measured: 25% over 1,000 even kicks (`kickoff.test.ts`). |
+| `kickoff.long` (#397) | `kickoff.ts` | receivers' 5 m line at Skill ≤ 30 to the try line at ≥ 90, peak 20 · dead on the full 10% (3 m past the dead-ball line) · paid off inside 10 m | The Long kick-off call. One draw, only when called. Dead on the full is a penalty to the receivers at halfway (no sin bin). |
 
 Tests: `tests/match/league/kicks.test.ts`.
 

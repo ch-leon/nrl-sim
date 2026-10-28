@@ -41,6 +41,14 @@ interface Played {
   refusals: Set<string>;
 }
 
+/**
+ * Seeds for the penalty pair: a home penalty in range is rare in a 6-minute half,
+ * and one the captain doesn't tap himself (Tap and go's moment) rarer still.
+ * 1–8 had both until the deeper default kick-off (#397) reshuffled every match;
+ * these four have Take the two on (14, 65, 119, 142) and Tap and go (65, 119, 142).
+ */
+const PENALTY_SEEDS = [14, 65, 119, 142];
+
 /** Play with the home coach making `call` whenever he may (as a player at the tray does: a tap, in on the next tick). */
 function play(seed: number, call: CoachCall | null, minutes = 6, side: 'home' | 'away' = 'home'): Played {
   const calls: CallInput[] = [];
@@ -163,7 +171,7 @@ describe('five more calls (#396): when the sim takes them', () => {
   it('the penalty pair only on a penalty his side has won, in range, and not the captain’s own choice', () => {
     const refused = new Set<string>();
     let on = 0;
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    for (const seed of PENALTY_SEEDS) {
       for (const c of ['take-two', 'tap-go'] as const) {
         const p = play(seed, c);
         on += p.legal.length;
@@ -242,7 +250,7 @@ describe('five more calls (#396): each does what it says', () => {
 
   it('Take the two: the captain’s call is overruled and the goal is attempted', () => {
     let made = 0;
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    for (const seed of PENALTY_SEEDS) {
       const p = play(seed, 'take-two');
       for (const after of afterCalls(p, 'take-two')) {
         made++;
@@ -255,7 +263,7 @@ describe('five more calls (#396): each does what it says', () => {
 
   it('Tap and go: the penalty is tapped, and the set’s call is still his', () => {
     let made = 0;
-    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    for (const seed of PENALTY_SEEDS) {
       const calls: CallInput[] = [];
       const sim = new LiveSim(H, A, seed, { length: { halves: 1, halfMinutes: 6 }, calls });
       const events: SimEvent[] = [];

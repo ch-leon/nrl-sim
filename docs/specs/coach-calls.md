@@ -58,6 +58,8 @@ scope. No new mechanics.
 | **Field goal** | Only when 2c's field-goal rule is on (last minutes, close, in range) | This set | The kicker drops for goal on the next tackle he has it | Over |
 | **Rush** | Defending | Next set | Defence plan = Rush for one set | Tackle behind the advantage line, intercept, strip or error |
 | **Hold** | Defending | Next set | Defence plan = Compressed for one set | Set ends with < 25 m gained |
+| **Short kick-off** (#397) | The kicking side, in the break before its kick-off: after the try they conceded until the conversion is taken, and the restart until the kicker runs in (not a drop-out, not at the siren or in golden point); once a kick-off, not a set call | The kick-off | High, 12 m past halfway, the chase under it. Regathered 25% ± 0.5% a point of the best chaser's Speed over the catcher's Skill (15–40%); one draw, only when called | Regathered (a miss is their ball about 12 m from halfway) |
+| **Long kick-off** (#397) | As Short | The kick-off | For the in-goal and the 5 m line (the receivers' 5–0 m line by the kicker's Skill), to the fullback. Dead on the full 10%: a penalty to the receivers at halfway, no sin bin; one draw, only when called | Taken inside their 10 m |
 | **Fresh legs** (#367) | Either way, once a half, while a man on the field is under 0.40 legs and the bench has someone with 0.40 or more | Until the swap | The most tired man (ties by slot) comes off for the freshest bench man, his position group first: at the next play-the-ball where he is free (swapped where he stands), else the next stoppage (he jogs off, as a Rotation swap), else in the sheds at half-time. No dice | The swap is made. Lapses unpaid (and the half's call comes back) if nobody is tired by then; a call still waiting at full time stays unpaid |
 
 40/20 joins the list when 2d brings touch. Calls for the defence never stop a defender
@@ -204,3 +206,31 @@ cap, not a second list.
 
 No calls still plays exactly as before: the new calls' state is read only when one is made, the
 refusal checks and the tray roll no dice, and both balance fingerprints are unchanged.
+
+## 11. Kick-off calls (#397)
+
+Leon, 28 Oct: "Kick offs don't go very far. Should we influence? Short / long etc". The
+kicking side had no call to make at a restart (the sim treats the receivers as attacking
+from the moment the kick-off is set), so Short and Long are one more pair in the coach tray
+(`TRAY_PAIRS`, id `kickoff`: first in §10's priority and order, under the same five-row cap),
+two tiles side by side under the title **Kick-off**, shown only to the kicking side in the break
+before its kick-off: the same break as the plan's (N11), from the try it conceded through
+the conversion and the restart until the kicker runs in. The restart alone is about two
+seconds of match time, too short at ×1 to open the tray and choose. A call the half ends
+on (the siren goes during the conversion) lapses unpaid. They use up neither of the set's calls, and are on from Coach's Office level 0. Rival coaches
+never make them: with no call the kick-off is the default deep one. The rules are in §3;
+the knobs in `src/match/league/kickoff.ts` (tuning reference §6).
+
+The judge settles a kick-off call where its kick comes down: "Short kick: regathered!",
+"Short kick: they took it", "Long kick: pinned them deep", "Long kick: dead on the full".
+They count in "Calls paid off" like any call. On screen and in the commentary the calls are
+**Short kick** and **Long kick** (the commentary ticker fits 56 characters with the longest
+club name); "Long kick: no kick-off" for one that lapsed.
+
+| Decision (Leon) | Default used |
+|---|---|
+| Default kick-off depth | The receivers' 8–15 m line, by the kicker's kicking Skill |
+| Short kick-off regather chance | About 25% base, 15–40% after Speed vs Skill |
+| Include Long? | Yes, about 10% dead on the full, a penalty at halfway |
+| Unlock | Office level 0, one per restart |
+| Does the AI use them? | No |

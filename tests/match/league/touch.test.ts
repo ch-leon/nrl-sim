@@ -63,7 +63,8 @@ describe('touch and dead ball in the live sim', () => {
 
   it('a ball into touch goes to the side that did not touch it last, as a play-the-ball 10 m in from touch', () => {
     let touches = 0;
-    for (const seed of [1, 2]) {
+    // Three seeds: two found only one touch after the deeper kick-off (#397) reshuffled their matches.
+    for (const seed of [1, 2, 3]) {
       const { events } = play(seed);
       const all = events.map((x) => x.e);
       events.forEach(({ e, snap }, i) => {

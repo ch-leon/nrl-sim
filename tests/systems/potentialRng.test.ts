@@ -16,8 +16,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * 6093831 before #369; 9501488 before Wave 3 task 04, whose rival need signings
  * (on the rivals' own seed, never rngSeed) change who the rivals field, so the
  * matches draw a different number of dice. The match engine is unchanged.
+ * 3473711671 before the deeper default kick-off (#397), which changes every
+ * match, so the season's matches draw a different number of dice again.
  */
-const MAIN_SEED_AFTER_SEASON = 3473711671;
+const MAIN_SEED_AFTER_SEASON = 3821082668;
 
 describe('the rng stream (#369)', () => {
   it('a season leaves rngSeed where main left it, the projection and the dot looked at every week', () => {

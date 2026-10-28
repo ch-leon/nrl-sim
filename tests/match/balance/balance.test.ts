@@ -254,8 +254,11 @@ describe('measuring and reporting', () => {
     expect(measureCell({ ...even, scenario: { ...even.scenario, track: 'home' } }, 1, 6).trackedWin).toBe(plain.homeWin);
   }, 60_000);
   it.each([
-    { attack: 'balanced' as const, expected: '8-16:346:3436c830c791688a' },
-    { attack: 'expansive' as const, expected: '14-14:385:97934f5b337f329e' },
+    // Re-pinned for the deeper default kick-off (#397: kickoff.deepDefault 0 -> 1, the
+    // receivers' 15–8 m line instead of their 24 m line; balance/plans/kickoff-depth.md).
+    // They were 8-16:346:3436c830c791688a and 14-14:385:97934f5b337f329e.
+    { attack: 'balanced' as const, expected: '18-4:374:cbf9fa3d4aa0c5c7' },
+    { attack: 'expansive' as const, expected: '14-10:369:df1ab5c448c16159' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];
