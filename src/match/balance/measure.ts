@@ -41,6 +41,7 @@ export const COUNTS = [
   'lostInContact', 'injuries', 'lineBreaks', 'coachCalls', 'callsPaid', 'completion',
   'sinBins', 'shortMin', 'binSwing', 'points', 'margin', 'homeMargin', 'goldenPoint', 'goldenPointWon', 'draws', 'possession',
   'bombs', 'bombsWon', 'bombsSpilled', 'grubbers', 'grubberTries', 'grubberRepeats', 'grubberDropouts', 'grubberTurnovers', 'kickTries',
+  'scrambles',
 ] as const;
 export type CountKey = (typeof COUNTS)[number];
 
@@ -268,10 +269,13 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
         lastKick = null;
         break;
       case 'regather':
+        if (e.detail === 'scramble') c.scrambles++;
         if (lastKick?.detail === 'bomb') c.bombsWon++;
         if (grubber && e.side === grubber.side) grubber.ours = true;
         break;
       case 'set-start':
+        // A loose ball both sides went for, and who came up with it (#99; a regather when it is the kicking side's in-goal race).
+        if (e.detail === 'scramble') c.scrambles++;
         if (grubber && e.side) {
           if (e.side === grubber.side) grubber.ours = true;
           else closeGrubber('grubberTurnovers');

@@ -63,6 +63,7 @@ import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, offsideChance, type CaptainRea
 import { edgeSheets, spreadSheets, type DifficultyEdge } from './spread';
 import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsBench, callIsDefence, callIsPenalty, callIsPlay, callScope, paidOffText, penaltyChoiceOf, withAttackCall, withDefenceCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
 import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall } from './kickoff';
+import { KICK_CONTEST, bombPeak, grubberRace, highBall } from './kickContest';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
@@ -511,6 +512,13 @@ export class LiveSim implements MatchSim {
   readonly kicksMeasured: Record<Side, number> = { home: 0, away: 0 };
   /** A loose ball only this side may take (after a knock-on); null = anyone's. */
   private looseFor: Side | null = null;
+  /**
+   * A scramble (#99): a loose ball both sides are near, said as it goes loose
+   * (LOOSE BALL!) and named when someone comes up with it. `raceFor`: the side
+   * that won the race to a grubber in the in-goal; only they can take it.
+   */
+  private scramble = false;
+  private raceFor: Side | null = null;
   /** The last ruck's markers and the tick its ball was played (they hold until released). */
   private markers: number[] = [];
   private ruckPlayedAt = -1000;
@@ -1491,6 +1499,10 @@ export class LiveSim implements MatchSim {
 
   private landings(): void {
     const b = this.ball;
+    if (b.kind === 'held') {
+      this.scramble = false;
+      this.raceFor = null;
+    }
     if (this.goalUp) {
       if (b.kind === 'flight' && landed(b, this.tick)) this.resolveGoal();
       return;
@@ -1517,6 +1529,7 @@ export class LiveSim implements MatchSim {
       if (b.via === 'bounce') {
         // Hops done: it lies there for whoever gets to it.
         this.ball = { kind: 'loose', pos: { ...b.to }, vel: { x: 0, y: 0 } };
+        this.maybeScramble(b.to);
         return;
       }
       // A called kick-off (#397) settles itself first.
@@ -1526,29 +1539,36 @@ export class LiveSim implements MatchSim {
         this.outOnTheFull(b.from, b.to);
         return;
       }
+      // A grubber into the in-goal (#99): the nearest attacker and defender race for it.
+      if (b.via === 'kick' && b.bounces > 0 && !this.kickoffUp && inOwnInGoal(b.to, this.dir)) {
+        this.raceForGrubber(b.to);
+        return;
+      }
       // A kick is anyone's: whoever is under it takes it, the nominated man on a tie.
-      const r = b.via === 'kick' ? this.underKick(b.to, b.receiver) : b.receiver !== null ? this.players[b.receiver] : undefined;
+      let r = b.via === 'kick' ? this.underKick(b.to, b.receiver) : b.receiver !== null ? this.players[b.receiver] : undefined;
       if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > (b.via === 'kick' ? LIVE.kickCatchReach : LIVE.catchReach))) {
         // Nobody under it: it comes down and bounces on in the direction it was going.
         if (b.via === 'pass') this.emit('loose', r ? `${r.name} can't get to the pass — loose ball` : 'The pass goes to ground — loose ball', r);
         if (b.bounces > 0) {
           // A grubber has done its hopping: it lies where it stopped.
           this.ball = { kind: 'loose', pos: { ...b.to }, vel: { x: 0, y: 0 } };
+          this.looseFor = null;
+          this.maybeScramble(b.to);
         } else {
           // It bounces on the way it was going; a touch-finder runs on for the line.
           const roll = b.via === 'kick' ? (this.kickFrom?.aim ? TOUCH.touchRollM : 4) + this.rng.next() * 4 : 2;
           this.bounce(b.to, sub(b.to, b.from), roll);
+          this.looseFor = null;
         }
-        this.looseFor = null;
         return;
       }
+      // A bomb with a chaser and a catcher under it (#99): won back, spilled or caught, on one draw.
+      const contested = b.via === 'kick' && this.kickInAir === 'bomb' && !this.kickoffUp ? this.contestBomb(b) : null;
+      if (contested === 'settled') return;
+      if (contested) r = contested;
       const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < LIVE.pressureM);
-      if (b.via === 'kick' && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.skill - 50) / 300 : LIVE.dropChance) * this.wx.handling) {
-        // Spilled under the high ball: a scramble for anyone.
-        this.emit('drop', `${r.name} spills the kick under pressure!`, r);
-        this.lastTouch = r.side;
-        this.bounce(b.to, { x: (this.rng.next() - 0.5) * 2, y: (this.rng.next() - 0.5) * 2 }, 2, 12, 2);
-        this.looseFor = null;
+      if (b.via === 'kick' && !contested && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.skill - 50) / 300 : LIVE.dropChance) * this.wx.handling) {
+        this.spillKick(r, b.to, `${r.name} spills the kick under pressure!`);
         return;
       }
       const spillExtra = this.spillExtra;
@@ -1597,6 +1617,7 @@ export class LiveSim implements MatchSim {
       let bd = LIVE.pickupM;
       for (const p of this.players) {
         if (this.looseFor && p.side !== this.looseFor) continue;
+        if (this.raceFor && p.side !== this.raceFor) continue;
         if (this.locked(p) || !this.onField(p)) continue;
         const d = dist(p.body.pos, b.pos);
         if (d < bd) {
@@ -1605,14 +1626,26 @@ export class LiveSim implements MatchSim {
         }
       }
       if (best) {
+        const scramble = this.scramble;
+        const raced = this.raceFor !== null;
+        // The kicking side first to its own grubber in-goal is a regather (a try next tick), as when it is gathered off the boot.
+        const regather = raced && best.side !== this.attacking;
+        this.scramble = false;
+        this.raceFor = null;
         this.ball = { kind: 'held', by: this.indexOf(best) };
         best.catchTick = this.tick;
         best.decided = false;
         if (best.side !== this.attacking) this.turnover();
         this.mark = { ...best.body.pos };
         this.endKick(best.side, best.body.pos);
-        if (this.groundInGoal(best)) return;
-        this.emit('set-start', `${best.name} scoops it up — ${this.names[this.attacking]} ball`, best);
+        if (scramble) {
+          // Who came up with it (#99): the ticker names him, the report counts it.
+          if (regather) this.emit('regather', `${best.name} wins the race to it in-goal!`, best);
+          else this.emit('set-start', raced ? `${best.name} beats them to it in-goal` : `${best.name} wins the scramble — ${this.names[this.attacking]} ball`, best);
+          this.events[this.events.length - 1]!.detail = 'scramble';
+        }
+        if (this.groundInGoal(best, raced)) return;
+        if (!scramble) this.emit('set-start', `${best.name} scoops it up — ${this.names[this.attacking]} ball`, best);
         if (this.phase.kind !== 'play') this.phase = { kind: 'play' };
       }
     }
@@ -1632,6 +1665,112 @@ export class LiveSim implements MatchSim {
       }
     }
     return best;
+  }
+
+  /**
+   * A bomb comes down with a chaser and a catcher under it (#99, BAK-208 §4.3):
+   * whoever is a step nearer, it is the chaser's Speed against the catcher's
+   * Skill, the height of the kick, a Kick-chase side and the wet
+   * (kickContest.ts). One draw: won back (he taps it back to his side),
+   * spilled, or caught under pressure (the catcher is returned). Null when only
+   * one side is under it: the catch, or a regather, as for any kick.
+   */
+  private contestBomb(b: Extract<BallState, { kind: 'flight' }>): Player | 'settled' | null {
+    const kicking = other(this.attacking);
+    const under = (s: Side): Player | undefined =>
+      this.side(s)
+        .filter((p) => !this.locked(p) && this.onField(p) && dist(p.body.pos, b.to) <= KICK_CONTEST.bomb.contestM)
+        .sort((p, q) => dist(p.body.pos, b.to) - dist(q.body.pos, b.to))[0];
+    const chaser = under(kicking);
+    // The man it was kicked to, if he is under it; else the receiving side's nearest.
+    const nominated = b.receiver !== null ? this.players[b.receiver] : undefined;
+    const mine = nominated && nominated.side === this.attacking && !this.locked(nominated) && this.onField(nominated) && dist(nominated.body.pos, b.to) <= KICK_CONTEST.bomb.contestM;
+    const catcher = mine ? nominated : under(this.attacking);
+    if (!chaser || !catcher) return null;
+    const odds = highBall(chaser.stats.speed, catcher.stats.skill, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling);
+    const u = this.rng.next();
+    if (u < odds.won) {
+      this.ball = { kind: 'held', by: this.indexOf(chaser) };
+      chaser.catchTick = this.tick;
+      chaser.decided = false;
+      chaser.steppedOn = -1;
+      this.lock(chaser, 'catch', 3);
+      this.emit('regather', `${chaser.name} beats ${catcher.name} to it — taps it back!`, chaser);
+      this.events[this.events.length - 1]!.detail = 'contest';
+      this.turnover();
+      return 'settled';
+    }
+    if (u < odds.won + odds.spill) {
+      this.spillKick(catcher, b.to, `${catcher.name} spills the bomb with ${chaser.name} on him!`);
+      return 'settled';
+    }
+    return catcher;
+  }
+
+  /**
+   * A kick spilled (#99): forward off his hands is a knock-on, the kicking
+   * side's ball whoever reaches it; back or sideways it is loose for anyone,
+   * a scramble when both sides are near it as it settles. A kick-off or a
+   * drop-out spilled is loose for anyone either way, as it was (#397).
+   */
+  private spillKick(r: Player, at: Vec, text: string): void {
+    this.lastTouch = r.side;
+    const way = { x: (this.rng.next() - 0.5) * 2, y: (this.rng.next() - 0.5) * 2 };
+    this.emit('drop', text, r);
+    if (way.x * this.dir > 0 && !this.kickoffUp) {
+      this.events[this.events.length - 1]!.detail = 'knock-on';
+      this.bounce(at, way, 2.5, 12, 2);
+      this.turnover();
+      this.looseFor = this.attacking; // a knock-on is theirs whoever reaches it
+      if (this.siren) this.endHalf(); // a knock-on kills the ball
+      return;
+    }
+    this.bounce(at, way, 2, 12, 2);
+  }
+
+  /** A loose ball both sides are near is a scramble (#99): LOOSE BALL! over the man nearest it, and the winner is named when he has it. */
+  private maybeScramble(at: Vec): void {
+    if (this.looseFor) return;
+    const nearest = (s: Side): Player | undefined =>
+      this.side(s)
+        .filter((p) => !this.locked(p) && this.onField(p))
+        .sort((p, q) => dist(p.body.pos, at) - dist(q.body.pos, at))[0];
+    const h = nearest('home');
+    const a = nearest('away');
+    if (!h || !a || dist(h.body.pos, at) > KICK_CONTEST.scramble.nearM || dist(a.body.pos, at) > KICK_CONTEST.scramble.nearM) return;
+    this.scramble = true;
+    this.emit('loose-ball', `Loose ball — ${h.name} and ${a.name} go for it`, dist(h.body.pos, at) <= dist(a.body.pos, at) ? h : a);
+  }
+
+  /**
+   * A grubber has come to rest in the in-goal (#99, BAK-208 §4.4): the attacker
+   * and the defender quickest to it race for it. Speed decides it (each man's
+   * time to the ball), the bounce adds a little luck (kickContest.ts), and only
+   * the winner's side can take it: the attacker grounding it is a try, the
+   * defender grounds it for a 20 m restart. With no attacker near, it is the
+   * defender's to gather. A grubber that runs dead never gets here.
+   */
+  private raceForGrubber(at: Vec): void {
+    const kicking = other(this.attacking);
+    this.ball = { kind: 'loose', pos: { ...at }, vel: { x: 0, y: 0 } };
+    this.looseFor = null;
+    const secs = (p: Player): number => dist(p.body.pos, at) / p.body.maxSpeed;
+    const first = (s: Side): Player | undefined =>
+      this.side(s)
+        .filter((p) => !this.locked(p) && this.onField(p))
+        .sort((p, q) => secs(p) - secs(q))[0];
+    const a = first(kicking);
+    const d = first(this.attacking);
+    if (!a || dist(a.body.pos, at) > KICK_CONTEST.grubber.raceM) {
+      // No race: the defence's to gather (grounded, or run out, as for any kick in-goal).
+      this.looseFor = this.attacking;
+      return;
+    }
+    const attackerWins = !d || this.rng.next() < grubberRace(secs(a), secs(d), this.tactics[kicking].attack === 'kick-chase');
+    this.raceFor = attackerWins ? kicking : this.attacking;
+    this.scramble = true;
+    this.emit('loose-ball', d ? `Loose in the in-goal — ${a.name} and ${d.name} race for it` : `Loose in the in-goal — ${a.name} is after it`, a);
+    this.events[this.events.length - 1]!.detail = 'in-goal';
   }
 
   /** Possession changes hands where the ball is; a fresh set for the other side. */
@@ -1907,7 +2046,8 @@ export class LiveSim implements MatchSim {
         return { ...base, to: crossFieldTarget(h.body.pos, this.dir, far.body.pos, this.rng.next()), receiver: this.indexOf(far), peak: 13 };
       }
       case 'bomb':
-        return { ...base, to: bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), receiver: this.indexOf(fb), peak: 20, ...trait };
+        // Big Boot puts it higher (#99): more hang, and the chase is under it.
+        return { ...base, to: bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait };
       default: {
         // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch; else to the fullback.
         const toLine = this.toLine(h);
@@ -2220,13 +2360,14 @@ export class LiveSim implements MatchSim {
   /**
    * A defender with the ball in his own in-goal off the other side's kick: with
    * an attacker close or deep in-goal he grounds it for a 20 m restart; else he
-   * runs it out. Returns true when he grounded it.
+   * runs it out. Having raced an attacker to a grubber (#99) he grounds it.
+   * Returns true when he grounded it.
    */
-  private groundInGoal(p: Player): boolean {
+  private groundInGoal(p: Player, raced = false): boolean {
     const dir = this.dirOf(p.side);
     if (!inOwnInGoal(p.body.pos, dir) || this.lastKicker < 0 || this.players[this.lastKicker]!.side === p.side) return false;
     const deep = Math.abs(p.body.pos.x - ownLineX(dir)) > TOUCH.groundDeepM;
-    const pressed = this.side(other(p.side)).some((a) => dist(a.body.pos, p.body.pos) < TOUCH.groundNearM);
+    const pressed = raced || this.side(other(p.side)).some((a) => dist(a.body.pos, p.body.pos) < TOUCH.groundNearM);
     if (!deep && !pressed) return false;
     if (this.siren) {
       this.emit('dead-ball', `${p.name} grounds it in-goal`, p);

@@ -18,8 +18,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * matches draw a different number of dice. The match engine is unchanged.
  * 3473711671 before the deeper default kick-off (#397), which changes every
  * match, so the season's matches draw a different number of dice again.
+ * 3821082668 before the kick contests (#99: the bomb contest, the grubber race
+ * in-goal), which change every match the same way.
  */
-const MAIN_SEED_AFTER_SEASON = 3821082668;
+const MAIN_SEED_AFTER_SEASON = 3040797444;
 
 describe('the rng stream (#369)', () => {
   it('a season leaves rngSeed where main left it, the projection and the dot looked at every week', () => {

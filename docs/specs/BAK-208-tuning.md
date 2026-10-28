@@ -1257,3 +1257,41 @@ more one-on-ones are stepped instead of being carried into a long kick. The
 bombs are the same bias. **Assumed (needs Leon):** that step, and leaving the
 other presets on the N13.1 tables.
 
+
+## 31. Kick contests (#99; BAK-208 §4.3–4.4)
+
+The contests a kick sets up (`src/match/league/kickContest.ts`, played by
+`live.ts`). One function, `chaserWins`, is the chaser's Speed against the
+catcher's Skill for both the bomb and the Short kick-off's regather (#397,
+`kickoff.short`, unchanged). Overridable by name (`kickContest.bomb.won.base`,
+`kickContest.grubber.bounceS`, …). Plan and results:
+`balance/plans/kick-contest.md` (runs `20261028-172235-kick-contest` on main,
+`20261028-180218-kick-contest` after). Tests: `tests/match/league/kickContest.test.ts`.
+
+| Knob | File | Value | Effect |
+|---|---|---|---|
+| `kickContest.bomb.contestM` | `kickContest.ts` | 3 m | A bomb is contested when a chaser and a catcher are both this close as it lands, whoever is nearer. With only one side under it, it is a catch (`live.dropChance` / `dropPressured`) or a regather as before. A chaser is under almost every bomb: 3, 4 and 5 m measured the same. |
+| `kickContest.bomb.won` | `kickContest.ts` | 11% + 0.2%/pt (chaser's Speed − catcher's Skill), 5–25% | Won back: the chaser taps it back, a fresh set (REGATHER! / TAPS IT BACK!). |
+| `kickContest.bomb.spill` | `kickContest.ts` | 16% + 0.2%/pt, 8–32%, × `weather.rainHandling` in rain | Of the rest, spilled. Forward off his hands it is a knock-on, the kicking side's ball; back or sideways a scramble. Kick-off and drop-out spills stay loose for anyone. |
+| `kickContest.bomb.peak` / `bootPeakM` / `perPeakM` | `kickContest.ts` | 20 m · +2 m a level of Big Boot · +0.5% won and spilled per metre over 20 | Height of a bomb (hang 4.0 s; 4.6 s with Big Boot III): the chase is under it longer. |
+| `kickContest.bomb.kickChase` | `kickContest.ts` | +3% | A Kick-chase side's chasers, won and spilled. |
+| `kickContest.grubber.raceM` | `kickContest.ts` | 14 m | A grubber at rest in the in-goal is raced for when the attacker quickest to it is this close; otherwise it is the defender's alone to gather (grounded or run out, as any kick in-goal). |
+| `kickContest.grubber.bounceS` | `kickContest.ts` | 0.45 s | Each man's time to the ball (distance ÷ top speed) decides the race; the bounce moves the gap by up to this either way, so a man 0.45 s quicker always wins and a dead heat is a coin toss. The attacker first is a regather and the try; the defender grounds it for a 20 m restart. 0.3 and 0.6 measured the same. |
+| `kickContest.grubber.kickChaseS` | `kickContest.ts` | 0.15 s | A Kick-chase side's edge in the race. |
+| `kickContest.scramble.nearM` | `kickContest.ts` | 6 m | A loose ball both sides have a man this close to is a scramble: LOOSE BALL!, the winner named, counted in the report (`scrambles` in the harness). No dice. |
+
+Before → after, even 60 v 60, 400 matches: bombs won back **4.0% → 8.2%**,
+spilled **10.9% → 11.6%** (contested one in seven → **one in five**); grubber
+tries 0.297 → 0.345 (within luck; inside #99's 0.2–0.4, over §12's 0.20–0.30
+guardrail); tries 5.50 → 5.73, points 28.4 → 29.7, completion 69.8% → 69.6%,
+penalties 1.52 → 1.47, kick metres 443 → 423 (beyond luck); 1.5 scrambles a
+match. Kick-chase v Balanced: contested 13.5% → 24.1%, grubber tries 0.35 →
+0.43, the Kick-chase side wins 50.5% → 48.0%. 70 v 50: 83% → 76% (200 matches).
+The golden even Balanced / Slide match (seed 1) moved on purpose, from
+`18-4:374:cbf9fa3d4aa0c5c7` to `10-26:350:34ab09d37c3de210`; Expansive from
+`14-10:369:df1ab5c448c16159` to `8-10:377:e051c574b7fe72b5`.
+
+**Assumed (needs Leon):** about one bomb in five contested between even sides
+(won back 6–10%, spilled 10–14%), grubber tries 0.2–0.4 a match, and a
+defender who wins the race grounds it for a 20 m restart (a goal-line
+drop-out is a follow-up).

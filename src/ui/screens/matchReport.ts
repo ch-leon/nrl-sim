@@ -119,6 +119,7 @@ export function buildMatchReport(
   }
   const count = (kind: MatchEvent['kind'], id: string): number => result.events.filter((e) => e.kind === kind && e.teamId === id).length;
   const pair = (label: string, h: number | string, a: number | string): ReportRow => ({ label, home: String(h), away: String(a) });
+  const scrambles = (id: string): number => result.events.filter((e) => e.detail === 'scramble' && e.teamId === id).length;
   const s = result.stats;
   const rows = [
     pair('Possession', `${s.possession[0]}%`, `${s.possession[1]}%`),
@@ -127,6 +128,8 @@ export function buildMatchReport(
     pair('Errors', s.errors[0], s.errors[1]),
     pair('Kicks', count('kick', home.id), count('kick', away.id)),
     pair('Big hits', count('big-hit', home.id), count('big-hit', away.id)),
+    // Scrambles won (#99): loose balls both sides went for, when there was one.
+    ...(scrambles(home.id) + scrambles(away.id) > 0 ? [pair('Scrambles won', scrambles(home.id), scrambles(away.id))] : []),
     // Coach calls (#73): made, and how many paid off, when either coach made one.
     ...(result.calls ? [pair('Calls paid off', `${result.calls.paid[0]}/${result.calls.made[0]}`, `${result.calls.paid[1]}/${result.calls.made[1]}`)] : []),
   ];
@@ -557,6 +560,8 @@ export const REPORT_CSS = `
 .nrl-rp-potm-label { font-family: var(--nrl-f-label); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-btn.nrl-rp-back { flex: 0 0 auto; width: 100%; height: 48px; font-size: 1.1875rem; }
 .nrl-rp-stats { min-height: 0; overflow-y: auto; }
+/* Eight rows (Scrambles won and Calls paid off, #99) fit unscrolled at 956×330. */
+@media (max-height: 340px) { .nrl-rp-stats .nrl-mo-statrow { height: 31px; } }
 @media (max-width: 720px) { .nrl-report { grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; } }
 @media (max-width: 560px) { .nrl-report { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; overflow-y: auto; } }
 `;
