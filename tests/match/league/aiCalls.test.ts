@@ -77,10 +77,11 @@ describe('the AI coach (N9.6)', () => {
 });
 
 describe('calls unlocked by the Coach’s Office (N9.6)', () => {
-  it('three calls with none built (Fresh legs, #367), more with each level, all ten at level 3', () => {
+  it('three calls with none built (Fresh legs, #367), more with each level, all of them at level 3', () => {
     expect(unlockedCalls(0)).toEqual(['hit-up', 'hold', 'fresh-legs']);
-    expect(unlockedCalls(1)).toEqual(['hit-up', 'hold', 'fresh-legs', 'shift-left', 'shift-right', 'rush']);
-    expect(unlockedCalls(2)).toHaveLength(8);
+    // #396 added Offload and Gang tackle at level 1, Grubber and the penalty pair at 2, 40/20 at 3.
+    expect(unlockedCalls(1)).toEqual(['hit-up', 'hold', 'fresh-legs', 'shift-left', 'shift-right', 'rush', 'offload', 'gang-tackle']);
+    expect(unlockedCalls(2)).toHaveLength(13);
     expect([...unlockedCalls(3)].sort()).toEqual([...COACH_CALLS].sort());
     expect(unlockedCalls(9)).toEqual(unlockedCalls(3));
     expect(unlockLevel('field-goal')).toBe(3);

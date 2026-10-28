@@ -30,7 +30,7 @@ import { bus } from '../../core/events';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
-import { CALL_LABEL, type CoachCall } from '../../match/league/calls';
+import { CALL_LABEL, callIsBench, callIsDefence, callIsPenalty, type CoachCall } from '../../match/league/calls';
 import { teamTags } from '../teamTag';
 import { MOMENTUM_STEP_MIN, momentumLabel, momentumLeader, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
 
@@ -387,6 +387,15 @@ const CALL_CAPTION: Readonly<Record<string, string>> = {
   'used this half': 'used this half',
   'no one’s tired yet': 'nobody tired',
   'bench is spent': 'bench spent',
+  // #396
+  'tackles 1–4': 'tackles 1–4',
+  'not inside their 25': 'in their 25',
+  'not behind your 40': 'behind your 40',
+  'no penalty': 'no penalty',
+  'one call a penalty': 'one a penalty',
+  'too far out': 'too far out',
+  'the captain’s call': 'captain’s call',
+  'the siren’s gone': 'siren’s gone',
 };
 
 /** Why a call is off, in a few words; "called" once made this set, nothing while it can be made. */
@@ -408,6 +417,12 @@ export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
   rush: 'defending: rush up for the next set',
   hold: 'defending: hold the line for the next set',
   'fresh-legs': 'once a half: tired man off, fresh man on',
+  offload: 'tackles 1–4: the next two carries look to offload',
+  'gang-tackle': 'defending: an extra man in the next two tackles',
+  grubber: 'tackle 4+, inside their 25: grubber the last for the line',
+  'forty-twenty': 'tackle 4+, behind your 40: kick the last for touch in their 20',
+  'take-two': 'a penalty won, in range: a shot at goal for two',
+  'tap-go': 'a penalty won, in range: tap it and run',
 };
 
 /** What a call does, in plain English, on its row in the coach tray (3o): CALL_WHEN less its "when". */
@@ -417,6 +432,26 @@ export function callEffect(call: CoachCall): string {
   return i < 0 ? w : w.slice(i + 2);
 }
 
+/** What a call does on its tile in the coach tray (#396): CALL_WHEN's effect, short enough for a tile two a line. */
+export const CALL_TILE: Readonly<Record<CoachCall, string>> = {
+  'hit-up': 'forwards take it in',
+  'shift-left': 'next play goes left',
+  'shift-right': 'next play goes right',
+  'kick-early': 'kick on the next tackle',
+  'run-it': 'run the last, no kick',
+  bomb: 'the last kick is a bomb',
+  'field-goal': 'drop for goal',
+  rush: 'rush up, next set',
+  hold: 'hold the line, next set',
+  'fresh-legs': 'tired man off, fresh on',
+  offload: 'look to offload, 2 carries',
+  'gang-tackle': 'extra man in, 2 tackles',
+  grubber: 'grubber it for the line',
+  'forty-twenty': 'kick for touch in their 20',
+  'take-two': 'a shot at goal for two',
+  'tap-go': 'tap it and run',
+};
+
 /** When a call that is not on yet comes on, from the sim's refusal (the coach tray's footer). */
 const UNLOCK_WHEN: Readonly<Record<string, string>> = {
   'tackles 3–4': 'from tackle 3',
@@ -425,6 +460,8 @@ const UNLOCK_WHEN: Readonly<Record<string, string>> = {
   'not now': 'once play restarts',
   'used this half': 'next half',
   'no one’s tired yet': 'once someone tires',
+  'not inside their 25': 'inside their 25',
+  'not behind your 40': 'behind your 40',
 };
 
 /**
@@ -455,6 +492,82 @@ export function callsUnlockLine(
   const next = levels[0];
   if (next) parts.push(`${next[1].join(', ')} at Coach's Office level ${next[0]}${levels.length > 1 ? ', more above' : ''}`);
   return parts.join(' · ');
+}
+
+/** A button in the coach tray (#396): a call, and the sim's refusal (null when it can be made now). */
+export interface TrayButton {
+  call: CoachCall;
+  why: string | null;
+}
+
+/** A row of the coach tray (#396): one call, or two side by side (`shift`: left and right; `penalty`: Take the two and Tap and go). */
+export interface TrayRow {
+  id: string;
+  buttons: readonly TrayButton[];
+}
+
+/** The most rows the tray shows (#396), and the most buttons: two rows of three or three of two, so it never scrolls. */
+export const TRAY_MAX_ROWS = 5;
+export const TRAY_MAX_BUTTONS = 6;
+
+/** Calls that share a row, side by side. */
+const TRAY_PAIRS: readonly (readonly [string, CoachCall, CoachCall])[] = [
+  ['shift', 'shift-left', 'shift-right'],
+  ['penalty', 'take-two', 'tap-go'],
+];
+
+/** A refusal that still shows a pair's other half, greyed: it says why that half is not on (#396). */
+const PAIR_SHOWS = new Set(['the captain’s call', 'the siren’s gone']);
+
+/**
+ * Which rows win when more are on than fit (#396): the penalty (it is gone in seconds),
+ * the last-tackle kicks, Fresh legs, Kick early, then the next play's calls. Defending,
+ * four rows at most are ever on.
+ */
+const TRAY_PRIORITY: readonly string[] = ['penalty', 'field-goal', 'grubber', 'forty-twenty', 'bomb', 'run-it', 'fresh-legs', 'kick-early', 'hit-up', 'shift', 'offload', 'rush', 'hold', 'gang-tackle'];
+
+/** The order the rows show in: the penalty, the next play, the set's kick, defence, the bench. */
+const TRAY_ORDER: readonly string[] = ['penalty', 'hit-up', 'shift', 'offload', 'kick-early', 'run-it', 'bomb', 'grubber', 'forty-twenty', 'field-goal', 'rush', 'hold', 'gang-tackle', 'fresh-legs'];
+
+/** Is the call one for this side now: attack calls with the ball, defence calls without it; the bench and a penalty won either way. */
+export function callForRole(call: CoachCall, attacking: boolean): boolean {
+  return callIsBench(call) || callIsPenalty(call) || callIsDefence(call) !== attacking;
+}
+
+/**
+ * The coach tray's rows now (#396): the unlocked calls that can be made (the sim's
+ * refusal is null) for the side's role, paired where two share a row, at most
+ * TRAY_MAX_ROWS rows and TRAY_MAX_BUTTONS buttons, by TRAY_PRIORITY, shown in
+ * TRAY_ORDER. A pair keeps its other half greyed when that half says something about
+ * this moment (the captain already chose it, the siren has gone). Pure: no dice.
+ */
+export function trayRows(calls: readonly TrayButton[], attacking: boolean): TrayRow[] {
+  const mine = calls.filter((c) => callForRole(c.call, attacking));
+  const paired = new Set<CoachCall>(TRAY_PAIRS.flatMap(([, a, b]) => [a, b]));
+  const rows: TrayRow[] = [];
+  for (const [id, a, b] of TRAY_PAIRS) {
+    const half = [a, b].map((call) => mine.find((c) => c.call === call)).filter((c): c is TrayButton => !!c);
+    if (!half.some((c) => c.why === null)) continue;
+    rows.push({ id, buttons: half.filter((c) => c.why === null || PAIR_SHOWS.has(c.why)) });
+  }
+  for (const c of mine) if (c.why === null && !paired.has(c.call)) rows.push({ id: c.call, buttons: [c] });
+  const rank = (r: TrayRow, order: readonly string[]): number => {
+    const i = order.indexOf(r.id);
+    return i < 0 ? order.length : i;
+  };
+  const shown: TrayRow[] = [];
+  let buttons = 0;
+  for (const r of [...rows].sort((p, q) => rank(p, TRAY_PRIORITY) - rank(q, TRAY_PRIORITY))) {
+    if (shown.length >= TRAY_MAX_ROWS || buttons + r.buttons.length > TRAY_MAX_BUTTONS) continue;
+    shown.push(r);
+    buttons += r.buttons.length;
+  }
+  return shown.sort((p, q) => rank(p, TRAY_ORDER) - rank(q, TRAY_ORDER));
+}
+
+/** The calls the tray's rows offer now (for the COACH badge's count). */
+export function trayCallsOn(rows: readonly TrayRow[]): number {
+  return rows.reduce((n, r) => n + r.buttons.filter((b) => b.why === null).length, 0);
 }
 
 /**
@@ -1438,29 +1551,41 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-coach-badge[data-state="made"] { color: var(--nrl-accent); }
 .nrl-mo-coach[aria-expanded="true"] { padding: 0 16px; background: var(--nrl-button); box-shadow: inset 0 0 0 2px var(--nrl-accent); }
 .nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { display: none; }
-/* The coach tray (3o): only the calls on now; the match keeps playing. */
+/* The coach tray (3o): only the calls on now; the match keeps playing. #396: at most five rows
+   (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls. */
 .nrl-mo-tray {
   position: fixed; left: calc(16px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 21;
   width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; box-sizing: border-box;
-  display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 14px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-tray);
+  display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 14px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-tray);
   pointer-events: auto; animation: nrl-mo-up 180ms ease-out;
 }
 .nrl-mo-tray[hidden] { display: none; }
 /* The tray and the full log side by side: the log gives way on a narrow phone (667px) rather than sit under the tray. */
 .nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 360px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
-.nrl-mo-tray-list { display: flex; flex-direction: column; gap: 6px; }
+.nrl-mo-tray-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row dense; gap: 6px; }
+/* A pair (#396: Shift ◀ ▶, Take the two / Tap and go) is one row: two tiles that stay together. */
+.nrl-mo-tray-pair { grid-column: span 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .nrl-mo-tray-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .nrl-mo-tray-title { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
 .nrl-mo-tray-note { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-btn.nrl-mo-tray-call {
-  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 44px; padding: 0 12px;
-  border-radius: 8px; text-transform: none; letter-spacing: 0; text-align: left;
+  min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; height: 44px; padding: 0 10px;
+  border-radius: 8px; text-transform: none; letter-spacing: 0; text-align: left; overflow: hidden;
 }
-.nrl-mo-tray-call b { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; }
-.nrl-mo-tray-call span { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; color: var(--nrl-text-2); }
-.nrl-mo-tray-none { padding: 6px 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
-.nrl-mo-tray-foot { font-size: 0.75rem; line-height: 1.35; color: var(--nrl-muted); }
+.nrl-mo-tray-call b { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; line-height: 1.1; }
+.nrl-mo-tray-call span {
+  max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.2; color: var(--nrl-text-2);
+}
+.nrl-mo-tray-none { grid-column: 1 / -1; padding: 6px 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
+.nrl-mo-tray-foot { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 0.75rem; line-height: 1.3; color: var(--nrl-muted); }
 .nrl-mo-tray-foot:empty { display: none; }
+/* A short wide phone (956×330): three tiles a line in a wider tray, so six fit in two. */
+@media (max-height: 360px) and (min-width: 760px) {
+  .nrl-mo-tray { width: min(540px, calc(100vw - 32px)); }
+  .nrl-mo-tray-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 540px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
+}
 /* The speed pill (MatchScene): pause, the speeds (the one playing a yellow circle), SKIP. */
 .nrl-mo-controls {
   pointer-events: auto; height: 56px; display: flex; align-items: center; gap: 2px; padding: 0 6px; box-sizing: border-box;
