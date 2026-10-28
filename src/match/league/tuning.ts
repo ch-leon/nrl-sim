@@ -22,6 +22,7 @@ import { RATING } from './spread';
 import { BREAKS } from './breaks';
 import { CALLS } from './calls';
 import { KICKOFF } from './kickoff';
+import { KICK_CONTEST } from './kickContest';
 import { WRESTLE } from './wrestle';
 import { BIN } from './sinbin';
 import { DIFFICULTIES, DIFFICULTY } from '../../config';
@@ -65,6 +66,7 @@ export const KNOBS = {
   rating: RATING,
   calls: CALLS,
   kickoff: KICKOFF,
+  kickContest: KICK_CONTEST,
   breaks: BREAKS,
   goals: GOALS,
   bin: BIN,

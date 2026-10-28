@@ -44,6 +44,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   kick: { word: 'KICK!', tone: 'neutral' },
   regather: { word: 'REGATHER!', tone: 'attack', big: true },
   drop: { word: 'DROPPED!', tone: 'bad' },
+  // Kick contests (#99): a loose ball both sides are near, over the man nearest it.
+  'loose-ball': { word: 'LOOSE BALL!', tone: 'neutral' },
   try: { word: 'TRY!', tone: 'attack', big: true },
   // Legs and the wrestle (§8): a quick play-the-ball off a short wrestle, a player whose legs are gone (COOKED!, not to be confused with running out of gas).
   'quick-ptb': { word: 'QUICK PTB!', tone: 'attack' },
@@ -125,6 +127,10 @@ export function popupFor(e: SimEvent): Popup | null {
               ? `${CALL_LABEL[e.detail].toUpperCase()}!`
               : e.kind === 'error' && e.detail === 'contact'
               ? 'SPILLED!'
+              : e.kind === 'regather' && e.detail === 'contest'
+              ? 'TAPS IT BACK!'
+              : e.kind === 'drop' && e.detail === 'knock-on'
+              ? 'KNOCK-ON!'
               : e.kind === 'penalty-choice'
               ? (CALL_WORDS[e.detail ?? 'tap'] ?? w.word)
               : w.word;

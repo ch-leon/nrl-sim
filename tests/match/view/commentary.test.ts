@@ -41,6 +41,8 @@ const SAMPLES: SimEvent[] = [
   ev('kickoff'), ev('drop-out'),
   ...['long', 'bomb', 'grubber', 'chip', 'cross-field'].map((d) => ev('kick', { detail: d })),
   ev('set-start'), ev('regather'), ev('drop'), ev('40-20'), ev('on-full'),
+  // Kick contests (#99).
+  ev('regather', { detail: 'contest' }), ev('drop', { detail: 'knock-on' }), ev('loose-ball'), ev('loose-ball', { detail: 'in-goal' }), ev('set-start', { detail: 'scramble' }), ev('regather', { detail: 'scramble' }),
   ev('touch', { detail: 'kick' }), ev('touch', { detail: 'penalty' }), ev('touch', { detail: 'bundled' }),
   nobody('touch', { detail: 'loose' }), nobody('touch'),
   nobody('dead-ball', { detail: '20m' }), ev('dead-ball', { detail: '20m' }), ev('dead-ball'),

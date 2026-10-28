@@ -72,6 +72,8 @@ export function toMatchEvent(e: SimEvent, snap: Snapshot, ids: Record<Side, stri
   if (e.kind === '40-20') ev.detail = '40-20';
   // Kicks at goal carry their result; the overlay scores only the good ones.
   if (e.kind === 'conversion' || e.kind === 'field-goal' || e.kind === 'penalty-goal') ev.detail = e.detail === 'good' ? 'good' : 'missed';
+  // A scramble won (#99): the match report counts them.
+  if ((e.kind === 'set-start' || e.kind === 'regather') && e.detail === 'scramble') ev.detail = 'scramble';
   // A try in the bonus zone (Nines) is worth five; the overlay reads the mark.
   if (e.kind === 'try' && e.detail === 'bonus') ev.detail = 'bonus';
   // Won in golden point (N9.4): the full-time whistle says so.

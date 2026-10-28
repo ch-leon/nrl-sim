@@ -119,6 +119,7 @@ export function buildMatchReport(
   }
   const count = (kind: MatchEvent['kind'], id: string): number => result.events.filter((e) => e.kind === kind && e.teamId === id).length;
   const pair = (label: string, h: number | string, a: number | string): ReportRow => ({ label, home: String(h), away: String(a) });
+  const scrambles = (id: string): number => result.events.filter((e) => e.detail === 'scramble' && e.teamId === id).length;
   const s = result.stats;
   const rows = [
     pair('Possession', `${s.possession[0]}%`, `${s.possession[1]}%`),
@@ -127,6 +128,8 @@ export function buildMatchReport(
     pair('Errors', s.errors[0], s.errors[1]),
     pair('Kicks', count('kick', home.id), count('kick', away.id)),
     pair('Big hits', count('big-hit', home.id), count('big-hit', away.id)),
+    // Scrambles won (#99): loose balls both sides went for, when there was one.
+    ...(scrambles(home.id) + scrambles(away.id) > 0 ? [pair('Scrambles won', scrambles(home.id), scrambles(away.id))] : []),
     // Coach calls (#73): made, and how many paid off, when either coach made one.
     ...(result.calls ? [pair('Calls paid off', `${result.calls.paid[0]}/${result.calls.made[0]}`, `${result.calls.paid[1]}/${result.calls.made[1]}`)] : []),
   ];

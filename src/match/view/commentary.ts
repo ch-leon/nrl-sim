@@ -56,6 +56,13 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'set-start:gathered': ['{player} scoops up the loose ball.', '{player} pounces on it.', '{player} picks it up off the ground.'],
   regather: ['{player} regathers the kick!', 'Regathered! {player} wins it back.', '{player} wins the race to it!'],
   drop: ['{player} spills the kick under pressure!', "Dropped! {player} can't hold the kick.", '{player} puts the high ball down.'],
+  // Kick contests (#99): a bomb won in the air, a spill that goes forward, a scramble and who wins it.
+  'regather:contest': ['{player} taps it back from the high ball!', 'Taps it back! {player} beats the catcher.', '{player} gets up highest and taps it back.'],
+  'drop:knock-on': ['{player} knocks on under the high ball.', "Knock-on! {player} can't hold the bomb.", '{player} spills it forward — knock-on.'],
+  'loose-ball': ["Loose ball! It's a scramble.", 'Loose ball — both sides go for it.', "It's loose! Who wants it?"],
+  'loose-ball:in-goal': ["Loose in the in-goal — it's a race!", 'A race for it in the in-goal!', 'Both sides chase it into the in-goal.'],
+  'set-start:scramble': ['{player} wins the scramble.', '{player} comes up with the loose ball!', '{player} gets to it first.'],
+  'regather:scramble': ['{player} wins the race to it in-goal!', '{player} gets there first in-goal!', '{player} beats them to it over the line!'],
   '40-20': ['40/20! {player} finds touch.', 'A 40/20 from {player}!', '40/20 — {team} get the ball back.'],
   'on-full': ['Out on the full — {other} ball.', '{player} kicks it out on the full.', 'On the full! {other} get the ball back.'],
   'touch:kick': ['It finds touch — {other} ball.', '{player} finds touch.', 'Out it goes off the boot of {player}.'],
@@ -182,7 +189,12 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
     case 'kick':
       return `kick:${d && LINES[`kick:${d}`] ? d : 'long'}`;
     case 'set-start':
+      if (d === 'scramble') return 'set-start:scramble';
       return kickInAir ? 'set-start:caught' : 'set-start:gathered';
+    case 'regather':
+    case 'drop':
+    case 'loose-ball':
+      return d && LINES[`${e.kind}:${d}`] ? `${e.kind}:${d}` : e.kind;
     case 'touch':
       return d === 'kick' || d === 'penalty' || d === 'bundled' ? `touch:${d}` : 'touch';
     case 'dead-ball':

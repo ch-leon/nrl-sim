@@ -4,6 +4,7 @@
 // how high it goes and the odds. Not in tuning.ts while #391 edits it.
 import { IN_GOAL } from '../core/field';
 import { clamp, type Vec } from '../core/vec';
+import { chaserWins } from './kickContest';
 import { kickoffTarget } from './tactics';
 
 /** The kick-off knobs (tuning reference, kick-off rows). */
@@ -68,10 +69,9 @@ export function kickoffLanding(call: KickoffCall | null, receivingDir: 1 | -1, j
   return { to: kickoffTarget(receivingDir, jitter01, line), peak: kickoffPeak(call, deep) };
 }
 
-/** A short kick-off's chance of being regathered: the best chaser's Speed against the catcher's Skill. */
+/** A short kick-off's chance of being regathered: the best chaser's Speed against the catcher's Skill (the bomb's contest, kickContest.ts, #99). */
 export function regatherChance(chaserSpeed: number, catcherSkill: number): number {
-  const s = KICKOFF.short;
-  return clamp(s.base + (chaserSpeed - catcherSkill) * s.perPoint, s.min, s.max);
+  return chaserWins(KICKOFF.short, chaserSpeed, catcherSkill);
 }
 
 /** A Long kick-off pinned them: it came down `lineM` metres from their own try line, inside `pinnedM`. */
