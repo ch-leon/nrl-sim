@@ -854,6 +854,12 @@ function ensureAudioStyles(): void {
   .nrl-settings-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; gap: 6px 12px; }
   .nrl-settings-col { display: contents; }
   .nrl-settings-import { grid-row: span 2; align-self: start; }
+  /* Each column one group, read down (#359's note: Rival matches headed the middle one): sound and
+     text size · the match switches · the key moments, weekly summary and install · the save tools. */
+  .nrl-settings-col:first-child > :nth-child(-n+2), .nrl-settings-col:last-child > :first-child { grid-column: 1; }
+  .nrl-settings-col:first-child > :nth-child(n+3) { grid-column: 2; }
+  .nrl-settings-col:last-child > :nth-child(n+4) { grid-column: 3; }
+  .nrl-settings-col:last-child > :nth-child(2), .nrl-settings-col:last-child > :nth-child(3) { grid-column: 4; }
   /* A quarter of the width: the three sizes take the row (the group keeps its "Text size" label for a
      screen reader), and the two buttons close up so REPLAY TUTORIAL fits. */
   .nrl-settings-textsize { padding: 0; background: none; }

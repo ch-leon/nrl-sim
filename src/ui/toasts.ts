@@ -3,7 +3,9 @@
 // dismisses it, and it sits where no control is:
 //   - at the club, just above the dock, centred (the decisions chip has the
 //     top-left corner and a sheet's header row its top edge); at the top while
-//     Office's tiles take that place;
+//     Office's tiles take that place. The open sheet's list under it keeps room
+//     at its foot while it shows, so the last row scrolls clear of it, and a
+//     long info toast (the install hint) sits left of PLAY WEEK (Wave 3);
 //   - in a match, in the row under the score bug, short of the full log, and
 //     not while the Replay try chip, a key-moment banner or the stats are in that row;
 //   - with no dock (the title, the lab), centred at the top.
@@ -20,7 +22,7 @@
 // match's own toasts show. A club toast waits, and they all show once the club
 // is back; the news inbox has every one either way.
 import { bus, type Events } from '../core/events';
-import { button, el, ensureStyles } from './dom';
+import { NAV_INSET_VAR, button, el, ensureStyles } from './dom';
 
 type Notice = Events['ui:notify'];
 
@@ -55,6 +57,104 @@ export function dismissOnBodyTap(n: Notice): boolean {
 /** The narrowest lane `n` can sit in. */
 export function laneMinPx(n: Notice | undefined): number {
   return n && isActionToast(n) ? ACTION_LANE_PX : MIN_LANE_PX;
+}
+
+/** The dock lane's gap above the dock (its --nrl-nav-h already holds the 12px under the dock). */
+export const DOCK_GAP_PX = 20;
+/** Clear space between a list's last row, scrolled to the end, and the toast over it. */
+export const RESERVE_GAP_PX = 8;
+/** The narrowed lane's inset from the dock's left edge, and its gap to PLAY WEEK. */
+const EDGE_PX = 12;
+/** The centred lane's widest (30rem at Normal text, the CSS's min(30rem, …)). */
+const LANE_MAX_PX = 480;
+
+/** A long-lived info toast (the install hint): it names a time past the longest a toast stays. */
+export function isLongInfo(n: Notice): boolean {
+  return n.kind === 'info' && !isActionToast(n) && (n.ms ?? 0) > TOAST_MAX_MS;
+}
+
+/** What the dock lane is placed against: the viewport, the dock, and the toast in view. */
+export interface DockLaneIn {
+  vh: number;
+  /** The dock's height with the 12px under it (--nrl-nav-h). */
+  navH: number;
+  /** PLAY WEEK's left edge, or null with no play button. */
+  playLeft: number | null;
+  /** The dock's left edge (12px in from the left safe-area inset). */
+  dockLeft: number;
+  /** The toast in view's height. */
+  toastH: number;
+}
+
+/** Where the dock lane sits: its bottom edge, the toast's top, and for a long info toast its left and width. */
+export interface DockLane {
+  /** The lane's bottom edge, up from the viewport's bottom. */
+  bottom: number;
+  /** The toast's top edge (y): a list under it reserves room down to here. */
+  top: number;
+  /** A long info toast sits left of PLAY WEEK, not centred: its left and width (null: centred, as the CSS has it). */
+  left: number | null;
+  width: number | null;
+}
+
+/**
+ * The dock lane at the club (#339, Wave 3): just above the dock, centred; a long
+ * info toast (the install hint, up eight seconds) narrowed to the left of PLAY WEEK,
+ * so it is never over the ▾ menu's column. Too little room there and it stays centred.
+ */
+export function dockLane(n: Notice | undefined, g: DockLaneIn): DockLane {
+  const bottom = g.navH + DOCK_GAP_PX;
+  const top = g.vh - bottom - g.toastH;
+  if (!n || !isLongInfo(n) || g.playLeft === null) return { bottom, top, left: null, width: null };
+  const left = g.dockLeft + EDGE_PX;
+  const width = Math.min(LANE_MAX_PX, Math.floor(g.playLeft - EDGE_PX - left));
+  return width >= MIN_LANE_PX ? { bottom, top, left, width } : { bottom, top, left: null, width: null };
+}
+
+/**
+ * The room a scrolling list keeps at its foot while a toast is over it: from the
+ * toast's top to the list's bottom, plus a gap, so its last row scrolls clear of
+ * the toast. Nothing when the toast is below the list.
+ */
+export function listReserve(listBottom: number, toastTop: number): number {
+  const overlap = Math.ceil(listBottom - toastTop);
+  return overlap > 0 ? overlap + RESERVE_GAP_PX : 0;
+}
+
+/** Class and property a list holding a reserve wears (dom.ts's `.nrl-toast-reserve::after` is the room). */
+export const RESERVE_CLASS = 'nrl-toast-reserve';
+export const RESERVE_VAR = '--nrl-toast-pad';
+
+/** What holdReserve touches on a scrolling list (a stand-in in the tests). */
+export interface ReserveList {
+  classList: Pick<DOMTokenList, 'add' | 'remove'>;
+  style: Pick<CSSStyleDeclaration, 'setProperty' | 'removeProperty' | 'getPropertyValue'>;
+}
+
+/**
+ * Give each list in `next` its reserve, and take it off every list in `held` that
+ * is not in `next` (the toast went, moved off it, or the sheet changed). Returns
+ * the lists holding one now. Writes only what changed.
+ */
+export function holdReserve<T extends ReserveList>(held: ReadonlySet<T>, next: ReadonlyMap<T, number>): Set<T> {
+  for (const list of held) {
+    if (next.has(list)) continue;
+    list.classList.remove(RESERVE_CLASS);
+    list.style.removeProperty(RESERVE_VAR);
+  }
+  const now = new Set<T>();
+  for (const [list, px] of next) {
+    if (px <= 0) {
+      list.classList.remove(RESERVE_CLASS);
+      list.style.removeProperty(RESERVE_VAR);
+      continue;
+    }
+    const v = `${px}px`;
+    if (list.style.getPropertyValue(RESERVE_VAR) !== v) list.style.setProperty(RESERVE_VAR, v);
+    list.classList.add(RESERVE_CLASS);
+    now.add(list);
+  }
+  return now;
 }
 
 /** A toast that waits for the club: anything not about the match while a match is on screen. */
@@ -99,8 +199,35 @@ export function initToasts(root: HTMLElement): void {
     if (lane.dataset.lane !== mode) lane.dataset.lane = mode;
     if (lane.style.cssText !== css) lane.style.cssText = css;
   };
+  // Lists holding room at their foot for the toast over them (Wave 3).
+  let reserved = new Set<HTMLElement>();
+  const release = (): void => {
+    if (reserved.size) reserved = holdReserve(reserved, new Map());
+  };
+  /** The innermost scrolling list under (x, y), not the toast itself. */
+  const listAt = (x: number, y: number): HTMLElement | null => {
+    for (const e of document.elementsFromPoint(x, y)) {
+      if (lane.contains(e) || !(e instanceof HTMLElement)) continue;
+      if (/(auto|scroll)/.test(getComputedStyle(e).overflowY)) return e;
+    }
+    return null;
+  };
+  /** Each list the toast in view lies over keeps room for it, so its last row scrolls clear. */
+  const reserve = (toastTop: number): void => {
+    const r = shown?.getBoundingClientRect();
+    const next = new Map<HTMLElement, number>();
+    if (r && r.width > 0) {
+      // Its left end, middle and right end: a two-column sheet has a list under each.
+      for (const x of [r.left + 8, (r.left + r.right) / 2, r.right - 8]) {
+        const list = listAt(x, r.top + 2);
+        if (list && !next.has(list)) next.set(list, listReserve(list.getBoundingClientRect().bottom, toastTop));
+      }
+    }
+    reserved = holdReserve(reserved, next);
+  };
   const place = (): void => {
     if (matchOn()) {
+      release();
       // From the left inset (CSS) up to the full log on the right, while it is open.
       setLane('match', '');
       const log = document.querySelector('.nrl-mo-full')?.getBoundingClientRect();
@@ -115,12 +242,29 @@ export function initToasts(root: HTMLElement): void {
       const rightRoom = Math.floor(window.innerWidth - dialog.right - 24);
       if (Math.max(leftRoom, rightRoom) >= MIN_LANE_PX) {
         setLane('beside', leftRoom >= rightRoom ? `width: ${leftRoom}px;` : `left: ${Math.ceil(dialog.right + 12)}px; width: ${rightRoom}px;`);
+        release();
         return;
       }
     }
     // Office's tiles sit where the dock lane is: while the sheet is up the toast goes to the top.
     const office = document.querySelector('.nrl-nav-sheet:not([hidden])');
-    setLane(document.querySelector('.nrl-dock') && !office ? 'dock' : 'top', '');
+    const dock = document.querySelector('.nrl-dock')?.getBoundingClientRect();
+    if (!dock || office) {
+      setLane('top', '');
+      release();
+      return;
+    }
+    // Just above the dock; a long info toast left of PLAY WEEK. A list under it keeps room for it.
+    const play = document.querySelector('.nrl-dock-play-group')?.getBoundingClientRect();
+    const g = dockLane(shown ? notices.get(shown) : undefined, {
+      vh: window.innerHeight,
+      navH: parseFloat(document.documentElement.style.getPropertyValue(NAV_INSET_VAR)) || 0,
+      playLeft: play && play.width > 0 ? play.left : null,
+      dockLeft: dock.left,
+      toastH: shown?.getBoundingClientRect().height ?? 0,
+    });
+    setLane('dock', g.left === null ? '' : `left: ${g.left}px; width: ${g.width}px; transform: none; justify-content: flex-start;`);
+    reserve(g.top);
   };
   /** The toast in view, under nothing: its middle takes a tap. */
   const seen = (t: Element): boolean => {
@@ -150,6 +294,7 @@ export function initToasts(root: HTMLElement): void {
     }
     lane.hidden = !first || rowTaken();
     if (!lane.hidden) place();
+    else release();
     if (first && !timer) {
       last = performance.now();
       timer = setInterval(tick, TICK_MS);

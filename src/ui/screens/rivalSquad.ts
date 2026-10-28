@@ -85,6 +85,11 @@ const RIVAL_CSS = `
 .nrl-rival-table td.nrl-rival-traits { white-space: normal; line-height: 1.25; font-size: 0.75rem; color: var(--nrl-text-2); min-width: 8rem; }
 /* 956×330: the club's lines tighter so five rows show. */
 @media (max-height: 340px) { .nrl-rival-head h2 { font-size: 1.1875rem; } .nrl-rival-head p { font-size: 0.75rem; } }
+/* …and four whole rows (Wave 3): a slimmer frame round the sheet and its header row; the rows keep 44. */
+@media (max-height: 340px) {
+  .nrl-dialog-region .nrl-modal.nrl-rival-modal { padding: 4px 12px; }
+  .nrl-rival-head { margin-bottom: 4px; }
+}
 `;
 
 /** Open the squad sheet for `club` (over the League screen). */
