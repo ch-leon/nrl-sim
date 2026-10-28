@@ -48,7 +48,7 @@ import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { RING_STYLES, resolveKits, type RingStyle } from '../art/match/kitClash';
 import { drawRing } from '../match/view/rings';
-import { teamLetters, teamTags } from '../ui/teamTag';
+import { teamLetters, teamLettersOn, teamTags } from '../ui/teamTag';
 import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForPlayer, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
   CROSSBAR_Z,
@@ -614,8 +614,8 @@ export class MatchScene extends Phaser.Scene {
 
   private updateReadability(delta: number): void {
     const cam = this.cameras.main;
-    // Team letters follow the Settings switch, the pause sheet's included.
-    const lettersOn = getState().settings.teamLetters === true;
+    // Team letters follow the Settings switch, the pause sheet's included; off in the lab, which has no save.
+    const lettersOn = teamLettersOn(() => getState().settings);
     if (this.built && lettersOn !== this.letters.length > 0) this.setLetters(lettersOn);
     for (const { actor, text } of this.letters) {
       // The name tag takes the letter's place over its man while it shows.

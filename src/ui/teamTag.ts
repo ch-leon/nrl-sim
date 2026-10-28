@@ -48,6 +48,19 @@ export function teamLetters(tags: readonly [string, string]): [string, string] {
   return h === a ? ['H', 'A'] : [h, a];
 }
 
+/**
+ * Whether Team letters are on (#371): off when absent, and off with no save at all
+ * (the match lab plays without one, so `read` throws there), the way the match's
+ * key moments and remembered speed read their settings.
+ */
+export function teamLettersOn(read: () => { teamLetters?: boolean }): boolean {
+  try {
+    return read().teamLetters === true;
+  } catch {
+    return false;
+  }
+}
+
 /** A name's words, punctuation dropped. */
 function nameWords(name: string): string[] {
   return name.trim().split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter(Boolean);
