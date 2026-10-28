@@ -18,6 +18,9 @@ import {
   HINTS,
   TAP_COUNT,
   TUTORIAL_END_TEXT,
+  overlapArea,
+  pickDock,
+  type Box,
   type TutorialStep,
 } from '../../src/ui/tutorial';
 import type { Events } from '../../src/core/events';
@@ -245,5 +248,44 @@ describe('nextStepIndex (#370)', () => {
   it('never skips into another tap, and the advance ends the run', () => {
     expect(STEPS[nextStepIndex(at('recruit'), 'player:signed')]!.id).toBe('advance');
     expect(nextStepIndex(at('advance'), 'week:advanced')).toBe(STEPS.length);
+  });
+});
+
+describe('pickDock: clear of the anchor and the Undo toast (#337 U2, #412)', () => {
+  const box = (left: number, top: number, right: number, bottom: number): Box => ({ left, top, right, bottom });
+  // 667×375: the bar along the dock (bottom), the bar at the top, and the top-right and right corners.
+  const bar = [box(12, 251, 652, 307), box(12, 4, 652, 60), box(300, 4, 655, 60), box(300, 251, 655, 307)];
+  const row = box(20, 90, 640, 134); // the first free agent's row, under the header
+  const undo = box(195, 235, 472, 295); // the build's Undo toast, just above the dock (TOAST_PAD round it)
+
+  it('measures overlap in px², and none for boxes that only touch', () => {
+    expect(overlapArea(box(0, 0, 10, 10), box(5, 5, 20, 20))).toBe(25);
+    expect(overlapArea(box(0, 0, 10, 10), box(10, 0, 20, 10))).toBe(0);
+  });
+
+  it('takes the first dock clear of the anchor when no toast is up', () => {
+    expect(pickDock(bar, row, null)).toBe(0);
+    expect(pickDock(bar, box(20, 250, 640, 300), null)).toBe(1);
+  });
+
+  it('skips a dock over the Undo toast though it is clear of the anchor (#412, step 2 after Build here)', () => {
+    expect(pickDock(bar, row, undo)).toBe(1);
+  });
+
+  it('keeps clear of the toast before the anchor: the toast wins while its Undo counts down', () => {
+    // The anchor at the top and the toast at the bottom: only the top docks are clear of the toast.
+    const top = box(20, 10, 640, 50);
+    expect(pickDock(bar, top, undo)).toBe(2);
+    expect(overlapArea(bar[2]!, top)).toBeGreaterThan(0);
+  });
+
+  it('stands the bubble aside (-1) when every dock covers the toast', () => {
+    expect(pickDock(bar, row, box(0, 0, 667, 375))).toBe(-1);
+  });
+
+  it('with every dock over the anchor and no toast, takes the one that covers least', () => {
+    // The full-width bars cover 640px of it, the right-hand ones 355px: the right one dips in least (29px).
+    const big = box(0, 30, 667, 280);
+    expect(pickDock(bar, big, null)).toBe(3);
   });
 });

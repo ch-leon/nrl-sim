@@ -75,7 +75,13 @@ describe('playerPageModel', () => {
     // A full-length contract cannot be renewed; a broke club cannot pay the fee.
     const fresh = { ...p, contractWeeks: CONTRACTS.NEW_CONTRACT_WEEKS };
     expect(playerActions(fresh, { kind: 'squad' }, s)[0]).toMatchObject({ enabled: false, why: 'Contract already full length' });
-    expect(playerActions(p, { kind: 'squad' }, { ...s, money: 0 })[0]).toMatchObject({ enabled: false, why: 'Not enough money for the fee' });
+    expect(playerActions(p, { kind: 'squad' }, { ...s, money: 0 })[0]).toMatchObject({
+      enabled: false, why: `Not enough money for the $${renewalFee(s, p).toLocaleString('en-US')} fee`,
+    });
+    // #420: a disabled Renew shows no price, just "Renew"; the price stays on an enabled one.
+    expect(playerActions(fresh, { kind: 'squad' }, s)[0]!.label).toBe('Renew');
+    expect(playerActions(p, { kind: 'squad' }, { ...s, money: 0 })[0]!.label).toBe('Renew');
+    expect(renew!.label).toMatch(/^Renew · \$/);
     // At the minimum squad nobody can leave.
     const thin = { ...s, squad: s.squad.slice(0, SQUAD_MIN) };
     const acts = playerActions(thin.squad[0]!, { kind: 'squad' }, thin);

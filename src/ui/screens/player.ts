@@ -186,10 +186,11 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
   return [
     {
       id: 'renew',
-      label: `Renew · ${fmtMoney(fee)}`,
+      // #420: a Renew that can't be had shows no price; the line above it says why (with the fee when it is the money).
+      label: fresh || broke ? 'Renew' : `Renew · ${fmtMoney(fee)}`,
       detail: `${fmtMoney(renewalWeeklyCost(state, p))}/wk for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks`,
       enabled: !fresh && !broke,
-      ...(fresh ? { why: 'Contract already full length' } : broke ? { why: 'Not enough money for the fee' } : {}),
+      ...(fresh ? { why: 'Contract already full length' } : broke ? { why: `Not enough money for the ${fmtMoney(fee)} fee` } : {}),
     },
     {
       id: 'sell',
@@ -362,10 +363,13 @@ export const PLAYER_CSS = `
   font-size: 0.8125rem;
 }
 .nrl-player.nrl-player-rival { grid-template-columns: 230px minmax(0, 1fr); }
-.nrl-player-card, .nrl-player-side { min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+/* #415: each column scrolls on its own when its words outgrow it (a larger text size, a short phone):
+   ◂ back holds still at the top of the card, the deals at the foot of the side. */
+.nrl-player-card, .nrl-player-side { min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overscroll-behavior: contain; }
+.nrl-player-card > *, .nrl-player-side > * { flex-shrink: 0; }
 .nrl-player-card .nrl-back { align-self: flex-start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 /* ◂ back and Rename (#398) share the card's top row; back gives way when the club's name is long. */
-.nrl-player-headrow { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.nrl-player-headrow { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; position: sticky; top: 0; z-index: 1; background: var(--nrl-navy); }
 .nrl-player-headrow .nrl-back { flex: 0 1 auto; min-width: 0; }
 .nrl-player-top { display: flex; align-items: center; gap: 10px; }
 .nrl-player-portrait {
@@ -393,7 +397,7 @@ export const PLAYER_CSS = `
 .nrl-player-about { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-right: 4px; }
 .nrl-player h3 { flex: 0 0 auto; margin: 10px 0 4px; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-player h3:first-child { margin-top: 0; }
-.nrl-player-outlook { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 10px; border-radius: 8px; background: var(--nrl-panel); }
+.nrl-player-outlook { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 10px; border-radius: 8px; background: var(--nrl-panel); }
 .nrl-player-curve { flex: 0 0 auto; width: 132px; height: 38px; }
 .nrl-player-outlook-text { flex: 1 1 9em; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 0.75rem; line-height: 1.35; color: var(--nrl-text-2); }
 .nrl-player-outlook-text b { color: var(--nrl-text); }
@@ -414,9 +418,8 @@ export const PLAYER_CSS = `
 .nrl-btn.nrl-player-role { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; font-size: 1rem; }
 .nrl-player-role-state { color: var(--nrl-muted); }
 .nrl-player-role[aria-pressed="true"] .nrl-player-role-state { color: var(--nrl-accent); }
-/* What each deal costs, and why one is shut (in yellow): just above the buttons. */
-.nrl-player-why { flex: 0 1 auto; min-height: 0; overflow: hidden; margin-top: auto; font-size: 0.6875rem; line-height: 1.35; color: var(--nrl-muted); }
-.nrl-player-why > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* What each deal costs, and why one is shut (in yellow): just above the buttons. Whole lines, wrapped (#415). */
+.nrl-player-why { flex: 0 0 auto; margin-top: auto; display: flex; flex-direction: column; gap: 2px; font-size: 0.6875rem; line-height: 1.35; color: var(--nrl-muted); }
 /* #203: the actions are pinned to the foot of the column, on screen without scrolling. */
 .nrl-player-actions {
   flex: 0 0 auto;
@@ -426,7 +429,7 @@ export const PLAYER_CSS = `
   gap: 6px;
   position: sticky;
   bottom: 0;
-  background: var(--nrl-sheet);
+  background: var(--nrl-navy);
   z-index: 1;
 }
 .nrl-player-why + .nrl-player-actions { margin-top: 0; }

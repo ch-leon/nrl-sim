@@ -64,10 +64,14 @@ function ensureLineupStyles(): void {
 }
 
 const LINEUP_CSS = `
-/* Two columns (3e): the bench strip and the pitch, and the list beside them. */
+/* Two columns (3e): the bench strip and the pitch, and the list beside them. Where the sheet is
+   shorter than the bench and the pitch at their least (568×320 at a larger text size, or with the
+   first-visit hint up) the two scroll together inside the sheet rather than lose the fullback (#422). */
 .nrl-lineup-body {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(200px, 34%, 270px);
   gap: 12px;
@@ -130,6 +134,9 @@ const LINEUP_CSS = `
   line-height: 1.15;
   text-align: left;
 }
+/* #422: a tile drawn lower than a finger (40px on the pitch, 36 on the bench on a short phone) is tapped over a
+   44px band: its hit area reaches into the gaps round it, never as far as the next tile's. */
+.nrl-lineup-tile::after { content: ''; position: absolute; left: 0; right: 0; top: min(0px, calc(50% - 22px)); bottom: min(0px, calc(50% - 22px)); }
 .nrl-lineup-tile:hover { background: #22305c; }
 .nrl-lineup-tile:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
 .nrl-lineup-tile[data-selected] { box-shadow: 0 0 0 2px var(--nrl-accent); z-index: 2; }
@@ -223,6 +230,7 @@ const LINEUP_CSS = `
 }
 /* Short sheets (956×330, 667×375): the bench strip and tiles a touch lower so three lines fit. */
 @media (max-height: 380px) {
+  .nrl-lineup-bench { padding: 4px 3px; } /* room for the 36px seats' 44px hit areas (#422) */
   .nrl-lineup-bench .nrl-lineup-tile { height: 36px; }
   .nrl-lineup-tile { height: 40px; }
   .nrl-lineup-field { min-height: ${3 * 40 + 2 * GAP + 8}px; }
