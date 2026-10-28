@@ -241,7 +241,7 @@ export function tickContracts(state: GameState): GameState {
     } else if (takeBoardLoan(newWage * 4)) {
       keep.push({ ...p, wage: newWage, contractWeeks: 52 });
       bus.emit('ui:notify', {
-        text: `${p.name} re-signed on a board loan of $${(newWage * 4).toLocaleString()}, repaid at the season's end.`,
+        text: `${p.name} re-signed on a board loan of ${moneyText(newWage * 4)}, repaid at the season's end.`,
         kind: 'info',
       });
     } else {
@@ -256,6 +256,17 @@ export function tickContracts(state: GameState): GameState {
   const s = getState();
   setState({ squad: keep, freeAgents: [...s.freeAgents, ...departed] });
   return getState();
+}
+
+/**
+ * Money in a toast the way the dock shows it (hud.ts fmtMoney): `$8,946`, and
+ * `-$8,946` below zero, the sign before the dollar and en-US grouping whatever
+ * the device's locale (#417). systems/ doesn't import from ui/, so it's here.
+ */
+export function moneyText(n: number): string {
+  const rounded = Math.round(n);
+  const grouped = Math.abs(rounded).toLocaleString('en-US');
+  return rounded < 0 ? `-$${grouped}` : `$${grouped}`;
 }
 
 /**
@@ -276,7 +287,7 @@ export function handleBankruptcy(_state: GameState): GameState {
   const warned = balance < ECON.BANKRUPTCY_WARN;
   if (warned) {
     bus.emit('ui:notify', {
-      text: `The club is in the red ($${balance.toLocaleString()}). Balance the books!`,
+      text: `The club is in the red (${moneyText(balance)}). Balance the books!`,
       kind: 'danger',
     });
   }

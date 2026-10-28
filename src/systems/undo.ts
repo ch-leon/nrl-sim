@@ -15,11 +15,12 @@
 // Pure-ish around getState/setState; no DOM, no Phaser.
 
 import { bus } from '../core/events';
-import { getState, setState, type GameState, type PlacedFacility, type Player } from '../core/state';
+import { getState, setState, type GameState, type Lineup, type PlacedFacility, type Player } from '../core/state';
 import { earnMoney, spendMoney } from '../data/club';
 import { FACILITY_CATALOG } from '../data/facility';
 import { demolishFacility, validatePlacement } from '../world/placement';
 import { signPlayer, signingFee, type SignResult } from './freeagency';
+import { signingNote } from './lineup';
 
 /** How long the Undo stays on offer. */
 export const UNDO_MS = 5000;
@@ -110,19 +111,25 @@ export function offerBuild(f: PlacedFacility, cost: number, now = Date.now()): v
 /**
  * Offer to take back a signing: `asWas` (the free agent before he signed) goes
  * back into the pool at `poolIndex` and the fee comes back. Only while he is
- * still in the squad (not sold or released in the meantime).
+ * still in the squad (not sold or released in the meantime). `lineup` is the
+ * nine before he went into it and the one he left (#416): the old one comes
+ * back while the lineup is still as he left it.
  */
-export function offerSign(signed: Player, asWas: Player, poolIndex: number, fee: number, now = Date.now()): void {
+export function offerSign(
+  signed: Player, asWas: Player, poolIndex: number, fee: number, now = Date.now(),
+  opts: { text?: string; lineup?: { before: Lineup; after: Lineup } } = {},
+): void {
   offerUndo({
     kind: 'sign',
-    text: `Signed ${signed.name}`,
+    text: opts.text ?? `Signed ${signed.name}`,
     expiresAt: now + UNDO_MS,
     canRevert: (s) => s.squad.some((p) => p.id === signed.id) && !s.freeAgents.some((p) => p.id === signed.id),
     revert: () => {
       const s = getState();
       const pool = [...s.freeAgents];
       pool.splice(Math.min(poolIndex, pool.length), 0, asWas);
-      setState({ squad: s.squad.filter((p) => p.id !== signed.id), freeAgents: pool });
+      const lineup = opts.lineup && s.lineup === opts.lineup.after ? { lineup: opts.lineup.before } : {};
+      setState({ squad: s.squad.filter((p) => p.id !== signed.id), freeAgents: pool, ...lineup });
       earnMoney(fee, `undo:sign:${signed.id}`);
       bus.emit('player:unsigned', { player: asWas });
     },
@@ -157,9 +164,12 @@ export function signWithUndo(playerId: string): SignResult {
   const index = s.freeAgents.findIndex((p) => p.id === playerId);
   const asWas = s.freeAgents[index];
   const fee = asWas ? signingFee(s, asWas) : 0;
-  const res = signPlayer(s, playerId, { toast: false });
-  const signed = getState().squad.find((p) => p.id === playerId);
-  if (res.ok && asWas && signed) offerSign(signed, asWas, index, fee);
+  const res = signPlayer(s, playerId, { toast: false, intoLineup: true });
+  const after = getState();
+  const signed = after.squad.find((p) => p.id === playerId);
+  // "Signed Deakin Cronky: goes straight into the nine at second-row" (#416).
+  const text = res.placed && signed ? `Signed ${signed.name}: ${signingNote(res.placed)}` : undefined;
+  if (res.ok && asWas && signed) offerSign(signed, asWas, index, fee, Date.now(), { ...(text ? { text } : {}), lineup: { before: s.lineup, after: after.lineup } });
   return res;
 }
 

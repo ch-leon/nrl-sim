@@ -637,7 +637,13 @@ export function resolveDueRollovers(state: GameState, now: number): Applied {
   return { state: s, money, news };
 }
 
-/** Put one card in front of the player. The e2e hook uses it to open a choice. */
+/**
+ * Put one card in front of the player. The e2e hook uses it to open a choice.
+ * Its subject is filled the way drawEvent fills it, with the first candidate in
+ * place of the dice (#424): a rival's star brings his club, rating and fee. A
+ * card with a subject and nobody to fill it is not planted (false), as the
+ * draw's eligibility check would not draw it.
+ */
 export function plantPending(cardId: string): boolean {
   const card = cardById(cardId);
   if (!card) return false;
@@ -650,9 +656,22 @@ export function plantPending(cardId: string): boolean {
     week: s.week,
     expiresAt: now + (card.when?.offer === 'rollover' ? 0 : EVENTS.ANSWER_WEEKS),
   };
-  if (card.subject && card.subject !== 'rivalStar') {
+  if (card.subject === 'rivalStar') {
+    const pick = rivalStars(s)[0];
+    if (!pick) return false;
+    ev.subjectId = pick.player.id;
+    ev.subjectName = pick.player.name;
+    ev.rivalId = pick.club.id;
+    ev.fee = pick.fee;
+    ev.vars = {
+      rival: pick.club.name, ovr: String(overallRating(pick.player)), position: pick.player.position,
+      fee: `$${pick.fee.toLocaleString('en-US')}`,
+    };
+  } else if (card.subject) {
     const who = subjectCandidates(s, card.subject)[0];
-    if (who) { ev.subjectId = who.id; ev.subjectName = who.name; }
+    if (!who) return false;
+    ev.subjectId = who.id;
+    ev.subjectName = who.name;
   }
   setState({
     eventDeck: { ...s.eventDeck, pending: [ev, ...s.eventDeck.pending.filter((p) => p.cardId !== cardId)] },

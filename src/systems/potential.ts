@@ -65,16 +65,21 @@ export function projectCareer(
   return { points, peak };
 }
 
-export type CareerStage = 'Developing' | 'Prime' | 'Declining';
+export type CareerStage = 'Developing' | 'Prime' | 'Declining' | 'Still improving';
 
 /**
  * Where an age sits on the curve, from training.ts ageMod's bands: Developing
  * while he trains at ×1.5 (21 and under), Prime while he still gains at ×1 or
- * ×0.6 (22–30), Declining from the veteran decline at ×0.25 (31+).
+ * ×0.6 (22–30), Declining from the veteran decline at ×0.25 (31+). Given his
+ * projection, a veteran whose curve still tops out later than today (good
+ * facilities outrun the decline) is Still improving, so the word agrees with
+ * the line the page draws (#419).
  */
-export function careerStage(age: number): CareerStage {
+export function careerStage(age: number, projection?: Pick<CareerProjection, 'peak'>): CareerStage {
   const m = ageMod(age);
-  return m > 1 ? 'Developing' : m >= ageMod(30) ? 'Prime' : 'Declining';
+  if (m > 1) return 'Developing';
+  if (m >= ageMod(30)) return 'Prime';
+  return projection && projection.peak.age > age ? 'Still improving' : 'Declining';
 }
 
 /** The page shows the retirement risk from this age: one birthday short of RETIRE_SOFT_AGE. */

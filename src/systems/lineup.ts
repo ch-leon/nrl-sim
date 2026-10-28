@@ -323,3 +323,74 @@ export function placeAt(lineup: Lineup, spot: Spot, id: string): Lineup {
   }
   return fromSeats(lineup, starters, seats);
 }
+
+// ── A new signing (#416) ─────────────────────────────────────────────────────
+
+/** Where a signing went: into the nine (and whom he put on the bench), onto the bench, or neither. */
+export interface SigningPlacement {
+  /** The lineup with him in it; the same object when nothing changed. */
+  lineup: Lineup;
+  where: 'nine' | 'bench' | 'out';
+  /** The slot he took in the nine. */
+  slot?: number;
+  /** The starter he moved to the bench (or out of the thirteen when no seat was his to take). */
+  displaced?: string;
+}
+
+/**
+ * Seat `p` on the bench (#416): a free seat, else that of a man who has left
+ * the club, else that of the weakest man on it by overall when `p` out-rates
+ * him. The same object back when there is no seat for him.
+ */
+function seatOnBench(lineup: Lineup, byId: ReadonlyMap<string, Player>, p: Player): Lineup {
+  if (lineup.bench.length < BENCH.size) return { ...lineup, bench: [...lineup.bench, p.id] };
+  let seat = lineup.bench.findIndex((id) => !byId.has(id));
+  if (seat < 0) {
+    const seated = lineup.bench.map((id, index) => ({ index, man: byId.get(id)! }));
+    const weakest = seated.sort((a, b) => byOverall(b.man, a.man) || b.index - a.index)[0];
+    if (weakest && byOverall(p, weakest.man) < 0) seat = weakest.index;
+  }
+  return seat < 0 ? lineup : { ...lineup, bench: lineup.bench.map((id, i) => (i === seat ? p.id : id)) };
+}
+
+/**
+ * Where a man the coach has just signed goes (#416). He takes the slot he is
+ * best suited to (his own position; a lock's nearest) when he out-rates the man
+ * picked there by effective rating, the weakest such starter first, and that
+ * man goes to the bench (seatOnBench). An open slot, or one whose man has left
+ * the club, is his outright. Otherwise he takes a bench seat the same way, or
+ * stays outside the thirteen. The coach's kicker and captain stay picked, as
+ * after Auto pick: one moved to the bench hands over to the default while he is
+ * off (sheets.ts kickerAndCaptain). Only for your club, only at a signing: Auto
+ * pick, resolveLineup and the rivals never call it, so the sim's own path and
+ * the pinned matches don't see it. `squad` is the squad with him in it.
+ */
+export function placeSigning(lineup: Lineup, squad: readonly Player[], signed: Player): SigningPlacement {
+  if (!isFit(signed) || spotOf(lineup, signed.id)) return { lineup, where: 'out' };
+  const byId = new Map(squad.map((p) => [p.id, p] as const));
+  const best = Math.max(...LINEUP_SLOTS.map((pos) => positionFit(signed.position, pos)));
+  let take: { slot: number; margin: number; out: Player | undefined } | undefined;
+  LINEUP_SLOTS.forEach((pos, slot) => {
+    if (positionFit(signed.position, pos) !== best) return;
+    const id = lineup.starters[slot] ?? null;
+    const out = id ? byId.get(id) : undefined;
+    const margin = effectiveRating(signed, pos) - (out ? effectiveRating(out, pos) : 0);
+    if (margin > 0 && (!take || margin > take.margin)) take = { slot, margin, out };
+  });
+  if (take) {
+    const { slot, out } = take;
+    // placeAt seats the man he replaces only when a seat is free; seatOnBench also tries the weakest seat.
+    let next = placeAt(lineup, { kind: 'starter', slot }, signed.id);
+    if (out && !next.bench.includes(out.id)) next = seatOnBench(next, byId, out);
+    return { lineup: next, where: 'nine', slot, ...(out ? { displaced: out.id } : {}) };
+  }
+  const next = seatOnBench(lineup, byId, signed);
+  return next === lineup ? { lineup, where: 'out' } : { lineup: next, where: 'bench' };
+}
+
+/** The signing toast's second half (#416): "goes straight into the nine at second-row", "starts on the bench". */
+export function signingNote(placed: Pick<SigningPlacement, 'where' | 'slot'>): string {
+  if (placed.where === 'nine' && placed.slot !== undefined) return `goes straight into the nine at ${LINEUP_SLOTS[placed.slot]}`;
+  if (placed.where === 'bench') return 'starts on the bench';
+  return 'is outside the thirteen for now: pick him in Lineup';
+}

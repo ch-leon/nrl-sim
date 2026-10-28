@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   absWeek, applyEffects, chooseEvent, describeEffects, drawEvent, eventsTick, fillText, isEligible,
-  registerEventsSystem, resolveEvent, subjectCandidates, tickModifiers, weekResult,
+  plantPending, registerEventsSystem, resolveEvent, rivalStars, subjectCandidates, tickModifiers, weekResult,
 } from '../../src/systems/events';
 import { EVENT_CARDS, cardById, type EventCardDef, type EventEffect } from '../../src/data/events';
 import { initLeague, registerFixturesSystem, PLAYER_ID } from '../../src/systems/fixtures';
@@ -425,5 +425,55 @@ describe('rival player cards (#74)', () => {
     expect(broke.news[0]!.text).toContain("couldn't afford");
     const gone = resolveEvent({ ...s, eventDeck: { ...s.eventDeck, pending: [{ ...ev, subjectId: 'nobody' }] } }, 'ru', 0, 1)!;
     expect(gone.news[0]!.text).toContain('no longer available');
+  });
+});
+
+describe('plantPending (the e2e card hook, #424)', () => {
+  const planted = (id: string): PendingEvent | undefined => getState().eventDeck.pending.find((p) => p.cardId === id);
+  const outcome = (id: string, i: number): string => {
+    const ev = planted(id)!;
+    return fillText(card(id).choices[i]!.outcome, { subjectName: ev.subjectName, clubName: getState().clubName, vars: ev.vars });
+  };
+
+  it('a rival-star card names a real rival club and player, as the draw does (first one, no dice)', () => {
+    const s = fresh(21);
+    setState({ money: 500_000 });
+    const first = rivalStars(getState())[0]!;
+    expect(first).toBeDefined();
+    const rng = s.eventDeck.rng;
+    expect(plantPending('rivalUnsettled')).toBe(true);
+    const ev = planted('rivalUnsettled')!;
+    expect(ev).toMatchObject({ subjectId: first.player.id, subjectName: first.player.name, rivalId: first.club.id, fee: first.fee });
+    expect(ev.vars).toEqual({ rival: first.club.name, ovr: String(overallRating(first.player)), position: first.player.position, fee: `$${first.fee.toLocaleString('en-US')}` });
+    expect(outcome('rivalUnsettled', 1)).toBe(`${first.player.name} stays at ${first.club.name} for now.`);
+    expect(outcome('rivalUnsettled', 1)).not.toMatch(/[{}]|A player/);
+    expect(getState().eventDeck.rng).toBe(rng); // nothing rolled
+  });
+
+  it('a rival-star card with no star on offer is not planted', () => {
+    fresh(21);
+    setState({ money: 0 });
+    expect(rivalStars(getState())).toEqual([]);
+    expect(plantPending('rivalUnsettled')).toBe(false);
+    expect(planted('rivalUnsettled')).toBeUndefined();
+  });
+
+  it('a squad card with nobody to fill it is not planted; with somebody, he is named', () => {
+    fresh(7);
+    setState({ squad: getState().squad.map((p) => ({ ...p, morale: 80 })) });
+    expect(subjectCandidates(getState(), 'unhappy')).toEqual([]);
+    expect(plantPending('unhappyTalk')).toBe(false);
+    expect(planted('unhappyTalk')).toBeUndefined();
+    const sad = getState().squad[2]!;
+    setState({ squad: getState().squad.map((p) => (p.id === sad.id ? { ...p, morale: 20 } : p)) });
+    expect(plantPending('unhappyTalk')).toBe(true);
+    expect(planted('unhappyTalk')).toMatchObject({ subjectId: sad.id, subjectName: sad.name });
+    expect(outcome('unhappyTalk', 0)).toBe(`A long chat has ${sad.name} feeling better.`);
+  });
+
+  it('a card with no subject still plants', () => {
+    fresh(7);
+    expect(plantPending('baliTrip')).toBe(true);
+    expect(planted('baliTrip')!.subjectId).toBeUndefined();
   });
 });

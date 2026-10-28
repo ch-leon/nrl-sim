@@ -269,6 +269,26 @@ describe('signPlayer', () => {
     expect(signed!.id).toBe(agent.id);
   });
 
+  it('leaves the lineup alone unless the coach\'s tap asks (#416: the soak and the rivals never place him)', () => {
+    const agent = { ...firstAgent(), injuredWeeks: 0, stats: { speed: 99, strength: 99, stamina: 99, skill: 99, footyIQ: 99 } };
+    setState({ freeAgents: [agent, ...getState().freeAgents.slice(1)] });
+    const lineup = getState().lineup;
+    const plain = signPlayer(getState(), agent.id);
+    expect(plain).toEqual({ ok: true });
+    expect(getState().lineup).toBe(lineup);
+  });
+
+  it('with intoLineup a man who out-rates a starter goes into the nine before player:signed (#416)', () => {
+    const agent = { ...firstAgent(), injuredWeeks: 0, stats: { speed: 99, strength: 99, stamina: 99, skill: 99, footyIQ: 99 } };
+    setState({ freeAgents: [agent, ...getState().freeAgents.slice(1)] });
+    let inNine = false;
+    bus.on('player:signed', () => { inNine = getState().lineup.starters.includes(agent.id); });
+    const res = signPlayer(getState(), agent.id, { intoLineup: true });
+    expect(res.placed?.where).toBe('nine');
+    expect(getState().lineup).toBe(res.placed!.lineup);
+    expect(inNine).toBe(true);
+  });
+
   it('emits ui:notify success on signing', () => {
     let kind: string | null = null;
     bus.on('ui:notify', (n) => { kind = n.kind; });
