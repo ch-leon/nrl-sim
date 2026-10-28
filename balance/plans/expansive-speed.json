@@ -1,0 +1,251 @@
+{
+  "name": "expansive speed",
+  "description": "#322 stage A (balance/plans/expansive-speed.md): does making Speed count for more (top-speed slope pace.extraPerStat; bust points per m/s of momentum and its cap) bring an Expansive rival back to even against a level rival, without moving the even match, the other presets or the 70 v 50 gap? Rival rows draw squads whose nine reads as the style under the frozen thresholds, with the break rule on both sides as a rival-v-rival game has it. Preset rows are as presets.json (break rule off).",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "seeds": 200,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive rival v level rival",
+      "seeds": 200,
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "squad": "rival",
+        "style": "expansive"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    },
+    {
+      "name": "kick-chase rival v level rival",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "squad": "rival",
+        "style": "kick-chase"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    },
+    {
+      "name": "grind rival v level rival",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "squad": "rival",
+        "style": "grind"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    },
+    {
+      "name": "pace for power v flat 60",
+      "seeds": 200,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "stats": {
+          "speed": 70,
+          "strength": 47
+        },
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "seeds": 200,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "grind v balanced",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "rush v slide",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed v slide",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "seeds": 80,
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "pace 0.03 \u00b7 momentum 2/6",
+      "tuning": {
+        "momentum.perMs": 0.02,
+        "momentum.cap": 0.06
+      }
+    },
+    {
+      "name": "pace 0.03 \u00b7 momentum 3/8",
+      "tuning": {
+        "momentum.perMs": 0.03,
+        "momentum.cap": 0.08
+      }
+    },
+    {
+      "name": "pace 0.045 \u00b7 momentum 1/4",
+      "tuning": {
+        "pace.extraPerStat": 0.045
+      }
+    },
+    {
+      "name": "pace 0.045 \u00b7 momentum 2/6",
+      "tuning": {
+        "pace.extraPerStat": 0.045,
+        "momentum.perMs": 0.02,
+        "momentum.cap": 0.06
+      }
+    },
+    {
+      "name": "pace 0.045 \u00b7 momentum 3/8",
+      "tuning": {
+        "pace.extraPerStat": 0.045,
+        "momentum.perMs": 0.03,
+        "momentum.cap": 0.08
+      }
+    },
+    {
+      "name": "pace 0.06 \u00b7 momentum 1/4",
+      "tuning": {
+        "pace.extraPerStat": 0.06
+      }
+    },
+    {
+      "name": "pace 0.06 \u00b7 momentum 2/6",
+      "tuning": {
+        "pace.extraPerStat": 0.06,
+        "momentum.perMs": 0.02,
+        "momentum.cap": 0.06
+      }
+    },
+    {
+      "name": "pace 0.06 \u00b7 momentum 3/8",
+      "tuning": {
+        "pace.extraPerStat": 0.06,
+        "momentum.perMs": 0.03,
+        "momentum.cap": 0.08
+      }
+    }
+  ]
+}

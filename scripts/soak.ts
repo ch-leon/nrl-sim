@@ -9,6 +9,8 @@
 //   npm run soak -- --live-rivals        rival rounds on the live sim too (N9.2's setting; several times slower),
 //                                        each style's score against its strength (#249), and at a level
 //                                        rating the wins ÷ games and the break-rule switches (N14.2)
+//   npm run soak -- --tune pace.extraPerStat=0.045   a match knob overridden by name for the whole run, as the
+//                                        balance harness names it (repeatable; #322)
 //
 // Since the switch-over to the live match sim (BAK-207 Phase 4) every match the
 // player's club plays is a whole live match, about 15 s a season headless, so the
@@ -31,6 +33,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { levelWinRates, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
+import { applyTuning } from '../src/match/league/tuning';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const opt = (name: string, dflt: number): number => {
@@ -47,6 +50,14 @@ const jsonOut = str('json');
 // Without --difficulties: idle and managed on Normal plus idle on Hard (the original soak).
 const difficulties = str('difficulties')?.split(',').filter((d): d is Difficulty => DIFFICULTIES.includes(d as Difficulty));
 const liveRivals = args.includes('--live-rivals');
+// Match knobs by name (#322): set in this process and passed to every --jobs child, so a
+// candidate value can be soaked before its default moves. Never on in the game.
+const tuneArgs = args.flatMap((a, i) => (a === '--tune' && args[i + 1] ? ['--tune', args[i + 1]!] : []));
+const tuning = Object.fromEntries(tuneArgs.filter((_, i) => i % 2 === 1).map((kv) => {
+  const [key, value] = kv.split('=');
+  return [key!, Number(value)];
+}));
+applyTuning(tuning);
 const modes = args.includes('--managed-only') ? ['managed'] as const : ['idle', 'managed'] as const;
 
 // Child of a --jobs run: play the runs in the given file, write the results, stop.
@@ -82,7 +93,7 @@ async function runInJobs(all: SoakOptions[], jobs: number): Promise<SoakResult[]
       const inFile = join(dir, `in-${j}.json`);
       const outFile = join(dir, `out-${j}.json`);
       writeFileSync(inFile, JSON.stringify(chunk.map(({ o }) => o)));
-      const child = spawn('npx', ['vite-node', 'scripts/soak.ts', '--', '--child', inFile, '--out', outFile], { stdio: ['ignore', 'ignore', 'inherit'] });
+      const child = spawn('npx', ['vite-node', 'scripts/soak.ts', '--', '--child', inFile, '--out', outFile, ...tuneArgs], { stdio: ['ignore', 'ignore', 'inherit'] });
       child.on('exit', (code) => {
         if (code !== 0) return reject(new Error(`soak job ${j + 1} exited ${code}`));
         const rs = JSON.parse(readFileSync(outFile, 'utf8')) as SoakResult[];
@@ -111,6 +122,7 @@ const pct = (n: number): string => `${Math.round(n * 100)}%`;
 // three nearest-rated rivals, games in brackets) are the whole run's (N12.1), and so is
 // forf (rounds forfeited short of 13 fit, finding 20).
 if (liveRivals) console.log('Rival rounds on the live sim (--live-rivals) in the fresh-game runs.');
+if (tuneArgs.length) console.log(`Match knobs overridden (--tune): ${Object.entries(tuning).map(([key, v]) => `${key} = ${v}`).join(', ')}.`);
 console.log(`${pad('seed', 7)} ${pad('mode', 9)} ${pad('from', 4)} ${pad('seasons', 7)} ${pad('money', 9)} ${pad('minMoney', 9)} ${pad('squad', 5)} ${pad('pool', 5)} ${pad('KB', 6)} ${pad('rivals', 7)} ${pad('rep', 4)} ${pad('record', 8)} ${pad('margin', 6)} ${pad('pos', 3)} ${pad('forf', 4)} ${pad('fin', 4)} ${pad('near', 9)} ${pad('nine', 5)} ${pad('rmean', 5)} ${pad('gap', 5)} ${pad('signed', 12)} ${pad('ms', 6)} problems`);
 for (const r of results) {
   const last = r.seasons[r.seasons.length - 1];

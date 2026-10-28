@@ -3,7 +3,7 @@
 // expanded in order, the report's bands and luck test, and a measured cell
 // that is deterministic and actually feels its overrides.
 import { describe, it, expect } from 'vitest';
-import { BASE } from '../../../src/match/league/contest';
+import { BASE, MOMENTUM, OPEN, contestOdds } from '../../../src/match/league/contest';
 import { FATIGUE } from '../../../src/match/league/fatigue';
 import { LIVE, LiveSim } from '../../../src/match/league/live';
 import { PRESET_TABLES, attackPlan, defencePlan } from '../../../src/match/league/presets';
@@ -48,6 +48,16 @@ describe('knobs by name', () => {
     expect(attackPlan('balanced', 'midfield').kickBias.bomb).toBe(2);
     restore();
     expect(JSON.stringify(PRESET_TABLES)).toBe(before);
+  });
+  it('names the momentum at contact (#322): bust points per m/s, capped', () => {
+    const bust = (speedDiff: number): number => contestOdds(0.5, { ...OPEN, speedDiff }).broken - contestOdds(0.5, OPEN).broken;
+    expect(bust(2)).toBeCloseTo(Math.min(MOMENTUM.cap, 2 * MOMENTUM.perMs));
+    const restore = applyTuning({ 'momentum.perMs': 0.05, 'momentum.cap': 0.08 });
+    expect(bust(1)).toBeCloseTo(0.05);
+    expect(bust(3)).toBeCloseTo(0.08);
+    expect(bust(-3)).toBeCloseTo(-0.08);
+    restore();
+    expect(bust(2)).toBeCloseTo(Math.min(MOMENTUM.cap, 2 * MOMENTUM.perMs));
   });
   it('refuses typos and non-numbers before changing anything', () => {
     expect(checkTuning({ 'wrestle.gripBse': 1 })).toHaveLength(1);
@@ -132,6 +142,20 @@ describe('plans', () => {
     expect(checkPlan(plan({ scenarios: [{ name: 's', home: { rivalOf: 'hard' }, away: { rivalOf: 'easy' } }] })).join('\n')).toMatch(/only one side is the rival/);
     expect(checkPlan(plan({ scenarios: [{ ...EVEN, seeds: 0, bothWays: true }] })).join('\n')).toMatch(/seeds must be a whole number[\s\S]*bothWays needs track/);
     expect(checkPlan(plan({ scenarios: [{ ...EVEN, seeds: 40, track: 'home', bothWays: true }] }))).toEqual([]);
+  });
+  it('draws a rival squad of a style (#322): its nine reads as that attack, the same squad on the same seed, level rival as before', () => {
+    for (const style of ['expansive', 'grind', 'kick-chase'] as const) {
+      for (const seed of [1, 2, 3]) {
+        const s = scenarioSides({ squad: 'rival', style }, { squad: 'rival' }, seed);
+        expect(s.home.tactics!.attack).toBe(style);
+        expect(Math.abs(s.nine.away! - s.nine.home!)).toBeLessThan(2);
+        expect(scenarioSides({ squad: 'rival', style }, { squad: 'rival' }, seed).home.roster).toEqual(s.home.roster);
+      }
+    }
+    // A style its first draw already has is that draw: no style, same squad.
+    const plain = scenarioSides({ squad: 'rival' }, { rating: 60 }, 4).home;
+    expect(scenarioSides({ squad: 'rival', style: plain.tactics!.attack }, { rating: 60 }, 4).home.roster).toEqual(plain.roster);
+    expect(checkPlan(plan({ scenarios: [{ name: 's', home: { rating: 60, style: 'expansive' }, away: { squad: 'rival', style: 'yolo' as never } }] })).join('\n')).toMatch(/style needs squad rival[\s\S]*unknown style "yolo"/);
   });
   it('plays a rival with the difficulty’s edge (N12.2), swept by name as difficulty.<d>.rivalEdge', () => {
     expect(listKnobs().map((k) => k.path)).toEqual(expect.arrayContaining(['difficulty.easy.rivalEdge', 'difficulty.normal.rivalEdge', 'difficulty.hard.rivalEdge']));

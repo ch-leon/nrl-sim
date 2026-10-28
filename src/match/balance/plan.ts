@@ -7,7 +7,7 @@ import { DIFFICULTIES, type Difficulty } from '../../config';
 import { isCoachCall, type CoachCall } from '../league/calls';
 import { isRotation, type Rotation } from '../league/bench';
 import { isLegs, type Legs } from '../league/fatigue';
-import { isAttackPreset, isDefencePreset, type TeamTactics } from '../league/presets';
+import { isAttackPreset, isDefencePreset, type AttackPreset, type TeamTactics } from '../league/presets';
 import { checkTuning, type Overrides } from '../league/tuning';
 
 export interface SideSpec {
@@ -33,6 +33,12 @@ export interface SideSpec {
    * left out. `traits`, `tactics`, `bench` and `rotation` override what it gets.
    */
   squad?: 'player' | 'rival';
+  /**
+   * A `rival` squad whose nine reads as this attack under the style thresholds
+   * (RIVAL_STYLE, tuning §28): each seed draws rival squads until one does, so
+   * a style's own squads can be played against a level rival (#322).
+   */
+  style?: AttackPreset;
   /** A `player` squad's difficulty (its start rating); normal unless given. */
   difficulty?: Difficulty;
   /** A `player` squad with its star swapped for a first-grader at his position (what the squad's shape is worth). */
@@ -166,6 +172,8 @@ export function checkPlan(p: Plan): string[] {
       if (spec.rotation !== undefined && !isRotation(spec.rotation)) errs.push(`${s.name} ${side}: rotation must be off / standard / heavy`);
       if (spec.squad !== undefined && spec.squad !== 'player' && spec.squad !== 'rival') errs.push(`${s.name} ${side}: squad must be player / rival`);
       if (spec.squad !== undefined && spec.club !== undefined) errs.push(`${s.name} ${side}: a side is a club or a squad, not both`);
+      if (spec.style !== undefined && !isAttackPreset(spec.style)) errs.push(`${s.name} ${side}: unknown style "${spec.style}"`);
+      if (spec.style !== undefined && spec.squad !== 'rival') errs.push(`${s.name} ${side}: style needs squad rival`);
       if (spec.difficulty !== undefined && !DIFFICULTIES.includes(spec.difficulty)) errs.push(`${s.name} ${side}: difficulty must be easy / normal / hard`);
       if (spec.rivalOf !== undefined && !DIFFICULTIES.includes(spec.rivalOf)) errs.push(`${s.name} ${side}: rivalOf must be easy / normal / hard`);
     }

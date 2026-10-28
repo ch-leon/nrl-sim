@@ -48,6 +48,12 @@ export function carrierEdge(atk: ContestStats, def: ContestStats): number {
 /** Even-stats, one-on-one, square baseline (design doc §4.1). */
 export const BASE = { bigHit: 0.1, broken: 0.12, fend: 0.07, offload: 0.12, strip: 0.02 };
 
+/**
+ * Momentum at contact (§4.1, #322): bust points per m/s the carrier is quicker
+ * than his tackler, capped either way. Overridable by name (`momentum.perMs`).
+ */
+export const MOMENTUM = { perMs: 0.01, cap: 0.04 };
+
 /** Probability points traits add to (or take from) each outcome, already scaled by level (§3). */
 export interface ContestMods {
   broken?: number;
@@ -95,8 +101,8 @@ export function contestOdds(edge: number, s: Situation, mods: ContestMods = {}):
     fend += 0.03;
     bigHit -= 0.06;
   }
-  // Momentum: ±1% bust per m/s, capped.
-  broken += Math.max(-0.04, Math.min(0.04, s.speedDiff * 0.01));
+  // Momentum: bust points per m/s, capped.
+  broken += Math.max(-MOMENTUM.cap, Math.min(MOMENTUM.cap, s.speedDiff * MOMENTUM.perMs));
   if (s.lastTackle) bigHit += 0.03;
   // Fatigue (F): a spent carrier can't bust or fend; a spent tackler can't hit.
   const fw = FATIGUE.contest;
