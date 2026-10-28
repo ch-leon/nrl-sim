@@ -1,24 +1,25 @@
-// scripts/gen-icons.mjs — BAK-204 (WU-16)
-// Zero-dependency PNG icon generator for the PWA. Uses only Node builtins.
-// Draws a solid #1a1a2e background with a light-tinted rugby-ball ellipse motif
-// into a raw RGBA buffer and encodes a spec-valid PNG by hand (signature, IHDR,
-// IDAT with per-row filter byte 0 + zlib deflate, IEND, correct CRC32 per chunk).
+// scripts/gen-icons.mjs — BAK-204 (WU-16), #363
+// Zero-dependency PNG icon generator for the PWA. The pixels are the brand's
+// (src/art/appIcon.ts draws them from src/brand.ts: its colours and icon letters),
+// so renaming the game regenerates the icons. This file encodes them as a
+// spec-valid PNG by hand (signature, IHDR, IDAT with per-row filter byte 0 + zlib
+// deflate, IEND, correct CRC32 per chunk) using only Node builtins.
 // Idempotent: overwrites public/icons/icon-192.png and icon-512.png.
 //
-// Run via the `prebuild` npm script (node scripts/gen-icons.mjs).
+// Run via the `predev`/`prebuild` npm scripts with vite-node (it reads the brand's
+// TypeScript). `--dry-run` prints what it would write and writes nothing.
 
 import { writeFileSync, mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BRAND } from '../src/brand';
+import { renderIcon } from '../src/art/appIcon';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(__dirname, '..', 'public', 'icons');
-
-// --- Palette (matches theme_color/background_color #1a1a2e) ---
-const BG = [0x1a, 0x1a, 0x2e]; // dark navy
-const BALL = [0xe8, 0xe4, 0xd8]; // warm off-white leather
-const SEAM = [0x1a, 0x1a, 0x2e]; // seam/lace drawn in bg colour for contrast
+const DRY_RUN = process.argv.includes('--dry-run');
 
 // --- CRC32 (PNG polynomial 0xEDB88320) ---
 const CRC_TABLE = (() => {
@@ -51,49 +52,6 @@ function chunk(type, data) {
   return Buffer.concat([len, typeBuf, data, crc]);
 }
 
-/**
- * Render a size x size RGBA icon: navy field with a centred rugby-ball ellipse
- * (pointy oval, long axis diagonal-ish) plus a central seam and lace strokes.
- */
-function renderRgba(size) {
-  const px = Buffer.alloc(size * size * 4);
-  const cx = size / 2;
-  const cy = size / 2;
-  // Ellipse radii: tall/narrow oval (rugby ball on its point-ish).
-  const rx = size * 0.24;
-  const ry = size * 0.40;
-
-  const set = (x, y, rgb, a = 255) => {
-    const o = (y * size + x) * 4;
-    px[o] = rgb[0];
-    px[o + 1] = rgb[1];
-    px[o + 2] = rgb[2];
-    px[o + 3] = a;
-  };
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      set(x, y, BG); // fill background
-      const nx = (x - cx) / rx;
-      const ny = (y - cy) / ry;
-      const d = nx * nx + ny * ny;
-      if (d <= 1) {
-        set(x, y, BALL);
-        // Vertical central seam (a couple px wide).
-        if (Math.abs(x - cx) <= Math.max(1, size * 0.012)) {
-          set(x, y, SEAM);
-        }
-        // Horizontal lace rungs across the seam near the centre.
-        const rung = Math.abs(y - cy) % Math.max(6, Math.round(size * 0.06));
-        if (rung < Math.max(1, size * 0.012) && Math.abs(x - cx) <= size * 0.05) {
-          set(x, y, SEAM);
-        }
-      }
-    }
-  }
-  return px;
-}
-
 /** Encode RGBA (size x size) to a PNG Buffer (8-bit, colour type 6). */
 function encodePng(size, rgba) {
   const SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -112,7 +70,7 @@ function encodePng(size, rgba) {
   const raw = Buffer.alloc((stride + 1) * size);
   for (let y = 0; y < size; y++) {
     raw[y * (stride + 1)] = 0;
-    rgba.copy(raw, y * (stride + 1) + 1, y * stride, y * stride + stride);
+    raw.set(rgba.subarray(y * stride, y * stride + stride), y * (stride + 1) + 1);
   }
   const idat = deflateSync(raw, { level: 9 });
 
@@ -125,14 +83,15 @@ function encodePng(size, rgba) {
 }
 
 function writeIcon(size) {
-  const png = encodePng(size, renderRgba(size));
+  const png = encodePng(size, renderIcon(size, BRAND));
   const path = join(OUT_DIR, `icon-${size}.png`);
-  writeFileSync(path, png);
-  return { path, bytes: png.length };
+  if (!DRY_RUN) writeFileSync(path, png);
+  return { path, bytes: png.length, sha: createHash('sha256').update(png).digest('hex').slice(0, 12) };
 }
 
-mkdirSync(OUT_DIR, { recursive: true });
+if (!DRY_RUN) mkdirSync(OUT_DIR, { recursive: true });
+console.log(`[gen-icons] ${BRAND.name}: field ${BRAND.colors.app}, ball ${BRAND.colors.iconBall}, letters "${BRAND.iconLetters}"`);
 for (const size of [192, 512]) {
-  const { path, bytes } = writeIcon(size);
-  console.log(`[gen-icons] wrote ${path} (${bytes} bytes)`);
+  const { path, bytes, sha } = writeIcon(size);
+  console.log(`[gen-icons] ${DRY_RUN ? 'would write' : 'wrote'} ${path} (${bytes} bytes, sha256 ${sha})`);
 }

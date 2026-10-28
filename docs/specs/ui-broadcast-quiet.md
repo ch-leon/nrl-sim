@@ -210,6 +210,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
 - **Transitions** (suggested): sheets slide up 180ms ease-out; banners fade/slide in 150ms and out after 3s.
 
 ## Design tokens
+In code the colours are `src/ui/tokens.ts` (`COLOR_TOKENS`); `src/ui/dom.ts` writes them out as the `--nrl-*` properties, and the brand (`src/brand.ts`, #363) points at them.
 - **Surfaces**: navy #0e1630 · panel #141d3a · raised #1b264a · button #1f2b55 · divider/track #26325c · user-row highlight #24346b
 - **Text**: #ffffff · secondary #c9d1ea · muted #9aa6c7
 - **Accent**: #f4d03f, with #0e1630 text on it

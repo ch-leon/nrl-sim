@@ -19,6 +19,8 @@ import { kitFromColors } from '../art/match/kit';
 import { LOOKS, drawPlayerFrame } from '../art/match/players';
 import { encodeCanvas } from '../art/portrait';
 import { PLAYER_ID } from '../systems/fixtures';
+import { BRAND, type Brand } from '../brand';
+import { COLOR_TOKENS } from './tokens';
 
 export interface TitleChoice {
   mode: 'continue' | 'new';
@@ -55,6 +57,8 @@ const TITLE_CSS = `
   font-weight: 700; font-size: 48px; letter-spacing: 0.06em; line-height: 1; }
 .nrl-title h1::after { content: 'Club manager'; display: block; margin-top: 6px; font-style: normal; font-size: 13px;
   font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: #f4d03f; }
+.nrl-title-logo { display: block; margin: 0 auto; max-width: min(70vw, 360px); max-height: 72px; object-fit: contain; }
+.nrl-title-parent { margin: -8px 0 0; text-align: center; font-size: 12px; letter-spacing: 0.08em; color: ${COLOR_TOKENS.muted}; }
 .nrl-title-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 10px; }
 .nrl-title-card { border-radius: 14px; background: rgba(27, 38, 74, 0.95); padding: 12px 14px;
   display: flex; flex-direction: column; gap: 4px; min-width: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
@@ -111,6 +115,8 @@ const TITLE_CSS = `
 @media (max-height: 500px) {
   .nrl-title h1 { font-size: 34px; }
   .nrl-title h1::after { margin-top: 4px; font-size: 11px; }
+  .nrl-title-logo { max-height: 48px; }
+  .nrl-title-parent { margin-top: -6px; font-size: 11px; }
   .nrl-title-main { gap: 10px; }
 }
 @media (max-height: 500px) {
@@ -152,6 +158,29 @@ function mkButton(label: string, dataAttr: string, cls = ''): HTMLButtonElement 
   b.type = 'button';
   b.setAttribute(dataAttr, '');
   return b;
+}
+
+/**
+ * The title's heading (#363): the brand's logo (its title text today, or an image
+ * from public/), then the parent-brand line when the brand shows it.
+ */
+export function titleHeading(brand: Brand = BRAND): HTMLElement[] {
+  const h1 = mk('h1', 'nrl-title-name');
+  if (brand.logo.kind === 'image') {
+    const img = mk('img', 'nrl-title-logo');
+    img.setAttribute('src', `${import.meta.env.BASE_URL}${brand.logo.src}`);
+    img.setAttribute('alt', brand.name);
+    h1.appendChild(img);
+  } else {
+    h1.textContent = brand.titleText;
+  }
+  const out: HTMLElement[] = [h1];
+  if (brand.parentBrand.show) {
+    const line = mk('p', 'nrl-title-parent', `a ${brand.parentBrand.name} game`);
+    line.setAttribute('data-nrl-parent-brand', '');
+    out.push(line);
+  }
+  return out;
 }
 
 /** The jersey a club in these colours runs out in, as an image URL ('' without a canvas). */
@@ -241,7 +270,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
 
     const showSlots = (notice?: string): void => {
       main.replaceChildren();
-      main.appendChild(mk('h1', 'nrl-title-name', 'NRL SIM'));
+      for (const e of titleHeading()) main.appendChild(e);
       const slots = mk('div', 'nrl-title-slots');
       for (const s of getSlotSummaries()) slots.appendChild(slotCard(s));
       main.appendChild(slots);

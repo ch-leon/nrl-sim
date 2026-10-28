@@ -36,7 +36,8 @@ describe('gen-icons.mjs', () => {
 
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const root = path.join(here, '..', '..');
-    cp.execFileSync('node', ['scripts/gen-icons.mjs'], { cwd: root });
+    // vite-node: the script reads the brand's TypeScript (#363), as npm's prebuild runs it.
+    cp.execFileSync(path.join(root, 'node_modules', '.bin', 'vite-node'), ['scripts/gen-icons.mjs'], { cwd: root });
 
     for (const size of [192, 512]) {
       const p = path.join(root, 'public', 'icons', `icon-${size}.png`);

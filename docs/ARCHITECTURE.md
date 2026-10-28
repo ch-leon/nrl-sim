@@ -42,6 +42,8 @@
 src/
   main.ts                    # boot Phaser + register scenes + wire UI (ORCHESTRATOR-OWNED)
   config.ts                  # game constants (grid size, tile size, econ tuning)
+  brand.ts                   # the game's name, short name, colours (the theme's tokens) and logo; renaming is this file (#363)
+  brandBuild.ts              # the brand as the build writes it: index.html's %BRAND_*% values, the PWA manifest (#363)
   core/
     events.ts                # EventBus + typed event names          (WU-3)
     state.ts                 # GameState type, createNewGame(), store accessors (WU-3)
@@ -88,6 +90,7 @@ src/
     placement.ts             # facility placement controller          (WU-8 / BAK-178)
   ui/
     dom.ts                   # DOM helpers: panel(), button(), mount  (WU-5)
+    tokens.ts                # the Broadcast Quiet colour tokens as values; dom.ts writes them as --nrl-* (#363)
     hud.ts                   # the dock's status + PLAY WEEK, the decisions chip (WU-5 / BAK-163)
     fonts.ts                 # the UI's three typefaces, self-hosted (Broadcast Quiet)
     title.ts                 # title screen: three slot cards, the new-club step (#350 T1)

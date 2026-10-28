@@ -9,8 +9,15 @@
 // Where the browser does allow it (installed PWA / fullscreen on Android), we
 // also ask for a landscape lock on the first tap; failures are ignored.
 
+import { BRAND, type Brand } from '../brand';
+
 /** Touch device held upright → blocked. Shared by the CSS and the JS guard. */
 export const PORTRAIT_QUERY = '(orientation: portrait) and (pointer: coarse)';
+
+/** The rotate card's line, with the game's name from the brand (#363). */
+export function rotateText(brand: Brand = BRAND): string {
+  return `${brand.name} plays in landscape. The game is paused until you rotate.`;
+}
 
 type MatchMediaFn = (query: string) => Pick<MediaQueryList, 'matches' | 'addEventListener'>;
 
@@ -92,8 +99,12 @@ export function initLandscapeGuard(hooks: LandscapeGuardHooks): void {
   card.setAttribute('aria-label', 'Rotate your device');
   card.innerHTML =
     '<div class="nrl-rotate-card"><div class="nrl-rotate-phone" aria-hidden="true"></div>' +
-    '<p class="nrl-rotate-title">Turn your phone sideways</p>' +
-    '<p class="nrl-rotate-text">NRL Sim plays in landscape. The game is paused until you rotate.</p></div>';
+    '<p class="nrl-rotate-title">Turn your phone sideways</p></div>';
+  // The game's name is the brand's (#363), set as text so any name is safe.
+  const text = document.createElement('p');
+  text.className = 'nrl-rotate-text';
+  text.textContent = rotateText();
+  card.firstElementChild?.appendChild(text);
   document.body.appendChild(card);
 
   watchOrientation(hooks, (q) => window.matchMedia(q));
