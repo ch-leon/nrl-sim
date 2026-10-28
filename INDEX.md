@@ -157,3 +157,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-015924-standard | standard | afe60cf | main | [report](runs/20261028-015924-standard/report.md) |
 | 20261028-050605-standard | standard | 54ae572 | main | [report](runs/20261028-050605-standard/report.md) |
 | 20261028-072210-standard | standard | bc20536 | main | [report](runs/20261028-072210-standard/report.md) |
+| 20261028-091624-expansive-speed | expansive speed | f6edc06 (uncommitted changes) | claude/expansive-speed-322 | [report](runs/20261028-091624-expansive-speed/report.md) |
