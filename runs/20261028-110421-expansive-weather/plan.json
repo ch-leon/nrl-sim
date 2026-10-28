@@ -1,0 +1,74 @@
+{
+  "name": "expansive weather",
+  "description": "#322 follow-up: stage A's Expansive rival was even against a level rival in clear weather, while the season (25% rain, 15% wind) has it at 44%. Does the weather carry the gap? Baseline knobs only.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "expansive rival v level rival, clear",
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "squad": "rival",
+        "style": "expansive"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    },
+    {
+      "name": "expansive rival v level rival, rain",
+      "weather": "rain",
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "squad": "rival",
+        "style": "expansive"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    },
+    {
+      "name": "expansive rival v level rival, wind",
+      "weather": "wind",
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "squad": "rival",
+        "style": "expansive"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    },
+    {
+      "name": "balanced rival v level rival, rain",
+      "weather": "rain",
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "squad": "rival",
+        "style": "balanced"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    }
+  ]
+}
