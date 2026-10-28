@@ -924,10 +924,10 @@ function toastReport(page, avoid, safe, tappable = true) {
 
 /**
  * What a toast must never touch at the club: the dock (its tabs, money, PLAY WEEK and ▾, the ▾ menu), Office's tiles,
- * the decisions chip, a sheet's header row or a dialog's ✕. The lane sits just above the
+ * the decisions and board chips, a sheet's header row or a dialog's ✕. The lane sits just above the
  * dock (Broadcast Quiet), so it may lie over the foot of an open sheet's list.
  */
-const CLUB_AVOID = ['.nrl-dock', '.nrl-hud-menu:not([hidden])', '.nrl-nav-sheet:not([hidden])', '[data-decisions-chip]:not([hidden])', '.nrl-screen-x', '.nrl-screen-head', '.nrl-news-head'];
+const CLUB_AVOID = ['.nrl-dock', '.nrl-hud-menu:not([hidden])', '.nrl-nav-sheet:not([hidden])', '[data-decisions-chip]:not([hidden])', '.nrl-board-chip:not([hidden])', '.nrl-screen-x', '.nrl-screen-head', '.nrl-news-head'];
 /** …and in a match: the score bug, the stats, the commentary line or full log, and every control. */
 const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-statsheet', '.nrl-mo-strip', '.nrl-mo-full', '.nrl-mo-log-toggle', '.nrl-mo-bar [data-coach]', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay'];
 /** The burst the check fires: a problem, a routine stop, good news, a confirmation. */
