@@ -2,8 +2,10 @@
 // Nines has unlimited interchanges. Each side carries a bench of up to four; at
 // a stoppage (after a try, and at half-time) the coach's rotation policy takes
 // off the most tired men for fresher ones. A benched player gets his legs back
-// slowly, never all the way to fresh within a match. Pure: live.ts keeps the
+// slowly, never all the way to fresh within a match. The coach's Fresh legs
+// call (#367) makes one more swap, its pick here too. Pure: live.ts keeps the
 // bench and calls these.
+import type { Position } from '../../core/state';
 
 /** How hard a coach rotates. Off: the starters play the whole match. */
 export type Rotation = 'off' | 'standard' | 'heavy';
@@ -68,4 +70,51 @@ export function pickSwaps(
     free.splice(k, 1);
   }
   return out;
+}
+
+/** Fresh legs (#367): a man coming on covers his own group first. */
+export type PositionGroup = 'forward' | 'half' | 'back';
+export const POSITION_GROUP: Readonly<Record<Position, PositionGroup>> = {
+  hooker: 'forward',
+  prop: 'forward',
+  'second-row': 'forward',
+  lock: 'forward',
+  'five-eighth': 'half',
+  halfback: 'half',
+  fullback: 'back',
+  winger: 'back',
+  centre: 'back',
+};
+
+/**
+ * Fresh legs (#367): the most tired man with legs under `offBelow` (ties by slot)
+ * for the freshest uninjured bench man with at least `onAtLeast`, from his position
+ * group first (ties by bench index). Slots and bench indexes in `taken` are skipped.
+ * Null when nobody is tired or nobody on the bench is fresh.
+ */
+export function pickFreshLegs(
+  field: readonly { slot: number; energy: number; position: Position }[],
+  bench: readonly { energy: number; injured?: boolean; position?: Position }[],
+  offBelow: number,
+  onAtLeast: number,
+  taken: { slots?: ReadonlySet<number>; bench?: ReadonlySet<number> } = {},
+): { slot: number; bench: number } | null {
+  let off: (typeof field)[number] | null = null;
+  for (const p of field) {
+    if (p.energy >= offBelow || taken.slots?.has(p.slot)) continue;
+    if (!off || p.energy < off.energy || (p.energy === off.energy && p.slot < off.slot)) off = p;
+  }
+  if (!off) return null;
+  const group = POSITION_GROUP[off.position];
+  let best = -1;
+  let bestSame = false;
+  bench.forEach((b, i) => {
+    if (b.injured || b.energy < onAtLeast || taken.bench?.has(i)) return;
+    const same = b.position !== undefined && POSITION_GROUP[b.position] === group;
+    if (best < 0 || (same && !bestSame) || (same === bestSame && b.energy > bench[best]!.energy)) {
+      best = i;
+      bestSame = same;
+    }
+  });
+  return best < 0 ? null : { slot: off.slot, bench: best };
 }

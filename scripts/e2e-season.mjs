@@ -418,6 +418,15 @@ async function play() {
       }
     };
   });
+  // The weekly summary card (#368) shows after every advance. The week-summary step
+  // checks it once; after that a flag (kept across the reload) closes each one as it
+  // opens, so it never sits over the grounds or the update bar in the other steps.
+  await ctx.addInitScript(() => {
+    new MutationObserver(() => {
+      if (sessionStorage.getItem('nrlE2eCloseSummary') !== '1') return;
+      document.querySelector('[data-week-summary] [data-summary-close]')?.click();
+    }).observe(document, { childList: true, subtree: true });
+  });
   page = await ctx.newPage();
   page.setDefaultTimeout(10000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
@@ -634,6 +643,24 @@ async function play() {
     rec.notes.push('build raised mid-match, bar held');
   });
   await step('back-to-club', async (rec) => { await leaveMatch(); await facilitiesDrawn(rec); }, { quietToasts: true });
+  // #368: the week's summary, once the club is back: it fits without scrolling, its
+  // buttons take a finger, and Close puts it away. Later cards close themselves.
+  await step('week-summary', async (rec) => {
+    const card = page.locator('[data-week-summary]');
+    if (!(await card.count())) await card.waitFor({ timeout: 5000 }).catch(() => {});
+    if (!(await card.count())) return 'no weekly summary on this build';
+    const fit = await page.evaluate(() => {
+      const box = document.querySelector('[data-week-summary]').closest('.nrl-modal-scroll');
+      return { scrolls: box.scrollHeight > box.clientHeight + 1, title: document.querySelector('[data-week-summary] h2')?.textContent };
+    });
+    rec.notes.push(fit.title ?? '');
+    if (fit.scrolls) throw new Error('the weekly summary scrolls');
+    const small = await smallestBox('[data-summary-advance], [data-summary-close]');
+    if (tooSmall(small)) throw new Error(`summary buttons ${small.w}×${small.h}, under ${TOUCH_MIN}px on touch`);
+    await tap('[data-summary-close]');
+    await card.waitFor({ state: 'detached', timeout: 3000 });
+    await page.evaluate(() => sessionStorage.setItem('nrlE2eCloseSummary', '1'));
+  });
   await step('update-bar', async (rec) => {
     if (!updateRaised) return 'skipped';
     await page.waitForSelector('.nrl-update-toast', { state: 'visible', timeout: 5000 });

@@ -31,6 +31,6 @@ describe('objectiveStatus (3k)', () => {
   });
 
   it('every status has its chip', () => {
-    expect(Object.values(OBJECTIVE_STATUS_LABEL)).toEqual(['On track', 'At risk', 'Pending', 'Met', 'Failed']);
+    expect(Object.values(OBJECTIVE_STATUS_LABEL)).toEqual(['On track', 'At risk', 'Pending', 'Met', 'Failed', 'Off track']);
   });
 });

@@ -11,3 +11,7 @@ balance/runs/
 balance/plans/experiments/
 .balance-log/
 e2e-output/
+
+# Build env (VITE_* placeholders for the commercial work, #362): never committed.
+.env
+.env.*

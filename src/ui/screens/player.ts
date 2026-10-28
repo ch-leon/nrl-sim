@@ -19,7 +19,9 @@ import { marketWage, overallRating } from '../../data/player';
 import { ROMAN, TRAITS, traitTip } from '../../data/traits';
 import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } from '../../systems/contracts';
-import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis, signPlayer } from '../../systems/freeagency';
+import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
+import { signWithUndo } from '../../systems/undo';
+import { activePack } from '../../content';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
 import { kitFromColors, type Kit } from '../../art/match/kit';
@@ -30,6 +32,7 @@ import { fmtMoney } from './finance';
 import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
 import { LINEUP_SLOTS, resolveLineup, setCaptain, setKicker, statsAt } from '../../systems/lineup';
 import { kickerAndCaptain } from '../../match/league/sheets';
+import { RETIREMENT_NOTE_AGE, careerStage, projectCareer, retirementRisk, type CareerPoint, type CareerStage } from '../../systems/potential';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
 
@@ -86,11 +89,43 @@ export interface PlayerPageModel {
   tenure: string | null;
   season: StatTally | null;
   career: StatTally | null;
+  /** His projected career (#369): a view of the training rules run forward, not a hidden stat. */
+  outlook: PlayerOutlook;
   actions: PlayerAction[];
 }
 
+export interface PlayerOutlook {
+  /** Rating today, then at each birthday to 34. */
+  points: CareerPoint[];
+  peak: CareerPoint;
+  /** "Projected peak: 74 at 26 (at your club)". */
+  peakText: string;
+  /** Where he is on the curve, by training.ts ageMod's bands. */
+  stage: CareerStage;
+  /** "Retirement risk: 20% at the season's end", from 33. */
+  retirement: string | null;
+}
+
+/**
+ * The player page's outlook (#369): his career projected from the club's
+ * facilities and focus today. Free agents and rivals are projected as if they
+ * trained at your club, and say so.
+ */
+export function playerOutlook(p: Player, ctx: PlayerContext, state: GameState): PlayerOutlook {
+  const { points, peak } = projectCareer(p, state.facilities, state.training?.focus ?? 'balanced', undefined, state.week);
+  const where = ctx.kind === 'squad' ? '' : ' (at your club)';
+  const when = peak.age === p.age ? 'now' : `at ${peak.age}`;
+  return {
+    points,
+    peak,
+    peakText: `Projected peak: ${peak.rating} ${when}${where}`,
+    stage: careerStage(p.age),
+    retirement: p.age >= RETIREMENT_NOTE_AGE ? `Retirement risk: ${Math.round(retirementRisk(p.age) * 100)}% at the season's end` : null,
+  };
+}
+
 const STAT_LABELS: readonly [keyof PlayerStats, string][] = [
-  ['speed', 'Speed'], ['strength', 'Strength'], ['stamina', 'Stamina'], ['skill', 'Skill'], ['footyIQ', 'Footy IQ'],
+  ['speed', 'Speed'], ['strength', 'Strength'], ['stamina', 'Stamina'], ['skill', 'Skill'], ['footyIQ', activePack().vocab.iqStat],
 ];
 
 /** Morale in a word: 70+ happy, 50+ content, 30+ unsettled, else unhappy. */
@@ -276,6 +311,7 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
       ? { games: p.seasonStats.games, tries: p.seasonStats.tries, tackles: p.seasonStats.tackles, lineBreaks: p.seasonStats.lineBreaks }
       : squad ? { games: 0, tries: 0, tackles: 0, lineBreaks: 0 } : null,
     career: p.career ?? null,
+    outlook: playerOutlook(p, ctx, state),
     actions: playerActions(p, ctx, state),
   };
 }
@@ -350,6 +386,11 @@ export const PLAYER_CSS = `
 .nrl-player-about { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-right: 4px; }
 .nrl-player h3 { flex: 0 0 auto; margin: 10px 0 4px; font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-player h3:first-child { margin-top: 0; }
+.nrl-player-outlook { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 8px; background: var(--nrl-panel); }
+.nrl-player-curve { flex: 0 0 auto; width: 132px; height: 38px; }
+.nrl-player-outlook-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 12px; line-height: 1.35; color: var(--nrl-text-2); }
+.nrl-player-outlook-text b { color: var(--nrl-text); }
+.nrl-player-outlook-text small { font-size: 11px; color: var(--nrl-muted); }
 .nrl-player-stats { display: flex; flex-direction: column; flex: 0 0 auto; }
 .nrl-statrow { display: grid; grid-template-columns: 72px minmax(0, 1fr) 30px 56px; align-items: center; gap: 8px; height: 28px; }
 .nrl-stattrack { height: 6px; border-radius: 3px; background: var(--nrl-button); overflow: hidden; }
@@ -410,7 +451,7 @@ const FAILURE: Record<string, string> = {
 function runAction(id: PlayerActionId, playerId: string): { ok: boolean; reason?: string } {
   const s = getState();
   switch (id) {
-    case 'sign': return signPlayer(s, playerId);
+    case 'sign': return signWithUndo(playerId); // with a 5-second Undo (#370)
     case 'renew': return renewEarly(s, playerId);
     case 'sell': return sellPlayer(s, playerId);
     case 'release': return releasePlayer(s, playerId);
@@ -455,6 +496,49 @@ function setLineup(next: GameState['lineup']): void {
   if (next === getState().lineup) return;
   setState({ lineup: next });
   save(getState());
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const CURVE_W = 132;
+const CURVE_H = 38;
+
+/** The curve's rating axis spans at least this many points, so a one-point wobble reads as flat. */
+const CURVE_MIN_SPAN = 20;
+
+/** Each point of the curve in the SVG's box: age across, rating up, over at least CURVE_MIN_SPAN points. Pure. */
+export function curveXY(points: readonly CareerPoint[], w = CURVE_W, h = CURVE_H): { x: number; y: number }[] {
+  const min = Math.min(...points.map((q) => q.rating));
+  const max = Math.max(...points.map((q) => q.rating));
+  const grow = Math.max(0, CURVE_MIN_SPAN - (max - min)) / 2;
+  const lo = min - grow;
+  const hi = max + grow;
+  const first = points[0]!.age;
+  const span = Math.max(1, points[points.length - 1]!.age - first);
+  const pad = 3;
+  return points.map((q) => ({
+    x: pad + ((q.age - first) / span) * (w - 2 * pad),
+    y: pad + (1 - (q.rating - lo) / (hi - lo)) * (h - 2 * pad),
+  }));
+}
+
+/** The age curve (#369): rating against age, today ringed, the peak on a dotted line, in the sheet's yellow. */
+function careerCurve(o: PlayerOutlook): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${CURVE_W} ${CURVE_H}`);
+  svg.setAttribute('class', 'nrl-player-curve');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `Projected rating by age: ${o.points.map((q) => `${q.rating} at ${q.age}`).join(', ')}`);
+  const xy = curveXY(o.points);
+  const add = (tag: string, attrs: Record<string, string | number>): void => {
+    const n = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+    svg.append(n);
+  };
+  const peak = xy[o.points.indexOf(o.peak)]!;
+  add('line', { x1: peak.x, x2: peak.x, y1: 0, y2: CURVE_H, stroke: 'var(--nrl-muted)', 'stroke-width': 1, 'stroke-dasharray': '2 2' });
+  add('polyline', { points: xy.map((q) => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(' '), fill: 'none', stroke: 'var(--nrl-accent)', 'stroke-width': 2, 'stroke-linejoin': 'round' });
+  add('circle', { cx: xy[0]!.x, cy: xy[0]!.y, r: 3, fill: 'var(--nrl-text)' });
+  return svg;
 }
 
 /**
@@ -515,6 +599,14 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     const about = el('div', { class: 'nrl-player-col nrl-player-about' },
       el('h3', { text: m.trainingFocus ? `Stats · this week's training: ${m.trainingFocus}` : 'Stats' }),
       statBars(m.stats, m.trainingFocus),
+      // #369: the projection, under the stats it comes from.
+      el('h3', { text: 'Outlook' }),
+      el('div', { class: 'nrl-player-outlook', attrs: { 'data-outlook': m.outlook.stage, title: 'Your training rules run forward from your facilities and focus today: a projection, not a hidden potential stat.' } },
+        careerCurve(m.outlook),
+        el('div', { class: 'nrl-player-outlook-text' },
+          el('div', {}, el('b', { text: m.outlook.stage }), ' · ', m.outlook.peakText),
+          ...(m.outlook.retirement ? [el('div', { class: 'nrl-player-expiring', text: m.outlook.retirement })] : []),
+          el('small', { text: 'A projection: it depends on your facilities.' }))),
       el('h3', { text: 'Traits' }),
       ...(m.traits.length > 0
         ? m.traits.map((t) => el('div', { class: `nrl-player-trait${t.bad ? ' nrl-player-trait-bad' : ''}` }, el('b', { text: t.label }), t.tip))

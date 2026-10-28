@@ -8,17 +8,18 @@ import { bus } from '../../core/events';
 import { getState, type GameState, type Objective } from '../../core/state';
 import { getActiveSlot } from '../../core/save';
 import { BOARD } from '../../config';
-import { objectiveLine, sackedSummary } from '../../systems/board';
+import { objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board';
+import { financeSummary } from './finance';
 import { ladderPosition } from '../../systems/fixtures';
 import { STAFF, STAFF_ROLES, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
 import { el, button, openModal, openScreen, closeScreen, ensureStyles } from '../dom';
 
 /** How an objective stands (3k): ON TRACK / AT RISK while the season runs, MET / FAILED once reviewed, PENDING before a ball is kicked. */
-export type ObjectiveStatus = 'on-track' | 'at-risk' | 'pending' | 'met' | 'failed';
+export type ObjectiveStatus = 'on-track' | 'at-risk' | 'pending' | 'met' | 'failed' | 'off-track';
 
 /** The status chip's words. */
 export const OBJECTIVE_STATUS_LABEL: Record<ObjectiveStatus, string> = {
-  'on-track': 'On track', 'at-risk': 'At risk', pending: 'Pending', met: 'Met', failed: 'Failed',
+  'on-track': 'On track', 'at-risk': 'At risk', pending: 'Pending', met: 'Met', failed: 'Failed', 'off-track': 'Off track',
 };
 
 /**
@@ -66,8 +67,12 @@ export function buildObjectivesSection(state: GameState): HTMLElement {
   if (state.objectives.length === 0) {
     box.append(el('p', { class: 'nrl-board-empty', text: 'The board will set goals once the season is under way.' }));
   } else {
+    // #368: while the season runs, the board's own risk read (systems/board objectiveRisk, from the
+    // same runway as the money readout), so this screen and the hub's chip never disagree.
+    const runway = financeSummary(state).runwayWeeks;
     for (const o of state.objectives) {
-      const st = objectiveStatus(o, state);
+      const now = objectiveStatus(o, state);
+      const st: ObjectiveStatus = now === 'on-track' || now === 'at-risk' ? objectiveRisk(o, state, runway) : now;
       const detail = objectiveDetail(o, state);
       box.append(el('div', { class: `nrl-board-obj nrl-board-${o.status}`, attrs: { 'data-objective': o.kind, 'data-status': st } },
         el('div', { class: 'nrl-board-obj-text' }, el('span', { text: o.text }), ...(detail ? [el('small', { text: detail })] : [])),
@@ -193,7 +198,7 @@ export const BOARD_CSS = `
 .nrl-board-status { font-family: var(--nrl-f-label); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
 .nrl-board-status-on-track, .nrl-board-status-met { color: var(--nrl-pos); }
 .nrl-board-status-at-risk { color: var(--nrl-accent); }
-.nrl-board-status-failed { color: var(--nrl-neg); }
+.nrl-board-status-failed, .nrl-board-status-off-track { color: var(--nrl-neg); }
 .nrl-board-status-pending { color: var(--nrl-muted); }
 .nrl-board-empty { color: var(--nrl-muted); margin: 4px 0; }
 .nrl-staff-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }

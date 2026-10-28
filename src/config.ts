@@ -1,33 +1,39 @@
 // Game constants — see ARCHITECTURE.md §3. This file is the single source of
-// truth for tuning values shared across sim, systems, data, and rendering.
+// truth for tuning values shared across sim, systems, data, and rendering. The
+// league's shape (rounds, finals, players on field, squad size, the rating
+// centre) comes from the active content pack (src/content, #361) and is
+// re-exported here under its old names.
+import { activeLeague } from './content';
+
+const league = activeLeague();
 
 export const GRID_W = 20;            // club grounds grid (tiles)
 export const GRID_H = 20;
 export const TILE_W = 64;            // iso tile screen width (2:1 diamond)
 export const TILE_H = 32;
-export const SEASON_ROUNDS = 24;     // home & away vs 15 rivals + repeats
-export const FINALS_WEEKS = 3;       // weeks 25-27 if qualified
+export const SEASON_ROUNDS = league.seasonRounds;  // AU: 24, home & away vs 15 rivals + repeats
+export const FINALS_WEEKS = league.finalsWeeks;    // AU: 3, weeks 25-27 if qualified
 export const WEEKS_PER_SEASON = SEASON_ROUNDS + FINALS_WEEKS;
-export const SQUAD_CAP = 30;
-export const SQUAD_MIN = 13;         // cannot play a match below this (club management)
+export const SQUAD_CAP = league.squadCap;
+export const SQUAD_MIN = league.squadMin;          // cannot play a match below this (club management)
 /** Points awarded to the non-forfeiting side (fit squad < SQUAD_MIN). */
-export const FORFEIT_SCORE = 24;
+export const FORFEIT_SCORE = league.forfeitScore;
 /** Soft retirement age — chance ramps from here to RETIRE_HARD_AGE (GitHub #5). */
 export const RETIRE_SOFT_AGE = 34;
 /** Hard retirement age — players at/above this always retire at season rollover. */
 export const RETIRE_HARD_AGE = 38;
 /** Players on the field per side in a match (Nines trial — BAK-206 / #1). */
-export const ON_FIELD = 9;
+export const ON_FIELD = league.onField;
 /** Tackles per set before a last-tackle kick (Nines trial — BAK-206 / #1). */
-export const SET_TACKLES = 5;
+export const SET_TACKLES = league.setTackles;
 export const STARTING_MONEY = 200_000;
 export const STAT_MAX = 100;
 
 /**
  * The league's rating centre and where a new game starts against it (N5, #140).
- * Rival strength is the mean overall of a club's best nine; the rivals in
- * data/league.ts are spread around MEAN, and systems/rivals.ts pulls their
- * development back toward it. The player's starting squad is generated like a
+ * Rival strength is the mean overall of a club's best nine; the content
+ * pack's rivals (data/league.ts) are spread around MEAN, and systems/rivals.ts
+ * pulls their development back toward it. The player's starting squad is generated like a
  * rival's: START_STARS stars for a hero, one first-grader per position around
  * START_FIRST_GRADE (moved by the difficulty's startRating), and depth players
  * START_DEPTH_GAP below, so on Normal the best nine starts level with the rival
@@ -36,15 +42,11 @@ export const STAT_MAX = 100;
  * The free-agent pool sits around the league too (N12): a new club's pool is
  * generated around MEAN − POOL_BELOW (a level club's first-grader, so the
  * Recruit screen is not a shop), and scouting lifts it from there
- * (systems/freeagency.ts poolTarget). Assumed (needs Leon).
+ * (systems/freeagency.ts poolTarget). Assumed (needs Leon). The values are the
+ * content pack's (AU: MEAN 55, one star, first grade 52, depth 8 below, pool 3
+ * below; src/content/au.ts).
  */
-export const LEAGUE = {
-  MEAN: 55,
-  START_STARS: 1,
-  START_FIRST_GRADE: 52,
-  START_DEPTH_GAP: 8,
-  POOL_BELOW: 3,
-} as const;
+export const LEAGUE = league.rating;
 
 // Training curve (GitHub #35). Each week's stat gain is multiplied by headroom:
 //   GAIN_RATE × (1 − stat / STAT_MAX) ^ HEADROOM_EXP

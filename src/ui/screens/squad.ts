@@ -19,6 +19,7 @@ import {
 } from './recruit';
 import { openLineupScreen } from './lineup';
 import { fitnessPct, moraleWord, openPlayerPage, positionLabel, squadNumbers } from './player';
+import { contractsEndingSoon, endsInTag } from '../../systems/contracts';
 
 const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
 
@@ -141,6 +142,8 @@ export function openSquadScreen(): void {
       return;
     }
     const numbers = squadNumbers(s);
+    // The dock's red dot leads here (#369): the same dot on each of those rows, its weeks in TO.
+    const ending = new Set(contractsEndingSoon(s).map((p) => p.id));
     for (const p of sortSquad(s.squad, sortKey)) {
       const no = numbers.get(p.id);
       const fit = fitnessPct(p);
@@ -148,7 +151,7 @@ export function openSquadScreen(): void {
       const unhappy = p.morale < 50;
       list.appendChild(tableRow(p, [
         el('span', { class: 'nrl-num nrl-squad-no', text: no ? String(no) : '–', attrs: { title: no ? (no <= 9 ? 'Starting this week' : 'On the bench this week') : 'Not in the side this week' } }),
-        whoCell(p.name, availabilityNote(p), traitChips(p)),
+        whoCell(p.name, availabilityNote(p), traitChips(p), ending.has(p.id) ? `contract ${endsInTag(p)}` : undefined),
         el('span', { class: 'nrl-row-pos', text: posShort(p.position), attrs: { title: positionLabel(p.position) } }),
         el('span', { class: 'nrl-num nrl-row-ovr', text: String(overallRating(p)), attrs: { title: 'Overall rating' } }),
         fitnessCell(fit, p.injuredWeeks > 0, p.injuredWeeks > 0 ? `Injured: out ${p.injuredWeeks} wk` : `Fitness ${fit}%: 100 less his injury risk (${p.injuryRisk})`),

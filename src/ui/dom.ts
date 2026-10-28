@@ -765,30 +765,45 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 @keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(12px); } }
 @media (prefers-reduced-motion: reduce) { .nrl-nav-sheet, .nrl-screen-region { animation: none !important; } }
 
-/* ── Decisions chip: the club home's one thing on the grounds ───────────── */
-.nrl-decisions-chip {
-  pointer-events: auto;
+/* ── Hub chips: the club home's only things on the grounds (3a) ──────────
+   The decisions waiting, and (#368) the board objective most at risk under it. */
+.nrl-hub-chips {
+  pointer-events: none;
   position: fixed;
   top: calc(12px + var(--nrl-safe-t));
   left: calc(16px + var(--nrl-safe-l));
-  height: 44px;
   max-width: calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  z-index: 45;
+}
+body.nrl-match-active .nrl-hub-chips { display: none; }
+.nrl-decisions-chip {
+  pointer-events: auto;
+  height: 44px;
+  max-width: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 6px 0 14px;
+  border: 0;
   border-radius: 12px;
   background: rgba(14, 22, 48, 0.95);
   box-shadow: var(--nrl-shadow-chip);
   color: var(--nrl-text);
-  z-index: 45;
+  font: inherit;
   box-sizing: border-box;
 }
 .nrl-decisions-chip[hidden] { display: none; }
 .nrl-decisions-chip-count { font-family: var(--nrl-f-label); font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: var(--nrl-accent); white-space: nowrap; }
 .nrl-decisions-chip-top { font-size: 13px; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .nrl-decisions-chip .nrl-btn { min-height: 34px; height: 34px; border-radius: 8px; padding: 0 12px; font-size: 15px; flex: 0 0 auto; }
-body.nrl-match-active .nrl-decisions-chip { display: none; }
+/* The board chip is one button: amber at risk, red off track. */
+.nrl-board-chip { padding-right: 14px; cursor: pointer; text-align: left; }
+.nrl-board-chip:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
+.nrl-board-chip.nrl-hud-board-off .nrl-decisions-chip-count { color: var(--nrl-neg); }
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
 .nrl-modal-backdrop {
@@ -1187,6 +1202,54 @@ body.nrl-match-active .nrl-update-toast { display: none; }
 @media (max-width: 480px) {
   .nrl-event-choices { flex-direction: column; }
 }
+
+/* ── The weekly summary (#368): after each advance, two columns (the squad; the
+   money and the board) so a typical week fits a phone on its side unscrolled. ── */
+.nrl-dialog-region .nrl-summary-modal { width: min(100%, 680px); }
+.nrl-summary h2 { margin: 0 0 8px; padding-right: 44px; min-height: 36px; display: flex; align-items: center; }
+.nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 6px 10px; }
+.nrl-summary-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.nrl-summary-sec { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 13px; }
+.nrl-summary-sec h3 { margin: 0 0 2px; }
+.nrl-summary-sec p { margin: 2px 0 0; line-height: 1.35; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-summary-none { color: var(--nrl-muted); font-style: italic; }
+.nrl-summary-up { color: var(--nrl-pos); }
+.nrl-summary-down { color: var(--nrl-neg); }
+.nrl-summary-board.nrl-summary-happy { border-left-color: var(--nrl-pos); }
+.nrl-summary-board.nrl-summary-watching { border-left-color: var(--nrl-accent); }
+.nrl-summary-board.nrl-summary-worried { border-left-color: var(--nrl-alert); }
+.nrl-summary .nrl-decisions-actions { margin-top: 10px; }
+@media (max-height: 500px), (max-width: 480px) {
+  .nrl-summary h2 { margin-bottom: 4px; }
+  .nrl-summary-sec { font-size: 12px; padding: 4px 8px; }
+  .nrl-summary-col { gap: 4px; }
+}
+
+/* ── #370: the Undo toast and the first-visit hints ─────────────────────── */
+.nrl-toast.nrl-toast-action { cursor: default; max-height: none; padding-top: 0; padding-bottom: 0; padding-right: 4px; gap: 6px; min-height: 52px; }
+.nrl-toast-action .nrl-toast-text { flex: 1 1 auto; min-width: 0; -webkit-line-clamp: 3; overflow-wrap: anywhere; }
+.nrl-toast-action .nrl-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 8px; font-size: 15px; }
+.nrl-btn.nrl-toast-btn { background: var(--nrl-toast-action-bg, var(--nrl-accent)); color: var(--nrl-toast-action-ink, var(--nrl-on-accent)); }
+.nrl-toast-btn[hidden] { display: none; }
+.nrl-btn.nrl-toast-x { width: 44px; padding: 0; font-family: var(--nrl-f-body); }
+.nrl-hint {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  padding: 0 0 0 12px;
+  min-height: 44px;
+  border-radius: 10px;
+  background: var(--nrl-raised);
+  color: var(--nrl-text-2);
+  border-left: 3px solid var(--nrl-accent);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.nrl-hint-text { flex: 1 1 auto; min-width: 0; }
+.nrl-btn.nrl-hint-x { flex: 0 0 auto; width: 44px; min-height: 44px; padding: 0; background: transparent; font-family: var(--nrl-f-body); }
 
 /* ── Placement bar (#78): what to do while placing or moving, and Cancel ── */
 .nrl-placebar {

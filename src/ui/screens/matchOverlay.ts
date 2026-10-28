@@ -31,6 +31,7 @@ import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { CALL_LABEL, type CoachCall } from '../../match/league/calls';
+import { MOMENTUM_STEP_MIN, momentumLabel, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
 
 // ── Pure accumulator (unit-tested independent of the DOM) ─────────────────────
 
@@ -403,6 +404,9 @@ const CALL_CAPTION: Readonly<Record<string, string>> = {
   'late in the set': 'tackle 4+',
   'not in range': 'not in range',
   'full time': 'full time',
+  'used this half': 'used this half',
+  'no one’s tired yet': 'nobody tired',
+  'bench is spent': 'bench spent',
 };
 
 /** Why a call is off, in a few words; "called" once made this set, nothing while it can be made. */
@@ -423,6 +427,7 @@ export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
   'field-goal': 'late, close and in range: drop for goal',
   rush: 'defending: rush up for the next set',
   hold: 'defending: hold the line for the next set',
+  'fresh-legs': 'once a half: tired man off, fresh man on',
 };
 
 /** What a call does, in plain English, on its row in the coach tray (3o): CALL_WHEN less its "when". */
@@ -438,6 +443,8 @@ const UNLOCK_WHEN: Readonly<Record<string, string>> = {
   'late in the set': 'from tackle 4',
   'not in range': 'when in range',
   'not now': 'once play restarts',
+  'used this half': 'next half',
+  'no one’s tired yet': 'once someone tires',
 };
 
 /**
@@ -776,18 +783,27 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const halfEl = el('span', { class: 'nrl-mo-half', text: '1H' });
   // The score in words, for a screen reader (and the e2e's read of it).
   const scoreEl = el('span', { class: 'nrl-mo-score nrl-mo-sr', text: '0 – 0' });
-  const possHome = el('i');
-  possHome.style.background = worn.home;
-  possHome.style.width = '50%';
-  const possAway = el('i');
-  possAway.style.background = worn.away;
+  // The team-colour split under the score bug is the momentum line (#366): who is on top, the last few minutes.
+  const momentum = momentumLine(worn);
   const board = el(
     'button',
     { class: 'nrl-mo-scoreboard', attrs: { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'nrl-mo-stats', title: 'Match stats' } },
     el('span', { class: 'nrl-mo-bug' }, homeCell.cell, awayCell.cell, el('span', { class: 'nrl-mo-clockbox' }, clockEl, halfEl)),
-    el('span', { class: 'nrl-mo-poss', attrs: { 'aria-hidden': 'true' } }, possHome, possAway),
+    momentum.svg,
     scoreEl,
   );
+
+  // The momentum line (#366): the events that move it, at the match-minute they were seen.
+  const momentumSeen: MomentumEvent[] = [];
+  /** The live clock in match-minutes (golden point after the 14), and the furthest it has been (a replay winds the clock back, not the line). */
+  let clockMin = 0;
+  let nowMin = 0;
+  let drawnAt = -Infinity;
+  const drawMomentum = (): void => {
+    drawnAt = nowMin;
+    const samples = momentumWindow(momentumSeen, homeId, nowMin);
+    momentum.draw(samples, momentumLabel(samples, { home: home.name, away: away.name }));
+  };
 
   // Stats (no permanent panel): the score bug opens them, in the report's layout.
   const statsBody = el('div', { class: 'nrl-mo-stats-body' });
@@ -958,7 +974,6 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       clockEl.textContent = formatClock(state.minute, 2 * halfMinutes);
       halfEl.textContent = state.half === 1 ? '1H' : '2H';
     }
-    possHome.style.width = `${possessionPct(state)[0]}%`;
     if (statsOpen) renderStats();
   };
 
@@ -1068,6 +1083,17 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     else if (ev.kind === 'kick') counts.kicks[i]!++;
     else if (ev.kind === 'big-hit') counts.hits[i]!++;
     render();
+    if (ev.kind === 'try' || ev.kind === 'big-hit' || ev.kind === 'error' || ev.kind === 'set-start') {
+      // Seen this frame: the live clock's minute, kept inside the event's own (a resumed match's catch-up has no clock yet).
+      const prev = momentumSeen[momentumSeen.length - 1]?.at ?? 0;
+      const at = Math.max(prev, Math.min(ev.t + 0.999, Math.max(ev.t, clockMin)));
+      momentumSeen.push({ at, kind: ev.kind, teamId: ev.teamId });
+      nowMin = Math.max(nowMin, at);
+      drawMomentum();
+    } else if (!liveClock && ev.t > nowMin) {
+      nowMin = ev.t;
+      drawMomentum();
+    }
     const b = scoreBanner(ev, homeId, [home.name, away.name]);
     if (b) {
       const kind = ev.kind === 'try' ? 'score try' : 'score';
@@ -1126,6 +1152,11 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     },
     setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void {
       liveClock = true;
+      clockMin = (half === 'gp' ? 2 * halfMinutes * 60 + matchSeconds : matchSeconds) / 60;
+      if (clockMin > nowMin) {
+        nowMin = clockMin;
+        if (nowMin - drawnAt >= MOMENTUM_STEP_MIN) drawMomentum();
+      }
       // Full time keeps the clock and the label it had at the whistle, except while a replay
       // shows an earlier half. (After a Skip the paused sim still reports where it stopped.)
       if (finalClock !== null && !root.classList.contains('nrl-mo-replaying')) {
@@ -1209,6 +1240,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
 
   active = handle;
   render();
+  drawMomentum();
   return handle;
 }
 
@@ -1218,6 +1250,43 @@ export function unmountMatchOverlay(): void {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/** The sparkline's drawing box; CSS stretches it to the score bug's width and 8px tall. */
+const MOMENTUM_BOX = { width: 100, height: 12 };
+
+/** The momentum line under the score bug (#366): home's share filled above the middle in its colour, away's below in its. */
+function momentumLine(worn: { home: string; away: string }): { svg: SVGSVGElement; draw: (samples: Parameters<typeof momentumShapes>[0], label: string) => void } {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'nrl-mo-momentum');
+  svg.setAttribute('viewBox', `0 0 ${MOMENTUM_BOX.width} ${MOMENTUM_BOX.height}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('role', 'img');
+  const shape = (fill: string): SVGPolygonElement => {
+    const p = document.createElementNS(SVG_NS, 'polygon');
+    p.setAttribute('fill', fill);
+    p.setAttribute('class', 'nrl-mo-momentum-fill');
+    return p;
+  };
+  const homeShape = shape(worn.home);
+  const awayShape = shape(worn.away);
+  const axis = document.createElementNS(SVG_NS, 'line');
+  axis.setAttribute('class', 'nrl-mo-momentum-axis');
+  axis.setAttribute('x1', '0');
+  axis.setAttribute('x2', String(MOMENTUM_BOX.width));
+  axis.setAttribute('y1', String(MOMENTUM_BOX.height / 2));
+  axis.setAttribute('y2', String(MOMENTUM_BOX.height / 2));
+  svg.append(homeShape, awayShape, axis);
+  return {
+    svg,
+    draw(samples, label): void {
+      const sh = momentumShapes(samples, MOMENTUM_BOX.width, MOMENTUM_BOX.height);
+      homeShape.setAttribute('points', sh.home);
+      awayShape.setAttribute('points', sh.away);
+      if (svg.getAttribute('aria-label') !== label) svg.setAttribute('aria-label', label);
+    },
+  };
+}
 
 function weatherWord(w: WeatherKind): string {
   return w === 'rain' ? 'Rain' : w === 'wind' ? 'Wind' : 'Clear';
@@ -1268,9 +1337,24 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-clockbox { display: flex; align-items: center; gap: 6px; padding: 0 10px; background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-clock { font-family: var(--nrl-f-num); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .nrl-mo-half { font-family: var(--nrl-f-label); font-size: 15px; font-weight: 700; min-width: 1.3em; }
-.nrl-mo-poss { display: flex; height: 4px; }
-.nrl-mo-poss > i { display: block; height: 100%; transition: width 0.4s ease; }
-.nrl-mo-poss > i:last-child { flex: 1 1 auto; }
+/* The momentum line (#366), the team-colour split under the bug: home above the middle, away below. */
+.nrl-mo-momentum { display: block; width: 100%; height: 8px; background: var(--nrl-panel); }
+.nrl-mo-momentum-fill { stroke: none; }
+.nrl-mo-momentum-axis { stroke: rgba(255, 255, 255, 0.25); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+/* What a call did (#366): a tag over COACH for two seconds; it never takes a tap or moves the row. */
+.nrl-mo-call-result {
+  position: fixed; left: calc(16px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 20; pointer-events: none;
+  max-width: calc(100vw - 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 8px 12px; border-radius: 10px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-chip);
+  font-family: var(--nrl-f-label); font-size: 15px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nrl-text-2);
+  animation: nrl-mo-up 180ms ease-out;
+}
+.nrl-mo-call-result[data-paid] { color: var(--nrl-pos); }
+.nrl-mo-tray-open ~ .nrl-mo-call-result, .nrl-mo-call-result[hidden] { display: none; }
+/* Key moments (#366): the speed a break, a try or the last minutes hold the match at pulses in the pill; the chosen one stays yellow. */
+.nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { box-shadow: inset 0 0 0 2px var(--nrl-accent); animation: nrl-mo-slow 0.9s ease-in-out infinite alternate; }
+@keyframes nrl-mo-slow { from { color: var(--nrl-text); } to { color: var(--nrl-accent); } }
+@media (prefers-reduced-motion: reduce) { .nrl-mo-call-result, .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { animation: none; } }
 /* The stats, opened from the score bug: the report's stat column (3t). Asked for, so over the banner. */
 .nrl-mo-statsheet {
   position: fixed; top: calc(var(--nrl-mo-board, 60px) + 6px); left: calc(16px + var(--nrl-safe-l)); z-index: 19;

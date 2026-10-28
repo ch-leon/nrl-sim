@@ -10,8 +10,9 @@ import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
 import { overallRating } from '../../data/player';
 import {
-  signPlayer, signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
+  signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
+import { signWithUndo } from '../../systems/undo';
 import { SQUAD_CAP } from '../../config';
 import { POSITION_SHORT } from '../../systems/lineup';
 import { openPlayerPage, positionLabel } from './player';
@@ -82,6 +83,7 @@ const SCREEN_CSS = `
 .nrl-row-who { display: flex; align-items: center; gap: 6px; overflow: hidden; padding-right: 6px; }
 .nrl-row-name { flex: 0 1 auto; min-width: 3em; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
 .nrl-row-note { flex: 0 0 auto; font-size: 11px; color: var(--nrl-neg); }
+.nrl-row-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); }
 .nrl-chip {
   flex: 0 0 auto;
   font-family: var(--nrl-f-label);
@@ -218,10 +220,15 @@ export function tableRow(p: Player, cells: Node[], onOpen: () => void): HTMLElem
   return row;
 }
 
-/** The name cell: name, an optional note in red (a knock, a ban), then chips. */
-export function whoCell(name: string, note: string | null, chips: HTMLElement[]): HTMLElement {
+/**
+ * The name cell: name, an optional alert dot (#369: a contract ending, the
+ * dock's dot leads here; `alert` is what it reads out), an optional note in red
+ * (a knock, a ban), then chips.
+ */
+export function whoCell(name: string, note: string | null, chips: HTMLElement[], alert?: string): HTMLElement {
   return el('span', { class: 'nrl-row-who' },
     el('span', { class: 'nrl-row-name', text: name }),
+    ...(alert ? [el('span', { class: 'nrl-row-dot', attrs: { title: alert, 'aria-label': alert, role: 'img', 'data-row-alert': '' } })] : []),
     ...(note ? [el('span', { class: 'nrl-row-note', text: note })] : []),
     ...chips);
 }
@@ -353,7 +360,7 @@ export function openRecruitScreen(): void {
       const short = fee - s.money;
       // The signing fee: a transfer-style fee by rating and age (#146).
       const action = button(full ? 'SQUAD FULL' : short > 0 ? `NEED ${shortMoney(short)}` : 'SIGN', () => {
-        const res = signPlayer(getState(), agent.id);
+        const res = signWithUndo(agent.id); // "Signed …" with a 5-second Undo (#370)
         if (!res.ok) bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'info' });
       }, { class: `nrl-row-action${full || short > 0 ? '' : ' nrl-btn-primary'}` });
       action.addEventListener('click', (e) => e.stopPropagation());

@@ -5,11 +5,12 @@ import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
-import { enableAutosave, getActiveSlot, load, save } from './core/save';
+import { enableAutosave, getActiveSlot, getSlotSummaries, load, save } from './core/save';
 import { showTitleFlow } from './ui/title';
 import { advanceWeek } from './core/time';
 import { advanceUntil } from './core/advance';
-import { createHud } from './ui/hud';
+import { advanceFromClub, createHud } from './ui/hud';
+import { initWeekSummary } from './ui/weekSummary';
 import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
 import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
@@ -26,6 +27,7 @@ import { registerStatsSystem } from './systems/stats';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
+import { contractsEndingSoon, endingSoonLabel } from './systems/contracts';
 import { initBoardUi, openStaffScreen, STAFF_SCREEN_TITLE } from './ui/screens/board';
 import { BOARD, FEATURES } from './config';
 import { fmtMoney } from './ui/hud';
@@ -46,11 +48,14 @@ import { advanceUntilAsked, askBeforeAdvance, decisionChipItems, openDecisions, 
 import { initAudio, initAudioUi, soundStatus } from './fx/audio';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
-import { setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
+import { initFirstVisitHints, setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
+import { commitUndo, initUndo } from './systems/undo';
 import { openGuideScreen } from './ui/guide/guide';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
 import { bootLab } from './match/lab/boot';
+import { commercialEnabled } from './commercial/flags';
+import { initCommercial, recordFirstRun } from './commercial/demo';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
@@ -99,10 +104,13 @@ async function boot(): Promise<void> {
     },
   });
   initToasts(uiRoot);
+  initUndo(); // a match starting ends the 5-second Undo (#370)
   initSeasonEndFeedback();
   initFinanceLedger();
   initNewsInbox();
   warmMatchArt(); // the match ground painted in the art worker while the title is up (N10.5)
+  // #362: the careers already here before the first commercial run keep the full game.
+  if (commercialEnabled()) recordFirstRun(getSlotSummaries());
   const choice = await showTitleFlow(uiRoot);
   if (choice.mode === 'continue') {
     const saved = load();
@@ -118,6 +126,7 @@ async function boot(): Promise<void> {
     createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
+  if (commercialEnabled()) initCommercial(getActiveSlot()); // the demo gate's slot and its end toast (#362)
   // The player's kit design (#79) feeds every kit drawn from here on.
   syncKitDesign(getState());
   bus.on('state:changed', (s) => syncKitDesign(s));
@@ -138,7 +147,7 @@ async function boot(): Promise<void> {
   registerBoardSystem();
   registerEventsSystem();
   registerRivalsSystem();
-  initMatchReport();
+  initMatchReport({ onReason: (screen) => nav.open(screen) }); // "Why did I lose?" (#368)
   initBoardUi();
   // The next fixture's match art, painted in a Worker during the week and uploaded in idle slices (N10.5).
   initMatchArtAhead({ textures: () => game?.textures ?? null, busy: () => game?.scene.isActive('Match') ?? false });
@@ -166,15 +175,27 @@ async function boot(): Promise<void> {
   // (#315). A later turn to portrait still sleeps from onBlock, above.
   sleepLoopIfPortrait(g, () => portraitBlocked);
   // #338: neither advance takes a pending card's default unasked.
+  // #370: each first keeps whatever an open Undo would take back, so the decisions confirm is unchanged.
+  const advanceOneWeek = (): void => {
+    commitUndo();
+    askBeforeAdvance(1, () => advanceWeek());
+  };
+  const runwayWeeks = (s: GameState): number | null => financeSummary(s).runwayWeeks;
   createHud({
-    onAdvanceWeek: () => askBeforeAdvance(1, () => advanceWeek()),
-    onAdvanceUntil: (t) => advanceUntilAsked(t, advanceUntil),
+    onAdvanceWeek: advanceOneWeek,
+    onAdvanceUntil: (t) => {
+      commitUndo();
+      advanceUntilAsked(t, advanceUntil);
+    },
     onNextMatch: () => nav.open('fixtures'),
     onMoney: () => nav.open('finance'),
+    onBoard: () => nav.open('staff'), // the objective at risk (#368)
     onDecisions: () => void openDecisions(),
     decisions: decisionChipItems,
-    runwayWeeks: (s) => financeSummary(s).runwayWeeks,
+    runwayWeeks,
   });
+  // #368: the weekly summary, from the club as it stands now; its Play Week is the dock's.
+  initWeekSummary({ onAdvance: () => advanceFromClub(advanceOneWeek), runwayWeeks });
 
   // Grounds → Match handoff: for the classic engine state/ladder are already
   // applied by the matchday tick hook before this fires and the Match scene is
@@ -249,9 +270,17 @@ async function boot(): Promise<void> {
   newsInbox.onChange(refreshNewsBadge);
   bus.on('state:changed', refreshNewsBadge);
   refreshNewsBadge();
+  // Squad's red dot (#369): a contract ends within 4 weeks. Looking doesn't clear it; renewing, selling or releasing does.
+  const refreshSquadDot = (): void => {
+    const n = contractsEndingSoon(getState()).length;
+    nav.setDot('squad', n > 0, endingSoonLabel(n));
+  };
+  bus.on('state:changed', refreshSquadDot);
+  refreshSquadDot();
 
   setTutorialScreens((id) => nav.open(id)); // each step opens its own screen (#337)
   startTutorial(); // self-guards on settings.tutorialDone
+  initFirstVisitHints(); // a line atop Lineup, News, Finance and Contracts the first time each opens (#370)
   initPwa({ holdIosHint: whenTutorialDone }); // the install hint waits for the tutorial (#337 U4)
 
   // A live match in progress when the app was closed (#73): the save is from the

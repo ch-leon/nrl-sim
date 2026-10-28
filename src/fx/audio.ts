@@ -709,6 +709,12 @@ export function initAudioUi(): () => void {
     () => getState().settings.coachCalls !== false, (on) => setSetting({ coachCalls: on }), 'nrl-live-toggle');
   const liveRivals = toggle('Rival matches played out', 'Real stats and injuries for every result. Match weeks take longer on a phone.',
     () => getState().settings.liveRivals === true, (on) => setSetting({ liveRivals: on }), 'nrl-live-toggle nrl-rivals-toggle');
+  // #366: on when absent, so an old save slows down for big moments too.
+  const keyMoments = toggle('Slow down for big moments', 'Line breaks, tries and the last two minutes',
+    () => getState().settings.keyMoments !== false, (on) => setSetting({ keyMoments: on }), 'nrl-live-toggle nrl-moments-toggle');
+  // #368: the weekly summary card after each advance; on unless switched off.
+  const weekSummary = toggle('Show weekly summary', 'Training, injuries, money and the board after each advance.',
+    () => getState().settings.weekSummary !== false, (on) => setSetting({ weekSummary: on }), 'nrl-summary-toggle');
 
   const installBtn = button('Install app', () => {
     void promptInstall().then((outcome) => {
@@ -763,9 +769,11 @@ export function initAudioUi(): () => void {
         el('label', { class: 'nrl-audio-row' }, el('b', { text: 'Volume' }), slider),
         mute.row, coachCalls.row, liveRivals.row),
       el('div', { class: 'nrl-settings-col' },
-        el('div', { class: 'nrl-audio-row nrl-audio-btnrow' }, replayBtn),
-        el('div', { class: 'nrl-audio-row nrl-audio-btnrow' }, exportBtn),
+        // One row for the two, so the key-moments and weekly-summary switches (#366, #368) cost no height.
+        el('div', { class: 'nrl-audio-row nrl-audio-btnrow nrl-settings-pair' }, replayBtn, exportBtn),
         importRow,
+        keyMoments.row,
+        weekSummary.row,
         installRow),
     ),
   );
@@ -773,7 +781,7 @@ export function initAudioUi(): () => void {
   ensureAudioStyles();
   return () => {
     syncInstallVisibility();
-    for (const t of [mute, coachCalls, liveRivals]) t.sync();
+    for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary]) t.sync();
     slider.value = String(Math.round(clampVolume(getState().settings.volume) * 100));
     importIdle();
     openModal(content, { class: 'nrl-settings-modal', region: true, closeButton: true });
@@ -811,6 +819,8 @@ function ensureAudioStyles(): void {
 .nrl-audio-row > .nrl-btn { flex: 1 1 auto; }
 .nrl-audio-btnrow { padding: 0; background: none; }
 .nrl-audio-btnrow > .nrl-btn { min-height: 44px; }
+.nrl-settings-pair { gap: 4px; }
+.nrl-settings-pair > .nrl-btn { flex: 1 1 0; padding: 0 8px; }
 .nrl-settings-toggle { cursor: pointer; }
 .nrl-settings-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; font-size: 13px; }
 .nrl-settings-text b { font-family: var(--nrl-f-label); font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -819,10 +829,12 @@ function ensureAudioStyles(): void {
 .nrl-settings-import { flex-wrap: wrap; padding: 0; background: none; }
 .nrl-settings-import:has(.nrl-settings-ask) { padding: 0 10px 8px; background: var(--nrl-raised); }
 .nrl-settings-import > .nrl-btn { flex: 1 1 auto; min-height: 44px; }
-/* 956x330: three columns of rows, so every switch and the Import question sit on screen unscrolled. */
+/* 956x330: columns of three rows, so every switch and the Import question sit on screen unscrolled.
+   Four since the key-moments and weekly-summary switches (#366, #368); the hints go, which no longer fit. */
 @media (max-height: 340px) {
   .nrl-dialog-region .nrl-settings-modal { width: min(100%, 940px); }
-  .nrl-settings-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; gap: 6px 12px; }
+  .nrl-settings-text small { display: none; }
+  .nrl-settings-cols { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, auto); grid-auto-flow: column; align-items: start; gap: 6px 12px; }
   .nrl-settings-col { display: contents; }
   .nrl-settings-import { grid-row: span 2; align-self: start; }
 }

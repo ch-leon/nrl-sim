@@ -36,6 +36,7 @@
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
+import type { Position } from '../../core/state';
 import { TICK_S, type MatchSim } from '../core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_Y, clampToGround, inGoal } from '../core/field';
 import { arrive, integrate, makeBody, maxSpeedFor, separate, speedOf, type Body } from '../core/body';
@@ -56,11 +57,11 @@ import { FATIGUE, afterRun, drainRate, legsSpeed, tiredness } from './fatigue';
 import { GAS, canSprint, paceMult, refillSeconds, runCostMult, stepGas, tankSeconds, type GasState } from './gas';
 import { WRESTLE, driveSpeed, fightOf, gripOf, holdOf, ruckTicks, wrestleTick, type WrestleState } from './wrestle';
 import { NINES, clockText, fullMatch, type MatchLength } from './rules';
-import { BENCH, DEFAULT_ROTATION, benchRecover, pickSwaps, type Rotation } from './bench';
+import { BENCH, DEFAULT_ROTATION, benchRecover, pickFreshLegs, pickSwaps, type Rotation } from './bench';
 import { GOALS, conversionSpot, goalChance, inBonusZone, postsFor } from './goals';
 import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, offsideChance, type CaptainRead } from './penalties';
 import { edgeSheets, spreadSheets, type DifficultyEdge } from './spread';
-import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsDefence, callIsPlay, paidOffText, withAttackCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
+import { CALLS, CALL_LABEL, CallJudge, callDefence, callIsBench, callIsDefence, callIsPlay, paidOffText, withAttackCall, type CallInput, type CallVerdict, type CoachCall } from './calls';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
 import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
@@ -249,6 +250,8 @@ interface Player {
   subFor: number | null;
   subAt: number;
   subSpot: Vec;
+  /** …on the coach's Fresh legs call (#367): the swap is tagged and pays the call. */
+  subFresh: boolean;
   /** In the sin bin (#71): back when the match clock reaches this many seconds (−1 on the field); he stands at `binSpot` on the touchline meanwhile. */
   binUntilS: number;
   binSpot: Vec;
@@ -266,6 +269,8 @@ interface BenchMan {
   traits: TraitInstance[];
   stamina: number;
   energy: number;
+  /** His position (Fresh legs, #367, brings on the same group first); absent when the sheet gave none. */
+  position?: Position;
 }
 
 type Phase =
@@ -384,7 +389,7 @@ function captainOf(sheet: TeamSheet): CaptainRead {
 function benchOf(sheet: TeamSheet): BenchMan[] {
   return (sheet.bench ?? []).slice(0, BENCH.size).map((e) => {
     const traits = e.traits ? [...e.traits] : [];
-    return { name: e.name, key: e.id ?? e.name, ...(e.id ? { id: e.id } : {}), injuryRisk: e.injuryRisk ?? 20, injured: false, stats: statsOf(e), traits, stamina: e.stats?.stamina ?? 50, energy: 1 };
+    return { name: e.name, key: e.id ?? e.name, ...(e.id ? { id: e.id } : {}), injuryRisk: e.injuryRisk ?? 20, injured: false, stats: statsOf(e), traits, stamina: e.stats?.stamina ?? 50, energy: 1, ...(e.position ? { position: e.position } : {}) };
   });
 }
 
@@ -466,10 +471,21 @@ export class LiveSim implements MatchSim {
     home: { attack: null, defence: null, usedAttack: false, usedDefence: false },
     away: { attack: null, defence: null, usedAttack: false, usedDefence: false },
   };
+  /** Fresh legs (#367): a swap waiting for the next play-the-ball or stoppage, and the calls made this half. */
+  private readonly freshLegs: Record<Side, { pending: boolean; usedThisHalf: number }> = {
+    home: { pending: false, usedThisHalf: 0 },
+    away: { pending: false, usedThisHalf: 0 },
+  };
   /** Who had the ball and on what tackle at the end of the last tick: a new set or a tackle ends a call's scope. */
   private callAtk: Side | null = null;
   /** Which calls paid off (spec §3's last column). */
   private readonly judge = new CallJudge();
+  /**
+   * Every call judged so far, paid or not, with its ground (#366): the match screen
+   * reads the new ones after each tick for the result tag by the chips. A view-side
+   * channel, not events, so the event stream and every recorded match stay as they are.
+   */
+  readonly verdicts: CallVerdict[] = [];
   /** Sets each side has had and how many it completed (§7 completion: a set not ended by its own error, a turnover or a penalty against it). */
   readonly sets: Record<Side, number> = { home: 0, away: 0 };
   readonly setsCompleted: Record<Side, number> = { home: 0, away: 0 };
@@ -634,6 +650,7 @@ export class LiveSim implements MatchSim {
         subFor: null,
         subAt: 0,
         subSpot: { x: 50, y: 1 },
+        subFresh: false,
         binUntilS: -1,
         binSpot: { x: 50, y: 1 },
       };
@@ -813,6 +830,8 @@ export class LiveSim implements MatchSim {
       default:
         break;
     }
+    // Fresh legs (#367): one test a tick, and nothing more, until a coach calls it.
+    if (this.freshLegs.home.pending || this.freshLegs.away.pending) this.landFreshLegs();
     if (this.tick % Math.max(1, Math.round(LIVE.decideEveryTicks)) === 0) this.assignTargets();
     this.move();
     this.restBench();
@@ -846,6 +865,13 @@ export class LiveSim implements MatchSim {
   callRefusal(side: Side, call: CoachCall): string | null {
     const k = this.phase.kind;
     if (this.finished || k === 'half-time' || k === 'conversion' || k === 'goal' || k === 'try') return 'not now';
+    if (callIsBench(call)) {
+      const fl = this.freshLegs[side];
+      if (fl.pending || fl.usedThisHalf >= CALLS.freshLegs.perHalf) return 'used this half';
+      if (!this.side(side).some((p) => p.subFor === null && p.energy < CALLS.freshLegs.offBelow)) return 'no one’s tired yet';
+      if (!this.bench[side].some((b) => !b.injured && b.energy >= CALLS.freshLegs.onAtLeast)) return 'bench is spent';
+      return null;
+    }
     const st = this.callState[side];
     if (callIsDefence(call)) {
       if (this.attacking === side) return 'not while you have the ball';
@@ -933,6 +959,17 @@ export class LiveSim implements MatchSim {
   call(side: Side, call: CoachCall): string | null {
     const why = this.callRefusal(side, call);
     if (why) return why;
+    if (callIsBench(call)) {
+      // Neither of the set's calls: the swap waits for the next play-the-ball or stoppage.
+      const fl = this.freshLegs[side];
+      fl.pending = true;
+      fl.usedThisHalf++;
+      const pick = this.freshLegsPick(side);
+      this.emit('coach-call', `${this.names[side]} coach calls: ${CALL_LABEL[call].toLowerCase()}`, pick ? this.at(side, pick.slot) : this.kicker(side));
+      this.events[this.events.length - 1]!.detail = call;
+      this.judge.make(side, call, this.attacking, this.dirOf(this.attacking), this.ballPos().x);
+      return null;
+    }
     const st = this.callState[side];
     if (callIsDefence(call)) {
       st.defence = call;
@@ -983,6 +1020,51 @@ export class LiveSim implements MatchSim {
     return left <= GOALS.fieldGoalLastS + GOALS.fieldGoalSoonExtraS && margin >= GOALS.fieldGoalMargin[0] && margin <= GOALS.fieldGoalMargin[1];
   }
 
+  /** Fresh legs (#367): called and waiting for its swap (the chip stays lit). */
+  freshLegsPending(side: Side): boolean {
+    return this.freshLegs[side].pending;
+  }
+
+  /** Who Fresh legs would bring off and on now (bench.ts pickFreshLegs), skipping `taken`. */
+  private freshLegsPick(side: Side, taken?: { slots: ReadonlySet<number>; bench: ReadonlySet<number> }): { slot: number; bench: number } | null {
+    const field = this.side(side).filter((p) => p.subFor === null).map((p) => ({ slot: p.slot, energy: p.energy, position: ROLES[p.slot]!.name }));
+    return pickFreshLegs(field, this.bench[side], CALLS.freshLegs.offBelow, CALLS.freshLegs.onAtLeast, taken);
+  }
+
+  /**
+   * Fresh legs at a play-the-ball (#367): the swap is made where he stands, as a
+   * jog that runs out of time is, if he is free: not in the ruck (the man playing
+   * the ball, the tackler, the markers, the dummy-half), not holding the ball, not
+   * locked. A busy man waits for the next ruck, or the next stoppage (callSwaps).
+   */
+  private landFreshLegs(): void {
+    const ph = this.phase;
+    if (ph.kind !== 'ruck' || ph.stage === 'down') return;
+    for (const side of ['home', 'away'] as const) {
+      const fl = this.freshLegs[side];
+      if (!fl.pending) continue;
+      const pick = this.freshLegsPick(side);
+      if (!pick) {
+        this.lapseFreshLegs(side);
+        continue;
+      }
+      const p = this.at(side, pick.slot);
+      const i = this.indexOf(p);
+      const dh = p === this.dummyHalf(this.attacking) || (ph.handover && p === this.dummyHalf(other(this.attacking)));
+      if (p === this.holder() || i === ph.carrier || i === ph.tackler || this.markers.includes(i) || dh || this.locked(p)) continue;
+      fl.pending = false;
+      this.swapIn(p, pick.bench, true);
+    }
+  }
+
+  /** Fresh legs with nobody left to bring off (#367): the call lapses, unpaid, and the coach has it back for the half. */
+  private lapseFreshLegs(side: Side): void {
+    const fl = this.freshLegs[side];
+    fl.pending = false;
+    fl.usedThisHalf = Math.max(0, fl.usedThisHalf - 1);
+    this.announcePaid(this.judge.lapsed(side));
+  }
+
   /** Calls each side has made, and how many paid off. */
   get callsMade(): Readonly<Record<Side, number>> {
     return this.judge.made;
@@ -991,9 +1073,10 @@ export class LiveSim implements MatchSim {
     return this.judge.paid;
   }
 
-  /** A call that paid off goes in the commentary (no player: the coach's). */
+  /** A call that paid off goes in the commentary (no player: the coach's). Every verdict is kept for the match screen. */
   private announcePaid(vs: readonly CallVerdict[]): void {
     for (const v of vs) {
+      this.verdicts.push(v);
       if (v.paid) this.events.push({ tick: this.tick, kind: 'call-paid', text: paidOffText(this.names[v.side], v.call), side: v.side, detail: v.call });
     }
   }
@@ -1113,6 +1196,18 @@ export class LiveSim implements MatchSim {
     if (this.tick < ph.t0 + (this.golden ? NINES.goldenPointBreakTicks : NINES.halfTimeTicks)) return;
     // Golden point straight after full time: no legs back, no swaps in the sheds.
     const legsBack = this.golden ? 0 : NINES.halfTimeLegsBack;
+    // Fresh legs still to land (#367) is made in the sheds, picked on the legs they came in with (before any come back); each side gets a new call for the half.
+    for (const side of ['home', 'away'] as const) {
+      const fl = this.freshLegs[side];
+      if (fl.pending) {
+        const pick = this.freshLegsPick(side);
+        if (pick) {
+          fl.pending = false;
+          this.swapIn(this.at(side, pick.slot), pick.bench, true);
+        } else this.lapseFreshLegs(side);
+      }
+      fl.usedThisHalf = 0;
+    }
     for (const p of this.players) {
       p.energy += (1 - p.energy) * legsBack;
       p.gas = { gas: p.energy, blown: false };
@@ -1141,14 +1236,14 @@ export class LiveSim implements MatchSim {
   }
 
   // ── Interchanges (2b) ─────────────────────────────────────────────────────
-  /** Who the coach takes off now, by his rotation policy. */
-  private swapsFor(side: Side): { slot: number; bench: number }[] {
+  /** Who the coach takes off now, by his rotation policy. `taken`: a Fresh legs swap at this stoppage (#367), already made, so neither man is picked again. */
+  private swapsFor(side: Side, taken?: { slots: ReadonlySet<number>; bench: ReadonlySet<number> }): { slot: number; bench: number }[] {
     // A hurt man comes off first, whatever the rotation, for the freshest man left (2f).
     const bench = this.bench[side];
     const out: { slot: number; bench: number }[] = [];
-    const used = new Set<number>();
+    const used = new Set<number>(taken?.bench);
     for (const p of this.side(side)) {
-      if (!p.hurt || p.subFor !== null) continue;
+      if (!p.hurt || p.subFor !== null || taken?.slots.has(p.slot)) continue;
       let best = -1;
       bench.forEach((b, i) => {
         if (!b.injured && !used.has(i) && (best < 0 || b.energy > bench[best]!.energy)) best = i;
@@ -1158,17 +1253,31 @@ export class LiveSim implements MatchSim {
       out.push({ slot: p.slot, bench: best });
     }
     const rest = pickSwaps(
-      this.side(side).filter((p) => !out.some((o) => o.slot === p.slot)).map((p) => ({ slot: p.slot, energy: p.energy })),
+      this.side(side).filter((p) => !out.some((o) => o.slot === p.slot) && !taken?.slots.has(p.slot)).map((p) => ({ slot: p.slot, energy: p.energy })),
       bench.map((b, i) => (b.injured || used.has(i) ? { energy: -Infinity } : b)),
       this.rotation[side],
     );
     return [...out, ...rest];
   }
 
-  /** After a try: the men coming off head for the interchange spot (the restart waits for them). */
+  /** After a try: the men coming off head for the interchange spot (the restart waits for them). A Fresh legs call still to land goes first (#367). */
   private callSwaps(): void {
     for (const side of ['home', 'away'] as const) {
-      for (const sw of this.swapsFor(side)) {
+      if (this.freshLegs[side].pending) {
+        const pick = this.freshLegsPick(side);
+        if (pick) {
+          const p = this.at(side, pick.slot);
+          p.subFor = pick.bench;
+          p.subAt = this.tick;
+          p.subSpot = this.interchangeSpot(p);
+          p.subFresh = true;
+          this.freshLegs[side].pending = false;
+        } else this.lapseFreshLegs(side);
+      }
+      // A man already on his way off for Fresh legs counts as swapped at this stoppage.
+      const going = this.side(side).find((p) => p.subFresh && p.subFor !== null);
+      const taken = going ? { slots: new Set([going.slot]), bench: new Set([going.subFor!]) } : undefined;
+      for (const sw of this.swapsFor(side, taken)) {
         const p = this.at(side, sw.slot);
         p.subFor = sw.bench;
         p.subAt = this.tick;
@@ -1191,11 +1300,11 @@ export class LiveSim implements MatchSim {
     }
   }
 
-  /** The bench man takes this player's place (slot, role, spot); the player takes his on the bench. */
-  private swapIn(p: Player, bi: number): void {
+  /** The bench man takes this player's place (slot, role, spot); the player takes his on the bench. `fresh`: the coach's Fresh legs call (#367), which it pays. */
+  private swapIn(p: Player, bi: number, fresh = p.subFresh): void {
     const b = this.bench[p.side][bi];
     if (!b) return;
-    this.bench[p.side][bi] = { name: p.name, key: p.key, ...(p.id ? { id: p.id } : {}), injuryRisk: p.injuryRisk, injured: p.hurt, stats: p.stats, traits: p.traits, stamina: p.stamina, energy: p.energy };
+    this.bench[p.side][bi] = { name: p.name, key: p.key, ...(p.id ? { id: p.id } : {}), injuryRisk: p.injuryRisk, injured: p.hurt, stats: p.stats, traits: p.traits, stamina: p.stamina, energy: p.energy, position: ROLES[p.slot]!.name };
     const out = p.name;
     const wasHurt = p.hurt;
     p.name = b.name;
@@ -1217,7 +1326,12 @@ export class LiveSim implements MatchSim {
     p.busyUntil = p.cooldownUntil = p.immuneUntil = p.burstUntil = 0;
     p.brokeAt = -1000;
     p.subFor = null;
+    p.subFresh = false;
     this.emit('interchange', wasHurt ? `${p.name} on for the injured ${out}` : `${p.name} on for ${out}`, p);
+    if (fresh) {
+      this.events[this.events.length - 1]!.detail = 'fresh-legs';
+      this.announcePaid(this.judge.swapped(p.side, out, p.name));
+    }
   }
 
   /** The bench's legs come back a little each tick. */
@@ -2157,6 +2271,11 @@ export class LiveSim implements MatchSim {
     culprit.binUntilS = this.matchSeconds + BIN.minutes * 60;
     culprit.binSpot = this.interchangeSpot(culprit);
     culprit.subFor = null;
+    if (culprit.subFresh) {
+      // Fresh legs (#367) was taking him off: it waits for the next man instead.
+      culprit.subFresh = false;
+      this.freshLegs[offender].pending = true;
+    }
     culprit.cooldownUntil = culprit.immuneUntil = culprit.burstUntil = 0;
     this.refreshOnField();
     this.emit('sin-bin', `${culprit.name} is sent to the sin bin — ${binReasonText(reason)}`, culprit);

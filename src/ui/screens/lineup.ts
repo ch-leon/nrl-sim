@@ -49,7 +49,7 @@ const FIELD_LINES: readonly (readonly number[])[] = [
 
 const ROTATION_LABEL: Readonly<Record<Rotation, string>> = { off: 'Off', standard: 'Standard', heavy: 'Heavy' };
 const ROTATION_TIP: Readonly<Record<Rotation, string>> = {
-  off: 'Off: the nine play the whole match (only a hurt man comes off)',
+  off: 'Off: the nine play the whole match (only a hurt man comes off, or Fresh legs when you call it)',
   standard: 'Standard: tired men come off under 55% legs, two at a stoppage',
   heavy: 'Heavy: men come off under 70% legs, three at a stoppage',
 };

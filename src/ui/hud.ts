@@ -5,12 +5,13 @@
 // call destroy() to unsubscribe and remove it.
 
 import { bus } from '../core/events';
-import { getState, type GameState } from '../core/state';
+import { getState, type GameState, type Objective } from '../core/state';
 import type { AdvanceTarget } from '../core/advanceRules';
 import { weekHeld } from '../core/time';
 import { advanceInProgress, stopAdvance } from '../core/advance';
 import { playerMatchPending, resumePlayerMatch } from '../systems/matchday';
 import { nextFixture } from '../systems/league';
+import { RISK_WORD, ladderStanding, worstObjective, type ObjectiveRisk } from '../systems/board';
 import { ECON, WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, dock, activeScreen, onScreenChange } from './dom';
 
@@ -24,6 +25,8 @@ export interface HudOpts {
   onNextMatch?: () => void;
   /** Called from the money tile (#351 H2). Absent => the tile is a plain readout. */
   onMoney?: () => void;
+  /** Called from the board chip (#368). Absent => no chip. */
+  onBoard?: () => void;
   /** The decisions chip's REVIEW (3a). Absent => no chip. */
   onDecisions?: () => void;
   /** The decisions waiting, soonest due first: the chip names the first. */
@@ -124,6 +127,77 @@ export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { opponent
   const detail = `${home ? 'Home' : 'Away'}${place ? ` · ${place}` : ''}`;
   const label = `Next match: ${opp.name}, ${home ? 'home' : 'away'}${place ? `. You are ${place} on the ladder` : ''}`;
   return { opponent: `v ${placeName(opp.name)}`, detail, label };
+}
+
+/** "$32k", "-$4k", "$1.2m": money short enough for the board chip's second line. */
+export function fmtMoneyShort(n: number): string {
+  const abs = Math.abs(Math.round(n));
+  const body = abs >= 1_000_000 ? `${(abs / 1_000_000).toFixed(1).replace(/\.0$/, '')}m` : abs >= 1000 ? `${Math.round(abs / 1000)}k` : String(abs);
+  return `${n < 0 && abs > 0 ? '-' : ''}$${body}`;
+}
+
+/** The board chip's short form (#368): "top 8", "rival", "cash", "build". */
+const BOARD_SHORT: Readonly<Record<Objective['kind'], (target: number) => string>> = {
+  finals: (target) => `top ${target}`, beatRival: () => 'rival', solvent: () => 'cash', build: () => 'build',
+};
+
+/**
+ * The hub's board chip (#368): the single worst objective at risk or worse, in
+ * two short lines ("Board: top 8" over "You're 11th"); `short` is the one-word
+ * form ("top 8"). The objective in full is in the label. Null when every
+ * objective is on track. `runwayWeeks` is the money readout's. Pure.
+ */
+export function boardChip(s: GameState, runwayWeeks: number | null): { title: string; detail: string; short: string; label: string; risk: ObjectiveRisk } | null {
+  const worst = worstObjective(s, runwayWeeks);
+  if (!worst) return null;
+  const { objective: o, risk } = worst;
+  let title: string;
+  let detail: string;
+  switch (o.kind) {
+    case 'finals': {
+      title = `Board: top ${o.target}`;
+      detail = `You're ${ordinal(ladderStanding(s).rank)}`;
+      break;
+    }
+    case 'beatRival': {
+      // The rival by name in the label only.
+      title = 'Board: rival';
+      detail = `${ordinal(ladderStanding(s).rank)} v ${ordinal(ladderStanding(s, o.rivalId).rank)}`;
+      break;
+    }
+    case 'solvent': {
+      title = o.target === 0 ? 'Board: solvent' : `Board: ${fmtMoneyShort(o.target)}`;
+      const weeks = runwayWeeks === null ? null : Math.floor(runwayWeeks);
+      detail = s.money < o.target || weeks === null ? `You have ${fmtMoneyShort(s.money)}` : `Cash: ${weeks} wk${weeks === 1 ? '' : 's'}`;
+      break;
+    }
+    case 'build': {
+      title = `Board: ${o.target} built`;
+      detail = `You have ${s.facilities.length}`;
+      break;
+    }
+  }
+  return { title, detail, short: BOARD_SHORT[o.kind](o.target), risk, label: `Board objective ${RISK_WORD[risk].toLowerCase()}: ${o.text}. ${detail}` };
+}
+
+/** The board chip's class for each risk it shows (#368). */
+export const BOARD_RISK_CLASS = { 'at-risk': 'nrl-hud-board-risk', 'off-track': 'nrl-hud-board-off' } as const;
+
+/**
+ * Play the week from the club: PLAY WEEK, and the weekly summary's button (#368).
+ * A parked match resumes, a held week says so, otherwise `onAdvanceWeek` runs.
+ */
+export function advanceFromClub(onAdvanceWeek?: () => void): void {
+  const choice = clubAdvanceChoice(playerMatchPending(), weekHeld());
+  if (choice === 'resume') {
+    resumePlayerMatch();
+    return;
+  }
+  if (choice === 'wait') {
+    weekStillFinishing();
+    return;
+  }
+  onAdvanceWeek?.();
 }
 
 /** PLAY WEEK's sub-line: "v Darwin · away", empty with no match left this season. Pure. */
@@ -231,18 +305,7 @@ export function createHud(opts: HudOpts = {}): Hud {
   // PLAY WEEK ▸ over who is next (#350 H1: "v Darwin · away").
   const advanceLabel = el('span', { class: 'nrl-dock-advance-label' });
   const advanceSub = el('span', { class: 'nrl-dock-advance-sub', attrs: { 'data-hud': 'next' } });
-  const advanceBtn = button('', () => {
-    const choice = clubAdvanceChoice(playerMatchPending(), weekHeld());
-    if (choice === 'resume') {
-      resumePlayerMatch();
-      return;
-    }
-    if (choice === 'wait') {
-      weekStillFinishing();
-      return;
-    }
-    opts.onAdvanceWeek?.();
-  }, { class: 'nrl-dock-advance' });
+  const advanceBtn = button('', () => advanceFromClub(opts.onAdvanceWeek), { class: 'nrl-dock-advance' });
   advanceBtn.setAttribute('data-hud', 'advance');
   advanceBtn.append(advanceLabel, advanceSub);
   if (!opts.onAdvanceWeek) advanceBtn.disabled = true;
@@ -324,7 +387,15 @@ export function createHud(opts: HudOpts = {}): Hud {
   const chip = el('div', { class: 'nrl-decisions-chip', attrs: { role: 'status', 'data-decisions-chip': '' } },
     chipCount, chipTop, button('Review', () => opts.onDecisions?.(), { class: 'nrl-decisions-review' }));
   chip.hidden = true;
-  if (opts.onDecisions) mount(chip);
+
+  // #368: the board objective most at risk, in the decisions chip's style under it; a tap opens Staff & Board.
+  const boardTitle = el('span', { class: 'nrl-decisions-chip-count' });
+  const boardDetail = el('span', { class: 'nrl-decisions-chip-top' });
+  const boardEl = el('button', { class: 'nrl-decisions-chip nrl-board-chip', attrs: { type: 'button', 'data-hud': 'board' }, onClick: () => opts.onBoard?.() },
+    boardTitle, boardDetail);
+  boardEl.hidden = true;
+  const chips = el('div', { class: 'nrl-hub-chips' }, chip, boardEl);
+  if (opts.onDecisions || opts.onBoard) mount(chips);
 
   let lastMoney: number | null = null;
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
@@ -371,8 +442,19 @@ export function createHud(opts: HudOpts = {}): Hud {
     renderChip(s);
   }
 
-  /** The chip shows on the bare grounds only: a sheet over them hides it (3a: one place to look). */
+  /** The chips show on the bare grounds only: a sheet over them hides them (3a: one place to look). */
   function renderChip(s: GameState): void {
+    const board = opts.onBoard && !advanceInProgress() && !activeScreen() ? boardChip(s, runway) : null;
+    boardEl.hidden = !board;
+    if (board) {
+      boardTitle.textContent = board.title.toUpperCase();
+      boardDetail.textContent = board.detail;
+      boardEl.classList.toggle(BOARD_RISK_CLASS['at-risk'], board.risk === 'at-risk');
+      boardEl.classList.toggle(BOARD_RISK_CLASS['off-track'], board.risk === 'off-track');
+      const label = `${board.label}. Tap for Staff & Board`;
+      boardEl.setAttribute('aria-label', label);
+      boardEl.title = label;
+    }
     const list = opts.decisions?.(s) ?? [];
     const on = !advanceInProgress() && list.length > 0 && !activeScreen();
     chip.hidden = !on;
@@ -429,7 +511,7 @@ export function createHud(opts: HudOpts = {}): Hud {
       if (flashTimer) clearTimeout(flashTimer);
       parts.status.replaceChildren();
       parts.play.replaceChildren();
-      chip.remove();
+      chips.remove();
     },
   };
 }

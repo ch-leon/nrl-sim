@@ -24,6 +24,7 @@ import { FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, TEN_METRES, bonusZoneGrid } from
 import { Canvas3D, isoProject, isoUnproject, noiseTile, sampleTile, whiteTile, type NoiseTile, type P3 } from './iso3d';
 import { drawText, textWidth } from './font';
 import type { Kit } from './kit';
+import { activeVocab } from '../../content';
 
 // ── Geometry (grid units, z in px) ──────────────────────────────────────────
 
@@ -321,16 +322,18 @@ interface Panel {
   text: string;
 }
 
+/** The hoardings' panels. The words are the content pack's (#361); the colours are the art's. */
 function panelsFor(home: Kit, away: Kit): Panel[] {
+  const signs = activeVocab().stadiumSigns;
   return [
-    { bg: 0xd8443a, fg: 0xffffff, text: 'MEAT PIES' },
-    { bg: 0x2b5fd9, fg: 0xffe14d, text: 'FOOTY' },
-    { bg: home.jersey, fg: home.trim, text: 'GO TEAM' },
+    { bg: 0xd8443a, fg: 0xffffff, text: signs.food },
+    { bg: 0x2b5fd9, fg: 0xffe14d, text: signs.sport },
+    { bg: home.jersey, fg: home.trim, text: signs.home },
     { bg: 0xffe14d, fg: 0x1c1424, text: 'NRL SIM' },
-    { bg: 0x1c1424, fg: 0x7be05a, text: 'SNAGS' },
-    { bg: 0xffffff, fg: 0xd8443a, text: 'TRY TIME' },
-    { bg: away.jersey, fg: away.trim, text: 'WELCOME' },
-    { bg: 0xf08a24, fg: 0x1c1424, text: 'GO HARD' },
+    { bg: 0x1c1424, fg: 0x7be05a, text: signs.snack },
+    { bg: 0xffffff, fg: 0xd8443a, text: signs.score },
+    { bg: away.jersey, fg: away.trim, text: signs.away },
+    { bg: 0xf08a24, fg: 0x1c1424, text: signs.cheer },
   ];
 }
 

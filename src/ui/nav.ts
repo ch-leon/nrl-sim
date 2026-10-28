@@ -60,6 +60,11 @@ export interface Nav {
   registerScreen(id: string, label: string, open: () => void, placement?: NavPlacement): void;
   /** An alert count on a registered screen: a dot on its tab (or on OFFICE); 0 clears it. */
   setBadge(id: string, count: number): void;
+  /**
+   * A red dot, no number, on a registered screen's tab (#369), read out as
+   * `label`; off hides it. Unlike a count it never rolls up into OFFICE.
+   */
+  setDot(id: string, on: boolean, label?: string): void;
   /** Open a registered screen as its tab or tile would (the tutorial, the money readout). */
   open(id: string): void;
   destroy(): void;
@@ -121,6 +126,30 @@ export class ScreenRegistry {
   }
 }
 
+/** What a nav button's marks show (#369): the count's text, whether a dot shows, and what it reads out. */
+export interface BadgeView {
+  count: string | null;
+  dot: boolean;
+  ariaLabel: string | null;
+}
+
+/** A button's count and dot, as read out. Pure. (The dock shows a count as a dot too.) */
+export function badgeView(label: string, count: number, dot: string | null = null): BadgeView {
+  const unread = count > 0 ? `${label}, ${count} unread` : null;
+  return {
+    count: count > 0 ? (count > 99 ? '99+' : String(count)) : null,
+    dot: dot !== null,
+    ariaLabel: unread && dot ? `${unread}; ${dot}` : unread ?? dot,
+  };
+}
+
+/** OFFICE's count: its tiles' counts. Dots stay on their own tabs (#369). Pure. */
+export function moreBadgeCount(screens: readonly NavScreen[], counts: ReadonlyMap<string, number>): number {
+  let total = 0;
+  for (const s of screens) if (s.more) total += counts.get(s.id) ?? 0;
+  return total;
+}
+
 /** A tab's text: the label in caps, "▴" after it while it is open (not CLUB: home has nothing to close). */
 export function tabText(label: string, open: boolean, home = false): string {
   return `${label.toUpperCase()}${open && !home ? ' ▴' : ''}`;
@@ -139,6 +168,8 @@ export function createNav(): Nav {
   const registry = new ScreenRegistry();
   const buttons = new Map<string, HTMLButtonElement>();
   const counts = new Map<string, number>();
+  // A dot's read-out label by screen id (#369); absent means no dot.
+  const dots = new Map<string, string>();
 
   // CLUB: home, the grounds with nothing over them.
   const club = tabButton('Club', () => {
@@ -267,14 +298,12 @@ export function createNav(): Nav {
 
   function paintBadge(id: string): void {
     const btn = buttons.get(id);
-    const s = registry.get(id);
-    if (btn && s) paint(btn, counts.get(id) ?? 0, s.label, !s.more);
+    const sc = registry.get(id);
+    if (btn && sc) paint(btn, badgeView(sc.label, counts.get(id) ?? 0, dots.get(id) ?? null), !sc.more);
   }
 
   function paintMoreBadge(): void {
-    let total = 0;
-    for (const s of registry.list()) if (s.more) total += counts.get(s.id) ?? 0;
-    paint(more, total, OFFICE_LABEL, true);
+    paint(more, badgeView(OFFICE_LABEL, moreBadgeCount(registry.list(), counts)), true);
   }
 
   function setBadge(id: string, count: number): void {
@@ -285,6 +314,14 @@ export function createNav(): Nav {
       if (!sheet.hidden) paintTiles();
     }
   }
+  function setDot(id: string, on: boolean, label?: string): void {
+    const next = on ? label ?? registry.get(id)?.label ?? id : null;
+    if ((dots.get(id) ?? null) === next) return;
+    if (next === null) dots.delete(id);
+    else dots.set(id, next);
+    paintBadge(id);
+  }
+
 
   // Over the grounds and any sheet, under the dock (the dock stays bright and tappable).
   mount(dim);
@@ -305,6 +342,7 @@ export function createNav(): Nav {
     el: root,
     registerScreen,
     setBadge,
+    setDot,
     open: (id) => pick(id, false),
     destroy() {
       offScreen();
@@ -316,18 +354,19 @@ export function createNav(): Nav {
   };
 }
 
-/** The alert on a tab (an 8px dot) or the count's spoken label on an Office tile. */
-function paint(btn: HTMLButtonElement, count: number, label: string, dot: boolean): void {
+/** The alert on a tab (an 8px dot, for a count or a #369 dot) and what the button reads out; a tile shows no dot. */
+function paint(btn: HTMLButtonElement, v: BadgeView, dotted: boolean): void {
   let badge = btn.querySelector<HTMLElement>('.nrl-nav-dot');
-  if (count <= 0) {
-    badge?.remove();
-    btn.removeAttribute('aria-label');
-    return;
+  const on = dotted && (v.count !== null || v.dot);
+  if (!on) badge?.remove();
+  else {
+    if (!badge) {
+      badge = el('span', { class: 'nrl-nav-dot', attrs: { 'aria-hidden': 'true', 'data-nav-badge': '' } });
+      btn.appendChild(badge);
+    }
+    if (v.count !== null) badge.setAttribute('data-count', v.count);
+    else badge.removeAttribute('data-count');
   }
-  if (dot && !badge) {
-    badge = el('span', { class: 'nrl-nav-dot', attrs: { 'aria-hidden': 'true', 'data-nav-badge': '' } });
-    btn.appendChild(badge);
-  }
-  if (badge) badge.setAttribute('data-count', String(count));
-  btn.setAttribute('aria-label', `${label}, ${count} waiting`);
+  if (v.ariaLabel === null) btn.removeAttribute('aria-label');
+  else btn.setAttribute('aria-label', v.ariaLabel);
 }

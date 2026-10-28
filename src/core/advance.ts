@@ -9,6 +9,8 @@
 // synchronous advanceWeek(): no hook can observe a half-run week.
 // N10.3: in a browser the week may hold while the player's match plays in the
 // Worker (matchday); the run waits for the week's end before asking the rules.
+// #362: in the demo the run stops cleanly before the first week past the demo's
+// last (commercial flag on only); the demo's end has its own event, not the toast.
 
 import { bus } from './events';
 import { getState, type GameState } from './state';
@@ -17,6 +19,7 @@ import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
 import { fitSquadCount, playerMatchPending } from '../systems/matchday';
 import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
+import { DEMO_ENDED_TEXT, demoBlocked } from '../commercial/demo';
 import {
   type AdvanceTarget, type StopReason, MAX_RUN_WEEKS,
   contractAlerts, forfeitRisk, newlyInjuredStarters, postWeekStop,
@@ -26,8 +29,11 @@ import {
 /** Outcome of one multi-advance. `stop.kind === 'target'` means it finished normally. */
 export interface AdvanceRun {
   weeksPlayed: number;
-  /** A rule's stop; 'stopped' when the player tapped Stop, 'busy' when a run was already under way (N10.2). */
-  stop: StopReason | { kind: 'stopped' | 'busy'; text: string };
+  /**
+   * A rule's stop; 'stopped' when the player tapped Stop, 'busy' when a run was already
+   * under way (N10.2), 'demo' at the demo's last week (#362).
+   */
+  stop: StopReason | { kind: 'stopped' | 'busy' | 'demo'; text: string };
 }
 
 /** What a Stop tap reports, in the same toast as a rule stop. */
@@ -97,6 +103,9 @@ export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<v
   }
   if (run.stop.kind === 'target') {
     bus.emit('ui:notify', { text: `Advanced ${targetLabel(target)}.`, kind: 'info' });
+  } else if (run.stop.kind === 'demo') {
+    const { season, week } = getState();
+    bus.emit('commercial:demoEnded', { season, week });
   } else {
     const weeks = run.weeksPlayed === 1 ? '1 week' : `${run.weeksPlayed} weeks`;
     bus.emit('ui:notify', {
@@ -129,6 +138,8 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
         if (stopAsked) return { weeksPlayed, stop: { kind: 'stopped', text: STOPPED_BY_YOU } };
       }
       const before = getState();
+      // The demo ends here: stop before the week, not inside it (#362).
+      if (demoBlocked(before)) return { weeksPlayed, stop: { kind: 'demo', text: DEMO_ENDED_TEXT } };
 
       // Forfeit risk is checked before the tick, the only point it can be avoided.
       const pre = forfeitRisk({

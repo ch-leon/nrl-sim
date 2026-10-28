@@ -29,6 +29,7 @@ import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
 import { styleLine } from '../ui/tacticsBlurbs';
 import {
   LivePlayback,
+  keyMomentsOn,
   playbackSpeedOf,
   PLAYBACK_SPEEDS,
   type PlaybackActor,
@@ -39,7 +40,7 @@ import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, COACH_CALLS, callIsDefence, unlockLevel, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callIsDefence, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
@@ -487,6 +488,8 @@ export class MatchScene extends Phaser.Scene {
           this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
         },
         speed: this.rememberedSpeed(),
+        keyMoments: () => this.keyMomentsOn(),
+        onCallResult: (v) => this.showCallResult(v),
       });
       this.mountPlaybackControls(this.playback.getSpeed());
       if (live.coachSide) {
@@ -532,6 +535,7 @@ export class MatchScene extends Phaser.Scene {
     if (this.kickFrame) this.kickBackUntil = time + KICK_RETURN_MS;
     this.kickBack = !this.kickFrame && time < this.kickBackUntil;
     // The coach's badge and tray follow the play a few times a second (#73).
+    this.showSlowed();
     if ((this.coachBtn || this.planBtn) && time - this.chipsAt > 150) {
       this.chipsAt = time;
       this.refreshCallChips();
@@ -917,8 +921,8 @@ export class MatchScene extends Phaser.Scene {
     // The set is over once the call has landed and the side may call again.
     const used = [...why.values()].includes('one call a set');
     if (!used && pb.tick > this.madeAt + 1) this.madeCall = null;
-    // His calls for the play now: attack calls with the ball, Rush and Hold without it.
-    const role = this.unlocked.filter((c) => callIsDefence(c) !== attacking);
+    // His calls for the play now: attack calls with the ball, Rush and Hold without it; Fresh legs (#367) either way.
+    const role = this.unlocked.filter((c) => callIsBench(c) || callIsDefence(c) !== attacking);
     const legal = role.filter((c) => why.get(c) === null);
     const badge = coachBadge(legal.length, attacking, this.madeCall);
     if (this.coachBadgeEl && this.coachBadgeEl.textContent !== badge.text) this.coachBadgeEl.textContent = badge.text;
@@ -947,7 +951,7 @@ export class MatchScene extends Phaser.Scene {
       }
       this.trayList.replaceChildren(...rows);
     }
-    const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && callIsDefence(c) !== attacking).map((call) => ({ call, level: unlockLevel(call) }));
+    const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && (callIsBench(c) || callIsDefence(c) !== attacking)).map((call) => ({ call, level: unlockLevel(call) }));
     const foot = callsUnlockLine(role.map((call) => ({ call, why: why.get(call) ?? null })), locked);
     if (this.trayFoot.textContent !== foot) this.trayFoot.textContent = foot;
   }
@@ -957,13 +961,68 @@ export class MatchScene extends Phaser.Scene {
     const pb = this.playback;
     if (!(pb instanceof LivePlayback)) return;
     if (pb.call(this.callSide, call) === null) {
-      this.madeCall = call;
-      this.madeAt = pb.tick;
+      // Fresh legs (#367) isn't the set's call: the badge keeps the set's own.
+      if (!callIsBench(call)) {
+        this.madeCall = call;
+        this.madeAt = pb.tick;
+      }
       this.overlay?.noteCall?.(CALL_LABEL[call]);
       this.toggleTray(false);
     }
     // A refusal (the play moved on under the finger) just rebuilds the rows.
     this.refreshCallChips();
+  }
+
+  // ── What each call did (#366): a tag over COACH for two seconds ──────────
+  private callResultEl: HTMLDivElement | null = null;
+  private callResultTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Only the coach's own calls get a tag; the rival's stay in the log. A new result replaces the one up. */
+  private showCallResult(v: CallVerdict): void {
+    if (!this.coachBtn || v.side !== this.callSide || this.finished) return;
+    let tag = this.callResultEl;
+    if (!tag) {
+      tag = document.createElement('div');
+      tag.className = 'nrl-mo-call-result';
+      tag.setAttribute('role', 'status');
+      this.callResultEl = tag;
+      mount(tag);
+    }
+    tag.textContent = callResultText(v);
+    tag.toggleAttribute('data-paid', v.paid);
+    // Not over the open tray: its rows are where the finger is.
+    tag.hidden = this.trayOpen();
+    if (this.callResultTimer) clearTimeout(this.callResultTimer);
+    this.callResultTimer = setTimeout(() => this.clearCallResult(), CALL_RESULT_MS);
+  }
+
+  private clearCallResult(): void {
+    if (this.callResultTimer) clearTimeout(this.callResultTimer);
+    this.callResultTimer = null;
+    this.callResultEl?.remove();
+    this.callResultEl = null;
+  }
+
+  // ── Key moments (#366): the pill shows the match slowed for one ───────────
+  private slowShown: number | null = null;
+
+  /** Slow down for big moments: on unless the player turned it off (an old save has no setting). */
+  private keyMomentsOn(): boolean {
+    try {
+      return keyMomentsOn(getState().settings);
+    } catch {
+      return true;
+    }
+  }
+
+  /** The speed a key moment holds the match at pulses in the pill; the chosen one stays yellow. */
+  private showSlowed(): void {
+    const pb = this.playback;
+    const to = pb instanceof LivePlayback && !this.finished ? pb.slowedTo : null;
+    if (to === this.slowShown) return;
+    this.slowShown = to;
+    for (const b of this.speedButtons) b.toggleAttribute('data-slow', to !== null && b.dataset.speed === String(to));
+    this.controlsEl?.toggleAttribute('data-slowed', to !== null);
   }
 
   /** The speed the player last picked, or ×4 for an old save and a match opened with no game loaded. */
@@ -1105,6 +1164,7 @@ export class MatchScene extends Phaser.Scene {
   private onFinished = ({ result }: { result: { homeScore: number; awayScore: number } }): void => {
     if (this.finished) return;
     this.finished = true;
+    this.clearCallResult();
     if (result.homeScore !== result.awayScore) this.hype(result.homeScore > result.awayScore ? 'home' : 'away', 0.9, 60_000);
     this.removeCoach();
     this.closePlan();
@@ -1181,6 +1241,8 @@ export class MatchScene extends Phaser.Scene {
     this.settingsWatch?.disconnect();
     this.settingsWatch = null;
     setFullTimeExit(null);
+    this.clearCallResult();
+    this.slowShown = null;
     this.speedButtons = [];
     if (this.backBtn) {
       this.backBtn.remove(); // DOM overlay persists across scenes (§7) — clean it up.

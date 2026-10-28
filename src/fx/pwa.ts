@@ -20,6 +20,8 @@
 
 import { bus } from '../core/events';
 import { domUpdateHooks, scheduleUpdatePrompt } from '../ui/updatePrompt';
+import { browserStorage } from '../core/storage/local';
+import { IOS_INSTALL_HINT_KEY } from '../core/storageKeys';
 
 /** The `beforeinstallprompt` event, typed minimally (not in lib.dom yet). */
 interface BeforeInstallPromptEvent extends Event {
@@ -27,7 +29,6 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-const IOS_HINT_KEY = 'nrlsim.iosInstallHintShown';
 /** How long the install hint stays in view (a tap dismisses it sooner). */
 export const IOS_HINT_MS = 8000;
 /** How often a running app asks the server whether a new build is up. */
@@ -179,8 +180,9 @@ async function registerServiceWorker(): Promise<void> {
 function maybeShowIosHint(): void {
   if (!isIosSafari() || isStandalone()) return;
   try {
-    if (localStorage.getItem(IOS_HINT_KEY)) return;
-    localStorage.setItem(IOS_HINT_KEY, '1');
+    const storage = browserStorage();
+    if (storage?.getItem(IOS_INSTALL_HINT_KEY)) return;
+    storage?.setItem(IOS_INSTALL_HINT_KEY, '1');
   } catch {
     // localStorage blocked (private mode) — show the hint anyway, once per load.
   }

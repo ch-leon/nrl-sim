@@ -9,29 +9,42 @@ import {
   ANCHOR_RETRY_MS,
   sentenceCount,
   whenTutorialDone,
+  firstStepIndex,
+  nextStepIndex,
+  tapUndone,
+  hintsArmed,
+  hintFor,
+  markHintSeen,
+  HINTS,
+  TAP_COUNT,
+  TUTORIAL_END_TEXT,
   type TutorialStep,
 } from '../../src/ui/tutorial';
 import type { Events } from '../../src/core/events';
-import { createNewGame, getState } from '../../src/core/state';
+import { createNewGame, getState, setState, type GameState } from '../../src/core/state';
+import { addFacility } from '../../src/data/club';
+import { FACILITY_CATALOG } from '../../src/data/facility';
 
 // DOM rendering (bubble / cutout / anchor scrolling) is NOT unit-tested: jsdom is
 // not installed and the vitest environment is 'node' (see vite.config.ts). Those
 // paths self-guard on `typeof document` and are covered by manual/preview QA.
-// These specs cover the pure, DOM-free contract: the declarative step list, the
-// advance-on mapping, and tutorialDone gating.
+// These specs cover the pure, DOM-free contract: the declarative step list (three
+// taps since #370), the first-visit hints, and tutorialDone gating.
 
-// The 7 canonical event names an event-driven step is allowed to reference.
+// The bus events an event-driven step may reference (#370 adds the Undo's two).
 const KNOWN_EVENTS: readonly (keyof Events)[] = [
   'state:changed', 'week:advanced', 'season:ended', 'money:changed',
-  'facility:placed', 'player:signed', 'match:started', 'match:event',
-  'match:finished', 'bankruptcy:warning', 'ui:notify',
+  'facility:placed', 'facility:removed', 'player:signed', 'player:unsigned', 'match:started', 'match:event',
+  'match:finished', 'bankruptcy:warning', 'ui:notify', 'commercial:demoEnded',
 ];
 
-describe('STEPS (declarative step list invariants)', () => {
-  it('walks build, place, recruit, squad, lineup and the first week, then News, Finance and Contracts (#337)', () => {
-    expect(STEPS.map((s) => s.id)).toEqual([
-      'welcome', 'build', 'place', 'recruit', 'squad', 'lineup', 'advance', 'news', 'finance', 'contracts', 'wrap',
-    ]);
+const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
+
+describe('STEPS: three guided taps (#370)', () => {
+  it('is build, place, recruit and advance, grouped into three taps', () => {
+    expect(STEPS.map((s) => s.id)).toEqual(['build', 'place', 'recruit', 'advance']);
+    expect(STEPS.map((s) => s.tap)).toEqual([1, 1, 2, 3]);
+    expect(TAP_COUNT).toBe(3);
   });
 
   it('has no step for the match: the tutorial stands aside until Back to Club (#337 U1)', () => {
@@ -41,95 +54,114 @@ describe('STEPS (declarative step list invariants)', () => {
     }
   });
 
-  it('keeps every bubble to two sentences (#337 U3)', () => {
-    for (const step of STEPS) expect(sentenceCount(step.text), step.id).toBeLessThanOrEqual(2);
+  it('keeps every bubble to one short sentence (#370)', () => {
+    for (const step of STEPS) expect(sentenceCount(step.text), step.id).toBe(1);
   });
 
-  it('opens the screen a step explains, and points inside it (#337 U3)', () => {
-    const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
-    for (const [id, screen] of [['build', 'build'], ['recruit', 'recruit'], ['squad', 'squad'], ['lineup', 'lineup'], ['news', 'news'], ['finance', 'finance'], ['contracts', 'contracts']] as const) {
-      expect(byId.get(id)!.opens, id).toBe(screen);
-    }
+  it('names the paddock as the catalog does, and says what each tap does', () => {
+    expect(byId.get('build')!.text).toBe(`Tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
+    expect(byId.get('place')!.text).toContain('green spot on the grass');
+    expect(byId.get('recruit')!.text).toMatch(/Sign on the best player you can afford/);
+    expect(byId.get('advance')!.text).toMatch(/Play Week/);
+  });
+
+  it('opens the screen a tap is on, and points inside it (#337 U3)', () => {
+    expect(byId.get('build')!.opens).toBe('build');
+    expect(byId.get('recruit')!.opens).toBe('recruit');
     expect(byId.get('build')!.anchor!.split(',')[0]).toContain('[data-screen-key="build"] [data-facility="trainingPaddock"]');
-    expect(byId.get('recruit')!.anchor!.split(',')[0]).toContain('[data-screen-key="recruit"] .nrl-row');
+    // The first enabled SIGN under the default rating sort: the best player the club can afford.
+    expect(byId.get('recruit')!.anchor!.split(',')[0]).toContain('[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled))');
+    expect(byId.get('advance')!.anchor).toBe('.nrl-hud-actions .nrl-btn');
     // The placement step frames the bar on the grass and moves on once the bar is up.
     expect(byId.get('build')!.until).toBe('.nrl-placebar:not([hidden])');
-    expect(byId.get('place')!.text).toContain('green spot on the grass');
   });
 
-  it('copy names the 5-tab nav: screens under More say so', () => {
-    const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
-    expect(byId.get('finance')!.text).toContain('in Office');
-    expect(byId.get('wrap')!.text).toContain('in Office');
+  it('every step is an event step on a real bus event; the advance also ends on the demo stopping it', () => {
+    for (const step of STEPS) {
+      expect(isEventStep(step), step.id).toBe(true);
+      if (isEventStep(step)) expect(KNOWN_EVENTS).toContain(step.advanceOn);
+      if (step.revertOn) expect(KNOWN_EVENTS).toContain(step.revertOn);
+      if (step.alsoOn) expect(KNOWN_EVENTS).toContain(step.alsoOn);
+    }
+    expect(byId.get('build')!.advanceOn).toBe('facility:placed');
+    expect(byId.get('place')!.advanceOn).toBe('facility:placed');
+    expect(byId.get('recruit')!.advanceOn).toBe('player:signed');
+    expect(byId.get('advance')!.advanceOn).toBe('week:advanced');
+    expect(byId.get('advance')!.alsoOn).toBe('commercial:demoEnded');
   });
 
-  it('gives every step a non-empty id and text', () => {
+  it('an Undo of tap 1 or tap 2 brings the run back to that tap', () => {
+    expect(byId.get('build')!.revertOn).toBe('facility:removed');
+    expect(byId.get('recruit')!.revertOn).toBe('player:unsigned');
+    expect(byId.get('place')!.revertOn).toBeUndefined();
+    expect(byId.get('advance')!.revertOn).toBeUndefined();
+  });
+
+  it('has unique, non-empty ids and text', () => {
+    expect(new Set(STEPS.map((s) => s.id)).size).toBe(STEPS.length);
     for (const step of STEPS) {
       expect(step.id.length).toBeGreaterThan(0);
       expect(step.text.trim().length).toBeGreaterThan(0);
     }
-  });
-
-  it('has unique step ids', () => {
-    expect(new Set(STEPS.map((s) => s.id)).size).toBe(STEPS.length);
-  });
-
-  it('first and last steps advance on the Next button, last is wrap', () => {
-    const last = STEPS[STEPS.length - 1]!;
-    expect(STEPS[0]!.advanceOn).toBe('next-button');
-    expect(last.id).toBe('wrap');
-    expect(last.advanceOn).toBe('next-button');
-  });
-});
-
-describe('advance-on mapping', () => {
-  it('maps each spec step to the correct advance trigger', () => {
-    const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
-    expect(byId.get('welcome')!.advanceOn).toBe('next-button');
-    expect(byId.get('build')!.advanceOn).toBe('facility:placed');
-    expect(byId.get('place')!.advanceOn).toBe('facility:placed');
-    expect(byId.get('recruit')!.advanceOn).toBe('player:signed');
-    expect(byId.get('squad')!.advanceOn).toBe('next-button');
-    expect(byId.get('advance')!.advanceOn).toBe('week:advanced');
-    expect(byId.get('wrap')!.advanceOn).toBe('next-button');
-  });
-
-  it('every event step references a real bus event name', () => {
-    for (const step of STEPS) {
-      if (isEventStep(step)) {
-        expect(KNOWN_EVENTS).toContain(step.advanceOn);
-      }
-    }
-  });
-
-  it('isEventStep is true iff advanceOn is not the Next button', () => {
-    for (const step of STEPS) {
-      expect(isEventStep(step)).toBe(step.advanceOn !== 'next-button');
-    }
-  });
-
-  it('classifies the 4 event steps and 7 button steps', () => {
-    const eventSteps = STEPS.filter(isEventStep);
-    expect(eventSteps.map((s) => s.id)).toEqual([
-      'build', 'place', 'recruit', 'advance',
-    ]);
-    const buttonSteps = STEPS.filter((s) => !isEventStep(s));
-    expect(buttonSteps.map((s) => s.id)).toEqual(['welcome', 'squad', 'lineup', 'news', 'finance', 'contracts', 'wrap']);
-  });
-});
-
-describe('anchors', () => {
-  it('centers welcome/wrap and anchors build/place/recruit/squad/lineup/advance', () => {
-    const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
-    expect(byId.get('welcome')!.anchor).toBeNull();
-    expect(byId.get('wrap')!.anchor).toBeNull();
-    for (const id of ['build', 'place', 'recruit', 'squad', 'lineup', 'advance']) {
-      expect(byId.get(id)!.anchor).not.toBeNull();
-    }
-  });
-
-  it('exposes a positive anchor-retry window', () => {
     expect(ANCHOR_RETRY_MS).toBeGreaterThan(0);
+  });
+
+  it('ends with the old wrap line as a toast, and it still says where the Guide is', () => {
+    expect(TUTORIAL_END_TEXT).toContain('in Office');
+  });
+});
+
+describe('where a run starts, and when an Undo takes it back', () => {
+  beforeEach(() => {
+    createNewGame('Test Club', 1);
+  });
+
+  it('a new game starts at tap 1; with a paddock already up, at tap 2', () => {
+    expect(getState().facilities.some((f) => f.defId === 'trainingPaddock')).toBe(false);
+    expect(firstStepIndex(getState())).toBe(0);
+    addFacility('trainingPaddock', 0, 0, 1);
+    expect(STEPS[firstStepIndex(getState())]!.id).toBe('recruit');
+  });
+
+  it('an undone paddock reverts tap 1; an undone Weights Room with a paddock up does not', () => {
+    const build = byId.get('build')!;
+    expect(tapUndone(build, getState())).toBe(true);
+    addFacility('trainingPaddock', 0, 0, 1);
+    expect(tapUndone(build, getState())).toBe(false);
+    expect(tapUndone(byId.get('recruit')!, getState())).toBe(true);
+  });
+});
+
+describe('first-visit hints (#370)', () => {
+  const base: GameState['settings'] = { muted: false, volume: 1, tutorialDone: true, difficulty: 'normal' };
+
+  it('are for Lineup, News, Finance and Contracts, one sentence each', () => {
+    expect(Object.keys(HINTS).sort()).toEqual(['contracts', 'finance', 'lineup', 'news']);
+    for (const [k, t] of Object.entries(HINTS)) expect(sentenceCount(t), k).toBe(1);
+  });
+
+  it('never show on a save without hintsSeen (every save from before #370)', () => {
+    expect(hintsArmed(base)).toBe(false);
+    for (const k of Object.keys(HINTS)) expect(hintFor(base, k)).toBeNull();
+  });
+
+  it('show once per screen once armed', () => {
+    let settings: GameState['settings'] = { ...base, hintsSeen: [] };
+    expect(hintsArmed(settings)).toBe(true);
+    expect(hintFor(settings, 'lineup')).toBe(HINTS.lineup);
+    settings = markHintSeen(settings, 'lineup');
+    expect(hintFor(settings, 'lineup')).toBeNull();
+    expect(hintFor(settings, 'news')).toBe(HINTS.news);
+    expect(markHintSeen(settings, 'lineup')).toBe(settings); // already seen: unchanged
+    expect(settings.hintsSeen).toEqual(['lineup']);
+  });
+
+  it('none on a screen without one, or with no screen', () => {
+    const armed = { ...base, hintsSeen: [] };
+    expect(hintFor(armed, 'squad')).toBeNull();
+    expect(hintFor(armed, 'build')).toBeNull();
+    expect(hintFor(armed, null)).toBeNull();
+    expect(hintFor(armed, 'toString')).toBeNull();
   });
 });
 
@@ -137,6 +169,7 @@ describe('sentenceCount', () => {
   it('counts sentences, not the dots inside them', () => {
     expect(sentenceCount('One. Two!')).toBe(2);
     expect(sentenceCount("That's the loop! The Guide under More explains the rest. Good luck, coach.")).toBe(3);
+    expect(sentenceCount('Lineup sets your nine; you can change the plan at half-time.')).toBe(1);
     expect(sentenceCount('No stop at the end')).toBe(1);
   });
 });
@@ -175,9 +208,42 @@ describe('startTutorial gating (node / DOM-less)', () => {
   it('no-ops (stays inactive) when tutorialDone is already true and not forced', () => {
     const s = getState();
     s.settings.tutorialDone = true;
+    const before = s.settings;
     startTutorial(false);
     expect(isTutorialActive()).toBe(false);
-    // tutorialDone must not have been cleared by a no-op start.
+    // tutorialDone must not have been cleared by a no-op start, and an old save gets no hints (#370).
     expect(getState().settings.tutorialDone).toBe(true);
+    expect(getState().settings).toBe(before);
+    expect(getState().settings.hintsSeen).toBeUndefined();
+  });
+
+  it('a new game arms the first-visit hints as the run starts (#370)', () => {
+    expect(getState().settings.hintsSeen).toBeUndefined();
+    startTutorial();
+    expect(getState().settings.hintsSeen).toEqual([]);
+  });
+
+  it('Replay tutorial resets the hints (#370)', () => {
+    const s = getState();
+    setState({ settings: { ...s.settings, tutorialDone: true, hintsSeen: ['lineup', 'news'] } });
+    startTutorial(true);
+    expect(getState().settings.hintsSeen).toEqual([]);
+    // tutorialDone stays true until a run completes.
+    expect(getState().settings.tutorialDone).toBe(true);
+  });
+});
+
+describe('nextStepIndex (#370)', () => {
+  const at = (id: string): number => STEPS.findIndex((s) => s.id === id);
+  it('the paddock placed while the build step still waits for its bar finishes tap 1', () => {
+    expect(STEPS[nextStepIndex(at('build'), 'facility:placed')]!.id).toBe('recruit');
+  });
+  it('the bar showing (the until poll) moves on to the place step only', () => {
+    expect(STEPS[nextStepIndex(at('build'), null)]!.id).toBe('place');
+    expect(STEPS[nextStepIndex(at('place'), 'facility:placed')]!.id).toBe('recruit');
+  });
+  it('never skips into another tap, and the advance ends the run', () => {
+    expect(STEPS[nextStepIndex(at('recruit'), 'player:signed')]!.id).toBe('advance');
+    expect(nextStepIndex(at('advance'), 'week:advanced')).toBe(STEPS.length);
   });
 });

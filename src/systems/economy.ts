@@ -367,6 +367,8 @@ const MODIFIER_LABELS = new Set(EVENT_CARDS.flatMap((c) => c.choices.flatMap((ch
  * signings, sales, renewals, releases and the grounds. Anything else is `other`.
  */
 export function classifyReason(reason: string): FinanceLine {
+  // An Undo (#370) books against the line it reverses, so the season nets to zero.
+  if (reason.startsWith('undo:')) return classifyReason(reason.slice(5));
   if (reason === 'wages') return 'wages';
   if (reason === 'upkeep') return 'upkeep';
   if (reason === 'overhead') return 'overhead';

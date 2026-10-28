@@ -18,7 +18,7 @@ import type { Rng } from '../utils/rng';
 export interface SuspensionReview {
   weeks: number;
   source: BanSource;
-  /** The ledger-style cause, e.g. "event: Trip to Bali", so a later appeal can name it. */
+  /** The ledger-style cause, e.g. "event: <card title>", so a later appeal can name it. */
   cause: string;
 }
 

@@ -30,10 +30,12 @@ import { spendMoney } from '../../data/club';
 import { ECON } from '../../config';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
+import { demolishWithUndo } from '../../systems/undo';
+import { activePack } from '../../content';
 import { POOL_POINTS_PER_BIAS, SCOUT_BIAS_PER_LEVEL, SCOUT_FEE_DISCOUNT_PER_LEVEL } from '../../systems/freeagency';
 import { REP_BASELINE } from '../../systems/league';
 import {
-  activeGroundsScene, demolishFacility, demolishRefund, moveFee, type GroundsSceneLike,
+  activeGroundsScene, demolishRefund, moveFee, type GroundsSceneLike,
 } from '../../world/placement';
 
 /** Format a money value for display (local; mirrors hud.fmtMoney conventions). */
@@ -55,7 +57,7 @@ const STAT_LABEL: Record<keyof PlayerStats, string> = {
   strength: 'Strength',
   stamina: 'Stamina',
   skill: 'Skill',
-  footyIQ: 'Footy IQ',
+  footyIQ: activePack().vocab.iqStat,
 };
 
 /** The free-agent pool's lift a level, in overall points (freeagency.poolTarget). */
@@ -167,7 +169,8 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
         if (!blocked) {
           const go = (): void => {
             closeScreen();
-            scene?.enterPlacementMode(def.id);
+            // The scene as it is now: the first tap (#370) can open Build before the grounds are up.
+            (scene ?? activeGroundsScene())?.enterPlacementMode(def.id);
           };
           row.addEventListener('click', go);
           row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
@@ -284,21 +287,13 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
   }, { class: 'nrl-facility-move' });
   if (money < fee || !activeGroundsScene()) moveBtn.disabled = true;
 
-  // Two taps so a stray one never knocks a building down.
-  let armed = false;
+  // One tap: the toast's 5-second Undo puts it back (#370; it replaced the "Really demolish?" tap).
   // Written in caps here, so the money keeps its small k (3b: "DEMOLISH +$9k").
   const demoBtn = button(`DEMOLISH +${fmtShort(refund)}`, () => {
-    if (!armed) {
-      armed = true;
-      demoBtn.textContent = `CONFIRM +${fmtShort(refund)}`;
-      demoBtn.classList.add('nrl-facility-armed');
-      return;
-    }
-    const got = demolishFacility(facility.id);
+    demolishWithUndo(facility.id);
     closeModal();
-    if (got !== null) bus.emit('ui:notify', { text: `${def.name} demolished. ${fmtMoney(got)} refunded.`, kind: 'info' });
   }, { class: 'nrl-btn-danger nrl-facility-demolish' });
-  demoBtn.title = `Two taps: refunds ${fmtMoney(refund)}`;
+  demoBtn.title = `Refunds ${fmtMoney(refund)}; Undo for 5 seconds`;
 
   actions.append(el('div', { class: 'nrl-facility-row' }, moveBtn, demoBtn));
   if (money < fee) actions.append(el('div', { class: 'nrl-facility-why', text: `Need ${fmtMoney(fee - Math.max(0, money))} more to move` }));
@@ -403,6 +398,4 @@ export const BUILD_CSS = `
 .nrl-facility-row { display: flex; gap: 6px; }
 .nrl-facility-row .nrl-btn { flex: 1 1 0; min-width: 0; font-size: 16px; padding: 0 8px; }
 .nrl-btn.nrl-facility-demolish { text-transform: none; }
-.nrl-btn.nrl-facility-demolish.nrl-facility-armed,
-.nrl-btn.nrl-facility-demolish.nrl-facility-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 `;

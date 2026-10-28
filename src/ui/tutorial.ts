@@ -9,10 +9,16 @@
 // calls startTutorial() after newGame; startTutorial() with no force is a no-op
 // when settings.tutorialDone is already true. Replay is startTutorial(true),
 // wired later from the settings popup (see REPLAY note at the bottom).
+//
+// #370: the first session is three guided taps (build a Training Paddock, sign a
+// player, Advance Week) in place of the 11-step tour; what the old steps
+// explained about Lineup, News, Finance and Contracts is a one-line hint the
+// first time each screen opens (HINTS, settings.hintsSeen). DECISION (Leon).
 
 import { bus, type Events } from '../core/events';
-import { getState, setState } from '../core/state';
-import { el, button, mount, ensureStyles } from './dom';
+import { getState, setState, type GameState } from '../core/state';
+import { FACILITY_CATALOG } from '../data/facility';
+import { el, button, mount, ensureStyles, onScreenChange, SCREEN_KEY_ATTR } from './dom';
 
 // ── Declarative step model ─────────────────────────────────────────────────
 
@@ -23,7 +29,7 @@ export type AdvanceOn = 'next-button' | keyof Events;
 export interface TutorialStep {
   /** Stable identifier (also used as a DOM hook + test key). */
   id: string;
-  /** Bubble body copy: two short sentences at most (#337). */
+  /** Bubble body copy: one short sentence (#370; two at most before it, #337). */
   text: string;
   /** CSS selector into #ui-root to highlight, or null for a centered bubble. */
   anchor: string | null;
@@ -33,102 +39,95 @@ export interface TutorialStep {
   opens?: string;
   /** Also advance once this selector is on screen (the placement bar, which has no bus event). */
   until?: string;
+  /** Which of the three guided taps it belongs to (#370): the bubble reads "1 of 3". */
+  tap: number;
+  /** An Undo of this step's action (#370): the run comes back to this step (see tapUndone). */
+  revertOn?: keyof Events;
+  /** Another event that also ends the step (the demo stopping the first advance, #362). */
+  alsoOn?: keyof Events;
 }
 
 /**
- * The onboarding steps, in order (BAK-202 spec; News, Finance and Contracts
- * added by N7, #188; Lineup by N11; tied to their screens by #337). Anchor
- * selectors reference elements that really exist in the shipped UI:
+ * The onboarding steps, in order (BAK-202 spec; tied to their screens by #337;
+ * three taps since #370). Tap 1 is two steps: Build opens with the paddock's row
+ * framed, and once its placement bar is up the next step frames the bar and the
+ * grass. Anchor selectors reference elements that really exist in the shipped UI:
  *   - the dock's tabs carry `data-screen="<id>"` (see ui/nav.ts registerScreen),
  *     Office's tiles too, in `.nrl-nav-sheet`
  *   - open screens carry `data-screen-key="<id>"` (see ui/dom.ts openScreen)
  *   - PLAY WEEK is the first button inside `.nrl-hud-actions` (ui/hud.ts)
- * An anchor may list fallbacks: the first on screen wins, so a screen in Office's
- * sheet is highlighted on the OFFICE tab until the sheet is open. When only a
- * fallback is on screen the bubble offers Next, so a closed screen never strands the player.
+ * An anchor may list fallbacks: the first on screen wins, so a screen reached
+ * through Squad's segments is highlighted on the SQUAD tab until it is open. When
+ * only a fallback is on screen the bubble offers Next, so a closed screen never strands the player.
+ *
+ * What became of the 11-step tour (#370): welcome and wrap dropped (the first tap
+ * is the welcome; the end is a toast, see endTutorial); squad dropped (the Guide's
+ * Squad page covers it); lineup, news, finance and contracts are HINTS.
  */
-const inMore = (id: string): string => `.nrl-nav-sheet .nrl-btn[data-screen="${id}"], .nrl-nav [data-nav-more]`;
-/** A screen reached through Squad's segments (Lineup, Recruit): its segment, else the SQUAD tab. */
-const inSquad = (id: string): string => `[data-seg="${id}"], .nrl-nav .nrl-btn[data-screen="squad"]`;
+/** A tab of the dock. */
+const tab = (id: string): string => `.nrl-nav .nrl-btn[data-screen="${id}"]`;
+/** A screen reached through Squad's segments (Recruit): its segment, else the SQUAD tab. */
+const inSquad = (id: string): string => `[data-seg="${id}"], ${tab('squad')}`;
+
+/** The paddock's name as the catalog has it, so a rename follows (#361 owns the names). */
+const PADDOCK = FACILITY_CATALOG.trainingPaddock.name;
 
 export const STEPS: readonly TutorialStep[] = [
   {
-    id: 'welcome',
-    text: 'Welcome, coach! Build, sign players, set your lineup, then play the week’s match.',
-    anchor: null,
-    advanceOn: 'next-button',
-  },
-  {
     id: 'build',
-    text: 'Tap Training Paddock to build one. It trains your squad every week.',
-    anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], .nrl-nav .nrl-btn[data-screen="build"]`,
+    text: `Tap ${PADDOCK} to build one.`,
+    anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], ${tab('build')}`,
     advanceOn: 'facility:placed',
     opens: 'build',
     until: '.nrl-placebar:not([hidden])',
+    tap: 1,
+    revertOn: 'facility:removed',
   },
   {
     id: 'place',
     text: 'Tap a green spot on the grass to build it there.',
-    anchor: '.nrl-placebar:not([hidden]), .nrl-nav .nrl-btn[data-screen="build"]',
+    anchor: `.nrl-placebar:not([hidden]), ${tab('build')}`,
     advanceOn: 'facility:placed',
+    tap: 1,
   },
   {
     id: 'recruit',
-    text: 'Pick a free agent and tap Sign to add him to your squad.',
+    // The default sort is by rating, so the first enabled SIGN is the best player the club can afford.
+    text: 'Tap Sign on the best player you can afford.',
     anchor:
       `[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled)), ` +
       `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inSquad('recruit')}`,
     advanceOn: 'player:signed',
     opens: 'recruit',
-  },
-  {
-    id: 'squad',
-    text: 'This is your squad. Tap a player for his ratings, form and morale.',
-    anchor: '.nrl-nav .nrl-btn[data-screen="squad"]',
-    advanceOn: 'next-button',
-    opens: 'squad',
-  },
-  {
-    id: 'lineup',
-    text: 'Lineup sets your nine, kicker, captain and game plan. You can change the plan at half-time.',
-    anchor: inSquad('lineup'),
-    advanceOn: 'next-button',
-    opens: 'lineup',
+    tap: 2,
+    revertOn: 'player:unsigned',
   },
   {
     id: 'advance',
-    text: 'Tap Play Week: training and wages run, then your first match kicks off.',
+    text: 'Tap Play Week to play your first match.',
     anchor: '.nrl-hud-actions .nrl-btn',
     advanceOn: 'week:advanced',
-  },
-  {
-    id: 'news',
-    text: 'News, in Office, keeps results and warnings. A decision shows as a chip on the grounds and a red count on Play Week.',
-    anchor: inMore('news'),
-    advanceOn: 'next-button',
-    opens: 'news',
-  },
-  {
-    id: 'finance',
-    text: "Finance, in Office, shows money in and out. The board's goals for the season are on Staff & Board, also in Office.",
-    anchor: inMore('finance'),
-    advanceOn: 'next-button',
-    opens: 'finance',
-  },
-  {
-    id: 'contracts',
-    text: 'Contracts lists every deal by expiry. Renew before a player walks, or sell him for a fee.',
-    anchor: `[data-screen-key="contracts"], ${inMore('finance')}`,
-    advanceOn: 'next-button',
-    opens: 'contracts',
-  },
-  {
-    id: 'wrap',
-    text: "That's the loop! The Guide in Office explains the rest, coach.",
-    anchor: null,
-    advanceOn: 'next-button',
+    tap: 3,
+    alsoOn: 'commercial:demoEnded',
   },
 ] as const;
+
+/** How many guided taps there are (the "of 3"). */
+export const TAP_COUNT = Math.max(...STEPS.map((s) => s.tap));
+
+/**
+ * The one-line hints shown the first time each screen opens (#370), by the
+ * screen's nav key. They carry what the old tour's steps for these screens said.
+ */
+export const HINTS: Readonly<Record<string, string>> = {
+  lineup: 'Lineup sets your nine, kicker, captain and game plan; you can change the plan at half-time.',
+  news: 'News keeps results and warnings; a decision shows here, on the grounds and as a red count on Play Week.',
+  finance: "Money in and out by line; the board's season goals are on Staff & Board.",
+  contracts: 'Deals by expiry: renew before a player walks, or sell him for a fee.',
+};
+
+/** The end of a completed run (#370): what the old wrap step said, as a club toast. */
+export const TUTORIAL_END_TEXT = "That's the loop. The Guide in Office explains the rest.";
 
 // ── Pure logic (unit-tested; no DOM) ───────────────────────────────────────
 
@@ -159,18 +158,64 @@ export function sentenceCount(text: string): number {
 /** Milliseconds between looks for a step's anchor while it is not on screen. */
 export const ANCHOR_RETRY_MS = 500;
 
+type Settings = GameState['settings'];
+
+/** A Training Paddock already stands. */
+function hasPaddock(s: Pick<GameState, 'facilities'>): boolean {
+  return s.facilities.some((f) => f.defId === 'trainingPaddock');
+}
+
+/** Where a run starts (#370): at tap 2 when a paddock already stands (a save written mid-run, a replay). */
+export function firstStepIndex(s: Pick<GameState, 'facilities'>): number {
+  return hasPaddock(s) ? STEPS.findIndex((st) => st.id === 'recruit') : 0;
+}
+
+/**
+ * Whether the Undo that fired `step.revertOn` took the step's work back, so the
+ * run returns to it (#370): an undone build only when no paddock stands now (an
+ * undone Weights Room leaves tap 1 done); an undone signing always.
+ */
+export function tapUndone(step: TutorialStep, s: Pick<GameState, 'facilities'>): boolean {
+  if (step.id === 'build') return !hasPaddock(s);
+  return step.revertOn !== undefined;
+}
+
+/**
+ * Whether first-visit hints are on for this save (#370). `hintsSeen` absent is a
+ * save from before the three taps (or one that never ran them): no hints, so an
+ * existing save sees nothing new. `[]` is armed, none seen yet.
+ */
+export function hintsArmed(settings: Pick<Settings, 'hintsSeen'>): boolean {
+  return Array.isArray(settings.hintsSeen);
+}
+
+/** The hint to show on screen `key` now, or null (not a hint screen, not armed, or already seen). */
+export function hintFor(settings: Pick<Settings, 'hintsSeen'>, key: string | null): string | null {
+  if (key === null || !Object.prototype.hasOwnProperty.call(HINTS, key)) return null;
+  if (!hintsArmed(settings) || settings.hintsSeen!.includes(key)) return null;
+  return HINTS[key]!;
+}
+
+/** `settings` with screen `key`'s hint marked seen (it shows once). */
+export function markHintSeen(settings: Settings, key: string): Settings {
+  const seen = settings.hintsSeen ?? [];
+  return seen.includes(key) ? settings : { ...settings, hintsSeen: [...seen, key] };
+}
+
 // ── Runtime state (module singleton) ───────────────────────────────────────
 
 interface ActiveTutorial {
   index: number;
   /** Root overlay node (holds bubble + optional cutout). */
   overlay: HTMLElement;
-  /** Unsubscribe for the current step's bus listener, if any. */
+  /** Unsubscribe for the current step's bus listeners (its advance, its alsoOn, earlier steps' revertOn). */
   offEvent: (() => void) | null;
   /** The anchor poll (an interval), while the step's anchor is not on screen. */
   retryTimer: ReturnType<typeof setTimeout> | null;
   /** Unsubscribe for the match hold (see holdForMatch). */
   offMatch: () => void;
+  /** A replay from Settings or the Guide: every tap also offers Next, as a step may not be doable in this save (#370). */
+  replay: boolean;
 }
 
 let active: ActiveTutorial | null = null;
@@ -209,7 +254,11 @@ export function isTutorialActive(): boolean {
  */
 export function startTutorial(force = false): void {
   if (isTutorialActive()) return;
-  if (!force && !shouldAutoStart(getState().settings)) return;
+  const s = getState();
+  if (!force && !shouldAutoStart(s.settings)) return;
+  // #370: arm the first-visit hints (a replay brings them back). Before the DOM
+  // guard so the node tests see it.
+  setState({ settings: { ...s.settings, hintsSeen: [] } });
   // DOM-less environments (node unit tests): nothing to render.
   if (typeof document === 'undefined') return;
 
@@ -220,7 +269,7 @@ export function startTutorial(force = false): void {
     attrs: { 'data-tutorial': 'overlay' },
   });
   mount(overlay);
-  active = { index: 0, overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay) };
+  active = { index: firstStepIndex(getState()), overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay), replay: force };
   renderStep();
 }
 
@@ -259,9 +308,10 @@ function holdForMatch(overlay: HTMLElement): () => void {
 
 /**
  * End the tutorial: mark it done, tear down DOM and any live bus listener /
- * timer. Idempotent — safe to call when no tutorial is active.
+ * timer. Idempotent — safe to call when no tutorial is active. `completed`: the
+ * run reached its end (not Skip), so the closing line shows as a club toast (#370).
  */
-export function endTutorial(): void {
+export function endTutorial(completed = false): void {
   if (!active) return;
   clearStepBindings(active);
   active.offMatch();
@@ -274,6 +324,7 @@ export function endTutorial(): void {
   if (!s.settings.tutorialDone) {
     setState({ settings: { ...s.settings, tutorialDone: true } });
   }
+  if (completed) bus.emit('ui:notify', { text: TUTORIAL_END_TEXT, kind: 'info' });
 }
 
 // ── Step lifecycle (DOM) ───────────────────────────────────────────────────
@@ -291,15 +342,53 @@ function clearStepBindings(a: ActiveTutorial): void {
 }
 
 /** Advance to the next step, or end the tutorial after the last one. */
-function advance(): void {
+function advance(fired: keyof Events | null = null): void {
   if (!active) return;
   clearStepBindings(active);
-  if (active.index >= STEPS.length - 1) {
-    endTutorial();
+  const index = nextStepIndex(active.index, fired);
+  if (index >= STEPS.length) {
+    endTutorial(true);
     return;
   }
-  active.index += 1;
+  active.index = index;
   renderStep();
+}
+
+/**
+ * The step after `index`, once `fired` (null: Next, or the `until` poll) has ended
+ * it. An event that also ends the next step of the same tap skips that step too:
+ * the paddock placed before the build step's poll saw the placement bar finishes
+ * all of tap 1 (#370). STEPS.length when the run is over.
+ */
+export function nextStepIndex(index: number, fired: keyof Events | null): number {
+  let i = index + 1;
+  while (fired !== null && i < STEPS.length && STEPS[i]!.tap === STEPS[index]!.tap && STEPS[i]!.advanceOn === fired) i++;
+  return i;
+}
+
+/**
+ * The current step's bus listeners: its advance event, its `alsoOn` (which ends
+ * the run: the demo stopped the first advance, so the paywall owns the screen),
+ * and every earlier step's `revertOn`, so an Undo of an earlier tap's action
+ * brings the run back to that tap (#370). Returns their teardown.
+ */
+function bindStep(a: ActiveTutorial, step: TutorialStep): () => void {
+  const offs: (() => void)[] = [];
+  if (isEventStep(step)) offs.push(bus.on(step.advanceOn, () => advance(step.advanceOn as keyof Events)));
+  if (step.alsoOn) offs.push(bus.on(step.alsoOn, () => endTutorial()));
+  for (let i = 0; i < a.index; i++) {
+    const earlier = STEPS[i]!;
+    if (!earlier.revertOn) continue;
+    offs.push(bus.on(earlier.revertOn, () => {
+      if (active !== a || !tapUndone(earlier, getState())) return;
+      clearStepBindings(a);
+      a.index = i;
+      renderStep();
+    }));
+  }
+  return () => {
+    for (const off of offs) off();
+  };
 }
 
 /**
@@ -316,16 +405,14 @@ function renderStep(): void {
   a.overlay.replaceChildren();
   // Held for a match: the step draws when the club is back (holdForMatch).
   if (a.overlay.hidden) {
-    if (isEventStep(step)) a.offEvent = bus.on(step.advanceOn, () => advance());
+    a.offEvent = bindStep(a, step);
     return;
   }
   if (step.opens && !document.querySelector(`[data-screen-key="${step.opens}"]`)) openScreenById?.(step.opens);
 
   // Bind the advance trigger. Event steps get exactly one listener (the current
   // step's only) so acting "out of order" earlier does nothing.
-  if (isEventStep(step)) {
-    a.offEvent = bus.on(step.advanceOn, () => advance());
-  }
+  a.offEvent = bindStep(a, step);
 
   if (!step.anchor) {
     renderBubble(a, step, { centered: true, forceNext: false });
@@ -450,11 +537,13 @@ function renderBubble(
   step: TutorialStep,
   opts: { centered: boolean; forceNext: boolean },
 ): HTMLElement {
-  const wantsNext = step.advanceOn === 'next-button' || opts.forceNext;
+  const wantsNext = step.advanceOn === 'next-button' || opts.forceNext || a.replay;
 
   const body = el('div', { class: 'nrl-tutorial-text', text: step.text });
 
-  const actions = el('div', { class: 'nrl-tutorial-actions' });
+  // "1 of 3" (#370) at the start of the button row, so it costs the copy no room.
+  const actions = el('div', { class: 'nrl-tutorial-actions' },
+    el('span', { class: 'nrl-tutorial-count', text: `${step.tap} of ${TAP_COUNT}` }));
   actions.appendChild(button('Skip', () => endTutorial(), { class: 'nrl-tutorial-skip' }));
   if (wantsNext) {
     actions.appendChild(button('Next', () => advance(), { class: 'nrl-tutorial-next nrl-btn-primary' }));
@@ -474,10 +563,46 @@ function renderBubble(
   return bubble;
 }
 
+// ── First-visit hints (#370) ─────────────────────────────────────────────
+
+/** The hint line for screen `key`: the text and a 44px ✕. */
+function hintLine(key: string, text: string): HTMLElement {
+  const line = el('div', { class: 'nrl-hint', attrs: { 'data-hint': key, role: 'note' } }, el('span', { class: 'nrl-hint-text', text }));
+  const x = button('✕', () => line.remove(), { class: 'nrl-hint-x' });
+  x.setAttribute('aria-label', 'Dismiss hint');
+  line.append(x);
+  return line;
+}
+
+/**
+ * Show each screen's one-line hint the first time it opens (#370): at the top of
+ * the screen, under its header (inside a framed screen's scroll, which its own
+ * re-renders leave alone). It is marked seen as it shows, so it shows once; not
+ * while a guided tap is up (it shows on the next visit instead). Call once, after
+ * the screens are registered. Returns the unsubscribe.
+ */
+export function initFirstVisitHints(): () => void {
+  return onScreenChange((key) => {
+    if (isTutorialActive()) return;
+    const s = getState();
+    const text = hintFor(s.settings, key);
+    if (!text || !key) return;
+    const node = document.querySelector<HTMLElement>(`[${SCREEN_KEY_ATTR}="${key}"]`);
+    if (!node) return;
+    const line = hintLine(key, text);
+    const scroll = node.querySelector('.nrl-modal-scroll');
+    const head = node.querySelector('.nrl-screen-head');
+    if (scroll) scroll.prepend(line);
+    else if (head) head.after(line);
+    else node.prepend(line);
+    setState({ settings: markHintSeen(s.settings, key) });
+  });
+}
+
 // ── Styles ───────────────────────────────────────────────────────────────
 // Injected once, lazily, from startTutorial. Kept out of dom.ts (owned by WU-5)
-// so this ticket edits only files it owns. Broadcast Quiet: a navy card with a
-// yellow edge pointing at the one thing to tap, ringed in yellow.
+// so this ticket edits only files it owns. Pixel-art styling to match the kit:
+// Broadcast Quiet: a navy card with a yellow edge pointing at the one thing to tap, ringed in yellow.
 
 const TUTORIAL_STYLE_ID = 'nrl-tutorial-styles';
 
@@ -495,7 +620,7 @@ export const TUTORIAL_CSS = `
   position: fixed;
   inset: 0;
   pointer-events: none; /* only the bubble takes taps */
-  z-index: 200;         /* above HUD/nav (55) and modals (100) */
+  z-index: 200;         /* above the dock (55) and modals (100) */
   font-family: var(--nrl-f-body, 'IBM Plex Sans', sans-serif);
 }
 .nrl-tutorial-cutout {
@@ -591,6 +716,22 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   .nrl-tutorial-bar .nrl-tutorial-text { margin: 0; font-size: 13px; line-height: 1.3; max-height: 5rem; }
 }
 .nrl-tutorial-bubble.nrl-tutorial-top { top: calc(var(--nrl-hud-h, 0px) + 0.25rem); bottom: auto; }
+/* #370: which of the three taps this is. */
+.nrl-tutorial-count {
+  align-self: center;
+  margin-right: auto;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--nrl-button, #1f2b55);
+  color: var(--nrl-accent, #f4d03f);
+  font-family: var(--nrl-f-label, 'Barlow Condensed', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 24px;
+  white-space: nowrap;
+}
 .nrl-tutorial-bubble.nrl-tutorial-right { left: auto; right: calc(0.75rem + var(--nrl-safe-r, 0px)); transform: none; }
 `;
 

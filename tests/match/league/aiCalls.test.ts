@@ -77,10 +77,10 @@ describe('the AI coach (N9.6)', () => {
 });
 
 describe('calls unlocked by the Coach’s Office (N9.6)', () => {
-  it('two calls with none built, more with each level, all nine at level 3', () => {
-    expect(unlockedCalls(0)).toEqual(['hit-up', 'hold']);
-    expect(unlockedCalls(1)).toEqual(['hit-up', 'hold', 'shift-left', 'shift-right', 'rush']);
-    expect(unlockedCalls(2)).toHaveLength(7);
+  it('three calls with none built (Fresh legs, #367), more with each level, all ten at level 3', () => {
+    expect(unlockedCalls(0)).toEqual(['hit-up', 'hold', 'fresh-legs']);
+    expect(unlockedCalls(1)).toEqual(['hit-up', 'hold', 'fresh-legs', 'shift-left', 'shift-right', 'rush']);
+    expect(unlockedCalls(2)).toHaveLength(8);
     expect([...unlockedCalls(3)].sort()).toEqual([...COACH_CALLS].sort());
     expect(unlockedCalls(9)).toEqual(unlockedCalls(3));
     expect(unlockLevel('field-goal')).toBe(3);
