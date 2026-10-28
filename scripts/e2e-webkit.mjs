@@ -2416,6 +2416,9 @@ async function runFlow(browser, { w: W, h: H, text }) {
       const at = await week();
       const left = 4 - (at - from);
       rec.notes.push(`W${from} → stopped at W${at} on "${await page.locator('[data-decisions] .nrl-event-title').first().textContent()}"`);
+      // The card scrolls inside its frame (#336): at 568×320 Larger a long card's choices start
+      // below the fold, so scroll to the first as a player would, then it must be whole.
+      await page.locator('[data-decisions] [data-event-choice]').first().scrollIntoViewIfNeeded();
       out.push(...await flowReach(page, ['[data-decisions] [data-event-choice]']));
       await shot('n4-card');
       await answerAll();
@@ -2423,6 +2426,7 @@ async function runFlow(browser, { w: W, h: H, text }) {
       await toast('Signed Jack Taufa from the player pool, on a two-year deal');
       await page.waitForTimeout(400);
       const label = await page.locator('[data-keep-advancing]').textContent();
+      await page.locator('[data-keep-advancing]').scrollIntoViewIfNeeded();
       const want = `Keep advancing (${left === 1 ? '1 week' : `${left} weeks`})`;
       if (label !== want) out.push(`Keep advancing reads "${label}", want "${want}"`);
       out.push(...await flowReach(page, ['[data-keep-advancing]']));
