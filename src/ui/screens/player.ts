@@ -122,7 +122,7 @@ export function playerOutlook(p: Player, ctx: PlayerContext, state: GameState): 
     points,
     peak,
     peakText: `Projected peak: ${peak.rating} ${when}${where}`,
-    stage: careerStage(p.age),
+    stage: careerStage(p.age, { peak }), // the word follows the curve (#419)
     retirement: p.age >= RETIREMENT_NOTE_AGE ? `Retirement risk: ${Math.round(retirementRisk(p.age) * 100)}% at the season's end` : null,
   };
 }

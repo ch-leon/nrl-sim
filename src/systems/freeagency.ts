@@ -14,6 +14,7 @@ import { SPECIAL_MAGNITUDE } from '../data/facility';
 import { LEAGUE, SQUAD_CAP, SQUAD_MIN, WEEKS_PER_SEASON } from '../config';
 import { transferFee } from './contracts';
 import { REP_BASELINE } from './league';
+import { placeSigning, type SigningPlacement } from './lineup';
 
 // ── Tuning constants (spec §Key interfaces) ─────────────────────────────────
 
@@ -30,6 +31,8 @@ export const NEW_CONTRACT_WEEKS = 52;
 export interface SignResult {
   ok: boolean;
   reason?: string;
+  /** Where the coach's signing went in the lineup (#416), when `opts.intoLineup` asked. */
+  placed?: SigningPlacement;
 }
 
 // ── Quality bias ────────────────────────────────────────────────────────────
@@ -130,9 +133,11 @@ export function signingFeeBasis(state: Pick<GameState, 'facilities'>, agent: Pla
  * Reasons: 'not-found' (id absent), 'squad-full' (squad at SQUAD_CAP),
  * 'insufficient-funds' (money < fee). On success emits 'player:signed' and a
  * 'ui:notify' success, unless `opts.toast` is false (the Recruit screen and the
- * player page show the Undo toast instead, #370).
+ * player page show the Undo toast instead, #370). With `opts.intoLineup` (the
+ * coach's own tap, #416) a man who out-rates a starter goes into the nine and
+ * `placed` says where; without it (the soak, tests) the lineup is left alone.
  */
-export function signPlayer(state: GameState, playerId: string, opts: { toast?: boolean } = {}): SignResult {
+export function signPlayer(state: GameState, playerId: string, opts: { toast?: boolean; intoLineup?: boolean } = {}): SignResult {
   const s = state;
   const agent = s.freeAgents.find((p) => p.id === playerId);
   if (!agent) return { ok: false, reason: 'not-found' };
@@ -148,14 +153,17 @@ export function signPlayer(state: GameState, playerId: string, opts: { toast?: b
   const { junior: _junior, departed: _departed, ...rest } = agent;
   const signed: Player = { ...rest, contractWeeks: NEW_CONTRACT_WEEKS };
   const after = getState();
+  const squad = [...after.squad, signed];
+  const placed = opts.intoLineup ? placeSigning(after.lineup, squad, signed) : undefined;
   setState({
     freeAgents: after.freeAgents.filter((p) => p.id !== playerId),
-    squad: [...after.squad, signed],
+    squad,
+    ...(placed ? { lineup: placed.lineup } : {}),
   });
 
   bus.emit('player:signed', signed);
   if (opts.toast !== false) bus.emit('ui:notify', { text: `Signed ${signed.name}`, kind: 'success' });
-  return { ok: true };
+  return placed ? { ok: true, placed } : { ok: true };
 }
 
 // ── Release ─────────────────────────────────────────────────────────────────

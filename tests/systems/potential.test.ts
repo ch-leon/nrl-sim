@@ -111,8 +111,26 @@ describe('projectCareer', () => {
 
 describe('stage and retirement', () => {
   it('reads the stage from ageMod\'s bands', () => {
-    expect([17, 21, 22, 27, 28, 30, 31, 36].map(careerStage))
+    expect([17, 21, 22, 27, 28, 30, 31, 36].map((age) => careerStage(age)))
       .toEqual(['Developing', 'Developing', 'Prime', 'Prime', 'Prime', 'Prime', 'Declining', 'Declining']);
+  });
+
+  it('a veteran whose projection still rises is Still improving, not Declining (#419)', () => {
+    // The play-test's man: 33, a 53 overall, a Training Paddock at L2.
+    const paddock: PlacedFacility[] = [{ id: 'p', defId: 'trainingPaddock', x: 0, y: 0, level: 2 }];
+    const old = mk('old', 33, flat(53));
+    const rising = projectCareer(old, paddock);
+    expect(rising.points[rising.points.length - 1]!.rating).toBeGreaterThan(overallRating(old));
+    expect(rising.peak.age).toBeGreaterThan(33);
+    expect(careerStage(33, rising)).toBe('Still improving');
+    expect(careerStage(33)).toBe('Declining'); // the age alone
+    // A falling (or flat) curve keeps the word.
+    const falling = projectCareer(mk('star', 33, flat(80)), paddock);
+    expect(falling.peak.age).toBe(33);
+    expect(careerStage(33, falling)).toBe('Declining');
+    // The young and the prime read as before, whatever the curve.
+    expect(careerStage(19, rising)).toBe('Developing');
+    expect(careerStage(27, falling)).toBe('Prime');
   });
 
   it('the retirement note starts at 33, at the chance of the coming rollover', () => {

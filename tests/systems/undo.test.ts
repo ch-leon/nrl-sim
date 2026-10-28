@@ -15,7 +15,7 @@ import { sellPlayer } from '../../src/systems/contracts';
 import {
   UNDO_MS, commitUndo, currentOffer, demolishWithUndo, initUndo, offerBuild, signWithUndo, undoNow,
 } from '../../src/systems/undo';
-import { resolveLineup } from '../../src/systems/lineup';
+import { LINEUP_SLOTS, resolveLineup } from '../../src/systems/lineup';
 
 /** The first free spot for `defId`, scanning row by row. */
 function freeSpot(s: GameState, defId: FacilityDefId, skip = 0): { x: number; y: number } {
@@ -103,7 +103,8 @@ describe('sign', () => {
     const agent = before.freeAgents[3]!;
     expect(signWithUndo(agent.id).ok).toBe(true);
     expect(getState().money).toBe(before.money - signingFee(before, agent));
-    expect(toasts.map((t) => t.text)).toEqual([`Signed ${agent.name}`]); // the Undo toast only, not two
+    expect(toasts).toHaveLength(1); // the Undo toast only, not two
+    expect(toasts[0]!.text).toMatch(new RegExp(`^Signed ${agent.name}: (goes straight into the nine at |starts on the bench|is outside the thirteen)`));
     const unsigned: Events['player:unsigned'][] = [];
     bus.on('player:unsigned', (e) => unsigned.push(e));
     expect(undoNow()).toBe(true);
@@ -111,6 +112,36 @@ describe('sign', () => {
     expect(getState().freeAgents[3]).toEqual(agent);
     expect(net(getState())).toBe(0);
     expect(unsigned.map((e) => e.player.id)).toEqual([agent.id]);
+  });
+
+  it('a man who out-rates a starter goes into the nine, says so, and Undo puts the old nine back (#416)', () => {
+    const s = getState();
+    const SR = LINEUP_SLOTS.indexOf('second-row');
+    const starter = s.squad.find((p) => p.id === s.lineup.starters[SR])!;
+    const agent = { ...s.freeAgents[0]!, position: 'second-row' as const, injuredWeeks: 0, stats: { ...starter.stats, strength: starter.stats.strength + 20, speed: starter.stats.speed + 20 } };
+    setState({ freeAgents: [agent, ...s.freeAgents.slice(1)] });
+    const before = structuredClone(getState());
+    expect(signWithUndo(agent.id).placed).toMatchObject({ where: 'nine', slot: SR, displaced: starter.id });
+    expect(getState().lineup.starters[SR]).toBe(agent.id);
+    expect(getState().lineup.bench).toContain(starter.id);
+    expect(toasts.map((t) => t.text)).toEqual([`Signed ${agent.name}: goes straight into the nine at second-row`]);
+    expect(undoNow()).toBe(true);
+    expect(getState().lineup).toEqual(before.lineup);
+    expect(strip(getState())).toEqual(strip(before));
+  });
+
+  it('Undo leaves a lineup the coach has changed since alone (the man just drops out of it)', () => {
+    const SR = LINEUP_SLOTS.indexOf('second-row');
+    const s = getState();
+    const starter = s.squad.find((p) => p.id === s.lineup.starters[SR])!;
+    const agent = { ...s.freeAgents[0]!, position: 'second-row' as const, injuredWeeks: 0, stats: { ...starter.stats, strength: starter.stats.strength + 20 } };
+    setState({ freeAgents: [agent, ...s.freeAgents.slice(1)] });
+    signWithUndo(agent.id);
+    const edited = { ...getState().lineup, captain: agent.id };
+    setState({ lineup: edited });
+    expect(undoNow()).toBe(true);
+    expect(getState().lineup).toBe(edited);
+    expect(resolveLineup(getState().lineup, getState().squad).lineup.starters).not.toContain(agent.id);
   });
 
   it('a man put in the nine and then unsigned drops out of the pick', () => {

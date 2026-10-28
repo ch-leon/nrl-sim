@@ -4,8 +4,8 @@
 // (each man in the slot he was picked for, at the stats his fit leaves him).
 import { describe, it, expect } from 'vitest';
 import {
-  FIT, LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
-  resolveLineup, spotOf, statsAt, swapSpots,
+  FIT, LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, placeSigning, positionFit,
+  resolveLineup, signingNote, spotOf, statsAt, swapSpots,
 } from '../../src/systems/lineup';
 import { ROLES } from '../../src/match/league/roles';
 import { POSITIONS, generatePlayerAround, overallRating } from '../../src/data/player';
@@ -15,7 +15,7 @@ import { runMatch } from '../../src/match/league/match';
 import { LiveSim } from '../../src/match/league/live';
 import { makeRng } from '../../src/utils/rng';
 import { BENCH } from '../../src/match/league/bench';
-import type { Lineup, Player } from '../../src/core/state';
+import type { Lineup, Player, Position } from '../../src/core/state';
 
 /** A squad with one first-grader per position rated exactly `first` and one depth man per position at `depth`, ids by position. */
 function squad(first = 65, depth = 55): Player[] {
@@ -253,5 +253,89 @@ describe('the sheet the sim gets', () => {
     const a = runMatch(sheet, other, { seed: 9 });
     const b = runMatch(teamSheetFromSquad(s, 'me', 'Me', ['#111', '#eee'], resolveLineup(l, s)), other, { seed: 9 });
     expect(b).toEqual(a);
+  });
+});
+
+describe('a new signing (#416)', () => {
+  const SR = LINEUP_SLOTS.indexOf('second-row');
+  const sq = squad();
+  const picked = (): Lineup => ({ ...autoPick(sq), captain: 'second-row-65', kicker: 'halfback-65' });
+  const recruit = (position: Position, rating: number, id = `new-${position}`): Player =>
+    ({ ...sq.find((p) => p.position === position)!, id, injuredWeeks: 0, stats: { speed: rating, strength: rating, stamina: rating, skill: rating, footyIQ: rating } });
+
+  it('a man who out-rates the starter in his own slot goes straight in; the starter goes to the bench', () => {
+    const l = picked();
+    expect(l.starters[SR]).toBe('second-row-65');
+    expect(l.bench).toHaveLength(BENCH.size);
+    const signed = recruit('second-row', 70);
+    const r = placeSigning(l, [...sq, signed], signed);
+    expect(r).toMatchObject({ where: 'nine', slot: SR, displaced: 'second-row-65' });
+    expect(r.lineup.starters[SR]).toBe(signed.id);
+    expect(r.lineup.starters.filter((_, i) => i !== SR)).toEqual(l.starters.filter((_, i) => i !== SR));
+    // A full bench: he takes the weakest man's seat, in its place in the order.
+    expect(r.lineup.bench).toHaveLength(BENCH.size);
+    expect(r.lineup.bench).toContain('second-row-65');
+    const gone = l.bench.filter((id) => !r.lineup.bench.includes(id));
+    expect(gone).toHaveLength(1);
+    expect(Math.min(...l.bench.map((id) => overallRating(sq.find((p) => p.id === id)!)))).toBe(overallRating(sq.find((p) => p.id === gone[0])!));
+    // The kicker and captain stay picked (as after Auto pick); one now on the bench hands over to the default.
+    expect(r.lineup.captain).toBe('second-row-65');
+    expect(r.lineup.kicker).toBe('halfback-65');
+    expect(r.lineup.rotation).toBe(l.rotation);
+    expect(r.lineup.tactics).toEqual(l.tactics);
+    expect(signingNote(r)).toBe('goes straight into the nine at second-row');
+    // The side that runs out has him.
+    expect(resolveLineup(r.lineup, [...sq, signed]).starters[SR]!.id).toBe(signed.id);
+  });
+
+  it('with a free seat the starter he replaces takes it', () => {
+    const l = { ...picked(), bench: picked().bench.slice(0, 2) };
+    const signed = recruit('second-row', 70);
+    const r = placeSigning(l, [...sq, signed], signed);
+    expect(r.lineup.bench).toEqual([...l.bench, 'second-row-65']);
+  });
+
+  it('of two slots for his position he takes the weaker starter\'s; an open slot is his', () => {
+    const l = picked();
+    const wingers = LINEUP_SLOTS.flatMap((pos, i) => (pos === 'winger' ? [i] : []));
+    const weak = { ...l, starters: l.starters.map((id, i) => (i === wingers[1] ? 'winger-55' : id)), bench: l.bench.filter((id) => id !== 'winger-55') };
+    const signed = recruit('winger', 62);
+    expect(placeSigning(weak, [...sq, signed], signed)).toMatchObject({ where: 'nine', slot: wingers[1], displaced: 'winger-55' });
+    const open = { ...l, starters: l.starters.map((id, i) => (i === SR ? null : id)) };
+    const r = placeSigning(open, [...sq, recruit('second-row', 50)], recruit('second-row', 50));
+    expect(r.where).toBe('nine');
+    expect(r.displaced).toBeUndefined();
+    expect(r.lineup.bench).toEqual(open.bench);
+  });
+
+  it('a lock (no lock slot in the nine) is tried where he fits best', () => {
+    const signed = recruit('lock', 75);
+    const r = placeSigning(picked(), [...sq, signed], signed);
+    expect(r.where).toBe('nine');
+    expect(positionFit('lock', LINEUP_SLOTS[r.slot!]!)).toBe(FIT.related);
+  });
+
+  it('no better than the starter: the bench, taking the weakest seat only when he out-rates its man', () => {
+    const l = picked();
+    const handy = recruit('second-row', 62);
+    const r = placeSigning(l, [...sq, handy], handy);
+    expect(r.where).toBe('bench');
+    expect(r.lineup.starters).toEqual(l.starters);
+    expect(r.lineup.bench).toContain(handy.id);
+    expect(signingNote(r)).toBe('starts on the bench');
+    const free = { ...l, bench: l.bench.slice(0, 3) };
+    const poor = recruit('second-row', 40);
+    expect(placeSigning(free, [...sq, poor], poor).lineup.bench).toEqual([...free.bench, poor.id]);
+    const out = placeSigning(l, [...sq, poor], poor);
+    expect(out.where).toBe('out');
+    expect(out.lineup).toBe(l);
+    expect(signingNote(out)).toContain('outside the thirteen');
+  });
+
+  it('an injured signing, or one already picked, changes nothing', () => {
+    const l = picked();
+    const hurt = { ...recruit('second-row', 80), injuredWeeks: 3 };
+    expect(placeSigning(l, [...sq, hurt], hurt)).toEqual({ lineup: l, where: 'out' });
+    expect(placeSigning(l, sq, sq.find((p) => p.id === 'second-row-65')!).lineup).toBe(l);
   });
 });
