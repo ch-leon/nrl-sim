@@ -777,13 +777,14 @@ function screenProblems(page, spec, safe) {
       const hit = document.elementFromPoint((rr.left + rr.right) / 2, (rr.top + rr.bottom) / 2);
       return !!hit && (el.contains(hit) || hit.contains(el));
     };
-    // Rows: four whole ones (or all of them when there are fewer), or one whole card.
-    // Three under 340px tall (956×330, Safari's toolbars up): the Broadcast Quiet sheet
-    // sits above a 56px dock and keeps 44px tap rows, which leaves room for three and a part.
+    // Rows: four whole ones (or all of them when there are fewer), or one whole card. At
+    // 956×330 (Safari's toolbars up) too since Wave 3: a 52px dock and slimmer sheet frames
+    // leave room for four 44px tap rows on Squad, Lineup, Recruit, Contracts and a rival's squad.
+    // A check can still ask for fewer there (`shortRows`), for a list under a banner.
     const rows = [...box.querySelectorAll(spec.rows)].filter((e) => e.getBoundingClientRect().height > 0);
     const shown = rows.filter(seen).length;
     const cards = spec.card ? [...box.querySelectorAll(spec.card)].filter(seen).length : 0;
-    const need = Math.min(window.innerHeight < 340 ? 3 : 4, rows.length);
+    const need = Math.min(spec.shortRows && window.innerHeight < 340 ? spec.shortRows : 4, rows.length);
     // Prose (the Guide): its paragraphs run to any length, so count the lines of
     // text on show instead, eight being about four short paragraphs.
     let lines = 0;
@@ -1053,6 +1054,56 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await page.locator(SHEET_EXIT).tap();
     return out;
   });
+  // Toasts keep off the rows (Wave 3, #339): with a toast up over Build, News and Squad, the
+  // list under it keeps room at its foot, so its last row scrolls whole into view above the
+  // toast; the toast covers no ✕, primary action or dock control; and the room goes with it.
+  await step('toast-reserve', async (rec) => {
+    const out = [];
+    for (const id of ['build', 'news', 'squad']) {
+      const spec = NAV_SCREENS.find((s) => s.id === id);
+      await openNav(page, id);
+      await page.waitForSelector(spec.box);
+      if (await page.locator('.nrl-hint-x').count()) await page.locator('.nrl-hint-x').tap();
+      for (let i = 0; i < 10 && (await page.locator('.nrl-toast').count()); i++) await page.locator('.nrl-toast').first().tap();
+      await page.evaluate(() => window.__nrlNotify({ text: 'Signed Jack Taufa from the player pool, on a two-year deal', kind: 'success', ms: 60000 }));
+      await page.waitForTimeout(500);
+      const r = await page.evaluate(([spec]) => {
+        const problems = [];
+        const t = document.querySelector('.nrl-toast')?.getBoundingClientRect();
+        if (!t || t.height < 1) return { problems: ['no toast on show'], note: '' };
+        // What must take a tap with the toast up: the sheet's ✕ (if any), its primary actions, the dock.
+        const must = [...document.querySelectorAll('.nrl-screen-region .nrl-screen-x, .nrl-dock button')];
+        for (const sel of spec.primary ?? []) must.push(...document.querySelectorAll(`${spec.box} ${sel}`));
+        for (const e of must) {
+          const er = e.getBoundingClientRect();
+          if (er.width < 1 || er.height < 1) continue;
+          const hit = document.elementFromPoint((er.left + er.right) / 2, (er.top + er.bottom) / 2);
+          if (!hit || !e.contains(hit)) problems.push(`${(e.textContent.trim() || e.getAttribute('aria-label') || e.tagName).slice(0, 14)} covered (a tap hits ${hit?.className || hit?.tagName})`);
+        }
+        // The last row, its list scrolled to the end: whole, and above the toast.
+        const rows = [...document.querySelectorAll(`${spec.box} :is(${spec.rows})`)].filter((e) => e.getBoundingClientRect().height > 0);
+        const last = rows.at(-1);
+        if (!last) return { problems: [...problems, 'no rows'], note: '' };
+        let list = last.parentElement;
+        while (list && !/(auto|scroll)/.test(getComputedStyle(list).overflowY)) list = list.parentElement;
+        if (list) list.scrollTop = list.scrollHeight;
+        const lr = last.getBoundingClientRect();
+        if (lr.bottom > t.top + 0.5) problems.push(`the last row ends at ${Math.round(lr.bottom)}, under the toast (from ${Math.round(t.top)})`);
+        if (list && lr.bottom > list.getBoundingClientRect().bottom + 1) problems.push('the last row does not scroll whole into view');
+        const room = list ? getComputedStyle(list, '::after').height : '';
+        return { problems, note: `${list?.className.split(' ')[0] ?? 'no list'} keeps ${room}` };
+      }, [spec]);
+      out.push(...r.problems.map((p) => `${id}: ${p}`));
+      rec.notes.push(`${id}: ${r.note}`);
+      await page.screenshot({ path: join(OUT, `toast-reserve-${id}.png`) });
+      await page.locator('.nrl-toast').first().tap();
+      await page.waitForTimeout(300);
+      const left = await page.evaluate(() => document.querySelectorAll('.nrl-toast-reserve').length);
+      if (left) out.push(`${id}: ${left} list(s) still keep room after the toast went`);
+    }
+    await page.locator(SHEET_EXIT).tap();
+    return out;
+  });
   // The Office sheet (was More): every tile whole, tappable, 44px tall, 12px labels, clear of the unsafe bands.
   await step('nav-more', async (rec) => {
     await tap('.nrl-nav [data-nav-more]');
@@ -1135,7 +1186,8 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     if (!(await page.evaluate(() => window.__nrlShowCard?.('baliTrip')))) throw new Error('card hook failed');
     await openNav(page, 'news');
     await page.waitForSelector('[data-decisions-open]');
-    const out = await check(rec, { box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', exit: SHEET_EXIT, primary: ['[data-decisions-open]'] }, 'news');
+    // At 956×330 the banner's row leaves room for three whole news rows (a fourth part shows).
+    const out = await check(rec, { box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', shortRows: 3, exit: SHEET_EXIT, primary: ['[data-decisions-open]'] }, 'news');
     if (await page.locator('.nrl-news .nrl-event-card').count()) out.push('the decision card is in the News feed');
     return out;
   });
@@ -1288,6 +1340,8 @@ async function runScreens(browser, { w: W, h: H, safe }) {
       const trayAt = Date.now();
       const traying = await clock();
       if (!(await runs(traying).then(() => true).catch(() => false))) out.push('the match stopped under the coach tray');
+      // Measure the tray settled (#390): mid slide-in (nrl-mo-up, 180ms) WebKit reports its 44px rows as 43.99998px.
+      await page.evaluate(() => Promise.all(document.querySelector('.nrl-mo-calls').getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))));
       const tray = await page.evaluate(() => {
         const t = document.querySelector('.nrl-mo-calls');
         const r = t.getBoundingClientRect();

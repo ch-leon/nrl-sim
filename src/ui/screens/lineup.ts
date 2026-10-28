@@ -227,6 +227,11 @@ const LINEUP_CSS = `
   .nrl-lineup-tile { height: 40px; }
   .nrl-lineup-field { min-height: ${3 * 40 + 2 * GAP + 8}px; }
 }
+/* 956×330: the list's gaps close up so four whole 44px rows show beside the pitch. */
+@media (max-height: 340px) {
+  .nrl-lineup-right { gap: 2px; }
+  .nrl-lineup-list { gap: 2px; }
+}
 
 /* The plan (#342): a bottom sheet over the dimmed Lineup, the half-time sheet's look (3r). */
 .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal {

@@ -625,7 +625,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-dock-tabs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 0 1 auto; }
 .nrl-dock-tabs > .nrl-btn {
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 44px; /* #389: CLUB, the shortest label, was 43 wide at Normal and 40 at Large */
+  justify-content: center;
   height: 44px;
   padding: 0 12px;
   border-radius: 10px;
@@ -1036,6 +1037,8 @@ html[data-text-size] .nrl-screen-sub { min-width: 6.5em; }
 }
 .nrl-toast-lane[hidden] { display: none; }
 .nrl-toast-lane[data-lane="dock"] { top: auto; bottom: calc(var(--nrl-nav-h, 0px) + 20px); }
+/* A list under the toast keeps room at its foot while it shows (toasts.ts listReserve), so its last row scrolls clear. */
+.nrl-toast-reserve::after { content: ''; display: block; flex: 0 0 auto; grid-column: 1 / -1; height: var(--nrl-toast-pad, 0px); }
 /* Beside an open dialog (toasts.ts sets the width, and the left when it is the right-hand room): above it, never over it. */
 .nrl-toast-lane[data-lane="beside"] { top: auto; bottom: calc(var(--nrl-nav-h, 0px) + 20px); left: calc(12px + var(--nrl-safe-l)); transform: none; justify-content: flex-start; z-index: 101; }
 .nrl-toast-lane[data-lane="match"] {
@@ -1117,6 +1120,19 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   .nrl-screen, .nrl-screen-backdrop .nrl-modal { padding: 6px 12px; }
   .nrl-screen-head { margin-bottom: 4px; }
   .nrl-nav-sheet { bottom: calc(var(--nrl-nav-h, 0px) + 6px); }
+}
+/* 956×330 (Safari's toolbars up on a 16 Pro Max): four whole rows on the list sheets too (#336's
+   leftover; Squad, Lineup, Recruit, Contracts, a rival's squad). Text keeps its size and taps stay
+   44: the room comes from the dock's frame (52, PLAY WEEK 44), the gaps round a sheet and its padding. */
+@media (max-height: 340px) {
+  .nrl-dock-wrap { padding-bottom: max(6px, var(--nrl-safe-b)); }
+  .nrl-dock { height: 52px; }
+  .nrl-dock-play { height: 44px; }
+  .nrl-dock-play-group > .nrl-btn { min-height: 44px; }
+  .nrl-screen-region { top: calc(var(--nrl-hud-h, 0px) + 6px + var(--nrl-safe-t)); bottom: calc(var(--nrl-nav-h, 0px) + 6px); }
+  .nrl-screen, .nrl-screen-backdrop .nrl-modal { padding: 4px 12px; }
+  .nrl-dialog-region { padding-top: calc(6px + var(--nrl-safe-t)); padding-bottom: 6px; }
+  .nrl-table th { padding-top: 2px; padding-bottom: 2px; }
 }
 
 /* ── News (#45), under Office ───────────────────────────────────────────── */
