@@ -140,7 +140,7 @@ export function squadSide(id: string, spec: SideSpec, seed: number, level: numbe
       squad = generateRivalSquad({ id: 'rival', strength }, draw === 0 ? seed : (hashString(`style:${draw}`) ^ seed) >>> 0);
       sheet = rivalMatchSheet({ id, name: id, colors: ['#111', '#eee'], strength: squadStrength(squad), squad });
       if (!spec.style || sheet.tactics?.attack === spec.style) break;
-      if (draw >= STYLE_DRAWS) throw new Error(`no ${spec.style} rival squad in ${STYLE_DRAWS} draws at strength ${strength}`);
+      if (draw + 1 >= STYLE_DRAWS) throw new Error(`no ${spec.style} rival squad in ${STYLE_DRAWS} draws at strength ${strength}`);
     }
   }
   const traits = (r: RosterEntry, key: string): RosterEntry => {

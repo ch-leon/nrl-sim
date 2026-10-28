@@ -40,7 +40,11 @@ was (`--tune pace.extraPerStat=0.06 --tune momentum.perMs=0.03 --tune momentum.c
 Expansive −6.8 → **−8.1** against strength and 44% → 43% at a level rating.
 Balanced (−4.4 at a level rating) and All-out (+6.6 against strength) leave
 the band, and Rush goes from +4.3 / +4.0 to +5.3 / +4.8. It fails every line
-of the pass bar.
+of the pass bar. The signed plan asked for 20 seeds on both sides of this
+comparison. Both were run at 10 (the baseline's own size), because stage A
+had already failed the 70 v 50 guard on every cell and the season moved the
+wrong way by more than a standard error. The two soaks' printed tables are
+in this section only; the harness runs are on `balance-log`.
 
 **Where the gap is not.** These checks also play no part in the match:
 
