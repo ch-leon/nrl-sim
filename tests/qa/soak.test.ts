@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   runSoak, checkState, nonFinitePaths, duplicatePlayers, asOldSave, OLD_VERSIONS, gapSample, bestNineMean, summariseSeasons,
   classifyReason, emptyTally, tallyNet, FINANCE_LINES, NEAR_RIVALS, nearestRivals, recordAgainst, advanceWeekAsTapped, registerAllSystems,
-  styleTable, styleMixOf, levelWinRates, offTheLevelMean, type SeasonSample, type SoakResult, type StyleGame,
+  styleTable, styleMixOf, levelWinRates, fieldedTable, offTheLevelMean, type SeasonSample, type SoakResult, type StyleGame,
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
@@ -375,6 +375,9 @@ describe('rival styles over a season (#249, N11)', () => {
       expect([0, 0.5, 1]).toContain(game.homeScore);
       expect(game.switches).toBeGreaterThanOrEqual(0);
       expect(Number.isInteger(game.switches)).toBe(true);
+      // The fielded nine is never better than the best nine of the whole squad (#322).
+      expect(game.homeFielded!).toBeLessThanOrEqual(game.homeStrength + 0.5);
+      expect(game.awayFielded!).toBeLessThanOrEqual(game.awayStrength + 0.5);
     }
     expect(runSoak({ seed: 11, seasons: 1, weeks: 1, mode: 'idle' }).styleGames).toBeUndefined();
   }, 60_000);
@@ -397,6 +400,22 @@ describe('rival styles over a season (#249, N11)', () => {
     const logged = offTheLevelMean([...rows.values()]).map((row) => row.style).sort();
     expect(logged).toEqual(['balanced', 'expansive']);
     expect(styleMixOf(games)).toEqual({ attacks: 4, defences: 1, switches: 30, games: 30 });
+  });
+
+  it('the fielded nine (#322): what a style leaves out of its strength, and wins ÷ games between level fielded nines', () => {
+    const fielded = (x: StyleGame, homeFielded: number, awayFielded: number): StyleGame => ({ ...x, homeFielded, awayFielded });
+    const games: StyleGame[] = [
+      // Rated level, but Expansive fields 4 points short: not level on the field, so it is left out of Level.
+      ...Array.from({ length: 10 }, () => fielded(g('expansive', 'balanced', 60, 60, 0), 56, 60)),
+      // Level on the field.
+      ...Array.from({ length: 10 }, () => fielded(g('expansive', 'balanced', 60, 60, 1), 59, 60)),
+      g('grind', 'balanced', 60, 60, 1), // recorded before #322: skipped
+    ];
+    const rows = new Map(fieldedTable(games, 'attack').map((row) => [row.style, row]));
+    expect(rows.get('expansive')).toEqual({ style: 'expansive', sides: 20, shortfall: 2.5, level: 10, levelScore: 1 });
+    expect(rows.get('balanced')!.shortfall).toBe(0);
+    expect(rows.get('balanced')!.levelScore).toBe(0);
+    expect(rows.get('grind')).toBeUndefined();
   });
 });
 

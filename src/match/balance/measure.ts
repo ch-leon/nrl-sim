@@ -105,6 +105,9 @@ export function bestNine(squad: readonly Player[]): number {
   return best.reduce((a, b) => a + b, 0) / best.length;
 }
 
+/** How many rival squads a styled side may draw before the plan is called impossible. */
+const STYLE_DRAWS = 500;
+
 /**
  * A squad-built side for one squad seed (N12.2) and its best nine, built as
  * matchday.ts builds the two sides of the player's match: a new game's squad
@@ -131,8 +134,14 @@ export function squadSide(id: string, spec: SideSpec, seed: number, level: numbe
     }
     sheet = teamSheetFromSquad(squad, id, id, ['#111', '#eee'], resolveLineup(lineup, squad));
   } else {
-    squad = generateRivalSquad({ id: 'rival', strength: Math.round(spec.rating ?? level) }, seed);
-    sheet = rivalMatchSheet({ id, name: id, colors: ['#111', '#eee'], strength: squadStrength(squad), squad });
+    const strength = Math.round(spec.rating ?? level);
+    // With a style, the first of this seed's draws whose nine reads as it (#322).
+    for (let draw = 0; ; draw++) {
+      squad = generateRivalSquad({ id: 'rival', strength }, draw === 0 ? seed : (hashString(`style:${draw}`) ^ seed) >>> 0);
+      sheet = rivalMatchSheet({ id, name: id, colors: ['#111', '#eee'], strength: squadStrength(squad), squad });
+      if (!spec.style || sheet.tactics?.attack === spec.style) break;
+      if (draw >= STYLE_DRAWS) throw new Error(`no ${spec.style} rival squad in ${STYLE_DRAWS} draws at strength ${strength}`);
+    }
   }
   const traits = (r: RosterEntry, key: string): RosterEntry => {
     if (!spec.traits || spec.traits === 'gen') return r;

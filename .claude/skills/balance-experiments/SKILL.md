@@ -52,6 +52,8 @@ include a neutral one (`even 60 v 60`) so effects can be told from matchup quirk
   player's match, a new pair every seed; a rival with no `rating` is level with the
   other side. `"rivalOf": "easy|normal|hard"` gives a side the difficulty's edge.
   Use them for questions about the player's club against its rivals.
+  `"style": "expansive"` (any attack) on a rival squad plays a squad whose nine
+  reads as that style, as the season's rival styles are picked (#322).
 - **Bench**: `"bench": 0–4` interchange players (default 4) and `"rotation":
   "off|standard|heavy"` (default standard). Rotation is a side setting, not a knob: to
   compare policies write one scenario per policy.
