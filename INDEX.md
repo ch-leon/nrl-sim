@@ -160,3 +160,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-091624-expansive-speed | expansive speed | f6edc06 (uncommitted changes) | claude/expansive-speed-322 | [report](runs/20261028-091624-expansive-speed/report.md) |
 | 20261028-110421-expansive-weather | expansive weather | 9d0f242 | claude/expansive-speed-322 | [report](runs/20261028-110421-expansive-weather/report.md) |
 | 20261028-110727-expansive-weather-controls | expansive weather controls | 9d0f242 | claude/expansive-speed-322 | [report](runs/20261028-110727-expansive-weather-controls/report.md) |
+| 20261028-121705-standard | standard | 9915e11 | main | [report](runs/20261028-121705-standard/report.md) |
