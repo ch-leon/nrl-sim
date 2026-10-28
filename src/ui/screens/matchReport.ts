@@ -487,34 +487,34 @@ export const REPORT_CSS = `
   font-family: var(--nrl-f-body); animation: nrl-mo-up 180ms ease-out;
 }
 .nrl-ft-head, .nrl-rp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.nrl-ft-title { font-family: var(--nrl-f-label); font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
+.nrl-ft-title { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
 .nrl-rp-tag {
-  padding: 2px 10px; border-radius: 6px; font-family: var(--nrl-f-label); font-size: 14px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 10px; border-radius: 6px; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   background: var(--nrl-line); color: var(--nrl-text-2);
 }
 .nrl-rp-tag[data-kind="win"] { background: var(--nrl-win); color: #fff; }
 .nrl-ft-score { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
-.nrl-ft-pts { font-family: var(--nrl-f-num); font-size: 42px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
-.nrl-ft-vs { font-family: var(--nrl-f-label); font-size: 22px; font-weight: 600; color: var(--nrl-text-2); }
+.nrl-ft-pts { font-family: var(--nrl-f-num); font-size: 2.625rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.nrl-ft-vs { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 600; color: var(--nrl-text-2); }
 .nrl-ft-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .nrl-ft-chips[hidden] { display: none; }
-.nrl-ft-chip { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); font-size: 13px; }
+.nrl-ft-chip { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); font-size: 0.8125rem; }
 .nrl-ft-chip b { font-family: var(--nrl-f-num); font-weight: 600; }
 .nrl-ft-chip-neg { color: var(--nrl-neg); }
 .nrl-ft-potm { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--nrl-line); border-bottom: 1px solid var(--nrl-line); }
 .nrl-ft-badge {
   flex: 0 0 44px; width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
-  background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-label); font-size: 18px; font-weight: 700;
+  background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700;
 }
 .nrl-ft-potm-text { display: flex; flex-direction: column; min-width: 0; }
-.nrl-ft-potm-label { font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
-.nrl-ft-potm-line { font-size: 15px; font-weight: 600; }
+.nrl-ft-potm-label { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-ft-potm-line { font-size: 0.9375rem; font-weight: 600; }
 .nrl-ft-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.nrl-ft-actions .nrl-btn { height: 48px; font-size: 18px; padding: 0 16px; }
-.nrl-ft-actions .nrl-btn-primary { padding: 0 22px; font-size: 19px; }
+.nrl-ft-actions .nrl-btn { height: 48px; font-size: 1.125rem; padding: 0 16px; }
+.nrl-ft-actions .nrl-btn-primary { padding: 0 22px; font-size: 1.1875rem; }
 @media (max-height: 400px) {
   .nrl-ft-card { gap: 10px; padding: 16px 20px; }
-  .nrl-ft-pts { font-size: 38px; }
+  .nrl-ft-pts { font-size: 2.375rem; }
 }
 /* The report (3t): a full sheet over the dimmed pitch, the stats column on the right. */
 .nrl-modal-backdrop.nrl-report-backdrop {
@@ -527,32 +527,32 @@ export const REPORT_CSS = `
 .nrl-report { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: minmax(0, 1fr); gap: 20px; }
 .nrl-rp-left { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
 .nrl-rp-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; }
-.nrl-rp-title { font-family: var(--nrl-f-label); font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-rp-title { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-rp-team { display: flex; align-items: center; gap: 10px; color: var(--nrl-text-2); }
 .nrl-rp-stripe { flex: 0 0 6px; width: 6px; height: 30px; }
-.nrl-rp-name { flex: 1 1 auto; min-width: 0; font-family: var(--nrl-f-label); font-size: 24px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-rp-pts { font-family: var(--nrl-f-num); font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.nrl-rp-name { flex: 1 1 auto; min-width: 0; font-family: var(--nrl-f-label); font-size: 1.5rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-rp-pts { font-family: var(--nrl-f-num); font-size: 1.75rem; font-weight: 500; font-variant-numeric: tabular-nums; }
 .nrl-rp-lead { color: var(--nrl-text); }
 .nrl-rp-lead .nrl-rp-name { font-weight: 700; }
 .nrl-rp-lead .nrl-rp-pts { font-weight: 600; }
-.nrl-rp-detail { margin: 0; padding-left: 16px; font-size: 12px; line-height: 1.4; color: var(--nrl-text-2); }
+.nrl-rp-detail { margin: 0; padding-left: 16px; font-size: 0.75rem; line-height: 1.4; color: var(--nrl-text-2); }
 .nrl-rp-detail-more { margin-top: -6px; }
-.nrl-report-note { margin: 0; font-size: 13px; color: var(--nrl-accent); }
-.nrl-report-summary { margin: 0; font-size: 13px; font-style: italic; line-height: 1.45; color: var(--nrl-text-2); }
-.nrl-report-changes { font-size: 12px; color: var(--nrl-muted); }
+.nrl-report-note { margin: 0; font-size: 0.8125rem; color: var(--nrl-accent); }
+.nrl-report-summary { margin: 0; font-size: 0.8125rem; font-style: italic; line-height: 1.45; color: var(--nrl-text-2); }
+.nrl-report-changes { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-report-changes summary { cursor: pointer; list-style: none; min-height: 28px; display: flex; align-items: center; }
 .nrl-report-changes summary::-webkit-details-marker { display: none; }
 .nrl-report-changes summary::before { content: '▸'; margin-right: 6px; }
 .nrl-report-changes[open] summary::before { content: '▾'; }
-.nrl-report-why summary { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 14px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-.nrl-report-why-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-top: 1px solid var(--nrl-button); font-size: 12px; color: var(--nrl-text-2); }
+.nrl-report-why summary { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.nrl-report-why-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-top: 1px solid var(--nrl-button); font-size: 0.75rem; color: var(--nrl-text-2); }
 .nrl-report-why-row > span { flex: 1 1 auto; min-width: 0; line-height: 1.35; }
-.nrl-btn.nrl-report-why-go { flex: 0 0 auto; min-height: 36px; padding: 0 10px; font-size: 14px; border-radius: 8px; }
+.nrl-btn.nrl-report-why-go { flex: 0 0 auto; min-height: 36px; padding: 0 10px; font-size: 0.875rem; border-radius: 8px; }
 @media (pointer: coarse) { .nrl-btn.nrl-report-why-go { min-height: 44px; } }
 .nrl-report-change { margin: 2px 0 0 14px; }
-.nrl-report-potm { margin: 0; font-size: 13px; color: var(--nrl-text-2); }
+.nrl-report-potm { margin: 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
 .nrl-rp-potm-label { font-family: var(--nrl-f-label); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
-.nrl-btn.nrl-rp-back { flex: 0 0 auto; width: 100%; height: 48px; font-size: 19px; }
+.nrl-btn.nrl-rp-back { flex: 0 0 auto; width: 100%; height: 48px; font-size: 1.1875rem; }
 .nrl-rp-stats { min-height: 0; overflow-y: auto; }
 @media (max-width: 720px) { .nrl-report { grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; } }
 @media (max-width: 560px) { .nrl-report { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; overflow-y: auto; } }

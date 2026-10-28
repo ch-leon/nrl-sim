@@ -66,11 +66,11 @@ describe('tabs and More (#344)', () => {
 import { CSS } from '../../src/ui/dom';
 
 describe('the dock on landscape phones (Broadcast Quiet)', () => {
-  it('is one 64px row: status, tabs, PLAY WEEK, with tab labels of 14px or more', () => {
+  it('is one 64px row: status, tabs, PLAY WEEK, with tab labels of 14px or more (rem since the text size, #371)', () => {
     expect(CSS).toMatch(/\.nrl-dock \{[^}]*height: 64px/);
-    expect(CSS).toMatch(/\.nrl-dock-tabs > \.nrl-btn \{[^}]*height: 44px[^}]*font-size: 16px/);
+    expect(CSS).toMatch(/\.nrl-dock-tabs > \.nrl-btn \{[^}]*height: 44px[^}]*font-size: 1rem/);
     const narrow = CSS.slice(CSS.indexOf('@media (max-width: 760px)'));
-    expect(narrow).toMatch(/\.nrl-dock-tabs > \.nrl-btn \{[^}]*font-size: 14px/);
+    expect(narrow).toMatch(/\.nrl-dock-tabs > \.nrl-btn \{[^}]*font-size: 0\.875rem/);
   });
 
   it('marks the open screen and clears the home bar', () => {

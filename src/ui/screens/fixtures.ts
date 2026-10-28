@@ -489,7 +489,7 @@ export const LEAGUE_CSS = `
 .nrl-league-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .nrl-league-label { display: flex; align-items: center; min-height: 24px; }
 .nrl-league-empty { color: var(--nrl-muted); margin: 8px 0; }
-.nrl-league-foot { flex: 0 0 auto; margin-top: 4px; font-size: 11px; color: var(--nrl-muted); }
+.nrl-league-foot { flex: 0 0 auto; margin-top: 4px; font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-ladder-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-table.nrl-ladder-table { table-layout: fixed; border-collapse: separate; border-spacing: 0; }
 .nrl-ladder-col-pos { width: 24px; }
@@ -542,7 +542,7 @@ export const LEAGUE_CSS = `
   font-style: normal;
   font-family: var(--nrl-f-num);
   font-weight: 600;
-  font-size: 10px;
+  font-size: 0.625rem;
   color: #fff;
 }
 .nrl-form-W { background: var(--nrl-win); }
@@ -552,7 +552,7 @@ export const LEAGUE_CSS = `
 
 /* The club's fixtures: 38px rows on #141d3a, the result in Mono. */
 .nrl-fixtures-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; margin-bottom: 4px; flex: 0 0 auto; }
-.nrl-btn.nrl-fixtures-toggle { min-height: 28px; padding: 0 10px; border-radius: 8px; font-size: 13px; letter-spacing: 0.06em; position: relative; }
+.nrl-btn.nrl-fixtures-toggle { min-height: 28px; padding: 0 10px; border-radius: 8px; font-size: 0.8125rem; letter-spacing: 0.06em; position: relative; }
 .nrl-btn.nrl-fixtures-toggle::after { content: ''; position: absolute; inset: -8px 0; } /* a 44px hit area */
 .nrl-fixtures-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 4px; }
 .nrl-fixture-row {
@@ -566,7 +566,7 @@ export const LEAGUE_CSS = `
   background: var(--nrl-panel);
   color: var(--nrl-text);
   font-family: var(--nrl-f-body);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: left;
   border: 0;
   box-sizing: border-box;
@@ -575,37 +575,37 @@ button.nrl-fixture-row { pointer-events: auto; cursor: pointer; width: 100%; box
 button.nrl-fixture-row:hover { background: #1a2550; }
 button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 1px; }
 @media (pointer: coarse) { button.nrl-fixture-row { height: 44px; } }
-.nrl-fixture-rd { width: 24px; flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 14px; font-weight: 600; color: var(--nrl-muted); }
+.nrl-fixture-rd { width: 24px; flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; color: var(--nrl-muted); }
 .nrl-fixture-opp { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-fixture-ha { color: var(--nrl-muted); }
-.nrl-fixture-res { flex: 0 0 auto; font-family: var(--nrl-f-num); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.nrl-fixture-res { flex: 0 0 auto; font-family: var(--nrl-f-num); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 .nrl-fixture-W { color: var(--nrl-pos); }
 .nrl-fixture-L { color: var(--nrl-neg); }
 .nrl-fixture-D { color: var(--nrl-text-2); }
-.nrl-fixture-next { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 14px; font-weight: 700; letter-spacing: 0.06em; }
+.nrl-fixture-next { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; }
 .nrl-fixture-later { color: var(--nrl-muted); }
 /* Every game: a round's label, then its games. */
 .nrl-fixtures-round { margin-top: 6px; flex: 0 0 auto; }
 .nrl-fixtures-round[data-current] { color: var(--nrl-accent); }
-.nrl-fixture { flex: 0 0 auto; font-size: 12px; color: var(--nrl-text-2); padding: 3px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-fixture { flex: 0 0 auto; font-size: 0.75rem; color: var(--nrl-text-2); padding: 3px 8px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-fixture[data-player] { background: var(--nrl-me); color: var(--nrl-text); font-weight: 600; }
 /* A narrow phone: the ladder takes a little more of the width. */
 @media (max-width: 700px) { .nrl-screen.nrl-league { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; } }
 
 /* The next-match preview: a dialog over the League sheet. */
 .nrl-dialog-region .nrl-modal.nrl-next-modal { width: min(100%, 640px); background: var(--nrl-navy); }
-.nrl-next-match { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.nrl-next-match { display: flex; flex-direction: column; gap: 8px; font-size: 0.8125rem; }
 .nrl-next-head { display: flex; align-items: baseline; gap: 10px; padding-right: 44px; min-height: 36px; align-items: center; }
-.nrl-next-label { font-family: var(--nrl-f-label); font-size: 15px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
-.nrl-next-where { font-family: var(--nrl-f-label); font-size: 18px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.nrl-next-label { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
+.nrl-next-where { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .nrl-next-sides { display: flex; flex-wrap: wrap; gap: 6px; }
 .nrl-next-side { display: flex; align-items: center; gap: 10px; flex: 1 1 15rem; min-width: 0; background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; }
 .nrl-next-swatch { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 4px; border: 3px solid; box-sizing: border-box; }
 .nrl-next-side-text { flex: 1 1 auto; min-width: 0; }
-.nrl-next-name { font-family: var(--nrl-f-label); font-size: 17px; font-weight: 700; letter-spacing: 0.03em; }
-.nrl-next-meta { font-family: var(--nrl-f-num); font-size: 12px; color: var(--nrl-text-2); }
+.nrl-next-name { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.03em; }
+.nrl-next-meta { font-family: var(--nrl-f-num); font-size: 0.75rem; color: var(--nrl-text-2); }
 .nrl-next-form { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: 0 0 auto; }
-.nrl-next-form small { font-size: 11px; }
+.nrl-next-form small { font-size: 0.6875rem; }
 .nrl-next-lines { display: flex; flex-direction: column; }
 .nrl-next-line { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--nrl-button); color: var(--nrl-text-2); overflow-wrap: anywhere; }
 /* The opponent's name: a text link with a 44px hit area (#194). */

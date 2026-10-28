@@ -3,7 +3,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { KIT_PATTERNS, kitFromColors, setKitDesign, type KitDesign } from '../../../src/art/match/kit';
 import {
-  CLASH_JERSEYS, KIT_CLASH_MIN, RING_MIN_DELTA, clashStrip, deltaE, kitContrast, kitCoverage, resolveKits, roleCoverage,
+  CLASH_JERSEYS, KIT_CLASH_MIN, RING_DASHES, RING_MIN_DELTA, RING_STYLES, clashStrip, deltaE, kitContrast, kitCoverage, resolveKits, ringOutline,
+  roleCoverage,
 } from '../../../src/art/match/kitClash';
 import { RIVAL_CLUBS } from '../../../src/data/league';
 import { DEFAULT_PLAYER_COLORS, PLAYER_PRIMARY_COLORS, PLAYER_SECONDARY_COLORS, isValidColorPair } from '../../../src/config';
@@ -145,6 +146,34 @@ describe('clashStrip', () => {
         expect(k.jersey).toBe(jersey);
         expect(deltaE(k.jersey, k.trim)).toBeGreaterThanOrEqual(40);
       }
+    }
+  });
+});
+
+// #371: the sides' rings differ in shape, not only colour: home solid, away dashed.
+describe('ring styles', () => {
+  it('home and away rings differ by side in every fixture, whatever the kits', () => {
+    expect(RING_STYLES.home).not.toBe(RING_STYLES.away);
+    // Two sides in the same colours: the clash strip changes the colours, never the shapes.
+    for (const [home, away] of [[player, player], [player, drovers], [drovers, player]] as const) {
+      expect(resolveKits(home, away).ringStyles).toEqual({ home: 'solid', away: 'dashed' });
+    }
+  });
+
+  it('a solid ring is one closed loop, a dashed one RING_DASHES arcs with gaps', () => {
+    const solid = ringOutline('solid', 15, 7.5);
+    expect(solid).toHaveLength(1);
+    const loop = solid[0]!;
+    expect(loop[0]!.x).toBeCloseTo(loop[loop.length - 1]!.x);
+    expect(loop[0]!.y).toBeCloseTo(loop[loop.length - 1]!.y);
+    const dashed = ringOutline('dashed', 15, 7.5);
+    expect(dashed).toHaveLength(RING_DASHES);
+    // A gap between each dash's end and the next one's start, and every point on the ellipse.
+    for (let i = 0; i < dashed.length; i++) {
+      const end = dashed[i]![dashed[i]!.length - 1]!;
+      const next = dashed[(i + 1) % dashed.length]![0]!;
+      expect(Math.hypot(end.x - next.x, end.y - next.y)).toBeGreaterThan(1);
+      for (const p of dashed[i]!) expect((p.x / 7.5) ** 2 + (p.y / 3.75) ** 2).toBeCloseTo(1);
     }
   });
 });

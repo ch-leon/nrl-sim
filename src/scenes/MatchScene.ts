@@ -46,7 +46,9 @@ import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
-import { resolveKits } from '../art/match/kitClash';
+import { RING_STYLES, resolveKits, type RingStyle } from '../art/match/kitClash';
+import { drawRing } from '../match/view/rings';
+import { teamLetters, teamLettersOn, teamTags } from '../ui/teamTag';
 import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForPlayer, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
   CROSSBAR_Z,
@@ -132,6 +134,7 @@ const TRAIL_MIN_LIFT = 30;
 const CROWD_TICK_MS = 220;
 /** Width (world px) of the team ring under every player (#340); the carrier's ring is 22. */
 const TEAM_RING_W = 15;
+const CARRIER_RING_W = 22;
 
 export interface MatchSceneData {
   home: TeamSheet;
@@ -147,19 +150,21 @@ export interface MatchSceneData {
 export class MatchActor implements PlaybackActor {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly shadow: Phaser.GameObjects.Image;
-  /** The side's ring at his feet (#340): which team he is on, whatever the kits. */
-  private readonly ring: Phaser.GameObjects.Ellipse;
+  /** The side's ring at his feet (#340): which team he is on, whatever the kits; solid or dashed by side (#371). */
+  private readonly ring: Phaser.GameObjects.Graphics;
   private readonly atlas: string;
   private look: number;
   private current = '';
   /** Whose look this is (live sim: a slot's player changes at an interchange). */
   private wearing: string | null = null;
 
-  constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string, ringColor: number) {
+  constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string, ringColor: number, ringStyle: RingStyle) {
     this.atlas = atlas;
     this.look = look;
     this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW);
-    this.ring = scene.add.ellipse(0, 0, TEAM_RING_W, TEAM_RING_W / 2).setStrokeStyle(1.5, ringColor, 0.9).setFillStyle(ringColor, 0.28).setDepth(DEPTH_SHADOW + 0.5);
+    this.ring = scene.add.graphics().setDepth(DEPTH_SHADOW + 0.5);
+    // #371: away's dashed ring is open (a faint fill), home's filled, so the two differ in shape twice over.
+    drawRing(this.ring, 0, 0, TEAM_RING_W, TEAM_RING_W / 2, ringStyle, { color: ringColor, width: 1.5, alpha: 0.9, fillAlpha: ringStyle === 'solid' ? 0.28 : 0.1 });
     this.sprite = scene.add.sprite(0, 0, atlas, `${look}-idle-0`);
     this.sprite.setOrigin((CENTER_X + 0.5) / FRAME_W, (BASE_Y + 1) / FRAME_H);
   }
@@ -284,7 +289,11 @@ export class MatchScene extends Phaser.Scene {
   private tagText: Phaser.GameObjects.Text | null = null;
   private tagActor: MatchActor | null = null;
   private tagUntil = 0;
-  private marker: Phaser.GameObjects.Ellipse | null = null;
+  private marker: Phaser.GameObjects.Graphics | null = null;
+  /** Team letters on players (#371, a setting, off by default): each man's side letter over his head. */
+  private letters: { actor: MatchActor; text: Phaser.GameObjects.Text }[] = [];
+  /** The side the carrier's ring is drawn for (redrawn only when it changes hands). */
+  private markerSide: TeamSide | null = null;
   private markerColors: Record<TeamSide, number> = { home: 0xffffff, away: 0xffffff };
   protected zoomTarget = MATCH_ZOOM;
   /** Authored (desktop) zoom for the current beat; zoomTarget is this scaled for the viewport. */
@@ -391,12 +400,13 @@ export class MatchScene extends Phaser.Scene {
       const a = this.away.roster?.[i];
       const homeLook = h ? lookForPlayer(h.id ?? h.name) : lookForSlot(i);
       const awayLook = a ? lookForPlayer(a.id ?? a.name) : lookForSlot(i + 5);
-      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow, kits.rings.home));
-      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow, kits.rings.away));
+      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow, kits.rings.home, kits.ringStyles.home));
+      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow, kits.rings.away, kits.ringStyles.away));
     }
     this.ball = new MatchBall(this, props.ball, props.ballShadow);
     this.markerColors = { home: kits.rings.home, away: kits.rings.away };
-    this.marker = this.add.ellipse(0, 0, 22, 11).setStrokeStyle(2, 0xffffff, 0.95).setFillStyle(0xffffff, 0.22).setVisible(false);
+    this.marker = this.add.graphics().setVisible(false);
+    this.markerSide = null;
     this.marker.setDepth(DEPTH_SHADOW + 2); // above the ground shadows, under every sprite
     this.tagText = this.add
       .text(0, 0, '', {
@@ -579,12 +589,43 @@ export class MatchScene extends Phaser.Scene {
       this.marker.setVisible(false);
       return;
     }
-    const c = this.markerColors[t.side];
-    this.marker.setStrokeStyle(2, c, 0.95).setFillStyle(c, 0.3).setPosition(t.x, t.y).setVisible(true);
+    if (t.side !== this.markerSide) {
+      this.markerSide = t.side;
+      this.marker.clear();
+      drawRing(this.marker, 0, 0, CARRIER_RING_W, CARRIER_RING_W / 2, RING_STYLES[t.side], { color: this.markerColors[t.side], width: 2, alpha: 0.95, fillAlpha: 0.3 });
+    }
+    this.marker.setPosition(t.x, t.y).setVisible(true);
+  }
+
+  /** #371: the side's letter (its tag's first, or H and A) over every player, screen-sized like the name tag; or none. */
+  private setLetters(on: boolean): void {
+    for (const l of this.letters) l.text.destroy();
+    this.letters = [];
+    if (!on) return;
+    const letters = teamLetters(teamTags(this.home.name, this.away.name));
+    for (const side of ['home', 'away'] as const) {
+      const letter = side === 'home' ? letters[0] : letters[1];
+      for (const actor of this.players[side]) {
+        const text = this.add
+          .text(0, 0, letter, { fontFamily: MATCH_LABEL_FONT, fontSize: '12px', fontStyle: 'bold', color: '#ffffff', backgroundColor: 'rgba(14,22,48,0.7)', padding: { x: 3, y: 0 }, resolution: 2 })
+          .setOrigin(0.5, 1)
+          .setDepth(DEPTH_TAG - 1);
+        this.letters.push({ actor, text });
+      }
+    }
   }
 
   private updateReadability(delta: number): void {
     const cam = this.cameras.main;
+    // Team letters follow the Settings switch, the pause sheet's included; off in the lab, which has no save.
+    const lettersOn = teamLettersOn(() => getState().settings);
+    if (this.built && lettersOn !== this.letters.length > 0) this.setLetters(lettersOn);
+    for (const { actor, text } of this.letters) {
+      // The name tag takes the letter's place over its man while it shows.
+      const show = actor.sprite.visible && actor !== this.tagActor;
+      text.setVisible(show);
+      if (show) text.setScale(1 / cam.zoom).setPosition(actor.sprite.x, actor.sprite.y - TAG_LIFT);
+    }
     if (this.tagText) {
       const a = this.tagActor;
       if (a && this.time.now < this.tagUntil) {
@@ -1231,6 +1272,8 @@ export class MatchScene extends Phaser.Scene {
     this.tagText = null;
     this.tagActor = null;
     this.marker = null;
+    this.markerSide = null;
+    this.letters = [];
     this.overlay?.destroy();
     this.overlay = null;
     if (this.playback instanceof LivePlayback) this.playback.destroy();

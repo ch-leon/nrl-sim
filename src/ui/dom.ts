@@ -431,7 +431,10 @@ export function ensureStyles(): void {
 // grounds, Barlow Condensed caps for labels and buttons, IBM Plex Sans for body
 // text, IBM Plex Mono for every number, one yellow primary a screen. Every
 // interactive/visible element opts back into pointer-events (the #ui-root
-// container is pointer-events:none).
+// container is pointer-events:none). Font sizes are rem, 1rem = 16px at Normal:
+// Settings › Text size scales the root (index.html, ui/textSize.ts, #371), so a new
+// rule sizes its text in rem too (13px is 0.8125rem) and boxes around text in em
+// or with room to grow.
 /** The shared stylesheet (exported for tests). */
 export const CSS = `
 :root {
@@ -493,7 +496,7 @@ export const CSS = `
   cursor: pointer;
   font-family: var(--nrl-f-label);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 0.9375rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--nrl-text);
@@ -550,7 +553,7 @@ export const CSS = `
   border-radius: 8px;
   background: transparent;
   color: var(--nrl-text);
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
@@ -560,7 +563,7 @@ export const CSS = `
 .nrl-label {
   font-family: var(--nrl-f-label);
   font-weight: 600;
-  font-size: 13px;
+  font-size: 0.8125rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--nrl-muted);
@@ -610,14 +613,14 @@ export const CSS = `
 }
 button.nrl-dock-statusbox { cursor: pointer; }
 button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; border-radius: 8px; }
-.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 15px; font-weight: 600; line-height: 1.2; white-space: nowrap; transition: color 0.15s ease; }
-.nrl-dock-week { font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); white-space: nowrap; }
+.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 0.9375rem; font-weight: 600; line-height: 1.2; white-space: nowrap; transition: color 0.15s ease; }
+.nrl-dock-week { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); white-space: nowrap; }
 /* #351 H2: under 20 weeks of runway the money goes amber, under 8 red; N12.5 in debt is red with its tag. */
 .nrl-dock-money.nrl-money-low { color: var(--nrl-fit-ok); }
 .nrl-dock-money.nrl-money-short, .nrl-dock-money.nrl-money-negative { color: var(--nrl-neg); }
 .nrl-dock-money.nrl-flash-up { color: var(--nrl-pos); }
 .nrl-dock-money.nrl-flash-down { color: var(--nrl-neg); }
-.nrl-hud-debt { margin-left: 4px; padding: 0 4px; border-radius: 4px; font-family: var(--nrl-f-label); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; background: var(--nrl-out); color: #fff; vertical-align: 1px; }
+.nrl-hud-debt { margin-left: 4px; padding: 0 4px; border-radius: 4px; font-family: var(--nrl-f-label); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; background: var(--nrl-out); color: #fff; vertical-align: 1px; }
 .nrl-dock-divider { width: 1px; height: 36px; background: var(--nrl-line); margin-right: 6px; flex: 0 0 auto; }
 .nrl-dock-tabs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 0 1 auto; }
 .nrl-dock-tabs > .nrl-btn {
@@ -628,7 +631,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   border-radius: 10px;
   background: transparent;
   color: var(--nrl-text-2);
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   display: inline-flex;
@@ -658,11 +661,12 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 }
 .nrl-dock-play-group > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
 .nrl-dock-advance { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 16px; max-width: 15rem; }
-.nrl-dock-advance-label { font-family: var(--nrl-f-label); font-size: 19px; font-weight: 700; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
-.nrl-dock-advance-sub { font-family: var(--nrl-f-body); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.3; }
+.nrl-dock-advance-label { font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
+.nrl-dock-advance-sub { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.3; }
 .nrl-dock-advance-sub:empty { display: none; }
-.nrl-btn.nrl-hud-menu-toggle { width: 40px; min-width: 40px; padding: 0; font-size: 14px; border-left: 1px solid rgba(14, 22, 48, 0.25); }
-.nrl-btn.nrl-hud-stop { width: auto; padding: 0 14px; border-left: 1px solid rgba(14, 22, 48, 0.25); font-size: 16px; }
+/* 44 wide, a finger's width on every phone (#371, from #381's check: it was 40, and 34 at 667). */
+.nrl-btn.nrl-hud-menu-toggle { width: 44px; min-width: 44px; padding: 0; font-size: 0.875rem; border-left: 1px solid rgba(14, 22, 48, 0.25); }
+.nrl-btn.nrl-hud-stop { width: auto; padding: 0 14px; border-left: 1px solid rgba(14, 22, 48, 0.25); font-size: 1rem; }
 .nrl-hud-stop[hidden], .nrl-hud-menu-toggle[hidden] { display: none; }
 /* N10.2: while a multi-week advance runs the button is a progress line, not a faded button. */
 .nrl-dock-play-group > .nrl-btn.nrl-hud-progress:disabled { opacity: 1; cursor: default; }
@@ -676,7 +680,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   background: var(--nrl-alert);
   color: #fff;
   font-family: var(--nrl-f-num);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 18px;
   text-align: center;
   vertical-align: 2px;
@@ -702,10 +706,12 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 @media (max-width: 760px) {
   .nrl-dock { padding: 0 6px 0 10px; }
   .nrl-dock-statusbox { padding-right: 8px; }
-  .nrl-dock-tabs > .nrl-btn { padding: 0 8px; font-size: 14px; letter-spacing: 0.04em; }
+  .nrl-dock-tabs > .nrl-btn { padding: 0 8px; font-size: 0.875rem; letter-spacing: 0.04em; }
   .nrl-dock-advance { padding: 0 10px; }
-  .nrl-dock-advance-label { font-size: 16px; }
-  .nrl-btn.nrl-hud-menu-toggle { width: 34px; min-width: 34px; }
+  .nrl-dock-advance-label { font-size: 1rem; }
+  /* Large and Larger text (#371): the tabs close up so all five and an alert dot stay whole. */
+  html[data-text-size] .nrl-dock-tabs > .nrl-btn { padding: 0 5px; gap: 3px; letter-spacing: 0.02em; }
+  html[data-text-size] .nrl-dock-advance { padding: 0 8px; }
 }
 @media (max-width: 620px) {
   .nrl-dock-advance-sub, .nrl-dock-week-total { display: none; }
@@ -759,8 +765,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 }
 .nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: #22305c; }
 .nrl-nav-sheet > .nrl-btn[aria-current="page"] { box-shadow: inset 0 0 0 2px var(--nrl-accent); }
-.nrl-office-name { font-family: var(--nrl-f-label); font-size: 18px; font-weight: 700; letter-spacing: 0.02em; color: var(--nrl-text); }
-.nrl-office-status { font-family: var(--nrl-f-body); font-size: 12px; font-weight: 400; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.nrl-office-name { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.02em; color: var(--nrl-text); }
+.nrl-office-status { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nrl-office-status[data-attn] { color: var(--nrl-accent); }
 .nrl-office-status:empty { display: none; }
 @media (max-width: 560px) { .nrl-nav-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -799,9 +805,9 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   box-sizing: border-box;
 }
 .nrl-decisions-chip[hidden] { display: none; }
-.nrl-decisions-chip-count { font-family: var(--nrl-f-label); font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: var(--nrl-accent); white-space: nowrap; }
-.nrl-decisions-chip-top { font-size: 13px; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.nrl-decisions-chip .nrl-btn { min-height: 34px; height: 34px; border-radius: 8px; padding: 0 12px; font-size: 15px; flex: 0 0 auto; }
+.nrl-decisions-chip-count { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.06em; color: var(--nrl-accent); white-space: nowrap; }
+.nrl-decisions-chip-top { font-size: 0.8125rem; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.nrl-decisions-chip .nrl-btn { min-height: 34px; height: 34px; border-radius: 8px; padding: 0 12px; font-size: 0.9375rem; flex: 0 0 auto; }
 /* The board chip is one button: amber at risk, red off track. */
 .nrl-board-chip { padding-right: 14px; cursor: pointer; text-align: left; }
 .nrl-board-chip:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
@@ -831,10 +837,10 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   max-height: 85dvh; /* #206: Safari's toolbars */
   overflow: auto;
   box-sizing: border-box;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
-.nrl-modal h2 { font-family: var(--nrl-f-label); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.15; }
-.nrl-modal h3 { font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-modal h2 { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.15; }
+.nrl-modal h3 { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 
 /* ── Sheets (the layering rule above openScreen in dom.ts) ───────────────
    A screen is a navy sheet above the dock: top 12, sides 12, bottom 88 on a
@@ -906,7 +912,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   padding: 0;
   border-radius: 8px;
   font-family: var(--nrl-f-body);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1;
 }
 .nrl-screen-x::after { content: ''; position: absolute; inset: -4px; } /* a 44px hit area */
@@ -926,7 +932,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   padding: 10px 14px;
   overflow: hidden;
   box-sizing: border-box;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .nrl-screen-head {
   display: flex;
@@ -941,7 +947,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-screen-title {
   font-family: var(--nrl-f-label);
   font-weight: 700;
-  font-size: 22px;
+  font-size: 1.375rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   line-height: 1.1;
@@ -949,7 +955,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   white-space: nowrap;
 }
 .nrl-screen-sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--nrl-text-2);
   white-space: nowrap;
   overflow: hidden;
@@ -958,6 +964,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   flex: 0 1 auto;
 }
 .nrl-screen-titles .nrl-screen-sub { margin: 0; }
+/* Large and Larger text (#371): the line beside the tabs keeps a few words' width; the controls scroll instead. */
+html[data-text-size] .nrl-screen-sub { min-width: 6.5em; }
 /* The controls: one row that scrolls sideways when the phone is narrow. Pushed
    right with a margin, not justify-content: an overflowing flex-end row spills
    off its start, where it cannot be scrolled to. */
@@ -973,7 +981,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-screen-tools::-webkit-scrollbar { display: none; }
 .nrl-screen-tools > * { flex: 0 0 auto; }
 .nrl-screen-tools > :first-child { margin-left: auto; }
-.nrl-screen-label { color: var(--nrl-muted); font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.nrl-screen-label { color: var(--nrl-muted); font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .nrl-screen-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -990,10 +998,10 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   text-align: center;
 }
 /* A table in a sheet: Barlow column heads, 1px #1f2b55 row rules, numbers in Mono. */
-.nrl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.nrl-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
 .nrl-table th {
   font-family: var(--nrl-f-label);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1009,7 +1017,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-table td { padding: 0 6px; height: 30px; border-top: 1px solid var(--nrl-button); white-space: nowrap; }
 .nrl-table td.nrl-num, .nrl-table th.nrl-num { text-align: right; }
 /* Back to the screen this one opened from: "◂ SQUAD". */
-.nrl-btn.nrl-back { min-height: 36px; padding: 0 10px; font-size: 14px; border-radius: 8px; }
+.nrl-btn.nrl-back { min-height: 36px; padding: 0 10px; font-size: 0.875rem; border-radius: 8px; }
 @media (pointer: coarse) { .nrl-btn.nrl-back { min-height: 44px; } }
 
 /* ── Toasts (ui:notify, #339): one at a time, in a lane over no control (toasts.ts
@@ -1028,6 +1036,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 }
 .nrl-toast-lane[hidden] { display: none; }
 .nrl-toast-lane[data-lane="dock"] { top: auto; bottom: calc(var(--nrl-nav-h, 0px) + 20px); }
+/* Beside an open dialog (toasts.ts sets the width, and the left when it is the right-hand room): above it, never over it. */
+.nrl-toast-lane[data-lane="beside"] { top: auto; bottom: calc(var(--nrl-nav-h, 0px) + 20px); left: calc(12px + var(--nrl-safe-l)); transform: none; justify-content: flex-start; z-index: 101; }
 .nrl-toast-lane[data-lane="match"] {
   transform: none;
   justify-content: flex-start;
@@ -1050,13 +1060,13 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   border-left: 4px solid var(--nrl-muted);
   box-shadow: var(--nrl-shadow-chip);
   font-family: var(--nrl-f-body);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1.3;
 }
 .nrl-toast:first-child { display: flex; }
 .nrl-toast-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.nrl-toast-more { flex: 0 0 auto; padding: 0 6px; border-radius: 6px; background: var(--nrl-button); color: var(--nrl-text-2); font-family: var(--nrl-f-num); font-size: 12px; }
+.nrl-toast-more { flex: 0 0 auto; padding: 0 6px; border-radius: 6px; background: var(--nrl-button); color: var(--nrl-text-2); font-family: var(--nrl-f-num); font-size: 0.75rem; }
 .nrl-toast-more:empty { display: none; }
 /* Red is for real problems only; routine stops and confirmations are neutral; good news is green with a gold edge. */
 .nrl-toast-info { background: rgba(14, 22, 48, 0.97); color: var(--nrl-text); border-left-color: var(--nrl-muted); }
@@ -1085,7 +1095,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   padding: 4px 4px 4px 14px;
   font-family: var(--nrl-f-label);
   font-weight: 700;
-  font-size: 15px;
+  font-size: 0.9375rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1110,7 +1120,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 }
 
 /* ── News (#45), under Office ───────────────────────────────────────────── */
-.nrl-news { font-size: 13px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-news { font-size: 0.8125rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-news-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 /* #345: the title and the filters are one row; the feed gets the rest. */
 .nrl-news-head { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; min-width: 0; min-height: 44px; margin-bottom: 8px; }
@@ -1146,16 +1156,16 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 }
 .nrl-news-decisions[hidden] { display: none; }
 .nrl-news-decisions-text { flex: 1 1 auto; min-width: 0; color: var(--nrl-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nrl-news-decisions-text b { font-family: var(--nrl-f-label); font-size: 15px; letter-spacing: 0.06em; color: var(--nrl-accent); margin-right: 8px; }
+.nrl-news-decisions-text b { font-family: var(--nrl-f-label); font-size: 0.9375rem; letter-spacing: 0.06em; color: var(--nrl-accent); margin-right: 8px; }
 .nrl-news-answer { flex: 0 0 auto; min-height: 36px; }
 
 /* ── A decision card (#75, #338, #346): the story, its deadline, a row per choice ── */
 .nrl-event-card { margin: 0 0 8px; }
 .nrl-event-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; padding-right: 44px; }
-.nrl-event-title { font-family: var(--nrl-f-label); font-size: 22px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; }
+.nrl-event-title { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1.15; }
 /* The deadline wraps (#345: it was cut off at "…or it's "Ban the t"). */
-.nrl-event-meta { font-size: 12px; color: var(--nrl-accent); line-height: 1.3; overflow-wrap: anywhere; }
-.nrl-event-text { margin: 6px 0 10px; overflow-wrap: anywhere; line-height: 1.45; font-size: 14px; color: var(--nrl-text-2); }
+.nrl-event-meta { font-size: 0.75rem; color: var(--nrl-accent); line-height: 1.3; overflow-wrap: anywhere; }
+.nrl-event-text { margin: 6px 0 10px; overflow-wrap: anywhere; line-height: 1.45; font-size: 0.875rem; color: var(--nrl-text-2); }
 .nrl-event-choices { display: flex; flex-direction: column; gap: 6px; }
 .nrl-btn.nrl-event-choice {
   flex: 1 1 auto;
@@ -1174,30 +1184,30 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   min-height: 48px;
 }
 .nrl-btn.nrl-event-choice:hover:not(:disabled) { background: #22305c; }
-.nrl-event-choice-label { font-family: var(--nrl-f-label); font-size: 17px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; color: var(--nrl-text); }
-.nrl-event-choice-hint { font-family: var(--nrl-f-body); font-size: 12px; font-weight: 400; line-height: 1.35; color: var(--nrl-text-2); }
+.nrl-event-choice-label { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; color: var(--nrl-text); }
+.nrl-event-choice-hint { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.35; color: var(--nrl-text-2); }
 /* #346: a risk is its own line, marked so it never reads as a sure cost. */
 .nrl-event-choice-risk {
-  font-family: var(--nrl-f-body); font-size: 12px; font-weight: 400; line-height: 1.35;
+  font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.35;
   color: var(--nrl-neg); padding-left: 8px; border-left: 2px solid var(--nrl-alert); margin-top: 2px;
 }
 /* The decisions popup and Advance Week's ask (#338, #345): a region dialog, one card. */
 .nrl-dialog-region .nrl-decisions-modal { width: min(100%, 680px); }
 .nrl-decisions h2, .nrl-ask h2 { margin: 0 0 8px; padding-right: 44px; min-height: 36px; display: flex; align-items: center; }
-.nrl-decisions-count { font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); margin: 0 0 2px; }
+.nrl-decisions-count { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); margin: 0 0 2px; }
 .nrl-decisions-note { margin: 0 0 12px; color: var(--nrl-text-2); }
 .nrl-decisions-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .nrl-decisions-actions .nrl-btn { flex: 1 1 12rem; }
 .nrl-ask-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.nrl-ask-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 12px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 13px; }
+.nrl-ask-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 12px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 0.8125rem; }
 .nrl-ask-row.nrl-ask-due { border-left-color: var(--nrl-accent); }
-.nrl-ask-title { font-family: var(--nrl-f-label); font-size: 17px; font-weight: 700; }
+.nrl-ask-title { font-family: var(--nrl-f-label); font-size: 1.0625rem; font-weight: 700; }
 .nrl-ask-note { color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-ask-due .nrl-ask-note { color: var(--nrl-accent); }
 /* Short landscape phones: the choices side by side, so all of them show with their hints. */
 @media (max-height: 500px) {
-  .nrl-event-title { font-size: 20px; }
-  .nrl-event-text { margin: 4px 0 8px; font-size: 13px; line-height: 1.35; }
+  .nrl-event-title { font-size: 1.25rem; }
+  .nrl-event-text { margin: 4px 0 8px; font-size: 0.8125rem; line-height: 1.35; }
   .nrl-event-choices { flex-direction: row; align-items: stretch; }
   .nrl-btn.nrl-event-choice { flex: 1 1 0; min-width: 0; width: auto; justify-content: flex-start; }
   .nrl-decisions h2, .nrl-ask h2 { margin-bottom: 4px; }
@@ -1212,7 +1222,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-summary h2 { margin: 0 0 8px; padding-right: 44px; min-height: 36px; display: flex; align-items: center; }
 .nrl-summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 6px 10px; }
 .nrl-summary-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.nrl-summary-sec { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 13px; }
+.nrl-summary-sec { padding: 6px 10px; border-radius: 8px; background: var(--nrl-raised); border-left: 3px solid var(--nrl-bench); font-size: 0.8125rem; }
 .nrl-summary-sec h3 { margin: 0 0 2px; }
 .nrl-summary-sec p { margin: 2px 0 0; line-height: 1.35; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-summary-none { color: var(--nrl-muted); font-style: italic; }
@@ -1224,14 +1234,14 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-summary .nrl-decisions-actions { margin-top: 10px; }
 @media (max-height: 500px), (max-width: 480px) {
   .nrl-summary h2 { margin-bottom: 4px; }
-  .nrl-summary-sec { font-size: 12px; padding: 4px 8px; }
+  .nrl-summary-sec { font-size: 0.75rem; padding: 4px 8px; }
   .nrl-summary-col { gap: 4px; }
 }
 
 /* ── #370: the Undo toast and the first-visit hints ─────────────────────── */
 .nrl-toast.nrl-toast-action { cursor: default; max-height: none; padding-top: 0; padding-bottom: 0; padding-right: 4px; gap: 6px; min-height: 52px; }
 .nrl-toast-action .nrl-toast-text { flex: 1 1 auto; min-width: 0; -webkit-line-clamp: 3; overflow-wrap: anywhere; }
-.nrl-toast-action .nrl-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 8px; font-size: 15px; }
+.nrl-toast-action .nrl-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 8px; font-size: 0.9375rem; }
 .nrl-btn.nrl-toast-btn { background: var(--nrl-toast-action-bg, var(--nrl-accent)); color: var(--nrl-toast-action-ink, var(--nrl-on-accent)); }
 .nrl-toast-btn[hidden] { display: none; }
 .nrl-btn.nrl-toast-x { width: 44px; padding: 0; font-family: var(--nrl-f-body); }
@@ -1241,6 +1251,8 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
+  /* On a two-column screen (Finance) the hint spans the top instead of taking the first column. */
+  grid-column: 1 / -1;
   margin: 0 0 8px;
   padding: 0 0 0 12px;
   min-height: 44px;
@@ -1248,7 +1260,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   background: var(--nrl-raised);
   color: var(--nrl-text-2);
   border-left: 3px solid var(--nrl-accent);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.35;
 }
 .nrl-hint-text { flex: 1 1 auto; min-width: 0; }
@@ -1274,11 +1286,11 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   border-radius: 12px;
   box-shadow: var(--nrl-shadow-chip);
   padding: 4px 4px 4px 14px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .nrl-placebar[hidden] { display: none; }
 .nrl-placebar-text { flex: 1 1 auto; line-height: 1.35; }
-.nrl-placebar-text b { font-family: var(--nrl-f-label); font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); margin-right: 6px; }
+.nrl-placebar-text b { font-family: var(--nrl-f-label); font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); margin-right: 6px; }
 .nrl-placebar-cancel { flex: 0 0 auto; }
 
 /* ── Kit & colours (#79), under Office ───────────────────────────────────── */
@@ -1287,15 +1299,15 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 .nrl-kit h2 { margin: 0; }
 .nrl-kit h3 { margin: 10px 0 4px; }
 .nrl-kit-controls > h3:first-child { margin-top: 0; }
-.nrl-kit-note { margin: 0; font-size: 12px; color: var(--nrl-muted); }
+.nrl-kit-note { margin: 0; font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-kit-body { display: flex; gap: 16px; flex: 1 1 auto; min-height: 0; }
 .nrl-kit-side { display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
 .nrl-kit-preview { display: flex; gap: 8px; align-items: flex-end; padding: 8px 10px; border-radius: 10px; background: var(--nrl-panel); }
-.nrl-kit-preview figure { margin: 0; text-align: center; font-family: var(--nrl-f-label); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-kit-preview figure { margin: 0; text-align: center; font-family: var(--nrl-f-label); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-kit-sprite { width: 72px; height: 77px; image-rendering: pixelated; }
 .nrl-kit-portrait { width: 60px; image-rendering: pixelated; }
 .nrl-kit-controls { flex: 1 1 16rem; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.nrl-kit-label { font-family: var(--nrl-f-label); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); margin: 6px 0 4px; }
+.nrl-kit-label { font-family: var(--nrl-f-label); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); margin: 6px 0 4px; }
 .nrl-kit-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .nrl-kit-row .nrl-seg { flex-wrap: wrap; }
 .nrl-kit-swatch {
@@ -1318,24 +1330,24 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
 }
 /* ── Guide, under Office (N7, #188, #344) ─────────────────────────────────── */
 /* #206: only the page scrolls; the tabs and the foot (Replay) stay in view. */
-.nrl-guide { font-size: 13px; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-guide { font-size: 0.8125rem; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-guide-tabs, .nrl-guide-foot { flex: 0 0 auto; }
 .nrl-guide-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 /* One row: the page tabs (a segmented control that swipes sideways), then Replay. */
 .nrl-guide-top { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-width: 0; margin-bottom: 10px; }
 .nrl-guide-top .nrl-guide-tabs { flex: 0 1 auto; min-width: 0; }
-.nrl-guide-tabs > .nrl-btn { padding: 0 12px; font-size: 15px; }
+.nrl-guide-tabs > .nrl-btn { padding: 0 12px; font-size: 0.9375rem; }
 .nrl-guide h2 { margin: 0; }
 .nrl-guide h3 { margin: 12px 0 4px; }
 /* N14 (#263): the screen a page describes, one tap away. */
 .nrl-guide-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 6px; }
-.nrl-btn.nrl-guide-link { min-height: 36px; padding: 0 12px; font-size: 14px; border-radius: 8px; }
+.nrl-btn.nrl-guide-link { min-height: 36px; padding: 0 12px; font-size: 0.875rem; border-radius: 8px; }
 .nrl-guide p { margin: 4px 0; line-height: 1.5; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-guide ul { margin: 4px 0 4px 18px; padding: 0; color: var(--nrl-text-2); }
 .nrl-guide li { margin: 3px 0; line-height: 1.45; overflow-wrap: anywhere; }
 .nrl-guide b, .nrl-guide strong { color: var(--nrl-text); }
 .nrl-guide-figure { border-radius: 10px; overflow: hidden; background: var(--nrl-panel); padding: 6px; }
 .nrl-guide-foot { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.nrl-guide-build { font-family: var(--nrl-f-num); font-size: 11px; color: var(--nrl-muted); white-space: nowrap; }
+.nrl-guide-build { font-family: var(--nrl-f-num); font-size: 0.6875rem; color: var(--nrl-muted); white-space: nowrap; }
 @media (max-width: 760px) { .nrl-guide-build { display: none; } }
 `;

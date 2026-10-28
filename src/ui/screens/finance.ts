@@ -605,11 +605,11 @@ export const FINANCE_CSS = `
 .nrl-finance-keys { display: flex; flex-direction: column; gap: 6px; }
 .nrl-finance-keys > .nrl-screen-title { line-height: 30px; letter-spacing: 0.04em; }
 .nrl-finance-tile { display: flex; flex-direction: column; background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; }
-.nrl-finance-tile .nrl-label { font-size: 12px; }
-.nrl-finance-big { font-size: 20px; line-height: 1.25; }
-.nrl-finance-making .nrl-finance-big { font-size: 22px; color: var(--nrl-pos); }
-.nrl-finance-losing .nrl-finance-big { font-size: 22px; color: var(--nrl-neg); }
-.nrl-finance-note { font-size: 12px; color: var(--nrl-text-2); }
+.nrl-finance-tile .nrl-label { font-size: 0.75rem; }
+.nrl-finance-big { font-size: 1.25rem; line-height: 1.25; }
+.nrl-finance-making .nrl-finance-big { font-size: 1.375rem; color: var(--nrl-pos); }
+.nrl-finance-losing .nrl-finance-big { font-size: 1.375rem; color: var(--nrl-neg); }
+.nrl-finance-note { font-size: 0.75rem; color: var(--nrl-text-2); }
 .nrl-finance-warn .nrl-finance-note { color: var(--nrl-neg); }
 .nrl-finance-stand { color: var(--nrl-accent); }
 button.nrl-finance-contracts {
@@ -619,9 +619,9 @@ button.nrl-finance-contracts {
 }
 button.nrl-finance-contracts:hover { background: #22305c; }
 button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
-.nrl-finance-contracts-text { font-size: 12px; color: var(--nrl-muted); }
+.nrl-finance-contracts-text { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-finance-contracts-due .nrl-finance-contracts-text { color: var(--nrl-accent); }
-.nrl-finance-view { font-family: var(--nrl-f-label); font-size: 14px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.nrl-finance-view { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
 .nrl-finance-right { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
 .nrl-finance-right > .nrl-seg { align-self: flex-start; }
 .nrl-finance-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; }
@@ -629,14 +629,14 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-finance-lines { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-finance-pnl, .nrl-finance-ledger { flex: 0 0 auto; }
 /* THIS WEEK: 28px line items, Mono values, the net under a 2px rule. */
-.nrl-finance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; border-top: 1px solid var(--nrl-button); font-size: 13px; }
+.nrl-finance-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; }
 .nrl-finance-label { color: var(--nrl-text-2); min-width: 0; }
 .nrl-finance-value { text-align: right; white-space: nowrap; }
-.nrl-finance-row.nrl-finance-net { min-height: 32px; border-top: 2px solid var(--nrl-line); font-size: 14px; font-weight: 600; }
+.nrl-finance-row.nrl-finance-net { min-height: 32px; border-top: 2px solid var(--nrl-line); font-size: 0.875rem; font-weight: 600; }
 .nrl-finance-weekly .nrl-finance-net { flex: 0 0 auto; }
 .nrl-finance-row.nrl-finance-net .nrl-finance-label { color: var(--nrl-text); }
 .nrl-finance-empty { color: var(--nrl-muted); margin: 8px 0; }
-.nrl-finance-foot { font-size: 11px; color: var(--nrl-muted); margin: 4px 0 0; }
+.nrl-finance-foot { font-size: 0.6875rem; color: var(--nrl-muted); margin: 4px 0 0; }
 /* SEASON P&L and LEDGER: compact Mono tables. */
 .nrl-finance-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
 .nrl-table.nrl-finance-table td { height: 28px; }
@@ -645,8 +645,8 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-finance-table td.nrl-finance-wk { text-align: left; color: var(--nrl-muted); }
 .nrl-finance-pnl-net td { border-top: 2px solid var(--nrl-line); font-weight: 600; }
 .nrl-finance-table .nrl-finance-pnl-net td.nrl-num { font-weight: 600; }
-.nrl-table .nrl-finance-pnl-sub td { height: auto; padding-bottom: 4px; border-top: 0; font-size: 11px; color: var(--nrl-muted); white-space: normal; }
-.nrl-btn.nrl-finance-past { margin-top: 8px; min-height: 36px; font-size: 14px; }
+.nrl-table .nrl-finance-pnl-sub td { height: auto; padding-bottom: 4px; border-top: 0; font-size: 0.6875rem; color: var(--nrl-muted); white-space: normal; }
+.nrl-btn.nrl-finance-past { margin-top: 8px; min-height: 36px; font-size: 0.875rem; }
 @media (pointer: coarse) { .nrl-btn.nrl-finance-past { min-height: 44px; } }
 /* A narrow phone (667px): a slimmer left column. */
 @media (max-width: 700px) { .nrl-screen.nrl-finance { grid-template-columns: 210px minmax(0, 1fr); gap: 12px; } }
@@ -655,7 +655,7 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
   .nrl-finance-keys { gap: 5px; }
   .nrl-finance-keys > .nrl-screen-title { line-height: 26px; }
   .nrl-finance-tile { padding: 6px 10px; }
-  .nrl-finance-big, .nrl-finance-making .nrl-finance-big, .nrl-finance-losing .nrl-finance-big { font-size: 19px; line-height: 1.2; }
+  .nrl-finance-big, .nrl-finance-making .nrl-finance-big, .nrl-finance-losing .nrl-finance-big { font-size: 1.1875rem; line-height: 1.2; }
   .nrl-finance-note { line-height: 1.3; }
 }
 
@@ -667,10 +667,10 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-contracts-table td.nrl-num { font-weight: 500; }
 .nrl-contract-who { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .nrl-contract-name { font-weight: 600; }
-.nrl-contract-meta { font-size: 11px; color: var(--nrl-muted); }
+.nrl-contract-meta { font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-contracts-table td.nrl-contract-soon { color: var(--nrl-neg); }
 .nrl-contract-actions { display: flex; gap: 6px; justify-content: flex-end; }
-.nrl-contract-actions .nrl-btn { min-height: 36px; padding: 0 10px; font-size: 14px; border-radius: 8px; text-transform: none; }
+.nrl-contract-actions .nrl-btn { min-height: 36px; padding: 0 10px; font-size: 0.875rem; border-radius: 8px; text-transform: none; }
 @media (pointer: coarse) { .nrl-contract-actions .nrl-btn { min-height: 44px; } }
 .nrl-contract-actions .nrl-btn.nrl-contract-armed, .nrl-contract-actions .nrl-btn.nrl-contract-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 .nrl-contract-gone td { color: var(--nrl-muted); }
@@ -684,7 +684,7 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
   .nrl-contract-meta { display: none; }
   .nrl-contracts-table th, .nrl-contracts-table td { padding: 0 4px; }
   .nrl-contract-actions { gap: 4px; }
-  .nrl-contract-actions .nrl-btn { padding: 0 7px; font-size: 13px; }
+  .nrl-contract-actions .nrl-btn { padding: 0 7px; font-size: 0.8125rem; }
 }
 `;
 

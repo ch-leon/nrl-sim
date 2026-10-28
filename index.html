@@ -24,6 +24,9 @@
          its landscape/portrait width ratio, 2.17× on a 16 Pro Max; the DOM overlay is
          laid out for the authored sizes, so keep them. */
       html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+      /* #371: Settings › Text size. The UI's font sizes are rem, so this one line scales them:
+         --nrl-text-scale is 1.15 (Large) or 1.3 (Larger) on <html>, unset (16px) at Normal (src/ui/textSize.ts). */
+      html { font-size: calc(16px * var(--nrl-text-scale, 1)); }
       html, body { margin: 0; height: 100%; background: %BRAND_BACKGROUND%; overflow: hidden; overscroll-behavior: none; }
       /* Broadcast Quiet: Plex Sans for body text; labels and numbers set their own (src/ui/dom.ts). */
       body { font-family: "IBM Plex Sans", system-ui, sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }

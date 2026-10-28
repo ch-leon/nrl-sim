@@ -373,19 +373,19 @@ export const HISTORY_CSS = `
   min-height: 44px;
   padding: 4px 0;
   border-top: 1px solid var(--nrl-button);
-  font-size: 13px;
+  font-size: 0.8125rem;
   box-sizing: border-box;
 }
 .nrl-history-row.nrl-history-headrow { min-height: 22px; padding: 0; border-top: 0; flex: 0 0 auto; }
 .nrl-history-row > span { min-width: 0; }
 .nrl-history-row .nrl-num { font-weight: 500; }
-.nrl-history-row small { display: block; font-family: var(--nrl-f-body); font-size: 11px; font-weight: 400; color: var(--nrl-muted); line-height: 1.3; letter-spacing: 0; text-transform: none; }
-.nrl-history-finish { font-family: var(--nrl-f-label); font-size: 16px; font-weight: 700; }
+.nrl-history-row small { display: block; font-family: var(--nrl-f-body); font-size: 0.6875rem; font-weight: 400; color: var(--nrl-muted); line-height: 1.3; letter-spacing: 0; text-transform: none; }
+.nrl-history-finish { font-family: var(--nrl-f-label); font-size: 1rem; font-weight: 700; }
 .nrl-history-finish.nrl-history-best { color: var(--nrl-accent); }
-.nrl-history-finish small { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.nrl-history-finish small { color: var(--nrl-accent); font-family: var(--nrl-f-label); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .nrl-history-player { overflow-wrap: anywhere; }
 .nrl-history-actions { display: flex; gap: 6px; justify-content: flex-end; }
-.nrl-history-actions .nrl-btn { min-height: 34px; padding: 0 12px; font-size: 14px; border-radius: 8px; }
+.nrl-history-actions .nrl-btn { min-height: 34px; padding: 0 12px; font-size: 0.875rem; border-radius: 8px; }
 @media (pointer: coarse) { .nrl-history-actions .nrl-btn { min-height: 44px; } }
 .nrl-history-empty { padding: 32px 16px; }
 /* A narrow phone (667px): slimmer columns, and the season's note to two lines (the whole of it in its tooltip). */
@@ -393,31 +393,31 @@ export const HISTORY_CSS = `
   .nrl-history-row { grid-template-columns: 48px 58px 62px 30px minmax(0, 1fr) 92px 128px; column-gap: 6px; }
   .nrl-history-player small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .nrl-history-actions { gap: 4px; }
-  .nrl-history-actions .nrl-btn { padding: 0 8px; font-size: 13px; }
+  .nrl-history-actions .nrl-btn { padding: 0 8px; font-size: 0.8125rem; }
 }
 .nrl-history-records { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); column-gap: 24px; }
-.nrl-history-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; border-top: 1px solid var(--nrl-button); font-size: 13px; }
+.nrl-history-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; }
 .nrl-history-record > span:last-child { text-align: right; }
 
 /* A season's books: the table scrolls, the net and the closing balance beside it. */
 .nrl-books-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 460px) minmax(180px, 240px); gap: 16px; }
 .nrl-books-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-books-keys { display: flex; flex-direction: column; gap: 6px; }
-.nrl-books-summary { font-size: 12px; color: var(--nrl-muted); margin: 0; }
+.nrl-books-summary { font-size: 0.75rem; color: var(--nrl-muted); margin: 0; }
 .nrl-books-closing td { border-top: 1px solid var(--nrl-line); font-weight: 600; }
 
 /* The season review (N7, #190): the finish, then the season in labelled lines, two columns. */
 .nrl-review-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .nrl-review-finish {
-  font-family: var(--nrl-f-label); font-size: 20px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: var(--nrl-f-label); font-size: 1.25rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
   background: var(--nrl-raised); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px;
 }
 .nrl-review-finish.nrl-review-premiers { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-review-lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); column-gap: 20px; align-items: start; }
 .nrl-review-col { display: flex; flex-direction: column; }
-.nrl-review-line { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--nrl-button); font-size: 13px; color: var(--nrl-text-2); overflow-wrap: anywhere; }
-.nrl-review-line > .nrl-label { font-size: 12px; }
-.nrl-review-objectives { list-style: none; margin: 0 0 4px 120px; padding: 0; font-size: 12px; }
+.nrl-review-line { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--nrl-button); font-size: 0.8125rem; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-review-line > .nrl-label { font-size: 0.75rem; }
+.nrl-review-objectives { list-style: none; margin: 0 0 4px 120px; padding: 0; font-size: 0.75rem; }
 .nrl-review-objectives li { padding: 1px 0; }
 .nrl-review-good, .nrl-review-line.nrl-review-good > span:last-child { color: var(--nrl-pos); }
 .nrl-review-bad, .nrl-review-line.nrl-review-bad > span:last-child { color: var(--nrl-neg); }

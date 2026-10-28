@@ -1,6 +1,6 @@
 // tests/match/view/legsLayer.test.ts — legs left on screen (BAK-208 §8).
 import { describe, it, expect } from 'vitest';
-import { legsBand, legsMarks } from '../../../src/match/view/legsLayer';
+import { LEGS_SYMBOLS, legsBand, legsMarks } from '../../../src/match/view/legsLayer';
 import type { PlayerSnap, Snapshot } from '../../../src/match/core/snapshot';
 import { FATIGUE } from '../../../src/match/league/fatigue';
 import { LiveSim } from '../../../src/match/league/live';
@@ -31,6 +31,11 @@ describe('legsMarks', () => {
       ['home', 1, 'tired'],
       ['away', 0, 'spent'],
     ]);
+  });
+  it('tired and spent carry a mark beside the bar, not only a colour (#371)', () => {
+    const m = legsMarks(snap([P('home', 0, { legs: 0.9 }), P('home', 1, { legs: 0.3 }), P('away', 0, { legs: 0.1 })]), FATIGUE);
+    expect(m.map((x) => x.symbol)).toEqual(['none', 'notch', 'cross']);
+    expect(new Set(Object.values(LEGS_SYMBOLS)).size).toBe(3);
   });
   it('bands switch exactly at tiredAt and spentAt', () => {
     expect(legsBand(FATIGUE.tiredAt, FATIGUE)).toBe('fresh');

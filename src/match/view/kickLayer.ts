@@ -16,6 +16,8 @@ import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import { toFieldPt } from '../core/field';
 import { LIFT_PX_PER_M } from './liveView';
 import { GROUNDED_LIFT } from './commentary';
+import { RING_STYLES } from '../../art/match/kitClash';
+import { drawRing } from './rings';
 
 /** The events a kick in general play starts with. */
 export const KICK_STARTS: ReadonlySet<string> = new Set(['kick', 'kickoff', 'drop-out']);
@@ -411,8 +413,9 @@ export class KickLayer {
       const w = at(s);
       under.fillStyle(SKID_COLOR, 0.7 * a).fillEllipse(w.x, w.y, 11, 5);
     }
-    // The contest under a bomb: a ring under each of the two in his side's colours; once
-    // one has it his ring goes white and grows, and the other's fades.
+    // The contest under a bomb: a ring under each of the two in his side's colours, solid
+    // for home and dashed for away (#371); once one has it his ring goes white and grows,
+    // and the other's fades.
     if (k.contest) {
       const won = (c: Contestant): boolean => k.winner !== null && k.winner.side === c.side && k.winner.slot === c.slot;
       for (const c of k.contest) {
@@ -420,14 +423,12 @@ export class KickLayer {
         const f = feet(c.side, c.slot);
         if (!f) continue;
         const fade = k.winner || k.downTick !== null ? a * a : 1;
-        const col = this.colors()[c.side];
-        under.fillStyle(col, 0.22 * fade).fillEllipse(f.x, f.y, RING_W, RING_H);
-        under.lineStyle(2, col, 0.95 * fade).strokeEllipse(f.x, f.y, RING_W, RING_H);
+        drawRing(under, f.x, f.y, RING_W, RING_H, RING_STYLES[c.side], { color: this.colors()[c.side], width: 2, alpha: 0.95 * fade, fillAlpha: 0.22 * fade });
       }
       const w = k.winner ? feet(k.winner.side, k.winner.slot) : null;
       if (w) {
         const grow = Math.min(1, (this.sinceDown ?? 0) / WIN_POP_MS);
-        under.lineStyle(2.5, 0xffffff, a).strokeEllipse(w.x, w.y, RING_W * (1 + 0.6 * grow), RING_H * (1 + 0.6 * grow));
+        drawRing(under, w.x, w.y, RING_W * (1 + 0.6 * grow), RING_H * (1 + 0.6 * grow), RING_STYLES[k.winner!.side], { color: 0xffffff, width: 2.5, alpha: a });
       }
     }
   }

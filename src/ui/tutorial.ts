@@ -665,7 +665,7 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   max-height: calc(100dvh - 1.5rem);
 }
 .nrl-tutorial-text {
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.45;
   margin-bottom: 10px;
   color: #c9d1ea;
@@ -713,7 +713,7 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
     padding: 6px 6px 6px 14px;
   }
   /* Capped in rem, which a text boost leaves alone: boosted copy scrolls (#206) instead of growing the bar over the screen. */
-  .nrl-tutorial-bar .nrl-tutorial-text { margin: 0; font-size: 13px; line-height: 1.3; max-height: 5rem; }
+  .nrl-tutorial-bar .nrl-tutorial-text { margin: 0; font-size: 0.8125rem; line-height: 1.3; max-height: 5rem; }
 }
 .nrl-tutorial-bubble.nrl-tutorial-top { top: calc(var(--nrl-hud-h, 0px) + 0.25rem); bottom: auto; }
 /* #370: which of the three taps this is. */
@@ -725,7 +725,7 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   background: var(--nrl-button, #1f2b55);
   color: var(--nrl-accent, #f4d03f);
   font-family: var(--nrl-f-label, 'Barlow Condensed', sans-serif);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;

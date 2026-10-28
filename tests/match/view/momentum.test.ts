@@ -4,7 +4,7 @@
 // 10 against it, 10% back toward even at every new set; clamped to ±100. The
 // line shows the last five match-minutes.
 import { describe, it, expect } from 'vitest';
-import { foldMomentum, momentumLabel, momentumShapes, momentumWindow, MOMENTUM_STEP_MIN, MOMENTUM_WINDOW_MIN, type MomentumEvent } from '../../../src/match/view/momentum';
+import { foldMomentum, momentumLabel, momentumLeader, momentumShapes, momentumWindow, MOMENTUM_STEP_MIN, MOMENTUM_WINDOW_MIN, type MomentumEvent } from '../../../src/match/view/momentum';
 import { MOMENTUM_BIGHIT, MOMENTUM_ERROR, MOMENTUM_TRY } from '../../../src/sim/weather';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
@@ -79,6 +79,12 @@ describe('momentumWindow (#366)', () => {
     expect(momentumLabel(momentumWindow(ebb, 'H', 6), names)).toBe('Momentum: Larrikins, fading');
     expect(momentumLabel(momentumWindow([ev(4, 'try', 'A')], 'H', 5), names)).toBe('Momentum: Sharks, building');
     expect(momentumLabel(momentumWindow([], 'H', 5), names)).toBe('Momentum: even');
+  });
+
+  it('names the leaning side for the tag at the line’s end (#371), none while even', () => {
+    expect(momentumLeader(momentumWindow([ev(4, 'try', 'H')], 'H', 5))).toBe('home');
+    expect(momentumLeader(momentumWindow([ev(4, 'try', 'A')], 'H', 5))).toBe('away');
+    expect(momentumLeader(momentumWindow([], 'H', 5))).toBeNull();
   });
 
   it('draws home above the middle and away below it', () => {
