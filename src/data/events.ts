@@ -435,8 +435,9 @@ const DECK: readonly EventCardDef[] = [
         label: 'Leave it',
         effects: [
           { kind: 'playerMorale', amount: 4 },
+          // No incident pick: the crash is the man in the photo's, not a hothead's (#409).
           {
-            kind: 'chance', p: WILDCARDS.INCIDENT_CHANCE, risk: true, pick: 'incident',
+            kind: 'chance', p: WILDCARDS.INCIDENT_CHANCE, risk: true,
             hit: [
               { kind: 'suspend', weeks: WILDCARDS.BAN_WEEKS, source: 'event' },
               { kind: 'reputation', amount: -2 },

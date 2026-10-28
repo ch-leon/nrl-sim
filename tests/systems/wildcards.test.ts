@@ -194,6 +194,32 @@ describe('wildcard odds', () => {
   });
 });
 
+describe('the jet-ski photo (#409)', () => {
+  it('a crash after "Leave it" bans the man in the photo and names him, never a hothead elsewhere', () => {
+    const s = fresh();
+    const [subject, other] = s.squad.filter((p) => p.injuredWeeks <= 0 && !p.junior);
+    // A hothead on low morale: the incident pick would land on him about nine times in ten.
+    const squad = s.squad.map((p) => (p.id === other!.id ? { ...p, morale: 20, traits: [{ id: 'hothead' as const, level: 3 as const }] } : p));
+    let hits = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const state: GameState = {
+        ...s, squad,
+        eventDeck: {
+          ...s.eventDeck, rng: seed,
+          pending: [{ id: 'ski', cardId: 'jetSki', season: 1, week: 1, expiresAt: 1 + EVENTS.ANSWER_WEEKS, subjectId: subject!.id, subjectName: subject!.name }],
+        },
+      };
+      const r = resolveEvent(state, 'ski', 1, 1)!;
+      const banned = r.state.squad.filter((p) => (p.suspendedWeeks ?? 0) > 0);
+      if (!banned.length) continue;
+      hits++;
+      expect(banned.map((p) => p.id)).toEqual([subject!.id]);
+      expect(r.news.find((n) => n.text.includes('jet ski'))?.text).toContain(subject!.name);
+    }
+    expect(hits).toBeGreaterThan(20);
+  });
+});
+
 describe('ban carry-over', () => {
   it('offers the trip once at the new season, and again the season after', () => {
     const s = fresh();
