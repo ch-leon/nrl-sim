@@ -11,8 +11,13 @@ import { registerAllSystems } from '../../src/qa/soak';
 import { playerPageModel } from '../../src/ui/screens/player';
 import { contractsEndingSoon } from '../../src/systems/contracts';
 
-/** rngSeed after one season of seed 1 on main before #369 (6093831), the same run without the hook below. */
-const MAIN_SEED_AFTER_SEASON = 9501488;
+/**
+ * rngSeed after one season of seed 1 on main, the same run without the hook below.
+ * 6093831 before #369; 9501488 before Wave 3 task 04, whose rival need signings
+ * (on the rivals' own seed, never rngSeed) change who the rivals field, so the
+ * matches draw a different number of dice. The match engine is unchanged.
+ */
+const MAIN_SEED_AFTER_SEASON = 3473711671;
 
 describe('the rng stream (#369)', () => {
   it('a season leaves rngSeed where main left it, the projection and the dot looked at every week', () => {

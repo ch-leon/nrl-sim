@@ -5,8 +5,10 @@
 //
 //   - New game / old save: generateRivalSquad builds a squad that matches the
 //     club's strength (seeded per club, so it never moves the main rngSeed).
-//   - Weekly: rivals with room or a weak spot may sign from state.freeAgents
-//     (rivalSigningTick); rival injuries heal; every rival player develops a
+//   - Weekly: rivals short of players or thin at a position sign the best-fit
+//     affordable free agent for that need, and the rest may still sign an upgrade
+//     from state.freeAgents (rivalSigningTick, rate-limited, Wave 3 task 04); rival
+//     injuries heal; every rival player develops a
 //     little by age on its own RNG stream, and the league anchor nudges every
 //     rival back toward LEAGUE.MEAN when the league as a whole has drifted
 //     (developRivalsWeek, #143).
@@ -16,11 +18,12 @@
 import { getState, setState, type GameState, type Player, type Position, type RivalClub } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
-import { LEAGUE, ON_FIELD, STAT_MAX, WEEKS_PER_SEASON } from '../config';
+import { LEAGUE, ON_FIELD, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { generatePlayerAround, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
+import { poolTarget } from './freeagency';
 
 // ── Tuning ───────────────────────────────────────────────────────────────────
 
@@ -30,10 +33,36 @@ export const RIVAL_SQUAD_SIZE = 20;
 export const RIVAL_SQUAD_MIN = 18;
 /** A rival at this size releases its weakest player to make room for a signing. */
 export const RIVAL_SQUAD_MAX = 24;
-/** Chance per rival per week to look for a signing. ~27 weeks × 0.1 ≈ 2.7 looks a season. */
+/** Chance per rival per week to look for an upgrade when it needs nobody. ~27 weeks × 0.1 ≈ 2.7 looks a season. */
 export const RIVAL_SIGN_CHANCE = 0.1;
-/** Signings at or above this overall make the news. */
-export const RIVAL_NOTABLE_OVERALL = 65;
+/**
+ * Chance per week a rival with a need (short of RIVAL_SQUAD_SIZE, or thin at a
+ * position) signs for it. Not certain, so a player the user has their eye on is
+ * still there for a week or two; a club in need usually fills it within two weeks.
+ */
+export const RIVAL_NEED_CHANCE = 0.5;
+/** A position with fewer fit players than this is thin, and the club looks to sign there. */
+export const RIVAL_POSITION_MIN = 2;
+/**
+ * Signings a rival may make in a week (DECISION (Leon): 1 in season). The finals
+ * weeks are the off-season window for the clubs out of it, so every rival may
+ * make RIVAL_SIGNINGS_OFFSEASON then.
+ */
+export const RIVAL_SIGNINGS_PER_WEEK = 1;
+export const RIVAL_SIGNINGS_OFFSEASON = 2;
+/** Rivals stop signing while this few signable free agents are left, so the pool never runs dry before its refresh. */
+export const RIVAL_POOL_FLOOR = 6;
+/**
+ * A signing makes the news when the player is in the top ~20% of the pool
+ * (DECISION (Leon)). A fresh pool's top fifth starts this far above its target
+ * (freeagency.poolTarget; generateFreeAgent's spread puts the 80th percentile at
+ * +6 at every target), so the line holds as rivals thin the pool between
+ * refreshes. The old fixed 65 sat above almost every player a new club's pool
+ * holds (it centres near 52), so the league's signings never showed.
+ */
+export const RIVAL_NOTABLE_ABOVE_TARGET = 6;
+/** The same top share, read off a pool directly (notableOverall) when no pool target is given. */
+export const RIVAL_NOTABLE_SHARE = 0.2;
 /** First-graders are generated around the club strength; depth players this far below. */
 export const RIVAL_DEPTH_GAP = 8;
 /** Juniors arrive this far below their anchor, then develop (about +14 by their mid-twenties). */
@@ -202,47 +231,148 @@ export function pickSigning(squad: readonly Player[], freeAgents: readonly Playe
   return pool.filter((p) => overallRating(p) > cut).sort(byOverall)[0] ?? null;
 }
 
+/** Fit to play: not injured or suspended. */
+function isFit(p: Player): boolean {
+  return p.injuredWeeks <= 0 && !(p.suspendedWeeks && p.suspendedWeeks > 0);
+}
+
+/** Fit players at each position. */
+function fitByPosition(squad: readonly Player[]): Map<Position, number> {
+  const out = new Map<Position, number>(POSITIONS.map((p) => [p, 0] as const));
+  for (const p of squad) if (isFit(p)) out.set(p.position, (out.get(p.position) ?? 0) + 1);
+  return out;
+}
+
+/** Why a rival signs: to fill a squad short of players or a thin position, or for an upgrade. */
+export interface RivalNeed {
+  kind: 'size' | 'thin';
+  position: Position;
+}
+
+/**
+ * What a rival needs, or null: a thin position (fewer than RIVAL_POSITION_MIN
+ * fit, after retirements or injuries) first, then a squad short of
+ * RIVAL_SQUAD_SIZE, filled at its thinnest position (ties: the weakest, then
+ * POSITIONS order).
+ */
+export function rivalNeed(squad: readonly Player[]): RivalNeed | null {
+  const fit = fitByPosition(squad);
+  const best = bestByPosition(squad);
+  let thinnest: Position = POSITIONS[0]!;
+  for (const pos of POSITIONS) {
+    const n = fit.get(pos) ?? 0;
+    const m = fit.get(thinnest) ?? 0;
+    if (n < m || (n === m && (best.get(pos) ?? 0) < (best.get(thinnest) ?? 0))) thinnest = pos;
+  }
+  if ((fit.get(thinnest) ?? 0) < RIVAL_POSITION_MIN) return { kind: 'thin', position: thinnest };
+  if (squad.length < RIVAL_SQUAD_SIZE) return { kind: 'size', position: thinnest };
+  return null;
+}
+
+/** Can `squad` take `target` under the squad limit and the salary cap? */
+function fits(squad: readonly Player[], target: Player): boolean {
+  return squad.length < RIVAL_SQUAD_MAX && squadWages(squad) + marketWage(target) <= RIVAL_WAGE_CAP;
+}
+
+/**
+ * The squad with room made for `target`: as it is if the player fits, else less
+ * its weakest player (one at most, and never one whose going would leave a
+ * position thinner than RIVAL_POSITION_MIN once `target` is in), or null when
+ * even that doesn't fit.
+ */
+function makeRoom(squad: readonly Player[], target: Player): { squad: Player[]; released: Player | null } | null {
+  if (fits(squad, target)) return { squad: [...squad], released: null };
+  const fit = fitByPosition(squad);
+  const spare = (p: Player): boolean => {
+    const now = fit.get(p.position) ?? 0;
+    const after = now - (isFit(p) ? 1 : 0) + (p.position === target.position ? 1 : 0);
+    return after >= Math.min(RIVAL_POSITION_MIN, now);
+  };
+  const worst = squad
+    .filter(spare)
+    .sort((a, b) => overallRating(a) - overallRating(b) || a.id.localeCompare(b.id))[0];
+  if (!worst) return null;
+  const without = squad.filter((p) => p.id !== worst.id);
+  return fits(without, target) ? { squad: without, released: worst } : null;
+}
+
+/**
+ * The free agent a rival signs for `need`, or null: the best affordable one at
+ * the needed position (after making room); for a squad short of players with
+ * nobody there, the best affordable one anywhere. Academy prospects are the
+ * player's own and are never taken.
+ */
+export function pickNeedSigning(squad: readonly Player[], freeAgents: readonly Player[], need: RivalNeed): Player | null {
+  const byOverall = (a: Player, b: Player): number => overallRating(b) - overallRating(a) || a.id.localeCompare(b.id);
+  const affordable = freeAgents.filter((p) => !p.junior && makeRoom(squad, p) !== null).sort(byOverall);
+  return affordable.find((p) => p.position === need.position) ?? (need.kind === 'size' ? affordable[0] ?? null : null);
+}
+
+/** The lowest overall that makes the news: the top RIVAL_NOTABLE_SHARE of `pool` (Infinity when it is empty). */
+export function notableOverall(pool: readonly Player[]): number {
+  const ovr = pool.filter((p) => !p.junior).map(overallRating).sort((a, b) => b - a);
+  if (ovr.length === 0) return Infinity;
+  return ovr[Math.max(1, Math.ceil(ovr.length * RIVAL_NOTABLE_SHARE)) - 1]!;
+}
+
 export interface SigningResult {
   clubs: RivalClub[];
   freeAgents: Player[];
   news: string[];
   /** Every signing, for tests and tuning. */
-  signed: { clubId: string; playerId: string; overall: number }[];
+  signed: { clubId: string; playerId: string; overall: number; reason: 'size' | 'thin' | 'upgrade' }[];
+}
+
+export interface SigningOptions {
+  playerId?: string;
+  /** Signings each rival may make this week (RIVAL_SIGNINGS_PER_WEEK; RIVAL_SIGNINGS_OFFSEASON in the finals weeks). */
+  perClub?: number;
+  /** Which rival picks first; turns with the week so no club always has first pick. */
+  start?: number;
+  /** Lowest overall that makes the news (default: notableOverall of the pool as the week began). */
+  notable?: number;
 }
 
 /**
- * One week of rival free agency (pure). Each rival rolls RIVAL_SIGN_CHANCE; on a
- * hit it signs pickSigning's choice, releasing its weakest player to the pool
- * first if it is at RIVAL_SQUAD_MAX or the RIVAL_WAGE_CAP needs the room. Clubs are visited in league order, so an
- * earlier club can take a player a later one wanted.
+ * One week of rival free agency (pure). Each rival, up to `perClub` times: with a
+ * need (rivalNeed) it rolls RIVAL_NEED_CHANCE and signs pickNeedSigning's choice;
+ * with none it rolls RIVAL_SIGN_CHANCE for pickSigning's upgrade. Either releases
+ * its weakest player to the pool first if the squad limit or the RIVAL_WAGE_CAP
+ * needs the room. Nobody signs while RIVAL_POOL_FLOOR or fewer signable agents
+ * are left. Clubs are visited in league order from `start`, so an earlier club
+ * can take a player a later one wanted. Signings at `notable` or above make the news.
  */
-export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readonly Player[], rng: Rng, playerId = 'player'): SigningResult {
+export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readonly Player[], rng: Rng, opts: SigningOptions = {}): SigningResult {
+  const { playerId = 'player', perClub = RIVAL_SIGNINGS_PER_WEEK, start = 0, notable = notableOverall(freeAgents) } = opts;
   let pool = [...freeAgents];
   const news: string[] = [];
   const signed: SigningResult['signed'] = [];
-  const out = clubs.map((club) => {
-    if (club.id === playerId || !club.squad) return club;
-    if (rng.next() >= RIVAL_SIGN_CHANCE) return club;
-    const target = pickSigning(club.squad, pool);
-    if (!target) return club;
-    let squad = [...club.squad];
-    // Make room under the squad limit and the salary cap by releasing the weakest
-    // player (one at most); if that still doesn't fit, there's no deal.
-    const worst = [...squad].sort((a, b) => overallRating(a) - overallRating(b) || a.id.localeCompare(b.id))[0];
-    const fits = (sq: readonly Player[]): boolean => sq.length < RIVAL_SQUAD_MAX && squadWages(sq) + marketWage(target) <= RIVAL_WAGE_CAP;
-    if (!fits(squad)) {
-      const without = worst ? squad.filter((p) => p.id !== worst.id) : squad;
-      if (!worst || !fits(without)) return club;
-      squad = without;
-      pool.push({ ...worst, injuredWeeks: 0 });
+  const out = [...clubs];
+  const n = clubs.length;
+  for (let k = 0; k < n; k++) {
+    const i = (((start % n) + n) % n + k) % n;
+    let club = out[i]!;
+    if (club.id === playerId || !club.squad) continue;
+    for (let t = 0; t < perClub; t++) {
+      if (pool.filter((p) => !p.junior).length <= RIVAL_POOL_FLOOR) break;
+      const squad: Player[] = club.squad!;
+      const need = rivalNeed(squad);
+      if (rng.next() >= (need ? RIVAL_NEED_CHANCE : RIVAL_SIGN_CHANCE)) break;
+      const target = need ? pickNeedSigning(squad, pool, need) : pickSigning(squad, pool);
+      if (!target) break;
+      // Make room under the squad limit and the salary cap by releasing the weakest
+      // player (one at most); if that still doesn't fit, there's no deal.
+      const room = makeRoom(squad, target);
+      if (!room) break;
+      if (room.released) pool.push({ ...room.released, injuredWeeks: 0 });
+      pool = pool.filter((p) => p.id !== target.id);
+      const ovr = overallRating(target);
+      signed.push({ clubId: club.id, playerId: target.id, overall: ovr, reason: need?.kind ?? 'upgrade' });
+      if (ovr >= notable) news.push(`${club.name} sign ${ovr}-rated ${target.position} ${target.name}.`);
+      club = withDerivedStrength({ ...club, squad: [...room.squad, { ...target, morale: 50, departed: false }] });
     }
-    pool = pool.filter((p) => p.id !== target.id);
-    squad.push({ ...target, morale: 50, departed: false });
-    const ovr = overallRating(target);
-    signed.push({ clubId: club.id, playerId: target.id, overall: ovr });
-    if (ovr >= RIVAL_NOTABLE_OVERALL) news.push(`${club.name} sign ${ovr}-rated ${target.position} ${target.name}.`);
-    return withDerivedStrength({ ...club, squad });
-  });
+    out[i] = club;
+  }
   return { clubs: out, freeAgents: pool, news, signed };
 }
 
@@ -392,13 +522,16 @@ export function rivalDevelopSeed(state: Pick<GameState, 'season' | 'week' | 'rng
   return (hashString(`rivals-develop:${state.season}:${state.week}`) ^ state.rngSeed) >>> 0;
 }
 
-/** Install the weekly rival hook: heal injuries, sign free agents, then develop and anchor. */
+/** Install the weekly rival hook: heal injuries, sign free agents (more in the finals weeks), then develop and anchor. */
 export function registerRivalsSystem(): void {
   registerTickHook('rivals', RIVALS_TICK_ORDER, () => {
     const s = getState();
     if (s.league.clubs.length === 0) return;
     const healed = healRivals(s.league.clubs);
-    const r = rivalSigningTick(healed, s.freeAgents, makeRng(rivalWeekSeed(s)));
+    const perClub = s.week > SEASON_ROUNDS ? RIVAL_SIGNINGS_OFFSEASON : RIVAL_SIGNINGS_PER_WEEK;
+    const r = rivalSigningTick(healed, s.freeAgents, makeRng(rivalWeekSeed(s)), {
+      perClub, start: s.week, notable: Math.round(poolTarget(s)) + RIVAL_NOTABLE_ABOVE_TARGET,
+    });
     const clubs = developRivalsWeek(r.clubs, makeRng(rivalDevelopSeed(s)));
     setState({ league: { ...s.league, clubs }, freeAgents: r.freeAgents });
     for (const text of r.news) bus.emit('ui:notify', { text, kind: 'info' });

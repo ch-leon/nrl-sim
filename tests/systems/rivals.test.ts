@@ -4,20 +4,21 @@ import {
   generateRivalSquad, squadStrength, withRivalSquads, pickSigning, rivalSigningTick, healRivals,
   injureRivalPlayers, rolloverRivals, rivalPlayer, weakestPosition, developmentRate, registerRivalsSystem,
   developRivalsWeek, developRivalPlayerWeek, rivalMeanStrength, anchorPerSeason, RIVAL_LEAGUE_MEAN, RIVAL_DEVELOPMENT,
-  RIVAL_SQUAD_SIZE, RIVAL_SQUAD_MIN, RIVAL_SQUAD_MAX, RIVAL_NOTABLE_OVERALL,
+  RIVAL_SQUAD_SIZE, RIVAL_SQUAD_MIN, RIVAL_SQUAD_MAX, RIVAL_POOL_FLOOR, RIVAL_SIGNINGS_OFFSEASON,
+  rivalNeed, pickNeedSigning, notableOverall, squadWages, RIVAL_WAGE_CAP, RIVALS_TICK_ORDER, RIVAL_NOTABLE_ABOVE_TARGET,
 } from '../../src/systems/rivals';
 import { STRENGTH_MIN, STRENGTH_MAX } from '../../src/systems/league';
 import { RIVAL_CLUBS } from '../../src/data/league';
 import { POSITIONS, overallRating, generatePlayer } from '../../src/data/player';
-import { createNewGame, getState, type Player, type RivalClub } from '../../src/core/state';
+import { createNewGame, getState, setState, type Player, type RivalClub } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { makeRng } from '../../src/utils/rng';
 import { initLeague, registerFixturesSystem, knockoutWinner, PLAYER_ID, FINALS_ROUNDS } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
-import { registerFreeAgencySystem } from '../../src/systems/freeagency';
+import { registerFreeAgencySystem, FREE_AGENT_POOL_SIZE, poolTarget } from '../../src/systems/freeagency';
 import { registerAgingSystem } from '../../src/systems/aging';
-import { advanceWeek, clearSeasonHooks, clearTickHooks, registerTickHook, withFastForward } from '../../src/core/time';
-import { WEEKS_PER_SEASON } from '../../src/config';
+import { advanceWeek, clearSeasonHooks, clearTickHooks, registerTickHook, withFastForward, TICK_ORDER } from '../../src/core/time';
+import { SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../src/config';
 
 beforeEach(() => {
   bus.clear();
@@ -27,6 +28,11 @@ beforeEach(() => {
 
 const club = (strength: number, id = 'rival-test'): RivalClub => ({ id, name: 'Test Rivals', colors: ['#000000', '#ffffff'], strength });
 const agent = (rng = makeRng(1), over: Partial<Player> = {}): Player => ({ ...generatePlayer(rng), ...over });
+/** Weak free agents nobody signs, so a test pool sits above RIVAL_POOL_FLOOR. */
+const filler = (n = RIVAL_POOL_FLOOR): Player[] => {
+  const rng = makeRng(99);
+  return Array.from({ length: n }, (_, i) => ({ ...rivalPlayer(rng, 'fill', POSITIONS[i % POSITIONS.length]!, 15), id: `fill-${i}` }));
+};
 
 describe('generateRivalSquad', () => {
   it('matches the club strength across the band, covering every position', () => {
@@ -80,32 +86,195 @@ describe('signings', () => {
     const c: RivalClub = { ...club(50), squad: generateRivalSquad(club(50), 4) };
     const star = rivalPlayer(rng, 'fa', weakestPosition(c.squad!), 80);
     // Find a seed whose first roll is a hit.
-    let r = rivalSigningTick([c], [star], makeRng(0));
-    for (let seed = 1; r.signed.length === 0; seed++) r = rivalSigningTick([c], [star], makeRng(seed));
-    expect(r.freeAgents).toEqual([]);
+    const pool = [star, ...filler()];
+    let r = rivalSigningTick([c], pool, makeRng(0));
+    for (let seed = 1; r.signed.length === 0; seed++) r = rivalSigningTick([c], pool, makeRng(seed));
+    expect(r.freeAgents).toEqual(filler());
     expect(r.clubs[0]!.squad!.some((p) => p.id === star.id)).toBe(true);
     expect(r.clubs[0]!.strength).toBe(squadStrength(r.clubs[0]!.squad!));
-    expect(overallRating(star)).toBeGreaterThanOrEqual(RIVAL_NOTABLE_OVERALL);
     expect(r.news[0]).toContain(star.name);
   });
 
   it('a full squad releases its weakest player into the pool first', () => {
     const rng = makeRng(5);
     const squad = Array.from({ length: RIVAL_SQUAD_MAX }, (_, i) => rivalPlayer(rng, 'c', POSITIONS[i % 9]!, 50 + (i === 7 ? -20 : 0)));
-    const worst = squad[7]!;
+    // Index 7 is a second-rower, one of only two: releasing him would leave the position thin.
+    squad[2] = rivalPlayer(rng, 'c', POSITIONS[2]!, 25);
+    const worst = squad[2]!;
     const c: RivalClub = { ...club(50), squad };
     const star = rivalPlayer(rng, 'fa', 'fullback', 85);
-    let r = rivalSigningTick([c], [star], makeRng(0));
-    for (let seed = 1; r.signed.length === 0; seed++) r = rivalSigningTick([c], [star], makeRng(seed));
+    const pool = [star, ...filler()];
+    let r = rivalSigningTick([c], pool, makeRng(0));
+    for (let seed = 1; r.signed.length === 0; seed++) r = rivalSigningTick([c], pool, makeRng(seed));
     expect(r.clubs[0]!.squad).toHaveLength(RIVAL_SQUAD_MAX);
-    expect(r.freeAgents.map((p) => p.id)).toEqual([worst.id]);
+    expect(r.freeAgents.map((p) => p.id)).toEqual([...filler().map((p) => p.id), worst.id]);
   });
 
   it('never touches the player club', () => {
     const me: RivalClub = { id: 'player', name: 'Me', colors: ['#000000', '#ffffff'], strength: 55 };
     for (let seed = 0; seed < 50; seed++) {
-      expect(rivalSigningTick([me], [agent()], makeRng(seed)).clubs[0]).toBe(me);
+      expect(rivalSigningTick([me], [agent(), ...filler()], makeRng(seed)).clubs[0]).toBe(me);
     }
+  });
+});
+
+// Wave 3 task 04: rivals fill gaps from the pool, within the cap, a signing a week.
+describe('need signings', () => {
+  const full = (strength = 55, seed = 20): RivalClub => ({ ...club(strength), squad: generateRivalSquad(club(strength), seed) });
+  /** Two at every position but one hooker (17), at overall 45. */
+  const c0 = (): Player[] => {
+    const rng = makeRng(32);
+    return POSITIONS.flatMap((pos) => (pos === 'hooker' ? [pos] : [pos, pos])).map((pos) => rivalPlayer(rng, 'c', pos, 45));
+  };
+  /** A pool with a decent player at every position, plus filler. */
+  const market = (target = 50, seed = 21): Player[] => {
+    const rng = makeRng(seed);
+    return [...POSITIONS.map((pos) => rivalPlayer(rng, 'fa', pos, target)), ...filler()];
+  };
+  /** Run the tick over seeds until a club signs (the need roll is a chance, not a certainty). */
+  const firstSigning = (clubs: RivalClub[], pool: Player[], opts = {}) => {
+    for (let seed = 0; seed < 200; seed++) {
+      const r = rivalSigningTick(clubs, pool, makeRng(seed), opts);
+      if (r.signed.length > 0) return r;
+    }
+    throw new Error('nobody signed in 200 seeds');
+  };
+
+  it('a full, fit squad needs nobody; a retirement leaves the position thin; a short squad fills its thinnest spot', () => {
+    const c = full();
+    expect(c.squad).toHaveLength(RIVAL_SQUAD_SIZE);
+    expect(rivalNeed(c.squad!)).toBeNull();
+    const hookers = c.squad!.filter((p) => p.position === 'hooker');
+    const noHooker = c.squad!.filter((p) => p.id !== hookers[0]!.id);
+    expect(rivalNeed(noHooker)).toEqual({ kind: 'thin', position: 'hooker' });
+    // Injured or suspended players don't count as cover.
+    const hurt = c.squad!.map((p) => (p.id === hookers[0]!.id ? { ...p, injuredWeeks: 3 } : p));
+    expect(rivalNeed(hurt)).toEqual({ kind: 'thin', position: 'hooker' });
+    const banned = c.squad!.map((p) => (p.id === hookers[0]!.id ? { ...p, suspendedWeeks: 2 } : p));
+    expect(rivalNeed(banned)?.position).toBe('hooker');
+    // Two short, but every position still has two: a size need.
+    const spares = c.squad!.filter((p) => c.squad!.filter((q) => q.position === p.position).length > 2);
+    const short = c.squad!.filter((p) => !spares.slice(0, 2).some((x) => x.id === p.id));
+    expect(short.length).toBeLessThan(RIVAL_SQUAD_SIZE);
+    expect(rivalNeed(short)?.kind).toBe('size');
+  });
+
+  it('fills the gap with the best affordable player at that position', () => {
+    const c = full();
+    const hooker = c.squad!.find((p) => p.position === 'hooker')!;
+    const thin: RivalClub = { ...c, squad: c.squad!.filter((p) => p.id !== hooker.id) };
+    const rng = makeRng(30);
+    const okHooker = rivalPlayer(rng, 'fa', 'hooker', 48);
+    const goodHooker = rivalPlayer(rng, 'fa', 'hooker', 58);
+    const star = rivalPlayer(rng, 'fa', 'prop', 80);
+    const pool = [okHooker, star, goodHooker, ...filler()];
+    expect(pickNeedSigning(thin.squad!, pool, { kind: 'thin', position: 'hooker' })?.id).toBe(goodHooker.id);
+    const r = firstSigning([thin], pool);
+    expect(r.signed).toEqual([{ clubId: c.id, playerId: goodHooker.id, overall: overallRating(goodHooker), reason: 'thin' }]);
+    expect(rivalNeed(r.clubs[0]!.squad!)).toBeNull();
+    expect(r.freeAgents.some((p) => p.id === goodHooker.id)).toBe(false);
+  });
+
+  it('respects the salary cap: a player it cannot afford is passed over for one it can', () => {
+    const rng = makeRng(31);
+    const pricey = rivalPlayer(rng, 'fa', 'hooker', 90);
+    const cheap = rivalPlayer(rng, 'fa', 'hooker', 35);
+    // Two at every position but hooker, everyone the same: find a level that leaves
+    // room for the cheap hooker but not the dear one, even after a release.
+    const base = c0();
+    let squad: Player[] | null = null;
+    for (let level = 30; level <= 99 && !squad; level++) {
+      const sq = base.map((p) => ({ ...p, stats: { speed: level, strength: level, stamina: level, skill: level, footyIQ: level } }));
+      const room = RIVAL_WAGE_CAP - squadWages(sq);
+      const freed = squadWages(sq.slice(0, 1));
+      if (room >= squadWages([cheap]) && room + freed < squadWages([pricey])) squad = sq;
+    }
+    expect(squad).not.toBeNull();
+    const need = { kind: 'thin', position: 'hooker' } as const;
+    expect(rivalNeed(squad!)).toEqual(need);
+    expect(pickNeedSigning(squad!, [pricey, cheap], need)?.id).toBe(cheap.id);
+    expect(pickNeedSigning(squad!, [pricey], need)).toBeNull();
+    // Without the cap in the way, the better one.
+    expect(pickNeedSigning(c0(), [pricey, cheap], need)?.id).toBe(pricey.id);
+  });
+
+  it('never goes past RIVAL_SQUAD_MAX, and never leaves the pool at or below RIVAL_POOL_FLOOR', () => {
+    const c = full();
+    let clubs: RivalClub[] = [{ ...c, squad: c.squad!.slice(0, RIVAL_SQUAD_MIN) }];
+    let pool = market(50);
+    for (let w = 0; w < 60; w++) {
+      const r = rivalSigningTick(clubs, [...pool, ...market(50, 100 + w).slice(0, 3)], makeRng(w), { perClub: RIVAL_SIGNINGS_OFFSEASON });
+      clubs = r.clubs;
+      pool = r.freeAgents;
+      expect(clubs[0]!.squad!.length).toBeLessThanOrEqual(RIVAL_SQUAD_MAX);
+      expect(pool.filter((p) => !p.junior).length).toBeGreaterThanOrEqual(RIVAL_POOL_FLOOR);
+    }
+    // A pool already down to the floor is left alone.
+    const thin = { ...c, squad: c.squad!.slice(0, 10) };
+    for (let seed = 0; seed < 30; seed++) expect(rivalSigningTick([thin], filler(), makeRng(seed)).signed).toEqual([]);
+  });
+
+  it('signs at most one a club a week in season, and up to RIVAL_SIGNINGS_OFFSEASON in the finals weeks', () => {
+    const short = (id: string, seed: number): RivalClub => {
+      const base = { ...club(55, id), squad: generateRivalSquad(club(55, id), seed) };
+      return { ...base, squad: base.squad.slice(0, 12) };
+    };
+    const clubs = [short('a', 1), short('b', 2), short('c', 3)];
+    const pool = [...market(50, 40), ...market(50, 41), ...market(50, 42)];
+    for (let seed = 0; seed < 40; seed++) {
+      const inSeason = rivalSigningTick(clubs, pool, makeRng(seed));
+      for (const id of ['a', 'b', 'c']) expect(inSeason.signed.filter((x) => x.clubId === id).length).toBeLessThanOrEqual(1);
+      const off = rivalSigningTick(clubs, pool, makeRng(seed), { perClub: RIVAL_SIGNINGS_OFFSEASON });
+      for (const id of ['a', 'b', 'c']) expect(off.signed.filter((x) => x.clubId === id).length).toBeLessThanOrEqual(RIVAL_SIGNINGS_OFFSEASON);
+    }
+    const most = Math.max(...Array.from({ length: 40 }, (_, seed) => rivalSigningTick(clubs, pool, makeRng(seed), { perClub: RIVAL_SIGNINGS_OFFSEASON }).signed.length));
+    expect(most).toBeGreaterThan(clubs.length); // some club made two
+  });
+
+  it('a club in need doesn\'t take a player instantly: some weeks it waits', () => {
+    const c = full();
+    const thin: RivalClub = { ...c, squad: c.squad!.filter((p) => p.position !== 'lock' || p !== c.squad!.find((q) => q.position === 'lock')) };
+    const pool = market(50);
+    const signedWeeks = Array.from({ length: 100 }, (_, seed) => rivalSigningTick([thin], pool, makeRng(seed)).signed.length);
+    const rate = signedWeeks.reduce((t, n) => t + n, 0) / 100;
+    expect(rate).toBeGreaterThan(0.3);
+    expect(rate).toBeLessThan(0.7);
+  });
+
+  it('is deterministic for a seed, and the first pick turns with the week', () => {
+    const clubs = withRivalSquads(RIVAL_CLUBS.map((c) => ({ ...c })), 50).map((c) => ({ ...c, squad: c.squad!.slice(0, 16) }));
+    const pool = [...market(50, 60), ...market(50, 61)];
+    expect(rivalSigningTick(clubs, pool, makeRng(5), { start: 3 })).toEqual(rivalSigningTick(clubs, pool, makeRng(5), { start: 3 }));
+    // Two clubs short of a lock, a star and a journeyman lock: when both sign, the club picking first gets the star.
+    const rng = makeRng(62);
+    const star = rivalPlayer(rng, 'fa', 'lock', 75);
+    const journeyman = rivalPlayer(rng, 'fa', 'lock', 45);
+    const lockless = [full(50, 63), { ...full(50, 64), id: 'rival-other' }].map((c) => ({ ...c, squad: c.squad!.filter((p) => p.position !== 'lock') }));
+    const winner = (start: number): string | undefined => {
+      for (let seed = 0; seed < 200; seed++) {
+        const r = rivalSigningTick(lockless, [star, journeyman, ...filler()], makeRng(seed), { start });
+        if (r.signed.length === 2) return r.signed.find((x) => x.playerId === star.id)?.clubId;
+      }
+      return undefined;
+    };
+    expect(winner(0)).toBe(lockless[0]!.id);
+    expect(winner(1)).toBe(lockless[1]!.id);
+  });
+
+  it('news only for the top of the pool', () => {
+    const rng = makeRng(70);
+    const pool = Array.from({ length: 10 }, (_, i) => rivalPlayer(rng, 'fa', POSITIONS[i % 9]!, 40 + i * 3));
+    const ovr = pool.map(overallRating).sort((a, b) => b - a);
+    expect(notableOverall(pool)).toBe(ovr[1]); // top 20% of 10 = the best two
+    expect(notableOverall([])).toBe(Infinity);
+    const c = full();
+    const thin: RivalClub = { ...c, squad: c.squad!.filter((p) => p.position !== 'lock') };
+    const lockMid = { ...rivalPlayer(rng, 'fa', 'lock', 50), id: 'lock-mid' };
+    const r = firstSigning([thin], [lockMid, ...filler()], { notable: overallRating(lockMid) + 1 });
+    expect(r.signed[0]!.playerId).toBe('lock-mid');
+    expect(r.news).toEqual([]);
+    const r2 = firstSigning([thin], [lockMid, ...filler()], { notable: overallRating(lockMid) });
+    expect(r2.news[0]).toContain(lockMid.name);
   });
 });
 
@@ -225,8 +394,49 @@ describe('weekly development and the league anchor (#143)', () => {
   });
 });
 
+describe('the weekly hook (Wave 3 task 04)', () => {
+  it('runs before the pool refresh, so a fresh pool is the user\'s for a week', () => {
+    expect(RIVALS_TICK_ORDER).toBeLessThan(TICK_ORDER.freeagents);
+  });
+
+  it('signs from the store\'s pool, two a club in the finals weeks, with news at the pool target + RIVAL_NOTABLE_ABOVE_TARGET', () => {
+    const run = (week: number): { signed: number; news: string[]; perClub: Map<string, number> } => {
+      bus.clear();
+      clearTickHooks();
+      createNewGame('Hook FC', 404);
+      initLeague(getState());
+      const s0 = getState();
+      // Every rival short of players, and a deep pool of good players.
+      const clubs = s0.league.clubs.map((c) => (c.squad ? { ...c, squad: c.squad.slice(0, 12) } : c));
+      const rng = makeRng(405);
+      const pool = Array.from({ length: 80 }, (_, i) => rivalPlayer(rng, 'fa', POSITIONS[i % 9]!, 40 + (i % 30)));
+      setState({ week, league: { ...s0.league, clubs }, freeAgents: pool });
+      const news: string[] = [];
+      bus.on('ui:notify', ({ text }) => { if (/ sign \d+-rated /.test(text)) news.push(text); });
+      registerRivalsSystem();
+      const before = new Map(getState().league.clubs.map((c) => [c.id, c.squad?.length ?? 0] as const));
+      advanceWeek();
+      const perClub = new Map<string, number>();
+      for (const c of getState().league.clubs) if (c.squad) perClub.set(c.id, c.squad.length - before.get(c.id)!);
+      const signed = [...perClub.values()].reduce((t, n) => t + n, 0);
+      expect(getState().freeAgents.length).toBe(pool.length - signed);
+      return { signed, news, perClub };
+    };
+    const inSeason = run(5);
+    expect(inSeason.signed).toBeGreaterThan(0);
+    expect(Math.max(...inSeason.perClub.values())).toBeLessThanOrEqual(1);
+    const finals = run(SEASON_ROUNDS + 1);
+    expect(Math.max(...finals.perClub.values())).toBe(RIVAL_SIGNINGS_OFFSEASON);
+    // The news line is for the top of the pool only.
+    const cut = Math.round(poolTarget(getState())) + RIVAL_NOTABLE_ABOVE_TARGET;
+    for (const line of [...inSeason.news, ...finals.news]) expect(Number(/ sign (\d+)-rated /.exec(line)![1])).toBeGreaterThanOrEqual(cut);
+    expect(finals.news.length).toBeGreaterThan(0);
+    expect(finals.news.length).toBeLessThan(finals.signed);
+  });
+});
+
 describe('five-season headless league', () => {
-  it('keeps rival strength in the band, crowns different champions, and signs 1–3 a season', () => {
+  it('keeps rival strength in the band and squads in their limits, crowns different champions, signs 1–3 a season, and the pool stays healthy', () => {
     createNewGame('Five FC', 2026);
     initLeague(getState());
     registerFixturesSystem();
@@ -243,6 +453,7 @@ describe('five-season headless league', () => {
     const rivalIds = () => new Set(getState().league.clubs.flatMap((c) => (c.squad ?? []).map((p) => p.id)));
     let signings = 0;
     let rolloverMs = 0;
+    const poolSizes: number[] = [];
     withFastForward(() => {
       for (let i = 0; i < 5 * WEEKS_PER_SEASON; i++) {
         const before = rivalIds();
@@ -262,7 +473,13 @@ describe('five-season headless league', () => {
           expect(c.strength).toBeGreaterThanOrEqual(STRENGTH_MIN);
           expect(c.strength).toBeLessThanOrEqual(STRENGTH_MAX);
           expect(c.squad!.length).toBeGreaterThanOrEqual(RIVAL_SQUAD_MIN);
+          expect(c.squad!.length).toBeLessThanOrEqual(RIVAL_SQUAD_MAX);
         }
+        // Wave 3 task 04: the pool stays healthy: never empty, never piling up.
+        const signable = s.freeAgents.filter((p) => !p.junior).length;
+        poolSizes.push(signable);
+        expect(signable).toBeGreaterThan(0);
+        expect(s.freeAgents.length).toBeLessThanOrEqual(3 * FREE_AGENT_POOL_SIZE);
         if (!rollover) for (const id of rivalIds()) if (!before.has(id)) signings++;
       }
     });
@@ -274,6 +491,9 @@ describe('five-season headless league', () => {
     const perRivalSeason = signings / (15 * 5);
     expect(perRivalSeason).toBeGreaterThanOrEqual(1);
     expect(perRivalSeason).toBeLessThanOrEqual(3);
+    const meanPool = poolSizes.reduce((t, n) => t + n, 0) / poolSizes.length;
+    expect(meanPool).toBeGreaterThanOrEqual(RIVAL_POOL_FLOOR);
+    expect(Math.min(...poolSizes)).toBeGreaterThan(0);
     // A final week the club does not play: the rival grand final, rollover and every season hook.
     expect(rolloverMs).toBeGreaterThan(0);
     expect(rolloverMs).toBeLessThan(100);

@@ -283,8 +283,13 @@ coaches auto-pick by slot with the same fit. Old saves (v10 → v11) get today's
 
 Rival squads (GitHub #74): every rival keeps a persistent `squad` (generated to match its
 strength at new game / v7→v8 migration, seeded per club so `rngSeed` is untouched). Weekly
-(tick order 59, before the free-agent refresh) rivals heal, may sign from `freeAgents`
-(weakest position first, under a salary cap), and develop (#143): on their own RNG stream
+(tick order 59, before the free-agent refresh, so a fresh pool is the player's for a week)
+rivals heal, sign from `freeAgents`, and develop. A rival short of `RIVAL_SQUAD_SIZE` or
+thin at a position (fewer than two fit) signs the best affordable free agent for that need
+on a 50% roll; the rest roll 10% for an upgrade at their weakest position. One signing a
+club a week in season, two in the finals weeks; never past `RIVAL_SQUAD_MAX` or the salary
+cap, never taking the pool down to `RIVAL_POOL_FLOOR`; signings in the pool's top ~20% make
+the news (Wave 3 task 04). Development (#143): on their own RNG stream
 (`rivalDevelopSeed`, never `rngSeed`) every rival player has a chance of ±1 on each stat
 that averages `RIVAL_DEVELOPMENT.BY_AGE` over a season (young +4, veterans −4) plus the
 pull toward `LEAGUE.MEAN`, and a league anchor nudges every rival back toward the mean
