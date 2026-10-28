@@ -135,17 +135,18 @@ describe('legs and the wrestle in the live sim', () => {
     // The mechanic on the sheets as written: in a real match the gap between the sides counts for less (rating.spread, Phase 3).
     const restore = applyTuning({ 'rating.spread': 1 });
     try {
-      // Four seeds: two left the mean within a few hundredths of the line whenever the seeds reshuffle.
-      for (let s = 1; s <= 4; s++) {
+      // Eight seeds: two, then four (the deeper kick-off, #397), left the mean within a few hundredths of the line whenever the seeds reshuffle.
+      for (let s = 1; s <= 8; s++) {
         const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s);
         play(sim, 600);
-        home += sim.energyOf('home') / 4;
-        away += sim.energyOf('away') / 4;
+        home += sim.energyOf('home') / 8;
+        away += sim.energyOf('away') / 8;
       }
     } finally {
       restore();
     }
-    expect(home).toBeLessThan(0.75);
+    // 0.75 until the deeper kick-off (#397), which leaves the Stamina-40 side at about 0.75 after ten minutes over these seeds.
+    expect(home).toBeLessThan(0.77);
     expect(away).toBeLessThan(1);
     expect(away).toBeGreaterThan(home + 0.08);
   });
@@ -166,7 +167,9 @@ describe('legs and the wrestle in the live sim', () => {
     };
     const fresh = tally(1);
     const spent = tally(LEGS_ENERGY.spent);
-    expect(spent.top).toBeLessThan(fresh.top * 0.9);
+    // Spent is −20% top speed; a spent man who gets back to tired legs in the stretch is −10% (#397's
+    // kick-off chase found one at exactly that), never fresh.
+    expect(spent.top).toBeLessThanOrEqual(fresh.top * FATIGUE.tiredSpeed + 1e-9);
     expect(spent.breaks / spent.tackles).toBeLessThan(fresh.breaks / fresh.tackles);
   });
   it('a held tackle is a wrestle: the bar runs down, more men end it sooner, and the tackle comes when he is held', () => {

@@ -392,12 +392,12 @@ describe('kicks in real matches', () => {
     expect(checked).toBeGreaterThan(2);
     // The phone goes wide for kicks. The landing stays in the band (asserted above).
     // Desktop holds the kicker with it. A phone holds him on most frames of these
-    // two seeds (about 71% after the 7:00 cut) and loses him on a long kick, as
-    // tuning §9 already says.
+    // two seeds (about 71% after the 7:00 cut, 63% since the deeper kick-off, #397,
+    // a 35–42 m kick) and loses him on a long kick, as tuning §9 already says.
     expect(zooms.phone).toContain(1);
     for (const z of [...zooms.phone, ...zooms.desktop]) expect([1, 2]).toContain(z);
     expect(held.desktop / frames.desktop).toBeGreaterThan(0.9);
-    expect(held.phone / frames.phone).toBeGreaterThan(0.65);
+    expect(held.phone / frames.phone).toBeGreaterThan(0.6);
     for (const t of ['long', 'bomb', 'kickoff']) expect(types).toContain(t);
   });
 });

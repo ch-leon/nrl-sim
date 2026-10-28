@@ -126,10 +126,11 @@ describe('tactics in the live sim', () => {
     const kc = events(sheet('H', 'kick-chase'), sheet('A', 'kick-chase'), SEEDS + 4, SECS * 4);
     expect(count(kc, 'kick')).toBeGreaterThan(count(bal, 'kick'));
     expect(count(kc, 'kick', undefined, 'bomb')).toBeGreaterThan(count(bal, 'kick', undefined, 'bomb'));
-    // Six times the seeds: offloads in 2½ minutes are few, and All-out's doubling needs ~70 matches to clear the noise.
-    const allOut = events(sheet('H', 'all-out'), away, SEEDS * 6, SECS);
-    const balShort = events(sheet('H'), away, SEEDS * 6, SECS);
-    expect(count(allOut, 'offload', 'home')).toBeGreaterThan(count(balShort, 'offload', 'home') * 1.5);
+    // Ten times the seeds: offloads in 2½ minutes are few, and All-out's doubling needs ~70 matches to clear the noise.
+    // It was over 1.5× Balanced's; the deeper kick-off (#397) makes it about 1.46× in these opening minutes.
+    const allOut = events(sheet('H', 'all-out'), away, SEEDS * 10, SECS);
+    const balShort = events(sheet('H'), away, SEEDS * 10, SECS);
+    expect(count(allOut, 'offload', 'home')).toBeGreaterThan(count(balShort, 'offload', 'home') * 1.4);
   });
   it('a Rush defence makes more big hits but concedes more busts and steps than Slide', () => {
     // Four times the seeds: busts and steps are rarer than big hits, and every new dice roll (2e's penalties) reshuffles a small sample.

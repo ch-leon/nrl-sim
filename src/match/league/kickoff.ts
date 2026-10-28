@@ -9,12 +9,12 @@ import { kickoffTarget } from './tactics';
 /** The kick-off knobs (tuning reference, kick-off rows). */
 export const KICKOFF = {
   /**
-   * 1 = the deeper default kick-off (#397 stage 2: it moves the match
-   * fingerprints, so it waits for the re-pin); 0 = today's, onto the
-   * receivers' 24 m line.
+   * 1 = the deeper default kick-off (#397 stage 2, on since 28 Oct; it
+   * re-pinned the match fingerprints); 0 = the old one, onto the receivers'
+   * 24 m line (balance/plans/kickoff-depth.md has both).
    */
-  deepDefault: 0,
-  /** Today's kick-off: onto the receivers' this-metre line, `peak` metres high. */
+  deepDefault: 1,
+  /** The old kick-off (deepDefault 0): onto the receivers' this-metre line, `peak` metres high. */
   today: { lineM: 24, peak: 16 },
   /**
    * The deeper default: onto the receivers' `worstM` line with a kicking skill
