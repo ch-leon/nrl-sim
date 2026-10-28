@@ -2481,7 +2481,7 @@ async function runFlow(browser, { w: W, h: H, text }) {
     await tap('[data-nrl-start]');
     await page.waitForSelector('[data-nrl-confirm]');
     const ask = (await page.locator('[data-nrl-confirm]').textContent()) ?? '';
-    rec.notes.push(`"${ask}"`);
+    rec.notes.push(`"${ask}"`, `root font ${await page.evaluate(() => getComputedStyle(document.documentElement).fontSize)}`);
     const out = /^Start over\? This replaces Flow FC \(S\d+ W\d+\)\.$/.test(ask) ? [] : [`the confirm reads "${ask}"`];
     out.push(...await flowReach(page, ['[data-nrl-start-confirm]', '[data-nrl-start-cancel]']));
     await shot('t2-at-check');
