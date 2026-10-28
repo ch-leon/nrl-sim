@@ -622,8 +622,11 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-dock-money.nrl-flash-down { color: var(--nrl-neg); }
 .nrl-hud-debt { margin-left: 4px; padding: 0 4px; border-radius: 4px; font-family: var(--nrl-f-label); font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; background: var(--nrl-out); color: #fff; vertical-align: 1px; }
 .nrl-dock-divider { width: 1px; height: 36px; background: var(--nrl-line); margin-right: 6px; flex: 0 0 auto; }
+/* Short of room (#344), PLAY WEEK's sub-line gives way first (its flex-shrink, below), then the
+   tabs, whose labels ellipsize down to 44px. PLAY WEEK itself never goes under its label. */
 .nrl-dock-tabs { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 0 1 auto; }
 .nrl-dock-tabs > .nrl-btn {
+  position: relative;
   flex: 0 1 auto;
   min-width: 44px; /* #389: CLUB, the shortest label, was 43 wide at Normal and 40 at Large */
   justify-content: center;
@@ -648,10 +651,23 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   color: var(--nrl-accent);
   font-weight: 700;
 }
+/* #344: and a 3px bar under its label, a shape that still reads without the colour (WCAG 1.4.1).
+   The label ellipsizes, so the bar sits in its 5px of bottom padding (the margin takes it back). */
+.nrl-nav-label { position: relative; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-bottom: 5px; margin-bottom: -5px; }
+.nrl-dock-tabs > .nrl-btn[aria-current="page"] .nrl-nav-label::after, .nrl-dock-tabs > .nrl-btn[aria-expanded="true"] .nrl-nav-label::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--nrl-accent);
+}
 /* An alert: an 8px dot after the label (the count is in its spoken label). */
 .nrl-nav-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); flex: 0 0 auto; }
 .nrl-dock-spacer { flex: 1 1 auto; min-width: 4px; }
-.nrl-dock-play { position: relative; display: flex; align-items: stretch; flex: 0 0 auto; height: 50px; }
+.nrl-dock-play { position: relative; display: flex; align-items: stretch; flex: 0 100 auto; height: 50px; }
 .nrl-dock-play:empty { display: none; }
 .nrl-dock-play-group { display: flex; align-items: stretch; border-radius: 12px; overflow: hidden; background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-dock-play-group > .nrl-btn {
@@ -663,8 +679,24 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-dock-play-group > .nrl-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
 .nrl-dock-advance { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 16px; max-width: 15rem; }
 .nrl-dock-advance-label { font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
-.nrl-dock-advance-sub { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.3; }
-.nrl-dock-advance-sub:empty { display: none; }
+/* One line (#344): it may break anywhere, so its narrowest is a letter and PLAY WEEK's narrowest is its
+   label; shrinking stops there and nothing runs under ▾. What doesn't fit is cut at a word. */
+.nrl-dock-advance-sub {
+  display: block;
+  max-height: 1.3em;
+  overflow: hidden;
+  white-space: normal; /* not the button's nowrap */
+  overflow-wrap: anywhere;
+  text-align: left;
+  font-family: var(--nrl-f-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  max-width: 100%;
+  line-height: 1.3;
+}
+.nrl-dock-advance-sub:empty, .nrl-dock-advance-sub[hidden] { display: none; }
 /* 44 wide, a finger's width on every phone (#371, from #381's check: it was 40, and 34 at 667). */
 .nrl-btn.nrl-hud-menu-toggle { width: 44px; min-width: 44px; padding: 0; font-size: 0.875rem; border-left: 1px solid rgba(14, 22, 48, 0.25); }
 .nrl-btn.nrl-hud-stop { width: auto; padding: 0 14px; border-left: 1px solid rgba(14, 22, 48, 0.25); font-size: 1rem; }
@@ -703,6 +735,15 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 }
 .nrl-hud-menu[hidden] { display: none; }
 .nrl-hud-menu-item { width: 100%; text-align: left; }
+/* Large and Larger text (#371): the tabs close up so all five, ▴ and an alert dot stay whole.
+   Up to 900px, not 760 (#344): at 844×390 with the notch's insets Large clipped them too.
+   Larger: no gap and no tracking between them, 18px more. */
+@media (max-width: 900px) {
+  html[data-text-size] .nrl-dock-tabs > .nrl-btn { padding: 0 5px; gap: 3px; letter-spacing: 0.02em; }
+  html[data-text-size] .nrl-dock-advance { padding: 0 8px; }
+  html[data-text-size="larger"] .nrl-dock-tabs { gap: 0; }
+  html[data-text-size="larger"] .nrl-dock-tabs > .nrl-btn { letter-spacing: 0; }
+}
 /* A narrow phone (667px): tighter tabs, the sub-line goes. */
 @media (max-width: 760px) {
   .nrl-dock { padding: 0 6px 0 10px; }
@@ -710,12 +751,36 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   .nrl-dock-tabs > .nrl-btn { padding: 0 8px; font-size: 0.875rem; letter-spacing: 0.04em; }
   .nrl-dock-advance { padding: 0 10px; }
   .nrl-dock-advance-label { font-size: 1rem; }
-  /* Large and Larger text (#371): the tabs close up so all five and an alert dot stay whole. */
-  html[data-text-size] .nrl-dock-tabs > .nrl-btn { padding: 0 5px; gap: 3px; letter-spacing: 0.02em; }
-  html[data-text-size] .nrl-dock-advance { padding: 0 8px; }
+  /* Larger at 667 (#344): 24px back from the dock's padding, so PLAY WEEK and five whole tabs fit. */
+  html[data-text-size="larger"] .nrl-dock { padding: 0 4px 0 8px; }
+  html[data-text-size="larger"] .nrl-dock-statusbox { padding-right: 6px; }
+  html[data-text-size="larger"] .nrl-dock-tabs > .nrl-btn { padding: 0 4px; }
+  html[data-text-size="larger"] .nrl-dock-advance { padding: 0 6px; }
 }
 @media (max-width: 620px) {
   .nrl-dock-advance-sub, .nrl-dock-week-total { display: none; }
+  /* An alert dot in its tab's corner, not after the label (#344: 11px a tab back at 568). */
+  .nrl-dock-tabs > .nrl-btn > .nrl-nav-dot { position: absolute; top: 5px; right: 5px; }
+}
+/* Two rows (#344), the money and PLAY WEEK over the five tabs, which share the width: upright in a
+   narrow window at any text size (375×667 and 320×568 with a mouse; a phone held upright shows the
+   rotate card), and up to 620px at Large and Larger, which don't fit one row there. ▴ goes (the bar
+   marks the open tab). */
+@media (max-width: 620px) {
+  html[data-text-size] .nrl-dock { height: auto; flex-wrap: wrap; row-gap: 4px; padding-top: 4px; padding-bottom: 4px; }
+  html[data-text-size] .nrl-dock-divider { display: none; }
+  html[data-text-size] .nrl-dock-tabs { order: 1; flex: 1 1 100%; gap: 0; }
+  html[data-text-size] .nrl-dock-tabs > .nrl-btn { flex: 1 1 0; padding: 0 2px; font-size: 0.75rem; letter-spacing: 0.02em; }
+  html[data-text-size] .nrl-nav-caret { display: none; }
+}
+@media (max-width: 560px) {
+  html .nrl-dock { height: auto; flex-wrap: wrap; row-gap: 4px; padding: 6px; }
+  html .nrl-dock-statusbox { padding: 0 0 0 6px; }
+  html .nrl-dock-advance { padding: 0 8px; }
+  .nrl-dock-divider { display: none; }
+  .nrl-dock-tabs { order: 1; flex: 1 1 100%; gap: 0; }
+  .nrl-dock-tabs > .nrl-btn { flex: 1 1 0; padding: 0 2px; font-size: 0.75rem; letter-spacing: 0.02em; }
+  .nrl-nav-caret { display: none; }
 }
 
 /* ── Office: the pop-up sheet over a dimmed grounds view ─────────────────── */
@@ -766,6 +831,18 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 }
 .nrl-nav-sheet > .nrl-btn:hover:not(:disabled) { background: #22305c; }
 .nrl-nav-sheet > .nrl-btn[aria-current="page"] { box-shadow: inset 0 0 0 2px var(--nrl-accent); }
+/* #344: the tab's bar, under an open tile's name too. */
+.nrl-nav-sheet > .nrl-btn[aria-current="page"] .nrl-office-name { position: relative; padding-bottom: 5px; }
+.nrl-nav-sheet > .nrl-btn[aria-current="page"] .nrl-office-name::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--nrl-accent);
+}
 .nrl-office-name { font-family: var(--nrl-f-label); font-size: 1.125rem; font-weight: 700; letter-spacing: 0.02em; color: var(--nrl-text); }
 .nrl-office-status { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nrl-office-status[data-attn] { color: var(--nrl-accent); }

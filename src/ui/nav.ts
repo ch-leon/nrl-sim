@@ -9,7 +9,8 @@
 // pop-up sheet, a grid of tiles over the dimmed grounds, each with a status
 // line (yellow when it wants attention). The open screen's tab carries
 // aria-current="page" (its screen key, see openScreen in dom.ts); a screen in
-// Office marks OFFICE and its own tile.
+// Office marks OFFICE and its own tile. The mark is a fill and a bar under the
+// label, so it reads without its colour (#344).
 
 import {
   button,
@@ -150,6 +151,43 @@ export function moreBadgeCount(screens: readonly NavScreen[], counts: ReadonlyMa
   return total;
 }
 
+/** The dock's two fixed buttons, by their data-screen: home and Office's sheet. */
+export const HOME_ID = 'club';
+export const OFFICE_ID = 'office';
+
+/** What the dock marks for a screen key (#344). Pure. */
+export interface NavMarks {
+  /** Ids with aria-current="page", the fill and the bar: the open screen's tab, OFFICE and its tile, or CLUB at home. */
+  current: string[];
+  /** Ids whose label shows ▴: the open tab (CLUB never does), OFFICE while its sheet is up or holds the screen. */
+  open: string[];
+}
+
+/**
+ * The marks for screen `key`, with Office's sheet up or not and a screen up or not.
+ * A screen in Office marks OFFICE and its tile; with nothing over the grounds, CLUB.
+ */
+export function navMarks(registry: ScreenRegistry, key: string | null, sheetUp: boolean, screenUp: boolean): NavMarks {
+  const owner = registry.owner(key);
+  const inMore = registry.inMore(key);
+  const current: string[] = [];
+  const open: string[] = [];
+  if (owner === null && !screenUp && !sheetUp) current.push(HOME_ID);
+  if (owner !== null) current.push(owner);
+  if (owner !== null && !inMore && !sheetUp) open.push(owner);
+  if (inMore) current.push(OFFICE_ID);
+  if (inMore || sheetUp) open.push(OFFICE_ID);
+  return { current, open };
+}
+
+/**
+ * What a tab or tile reads out (#344): its name (not the caps or ▴), then its alerts (#369).
+ * aria-current="page" says it is open, so the name doesn't. Pure.
+ */
+export function navSpeech(label: string, badge: BadgeView): string {
+  return badge.ariaLabel ?? label;
+}
+
 /** A tab's text: the label in caps, "▴" after it while it is open (not CLUB: home has nothing to close). */
 export function tabText(label: string, open: boolean, home = false): string {
   return `${label.toUpperCase()}${open && !home ? ' ▴' : ''}`;
@@ -176,8 +214,9 @@ export function createNav(): Nav {
     setSheet(false);
     closeScreen();
   });
-  club.setAttribute('data-screen', 'club');
+  club.setAttribute('data-screen', HOME_ID);
   club.setAttribute('data-nav-home', '');
+  club.setAttribute('aria-label', 'Club');
 
   const sheet = el('div', { class: 'nrl-nav-sheet', attrs: { id: 'nrl-nav-sheet', role: 'menu', 'aria-label': 'Office' } });
   sheet.hidden = true;
@@ -193,7 +232,7 @@ export function createNav(): Nav {
     setSheet(true);
   });
   more.setAttribute('data-nav-more', '');
-  more.setAttribute('data-screen', 'office');
+  more.setAttribute('data-screen', OFFICE_ID);
   more.setAttribute('aria-haspopup', 'menu');
   more.setAttribute('aria-controls', sheet.id);
   more.setAttribute('aria-expanded', 'false');
@@ -209,7 +248,10 @@ export function createNav(): Nav {
     const label = b.getAttribute('data-label') ?? '';
     const text = tabText(label, open, b === club);
     const span = b.querySelector('.nrl-nav-label');
-    if (span && span.textContent !== text) span.textContent = text;
+    if (!span || span.textContent === text) return;
+    // ▴ in a span of its own, so a narrow dock can drop it (#344: the bar marks the open tab).
+    const name = label.toUpperCase();
+    span.replaceChildren(name, ...(text === name ? [] : [el('span', { class: 'nrl-nav-caret', text: text.slice(name.length) })]));
   }
 
   function setSheet(open: boolean): void {
@@ -247,19 +289,13 @@ export function createNav(): Nav {
   }
 
   function mark(key: string | null): void {
-    const owner = registry.owner(key);
-    const office = !sheet.hidden || registry.inMore(key);
-    for (const [id, btn] of buttons) {
-      if (id === owner) btn.setAttribute('aria-current', 'page');
+    const m = navMarks(registry, key, !sheet.hidden, activeScreen() !== null);
+    const all: [string, HTMLButtonElement][] = [[HOME_ID, club], ...buttons, [OFFICE_ID, more]];
+    for (const [id, btn] of all) {
+      if (m.current.includes(id)) btn.setAttribute('aria-current', 'page');
       else btn.removeAttribute('aria-current');
-      if (!registry.get(id)?.more) setLabel(btn, id === owner && sheet.hidden);
+      if (!registry.get(id)?.more) setLabel(btn, m.open.includes(id));
     }
-    if (registry.inMore(key)) more.setAttribute('aria-current', 'page');
-    else more.removeAttribute('aria-current');
-    setLabel(more, office);
-    // Home is lit when nothing is over the grounds.
-    if (owner === null && !activeScreen() && sheet.hidden) club.setAttribute('aria-current', 'page');
-    else club.removeAttribute('aria-current');
   }
 
   function registerScreen(id: string, label: string, open: () => void, placement: NavPlacement = {}): void {
@@ -299,11 +335,24 @@ export function createNav(): Nav {
   function paintBadge(id: string): void {
     const btn = buttons.get(id);
     const sc = registry.get(id);
-    if (btn && sc) paint(btn, badgeView(sc.label, counts.get(id) ?? 0, dots.get(id) ?? null), !sc.more);
+    if (!btn || !sc) return;
+    const v = badgeView(sc.label, counts.get(id) ?? 0, dots.get(id) ?? null);
+    paint(btn, v, !sc.more);
+    // A tile with nothing to add reads its name and status line as they show.
+    if (sc.more && v.ariaLabel === null) btn.removeAttribute('aria-label');
+    else say(btn, sc.label, v);
   }
 
   function paintMoreBadge(): void {
-    paint(more, badgeView(OFFICE_LABEL, moreBadgeCount(registry.list(), counts)), true);
+    const v = badgeView(OFFICE_LABEL, moreBadgeCount(registry.list(), counts));
+    paint(more, v, true);
+    say(more, OFFICE_LABEL, v);
+  }
+
+  /** A button's spoken label: its name (not the caps or ▴), then its alerts (#344). */
+  function say(btn: HTMLButtonElement, label: string, v: BadgeView): void {
+    const text = navSpeech(label, v);
+    if (btn.getAttribute('aria-label') !== text) btn.setAttribute('aria-label', text);
   }
 
   function setBadge(id: string, count: number): void {
@@ -354,7 +403,7 @@ export function createNav(): Nav {
   };
 }
 
-/** The alert on a tab (an 8px dot, for a count or a #369 dot) and what the button reads out; a tile shows no dot. */
+/** The alert on a tab (an 8px dot, for a count or a #369 dot); a tile shows no dot. What it reads out is say()'s. */
 function paint(btn: HTMLButtonElement, v: BadgeView, dotted: boolean): void {
   let badge = btn.querySelector<HTMLElement>('.nrl-nav-dot');
   const on = dotted && (v.count !== null || v.dot);
@@ -367,6 +416,4 @@ function paint(btn: HTMLButtonElement, v: BadgeView, dotted: boolean): void {
     if (v.count !== null) badge.setAttribute('data-count', v.count);
     else badge.removeAttribute('data-count');
   }
-  if (v.ariaLabel === null) btn.removeAttribute('aria-label');
-  else btn.setAttribute('aria-label', v.ariaLabel);
 }
