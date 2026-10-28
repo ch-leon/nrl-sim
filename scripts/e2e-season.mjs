@@ -493,35 +493,63 @@ async function play() {
     rec.notes.push(`${rotateCard ? 'card gone, loop awake' : 'card gone'}, canvas ${o.game}`);
   });
 
-  // Facilities: build two, move one, demolish the other.
+  // Facilities: build two, move one, demolish the other. A tap on the grass only
+  // aims the ghost; Build here / Move here commits (#395).
   const cx = Math.round(W / 2), cy = Math.round(H / 2) + 10;
   const spotB = [cx - 130, cy + 20], spotMove = [cx + 120, cy + 30];
+  /** Screen point over the middle of a placed facility's footprint (the camera can have eased). */
+  const facilityAt = (defId) => page.evaluate((id) => {
+    const f = window.__nrlState().facilities.find((x) => x.defId === id);
+    const sc = window.__nrlGame.scene.getScene('Grounds');
+    const cam = sc.cameras.main;
+    const w = sc.cellToWorld(f.x + 0.5, f.y + 0.5); // 2×2 footprints; +16 = half a tile down to the centre
+    return [Math.round((w.x - cam.scrollX - cam.width / 2) * cam.zoom + cam.width / 2),
+      Math.round((w.y + 16 - cam.scrollY - cam.height / 2) * cam.zoom + cam.height / 2)];
+  }, defId);
+  const facilityCount = () => page.evaluate(() => window.__nrlState().facilities.length);
+  /** Tap the grass to aim (nothing is spent), then Build here / Move here. */
+  const aimThenGo = async (x, y) => {
+    const before = await facilityCount();
+    const money = await page.evaluate(() => window.__nrlState().money);
+    await tapAt(x, y);
+    await wait(250);
+    if ((await facilityCount()) !== before || (await page.evaluate(() => window.__nrlState().money)) !== money) {
+      throw new Error('a tap on the grass built or spent before Build here');
+    }
+    const go = page.locator('.nrl-placebar [data-place-go]');
+    if (await go.isDisabled()) throw new Error(`Build here disabled: ${(await go.textContent())?.trim()}`);
+    await press(go);
+  };
   await step('build-menu', async () => { await navTo('build'); await page.waitForSelector('.nrl-build-row'); });
   await step('build-placing', async () => {
     await press(page.locator('.nrl-build-row:not(.nrl-build-row-disabled)', { hasText: 'Training Paddock' }));
     await page.waitForSelector('.nrl-placebar:not([hidden])');
+    await wait(500);
   });
-  await step('built-paddock', async () => { await tapAt(cx, cy); await wait(2200); }, { quietToasts: true });
+  // The ghost starts on a free spot, so Build here works straight away.
+  await step('built-paddock', async () => { await press(page.locator('.nrl-placebar [data-place-go]')); await wait(2200); }, { quietToasts: true });
   await step('build-second', async () => {
     await navTo('build');
     await press(page.locator('.nrl-build-row:not(.nrl-build-row-disabled)', { hasText: 'Canteen' }));
-    await tapAt(...spotB);
+    await page.waitForSelector('.nrl-placebar:not([hidden])');
+    await wait(500);
+    await aimThenGo(...spotB);
     await wait(2200);
   }, { quietToasts: true });
-  await step('facility-popup', async () => { await tapAt(cx, cy); await page.waitForSelector('.nrl-facility-popup'); });
+  await step('facility-popup', async () => { await tapAt(...await facilityAt('trainingPaddock')); await page.waitForSelector('.nrl-facility-popup'); });
   await step('moving', async () => {
     await tap('.nrl-facility-move');
     await page.waitForSelector('.nrl-placebar:not([hidden])');
   });
   await step('moved', async (rec) => {
-    await tapAt(...spotMove);
+    await aimThenGo(...spotMove);
     await wait(2200);
     const s = await save();
     rec.notes.push(`money ${s?.money ?? '(not saved yet)'}`);
   }, { quietToasts: true });
   // One tap demolishes; the toast's Undo is the way back (#370 replaced the "Really demolish?" tap).
   await step('demolish-undo-toast', async () => {
-    await tapAt(...spotB);
+    await tapAt(...await facilityAt('canteen'));
     await page.waitForSelector('.nrl-facility-popup');
     await tap('.nrl-facility-demolish');
     await page.waitForSelector('.nrl-toast-action .nrl-toast-btn');

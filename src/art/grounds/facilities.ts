@@ -823,6 +823,26 @@ export function facilityOrigin(footprint: { w: number; h: number }, texH: number
   return { x: h / (w + h), y: (texH - (w + h) * (TILE_H / 2)) / texH };
 }
 
+/**
+ * The footprint side each facility's door faces, as drawn above (#395): most open
+ * onto their +gy ('s') face; the video room's door is on its +gx ('e') wall. The
+ * auto footpath (src/world/path.ts autoPaths) leaves from the middle of this side.
+ */
+export const FACILITY_DOOR: Record<FacilityDefId, 's' | 'e'> = {
+  trainingPaddock: 's', // gate gap in the front fence
+  weightsRoom: 's',
+  videoRoom: 'e',
+  physioCentre: 's',
+  canteen: 's', // serving hatch and tables
+  sponsorBoard: 's', // the advert faces this way
+  grandstand: 's',
+  academy: 's',
+  coachsOffice: 's',
+  scoutOffice: 's',
+  medicalBay: 's',
+  teamGym: 's', // roller door
+};
+
 /** Generate the art for one catalog facility at a level (pure; deterministic). */
 export function facilityArt(defId: FacilityDefId, level: FacilityLevel = 1): FacilityArt {
   const { w, h } = FACILITY_CATALOG[defId].footprint;

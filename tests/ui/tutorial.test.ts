@@ -60,7 +60,7 @@ describe('STEPS: three guided taps (#370)', () => {
 
   it('names the paddock as the catalog does, and says what each tap does', () => {
     expect(byId.get('build')!.text).toBe(`Tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
-    expect(byId.get('place')!.text).toContain('green spot on the grass');
+    expect(byId.get('place')!.text).toBe('Tap a green spot, then Build here.');
     expect(byId.get('recruit')!.text).toMatch(/Sign on the best player you can afford/);
     expect(byId.get('advance')!.text).toMatch(/Play Week/);
   });

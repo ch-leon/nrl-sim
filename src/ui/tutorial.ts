@@ -85,7 +85,7 @@ export const STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'place',
-    text: 'Tap a green spot on the grass to build it there.',
+    text: 'Tap a green spot, then Build here.',
     anchor: `.nrl-placebar:not([hidden]), ${tab('build')}`,
     advanceOn: 'facility:placed',
     tap: 1,
