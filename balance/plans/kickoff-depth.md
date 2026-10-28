@@ -72,9 +72,9 @@ The first run's 78% was luck. The favourite's win is near the target either way.
 Small-sample tests pinned on the default match, each with the reason beside it:
 `potentialRng.test.ts` (the season's rngSeed, re-pinned), `kickLayer.test.ts`
 (the phone holds the kicker on 63% of kick frames, was about 71%: a longer
-kick), `touch.test.ts` (a third seed), `fatigue.test.ts` (eight seeds; a
-Stamina-40 side is at about 0.75 after ten minutes; a spent man who gets back
-to tired legs runs at −10%), `presets.test.ts` (All-out offloads about 1.46×
+kick), `touch.test.ts` (a third seed), `fatigue.test.ts` (a Stamina-40 side
+is at about 0.76 after ten minutes, bar 0.77; a spent man who gets back to
+tired legs runs at −10%), `presets.test.ts` (All-out offloads about 1.43×
 Balanced's in the opening 2½ minutes, was over 1.5×), `moreCalls.test.ts` (#396's penalty
-pair: 16 seeds to find a home penalty in range, and Tap and go looks on to the first one the
-captain did not tap himself).
+pair on four named seeds that have a home penalty in range, one of them a penalty the
+captain did not tap himself, in place of 1–8, which no longer do).

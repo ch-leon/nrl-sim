@@ -2,7 +2,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { FIELD_LENGTH, IN_GOAL } from '../../../src/match/core/field';
 import type { Side, SimEvent } from '../../../src/match/core/snapshot';
-import { CALL_LABEL, callIsKickoff, callResultText, chipState, type CallVerdict } from '../../../src/match/league/calls';
+import { CALL_LABEL, callIsKickoff, callResultText, chipState, type CallInput, type CallVerdict } from '../../../src/match/league/calls';
 import { KICKOFF, kickoffLanding, kickoffLineM, pinnedDeep, regatherChance } from '../../../src/match/league/kickoff';
 import { LiveSim } from '../../../src/match/league/live';
 import { kickoffTarget } from '../../../src/match/league/tactics';
@@ -27,9 +27,11 @@ const flightTo = (sim: LiveSim): { x: number; y: number } | null => {
  * settled call, and the call's verdict.
  */
 function firstKickoff(seed: number, call: 'kickoff-short' | 'kickoff-long' | null, home: SideSpec = { rating: 60 }, away: SideSpec = { rating: 60 }) {
-  const probe = new LiveSim(sideSheet('H', home), sideSheet('A', away), seed);
-  const kicking = other(probe.inPossession);
-  const sim = new LiveSim(sideSheet('H', home), sideSheet('A', away), seed, call ? { calls: [{ tick: 1, side: kicking, call }] } : {});
+  // The calls are read as the match plays, so the kicking side's goes in once the sim says who kicks off.
+  const calls: CallInput[] = [];
+  const sim = new LiveSim(sideSheet('H', home), sideSheet('A', away), seed, { calls });
+  const kicking = other(sim.inPossession);
+  if (call) calls.push({ tick: 1, side: kicking, call });
   const events: SimEvent[] = [];
   let to: { x: number; y: number } | null = null;
   let verdict: CallVerdict | undefined;
@@ -230,7 +232,8 @@ describe('kick-off calls in the match (#397)', () => {
 
   it('are deterministic per seed, and a refused one changes nothing', () => {
     const play = (calls: { tick: number; side: Side; call: 'kickoff-short' | 'kickoff-long' }[]): string => {
-      const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 5, { calls });
+      // A 3-minute half: long enough for its kick-offs, called and not, and the play after them.
+      const sim = new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), 5, { calls, length: { halves: 1, halfMinutes: 3 } });
       const parts: string[] = [];
       while (!sim.finished && sim.tick < 100_000) {
         sim.step();
