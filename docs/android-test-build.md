@@ -89,7 +89,10 @@ determined person can still recover the logic. No source maps ship in the APK.
 
 Settings are deliberately moderate (no control-flow flattening or dead-code injection):
 base64 string-array encoding is applied only to the off-thread Worker chunks (the match
-engine and art generator), while the main-thread bundle gets a plain string array, so the
-frame rate is unaffected. Measured on the grounds and in a live match (software GL, no CPU
+engine and art generator), while the main-thread chunks get a plain string array, so the
+frame rate is unaffected. The main thread is the index chunk plus two loaded on demand
+(#400): the Guide (`guide-*.js`) and the Match Lab (`boot-*.js`); the script picks the
+Workers out by name, so those two take the index chunk's settings. Measured on the grounds and in a live match (software GL, no CPU
 throttle): **60 fps before and after** obfuscation; the APK's JS grows about **+22%**
-(2344 → 2853 KiB uncompressed; it compresses inside the APK's zip).
+(2344 → 2853 KiB uncompressed; it compresses inside the APK's zip). Since the slimmer
+Phaser (#400) it is 1631 → 2056 KiB (+26%) over five chunks.

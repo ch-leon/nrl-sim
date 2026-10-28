@@ -51,10 +51,9 @@ import { initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
 import { initFirstVisitHints, setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
 import { commitUndo, initUndo } from './systems/undo';
-import { openGuideScreen } from './ui/guide/guide';
+import { closeLoading, lazyOpener, screenDeps } from './ui/lazyScreen';
 import { clearLiveMatch, readLiveMatch } from './systems/liveMatchRecord';
 import { isLabHash } from './match/lab/controller';
-import { bootLab } from './match/lab/boot';
 import { commercialEnabled } from './commercial/flags';
 import { initCommercial, recordFirstRun } from './commercial/demo';
 import { openPaywall } from './ui/screens/paywall';
@@ -85,7 +84,9 @@ let portraitBlocked = false;
 
 async function boot(): Promise<void> {
   // BAK-207: `/#lab` opens the live match sim lab instead of the club game.
+  // Its own chunk (#400): a player's first load never fetches it.
   if (isLabHash(location.hash)) {
+    const { bootLab } = await import('./match/lab/boot');
     bootLab();
     return;
   }
@@ -264,8 +265,17 @@ async function boot(): Promise<void> {
   });
   // Kit designer (#79), behind the cosmetic-kits flag.
   if (FEATURES.cosmeticKits) nav.registerScreen('kit', 'Kit & colours', () => openKitDesigner(), { more: true, status: () => ({ text: 'Home / away' }) });
-  // The Guide (#188); Replay tutorial is in its footer.
-  nav.registerScreen('help', 'Guide', () => openGuideScreen(), { more: true, status: () => ({ text: 'How to play' }) });
+  // The Guide (#188); Replay tutorial is in its footer. Its own chunk (#400), fetched on the first open.
+  const openGuide = lazyOpener(
+    () => import('./ui/guide/guide'),
+    (m) => void m.openGuideScreen(),
+    screenDeps('Guide', { key: 'help', class: 'nrl-guide-modal' }),
+    () => {
+      closeLoading('help');
+      bus.emit('ui:notify', { text: "Couldn't load the Guide. Check the connection and try again.", kind: 'danger' });
+    },
+  );
+  nav.registerScreen('help', 'Guide', () => void openGuide(), { more: true, status: () => ({ text: 'How to play' }) });
   nav.registerScreen('settings', 'Settings', openSettings, { more: true, status: () => ({ text: soundStatus(getState().settings) }) });
   // Save & quit: write the slot and go back to the title's slots (#34's reload).
   nav.registerScreen('quit', 'Save & quit', () => {
