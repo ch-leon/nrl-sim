@@ -22,7 +22,36 @@ is the plan. Nothing in `src/` changes until Leon signs it off.
   and nobody has re-soaked the season since. The baseline below is a fresh
   soak on `main` at `bc20536`.
 
-**Baseline soak on `bc20536`: running (10 seeds × 3 seasons, Normal, idle and managed, `--live-rivals`). Its tables go here before sign-off.**
+### Baseline: `main` at `bc20536`
+
+`npm run soak -- --live-rivals --seasons 3 --seeds 10 --difficulties normal --jobs 4`.
+That was 10,346 rival-v-rival games in 23 minutes, with no problems and no
+forfeits. The break rule changed a plan 2.17 times a match. Attack mix:
+Balanced 34%, Grind 34%, Kick-chase 17%, Expansive 12%, All-out 3%.
+
+The 26 Oct pace slope did not close the gap. Expansive is −6.8 against
+strength (was −6.4) and 44% at a level rating.
+
+| Attack | Level: sides | Level: score | Level: off even | Strength: sides | Strength: diff | se |
+|---|---:|---:|---:|---:|---:|---:|
+| Balanced | 1,481 | 48% | −2.5 | 7,112 | −3.4 | 0.6 |
+| Grind | 1,340 | 53% | +3.1 | 6,961 | +3.8 | 0.6 |
+| Kick-chase | 711 | 55% | **+4.5** | 3,588 | +4.0 | 0.8 |
+| **Expansive** | 526 | 44% | **−5.9** | 2,476 | **−6.8** | 1.0 |
+| All-out | 58 | 41% | **−9.5** | 555 | +0.5 | 2.0 |
+
+| Defence | Level: sides | Level: score | Level: off even | Strength: sides | Strength: diff | se |
+|---|---:|---:|---:|---:|---:|---:|
+| Slide | 2,200 | 49% | −1.4 | 11,077 | −1.7 | 0.5 |
+| Rush | 1,248 | 54% | **+4.3** | 6,405 | +4.0 | 0.6 |
+| Compressed | 668 | 46% | −3.5 | 3,210 | −2.0 | 0.9 |
+
+**Bold** is more than 4 points off. Expansive is the only style off on both
+measures by more than two standard errors. Kick-chase and Rush sit right at
+the edge. All-out's level row is 58 sides, a standard error of about 6.5, and
+it is inside on the strength measure. Speed cannot help Expansive without
+reaching the other styles too, so the pass bar below protects those three
+edge rows explicitly.
 
 ## Hypothesis
 
@@ -110,9 +139,11 @@ npm run soak -- --live-rivals --seasons 3 --seeds 10 --difficulties normal --job
 ```
 
 This is the N14.2 run size. It plays about 10,000 rival-v-rival games and
-takes about an hour on 4 cores. It runs on the baseline (done, above) and on
-the one or two stage-A picks. If Expansive at a level rating lands within one
-standard error of the band edge, the pick is soaked again at 20 seeds.
+takes 23 minutes on 4 cores. It runs on the baseline (done, above) and on the
+one or two stage-A picks. Expansive's level row is only about 520 sides
+(standard error 2.2), so each pick is soaked at **20 seeds** (about 45
+minutes). The baseline is extended to the same 20 seeds, so the two are
+compared like for like.
 
 ## Pass bar
 
@@ -122,13 +153,17 @@ All of these must hold for the candidate:
    (difference −4.0 to +4.0), **and** 46–54% at a level rating (within 2
    rating points).
 2. **Season, every other style:** every attack and defence that is inside
-   both measures today stays inside them. Kick-chase (+4.3 against strength,
-   accepted on 25 Oct) gets no worse by more than one standard error.
+   both measures today stays inside them. The ones already over the line on
+   one measure (Kick-chase +4.5 and Rush +4.3 at a level rating, All-out's
+   58-side level row) get no worse by more than one standard error.
 3. **Even matches:** every attack preset against Balanced, and every defence
    against Slide, stays inside 45–55%.
 4. **Within ±5% of today:** home win rate, average points a match and tries a
-   match, on the even 60 v 60 row and on the season averages (rival-v-rival
-   points and tries). The 70 v 50 row stays near 70%.
+   match, on the even 60 v 60 row and on the level rival-v-rival row of
+   stage A. The soak's style games record a result, not a score, so the
+   harness carries this check. The 70 v 50 row stays near 70%, and the
+   soak's player record and margin a game stay within luck of the
+   baseline.
 
 If no variant on the grid passes, the change does not ship. The PR reports
 the grid and says that, and the gap stays parked.
