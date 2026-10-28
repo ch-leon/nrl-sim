@@ -1,0 +1,83 @@
+{
+  "name": "kickoff depth confirm",
+  "description": "#397 stage 2 confirm on fresh seeds (10001+): the first run (20261028-123504-kickoff-depth) had Rush v Slide fall from 52.5% to 40.5% and the even home win from 51% to 42% with the deeper default. More matches for those two, and the preset rows the first plan left out (grind, all-out, compressed), all against today's kick-off.",
+  "seeds": 200,
+  "seedStart": 10001,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "seeds": 600,
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "rush v slide",
+      "seeds": 300,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed v slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "grind v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "deeper default",
+      "tuning": {
+        "kickoff.deepDefault": 1
+      }
+    }
+  ]
+}

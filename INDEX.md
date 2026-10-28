@@ -170,3 +170,7 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-130228-standard | standard | 13b03fb | main | [report](runs/20261028-130228-standard/report.md) |
 | 20261028-133951-more-calls | more-calls | b9fb824 (uncommitted changes) | claude/more-coach-calls-396 | [report](runs/20261028-133951-more-calls/report.md) |
 | 20261028-143055-standard | standard | 45a74ae | main | [report](runs/20261028-143055-standard/report.md) |
+| 20261028-123504-kickoff-depth | kickoff depth | a110ca2 (uncommitted changes) | claude/kickoffs-397 | [report](runs/20261028-123504-kickoff-depth/report.md) |
+| 20261028-124128-kickoff-depth-confirm | kickoff depth confirm | b2ebadf | claude/kickoffs-397 | [report](runs/20261028-124128-kickoff-depth-confirm/report.md) |
+| 20261028-135316-kickoff-depth-gap | kickoff depth gap | b2ebadf | claude/kickoffs-397 | [report](runs/20261028-135316-kickoff-depth-gap/report.md) |
+| 20261028-145438-kickoff-depth | kickoff depth | cf43d1f | claude/kickoffs-397 | [report](runs/20261028-145438-kickoff-depth/report.md) |

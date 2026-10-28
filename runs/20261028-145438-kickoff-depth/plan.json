@@ -1,0 +1,76 @@
+{
+  "name": "kickoff depth",
+  "description": "#397 (balance/plans/kickoff-depth.md): the deeper default kick-off (the receivers' 15–8 m line by the kicker's Skill, 35–42 m from halfway) against the old one (their 24 m line, about 26 m): points, tries, completion and possession inside the §7 bands, for even sides, a rating gap and the attacking and defence styles? Baseline is the default (deeper, kickoff.deepDefault 1); the variant is the old kick-off. No coach calls.",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "seeds": 400,
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "rush v slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "old kick-off",
+      "tuning": {
+        "kickoff.deepDefault": 0
+      }
+    }
+  ]
+}

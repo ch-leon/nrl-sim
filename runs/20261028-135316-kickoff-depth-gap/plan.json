@@ -1,0 +1,25 @@
+{
+  "name": "kickoff depth gap",
+  "description": "#397 stage 2 confirm on fresh seeds (10001+): the first run had the 70 v 50 favourite go from 70% to 78% with the deeper default (100 matches). 400 matches each way of the question.",
+  "seeds": 400,
+  "seedStart": 10001,
+  "scenarios": [
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "deeper default",
+      "tuning": {
+        "kickoff.deepDefault": 1
+      }
+    }
+  ]
+}
