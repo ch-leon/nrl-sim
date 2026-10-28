@@ -12,7 +12,7 @@
 import { bus, type Events } from '../core/events';
 import { getState } from '../core/state';
 import { decisionViews, openDecisions } from './decisions';
-import { el, button, openModal } from './dom';
+import { el, button, openModal, segmented } from './dom';
 
 /** How many messages the ring buffer holds before the oldest is overwritten. */
 export const INBOX_CAPACITY = 100;
@@ -192,10 +192,12 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
     decisions.replaceChildren();
     decisions.hidden = views.length === 0;
     if (views.length === 0) return;
-    const answer = button('Answer', () => openDecisions(), { class: 'nrl-news-answer' });
+    const answer = button('Review', () => openDecisions(), { class: 'nrl-news-answer nrl-btn-primary' });
     answer.setAttribute('data-decisions-open', '');
     decisions.append(
-      el('span', { class: 'nrl-news-decisions-text', text: `${views.length === 1 ? 'Decision waiting' : `${views.length} decisions waiting`}: ${views.map((v) => v.title).join(', ')}` }),
+      el('span', { class: 'nrl-news-decisions-text' },
+        el('b', { text: `${views.length} ${views.length === 1 ? 'DECISION' : 'DECISIONS'}` }),
+        views.map((v) => v.title).join(', ')),
       answer,
     );
   };
@@ -225,25 +227,23 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
     }
   };
 
-  const filters = el('div', { class: 'nrl-news-filters' });
-  const filterButtons = new Map<NewsFilter, HTMLButtonElement>();
+  // ALL / INFO / GOOD / ALERT: the segmented control in the header row.
+  const filters = segmented<NewsFilter>(
+    (['all', ...NEWS_KINDS] as NewsFilter[]).map((f) => ({ id: f, label: FILTER_LABELS[f] })),
+    filter,
+    (f) => setFilter(f),
+    { class: 'nrl-news-filters', label: 'Show' },
+  );
+  for (const b of filters.buttons.values()) b.classList.add('nrl-news-filter');
   const setFilter = (f: NewsFilter): void => {
     filter = f;
-    for (const [key, btn] of filterButtons) {
-      btn.classList.toggle('nrl-news-active', key === f);
-      btn.setAttribute('aria-pressed', String(key === f));
-    }
+    filters.set(f);
     renderList();
   };
-  for (const f of ['all', ...NEWS_KINDS] as NewsFilter[]) {
-    const btn = button(FILTER_LABELS[f], () => setFilter(f), { class: 'nrl-news-filter' });
-    filterButtons.set(f, btn);
-    filters.append(btn);
-  }
 
   body.append(list);
-  // Title and filters share the header row, beside the ✕.
-  content.append(el('div', { class: 'nrl-news-head' }, el('h2', { text: 'News' }), filters), decisions, body);
+  // Title and filters share the header row.
+  content.append(el('div', { class: 'nrl-news-head' }, el('h2', { text: 'News' }), filters.el), decisions, body);
   setFilter('all');
   renderDecisions();
   const offState = bus.on('state:changed', () => {

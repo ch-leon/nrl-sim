@@ -20,15 +20,17 @@ import Phaser from 'phaser';
 import { CameraController } from '../world/camera';
 import { zoomForViewport } from '../world/viewport';
 import { bus } from '../core/events';
-import { button, mount } from '../ui/dom';
+import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
-import { CALL_WHEN, callCaption, callsHintSeasoned, callsLine, callsLockedHint, cssHex, mountMatchOverlay, showMatchSheet, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
+import { SKIP_ARM_MS, callEffect, callsHintSeasoned, callsLockedHint, callsUnlockLine, coachBadge, cssHex, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
+import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
+import { styleLine } from '../ui/tacticsBlurbs';
 import {
   LivePlayback,
-  playbackSpeedOf,
   keyMomentsOn,
+  playbackSpeedOf,
   PLAYBACK_SPEEDS,
   type PlaybackActor,
   type PlaybackBall,
@@ -38,23 +40,10 @@ import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS
 import { NINES } from '../match/league/rules';
 import { ON_FIELD } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callResultText, chipState, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callIsDefence, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
-/** Chip words: short enough for six 44 px chips on a phone on its side. Left and right are the attacker's as he faces the line (arrows would flip on screen with the ends). */
-const CHIP_LABEL: Readonly<Record<CoachCall, string>> = {
-  'hit-up': 'Hit-up',
-  'shift-left': 'Shift left',
-  'shift-right': 'Shift right',
-  'kick-early': 'Kick early',
-  'run-it': 'Run it',
-  bomb: 'Bomb',
-  'field-goal': 'Field goal',
-  rush: 'Rush',
-  hold: 'Hold',
-  'fresh-legs': 'Fresh legs',
-};
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
 import { resolveKits } from '../art/match/kitClash';
@@ -128,6 +117,8 @@ const MATCH_ZOOM = ZOOM_DEFAULT;
 const TAG_LIFT = 26;
 /** Ghost balls trailing a kicked ball. */
 const TRAIL_LEN = 5;
+/** The in-match labels (name tag, "Kick-off…") in the HUD's label face (Broadcast Quiet). */
+const MATCH_LABEL_FONT = '"Barlow Condensed", "Arial Narrow", sans-serif';
 /** On screen while a live match waits for its art to be painted or uploaded (N10.5). */
 export const KICK_OFF_TEXT = 'Kick-off…';
 
@@ -352,7 +343,7 @@ export class MatchScene extends Phaser.Scene {
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
     const beat = this.add
-      .text(this.cameras.main.width / 2, this.cameras.main.height / 2, KICK_OFF_TEXT, { fontFamily: '"Courier New", monospace', fontSize: '18px', fontStyle: 'bold', color: '#ffffff', resolution: 2 })
+      .text(this.cameras.main.width / 2, this.cameras.main.height / 2, KICK_OFF_TEXT, { fontFamily: MATCH_LABEL_FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', resolution: 2 })
       .setOrigin(0.5)
       .setScrollFactor(0);
     const token = ++this.buildToken;
@@ -409,12 +400,12 @@ export class MatchScene extends Phaser.Scene {
     this.marker.setDepth(DEPTH_SHADOW + 2); // above the ground shadows, under every sprite
     this.tagText = this.add
       .text(0, 0, '', {
-        fontFamily: '"Courier New", monospace',
-        fontSize: '13px',
+        fontFamily: MATCH_LABEL_FONT,
+        fontSize: '15px',
         fontStyle: 'bold',
         color: '#ffffff',
-        backgroundColor: 'rgba(16,16,28,0.82)',
-        padding: { x: 4, y: 1 },
+        backgroundColor: 'rgba(14,22,48,0.85)',
+        padding: { x: 5, y: 1 },
         resolution: 2,
       })
       .setOrigin(0.5, 1)
@@ -503,7 +494,7 @@ export class MatchScene extends Phaser.Scene {
       this.mountPlaybackControls(this.playback.getSpeed());
       if (live.coachSide) {
         const unlocked = live.unlockedCalls ?? COACH_CALLS;
-        this.mountCallChips(live.coachSide, unlocked);
+        this.mountCoach(live.coachSide, unlocked);
         // One ticker line when a club with a season behind it is short of calls (N9.6, #224). Not the calls row, and not week 2 of a new club.
         const club = getState();
         const hint = callsLockedHint(unlocked.length, COACH_CALLS.length, callsHintSeasoned(club.season, club.history.length));
@@ -511,6 +502,8 @@ export class MatchScene extends Phaser.Scene {
       }
       if (live.planSide) this.mountPlanChip(live.planSide);
       bus.on('match:finished', this.onFinished);
+      // The full-time card's Back to Club (matchReport.ts) leaves through this scene.
+      setFullTimeExit(() => this.exitToGrounds());
       // A phone may kill the app in the background: keep where the match is (#73).
       document.addEventListener('visibilitychange', this.onHidden);
       window.addEventListener('pagehide', this.onHidden);
@@ -541,9 +534,9 @@ export class MatchScene extends Phaser.Scene {
     this.kickFrame = cameraFrame(replayFrame, kick, this.autoZoom === null);
     if (this.kickFrame) this.kickBackUntil = time + KICK_RETURN_MS;
     this.kickBack = !this.kickFrame && time < this.kickBackUntil;
+    // The coach's badge and tray follow the play a few times a second (#73).
     this.showSlowed();
-    // The coach's chips follow the play a few times a second (#73).
-    if ((this.callsEl || this.planBtn) && time - this.chipsAt > 150) {
+    if ((this.coachBtn || this.planBtn) && time - this.chipsAt > 150) {
       this.chipsAt = time;
       this.refreshCallChips();
       this.refreshPlan();
@@ -709,39 +702,69 @@ export class MatchScene extends Phaser.Scene {
     cam.centerOn(c.x, c.y);
   }
 
-  // ── DOM playback controls (speed ×1/×2/×4/×8 + pause) ───────────────────────────
+  // ── The speed pill (3m): pause, 1×/2×/4×/8×, SKIP, in the overlay's bottom row ──
   private mountPlaybackControls(start: PlaybackSpeed = 1): void {
-    const wrap = document.createElement('div');
-    // Positioned by the overlay stylesheet (bottom-centre; the nav bar is hidden
-    // while the match overlay is up — including full-time — so nothing sits
-    // underneath).
-    wrap.className = 'nrl-mo-controls';
-
-    this.speedButtons = PLAYBACK_SPEEDS.map((s) => {
-      const b = button(`×${s}`, () => this.setSpeed(s));
-      if (s === start) b.setAttribute('data-active', 'true');
-      b.setAttribute('aria-pressed', String(s === start));
-      wrap.append(b);
-      return b;
-    });
-
-    // Skip (no undo) and Save & exit wait behind the pause button (#348 M3), not
-    // a finger's width from ×8.
+    const pill = document.createElement('div');
+    pill.className = 'nrl-mo-controls';
+    pill.setAttribute('role', 'group');
+    pill.setAttribute('aria-label', 'Playback');
+    // Skip to full time and Save & exit also wait behind the pause (#348 M3).
     const pause = button('❚❚', () => this.openPauseSheet(), { class: 'nrl-mo-pause' });
     pause.setAttribute('aria-label', 'Pause');
     pause.setAttribute('data-pause', '');
-    wrap.append(pause);
-
-    this.controlsEl = wrap;
-    mount(wrap);
+    pill.append(pause);
+    this.speedButtons = PLAYBACK_SPEEDS.map((s) => {
+      const b = button(`${s}×`, () => this.setSpeed(s), { class: 'nrl-mo-speed' });
+      b.dataset.speed = String(s);
+      b.setAttribute('aria-label', `Speed ×${s}`);
+      pill.append(b);
+      return b;
+    });
+    this.markSpeed(start);
+    const divider = document.createElement('span');
+    divider.className = 'nrl-mo-pill-div';
+    // SKIP has no undo and sits a finger's width from 8× (#348 M3): the first tap
+    // arms it, the second goes. The live sim can only skip to full time (no break in between).
+    const skip = button('Skip ▸▸', () => this.tapSkip(skip), { class: 'nrl-mo-skip' });
+    skip.setAttribute('data-skip-pill', '');
+    skip.title = 'Skip to full time';
+    pill.append(divider, skip);
+    this.controlsEl = pill;
+    const slot = this.overlay?.slot?.('speed');
+    if (slot) slot.append(pill);
+    else mount(pill);
   }
 
-  /** The sheet over the field (pause menu, calls list): the match holds while it is up. */
+  /** SKIP's first tap arms it ("Full time?") for a few seconds; the second skips. */
+  private skipArm: ReturnType<typeof setTimeout> | null = null;
+
+  private tapSkip(btn: HTMLButtonElement): void {
+    if (!this.skipArm) {
+      btn.textContent = 'Full time? ▸▸';
+      btn.setAttribute('data-armed', '');
+      this.skipArm = setTimeout(() => this.disarmSkip(btn), SKIP_ARM_MS);
+      return;
+    }
+    this.disarmSkip(btn);
+    this.toggleTray(false);
+    this.playback?.skip();
+  }
+
+  private disarmSkip(btn?: HTMLButtonElement): void {
+    if (this.skipArm) clearTimeout(this.skipArm);
+    this.skipArm = null;
+    if (!btn) return;
+    btn.textContent = 'Skip ▸▸';
+    btn.removeAttribute('data-armed');
+  }
+
+  /** The sheet over the field (the pause menu): the match holds while it is up. */
   private sheet: PlanCardHandle | null = null;
 
   private openSheet(make: (onDone: () => void) => PlanCardHandle): void {
     const pb = this.playback;
     if (!(pb instanceof LivePlayback) || this.finished || this.sheet || this.planCard) return;
+    this.toggleTray(false);
     pb.hold();
     this.sheet = make(() => {
       this.sheet = null;
@@ -754,13 +777,22 @@ export class MatchScene extends Phaser.Scene {
     if (!(pb instanceof LivePlayback)) return;
     const s = pb.score;
     const half = pb.half >= 3 ? 'Golden point' : pb.half === 2 ? '2nd half' : '1st half';
+    const score = document.createElement('div');
+    score.className = 'nrl-mo-sheet-line';
+    const pts = document.createElement('span');
+    pts.className = 'nrl-mo-sheet-score';
+    pts.textContent = `${s.home} – ${s.away}`;
+    score.append(`${this.home.name} `, pts, ` ${this.away.name}`);
+    const settings = matchSettingsOpener();
     this.openSheet((onDone) =>
       showMatchSheet({
         head: 'Paused',
-        lines: [`${this.home.name} ${s.home} – ${s.away} ${this.away.name}`, half],
+        lines: [score, half],
         actions: [
-          { label: 'Resume', onTap: () => {} },
+          { label: 'Resume', onTap: () => {}, primary: true },
           { label: 'Skip to full time', onTap: () => this.playback?.skip(), attrs: { 'data-skip': '' } },
+          // The Office's Settings dialog (sound, coach calls…), the match still held under it.
+          ...(settings ? [{ label: 'Settings', onTap: () => this.openSettings(settings), attrs: { 'data-settings': '' } }] : []),
           // Save & exit: write the resume record and go back to the club. The week
           // stays held, so Advance Week reads Resume match and continues this one.
           { label: 'Save & exit', onTap: () => this.saveAndExit(), attrs: { 'data-save-exit': '', 'aria-label': 'Save and exit to club' } },
@@ -770,106 +802,196 @@ export class MatchScene extends Phaser.Scene {
     );
   }
 
-  // ── Coach calls (#73): chips for the player's coach in a live match ─────────
+  /** Watches the Settings dialog opened from the pause sheet; the match goes on when it closes. */
+  private settingsWatch: MutationObserver | null = null;
+
+  private openSettings(open: () => void): void {
+    const pb = this.playback;
+    if (!(pb instanceof LivePlayback) || this.finished) return;
+    pb.hold();
+    open();
+    const dialog = document.querySelector('.nrl-settings-modal')?.closest('.nrl-modal-backdrop') ?? null;
+    if (!dialog) {
+      pb.release();
+      return;
+    }
+    const watch = new MutationObserver(() => {
+      if (dialog.isConnected) return;
+      watch.disconnect();
+      this.settingsWatch = null;
+      pb.release();
+    });
+    watch.observe(getRoot(), { childList: true });
+    this.settingsWatch = watch;
+  }
+
+  // ── Coach calls (#73, 3o): COACH in the bottom row and its tray of the calls on now ──
+  private coachBtn: HTMLButtonElement | null = null;
+  private coachLabel: HTMLSpanElement | null = null;
+  private coachBadgeEl: HTMLSpanElement | null = null;
+  /** The tray (`.nrl-mo-calls`): only while it is open do its rows exist. */
   private callsEl: HTMLDivElement | null = null;
-  private callChips: { call: CoachCall; btn: HTMLButtonElement; why: HTMLSpanElement }[] = [];
+  private trayTitle: HTMLSpanElement | null = null;
+  private trayList: HTMLDivElement | null = null;
+  private trayFoot: HTMLDivElement | null = null;
+  /** The calls the rows were last built for, so a row isn't rebuilt under the finger. */
+  private trayKey = '';
   private callSide: 'home' | 'away' = 'home';
-  /** The call made this set (its chip stays lit until the set ends). */
+  /** The calls his Coach's Office has unlocked (N9.6). */
+  private unlocked: readonly CoachCall[] = COACH_CALLS;
+  /** The call made this set (the badge names it until the set ends). */
   private madeCall: CoachCall | null = null;
   /** The tick the call was made on (it takes effect on the next). */
   private madeAt = 0;
   private chipsAt = 0;
 
-  private mountCallChips(side: 'home' | 'away', unlocked: readonly CoachCall[]): void {
+  private mountCoach(side: 'home' | 'away', unlocked: readonly CoachCall[]): void {
     this.callSide = side;
-    const wrap = document.createElement('div');
-    wrap.className = 'nrl-mo-calls';
-    // Only the calls his Coach's Office has unlocked (N9.6).
-    this.callChips = COACH_CALLS.filter((c) => unlocked.includes(c)).map((call) => {
-      const why = document.createElement('span');
-      why.className = 'nrl-mo-call-why';
-      const btn = button(CHIP_LABEL[call], () => {
-        if (!(this.playback instanceof LivePlayback)) return;
-        // A refusal shows as the chip's caption (refreshCallChips), not a toast over play.
-        // Fresh legs (#367) isn't the set's call: it lights only itself, until the swap.
-        if (this.playback.call(side, call) === null && !callIsBench(call)) {
-          this.madeCall = call;
-          this.madeAt = this.playback.tick;
-        }
-        this.refreshCallChips();
-      });
-      btn.setAttribute('data-call', call);
-      btn.append(why);
-      wrap.append(btn);
-      return { call, btn, why };
-    });
-    // "?": every call, when it can be made, and what unlocks the rest (#348 M6).
-    const help = button('?', () => this.openCallsHelp(unlocked), { class: 'nrl-mo-calls-help' });
-    help.setAttribute('aria-label', 'Calls');
-    help.setAttribute('data-calls-help', '');
-    wrap.append(help);
-    this.callsEl = wrap;
-    mount(wrap);
+    this.unlocked = unlocked;
+    const label = document.createElement('span');
+    label.className = 'nrl-mo-coach-label';
+    label.textContent = 'COACH';
+    const badge = document.createElement('span');
+    badge.className = 'nrl-mo-coach-badge';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'nrl-mo-coach';
+    btn.setAttribute('data-coach', '');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', 'nrl-mo-tray');
+    btn.append(label, badge);
+    btn.addEventListener('click', () => this.toggleTray());
+    const title = document.createElement('span');
+    title.className = 'nrl-mo-tray-title';
+    const note = document.createElement('span');
+    note.className = 'nrl-mo-tray-note';
+    note.textContent = 'Match keeps playing';
+    const head = document.createElement('div');
+    head.className = 'nrl-mo-tray-head';
+    head.append(title, note);
+    const list = document.createElement('div');
+    list.className = 'nrl-mo-tray-list';
+    const foot = document.createElement('div');
+    foot.className = 'nrl-mo-tray-foot';
+    const tray = document.createElement('div');
+    tray.className = 'nrl-mo-tray nrl-mo-calls';
+    tray.id = 'nrl-mo-tray';
+    tray.setAttribute('role', 'dialog');
+    tray.setAttribute('aria-label', 'Coach calls');
+    tray.hidden = true;
+    tray.append(head, list, foot);
+    this.coachBtn = btn;
+    this.coachLabel = label;
+    this.coachBadgeEl = badge;
+    this.callsEl = tray;
+    this.trayTitle = title;
+    this.trayList = list;
+    this.trayFoot = foot;
+    const slot = this.overlay?.slot?.('coach');
+    if (slot) slot.append(btn);
+    else mount(btn);
+    mount(tray);
     this.refreshCallChips();
   }
 
-  private openCallsHelp(unlocked: readonly CoachCall[]): void {
-    const list = document.createElement('div');
-    list.className = 'nrl-mo-call-help';
-    for (const call of COACH_CALLS) {
-      const name = document.createElement('b');
-      name.textContent = CALL_LABEL[call];
-      const when = document.createElement('span');
-      const locked = !unlocked.includes(call);
-      when.textContent = locked ? `Coach's Office level ${unlockLevel(call)}` : CALL_WHEN[call];
-      if (locked) {
-        name.className = 'nrl-mo-call-locked';
-        when.className = 'nrl-mo-call-locked';
-      }
-      list.append(name, when);
-    }
-    this.openSheet((onDone) => showMatchSheet({ head: 'Calls', lines: ['One call a set with the ball, one defending.', list], actions: [{ label: 'Back to the match', onTap: () => {} }], onDone }));
+  private trayOpen(): boolean {
+    return !!this.callsEl && !this.callsEl.hidden;
   }
 
-  /** The chips follow the play (calls.ts chipState): what makes sense now, or the call made this set. */
+  /** Open or close the tray. The match does not pause for it. */
+  private toggleTray(open = !this.trayOpen()): void {
+    if (!this.callsEl || !this.coachBtn) return;
+    if (open && (this.finished || this.sheet || this.planCard)) return;
+    if (open === this.trayOpen()) return;
+    this.callsEl.hidden = !open;
+    this.coachBtn.setAttribute('aria-expanded', String(open));
+    if (this.coachLabel) this.coachLabel.textContent = open ? 'COACH ▾' : 'COACH';
+    this.overlay?.setTrayOpen?.(open);
+    this.trayKey = '';
+    if (open) this.refreshCallChips();
+  }
+
+  /** The badge and the tray follow the play (a few times a second): the calls the sim takes now. */
   private refreshCallChips(): void {
-    if (!this.callsEl || !(this.playback instanceof LivePlayback)) return;
+    if (!this.coachBtn || !(this.playback instanceof LivePlayback)) return;
     const pb = this.playback;
-    const attacking = pb.inPossession === this.callSide;
-    const why = new Map(this.callChips.map(({ call }) => [call, pb.callRefusal(this.callSide, call)]));
+    const side = this.callSide;
+    const attacking = pb.inPossession === side;
+    const why = new Map(this.unlocked.map((call) => [call, pb.callRefusal(side, call)] as const));
     // The set is over once the call has landed and the side may call again.
     const used = [...why.values()].includes('one call a set');
     if (!used && pb.tick > this.madeAt + 1) this.madeCall = null;
-    for (const { call, btn, why: caption } of this.callChips) {
-      const refusal = why.get(call) ?? null;
-      const st = chipState(call, refusal, attacking, this.madeCall, pb.freshLegsPending(this.callSide));
-      btn.hidden = !st.show;
-      btn.disabled = !st.enabled;
-      btn.toggleAttribute('data-made', st.lit);
-      btn.title = refusal ?? CALL_LABEL[call];
-      const text = st.enabled ? '' : callCaption(refusal, st.lit);
-      if (caption.textContent !== text) caption.textContent = text;
+    // His calls for the play now: attack calls with the ball, Rush and Hold without it; Fresh legs (#367) either way.
+    const role = this.unlocked.filter((c) => callIsBench(c) || callIsDefence(c) !== attacking);
+    const legal = role.filter((c) => why.get(c) === null);
+    const badge = coachBadge(legal.length, attacking, this.madeCall);
+    if (this.coachBadgeEl && this.coachBadgeEl.textContent !== badge.text) this.coachBadgeEl.textContent = badge.text;
+    if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
+    if (!this.trayOpen() || !this.trayList || !this.trayTitle || !this.trayFoot) return;
+    const title = attacking ? 'Your ball' : 'Their ball';
+    if (this.trayTitle.textContent !== title) this.trayTitle.textContent = title;
+    const key = `${title}:${legal.join(',')}`;
+    if (key !== this.trayKey) {
+      this.trayKey = key;
+      const rows: HTMLElement[] = legal.map((call) => {
+        const b = button('', () => this.makeCall(call), { class: 'nrl-mo-tray-call' });
+        const name = document.createElement('b');
+        name.textContent = CALL_LABEL[call];
+        const what = document.createElement('span');
+        what.textContent = callEffect(call);
+        b.replaceChildren(name, what);
+        b.setAttribute('data-call', call);
+        return b;
+      });
+      if (rows.length === 0) {
+        const none = document.createElement('div');
+        none.className = 'nrl-mo-tray-none';
+        none.textContent = 'Nothing to call right now.';
+        rows.push(none);
+      }
+      this.trayList.replaceChildren(...rows);
     }
+    const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && (callIsBench(c) || callIsDefence(c) !== attacking)).map((call) => ({ call, level: unlockLevel(call) }));
+    const foot = callsUnlockLine(role.map((call) => ({ call, why: why.get(call) ?? null })), locked);
+    if (this.trayFoot.textContent !== foot) this.trayFoot.textContent = foot;
   }
 
-  // ── What each call did (#366): a tag over the chips for two seconds ───────
+  /** A call from the tray: in on the next tick, the tray closes, the log says it (and later whether it paid off). */
+  private makeCall(call: CoachCall): void {
+    const pb = this.playback;
+    if (!(pb instanceof LivePlayback)) return;
+    if (pb.call(this.callSide, call) === null) {
+      // Fresh legs (#367) isn't the set's call: the badge keeps the set's own.
+      if (!callIsBench(call)) {
+        this.madeCall = call;
+        this.madeAt = pb.tick;
+      }
+      this.overlay?.noteCall?.(CALL_LABEL[call]);
+      this.toggleTray(false);
+    }
+    // A refusal (the play moved on under the finger) just rebuilds the rows.
+    this.refreshCallChips();
+  }
+
+  // ── What each call did (#366): a tag over COACH for two seconds ──────────
   private callResultEl: HTMLDivElement | null = null;
   private callResultTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Only the coach's own calls get a tag; the rival's stay in the log. A new result replaces the one up. */
   private showCallResult(v: CallVerdict): void {
-    if (!this.callsEl || v.side !== this.callSide || this.finished) return;
+    if (!this.coachBtn || v.side !== this.callSide || this.finished) return;
     let tag = this.callResultEl;
     if (!tag) {
       tag = document.createElement('div');
       tag.className = 'nrl-mo-call-result';
       tag.setAttribute('role', 'status');
       this.callResultEl = tag;
+      mount(tag);
     }
-    if (tag.parentElement !== this.callsEl) this.callsEl.append(tag);
     tag.textContent = callResultText(v);
     tag.toggleAttribute('data-paid', v.paid);
-    tag.hidden = false;
+    // Not over the open tray: its rows are where the finger is.
+    tag.hidden = this.trayOpen();
     if (this.callResultTimer) clearTimeout(this.callResultTimer);
     this.callResultTimer = setTimeout(() => this.clearCallResult(), CALL_RESULT_MS);
   }
@@ -881,7 +1003,7 @@ export class MatchScene extends Phaser.Scene {
     this.callResultEl = null;
   }
 
-  // ── Key moments (#366): the speed row shows the match slowed for one ──────
+  // ── Key moments (#366): the pill shows the match slowed for one ───────────
   private slowShown: number | null = null;
 
   /** Slow down for big moments: on unless the player turned it off (an old save has no setting). */
@@ -893,13 +1015,13 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
-  /** The button of the speed a key moment holds the match at pulses; the chosen one stays lit. */
+  /** The speed a key moment holds the match at pulses in the pill; the chosen one stays yellow. */
   private showSlowed(): void {
     const pb = this.playback;
     const to = pb instanceof LivePlayback && !this.finished ? pb.slowedTo : null;
     if (to === this.slowShown) return;
     this.slowShown = to;
-    for (const b of this.speedButtons) b.toggleAttribute('data-slow', to !== null && b.textContent === `×${to}`);
+    for (const b of this.speedButtons) b.toggleAttribute('data-slow', to !== null && b.dataset.speed === String(to));
     this.controlsEl?.toggleAttribute('data-slowed', to !== null);
   }
 
@@ -912,13 +1034,18 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
-  private setSpeed(speed: PlaybackSpeed): void {
-    this.playback?.setSpeed(speed);
+  /** The speed playing now: a yellow circle in the pill (#348 M3). */
+  private markSpeed(speed: PlaybackSpeed): void {
     for (const b of this.speedButtons) {
-      const on = b.textContent === `×${speed}`;
+      const on = b.dataset.speed === String(speed);
       b.toggleAttribute('data-active', on);
       b.setAttribute('aria-pressed', String(on));
     }
+  }
+
+  private setSpeed(speed: PlaybackSpeed): void {
+    this.playback?.setSpeed(speed);
+    this.markSpeed(speed);
     try {
       const settings = getState().settings;
       if (settings.playbackSpeed !== speed) setState({ settings: { ...settings, playbackSpeed: speed } });
@@ -927,32 +1054,26 @@ export class MatchScene extends Phaser.Scene {
     }
   }
 
-  // ── The plan at the breaks (N11): the half-time card and the Plan chip after a try ──
+  // ── The plan at the breaks (N11, 3r): the half-time sheet and the Plan chip after a try ──
   private planSide: 'home' | 'away' | null = null;
   private planBtn: HTMLButtonElement | null = null;
-  /** The Plan chip's own row when there are no call chips to sit beside. */
-  private planWrap: HTMLDivElement | null = null;
   private planCard: PlanCardHandle | null = null;
-  /** The half whose break has had its card (one card a break). */
+  /** The half whose break has had its sheet (one a break). */
   private planCardHalf = 0;
 
   private mountPlanChip(side: 'home' | 'away'): void {
     this.planSide = side;
-    const btn = button('Plan', () => this.openPlanCard('Change the plan', ['In force from the kick-off']));
+    const btn = button('Plan ▸', () => this.openPlanCard('Change the plan'), { class: 'nrl-mo-planchip' });
     btn.setAttribute('data-plan', '');
+    btn.title = 'Change the plan from the restart';
     btn.hidden = true;
     this.planBtn = btn;
-    if (this.callsEl) this.callsEl.prepend(btn);
-    else {
-      const wrap = document.createElement('div');
-      wrap.className = 'nrl-mo-calls';
-      wrap.append(btn);
-      this.planWrap = wrap;
-      mount(wrap);
-    }
+    const slot = this.overlay?.slot?.('plan');
+    if (slot) slot.append(btn);
+    else mount(btn);
   }
 
-  /** At half-time the card comes up by itself, once; after a try the Plan chip shows until the restart is kicked. */
+  /** At half-time the sheet comes up by itself, once; after a try the Plan chip shows until the restart is kicked. */
   private refreshPlan(): void {
     const pb = this.playback;
     if (!this.planSide || !(pb instanceof LivePlayback) || this.finished) return;
@@ -960,24 +1081,41 @@ export class MatchScene extends Phaser.Scene {
     if (this.planBtn) this.planBtn.hidden = at !== 'try' || this.planCard !== null;
     if (at === 'half-time' && !this.planCard && this.planCardHalf !== pb.half) {
       this.planCardHalf = pb.half;
-      const s = pb.score;
-      const pct = (side: 'home' | 'away'): string => `${Math.round(pb.legs(side) * 100)}%`;
-      const lines = [`${this.home.name} ${s.home} – ${s.away} ${this.away.name}`, `Legs ${pct('home')} / ${pct('away')}`, callsLine(pb.calls.made, pb.calls.paid)];
-      // Every speed: the card waits for Continue (#341).
-      this.openPlanCard(pb.half >= 2 ? 'Golden point' : 'Half-time', lines);
+      // Every speed: the sheet waits for the coach (#341).
+      this.openPlanCard(pb.half >= 2 ? 'Golden point' : 'Half-time');
     }
   }
 
-  private openPlanCard(head: string, lines: string[]): void {
+  /** The half-time sheet's one line: who leads, possession, legs, his calls. */
+  private planSummary(pb: LivePlayback, side: 'home' | 'away'): string {
+    const other = side === 'home' ? 'away' : 'home';
+    const s = pb.score;
+    const margin = s[side] - s[other];
+    const lead = margin > 0 ? `You lead by ${margin}` : margin < 0 ? `You trail by ${-margin}` : 'Level';
+    const [ph, pa] = this.overlay?.possession?.() ?? [50, 50];
+    const legs = (x: 'home' | 'away'): number => Math.round(pb.legs(x) * 100);
+    const c = pb.calls;
+    const calls = c.made[side] > 0 ? ` · calls ${c.paid[side]}/${c.made[side]}` : '';
+    return `${lead} · ${side === 'home' ? ph : pa}% possession · legs ${legs(side)}% v ${legs(other)}%${calls}`;
+  }
+
+  private openPlanCard(head: string): void {
     const pb = this.playback;
     const side = this.planSide;
     if (!(pb instanceof LivePlayback) || !side || this.planCard) return;
     this.sheet?.close();
+    this.toggleTray(false);
     pb.hold();
     if (this.planBtn) this.planBtn.hidden = true;
+    const other = side === 'home' ? 'away' : 'home';
+    const s = pb.score;
     this.planCard = showPlanCard({
       head,
-      lines,
+      score: `${s.home}–${s.away}`,
+      summary: this.planSummary(pb, side),
+      // How the other side plays (the ladder shows it too, N11).
+      tendency: `${shortName(other === 'home' ? this.home.name : this.away.name)} play ${styleLine(pb.planFor(other))}`,
+      go: head === 'Half-time' ? 'Start 2nd half ▸' : head === 'Golden point' ? 'Golden point ▸' : 'Continue ▸',
       tactics: pb.planFor(side),
       onPick: (t) => pb.setTactics(side, t),
       onDone: () => {
@@ -993,44 +1131,51 @@ export class MatchScene extends Phaser.Scene {
     card?.close();
     this.planBtn?.remove();
     this.planBtn = null;
-    this.planWrap?.remove();
-    this.planWrap = null;
   }
 
-  // ── DOM return button (shown only at full-time) ──────────────────────────────
+  /** The coach's row and tray go (full time, leaving). */
+  private removeCoach(): void {
+    this.toggleTray(false);
+    this.coachBtn?.remove();
+    this.coachBtn = null;
+    this.callsEl?.remove();
+    this.callsEl = null;
+  }
+
+  // ── Back to Club: the full-time card's (matchReport.ts); this one only with no match ──
   private mountBackButton(): void {
-    // Hidden until full-time; before then, playback + Skip drive the flow.
-    const btn = button('Back to Club', () => this.exitToGrounds(), { class: 'nrl-match-back' });
+    // A live match leaves from its full-time card. The lab removes this one; a scene
+    // opened with no match (defensive) shows it at once, clear of the dock.
+    const btn = button('Back to Club ▸', () => this.exitToGrounds(), { class: 'nrl-btn-primary nrl-match-back' });
     btn.style.position = 'fixed';
-    // Bottom-centre, taking the playback controls' slot at full-time: the
-    // match overlay keeps the HUD/nav hidden until this is pressed (#14). With
-    // no match (defensive) there is no overlay, so it clears the visible nav instead.
-    btn.style.left = '50%';
-    btn.style.transform = 'translateX(-50%)';
+    btn.style.left = '0';
+    btn.style.right = '0';
+    btn.style.margin = '0 auto';
+    btn.style.width = 'max-content';
     const playing = this.live !== undefined;
-    btn.style.bottom = playing ? 'calc(0.5rem + var(--nrl-safe-b, 0px))' : '3.25rem';
+    btn.style.bottom = playing ? 'calc(12px + var(--nrl-safe-b, 0px))' : 'calc(var(--nrl-nav-h, 0px) + 12px)';
     btn.style.zIndex = '20';
-    // With no match (defensive), keep it visible.
     btn.style.display = playing ? 'none' : '';
     this.backBtn = btn;
     mount(btn);
   }
 
-  /** On full-time: the winners' end goes up, Back-to-Club shows, the playback controls go. */
+  /** On full time: the winners' end goes up, the controls go, the full-time card has the way out. */
   private onFinished = ({ result }: { result: { homeScore: number; awayScore: number } }): void => {
     if (this.finished) return;
     this.finished = true;
     this.clearCallResult();
     if (result.homeScore !== result.awayScore) this.hype(result.homeScore > result.awayScore ? 'home' : 'away', 0.9, 60_000);
-    this.callsEl?.remove();
-    this.callsEl = null;
+    this.removeCoach();
     this.closePlan();
     this.sheet?.close();
-    if (this.backBtn) this.backBtn.style.display = '';
+    this.disarmSkip();
     if (this.controlsEl) {
       this.controlsEl.remove();
       this.controlsEl = null;
     }
+    // The full-time card opened on the same event (it subscribed first). Without one, the old way out.
+    if (this.backBtn && !document.querySelector('.nrl-mo-ft')) this.backBtn.style.display = '';
   };
 
   private exitToGrounds(): void {
@@ -1089,13 +1234,15 @@ export class MatchScene extends Phaser.Scene {
       this.controlsEl.remove();
       this.controlsEl = null;
     }
-    this.clearCallResult();
-    this.slowShown = null;
-    this.callsEl?.remove();
-    this.callsEl = null;
+    this.removeCoach();
     this.closePlan();
     this.sheet?.close();
-    this.callChips = [];
+    this.disarmSkip();
+    this.settingsWatch?.disconnect();
+    this.settingsWatch = null;
+    setFullTimeExit(null);
+    this.clearCallResult();
+    this.slowShown = null;
     this.speedButtons = [];
     if (this.backBtn) {
       this.backBtn.remove(); // DOM overlay persists across scenes (§7) — clean it up.

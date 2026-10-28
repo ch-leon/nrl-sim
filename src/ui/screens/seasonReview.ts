@@ -18,10 +18,10 @@ import { registerSeasonHook } from '../../core/time';
 import { strengthChanges } from '../../systems/league';
 import { isFinalsRound, knockoutWinner } from '../../systems/fixtures';
 import { BOARD, FINALS_WEEKS, SEASON_ROUNDS } from '../../config';
-import { button, closeScreen, el, openModal } from '../dom';
+import { backButton, button, closeScreen, el, openScreen, screenHead } from '../dom';
 import { whenNoMatch } from '../updatePrompt';
 import { fmtMoney, seasonBooks } from './finance';
-import { fmtSeasonEndToast, fmtSeasonSummary, openHistoryScreen, seasonEndToastKind } from './history';
+import { ensureHistoryStyles, fmtSeasonEndToast, fmtSeasonSummary, openHistoryScreen, seasonEndToastKind } from './history';
 
 // ── Pure builders ───────────────────────────────────────────────────────────
 
@@ -206,46 +206,54 @@ export function moneyLineBad(closing: number | undefined): boolean {
 }
 
 /**
- * The review of a season. A nav screen rather than a dialog: the HUD and the
- * nav stay usable over it (the next week can be advanced, History opened).
- * One header row: the title, History (back to it, `back`, when opened from
- * there) and the frame's ✕, which closes it.
+ * The review of a season. A nav sheet rather than a dialog: the dock stays
+ * usable under it (the next week can be advanced, History opened). One header
+ * row: "◂ HISTORY" and the title when opened from History (`back`); at the
+ * rollover, the title with HISTORY and the one primary, CARRY ON, which closes it.
  */
 export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void } = {}): HTMLElement {
+  ensureHistoryStyles();
   const r = entry.review ?? {};
-  const content = el('div', { class: 'nrl-season-review', attrs: { 'data-season-review': String(entry.season) } });
   const body = el('div', { class: 'nrl-review-body' });
   const line = (label: string, text: string, cls = ''): HTMLElement =>
-    el('div', { class: `nrl-review-line ${cls}`.trim() }, el('b', { text: `${label}: ` }), text);
+    el('div', { class: `nrl-review-line ${cls}`.trim() }, el('span', { class: 'nrl-label', text: label }), el('span', { text }));
 
-  const toHistory = opts.back ?? (() => { openHistoryScreen(); });
-  content.append(el('div', { class: 'nrl-review-head' },
-    el('h2', { text: `Season ${entry.season} review` }),
-    button(opts.back ? '‹ History' : 'History', () => { closeScreen(); toHistory(); }, { class: 'nrl-review-history' }),
-  ));
-  content.append(body);
+  const toHistory = (): void => { closeScreen(); (opts.back ?? openHistoryScreen)(); };
+  const history = opts.back ? backButton('History', toHistory) : button('History', toHistory);
+  history.classList.add('nrl-review-history');
+  const head = opts.back
+    ? screenHead(`Season ${entry.season} review`, { lead: [history] })
+    : screenHead(`Season ${entry.season} review`, { controls: [history, button('Carry on ▸', () => closeScreen(), { class: 'nrl-btn-primary nrl-review-done' })] });
+  head.classList.add('nrl-review-head');
+
   body.append(el('div', { class: `nrl-review-finish${entry.premiership ? ' nrl-review-premiers' : ''}`, text: fmtSeasonSummary(entry).replace(/^Season \d+ — /, '') }));
+  // Two columns on a landscape phone: how the club did, then the club around it.
+  const season = el('div', { class: 'nrl-review-col' });
+  const club = el('div', { class: 'nrl-review-col' });
   const record = fmtRecord(entry);
-  if (record) body.append(line('Record', `${record} (${SEASON_ROUNDS} rounds${entry.ladderPosition > 0 && entry.ladderPosition <= 8 ? `, finals over ${FINALS_WEEKS} weeks` : ''})`));
-  if (entry.topScorer) body.append(line('Top try-scorer', `${entry.topScorer.name} (${entry.topScorer.tries})`));
-  if (r.potm) body.append(line('Player of the match', fmtPotmTotal(r.potm)));
+  if (record) season.append(line('Record', `${record} (${SEASON_ROUNDS} rounds${entry.ladderPosition > 0 && entry.ladderPosition <= 8 ? `, finals over ${FINALS_WEEKS} weeks` : ''})`));
+  if (entry.topScorer) season.append(line('Top try-scorer', `${entry.topScorer.name} (${entry.topScorer.tries})`));
+  if (r.potm) season.append(line('Player of the match', fmtPotmTotal(r.potm)));
   if (r.board) {
     const b = r.board;
     const verdict = b.sacked ? 'sacked' : b.missed === 0 ? 'all met' : `${b.met} met, ${b.missed} missed`;
-    body.append(line('Board', `${verdict} · patience ${b.patience}/${BOARD.MAX_PATIENCE}`, b.missed === 0 ? 'nrl-review-good' : 'nrl-review-bad'));
-    body.append(el('ul', { class: 'nrl-review-objectives' }, ...b.objectives.map((o) => el('li', { class: o.met ? 'nrl-review-good' : 'nrl-review-bad', text: `${tick(o.met)} ${o.text}` }))));
+    season.append(line('Board', `${verdict} · patience ${b.patience}/${BOARD.MAX_PATIENCE}`, b.missed === 0 ? 'nrl-review-good' : 'nrl-review-bad'));
+    season.append(el('ul', { class: 'nrl-review-objectives' }, ...b.objectives.map((o) => el('li', { class: o.met ? 'nrl-review-good' : 'nrl-review-bad', text: `${tick(o.met)} ${o.text}` }))));
+  }
+  if (r.reputation) {
+    const d = r.reputation.to - r.reputation.from;
+    season.append(line('Reputation', `${r.reputation.from} → ${r.reputation.to}${d === 0 ? '' : ` (${d > 0 ? '+' : ''}${d})`}`, d < 0 ? 'nrl-review-bad' : d > 0 ? 'nrl-review-good' : ''));
   }
   if (r.money) {
     // The closing balance from the books (N14, #262), where they were kept.
     const books = seasonBooks(getState(), entry.season);
-    body.append(line('Money', `${fmtMoneyInOut(r.money)}${books ? ` · closed on ${fmtMoney(books.closing)}` : ''}`, moneyLineBad(books?.closing) ? 'nrl-review-bad' : ''));
+    club.append(line('Money', `${fmtMoneyInOut(r.money)}${books ? ` · closed on ${fmtMoney(books.closing)}` : ''}`, moneyLineBad(books?.closing) ? 'nrl-review-bad' : ''));
   }
-  if (r.retired && r.retired.length > 0) body.append(line('Retired', r.retired.map((p) => `${p.name} (${p.age})`).join(', ')));
-  if (r.juniors) body.append(line('Academy', `${r.juniors} prospect${r.juniors === 1 ? '' : 's'} in the free-agent pool`));
-  if (r.movers && r.movers.length > 0) body.append(line('Rivals', fmtMovers(r.movers)));
-  if (r.reputation) {
-    const d = r.reputation.to - r.reputation.from;
-    body.append(line('Reputation', `${r.reputation.from} → ${r.reputation.to}${d === 0 ? '' : ` (${d > 0 ? '+' : ''}${d})`}`, d < 0 ? 'nrl-review-bad' : ''));
-  }
-  return openModal(content, { class: 'nrl-review-modal', screen: true, key: 'history' });
+  if (r.retired && r.retired.length > 0) club.append(line('Retired', r.retired.map((p) => `${p.name} (${p.age})`).join(', ')));
+  if (r.juniors) club.append(line('Academy', `${r.juniors} prospect${r.juniors === 1 ? '' : 's'} in the free-agent pool`));
+  if (r.movers && r.movers.length > 0) club.append(line('Rivals', fmtMovers(r.movers)));
+  body.append(el('div', { class: 'nrl-review-lines' }, season, ...(club.childElementCount > 0 ? [club] : [])));
+
+  const sheet = el('div', { class: 'nrl-screen nrl-season-review', attrs: { 'data-season-review': String(entry.season) } }, head, body);
+  return openScreen(sheet, undefined, 'history');
 }

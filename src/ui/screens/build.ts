@@ -1,17 +1,20 @@
 // src/ui/screens/build.ts — DOM build menu + facility upgrade/info popup (BAK-178).
 //
-// The build menu lists FACILITY_CATALOG with cost / upkeep a week (N6) / footprint /
-// "what it trains".
-// Unaffordable rows render disabled. Selecting an affordable facility closes the
-// menu and hands off to the live GroundsScene's placement mode via the scene
-// registry in world/placement.ts (DOM never imports Phaser).
+// The build menu (Broadcast Quiet 3c) is a sheet of tiles, three across, with a
+// category control (ALL / TRAINING / CLUB): each tile has the name, cost, what it
+// does at L1, and its upkeep a week (N6) and footprint. A tile the club can't
+// build stays visible, dimmed, and says why in place of its meta line.
+// Selecting a buildable tile closes the menu and hands off to the live
+// GroundsScene's placement mode via the scene registry in world/placement.ts
+// (DOM never imports Phaser).
 //
-// openFacilityPopup() renders the tap-a-placed-facility upgrade/info popup, priced
-// via upgradeCost, capped at L3, disabled when unaffordable. It also offers Move
-// (placement mode with that facility's ghost, for a fee) and Demolish (two taps,
-// part refund) — GitHub #78.
+// openFacilityPopup() renders the tap-a-placed-facility card (3b) on the right
+// of the grounds, so the building stays in view: its level pips, what it does,
+// upkeep, the upgrade priced via upgradeCost (capped at L3; unaffordable says
+// how much more is needed), Move (placement mode with that facility's ghost, for
+// a fee) and Demolish (two taps, part refund) — GitHub #78.
 
-import { el, panel, button, openModal, closeModal, closeScreen, mount } from '../dom';
+import { el, button, openModal, closeModal, closeScreen, openScreen, screenHead, segmented, ensureStyles } from '../dom';
 import {
   FACILITY_CATALOG,
   LEVEL_MULT,
@@ -25,10 +28,10 @@ import type { PlayerStats, PlacedFacility } from '../../core/state';
 import { getState, setState } from '../../core/state';
 import { spendMoney } from '../../data/club';
 import { ECON } from '../../config';
-import { activePack } from '../../content';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
 import { demolishWithUndo } from '../../systems/undo';
+import { activePack } from '../../content';
 import { POOL_POINTS_PER_BIAS, SCOUT_BIAS_PER_LEVEL, SCOUT_FEE_DISCOUNT_PER_LEVEL } from '../../systems/freeagency';
 import { REP_BASELINE } from '../../systems/league';
 import {
@@ -40,6 +43,13 @@ function fmtMoney(n: number): string {
   const abs = Math.abs(Math.round(n));
   const s = '$' + abs.toLocaleString('en-US');
   return n < 0 ? '-' + s : s;
+}
+
+/** Short money for a button: $900, $9k, $9.6k. */
+function fmtShort(n: number): string {
+  const abs = Math.abs(Math.round(n));
+  if (abs < 1000) return fmtMoney(n);
+  return `${n < 0 ? '-' : ''}$${(abs / 1000).toFixed(1).replace(/\.0$/, '')}k`;
 }
 
 const STAT_LABEL: Record<keyof PlayerStats, string> = {
@@ -97,73 +107,117 @@ export function facilityBlurb(def: FacilityDef, ctx: BlurbContext = { level: 1, 
   return parts.length > 0 ? parts.join('. ') : 'A club facility.';
 }
 
+/** The Build menu's categories (3c): TRAINING is every facility that trains a stat, CLUB the rest. */
+export type BuildCategory = 'all' | 'training' | 'club';
+
+/** Which category a facility is listed under (besides ALL). */
+export function facilityCategory(def: Pick<FacilityDef, 'trains'>): Exclude<BuildCategory, 'all'> {
+  return Object.values(def.trains).some((v) => (v ?? 0) > 0) ? 'training' : 'club';
+}
+
 /**
- * Open the build menu. Renders one row per catalog entry (name, cost, footprint,
- * blurb). Rows the club cannot afford are disabled. Clicking an affordable row
- * closes the menu and enters placement mode on the active GroundsScene.
+ * Why a facility can't be built now, or null when it can: a unique one already
+ * on the grounds, or the money short ("Need $23,390 more"). Pure.
+ */
+export function buildBlocker(def: Pick<FacilityDef, 'id' | 'cost' | 'unique'>, state: { money: number; facilities: readonly { defId: string }[] }): string | null {
+  if (def.unique && state.facilities.some((f) => f.defId === def.id)) return 'Built: upgrade it on the grounds';
+  if (state.money < def.cost) return `Need ${fmtMoney(def.cost - Math.max(0, state.money))} more`;
+  return null;
+}
+
+/** The category the menu last showed; holds while the game is open. */
+let category: BuildCategory = 'all';
+
+/**
+ * Open the build menu. Renders one tile per catalog entry (name, cost, what it
+ * does, upkeep and footprint). Tiles the club cannot build are dimmed and say
+ * why. Clicking a buildable tile closes the menu and enters placement mode on
+ * the active GroundsScene.
  *
  * `scene` is optional — defaults to the registered active GroundsScene so the
  * orchestrator can nav-register this as a zero-arg opener.
  */
 export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsScene()): void {
-  const money = getState().money;
-  const reputation = getState().reputation;
-
-  const rows = Object.values(FACILITY_CATALOG).map((def) => {
-    const built = def.unique && getState().facilities.some((f) => f.defId === def.id);
-    const affordable = money >= def.cost && !built;
-    const meta = el(
-      'div',
-      { class: 'nrl-build-meta' },
-      el('span', { class: 'nrl-build-cost', text: fmtMoney(def.cost) }),
-      el('span', { class: 'nrl-build-upkeep', text: `${fmtMoney(facilityUpkeep(def, 1))}/wk upkeep` }),
-      el('span', {
-        class: 'nrl-build-fp',
-        text: `${def.footprint.w}×${def.footprint.h}`,
-      }),
-    );
-    const row = el(
-      'div',
-      {
-        class: affordable ? 'nrl-build-row' : 'nrl-build-row nrl-build-row-disabled',
-        attrs: affordable ? { 'data-facility': def.id } : { 'aria-disabled': 'true' },
-      },
-      el('div', { class: 'nrl-build-top' }, el('span', { class: 'nrl-build-title', text: def.name }), meta),
-      el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation }) }),
-      ...(built ? [el('div', { class: 'nrl-build-hint', text: 'Already built — upgrade it instead.' })] : []),
-    );
-    if (affordable) {
-      row.addEventListener('click', () => {
-        closeScreen();
-        // The scene as it is now: the first tap (#370) can open Build before the grounds are up.
-        (scene ?? activeGroundsScene())?.enterPlacementMode(def.id);
-      });
-    }
-    return row;
-  });
-
-  const content = el(
-    'div',
-    { class: 'nrl-build-menu' },
-    el('h2', { class: 'nrl-build-heading', text: 'Build Facility' }),
-    el('div', { class: 'nrl-build-list' }, ...rows),
-  );
   ensureBuildStyles();
-  openModal(content, { class: 'nrl-build-modal', screen: true, key: 'build' });
+  const list = el('div', { class: 'nrl-build-list' });
+
+  const render = (): void => {
+    const s = getState();
+    const reputation = s.reputation;
+    const tiles = Object.values(FACILITY_CATALOG)
+      .filter((def) => category === 'all' || facilityCategory(def) === category)
+      .map((def) => {
+        const blocked = buildBlocker(def, s);
+        const built = def.unique === true && s.facilities.some((f) => f.defId === def.id);
+        const meta = `${fmtMoney(facilityUpkeep(def, 1))}/wk upkeep · ${def.footprint.w}×${def.footprint.h}`;
+        const row = el(
+          'div',
+          {
+            class: blocked ? 'nrl-build-row nrl-build-row-disabled' : 'nrl-build-row',
+            attrs: blocked ? { 'aria-disabled': 'true' } : { 'data-facility': def.id, role: 'button', tabindex: '0' },
+          },
+          el('div', { class: 'nrl-build-top' },
+            el('span', { class: 'nrl-build-title', text: def.name }),
+            // A unique facility already built has no price to pay (3c: "—").
+            el('span', { class: 'nrl-build-cost nrl-num', text: built ? '—' : fmtMoney(def.cost) })),
+          el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation }) }),
+          // Can't build: the meta line turns yellow and says why first.
+          blocked
+            ? el('div', { class: 'nrl-build-meta nrl-build-why', text: built ? blocked : `${blocked} · ${meta}` })
+            : el('div', { class: 'nrl-build-meta', text: meta }),
+        );
+        if (!blocked) {
+          const go = (): void => {
+            closeScreen();
+            // The scene as it is now: the first tap (#370) can open Build before the grounds are up.
+            (scene ?? activeGroundsScene())?.enterPlacementMode(def.id);
+          };
+          row.addEventListener('click', go);
+          row.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+        }
+        return row;
+      });
+    list.replaceChildren(...tiles);
+  };
+
+  const seg = segmented<BuildCategory>(
+    [{ id: 'all', label: 'All' }, { id: 'training', label: 'Training' }, { id: 'club', label: 'Club' }],
+    category,
+    (id) => { category = id; seg.set(id); render(); list.scrollTop = 0; },
+    { label: 'Category' },
+  );
+  render();
+
+  const sheet = el('div', { class: 'nrl-screen nrl-build-menu' },
+    screenHead('Build', { sub: el('span', { class: 'nrl-screen-sub', text: 'Pick one, then place it on the grounds' }), controls: [seg.el] }),
+    list,
+  );
+  // Money moves under an open menu (a week advanced from the dock): re-price the tiles.
+  const off = bus.on('state:changed', () => { if (sheet.isConnected) render(); });
+  openScreen(sheet, off, 'build');
 }
 
 /**
- * Open the upgrade/info popup for a placed facility. Shows name, level, blurb and
- * an Upgrade button priced by upgradeCost(def, nextLevel). The button is disabled
- * at L3 or when the club can't afford the next level. Upgrading spends money,
- * increments the level (persisted via setState), re-renders, and notifies.
+ * Open the card for a placed facility (3b), on the right so the building stays
+ * in view: no dimmed screen behind it, so the grounds beside it still take taps
+ * (another building opens its own card). Closed by its ✕, a sheet opening from
+ * the dock, or a match.
  */
 export function openFacilityPopup(facility: PlacedFacility): void {
   const def = FACILITY_CATALOG[facility.defId];
   ensureBuildStyles();
 
-  const body = renderFacilityBody(facility, def);
-  openModal(panel({ class: 'nrl-facility-popup' }, body), { class: 'nrl-facility-modal' });
+  const card = el('div', { class: 'nrl-facility-popup', attrs: { 'data-facility-popup': facility.id } });
+  card.append(renderFacilityBody(facility, def));
+  openModal(card, { class: 'nrl-facility-modal' }).classList.add('nrl-facility-backdrop');
+}
+
+/** "LEVEL ▬▬▭ 2/3". */
+function levelPips(level: number): HTMLElement {
+  const pips = el('span', { class: 'nrl-facility-pips', attrs: { 'aria-hidden': 'true' } });
+  for (let i = 1; i <= 3; i++) pips.append(el('i', i <= level ? { class: 'nrl-facility-pip-on' } : {}));
+  return el('div', { class: 'nrl-facility-level', attrs: { 'aria-label': `Level ${level} of 3` } },
+    el('span', { class: 'nrl-label', text: 'Level' }), pips, el('span', { class: 'nrl-num', text: `${level}/3` }));
 }
 
 function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLElement {
@@ -179,18 +233,22 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
   const upkeepText = atMax
     ? `Upkeep ${upkeepNow}/wk`
     : `Upkeep ${upkeepNow}/wk · L${nextLevel} ${fmtMoney(facilityUpkeep(def, nextLevel))}/wk`;
+  const x = button('✕', () => closeModal(), { class: 'nrl-screen-x nrl-facility-close' });
+  x.setAttribute('aria-label', 'Close');
   container.append(
-    el('h2', { class: 'nrl-facility-name', text: def.name }),
-    el('div', { class: 'nrl-facility-level', text: `Level ${facility.level} / 3` }),
-    el('div', { class: 'nrl-facility-upkeep', text: upkeepText }),
-    el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, reputation: getState().reputation }) }),
+    el('div', { class: 'nrl-facility-head' }, el('h2', { class: 'nrl-facility-name', text: def.name }), x),
+    levelPips(facility.level),
+    el('div', { class: 'nrl-facility-info' },
+      el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, reputation: getState().reputation }) }),
+      el('div', { class: 'nrl-facility-upkeep', text: upkeepText })),
   );
 
+  const actions = el('div', { class: 'nrl-facility-actions' });
   if (atMax) {
-    container.append(el('div', { class: 'nrl-facility-max', text: 'Fully upgraded (L3).' }));
+    actions.append(el('div', { class: 'nrl-facility-max', text: 'Fully upgraded · L3' }));
   } else {
     const upBtn = button(
-      `Upgrade to L${nextLevel} — ${fmtMoney(cost)}`,
+      `Upgrade to L${nextLevel} · ${fmtMoney(cost)}`,
       () => {
         // Re-check funds at click time (source of truth).
         if (getState().money < cost) return;
@@ -209,16 +267,20 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
           if (parent) parent.replaceChild(fresh, container);
         }
       },
-      { class: 'nrl-facility-upgrade' },
+      { class: 'nrl-btn-primary nrl-facility-upgrade' },
     );
-    if (!affordable) upBtn.disabled = true;
-    container.append(upBtn);
+    actions.append(upBtn);
+    // Disabled stays visible and says why.
+    if (!affordable) {
+      upBtn.disabled = true;
+      actions.append(el('div', { class: 'nrl-facility-why', text: `Need ${fmtMoney(cost - Math.max(0, money))} more to upgrade` }));
+    }
   }
 
   // Move / Demolish (#78).
   const fee = moveFee(def);
   const refund = demolishRefund(def, facility.level);
-  const moveBtn = button(`Move — ${fmtMoney(fee)}`, () => {
+  const moveBtn = button(`Move · ${fmtMoney(fee)}`, () => {
     if (getState().money < fee) return;
     closeModal();
     activeGroundsScene()?.enterMoveMode(facility.id);
@@ -226,85 +288,114 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
   if (money < fee || !activeGroundsScene()) moveBtn.disabled = true;
 
   // One tap: the toast's 5-second Undo puts it back (#370; it replaced the "Really demolish?" tap).
-  const demoBtn = button(`Demolish (+${fmtMoney(refund)})`, () => {
+  // Written in caps here, so the money keeps its small k (3b: "DEMOLISH +$9k").
+  const demoBtn = button(`DEMOLISH +${fmtShort(refund)}`, () => {
     demolishWithUndo(facility.id);
     closeModal();
-  }, { class: 'nrl-facility-demolish' });
+  }, { class: 'nrl-btn-danger nrl-facility-demolish' });
+  demoBtn.title = `Refunds ${fmtMoney(refund)}; Undo for 5 seconds`;
 
-  container.append(
-    el('div', { class: 'nrl-facility-actions' }, moveBtn, demoBtn),
-    button('Close', () => closeModal(), { class: 'nrl-facility-close' }),
-  );
+  actions.append(el('div', { class: 'nrl-facility-row' }, moveBtn, demoBtn));
+  if (money < fee) actions.append(el('div', { class: 'nrl-facility-why', text: `Need ${fmtMoney(fee - Math.max(0, money))} more to move` }));
+  container.append(actions);
   return container;
 }
 
-// ── Styles (injected once, mirrors the pixel-UI kit in ui/dom.ts) ───────────
+// ── Styles (injected once, beside the shared kit in ui/dom.ts) ─────────────
 
 const BUILD_STYLE_ID = 'nrl-build-styles';
 
 function ensureBuildStyles(): void {
   if (typeof document === 'undefined') return;
+  ensureStyles();
   if (document.getElementById(BUILD_STYLE_ID)) return;
-  // Ensure the base kit stylesheet is present too (mount() injects it).
-  mount(el('div', { attrs: { style: 'display:none' } }));
   const style = document.createElement('style');
   style.id = BUILD_STYLE_ID;
   style.textContent = BUILD_CSS;
   document.head.appendChild(style);
 }
 
-const BUILD_CSS = `
-.nrl-build-heading, .nrl-facility-name {
-  margin: 0 0 0.5rem;
-  font-size: clamp(1rem, 4vw, 1.3rem);
-}
-/* #336: tiles side by side, so a landscape phone shows four or more at once. */
-.nrl-screen-backdrop .nrl-build-modal { width: min(96vw, 900px); }
+export const BUILD_CSS = `
+/* 3c: the Build sheet. Three tiles across; only the grid scrolls. */
 .nrl-build-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  align-items: start;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-  padding: 0 3px 3px 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  align-content: start;
 }
+@media (max-width: 600px) { .nrl-build-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .nrl-build-list { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .nrl-build-row {
   pointer-events: auto;
   cursor: pointer;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  background: #f4d03f;
-  padding: 0.35rem 0.5rem;
-}
-.nrl-build-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-.nrl-build-row:hover:not(.nrl-build-row-disabled) { background: #f7dc6f; }
-.nrl-build-row:active:not(.nrl-build-row-disabled) {
-  transform: translate(3px, 3px);
-  box-shadow: 0 0 0 #000;
-}
-.nrl-build-row-disabled {
-  cursor: default;
-  opacity: 0.5;
-  background: #cfc9b4;
-}
-.nrl-build-title { font-weight: bold; }
-.nrl-build-meta {
   display: flex;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  white-space: nowrap;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--nrl-raised);
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  transition: background 0.12s ease;
 }
-.nrl-build-cost { font-weight: bold; }
-.nrl-build-upkeep { opacity: 0.85; }
-.nrl-facility-upkeep { font-size: 0.85rem; }
-.nrl-build-blurb { font-size: 0.75rem; line-height: 1.2; }
-.nrl-build-hint { font-size: 0.75rem; font-weight: bold; opacity: 0.85; }
-.nrl-facility-close { margin-top: 0.25rem; }
-.nrl-facility-body { display: flex; flex-direction: column; gap: 0.5rem; }
-.nrl-facility-level { font-weight: bold; }
-.nrl-facility-blurb { font-size: 0.85rem; line-height: 1.3; margin: 0; }
-.nrl-facility-max { font-weight: bold; color: #357a38; }
-.nrl-facility-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.nrl-facility-actions .nrl-btn { flex: 1 1 8rem; white-space: normal; }
-.nrl-btn.nrl-facility-demolish, .nrl-btn.nrl-facility-demolish:hover { background: #e8a598; }
+.nrl-build-row:hover:not(.nrl-build-row-disabled) { background: #22305c; }
+.nrl-build-row:active:not(.nrl-build-row-disabled) { transform: translateY(1px); }
+.nrl-build-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
+.nrl-build-row-disabled { cursor: default; opacity: 0.55; }
+.nrl-build-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.nrl-build-title { font-family: var(--nrl-f-label); font-size: 17px; font-weight: 700; letter-spacing: 0.03em; line-height: 1.15; min-width: 0; }
+.nrl-build-cost { font-size: 13px; color: var(--nrl-accent); white-space: nowrap; }
+.nrl-build-blurb { font-size: 12px; line-height: 1.3; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-build-meta { font-size: 11px; color: var(--nrl-muted); }
+.nrl-build-meta.nrl-build-why { color: var(--nrl-accent); }
+
+/* 3b: the facility card, on the right so the building stays in view. No dim and
+   no catch-all behind it: taps beside it reach the grounds. */
+.nrl-modal-backdrop.nrl-facility-backdrop { pointer-events: none; background: transparent; }
+.nrl-facility-backdrop .nrl-modal.nrl-facility-modal {
+  pointer-events: auto;
+  position: fixed;
+  top: calc(12px + var(--nrl-safe-t));
+  right: calc(12px + var(--nrl-safe-r));
+  bottom: calc(var(--nrl-nav-h, 0px) + 12px);
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  max-height: 440px;
+  border-radius: 16px;
+  background: var(--nrl-sheet);
+  box-shadow: var(--nrl-shadow-tray);
+  padding: 12px 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: nrl-sheet-up 180ms ease-out;
+}
+.nrl-facility-popup { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.nrl-facility-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }
+.nrl-facility-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 auto; }
+.nrl-modal .nrl-facility-name { margin: 0; font-size: 22px; letter-spacing: 0.04em; min-width: 0; }
+.nrl-facility-head .nrl-screen-x { position: relative; top: auto; right: auto; flex: 0 0 auto; }
+.nrl-facility-level { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.nrl-facility-pips { display: inline-flex; gap: 6px; }
+.nrl-facility-pips i { width: 28px; height: 6px; border-radius: 3px; background: var(--nrl-line); }
+.nrl-facility-pips i.nrl-facility-pip-on { background: var(--nrl-accent); }
+.nrl-facility-level .nrl-num { font-size: 13px; font-weight: 500; }
+/* What it does and its upkeep scroll if a long blurb meets a short phone. */
+.nrl-facility-info { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; }
+.nrl-facility-blurb { font-size: 13px; line-height: 1.4; color: var(--nrl-text-2); margin: 0; }
+.nrl-facility-upkeep { font-size: 12px; color: var(--nrl-muted); }
+.nrl-facility-actions { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
+.nrl-btn.nrl-facility-upgrade { width: 100%; min-height: 48px; font-size: 18px; }
+.nrl-facility-max {
+  min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 10px;
+  background: var(--nrl-raised); color: var(--nrl-pos);
+  font-family: var(--nrl-f-label); font-size: 18px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.nrl-facility-why { font-size: 12px; color: var(--nrl-accent); text-align: center; }
+.nrl-facility-row { display: flex; gap: 6px; }
+.nrl-facility-row .nrl-btn { flex: 1 1 0; min-width: 0; font-size: 16px; padding: 0 8px; }
+.nrl-btn.nrl-facility-demolish { text-transform: none; }
 `;

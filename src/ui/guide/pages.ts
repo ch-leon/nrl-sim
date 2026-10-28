@@ -80,12 +80,12 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     title: 'Your week',
     sections: [
       {
-        text: 'The season is 27 weeks: 24 rounds, then three finals weeks if you make the eight. Advance Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.',
+        text: 'The season is 27 weeks: 24 rounds, then three finals weeks if you make the eight. Play Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.',
       },
       {
         heading: 'Advancing further',
         bullets: [
-          'The ▾ beside Advance Week runs ×4 weeks, to the finals or to the season’s end.',
+          'The ▾ beside Play Week runs ×4 weeks, to the finals or to the season’s end.',
           `A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the club goes into the red, a forced sale, and the week the balance passes the −${dollars(-ECON.FORCED_SALE_FLOOR)} floor (not every week in the red).`,
         ],
       },
@@ -128,7 +128,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         heading: 'The Finance screen',
-        text: `This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, and the ledger (the board’s objectives and patience are on Staff & Board, under More). Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below −${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player each week (never below 13), and the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time. The balance in the top bar turns amber when the money would last fewer than ${RUNWAY_LOW_WEEKS} weeks at this week’s spending and red under ${RUNWAY_SHORT_WEEKS}; tap it to open this screen.`,
+        text: `This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, and the ledger (the board’s objectives and patience are on Staff & Board, in Office). Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below −${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player each week (never below 13), and the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time. The balance at the left of the dock turns amber when the money would last fewer than ${RUNWAY_LOW_WEEKS} weeks at this week’s spending and red under ${RUNWAY_SHORT_WEEKS}; tap it to open this screen.`,
       },
     ],
   },
@@ -164,7 +164,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Staff',
         bullets: [
-          'Three hires the facilities don’t cover, beside the board’s objectives on the Staff & Board screen (under More). Each is paid a wage a week with the running costs and stays until you let him go.',
+          'Three hires the facilities don’t cover, beside the board’s objectives on the Staff & Board screen (in Office). Each is paid a wage a week with the running costs and stays until you let him go.',
           `${STAFF.assistantCoach.title} (${dollars(STAFF.assistantCoach.wage)} a week on Normal): changes your plan at the break when you fast-forward a match, the same way a rival’s does. A match you watch, and Skip, stay on the plan you set.`,
           `${STAFF.analyst.title} (${dollars(STAFF.analyst.wage)} a week on Normal): on the next-match card and the rival’s squad page, says what they switch to when they are behind.`,
           `${STAFF.welfare.title} (${dollars(STAFF.welfare.wage)} a week on Normal): halves the odds of a player’s grievance card (a meeting, a pay-rise demand, a homesick youngster) and takes ${percent(WELFARE_RENEWAL_CUT)} off renewal asks.`,
@@ -188,7 +188,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'lineup',
     sections: [
       {
-        text: 'Your side plays a plan: an attack and a defence, picked on the Lineup screen (the chips under the header). It stays the plan for the match until you change it at a break.',
+        text: 'Your side plays a plan: an attack and a defence, picked on the Lineup screen (PLAN in its header). It stays the plan for the match until you change it at a break.',
       },
       {
         heading: 'Attack',
@@ -201,8 +201,8 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Changing it in a match',
         bullets: [
-          'At half-time (and before golden point) a card shows the score, both sides’ legs and the calls that paid off, with the two rows of chips: change the plan, then Continue. The match waits for Continue at any speed.',
-          'After a score, the Plan chip beside the call chips opens the same rows until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
+          'At half-time (and before golden point) a sheet comes up from the bottom with the score, possession and the calls that paid off, and the attack and defence rows: change the plan, then Start 2nd half. The match waits for Start 2nd half at any speed.',
+          'After a score, the Plan chip opens the same sheet until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
           'Coach calls are the moment-to-moment layer on top: one call a set each way.',
         ],
       },
@@ -238,12 +238,12 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'news',
     sections: [
       {
-        text: 'Every few weeks a decision turns up: a fan day, a sponsor’s offer, a player unsettled at a rival, a story about one of yours. News shows it as a banner and Advance Week wears a red count; Answer opens the card. Each choice says what surely happens and, on its own line, any risk.',
+        text: 'Every few weeks a decision turns up: a fan day, a sponsor’s offer, a player unsettled at a rival, a story about one of yours. A chip on the grounds names it, News shows it at the top and Play Week wears a red count; Review opens the card. Each choice says what surely happens and, on its own line, any risk.',
       },
       {
         bullets: [
           'A card waits 2 weeks for your answer. At most two wait at once. A season-end card, like the trip away, is due before the next match.',
-          'Advance Week never takes a default without asking: with a card waiting it lists what is pending, and you answer now or take the defaults and go.',
+          'Play Week never takes a default without asking: with a card waiting it lists what is pending, and you answer now or take the defaults and go.',
           'Money from a choice goes through the ledger like everything else, and the outcome is posted to News. Some choices leave a temporary effect for a few weeks.',
           `A risky choice says its odds. The sharp ones are a ${Math.round(WILDCARDS.INCIDENT_CHANCE * 100)}% chance of a ${WILDCARDS.BAN_WEEKS[0]}-${WILDCARDS.BAN_WEEKS[1]} week ban, and a Welfare Manager halves that. The ban shows on the squad as BAN, and the lineup leaves him out. After the grand final the squad asks for a trip to ${activePack().events.trip.destination}.`,
           'A new card stops a multi-week advance and opens; once it is answered, Keep advancing carries on to the same end.',

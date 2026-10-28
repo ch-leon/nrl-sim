@@ -111,3 +111,31 @@ describe('the pre-Nines note', () => {
     });
   }
 });
+
+// Broadcast Quiet 3l: the History sheet's summary and its rows.
+import { fmtHistorySummary, historyRowView } from '../../../src/ui/screens/history';
+import { emptyFinance, type SeasonRecord } from '../../../src/core/state';
+
+describe('the History table (3l)', () => {
+  const s1: SeasonRecord = { season: 1, ladderPosition: 5, premiership: false, wins: 13, losses: 10, draws: 1, pointsFor: 500, pointsAgainst: 480, topScorer: { name: 'Kobe Hale', tries: 9 }, review: { finals: { round: 25, won: false } } };
+  const s2: SeasonRecord = { season: 2, ladderPosition: 2, premiership: true, wins: 18, losses: 6, draws: 0, pointsFor: 600, pointsAgainst: 300, topScorer: { name: 'Kobe Hale', tries: 12 }, review: { potm: { total: 4, best: { name: 'Jett Mbyerson', count: 3 } } } };
+  const s3: SeasonRecord = { season: 3, ladderPosition: 11, premiership: false };
+
+  it('sums the seasons up in the head', () => {
+    expect(fmtHistorySummary([])).toBe('0 seasons · 0 premierships');
+    expect(fmtHistorySummary([s1, s2, s3])).toBe('3 seasons · 1 premiership · best finish 2nd');
+  });
+
+  it('a row has the finish, the record (W–D–L once a season drew), ladder points, the player of the season and the net', () => {
+    const books = { ...emptyFinance(1), wages: -100000, gate: 120000 };
+    const state = { history: [s1, s2, s3], finance: [books], money: 50000 };
+    const v1 = historyRowView(s1, state);
+    expect(v1).toMatchObject({ season: 'S1', finish: '5th', best: false, wl: '13–1–10', pfpa: '500–480', pts: '27', player: 'Kobe Hale', net: 20000 });
+    expect(v1.note).toBe('Out in the Qualifying Final · top try-scorer Kobe Hale (9)');
+    const v2 = historyRowView(s2, state);
+    expect(v2).toMatchObject({ finish: '2nd', best: true, premiers: true, wl: '18–0–6', pts: '36', player: 'Jett Mbyerson', net: null });
+    expect(v2.note).toBe('3 player-of-the-match awards · top try-scorer Kobe Hale (12)');
+    // Before the extended record (v4) and the review (v12): dashes, and the rules it was played under.
+    expect(historyRowView(s3, state)).toMatchObject({ wl: '—', pts: '—', player: '—', note: PRE_NINES_NOTE });
+  });
+});

@@ -10,10 +10,11 @@
 //   - the same with every font in the bubble boosted 2.17× (what Safari's boost did
 //     on Leon's phone, issue #206; WebKit on Linux never boosts by itself): the copy
 //     scrolls inside the bubble and Skip / Next stay reachable;
-//   - the Guide boosted the same way: the page scrolls, Replay and Close reachable,
-//     and Replay brings the tutorial back with Skip and Next on screen;
-//   - the player page (#203) between HUD and nav: ✕, Renew / Sell / Release / Close
-//     tappable, the nav uncovered; the ✕ closes it back to Squad.
+//   - the Guide boosted the same way: the page scrolls, Replay and the dock's CLUB
+//     (a sheet's way out) reachable, and Replay brings the tutorial back with Skip
+//     and Next on screen;
+//   - the player page (#203) above the dock: ◂ SQUAD, Renew / Sell / Release
+//     tappable, the dock's tabs uncovered; ◂ SQUAD goes back to Squad.
 // Then the landscape screens (#336, #344, #347): every nav screen and the main
 // popups at 844×390 with an iPhone 14's safe areas simulated and at 667×375 (see
 // runScreens). --screens-only runs just those.
@@ -22,10 +23,11 @@
 // to 844×390 must wake it with the canvas filling the screen. The same turn
 // mid-match freezes the clock and resumes it, and a parked match stays paused
 // until the phone is sideways, including after Continue reopens the page upright.
-// With the match up, the full call-chip set (Plan through Hold) is laid in and the
-// ticker is checked at 360×640, 390×844, 667×375 and 844×390: it has to sit clear
-// of the speed row, the chips and the corner buttons. The open log must scroll
-// fully between the scoreboard and ticker, and its icon keeps its hover fill.
+// With the match up, the coach tray is filled with every call (Hit-up through Hold)
+// and the commentary checked: the line (log = line) clear of the bottom row and the
+// score bug at 360×640, 390×844, 667×375 and 844×390; the full log (log = full) clear
+// of them and of the open tray, and scrolling, at 667×375 and 844×390; and the LOG
+// switch keeps its fill under hover.
 // Both Bali choices must fit, retain 44px targets and accept taps at these same
 // four sizes. Exits 1 on any failure.
 //
@@ -143,7 +145,12 @@ function scrolls(page, sel) {
   }, sel);
 }
 
-/** The copy fits its box unscrolled, or scrolls inside it when it doesn't (#206; one short sentence a tap fits boosted, #370). */
+/**
+ * Whether the copy in `sel` is all readable: it fits its box unscrolled, or it
+ * scrolls inside it. The dock (Broadcast Quiet) gives the bubble more room than
+ * the old nav did, so boosted welcome copy can fit whole at 844×390; what #206
+ * guards against is copy cut off with no way to reach it.
+ */
 function fitsOrScrolls(page, sel) {
   return page.evaluate((sel) => {
     const e = document.querySelector(sel);
@@ -220,14 +227,15 @@ async function runSize(browser, W, H) {
     const px = await boostFonts(page, '.nrl-tutorial-bubble', BOOST);
     rec.notes.push(`copy at ${Math.round(px)}px`);
     const out = await reachProblems(page, ...TUT);
-    if (!(await fitsOrScrolls(page, '.nrl-tutorial-text'))) out.push('the copy overflows the bubble without scrolling');
+    if (!(await fitsOrScrolls(page, '.nrl-tutorial-text'))) out.push('the copy is cut off and does not scroll inside the bubble');
     return out;
   });
   await step('tutorial-skipped', async () => {
     await tap('.nrl-tutorial-skip');
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
   });
-  const GUIDE = ['.nrl-guide-modal', ['.nrl-guide-replay', '.nrl-guide-modal .nrl-screen-x', '.nrl-guide-tab']];
+  // A sheet has no ✕ (Broadcast Quiet): its way out is the dock's CLUB.
+  const GUIDE = ['.nrl-guide-modal', ['.nrl-guide-replay', '.nrl-nav [data-nav-home]', '.nrl-guide-tab']];
   await step('guide', async () => {
     await openNav(page, 'help');
     await page.waitForSelector('[data-guide]');
@@ -248,9 +256,10 @@ async function runSize(browser, W, H) {
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
     return out;
   });
-  // #203: the player page (Squad → a player) sits between HUD and nav, with a ✕
-  // and Renew / Sell / Release on screen; the nav stays whole and tappable.
-  const PLAYER = ['.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="renew"]',
+  // #203: the player page (Squad → a player) sits above the dock (there is no top bar
+  // any more), with ◂ SQUAD (it has no ✕) and Renew / Sell / Release on screen; the
+  // dock's tabs stay whole and tappable.
+  const PLAYER = ['.nrl-player-modal', ['.nrl-player-modal [data-back]', '[data-player-action="renew"]',
     '[data-player-action="sell"]', '[data-player-action="release"]']];
   await step('player-page', async () => {
     await tap('.nrl-nav .nrl-btn[data-screen="squad"]');
@@ -260,10 +269,9 @@ async function runSize(browser, W, H) {
     const out = await reachProblems(page, ...PLAYER);
     out.push(...await page.evaluate(() => {
       const box = document.querySelector('.nrl-player-modal').getBoundingClientRect();
-      const nav = document.querySelector('.nrl-nav').getBoundingClientRect();
-      const hud = document.querySelector('.nrl-hud').getBoundingClientRect();
-      const problems = box.bottom > nav.top + 1 ? [`the player page runs into the nav (${Math.round(box.bottom)} > ${Math.round(nav.top)})`] : [];
-      if (box.top < hud.bottom - 1) problems.push(`the player page runs under the HUD (${Math.round(box.top)} < ${Math.round(hud.bottom)})`);
+      const dock = document.querySelector('.nrl-dock').getBoundingClientRect();
+      const problems = box.bottom > dock.top + 1 ? [`the player page runs into the dock (${Math.round(box.bottom)} > ${Math.round(dock.top)})`] : [];
+      if (box.top < -1) problems.push(`the player page runs off the top (${Math.round(box.top)})`);
       for (const b of document.querySelectorAll('.nrl-nav .nrl-btn')) {
         const r = b.getBoundingClientRect();
         if (r.width < 1 || r.height < 1) continue; // a More-sheet row while the sheet is shut
@@ -280,10 +288,10 @@ async function runSize(browser, W, H) {
     if (await renew.isDisabled()) { rec.notes.push('renew not offered for this player'); return []; }
     await renew.tap();
     await page.waitForTimeout(300);
-    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal .nrl-screen-x', '[data-player-action="sell"]']);
+    return reachProblems(page, '.nrl-player-modal', ['.nrl-player-modal [data-back]', '[data-player-action="sell"]']);
   });
   await step('player-page-closed', async () => {
-    await tap('.nrl-player-modal .nrl-screen-x');
+    await tap('.nrl-player-modal [data-back]');
     await page.waitForSelector('[data-player-page]', { state: 'detached' });
     return (await page.locator('.nrl-card-open').count()) ? [] : ['the Squad screen did not stay open under the player page'];
   });
@@ -341,7 +349,12 @@ async function runPortrait(browser) {
       canvas: box ? `${Math.round(box.width)}x${Math.round(box.height)}` : '',
       viewport: `${innerWidth}x${innerHeight}`,
       clock: document.querySelector('.nrl-mo-clock')?.textContent?.trim() ?? '',
-      advance: document.querySelector('.nrl-hud-actions > .nrl-btn')?.textContent?.trim() ?? '',
+      // PLAY WEEK's words, less the decisions count beside them.
+      advance: (() => {
+        const l = document.querySelector('.nrl-dock-advance-label')?.cloneNode(true);
+        l?.querySelector('.nrl-hud-alert')?.remove();
+        return l?.textContent?.trim() ?? '';
+      })(),
       controls: document.querySelectorAll('.nrl-mo-controls').length,
     };
   });
@@ -370,12 +383,14 @@ async function runPortrait(browser) {
     throw new Error(`${label}: loop did not resume with the canvas filling the screen (${JSON.stringify(await state())})`);
   });
   const turn = (width, height) => page.setViewportSize({ width, height });
+  /** PLAY WEEK's label (uppercase in the DOM) while a match is parked. */
+  const RESUME = 'RESUME MATCH ▸';
 
   await step('portrait-boot', async (rec) => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
     await press('[data-nrl-start]');
-    await page.waitForSelector('.nrl-hud');
+    await page.waitForSelector('.nrl-dock');
     await asleep('opened upright');
     const o = await state();
     if (!o.coarse) throw new Error('WebKit did not report a coarse pointer, so this is not a phone');
@@ -392,6 +407,10 @@ async function runPortrait(browser) {
     if (!(await skip.count())) return [];
     await skip.tap();
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
+    // The tour's first step opened Build (#370); back to the grounds, where the decisions chip shows.
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.nrl-screen-region', { state: 'detached', timeout: 5000 }).catch(() => {});
+    if (await page.locator('.nrl-screen-region').count()) throw new Error('Build stayed open after the tour was skipped');
   });
   // Inspect the event UI in both orientations. Hide only the rotate prompt:
   // portrait gameplay is still paused, but DOM choices must fit and accept taps.
@@ -402,11 +421,11 @@ async function runPortrait(browser) {
       for (const choice of [0, 1]) {
         await turn(w, h);
         if (!(await page.evaluate(() => window.__nrlShowCard?.('baliTrip')))) throw new Error('Bali hook failed');
-        // #345: News keeps its feed and shows the card as one row; Answer opens it in its own popup.
-        await page.locator('.nrl-nav .nrl-btn[data-screen="news"]').tap();
-        await page.waitForSelector('[data-decisions-open]');
-        if (await page.locator('.nrl-news .nrl-event-card').count()) problems.push(`${w}×${h}: the decision card is in the News feed`);
-        await page.locator('[data-decisions-open]').tap();
+        // 3a: the decisions chip on the grounds; its REVIEW opens the card in its own popup. (News,
+        // #345, is an Office tile now, and upright the dock squeezes OFFICE out of reach; the card's
+        // News row is checked sideways in runScreens' news-decision-banner.)
+        await page.waitForSelector('[data-decisions-chip]:not([hidden]) .nrl-decisions-review');
+        await page.locator('[data-decisions-chip] .nrl-decisions-review').tap();
         await page.waitForSelector('.nrl-decisions-modal .nrl-event-card');
         await page.waitForTimeout(100);
         const found = await reachProblems(page, '.nrl-decisions-modal', ['[data-event-choice="0"]', '[data-event-choice="1"]', '.nrl-decisions-modal .nrl-screen-x']);
@@ -432,7 +451,8 @@ async function runPortrait(browser) {
         await page.waitForTimeout(150);
         if (await page.locator('.nrl-event-card').count()) problems.push(`${w}×${h}: choice ${choice} did not resolve`);
         if (await page.evaluate(() => window.__nrlState().eventDeck.pending.length)) problems.push(`${w}×${h}: choice ${choice} left the card pending`);
-        await page.locator('.nrl-screen-region .nrl-screen-x').first().tap();
+        // The decisions dialog's ✕ if it is still up.
+        if (await page.locator('.nrl-decisions-modal .nrl-screen-x').count()) await page.locator('.nrl-decisions-modal .nrl-screen-x').tap();
       }
       rec.notes.push(`${w}×${h}: both choices tapped`);
     }
@@ -446,7 +466,7 @@ async function runPortrait(browser) {
     return problems;
   });
   await step('match-running', async (rec) => {
-    await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
+    await page.locator('.nrl-dock [data-hud="advance"]').tap();
     await page.waitForSelector('.nrl-mo-controls');
     await page.waitForFunction(() => {
       const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
@@ -479,24 +499,24 @@ async function runPortrait(browser) {
     // Save & exit is in the pause sheet (#348 M3).
     await page.locator('.nrl-mo-controls [data-pause]').tap();
     await page.locator('.nrl-mo-sheet [data-save-exit]').tap();
-    await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud');
+    await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
     const o = await state();
-    if (o.advance !== 'Resume match') throw new Error(`Advance Week reads "${o.advance}", not Resume match`);
-    rec.notes.push('Advance Week reads Resume match');
+    if (o.advance !== RESUME) throw new Error(`PLAY WEEK reads "${o.advance}", not ${RESUME}`);
+    rec.notes.push(`PLAY WEEK reads ${RESUME}`);
   });
   await step('parked-portrait', async (rec) => {
     await turn(390, 844);
     await asleep('parked at the club');
     const o = await state();
-    if (o.advance !== 'Resume match') throw new Error(`the parked match was dropped (${o.advance})`);
-    rec.notes.push('still Resume match, loop asleep');
+    if (o.advance !== RESUME) throw new Error(`the parked match was dropped (${o.advance})`);
+    rec.notes.push(`still ${RESUME}, loop asleep`);
   });
   await step('parked-landscape', async (rec) => {
     await turn(844, 390);
     await awake('parked at the club');
     const o = await state();
-    if (o.advance !== 'Resume match') throw new Error(`the parked match was dropped (${o.advance})`);
-    rec.notes.push(`still Resume match, canvas ${o.canvas}`);
+    if (o.advance !== RESUME) throw new Error(`the parked match was dropped (${o.advance})`);
+    rec.notes.push(`still ${RESUME}, canvas ${o.canvas}`);
   });
   // Continue with a live-match record auto-starts the match. Opened upright, the
   // loop is already asleep, so the match may draw under the card (the same as a
@@ -527,29 +547,34 @@ async function runPortrait(browser) {
     const o = await state();
     rec.notes.push(`clock ${before} → ${o.clock}, canvas ${o.canvas}`);
   });
-  // The full chip set wraps past a fixed offset (level-2 stack, three-line speed
-  // row). The ticker has to follow the measured chrome at each of those sizes.
+  // The coach calls were a row of chips that wrapped past a fixed offset; since Broadcast
+  // Quiet they are a tray over the COACH button (3o) listing the calls legal now. The
+  // tray is filled with every call, the log given 80 lines, and at each size: the
+  // commentary line (log = line, tray shut) clear of the bottom row and the score bug;
+  // then the full log (log = full, tray open) clear of the score bug, the bottom row and
+  // the tray, scrolling, at least four lines tall (sideways only). The LOG switch keeps its fill under hover.
   await step('chip-clearance', async (rec) => {
     await page.evaluate(() => {
-      let calls = document.querySelector('.nrl-mo-calls');
-      if (!calls) {
-        calls = document.createElement('div');
-        calls.className = 'nrl-mo-calls';
-        document.getElementById('ui-root').append(calls);
-      }
-      const labels = ['Plan', 'Hit-up', 'Shift left', 'Shift right', 'Kick early', 'Run it', 'Bomb', 'Field goal', 'Rush', 'Hold'];
-      calls.replaceChildren();
-      for (const label of labels) {
+      const sc = window.__nrlGame.scene.getScene('Match');
+      // Hold the tray's rows still: the scene rebuilds them with the play a few times a second.
+      sc.refreshCallChips = () => {};
+      sc.toggleTray(true);
+      const list = document.querySelector('.nrl-mo-tray-list');
+      const calls = [['hitUp', 'Hit-up'], ['shiftLeft', 'Shift left'], ['shiftRight', 'Shift right'], ['kickEarly', 'Kick early'], ['runIt', 'Run it'],
+        ['bomb', 'Bomb'], ['fieldGoal', 'Field goal'], ['rush', 'Rush'], ['hold', 'Hold']];
+      list.replaceChildren(...calls.map(([id, label]) => {
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'nrl-btn';
-        b.textContent = label;
-        if (label === 'Plan') b.setAttribute('data-plan', '');
-        calls.append(b);
-      }
-    });
-    await page.locator('.nrl-mo-log-toggle').evaluate((el) => el.click());
-    await page.evaluate(() => {
+        b.className = 'nrl-btn nrl-mo-tray-call';
+        b.setAttribute('data-call', id);
+        const name = document.createElement('b');
+        name.textContent = label;
+        const what = document.createElement('span');
+        what.textContent = 'What the call does, in plain words';
+        b.append(name, what);
+        return b;
+      }));
+      sc.toggleTray(false);
       const feed = document.querySelector('.nrl-mo-feed');
       for (let i = 0; i < 80; i++) {
         const line = document.createElement('div');
@@ -558,60 +583,71 @@ async function runPortrait(browser) {
         feed.append(line);
       }
     });
-    const problems = [];
-    const sizes = [[360, 640], [390, 844], [667, 375], [844, 390]];
-    for (const [w, h] of sizes) {
-      await turn(w, h);
-      let found = null;
-      for (let i = 0; i < 12; i++) {
-        await page.waitForTimeout(50);
-        found = await page.evaluate(() => {
-          const ticker = document.querySelector('.nrl-mo-commentary')?.getBoundingClientRect();
-          const log = document.querySelector('.nrl-mo-log-toggle')?.getBoundingClientRect();
-          if (!ticker || ticker.width < 1) return { pending: true, problems: ['ticker not laid out'] };
-          const hits = [];
-          const overlap = (r) => {
-            const w = Math.min(ticker.right, r.right) - Math.max(ticker.left, r.left);
-            const h = Math.min(ticker.bottom, r.bottom) - Math.max(ticker.top, r.top);
-            return w > 1 && h > 1;
-          };
-          for (const el of document.querySelectorAll('.nrl-mo-controls .nrl-btn, .nrl-mo-calls .nrl-btn, .nrl-audio-launcher .nrl-btn, .nrl-mo-log-toggle')) {
-            const r = el.getBoundingClientRect();
-            if (r.width < 1 || r.height < 1) continue;
-            if (overlap(r)) hits.push(el.textContent.trim() || el.getAttribute('aria-label') || 'button');
-          }
-          const score = document.querySelector('.nrl-mo-scoreboard')?.getBoundingClientRect();
-          if (score && overlap(score)) hits.push('scoreboard');
-          if (!log || log.width < 44 || log.height < 44) hits.push(`Log button ${Math.round(log?.width ?? 0)}×${Math.round(log?.height ?? 0)}`);
-          const panel = document.querySelector('.nrl-mo-log')?.getBoundingClientRect();
-          const feed = document.querySelector('.nrl-mo-feed');
-          if (!panel || panel.height < 1) hits.push('open log not visible');
-          else {
-            if (score && panel.top < score.bottom - 1) hits.push(`open log behind scoreboard (${panel.top.toFixed(1)} < ${score.bottom.toFixed(1)})`);
-            // Open, the log takes the ticker's place on the left half (#348 M4).
-            const lines = document.querySelector('.nrl-mo-ticker');
-            if (lines && lines.getBoundingClientRect().height > 0) hits.push('the ticker still shows under the open log');
-            if (ticker.right > innerWidth / 2 + 1) hits.push(`open log past the left half (${Math.round(ticker.right)} > ${innerWidth / 2})`);
-            if (panel.left < 0 || panel.right > innerWidth || panel.top < 0) hits.push('open log off screen');
-            if (!feed || feed.clientHeight < 12 || feed.scrollHeight <= feed.clientHeight) hits.push(`open log not scrollable (${feed?.clientHeight}px, panel ${panel.height.toFixed(1)}px)`);
-            // A read, not the ticker's two lines again (#348 M4): four lines at least, even with every chip up.
-            else if (feed.clientHeight < 60) hits.push(`open log only ${feed.clientHeight}px tall`);
-          }
-          const chips = document.querySelectorAll('.nrl-mo-calls .nrl-btn').length;
-          if (chips < 10) hits.push(`only ${chips} chips`);
-          return { pending: hits.length > 0, problems: hits };
-        });
-        if (!found.pending) break;
+    /** Problems with the commentary in `mode` ('line' or 'full'), measured in the page. */
+    const measure = (mode) => page.evaluate((mode) => {
+      const overlay = document.querySelector('.nrl-match-overlay');
+      const box = (sel) => { const e = document.querySelector(sel); const r = e?.getBoundingClientRect(); return r && r.width > 0 && r.height > 0 ? r : null; };
+      const meets = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+      const hits = [];
+      if (overlay?.dataset.log !== mode) return { pending: true, problems: [`log is ${overlay?.dataset.log}, want ${mode}`] };
+      const what = box(mode === 'full' ? '.nrl-mo-full' : '.nrl-mo-strip');
+      if (!what) return { pending: true, problems: [`the ${mode === 'full' ? 'full log' : 'commentary line'} is not laid out`] };
+      if (what.left < 0 || what.top < 0 || what.right > innerWidth || what.bottom > innerHeight) hits.push(`${mode === 'full' ? 'full log' : 'line'} off screen`);
+      for (const el of document.querySelectorAll('.nrl-mo-bar .nrl-btn, .nrl-mo-bar [data-coach], .nrl-mo-log-toggle')) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) continue;
+        if (meets(what, r)) hits.push(el.getAttribute('aria-label') || el.textContent.trim() || 'button');
       }
-      await page.screenshot({ path: join(OUT, `open-log-${w}x${h}.png`) });
-      if (found?.problems?.length) problems.push(`${w}×${h}: ${found.problems.join(', ')}`);
-      else rec.notes.push(`${w}×${h} clear`);
+      const score = box('.nrl-mo-scoreboard');
+      if (score && meets(what, score)) hits.push('score bug');
+      const log = box('.nrl-mo-log-toggle');
+      if (!log || log.width < 44 || log.height < 44) hits.push(`LOG switch ${Math.round(log?.width ?? 0)}×${Math.round(log?.height ?? 0)}`);
+      if (mode === 'full') {
+        const tray = box('.nrl-mo-calls');
+        if (!tray) hits.push('the coach tray is not open');
+        else if (meets(what, tray)) hits.push(`the coach tray (${Math.round(tray.right)} > ${Math.round(what.left)})`);
+        const feed = document.querySelector('.nrl-mo-feed');
+        if (!feed || feed.clientHeight < 12 || feed.scrollHeight <= feed.clientHeight) hits.push(`full log not scrollable (${feed?.clientHeight}px, panel ${what.height.toFixed(1)}px)`);
+        else if (feed.clientHeight < 60) hits.push(`full log only ${feed.clientHeight}px tall`);
+        const rows = document.querySelectorAll('.nrl-mo-calls [data-call]').length;
+        if (rows < 9) hits.push(`only ${rows} calls in the tray`);
+      }
+      return { pending: hits.length > 0, problems: hits };
+    }, mode);
+    const setMode = async (mode) => {
+      const sc = () => page.evaluate((open) => window.__nrlGame.scene.getScene('Match').toggleTray(open), mode === 'full');
+      if (mode === 'full') {
+        if (await page.locator('.nrl-match-overlay[data-log="hidden"]').count()) await page.locator('.nrl-mo-log-toggle').evaluate((el) => el.click());
+        if (await page.locator('.nrl-match-overlay[data-log="line"]').count()) await page.locator('.nrl-mo-strip').evaluate((el) => el.click());
+      } else if (await page.locator('.nrl-match-overlay[data-log="full"]').count()) await page.locator('.nrl-mo-full-x').evaluate((el) => el.click());
+      else if (await page.locator('.nrl-match-overlay[data-log="hidden"]').count()) await page.locator('.nrl-mo-log-toggle').evaluate((el) => el.click());
+      await sc();
+    };
+    const problems = [];
+    // The full log is a fixed 330px right panel (3m), drawn for a phone held sideways; upright the
+    // rotate card covers the match, so it is checked at the landscape sizes only.
+    const sizes = { line: [[360, 640], [390, 844], [667, 375], [844, 390]], full: [[667, 375], [844, 390]] };
+    for (const mode of ['line', 'full']) {
+      await setMode(mode);
+      for (const [w, h] of sizes[mode]) {
+        await turn(w, h);
+        let found = null;
+        for (let i = 0; i < 12; i++) {
+          await page.waitForTimeout(50);
+          found = await measure(mode);
+          if (!found.pending) break;
+        }
+        await page.screenshot({ path: join(OUT, `log-${mode}-${w}x${h}.png`) });
+        if (found?.problems?.length) problems.push(`${mode} ${w}×${h}: ${found.problems.join(', ')}`);
+        else rec.notes.push(`${mode} ${w}×${h} clear`);
+      }
     }
     await turn(844, 390);
+    await setMode('line');
     await page.locator('.nrl-mo-log-toggle').hover();
-    const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nrl-mo-log-toggle')).backgroundColor);
-    if (bg !== 'rgb(255, 246, 194)') problems.push(`open log hover fill is ${bg}, want rgb(255, 246, 194)`);
-    else rec.notes.push('open fill holds under hover');
+    const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nrl-mo-log-toggle .nrl-mo-switch')).backgroundColor);
+    if (bg !== 'rgb(244, 208, 63)') problems.push(`the LOG switch's on fill is ${bg} under hover, want rgb(244, 208, 63)`);
+    else rec.notes.push('LOG switch keeps its fill under hover');
     return problems;
   });
 
@@ -623,12 +659,14 @@ async function runPortrait(browser) {
 
 // ── Landscape screens (#336, #344, #347, #343, #351) ─────────────────────────
 // Every nav screen and the main popups on a phone held sideways. Each must show
-// at least four whole rows of its list or one whole card, keep its ✕ and its
+// at least four whole rows of its list or one whole card, keep its way out (a
+// sheet's is the dock's CLUB since Broadcast Quiet; a dialog's its ✕) and its
 // primary action on screen and tappable, and stay out of the unsafe bands. The
-// nav has at most five tabs with labels of 12px or more, and marks the open one.
+// dock has at most five tabs with labels of 12px or more, and marks the open one.
 // The toast lane (#339): a burst shows one toast at a time with a "+n" counter and
-// each kind's colour, clear of the nav, the bar's buttons and the open screen; in a
-// match it keeps off the open log, the scoreboard and every control.
+// each kind's colour, just above the dock, clear of it, the decisions chip and the
+// open sheet's header row; in a match it keeps off the full log, the score bug and
+// every control.
 // WebKit on Linux reports zero safe-area insets, so the iPhone's are simulated
 // through the --nrl-safe-* properties the UI reads env() into (src/ui/dom.ts).
 const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375 956x330').split(/\s+/).filter(Boolean).map((s) => {
@@ -638,36 +676,60 @@ const SCREEN_RUNS = (process.env.E2E_SCREEN_SIZES ?? '844x390@47,0,47,21 667x375
   return { w, h, safe: { l, t, r, b } };
 });
 
-/** Screens reached from the nav: what shows its content, and what must stay on screen. */
+/** A sheet's way out (Broadcast Quiet): sheets have no ✕; CLUB in the dock closes them. */
+const SHEET_EXIT = '.nrl-nav [data-nav-home]';
+/** Screens reached from the dock: what shows its content, and what must stay on screen. */
 const NAV_SCREENS = [
-  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-screen-body > *' },
+  { id: 'squad', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['[data-focus-menu]'] },
   { id: 'lineup', box: '.nrl-screen-region', rows: '.nrl-lineup-list > *', card: '.nrl-lineup-field', primary: ['[data-auto-pick]'] },
-  { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-screen-body > *', primary: ['.nrl-screen-body > :first-child .nrl-row-action'] },
-  { id: 'fixtures', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-fixture', card: '.nrl-next-match' },
-  { id: 'ladder', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-ladder-table tbody tr' },
+  { id: 'recruit', box: '.nrl-screen-region', rows: '.nrl-grid-body > .nrl-row', primary: ['.nrl-grid-body > :first-child .nrl-row-action'] },
+  { id: 'fixtures', box: '.nrl-screen-region', rows: '.nrl-fixture-row', primary: ['[data-next-row]'] },
+  { id: 'ladder', box: '.nrl-screen-region', rows: '.nrl-ladder-table tbody tr' },
   { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
-  { id: 'build', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-build-list > *', primary: ['.nrl-build-list > :first-child'] },
-  { id: 'finance', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-finance-row', card: '.nrl-finance-panel' },
+  { id: 'build', box: '.nrl-screen-region', rows: '.nrl-build-list > *', primary: ['.nrl-build-list > :first-child'] },
+  { id: 'finance', box: '.nrl-screen-region', rows: '.nrl-finance-row', card: '.nrl-finance-tile', primary: ['[data-finance-contracts]'] },
   { id: 'staff', box: '.nrl-screen-region', rows: '.nrl-staff-row', primary: ['.nrl-staff-row .nrl-btn'] },
-  { id: 'contracts', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-contracts .nrl-finance-panel, .nrl-contracts p', card: '.nrl-contracts .nrl-finance-panel' },
-  { id: 'history', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-history-row, .nrl-history p', card: '.nrl-history-list' },
+  { id: 'contracts', box: '.nrl-screen-region', rows: '.nrl-contracts-table tbody tr', primary: ['[data-back]'] },
+  { id: 'history', box: '.nrl-screen-region', rows: '.nrl-history-body tr, .nrl-history-empty', card: '.nrl-history-body' },
   { id: 'help', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-guide-body :is(p, li, h3)', prose: '.nrl-guide-body', primary: ['.nrl-guide-replay'] },
-];
+].map((s) => ({ exit: SHEET_EXIT, ...s }));
 
-/** Destinations that are a tab inside another screen: the screen, then the tab. */
-const NAV_VIA = { ladder: ['fixtures', '.nrl-league-tabs [data-tab="ladder"]'] };
+/**
+ * Destinations inside another sheet: the sheet, then what opens them there. The
+ * ladder shares League's sheet (3h); Lineup and Recruit are Squad's segments;
+ * Contracts is Finance's VIEW ▸.
+ */
+const NAV_VIA = {
+  ladder: ['fixtures', null],
+  lineup: ['squad', '.nrl-sq-tabs [data-seg="lineup"]'],
+  recruit: ['squad', '.nrl-sq-tabs [data-seg="recruit"]'],
+  contracts: ['finance', '[data-finance-contracts]'],
+};
 
-/** Tap a nav destination: its tab, or More and then its row in the sheet. */
+/**
+ * Open a destination as a player would: its dock tab, OFFICE then its tile, or
+ * the sheet that holds it then the control there. A tab tapped while its own
+ * sheet is open closes it (the dock is a toggle), so an open sheet is left as it is.
+ */
 async function openNav(page, id) {
-  const direct = page.locator(`.nrl-nav .nrl-btn[data-screen="${id}"]`);
-  if (await direct.count() && await direct.first().isVisible()) return direct.first().tap();
+  if (await page.locator(`.nrl-screen-region[data-screen-key="${id}"]`).count()) return;
   if (NAV_VIA[id]) {
-    await openNav(page, NAV_VIA[id][0]);
-    return page.locator(NAV_VIA[id][1]).first().tap();
+    const [via, sel] = NAV_VIA[id];
+    await openNav(page, via);
+    if (sel) await page.locator(sel).first().tap();
+    return;
+  }
+  const direct = page.locator(`.nrl-nav > .nrl-btn[data-screen="${id}"]`);
+  if (await direct.count() && await direct.first().isVisible()) {
+    // Lit for another of its sheets (Squad for Lineup): CLUB first, or the tap would close that.
+    if ((await direct.first().getAttribute('aria-current')) === 'page' && (await page.locator('.nrl-screen-region').count())) {
+      await page.locator(SHEET_EXIT).tap();
+    }
+    return direct.first().tap();
   }
   const more = page.locator('.nrl-nav [data-nav-more]');
   if (!(await more.count())) throw new Error(`no nav item for "${id}"`);
-  await more.tap();
+  if (!(await page.locator('.nrl-nav-sheet:not([hidden])').count())) await more.tap();
   await page.locator(`.nrl-nav-sheet [data-screen="${id}"]`).tap();
 }
 
@@ -716,10 +778,12 @@ function screenProblems(page, spec, safe) {
       return !!hit && (el.contains(hit) || hit.contains(el));
     };
     // Rows: four whole ones (or all of them when there are fewer), or one whole card.
+    // Three under 340px tall (956×330, Safari's toolbars up): the Broadcast Quiet sheet
+    // sits above a 56px dock and keeps 44px tap rows, which leaves room for three and a part.
     const rows = [...box.querySelectorAll(spec.rows)].filter((e) => e.getBoundingClientRect().height > 0);
     const shown = rows.filter(seen).length;
     const cards = spec.card ? [...box.querySelectorAll(spec.card)].filter(seen).length : 0;
-    const need = Math.min(4, rows.length);
+    const need = Math.min(window.innerHeight < 340 ? 3 : 4, rows.length);
     // Prose (the Guide): its paragraphs run to any length, so count the lines of
     // text on show instead, eight being about four short paragraphs.
     let lines = 0;
@@ -758,7 +822,7 @@ function screenProblems(page, spec, safe) {
     // The unsafe bands: no button of the screen or the nav, and no part of the screen, inside one.
     const inSafe = (rr) => rr.left >= safe.l - 1 && rr.right <= W - safe.r + 1 && rr.top >= safe.t - 1 && rr.bottom <= H - safe.b + 1;
     if (safe.l || safe.r || safe.t || safe.b) {
-      const unsafe = [...document.querySelectorAll('.nrl-screen-region button, .nrl-nav button, .nrl-hud button, .nrl-screen-title, .nrl-screen-region h2')]
+      const unsafe = [...document.querySelectorAll('.nrl-screen-region button, .nrl-dock button, .nrl-screen-title, .nrl-screen-region h2')]
         .filter((e) => { const rr = e.getBoundingClientRect(); return rr.width > 0 && rr.height > 0 && whole(e) && !inSafe(rr); })
         .map((e) => (e.textContent.trim() || e.getAttribute('aria-label') || e.tagName).slice(0, 14));
       if (unsafe.length) out.push(`in the unsafe band: ${[...new Set(unsafe)].slice(0, 6).join(', ')}${unsafe.length > 6 ? '…' : ''}`);
@@ -797,11 +861,10 @@ function controlsProblems(page, sels, safe) {
   }, [sels, safe]);
 }
 
-/** The chrome: top bar and nav heights, nav tabs, label size and the open tab. */
+/** The chrome: the dock's height, its tabs, label size and the open tab. */
 function chromeReport(page, openId) {
   return page.evaluate((openId) => {
-    const hud = document.querySelector('.nrl-hud')?.getBoundingClientRect();
-    const nav = document.querySelector('.nrl-nav')?.getBoundingClientRect();
+    const dock = document.querySelector('.nrl-dock')?.getBoundingClientRect();
     const tabs = [...document.querySelectorAll('.nrl-nav > .nrl-btn, .nrl-nav-tabs > .nrl-btn')].filter((b) => b.getBoundingClientRect().width > 0);
     const out = [];
     if (tabs.length > 5) out.push(`${tabs.length} nav tabs (want 5 at most)`);
@@ -818,7 +881,7 @@ function chromeReport(page, openId) {
         if (!ids.split(/\s+/).includes(openId)) out.push(`the open tab is "${cur.textContent.trim()}", not ${openId}'s`);
       }
     }
-    const note = `top bar ${Math.round(hud?.height ?? 0)}px, nav ${Math.round(nav?.height ?? 0)}px, ${tabs.length} tabs`;
+    const note = `dock ${Math.round(dock?.height ?? 0)}px, ${tabs.length} tabs`;
     return { problems: out, note };
   }, openId);
 }
@@ -863,10 +926,14 @@ function toastReport(page, avoid, safe, tappable = true) {
   }, [avoid, safe, tappable]);
 }
 
-/** What a toast must never touch at the club: the nav, the bar's buttons (the next-match chip too), an open screen or dialog. */
-const CLUB_AVOID = ['.nrl-nav', '.nrl-hud-actions', '.nrl-hud-next', '.nrl-hud [data-hud="money"]', '.nrl-audio-launcher', '.nrl-screen-region .nrl-modal', '.nrl-screen-x', '.nrl-screen-head'];
-/** …and in a match: the scoreboard, the stats, the ticker or open log, and every control. */
-const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-stats', '.nrl-mo-commentary', '.nrl-mo-log', '.nrl-mo-log-toggle', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay', '.nrl-audio-launcher'];
+/**
+ * What a toast must never touch at the club: the dock (its tabs, money, PLAY WEEK and ▾, the ▾ menu), Office's tiles,
+ * the decisions and board chips, a sheet's header row or a dialog's ✕. The lane sits just above the
+ * dock (Broadcast Quiet), so it may lie over the foot of an open sheet's list.
+ */
+const CLUB_AVOID = ['.nrl-dock', '.nrl-hud-menu:not([hidden])', '.nrl-nav-sheet:not([hidden])', '[data-decisions-chip]:not([hidden])', '.nrl-board-chip:not([hidden])', '.nrl-screen-x', '.nrl-screen-head', '.nrl-news-head'];
+/** …and in a match: the score bug, the stats, the commentary line or full log, and every control. */
+const MATCH_AVOID = ['.nrl-mo-scoreboard', '.nrl-mo-statsheet', '.nrl-mo-strip', '.nrl-mo-full', '.nrl-mo-log-toggle', '.nrl-mo-bar [data-coach]', '.nrl-mo-controls', '.nrl-mo-calls', '.nrl-mo-replay'];
 /** The burst the check fires: a problem, a routine stop, good news, a confirmation. */
 const TOAST_BURST = [
   { text: 'Kai Smith injured — out 3w', kind: 'danger' },
@@ -874,7 +941,8 @@ const TOAST_BURST = [
   { text: 'Signed Jack Taufa', kind: 'success' },
   { text: 'Advanced 4 weeks.', kind: 'info' },
 ];
-const TOAST_BG = { 'nrl-toast-danger': 'rgb(176, 58, 46)', 'nrl-toast-info': 'rgb(232, 224, 200)', 'nrl-toast-success': 'rgb(46, 125, 50)' };
+/** Each kind's fill (Broadcast Quiet's tokens: info on the navy sheet, success green, danger red; src/ui/dom.ts). */
+const TOAST_BG = { 'nrl-toast-danger': 'rgb(122, 42, 36)', 'nrl-toast-info': 'rgba(14, 22, 48, 0.97)', 'nrl-toast-success': 'rgb(29, 90, 51)' };
 
 async function runScreens(browser, { w: W, h: H, safe }) {
   const tag = `${W}x${H}${safe.l || safe.r || safe.b || safe.t ? '-safe' : ''}`;
@@ -953,7 +1021,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await page.waitForTimeout(250);
     const hint = await toastReport(page, CLUB_AVOID, safe);
     if (!/Add to Home Screen/.test(hint.text)) out.push(`the install hint is not in the lane (it shows "${hint.text}")`);
-    else if (hint.lane !== 'hud') out.push(`the install hint is in the ${hint.lane} lane, not the top bar's`);
+    else if (hint.lane !== 'dock') out.push(`the install hint is in the ${hint.lane} lane, not the dock's`);
     out.push(...hint.problems.map((p) => `install hint: ${p}`));
     // Clear whatever is queued, then the burst.
     for (let i = 0; i < 10 && (await page.locator('.nrl-toast').count()); i++) await page.locator('.nrl-toast').first().tap();
@@ -971,7 +1039,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
       if (r.bg !== TOAST_BG[`nrl-toast-${want.kind}`]) out.push(`toast ${i + 1} is ${r.bg}, want ${TOAST_BG[`nrl-toast-${want.kind}`]} for ${want.kind}`);
       const more = TOAST_BURST.length - 1 - i;
       if (r.more !== (more ? `+${more}` : '')) out.push(`toast ${i + 1}'s counter reads "${r.more}", want "${more ? `+${more}` : ''}"`);
-      if (r.lane !== 'hud') out.push(`toast ${i + 1} is in the ${r.lane} lane, not the top bar's`);
+      if (r.lane !== 'dock') out.push(`toast ${i + 1} is in the ${r.lane} lane, not the dock's`);
       if (i < TOAST_BURST.length - 1) {
         await page.locator('.nrl-toast').first().tap();
         await page.waitForTimeout(200);
@@ -982,10 +1050,10 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     if (!gone) out.push('the last toast did not go by itself');
     if (await page.evaluate(() => !document.querySelector('.nrl-toast-lane')?.hidden)) out.push('the empty lane is still shown');
     rec.notes.push(`shown in turn: ${seen.join(', ')}`);
-    await page.locator('.nrl-screen-region .nrl-screen-x').first().tap();
+    await page.locator(SHEET_EXIT).tap();
     return out;
   });
-  // The More sheet: every row whole, tappable, 44px tall, 12px labels, clear of the unsafe bands.
+  // The Office sheet (was More): every tile whole, tappable, 44px tall, 12px labels, clear of the unsafe bands.
   await step('nav-more', async (rec) => {
     await tap('.nrl-nav [data-nav-more]');
     await page.waitForSelector('.nrl-nav-sheet:not([hidden])');
@@ -993,18 +1061,18 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     const out = await page.evaluate((safe) => {
       const W = innerWidth, H = innerHeight;
       const problems = [];
-      if (document.querySelector('.nrl-nav [data-nav-more]')?.getAttribute('aria-expanded') !== 'true') problems.push('More is not aria-expanded');
+      if (document.querySelector('.nrl-nav [data-nav-more]')?.getAttribute('aria-expanded') !== 'true') problems.push('OFFICE is not aria-expanded');
       const items = [...document.querySelectorAll('.nrl-nav-sheet .nrl-btn')];
       for (const b of items) {
         const r = b.getBoundingClientRect();
-        const t = b.textContent.trim();
+        const t = (b.querySelector('.nrl-office-name') ?? b).textContent.trim();
         if (r.left < safe.l - 1 || r.right > W - safe.r + 1 || r.top < safe.t - 1 || r.bottom > H - safe.b + 1) problems.push(`${t} off screen or in the unsafe band`);
         if (r.height < 44) problems.push(`${t} ${Math.round(r.height)}px tall`);
-        if (parseFloat(getComputedStyle(b).fontSize) < 12) problems.push(`${t} label under 12px`);
+        if (parseFloat(getComputedStyle(b.querySelector('.nrl-office-name') ?? b).fontSize) < 12) problems.push(`${t} label under 12px`);
         const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
         if (!hit || !b.contains(hit)) problems.push(`${t} covered`);
       }
-      return { problems, note: `${items.length} rows: ${items.map((b) => b.textContent.trim()).join(', ')}` };
+      return { problems, note: `${items.length} tiles: ${items.map((b) => (b.querySelector('.nrl-office-name') ?? b).textContent.trim()).join(', ')}` };
     }, safe);
     rec.notes.push(out.note);
     return out.problems;
@@ -1027,15 +1095,16 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await openNav(page, 'squad');
     await tap('.nrl-screen-region [data-player-open] .nrl-row-name');
     await page.waitForSelector('[data-player-page]');
-    return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats',
+    // No ✕ (Broadcast Quiet): ◂ SQUAD is its one way out.
+    return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats', exit: '.nrl-player-modal [data-back]',
       primary: ['[data-player-action="renew"]', '[data-player-action="sell"]', '[data-player-action="release"]'] }, null);
   });
+  // The kit designer: Office's Kit & colours tile (it was a button on Squad).
   await step('popup-kit', async (rec) => {
-    await page.locator('.nrl-player-modal .nrl-screen-x').tap().catch(() => {});
-    await openNav(page, 'squad');
-    await tap('.nrl-squad-kit');
+    await page.locator('.nrl-player-modal [data-back]').tap().catch(() => {});
+    await openNav(page, 'kit');
     await page.waitForSelector('.nrl-kit-modal');
-    return check(rec, { box: '.nrl-kit-modal', rows: '.nrl-kit-preview', card: '.nrl-kit-preview', primary: ['.nrl-kit-save'] }, null);
+    return check(rec, { box: '.nrl-kit-modal', rows: '.nrl-kit-preview', card: '.nrl-kit-preview', exit: SHEET_EXIT, primary: ['.nrl-kit-save'] }, null);
   });
   await step('popup-rival-squad', async (rec) => {
     await openNav(page, 'ladder');
@@ -1043,10 +1112,10 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await page.waitForSelector('.nrl-rival-modal');
     return check(rec, { box: '.nrl-rival-modal', rows: '.nrl-rival-row' }, null);
   });
-  // Settings (#349 E1): behind the gear, every switch whole; Import asks on its own row first.
+  // Settings (#349 E1): an Office tile (the gear is gone), every switch whole; Import asks on its own row first.
   await step('popup-settings', async (rec) => {
     await closeAll();
-    await tap('.nrl-audio-gear');
+    await openNav(page, 'settings');
     await page.waitForSelector('.nrl-settings-modal');
     const out = await check(rec, { box: '.nrl-settings-modal', rows: '.nrl-audio-row', primary: ['.nrl-rivals-toggle .nrl-switch', '.nrl-settings-import .nrl-btn'] }, null);
     await tap('.nrl-settings-import .nrl-btn');
@@ -1066,7 +1135,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     if (!(await page.evaluate(() => window.__nrlShowCard?.('baliTrip')))) throw new Error('card hook failed');
     await openNav(page, 'news');
     await page.waitForSelector('[data-decisions-open]');
-    const out = await check(rec, { box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', primary: ['[data-decisions-open]'] }, 'news');
+    const out = await check(rec, { box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', exit: SHEET_EXIT, primary: ['[data-decisions-open]'] }, 'news');
     if (await page.locator('.nrl-news .nrl-event-card').count()) out.push('the decision card is in the News feed');
     return out;
   });
@@ -1076,20 +1145,20 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     return check(rec, { box: '.nrl-decisions-modal', rows: '.nrl-event-choice', card: '.nrl-event-card',
       primary: ['[data-event-choice="0"]', '[data-event-choice="1"]'] }, null);
   });
-  // #338: with a card waiting, Advance Week asks: it lists the card and takes no default.
-  // #350 H1: the button wears the count, and the hub names the next match.
+  // #338: with a card waiting, Advance Week (PLAY WEEK) asks: it lists the card and takes no default.
+  // #350 H1: the button wears the count, and names the next match on its sub-line.
   await step('advance-asks', async (rec) => {
     await tap('.nrl-decisions-modal .nrl-screen-x');
-    await page.evaluate(() => document.querySelector('.nrl-screen-region .nrl-screen-x')?.click());
+    await page.locator(SHEET_EXIT).tap();
     const before = await page.evaluate(() => { const s = window.__nrlState(); return { week: s.week, pending: s.eventDeck.pending.map((p) => p.id) }; });
     if (!before.pending.length) throw new Error('no card waiting to ask about');
     const out = [];
     const badge = (await page.locator('[data-hud="decisions"]').textContent().catch(() => ''))?.trim();
     if (badge !== String(before.pending.length)) out.push(`Advance Week's badge reads "${badge}", want ${before.pending.length}`);
     const chip = page.locator('[data-hud="next"]');
-    if (!(await chip.isVisible())) out.push('no next-match chip on the hub');
-    else rec.notes.push(`chip "${(await chip.textContent()).trim()}"`);
-    await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
+    if (!(await chip.isVisible())) out.push('PLAY WEEK does not name the next match');
+    else rec.notes.push(`sub-line "${(await chip.textContent()).trim()}"`);
+    await page.locator('.nrl-dock [data-hud="advance"]').tap();
     await page.waitForSelector('[data-advance-ask]');
     await page.waitForTimeout(600);
     const after = await page.evaluate(() => { const s = window.__nrlState(); return { week: s.week, pending: s.eventDeck.pending.map((p) => p.id) }; });
@@ -1126,7 +1195,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     if (!/^Play \d+ weeks\? It stops for decisions\.$/.test(q)) out.push(`the confirm asks "${q}"`);
     await page.locator('[data-advance-confirm] .nrl-btn', { hasText: 'Cancel' }).tap();
     await page.waitForTimeout(400);
-    if (await page.evaluate(() => !!document.querySelector('.nrl-hud[data-advancing]'))) out.push('Cancel started the run');
+    if (await page.evaluate(() => !!document.querySelector('.nrl-dock[data-advancing]'))) out.push('Cancel started the run');
     if ((await page.evaluate(() => window.__nrlState().week)) !== week) out.push('Cancel moved the week');
     return out;
   });
@@ -1134,13 +1203,13 @@ async function runScreens(browser, { w: W, h: H, safe }) {
   // each hold the match with every action on screen and uncovered, and the Replay try
   // chip hides under them and comes back after.
   await step('match-cards', async (rec) => {
-    await page.locator('.nrl-hud .nrl-btn', { hasText: 'Advance Week' }).first().tap();
+    await page.locator('.nrl-dock [data-hud="advance"]').tap();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
     const out = [];
-    // The ticker is never a blank strip: "Kick-off soon…" until the first line (#339).
-    const ticker = await page.evaluate(() => document.querySelector('.nrl-mo-ticker .nrl-mo-line:last-child')?.textContent?.trim() ?? '');
-    if (!ticker) out.push('the ticker is empty at kick-off');
-    else rec.notes.push(`ticker at kick-off: "${ticker.slice(0, 24)}"`);
+    // The commentary line is never a blank strip: "Kick-off soon…" until the first line (#339).
+    const ticker = await page.evaluate(() => document.querySelector('.nrl-mo-strip .nrl-mo-strip-text')?.textContent?.trim() ?? '');
+    if (!ticker) out.push('the commentary line is empty at kick-off');
+    else rec.notes.push(`line at kick-off: "${ticker.slice(0, 24)}"`);
     await page.waitForFunction(() => window.__nrlGame?.scene.getScene('Match')?.playback, null, { timeout: 30000 });
     const clock = () => page.locator('.nrl-mo-clock').textContent().then((t) => t?.trim());
     /** The clock moves on from `from` (the match is playing, not held). */
@@ -1189,31 +1258,68 @@ async function runScreens(browser, { w: W, h: H, safe }) {
     await page.waitForTimeout(1500);
     if ((await clock()) !== paused) out.push(`the clock ran under the pause sheet (${paused} → ${await clock()})`);
     if (await replayShows()) out.push('the Replay chip shows over the pause sheet');
-    out.push(...await blocked(['.nrl-mo-sheet .nrl-btn:first-of-type', '.nrl-mo-sheet [data-skip]', '.nrl-mo-sheet [data-save-exit]', '.nrl-mo-sheet .nrl-mo-sheet-x']));
+    out.push(...await blocked(['.nrl-mo-sheet .nrl-mo-sheet-actions .nrl-btn:first-child', '.nrl-mo-sheet [data-skip]', '.nrl-mo-sheet [data-save-exit]']));
+    // The sheet's ✕ is 36×36 (3m) with a 44px hit area (an ::after 4px past its box): that area must reach 44 and take the tap.
+    out.push(...await page.evaluate(() => {
+      const x = document.querySelector('.nrl-mo-sheet .nrl-mo-sheet-x');
+      if (!x) return ['.nrl-mo-sheet .nrl-mo-sheet-x missing'];
+      const r = x.getBoundingClientRect();
+      const after = getComputedStyle(x, '::after');
+      const grow = after.position === 'absolute' ? Math.max(0, -parseFloat(after.left) || 0) : 0;
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      const out = [];
+      if (r.width + 2 * grow < 44 || r.height + 2 * grow < 44) out.push(`the pause sheet's ✕ hits only ${Math.round(r.width + 2 * grow)}×${Math.round(r.height + 2 * grow)}`);
+      if (!(at === x || x.contains(at))) out.push(`the pause sheet's ✕ covered by ${at?.className || at?.tagName}`);
+      return out;
+    }));
     await page.screenshot({ path: join(OUT, 'pause-sheet.png') });
     await page.locator('.nrl-mo-sheet .nrl-btn', { hasText: 'Resume' }).tap();
     await page.waitForSelector('.nrl-mo-sheet', { state: 'detached', timeout: 3000 });
     if (!(await runs(paused).then(() => true).catch(() => false))) out.push('the match did not go on after Resume');
-    // The calls list behind "?".
-    if (await page.locator('.nrl-mo-calls [data-calls-help]').count()) {
-      await page.locator('.nrl-mo-calls [data-calls-help]').tap();
-      await page.waitForSelector('.nrl-mo-sheet');
-      const rows = await page.locator('.nrl-mo-call-help b').count();
-      if (rows < 9) out.push(`the calls list has ${rows} calls`);
-      out.push(...await blocked(['.nrl-mo-sheet .nrl-mo-sheet-actions .nrl-btn']));
-      await page.screenshot({ path: join(OUT, 'calls-help.png') });
-      await page.locator('.nrl-mo-sheet .nrl-mo-sheet-actions .nrl-btn').tap();
-      await page.waitForSelector('.nrl-mo-sheet', { state: 'detached', timeout: 3000 });
-    } else out.push('no "?" on the calls row');
+    // The calls (3o): the "?" list of every call is gone; COACH opens a tray of the calls
+    // legal now, with a line on when the others unlock. The match keeps playing under it
+    // (it is not a card), its rows take a tap, and COACH again shuts it.
+    if (await page.locator('.nrl-mo-bar [data-coach]').count()) {
+      out.push(...await blocked(['.nrl-mo-bar [data-coach]']));
+      await page.locator('.nrl-mo-bar [data-coach]').tap();
+      await page.waitForSelector('.nrl-mo-calls:not([hidden])', { timeout: 3000 });
+      const traying = await clock();
+      if (!(await runs(traying).then(() => true).catch(() => false))) out.push('the match stopped under the coach tray');
+      const tray = await page.evaluate(() => {
+        const t = document.querySelector('.nrl-mo-calls');
+        const r = t.getBoundingClientRect();
+        const rows = [...t.querySelectorAll('[data-call]')];
+        const problems = [];
+        if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) problems.push('the coach tray is off screen');
+        if (!t.querySelector('.nrl-mo-tray-title')?.textContent?.trim()) problems.push('the coach tray has no title');
+        if (!rows.length && !t.querySelector('.nrl-mo-tray-none')) problems.push('the coach tray lists nothing, not even "nothing to call"');
+        for (const b of rows) {
+          const br = b.getBoundingClientRect();
+          if (br.height < 44) problems.push(`call ${b.dataset.call} is ${Math.round(br.height)}px tall`);
+          const at = document.elementFromPoint((br.left + br.right) / 2, (br.top + br.bottom) / 2);
+          if (br.bottom > r.bottom + 1 && getComputedStyle(t).overflowY === 'visible') problems.push(`call ${b.dataset.call} is below the tray`);
+          else if (br.bottom <= r.bottom + 1 && !(at && b.contains(at))) problems.push(`call ${b.dataset.call} covered by ${at?.className || at?.tagName}`);
+        }
+        return { problems, rows: rows.length };
+      });
+      out.push(...tray.problems);
+      await page.screenshot({ path: join(OUT, 'coach-tray.png') });
+      await page.locator('.nrl-mo-bar [data-coach]').tap();
+      if (!(await page.locator('.nrl-mo-calls[hidden]').count())) out.push('COACH did not shut its tray');
+      rec.notes.push(`tray: ${tray.rows} call(s) on, the match playing under it`);
+    } else out.push('no COACH button in the bottom row');
     rec.notes.push(`card held at ${at}; sheet held at ${paused}`);
     return out;
   });
-  // A match toast with the log open (#339): under the scoreboard, clear of the log, the
-  // scoreboard, the stats and every control; a club toast fired with it waits for the club;
+  // A match toast with the full log open (#339): under the score bug, clear of the log, the
+  // score bug, the stats and every control; a club toast fired with it waits for the club;
   // and the lane gives way to the Replay try chip.
   await step('match-toast', async (rec) => {
     const out = [];
-    if ((await page.locator('.nrl-mo-log-toggle').getAttribute('aria-expanded')) !== 'true') await page.locator('.nrl-mo-log-toggle').tap();
+    // The log's three modes (3m): the LOG switch brings the line back, the line opens the full log.
+    if (await page.locator('.nrl-match-overlay[data-log="hidden"]').count()) await page.locator('.nrl-mo-log-toggle').tap();
+    if (await page.locator('.nrl-match-overlay[data-log="line"]').count()) await page.locator('.nrl-mo-strip').tap();
+    if (!(await page.locator('.nrl-match-overlay[data-log="full"]').count())) out.push('the full log did not open from the commentary line');
     await page.waitForTimeout(300);
     // A try just scored puts up the Replay try chip, and the lane waits it out; let it go first.
     await page.waitForFunction(() => !document.querySelector('.nrl-mo-replay:not([hidden])'), null, { timeout: 20000 }).catch(() => {});
@@ -1242,18 +1348,27 @@ async function runScreens(browser, { w: W, h: H, safe }) {
       lane: !document.querySelector('.nrl-toast-lane')?.hidden,
     }));
     if (both.chip && both.lane) out.push('the toast shows beside the Replay try chip');
-    await page.locator('.nrl-mo-log-toggle').tap();
+    await page.locator('.nrl-mo-full-x').tap();
     return out;
   });
-  // The full-time report (#351 P0, P2): the result and Player of the Match on screen,
-  // Back to Club its one exit, and the plan changes folded into one line.
+  // Full time (3s): a card with the result, Player of the Match and Back to Club, its one
+  // exit beside REPORT. The report (#351 P0, P2; 3t) no longer opens by itself: REPORT
+  // opens it, with the result and Player of the Match on screen, Back to Club its one exit,
+  // and the plan changes folded into one line.
   await step('popup-fulltime-report', async (rec) => {
     await page.locator('.nrl-mo-controls [data-pause]').tap();
     await page.locator('.nrl-mo-sheet [data-skip]').tap();
-    await page.waitForSelector('.nrl-report', { timeout: 60000 });
-    const out = await check(rec, { box: '.nrl-report-modal', rows: '.nrl-report-score, .nrl-report-potm', card: '.nrl-report-head', exit: '.nrl-match-back' }, null);
-    if (!(await page.locator('.nrl-report-result').count())) out.push('no WIN / LOSS / DRAW headline');
-    if (await page.locator('.nrl-report > .nrl-report-change').count()) out.push('plan changes shown as loose lines, not folded');
+    await page.waitForSelector('.nrl-mo-ft .nrl-ft-card', { timeout: 60000 });
+    await page.waitForTimeout(250);
+    const out = (await check(rec, { box: '.nrl-mo-ft .nrl-ft-card', rows: '.nrl-ft-score, .nrl-ft-potm', card: '.nrl-ft-head',
+      exit: '.nrl-mo-ft [data-back-to-club]', primary: ['.nrl-mo-ft [data-report]'] }, null)).map((p) => `full time: ${p}`);
+    if (!(await page.locator('.nrl-mo-ft .nrl-rp-tag').count())) out.push('full time: no WIN / LOSS / DRAW tag');
+    await page.screenshot({ path: join(OUT, 'full-time-card.png') });
+    await page.locator('.nrl-mo-ft [data-report]').tap();
+    await page.waitForSelector('.nrl-report', { timeout: 5000 });
+    out.push(...await check(rec, { box: '.nrl-report-modal', rows: '.nrl-rp-team, .nrl-report-potm', card: '.nrl-rp-head', exit: '.nrl-report-modal [data-back-to-club]' }, null));
+    if (!(await page.locator('.nrl-report .nrl-rp-tag').count())) out.push('no WIN / LOSS / DRAW headline');
+    if (await page.locator('.nrl-report .nrl-report-change:not(details .nrl-report-change)').count()) out.push('plan changes shown as loose lines, not folded');
     out.push(...await page.evaluate(() => {
       const potm = document.querySelector('.nrl-report-potm');
       if (!potm) return [];
@@ -1296,7 +1411,7 @@ async function runScreens(browser, { w: W, h: H, safe }) {
 // ── The tutorial, followed (#344, #337, #370) ────────────────────────────────
 // The three guided taps done the way the bubble says, never skipped: the paddock
 // placed on the grass, a player signed (then the Undo taken, which brings the run
-// back to tap 2, and signed again), then Advance Week into the first match, played
+// back to tap 2, and signed again), then Play Week into the first match, played
 // to full time with no tutorial over it, and back to the club with the run over.
 // Each tap opens its own screen; each control it points at must be whole, out
 // from under the bubble, and take the tap. Then the first-visit hints: Lineup's
@@ -1393,7 +1508,7 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   /** The Undo toast's button, once it is on show: whole, 44px, and the one a tap at its middle hits. Then tap it. */
   const tapUndo = async () => {
     await page.waitForSelector('.nrl-toast-action .nrl-toast-btn', { state: 'visible' });
-    await page.waitForTimeout(300); // past the toast's 160 ms entry slide, which starts 4px up
+    await page.waitForTimeout(300); // past the toast's entry slide
     const problem = await page.evaluate(() => {
       const t = document.querySelector('.nrl-toast-action .nrl-toast-btn');
       const r = t.getBoundingClientRect();
@@ -1458,7 +1573,7 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   // Advance Week: framed and clear; tapping it starts the first match, and the
   // tutorial is gone before the match draws and stays gone until Back to Club (#337 U1).
   await step('advance-to-match', async (rec) => {
-    const out = await tapTarget('.nrl-hud-actions > .nrl-btn', rec, 'Advance Week');
+    const out = await tapTarget('.nrl-hud-actions > [data-hud="advance"]', rec, 'PLAY WEEK');
     if (out.length) return out;
     await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
     if (!(await tutorialHidden())) out.push('the tutorial is up as the match starts');
@@ -1477,7 +1592,7 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   await step('match-full-time', async (rec) => {
     await page.locator('.nrl-mo-controls [data-pause]').tap();
     await page.locator('.nrl-mo-sheet [data-skip]').tap();
-    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 60000 });
+    await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 60000 });
     await page.waitForTimeout(700);
     const out = (await tutorialHidden()) ? [] : ['the tutorial showed over the full-time screen'];
     rec.notes.push('match played to full time (the match\'s Skip, not the tutorial\'s)');
@@ -1485,8 +1600,8 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   });
   // Back at the club the run is over: three taps, none skipped (#370).
   await step('back-to-club-done', async (rec) => {
-    await page.locator('.nrl-btn:has-text("Back to Club")').first().evaluate((b) => b.click());
-    await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud');
+    await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate((b) => b.click());
+    await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
     await page.waitForTimeout(700);
     const out = [];
     if (await page.locator('.nrl-tutorial').count()) out.push('the tutorial is still up after the first match');
@@ -1500,10 +1615,12 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     await page.waitForSelector('[data-screen-key="lineup"] [data-hint="lineup"]');
     const out = await reachProblems(page, '[data-hint="lineup"]', ['.nrl-hint-x']);
     const x = await page.locator('.nrl-hint-x').boundingBox();
-    if (!x || x.width < 44 || x.height < 44) out.push(`the hint's ✕ is ${x?.width}×${x?.height}px`);
+    // To the hundredth: on a sheet at a fractional y (the notch's inset) WebKit measures 44px as 43.99999.
+    const px = (v) => Math.round(v * 100) / 100;
+    if (!x || px(x.width) < 44 || px(x.height) < 44) out.push(`the hint's ✕ is ${x?.width}×${x?.height}px`);
     await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-lineup-hint-first.png`) }).catch(() => {});
     await page.locator('.nrl-hint-x').tap();
-    await page.locator('[data-screen-key="lineup"] .nrl-screen-head .nrl-screen-x').tap();
+    await page.locator('.nrl-nav [data-nav-home]').tap();
     await openNav(page, 'lineup');
     await page.waitForTimeout(400);
     if (await page.locator('[data-hint]').count()) out.push('the Lineup hint showed twice');
@@ -1512,13 +1629,14 @@ async function runTutorialWalk(browser, { w: W, h: H, safe }) {
   });
   // #370: a build's Undo inside 5 s takes the facility away and gives every dollar back.
   await step('undo-build', async (rec) => {
+    await page.locator('.nrl-nav [data-nav-home]').tap();
     const before = await money();
     const built = await page.evaluate(() => window.__nrlState().facilities.length);
     await openNav(page, 'build');
     await page.locator('[data-screen-key="build"] [data-facility="trainingPaddock"]').tap();
     await page.waitForSelector('.nrl-placebar:not([hidden])');
     await page.touchscreen.tap(Math.round(W / 2) - 60, Math.round(H / 2) + 40);
-    await page.waitForFunction((n) => window.__nrlState().facilities.length === n + 1, built);
+    await page.waitForFunction((k) => window.__nrlState().facilities.length === k + 1, built);
     const out = await tapUndo();
     await page.waitForTimeout(300);
     const after = await money();

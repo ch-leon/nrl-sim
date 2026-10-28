@@ -12,6 +12,9 @@
 // update bar raised mid-match (held until Back to Club), the next-match card and the
 // ladder's form column, the Guide's How Nines works, the season review at the
 // rollover and again from History. Each skips with a note on a build without it.
+// It drives the Broadcast Quiet UI (docs/specs/ui-broadcast-quiet.md) the way a
+// player does: the dock's tabs and PLAY WEEK, Office's tiles, Squad's segments,
+// CLUB to close a sheet (sheets have no ✕), the decisions chip's REVIEW.
 // Every step takes a screenshot and runs layout checks (nothing off-screen, no
 // sideways page scroll); a page or console error during a step fails it. Writes
 // e2e-output/<WxH>/report.json and exits 1 if anything failed. Slot 1 is dumped
@@ -111,11 +114,36 @@ const closeAny = async () => {
   });
   await wait(200);
 };
-/** Open a nav destination by id: its tab, or More then its row in the sheet (#344). */
+/** A sheet open on screen with this key (the dock's tab or an Office tile names it), or none. */
+const sheetOpen = (key) => page.locator(`.nrl-screen-region[data-screen-key="${key}"]`).count().then((n) => n > 0);
+/** Close whatever sheet is open: CLUB in the dock (Broadcast Quiet: sheets have no ✕). */
+const goHome = async () => {
+  await press(page.locator('.nrl-nav [data-nav-home]').first());
+  await wait(150);
+};
+/** Squad's segments (Lineup and Recruit are not tabs), and Finance's VIEW ▸ for Contracts. */
+const NAV_VIA = { lineup: ['squad', '.nrl-sq-tabs [data-seg="lineup"]'], recruit: ['squad', '.nrl-sq-tabs [data-seg="recruit"]'], contracts: ['finance', '[data-finance-contracts]'] };
+/**
+ * Open a nav destination by id as a player would: its dock tab, a segment or link
+ * inside the sheet that holds it, or OFFICE then its tile. A tab tapped while its
+ * own sheet is open closes it (the dock is a toggle), so an open sheet is left as is.
+ */
 const navTo = async (id) => {
+  if (await sheetOpen(id)) return;
+  if (NAV_VIA[id]) {
+    await navTo(NAV_VIA[id][0]);
+    await tap(NAV_VIA[id][1]);
+    await page.waitForSelector(`.nrl-screen-region[data-screen-key="${id}"]`);
+    return;
+  }
   const tab = page.locator(`.nrl-nav > .nrl-btn[data-screen="${id}"]`);
-  if (await tab.count()) { await press(tab.first()); return; }
-  await press(page.locator('.nrl-nav [data-nav-more]').first());
+  if (await tab.count()) {
+    // Its tab is lit for another of its sheets (Squad for Lineup, League for the ladder): a tap would close that.
+    if ((await tab.first().getAttribute('aria-current')) === 'page' && (await page.locator('.nrl-screen-region').count())) await goHome();
+    await press(tab.first());
+    return;
+  }
+  if (!(await page.locator('.nrl-nav-sheet:not([hidden])').count())) await press(page.locator('.nrl-nav [data-nav-more]').first());
   await press(page.locator(`.nrl-nav-sheet .nrl-btn[data-screen="${id}"]`).first());
 };
 
@@ -131,10 +159,15 @@ async function layoutProblems() {
       if (r.left < -1 || r.right > W + 1) out.push(`modal ${m.className} overflows sideways (${Math.round(r.left)}–${Math.round(r.right)})`);
       if (r.top < -1 || r.bottom > H + 1) out.push(`modal ${m.className} overflows vertically (${Math.round(r.top)}–${Math.round(r.bottom)})`);
     }
-    // Buttons whose label is clipped by their own box.
-    for (const b of document.querySelectorAll('.nrl-modal .nrl-btn, .nrl-hud .nrl-btn, .nrl-placebar .nrl-btn')) {
+    // Buttons whose label is clipped by their own box. The label's own extent (a Range over
+    // it), not scrollWidth alone: a ✕'s 44px hit area (an ::after past its box) overflows too.
+    for (const b of document.querySelectorAll('.nrl-modal .nrl-btn, .nrl-dock .nrl-btn, .nrl-placebar .nrl-btn')) {
       if (b.offsetParent === null) continue;
-      if (b.scrollWidth > b.clientWidth + 2) out.push(`button text clipped: "${b.textContent?.trim().slice(0, 40)}"`);
+      if (b.scrollWidth <= b.clientWidth + 2) continue;
+      const range = document.createRange();
+      range.selectNodeContents(b);
+      const t = range.getBoundingClientRect(), r = b.getBoundingClientRect();
+      if (t.left < r.left - 2 || t.right > r.right + 2) out.push(`button text clipped: "${b.textContent?.trim().slice(0, 40)}"`);
     }
     // Nav buttons pushed off-screen.
     const hidden = [...document.querySelectorAll('.nrl-nav .nrl-btn')].filter((b) => {
@@ -248,11 +281,25 @@ async function untappable(selector) {
 }
 
 /**
- * At full time: go back to the club. With the Player of the Match card up, Back to
- * Club must take the first tap (#203) and the card must go with the match view.
+ * Full time's Back to Club: the full-time card's (3s), or the report's when that is open.
+ * Both carry it, so only the one on screen counts.
+ */
+const BACK_TO_CLUB = '[data-back-to-club]:visible';
+
+/** The PLAY WEEK button's own words, less the decisions count beside them: "PLAY WEEK ▸", "RESUME MATCH ▸". */
+const playWeekLabel = () => page.evaluate(() => {
+  const l = document.querySelector('.nrl-dock-advance-label')?.cloneNode(true);
+  l?.querySelector('.nrl-hud-alert')?.remove();
+  return l?.textContent?.trim() ?? null;
+});
+
+/**
+ * At full time: go back to the club. The Player of the Match is on the full-time card
+ * (3s) beside Back to Club, which must take the first tap (#203), and the card must go
+ * with the match view.
  */
 async function leaveMatch() {
-  const back = page.locator('.nrl-btn:has-text("Back to Club")').first();
+  const back = page.locator(BACK_TO_CLUB).first();
   await back.waitFor();
   if (await page.locator('.nrl-potm-modal').count()) {
     const hit = await back.evaluate((b) => {
@@ -263,7 +310,7 @@ async function leaveMatch() {
     if (hit) throw new Error(`Back to Club is covered by "${hit}" while Player of the Match is up`);
   }
   await press(back);
-  await page.waitForSelector('.nrl-hud .nrl-btn:has-text("Advance Week")');
+  await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock [data-hud="advance"]');
   if (await page.locator('.nrl-potm-modal').count()) throw new Error('the Player of the Match card stayed up after Back to Club');
 }
 
@@ -284,7 +331,7 @@ async function weekAsTapped(rec) {
     .catch(() => { throw new Error(`Advance Week did nothing within 15 s at ${at.replace(/(\d+):(\d+)/, 'S$1 W$2')}`); });
   if (what === 'match') {
     await skipMatch();
-    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
+    await page.waitForSelector(BACK_TO_CLUB, { timeout: 30000 });
     await leaveMatch();
   }
   // The week ends once the rival round is in (as long as held-week allows); wait for it.
@@ -307,9 +354,9 @@ async function passAdvanceAsks() {
   }
 }
 
-/** Tap Advance Week and get past its questions. */
+/** Tap PLAY WEEK (Advance Week) in the dock and get past its questions. */
 async function tapAdvanceWeek() {
-  await tap('.nrl-hud .nrl-btn:has-text("Advance Week")');
+  await tap('.nrl-dock [data-hud="advance"]');
   await passAdvanceAsks();
 }
 
@@ -319,7 +366,7 @@ async function advanceMenu(i) {
   await tap(`.nrl-hud-menu-item >> nth=${i}`);
   await passAdvanceAsks();
   // N10.2: the advance yields between weeks; wait for the run to end.
-  await page.waitForFunction(() => !document.querySelector('.nrl-hud[data-advancing]'), null, { timeout: 240000 });
+  await page.waitForFunction(() => !document.querySelector('.nrl-dock[data-advancing]'), null, { timeout: 240000 });
   await wait(400);
 }
 
@@ -328,9 +375,16 @@ async function answerCards(rec) {
   const s = await save();
   const pending = s?.eventDeck?.pending ?? [];
   if (!pending.length) return 0;
-  // #345: News lists the waiting cards on one row; its Answer opens them one at a time.
-  await navTo('news');
-  await tap('[data-decisions-open]');
+  // 3a: the decisions chip on the bare grounds, its REVIEW opening the cards one at a time.
+  // (News lists them on one row too, #345, and is the way in with a sheet up.)
+  await closeAny();
+  if (await page.locator('.nrl-screen-region').count()) await goHome();
+  const chip = page.locator('[data-decisions-chip]:not([hidden]) .nrl-decisions-review');
+  if (await chip.count()) await press(chip.first());
+  else {
+    await navTo('news');
+    await tap('[data-decisions-open]');
+  }
   await page.waitForSelector('.nrl-event-card');
   let n = 0;
   while (await page.locator('.nrl-event-card').count()) {
@@ -394,7 +448,7 @@ async function play() {
   await step('new-game', async () => {
     await page.fill('[data-nrl-clubname]', 'Phone Test FC');
     await tap('[data-nrl-start]');
-    await page.waitForSelector('.nrl-hud');
+    await page.waitForSelector('.nrl-dock');
     await wait(1000);
   });
   await step('tutorial', async () => {
@@ -465,15 +519,23 @@ async function play() {
     const s = await save();
     rec.notes.push(`money ${s?.money ?? '(not saved yet)'}`);
   }, { quietToasts: true });
-  await step('demolish-confirm', async () => {
+  // One tap demolishes; the toast's Undo is the way back (#370 replaced the "Really demolish?" tap).
+  await step('demolish-undo-toast', async () => {
     await tapAt(...spotB);
     await page.waitForSelector('.nrl-facility-popup');
     await tap('.nrl-facility-demolish');
+    await page.waitForSelector('.nrl-toast-action .nrl-toast-btn');
   });
-  await step('demolished', async () => { await tap('.nrl-facility-demolish'); await wait(2000); }, { quietToasts: true });
+  await step('demolished', async (rec) => {
+    await page.waitForSelector('.nrl-toast-action', { state: 'detached', timeout: 10000 });
+    const n = await page.evaluate(() => window.__nrlState?.().facilities.length);
+    if (n !== 1) throw new Error(`want 1 facility after the demolish, have ${n}`);
+    return '1 facility left once the Undo lapsed';
+  }, { quietToasts: true });
 
   // Recruit: sign the best affordable free agent.
-  await step('recruit', async () => { await navTo('recruit'); await page.waitForSelector('.nrl-screen-title'); });
+  // Recruit is Squad's third segment (Broadcast Quiet), not a tab.
+  await step('recruit', async () => { await navTo('recruit'); await page.waitForSelector('[data-screen-key="recruit"] .nrl-row'); });
   await step('signed', async (rec) => {
     const btn = page.locator('.nrl-row .nrl-row-action:not([disabled])').first();
     const name = await page.locator('.nrl-row:has(.nrl-row-action:not([disabled])) .nrl-row-name').first().textContent();
@@ -481,10 +543,18 @@ async function play() {
     await wait(300);
     rec.notes.push(`signed ${name}`);
   });
-  await step('squad', async () => { await closeAny(); await navTo('squad'); await page.waitForSelector('.nrl-squad-kit'); });
-  // N11: the squad's training focus, a chip on the Squad screen; the pick is saved at once.
+  await step('squad', async () => {
+    await closeAny();
+    // From Recruit, its Squad segment; from anywhere else, the SQUAD tab.
+    const seg = page.locator('.nrl-sq-tabs [data-seg="squad"]');
+    if (await seg.count()) await press(seg.first());
+    else await navTo('squad');
+    await page.waitForSelector('[data-screen-key="squad"]');
+  });
+  // N11: the squad's training focus, a ▾ menu in the Squad sheet's header; the pick is saved at once.
   await step('training-focus', async (rec) => {
-    if (!(await page.locator('.nrl-squad-focus [data-focus="speed"]').count())) return 'no training focus on this build';
+    if (!(await page.locator('[data-focus-menu]').count())) return 'no training focus on this build';
+    await tap('[data-focus-menu]');
     await tap('.nrl-squad-focus [data-focus="speed"]');
     const focus = (await save())?.training?.focus;
     if (focus !== 'speed') throw new Error(`the saved training focus is ${focus}, not speed`);
@@ -501,15 +571,16 @@ async function play() {
     const actions = await page.locator(`[data-player-page="${id}"] [data-player-action]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-player-action')));
     rec.notes.push(`player ${id}; actions ${actions.join(', ') || 'none'}`);
   });
+  // The player page has no ✕ (Broadcast Quiet): its ◂ SQUAD goes back.
   await step('player-page-closed', async () => {
     if (!(await page.locator('[data-player-page]').count())) return 'skipped';
-    await tap('.nrl-player-modal .nrl-screen-x');
+    await tap('.nrl-player-modal [data-back]');
     await page.waitForSelector('[data-player-page]', { state: 'detached', timeout: 5000 });
-    await page.waitForSelector('.nrl-squad-kit');
+    await page.waitForSelector('[data-screen-key="squad"]');
   });
 
-  // Kit designer.
-  await step('kit-designer', async () => { await tap('.nrl-squad-kit'); await page.waitForSelector('.nrl-kit'); });
+  // Kit designer: Office's Kit & colours tile (it was a button on Squad).
+  await step('kit-designer', async () => { await navTo('kit'); await page.waitForSelector('.nrl-kit'); });
   await step('kit-saved', async () => {
     await tap('[data-kit-pattern="hoops"]');
     await tap('[data-kit-alt-pattern="stripes"]');
@@ -544,9 +615,9 @@ async function play() {
     const held = (await page.locator('.nrl-mo-clock').textContent())?.trim();
     if (held !== clock) throw new Error(`the clock ran on under the pause sheet (${clock} → ${held})`);
     await tap('.nrl-mo-sheet [data-save-exit]');
-    await page.waitForSelector('body:not(.nrl-match-active) .nrl-hud', { timeout: 15000 });
-    const label = (await page.locator('.nrl-hud-actions > .nrl-btn').first().textContent())?.trim();
-    if (label !== 'Resume match') throw new Error(`Advance Week reads "${label}", not Resume match`);
+    await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock', { timeout: 15000 });
+    const label = await playWeekLabel();
+    if (label !== 'RESUME MATCH ▸') throw new Error(`PLAY WEEK reads "${label}", not RESUME MATCH ▸`);
     await tap('.nrl-hud-menu-toggle');
     await tap('.nrl-hud-menu .nrl-btn:has-text("×4 weeks")');
     await page.waitForFunction(() => [...document.querySelectorAll('.nrl-toast')].some((t) => /still on/.test(t.textContent || '')));
@@ -555,7 +626,7 @@ async function play() {
     rec.notes.push(`left at ${clock}; button "${label}"; week still ${week}; menu: ${toast}`);
   }, { quietToasts: true });
   await step('resume-match', async (rec) => {
-    await tap('.nrl-hud .nrl-btn:has-text("Resume match")');
+    await tap('.nrl-dock [data-hud="advance"]:has-text("Resume match")');
     await page.waitForSelector('.nrl-mo-controls', { timeout: 20000 });
     await page.waitForFunction(() => {
       const t = document.querySelector('.nrl-mo-clock')?.textContent?.trim();
@@ -566,7 +637,7 @@ async function play() {
   });
   await step('match-fulltime', async () => {
     await skipMatch();
-    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 15000 });
+    await page.waitForSelector(BACK_TO_CLUB, { timeout: 15000 });
     await wait(500);
   });
   // N7 (#182): a new build waiting during a match: no bar while the match is on screen.
@@ -614,13 +685,15 @@ async function play() {
     await page.waitForSelector('.nrl-lineup-plan');
     if (!(await page.locator('.nrl-lineup-tac [data-tactic="grind"]').count())) return 'no tactics on this build';
     await tap('.nrl-lineup-tac [data-tactic="grind"]');
-    await closeAny();
+    if ((await page.locator('.nrl-lineup-tac [data-tactic="grind"]').getAttribute('aria-pressed')) !== 'true') throw new Error('Grind did not light on the plan sheet');
+    await tap('.nrl-lineup-plan [data-plan-done]');
+    await page.waitForSelector('.nrl-lineup-plan', { state: 'detached', timeout: 5000 });
     // Select a fit starter's tile (an injured one is replaced on the day, and the kick with
     // him), then make him the goal-kicker.
     const fit = page.locator('.nrl-lineup-tile[data-spot^="s"]:not([data-out]):not([data-empty])').first();
     const spot = await fit.getAttribute('data-spot');
     await press(fit);
-    await tap('.nrl-lineup-kc .nrl-btn:has-text("Kicker")');
+    await tap('.nrl-lineup-kc [data-make-kicker]');
     const l = await page.evaluate(() => window.__nrlState?.().lineup ?? null);
     const slot = Number(spot.slice(1));
     if (l?.tactics?.attack !== 'grind') throw new Error(`the lineup's attack is ${l?.tactics?.attack}, not grind`);
@@ -655,11 +728,11 @@ async function play() {
     rec.notes.push('Live match (beta) on');
   });
   await step('live-match', async (rec) => {
-    await tap('.nrl-league-modal .nrl-screen-x');
+    await goHome();
     if (!liveOn) return 'skipped: no live-match setting';
     await tapAdvanceWeek();
     await page.waitForSelector('.nrl-mo-controls', { timeout: 15000 });
-    await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×8' }));
+    await press(page.locator('.nrl-mo-controls [data-speed="8"]'));
     await wait(6000);
     const clock = (await page.locator('.nrl-mo-clock').textContent())?.trim();
     if (!clock || clock === '00:00') throw new Error(`the live match clock did not move (${clock})`);
@@ -807,37 +880,45 @@ async function play() {
     if (afterTick + 40 < tick) throw new Error(`resumed tick ${afterTick} is behind the kill tick ${tick}`);
     rec.notes.push(`killed at ${before} (tick ${tick}); resumed at ${after} (tick ${afterTick})`);
   });
-  // Coach calls (#73): the chips under the scoreboard in a live match. Tap the first
-  // one on offer and see it lit for the set; skipped when there are no chips.
+  // Coach calls (#73, 3o): COACH in the bottom row opens a tray of the calls legal now.
+  // Make the first one on offer and see the COACH badge name it for the set; skipped
+  // when there is no COACH button.
   await step('coach-call', async (rec) => {
     if (!liveOn) return 'skipped';
     if (!halfTimeDone && (await halfTimeCard().count())) await playHalfTime(rec);
-    if (!(await page.locator('.nrl-mo-calls .nrl-btn[data-call]').count())) return 'no coach-call chips on the match screen';
-    // At ×8 the chips switch with possession every second or so and are never still
-    // long enough for a locator click: call at ×1, tapping the first chip on offer
+    if (!(await page.locator('.nrl-mo-bar [data-coach]').count())) return 'no COACH button on the match screen';
+    // At ×8 the calls on offer switch with possession every second or so and are never still
+    // long enough for a locator click: call at ×1, opening the tray and tapping its first row
     // inside the page, then go back to ×8.
-    await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×1' }));
-    // The tap lights its chip at once (MatchScene.refreshCallChips) unless the call is refused,
-    // and the light goes with the set, which can end a tick later: read it in the same task.
+    await press(page.locator('.nrl-mo-controls [data-speed="1"]'));
+    // A call that lands names itself on the badge at once (MatchScene.makeCall) and closes the
+    // tray; one refused (the play moved on) rebuilds the rows: read it in the same task.
     let call = null;
+    let empty = 0;
     const refused = [];
     for (let i = 0; i < 40 && !call; i++) {
       const got = await page.evaluate(() => {
-        // Call chips only: the Plan chip (N11.2) shares the row and opens the plan card.
-        const b = [...document.querySelectorAll('.nrl-mo-calls .nrl-btn[data-call]')].find((e) => !e.hidden && !e.disabled);
+        const coach = document.querySelector('.nrl-mo-bar [data-coach]');
+        if (coach?.getAttribute('aria-expanded') !== 'true') coach?.click();
+        const b = document.querySelector('.nrl-mo-calls:not([hidden]) [data-call]');
         if (!b) return null;
         b.click();
-        return { call: b.getAttribute('data-call'), lit: b.hasAttribute('data-made'), why: b.title };
+        const badge = document.querySelector('.nrl-mo-coach-badge');
+        return { call: b.getAttribute('data-call'), made: badge?.getAttribute('data-state') === 'made', badge: badge?.textContent?.trim() ?? '', tray: !document.querySelector('.nrl-mo-calls')?.hidden };
       });
-      if (got?.lit) call = got.call;
-      else {
-        if (got) refused.push(`${got.call}: ${got.why}`);
-        await wait(250);
-      }
+      if (got?.made) { call = got; break; }
+      if (got) refused.push(got.call); else empty++;
+      await wait(250);
     }
-    if (!call) throw new Error(refused.length ? `no call lit its chip (${refused.slice(-2).join('; ')})` : 'no coach-call chip was on offer for 10 s');
-    rec.notes.push(`called ${call}${refused.length ? ` (${refused.length} refused first)` : ''}`);
-    await press(page.locator('.nrl-mo-controls .nrl-btn', { hasText: '×8' }));
+    // Leave the tray shut: open, it hides every speed but the one playing.
+    await page.evaluate(() => {
+      const coach = document.querySelector('.nrl-mo-bar [data-coach]');
+      if (coach?.getAttribute('aria-expanded') === 'true') coach.click();
+    });
+    if (!call) throw new Error(refused.length ? `no call landed (${refused.slice(-3).join(', ')} refused)` : 'the tray offered no call for 10 s');
+    if (call.tray) throw new Error(`the tray stayed open after ${call.call} was made`);
+    rec.notes.push(`called ${call.call}; badge reads "${call.badge}"${refused.length ? ` (${refused.length} refused first)` : ''}${empty ? `; ${empty} looks at an empty tray` : ''}`);
+    await press(page.locator('.nrl-mo-controls [data-speed="8"]'));
   });
   // N11: the half-time card comes up by itself and waits for Continue (#341); change the attack and play on.
   await step('half-time-plan', async (rec) => {
@@ -851,7 +932,7 @@ async function play() {
   await step('live-fulltime', async (rec) => {
     if (!liveOn) return 'skipped';
     await skipMatch();
-    await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 20000 });
+    await page.waitForSelector(BACK_TO_CLUB, { timeout: 20000 });
     await wait(500);
     const shown = (await page.locator('.nrl-mo-score').textContent())?.trim();
     // A live match holds the week until full time (#73), so read the live state, not the slot.
@@ -887,28 +968,34 @@ async function play() {
     await navTo('news');
     await page.waitForSelector('.nrl-news-list');
   });
-  // N7 (#184): the next-match card on the Fixtures tab, with the opponent's form.
+  // N7 (#184): the next-match card, with the opponent's form. League is one sheet (ladder and
+  // fixtures, 3h); the card is a preview dialog behind the fixtures' NEXT row.
   await step('next-match', async (rec) => {
     await closeAny();
     await navTo('fixtures');
     await page.waitForSelector('.nrl-league');
+    const row = page.locator('[data-next-row]');
+    if (!(await row.count())) return 'no NEXT row on the fixtures (no match left?)';
+    await press(row.first());
+    await page.waitForSelector('[data-next-match]', { timeout: 5000 });
     const card = page.locator('[data-next-match]');
-    if (!(await card.count())) return 'no next-match card on this build';
     const opp = (await page.locator('[data-next-opponent]').first().textContent())?.trim().replace(/\s+/g, ' ');
     const form = await page.locator('[data-next-match] .nrl-form i').count();
     if (!opp) throw new Error('the next-match card names no opponent');
     rec.notes.push(`next: ${opp.slice(0, 60)}; ${form} form cells`);
   });
+  // The ladder is on the same League sheet; its FORM column shows from 760px wide.
   await step('ladder', async (rec) => {
     await closeAny();
-    await navTo('fixtures'); await tap('.nrl-league-tabs .nrl-btn:has-text("Ladder")');
+    await navTo('fixtures');
     await page.waitForSelector('.nrl-ladder-table');
-    const form = await page.locator('.nrl-ladder-form').count();
-    if (form) rec.notes.push(`form column on ${form} rows`);
+    const form = await page.locator('.nrl-ladder-table td.nrl-ladder-form:visible').count();
+    rec.notes.push(form ? `form column on ${form} rows` : 'form column hidden at this width');
+    if (W >= 760 && !form) throw new Error(`no form column on the ladder at ${W}px`);
   });
   await step('rival-squad', async () => { await tap('.nrl-ladder-club'); await page.waitForSelector('.nrl-rival-squad'); });
 
-  // Contracts: renew someone.
+  // Contracts: renew someone. Office → Finance → its contracts VIEW ▸.
   await step('contracts', async () => {
     await press(page.locator('.nrl-rival-modal .nrl-screen-x'));
     await closeAny();
@@ -916,17 +1003,23 @@ async function play() {
     await wait(300);
   });
   await step('renewed', async (rec) => {
-    const renew = page.locator('.nrl-contract-actions .nrl-btn:has-text("Renew")').first();
+    const renew = page.locator('.nrl-contract-actions [data-contract-renew]:not([disabled])').first();
     if (!(await renew.count())) return 'no contract to renew';
     const label = await renew.textContent();
     await press(renew);
     rec.notes.push(`tapped ${label}`);
   });
-  await step('finance', async () => { await closeAny(); await navTo('finance'); await wait(300); });
-  // N14.5 (#287): the Staff screen, under More since #344. Hire the Welfare Manager, so the saves
+  // Back to Finance by the Contracts sheet's ◂ FINANCE.
+  await step('finance', async () => {
+    await closeAny();
+    await tap('[data-screen-key="contracts"] [data-back]');
+    await page.waitForSelector('[data-screen-key="finance"]');
+  });
+  // N14.5 (#287): the Staff screen, an Office tile (Staff & Board). Hire the Welfare Manager, so the saves
   // dumped after this (after-rollover, live-rivals) carry a staffed club for the corpus.
   await step('staff-hire', async (rec) => {
-    if (await page.locator('.nrl-nav [data-screen="staff"]').count()) { await navTo('staff'); await wait(300); }
+    await navTo('staff');
+    await wait(300);
     const row = page.locator('.nrl-staff-row[data-staff="welfare"]');
     if (!(await row.count())) return 'no Staff section on this build';
     const hire = row.locator('.nrl-btn:has-text("Hire")');
@@ -949,18 +1042,23 @@ async function play() {
     const tabs = await page.locator('[data-guide-tab]').count();
     rec.notes.push(`${tabs} Guide pages; How Nines works open`);
   });
+  // A sheet has no ✕ (Broadcast Quiet): CLUB in the dock closes it.
   await step('guide-closed', async () => {
     if (!(await page.locator('[data-guide]').count())) return 'skipped';
-    await tap('.nrl-guide-modal .nrl-screen-x');
+    await goHome();
     await page.waitForSelector('[data-guide]', { state: 'detached', timeout: 5000 });
   });
 
-  // N14 (#263): the controls N7 left under 44px on a touch screen, and the League's ✕
-  // staying in view while the ladder scrolls.
+  // N14 (#263): the controls N7 left under 44px on a touch screen, and the League's way out
+  // staying in view while the ladder scrolls. The League had a ✕ in its frame; a sheet now
+  // closes from the dock (its tab, or CLUB), so the check is that the ladder scrolls inside
+  // the sheet (3h: the header row holds still) with the dock's CLUB and LEAGUE whole and tappable.
   await step('control-sizes', async (rec) => {
     await closeAny();
     const found = [];
-    await tap('.nrl-audio-gear');
+    // Settings is an Office tile (the floating gear is gone).
+    await navTo('settings');
+    await page.waitForSelector('.nrl-settings-modal');
     const mute = await smallestBox('.nrl-audio-row input[type="checkbox"]');
     if (mute) rec.notes.push(`mute ${mute.w}×${mute.h}`);
     if (tooSmall(mute)) found.push(`Mute ${mute.w}×${mute.h}`);
@@ -971,18 +1069,29 @@ async function play() {
     if (row) rec.notes.push(`lineup rows ${row.w}×${row.h}`);
     if (tooSmall(row)) found.push(`lineup row ${row.w}×${row.h}`);
     await closeAny();
-    await navTo('fixtures'); await tap('.nrl-league-tabs .nrl-btn:has-text("Ladder")');
+    await navTo('fixtures');
     await page.waitForSelector('.nrl-ladder-table');
-    const closeInView = await page.evaluate(() => {
-      const body = document.querySelector('.nrl-league-body');
-      if (!body) return false; // no body to scroll: the check can't pass by not scrolling
+    const scrolled = await page.evaluate(() => {
+      const body = document.querySelector('.nrl-league .nrl-ladder-scroll');
+      const sheet = document.querySelector('.nrl-screen-region[data-screen-key] .nrl-league')?.getBoundingClientRect()
+        ?? document.querySelector('.nrl-league')?.getBoundingClientRect();
+      if (!body || !sheet) return { ok: false, why: 'no ladder to scroll' };
+      const top = sheet.top;
       body.scrollTop = body.scrollHeight;
-      const c = document.querySelector('.nrl-league-modal .nrl-screen-x')?.getBoundingClientRect();
-      return !!c && c.top >= 0 && c.bottom <= window.innerHeight;
+      const moved = Math.abs(document.querySelector('.nrl-league').getBoundingClientRect().top - top) > 1;
+      const exits = ['[data-nav-home]', '.nrl-nav > .nrl-btn[data-screen="fixtures"]'].map((sel) => {
+        const b = document.querySelector(sel);
+        const r = b?.getBoundingClientRect();
+        if (!r || r.width < 1) return `${sel} missing`;
+        if (r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) return `${sel} off screen`;
+        const at = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+        return b.contains(at) ? null : `${sel} covered by ${at?.className || at?.tagName}`;
+      }).filter(Boolean);
+      return { ok: !moved && !exits.length, why: [moved ? 'the sheet moved with its list' : '', ...exits].filter(Boolean).join(', ') };
     });
-    rec.notes.push(closeInView ? 'League ✕ in view after scrolling' : 'League ✕ scrolled away');
-    if (!closeInView) found.push('League ✕ scrolled away');
-    await closeAny();
+    rec.notes.push(scrolled.ok ? 'ladder scrolled inside the sheet; CLUB and LEAGUE in view' : `League: ${scrolled.why}`);
+    if (!scrolled.ok) found.push(`League: ${scrolled.why}`);
+    await goHome();
     if (found.length) throw new Error(found.join('; '));
   });
 
@@ -992,7 +1101,7 @@ async function play() {
   await step('reload-title', async () => { await page.reload(); await page.waitForSelector('[data-nrl-continue-1]'); });
   await step('continued', async (rec) => {
     await tap('[data-nrl-continue-1]');
-    await page.waitForSelector('.nrl-hud');
+    await page.waitForSelector('.nrl-dock');
     await wait(800);
     const s = await page.evaluate(() => window.__nrlState());
     // What the player can change between weeks, some of it free (the kit, a card left open).
@@ -1054,8 +1163,8 @@ async function play() {
       return 'no season review on this build';
     }
     rec.notes.push((await review.locator('.nrl-review-finish').textContent())?.trim() ?? '');
-    // #351 E2: one header row, title and History beside the frame's ✕, no Close at the bottom.
-    await tap('.nrl-review-modal > .nrl-screen-x');
+    // #351 E2: one header row, title and History beside its way out: Carry on ▸ (a sheet has no ✕).
+    await tap('[data-season-review] .nrl-review-done');
     await page.waitForSelector('[data-season-review]', { state: 'detached', timeout: 5000 });
   });
   await step('history', async () => { await navTo('history'); await wait(300); });
@@ -1070,13 +1179,14 @@ async function play() {
   });
   await step('season-2-week-2', async (rec) => {
     await closeAny();
+    await goHome();
     await answerCards(rec);
     await tapAdvanceWeek();
     await wait(1500);
     // A match week opens the match scene; skip it.
     if (await page.locator('.nrl-mo-controls').count()) {
       await skipMatch();
-      await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 15000 });
+      await page.waitForSelector(BACK_TO_CLUB, { timeout: 15000 });
       await leaveMatch();
     }
     const s = await save();
@@ -1091,8 +1201,8 @@ async function play() {
   await step('held-week', async (rec) => {
     await closeAny();
     await answerCards(rec);
-    // The setting is in Settings, behind the gear (#350 X3).
-    await tap('.nrl-audio-gear');
+    // The setting is in Settings, an Office tile (#350 X3; the gear went with Broadcast Quiet).
+    await navTo('settings');
     const toggle = page.locator('.nrl-rivals-toggle input[type="checkbox"]');
     if (!(await toggle.count())) return 'no rival-rounds setting on this build';
     await press(toggle);
@@ -1108,7 +1218,7 @@ async function play() {
       .then((h) => h.jsonValue());
     if (match === 'match') {
       await skipMatch();
-      await page.waitForSelector('.nrl-btn:has-text("Back to Club")', { timeout: 30000 });
+      await page.waitForSelector(BACK_TO_CLUB, { timeout: 30000 });
       await leaveMatch();
     } else rec.notes.push('the round forfeited (short of 13 fit at a full squad), so only the rivals hold the week');
     const held = () => page.evaluate((w) => window.__nrlState().week === w, week);
@@ -1116,12 +1226,13 @@ async function play() {
     // QA finding 22: the screens that save at once are live during the hold. A change now (the
     // squad's training focus) must not write the half-ticked week: slot 1 stays as the week began.
     await navTo('squad');
+    await tap('[data-focus-menu]');
     const focus = page.locator('.nrl-squad-focus [data-focus]:not(.nrl-sort-active)').first();
     rec.notes.push(`focus → ${await focus.getAttribute('data-focus')} during the hold`);
     await press(focus);
-    // A screen, not a modal: closeAny leaves it up, over the Advance menu the taps below need.
-    await press(page.locator('.nrl-screen-region .nrl-screen-x').first());
-    await page.waitForSelector('.nrl-squad-focus', { state: 'detached', timeout: 5000 });
+    // A sheet, not a modal: closeAny leaves it up. CLUB closes it.
+    await goHome();
+    await page.waitForSelector('[data-screen-key="squad"]', { state: 'detached', timeout: 5000 });
     if (!(await held())) throw new Error('the hold ended before the focus change: the slowed Worker was not slow enough');
     const slot = await save();
     if (JSON.stringify(slot) !== slotBefore) {
@@ -1154,7 +1265,7 @@ async function play() {
     await dumpSave('live-rivals', rec);
     // Back to the default for whatever runs next.
     await page.evaluate(() => { window.__nrlWorkerDelayMs = 0; });
-    await tap('.nrl-audio-gear');
+    await navTo('settings');
     await press(page.locator('.nrl-rivals-toggle input[type="checkbox"]'));
     await closeAny();
   }, { quietToasts: true });
@@ -1166,7 +1277,7 @@ async function play() {
     const s = await save();
     const file = join(OUT, 'import.json');
     writeFileSync(file, JSON.stringify({ ...s, clubName: 'Imported FC' }));
-    await tap('.nrl-audio-gear');
+    await navTo('settings');
     // Wait and tap together: a wait started alone rejects unhandled if the tap outlasts it, and
     // Node ends the whole run there (1280×800 under load, 21 Oct 23:10).
     // Import asks first (#349 E1): the file is chosen from the confirm.
@@ -1183,7 +1294,7 @@ async function play() {
   });
   await step('import-continued', async (rec) => {
     await tap('[data-nrl-continue-1]');
-    await page.waitForSelector('.nrl-hud');
+    await page.waitForSelector('.nrl-dock');
     const live = await page.evaluate(() => window.__nrlState().clubName);
     if (live !== 'Imported FC') throw new Error(`Continue opened "${live}", not the imported club`);
     rec.notes.push('Continue opened the imported club');

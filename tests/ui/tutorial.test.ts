@@ -62,7 +62,7 @@ describe('STEPS: three guided taps (#370)', () => {
     expect(byId.get('build')!.text).toBe(`Tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
     expect(byId.get('place')!.text).toContain('green spot on the grass');
     expect(byId.get('recruit')!.text).toMatch(/Sign on the best player you can afford/);
-    expect(byId.get('advance')!.text).toMatch(/Advance Week/);
+    expect(byId.get('advance')!.text).toMatch(/Play Week/);
   });
 
   it('opens the screen a tap is on, and points inside it (#337 U3)', () => {
@@ -107,7 +107,7 @@ describe('STEPS: three guided taps (#370)', () => {
   });
 
   it('ends with the old wrap line as a toast, and it still says where the Guide is', () => {
-    expect(TUTORIAL_END_TEXT).toContain('under More');
+    expect(TUTORIAL_END_TEXT).toContain('in Office');
   });
 });
 

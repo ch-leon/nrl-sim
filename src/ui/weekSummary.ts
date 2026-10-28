@@ -209,7 +209,7 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void })
     el('h3', {}, 'Board: ', el('span', { class: 'nrl-summary-mood', text: MOOD_WORD[v.board.mood] })),
     el('p', { text: v.board.text }));
 
-  const advance = button('Advance Week', () => { closeModal(); opts.onAdvance(); }, { class: 'nrl-summary-advance' });
+  const advance = button('Play week ▸', () => { closeModal(); opts.onAdvance(); }, { class: 'nrl-summary-advance nrl-btn-primary' });
   advance.setAttribute('data-summary-advance', '');
   const close = button('Close', () => closeModal());
   close.setAttribute('data-summary-close', '');

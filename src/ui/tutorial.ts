@@ -52,18 +52,22 @@ export interface TutorialStep {
  * three taps since #370). Tap 1 is two steps: Build opens with the paddock's row
  * framed, and once its placement bar is up the next step frames the bar and the
  * grass. Anchor selectors reference elements that really exist in the shipped UI:
- *   - nav buttons carry `data-screen="<id>"` (see ui/nav.ts registerScreen)
+ *   - the dock's tabs carry `data-screen="<id>"` (see ui/nav.ts registerScreen),
+ *     Office's tiles too, in `.nrl-nav-sheet`
  *   - open screens carry `data-screen-key="<id>"` (see ui/dom.ts openScreen)
- *   - the Advance Week control is the button inside `.nrl-hud-actions` (ui/hud.ts)
- * An anchor may list fallbacks: the first on screen wins, so a screen in More's
- * sheet (#344) is highlighted on the More tab until the sheet is open. When only
- * a fallback is on screen the bubble offers Next, so a closed screen never strands the player.
+ *   - PLAY WEEK is the first button inside `.nrl-hud-actions` (ui/hud.ts)
+ * An anchor may list fallbacks: the first on screen wins, so a screen reached
+ * through Squad's segments is highlighted on the SQUAD tab until it is open. When
+ * only a fallback is on screen the bubble offers Next, so a closed screen never strands the player.
  *
  * What became of the 11-step tour (#370): welcome and wrap dropped (the first tap
  * is the welcome; the end is a toast, see endTutorial); squad dropped (the Guide's
  * Squad page covers it); lineup, news, finance and contracts are HINTS.
  */
-const inMore = (id: string): string => `.nrl-nav .nrl-btn[data-screen="${id}"], .nrl-nav [data-nav-more]`;
+/** A tab of the dock. */
+const tab = (id: string): string => `.nrl-nav .nrl-btn[data-screen="${id}"]`;
+/** A screen reached through Squad's segments (Recruit): its segment, else the SQUAD tab. */
+const inSquad = (id: string): string => `[data-seg="${id}"], ${tab('squad')}`;
 
 /** The paddock's name as the catalog has it, so a rename follows (#361 owns the names). */
 const PADDOCK = FACILITY_CATALOG.trainingPaddock.name;
@@ -72,7 +76,7 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'build',
     text: `Tap ${PADDOCK} to build one.`,
-    anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], ${inMore('build')}`,
+    anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], ${tab('build')}`,
     advanceOn: 'facility:placed',
     opens: 'build',
     until: '.nrl-placebar:not([hidden])',
@@ -82,7 +86,7 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'place',
     text: 'Tap a green spot on the grass to build it there.',
-    anchor: `.nrl-placebar:not([hidden]), ${inMore('build')}`,
+    anchor: `.nrl-placebar:not([hidden]), ${tab('build')}`,
     advanceOn: 'facility:placed',
     tap: 1,
   },
@@ -92,7 +96,7 @@ export const STEPS: readonly TutorialStep[] = [
     text: 'Tap Sign on the best player you can afford.',
     anchor:
       `[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled)), ` +
-      `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inMore('recruit')}`,
+      `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inSquad('recruit')}`,
     advanceOn: 'player:signed',
     opens: 'recruit',
     tap: 2,
@@ -100,7 +104,7 @@ export const STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'advance',
-    text: 'Tap Advance Week to play your first match.',
+    text: 'Tap Play Week to play your first match.',
     anchor: '.nrl-hud-actions .nrl-btn',
     advanceOn: 'week:advanced',
     tap: 3,
@@ -117,13 +121,13 @@ export const TAP_COUNT = Math.max(...STEPS.map((s) => s.tap));
  */
 export const HINTS: Readonly<Record<string, string>> = {
   lineup: 'Lineup sets your nine, kicker, captain and game plan; you can change the plan at half-time.',
-  news: 'News keeps results and warnings; a decision shows here and as a red count on Advance Week.',
+  news: 'News keeps results and warnings; a decision shows here, on the grounds and as a red count on Play Week.',
   finance: "Money in and out by line; the board's season goals are on Staff & Board.",
   contracts: 'Deals by expiry: renew before a player walks, or sell him for a fee.',
 };
 
 /** The end of a completed run (#370): what the old wrap step said, as a club toast. */
-export const TUTORIAL_END_TEXT = "That's the loop. The Guide under More explains the rest.";
+export const TUTORIAL_END_TEXT = "That's the loop. The Guide in Office explains the rest.";
 
 // ── Pure logic (unit-tested; no DOM) ───────────────────────────────────────
 
@@ -542,7 +546,7 @@ function renderBubble(
     el('span', { class: 'nrl-tutorial-count', text: `${step.tap} of ${TAP_COUNT}` }));
   actions.appendChild(button('Skip', () => endTutorial(), { class: 'nrl-tutorial-skip' }));
   if (wantsNext) {
-    actions.appendChild(button('Next', () => advance(), { class: 'nrl-tutorial-next' }));
+    actions.appendChild(button('Next', () => advance(), { class: 'nrl-tutorial-next nrl-btn-primary' }));
   }
 
   // A step that opened its screen keeps to a bar on a landscape phone, so the screen shows under it.
@@ -598,7 +602,7 @@ export function initFirstVisitHints(): () => void {
 // ── Styles ───────────────────────────────────────────────────────────────
 // Injected once, lazily, from startTutorial. Kept out of dom.ts (owned by WU-5)
 // so this ticket edits only files it owns. Pixel-art styling to match the kit:
-// chunky borders, hard drop shadow, monospace, pixelated rendering.
+// Broadcast Quiet: a navy card with a yellow edge pointing at the one thing to tap, ringed in yellow.
 
 const TUTORIAL_STYLE_ID = 'nrl-tutorial-styles';
 
@@ -616,15 +620,15 @@ export const TUTORIAL_CSS = `
   position: fixed;
   inset: 0;
   pointer-events: none; /* only the bubble takes taps */
-  z-index: 200;         /* above HUD/nav (55) and modals (100) */
-  font-family: 'Courier New', monospace;
-  image-rendering: pixelated;
+  z-index: 200;         /* above the dock (55) and modals (100) */
+  font-family: var(--nrl-f-body, 'IBM Plex Sans', sans-serif);
 }
 .nrl-tutorial-cutout {
   position: fixed;
   pointer-events: none;
-  border: 3px solid #f4d03f;
-  box-shadow: 0 0 0 3px #000, 0 0 12px 2px #f4d03f;
+  border: 2px solid #f4d03f;
+  border-radius: 12px;
+  box-shadow: 0 0 0 4px rgba(244, 208, 63, 0.25), 0 0 18px 2px rgba(244, 208, 63, 0.45);
   z-index: 200;
 }
 /* #337 U1: never over a match, live or at full time. */
@@ -633,14 +637,15 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   pointer-events: auto;
   position: fixed;
   left: 50%;
-  bottom: calc(5rem + var(--nrl-safe-b, 0px)); /* clear of the nav and the home bar */
+  bottom: calc(var(--nrl-nav-h, 5rem) + 12px); /* clear of the dock (its height includes the home bar) */
   transform: translateX(-50%);
   max-width: min(90vw, 320px);
-  background: #e8e0c8;
-  color: #1a1a2e;
-  border: 3px solid #000;
-  box-shadow: 3px 3px 0 #000;
-  padding: 0.75rem 0.9rem;
+  background: rgba(14, 22, 48, 0.97);
+  color: #fff;
+  border-radius: 14px;
+  border-left: 4px solid #f4d03f;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  padding: 12px 14px;
   z-index: 201;
   /* #206: never taller than the room above its dock. The copy scrolls inside the
      bubble and Skip / Next stay pinned at its foot, so however big the text gets
@@ -649,8 +654,8 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 5.75rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
-  max-height: calc(100dvh - 5.75rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
+  max-height: calc(100vh - var(--nrl-nav-h, 5rem) - 24px - var(--nrl-safe-t, 0px));
+  max-height: calc(100dvh - var(--nrl-nav-h, 5rem) - 24px - var(--nrl-safe-t, 0px));
 }
 .nrl-tutorial-centered {
   top: 50%;
@@ -660,9 +665,10 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   max-height: calc(100dvh - 1.5rem);
 }
 .nrl-tutorial-text {
-  font-size: clamp(0.8rem, 3vw, 1rem);
-  line-height: 1.35;
-  margin-bottom: 0.7rem;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: 10px;
+  color: #c9d1ea;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -671,23 +677,26 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
 .nrl-tutorial-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: 8px;
   flex: 0 0 auto;
 }
+.nrl-tutorial-actions .nrl-btn { min-height: 40px; }
+@media (pointer: coarse) { .nrl-tutorial-actions .nrl-btn { min-height: 44px; } }
 /* A landscape phone (#195): the bubble docks bottom-left, clear of the tile the
    player has to tap, the match's speed buttons and the home bar. */
 @media (max-height: 500px) {
   .nrl-tutorial-bubble, .nrl-tutorial-centered {
     top: auto;
-    bottom: calc(4.5rem + var(--nrl-safe-b, 0px));
-    left: calc(0.75rem + var(--nrl-safe-l, 0px));
+    bottom: calc(var(--nrl-nav-h, 4.5rem) + 12px);
+    left: calc(12px + var(--nrl-safe-l, 0px));
     right: auto;
     transform: none;
     /* 300px with border-box is ~265px of copy: every step fits unscrolled at
        750×340 and 956×330 (#208); the height cap below is the backstop. */
     max-width: min(60vw, 300px);
-    max-height: calc(100vh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
-    max-height: calc(100dvh - 5.25rem - var(--nrl-safe-b, 0px) - var(--nrl-safe-t, 0px));
+    /* From the dock's top (its height plus the 12px gap) to 12px under the top edge. */
+    max-height: calc(100vh - var(--nrl-nav-h, 4.5rem) - 24px - var(--nrl-safe-t, 0px));
+    max-height: calc(100dvh - var(--nrl-nav-h, 4.5rem) - 24px - var(--nrl-safe-t, 0px));
   }
 }
 /* The bar: one row above the nav, copy then Skip and Next, over about one row of
@@ -699,23 +708,28 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
     gap: 0.6rem;
     left: calc(0.75rem + var(--nrl-safe-l, 0px));
     right: calc(0.75rem + var(--nrl-safe-r, 0px));
-    bottom: calc(var(--nrl-nav-h, 3.5rem) + 0.25rem);
+    bottom: calc(var(--nrl-nav-h, 3.5rem) + 4px);
     max-width: 640px;
-    padding: 0.35rem 0.6rem;
+    padding: 6px 6px 6px 14px;
   }
   /* Capped in rem, which a text boost leaves alone: boosted copy scrolls (#206) instead of growing the bar over the screen. */
-  .nrl-tutorial-bar .nrl-tutorial-text { margin: 0; font-size: 0.8rem; line-height: 1.25; max-height: 5rem; }
+  .nrl-tutorial-bar .nrl-tutorial-text { margin: 0; font-size: 13px; line-height: 1.3; max-height: 5rem; }
 }
 .nrl-tutorial-bubble.nrl-tutorial-top { top: calc(var(--nrl-hud-h, 0px) + 0.25rem); bottom: auto; }
 /* #370: which of the three taps this is. */
 .nrl-tutorial-count {
   align-self: center;
   margin-right: auto;
-  padding: 0 0.3em;
-  background: var(--nrl-tutorial-count-bg, #1a1a2e);
-  color: var(--nrl-tutorial-count-ink, #f4d03f);
-  font-size: 0.85em;
-  font-weight: bold;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--nrl-button, #1f2b55);
+  color: var(--nrl-accent, #f4d03f);
+  font-family: var(--nrl-f-label, 'Barlow Condensed', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 24px;
   white-space: nowrap;
 }
 .nrl-tutorial-bubble.nrl-tutorial-right { left: auto; right: calc(0.75rem + var(--nrl-safe-r, 0px)); transform: none; }

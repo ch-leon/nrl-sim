@@ -76,7 +76,7 @@ export function renderGuidePage(page: GuidePage): HTMLElement {
 /** Open the Guide on `pageId` (else where it was last, else the first page). */
 export function openGuideScreen(pageId?: string): HTMLElement {
   const content = el('div', { class: 'nrl-guide', attrs: { 'data-guide': '' } });
-  const tabs = el('div', { class: 'nrl-guide-tabs', attrs: { role: 'tablist' } });
+  const tabs = el('div', { class: 'nrl-seg nrl-guide-tabs', attrs: { role: 'tablist' } });
   const body = el('div', { class: 'nrl-guide-body' });
 
   const show = (id: string): void => {
@@ -90,6 +90,7 @@ export function openGuideScreen(pageId?: string): HTMLElement {
   };
   for (const p of GUIDE_PAGES) {
     const b = button(p.short, () => show(p.id), { class: 'nrl-guide-tab' });
+    b.setAttribute('aria-pressed', 'false');
     b.setAttribute('data-guide-tab', p.id);
     b.setAttribute('role', 'tab');
     tabs.append(b);
@@ -98,7 +99,7 @@ export function openGuideScreen(pageId?: string): HTMLElement {
   const foot = el('div', { class: 'nrl-guide-foot' });
   foot.append(el('span', { class: 'nrl-guide-build', text: `Build ${buildLabel()}`, attrs: { 'data-nrl-build': '' } }));
   if (updateReady()) {
-    foot.append(button('New version: reload', () => reloadForUpdate(), { class: 'nrl-guide-update' }));
+    foot.append(button('New version: reload', () => reloadForUpdate(), { class: 'nrl-guide-update nrl-btn-primary' }));
   }
   foot.append(
     button('Replay tutorial', () => {
@@ -107,7 +108,7 @@ export function openGuideScreen(pageId?: string): HTMLElement {
     }, { class: 'nrl-guide-replay' }),
   );
 
-  content.append(tabs, body, foot);
+  content.append(el('div', { class: 'nrl-guide-top' }, tabs, foot), body);
   show(pageId ?? lastPageId ?? GUIDE_PAGES[0]!.id);
   return openModal(content, { class: 'nrl-guide-modal', screen: true, key: 'help' });
 }

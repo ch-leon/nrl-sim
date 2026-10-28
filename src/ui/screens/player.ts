@@ -1,32 +1,37 @@
 // src/ui/screens/player.ts — the player page (N7, GitHub #185).
 //
-// Tap a PlayerCard on the Squad or Recruit screen, or a row of a rival's squad,
-// and this dialog opens over it: portrait, the stat bars, every trait with its
-// tip, age and position, morale and why, the contract and wage, this season's
-// and the career tallies, and the actions that apply where the player is
-// (sign a free agent; renew, sell or release one of yours) through the same
-// system functions the Recruit, Squad and Contracts screens call. The
-// view-model (playerPageModel) is pure and unit-tested; the DOM renders it.
-// No Phaser.
+// Tap a row on the Squad or Recruit screen, or of a rival's squad, and this
+// page opens over it as a full sheet (3f, Broadcast Quiet) in three columns.
+// Left: ◂ back to where it was opened, the portrait, name, position, age and
+// the number he wears, overall and fitness, the contract. Middle: the stat bars
+// with this week's training gain, every trait with its tip, morale and why,
+// injury risk, this season's and the career tallies. Right: his roles in the
+// side (goal-kicker, captain) and, pinned at the foot, the actions that apply
+// where the player is (sign a free agent; renew, sell or release one of yours)
+// through the same system functions the Recruit, Squad and Contracts screens
+// call. The view-model (playerPageModel) is pure and unit-tested; the DOM
+// renders it. No Phaser.
 
 import { bus } from '../../core/events';
-import { getState, type GameState, type Player, type PlayerStats, type RivalClub, type StatTally } from '../../core/state';
+import { getState, setState, type GameState, type Player, type PlayerStats, type RivalClub, type StatTally } from '../../core/state';
+import { save } from '../../core/save';
 import { marketWage, overallRating } from '../../data/player';
 import { ROMAN, TRAITS, traitTip } from '../../data/traits';
 import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } from '../../systems/contracts';
 import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
 import { signWithUndo } from '../../systems/undo';
+import { activePack } from '../../content';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
-import { activePack } from '../../content';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PORTRAIT_H, PORTRAIT_W, TRAINING_KIT, portraitDataUrl } from '../../art/portrait';
-import { button, closeModal, el, openModal, panel } from '../dom';
-import { ensureScreenStyles } from './recruit';
+import { backButton, button, closeModal, el, openModal } from '../dom';
+import { ensureScreenStyles, fitColour } from './recruit';
 import { fmtMoney } from './finance';
 import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
-import { LINEUP_SLOTS, resolveLineup } from '../../systems/lineup';
+import { LINEUP_SLOTS, resolveLineup, setCaptain, setKicker, statsAt } from '../../systems/lineup';
+import { kickerAndCaptain } from '../../match/league/sheets';
 import { RETIREMENT_NOTE_AGE, careerStage, projectCareer, retirementRisk, type CareerPoint, type CareerStage } from '../../systems/potential';
 
 // ── View-model (pure) ───────────────────────────────────────────────────────
@@ -41,7 +46,7 @@ export type PlayerActionId = 'sign' | 'renew' | 'sell' | 'release';
 
 export interface PlayerAction {
   id: PlayerActionId;
-  /** Button text, e.g. "Sell +$12,000". */
+  /** Button text, e.g. "Renew · $38,000", "Sell +$12,000". */
   label: string;
   /** Small print under the buttons, e.g. "$1,200/wk for 52 weeks". */
   detail?: string;
@@ -69,6 +74,12 @@ export interface PlayerPageModel {
   morale: { value: number; word: string; reasons: string[] };
   /** "Fit" or "Out 3 weeks". */
   fitness: string;
+  /** Fitness as a %, as the Squad table shows it ({@link fitnessPct}). */
+  fitnessPct: number;
+  /** The number he wears this week (squad only, {@link squadNumbers}), or null. */
+  number: number | null;
+  /** His jobs in the nine (squad only, N11): null for anyone else. */
+  roles: { starter: boolean; kicker: boolean; captain: boolean } | null;
   injured: boolean;
   /** "low", "moderate" or "high". */
   injuryRisk: string;
@@ -158,7 +169,7 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
     const broke = state.money < fee;
     return [{
       id: 'sign',
-      label: `Sign ${fmtMoney(fee)}`,
+      label: `Sign · ${fmtMoney(fee)}`,
       detail: `${signingFeeBasis(state, p)} · then ${fmtMoney(paidWage(p, state))}/wk`,
       enabled: !full && !broke,
       ...(full ? { why: `Squad full (${SQUAD_CAP})` } : broke ? { why: 'Not enough money for the fee' } : {}),
@@ -172,7 +183,7 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
   return [
     {
       id: 'renew',
-      label: `Renew ${fmtMoney(fee)}`,
+      label: `Renew · ${fmtMoney(fee)}`,
       detail: `${fmtMoney(renewalWeeklyCost(state, p))}/wk for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks`,
       enabled: !fresh && !broke,
       ...(fresh ? { why: 'Contract already full length' } : broke ? { why: 'Not enough money for the fee' } : {}),
@@ -186,7 +197,7 @@ export function playerActions(p: Player, ctx: PlayerContext, state: GameState): 
     },
     {
       id: 'release',
-      label: `Release ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`,
+      label: `Release · ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`,
       detail: `${RELEASE_PAYOUT_WEEKS}×wage settlement`,
       enabled: !atMin,
       danger: true,
@@ -221,6 +232,44 @@ export function lineupSlotText(state: Pick<GameState, 'lineup' | 'squad'>, playe
   return picked ? 'Picked, but injured' : 'Not picked';
 }
 
+/**
+ * Fitness, for the Squad table and the player page: 100 less his injury risk
+ * (how much his body can take), 0 while he is injured. A ban does not touch it.
+ */
+export function fitnessPct(p: Pick<Player, 'injuredWeeks' | 'injuryRisk'>): number {
+  if (p.injuredWeeks > 0) return 0;
+  return Math.max(0, Math.min(100, Math.round(100 - p.injuryRisk)));
+}
+
+/**
+ * The number each man wears this week, by id: 1–9 the nine by slot
+ * (LINEUP_SLOTS order), 10–13 the bench, as the side runs out (injured men
+ * covered). Men not in the side have none. Pure.
+ */
+export function squadNumbers(state: Pick<GameState, 'lineup' | 'squad'>): Map<string, number> {
+  const side = resolveLineup(state.lineup, state.squad);
+  const out = new Map<string, number>();
+  side.starters.forEach((p, slot) => { if (p) out.set(p.id, slot + 1); });
+  side.bench.forEach((p, i) => out.set(p.id, LINEUP_SLOTS.length + 1 + i));
+  return out;
+}
+
+/**
+ * Who kicks the goals and who captains the side that runs out (N11): the
+ * coach's picks when they are in the nine, else the defaults — as the Lineup
+ * screen and the match work it out. Pure.
+ */
+export function sideRoles(state: Pick<GameState, 'lineup' | 'squad'>): { starters: Set<string>; kicker?: string; captain?: string } {
+  const side = resolveLineup(state.lineup, state.squad);
+  const nine = side.starters.flatMap((p, slot) => (p ? [{ ...p, position: LINEUP_SLOTS[slot]!, stats: statsAt(p, LINEUP_SLOTS[slot]!) }] : []));
+  return { starters: new Set(nine.map((p) => p.id)), ...kickerAndCaptain(nine, state.lineup) };
+}
+
+/** One man's jobs from {@link sideRoles}. */
+function rolesOf(r: ReturnType<typeof sideRoles>, id: string): { starter: boolean; kicker: boolean; captain: boolean } {
+  return { starter: r.starters.has(id), kicker: r.kicker === id, captain: r.captain === id };
+}
+
 /** Everything the page shows, from the player, where he is and the game state. */
 export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState): PlayerPageModel {
   const squad = ctx.kind === 'squad';
@@ -250,6 +299,9 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     morale: { value: p.morale, word: moraleWord(p.morale), reasons: squad ? moraleReasons(p) : [] },
     fitness: p.injuredWeeks > 0 ? `Out ${weeksText(p.injuredWeeks)}` : (p.suspendedWeeks ?? 0) > 0 ? `Banned ${weeksText(p.suspendedWeeks ?? 0)}` : 'Fit',
     injured: p.injuredWeeks > 0 || (p.suspendedWeeks ?? 0) > 0,
+    fitnessPct: fitnessPct(p),
+    number: squad ? squadNumbers(state).get(p.id) ?? null : null,
+    roles: squad ? rolesOf(sideRoles(state), p.id) : null,
     injuryRisk: riskWord(p.injuryRisk),
     contract,
     tenure: squad && seasonsAtClub !== null
@@ -271,6 +323,121 @@ export function fmtTally(t: StatTally): string {
 }
 
 // ── DOM ─────────────────────────────────────────────────────────────────────
+
+const PLAYER_STYLE_ID = 'nrl-player-styles';
+
+function ensurePlayerStyles(): void {
+  ensureScreenStyles();
+  if (document.getElementById(PLAYER_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = PLAYER_STYLE_ID;
+  style.textContent = PLAYER_CSS;
+  document.head.appendChild(style);
+}
+
+/** The page's stylesheet (exported for tests). */
+export const PLAYER_CSS = `
+/* 3f: a full sheet over the one it was opened from (a region dialog, #203: the dock stays whole below it).
+   Solid navy: the sheet under it must not show through. */
+.nrl-dialog-region .nrl-modal.nrl-player-modal {
+  width: 100%;
+  max-width: 1180px;
+  height: 100%;
+  max-height: 100%;
+  background: var(--nrl-navy);
+  border-radius: 16px;
+  box-shadow: var(--nrl-shadow-tray);
+  padding: 10px 14px;
+}
+/* Three columns, 230 / 1fr / 200: who he is, what he can do, his jobs and the deals. */
+.nrl-player {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 200px;
+  gap: 16px;
+  font-size: 13px;
+}
+.nrl-player.nrl-player-rival { grid-template-columns: 230px minmax(0, 1fr); }
+.nrl-player-card, .nrl-player-side { min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.nrl-player-card .nrl-back { align-self: flex-start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.nrl-player-top { display: flex; align-items: center; gap: 10px; }
+.nrl-player-portrait {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  background: var(--nrl-button);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.nrl-player-id { min-width: 0; }
+.nrl-player-name { font-family: var(--nrl-f-label); font-size: 22px; font-weight: 700; line-height: 1; overflow-wrap: anywhere; }
+.nrl-player-meta { margin-top: 4px; font-size: 12px; color: var(--nrl-text-2); }
+.nrl-player-where { font-size: 12px; color: var(--nrl-muted); }
+.nrl-player-out { color: var(--nrl-neg); }
+.nrl-player-tiles { display: flex; gap: 6px; }
+.nrl-player-tile { flex: 1 1 0; min-width: 0; border-radius: 8px; background: var(--nrl-raised); padding: 6px 8px; display: flex; flex-direction: column; }
+.nrl-player-tile b { font-family: var(--nrl-f-num); font-size: 20px; font-weight: 600; line-height: 1.2; }
+.nrl-player-tile span { font-size: 11px; color: var(--nrl-muted); }
+.nrl-player-deal { font-size: 12px; line-height: 1.35; color: var(--nrl-text-2); }
+.nrl-player-expiring { color: var(--nrl-neg); }
+/* The middle column scrolls on its own; the left and the actions hold still. */
+.nrl-player-about { min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-right: 4px; }
+.nrl-player h3 { flex: 0 0 auto; margin: 10px 0 4px; font-family: var(--nrl-f-label); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
+.nrl-player h3:first-child { margin-top: 0; }
+.nrl-player-outlook { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 8px; background: var(--nrl-panel); }
+.nrl-player-curve { flex: 0 0 auto; width: 132px; height: 38px; }
+.nrl-player-outlook-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 12px; line-height: 1.35; color: var(--nrl-text-2); }
+.nrl-player-outlook-text b { color: var(--nrl-text); }
+.nrl-player-outlook-text small { font-size: 11px; color: var(--nrl-muted); }
+.nrl-player-stats { display: flex; flex-direction: column; flex: 0 0 auto; }
+.nrl-statrow { display: grid; grid-template-columns: 72px minmax(0, 1fr) 30px 56px; align-items: center; gap: 8px; height: 28px; }
+.nrl-stattrack { height: 6px; border-radius: 3px; background: var(--nrl-button); overflow: hidden; }
+.nrl-statfill { height: 100%; background: var(--nrl-accent); }
+.nrl-stat-val { font-family: var(--nrl-f-num); font-weight: 600; }
+.nrl-stat-gain { font-family: var(--nrl-f-num); font-size: 12px; color: var(--nrl-pos); white-space: nowrap; }
+.nrl-stat-gain.nrl-stat-loss { color: var(--nrl-neg); }
+.nrl-player-trait, .nrl-player-line { flex: 0 0 auto; margin: 2px 0; font-size: 12px; line-height: 1.4; color: var(--nrl-text-2); overflow-wrap: anywhere; }
+.nrl-player-trait b { color: var(--nrl-text); font-weight: 600; margin-right: 6px; }
+.nrl-player-trait-bad b { color: var(--nrl-neg); }
+.nrl-player-line b { color: var(--nrl-muted); font-weight: 500; }
+/* Roles (N11): a row per job, ON in yellow, OFF muted. */
+.nrl-btn.nrl-player-role { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; font-size: 16px; }
+.nrl-player-role-state { color: var(--nrl-muted); }
+.nrl-player-role[aria-pressed="true"] .nrl-player-role-state { color: var(--nrl-accent); }
+/* What each deal costs, and why one is shut (in yellow): just above the buttons. */
+.nrl-player-why { flex: 0 1 auto; min-height: 0; overflow: hidden; margin-top: auto; font-size: 11px; line-height: 1.35; color: var(--nrl-muted); }
+.nrl-player-why > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* #203: the actions are pinned to the foot of the column, on screen without scrolling. */
+.nrl-player-actions {
+  flex: 0 0 auto;
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  position: sticky;
+  bottom: 0;
+  background: var(--nrl-sheet);
+  z-index: 1;
+}
+.nrl-player-why + .nrl-player-actions { margin-top: 0; }
+.nrl-player-actions .nrl-btn { min-width: 0; padding: 0 6px; white-space: normal; font-size: 15px; }
+.nrl-player-actions .nrl-btn-primary { grid-column: 1 / -1; font-size: 17px; }
+/* Short sheets (667×375, 956×330): tighter, so the jobs and the deals still fit. */
+@media (max-height: 400px) {
+  .nrl-player-card, .nrl-player-side { gap: 6px; }
+  .nrl-statrow { height: 26px; }
+  .nrl-player-tile { padding: 4px 8px; }
+  .nrl-player-tile b { font-size: 18px; }
+}
+/* A narrow phone (667): the side columns give a little. */
+@media (max-width: 760px) {
+  .nrl-player { grid-template-columns: 196px minmax(0, 1fr) 176px; gap: 12px; }
+  .nrl-player.nrl-player-rival { grid-template-columns: 196px minmax(0, 1fr); }
+  .nrl-statrow { grid-template-columns: 60px minmax(0, 1fr) 26px 52px; gap: 6px; }
+}
+`;
 
 const FAILURE: Record<string, string> = {
   'squad-full': 'Squad is full — release a player first.',
@@ -305,18 +472,30 @@ function findPlayer(id: string, ctx: PlayerContext, state: GameState): Player | 
   return list.find((p) => p.id === id) ?? null;
 }
 
+/** The back button's label: the sheet the page was opened from. */
+function backLabel(ctx: PlayerContext): string {
+  return ctx.kind === 'squad' ? 'Squad' : ctx.kind === 'freeAgent' ? 'Recruit' : ctx.club.name;
+}
+
 function statBars(stats: PlayerPageModel['stats'], focus: string | null): HTMLElement {
   return el('div', { class: 'nrl-statbars nrl-player-stats' }, ...stats.map(({ label, value, gain }) => {
     const fill = el('div', { class: 'nrl-statfill' });
     fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
-    const row = el('div', { class: 'nrl-statrow' }, el('span', { text: label }), el('div', { class: 'nrl-stattrack' }, fill), el('span', { text: String(value) }));
-    // N11: what a week's training under the squad focus adds.
-    if (gain !== undefined) {
-      row.style.gridTemplateColumns = '4.6rem 1fr 1.8rem 2.6rem';
-      row.append(el('span', { class: 'nrl-stat-gain', text: `${gain < 0 ? '−' : '+'}${Math.abs(gain).toFixed(1)}/wk`, attrs: { title: `A week's training under the ${focus} focus`, 'data-gain': '', style: 'font-size:0.7em;color:#2e7d32;white-space:nowrap' } }));
-    }
+    const row = el('div', { class: 'nrl-statrow' },
+      el('span', { text: label }), el('div', { class: 'nrl-stattrack' }, fill), el('span', { class: 'nrl-stat-val', text: String(value) }));
+    // N11: what a week's training under the squad focus adds (a stat that does not move shows nothing).
+    row.append(gain !== undefined && gain !== 0
+      ? el('span', { class: `nrl-stat-gain${gain < 0 ? ' nrl-stat-loss' : ''}`, text: `${gain < 0 ? '−' : '+'}${Math.abs(gain).toFixed(1)}/wk`, attrs: { title: `A week's training under the ${focus} focus`, 'data-gain': '' } })
+      : el('span'));
     return row;
   }));
+}
+
+/** Write the coach's lineup and keep it now, as the Lineup screen does. */
+function setLineup(next: GameState['lineup']): void {
+  if (next === getState().lineup) return;
+  setState({ lineup: next });
+  save(getState());
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -342,7 +521,7 @@ export function curveXY(points: readonly CareerPoint[], w = CURVE_W, h = CURVE_H
   }));
 }
 
-/** The age curve (#369): rating against age, today ringed, the peak on a dotted line. Colours are custom properties for the theme. */
+/** The age curve (#369): rating against age, today ringed, the peak on a dotted line, in the sheet's yellow. */
 function careerCurve(o: PlayerOutlook): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${CURVE_W} ${CURVE_H}`);
@@ -356,21 +535,21 @@ function careerCurve(o: PlayerOutlook): SVGSVGElement {
     svg.append(n);
   };
   const peak = xy[o.points.indexOf(o.peak)]!;
-  add('line', { x1: peak.x, x2: peak.x, y1: 0, y2: CURVE_H, stroke: 'var(--nrl-curve-peak, #b03a2e)', 'stroke-width': 1, 'stroke-dasharray': '2 2' });
-  add('polyline', { points: xy.map((q) => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(' '), fill: 'none', stroke: 'var(--nrl-curve-line, #2e7d32)', 'stroke-width': 2, 'stroke-linejoin': 'round' });
-  add('circle', { cx: xy[0]!.x, cy: xy[0]!.y, r: 3, fill: 'var(--nrl-curve-now, #000)' });
+  add('line', { x1: peak.x, x2: peak.x, y1: 0, y2: CURVE_H, stroke: 'var(--nrl-muted)', 'stroke-width': 1, 'stroke-dasharray': '2 2' });
+  add('polyline', { points: xy.map((q) => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(' '), fill: 'none', stroke: 'var(--nrl-accent)', 'stroke-width': 2, 'stroke-linejoin': 'round' });
+  add('circle', { cx: xy[0]!.x, cy: xy[0]!.y, r: 3, fill: 'var(--nrl-text)' });
   return svg;
 }
 
 /**
  * Open the page for `player` as found in `ctx`. It follows the player through
  * state changes (a renewal updates the contract line; a sale, release or
- * signing closes it). `onClose` runs when it closes by any route, so a rival
- * squad can come back.
+ * signing closes it). `onClose` runs when it closes by any route (◂ back, a
+ * dock tap), so a rival squad can come back.
  */
 export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClose?: () => void } = {}): HTMLElement {
-  ensureScreenStyles();
-  const content = el('div', { class: 'nrl-player', attrs: { 'data-player-page': player.id } });
+  ensurePlayerStyles();
+  const content = el('div', { class: `nrl-player${ctx.kind === 'rival' ? ' nrl-player-rival' : ''}`, attrs: { 'data-player-page': player.id } });
   let armed: PlayerActionId | null = null;
   let closed = false;
 
@@ -381,6 +560,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     closeModal();
     opts.onClose?.();
   };
+  const back = backButton(backLabel(ctx), finish);
 
   const render = (): void => {
     const state = getState();
@@ -389,72 +569,112 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     const m = playerPageModel(p, ctx, state);
     const kit = kitFor(ctx, state);
 
+    // Left: who he is, his overall and fitness, his deal.
     const portrait = el('img', {
       class: 'nrl-player-portrait',
-      attrs: { src: portraitDataUrl(p.id, kit), alt: '', width: String(PORTRAIT_W * 6), height: String(PORTRAIT_H * 6) },
+      attrs: { src: portraitDataUrl(p.id, kit), alt: '', width: String(PORTRAIT_W * 4), height: String(PORTRAIT_H * 4) },
     });
-    const head = el('div', { class: 'nrl-player-id' },
-      el('div', { class: 'nrl-player-name' }, el('span', { text: m.name }), el('span', { class: 'nrl-card-ovr', text: String(m.overall), attrs: { title: 'Overall rating' } })),
-      el('div', { class: 'nrl-card-meta' },
-        el('span', { class: 'nrl-badge', text: m.position }),
-        el('span', { text: `Age ${m.age}` }),
-        el('span', { class: m.injured ? 'nrl-badge nrl-badge-out' : 'nrl-badge', text: m.fitness }),
-      ),
+    const meta = [m.position, `age ${m.age}`, ...(m.number !== null ? [`#${m.number}`] : [])].join(' · ');
+    const fit = el('b', { text: p.injuredWeeks > 0 ? 'OUT' : `${m.fitnessPct}%` });
+    fit.style.color = fitColour(m.fitnessPct);
+    const card = el('div', { class: 'nrl-player-card' },
+      back,
+      el('div', { class: 'nrl-player-top' }, portrait,
+        el('div', { class: 'nrl-player-id' },
+          el('div', { class: 'nrl-player-name', text: m.name }),
+          el('div', { class: 'nrl-player-meta', text: meta }))),
       el('div', { class: 'nrl-player-where', text: m.where }),
+      ...(m.fitness !== 'Fit' ? [el('div', { class: 'nrl-player-where nrl-player-out', text: m.fitness })] : []),
+      el('div', { class: 'nrl-player-tiles' },
+        el('div', { class: 'nrl-player-tile', attrs: { title: 'Overall rating' } }, el('b', { text: String(m.overall) }), el('span', { text: 'overall' })),
+        el('div', { class: 'nrl-player-tile', attrs: { title: `Fitness: 100 less his injury risk (${p.injuryRisk}); 0 while injured` } }, fit, el('span', { text: 'fitness' }))),
+      el('div', { class: `nrl-player-deal${m.contract.expiring ? ' nrl-player-expiring' : ''}`, text: ctx.kind === 'freeAgent' ? m.contract.text : `Contract: ${m.contract.text}` }),
+      ...(m.tenure ? [el('div', { class: 'nrl-player-deal', text: m.tenure })] : []),
     );
-    const top = el('div', { class: 'nrl-player-top' }, portrait, head);
 
-    const line = (label: string, text: string, cls = ''): HTMLElement =>
-      el('div', { class: `nrl-player-line ${cls}`.trim() }, el('b', { text: `${label}: ` }), text);
-
+    // Middle: his stats and this week's training, traits, condition, record.
+    const line = (label: string, text: string): HTMLElement =>
+      el('div', { class: 'nrl-player-line' }, el('b', { text: `${label}: ` }), text);
+    const moraleText = `${m.morale.word} (${m.morale.value})${m.morale.reasons.length ? ' · ' + m.morale.reasons.join(', ') : ''}`;
     const about = el('div', { class: 'nrl-player-col nrl-player-about' },
-      el('h3', { text: 'Stats' }),
+      el('h3', { text: m.trainingFocus ? `Stats · this week's training: ${m.trainingFocus}` : 'Stats' }),
       statBars(m.stats, m.trainingFocus),
       // #369: the projection, under the stats it comes from.
+      el('h3', { text: 'Outlook' }),
       el('div', { class: 'nrl-player-outlook', attrs: { 'data-outlook': m.outlook.stage, title: 'Your training rules run forward from your facilities and focus today: a projection, not a hidden potential stat.' } },
-        el('div', { class: 'nrl-player-outlook-head' }, el('b', { text: m.outlook.stage }), ' · ', m.outlook.peakText),
-        el('div', { class: 'nrl-player-outlook-body' },
-          careerCurve(m.outlook),
-          el('div', { class: 'nrl-player-outlook-note' },
-            ...(m.outlook.retirement ? [el('div', { class: 'nrl-player-expiring', text: m.outlook.retirement })] : []),
-            el('div', { text: 'A projection: it depends on your facilities.' }),
-          ),
-        ),
-      ),
+        careerCurve(m.outlook),
+        el('div', { class: 'nrl-player-outlook-text' },
+          el('div', {}, el('b', { text: m.outlook.stage }), ' · ', m.outlook.peakText),
+          ...(m.outlook.retirement ? [el('div', { class: 'nrl-player-expiring', text: m.outlook.retirement })] : []),
+          el('small', { text: 'A projection: it depends on your facilities.' }))),
       el('h3', { text: 'Traits' }),
       ...(m.traits.length > 0
         ? m.traits.map((t) => el('div', { class: `nrl-player-trait${t.bad ? ' nrl-player-trait-bad' : ''}` }, el('b', { text: t.label }), t.tip))
         : [el('div', { class: 'nrl-player-line', text: 'None — a solid citizen' })]),
-    );
-    const moraleText = `${m.morale.word} (${m.morale.value})${m.morale.reasons.length ? ' · ' + m.morale.reasons.join(', ') : ''}`;
-    const details = el('div', { class: 'nrl-player-col nrl-player-details' },
       el('h3', { text: 'Condition' }),
       line('Morale', moraleText),
       line('Injury risk', m.injuryRisk),
-      el('h3', { text: 'Contract' }),
-      line('Deal', m.contract.text, m.contract.expiring ? 'nrl-player-expiring' : ''),
-      ...(m.tenure ? [line('Club', m.tenure)] : []),
       ...(m.season || m.career ? [el('h3', { text: 'Record' })] : []),
       ...(m.season ? [line('This season', fmtTally(m.season))] : []),
       ...(m.career ? [line('Career', fmtTally(m.career))] : []),
     );
 
-    const actions = el('div', { class: 'nrl-player-actions' });
-    for (const a of m.actions) {
-      const btn = button(armed === a.id && a.confirm ? a.confirm : a.label, () => {
-        if (a.confirm && armed !== a.id) { armed = a.id; render(); return; }
-        armed = null;
-        const res = runAction(a.id, p.id);
-        if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
-      }, a.danger ? { class: 'nrl-btn-danger' } : {});
-      btn.setAttribute('data-player-action', a.id);
-      if (!a.enabled) { btn.disabled = true; btn.title = a.why ?? ''; }
-      actions.append(btn);
+    // Right: his jobs in the nine (N11), then the deals pinned at the foot.
+    const side = el('div', { class: 'nrl-player-side' });
+    const notes: { text: string; attn: boolean }[] = [];
+    if (m.roles) {
+      const roles = m.roles;
+      // The Lineup screen's switches: picking the man already chosen goes back to the default.
+      const role = (job: string, on: boolean, attr: 'kicker' | 'captain', pick: () => void): HTMLButtonElement => {
+        const b = button('', pick, { class: 'nrl-player-role' });
+        b.append(el('span', { text: job }), el('span', { class: 'nrl-player-role-state', text: on ? 'On' : 'Off' }));
+        b.setAttribute('aria-pressed', String(on));
+        b.setAttribute('data-player-role', attr);
+        b.disabled = !roles.starter;
+        b.title = !roles.starter ? 'Starters only' : on ? 'His job: tap to go back to the default' : `Make him the ${job.toLowerCase()}`;
+        return b;
+      };
+      side.append(
+        el('h3', { text: 'Roles' }),
+        role('Goal-kicker', roles.kicker, 'kicker', () => setLineup(setKicker(getState().lineup, p.id))),
+        role('Captain', roles.captain, 'captain', () => setLineup(setCaptain(getState().lineup, p.id))),
+      );
+      if (!roles.starter) notes.push({ text: 'Roles: starters only — pick him in the nine', attn: true });
     }
-    const why = m.actions.filter((a) => a.detail || a.why).map((a) => `${a.label.split(' ')[0]}: ${a.why ?? a.detail}`).join(' · ');
-    if (why) actions.append(el('div', { class: 'nrl-player-why', text: why }));
+    for (const a of m.actions) {
+      const verb = a.label.split(/[ ·+]/)[0];
+      if (a.why) notes.push({ text: `${verb}: ${a.why}`, attn: true });
+      else if (a.detail) notes.push({ text: `${verb}: ${a.detail}`, attn: false });
+    }
+    if (ctx.kind === 'rival') notes.push({ text: `Plays for ${ctx.club.name}: not for sale`, attn: false });
+    if (notes.length) {
+      side.append(el('div', { class: 'nrl-player-why' },
+        ...notes.map((n) => el('div', { class: n.attn ? 'nrl-attn' : '', text: n.text, attrs: { title: n.text } }))));
+    }
+    if (m.actions.length) {
+      const actions = el('div', { class: 'nrl-player-actions' });
+      for (const a of m.actions) {
+        // Renew or Sign is the page's one primary; Sell and Release share the row under it.
+        const primary = a.id === 'renew' || a.id === 'sign';
+        const btn = button(armed === a.id && a.confirm ? a.confirm : a.label, () => {
+          if (a.confirm && armed !== a.id) { armed = a.id; render(); return; }
+          armed = null;
+          const res = runAction(a.id, p.id);
+          if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
+        }, { class: primary ? 'nrl-btn-primary' : 'nrl-btn-danger' });
+        btn.setAttribute('data-player-action', a.id);
+        if (!a.enabled) { btn.disabled = true; btn.title = a.why ?? ''; }
+        else if (a.detail) btn.title = a.detail;
+        actions.append(btn);
+      }
+      side.append(actions);
+    }
 
-    content.replaceChildren(top, el('div', { class: 'nrl-player-grid' }, about, details), actions);
+    // A rival's man has no jobs or deals here: two columns, the note under his card.
+    if (ctx.kind === 'rival') {
+      card.append(...side.childNodes);
+      content.replaceChildren(card, about);
+    } else content.replaceChildren(card, about, side);
   };
 
   const off = bus.on('state:changed', () => {
@@ -462,15 +682,8 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     render();
   });
   render();
-  // In the band between HUD and nav, with a ✕ in the corner (#203).
-  const backdrop = openModal(panel({ class: 'nrl-player-panel' }, content), { class: 'nrl-player-modal', region: true });
-  const box = backdrop.querySelector('.nrl-modal');
-  if (box) {
-    const x = button('✕', finish, { class: 'nrl-screen-x' });
-    x.setAttribute('aria-label', 'Close');
-    box.classList.add('nrl-modal-has-x');
-    box.prepend(x);
-  }
+  // A full sheet in the band above the dock (#203); ◂ back is the one close (#349 A5).
+  const backdrop = openModal(content, { class: 'nrl-player-modal', region: true });
   // The backdrop's own listener has closed the dialog; tell whoever opened it.
   backdrop.addEventListener('click', () => { if (!closed) { closed = true; off(); opts.onClose?.(); } });
   return backdrop;

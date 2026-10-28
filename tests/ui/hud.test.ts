@@ -66,20 +66,15 @@ describe('moneyTile (N12.5)', () => {
     expect(moneyTile(ECON.BANKRUPTCY_WARN).inDebt).toBe(false);
   });
 
-  it('the in-debt class colours the tile red and the tag is white on red', () => {
+  it('the in-debt class colours the money red and the tag is white on red', () => {
     expect(IN_DEBT_CLASS).toBe('nrl-money-negative');
-    expect(CSS).toMatch(new RegExp(`\\.nrl-hud-stat\\.${IN_DEBT_CLASS} \\{[^}]*color: #b00020`));
-    expect(CSS).toMatch(/\.nrl-hud-debt \{[^}]*background: #b00020;[^}]*color: #fff/);
+    expect(CSS).toMatch(new RegExp(`\\.nrl-dock-money\\.${IN_DEBT_CLASS} \\{[^}]*color: var\\(--nrl-neg\\)`));
+    expect(CSS).toMatch(/\.nrl-hud-debt \{[^}]*background: var\(--nrl-out\);[^}]*color: #fff/);
   });
 
-  it('below 760px the tag hides (for screen readers only) and the tile wears a red border, so the HUD stays one row at 667×375 (#239)', () => {
-    const at = CSS.indexOf('@media (max-width: 759px)');
-    expect(at).toBeGreaterThan(CSS.indexOf('.nrl-hud-debt {'));
-    const block = CSS.slice(at, CSS.indexOf('\n}', at));
-    expect(block).toMatch(new RegExp(`\\.nrl-hud-stat\\.${IN_DEBT_CLASS} \\{[^}]*border-color: #b00020`));
-    expect(block).toMatch(/\.nrl-hud-debt \{[^}]*position: absolute;[^}]*width: 1px;[^}]*clip: rect\(0 0 0 0\)/);
-    // Visually hidden, not display: none, so the tile still reads "in debt".
-    expect(block).not.toMatch(/\.nrl-hud-debt \{[^}]*display: none/);
+  it('the dock keeps the tag on one row: it is part of the status block, never wrapped onto a second line', () => {
+    expect(CSS).toMatch(/\.nrl-dock-money \{[^}]*white-space: nowrap/);
+    expect(CSS).toMatch(/\.nrl-dock \{[^}]*height: 64px/);
   });
 });
 
@@ -265,10 +260,11 @@ describe('the board chip (#368)', () => {
     expect(fmtMoneyShort(800)).toBe('$800');
   });
 
-  it('the chip sits beside the next match and its risk colours are themable', () => {
-    expect(CSS).toContain('.nrl-hud .nrl-btn.nrl-hud-board');
-    expect(CSS).toContain('var(--nrl-risk-amber, #d08a00)');
-    // Under 760px the short form, so the toast lane keeps its room.
-    expect(CSS).toMatch(/@media \(max-width: 759px\) \{\s*\.nrl-hud-board-wide \{ display: none; \}/);
+  it('the chip sits under the decisions chip on the grounds, amber at risk and red off track', () => {
+    // Broadcast Quiet: the grounds carry the hub chips only (3a), the board's under the decisions'.
+    expect(CSS).toMatch(/\.nrl-hub-chips \{[^}]*flex-direction: column/);
+    expect(CSS).toContain('.nrl-board-chip');
+    expect(CSS).toMatch(/\.nrl-board-chip\.nrl-hud-board-off \.nrl-decisions-chip-count \{[^}]*var\(--nrl-neg\)/);
+    expect(BOARD_RISK_CLASS['off-track']).toBe('nrl-hud-board-off');
   });
 });

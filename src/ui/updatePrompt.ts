@@ -85,7 +85,7 @@ export function showUpdateToast(onReload: () => void): HTMLElement {
     reload.disabled = true;
     reload.textContent = 'Reloading…';
     onReload();
-  }, { class: 'nrl-update-reload' });
+  }, { class: 'nrl-update-reload nrl-btn-primary' });
   const later = button('Later', () => toast.remove(), { class: 'nrl-update-later' });
   later.setAttribute('aria-label', 'Not now');
   const toast = el('div', { class: 'nrl-update-toast', attrs: { role: 'status', 'data-nrl-update': '' } }, text, reload, later);

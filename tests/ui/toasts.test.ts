@@ -62,9 +62,9 @@ describe('colour by meaning (#339)', () => {
     expect(stopToastKind('target')).toBe('info');
   });
   it('info is neutral, success green, danger red', () => {
-    expect(rule(CSS, '.nrl-toast-info')).toContain('background: #e8e0c8');
-    expect(rule(CSS, '.nrl-toast-success')).toContain('background: #2e7d32');
-    expect(rule(CSS, '.nrl-toast-danger')).toContain('background: #b03a2e');
+    expect(rule(CSS, '.nrl-toast-info')).toContain('background: rgba(14, 22, 48, 0.97)');
+    expect(rule(CSS, '.nrl-toast-success')).toContain('background: #1d5a33');
+    expect(rule(CSS, '.nrl-toast-danger')).toContain('background: #7a2a24');
   });
 });
 
@@ -89,10 +89,10 @@ describe('small feedback', () => {
     expect(TICKER_WAIT_TEXT).toMatch(/Kick-off soon/);
     expect(rule(OVERLAY_CSS, '.nrl-mo-line-wait')).toContain('opacity');
   });
-  it('the guide says the half-time card waits for Continue', () => {
+  it('the guide says the half-time sheet waits for Start 2nd half', () => {
     const text = JSON.stringify([...CLUB_PAGES, NINES_PAGE]);
     expect(text).not.toMatch(/by itself|a tap holds it/);
-    expect(text).toMatch(/waits (for|until you tap) Continue/);
+    expect(text).toMatch(/waits (for|until you tap) Start 2nd half/);
   });
 });
 

@@ -1,6 +1,12 @@
-// src/ui/screens/contracts.ts — Contracts nav screen (GitHub #40, part of #49).
-// Every contract sorted by expiry, with renew / release / sell actions. The
-// numbers come from systems/contracts.ts; this file only renders them.
+// src/ui/screens/contracts.ts — Contracts screen (GitHub #40, part of #49), under
+// Finance (its "contracts end … VIEW ▸" tile). A sheet in the Broadcast Quiet
+// look: "◂ FINANCE", a summary line, and one table row a player, soonest to end
+// first, with renew / release / sell. The numbers come from systems/contracts.ts;
+// this file only renders them.
+//
+// No yellow on this screen: it is a list of 20-odd equal choices, and a yellow
+// RENEW on every row would be a column of primaries. RENEW is the plain
+// secondary button; RELEASE and SELL are the destructive red-on-navy, two taps.
 
 import { bus } from '../../core/events';
 import { getState, type Player } from '../../core/state';
@@ -10,9 +16,8 @@ import {
   contractRows, renewalFee, renewalWeeklyCost, renewEarly, renewsOnLoan, sellPlayer, transferFee,
 } from '../../systems/contracts';
 import { SQUAD_MIN, difficultyMultipliers } from '../../config';
-import { el, panel, button, openModal } from '../dom';
-import { fmtMoney } from './finance';
-import { ensureScreenStyles } from './recruit';
+import { el, button, openScreen, screenHead, backButton } from '../dom';
+import { EXPIRY_WINDOW_WEEKS, ensureFinanceStyles, fmtMoney, openFinanceScreen } from './finance';
 
 const REASONS: Record<string, string> = {
   'insufficient-funds': 'Not enough money.',
@@ -23,6 +28,13 @@ const REASONS: Record<string, string> = {
 
 function act(result: { ok: boolean; reason?: string }): void {
   if (!result.ok) bus.emit('ui:notify', { text: REASONS[result.reason ?? ''] ?? 'Not possible.', kind: 'info' });
+}
+
+/** Short money for a button: $900, $12k, $12.5k (the labels are written in caps so the k stays small). */
+function fmtShort(n: number): string {
+  const abs = Math.abs(Math.round(n));
+  if (abs < 1000) return fmtMoney(n);
+  return `${n < 0 ? '-' : ''}$${(abs / 1000).toFixed(1).replace(/\.0$/, '')}k`;
 }
 
 /**
@@ -59,89 +71,118 @@ export function heldRows(order: readonly string[], rows: readonly Player[], gone
   return out;
 }
 
+/** "24 players · 3 end within 8 wks · wages $14,200/wk". */
+export function contractsSummary(players: readonly Pick<Player, 'contractWeeks' | 'wage'>[], wageMult = 1): string {
+  const soon = players.filter((p) => p.contractWeeks <= EXPIRY_WINDOW_WEEKS).length;
+  const wages = players.reduce((t, p) => t + Math.round(p.wage * wageMult), 0);
+  return `${players.length} players · ${soon} end within ${EXPIRY_WINDOW_WEEKS} wks · wages ${fmtMoney(wages)}/wk`;
+}
+
 /** This visit's order, renewals and departures; reset when the screen opens. */
 let order: string[] = [];
 const renewed = new Set<string>();
 const gone = new Map<string, GoneRow>();
 
-function render(content: HTMLElement): void {
+function render(sub: HTMLElement, tbody: HTMLElement): void {
   const s = getState();
   const wageMult = difficultyMultipliers(s.settings.difficulty).wages;
-  const nodes: HTMLElement[] = [el('h2', { text: 'Contracts' })];
+  sub.textContent = contractsSummary(s.squad, wageMult);
+  const rows: HTMLElement[] = [];
+  const rerender = (): void => render(sub, tbody);
   for (const row of heldRows(order, contractRows(s), gone)) {
     if (row.kind === 'gone') {
       const done = button(row.done, () => {});
       done.disabled = true;
-      const held = panel({ class: 'nrl-finance-panel nrl-contract-gone' },
-        el('div', { class: 'nrl-contract-info' }, row.text), el('div', { class: 'nrl-contract-actions' }, done));
-      held.setAttribute('data-contract-gone', row.id);
-      nodes.push(held);
+      const held = el('tr', { class: 'nrl-contract-gone', attrs: { 'data-contract-gone': row.id } },
+        el('td', { class: 'nrl-contract-info', text: row.text, attrs: { colspan: '5' } }),
+        el('td', {}, el('div', { class: 'nrl-contract-actions' }, done)));
+      rows.push(held);
       continue;
     }
     const p = row.player;
     const weeks = p.contractWeeks;
-    const wk = `${weeks} wk${weeks === 1 ? '' : 's'}`;
-    const info = el('div', { class: 'nrl-contract-info' },
-      el('strong', { text: p.name }),
-      ` · OVR ${overallRating(p)} · age ${p.age} · morale ${p.morale} · `,
-      el('span', { class: weeks <= 8 ? 'nrl-finance-neg' : '', text: wk }),
-      ` · ${fmtMoney(Math.round(p.wage * wageMult))}/wk`,
-    );
+    const onLoan = renewsOnLoan(s, p);
+    // Who he is, and what a renewal would pay him (the button says what it costs now).
+    const meta = `age ${p.age} · morale ${p.morale} · renews at ${fmtMoney(renewalWeeklyCost(s, p))}/wk${onLoan ? ' on a board loan' : ''}`;
+    const who = el('td', { class: 'nrl-contract-info', attrs: { title: meta } }, el('div', { class: 'nrl-contract-who' },
+      el('span', { class: 'nrl-contract-name', text: p.name }),
+      el('span', { class: 'nrl-contract-meta', text: meta })));
+
     let renew: HTMLButtonElement;
     if (renewed.has(p.id)) {
-      renew = button('Renewed ✓', () => {});
+      renew = button('RENEWED ✓', () => {});
       renew.disabled = true;
     } else {
-      renew = button(`Renew ${fmtMoney(renewalFee(s, p))}${renewsOnLoan(s, p) ? ' on a board loan' : ''} (${fmtMoney(renewalWeeklyCost(s, p))}/wk)`, () => {
+      renew = button(`RENEW ${fmtMoney(renewalFee(s, p))}`, () => {
         armed = null;
         const res = renewEarly(getState(), p.id);
         if (res.ok) renewed.add(p.id);
         act(res);
-        render(content);
+        rerender();
       });
+      renew.title = `Renew: ${fmtMoney(renewalFee(s, p))} now${onLoan ? ' on a board loan' : ''}, then ${fmtMoney(renewalWeeklyCost(s, p))}/wk`;
     }
     renew.setAttribute('data-contract-renew', p.id);
-    const actions = el('div', { class: 'nrl-contract-actions' },
-      renew,
-      button(armed === `release:${p.id}` ? 'Really release?' : `Release ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`, () => {
-        const g = guardTap(armed, `release:${p.id}`);
-        armed = g.armed;
-        if (g.run) {
-          const res = releasePlayer(getState(), p.id);
-          if (res.ok) gone.set(p.id, { text: `${p.name} · released`, done: 'Released ✓' });
-          act(res);
-        }
-        render(content);
-      }, armed === `release:${p.id}` ? { class: 'nrl-btn-danger' } : {}),
-      button(armed === `sell:${p.id}` ? 'Really sell?' : `Sell +${fmtMoney(transferFee(p))}`, () => {
-        const g = guardTap(armed, `sell:${p.id}`);
-        armed = g.armed;
-        if (g.run) {
-          const fee = transferFee(p);
-          const res = sellPlayer(getState(), p.id);
-          if (res.ok) gone.set(p.id, { text: `${p.name} · sold for ${fmtMoney(fee)}`, done: 'Sold ✓' });
-          act(res);
-        }
-        render(content);
-      }, armed === `sell:${p.id}` ? { class: 'nrl-btn-danger' } : {}),
-    );
-    nodes.push(panel({ class: 'nrl-finance-panel' }, info, actions));
+    const releaseArmed = armed === `release:${p.id}`;
+    const sellArmed = armed === `sell:${p.id}`;
+    const release = button(releaseArmed ? 'REALLY RELEASE?' : `RELEASE ${fmtShort(RELEASE_PAYOUT_WEEKS * p.wage)}`, () => {
+      const g = guardTap(armed, `release:${p.id}`);
+      armed = g.armed;
+      if (g.run) {
+        const res = releasePlayer(getState(), p.id);
+        if (res.ok) gone.set(p.id, { text: `${p.name} · released`, done: 'RELEASED ✓' });
+        act(res);
+      }
+      rerender();
+    }, { class: releaseArmed ? 'nrl-btn-danger nrl-contract-armed' : 'nrl-btn-danger' });
+    release.title = `Two taps: pays out ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`;
+    const sell = button(sellArmed ? 'REALLY SELL?' : `SELL +${fmtShort(transferFee(p))}`, () => {
+      const g = guardTap(armed, `sell:${p.id}`);
+      armed = g.armed;
+      if (g.run) {
+        const fee = transferFee(p);
+        const res = sellPlayer(getState(), p.id);
+        if (res.ok) gone.set(p.id, { text: `${p.name} · sold for ${fmtMoney(fee)}`, done: 'SOLD ✓' });
+        act(res);
+      }
+      rerender();
+    }, { class: sellArmed ? 'nrl-btn-danger nrl-contract-armed' : 'nrl-btn-danger' });
+    sell.title = `Two taps: a transfer fee of ${fmtMoney(transferFee(p))}`;
+
+    rows.push(el('tr', { attrs: { 'data-contract': p.id } },
+      who,
+      el('td', { text: p.position }),
+      el('td', { class: 'nrl-num', text: String(overallRating(p)) }),
+      el('td', { class: `nrl-num${weeks <= EXPIRY_WINDOW_WEEKS ? ' nrl-contract-soon' : ''}`, text: `${weeks} wk${weeks === 1 ? '' : 's'}` }),
+      el('td', { class: 'nrl-num', text: fmtMoney(Math.round(p.wage * wageMult)) }),
+      el('td', {}, el('div', { class: 'nrl-contract-actions' }, renew, release, sell)),
+    ));
   }
-  content.replaceChildren(...nodes);
+  tbody.replaceChildren(...rows);
 }
 
-/** Open the Contracts screen. Re-renders on state changes until closed. */
+/** Open the Contracts sheet (lights Finance, which holds it). Re-renders on state changes until closed. */
 export function openContractsScreen(): HTMLElement {
-  ensureScreenStyles(); // the armed button's red (.nrl-btn-danger)
+  ensureFinanceStyles();
   armed = null;
   order = contractRows(getState()).map((p) => p.id);
   renewed.clear();
   gone.clear();
-  const content = el('div', { class: 'nrl-finance nrl-contracts' });
-  render(content);
+  const sub = el('span', { class: 'nrl-screen-sub' });
+  const tbody = el('tbody');
+  const table = el('table', { class: 'nrl-table nrl-contracts-table' },
+    el('colgroup', {}, el('col'), el('col', { attrs: { style: 'width:44px' } }), el('col', { attrs: { style: 'width:44px' } }),
+      el('col', { attrs: { style: 'width:64px' } }), el('col', { attrs: { style: 'width:76px' } }), el('col', { class: 'nrl-contracts-col-actions' })),
+    el('thead', {}, el('tr', {},
+      el('th', { text: 'Player' }), el('th', { text: 'Pos' }), el('th', { class: 'nrl-num', text: 'Ovr' }),
+      el('th', { class: 'nrl-num', text: 'Left' }), el('th', { class: 'nrl-num', text: 'Wage' }), el('th'))),
+    tbody);
+  render(sub, tbody);
+  const sheet = el('div', { class: 'nrl-screen nrl-finance-sheet nrl-contracts' },
+    screenHead('Contracts', { lead: [backButton('Finance', () => openFinanceScreen())], sub }),
+    el('div', { class: 'nrl-contracts-scroll' }, table));
   const off = bus.on('state:changed', () => {
-    if (!content.isConnected) { off(); return; }
-    render(content);
+    if (sheet.isConnected) render(sub, tbody);
   });
-  return openModal(content, { class: 'nrl-finance-modal', screen: true, key: 'contracts' });
+  return openScreen(sheet, off, 'contracts');
 }
