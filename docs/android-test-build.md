@@ -65,8 +65,9 @@ update, above). There is no cloud save and no account — this is a local-only t
 
 ## What the native build does differently
 
-- **Landscape, full screen.** The game is landscape-only on touch, so the app is locked to
-  landscape (`android:screenOrientation="sensorLandscape"`) and runs edge-to-edge with the
+- **Either way up, full screen.** The menus work upright (#350): the app turns with the phone
+  (`android:screenOrientation="fullSensor"`), and the live match and the grounds ask for it to
+  be turned sideways, as on the web (`src/ui/orientation.ts`). It runs edge-to-edge with the
   status and navigation bars hidden (`SystemBars` in `capacitor.config.ts`). Safe-area
   insets (notch / camera cutout) are handled the same way as the web build — the WebView
   fills them with `env(safe-area-inset-*)`, which the UI already reads into

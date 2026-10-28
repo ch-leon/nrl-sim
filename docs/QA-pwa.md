@@ -23,7 +23,8 @@ devices/browsers. Run these manually before shipping a build.
 2. Trigger the in-app **Install** button (settings popup) → native prompt appears
    → accept. (Or use the browser's "Add to Home screen".)
 3. Launch from the home-screen icon: app opens **full-screen**, no browser chrome,
-   **landscape** orientation, splash uses `#1a1a2e`.
+   either way up (`orientation: any`, #350: the menus work upright, the match and the
+   grounds ask to turn sideways), splash uses `#1a1a2e`.
 4. Enable airplane mode, relaunch: the game loads and is playable **offline**.
 
 ### iOS Safari (manual install path)

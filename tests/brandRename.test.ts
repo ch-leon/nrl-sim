@@ -75,7 +75,7 @@ describe('renaming the game is one file (dry run)', () => {
   });
 
   it('5. the rotate message', () => {
-    expect(rotateText()).toBe('Footy Manager plays in landscape. The game is paused until you rotate.');
+    expect(rotateText()).toBe('In Footy Manager, the match and the grounds play in landscape. Turn your phone sideways to carry on.');
   });
 
   it('6. the stadium sign', () => {

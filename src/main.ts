@@ -49,6 +49,8 @@ import { initAudio, initAudioUi, soundStatus } from './fx/audio';
 import { textSizeSync } from './ui/textSize';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
+import { ensurePortraitStyles, initPortraitMenus, type PortraitMenus } from './ui/portrait';
+import { openClubHome } from './ui/screens/clubHome';
 import { initFirstVisitHints, setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
 import { commitUndo, initUndo } from './systems/undo';
 import { closeLoading, lazyOpener, screenDeps } from './ui/lazyScreen';
@@ -77,10 +79,11 @@ const config: Phaser.Types.Core.GameConfig = {
 
 const uiRoot = document.getElementById('ui-root') as HTMLElement;
 
-// Landscape only: on a phone held upright the rotate card covers the game and
-// the Phaser loop sleeps (pausing match playback) until it's turned sideways.
+// Upright on a phone (#350) the menus work and the Phaser loop sleeps; the rotate
+// card covers the live match and the grounds until the phone is turned sideways.
 let game: Phaser.Game | null = null;
 let portraitBlocked = false;
+let portrait: PortraitMenus | null = null;
 
 async function boot(): Promise<void> {
   // BAK-207: `/#lab` opens the live match sim lab instead of the club game.
@@ -90,10 +93,15 @@ async function boot(): Promise<void> {
     bootLab();
     return;
   }
-  initLandscapeGuard({
+  ensurePortraitStyles(); // before the title, which is a menu upright too
+  const guard = initLandscapeGuard({
+    // The title and new-game setup are menus; the save's views are read once it is loaded.
+    view: () => 'menu',
+    onBack: () => portrait?.backToMenus(),
     onBlock: () => {
       portraitBlocked = true;
       game?.loop.sleep();
+      portrait?.sync();
     },
     onUnblock: () => {
       portraitBlocked = false;
@@ -104,6 +112,7 @@ async function boot(): Promise<void> {
       // landing beside the camera (found by the playthrough's portrait step).
       // Refresh once the next frame has laid out.
       requestAnimationFrame(() => game?.scale.refresh());
+      portrait?.sync();
     },
   });
   initToasts(uiRoot, { advancing: advanceInProgress });
@@ -182,6 +191,12 @@ async function boot(): Promise<void> {
   // when it first asked for a pause. Sleep once the loop has actually started
   // (#315). A later turn to portrait still sleeps from onBlock, above.
   sleepLoopIfPortrait(g, () => portraitBlocked);
+  // #350: upright the loop sleeps under the menus, so a scene change a menu asks for (the
+  // full-time card's Back to Club) would wait in Phaser's queue until the phone turned. Run it
+  // after the tap instead; nothing else of the game steps.
+  document.addEventListener('click', () => setTimeout(() => {
+    if (portraitBlocked && !g.loop.running && g.isBooted) g.scene.processQueue();
+  }, 0), true);
   // #338: neither advance takes a pending card's default unasked.
   // #370: each first keeps whatever an open Undo would take back, so the decisions confirm is unchanged.
   const advanceOneWeek = (): void => {
@@ -294,6 +309,17 @@ async function boot(): Promise<void> {
   };
   bus.on('state:changed', refreshSquadDot);
   refreshSquadDot();
+
+  // #350: upright, CLUB is the Club home sheet (the grounds need landscape).
+  portrait = initPortraitMenus(guard, () => openClubHome({
+    decisions: decisionChipItems,
+    runwayWeeks,
+    onMoney: () => nav.open('finance'),
+    onNextMatch: () => nav.open('fixtures'),
+    onDecisions: () => void openDecisions(),
+    onBoard: () => nav.open('staff'),
+    onGrounds: () => portrait?.seeGrounds(),
+  }));
 
   setTutorialScreens((id) => nav.open(id)); // each step opens its own screen (#337)
   startTutorial(); // self-guards on settings.tutorialDone

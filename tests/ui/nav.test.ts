@@ -154,6 +154,11 @@ describe('the marker (#344)', () => {
   it('a screen with no tab (the kit) marks nothing, not CLUB', () => {
     expect(navMarks(r, 'kit', false, true)).toEqual({ current: [], open: [] });
   });
+
+  it('upright, the Club home sheet (#350) marks CLUB with no ▴, not while Office is up', () => {
+    expect(navMarks(r, HOME_ID, false, true)).toEqual({ current: [HOME_ID], open: [] });
+    expect(navMarks(r, HOME_ID, true, true)).toEqual({ current: [], open: [OFFICE_ID] });
+  });
 });
 
 describe('what a tab says (#344)', () => {

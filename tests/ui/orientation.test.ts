@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PORTRAIT_QUERY, sleepLoopIfPortrait, watchOrientation, type PortraitLoop } from '../../src/ui/orientation';
+import { LANDSCAPE_ONLY, PORTRAIT_QUERY, ROTATE_TITLE, orientationGate, sleepLoopIfPortrait, watchOrientation, type OrientationView, type PortraitLoop } from '../../src/ui/orientation';
 
 /** A controllable stand-in for window.matchMedia(PORTRAIT_QUERY). */
 function fakeMedia(initial: boolean) {
@@ -16,6 +16,35 @@ function fakeMedia(initial: boolean) {
   };
   return { mm, queries, fire: (matches: boolean) => listener?.({ matches }) };
 }
+
+describe('the orientation gate (#350 P1)', () => {
+  const VIEWS: OrientationView[] = ['menu', 'match', 'grounds', 'placement', 'facility'];
+
+  it('the live match, the grounds, placement and the facility card need landscape; menus do not', () => {
+    expect([...LANDSCAPE_ONLY].sort()).toEqual(['facility', 'grounds', 'match', 'placement']);
+    expect(LANDSCAPE_ONLY.has('menu')).toBe(false);
+  });
+
+  it('upright on a touch device: menus show, every landscape-only view gets the rotate card', () => {
+    const gate = (view: OrientationView) => orientationGate({ portrait: true, coarse: true, view });
+    expect(VIEWS.map(gate)).toEqual(['menu', 'rotate', 'rotate', 'rotate', 'rotate']);
+  });
+
+  it('sideways, nothing is blocked', () => {
+    for (const view of VIEWS) expect(orientationGate({ portrait: false, coarse: true, view })).toBe('menu');
+  });
+
+  it('a desktop window (fine pointer) is never blocked, however tall', () => {
+    for (const view of VIEWS) {
+      expect(orientationGate({ portrait: true, coarse: false, view })).toBe('menu');
+      expect(orientationGate({ portrait: false, coarse: false, view })).toBe('menu');
+    }
+  });
+
+  it("the card's title", () => {
+    expect(ROTATE_TITLE).toBe('Turn your phone sideways');
+  });
+});
 
 describe('landscape guard', () => {
   it('only blocks touch devices held upright (desktop windows never)', () => {

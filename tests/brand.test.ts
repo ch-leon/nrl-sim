@@ -120,9 +120,9 @@ describe('each consumer reads BRAND', () => {
     expect(img.attrs.alt).toBe('NRL Sim');
   });
 
-  it("the rotate message is today's line, with the brand's name", () => {
-    expect(rotateText()).toBe('NRL Sim plays in landscape. The game is paused until you rotate.');
-    expect(rotateText(withBrand({ name: 'Other Game' }))).toMatch(/^Other Game plays in landscape\./);
+  it("the rotate message (#350) names the match and the grounds, with the brand's name", () => {
+    expect(rotateText()).toBe('In NRL Sim, the match and the grounds play in landscape. Turn your phone sideways to carry on.');
+    expect(rotateText(withBrand({ name: 'Other Game' }))).toMatch(/^In Other Game, the match and the grounds play in landscape\./);
   });
 
   it('the manifest (the config object vite-plugin-pwa is given) carries the brand', () => {

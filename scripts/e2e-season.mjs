@@ -457,8 +457,10 @@ async function play() {
   });
   await step('tutorial-skipped', async (rec) => { await tap('.nrl-tutorial-skip'); await dumpSave('after-tutorial', rec); });
 
-  // A phone held upright: the rotate card covers the game and the loop sleeps
-  // until it is turned sideways again (src/ui/orientation.ts). Turned back, the
+  // A phone held upright: the menus work (#350), so the sheet left open (the tour's
+  // Build) stays up, or Club home stands in for the grounds, with no rotate card; the
+  // loop sleeps behind it until the phone is
+  // turned sideways again (src/ui/orientation.ts, src/ui/portrait.ts). Turned back, the
   // canvas must fill the landscape viewport again: Phaser's scale manager can
   // refresh from the old bounds while the rotation is still settling and then take
   // the new bounds as "no change", leaving the canvas at the portrait size (every
@@ -466,21 +468,24 @@ async function play() {
   const orientation = () => page.evaluate(() => ({
     coarse: matchMedia('(pointer: coarse)').matches,
     card: getComputedStyle(document.querySelector('.nrl-rotate')).display !== 'none',
+    menu: !!document.querySelector('.nrl-screen-region'),
+    home: !!document.querySelector('[data-club-home]'),
     running: window.__nrlGame?.loop.running,
     game: `${window.__nrlGame?.scale.gameSize.width}x${window.__nrlGame?.scale.gameSize.height}`,
     viewport: `${innerWidth}x${innerHeight}`,
   }));
-  let rotateCard = false;
+  let sleptUpright = false;
   await step('portrait', async (rec) => {
     if (!PHONE) return 'desktop window: no rotate card';
     await page.setViewportSize({ width: H, height: W });
     await wait(600);
     const o = await orientation();
-    if (!o.coarse) return 'this Chromium reports a fine pointer in portrait, so the rotate card cannot show';
-    if (!o.card) throw new Error('no rotate card in portrait');
-    if (o.running !== false) throw new Error('game loop still running under the rotate card');
-    rotateCard = true;
-    rec.notes.push('rotate card shown, loop asleep');
+    if (!o.coarse) return 'this Chromium reports a fine pointer in portrait, so the menus stay as they are';
+    if (o.card) throw new Error('the rotate card is up over a menu');
+    if (!o.menu) throw new Error('no sheet upright (Club home stands in for the grounds)');
+    if (o.running !== false) throw new Error('game loop still running behind the menus');
+    sleptUpright = true;
+    rec.notes.push(`${o.home ? 'Club home' : 'the open sheet'}, no rotate card, loop asleep`);
   });
   await step('landscape-again', async (rec) => {
     if (!PHONE) return 'desktop window';
@@ -488,9 +493,10 @@ async function play() {
     await wait(600);
     const o = await orientation();
     if (o.card) throw new Error('rotate card still up in landscape');
-    if (rotateCard && o.running !== true) throw new Error('game loop did not wake');
+    if (o.home) throw new Error('Club home still up sideways, over the grounds');
+    if (sleptUpright && o.running !== true) throw new Error('game loop did not wake');
     if (o.game !== o.viewport) throw new Error(`canvas is ${o.game} in a ${o.viewport} viewport after rotating back`);
-    rec.notes.push(`${rotateCard ? 'card gone, loop awake' : 'card gone'}, canvas ${o.game}`);
+    rec.notes.push(`${sleptUpright ? 'loop awake' : 'card gone'}, canvas ${o.game}`);
   });
 
   // Facilities: build two, move one, demolish the other. A tap on the grass only
