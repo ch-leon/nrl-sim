@@ -888,7 +888,9 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-decisions-chip[hidden] { display: none; }
 .nrl-decisions-chip-count { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.06em; color: var(--nrl-accent); white-space: nowrap; }
 .nrl-decisions-chip-top { font-size: 0.8125rem; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.nrl-decisions-chip .nrl-btn { min-height: 34px; height: 34px; border-radius: 8px; padding: 0 12px; font-size: 0.9375rem; flex: 0 0 auto; }
+.nrl-decisions-chip .nrl-btn { min-height: 34px; height: 34px; border-radius: 8px; padding: 0 12px; font-size: 0.9375rem; flex: 0 0 auto; position: relative; }
+/* #418: Review stays 34px in the 44px chip; its hit area is the chip's full height (a tap just above or below it counts). */
+.nrl-decisions-chip .nrl-btn::after { content: ''; position: absolute; inset: -5px 0; }
 /* The board chip is one button: amber at risk, red off track. */
 .nrl-board-chip { padding-right: 14px; cursor: pointer; text-align: left; }
 .nrl-board-chip:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
@@ -1024,7 +1026,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   min-width: 0;
   min-height: 44px;
 }
-.nrl-screen-titles { flex: 0 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+/* Centred, not on the baseline (#413): a line that wraps to two stays inside the 44px row (one sits within a pixel of where the baseline put it). */
+.nrl-screen-titles { flex: 0 1 auto; display: flex; align-items: center; gap: 10px; }
 .nrl-screen-title {
   font-family: var(--nrl-f-label);
   font-weight: 700;
@@ -1035,18 +1038,25 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   color: var(--nrl-text);
   white-space: nowrap;
 }
+/* The line beside the title keeps a few words' width (#371) and wraps to two lines rather than cut a
+   word; the titles never shrink under it (#413: their least is the title, the tabs and the line's
+   longest word or 6.5em), so on a narrow phone or at a larger text size the controls give way and scroll. */
 .nrl-screen-sub {
   font-size: 0.8125rem;
+  line-height: 1.3;
   color: var(--nrl-text-2);
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-width: 6.5em;
   flex: 0 1 auto;
 }
 .nrl-screen-titles .nrl-screen-sub { margin: 0; }
-/* Large and Larger text (#371): the line beside the tabs keeps a few words' width; the controls scroll instead. */
-html[data-text-size] .nrl-screen-sub { min-width: 6.5em; }
+/* The titles take the squeeze first (their shrink weighted far past the controls'), so the controls
+   give way and scroll only once the line is at its least. */
+.nrl-screen .nrl-screen-head > .nrl-screen-titles { flex-shrink: 100; }
+.nrl-screen .nrl-screen-head > .nrl-screen-tools { flex-shrink: 1; }
 /* The controls: one row that scrolls sideways when the phone is narrow. Pushed
    right with a margin, not justify-content: an overflowing flex-end row spills
    off its start, where it cannot be scrolled to. */

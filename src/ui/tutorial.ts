@@ -216,6 +216,8 @@ interface ActiveTutorial {
   offMatch: () => void;
   /** A replay from Settings or the Guide: every tap also offers Next, as a step may not be doable in this save (#370). */
   replay: boolean;
+  /** Stops watching the toast lane for an Undo toast to keep clear of (#412). */
+  offToast: (() => void) | null;
 }
 
 let active: ActiveTutorial | null = null;
@@ -269,7 +271,7 @@ export function startTutorial(force = false): void {
     attrs: { 'data-tutorial': 'overlay' },
   });
   mount(overlay);
-  active = { index: firstStepIndex(getState()), overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay), replay: force };
+  active = { index: firstStepIndex(getState()), overlay, offEvent: null, retryTimer: null, offMatch: holdForMatch(overlay), replay: force, offToast: null };
   renderStep();
 }
 
@@ -338,6 +340,10 @@ function clearStepBindings(a: ActiveTutorial): void {
   if (a.retryTimer !== null) {
     clearInterval(a.retryTimer as ReturnType<typeof setInterval>);
     a.retryTimer = null;
+  }
+  if (a.offToast) {
+    a.offToast();
+    a.offToast = null;
   }
 }
 
@@ -436,12 +442,7 @@ function renderStep(): void {
   let found = findAnchor(step.anchor);
   let shown = found?.el ?? null;
   show(found);
-  a.retryTimer = setInterval(() => {
-    if (active !== a || STEPS[a.index] !== step || a.overlay.hidden) return;
-    if (step.until && findAnchor(step.until)) {
-      advance();
-      return;
-    }
+  const follow = (): void => {
     found = findAnchor(step.anchor!);
     const now = found?.el ?? null;
     if (now !== shown) {
@@ -452,6 +453,18 @@ function renderStep(): void {
       renderCutout(a, now);
       dockClear(a.overlay.querySelector('.nrl-tutorial-bubble')!, now);
     }
+  };
+  // #412: an Undo toast coming or going re-docks the bubble at once, not on the next poll.
+  a.offToast = watchToasts(() => {
+    if (active === a && STEPS[a.index] === step && !a.overlay.hidden) follow();
+  });
+  a.retryTimer = setInterval(() => {
+    if (active !== a || STEPS[a.index] !== step || a.overlay.hidden) return;
+    if (step.until && findAnchor(step.until)) {
+      advance();
+      return;
+    }
+    follow();
   }, ANCHOR_RETRY_MS);
 }
 
@@ -506,25 +519,77 @@ function renderCutout(a: ActiveTutorial, anchorEl: HTMLElement): void {
 /** Bubble docks, tried in order until one leaves the anchor uncovered (More's sheet fills the bottom-left dock, #344). */
 const DOCKS = ['', ' nrl-tutorial-top', ' nrl-tutorial-top nrl-tutorial-right', ' nrl-tutorial-right'];
 
+/** A box on screen, as getBoundingClientRect gives it. */
+export interface Box { left: number; top: number; right: number; bottom: number }
+
+/** How much of `a` and `b` overlap, in px². Pure. */
+export function overlapArea(a: Box, b: Box): number {
+  return Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+    Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+}
+
 /**
- * Dock the bubble clear of the anchor and its frame (#337 U2). When every dock
- * overlaps (a big row on a short screen), take the one that covers least.
+ * Which dock the bubble takes (#337 U2, #412), by index into `docks` (the
+ * bubble's box at each DOCKS entry): the first clear of the anchor and of the
+ * Undo toast on show (`toast`, null when none); else, of the docks clear of the
+ * toast, the one that covers least of the anchor. When every dock covers the
+ * toast, -1: the toast wins while its Undo counts down and the bubble stands
+ * aside until it goes. Pure.
+ */
+export function pickDock(docks: readonly Box[], anchor: Box, toast: Box | null): number {
+  let best = -1;
+  let least = Infinity;
+  for (const [i, b] of docks.entries()) {
+    if (toast && overlapArea(b, toast) > 0) continue;
+    const area = overlapArea(b, anchor);
+    if (area === 0) return i;
+    if (area < least) { best = i; least = area; }
+  }
+  return best;
+}
+
+/** Room kept round the Undo toast, so its 44px Undo and ✕ are whole (#412). */
+const TOAST_PAD = 4;
+
+/** The action toast on show (the 5-second Undo, #370) with TOAST_PAD round it, or null. */
+function undoToastBox(): Box | null {
+  const t = document.querySelector('.nrl-toast-lane:not([hidden]) .nrl-toast-action');
+  const r = t?.getBoundingClientRect();
+  if (!r || r.width === 0 || r.height === 0) return null;
+  return { left: r.left - TOAST_PAD, top: r.top - TOAST_PAD, right: r.right + TOAST_PAD, bottom: r.bottom + TOAST_PAD };
+}
+
+/** Call `fn` when the toast lane changes (a toast comes, goes or moves); returns the teardown. */
+function watchToasts(fn: () => void): () => void {
+  const lane = document.querySelector('.nrl-toast-lane');
+  if (!lane || typeof MutationObserver === 'undefined') return () => {};
+  const obs = new MutationObserver(fn);
+  obs.observe(lane, { childList: true, attributes: true, attributeFilter: ['hidden', 'style', 'data-lane'] });
+  return () => obs.disconnect();
+}
+
+/**
+ * Dock the bubble clear of the anchor and its frame (#337 U2), and of an Undo
+ * toast (#412): see pickDock. When every dock overlaps the anchor (a big row on
+ * a short screen), take the one that covers least; when every dock covers the
+ * toast, the bubble stands aside (data-aside) until the toast goes.
  */
 function dockClear(bubble: HTMLElement, anchorEl: HTMLElement): void {
   const pad = 6;
   const a = anchorEl.getBoundingClientRect();
-  const r = { left: a.left - pad, right: a.right + pad, top: a.top - pad, bottom: a.bottom + pad };
+  const anchor = { left: a.left - pad, right: a.right + pad, top: a.top - pad, bottom: a.bottom + pad };
   const base = bubble.classList.contains('nrl-tutorial-bar') ? 'nrl-tutorial-bubble nrl-tutorial-bar' : 'nrl-tutorial-bubble';
-  let best = { dock: DOCKS[0]!, area: Infinity };
+  const toast = undoToastBox();
+  const boxes: Box[] = [];
   for (const dock of DOCKS) {
     bubble.className = `${base}${dock}`;
-    const b = bubble.getBoundingClientRect();
-    const area = Math.max(0, Math.min(b.right, r.right) - Math.max(b.left, r.left)) *
-      Math.max(0, Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top));
-    if (area === 0) return;
-    if (area < best.area) best = { dock, area };
+    boxes.push(bubble.getBoundingClientRect());
+    // Without a toast, the first dock clear of the anchor is the answer: stop measuring.
+    if (!toast && overlapArea(boxes[boxes.length - 1]!, anchor) === 0) break;
   }
-  bubble.className = `${base}${best.dock}`;
+  const i = pickDock(boxes, anchor, toast);
+  bubble.className = `${base}${DOCKS[Math.max(0, i)]!}`;
+  bubble.toggleAttribute('data-aside', i < 0);
 }
 
 /**
@@ -733,6 +798,8 @@ body.nrl-match-active .nrl-tutorial, .nrl-tutorial[hidden] { display: none; }
   white-space: nowrap;
 }
 .nrl-tutorial-bubble.nrl-tutorial-right { left: auto; right: calc(0.75rem + var(--nrl-safe-r, 0px)); transform: none; }
+/* #412: no dock clear of the Undo toast: the bubble stands aside (and takes no taps) until the toast goes. */
+.nrl-tutorial-bubble[data-aside] { visibility: hidden; }
 `;
 
 // REPLAY (orchestrator wiring): the Guide's footer (ui/guide/guide.ts, under

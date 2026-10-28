@@ -39,9 +39,10 @@ describe('region dialog (#203)', () => {
     expect(r).toContain('z-index');
     expect(r).toContain('margin-top: auto'); // pushed to the column's foot
     expect(r).toContain('flex: 0 0 auto'); // never squeezed out
-    // The column holding them does not scroll (only the middle one does), so they are always in view.
+    // #415: the column holding them scrolls when its words outgrow it (a larger text size); the
+    // actions, sticky at its foot, stay in view while the rest scrolls under them.
     const side = rule('.nrl-player-card, .nrl-player-side', PLAYER_CSS);
-    expect(side).toContain('overflow: hidden');
+    expect(side).toContain('overflow-y: auto');
     expect(side).toContain('min-height: 0');
     expect(rule('.nrl-player-about', PLAYER_CSS)).toContain('overflow-y: auto');
   });
