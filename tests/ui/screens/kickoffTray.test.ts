@@ -38,6 +38,14 @@ describe('the kick-off pair in the coach tray (#397)', () => {
     expect(block('@media (max-height: 360px)')).toContain('.nrl-mo-tray-foot { flex-shrink: 0; -webkit-line-clamp: 1; }');
   });
 
+  it('keeps the whole footer at Large on a 375-tall phone without a scrolling tray (#432)', () => {
+    const block = (head: string): string => OVERLAY_CSS.match(new RegExp(`${head.replace(/[()]/g, '\\$&')} \\{([\\s\\S]*?)\\n\\}`))?.[1] ?? '';
+    const mid = block('@media (min-height: 361px) and (max-height: 400px)');
+    expect(mid).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
+    expect(mid).toContain('flex-shrink: 0');
+    expect(mid).toContain('-webkit-line-clamp: unset');
+  });
+
   it('is on from Office level 0, with short tile words', () => {
     expect(unlockedCalls(0)).toEqual(expect.arrayContaining(['kickoff-short', 'kickoff-long']));
     for (const c of ['kickoff-short', 'kickoff-long'] as const) {

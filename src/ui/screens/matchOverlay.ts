@@ -1672,8 +1672,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
    line inside the 44px tile (Normal is untouched). A short phone is already three
    a line across the screen, so there the caption draws a little smaller — still
    bigger than Normal — and may use a second line rather than end in an ellipsis.
-   The footer keeps its one line on a short phone (#396); on a taller one it may
-   run to four, since the tray has the room and must not scroll. */
+   The footer keeps its one line on a short phone (#396). On a 375-tall phone at
+   Large and Larger it keeps every line: three columns free a row so it need not shrink. */
 .nrl-mo-tray-none { grid-column: 1 / -1; padding: 6px 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
 .nrl-mo-tray-foot { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 0.75rem; line-height: 1.3; color: var(--nrl-muted); }
 .nrl-mo-tray-foot:empty { display: none; }
@@ -1704,6 +1704,27 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   html[data-text-size] .nrl-mo-tray { width: min(480px, calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
   html[data-text-size] .nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 480px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
   html[data-text-size] .nrl-mo-tray-foot { -webkit-line-clamp: 4; }
+}
+/* 667×375 and 844×390 at Large and Larger (#432): two columns of 44px tiles leave the
+   footer to shrink under the tray's max height, so a 4-line clamp still ellipsizes
+   inside one leftover line. Three columns drop a row. The footer then keeps every
+   line (it does not shrink), the captions still fit one line in the wider tray, and
+   a full tray does not scroll. The log gives way while the tray is open. Shorter
+   phones (568×320, 956×330) stay on the one-line footer. */
+@media (min-height: 361px) and (max-height: 400px) {
+  html[data-text-size] .nrl-mo-tray {
+    width: min(640px, calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r)));
+    gap: 4px;
+    padding: 6px 10px;
+  }
+  html[data-text-size] .nrl-mo-tray-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-text-size] .nrl-mo-tray-open .nrl-mo-full { display: none; }
+  html[data-text-size] .nrl-mo-tray-foot {
+    flex-shrink: 0;
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
 }
 /* A narrow window (a phone upright, where a fine pointer still shows the match): two
    columns are too slim for the longest caption, at Normal as well as Large. The caption
