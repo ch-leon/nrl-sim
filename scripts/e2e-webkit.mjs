@@ -887,8 +887,10 @@ async function runPortraitMenus(browser) {
     rmSync(OUT, { recursive: true, force: true });
     mkdirSync(OUT, { recursive: true });
     const report = { size: tag, safe, steps: [], errors: [] };
+    // Reduced motion: the sheets come up without their 180ms rise, so each of the ~200 opens
+    // is measured at once (the CI job's 20 minutes are close to full).
     const ctx = await browser.newContext({
-      viewport: { width: W, height: H }, deviceScaleFactor: run.dpr, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
+      viewport: { width: W, height: H }, deviceScaleFactor: run.dpr, hasTouch: true, isMobile: true, userAgent: IPHONE_UA, reducedMotion: 'reduce',
     });
     await ctx.addInitScript(closeWeekSummary);
     const page = await ctx.newPage();
@@ -949,7 +951,7 @@ async function runPortraitMenus(browser) {
       else if (m.id === 'office') await press('.nrl-nav [data-nav-more]');
       else if (!m.from) await openNav(page, m.id);
       if (m.wait) await page.waitForSelector(m.wait);
-      await page.waitForTimeout(250); // the sheet's 180ms rise
+      await page.waitForTimeout(50); // a frame for the sheet's layout (no rise: reduced motion)
     };
 
     await step('title', async (rec) => {
@@ -1002,7 +1004,7 @@ async function runPortraitMenus(browser) {
             ...await cardDown(m.id),
           ];
           out.push(...found.map((p) => `${m.id}: ${p}`));
-          if (found.length || t === 'larger') await page.screenshot({ path: join(OUT, `${t}-${m.id}.png`) });
+          if (found.length) await page.screenshot({ path: join(OUT, `${t}-${m.id}.png`) });
           checked++;
         }
         await home();
