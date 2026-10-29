@@ -4,8 +4,9 @@
 // vitest env has no DOM, so these pin the pure helpers and the CSS.
 import { describe, it, expect } from 'vitest';
 import {
-  ACTION_LANE_PX, DOCK_GAP_PX, TOAST_CAP, TRIM_KEEP, MIN_LANE_PX, RESERVE_CLASS, RESERVE_GAP_PX, RESERVE_VAR, TOAST_BUSY_MS, TOAST_MAX_MS, TOAST_MIN_MS,
-  dismissOnBodyTap, dockLane, moreInNews, trimQueue, trimmable, holdReserve, isActionToast, isLongInfo, laneIndex, laneMinPx, listReserve, queueBadge, toastMs,
+  ACTION_LANE_PX, DOCK_GAP_PX, TOAST_CAP, TRIM_KEEP, MIN_LANE_PX, RESERVE_CLASS, RESERVE_GAP_PX, RESERVE_VAR,
+  TOAST_BUSY_MS, TOAST_LIFT_GAP, TOAST_LIFT_VAR, TOAST_MAX_MS, TOAST_MIN_MS,
+  dismissOnBodyTap, dockLane, moreInNews, trimQueue, trimmable, holdReserve, isActionToast, isLongInfo, laneIndex, laneMinPx, listReserve, queueBadge, toastLiftPx, toastMs,
   type ReserveList,
 } from '../../src/ui/toasts';
 import { UNDO_MS } from '../../src/systems/undo';
@@ -186,6 +187,17 @@ describe('the dock lane keeps off the list rows (Wave 3, #339)', () => {
   it('the reserve is room after the list\'s last row, sized by its property', () => {
     expect(rule(CSS, `.${RESERVE_CLASS}::after`)).toContain(`height: var(${RESERVE_VAR}, 0px)`);
     expect(rule(CSS, `.${RESERVE_CLASS}::after`)).toContain('flex: 0 0 auto');
+  });
+  it('the install hint lifts a sheet clear of the rows it used to cover (#434)', () => {
+    expect(toastLiftPx(0)).toBe(0);
+    expect(toastLiftPx(34)).toBe(34 + DOCK_GAP_PX + TOAST_LIFT_GAP);
+    expect(toastLiftPx(40.2)).toBe(Math.ceil(40.2 + DOCK_GAP_PX + TOAST_LIFT_GAP));
+    expect(rule(CSS, '\n.nrl-screen-region')).toContain(`var(${TOAST_LIFT_VAR}, 0px)`);
+    expect(rule(CSS, '\n.nrl-dialog-region')).toContain(`var(${TOAST_LIFT_VAR}, 0px)`);
+    // A short screen's own bottom inset keeps the lift, or it would paint back over the list.
+    expect(CSS).toContain(`bottom: calc(var(--nrl-nav-h, 0px) + 8px + var(${TOAST_LIFT_VAR}, 0px))`);
+    expect(CSS).toContain(`bottom: calc(var(--nrl-nav-h, 0px) + 6px + var(${TOAST_LIFT_VAR}, 0px))`);
+    expect(rule(CSS, '.nrl-toast-long .nrl-toast-text')).toContain('-webkit-line-clamp: 4');
   });
 });
 

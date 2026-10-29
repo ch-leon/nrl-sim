@@ -228,9 +228,9 @@ export const PORTRAIT_CSS = `
     left: calc(8px + var(--nrl-safe-l));
     right: calc(8px + var(--nrl-safe-r));
     top: calc(8px + var(--nrl-safe-t));
-    bottom: calc(var(--nrl-nav-h, 0px) + 8px);
+    bottom: calc(var(--nrl-nav-h, 0px) + 8px + var(--nrl-toast-lift, 0px));
   }
-  html:root .nrl-dialog-region { top: 0; bottom: var(--nrl-nav-h, 0px); padding: calc(8px + var(--nrl-safe-t)) calc(8px + var(--nrl-safe-r)) 8px calc(8px + var(--nrl-safe-l)); }
+  html:root .nrl-dialog-region { top: 0; bottom: calc(var(--nrl-nav-h, 0px) + var(--nrl-toast-lift, 0px)); padding: calc(8px + var(--nrl-safe-t)) calc(8px + var(--nrl-safe-r)) 8px calc(8px + var(--nrl-safe-l)); }
   html:root .nrl-nav-sheet { left: calc(8px + var(--nrl-safe-l)); right: calc(8px + var(--nrl-safe-r)); grid-template-columns: repeat(2, minmax(0, 1fr)); }
   html:root .nrl-screen { padding: 8px 10px; }
   html:root .nrl-modal { max-width: calc(100vw - 16px); }

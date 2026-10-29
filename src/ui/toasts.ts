@@ -69,6 +69,20 @@ export function laneMinPx(n: Notice | undefined): number {
 export const DOCK_GAP_PX = 20;
 /** Clear space between a list's last row, scrolled to the end, and the toast over it. */
 export const RESERVE_GAP_PX = 8;
+/** Gap kept between a long info toast and the sheet or dialog lifted clear of it (#434). */
+export const TOAST_LIFT_GAP = 8;
+/** Custom property added to a sheet or dialog's bottom inset while the install hint is up. */
+export const TOAST_LIFT_VAR = '--nrl-toast-lift';
+
+/**
+ * How far a sheet or dialog rises so the install hint sits clear of its content
+ * (#434). Sized for a dialog that rests on the nav (no pad of its own); a sheet
+ * already inset above the nav clears by a little more. Nothing when there is no toast.
+ */
+export function toastLiftPx(toastH: number): number {
+  if (toastH <= 0) return 0;
+  return Math.ceil(toastH + DOCK_GAP_PX + TOAST_LIFT_GAP);
+}
 /** The narrowed lane's inset from the dock's left edge, and its gap to PLAY WEEK. */
 const EDGE_PX = 12;
 /** The centred lane's widest (30rem at Normal text, the CSS's min(30rem, …)). */
@@ -258,6 +272,14 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
     if (lane.dataset.lane !== mode) lane.dataset.lane = mode;
     if (lane.style.cssText !== css) lane.style.cssText = css;
   };
+  // The install hint lifts the open sheet and any dialog clear of itself (#434).
+  const setLift = (px: number): void => {
+    const v = px > 0 ? `${px}px` : '';
+    const root = document.documentElement;
+    if ((root.style.getPropertyValue(TOAST_LIFT_VAR) || '') === v) return;
+    if (v) root.style.setProperty(TOAST_LIFT_VAR, v);
+    else root.style.removeProperty(TOAST_LIFT_VAR);
+  };
   // Lists holding room at their foot for the toast over them (Wave 3).
   let reserved = new Set<HTMLElement>();
   const release = (): void => {
@@ -287,6 +309,7 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
   const place = (): void => {
     if (matchOn()) {
       release();
+      setLift(0);
       // From the left inset (CSS) up to the full log on the right, while it is open.
       setLane('match', '');
       const log = document.querySelector('.nrl-mo-full')?.getBoundingClientRect();
@@ -302,6 +325,7 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
       if (Math.max(leftRoom, rightRoom) >= MIN_LANE_PX) {
         setLane('beside', leftRoom >= rightRoom ? `width: ${leftRoom}px;` : `left: ${Math.ceil(dialog.right + 12)}px; width: ${rightRoom}px;`);
         release();
+        setLift(0);
         return;
       }
     }
@@ -311,18 +335,24 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
     if (!dock || office) {
       setLane('top', '');
       release();
+      setLift(0);
       return;
     }
     // Just above the dock; a long info toast left of PLAY WEEK. A list under it keeps room for it.
     const play = document.querySelector('.nrl-dock-play-group')?.getBoundingClientRect();
+    const toastH = shown?.getBoundingClientRect().height ?? 0;
     const g = dockLane(shown ? notices.get(shown) : undefined, {
       vh: window.innerHeight,
       navH: parseFloat(document.documentElement.style.getPropertyValue(NAV_INSET_VAR)) || 0,
       playLeft: play && play.width > 0 ? play.left : null,
       dockLeft: dock.left,
-      toastH: shown?.getBoundingClientRect().height ?? 0,
+      toastH,
     });
     setLane('dock', g.left === null ? '' : `left: ${g.left}px; width: ${g.width}px; transform: none; justify-content: flex-start;`);
+    // A long info toast (the install hint) stays up for seconds: lift the sheet so it
+    // does not cover the rows that are already on screen. A short toast keeps the reserve.
+    const hint = shown ? notices.get(shown) : undefined;
+    setLift(hint && isLongInfo(hint) ? toastLiftPx(toastH) : 0);
     reserve(g.top);
   };
   /** The toast in view, under nothing: its middle takes a tap. */
@@ -353,7 +383,10 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
     }
     lane.hidden = !first || rowTaken();
     if (!lane.hidden) place();
-    else release();
+    else {
+      release();
+      setLift(0);
+    }
     if (first && !timer) {
       last = performance.now();
       timer = setInterval(tick, TICK_MS);
@@ -382,6 +415,9 @@ export function initToasts(root: HTMLElement, opts: { advancing?: () => boolean 
   const build = (n: Notice): Element => {
     const more = el('span', { class: 'nrl-toast-more', attrs: { 'aria-hidden': 'true' } });
     const toast = el('div', { class: `nrl-toast nrl-toast-${n.kind}` }, el('span', { class: 'nrl-toast-text', text: n.text }), more);
+    // The install hint is narrowed beside PLAY WEEK. At Larger text that column is
+    // two lines too short, so it may wrap further (#434) and the sheet lifts with it.
+    if (isLongInfo(n)) toast.classList.add('nrl-toast-long');
     if (dismissOnBodyTap(n)) {
       toast.title = 'Tap to dismiss';
       toast.addEventListener('click', () => close(toast));

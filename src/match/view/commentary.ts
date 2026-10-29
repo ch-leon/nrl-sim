@@ -26,14 +26,31 @@ import { PRESET_LABEL } from '../league/presets';
  * New, about 0.6em a character (measured in Chromium when the strip also held
  * the Log button: docs/status/2026-10-show.md, N15.2). The button has moved off
  * the strip, so the strip holds more; lines are still written to 56. Every line,
- * filled with the longest names the game makes, fits it (a test).
+ * filled with the longest names the game makes, fits it (a test). A name the
+ * player typed (up to 24 characters, #401) can run a couple past that; the strip
+ * wraps the line onto a second (#433) rather than letting it run over the log.
  */
 export const TICKER_FIT_CHARS = 56;
 
+/**
+ * Longest full club name kept when its last word is too short to stand alone
+ * ("Zone Test FC", "Live Test FC"). A longer typed name uses an earlier word
+ * (#433: "Murwillumbah Mountain Go" → "Mountain"), so the ticker line still fits.
+ */
+const SHORT_NAME_KEEP = 16;
+
 /** A club in a line: its last word ("Larrikins"), unless that is a bare "FC" or the like. The match report's columns use it too. */
 export function shortName(name: string): string {
-  const last = name.trim().split(/\s+/).pop() ?? name;
-  return last.length >= 4 ? last : name;
+  const trimmed = name.trim().replace(/\s+/g, ' ');
+  const words = trimmed.split(' ').filter(Boolean);
+  const last = words[words.length - 1] ?? trimmed;
+  if ([...last].length >= 4) return last;
+  if ([...trimmed].length <= SHORT_NAME_KEEP) return trimmed;
+  for (let i = words.length - 2; i >= 0; i--) {
+    const word = words[i]!;
+    if ([...word].length >= 4) return word;
+  }
+  return trimmed;
 }
 
 /**

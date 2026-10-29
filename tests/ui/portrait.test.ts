@@ -74,6 +74,10 @@ describe('the portrait stylesheet leaves landscape alone (#350)', () => {
     expect(PORTRAIT_CSS).toMatch(/\.nrl-hub-chips \{ display: none; \}/);
   });
 
+  it('the install hint can lift a sheet clear of the list (#434)', () => {
+    expect(PORTRAIT_CSS).toContain('var(--nrl-toast-lift, 0px)');
+  });
+
   it('the tabs and PLAY WEEK keep a finger’s height', () => {
     expect(PORTRAIT_CSS).toMatch(/\.nrl-dock-tabs > \.nrl-btn \{[^}]*height: 48px/);
     expect(PORTRAIT_CSS).toMatch(/\.nrl-dock-play \{[^}]*height: 48px/);
