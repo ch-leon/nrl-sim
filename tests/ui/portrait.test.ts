@@ -70,6 +70,10 @@ describe('the portrait stylesheet leaves landscape alone (#350)', () => {
     expect(closedAt).toBe(css.length - 1);
   });
 
+  it('the grounds’ chips give way to Club home’s rows (decisions, the board)', () => {
+    expect(PORTRAIT_CSS).toMatch(/\.nrl-hub-chips \{ display: none; \}/);
+  });
+
   it('the tabs and PLAY WEEK keep a finger’s height', () => {
     expect(PORTRAIT_CSS).toMatch(/\.nrl-dock-tabs > \.nrl-btn \{[^}]*height: 48px/);
     expect(PORTRAIT_CSS).toMatch(/\.nrl-dock-play \{[^}]*height: 48px/);

@@ -214,6 +214,9 @@ export const PORTRAIT_CSS = `
     letter-spacing: 0.02em;
   }
   html:root .nrl-dock-tabs > .nrl-btn > .nrl-nav-dot { position: absolute; top: 6px; right: 6px; }
+  /* The grounds' chips (decisions, the board at risk) are Club home's rows upright; over Office's
+     tiles a one-line chip would cut its words. */
+  html:root .nrl-hub-chips { display: none; }
   /* Club home shows the money and week itself: PLAY WEEK takes the row. */
   html:root body:has([data-club-home]) .nrl-dock-status { display: none; }
   html:root body:has([data-club-home]) .nrl-dock-play { grid-column: 1 / -1; justify-self: stretch; }
