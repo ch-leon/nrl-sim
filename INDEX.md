@@ -179,3 +179,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-172235-kick-contest | kick-contest | 91ef9d2 | claude/kick-types-99 | [report](runs/20261028-172235-kick-contest/report.md) |
 | 20261028-180218-kick-contest | kick-contest | 91ef9d2 (uncommitted changes) | claude/kick-types-99 | [report](runs/20261028-180218-kick-contest/report.md) |
 | 20261028-201107-standard | standard | 7dcff53 | main | [report](runs/20261028-201107-standard/report.md) |
+| 20261029-044813-standard | standard | a660416 | main | [report](runs/20261029-044813-standard/report.md) |
