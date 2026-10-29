@@ -165,14 +165,15 @@ export interface NavMarks {
 
 /**
  * The marks for screen `key`, with Office's sheet up or not and a screen up or not.
- * A screen in Office marks OFFICE and its tile; with nothing over the grounds, CLUB.
+ * A screen in Office marks OFFICE and its tile; with nothing over the grounds, CLUB,
+ * and CLUB too for the Club home sheet (key HOME_ID), home on a phone held upright (#350).
  */
 export function navMarks(registry: ScreenRegistry, key: string | null, sheetUp: boolean, screenUp: boolean): NavMarks {
   const owner = registry.owner(key);
   const inMore = registry.inMore(key);
   const current: string[] = [];
   const open: string[] = [];
-  if (owner === null && !screenUp && !sheetUp) current.push(HOME_ID);
+  if (!sheetUp && (key === HOME_ID || (owner === null && !screenUp))) current.push(HOME_ID);
   if (owner !== null) current.push(owner);
   if (owner !== null && !inMore && !sheetUp) open.push(owner);
   if (inMore) current.push(OFFICE_ID);
@@ -209,10 +210,10 @@ export function createNav(): Nav {
   // A dot's read-out label by screen id (#369); absent means no dot.
   const dots = new Map<string, string>();
 
-  // CLUB: home, the grounds with nothing over them.
+  // CLUB: home, the grounds with nothing over them (upright, the Club home sheet, #350: already home, it stays).
   const club = tabButton('Club', () => {
     setSheet(false);
-    closeScreen();
+    if (screenKey() !== HOME_ID) closeScreen();
   });
   club.setAttribute('data-screen', HOME_ID);
   club.setAttribute('data-nav-home', '');

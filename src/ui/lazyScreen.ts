@@ -11,7 +11,8 @@
 //    "Loading…" one, went back to the club): the late chunk is kept for next time
 //    and opens nothing. A second tap of the same entry supersedes the first.
 //  - The fetch failed: `failed` runs (a toast), and the next tap tries again.
-import { closeScreen, el, openModal, activeScreen } from './dom';
+import { closeScreen, el, openModal, activeScreen, screenKey } from './dom';
+import { HOME_ID } from './nav';
 
 /** Under this a first open shows nothing in between (#400's DECISION default). */
 export const LOADING_DELAY_MS = 150;
@@ -71,10 +72,14 @@ export function lazyOpener<M>(
   };
 }
 
-/** The DOM's deps: the screen slot, a title-and-"Loading…" sheet keyed like the real one, and real timers. */
+/**
+ * The DOM's deps: the screen slot, a title-and-"Loading…" sheet keyed like the real one, and real timers.
+ * Upright, the Club home sheet is home (#350), as the bare grounds are sideways: it opens by itself
+ * while a tile's chunk loads, so it reads as nothing open, not as the player moving on.
+ */
 export function screenDeps(title: string, opts: { key: string; class?: string }): LazyDeps {
   return {
-    current: () => activeScreen(),
+    current: () => (screenKey() === HOME_ID ? null : activeScreen()),
     loading: () => {
       const body = el('div', { class: 'nrl-lazy-loading', attrs: { 'data-lazy-loading': opts.key, 'aria-busy': 'true' } });
       body.append(el('div', { class: 'nrl-screen-title', text: title }), el('p', { text: 'Loading…' }));

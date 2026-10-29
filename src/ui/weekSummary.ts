@@ -17,7 +17,8 @@ import { advanceInProgress } from '../core/advance';
 import { weekHeld } from '../core/time';
 import { BOARD, WEEKS_PER_SEASON } from '../config';
 import { RISK_WORD, type ObjectiveRisk } from '../systems/board';
-import { el, button, openModal, closeModal, activeScreen, dialogOpen } from './dom';
+import { el, button, openModal, closeModal, activeScreen, dialogOpen, screenKey } from './dom';
+import { CLUB_HOME_KEY } from './screens/clubHome';
 import { boardChip, fmtMoney, fmtMoneyShort } from './hud';
 import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
 import { FINANCE_LINE_LABELS } from './screens/finance';
@@ -255,7 +256,8 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
       held: weekHeld(),
       matchOnScreen: typeof document !== 'undefined' && !!document.body?.classList.contains(MATCH_ACTIVE_CLASS),
       dialog: dialogOpen(),
-      screen: activeScreen() !== null,
+      // Upright, the Club home sheet is the club (#350): the card shows over it as over the grounds.
+      screen: activeScreen() !== null && screenKey() !== CLUB_HOME_KEY,
       tutorial: isTutorialActive(),
     });
     if (!can) return;
