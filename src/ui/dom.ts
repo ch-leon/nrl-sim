@@ -935,7 +935,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   left: calc(12px + var(--nrl-safe-l));
   right: calc(12px + var(--nrl-safe-r));
   top: calc(var(--nrl-hud-h, 0px) + 12px + var(--nrl-safe-t));
-  bottom: calc(var(--nrl-nav-h, 0px) + 12px);
+  bottom: calc(var(--nrl-nav-h, 0px) + 12px + var(--nrl-toast-lift, 0px));
   max-width: 1180px;
   margin: 0 auto;
   z-index: 50;
@@ -956,7 +956,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 /* A region dialog (#203): above the sheets, the dock still whole and tappable below it. */
 .nrl-dialog-region {
   top: var(--nrl-hud-h, 0px);
-  bottom: var(--nrl-nav-h, 0px);
+  bottom: calc(var(--nrl-nav-h, 0px) + var(--nrl-toast-lift, 0px));
   padding: calc(12px + var(--nrl-safe-t)) calc(12px + var(--nrl-safe-r)) 12px calc(12px + var(--nrl-safe-l));
   background: rgba(5, 9, 22, 0.35);
 }
@@ -1159,6 +1159,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 }
 .nrl-toast:first-child { display: flex; }
 .nrl-toast-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.nrl-toast-long .nrl-toast-text { -webkit-line-clamp: 4; }
 .nrl-toast-more { flex: 0 0 auto; padding: 0 6px; border-radius: 6px; background: var(--nrl-button); color: var(--nrl-text-2); font-family: var(--nrl-f-num); font-size: 0.75rem; }
 .nrl-toast-more:empty { display: none; }
 /* Red is for real problems only; routine stops and confirmations are neutral; good news is green with a gold edge. */
@@ -1206,7 +1207,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   .nrl-dock { height: 56px; }
   .nrl-dock-play { height: 46px; }
   .nrl-dock-play-group > .nrl-btn { min-height: 46px; }
-  .nrl-screen-region { top: calc(var(--nrl-hud-h, 0px) + 8px + var(--nrl-safe-t)); bottom: calc(var(--nrl-nav-h, 0px) + 8px); }
+  .nrl-screen-region { top: calc(var(--nrl-hud-h, 0px) + 8px + var(--nrl-safe-t)); bottom: calc(var(--nrl-nav-h, 0px) + 8px + var(--nrl-toast-lift, 0px)); }
   .nrl-screen, .nrl-screen-backdrop .nrl-modal { padding: 6px 12px; }
   .nrl-screen-head { margin-bottom: 4px; }
   .nrl-nav-sheet { bottom: calc(var(--nrl-nav-h, 0px) + 6px); }
@@ -1219,7 +1220,7 @@ body:has(.nrl-update-toast) .nrl-hub-chips { max-width: calc(100vw - 32px - 310p
   .nrl-dock { height: 52px; }
   .nrl-dock-play { height: 44px; }
   .nrl-dock-play-group > .nrl-btn { min-height: 44px; }
-  .nrl-screen-region { top: calc(var(--nrl-hud-h, 0px) + 6px + var(--nrl-safe-t)); bottom: calc(var(--nrl-nav-h, 0px) + 6px); }
+  .nrl-screen-region { top: calc(var(--nrl-hud-h, 0px) + 6px + var(--nrl-safe-t)); bottom: calc(var(--nrl-nav-h, 0px) + 6px + var(--nrl-toast-lift, 0px)); }
   .nrl-screen, .nrl-screen-backdrop .nrl-modal { padding: 4px 12px; }
   .nrl-dialog-region { padding-top: calc(6px + var(--nrl-safe-t)); padding-bottom: 6px; }
   .nrl-table th { padding-top: 2px; padding-bottom: 2px; }

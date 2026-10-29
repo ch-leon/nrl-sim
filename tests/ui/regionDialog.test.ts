@@ -26,7 +26,8 @@ describe('region dialog (#203)', () => {
     // Its own rule, not the padding it shares with the screen backdrop.
     const r = rule('\n.nrl-dialog-region');
     expect(r).toContain('top: var(--nrl-hud-h');
-    expect(r).toContain('bottom: var(--nrl-nav-h');
+    // The install hint adds --nrl-toast-lift (0 unless that toast is up, #434).
+    expect(r).toContain('bottom: calc(var(--nrl-nav-h, 0px) + var(--nrl-toast-lift, 0px))');
   });
   it('caps the card to the region', () => {
     expect(rule('.nrl-dialog-region .nrl-modal')).toContain('max-height: 100%');

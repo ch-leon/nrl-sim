@@ -9,6 +9,8 @@ import {
   LOG_MODE_KEY,
   OVERLAY_CSS,
   SKIP_ARM_MS,
+  TICKER_MIN_PX,
+  fittedTickerPx,
   bannerText,
   callCaption,
   callEffect,
@@ -124,7 +126,15 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
   });
   it('the log: one line, nothing, or the full log on the right', () => {
     expect(rule(OVERLAY_CSS, '.nrl-mo-strip')).toContain('width: min(560px');
+    expect(rule(OVERLAY_CSS, '.nrl-mo-strip')).toContain('min-height: 40px');
+    // #433: a long name wraps to a second line; anything past that still ends in an ellipsis.
     expect(rule(OVERLAY_CSS, '.nrl-mo-strip-text')).toContain('text-overflow: ellipsis');
+    expect(rule(OVERLAY_CSS, '.nrl-mo-strip-text')).toContain('-webkit-line-clamp: 2');
+    // A narrow window gets a third line; the fitter then draws a long name smaller (#433).
+    expect(OVERLAY_CSS).toContain('@media (max-width: 520px)');
+    expect(fittedTickerPx(14, 40, 40)).toBe(14);
+    expect(fittedTickerPx(20, 40, 30)).toBe(15);
+    expect(fittedTickerPx(14, 200, 40)).toBe(TICKER_MIN_PX);
     const full = rule(OVERLAY_CSS, '.nrl-mo-full');
     expect(full).toContain('right: calc(12px');
     expect(full).toContain('width: min(330px');

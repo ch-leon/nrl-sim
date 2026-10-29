@@ -612,6 +612,18 @@ export function callsLine(made: Readonly<Record<'home' | 'away', number>>, paid:
 /** How long SKIP in the speed pill stays armed for its second tap (it has no undo, #348 M3). */
 export const SKIP_ARM_MS = 3000;
 
+/** Smallest the ticker's line is drawn, px, when a long name would otherwise run over (#433). */
+export const TICKER_MIN_PX = 11;
+
+/**
+ * Font size that fits `needed` px of text into `available` px. Unchanged when it
+ * already fits. Never below `minPx`.
+ */
+export function fittedTickerPx(basePx: number, neededPx: number, availablePx: number, minPx = TICKER_MIN_PX): number {
+  if (!(availablePx > 0) || neededPx <= availablePx + 1 || basePx <= minPx) return Math.max(minPx, basePx);
+  return Math.max(minPx, (basePx * availablePx) / neededPx);
+}
+
 /** The pause sheet's Settings (the Office's Settings dialog, fx/audio.ts), set once at boot. */
 let settingsOpener: (() => void) | null = null;
 
@@ -985,6 +997,28 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     el('span', { class: 'nrl-mo-strip-more', text: 'FULL LOG ▴' }),
   );
   strip.addEventListener('click', () => setMode('full'));
+  // A long typed name wraps (the CSS) and, on a narrow window, draws smaller until the
+  // whole line is inside the strip (#433). The size resets when the line or the width changes.
+  let fitKey = '';
+  const fitStrip = (): void => {
+    if (stripText.clientHeight < 1) return;
+    const key = `${stripText.textContent}\0${strip.clientWidth}\0${document.documentElement.getAttribute('data-text-size') ?? ''}`;
+    if (key === fitKey) return;
+    fitKey = key;
+    stripText.style.fontSize = '';
+    for (let i = 0; i < 4; i++) {
+      if (stripText.scrollHeight <= stripText.clientHeight + 1) break;
+      const base = parseFloat(getComputedStyle(stripText).fontSize);
+      const next = fittedTickerPx(base, stripText.scrollHeight, stripText.clientHeight);
+      if (next >= base - 0.4) break;
+      stripText.style.fontSize = `${next}px`;
+    }
+  };
+  const fitObserver = new MutationObserver(fitStrip);
+  fitObserver.observe(stripText, { childList: true, characterData: true, subtree: true });
+  fitObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-text-size'] });
+  const stripObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fitStrip) : null;
+  stripObserver?.observe(strip);
   const feed = el('div', { class: 'nrl-mo-feed' });
   const closeLog = button('✕', () => setMode('line'), { class: 'nrl-mo-full-x' });
   closeLog.setAttribute('aria-label', 'Close the log');
@@ -1259,6 +1293,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       document.documentElement.style.removeProperty(BOARD_VAR);
       if (boardFrame) cancelAnimationFrame(boardFrame);
       boardObserver?.disconnect();
+      fitObserver.disconnect();
+      stripObserver?.disconnect();
       cardWatch.disconnect();
       window.removeEventListener('resize', scheduleBoard);
       queued = null;
@@ -1528,13 +1564,23 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 /* The commentary line (log = line): above the bottom row, centred; tap it for the full log. */
 .nrl-mo-strip {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(78px + var(--nrl-safe-b)); z-index: 14;
-  width: min(560px, calc(100vw - 32px)); height: 40px; display: flex; align-items: stretch; margin: 0; padding: 0; border: 0;
+  width: min(560px, calc(100vw - 32px)); min-height: 40px; display: flex; align-items: stretch; margin: 0; padding: 0; border: 0;
   border-radius: 8px; overflow: hidden; background: rgba(14, 22, 48, 0.95); color: var(--nrl-text); box-shadow: var(--nrl-shadow-chip);
   font: inherit; text-align: left; cursor: pointer; pointer-events: auto;
 }
 .nrl-mo-strip:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-strip-live { display: flex; align-items: center; padding: 0 10px; background: var(--nrl-accent); color: var(--nrl-on-accent); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; }
-.nrl-mo-strip-text { flex: 1 1 auto; min-width: 0; align-self: center; padding: 0 12px; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* #433: a long typed name wraps onto a second line (the strip grows up, clear of the
+   bottom row) instead of running over FULL LOG. A third line still ends in an ellipsis. */
+.nrl-mo-strip-text {
+  flex: 1 1 auto; min-width: 0; align-self: center; padding: 4px 12px; font-size: 0.875rem; line-height: 1.25;
+  white-space: normal; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+/* A narrow window (portrait width): a third line, then the fitter draws it smaller (#433). */
+@media (max-width: 520px) {
+  .nrl-mo-strip-text { -webkit-line-clamp: 3; }
+}
 .nrl-mo-strip-more { display: flex; align-items: center; padding: 0 12px; border-left: 1px solid var(--nrl-line); font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 700; color: var(--nrl-text-2); white-space: nowrap; }
 .nrl-mo-line-wait { font-style: italic; opacity: 0.75; }
 /* Log = full: the log on the right, filtered; log = hidden: neither. */
@@ -1622,6 +1668,12 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.2; color: var(--nrl-text-2);
 }
+/* #432: at Large and Larger the tray grows wider, so each caption still fits on one
+   line inside the 44px tile (Normal is untouched). A short phone is already three
+   a line across the screen, so there the caption draws a little smaller — still
+   bigger than Normal — and may use a second line rather than end in an ellipsis.
+   The footer keeps its one line on a short phone (#396). On a 375-tall phone at
+   Large and Larger it keeps every line: three columns free a row so it need not shrink. */
 .nrl-mo-tray-none { grid-column: 1 / -1; padding: 6px 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
 .nrl-mo-tray-foot { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 0.75rem; line-height: 1.3; color: var(--nrl-muted); }
 .nrl-mo-tray-foot:empty { display: none; }
@@ -1644,6 +1696,42 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 @media (max-height: 360px) {
   .nrl-mo-tray { gap: 4px; padding: 6px 12px; }
   .nrl-mo-tray-foot { flex-shrink: 0; -webkit-line-clamp: 1; }
+  html[data-text-size] .nrl-btn.nrl-mo-tray-call { height: auto; min-height: 44px; padding: 2px 8px; }
+  html[data-text-size] .nrl-mo-tray-call span { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  html[data-text-size="larger"] .nrl-mo-tray-call span { font-size: 0.64rem; }
+}
+@media (min-height: 361px) {
+  html[data-text-size] .nrl-mo-tray { width: min(480px, calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
+  html[data-text-size] .nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 480px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
+  html[data-text-size] .nrl-mo-tray-foot { -webkit-line-clamp: 4; }
+}
+/* 667×375 and 844×390 at Large and Larger (#432): two columns of 44px tiles leave the
+   footer to shrink under the tray's max height, so a 4-line clamp still ellipsizes
+   inside one leftover line. Three columns drop a row. The footer then keeps every
+   line (it does not shrink), the captions still fit one line in the wider tray, and
+   a full tray does not scroll. The log gives way while the tray is open. Shorter
+   phones (568×320, 956×330) stay on the one-line footer. */
+@media (min-height: 361px) and (max-height: 400px) {
+  html[data-text-size] .nrl-mo-tray {
+    width: min(640px, calc(100vw - 32px - var(--nrl-safe-l) - var(--nrl-safe-r)));
+    gap: 4px;
+    padding: 6px 10px;
+  }
+  html[data-text-size] .nrl-mo-tray-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-text-size] .nrl-mo-tray-open .nrl-mo-full { display: none; }
+  html[data-text-size] .nrl-mo-tray-foot {
+    flex-shrink: 0;
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+}
+/* A narrow window (a phone upright, where a fine pointer still shows the match): two
+   columns are too slim for the longest caption, at Normal as well as Large. The caption
+   wraps to a second line and the tile grows; a wide phone is unchanged. */
+@media (max-width: 520px) {
+  .nrl-btn.nrl-mo-tray-call { height: auto; min-height: 44px; padding: 3px 8px; }
+  .nrl-mo-tray-call span { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 }
 /* The speed pill (MatchScene): pause, the speeds (the one playing a yellow circle), SKIP. */
 .nrl-mo-controls {

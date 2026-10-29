@@ -262,6 +262,18 @@ describe('the ticker at 844×390', () => {
   it('names a club by its last word, as the report does', () => {
     expect(shortName('Shellharbour Scorpions')).toBe('Scorpions');
     expect(shortName('Zone Test FC')).toBe('Zone Test FC');
+    expect(shortName('Live Test FC')).toBe('Live Test FC');
+  });
+
+  it('a long typed club whose last word is too short to stand alone uses an earlier word (#433)', () => {
+    expect(shortName('Murwillumbah Mountain Go')).toBe('Mountain');
+    expect(shortName('Go')).toBe('Go');
+    const player = 'Mackenzie Tuilagi-Fonoti';
+    expect([...player].length).toBe(24);
+    const team = shortName('Murwillumbah Mountain Go');
+    const line = fillLine('TRY! {player} scores for {team}.', { player, team });
+    expect(line).toBe('TRY! Mackenzie Tuilagi-Fonoti scores for Mountain.');
+    expect(line!.length).toBeLessThanOrEqual(TICKER_FIT_CHARS);
   });
 });
 
