@@ -7,6 +7,7 @@
 // that seed. A killed app resumes the same match with its calls. Fast-forward
 // still plays headless, and a whole season plays end to end.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { exportSave, __setStorage, save } from '../../src/core/save';
 import { bus, type LiveMatchData } from '../../src/core/events';
 import { createNewGame, getState, setState, type Fixture } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, weekHeld } from '../../src/core/time';
@@ -113,6 +114,38 @@ describe('live match (beta): the match on screen is the match', () => {
   });
   afterEach(() => {
     delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
+
+  it('keeps uncontrolled record and mid-match export bytes free of empty controls', () => {
+    fakeStorage();
+    const storage = globalThis.localStorage;
+    __setStorage(storage);
+    try {
+      newGame(42);
+      save(getState());
+      advanceWeek();
+      const live = started[0]!.live!;
+      expect(live).not.toHaveProperty('controls');
+      const initial = readLiveMatch()!;
+      expect(initial).not.toHaveProperty('controls');
+      expect(storage.getItem('nrl-live-match-1')).toBe(JSON.stringify(initial));
+      live.onProgress?.([], 40, [], []);
+      const expected = { ...initial, tick: 40 };
+      expect(storage.getItem('nrl-live-match-1')).toBe(JSON.stringify(expected));
+      const exported = exportSave(getState());
+      expect(exported).not.toContain('"controls"');
+      expect(JSON.parse(exported).nrlLiveMatch).toEqual(expected);
+      const inputs = [{ tick: 41, side: 'home' as const, kind: 'pass-left' as const }];
+      live.onProgress?.([], 40, [], inputs);
+      expect(readLiveMatch()?.controls).toEqual(inputs);
+      expect(live.controls).toEqual(inputs);
+      expect(JSON.parse(exportSave(getState())).nrlLiveMatch.controls).toEqual(inputs);
+      // Older Labs heads wrote an empty list: reading that record also omits it.
+      storage.setItem('nrl-live-match-1', JSON.stringify({ ...expected, controls: [] }));
+      expect(exportSave(getState())).toBe(exported);
+      expect(writeLiveMatch({ ...expected, controls: [] })).toBe(true);
+      expect(storage.getItem('nrl-live-match-1')).toBe(JSON.stringify(expected));
+    } finally { __setStorage(null); }
   });
 
   it('the week holds at kick-off; the watched match is the result, applied with the rest of the week at full time', () => {
@@ -425,4 +458,13 @@ describe('live match (beta): the match on screen is the match', () => {
     expect(mine.length).toBeGreaterThan(0);
     for (const f of mine) expect(f.result).toBeDefined();
   }, 180_000);
+});
+
+it('validates optional Labs controls, rejecting malformed timed intents', () => {
+  const record = { season: 1, week: 2, round: 1, homeId: 'H', awayId: 'A', seed: 1, calls: [], tick: 20 };
+  expect(isLiveMatchRecord(record)).toBe(true);
+  expect(isLiveMatchRecord({ ...record, controls: [{ tick: 10, side: 'home', kind: 'kick', aim: { x: 45.1, y: 20 } }] })).toBe(true);
+  for (const controls of [null, {}, [{ tick: -1, side: 'home', kind: 'kick' }], [{ tick: 10, side: 'away', kind: 'jump' }], [{ tick: 10, side: 'home', kind: 'kick', aim: { x: NaN, y: 20 } }]]) {
+    expect(isLiveMatchRecord({ ...record, controls })).toBe(false);
+  }
 });

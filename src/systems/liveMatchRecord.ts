@@ -9,6 +9,7 @@
 // and plan change, when the page hides, every LIVE_MATCH_SAVE_SECONDS of match
 // time, and on Save & exit, so a kill that never fires pagehide loses at most
 // that much. A few hundred bytes, kept next to the save slot; cleared at full time.
+import { type ControlInput, isControlInput } from '../match/league/controls';
 import { getActiveSlot } from '../core/save';
 import { browserStorage, type StorageLike } from '../core/storage/local';
 import { liveMatchKey } from '../core/storageKeys';
@@ -40,6 +41,7 @@ export interface LiveMatchRecord {
   calls: CallInput[];
   /** Plan changes at the breaks (N11); absent in a record from before them. */
   plans?: PlanInput[];
+  controls?: ControlInput[];
   tick: number;
   /**
    * Halves this record was written under. Absent on a record from before the
@@ -72,7 +74,8 @@ export function isLiveMatchRecord(x: unknown): x is LiveMatchRecord {
     && typeof r.round === 'number' && typeof r.homeId === 'string' && typeof r.awayId === 'string'
     && typeof r.seed === 'number' && typeof r.tick === 'number'
     && Array.isArray(r.calls)
-    && (r.plans === undefined || Array.isArray(r.plans));
+    && (r.plans === undefined || Array.isArray(r.plans))
+    && (r.controls === undefined || Array.isArray(r.controls) && r.controls.every(isControlInput));
 }
 
 export function readLiveMatch(): LiveMatchRecord | null {
@@ -80,10 +83,17 @@ export function readLiveMatch(): LiveMatchRecord | null {
     const raw = store()?.getItem(liveMatchKey(getActiveSlot()));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    return isLiveMatchRecord(parsed) ? parsed : null;
+    return isLiveMatchRecord(parsed) ? optionalControls(parsed) : null;
   } catch {
     return null;
   }
+}
+
+/** Labs: match controls (Leon, 30 Oct). Empty inputs keep the pre-Labs record bytes. */
+function optionalControls(record: LiveMatchRecord): LiveMatchRecord {
+  if (record.controls?.length) return record;
+  const { controls: _controls, ...plain } = record;
+  return plain;
 }
 
 /** Write the record for `slot` (the active one, when omitted). False when storage is missing, full or blocked. */
@@ -92,7 +102,7 @@ export function writeLiveMatch(r: LiveMatchRecord, slot: number = getActiveSlot(
   try {
     const s = store();
     if (!s) return false;
-    s.setItem(liveMatchKey(slot), JSON.stringify(r));
+    s.setItem(liveMatchKey(slot), JSON.stringify(optionalControls(r)));
     return true;
   } catch {
     // Storage full or blocked: the match can still be played, just not resumed.

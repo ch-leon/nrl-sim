@@ -2,6 +2,7 @@
 // time (BAK-207 §3.5, §5.1 2a). Returns the same MatchResult the old engine
 // does, so the season, ladder, player stats and overlay can take it as is.
 // Event minutes are Nines minutes (0–14) off the match clock.
+import { type ControlInput } from './controls';
 import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/events';
 import { applyMomentumEvent, decayMomentum } from '../../sim/weather';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
@@ -22,6 +23,7 @@ export interface RunMatchOptions {
   length?: MatchLength;
   /** Coach calls by tick (#73): the match as the player called it. */
   calls?: CallInput[];
+  controls?: ControlInput[] | undefined;
   /** Sides with an AI coach (N9.6). */
   aiCoach?: ('home' | 'away')[];
   /** A final (N9.4): golden point if level at full time. */
@@ -102,6 +104,7 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     ...(opts.length ? { length: opts.length } : {}),
     ...(opts.weather ? { weather: opts.weather } : {}),
     ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}),
+    ...(opts.controls?.length ? { controls: opts.controls } : {}),
     ...(opts.calls ? { calls: opts.calls } : {}),
     ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}),
     ...(opts.goldenPoint ? { goldenPoint: true } : {}),

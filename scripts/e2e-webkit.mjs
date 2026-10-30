@@ -3460,6 +3460,72 @@ async function runLadderForm(browser) {
   return report.steps.filter((s) => !s.ok).length + report.errors.length;
 }
 
+// Labs: match controls (Leon, 30 Oct). One short, isolated phase; normal phases stay off.
+async function runLabsControls(browser) {
+  const started = Date.now();
+  const ctx = await browser.newContext({ viewport: { width: 667, height: 375 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
+  await ctx.addInitScript(closeWeekSummary);
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(10000);
+  const OUT = join(OUT_ROOT, 'webkit', 'labs-controls');
+  mkdirSync(OUT, { recursive: true });
+  try {
+    await page.goto(`${BASE}&labs=1`);
+    await page.locator('[data-nrl-start]').tap();
+    await page.locator('.nrl-tutorial-skip').tap();
+    await openNav(page, 'settings');
+    await page.locator('.nrl-labs-open').tap();
+    await page.locator('[data-experiment="match-controls"]').check();
+    await page.locator('.nrl-modal .nrl-screen-x').tap();
+    if (await page.locator(SHEET_EXIT).count()) await page.locator(SHEET_EXIT).first().tap();
+    await page.locator('.nrl-dock [data-hud="advance"]').tap();
+    for (let i = 0; i < 2; i++) {
+      const ask = page.locator('[data-confirm-advance], [data-ask-proceed]');
+      if (await ask.count()) await ask.first().tap();
+    }
+    await page.locator('.nrl-labs-badge').waitFor();
+    await page.locator('.nrl-labs-hint').waitFor({ timeout: 25000 });
+    await page.screenshot({ path: join(OUT, 'hint.png') });
+    await page.locator('.nrl-labs-hint').tap();
+    // A seeded first carry can end as the hint closes. Wait and send in the
+    // same browser task, so this phase always swipes on his attacking set.
+    await page.waitForFunction(() => {
+      const match = window.__nrlGame?.scene.getScene('Match');
+      const pb = match?.playback;
+      if (!pb?.controlsAvailable || pb.controlAttacking !== match.live?.planSide || pb.controlPhase !== 'play') return false;
+      const canvas = document.querySelector('canvas');
+      const camera = match.cameras.main;
+      const before = { x: camera.scrollX, y: camera.scrollY };
+      for (const [type, x] of [['pointerdown', 270], ['pointermove', 320], ['pointerup', 340]]) {
+        canvas.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: 160, pointerId: 41, pointerType: 'mouse', bubbles: true }));
+        // Feed Phaser's native mouse path too: a recognised control must not pan.
+        canvas.dispatchEvent(new MouseEvent(type.replace('pointer', 'mouse'), {
+          clientX: x, clientY: 160, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+          view: window, bubbles: true, cancelable: true,
+        }));
+      }
+      if (camera.scrollX !== before.x || camera.scrollY !== before.y) throw new Error('control swipe panned the camera');
+      if (!Object.keys(localStorage).filter((k) => k.startsWith('nrl-live-match-')).some((k) => JSON.parse(localStorage.getItem(k)).controls?.length)) throw new Error('attacking swipe was not recorded');
+      return true;
+    }, null, { timeout: 20000 });
+    if (await page.locator('.nrl-mo-speed:visible').count() !== 4) throw new Error('a speed choice is hidden');
+    await page.locator('.nrl-mo-labs-skip').tap();
+    await page.screenshot({ path: join(OUT, 'skip-set.png') });
+    await page.locator('.nrl-mo-pause').tap();
+    await page.locator('.nrl-mo-sheet [data-settings]').tap();
+    await page.locator('.nrl-labs-open').tap();
+    await page.locator('.nrl-labs-off').tap();
+    const off = await page.evaluate(() => JSON.parse(localStorage.getItem('nrl-sim-labs')));
+    if (off.visible || Object.values(off.on).some(Boolean)) throw new Error('Turn all off retained Labs');
+    log(`ok  labs controls (${((Date.now() - started) / 1000).toFixed(1)}s)`);
+    return 0;
+  } catch (err) {
+    log(`FAIL labs controls — ${err.message}`);
+    await page.screenshot({ path: join(OUT, 'failure.png') }).catch(() => {});
+    return 1;
+  } finally { await ctx.close(); }
+}
+
 const SCREENS_ONLY = argv.includes('--screens-only');
 let failed = 0;
 try {
@@ -3478,6 +3544,7 @@ try {
   failed += await runLargeTextTargets(browser);
   if (!SCREENS_ONLY) failed += await runLadderForm(browser);
   if (!SCREENS_ONLY) failed += await runPortraitMenus(browser);
+  if (!SCREENS_ONLY) failed += await runLabsControls(browser);
   await browser.close();
 } catch (err) {
   console.error(err);

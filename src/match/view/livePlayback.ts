@@ -10,6 +10,8 @@
 // weather) there and finishes from its result, so the page never freezes; the
 // match is deterministic from that record, so the result is the one playing on
 // would have given.
+import { SET_TACKLES } from '../../config';
+import { type ControlInput, type ControlKind, roundedAim } from '../league/controls';
 import type Phaser from 'phaser';
 import { bus } from '../../core/events';
 import type { Fixture } from '../../core/state';
@@ -174,6 +176,10 @@ export interface SkipJob {
 
 /** A big moment's close-up lasts this long before easing back out. */
 const CLOSEUP_MS = 1500;
+// Labs: match controls (Leon, 30 Oct). Presentation only.
+export const CONTROLS_ENGAGE_MS = 600;
+export const CONTROLS_ENGAGE_FACTOR = 0.35;
+export const CONTROLS_SKIP_MAX_TICKS = 30_000;
 
 interface Sprite {
   x: number;
@@ -201,6 +207,8 @@ export interface LivePlaybackOptions {
   calls: CallInput[];
   /** Plan changes at the breaks so far (N11); a resumed match brings its own. */
   plans?: PlanInput[];
+  controls?: ControlInput[];
+  controlsSide?: Side;
   /** The rival's AI coach (N9.6). */
   aiCoach?: ('home' | 'away')[];
   /** Sides whose plan changes at the breaks (N13.5). The watched match, a resume and a Skip all use it. */
@@ -216,7 +224,7 @@ export interface LivePlaybackOptions {
   /** A resumed match: played on silently to this tick (the overlay still counts it) before the player takes over. */
   resumeAt?: number;
   /** A call, a plan change, the periodic write, Save & exit, or the app going to the background. False when the write did not land. */
-  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => boolean;
+  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[], controls?: readonly ControlInput[]) => boolean;
   fixture: Fixture | undefined;
   overlay: MatchOverlayHandle | null;
   /** Ease the camera back out after a big moment's close-up. */
@@ -247,6 +255,8 @@ export class LivePlayback {
   private readonly commentator: Commentator;
   /** The full-time line of a match skipped here, said once it is over. */
   private finalLine = '';
+  private readonly controls: ControlInput[];
+  private engaged = '';
   private speed: PlaybackSpeed = LIVE_DEFAULT_SPEED;
   /** 1 in open play, easing toward 2 in dead time. Multiplies `speed` for the runner only. */
   private pace = 1;
@@ -285,10 +295,11 @@ export class LivePlayback {
   ) {
     const { home, away } = opts;
     this.plans = opts.plans ?? [];
+    this.controls = opts.controls ?? [];
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
     this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
-    const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, controls: this.controls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.simOpts = simOpts;
     this.factory = (seed) => new LiveSim(home, away, seed, simOpts);
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
@@ -307,6 +318,14 @@ export class LivePlayback {
       // Every tick, so a break ends on its tackle however many ticks a frame steps.
       if (!this.skipping) this.keyMoments.phase(this.sim.phaseKind);
       this.passVerdicts();
+      if (opts.controlsSide && !this.skipping && this.sim.inPossession === opts.controlsSide) {
+        this.runner.setSpeed(Math.min(1, this.runner.speed));
+        const key = this.sim.controlEngagement;
+        if (key && key !== this.engaged) {
+          this.engaged = key;
+          this.runner.slowMo(CONTROLS_ENGAGE_MS, CONTROLS_ENGAGE_FACTOR);
+        }
+      }
     };
     this.runner.setSpeed(this.speed);
     // A resumed match plays on, silently, to where it was.
@@ -333,6 +352,50 @@ export class LivePlayback {
 
   private get sim(): LiveSim {
     return this.runner.current as LiveSim;
+  }
+
+  /** Labs: match controls (Leon, 30 Oct). The same list is read by seek and the worker. */
+  control(kind: ControlKind, aim?: { x: number; y: number }): void {
+    const side = this.opts.controlsSide;
+    if (!side || !this.controlsAvailable || this.sim.inPossession !== side) return;
+    this.controls.push({ tick: this.runner.tick + 1, side, kind, ...(aim ? { aim: roundedAim(aim) } : {}) });
+    this.persistProgress();
+  }
+  get controlsAvailable(): boolean {
+    return !this.finishEmitted && !this.awaitingSkip && !this.replay && this.holds === 0 && this.runner.playing;
+  }
+  get controlPicture(): Snapshot { return this.runner.cur; }
+  get controlAttacking(): Side { return this.sim.inPossession; }
+  get controlPhase(): string { return this.sim.phaseKind; }
+  get controlTackle(): number { return this.sim.tackleCount; }
+  get controlDirection(): 1 | -1 { return this.sim.controlDirection; }
+  /** Fast-forward with the recorder still connected. Never writes an intent. */
+  skipSet(): void {
+    const side = this.opts.controlsSide;
+    if (!side || !this.controlsAvailable) return;
+    const attacking = this.sim.inPossession === side;
+    const lastAlready = this.sim.tackleCount >= SET_TACKLES - 1;
+    const half = this.runner.cur.clock?.half;
+    const start = this.runner.tick;
+    this.keyMoments.clear();
+    this.skipping = true;
+    try {
+      do {
+        this.runner.step();
+        if (this.sim.phaseKind === 'half-time' || this.runner.cur.clock?.half !== half) break;
+        if (attacking) {
+          if (this.sim.inPossession !== side || (!lastAlready && this.sim.tackleCount >= SET_TACKLES - 1) || this.sim.tickEvents.some((e) => e.kind === 'try' || e.kind === 'set-start')) break;
+        } else if (this.sim.inPossession === side && (this.sim.phaseKind === 'play' || this.sim.phaseKind === 'ruck' || this.sim.tickEvents.some((e) => e.kind === 'set-start'))) break;
+      } while (!this.runner.finished && this.runner.tick - start < CONTROLS_SKIP_MAX_TICKS);
+    } finally { this.skipping = false; if (!this.runner.finished && this.holds === 0) this.runner.play(); }
+    this.view.draw(this.runner.prev, this.runner.cur, 1, 0.001);
+    const ball = this.runner.cur.ball;
+    const f = toFieldPt(ball);
+    const at = this.scene.fieldToWorld(f.fx, f.fy);
+    this.scene.cameras.main.centerOn(at.x, at.y);
+    this.showClock();
+    this.persistProgress();
+    if (this.runner.finished) this.finish();
   }
 
   /** Why `side`'s coach can't make `call` now, or null (#73). */
@@ -450,7 +513,7 @@ export class LivePlayback {
   /** Write the record now and start the interval again from this tick. False when the write did not land. */
   private persistProgress(): boolean {
     if (this.finishEmitted) return false;
-    const wrote = this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans) ?? true;
+    const wrote = this.opts.onProgress?.(this.opts.calls, this.runner.tick, this.plans, this.controls) ?? true;
     if (!wrote) return false;
     this.lastSavedTick = this.runner.tick;
     return true;
@@ -508,7 +571,8 @@ export class LivePlayback {
       this.keySpeed = blendPace(held, cap === null ? free : Math.min(cap, free), deltaMs);
       if (cap === null && this.keySpeed > free * 0.995) this.keySpeed = null;
     }
-    this.runner.setSpeed(this.keySpeed ?? free);
+    const attacking = this.opts.controlsSide && this.sim.inPossession === this.opts.controlsSide;
+    this.runner.setSpeed(attacking ? Math.min(1, this.keySpeed ?? free) : this.keySpeed ?? free);
   }
 
   /** The calls judged since the last tick go to the screen; a skipped or resumed stretch shows none. */
@@ -559,6 +623,7 @@ export class LivePlayback {
       seed: o.seed,
       weather: o.weather,
       calls: [...o.calls],
+      ...(this.controls.length ? { controls: [...this.controls] } : {}),
       ...(this.plans.length ? { plans: this.plans.map((p) => ({ ...p, tactics: { ...p.tactics } })) } : {}),
       ...(o.injuryRate !== undefined ? { injuryRate: o.injuryRate } : {}),
       ...(o.difficultyEdge ? { difficultyEdge: o.difficultyEdge } : {}),

@@ -12,6 +12,7 @@
 //  - The context starts suspended; initAudio() registers a one-time, self-removing
 //    pointer/key listener that resume()s it on the first user gesture.
 
+import { labsVisible } from '../labs/flags';
 import { bus } from '../core/events';
 import { getState, setState, type GameState } from '../core/state';
 import { el, button, openModal, closeModal, screenKey, segmented } from '../ui/dom';
@@ -821,8 +822,13 @@ export function initAudioUi(): () => void {
     ),
   );
 
+  // Labs: match controls (Leon, 30 Oct). Load the sheet only when opened.
+  const labs = button('Labs', () => { void import('../labs/panel').then((m) => m.openLabsPanel()); }, { class: 'nrl-audio-row nrl-labs-open' });
+  labs.style.minHeight = '44px';
   ensureAudioStyles();
   return () => {
+    labs.remove();
+    if (labsVisible()) content.querySelector('.nrl-settings-col:last-child')?.append(labs);
     syncInstallVisibility();
     for (const t of [mute, coachCalls, keyMoments, liveRivals, weekSummary, teamLetters]) t.sync();
     textSize.set(textSizeOf(getState().settings.textSize));
