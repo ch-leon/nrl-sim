@@ -12,7 +12,7 @@ import { hintSeen, markHintSeen } from '../../labs/flags';
 import { button } from '../../ui/dom';
 import { COLOR_TOKENS } from '../../ui/tokens';
 
-export const GESTURE = { swipePx: 30, swipeMs: 350, kickHoldMs: 180, cancelPx: 15, dominance: 1.25, kickAlignment: 0.75 };
+export const GESTURE = { swipePx: 30, stepPx: 22, swipeMs: 600, cancelPx: 15, kickAlignment: 0.6 };
 export interface GesturePoint extends Vec { pointers?: number; atMs?: number }
 export interface GestureContext { lastTackle?: boolean; attack?: Vec }
 export function classifyGesture(points: readonly GesturePoint[], ms: number, context: GestureContext = {}): ControlKind | null {
@@ -21,16 +21,19 @@ export function classifyGesture(points: readonly GesturePoint[], ms: number, con
   const dx = b.x - a.x, dy = b.y - a.y;
   const length = Math.hypot(dx, dy);
   if (length < GESTURE.cancelPx) return null;
-  const attack = context.attack;
-  // A press is the pause before movement, not a quick swipe's total time.
-  const moved = points.find((p) => Math.hypot(p.x - a.x, p.y - a.y) >= GESTURE.cancelPx);
-  const held = moved?.atMs !== undefined ? moved.atMs >= GESTURE.kickHoldMs : ms >= GESTURE.swipeMs;
-  if (attack && held
-    && (dx * attack.x + dy * attack.y) / Math.hypot(attack.x, attack.y) < -Math.max(GESTURE.swipePx, length * GESTURE.kickAlignment)) return context.lastTackle ? 'kick' : null;
-  if (length <= GESTURE.swipePx || ms >= GESTURE.swipeMs) return null;
-  if (Math.abs(dx) > Math.abs(dy) * GESTURE.dominance) return dx < 0 ? 'pass-left' : 'pass-right';
-  if (Math.abs(dy) > Math.abs(dx) * GESTURE.dominance) return dy < 0 ? 'step-up' : 'step-down';
-  return null;
+  // Backwards has priority over both screen axes, on every tackle.
+  if (isBackwardDrag(points, context)) return context.lastTackle ? 'kick' : null;
+  if (ms > GESTURE.swipeMs) return null;
+  if (Math.abs(dy) > Math.abs(dx)) return Math.abs(dy) >= GESTURE.stepPx ? (dy < 0 ? 'step-up' : 'step-down') : null;
+  return Math.abs(dx) >= GESTURE.swipePx ? (dx < 0 ? 'pass-left' : 'pass-right') : null;
+}
+/** Is this a deliberate drag towards the player's own line? No press-pause required. */
+export function isBackwardDrag(points: readonly GesturePoint[], context: GestureContext): boolean {
+  const a = points[0], b = points[points.length - 1], attack = context.attack;
+  if (!a || !b || !attack) return false;
+  const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
+  const axis = Math.hypot(attack.x, attack.y);
+  return length >= GESTURE.swipePx && axis > 0 && -(dx * attack.x + dy * attack.y) / (length * axis) >= GESTURE.kickAlignment;
 }
 /** Convert screen pass / step to the pitch's lateral axis, using the projected view. */
 export function pitchIntent(kind: ControlKind, lateral: Vec): ControlKind {
@@ -55,6 +58,8 @@ export class ControlsLayer {
   private hint: HTMLButtonElement | null = null;
   private readonly line: Phaser.GameObjects.Graphics;
   private readonly label: Phaser.GameObjects.Text;
+  private feedbackUntil = 0;
+  private readonly feedback: Phaser.GameObjects.Text;
   private readonly styles: HTMLStyleElement;
   private readonly canvas: HTMLCanvasElement;
 
@@ -81,6 +86,7 @@ export class ControlsLayer {
     document.head.append(this.styles);
     this.line = scene.add.graphics().setDepth(89000);
     this.label = scene.add.text(0, 0, '', { fontSize: '14px', color: COLOR_TOKENS.accent, backgroundColor: COLOR_TOKENS.navy }).setDepth(89001).setOrigin(0.5, 1).setVisible(false);
+    this.feedback = scene.add.text(0, 0, '', { fontSize: '14px', color: COLOR_TOKENS.accent, backgroundColor: COLOR_TOKENS.navy }).setDepth(89002).setOrigin(0.5, 1).setVisible(false);
     window.addEventListener('pointerdown', this.down, { passive: true, capture: true });
     window.addEventListener('pointermove', this.move, { passive: true, capture: true });
     window.addEventListener('pointerup', this.up, { passive: true, capture: true });
@@ -135,6 +141,11 @@ export class ControlsLayer {
       this.points.push({ x: e.clientX, y: e.clientY, atMs: performance.now() - this.started });
       const kind = classifyGesture(this.points, performance.now() - this.started, this.context());
       if (kind) this.pb.control(pitchIntent(kind, this.axis().lateral), kind === 'kick' ? this.aim() : undefined);
+      const labels = { 'step-up': 'STEP ↑', 'step-down': 'STEP ↓', 'pass-left': 'PASS ←', 'pass-right': 'PASS →', kick: 'KICK' };
+      if (kind || dist(this.points[0]!, this.points[this.points.length - 1]!) >= GESTURE.cancelPx) {
+        this.feedback.setText(kind ? labels[kind] : isBackwardDrag(this.points, this.context()) && !this.context().lastTackle ? 'KICK ON LAST TACKLE' : '?');
+        this.feedbackUntil = performance.now() + 500;
+      }
     }
     this.cancel();
   };
@@ -160,6 +171,9 @@ export class ControlsLayer {
     this.label.setText(controlKickBand(dist(ball, aim), LIVE.controlsChipFromM, LIVE.controlsBombFromM, this.pb.controlDirection > 0 ? FIELD_LENGTH - ball.x : ball.x).toUpperCase()).setPosition((a.x + b.x) / 2, (a.y + b.y) / 2 - 8 / zoom).setScale(1 / zoom).setVisible(true);
   }
   private update = (): void => {
+    const zoom = this.scene.cameras.main.zoom;
+    const ball = this.world(this.pb.controlPicture.ball);
+    this.feedback.setPosition(ball.x, ball.y - 24 / zoom).setScale(1 / zoom).setVisible(!this.pb.finished && performance.now() < this.feedbackUntil);
     const text = this.pb.controlAttacking === this.mine ? 'Skip set' : 'Skip to our ball';
     this.skip.textContent = text;
     this.skip.disabled = !this.pb.controlsAvailable;
@@ -168,7 +182,7 @@ export class ControlsLayer {
     if (!this.pb.controlsAvailable) this.cancel();
     else if (!hintSeen('match-controls') && !this.hint && this.pb.controlAttacking === this.mine && this.pb.controlPhase === 'play' && this.pb.controlPicture.ball.holder?.side === this.mine) {
       this.pb.hold();
-      this.hint = button('Swipe ← → to pass · ↑ ↓ to step · drag back to kick on the last', () => {
+      this.hint = button('Swipe ← → pass · ↑ ↓ step · on the LAST TACKLE drag back to kick', () => {
         markHintSeen('match-controls');
         this.hint?.remove(); this.hint = null; this.pb.release();
       }, { class: 'nrl-labs-hint' });
@@ -187,6 +201,6 @@ export class ControlsLayer {
     window.removeEventListener('blur', this.blur);
     this.scene.events.off('update', this.update);
     if (this.hint) { this.hint.remove(); this.pb.release(); }
-    this.skip.remove(); this.badge.remove(); this.styles.remove(); this.line.destroy(); this.label.destroy();
+    this.skip.remove(); this.badge.remove(); this.styles.remove(); this.line.destroy(); this.label.destroy(); this.feedback.destroy();
   }
 }

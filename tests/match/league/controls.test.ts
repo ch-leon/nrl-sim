@@ -104,6 +104,44 @@ describe('timed decisions', () => {
     expect(s.pendingControl[carrier.side]).toBeNull();
     roll.mockRestore();
   });
+  it.each(['step-up', 'kick'] as const)('retains %s through ruck stages and a locked catch', (kind) => {
+    const { sim, s, carrier } = moment();
+    s.tackles = SET_TACKLES - 1;
+    const dh = s.dummyHalf(carrier.side);
+    s.ball = { kind: 'held', by: s.players.indexOf(dh) };
+    s.phase = { kind: 'ruck', stage: 'down', t0: s.tick, carrier: s.players.indexOf(carrier), tackler: s.players.findIndex((p) => p.side !== carrier.side), down: 0, pace: null, handover: false, heldAt: 0 } as unknown as Inside['phase'];
+    const controls = (s as unknown as { controlList: ControlInput[] }).controlList;
+    controls.push({ tick: sim.tick + 1, side: carrier.side, kind, aim: { x: 55, y: 34 } });
+    sim.step();
+    expect(s.pendingControl[carrier.side]?.kind).toBe(kind);
+    s.ball = { kind: 'held', by: s.players.indexOf(carrier) };
+    s.phase = { kind: 'play' };
+    carrier.lockUntil = s.tick + 3;
+    sim.step();
+    expect(s.pendingControl[carrier.side]?.kind).toBe(kind);
+    carrier.lockUntil = 0;
+    s.stepPlay();
+    expect(s.pendingControl[carrier.side]).toBeNull();
+    if (kind === 'kick') expect(s.pendingKick).not.toBeNull();
+    else expect(carrier.jink?.dy).toBe(-LIVE.stepJinkM);
+  });
+  it('a last-tackle drag overrides an existing kick wind-up, even on its launch tick', () => {
+    const { sim, s, carrier } = moment();
+    s.tackles = SET_TACKLES - 1; s.lastPlay = true;
+    s.pendingControl[carrier.side] = { tick: s.tick, side: carrier.side, kind: 'kick', aim: { x: 50 + s.dir * 5, y: 34 } };
+    s.stepPlay();
+    expect(s.pendingKick?.kind).toBe('grubber');
+    (s.pendingKick as unknown as { at: number }).at = sim.tick + 1;
+    const controls = (s as unknown as { controlList: ControlInput[] }).controlList;
+    controls.push({ tick: sim.tick + 1, side: carrier.side, kind: 'kick', aim: { x: 50 + s.dir * 30, y: 34 } });
+    sim.step();
+    expect(s.ball.kind).toBe('held');
+    expect(s.pendingControl[carrier.side]?.kind).toBe('kick');
+    carrier.lockUntil = 0;
+    s.stepPlay();
+    expect(s.pendingControl[carrier.side]).toBeNull();
+    expect(s.pendingKick?.kind).toBe('bomb');
+  });
   it('maps the named drag lengths to grubber, chip and bomb', () => {
     expect(controlKickBand(0, LIVE.controlsChipFromM, LIVE.controlsBombFromM)).toBe('grubber');
     expect(controlKickBand(LIVE.controlsChipFromM, LIVE.controlsChipFromM, LIVE.controlsBombFromM)).toBe('chip');
@@ -146,13 +184,15 @@ describe('timed decisions', () => {
       }
     }
   });
-  it('clears an unused step at the next tackle', () => {
+  it('applies a queued step in open space before the AI can pass it away', () => {
     const { sim, s, carrier } = moment();
     s.pendingControl[carrier.side] = { tick: s.tick, side: carrier.side, kind: 'step-up' };
-    const until = s.tick + 2000;
-    while (sim.phaseKind === 'play' && sim.tick < until) sim.step();
-    expect(sim.tick).toBeLessThan(until);
+    s.stepPlay();
+    expect(carrier.jink?.dy).toBe(-LIVE.stepJinkM);
     expect(s.pendingControl[carrier.side]).toBeNull();
+    const y = carrier.body.pos.y;
+    sim.step();
+    expect(carrier.body.pos.y).toBeLessThan(y);
   });
 });
 
@@ -165,7 +205,7 @@ it('a controlled watched match equals the skipped replay, resume and seek', () =
   r.onStep = () => rec.clock((r.current as LiveSim).matchSeconds);
   while (!r.finished) {
     const sim = r.current as LiveSim;
-    if (sim.tick % 61 === 0) controls.push({ tick: sim.tick + 1, side: sim.inPossession, kind: sim.tackleCount === SET_TACKLES - 1 ? 'kick' : 'pass-left', aim: { x: 65, y: 30 } });
+    if (sim.tick % 61 === 0) controls.push({ tick: sim.tick + 1, side: sim.inPossession, kind: sim.tackleCount === SET_TACKLES - 1 ? 'kick' : sim.tick % 2 ? 'step-up' : 'pass-left', aim: { x: 65, y: 30 } });
     r.step();
   }
   expect(rec.result(r.current as LiveSim)).toEqual(runMatch(home, away, { seed: 8, controls }));

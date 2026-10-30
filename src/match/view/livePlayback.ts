@@ -696,7 +696,10 @@ export class LivePlayback {
 
   /** The overlay's clock off the sim's: match seconds and the half. */
   private showClock(): void {
-    this.showClockFrom(this.runner.cur.clock);
+    const picture = this.runner.cur;
+    this.opts.overlay?.setTackle?.(!this.finished && !this.replay && picture.ball.holder
+      && this.controlTackle < SET_TACKLES && ['play', 'tackle', 'ruck'].includes(this.controlPhase) ? this.controlTackle : null);
+    this.showClockFrom(picture.clock);
   }
 
   /** Pop-ups, the wrestle bar and sprint streaks, once the camera has moved this frame. */
@@ -873,6 +876,7 @@ export class LivePlayback {
     const prev = replay.snaps[Math.max(0, replay.index - 1)]!;
     const a = replay.index === 0 ? 0 : Math.min(0.999, replay.acc / TICK_MS);
     this.view.draw(prev, cur, a, 1);
+    this.opts.overlay?.setTackle?.(null);
     this.showClockFrom(cur.clock);
     if (cur.score) this.opts.overlay?.setScore(cur.score.home, cur.score.away);
   }

@@ -817,13 +817,16 @@ export class LiveSim implements MatchSim {
     this.tick++;
     this.events = [];
     const beforeSide = this.attacking;
-    const beforePhase = this.phase.kind;
     const beforeTackles = this.tackles;
-    const beforePtb = this.phase.kind === 'ruck' && this.phase.stage === 'ptb';
     // Labs: match controls (Leon, 30 Oct). One pending intent per attacking side.
     while (this.controlRead < this.controlList.length && this.controlList[this.controlRead]!.tick <= this.tick) {
       const c = this.controlList[this.controlRead++]!;
-      if (c.tick === this.tick && c.side === this.attacking && (c.kind !== 'kick' || this.tackles === SET_TACKLES - 1)) this.pendingControl[c.side] = c;
+      if (c.tick === this.tick && c.side === this.attacking && (c.kind !== 'kick' || this.tackles === SET_TACKLES - 1)) {
+        this.pendingControl[c.side] = c;
+        // A manual decision can arrive during the AI's wind-up, including its
+        // launch tick. Keep the animation lock, but let the input decide the action.
+        if (this.phase.kind === 'play' && this.holder()?.side === c.side) this.pendingKick = null;
+      }
     }
     // Coach calls due this tick (#73).
     while (this.callRead < this.callList.length && this.callList[this.callRead]!.tick <= this.tick) {
@@ -890,9 +893,8 @@ export class LiveSim implements MatchSim {
     }
     this.watchLineBreak(h);
     this.expireCalls();
-    if (this.attacking !== beforeSide || this.tackles !== beforeTackles
-      || (this.phase.kind !== beforePhase && this.phase.kind !== 'play')
-      || (!beforePtb && this.phase.kind === 'ruck' && this.phase.stage === 'ptb')) {
+    if (this.attacking !== beforeSide || this.tackles < beforeTackles
+      || !['play', 'tackle', 'ruck'].includes(this.phase.kind)) {
       this.pendingControl.home = this.pendingControl.away = null;
     }
   }
@@ -1951,6 +1953,25 @@ export class LiveSim implements MatchSim {
       }
     }
 
+    // A manual step waits through catches, the ruck and locks, then attempts
+    // the move before the AI can pass or kick it away. The normal success roll
+    // still decides whether a nearby defender is beaten.
+    if (intent?.kind === 'step-up' || intent?.kind === 'step-down') {
+      this.pendingControl[this.attacking] = null;
+      const target = nearest;
+      const way = intent.kind === 'step-up' ? -1 : 1;
+      h.jink = { dy: way * LIVE.stepJinkM, ticks: LIVE.stepJinkTicks };
+      if (target && nearD <= LIVE.stepRange) {
+        h.steppedOn = this.indexOf(target);
+        const st = stepTraits(h.traits, target.traits, this.toLine(h) <= FINISHER_M);
+        const sit = this.situation(h, target, committed);
+        if (this.rng.next() < stepChance(h.stats, target.stats, sit, st.bonus + this.defPlan().stepAgainst + (defenders.length < PLAYERS ? BIN.shortStep : 0))) {
+          this.sidestep(h, target, announce(st.credit), way);
+        }
+      }
+      return;
+    }
+
     // Last tackle: the kicker makes one call for the play — run it when he's
     // on the line (or fancies it inside 40), else a kick for the zone — then
     // runs a few steps and puts boot to ball.
@@ -2029,12 +2050,9 @@ export class LiveSim implements MatchSim {
       if (sit.defenders === 1) {
         h.steppedOn = this.indexOf(nearest);
         const st = stepTraits(h.traits, nearest.traits, toLine <= FINISHER_M);
-        const intent = this.pendingControl[this.attacking];
-        const stepping = intent?.kind === 'step-up' || intent?.kind === 'step-down';
-        if (stepping) this.pendingControl[this.attacking] = null;
-        const tries = stepping || plan.step >= 1 || this.rng.next() < plan.step;
+        const tries = plan.step >= 1 || this.rng.next() < plan.step;
         if (tries && this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus + dplan.stepAgainst + (defenders.length < PLAYERS ? BIN.shortStep : 0))) {
-          this.sidestep(h, nearest, announce(st.credit), stepping ? (intent.kind === 'step-up' ? -1 : 1) : undefined);
+          this.sidestep(h, nearest, announce(st.credit));
           return;
         }
       }

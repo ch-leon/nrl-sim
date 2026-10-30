@@ -7,30 +7,42 @@ describe('pitch gestures', () => {
       expect(classifyGesture([start, { x, y }], 200)).toBe(kind);
     }
   });
-  it('ignores taps, slow swipes, diagonals and any second finger', () => {
+  it('ignores taps, swipes beyond 600ms and any second finger', () => {
     expect(classifyGesture([start, { x: 210, y: 100 }], 100)).toBeNull();
-    expect(classifyGesture([start, { x: 260, y: 100 }], 400)).toBeNull();
-    expect(classifyGesture([start, { x: 260, y: 160 }], 100)).toBeNull();
+    expect(classifyGesture([start, { x: 260, y: 100 }], 601)).toBeNull();
     expect(classifyGesture([start, { x: 260, y: 100, pointers: 2 }], 100)).toBeNull();
   });
   it('recognises a held backwards drag on the last, cancelling near its start', () => {
     const ctx = { lastTackle: true, attack: { x: 1, y: 0 } };
     expect(classifyGesture([start, { x: 100, y: 110 }], 500, ctx)).toBe('kick');
     expect(classifyGesture([start, { x: 100, y: 110 }, start], 500, ctx)).toBeNull();
-    expect(classifyGesture([start, { x: 100, y: 110 }], 500)).toBeNull();
+    expect(classifyGesture([start, { x: 100, y: 110 }], 601)).toBeNull();
     expect(classifyGesture([start, { x: 300, y: 110 }], 500, { ...ctx, attack: { x: -1, y: 0 } })).toBe('kick');
   });
   it('keeps a vertical step on the last from becoming a diagonal backwards kick', () => {
     expect(classifyGesture([start, { x: 200, y: 10 }], 220,
       { lastTackle: true, attack: { x: 2, y: 1 } })).toBe('step-up');
   });
-  it('passes on a quick backwards swipe on the last, and kicks only after a hold', () => {
+  it('kicks on every backward last-tackle drag without a hold, never passing or stepping', () => {
     const ctx = { lastTackle: true, attack: { x: 1, y: 0 } };
     const end = { x: 100, y: 100 };
-    expect(classifyGesture([start, end], 220, ctx)).toBe('pass-left');
-    expect(classifyGesture([start, { x: 175, y: 100, atMs: 40 }, end], 220, ctx)).toBe('pass-left');
+    expect(classifyGesture([start, end], 220, ctx)).toBe('kick');
+    expect(classifyGesture([start, { x: 175, y: 100, atMs: 40 }, end], 220, ctx)).toBe('kick');
     expect(classifyGesture([start, { ...end, atMs: 200 }], 220, ctx)).toBe('kick');
     expect(classifyGesture([start, { ...end, atMs: 200 }], 220, { ...ctx, lastTackle: false })).toBeNull();
+  });
+  it('accepts short slow vertical swipes and resolves the diagonal band by dominant axis', () => {
+    expect(classifyGesture([start, { x: 205, y: 77 }], 590)).toBe('step-up');
+    expect(classifyGesture([start, { x: 205, y: 78 }], 600)).toBe('step-up');
+    expect(classifyGesture([start, { x: 205, y: 79 }], 590)).toBeNull();
+    expect(classifyGesture([start, { x: 240, y: 139 }], 550)).toBe('pass-right');
+    expect(classifyGesture([start, { x: 239, y: 140 }], 550)).toBe('step-down');
+    expect(classifyGesture([start, { x: 240, y: 140 }], 550)).toBe('pass-right');
+  });
+  it('reserves diagonal backward drags for kicks and explains the non-last restriction in the view', () => {
+    const points = [start, { x: 170, y: 60 }];
+    expect(classifyGesture(points, 50, { attack: { x: 1, y: 0 }, lastTackle: true })).toBe('kick');
+    expect(classifyGesture(points, 50, { attack: { x: 1, y: 0 }, lastTackle: false })).toBeNull();
   });
   it('converts through the projected lateral axis independently of attacking direction', () => {
     expect(pitchIntent('pass-left', { x: -1, y: 1 })).toBe('pass-right');
