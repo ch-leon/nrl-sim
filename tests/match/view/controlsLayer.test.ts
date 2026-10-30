@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { classifyGesture, pitchIntent } from '../../../src/match/view/controlsLayer';
+import { classifyGesture, isBackwardDrag, pitchIntent } from '../../../src/match/view/controlsLayer';
+import { fieldToWorldPoint } from '../../../src/scenes/matchField';
+import { toFieldPt } from '../../../src/match/core/field';
 const start = { x: 200, y: 100 };
 describe('pitch gestures', () => {
   it('classifies quick, mostly horizontal and vertical swipes', () => {
@@ -40,10 +42,31 @@ describe('pitch gestures', () => {
     expect(classifyGesture([start, { x: 240, y: 140 }], 550)).toBe('pass-right');
   });
   it('reserves diagonal backward drags for kicks and explains the non-last restriction in the view', () => {
-    const points = [start, { x: 170, y: 60 }];
+    const points = [start, { x: 160, y: 70 }];
     expect(classifyGesture(points, 50, { attack: { x: 1, y: 0 }, lastTackle: true })).toBe('kick');
     expect(classifyGesture(points, 50, { attack: { x: 1, y: 0 }, lastTackle: false })).toBeNull();
   });
+  // Use the same metres → field → screen projection as ControlsLayer.axis().
+  const origin = toFieldPt({ x: 0, y: 0 }), metre = toFieldPt({ x: 1, y: 0 });
+  const o = fieldToWorldPoint(origin.fx, origin.fy, 500);
+  const f = fieldToWorldPoint(metre.fx, metre.fy, 500);
+  for (const direction of [1, -1] as const) for (const lastTackle of [false, true]) {
+    const attack = { x: (f.x - o.x) * direction, y: (f.y - o.y) * direction };
+    const context = { attack, lastTackle };
+    it.each([-10, 10])(`keeps 550ms vertical diagonals as steps (attack ${direction}, last ${lastTackle}, dx %s)`, (dx) => {
+      for (const dy of [-45, 45]) {
+        const points = [start, { x: start.x + dx, y: start.y + dy }];
+        expect(classifyGesture(points, 550, context)).toBe(dy < 0 ? 'step-up' : 'step-down');
+        expect(isBackwardDrag(points, context)).toBe(false);
+      }
+    });
+    it(`reserves a drag along the real backward axis for kick (attack ${direction}, last ${lastTackle})`, () => {
+      const scale = 70 / Math.hypot(attack.x, attack.y);
+      const points = [start, { x: start.x - attack.x * scale, y: start.y - attack.y * scale }];
+      expect(isBackwardDrag(points, context)).toBe(true);
+      expect(classifyGesture(points, 550, context)).toBe(lastTackle ? 'kick' : null);
+    });
+  }
   it('converts through the projected lateral axis independently of attacking direction', () => {
     expect(pitchIntent('pass-left', { x: -1, y: 1 })).toBe('pass-right');
     expect(pitchIntent('step-up', { x: -1, y: 1 })).toBe('step-up');

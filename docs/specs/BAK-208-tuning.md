@@ -1334,8 +1334,12 @@ are added. The Nines denominator stays five.
 | `GESTURE.kickAlignment` | `match/view/controlsLayer.ts` | 0.6 | Backward alignment; formerly 0.75 and a 180 ms hold. |
 
 The larger screen axis wins (horizontal wins exact ties); the former 1.25 ratio
-and diagonal rejection band are removed. Backward drags take priority on every
-tackle, with a restriction label before the last. Kicks have no duration limit.
+and diagonal rejection band are removed. Vertical-dominant swipes stay steps even
+inside the backward alignment cone.
+Only horizontal-dominant backward drags take kick priority on every tackle, with
+a restriction label before the last. The smoke pins career seed 1 during new-game
+creation, restores wall time before play, and still waits for our possession.
+Kicks have no duration limit.
 Every recognised input flashes its screen direction for 500 ms near the ball;
 unrecognised pitch swipes flash `?`. Kick aim bands and scatter are unchanged.
 

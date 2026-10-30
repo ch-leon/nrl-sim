@@ -21,7 +21,7 @@ export function classifyGesture(points: readonly GesturePoint[], ms: number, con
   const dx = b.x - a.x, dy = b.y - a.y;
   const length = Math.hypot(dx, dy);
   if (length < GESTURE.cancelPx) return null;
-  // Backwards has priority over both screen axes, on every tackle.
+  // Vertical-dominant swipes remain steps; backward drags own the horizontal bucket.
   if (isBackwardDrag(points, context)) return context.lastTackle ? 'kick' : null;
   if (ms > GESTURE.swipeMs) return null;
   if (Math.abs(dy) > Math.abs(dx)) return Math.abs(dy) >= GESTURE.stepPx ? (dy < 0 ? 'step-up' : 'step-down') : null;
@@ -33,7 +33,9 @@ export function isBackwardDrag(points: readonly GesturePoint[], context: Gesture
   if (!a || !b || !attack) return false;
   const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
   const axis = Math.hypot(attack.x, attack.y);
-  return length >= GESTURE.swipePx && axis > 0 && -(dx * attack.x + dy * attack.y) / (length * axis) >= GESTURE.kickAlignment;
+  // The pitch's projected attack axis slopes up/down. Its broad alignment
+  // cone alone also catches mostly vertical steps (e.g. -10, -45).
+  return Math.abs(dx) >= Math.abs(dy) && length >= GESTURE.swipePx && axis > 0 && -(dx * attack.x + dy * attack.y) / (length * axis) >= GESTURE.kickAlignment;
 }
 /** Convert screen pass / step to the pitch's lateral axis, using the projected view. */
 export function pitchIntent(kind: ControlKind, lateral: Vec): ControlKind {
