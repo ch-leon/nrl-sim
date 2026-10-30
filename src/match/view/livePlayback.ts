@@ -365,6 +365,8 @@ export class LivePlayback {
     return !this.finishEmitted && !this.awaitingSkip && !this.replay && this.holds === 0 && this.runner.playing;
   }
   get controlPicture(): Snapshot { return this.runner.cur; }
+  get controlAttacking(): Side { return this.sim.inPossession; }
+  get controlPhase(): string { return this.sim.phaseKind; }
   get controlTackle(): number { return this.sim.tackleCount; }
   get controlDirection(): 1 | -1 { return this.sim.controlDirection; }
   /** Fast-forward with the recorder still connected. Never writes an intent. */

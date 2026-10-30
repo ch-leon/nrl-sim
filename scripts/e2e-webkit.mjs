@@ -3484,16 +3484,22 @@ async function runLabsControls(browser) {
       if (await ask.count()) await ask.first().tap();
     }
     await page.locator('.nrl-labs-badge').waitFor();
-    await page.locator('.nrl-labs-hint').waitFor({ timeout: 20000 });
+    await page.locator('.nrl-labs-hint').waitFor({ timeout: 25000 });
     await page.screenshot({ path: join(OUT, 'hint.png') });
     await page.locator('.nrl-labs-hint').tap();
-    await page.evaluate(() => {
+    // A seeded first carry can end as the hint closes. Wait and send in the
+    // same browser task, so this phase always swipes on his attacking set.
+    await page.waitForFunction(() => {
+      const match = window.__nrlGame?.scene.getScene('Match');
+      const pb = match?.playback;
+      if (!pb?.controlsAvailable || pb.controlAttacking !== match.live?.planSide || pb.controlPhase !== 'play') return false;
       const canvas = document.querySelector('canvas');
       for (const [type, x] of [['pointerdown', 270], ['pointermove', 320], ['pointerup', 340]]) {
         canvas.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: 160, pointerId: 41, pointerType: 'touch', bubbles: true }));
       }
-    });
-    await page.waitForFunction(() => Object.keys(localStorage).filter((k) => k.startsWith('nrl-live-match-')).some((k) => JSON.parse(localStorage.getItem(k)).controls?.length));
+      if (!Object.keys(localStorage).filter((k) => k.startsWith('nrl-live-match-')).some((k) => JSON.parse(localStorage.getItem(k)).controls?.length)) throw new Error('attacking swipe was not recorded');
+      return true;
+    }, null, { timeout: 20000 });
     await page.locator('.nrl-mo-labs-skip').tap();
     await page.screenshot({ path: join(OUT, 'skip-set.png') });
     await page.locator('.nrl-mo-pause').tap();

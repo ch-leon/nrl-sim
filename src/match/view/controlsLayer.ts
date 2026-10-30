@@ -111,7 +111,7 @@ export class ControlsLayer {
   private down = (e: PointerEvent): void => {
     this.pointers.add(e.pointerId);
     if (this.pointers.size !== 1) { this.cancel(); return; }
-    if (!this.pb.controlsAvailable || this.pb.inPossession !== this.mine || !this.pitchHit(e.clientX, e.clientY)) return;
+    if (!this.pb.controlsAvailable || this.pb.controlAttacking !== this.mine || !this.pitchHit(e.clientX, e.clientY)) return;
     this.pointer = e.pointerId;
     this.started = performance.now();
     this.points = [{ x: e.clientX, y: e.clientY }];
@@ -152,7 +152,7 @@ export class ControlsLayer {
     this.skip.parentElement?.classList.remove('nrl-labs-compact');
   };
   private update = (): void => {
-    const text = this.pb.inPossession === this.mine ? 'Skip set' : 'Skip to our ball';
+    const text = this.pb.controlAttacking === this.mine ? 'Skip set' : 'Skip to our ball';
     if (this.skip.textContent !== text) { this.skip.textContent = text; this.uncompact(); }
     this.skip.disabled = !this.pb.controlsAvailable;
     const slot = this.skip.parentElement;
@@ -168,7 +168,7 @@ export class ControlsLayer {
     this.skip.hidden = this.pb.finished;
     this.badge.hidden = this.pb.finished;
     if (!this.pb.controlsAvailable) this.cancel();
-    else if (!hintSeen('match-controls') && !this.hint && this.pb.inPossession === this.mine && this.pb.controlPicture.ball.holder?.side === this.mine) {
+    else if (!hintSeen('match-controls') && !this.hint && this.pb.controlAttacking === this.mine && this.pb.controlPhase === 'play' && this.pb.controlPicture.ball.holder?.side === this.mine) {
       this.pb.hold();
       this.hint = button('Swipe ← → to pass · ↑ ↓ to step · drag back to kick on the last', () => {
         markHintSeen('match-controls');
