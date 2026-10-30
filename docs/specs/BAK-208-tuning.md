@@ -1305,7 +1305,7 @@ path. Its timed controls share the seed replay contract with coach calls.
 | Name | File | Value | Meaning |
 | --- | --- | --- | --- |
 | `LIVE.controlsChipFromM` | `match/league/live.ts` | 12 m | Drag length at which a grubber becomes a chip. |
-| `LIVE.controlsBombFromM` | `match/league/live.ts` | 24 m | Drag length at which a chip becomes a bomb. |
+| `LIVE.controlsBombFromM` | `match/league/live.ts` | 24 m | Drag length at which a chip becomes a bomb inside `ATTACK_KICK_M`, or a territory kick beyond it. |
 | `CONTROLS_ENGAGE_MS` | `match/view/livePlayback.ts` | 600 ms | First engagement's real-time slow beat. |
 | `CONTROLS_ENGAGE_FACTOR` | `match/view/livePlayback.ts` | 0.35 | Playback factor during that beat. |
 | `CONTROLS_SKIP_MAX_TICKS` | `match/view/livePlayback.ts` | 30,000 | Safety cap on one set skip; events remain connected to the recorder. |
@@ -1314,3 +1314,7 @@ Kick aims nudge the normal random target halfway towards the pitch point, clampe
 to the same kick's existing endpoint envelope. These controls do not alter wind,
 boot traits, catch rolls or contests. Nines' last tackle is `SET_TACKLES - 1`
 completed tackles (four), as in the existing sim.
+
+Controlled long drags use the existing `ATTACK_KICK_M` (50 m from the line)
+threshold: a bomb in attacking range, a normal territory kick from deeper. The
+aim preview uses the same choice as the sim. No default kick weights change.

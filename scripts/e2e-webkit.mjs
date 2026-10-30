@@ -3494,12 +3494,21 @@ async function runLabsControls(browser) {
       const pb = match?.playback;
       if (!pb?.controlsAvailable || pb.controlAttacking !== match.live?.planSide || pb.controlPhase !== 'play') return false;
       const canvas = document.querySelector('canvas');
+      const camera = match.cameras.main;
+      const before = { x: camera.scrollX, y: camera.scrollY };
       for (const [type, x] of [['pointerdown', 270], ['pointermove', 320], ['pointerup', 340]]) {
-        canvas.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: 160, pointerId: 41, pointerType: 'touch', bubbles: true }));
+        canvas.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: 160, pointerId: 41, pointerType: 'mouse', bubbles: true }));
+        // Feed Phaser's native mouse path too: a recognised control must not pan.
+        canvas.dispatchEvent(new MouseEvent(type.replace('pointer', 'mouse'), {
+          clientX: x, clientY: 160, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+          view: window, bubbles: true, cancelable: true,
+        }));
       }
+      if (camera.scrollX !== before.x || camera.scrollY !== before.y) throw new Error('control swipe panned the camera');
       if (!Object.keys(localStorage).filter((k) => k.startsWith('nrl-live-match-')).some((k) => JSON.parse(localStorage.getItem(k)).controls?.length)) throw new Error('attacking swipe was not recorded');
       return true;
     }, null, { timeout: 20000 });
+    if (await page.locator('.nrl-mo-speed:visible').count() !== 4) throw new Error('a speed choice is hidden');
     await page.locator('.nrl-mo-labs-skip').tap();
     await page.screenshot({ path: join(OUT, 'skip-set.png') });
     await page.locator('.nrl-mo-pause').tap();

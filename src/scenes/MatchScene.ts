@@ -515,7 +515,7 @@ export class MatchScene extends Phaser.Scene {
       });
       this.mountPlaybackControls(this.playback.getSpeed());
       // Labs: match controls (Leon, 30 Oct). Snapshot the switch for this match.
-      if (experimentOn('match-controls') && live.planSide && this.controlsEl) this.controlsLayer = new ControlsLayer(this, this.playback, live.planSide, this.controlsEl);
+      if (experimentOn('match-controls') && live.planSide && this.controlsEl) this.controlsLayer = new ControlsLayer(this, this.playback, live.planSide, this.controlsEl, (held) => this.camController.holdPan(held));
       if (live.coachSide) {
         const unlocked = live.unlockedCalls ?? COACH_CALLS;
         this.mountCoach(live.coachSide, unlocked);

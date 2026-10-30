@@ -2,7 +2,7 @@
 import type { Side } from '../core/snapshot';
 import type { Vec } from '../core/vec';
 import { clamp } from '../core/vec';
-import { pickReceiver, type Candidate } from './tactics';
+import { ATTACK_KICK_M, pickReceiver, type Candidate } from './tactics';
 
 export type ControlKind = 'pass-left' | 'pass-right' | 'step-up' | 'step-down' | 'kick';
 export interface ControlInput { tick: number; side: Side; kind: ControlKind; aim?: Vec }
@@ -20,8 +20,8 @@ export function controlReceiver(at: Vec, dir: 1 | -1, candidates: readonly Candi
   const sign = kind === 'pass-left' ? -1 : 1;
   return pickReceiver(at, dir, candidates.filter((c) => (c.pos.y - at.y) * sign > 0));
 }
-export function controlKickBand(length: number, chipFrom: number, bombFrom: number): 'grubber' | 'chip' | 'bomb' {
-  return length < chipFrom ? 'grubber' : length < bombFrom ? 'chip' : 'bomb';
+export function controlKickBand(length: number, chipFrom: number, bombFrom: number, toLine = ATTACK_KICK_M): 'grubber' | 'chip' | 'bomb' | 'long' {
+  return length < chipFrom ? 'grubber' : length < bombFrom ? 'chip' : toLine > ATTACK_KICK_M ? 'long' : 'bomb';
 }
 /** Nudge within the normal target envelope, including its ground clamps. */
 export function controlAim(target: Vec, aim: Vec | undefined, low: Vec, high: Vec): Vec {

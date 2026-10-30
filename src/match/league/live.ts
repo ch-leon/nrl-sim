@@ -1939,7 +1939,7 @@ export class LiveSim implements MatchSim {
         this.pendingControl[this.attacking] = null;
         if (this.tackles === SET_TACKLES - 1) {
           const length = intent.aim ? dist(h.body.pos, intent.aim) : 0;
-          const kind = controlKickBand(length, LIVE.controlsChipFromM, LIVE.controlsBombFromM);
+          const kind = controlKickBand(length, LIVE.controlsChipFromM, LIVE.controlsBombFromM, this.toLine(h));
           this.pendingKick = this.planKick(h, kind, intent.aim);
           this.lock(h, 'kick', LIVE.kickLockTicks);
           return;
@@ -2112,6 +2112,12 @@ export class LiveSim implements MatchSim {
         // Big Boot puts it higher (#99): more hang, and the chase is under it.
         return { ...base, to: controlAim(bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), aim, bombTarget(h.body.pos, this.dir, fb.body.pos, 0), bombTarget(h.body.pos, this.dir, fb.body.pos, 1)), receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait };
       default: {
+        // Labs: match controls (Leon, 30 Oct). Territory aims keep the normal
+        // wind / boot target and its scatter; only the intent chooses the kick.
+        if (aim) {
+          const to = kickTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next(), boot);
+          return { ...base, to: controlAim(to, aim, kickTarget(h.body.pos, this.dir, fb.body.pos, 0, boot), kickTarget(h.body.pos, this.dir, fb.body.pos, 1, boot)), receiver: this.indexOf(fb), peak: 12, ...trait };
+        }
         // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch; else to the fullback.
         const toLine = this.toLine(h);
         const lever = traitBoost(h.traits, 'bigBoot') + traitBoost(h.traits, 'playmaker');

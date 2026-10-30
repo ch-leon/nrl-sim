@@ -4,7 +4,7 @@ import type Phaser from 'phaser';
 import type { Side } from '../core/snapshot';
 import type { Vec } from '../core/vec';
 import { dist } from '../core/vec';
-import { toFieldPt } from '../core/field';
+import { FIELD_LENGTH, toFieldPt } from '../core/field';
 import { controlKickBand, type ControlKind } from '../league/controls';
 import { LIVE } from '../league/live';
 import type { LivePlayback, LivePlaybackScene } from './livePlayback';
@@ -58,7 +58,7 @@ export class ControlsLayer {
   private readonly styles: HTMLStyleElement;
   private readonly canvas: HTMLCanvasElement;
 
-  constructor(private readonly scene: Phaser.Scene & LivePlaybackScene, private readonly pb: LivePlayback, private readonly mine: Side, slot: HTMLElement) {
+  constructor(private readonly scene: Phaser.Scene & LivePlaybackScene, private readonly pb: LivePlayback, private readonly mine: Side, slot: HTMLElement, private readonly holdPan: (held: boolean) => void) {
     this.canvas = scene.game.canvas;
     this.skip = button('Skip set', () => pb.skipSet(), { class: 'nrl-mo-labs-skip' });
     slot.append(this.skip);
@@ -81,11 +81,11 @@ export class ControlsLayer {
     document.head.append(this.styles);
     this.line = scene.add.graphics().setDepth(89000);
     this.label = scene.add.text(0, 0, '', { fontSize: '14px', color: COLOR_TOKENS.accent, backgroundColor: COLOR_TOKENS.navy }).setDepth(89001).setOrigin(0.5, 1).setVisible(false);
-    window.addEventListener('pointerdown', this.down, { passive: true });
-    window.addEventListener('pointermove', this.move, { passive: true });
-    window.addEventListener('pointerup', this.up, { passive: true });
-    window.addEventListener('pointercancel', this.cancelPointer, { passive: true });
-    window.addEventListener('blur', this.cancel);
+    window.addEventListener('pointerdown', this.down, { passive: true, capture: true });
+    window.addEventListener('pointermove', this.move, { passive: true, capture: true });
+    window.addEventListener('pointerup', this.up, { passive: true, capture: true });
+    window.addEventListener('pointercancel', this.cancelPointer, { passive: true, capture: true });
+    window.addEventListener('blur', this.blur);
     scene.events.on('update', this.update);
   }
   private pitchHit(x: number, y: number): boolean { return document.elementFromPoint(x, y) === this.canvas; }
@@ -116,6 +116,7 @@ export class ControlsLayer {
     this.pointers.add(e.pointerId);
     if (this.pointers.size !== 1) { this.cancel(); return; }
     if (!this.pb.controlsAvailable || this.pb.controlAttacking !== this.mine || !this.pitchHit(e.clientX, e.clientY)) return;
+    this.holdPan(true);
     this.pointer = e.pointerId;
     this.started = performance.now();
     this.points = [{ x: e.clientX, y: e.clientY, atMs: 0 }];
@@ -128,6 +129,7 @@ export class ControlsLayer {
   };
   private up = (e: PointerEvent): void => {
     this.pointers.delete(e.pointerId);
+    if (this.pointers.size === 0) this.holdPan(false);
     if (this.pointer !== e.pointerId) return;
     if (this.pitchHit(e.clientX, e.clientY)) {
       this.points.push({ x: e.clientX, y: e.clientY, atMs: performance.now() - this.started });
@@ -136,7 +138,13 @@ export class ControlsLayer {
     }
     this.cancel();
   };
-  private cancelPointer = (e: PointerEvent): void => { this.pointers.delete(e.pointerId); this.cancel(); };
+  private cancelPointer = (e: PointerEvent): void => {
+    this.pointers.delete(e.pointerId);
+    if (this.pointers.size === 0) this.holdPan(false);
+    this.cancel();
+  };
+  private blur = (): void => { this.pointers.clear(); this.holdPan(false); this.cancel(); };
+  // Keep a cancelled control's finger reserved until it lifts. Pinch ignores holdPan.
   private cancel = (): void => { this.pointer = null; this.points = []; this.line.clear(); this.label.setVisible(false); };
   private drawAim(): void {
     this.line.clear();
@@ -149,7 +157,7 @@ export class ControlsLayer {
     const n = Math.max(2, Math.ceil(dist(a, b) * zoom / 8));
     for (let i = 0; i < n; i += 2) this.line.lineBetween(a.x + (b.x - a.x) * i / n, a.y + (b.y - a.y) * i / n, a.x + (b.x - a.x) * (i + 1) / n, a.y + (b.y - a.y) * (i + 1) / n);
     this.line.strokeCircle(b.x, b.y, 7 / zoom);
-    this.label.setText(controlKickBand(dist(ball, aim), LIVE.controlsChipFromM, LIVE.controlsBombFromM).toUpperCase()).setPosition((a.x + b.x) / 2, (a.y + b.y) / 2 - 8 / zoom).setScale(1 / zoom).setVisible(true);
+    this.label.setText(controlKickBand(dist(ball, aim), LIVE.controlsChipFromM, LIVE.controlsBombFromM, this.pb.controlDirection > 0 ? FIELD_LENGTH - ball.x : ball.x).toUpperCase()).setPosition((a.x + b.x) / 2, (a.y + b.y) / 2 - 8 / zoom).setScale(1 / zoom).setVisible(true);
   }
   private update = (): void => {
     const text = this.pb.controlAttacking === this.mine ? 'Skip set' : 'Skip to our ball';
@@ -171,11 +179,12 @@ export class ControlsLayer {
     if (this.pointer !== null) this.drawAim();
   };
   destroy(): void {
-    window.removeEventListener('pointerdown', this.down);
-    window.removeEventListener('pointermove', this.move);
-    window.removeEventListener('pointerup', this.up);
-    window.removeEventListener('pointercancel', this.cancelPointer);
-    window.removeEventListener('blur', this.cancel);
+    this.blur();
+    window.removeEventListener('pointerdown', this.down, true);
+    window.removeEventListener('pointermove', this.move, true);
+    window.removeEventListener('pointerup', this.up, true);
+    window.removeEventListener('pointercancel', this.cancelPointer, true);
+    window.removeEventListener('blur', this.blur);
     this.scene.events.off('update', this.update);
     if (this.hint) { this.hint.remove(); this.pb.release(); }
     this.skip.remove(); this.badge.remove(); this.styles.remove(); this.line.destroy(); this.label.destroy();

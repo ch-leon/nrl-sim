@@ -83,10 +83,17 @@ export function readLiveMatch(): LiveMatchRecord | null {
     const raw = store()?.getItem(liveMatchKey(getActiveSlot()));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    return isLiveMatchRecord(parsed) ? parsed : null;
+    return isLiveMatchRecord(parsed) ? optionalControls(parsed) : null;
   } catch {
     return null;
   }
+}
+
+/** Labs: match controls (Leon, 30 Oct). Empty inputs keep the pre-Labs record bytes. */
+function optionalControls(record: LiveMatchRecord): LiveMatchRecord {
+  if (record.controls?.length) return record;
+  const { controls: _controls, ...plain } = record;
+  return plain;
 }
 
 /** Write the record for `slot` (the active one, when omitted). False when storage is missing, full or blocked. */
@@ -95,7 +102,7 @@ export function writeLiveMatch(r: LiveMatchRecord, slot: number = getActiveSlot(
   try {
     const s = store();
     if (!s) return false;
-    s.setItem(liveMatchKey(slot), JSON.stringify(r));
+    s.setItem(liveMatchKey(slot), JSON.stringify(optionalControls(r)));
     return true;
   } catch {
     // Storage full or blocked: the match can still be played, just not resumed.

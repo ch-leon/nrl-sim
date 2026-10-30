@@ -116,6 +116,21 @@ describe('timed decisions', () => {
       expect(s.pendingKick?.kind).toBe(kind);
     }
   });
+  it('uses the existing attacking range for a long drag: territory deep, bomb near the line', () => {
+    expect(controlKickBand(30, LIVE.controlsChipFromM, LIVE.controlsBombFromM, 50)).toBe('bomb');
+    expect(controlKickBand(30, LIVE.controlsChipFromM, LIVE.controlsBombFromM, 50.1)).toBe('long');
+    for (const dir of [1, -1] as const) {
+      const { s, carrier } = moment();
+      s.dir = dir; s.tackles = SET_TACKLES - 1; s.lastPlay = true;
+      carrier.body.pos = { x: dir > 0 ? 20 : 80, y: 34 };
+      s.pendingControl[carrier.side] = { tick: s.tick, side: carrier.side, kind: 'kick', aim: { x: carrier.body.pos.x + dir * 30, y: 999 } };
+      s.stepPlay();
+      expect(s.pendingKick?.kind).toBe('long');
+      // Same normal territory target / scatter, even for an extreme aim.
+      expect(s.pendingKick?.to.x).toBe(carrier.body.pos.x + dir * 32);
+      expect(s.pendingKick?.to.y).toBe(42);
+    }
+  });
   it('clamps extreme aims to the existing scatter envelope in either direction', () => {
     expect(controlAim({ x: 20, y: 30 }, { x: 900, y: -900 }, { x: 18, y: 28 }, { x: 22, y: 32 })).toEqual({ x: 22, y: 28 });
     expect(controlAim({ x: 20, y: 30 }, { x: -900, y: 900 }, { x: 22, y: 32 }, { x: 18, y: 28 })).toEqual({ x: 18, y: 32 });
