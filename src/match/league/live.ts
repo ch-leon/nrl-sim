@@ -33,6 +33,8 @@
 // Sin bins (#71): a penalty can send the offender to the touchline for five
 // minutes of match clock; his side plays a man short and stand-ins take his
 // duties until he is back.
+import { controlAim, controlKickBand, controlReceiver, type ControlInput } from './controls';
+export type { ControlInput } from './controls';
 import { SET_TACKLES } from '../../config';
 import { makeRng, type Rng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
@@ -75,6 +77,9 @@ import { BIN, binReason, binReasonText, sinBinChance } from './sinbin';
  * metres. Overridable by name in balance experiments (tuning.ts).
  */
 export const LIVE = {
+  // Labs: match controls (Leon, 30 Oct). Drag length in pitch metres.
+  controlsChipFromM: 12,
+  controlsBombFromM: 24,
   // Speed (N9.1): players re-pick their targets every this many ticks (1 = every tick, 20 Hz;
   // 2 is a fifth faster but costs a sixth of the line breaks and All-out's edge) and bodies are
   // pushed apart this many times a tick (1 costs a sixth of the points).
@@ -344,6 +349,7 @@ export function runOn(v0: number, a: number, vMax: number, t: number): number {
 }
 
 export interface LiveOptions {
+  controls?: ControlInput[] | undefined;
   /** Lab and tests: start everyone on these legs (1 = a kick-off). */
   energy?: number;
   /** Two Nines halves unless told otherwise (the balance harness plays single stretches). */
@@ -453,6 +459,10 @@ export class LiveSim implements MatchSim {
   private overLineAt = -1;
   /** The side that has broken the line in this stretch of open play (one line break until the next tackle or stoppage). */
   private lineBrokenBy: Side | null = null;
+  /** Labs: match controls (Leon, 30 Oct). One timed intent for the next decision. */
+  private readonly controlList: ControlInput[];
+  private controlRead = 0;
+  private readonly pendingControl: Record<Side, ControlInput | null> = { home: null, away: null };
   /** Coach calls (#73): the list by tick, how far it has been read, each side's call in force and whether it has had its call this set each way. */
   private readonly callList: CallInput[];
   /** Sides with an AI coach (N9.6). */
@@ -553,6 +563,7 @@ export class LiveSim implements MatchSim {
     this.rng = makeRng(seed);
     this.firstReceiver = this.rng.next() < 0.5 ? 'home' : 'away';
     this.callList = opts.calls ?? [];
+    this.controlList = opts.controls ?? [];
     this.aiCoach = opts.aiCoach ?? [];
     this.planList = opts.plans ?? [];
     const listed = opts.breakRuleSides;
@@ -805,6 +816,15 @@ export class LiveSim implements MatchSim {
     }
     this.tick++;
     this.events = [];
+    const beforeSide = this.attacking;
+    const beforePhase = this.phase.kind;
+    const beforeTackles = this.tackles;
+    const beforePtb = this.phase.kind === 'ruck' && this.phase.stage === 'ptb';
+    // Labs: match controls (Leon, 30 Oct). One pending intent per attacking side.
+    while (this.controlRead < this.controlList.length && this.controlList[this.controlRead]!.tick <= this.tick) {
+      const c = this.controlList[this.controlRead++]!;
+      if (c.tick === this.tick && c.side === this.attacking && (c.kind !== 'kick' || this.tackles === SET_TACKLES - 1)) this.pendingControl[c.side] = c;
+    }
     // Coach calls due this tick (#73).
     while (this.callRead < this.callList.length && this.callList[this.callRead]!.tick <= this.tick) {
       const c = this.callList[this.callRead++]!;
@@ -870,6 +890,11 @@ export class LiveSim implements MatchSim {
     }
     this.watchLineBreak(h);
     this.expireCalls();
+    if (this.attacking !== beforeSide || this.tackles !== beforeTackles
+      || (this.phase.kind !== beforePhase && this.phase.kind !== 'play')
+      || (!beforePtb && this.phase.kind === 'ruck' && this.phase.stage === 'ptb')) {
+      this.pendingControl.home = this.pendingControl.away = null;
+    }
   }
 
   // ── Coach calls (#73) ─────────────────────────────────────────────────────
@@ -884,6 +909,15 @@ export class LiveSim implements MatchSim {
   /** What the match is doing (open play, a tackle, a ruck, a restart…). */
   get phaseKind(): string {
     return this.phase.kind;
+  }
+
+  /** Labs: match controls (Leon, 30 Oct). Read-only presentation cues. */
+  get controlDirection(): 1 | -1 { return this.dir; }
+  get controlEngagement(): string | null {
+    const h = this.holder();
+    if (!h || h.side !== this.attacking || this.phase.kind !== 'play') return null;
+    const nearest = this.committed(h, this.side(other(this.attacking)))[0];
+    return nearest && dist(nearest.body.pos, h.body.pos) < LIVE.engageM ? `${h.side}:${this.indexOf(h)}:${h.catchTick}` : null;
   }
 
   /** Why a side can't make this call now, or null when it can. */
@@ -1775,6 +1809,7 @@ export class LiveSim implements MatchSim {
 
   /** Possession changes hands where the ball is; a fresh set for the other side. */
   private turnover(): void {
+    this.pendingControl.home = this.pendingControl.away = null;
     this.kickCall = this.fgCall = null;
     this.attacking = other(this.attacking);
     this.dir = this.dirOf(this.attacking);
@@ -1898,6 +1933,24 @@ export class LiveSim implements MatchSim {
     const nearest = committed[0];
     const nearD = nearest ? dist(nearest.body.pos, h.body.pos) : Infinity;
 
+    const intent = this.pendingControl[this.attacking];
+    if (intent) {
+      if (intent.kind === 'kick') {
+        this.pendingControl[this.attacking] = null;
+        if (this.tackles === SET_TACKLES - 1) {
+          const length = intent.aim ? dist(h.body.pos, intent.aim) : 0;
+          const kind = controlKickBand(length, LIVE.controlsChipFromM, LIVE.controlsBombFromM);
+          this.pendingKick = this.planKick(h, kind, intent.aim);
+          this.lock(h, 'kick', LIVE.kickLockTicks);
+          return;
+        }
+      } else if ((intent.kind === 'pass-left' || intent.kind === 'pass-right') && this.tick - h.catchTick >= LIVE.passCooldown) {
+        this.pendingControl[this.attacking] = null;
+        const receiver = controlReceiver(h.body.pos, this.dir, this.candidates(h, this.atkPlan(h)), intent.kind);
+        if (receiver !== null) { this.pass(h, this.players[receiver]!); return; }
+      }
+    }
+
     // Last tackle: the kicker makes one call for the play — run it when he's
     // on the line (or fancies it inside 40), else a kick for the zone — then
     // runs a few steps and puts boot to ball.
@@ -1976,9 +2029,12 @@ export class LiveSim implements MatchSim {
       if (sit.defenders === 1) {
         h.steppedOn = this.indexOf(nearest);
         const st = stepTraits(h.traits, nearest.traits, toLine <= FINISHER_M);
-        const tries = plan.step >= 1 || this.rng.next() < plan.step;
+        const intent = this.pendingControl[this.attacking];
+        const stepping = intent?.kind === 'step-up' || intent?.kind === 'step-down';
+        if (stepping) this.pendingControl[this.attacking] = null;
+        const tries = stepping || plan.step >= 1 || this.rng.next() < plan.step;
         if (tries && this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus + dplan.stepAgainst + (defenders.length < PLAYERS ? BIN.shortStep : 0))) {
-          this.sidestep(h, nearest, announce(st.credit));
+          this.sidestep(h, nearest, announce(st.credit), stepping ? (intent.kind === 'step-up' ? -1 : 1) : undefined);
           return;
         }
       }
@@ -2019,7 +2075,7 @@ export class LiveSim implements MatchSim {
   }
 
   /** Where the kick goes and who it is for, by type (BAK-208 §4.4). */
-  private planKick(h: Player, kind: KickChoice): PendingKick {
+  private planKick(h: Player, kind: KickChoice, aim?: Vec): PendingKick {
     const def = other(this.attacking);
     const fb = this.fullback(def);
     const boot0 = bootMult(h.traits);
@@ -2035,10 +2091,17 @@ export class LiveSim implements MatchSim {
         const wing = wingers[Math.floor(this.rng.next() * wingers.length)] ?? h;
         const lane = wing.body.pos.y * (1 - TOUCH.grubberInfield) + h.body.pos.y * TOUCH.grubberInfield;
         const t = grubberTarget(h.body.pos, this.dir, this.rng.next(), lane, TOUCH.grubberMissM);
-        return { ...base, to: { x: t.x + this.dir * this.rng.next() * TOUCH.grubberLongM, y: t.y }, receiver: null, peak: 0.9 };
+        const to = { x: t.x + this.dir * this.rng.next() * TOUCH.grubberLongM, y: t.y };
+        if (aim) {
+          const low = grubberTarget(h.body.pos, this.dir, 0, lane, TOUCH.grubberMissM);
+          const high = grubberTarget(h.body.pos, this.dir, 1, lane, TOUCH.grubberMissM);
+          high.x += this.dir * TOUCH.grubberLongM;
+          return { ...base, to: controlAim(to, aim, low, high), receiver: null, peak: 0.9 };
+        }
+        return { ...base, to, receiver: null, peak: 0.9 };
       }
       case 'chip':
-        return { ...base, to: chipTarget(h.body.pos, this.dir, this.rng.next()), receiver: this.indexOf(h), peak: 5 };
+        return { ...base, to: controlAim(chipTarget(h.body.pos, this.dir, this.rng.next()), aim, chipTarget(h.body.pos, this.dir, 0), chipTarget(h.body.pos, this.dir, 1)), receiver: this.indexOf(h), peak: 5 };
       case 'cross-field': {
         // The winger on the far side of the field from the ball has the space.
         const wingers = this.side(this.attacking).filter((p) => ROLES[p.slot]!.name === 'winger');
@@ -2047,7 +2110,7 @@ export class LiveSim implements MatchSim {
       }
       case 'bomb':
         // Big Boot puts it higher (#99): more hang, and the chase is under it.
-        return { ...base, to: bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait };
+        return { ...base, to: controlAim(bombTarget(h.body.pos, this.dir, fb.body.pos, this.rng.next()), aim, bombTarget(h.body.pos, this.dir, fb.body.pos, 0), bombTarget(h.body.pos, this.dir, fb.body.pos, 1)), receiver: this.indexOf(fb), peak: bombPeak(traitBoost(h.traits, 'bigBoot')), ...trait };
       default: {
         // Territory (2d): from his own 40 on the last he may go for the 40/20; from deep, often for touch; else to the fullback.
         const toLine = this.toLine(h);
@@ -2100,9 +2163,9 @@ export class LiveSim implements MatchSim {
   }
 
   /** A clean step: the defender grasps air, the carrier jinks past with a burst. */
-  private sidestep(c: Player, t: Player, trait?: string): void {
+  private sidestep(c: Player, t: Player, trait?: string, way?: number): void {
     this.emit('step', `${c.name} steps ${t.name}!`, c, trait);
-    const sideways = c.body.pos.y >= t.body.pos.y ? 1 : -1;
+    const sideways = way ?? (c.body.pos.y >= t.body.pos.y ? 1 : -1);
     c.jink = { dy: sideways * LIVE.stepJinkM, ticks: LIVE.stepJinkTicks };
     this.lock(t, 'tackled', 12, add(t.body.pos, { x: this.dir * 0.8, y: -sideways * 0.6 }));
     t.cooldownUntil = this.tick + LIVE.beatenCooldown;
@@ -2199,6 +2262,16 @@ export class LiveSim implements MatchSim {
     if (ph.heldAt === 0) ph.heldAt = this.tick;
     if (this.tick < ph.heldAt + LIVE.dhHoldTicks) return;
     this.lastPlay = this.tackles === SET_TACKLES - 1;
+    const intent = this.pendingControl[this.attacking];
+    if (intent && (intent.kind === 'pass-left' || intent.kind === 'pass-right')) {
+      this.pendingControl[this.attacking] = null;
+      const receiver = controlReceiver(h.body.pos, this.dir, this.candidates(h), intent.kind);
+      if (receiver !== null) {
+        this.pass(h, this.players[receiver]!);
+        this.phase = { kind: 'play' };
+        return;
+      }
+    }
     let receiver: number | null = null;
     if (this.lastPlay) {
       const k = this.kicker(this.attacking);

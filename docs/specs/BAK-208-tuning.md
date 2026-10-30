@@ -1295,3 +1295,22 @@ The golden even Balanced / Slide match (seed 1) moved on purpose, from
 (won back 6–10%, spilled 10–14%), grubber tries 0.2–0.4 a match, and a
 defender who wins the race grounds it for a 20 m restart (a goal-line
 drop-out is a follow-up).
+
+
+## Labs: match controls (Leon, 30 Oct)
+
+The experiment is off by default and has no random draws or events on the default
+path. Its timed controls share the seed replay contract with coach calls.
+
+| Name | File | Value | Meaning |
+| --- | --- | --- | --- |
+| `LIVE.controlsChipFromM` | `match/league/live.ts` | 12 m | Drag length at which a grubber becomes a chip. |
+| `LIVE.controlsBombFromM` | `match/league/live.ts` | 24 m | Drag length at which a chip becomes a bomb. |
+| `CONTROLS_ENGAGE_MS` | `match/view/livePlayback.ts` | 600 ms | First engagement's real-time slow beat. |
+| `CONTROLS_ENGAGE_FACTOR` | `match/view/livePlayback.ts` | 0.35 | Playback factor during that beat. |
+| `CONTROLS_SKIP_MAX_TICKS` | `match/view/livePlayback.ts` | 30,000 | Safety cap on one set skip; events remain connected to the recorder. |
+
+Kick aims nudge the normal random target halfway towards the pitch point, clamped
+to the same kick's existing endpoint envelope. These controls do not alter wind,
+boot traits, catch rolls or contests. Nines' last tackle is `SET_TACKLES - 1`
+completed tackles (four), as in the existing sim.

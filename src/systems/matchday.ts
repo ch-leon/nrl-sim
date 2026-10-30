@@ -78,12 +78,14 @@ export function resumePlayerMatch(): boolean {
     if (rec.tick > 0 && !liveMatchSameRules(rec)) {
       live.calls = [];
       live.plans = [];
+      live.controls = [];
       delete live.resumeAt;
-      writeLiveMatch({ ...rec, calls: [], plans: [], tick: 0, halfMinutes: NINES.halfMinutes });
+      writeLiveMatch({ ...rec, calls: [], plans: [], controls: [], tick: 0, halfMinutes: NINES.halfMinutes });
       bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info', match: true });
     } else {
       live.calls = [...rec.calls];
       live.plans = rec.plans ? [...rec.plans] : [];
+      live.controls = rec.controls ? [...rec.controls] : [];
       if (rec.tick > 0) live.resumeAt = rec.tick;
       else delete live.resumeAt;
     }
@@ -300,7 +302,7 @@ export function registerPlayerMatchSystem(): void {
     // what the player watched (and called).
     if (!ctx.fastForward && ctx.hold) {
       ctx.hold();
-      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes };
+      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], controls: resumed?.controls ? [...resumed.controls] : [], plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes };
       writeLiveMatch(record);
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
         if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
@@ -318,6 +320,7 @@ export function registerPlayerMatchSystem(): void {
         ...(matchOpts.goldenPoint ? { goldenPoint: true } : {}),
         calls: record.calls,
         plans: record.plans ?? [],
+        controls: record.controls ?? [],
         ...(record.tick > 0 ? { resumeAt: record.tick } : {}),
         planSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const),
         ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
@@ -326,8 +329,8 @@ export function registerPlayerMatchSystem(): void {
       };
       // Keep the tick on the parked match too, so Resume still has it if the
       // stored record is later missing or unreadable.
-      live.onProgress = (calls, tick, plans) => {
-        const wrote = writeLiveMatch({ ...record, calls: [...calls], plans: [...plans], tick });
+      live.onProgress = (calls, tick, plans, controls = []) => {
+        const wrote = writeLiveMatch({ ...record, calls: [...calls], plans: [...plans], controls: [...controls], tick });
         if (wrote && tick > 0) live.resumeAt = tick;
         return wrote;
       };

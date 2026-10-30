@@ -426,3 +426,12 @@ describe('live match (beta): the match on screen is the match', () => {
     for (const f of mine) expect(f.result).toBeDefined();
   }, 180_000);
 });
+
+it('validates optional Labs controls, rejecting malformed timed intents', () => {
+  const record = { season: 1, week: 2, round: 1, homeId: 'H', awayId: 'A', seed: 1, calls: [], tick: 20 };
+  expect(isLiveMatchRecord(record)).toBe(true);
+  expect(isLiveMatchRecord({ ...record, controls: [{ tick: 10, side: 'home', kind: 'kick', aim: { x: 45.1, y: 20 } }] })).toBe(true);
+  for (const controls of [null, {}, [{ tick: -1, side: 'home', kind: 'kick' }], [{ tick: 10, side: 'away', kind: 'jump' }], [{ tick: 10, side: 'home', kind: 'kick', aim: { x: NaN, y: 20 } }]]) {
+    expect(isLiveMatchRecord({ ...record, controls })).toBe(false);
+  }
+});

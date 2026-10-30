@@ -1,6 +1,7 @@
 // src/core/events.ts — tiny typed event bus. See ARCHITECTURE §5. No Phaser.
 // Systems publish; scenes/UI subscribe. This is the only cross-system channel.
 
+import { type ControlInput } from '../match/league/controls';
 import type {
   GameState, PlacedFacility, Player, Fixture,
 } from './state';
@@ -21,13 +22,14 @@ export interface LiveMatchData {
   calls?: CallInput[];
   /** Plan changes already made at the breaks (N11). */
   plans?: PlanInput[];
+  controls?: ControlInput[];
   resumeAt?: number;
   /**
    * Keep the resume record: on each call or plan change, every couple of seconds of
    * match time, on Save & exit, and when the app goes to the background.
    * False when the write did not land (storage full or blocked).
    */
-  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[]) => boolean;
+  onProgress?: (calls: readonly CallInput[], tick: number, plans: readonly PlanInput[], controls?: readonly ControlInput[]) => boolean;
   /** The player's side: he may change the plan at the breaks (N11). */
   planSide?: 'home' | 'away';
   /** The player's side, when he has the coach-call chips (#73; the Coach calls setting). */

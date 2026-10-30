@@ -34,3 +34,6 @@ export function saveMetaKey(slot: number): string {
 export function liveMatchKey(slot: number): string {
   return `${LIVE_MATCH_PREFIX}${slot}`;
 }
+
+/** Local experiments, never part of a career (Labs: match controls (Leon, 30 Oct)). */
+export const LABS_KEY = 'nrl-sim-labs';

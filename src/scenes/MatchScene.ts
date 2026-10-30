@@ -16,6 +16,8 @@
 //   < particles (10 000) < FG near terraces < front crowd.
 //
 // Pure geometry lives in ./matchField and src/art/match (Phaser-free, tested).
+import { experimentOn } from '../labs/flags';
+import { ControlsLayer } from '../match/view/controlsLayer';
 import Phaser from 'phaser';
 import { CameraController } from '../world/camera';
 import { zoomForViewport } from '../world/viewport';
@@ -311,6 +313,7 @@ export class MatchScene extends Phaser.Scene {
   private kickBack = false;
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
+  private controlsLayer: ControlsLayer | null = null;
   private playback: LivePlayback | null = null;
   private live: LiveMatchData | undefined;
   private overlay: MatchOverlayHandle | null = null;
@@ -488,6 +491,8 @@ export class MatchScene extends Phaser.Scene {
         ...(live.injuryRate !== undefined ? { injuryRate: live.injuryRate } : {}),
         ...(live.difficultyEdge ? { difficultyEdge: live.difficultyEdge } : {}),
         calls: live.calls ?? [],
+        controls: live.controls ?? [],
+        ...(experimentOn('match-controls') && live.planSide ? { controlsSide: live.planSide } : {}),
         ...(live.plans ? { plans: live.plans } : {}),
         ...(live.aiCoach?.length ? { aiCoach: live.aiCoach } : {}),
         ...(live.breakRuleSides?.length ? { breakRuleSides: live.breakRuleSides } : {}),
@@ -509,6 +514,8 @@ export class MatchScene extends Phaser.Scene {
         onCallResult: (v) => this.showCallResult(v),
       });
       this.mountPlaybackControls(this.playback.getSpeed());
+      // Labs: match controls (Leon, 30 Oct). Snapshot the switch for this match.
+      if (experimentOn('match-controls') && live.planSide && this.controlsEl) this.controlsLayer = new ControlsLayer(this, this.playback, live.planSide, this.controlsEl);
       if (live.coachSide) {
         const unlocked = live.unlockedCalls ?? COACH_CALLS;
         this.mountCoach(live.coachSide, unlocked);
@@ -1307,6 +1314,8 @@ export class MatchScene extends Phaser.Scene {
     this.letters = [];
     this.overlay?.destroy();
     this.overlay = null;
+    this.controlsLayer?.destroy();
+    this.controlsLayer = null;
     if (this.playback instanceof LivePlayback) this.playback.destroy();
     this.playback = null;
     if (this.controlsEl) {

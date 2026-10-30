@@ -9,6 +9,7 @@
 // and plan change, when the page hides, every LIVE_MATCH_SAVE_SECONDS of match
 // time, and on Save & exit, so a kill that never fires pagehide loses at most
 // that much. A few hundred bytes, kept next to the save slot; cleared at full time.
+import { type ControlInput, isControlInput } from '../match/league/controls';
 import { getActiveSlot } from '../core/save';
 import { browserStorage, type StorageLike } from '../core/storage/local';
 import { liveMatchKey } from '../core/storageKeys';
@@ -40,6 +41,7 @@ export interface LiveMatchRecord {
   calls: CallInput[];
   /** Plan changes at the breaks (N11); absent in a record from before them. */
   plans?: PlanInput[];
+  controls?: ControlInput[];
   tick: number;
   /**
    * Halves this record was written under. Absent on a record from before the
@@ -72,7 +74,8 @@ export function isLiveMatchRecord(x: unknown): x is LiveMatchRecord {
     && typeof r.round === 'number' && typeof r.homeId === 'string' && typeof r.awayId === 'string'
     && typeof r.seed === 'number' && typeof r.tick === 'number'
     && Array.isArray(r.calls)
-    && (r.plans === undefined || Array.isArray(r.plans));
+    && (r.plans === undefined || Array.isArray(r.plans))
+    && (r.controls === undefined || Array.isArray(r.controls) && r.controls.every(isControlInput));
 }
 
 export function readLiveMatch(): LiveMatchRecord | null {
