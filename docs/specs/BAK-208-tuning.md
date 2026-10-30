@@ -1319,7 +1319,8 @@ Controlled long drags use the existing `ATTACK_KICK_M` (50 m from the line)
 threshold: a bomb in attacking range, a normal territory kick from deeper. The
 aim preview uses the same choice as the sim. No default kick weights change.
 
-The live score bug reads the completed-tackle count from playback (the same
+The tackle chip sits beside the clock inside the existing 44 px score row, so
+the fullest coach tray keeps its vertical room. The live score bug reads the completed-tackle count from playback (the same
 `controlTackle` used by Labs), adding one for the current play. It hides during
 ball flights, dead-ball phases, replays and full time. No snapshot or save fields
 are added. The Nines denominator stays five.

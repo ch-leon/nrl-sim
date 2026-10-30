@@ -935,9 +935,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const board = el(
     'button',
     { class: 'nrl-mo-scoreboard', attrs: { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'nrl-mo-stats', title: 'Match stats' } },
-    el('span', { class: 'nrl-mo-bug' }, homeCell.cell, awayCell.cell, el('span', { class: 'nrl-mo-clockbox' }, clockEl, halfEl)),
+    el('span', { class: 'nrl-mo-bug' }, homeCell.cell, awayCell.cell, el('span', { class: 'nrl-mo-clockbox' }, clockEl, halfEl), tackleEl),
     momentum.row,
-    tackleEl,
     scoreEl,
   );
 
@@ -1520,8 +1519,9 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-scoreboard:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-scoreboard[aria-expanded="true"]::after { content: ''; position: absolute; inset: 0; border-radius: 8px; box-shadow: inset 0 0 0 2px var(--nrl-accent); pointer-events: none; }
-.nrl-mo-tackle { display: block; padding: 3px 8px; font: 700 0.8125rem var(--nrl-f-label); line-height: 1.2; letter-spacing: 0.04em; white-space: nowrap; }
+.nrl-mo-tackle { display: flex; align-items: center; padding: 0 8px; font: 700 0.8125rem var(--nrl-f-label); line-height: 1.2; letter-spacing: 0.04em; white-space: nowrap; }
 .nrl-mo-tackle[hidden] { display: none; }
+@media (orientation: portrait) { .nrl-mo-tackle { display: none; } }
 .nrl-mo-tackle-last { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-bug { display: flex; height: 44px; }
 .nrl-mo-team { display: flex; align-items: stretch; }

@@ -3519,7 +3519,22 @@ async function runLabsControls(browser) {
         pb.skipSet(); return false;
       }
       if (!pb.controlPicture.ball.holder) return false;
-      pb.hold(); return true;
+      pb.hold();
+      // Freeze the fullest tray, as in the existing portrait/clearance check.
+      match.refreshCallChips = () => {};
+      const tile = (name, hint) => {
+        const b = document.createElement('button');
+        b.className = 'nrl-btn nrl-mo-tray-call';
+        const title = document.createElement('b'), caption = document.createElement('span');
+        title.textContent = name; caption.textContent = hint;
+        b.append(title, caption); return b;
+      };
+      const pair = document.createElement('div'); pair.className = 'nrl-mo-tray-pair';
+      pair.append(tile('Shift left', 'ball to the left'), tile('Shift right', 'ball to the right'));
+      document.querySelector('.nrl-mo-tray-list').replaceChildren(tile('Hit-up', 'forwards take it in'), pair,
+        tile('Offload', 'keep the ball alive'), tile('Kick early', 'kick next tackle'), tile('Fresh legs', 'fresh legs on'));
+      document.querySelector('.nrl-mo-tray-foot').textContent = 'Run it, Bomb, Grubber, 40/20 from tackle 4 · Field goal when in range · Take the two, Tap and go at Coach’s Office level 2, more above';
+      return true;
     }, null, { timeout: 30000 });
     for (const [width, height] of [[667, 375], [844, 390], [956, 330]]) {
       await page.setViewportSize({ width, height });
@@ -3536,8 +3551,10 @@ async function runLabsControls(browser) {
           const problems = [];
           if (el.hidden || !el.textContent.includes('LAST TACKLE')) problems.push('last tackle missing');
           if (r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight || el.scrollWidth > el.clientWidth) problems.push('count clipped');
+          const tray = document.querySelector('.nrl-mo-tray');
+          if (tray.scrollHeight > tray.clientHeight + 1) problems.push('full coach tray scrolls');
           const intersects = (b) => r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top;
-          for (const sel of ['.nrl-mo-bug', '.nrl-mo-bar', '.nrl-mo-tray:not([hidden])', '.nrl-mo-calls', '.nrl-mo-skip', '.nrl-labs-badge']) {
+          for (const sel of ['.nrl-mo-team', '.nrl-mo-clockbox', '.nrl-mo-bar', '.nrl-mo-tray:not([hidden])', '.nrl-mo-calls', '.nrl-mo-skip', '.nrl-labs-badge']) {
             for (const other of document.querySelectorAll(sel)) if (intersects(other.getBoundingClientRect())) problems.push(`count overlaps ${sel}`);
           }
           return problems;
