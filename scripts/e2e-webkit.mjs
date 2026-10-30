@@ -3546,6 +3546,7 @@ async function runLabsControls(browser) {
         }, [size, scale]);
         await page.waitForTimeout(100);
         await page.locator('.nrl-mo-bar [data-coach]').tap();
+        await page.waitForTimeout(200); // Let the tray's entrance animation finish for the capture.
         const problems = await page.evaluate(() => {
           const el = document.querySelector('.nrl-mo-tackle'), r = el.getBoundingClientRect();
           const problems = [];
