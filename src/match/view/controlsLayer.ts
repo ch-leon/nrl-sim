@@ -12,7 +12,7 @@ import { hintSeen, markHintSeen } from '../../labs/flags';
 import { button } from '../../ui/dom';
 import { COLOR_TOKENS } from '../../ui/tokens';
 
-export const GESTURE = { swipePx: 30, swipeMs: 350, kickHoldMs: 180, cancelPx: 15, dominance: 1.25 };
+export const GESTURE = { swipePx: 30, swipeMs: 350, kickHoldMs: 180, cancelPx: 15, dominance: 1.25, kickAlignment: 0.75 };
 export interface GesturePoint extends Vec { pointers?: number }
 export interface GestureContext { lastTackle?: boolean; attack?: Vec }
 export function classifyGesture(points: readonly GesturePoint[], ms: number, context: GestureContext = {}): ControlKind | null {
@@ -23,7 +23,7 @@ export function classifyGesture(points: readonly GesturePoint[], ms: number, con
   if (length < GESTURE.cancelPx) return null;
   const attack = context.attack;
   if (context.lastTackle && attack && ms >= GESTURE.kickHoldMs
-    && (dx * attack.x + dy * attack.y) / Math.hypot(attack.x, attack.y) < -GESTURE.swipePx) return 'kick';
+    && (dx * attack.x + dy * attack.y) / Math.hypot(attack.x, attack.y) < -Math.max(GESTURE.swipePx, length * GESTURE.kickAlignment)) return 'kick';
   if (length <= GESTURE.swipePx || ms >= GESTURE.swipeMs) return null;
   if (Math.abs(dx) > Math.abs(dy) * GESTURE.dominance) return dx < 0 ? 'pass-left' : 'pass-right';
   if (Math.abs(dy) > Math.abs(dx) * GESTURE.dominance) return dy < 0 ? 'step-up' : 'step-down';

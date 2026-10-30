@@ -20,6 +20,10 @@ describe('pitch gestures', () => {
     expect(classifyGesture([start, { x: 100, y: 110 }], 500)).toBeNull();
     expect(classifyGesture([start, { x: 300, y: 110 }], 500, { ...ctx, attack: { x: -1, y: 0 } })).toBe('kick');
   });
+  it('keeps a vertical step on the last from becoming a diagonal backwards kick', () => {
+    expect(classifyGesture([start, { x: 200, y: 10 }], 220,
+      { lastTackle: true, attack: { x: 2, y: 1 } })).toBe('step-up');
+  });
   it('converts through the projected lateral axis independently of attacking direction', () => {
     expect(pitchIntent('pass-left', { x: -1, y: 1 })).toBe('pass-right');
     expect(pitchIntent('step-up', { x: -1, y: 1 })).toBe('step-up');
