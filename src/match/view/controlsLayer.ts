@@ -54,7 +54,6 @@ export class ControlsLayer {
   private readonly label: Phaser.GameObjects.Text;
   private readonly styles: HTMLStyleElement;
   private readonly canvas: HTMLCanvasElement;
-  private compact = false;
 
   constructor(private readonly scene: Phaser.Scene & LivePlaybackScene, private readonly pb: LivePlayback, private readonly mine: Side, slot: HTMLElement) {
     this.canvas = scene.game.canvas;
@@ -63,15 +62,18 @@ export class ControlsLayer {
     this.badge = document.createElement('span');
     this.badge.className = 'nrl-labs-badge';
     this.badge.textContent = 'LABS';
-    slot.classList.add('nrl-labs-controls');
     document.body.append(this.badge);
     this.styles = document.createElement('style');
     this.styles.textContent = `
       .nrl-labs-badge { position:fixed; right:calc(12px + var(--nrl-safe-r)); top:calc(76px + var(--nrl-safe-t)); z-index:14; pointer-events:none; color:var(--nrl-accent); background:var(--nrl-navy); font:700 10px var(--nrl-f-label); padding:3px 5px; border-radius:4px; }
       .nrl-mo-controls .nrl-btn.nrl-mo-labs-skip { width:auto; max-width:104px; min-height:44px; padding:0 6px; font-size:0.75rem; white-space:normal; line-height:1.05; }
-      .nrl-labs-controls.nrl-labs-compact .nrl-mo-speed:not([aria-pressed="true"]) { display:none; }
       .nrl-labs-hint { position:fixed; inset:0; z-index:24; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(14,22,48,0.78); color:var(--nrl-text); font:1rem var(--nrl-f-body); line-height:1.5; border:0; }
-      @media(max-width:700px) { .nrl-mo-controls:has(.nrl-mo-labs-skip) { gap:0; padding:0 4px; } .nrl-mo-controls .nrl-btn.nrl-mo-labs-skip { max-width:76px; font-size:0.6875rem; } }
+      @media(max-width:720px) {
+        .nrl-mo-controls:has(.nrl-mo-labs-skip) { gap:0; padding:0; }
+        .nrl-mo-controls:has(.nrl-mo-labs-skip) .nrl-mo-pill-div { display:none; }
+        .nrl-mo-controls .nrl-btn.nrl-mo-labs-skip { width:44px; max-width:44px; padding:0; font-size:0.625rem; }
+      }
+      @media(max-width:600px) { .nrl-mo-bar:has(.nrl-mo-labs-skip) { gap:4px; } }
     `;
     document.head.append(this.styles);
     this.line = scene.add.graphics().setDepth(89000);
@@ -81,7 +83,6 @@ export class ControlsLayer {
     window.addEventListener('pointerup', this.up, { passive: true });
     window.addEventListener('pointercancel', this.cancelPointer, { passive: true });
     window.addEventListener('blur', this.cancel);
-    window.addEventListener('resize', this.uncompact);
     scene.events.on('update', this.update);
   }
   private pitchHit(x: number, y: number): boolean { return document.elementFromPoint(x, y) === this.canvas; }
@@ -147,24 +148,10 @@ export class ControlsLayer {
     this.line.strokeCircle(b.x, b.y, 7 / zoom);
     this.label.setText(controlKickBand(dist(ball, aim), LIVE.controlsChipFromM, LIVE.controlsBombFromM).toUpperCase()).setPosition((a.x + b.x) / 2, (a.y + b.y) / 2 - 8 / zoom).setScale(1 / zoom).setVisible(true);
   }
-  private uncompact = (): void => {
-    this.compact = false;
-    this.skip.parentElement?.classList.remove('nrl-labs-compact');
-  };
   private update = (): void => {
     const text = this.pb.controlAttacking === this.mine ? 'Skip set' : 'Skip to our ball';
-    if (this.skip.textContent !== text) { this.skip.textContent = text; this.uncompact(); }
+    this.skip.textContent = text;
     this.skip.disabled = !this.pb.controlsAvailable;
-    const slot = this.skip.parentElement;
-    const bar = slot?.closest('.nrl-mo-bar');
-    if (slot && bar && !this.compact && bar.scrollWidth > bar.clientWidth) {
-      this.compact = true;
-      slot.classList.add('nrl-labs-compact');
-    }
-    if (slot && this.compact && window.innerWidth > 720) {
-      this.compact = false;
-      slot.classList.remove('nrl-labs-compact');
-    }
     this.skip.hidden = this.pb.finished;
     this.badge.hidden = this.pb.finished;
     if (!this.pb.controlsAvailable) this.cancel();
@@ -186,10 +173,8 @@ export class ControlsLayer {
     window.removeEventListener('pointerup', this.up);
     window.removeEventListener('pointercancel', this.cancelPointer);
     window.removeEventListener('blur', this.cancel);
-    window.removeEventListener('resize', this.uncompact);
     this.scene.events.off('update', this.update);
     if (this.hint) { this.hint.remove(); this.pb.release(); }
-    this.skip.parentElement?.classList.remove('nrl-labs-controls', 'nrl-labs-compact');
     this.skip.remove(); this.badge.remove(); this.styles.remove(); this.line.destroy(); this.label.destroy();
   }
 }
