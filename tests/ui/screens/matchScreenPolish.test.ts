@@ -182,7 +182,7 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
     }
     expect(callEffect('hit-up')).toBe('the forwards take the next carry');
   });
-  it('3o: the tray footer says when the others come on, and what the Coach’s Office still locks', () => {
+  it('3o: the tray footer says when the others come on, and the locked calls the tray had no room for', () => {
     expect(callsUnlockLine([
       { call: 'hit-up', why: null },
       { call: 'kick-early', why: 'tackles 3–4' },
@@ -190,8 +190,8 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
       { call: 'run-it', why: 'late in the set' },
     ], [])).toBe('Kick early from tackle 3 · Bomb, Run it from tackle 4');
     expect(callsUnlockLine([{ call: 'hit-up', why: 'one call a set' }], [{ call: 'field-goal', level: 3 }, { call: 'bomb', level: 3 }]))
-      .toBe("Called this set: the next call with the next set · Field goal, Bomb at Coach's Office level 3");
-    expect(callsUnlockLine([], [{ call: 'kick-early', level: 2 }, { call: 'shift-left', level: 1 }])).toBe("Shift left at Coach's Office level 1, more above");
+      .toBe("Called this set: the next call with the next set · +2 locked: Coach's Office 3");
+    expect(callsUnlockLine([], [{ call: 'kick-early', level: 2 }, { call: 'shift-left', level: 1 }])).toBe("+2 locked: Coach's Office 1–2");
     expect(callsUnlockLine([{ call: 'rush', why: null }], [])).toBe('');
   });
   it('3m: the COACH badge never goes away: the calls on now, the call made, or why none', () => {

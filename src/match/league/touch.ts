@@ -91,7 +91,11 @@ export function inOwnInGoal(p: Vec, dir: 1 | -1): boolean {
   return dir > 0 ? p.x < 0 : p.x > FIELD_LENGTH;
 }
 
+/** The 40/20's lines: kicked from behind his own 40, out inside their 20 (metres from each try line). */
+export const FORTY_TWENTY_FROM_M = 40;
+export const FORTY_TWENTY_INTO_M = 20;
+
 /** A 40/20: kicked from inside the kicker's own 40, bounced into touch inside the other side's 20 (metres to the line he attacks, at the kick and where it went out). */
 export function isFortyTwenty(kickToLine: number, outToLine: number): boolean {
-  return kickToLine >= FIELD_LENGTH - 40 && outToLine <= 20 && outToLine >= 0;
+  return kickToLine >= FIELD_LENGTH - FORTY_TWENTY_FROM_M && outToLine <= FORTY_TWENTY_INTO_M && outToLine >= 0;
 }

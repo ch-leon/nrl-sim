@@ -11,6 +11,8 @@
 // from the match code, so this file never breaks a match refactor.
 
 import type { GuidePage } from './pages';
+import { CALLS } from '../../match/league/calls';
+import { andList, callNames } from '../coachCallsText';
 
 /** The numbers the page quotes. Kept equal to the rule constants by a test. */
 export const NINES_FACTS = {
@@ -101,12 +103,13 @@ export const NINES_PAGE: GuidePage = {
     },
     {
       heading: 'Tactics, traits and coach calls',
+      link: 'calls',
       bullets: [
         'Each side plays an attack preset (Grind, Balanced, Expansive, Kick-chase, All-out) and a defence preset (Slide, Rush, Compressed) by zone of the field.',
         'Traits fire in their moment and are announced when they do: a step, a fend, an offload, a big hit, a strip, an intercept.',
         'In a live match COACH, bottom left, opens the coach calls for the next play (only the ones you can make now, five at most; the match keeps playing): with the ball Hit-up, Shift left or right, Offload (the next two carries look for it, tackles 1–4), Kick early, Run it, Bomb, Grubber (inside their 25), 40/20 (from behind your 40, in reach of their 20) and Field goal; defending Rush, Hold or Gang tackle (an extra man in the next two tackles, but more room out wide). One call a set; the stats (tap the score) count the calls that paid off. Fresh legs (your most tired man off for the freshest on the bench) is any time, once a half, and doesn’t use up the set’s call.',
         'Win a penalty within kicking range and the tray offers Take the two or Tap and go, over your captain’s choice (his own shows greyed). It doesn’t use up the set’s call.',
-        'With no Coach’s Office you have Hit-up, Hold, Fresh legs and your kick-off calls; each level of it adds calls: Shift, Rush, Offload and Gang tackle; then Kick early, Run it, Grubber and the penalty calls; then Bomb, Field goal and 40/20.',
+        `With no Coach’s Office you have ${andList(callNames(CALLS.unlocks[0]!))}; each level of it adds calls: ${CALLS.unlocks.slice(1).map((tier, i) => `level ${i + 1}, ${andList(callNames(tier))}`).join('; ')}. A locked call that would fit the moment shows greyed in the tray, tagged with the level that unlocks it. Office ▸ Coach calls lists every call, what it does and when you can make it.`,
         'Your kick-off: after they score, and in the pause before your kicker runs in, COACH offers Short or Long (from the start, once a kick-off, and it doesn’t use up a set’s call). Short goes high about 12 m past halfway for your chasers: about one in four comes back to you (more with quick chasers, fewer against a sure catcher), and if it doesn’t they have the ball near halfway. Long goes for their in-goal and the 5 m line to pin them deep, but about one in ten goes dead on the full: a penalty to them at halfway. With no call your kicker puts it deep, his kicking skill deciding how deep. Rival coaches always kick it deep.',
       ],
     },

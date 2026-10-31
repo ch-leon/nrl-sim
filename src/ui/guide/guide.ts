@@ -16,6 +16,7 @@ import { openSquadScreen } from '../screens/squad';
 import { openLineupScreen } from '../screens/lineup';
 import { openLadderScreen } from '../screens/fixtures';
 import { openBuildScreen } from '../screens/build';
+import { openCoachCallsScreen } from '../screens/coachCalls';
 import { openInboxScreen } from '../inbox';
 import { NINES_PAGE } from './nines';
 import { bonusZoneSvg } from './zonePicture';
@@ -36,12 +37,24 @@ export const GUIDE_SCREENS: Record<GuideScreen, { label: string; open: () => voi
   news: { label: 'Open News', open: () => openInboxScreen() },
   ladder: { label: 'Open Ladder', open: () => openLadderScreen() },
   build: { label: 'Open Build', open: () => openBuildScreen() },
+  calls: { label: 'Open Coach calls', open: () => openCoachCallsScreen() },
 };
 
 /** Each picture's markup (a static SVG built from the page's facts). */
 const GUIDE_FIGURES: Record<GuideFigure, () => string> = {
   'bonus-zone': bonusZoneSvg,
 };
+
+/** A link to a screen (a page's, under its title; a section's, under its text): closes the Guide and opens it. */
+function screenLink(screen: GuideScreen): HTMLButtonElement {
+  const link = GUIDE_SCREENS[screen];
+  const b = button(`${link.label} →`, () => {
+    closeScreen();
+    link.open();
+  }, { class: 'nrl-guide-link' });
+  b.setAttribute('data-guide-link', screen);
+  return b;
+}
 
 /** The page the Guide reopens on. */
 let lastPageId: string | undefined;
@@ -52,6 +65,7 @@ function renderSection(s: GuideSection): HTMLElement[] {
   if (s.text) out.push(el('p', { text: s.text }));
   if (s.figure) out.push(el('figure', { class: 'nrl-guide-figure', html: GUIDE_FIGURES[s.figure](), attrs: { 'data-guide-figure': s.figure, style: 'margin: 0.3rem 0' } }));
   if (s.bullets && s.bullets.length > 0) out.push(el('ul', {}, ...s.bullets.map((b) => el('li', { text: b }))));
+  if (s.link) out.push(screenLink(s.link));
   return out;
 }
 
@@ -59,15 +73,7 @@ function renderSection(s: GuideSection): HTMLElement[] {
 export function renderGuidePage(page: GuidePage): HTMLElement {
   const body = el('div', { class: 'nrl-guide-page', attrs: { 'data-guide-page': page.id } });
   const head = el('div', { class: 'nrl-guide-head' }, el('h2', { text: page.title }));
-  if (page.screen) {
-    const link = GUIDE_SCREENS[page.screen];
-    const b = button(`${link.label} →`, () => {
-      closeScreen();
-      link.open();
-    }, { class: 'nrl-guide-link' });
-    b.setAttribute('data-guide-link', page.screen);
-    head.append(b);
-  }
+  if (page.screen) head.append(screenLink(page.screen));
   body.append(head);
   for (const s of page.sections) body.append(...renderSection(s));
   return body;

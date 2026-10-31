@@ -34,6 +34,9 @@ import { demolishWithUndo } from '../../systems/undo';
 import { activePack } from '../../content';
 import { POOL_POINTS_PER_BIAS, SCOUT_BIAS_PER_LEVEL, SCOUT_FEE_DISCOUNT_PER_LEVEL } from '../../systems/freeagency';
 import { REP_BASELINE } from '../../systems/league';
+import { coachsOfficeLevel } from '../../systems/matchday';
+import { officeUnlockLine } from '../coachCallsText';
+import { openCoachCallsScreen } from './coachCalls';
 import {
   activeGroundsScene, demolishRefund, moveFee, type GroundsSceneLike,
 } from '../../world/placement';
@@ -72,14 +75,27 @@ const SPECIAL_COPY: Record<FacilityDefId, string> = {
   physioCentre: 'Injured players recover 1 week faster',
   medicalBay: 'Injured players recover 1 week faster per level',
   canteen: `+${SPECIAL_MAGNITUDE.morale} squad morale/week per level`,
-  coachsOffice: `+${SPECIAL_MAGNITUDE.morale} squad morale/week per level`,
+  coachsOffice: '', // depends on the club's best Coach's Office: officeCopy
   trainingPaddock: '', weightsRoom: '', videoRoom: '', teamGym: '',
 };
 
-/** Which level a blurb describes and the club's reputation now (the Sponsor Board's return depends on both). */
+/**
+ * Which level a blurb describes and the club's reputation now (the Sponsor Board's return depends on both),
+ * and the club's best Coach's Office (0 = none; the Coach's Office names the calls its next level unlocks).
+ */
 export interface BlurbContext {
   level: 1 | 2 | 3;
   reputation: number;
+  officeLevel?: number;
+}
+
+/**
+ * The Coach's Office's line (N9.6): morale, and the coach calls it unlocks, with
+ * what the club's next level unlocks ("Level 2 unlocks Kick early, Run it, …"), or
+ * that every call is unlocked. The calls come from CALLS.unlocks.
+ */
+function officeCopy({ officeLevel = 0 }: BlurbContext): string {
+  return `+${SPECIAL_MAGNITUDE.morale} squad morale/week per level. Unlocks coach calls. ${officeUnlockLine(officeLevel)}`;
 }
 
 /**
@@ -103,7 +119,7 @@ export function facilityBlurb(def: FacilityDef, ctx: BlurbContext = { level: 1, 
     .map(([stat, v]) => `+${v} ${STAT_LABEL[stat]}`);
   const parts: string[] = [];
   if (trains.length > 0) parts.push('Trains ' + trains.join(', ') + ' / week');
-  if (def.special) parts.push(def.id === 'sponsorBoard' ? sponsorCopy(ctx) : SPECIAL_COPY[def.id]);
+  if (def.special) parts.push(def.id === 'sponsorBoard' ? sponsorCopy(ctx) : def.id === 'coachsOffice' ? officeCopy(ctx) : SPECIAL_COPY[def.id]);
   return parts.length > 0 ? parts.join('. ') : 'A club facility.';
 }
 
@@ -144,6 +160,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
   const render = (): void => {
     const s = getState();
     const reputation = s.reputation;
+    const officeLevel = coachsOfficeLevel(s);
     const tiles = Object.values(FACILITY_CATALOG)
       .filter((def) => category === 'all' || facilityCategory(def) === category)
       .map((def) => {
@@ -160,12 +177,14 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
             el('span', { class: 'nrl-build-title', text: def.name }),
             // A unique facility already built has no price to pay (3c: "—").
             el('span', { class: 'nrl-build-cost nrl-num', text: built ? '—' : fmtMoney(def.cost) })),
-          el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation }) }),
+          el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation, officeLevel }) }),
           // Can't build: the meta line turns yellow and says why first.
           blocked
             ? el('div', { class: 'nrl-build-meta nrl-build-why', text: built ? blocked : `${blocked} · ${meta}` })
             : el('div', { class: 'nrl-build-meta', text: meta }),
         );
+        // The Coach's Office's tile opens the Coach calls page, built or not, buildable or not.
+        if (def.id === 'coachsOffice') row.append(seeCallsButton());
         if (!blocked) {
           const go = (): void => {
             closeScreen();
@@ -212,6 +231,21 @@ export function openFacilityPopup(facility: PlacedFacility): void {
   openModal(card, { class: 'nrl-facility-modal' }).classList.add('nrl-facility-backdrop');
 }
 
+/**
+ * "See coach calls" (the Coach's Office's tile and card): opens the Coach calls
+ * page. On a tile that is itself a button, so its tap and Enter stop here.
+ */
+function seeCallsButton(): HTMLButtonElement {
+  const b = button('See coach calls ▸', () => {
+    closeModal();
+    openCoachCallsScreen();
+  }, { class: 'nrl-build-calls' });
+  b.setAttribute('data-see-calls', '');
+  b.addEventListener('click', (e) => e.stopPropagation());
+  b.addEventListener('keydown', (e) => e.stopPropagation());
+  return b;
+}
+
 /** "LEVEL ▬▬▭ 2/3". */
 function levelPips(level: number): HTMLElement {
   const pips = el('span', { class: 'nrl-facility-pips', attrs: { 'aria-hidden': 'true' } });
@@ -239,8 +273,9 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
     el('div', { class: 'nrl-facility-head' }, el('h2', { class: 'nrl-facility-name', text: def.name }), x),
     levelPips(facility.level),
     el('div', { class: 'nrl-facility-info' },
-      el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, reputation: getState().reputation }) }),
-      el('div', { class: 'nrl-facility-upkeep', text: upkeepText })),
+      el('p', { class: 'nrl-facility-blurb', text: facilityBlurb(def, { level: facility.level, reputation: getState().reputation, officeLevel: coachsOfficeLevel(getState()) }) }),
+      el('div', { class: 'nrl-facility-upkeep', text: upkeepText }),
+      ...(def.id === 'coachsOffice' ? [seeCallsButton()] : [])),
   );
 
   const actions = el('div', { class: 'nrl-facility-actions' });
@@ -351,6 +386,15 @@ export const BUILD_CSS = `
 .nrl-build-blurb { font-size: 0.75rem; line-height: 1.3; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-build-meta { font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-build-meta.nrl-build-why { color: var(--nrl-accent); }
+/* The Coach's Office's way to the Coach calls page: a 44px link-style button at the foot of its tile and card. */
+.nrl-btn.nrl-build-calls {
+  align-self: flex-start; min-height: 44px; padding: 0 10px; margin-top: 2px;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-accent);
+  font-size: 0.875rem; text-transform: none; letter-spacing: 0.02em; white-space: normal; text-align: left;
+}
+/* An unaffordable Coach's Office still opens the page: its tile dims all but the button. */
+.nrl-build-row-disabled:has(.nrl-build-calls) { opacity: 1; }
+.nrl-build-row-disabled:has(.nrl-build-calls) > :not(.nrl-build-calls) { opacity: 0.55; }
 
 /* 3b: the facility card, on the right so the building stays in view. No dim and
    no catch-all behind it: taps beside it reach the grounds. */

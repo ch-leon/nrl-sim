@@ -32,6 +32,8 @@ import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { CALL_LABEL, callIsBench, callIsDefence, callIsKickoff, callIsPenalty, type CoachCall } from '../../match/league/calls';
+import { TICKER_FIT_CHARS } from '../../match/view/commentary';
+import { lockedCallsLine, officeLevelName, officeLevelOf } from '../coachCallsText';
 import { teamTags } from '../teamTag';
 import { MOMENTUM_STEP_MIN, momentumLabel, momentumLeader, momentumShapes, momentumWindow, type MomentumEvent } from '../../match/view/momentum';
 
@@ -244,23 +246,15 @@ export function bannerLife(headline: string): number {
 }
 
 /**
- * One ticker line when the Coach's Office has not unlocked every call (N15.6,
- * the #224 note). For a club with a season already behind it, not week 2 of a
- * new club, and not once every call is there. A season-1 save from before the
- * unlock tiers has no version stored, so it stays quiet too.
+ * One ticker line, once a match, while the Coach's Office has calls still to
+ * unlock (N15.6, the #224 note): the next level and what it unlocks ("Coach's
+ * Office unlocks Shift, Rush, Offload and Gang tackle"), in season 1 too. A club
+ * that keeps starting over never had a season behind it, so it never saw the
+ * old line. Quiet once every call is unlocked. `unlocked` is what the match was given.
  */
-export const CALLS_LOCKED_HINT = "More calls unlock as you build up the Coach's Office.";
-
-/** True once a season has been completed, or the club is already into a later one. */
-export function callsHintSeasoned(season: number, seasonsPlayed: number): boolean {
-  return season > 1 || seasonsPlayed > 0;
+export function callsLockedHint(unlocked: readonly CoachCall[]): string | null {
+  return lockedCallsLine(officeLevelOf(unlocked), TICKER_FIT_CHARS);
 }
-
-export function callsLockedHint(unlocked: number, all: number, seasoned: boolean): string | null {
-  if (!seasoned || unlocked >= all) return null;
-  return CALLS_LOCKED_HINT;
-}
-
 
 // ── Key-moment banner (pure) ───────────────────────────────────────────────────
 
@@ -475,10 +469,12 @@ const UNLOCK_WHEN: Readonly<Record<string, string>> = {
 /**
  * The coach tray's footer (3o): when the calls that are not on now come on
  * ("Kick early from tackle 3 · Bomb, Run it from tackle 4"), that the set's call
- * is made, and what the Coach's Office still has to unlock. `waiting` is this
- * side's calls for the play now (attack or defence) with the sim's refusal.
+ * is made, and the locked calls that fit the moment but not the tray. `waiting`
+ * is this side's calls for the play now (attack or defence) with the sim's refusal.
  * `hidden`: calls on now that the five-row cap left out of the tray (#396),
  * said first ("+2 more: Hit-up, Offload") so a legal call never just vanishes.
+ * `locked`: the locked rows trayWithLocked had no room for, said last
+ * ("+3 locked: Coach's Office 2").
  */
 export function callsUnlockLine(
   waiting: readonly { call: CoachCall; why: string | null }[],
@@ -497,19 +493,21 @@ export function callsUnlockLine(
   }
   if (called) parts.push('Called this set: the next call with the next set');
   for (const [when, names] of groups) parts.push(`${names.join(', ')} ${when}`);
-  const byLevel = new Map<number, string[]>();
-  for (const { call, level } of locked) byLevel.set(level, [...(byLevel.get(level) ?? []), CALL_LABEL[call]]);
-  // The next level up only, so the line stays a line.
-  const levels = [...byLevel].sort((p, q) => p[0] - q[0]);
-  const next = levels[0];
-  if (next) parts.push(`${next[1].join(', ')} at Coach's Office level ${next[0]}${levels.length > 1 ? ', more above' : ''}`);
+  if (locked.length > 0) {
+    const levels = [...new Set(locked.map((l) => l.level))].sort((p, q) => p - q);
+    parts.push(`+${locked.length} locked: Coach's Office ${levels.length > 1 ? `${levels[0]}–${levels[levels.length - 1]}` : levels[0]}`);
+  }
   return parts.join(' · ');
 }
 
-/** A button in the coach tray (#396): a call, and the sim's refusal (null when it can be made now). */
+/**
+ * A button in the coach tray (#396): a call, and the sim's refusal (null when it can be made now).
+ * `locked`: the Coach's Office level it needs, for a call the club hasn't unlocked (greyed, never made).
+ */
 export interface TrayButton {
   call: CoachCall;
   why: string | null;
+  locked?: number;
 }
 
 /** A row of the coach tray (#396): one call, or two side by side (`shift`: left and right; `penalty`: Take the two and Tap and go). */
@@ -589,9 +587,85 @@ export function trayHidden(calls: readonly TrayButton[], attacking: boolean, row
   return calls.filter((c) => c.why === null && callForRole(c.call, attacking) && !shown.has(c.call)).map((c) => c.call);
 }
 
-/** The calls the tray's rows offer now (for the COACH badge's count). */
+/**
+ * The tray with the locked calls under the usable ones: `rows` (trayRows, never
+ * touched) first, then each locked call the sim would take now if it were
+ * unlocked (`locked`: refusal null, a level each), paired as trayRows pairs them,
+ * the nearest level first, while the tray has rows and buttons to spare. What
+ * doesn't fit is `overflow`, for the footer. So a locked call never takes a usable
+ * one's place, and only ones that fit the moment show.
+ */
+export function trayWithLocked(rows: readonly TrayRow[], locked: readonly TrayButton[]): { rows: TrayRow[]; overflow: TrayButton[] } {
+  const extra: TrayRow[] = [];
+  const paired = new Set<CoachCall>(TRAY_PAIRS.flatMap(([, a, b]) => [a, b]));
+  for (const [id, a, b] of TRAY_PAIRS) {
+    const half = locked.filter((c) => c.call === a || c.call === b);
+    if (half.length > 0) extra.push({ id, buttons: half });
+  }
+  for (const c of locked) if (!paired.has(c.call)) extra.push({ id: c.call, buttons: [c] });
+  const level = (r: TrayRow): number => Math.min(...r.buttons.map((b) => b.locked ?? 0));
+  const order = (r: TrayRow): number => {
+    const i = TRAY_ORDER.indexOf(r.id);
+    return i < 0 ? TRAY_ORDER.length : i;
+  };
+  extra.sort((p, q) => level(p) - level(q) || order(p) - order(q));
+  const out = [...rows];
+  const overflow: TrayButton[] = [];
+  let buttons = rows.reduce((n, r) => n + r.buttons.length, 0);
+  for (const r of extra) {
+    if (out.length >= TRAY_MAX_ROWS || buttons + r.buttons.length > TRAY_MAX_BUTTONS) {
+      overflow.push(...r.buttons);
+      continue;
+    }
+    out.push(r);
+    buttons += r.buttons.length;
+  }
+  return { rows: out, overflow };
+}
+
+/** The calls the tray's rows offer now (for the COACH badge's count): a locked call is not one. */
 export function trayCallsOn(rows: readonly TrayRow[]): number {
-  return rows.reduce((n, r) => n + r.buttons.filter((b) => b.why === null).length, 0);
+  return rows.reduce((n, r) => n + r.buttons.filter((b) => b.why === null && b.locked === undefined).length, 0);
+}
+
+/** A locked tile's tag, and the note a tap on it shows. */
+export const lockedTag = (level: number): string => officeLevelName(level);
+export const lockedNote = (level: number): string => `Unlocks with ${officeLevelName(level)}`;
+
+/**
+ * The tray's rows as elements (3o, #396): a tile a call, a pair side by side.
+ * A usable tile makes its call (`onCall`); a pair's greyed half says why it is
+ * off; a locked tile (`locked`) is greyed with its "Coach's Office 2" tag,
+ * aria-disabled, and a tap only shows its note (`onLocked`), never a call.
+ */
+export function trayRowEls(rows: readonly TrayRow[], onCall: (call: CoachCall) => void, onLocked: (level: number) => void): HTMLElement[] {
+  const tile = ({ call, why: off, locked }: TrayButton): HTMLButtonElement => {
+    const b = button('', () => (locked === undefined ? onCall(call) : onLocked(locked)), { class: locked === undefined ? 'nrl-mo-tray-call' : 'nrl-mo-tray-call nrl-mo-tray-locked' });
+    const name = document.createElement('b');
+    name.textContent = CALL_LABEL[call];
+    const what = document.createElement('span');
+    // A pair's greyed half (#396) says why it is off: "captain’s call". The tile's text is short; the whole line is its title.
+    what.textContent = locked !== undefined ? lockedTag(locked) : off === null ? CALL_TILE[call] : callCaption(off, false);
+    b.replaceChildren(name, what);
+    b.setAttribute('data-call', call);
+    if (locked !== undefined) {
+      b.title = `${CALL_LABEL[call]}: ${lockedNote(locked)}`;
+      b.setAttribute('aria-disabled', 'true');
+      b.setAttribute('data-locked', String(locked));
+    } else {
+      b.title = `${CALL_LABEL[call]}: ${callEffect(call)}`;
+      b.disabled = off !== null;
+    }
+    return b;
+  };
+  return rows.map((r) => {
+    if (r.buttons.length === 1) return tile(r.buttons[0]!);
+    const pair = document.createElement('div');
+    pair.className = 'nrl-mo-tray-pair';
+    pair.setAttribute('data-row', r.id);
+    pair.append(...r.buttons.map(tile));
+    return pair;
+  });
 }
 
 /**
@@ -1685,6 +1759,11 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.2; color: var(--nrl-text-2);
 }
+/* A locked call (the Coach's Office hasn't unlocked it): greyed, outlined rather than filled, its level as a
+   small tag. aria-disabled, not disabled, so a tap can say what unlocks it; it never makes the call. */
+.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-muted); cursor: default; }
+.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked:hover { background: transparent; }
+.nrl-mo-tray-locked span { color: var(--nrl-muted); font-family: var(--nrl-f-label); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.6875rem; }
 /* #432: at Large and Larger the tray grows wider, so each caption still fits on one
    line inside the 44px tile (Normal is untouched). A short phone is already three
    a line across the screen, so there the caption draws a little smaller — still
