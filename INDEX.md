@@ -181,3 +181,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261028-201107-standard | standard | 7dcff53 | main | [report](runs/20261028-201107-standard/report.md) |
 | 20261029-044813-standard | standard | a660416 | main | [report](runs/20261029-044813-standard/report.md) |
 | 20261030-111159-standard | standard | 63ee6be | main | [report](runs/20261030-111159-standard/report.md) |
+| 20261031-000644-standard | standard | 51cfebc | main | [report](runs/20261031-000644-standard/report.md) |
