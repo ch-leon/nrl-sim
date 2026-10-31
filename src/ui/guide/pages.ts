@@ -19,6 +19,7 @@ import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
 import { REP_BASELINE } from '../../systems/league';
 import { RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS } from '../hud';
+import { officeUnlockLine } from '../coachCallsText';
 
 const dollars = (n: number): string => `$${n.toLocaleString('en-US')}`;
 const percent = (x: number): string => `${Math.round(x * 100)}%`;
@@ -50,6 +51,16 @@ export function sponsorBullet(club: Pick<GameState, 'reputation' | 'facilities'>
   return `${rule} ${now}`;
 }
 
+/**
+ * The Grounds page's Coach's Office line (N9.6): what it trains, morale, and the
+ * coach calls it unlocks, with what the club's next level unlocks (from CALLS.unlocks).
+ */
+export function coachsOfficeBullet(club: Pick<GameState, 'facilities'> | null = clubNow()): string {
+  const level = (club?.facilities ?? []).reduce((m, f) => (f.defId === 'coachsOffice' ? Math.max(m, f.level) : m), 0);
+  const yours = level > 0 ? `Yours is level ${level}. ` : '';
+  return `Coach’s Office ($30,000): IQ and skill, and morale, and it unlocks coach calls (Office ▸ Coach calls lists them all). ${yours}${officeUnlockLine(level)}`;
+}
+
 /** A picture a section can show under its text (guide.ts draws it). */
 export type GuideFigure = 'bonus-zone';
 
@@ -58,10 +69,12 @@ export interface GuideSection {
   text?: string;
   bullets?: string[];
   figure?: GuideFigure;
+  /** A screen the section links to, under its text (guide.ts draws the button). */
+  link?: GuideScreen;
 }
 
 /** A nav screen a page can link to (N14, #263): guide.ts opens it. */
-export type GuideScreen = 'finance' | 'squad' | 'lineup' | 'news' | 'ladder' | 'build';
+export type GuideScreen = 'finance' | 'squad' | 'lineup' | 'news' | 'ladder' | 'build' | 'calls';
 
 export interface GuidePage {
   id: string;
@@ -291,12 +304,16 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         heading: 'What each one does',
-        bullets: [
-          `Training Paddock ($8,000): speed and stamina. Weights Room ($15,000): strength. Team Gym ($40,000): strength, speed and stamina. Video Room ($18,000): ${IQ_INLINE}. Coach’s Office ($30,000): IQ and skill, and morale.`,
-          'Physio Centre ($22,000): stamina, and injuries heal a week faster. Medical Bay ($35,000): injuries heal faster by its level.',
-          `Canteen ($12,000): morale. Sponsor Board ($10,000, one only): ${dollars(ECON.SPONSOR_BASE)} a week plus ${dollars(ECON.SPONSOR_PER_REP)} a reputation point (up to ${dollars(ECON.SPONSOR_CAP)}), more at levels 2 and 3. Grandstand ($120,000, one only): seats 3,500, 5,000 or 6,500.`,
-          'Academy ($60,000): skill and IQ, more and better juniors each pre-season. Scout Office ($25,000): a better free-agent pool and signing fees 10% cheaper per level.',
-        ],
+        // A getter, so the Coach's Office line names what the club's next level unlocks each time the page is shown.
+        get bullets(): string[] {
+          return [
+            `Training Paddock ($8,000): speed and stamina. Weights Room ($15,000): strength. Team Gym ($40,000): strength, speed and stamina. Video Room ($18,000): ${IQ_INLINE}.`,
+            coachsOfficeBullet(),
+            'Physio Centre ($22,000): stamina, and injuries heal a week faster. Medical Bay ($35,000): injuries heal faster by its level.',
+            `Canteen ($12,000): morale. Sponsor Board ($10,000, one only): ${dollars(ECON.SPONSOR_BASE)} a week plus ${dollars(ECON.SPONSOR_PER_REP)} a reputation point (up to ${dollars(ECON.SPONSOR_CAP)}), more at levels 2 and 3. Grandstand ($120,000, one only): seats 3,500, 5,000 or 6,500.`,
+            'Academy ($60,000): skill and IQ, more and better juniors each pre-season. Scout Office ($25,000): a better free-agent pool and signing fees 10% cheaper per level.',
+          ];
+        },
       },
       {
         heading: 'Life on the grounds',

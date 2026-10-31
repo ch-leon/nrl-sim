@@ -234,3 +234,32 @@ club name); "Long kick: no kick-off" for one that lapsed.
 | Include Long? | Yes, about 10% dead on the full, a penalty at halfway |
 | Unlock | Office level 0, one per restart |
 | Does the AI use them? | No |
+
+## 12. Explaining the unlocks (coach calls clarity)
+
+Leon played several matches and thought only one call could ever be used: most calls unlock
+with the Coach's Office (§20's `calls.unlocks`), and the game said so only in the Guide and a
+grey footer. The unlocks stay exactly as they are; what changed is display only:
+
+- **Build card and Guide.** The Coach's Office's line says it unlocks coach calls as well as
+  morale, and names what the club's next level unlocks ("Level 2 unlocks Kick early, Run it,
+  Grubber, Take the two and Tap and go"); at level 3, that every call is unlocked. Its Build tile
+  and its card on the grounds have **See coach calls**.
+- **The ticker hint.** One line a match while calls are locked, season 1 included (it used to
+  wait for a club's second season): "Coach's Office unlocks Shift, Rush, Offload, Gang tackle",
+  cut to "+2" past the ticker's 56 characters. Quiet once everything is unlocked.
+- **Locked calls in the tray** (`trayWithLocked`). A locked call the sim would take right now
+  (its refusal is null) shows greyed under the usable rows, tagged "Coach's Office N",
+  aria-disabled; a tap says "Unlocks with Coach's Office N" in the footer and never makes a
+  call. Usable rows are placed first (`trayRows`, untouched), so a locked call never takes their
+  place in the 5 rows / 6 buttons; locked ones that don't fit are the footer's "+3 locked:
+  Coach's Office 2". Only calls that fit the moment show: no late-set kicks on tackle 1, no
+  penalty pair without a penalty.
+- **The Coach calls page** (Office ▸ Coach calls, beside Staff & Board; `coachCallsPageData` in
+  `src/ui/coachCallsText.ts`). Every call grouped by the level that unlocks it, each group
+  locked or unlocked for the club, what each does and when it can be made, worded from the knobs
+  `callRefusal` reads (CALLS, GOALS, SET_TACKLES and the 40/20's lines, now `FORTY_TWENTY_FROM_M`
+  and `FORTY_TWENTY_INTO_M` in `touch.ts`, same values), and the one-a-set rule.
+
+Nothing the sim does changed: same calls, levels, gating and AI coaches, and both balance
+fingerprints are unchanged.
