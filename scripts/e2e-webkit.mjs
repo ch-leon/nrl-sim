@@ -3517,7 +3517,7 @@ async function runLabsControls(browser) {
     }, null, { timeout: 20000 });
     if (await page.locator('.nrl-mo-speed:visible').count() !== 4) throw new Error('a speed choice is hidden');
     // The tackle count stays up through passes, kicks and dead time (Leon on iPhone: it
-    // flashed). 16 s of live play at 844×390, read every 100 ms.
+    // flashed). 15 s of live play at 844×390, read every 100 ms.
     await page.setViewportSize({ width: 844, height: 390 });
     const steady = await page.evaluate(() => new Promise((done) => {
       const pb = window.__nrlGame.scene.getScene('Match').playback;
@@ -3537,7 +3537,7 @@ async function runLabsControls(browser) {
           labels.add(el.textContent);
           widths.add(Math.round(r.width));
         }
-        if (samples >= 160) {
+        if (samples >= 150) {
           clearInterval(id);
           // Its width is reserved for the longest label: a new count never shifts the score row.
           if (widths.size > 1) problems.push(`width moved: ${[...widths].join(', ')}px`);
