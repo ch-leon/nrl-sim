@@ -92,14 +92,17 @@ const SET_PHASES: ReadonlySet<string> = new Set(['play', 'tackle', 'ruck']);
 
 /**
  * The tackle count on screen, held steady (Leon on iPhone: the chip flashed). In
- * open play, a tackle and a ruck it is the sim's count, whether the ball is held,
- * passed or kicked; the tackle that makes it SET_TACKLES is already the other
- * side's first. Through a try, a conversion, a restart or a set piece it holds,
+ * open play, a tackle and a ruck it is the sim's count, the ball in hand or passed;
+ * the tackle that makes it SET_TACKLES is already the other side's first. The sim
+ * hands a kick to the receivers as it leaves the boot, so with the ball in the air
+ * and the sim's possession changed, it holds the kicking side's count until someone
+ * has the ball. Through a try, a conversion, a restart or a set piece it holds,
  * unless the ball has changed hands: then it is the new side's first. Pure, and the
  * same object back while nothing changed.
  */
-export function holdTackle(held: ShownTackle | null, phase: string, side: Side, count: number): ShownTackle {
+export function holdTackle(held: ShownTackle | null, phase: string, side: Side, count: number, inHand: boolean): ShownTackle {
   let next: ShownTackle;
+  if (phase === 'play' && !inHand && held && held.side !== side) return held;
   if (SET_PHASES.has(phase)) next = count >= SET_TACKLES ? { side: side === 'home' ? 'away' : 'home', count: 0 } : { side, count };
   else if (!held || held.side !== side) next = { side, count: 0 };
   else return held;
@@ -721,8 +724,8 @@ export class LivePlayback {
   /** The overlay's clock off the sim's: match seconds and the half. */
   private showClock(): void {
     const picture = this.runner.cur;
-    // The sim's own count and possession, Labs or not: held through passes, kicks and dead time.
-    this.shownTackle = holdTackle(this.shownTackle, this.controlPhase, this.controlAttacking, this.controlTackle);
+    // The sim's own count and possession, Labs or not: held through kicks in the air and dead time.
+    this.shownTackle = holdTackle(this.shownTackle, this.controlPhase, this.controlAttacking, this.controlTackle, !!picture.ball.holder);
     this.opts.overlay?.setTackle?.(this.finished || this.replay ? null : this.shownTackle.count);
     this.showClockFrom(picture.clock);
   }

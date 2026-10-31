@@ -10,7 +10,6 @@ import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { holdTackle, LivePlayback, type LivePlaybackScene, type ShownTackle } from '../../../src/match/view/livePlayback';
 import { TackleChip, tackleLabel, type MatchOverlayHandle, type TackleChipEl } from '../../../src/ui/screens/matchOverlay';
-import type { Side } from '../../../src/match/core/snapshot';
 import type Phaser from 'phaser';
 
 const FIRST = `TACKLE 1/${SET_TACKLES}`;
@@ -42,20 +41,31 @@ describe('tackleLabel and holdTackle', () => {
 
   it('follows the set in play, holds through dead time, and hands over without a gap', () => {
     let h: ShownTackle | null = null;
-    h = holdTackle(h, 'restart', 'home', 0);
+    h = holdTackle(h, 'restart', 'home', 0, false);
     expect(h).toEqual({ side: 'home', count: 0 });
-    h = holdTackle(h, 'play', 'home', 2);
+    h = holdTackle(h, 'play', 'home', 2, true);
     expect(h).toEqual({ side: 'home', count: 2 });
-    // Unchanged: the same object back.
-    expect(holdTackle(h, 'ruck', 'home', 2)).toBe(h);
+    // Unchanged: the same object back, the ball in hand or passed.
+    expect(holdTackle(h, 'ruck', 'home', 2, true)).toBe(h);
+    expect(holdTackle(h, 'play', 'home', 2, false)).toBe(h);
     // A try and its conversion hold the count; the kick-off to the other side is their first.
-    expect(holdTackle(h, 'try', 'home', 0)).toBe(h);
-    expect(holdTackle(h, 'conversion', 'home', 0)).toBe(h);
-    expect(holdTackle(h, 'restart', 'away', 0)).toEqual({ side: 'away', count: 0 });
+    expect(holdTackle(h, 'try', 'home', 0, true)).toBe(h);
+    expect(holdTackle(h, 'conversion', 'home', 0, false)).toBe(h);
+    expect(holdTackle(h, 'restart', 'away', 0, false)).toEqual({ side: 'away', count: 0 });
     // The tackle that makes it SET_TACKLES is the other side's first, through the ruck.
-    h = holdTackle(h, 'ruck', 'home', SET_TACKLES);
+    h = holdTackle(h, 'ruck', 'home', SET_TACKLES, true);
     expect(h).toEqual({ side: 'away', count: 0 });
-    expect(holdTackle(h, 'ruck', 'away', 0)).toBe(h);
+    expect(holdTackle(h, 'ruck', 'away', 0, true)).toBe(h);
+  });
+
+  it('holds the last tackle through the kick in the air, then the receivers\' first once it is taken', () => {
+    let h: ShownTackle = holdTackle(null, 'play', 'home', SET_TACKLES - 1, true);
+    // The sim hands the kick to the receivers as it leaves the boot.
+    expect(holdTackle(h, 'play', 'away', 0, false)).toBe(h);
+    h = holdTackle(h, 'play', 'away', 0, true);
+    expect(h).toEqual({ side: 'away', count: 0 });
+    // Kicked dead or into touch: the restart or scrum to the other side is their first.
+    expect(holdTackle({ side: 'home', count: SET_TACKLES - 1 }, 'set-piece', 'away', 0, false)).toEqual({ side: 'away', count: 0 });
   });
 });
 
@@ -119,30 +129,39 @@ it.each([['off', undefined], ['on', 'home']] as const)('LivePlayback keeps the c
     home: sideSheet('H', { rating: 60 }), away: sideSheet('A', { rating: 60 }),
     seed: 11, weather: 'clear', calls: [], speed: 8, keyMoments: () => false, fixture: undefined, overlay, closeUpDone: () => {}, ...(controlsSide ? { controlsSide } : {}),
   });
+  const shown = () => (pb as unknown as { shownTackle: ShownTackle }).shownTackle;
   const seen = { ruck: false, pass: false, lastKick: false, handover: false, restart: false };
-  let prevSide: Side = pb.controlAttacking;
   let prevPhase = pb.controlPhase;
   pb.update(16);
+  let prev = shown();
   while (!pb.finished) {
     pb.update(50);
     if (pb.finished) break;
     const phase = pb.controlPhase;
     const holder = pb.controlPicture.ball.holder;
+    const now = shown();
     expect(el.hidden).toBe(false);
     expect(el.textContent).not.toBe('');
     expect(LABELS.has(el.textContent!)).toBe(true);
+    expect(el.textContent).toBe(tackleLabel(now.count));
     if (phase === 'ruck') seen.ruck = true;
-    if (phase === 'play' && !holder) {
-      if (pb.controlTackle === SET_TACKLES - 1) { seen.lastKick = true; expect(el.textContent).toBe(LAST); }
-      else seen.pass = true;
-    }
     if (phase === 'restart' && prevPhase !== 'restart') seen.restart = true;
-    // The ball changed hands in a set (a handover, an intercept, a last-tackle kick caught): their first, straight away.
-    if (pb.controlAttacking !== prevSide && ['play', 'tackle', 'ruck'].includes(phase)) {
+    if (phase === 'play' && !holder) {
+      // A kick in the air: the sim has handed it to the receivers; the chip keeps the kicking side's count.
+      if (pb.controlAttacking !== now.side) {
+        if (now.count === SET_TACKLES - 1) { seen.lastKick = true; expect(el.textContent).toBe(LAST); }
+      } else seen.pass = true;
+    }
+    // With the ball in hand in a set, it is the sim's own count for the side with it.
+    if (holder && ['play', 'tackle', 'ruck'].includes(phase) && pb.controlTackle < SET_TACKLES) {
+      expect(now).toEqual({ side: pb.controlAttacking, count: pb.controlTackle });
+    }
+    // The ball changed hands (a handover, an intercept, a kick taken, a restart): their first, straight away.
+    if (now.side !== prev.side) {
       seen.handover = true;
       expect(el.textContent).toBe(FIRST);
     }
-    prevSide = pb.controlAttacking;
+    prev = now;
     prevPhase = phase;
   }
   expect(seen).toEqual({ ruck: true, pass: true, lastKick: true, handover: true, restart: true });
@@ -151,10 +170,12 @@ it.each([['off', undefined], ['on', 'home']] as const)('LivePlayback keeps the c
   pb.destroy();
 }, 60000);
 
-it('a seed-pinned match: the held count is up on ≥99% of ticks and changes only with the set', () => {
+it('a seed-pinned match: the chip is up on ≥99% of ticks, right with the ball in hand, and changes only with the set', () => {
   const r = new Runner((s) => new LiveSim(sideSheet('H', { rating: 60 }), sideSheet('A', { rating: 60 }), s, { weather: 'clear' }), 1);
+  const { el } = spyEl();
+  const chip = new TackleChip(el);
   let held: ShownTackle | null = null;
-  let ticks = 0, up = 0, changes = 0, tackles = 0, handovers = 0;
+  let ticks = 0, up = 0, wrong = 0, changes = 0, tackles = 0, handovers = 0;
   // The rule it replaces, for the record: up only with the ball in hand, in a set, short of the last.
   let oldUp = 0, oldToggles = 0, oldWas = false;
   let label = '';
@@ -165,19 +186,23 @@ it('a seed-pinned match: the held count is up on ≥99% of ticks and changes onl
       if (e.kind === 'tackle' || e.kind === 'big-hit') tackles++;
       if (e.kind === 'handover' || e.kind === 'set-start') handovers++;
     }
-    const before = held;
-    held = holdTackle(held, sim.phaseKind, sim.inPossession, sim.tackleCount);
+    const inHand = !!r.cur.ball.holder;
+    held = holdTackle(held, sim.phaseKind, sim.inPossession, sim.tackleCount, inHand);
+    chip.show(held.count);
     ticks++;
-    if (held) up++;
-    const now = tackleLabel(held.count);
-    if (before && now !== label) changes++;
-    label = now;
-    const old = !!r.cur.ball.holder && sim.tackleCount < SET_TACKLES && ['play', 'tackle', 'ruck'].includes(sim.phaseKind);
+    if (!el.hidden && el.textContent) up++;
+    // Held, never stale: with the ball in hand in a set it is the sim's count for the side with it.
+    if (inHand && ['play', 'tackle', 'ruck'].includes(sim.phaseKind) && sim.tackleCount < SET_TACKLES
+      && (held.side !== sim.inPossession || held.count !== sim.tackleCount)) wrong++;
+    if (label && el.textContent !== label) changes++;
+    label = el.textContent!;
+    const old = inHand && sim.tackleCount < SET_TACKLES && ['play', 'tackle', 'ruck'].includes(sim.phaseKind);
     if (old) oldUp++;
     if (old !== oldWas) oldToggles++;
     oldWas = old;
   }
   console.log(`tackle chip, seed 1, ${ticks} ticks: before ${(100 * oldUp / ticks).toFixed(1)}% up, ${oldToggles} toggles; after ${(100 * up / ticks).toFixed(1)}% up, ${changes} label changes (${tackles} tackles, ${handovers} handovers/new sets)`);
   expect(up / ticks).toBeGreaterThanOrEqual(0.99);
+  expect(wrong).toBe(0);
   expect(changes).toBeLessThanOrEqual(2 * (tackles + handovers));
 }, 60000);

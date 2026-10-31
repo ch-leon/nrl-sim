@@ -186,7 +186,7 @@ describe('LivePlayback key moments (#366)', () => {
   });
 });
 
-it('the default non-Labs playback shows the sim\'s count in a set, holds it through flight and dead time, and hides at full time', () => {
+it('the default non-Labs playback shows the sim\'s count with the ball in hand, holds it through flight and dead time, and hides at full time', () => {
   const setTackle = vi.fn();
   const overlay = { setTackle, setClock() {}, comment() {}, offerReplay() {} } as unknown as MatchOverlayHandle;
   const pb = playback(false, 8, 11, overlay);
@@ -197,7 +197,7 @@ it('the default non-Labs playback shows the sim\'s count in a set, holds it thro
     const count = setTackle.mock.lastCall?.[0] as number | null;
     expect(count).not.toBeNull();
     expect(count).toBeLessThan(SET_TACKLES);
-    if (['play', 'tackle', 'ruck'].includes(pb.controlPhase) && pb.controlTackle < SET_TACKLES) expect(count).toBe(pb.controlTackle);
+    if (pb.controlPicture.ball.holder && ['play', 'tackle', 'ruck'].includes(pb.controlPhase) && pb.controlTackle < SET_TACKLES) expect(count).toBe(pb.controlTackle);
     if (count === SET_TACKLES - 1) sawLast = true;
     if (!pb.controlPicture.ball.holder) sawFlight = true;
   }
