@@ -12,7 +12,7 @@ import { NINES_PAGE } from '../../src/ui/guide/nines';
 import { facilityBlurb } from '../../src/ui/screens/build';
 import { FACILITY_CATALOG } from '../../src/data/facility';
 
-const office = (level: number) => (level > 0 ? [{ id: 'co', defId: 'coachsOffice' as const, level, x: 0, y: 0 }] : []);
+const office = (level: 0 | 1 | 2 | 3) => (level > 0 ? [{ id: 'co', defId: 'coachsOffice' as const, level: level as 1 | 2 | 3, x: 0, y: 0 }] : []);
 
 describe('coachCallsPageData', () => {
   it('lists every call in CALLS.unlocks exactly once, at the level that unlocks it', () => {
