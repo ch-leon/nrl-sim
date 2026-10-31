@@ -1647,6 +1647,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
   animation: nrl-mo-in-right 180ms ease-out;
 }
+/* A phone held sideways has no room for both beside each other: the log starts under the score bug (44px and the momentum row), so the tackle count stays in view. */
+@media (max-width: 1023px) { .nrl-mo-full { top: calc(64px + 0.75rem + var(--nrl-safe-t)); } }
 .nrl-match-overlay:not([data-log="full"]) .nrl-mo-full,
 .nrl-match-overlay:not([data-log="line"]) .nrl-mo-strip,
 .nrl-mo-tray-open .nrl-mo-strip, .nrl-mo-stats-on .nrl-mo-strip { display: none; }
