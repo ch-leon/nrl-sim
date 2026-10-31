@@ -186,20 +186,20 @@ describe('LivePlayback key moments (#366)', () => {
   });
 });
 
-it('the default non-Labs playback displays its count, reaches the last and hides in flight and at full time', () => {
+it('the default non-Labs playback shows the sim\'s count with the ball in hand, holds it through flight and dead time, and hides at full time', () => {
   const setTackle = vi.fn();
   const overlay = { setTackle, setClock() {}, comment() {}, offerReplay() {} } as unknown as MatchOverlayHandle;
   const pb = playback(false, 8, 11, overlay);
   let sawLast = false, sawFlight = false;
   while (!pb.finished) {
     pb.update(100);
+    if (pb.finished) break;
     const count = setTackle.mock.lastCall?.[0] as number | null;
-    if (count !== null) {
-      expect(count).toBe(pb.controlTackle);
-      expect(pb.controlPicture.ball.holder).not.toBeNull();
-      expect(count).toBeLessThan(SET_TACKLES);
-      if (count === SET_TACKLES - 1) sawLast = true;
-    } else if (!pb.controlPicture.ball.holder) sawFlight = true;
+    expect(count).not.toBeNull();
+    expect(count).toBeLessThan(SET_TACKLES);
+    if (pb.controlPicture.ball.holder && ['play', 'tackle', 'ruck'].includes(pb.controlPhase) && pb.controlTackle < SET_TACKLES) expect(count).toBe(pb.controlTackle);
+    if (count === SET_TACKLES - 1) sawLast = true;
+    if (!pb.controlPicture.ball.holder) sawFlight = true;
   }
   pb.update(16);
   expect(setTackle.mock.lastCall?.[0]).toBeNull();

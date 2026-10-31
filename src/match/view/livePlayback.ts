@@ -84,6 +84,31 @@ export function shownPossession(shown: Pick<Snapshot, 'ball'>, simAttacking: Sid
   return shown.ball.holder?.side ?? simAttacking;
 }
 
+/** What the tackle count chip holds: the side with the ball and its completed tackles. */
+export interface ShownTackle { side: Side; count: number }
+
+/** The phases where the sim's count is the set being played. */
+const SET_PHASES: ReadonlySet<string> = new Set(['play', 'tackle', 'ruck']);
+
+/**
+ * The tackle count on screen, held steady (Leon on iPhone: the chip flashed). In
+ * open play, a tackle and a ruck it is the sim's count, the ball in hand or passed;
+ * the tackle that makes it SET_TACKLES is already the other side's first. The sim
+ * hands a kick to the receivers as it leaves the boot, so with the ball in the air
+ * and the sim's possession changed, it holds the kicking side's count until someone
+ * has the ball. Through a try, a conversion, a restart or a set piece it holds,
+ * unless the ball has changed hands: then it is the new side's first. Pure, and the
+ * same object back while nothing changed.
+ */
+export function holdTackle(held: ShownTackle | null, phase: string, side: Side, count: number, inHand: boolean): ShownTackle {
+  let next: ShownTackle;
+  if (phase === 'play' && !inHand && held && held.side !== side) return held;
+  if (SET_PHASES.has(phase)) next = count >= SET_TACKLES ? { side: side === 'home' ? 'away' : 'home', count: 0 } : { side, count };
+  else if (!held || held.side !== side) next = { side, count: 0 };
+  else return held;
+  return held && held.side === next.side && held.count === next.count ? held : next;
+}
+
 /** How quickly the pace eases between ×1 and ×2. Most of the gap closes in about 0.4 s, so a phase change does not lurch. */
 export const PACE_BLEND_MS = 400;
 
@@ -288,6 +313,8 @@ export class LivePlayback {
   private readonly replayKicks = new KickWatch();
   /** Tries that have already been offered a replay (one each). */
   private readonly replayedTries = new Set<number>();
+  /** The tackle count on the chip (holdTackle), null until the first frame. */
+  private shownTackle: ShownTackle | null = null;
 
   constructor(
     private readonly scene: LivePlaybackScene & Phaser.Scene,
@@ -697,8 +724,9 @@ export class LivePlayback {
   /** The overlay's clock off the sim's: match seconds and the half. */
   private showClock(): void {
     const picture = this.runner.cur;
-    this.opts.overlay?.setTackle?.(!this.finished && !this.replay && picture.ball.holder
-      && this.controlTackle < SET_TACKLES && ['play', 'tackle', 'ruck'].includes(this.controlPhase) ? this.controlTackle : null);
+    // The sim's own count and possession, Labs or not: held through kicks in the air and dead time.
+    this.shownTackle = holdTackle(this.shownTackle, this.controlPhase, this.controlAttacking, this.controlTackle, !!picture.ball.holder);
+    this.opts.overlay?.setTackle?.(this.finished || this.replay ? null : this.shownTackle.count);
     this.showClockFrom(picture.clock);
   }
 

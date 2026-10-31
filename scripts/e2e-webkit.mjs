@@ -651,8 +651,9 @@ async function runPortrait(browser) {
     };
     const problems = [];
     // The full log is a fixed 330px right panel (3m), drawn for a phone held sideways; upright the
-    // rotate card covers the match, so it is checked at the landscape sizes only.
-    const sizes = { line: [[360, 640], [390, 844], [667, 375], [844, 390]], full: [[667, 375], [844, 390]] };
+    // rotate card covers the match, so it is checked at the landscape sizes only. Beside the score
+    // bug where there is room (956×330), under it where there is not (667×375, 844×390).
+    const sizes = { line: [[360, 640], [390, 844], [667, 375], [844, 390]], full: [[667, 375], [844, 390], [956, 330]] };
     for (const mode of ['line', 'full']) {
       await setMode(mode);
       for (const [w, h] of sizes[mode]) {
@@ -3517,6 +3518,38 @@ async function runLabsControls(browser) {
       return true;
     }, null, { timeout: 20000 });
     if (await page.locator('.nrl-mo-speed:visible').count() !== 4) throw new Error('a speed choice is hidden');
+    // The tackle count stays up through passes, kicks and dead time (Leon on iPhone: it
+    // flashed). 15 s of live play at 844×390, read every 100 ms.
+    await page.setViewportSize({ width: 844, height: 390 });
+    const steady = await page.evaluate(() => new Promise((done) => {
+      const pb = window.__nrlGame.scene.getScene('Match').playback;
+      const problems = [], labels = new Set(), widths = new Set();
+      let samples = 0, inFlight = 0;
+      const id = setInterval(() => {
+        samples++;
+        const el = document.querySelector('.nrl-mo-tackle');
+        if (!pb.controlPicture.ball.holder) inFlight++;
+        if (!el) problems.push(`${samples}: missing`);
+        else {
+          const r = el.getBoundingClientRect();
+          if (el.hidden) problems.push(`${samples}: hidden`);
+          if (getComputedStyle(el).display === 'none') problems.push(`${samples}: display none`);
+          if (!r.width || !r.height) problems.push(`${samples}: no size`);
+          if (!el.textContent.trim()) problems.push(`${samples}: empty`);
+          labels.add(el.textContent);
+          widths.add(Math.round(r.width));
+        }
+        if (samples >= 150) {
+          clearInterval(id);
+          // Its width is reserved for the longest label: a new count never shifts the score row.
+          if (widths.size > 1) problems.push(`width moved: ${[...widths].join(', ')}px`);
+          done({ samples, inFlight, labels: [...labels], problems });
+        }
+      }, 100);
+    }));
+    if (steady.problems.length) throw new Error(`tackle count not steady: ${steady.problems.slice(0, 5).join(', ')} (${steady.problems.length} of ${steady.samples})`);
+    log(`  tackle count up on ${steady.samples}/${steady.samples} samples, ${steady.inFlight} with the ball in the air (${steady.labels.join(' | ')})`);
+    await page.setViewportSize({ width: 667, height: 375 });
     // Reach our last tackle without assuming who receives the seeded kickoff.
     await page.waitForFunction(() => {
       const match = window.__nrlGame?.scene.getScene('Match'), pb = match?.playback;

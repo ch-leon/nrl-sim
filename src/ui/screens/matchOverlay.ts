@@ -890,6 +890,49 @@ export function matchColours(homeId: string, awayId: string): { home: string; aw
   return c && c.homeId === homeId && c.awayId === awayId ? { home: c.home, away: c.away } : { home: 'var(--nrl-home)', away: 'var(--nrl-away)' };
 }
 
+/** The tackle count chip's words: completed tackles in, "TACKLE n/SET" or the last tackle out. */
+export function tackleLabel(count: number): string {
+  return count === SET_TACKLES - 1 ? `LAST TACKLE · ${SET_TACKLES}/${SET_TACKLES}` : `TACKLE ${count + 1}/${SET_TACKLES}`;
+}
+
+/** The parts of the chip's element the overlay writes. */
+export type TackleChipEl = Pick<HTMLElement, 'hidden' | 'textContent'> & { classList: Pick<DOMTokenList, 'toggle'> };
+
+/**
+ * The tackle count chip in the score row. It writes to the page only when its
+ * words, its last-tackle accent or whether it shows change, so a count held
+ * frame after frame never touches the DOM (and never reflows the row). Full time
+ * hides it for good.
+ */
+export class TackleChip {
+  private text = '';
+  private last = false;
+  private hidden = true;
+  private over = false;
+
+  constructor(private readonly el: TackleChipEl) {
+    el.hidden = true;
+  }
+
+  /** Completed tackles in the set on screen, or null to hide it (a replay). */
+  show(count: number | null): void {
+    const hidden = count === null || this.over;
+    if (!hidden) {
+      const text = tackleLabel(count!);
+      const last = count === SET_TACKLES - 1;
+      if (text !== this.text) this.el.textContent = this.text = text;
+      if (last !== this.last) this.el.classList.toggle('nrl-mo-tackle-last', (this.last = last));
+    }
+    if (hidden !== this.hidden) this.el.hidden = this.hidden = hidden;
+  }
+
+  /** The final whistle: hidden from here on. */
+  fullTime(): void {
+    this.over = true;
+    this.show(null);
+  }
+}
+
 export interface MatchOverlayHandle {
   /** Remove the overlay and unsubscribe all bus handlers. Idempotent. */
   destroy(): void;
@@ -1000,7 +1043,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const awayCell = teamCell('away', codes[1], worn.away);
   const clockEl = el('span', { class: 'nrl-mo-clock', text: opts.halfMinutes ? formatClockSeconds(0, 2 * halfMinutes) : formatClock(0) });
   const tackleEl = el('span', { class: 'nrl-mo-tackle' });
-  tackleEl.hidden = true;
+  const tackle = new TackleChip(tackleEl);
   const halfEl = el('span', { class: 'nrl-mo-half', text: '1H' });
   // The score in words, for a screen reader (and the e2e's read of it).
   const scoreEl = el('span', { class: 'nrl-mo-score nrl-mo-sr', text: '0 – 0' });
@@ -1157,6 +1200,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     strip.setAttribute('aria-expanded', String(m === 'full'));
     if (m === 'full') feed.scrollTop = 0;
     saveLogMode(m);
+    // Opened: beside the score bug, or under it if there is no room (placeBoard).
+    if (m === 'full') requestAnimationFrame(() => placeBoard());
   };
   setMode(mode);
 
@@ -1164,7 +1209,12 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   let boardFrame = 0;
   const placeBoard = (): void => {
     boardFrame = 0;
-    document.documentElement.style.setProperty(BOARD_VAR, `${Math.ceil(board.getBoundingClientRect().bottom)}px`);
+    const b = board.getBoundingClientRect();
+    document.documentElement.style.setProperty(BOARD_VAR, `${Math.ceil(b.bottom)}px`);
+    // The open full log sits beside the score bug where there is room, else under it, so the
+    // tackle count stays in view: a narrow phone, the notch's insets or a larger text size.
+    // Its resting left edge from layout: the slide-in's transform is not where it settles.
+    if (full.offsetWidth > 0) root.classList.toggle('nrl-mo-full-under', b.right + 8 > innerWidth - parseFloat(getComputedStyle(full).right) - full.offsetWidth);
   };
   const scheduleBoard = (): void => {
     if (!boardFrame) boardFrame = requestAnimationFrame(placeBoard);
@@ -1401,10 +1451,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       if (statsOpen) renderStats();
     },
     setTackle(count: number | null): void {
-      tackleEl.hidden = count === null || finalClock !== null;
-      const last = count === SET_TACKLES - 1;
-      tackleEl.classList.toggle('nrl-mo-tackle-last', last);
-      tackleEl.textContent = count === null ? '' : last ? `LAST TACKLE · ${SET_TACKLES}/${SET_TACKLES}` : `TACKLE ${count + 1}/${SET_TACKLES}`;
+      tackle.show(finalClock === null ? count : null);
     },
     setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void {
       liveClock = true;
@@ -1417,7 +1464,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       // shows an earlier half. (After a Skip the paused sim still reports where it stopped.)
       if (finalClock !== null && !root.classList.contains('nrl-mo-replaying')) {
         clockEl.textContent = finalClock;
-        tackleEl.hidden = true;
+        tackle.fullTime();
         halfEl.textContent = 'FT';
         return;
       }
@@ -1491,7 +1538,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       if (bannerTimer) clearTimeout(bannerTimer);
       hideBanner();
     }
-    tackleEl.hidden = true;
+    tackle.fullTime();
     halfEl.textContent = 'FT';
     finalClock = clockEl.textContent ?? '';
     root.classList.add('nrl-mo-final');
@@ -1593,7 +1640,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-scoreboard:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-scoreboard[aria-expanded="true"]::after { content: ''; position: absolute; inset: 0; border-radius: 8px; box-shadow: inset 0 0 0 2px var(--nrl-accent); pointer-events: none; }
-.nrl-mo-tackle { display: flex; align-items: center; padding: 0 8px; font: 700 0.8125rem var(--nrl-f-label); line-height: 1.2; letter-spacing: 0.04em; white-space: nowrap; }
+.nrl-mo-tackle { display: flex; align-items: center; justify-content: center; box-sizing: content-box; min-width: 17ch; padding: 0 8px; font: 700 0.8125rem var(--nrl-f-label); line-height: 1.2; letter-spacing: 0.04em; white-space: nowrap; }
 .nrl-mo-tackle[hidden] { display: none; }
 @media (orientation: portrait) { .nrl-mo-tackle { display: none; } }
 .nrl-mo-tackle-last { background: var(--nrl-accent); color: var(--nrl-on-accent); }
@@ -1681,6 +1728,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
   animation: nrl-mo-in-right 180ms ease-out;
 }
+.nrl-mo-full-under .nrl-mo-full { top: calc(var(--nrl-mo-board, 60px) + 6px); }
 .nrl-match-overlay:not([data-log="full"]) .nrl-mo-full,
 .nrl-match-overlay:not([data-log="line"]) .nrl-mo-strip,
 .nrl-mo-tray-open .nrl-mo-strip, .nrl-mo-stats-on .nrl-mo-strip { display: none; }
