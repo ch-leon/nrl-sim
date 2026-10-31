@@ -1126,6 +1126,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
     strip.setAttribute('aria-expanded', String(m === 'full'));
     if (m === 'full') feed.scrollTop = 0;
     saveLogMode(m);
+    // Opened: beside the score bug, or under it if there is no room (placeBoard).
+    if (m === 'full') requestAnimationFrame(() => placeBoard());
   };
   setMode(mode);
 
@@ -1133,7 +1135,12 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   let boardFrame = 0;
   const placeBoard = (): void => {
     boardFrame = 0;
-    document.documentElement.style.setProperty(BOARD_VAR, `${Math.ceil(board.getBoundingClientRect().bottom)}px`);
+    const b = board.getBoundingClientRect();
+    document.documentElement.style.setProperty(BOARD_VAR, `${Math.ceil(b.bottom)}px`);
+    // The open full log sits beside the score bug where there is room, else under it, so the
+    // tackle count stays in view: a narrow phone, the notch's insets or a larger text size.
+    // Its resting left edge from layout: the slide-in's transform is not where it settles.
+    if (full.offsetWidth > 0) root.classList.toggle('nrl-mo-full-under', b.right + 8 > innerWidth - parseFloat(getComputedStyle(full).right) - full.offsetWidth);
   };
   const scheduleBoard = (): void => {
     if (!boardFrame) boardFrame = requestAnimationFrame(placeBoard);
@@ -1647,8 +1654,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
   animation: nrl-mo-in-right 180ms ease-out;
 }
-/* A phone held sideways has no room for both beside each other: the log starts under the score bug (44px and the momentum row), so the tackle count stays in view. */
-@media (max-width: 1023px) { .nrl-mo-full { top: calc(64px + 0.75rem + var(--nrl-safe-t)); } }
+.nrl-mo-full-under .nrl-mo-full { top: calc(var(--nrl-mo-board, 60px) + 6px); }
 .nrl-match-overlay:not([data-log="full"]) .nrl-mo-full,
 .nrl-match-overlay:not([data-log="line"]) .nrl-mo-strip,
 .nrl-mo-tray-open .nrl-mo-strip, .nrl-mo-stats-on .nrl-mo-strip { display: none; }

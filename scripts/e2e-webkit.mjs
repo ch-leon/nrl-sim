@@ -650,8 +650,9 @@ async function runPortrait(browser) {
     };
     const problems = [];
     // The full log is a fixed 330px right panel (3m), drawn for a phone held sideways; upright the
-    // rotate card covers the match, so it is checked at the landscape sizes only.
-    const sizes = { line: [[360, 640], [390, 844], [667, 375], [844, 390]], full: [[667, 375], [844, 390]] };
+    // rotate card covers the match, so it is checked at the landscape sizes only. Beside the score
+    // bug where there is room (956×330), under it where there is not (667×375, 844×390).
+    const sizes = { line: [[360, 640], [390, 844], [667, 375], [844, 390]], full: [[667, 375], [844, 390], [956, 330]] };
     for (const mode of ['line', 'full']) {
       await setMode(mode);
       for (const [w, h] of sizes[mode]) {
