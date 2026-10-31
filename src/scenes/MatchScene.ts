@@ -26,7 +26,7 @@ import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
-import { CALL_TILE, SKIP_ARM_MS, callCaption, callEffect, callForRole, callsHintSeasoned, callsLockedHint, callsUnlockLine, coachBadge, cssHex, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayRows, type MatchOverlayHandle, type PlanCardHandle, type TrayButton } from '../ui/screens/matchOverlay';
+import { SKIP_ARM_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
 import { styleLine } from '../ui/tacticsBlurbs';
 import {
@@ -119,6 +119,8 @@ const DEPTH_CROWD_FRONT = 60_000;
 const MATCH_ZOOM = ZOOM_DEFAULT;
 /** Name tag sits this many world px above a player's feet (just over his head). */
 const TAG_LIFT = 26;
+/** How long a tap on a locked call's tile shows what unlocks it, in the tray's footer (ms). */
+const LOCKED_NOTE_MS = 2000;
 /** Ghost balls trailing a kicked ball. */
 const TRAIL_LEN = 5;
 /** The in-match labels (name tag, "Kick-off…") in the HUD's label face (Broadcast Quiet). */
@@ -519,9 +521,8 @@ export class MatchScene extends Phaser.Scene {
       if (live.coachSide) {
         const unlocked = live.unlockedCalls ?? COACH_CALLS;
         this.mountCoach(live.coachSide, unlocked);
-        // One ticker line when a club with a season behind it is short of calls (N9.6, #224). Not the calls row, and not week 2 of a new club.
-        const club = getState();
-        const hint = callsLockedHint(unlocked.length, COACH_CALLS.length, callsHintSeasoned(club.season, club.history.length));
+        // One ticker line a match while calls are still locked (N9.6, #224): what the next Coach's Office level unlocks. Season 1 too.
+        const hint = callsLockedHint(unlocked);
         if (hint) this.overlay?.comment(hint);
       }
       if (live.planSide) this.mountPlanChip(live.planSide);
@@ -994,38 +995,23 @@ export class MatchScene extends Phaser.Scene {
     const role = this.unlocked.filter((c) => callForRole(c, attacking));
     // The rows the tray shows (#396): at most five, so it never scrolls.
     const buttons = role.map((call) => ({ call, why: why.get(call) ?? null }));
-    const rows = trayRows(buttons, attacking);
-    const badge = coachBadge(trayCallsOn(rows), attacking, this.madeCall);
+    const usable = trayRows(buttons, attacking);
+    const badge = coachBadge(trayCallsOn(usable), attacking, this.madeCall);
     if (this.coachBadgeEl && this.coachBadgeEl.textContent !== badge.text) this.coachBadgeEl.textContent = badge.text;
     if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
     if (!this.trayOpen() || !this.trayList || !this.trayTitle || !this.trayFoot) return;
+    // The locked calls (N9.6) that fit the moment: ones the sim would take now if his Coach's Office had them,
+    // under the usable rows while there is room, the rest in the footer. The sim never sees them as calls.
+    const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && callForRole(c, attacking) && pb.callRefusal(side, c) === null)
+      .map((call) => ({ call, why: null, locked: unlockLevel(call) }));
+    const { rows, overflow } = trayWithLocked(usable, locked);
     // The kick-off pair (#397) is up: the break before his side's kick-off.
     const title = rows.some((r) => r.id === 'kickoff') ? 'Kick-off' : attacking ? 'Your ball' : 'Their ball';
     if (this.trayTitle.textContent !== title) this.trayTitle.textContent = title;
-    const key = `${title}:${rows.map((r) => r.buttons.map((b) => `${b.call}${b.why === null ? '' : '-'}`).join('+')).join(',')}`;
+    const key = `${title}:${rows.map((r) => r.buttons.map((b) => `${b.call}${b.locked !== undefined ? '#' : b.why === null ? '' : '-'}`).join('+')).join(',')}`;
     if (key !== this.trayKey) {
       this.trayKey = key;
-      const tile = ({ call, why: off }: TrayButton): HTMLButtonElement => {
-        const b = button('', () => this.makeCall(call), { class: 'nrl-mo-tray-call' });
-        const name = document.createElement('b');
-        name.textContent = CALL_LABEL[call];
-        const what = document.createElement('span');
-        // A pair's greyed half (#396) says why it is off: "captain’s call". The tile's text is short; the whole line is its title.
-        what.textContent = off === null ? CALL_TILE[call] : callCaption(off, false);
-        b.replaceChildren(name, what);
-        b.title = `${CALL_LABEL[call]}: ${callEffect(call)}`;
-        b.setAttribute('data-call', call);
-        b.disabled = off !== null;
-        return b;
-      };
-      const els: HTMLElement[] = rows.map((r) => {
-        if (r.buttons.length === 1) return tile(r.buttons[0]!);
-        const pair = document.createElement('div');
-        pair.className = 'nrl-mo-tray-pair';
-        pair.setAttribute('data-row', r.id);
-        pair.append(...r.buttons.map(tile));
-        return pair;
-      });
+      const els: HTMLElement[] = trayRowEls(rows, (call) => this.makeCall(call), (level) => this.noteLocked(level));
       if (els.length === 0) {
         const none = document.createElement('div');
         none.className = 'nrl-mo-tray-none';
@@ -1034,10 +1020,21 @@ export class MatchScene extends Phaser.Scene {
       }
       this.trayList.replaceChildren(...els);
     }
-    // The penalty pair (#396) only ever shows on a penalty won, so the footer doesn't list it as locked.
-    const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && callForRole(c, attacking) && !callIsPenalty(c)).map((call) => ({ call, level: unlockLevel(call) }));
-    const foot = callsUnlockLine(buttons, locked, trayHidden(buttons, attacking, rows));
+    // A tap on a locked tile says what unlocks it, in the footer, for a moment.
+    const foot = this.time.now < this.lockedNoteUntil
+      ? this.lockedNoteText
+      : callsUnlockLine(buttons, overflow.map((b) => ({ call: b.call, level: b.locked ?? 0 })), trayHidden(buttons, attacking, rows));
     if (this.trayFoot.textContent !== foot) this.trayFoot.textContent = foot;
+  }
+
+  /** The note a tap on a locked tile shows in the footer ("Unlocks with Coach's Office 2"), and until when. */
+  private lockedNoteText = '';
+  private lockedNoteUntil = 0;
+
+  private noteLocked(level: number): void {
+    this.lockedNoteText = lockedNote(level);
+    this.lockedNoteUntil = this.time.now + LOCKED_NOTE_MS;
+    this.refreshCallChips();
   }
 
   /** A call from the tray: in on the next tick, the tray closes, the log says it (and later whether it paid off). */

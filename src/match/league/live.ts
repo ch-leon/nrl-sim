@@ -68,7 +68,7 @@ import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall }
 import { KICK_CONTEST, bombPeak, grubberRace, highBall } from './kickContest';
 import { WEATHER, injuryChance, lostInContactChance, weatherEffect, type WeatherEffect } from './weather';
 import type { MatchInjury, WeatherKind } from '../../sim/events';
-import { TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
+import { FORTY_TWENTY_INTO_M, TOUCH, exitPoint, inOwnInGoal, isFortyTwenty, outOfPlay, ownLineX, touchRestartSpot, twentySpot } from './touch';
 import { BIN, binReason, binReasonText, sinBinChance } from './sinbin';
 
 // ── Tuning ─────────────────────────────────────────────────────────────────
@@ -971,7 +971,7 @@ export class LiveSim implements MatchSim {
    * kicker's Big Boot and the wind, without its gusts), the shortest roll on (touchRollM), and their 20 (isFortyTwenty's).
    */
   private fortyTwentyReach(side: Side): number {
-    return 20 + TOUCH.touchRollM + CALLS.fortyTwenty.reachM * bootMult(this.kicker(side).traits).dist * this.wx.kickDistance;
+    return FORTY_TWENTY_INTO_M + TOUCH.touchRollM + CALLS.fortyTwenty.reachM * bootMult(this.kicker(side).traits).dist * this.wx.kickDistance;
   }
 
   /**

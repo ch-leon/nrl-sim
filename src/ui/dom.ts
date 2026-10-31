@@ -1455,6 +1455,8 @@ body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; 
 /* N14 (#263): the screen a page describes, one tap away. */
 .nrl-guide-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 6px; }
 .nrl-btn.nrl-guide-link { min-height: 36px; padding: 0 12px; font-size: 0.875rem; border-radius: 8px; }
+/* A section's link (the coach calls' Open Coach calls), under its text in the scroll: a full 44px tap. */
+.nrl-guide-page > .nrl-btn.nrl-guide-link { min-height: 44px; margin: 2px 0 6px; }
 .nrl-guide p { margin: 4px 0; line-height: 1.5; color: var(--nrl-text-2); overflow-wrap: anywhere; }
 .nrl-guide ul { margin: 4px 0 4px 18px; padding: 0; color: var(--nrl-text-2); }
 .nrl-guide li { margin: 3px 0; line-height: 1.45; overflow-wrap: anywhere; }

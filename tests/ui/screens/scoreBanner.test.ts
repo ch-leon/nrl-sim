@@ -1,8 +1,9 @@
 // tests/ui/screens/scoreBanner.test.ts — the centre-screen pop-up for every
 // scoring attempt: who scored, what it was, and how many points. Pure — no DOM.
 import { describe, it, expect } from 'vitest';
-import { BANNER_MS, CALLS_LOCKED_HINT, bannerLife, callsHintSeasoned, callsLockedHint, initLiveState, inkFor, reduceEvent, scoreBanner } from '../../../src/ui/screens/matchOverlay';
+import { BANNER_MS, bannerLife, callsLockedHint, initLiveState, inkFor, reduceEvent, scoreBanner } from '../../../src/ui/screens/matchOverlay';
 import { TICKER_FIT_CHARS } from '../../../src/match/view/commentary';
+import { COACH_CALLS, unlockedCalls } from '../../../src/match/league/calls';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
 import type { MatchEvent } from '../../../src/sim/events';
@@ -74,15 +75,15 @@ describe('scoreBanner', () => {
     expect(bannerLife('CONVERTED')).toBe(BANNER_MS.kick);
   });
 
-  it('hints in the ticker when a seasoned club is short of call chips, and the line fits', () => {
-    expect(callsHintSeasoned(1, 0)).toBe(false);
-    expect(callsHintSeasoned(2, 0)).toBe(true);
-    expect(callsHintSeasoned(1, 1)).toBe(true);
-    expect(callsLockedHint(2, 9, callsHintSeasoned(1, 0))).toBeNull();
-    expect(callsLockedHint(2, 9, false)).toBeNull();
-    expect(callsLockedHint(9, 9, true)).toBeNull();
-    expect(callsLockedHint(2, 9, true)).toBe(CALLS_LOCKED_HINT);
-    expect(CALLS_LOCKED_HINT.length).toBeLessThanOrEqual(TICKER_FIT_CHARS);
+  it('hints in the ticker while calls are locked, season 1 too, naming the next unlock, and the line fits', () => {
+    // No more season gate: a club's first match with no Coach's Office gets the line.
+    expect(callsLockedHint(unlockedCalls(0))).toBe("Coach's Office unlocks Shift, Rush, Offload, Gang tackle");
+    expect(callsLockedHint(unlockedCalls(1))).toMatch(/^Coach's Office 2 unlocks Kick early, Run it/);
+    expect(callsLockedHint(unlockedCalls(2))).toBe("Coach's Office 3 unlocks Bomb, Field goal and 40/20");
+    // Quiet once every call is unlocked (and for a match given every call, like the lab's).
+    expect(callsLockedHint(unlockedCalls(3))).toBeNull();
+    expect(callsLockedHint(COACH_CALLS)).toBeNull();
+    for (let level = 0; level < 3; level++) expect(callsLockedHint(unlockedCalls(level))!.length).toBeLessThanOrEqual(TICKER_FIT_CHARS);
   });
 });
 

@@ -19,7 +19,7 @@ import { initLeague, registerFixturesSystem } from './systems/fixtures';
 import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
-import { registerPlayerMatchSystem } from './systems/matchday';
+import { coachsOfficeLevel, registerPlayerMatchSystem } from './systems/matchday';
 import { registerAgingSystem } from './systems/aging';
 import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
@@ -34,6 +34,7 @@ import { fmtMoney } from './ui/hud';
 import { initMatchReport } from './ui/screens/matchReport';
 import { setMatchSettingsOpener } from './ui/screens/matchOverlay';
 import { openBuildScreen } from './ui/screens/build';
+import { COACH_CALLS_TITLE, coachCallsStatus, openCoachCallsScreen } from './ui/screens/coachCalls';
 import { initPlacementBar } from './ui/placementBar';
 import { openKitDesigner, syncKitDesign } from './ui/screens/kit';
 import { openSquadScreen } from './ui/screens/squad';
@@ -263,6 +264,11 @@ async function boot(): Promise<void> {
       const p = getState().boardPatience;
       return { text: `Board patience ${p}/${BOARD.MAX_PATIENCE}`, attn: p <= 2 };
     },
+  });
+  // Every coach call and what unlocks it (the Coach's Office), beside the staff: the club's football side.
+  nav.registerScreen('calls', COACH_CALLS_TITLE, () => openCoachCallsScreen(), {
+    more: true,
+    status: () => ({ text: coachCallsStatus(coachsOfficeLevel(getState())) }),
   });
   nav.registerScreen('news', 'News', () => openInboxScreen(), {
     more: true,
