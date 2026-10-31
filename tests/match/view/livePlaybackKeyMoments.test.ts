@@ -3,13 +3,15 @@
 // the match plays at ×1; the last two minutes of the second half and golden point
 // at ×2 at most. An override on screen only: the chosen speed and the saved
 // setting are never rewritten, a speed tap ends the moment, Skip ignores it.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { KEY_MOMENT_LATE_MIN, KeyMoments, LivePlayback, keyMomentsOn, type LivePlaybackScene } from '../../../src/match/view/livePlayback';
 import { migrateState } from '../../../src/core/save';
 import { SAVE_VERSION } from '../../../src/core/state';
 import { NINES } from '../../../src/match/league/rules';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { createNewGame, getState, setState } from '../../../src/core/state';
+import { SET_TACKLES } from '../../../src/config';
+import type { MatchOverlayHandle } from '../../../src/ui/screens/matchOverlay';
 import type Phaser from 'phaser';
 
 const H = NINES.halfMinutes;
@@ -101,7 +103,7 @@ function fakeScene(): LivePlaybackScene & Phaser.Scene {
   return new Proxy(base, { get: (t, p) => (p in t ? (t as Record<string | symbol, unknown>)[p] : noop) }) as unknown as LivePlaybackScene & Phaser.Scene;
 }
 
-function playback(keyMoments: boolean, speed: 1 | 2 | 4 | 8 = 8, seed = 11) {
+function playback(keyMoments: boolean, speed: 1 | 2 | 4 | 8 = 8, seed = 11, overlay: MatchOverlayHandle | null = null) {
   return new LivePlayback(fakeScene(), {
     home: sideSheet('H', { rating: 70 }),
     away: sideSheet('A', { rating: 45 }),
@@ -111,7 +113,7 @@ function playback(keyMoments: boolean, speed: 1 | 2 | 4 | 8 = 8, seed = 11) {
     speed,
     keyMoments: () => keyMoments,
     fixture: undefined,
-    overlay: null,
+    overlay,
     closeUpDone: () => {},
   });
 }
@@ -183,3 +185,25 @@ describe('LivePlayback key moments (#366)', () => {
     expect(pb.slowedTo).toBeNull();
   });
 });
+
+it('the default non-Labs playback displays its count, reaches the last and hides in flight and at full time', () => {
+  const setTackle = vi.fn();
+  const overlay = { setTackle, setClock() {}, comment() {}, offerReplay() {} } as unknown as MatchOverlayHandle;
+  const pb = playback(false, 8, 11, overlay);
+  let sawLast = false, sawFlight = false;
+  while (!pb.finished) {
+    pb.update(100);
+    const count = setTackle.mock.lastCall?.[0] as number | null;
+    if (count !== null) {
+      expect(count).toBe(pb.controlTackle);
+      expect(pb.controlPicture.ball.holder).not.toBeNull();
+      expect(count).toBeLessThan(SET_TACKLES);
+      if (count === SET_TACKLES - 1) sawLast = true;
+    } else if (!pb.controlPicture.ball.holder) sawFlight = true;
+  }
+  pb.update(16);
+  expect(setTackle.mock.lastCall?.[0]).toBeNull();
+  expect(sawLast).toBe(true);
+  expect(sawFlight).toBe(true);
+  pb.destroy();
+}, 30000);

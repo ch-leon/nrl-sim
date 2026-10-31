@@ -1318,3 +1318,35 @@ completed tackles (four), as in the existing sim.
 Controlled long drags use the existing `ATTACK_KICK_M` (50 m from the line)
 threshold: a bomb in attacking range, a normal territory kick from deeper. The
 aim preview uses the same choice as the sim. No default kick weights change.
+
+The tackle chip sits beside the clock inside the existing 44 px score row, so
+the fullest coach tray keeps its vertical room. The live score bug reads the completed-tackle count from playback (the same
+`controlTackle` used by Labs), adding one for the current play. It hides during
+ball flights, dead-ball phases, replays and full time. No snapshot or save fields
+are added. The Nines denominator stays five.
+
+| Gesture knob | File | Value | Meaning |
+| --- | --- | --- | --- |
+| `GESTURE.swipePx` | `match/view/controlsLayer.ts` | 30 px | Minimum horizontal swipe or backward kick drag. |
+| `GESTURE.stepPx` | `match/view/controlsLayer.ts` | 22 px | Minimum vertical movement for a step. |
+| `GESTURE.swipeMs` | `match/view/controlsLayer.ts` | 600 ms | Maximum pass/step duration; formerly 350 ms. |
+| `GESTURE.cancelPx` | `match/view/controlsLayer.ts` | 15 px | Below this, treat release as a tap, without rejection feedback. |
+| `GESTURE.kickAlignment` | `match/view/controlsLayer.ts` | 0.6 | Backward alignment; formerly 0.75 and a 180 ms hold. |
+
+The larger screen axis wins (horizontal wins exact ties); the former 1.25 ratio
+and diagonal rejection band are removed. Vertical-dominant swipes stay steps even
+inside the backward alignment cone.
+Only horizontal-dominant backward drags take kick priority on every tackle, with
+a restriction label before the last. The smoke pins career seed 1 during new-game
+creation, restores wall time before play, and still waits for our possession.
+Kicks have no duration limit.
+Every recognised input flashes its screen direction for 500 ms near the ball;
+unrecognised pitch swipes flash `?`. Kick aim bands and scatter are unchanged.
+
+A manual step starts its directional jink on the next unlocked held-ball play,
+before AI passing/kicking; beating a nearby defender retains the normal success
+roll. Inputs survive ruck stage changes and catches. Possession changes, new sets
+and dead-ball phases clear unused inputs. A last-tackle kick waits through the
+ruck or catch lock and applies on the next movable carry. A manual input also
+replaces an AI kick already winding up, including on its launch tick; an already completed
+last tackle still hands over normally (a queued input cannot undo contact).

@@ -34,7 +34,7 @@ it('reserves a control swipe before camera movement, releases it, and permits pi
   const addListener = vi.fn((name: string, cb: (e: PointerEvent) => void) => listeners.set(name, cb));
   vi.stubGlobal('window', { addEventListener: addListener, removeEventListener: vi.fn() });
   const drawing = {
-    clear: vi.fn(), destroy: vi.fn(),
+    clear: vi.fn(), destroy: vi.fn(), setText: vi.fn(),
     setDepth() { return this; }, setOrigin() { return this; }, setVisible() { return this; },
   };
   const surface = { ...scene, game: { canvas }, events: { on: vi.fn(), off: vi.fn() },
@@ -52,6 +52,16 @@ it('reserves a control swipe before camera movement, releases it, and permits pi
   expect([cam.scrollX, cam.scrollY]).toEqual(before);
   listeners.get('pointerup')!(event(1, 365)); p0.isDown = false; emit('pointerup', p0);
   expect(control).toHaveBeenCalledOnce();
+  expect(drawing.setText).toHaveBeenCalledWith('PASS →');
+
+  // A visible but too-short pitch swipe acknowledges rejection without panning.
+  p0.isDown = true; p0.x = 300;
+  listeners.get('pointerdown')!(event(1, 300)); emit('pointerdown', p0);
+  p0.x = 320;
+  listeners.get('pointermove')!(event(1, 320)); emit('pointermove', p0);
+  listeners.get('pointerup')!(event(1, 320)); p0.isDown = false; emit('pointerup', p0);
+  expect(control).toHaveBeenCalledOnce();
+  expect(drawing.setText).toHaveBeenCalledWith('?');
 
   p0.isDown = true; p0.x = 300;
   listeners.get('pointerdown')!(event(1, 300)); emit('pointerdown', p0);

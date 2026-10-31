@@ -24,6 +24,7 @@
 // The commentary's lines come from the live playback (match/view/commentary.ts,
 // N15.2) through `comment()`: the overlay keeps the score from the events and
 // only says something of its own when a score or a call came with no line.
+import { SET_TACKLES } from '../../config';
 import { newReplayOffer, stepReplayOffer, type ReplayOffer } from '../../match/view/replay';
 import { el, button, mount, ensureStyles, getRoot, segmented, type Segmented } from '../dom';
 import { bus } from '../../core/events';
@@ -818,6 +819,8 @@ export function matchColours(homeId: string, awayId: string): { home: string; aw
 export interface MatchOverlayHandle {
   /** Remove the overlay and unsubscribe all bus handlers. Idempotent. */
   destroy(): void;
+  /** Completed tackles before this play, or null while there is no meaningful count. */
+  setTackle?(count: number | null): void;
   /** The live sim's running clock (match seconds and half), finer than the events' whole minutes. */
   setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void;
   /** A line in the commentary and the log: every line comes this way, from the live playback's commentary (N15.2). */
@@ -922,6 +925,8 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const homeCell = teamCell('home', codes[0], worn.home);
   const awayCell = teamCell('away', codes[1], worn.away);
   const clockEl = el('span', { class: 'nrl-mo-clock', text: opts.halfMinutes ? formatClockSeconds(0, 2 * halfMinutes) : formatClock(0) });
+  const tackleEl = el('span', { class: 'nrl-mo-tackle' });
+  tackleEl.hidden = true;
   const halfEl = el('span', { class: 'nrl-mo-half', text: '1H' });
   // The score in words, for a screen reader (and the e2e's read of it).
   const scoreEl = el('span', { class: 'nrl-mo-score nrl-mo-sr', text: '0 – 0' });
@@ -930,7 +935,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   const board = el(
     'button',
     { class: 'nrl-mo-scoreboard', attrs: { type: 'button', 'aria-expanded': 'false', 'aria-controls': 'nrl-mo-stats', title: 'Match stats' } },
-    el('span', { class: 'nrl-mo-bug' }, homeCell.cell, awayCell.cell, el('span', { class: 'nrl-mo-clockbox' }, clockEl, halfEl)),
+    el('span', { class: 'nrl-mo-bug' }, homeCell.cell, awayCell.cell, el('span', { class: 'nrl-mo-clockbox' }, clockEl, halfEl), tackleEl),
     momentum.row,
     scoreEl,
   );
@@ -1321,6 +1326,12 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       calls = { made: { ...made }, paid: { ...paid } };
       if (statsOpen) renderStats();
     },
+    setTackle(count: number | null): void {
+      tackleEl.hidden = count === null || finalClock !== null;
+      const last = count === SET_TACKLES - 1;
+      tackleEl.classList.toggle('nrl-mo-tackle-last', last);
+      tackleEl.textContent = count === null ? '' : last ? `LAST TACKLE · ${SET_TACKLES}/${SET_TACKLES}` : `TACKLE ${count + 1}/${SET_TACKLES}`;
+    },
     setClock(matchSeconds: number, half: 1 | 2 | 'gp'): void {
       liveClock = true;
       clockMin = (half === 'gp' ? 2 * halfMinutes * 60 + matchSeconds : matchSeconds) / 60;
@@ -1332,6 +1343,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       // shows an earlier half. (After a Skip the paused sim still reports where it stopped.)
       if (finalClock !== null && !root.classList.contains('nrl-mo-replaying')) {
         clockEl.textContent = finalClock;
+        tackleEl.hidden = true;
         halfEl.textContent = 'FT';
         return;
       }
@@ -1405,6 +1417,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       if (bannerTimer) clearTimeout(bannerTimer);
       hideBanner();
     }
+    tackleEl.hidden = true;
     halfEl.textContent = 'FT';
     finalClock = clockEl.textContent ?? '';
     root.classList.add('nrl-mo-final');
@@ -1506,6 +1519,10 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-scoreboard:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-scoreboard[aria-expanded="true"]::after { content: ''; position: absolute; inset: 0; border-radius: 8px; box-shadow: inset 0 0 0 2px var(--nrl-accent); pointer-events: none; }
+.nrl-mo-tackle { display: flex; align-items: center; padding: 0 8px; font: 700 0.8125rem var(--nrl-f-label); line-height: 1.2; letter-spacing: 0.04em; white-space: nowrap; }
+.nrl-mo-tackle[hidden] { display: none; }
+@media (orientation: portrait) { .nrl-mo-tackle { display: none; } }
+.nrl-mo-tackle-last { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-bug { display: flex; height: 44px; }
 .nrl-mo-team { display: flex; align-items: stretch; }
 .nrl-mo-stripe { flex: 0 0 6px; width: 6px; }
