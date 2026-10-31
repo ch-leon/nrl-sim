@@ -3516,6 +3516,38 @@ async function runLabsControls(browser) {
       return true;
     }, null, { timeout: 20000 });
     if (await page.locator('.nrl-mo-speed:visible').count() !== 4) throw new Error('a speed choice is hidden');
+    // The tackle count stays up through passes, kicks and dead time (Leon on iPhone: it
+    // flashed). 16 s of live play at 844×390, read every 100 ms.
+    await page.setViewportSize({ width: 844, height: 390 });
+    const steady = await page.evaluate(() => new Promise((done) => {
+      const pb = window.__nrlGame.scene.getScene('Match').playback;
+      const problems = [], labels = new Set(), widths = new Set();
+      let samples = 0, inFlight = 0;
+      const id = setInterval(() => {
+        samples++;
+        const el = document.querySelector('.nrl-mo-tackle');
+        if (!pb.controlPicture.ball.holder) inFlight++;
+        if (!el) problems.push(`${samples}: missing`);
+        else {
+          const r = el.getBoundingClientRect();
+          if (el.hidden) problems.push(`${samples}: hidden`);
+          if (getComputedStyle(el).display === 'none') problems.push(`${samples}: display none`);
+          if (!r.width || !r.height) problems.push(`${samples}: no size`);
+          if (!el.textContent.trim()) problems.push(`${samples}: empty`);
+          labels.add(el.textContent);
+          widths.add(Math.round(r.width));
+        }
+        if (samples >= 160) {
+          clearInterval(id);
+          // Its width is reserved for the longest label: a new count never shifts the score row.
+          if (widths.size > 1) problems.push(`width moved: ${[...widths].join(', ')}px`);
+          done({ samples, inFlight, labels: [...labels], problems });
+        }
+      }, 100);
+    }));
+    if (steady.problems.length) throw new Error(`tackle count not steady: ${steady.problems.slice(0, 5).join(', ')} (${steady.problems.length} of ${steady.samples})`);
+    log(`  tackle count up on ${steady.samples}/${steady.samples} samples, ${steady.inFlight} with the ball in the air (${steady.labels.join(' | ')})`);
+    await page.setViewportSize({ width: 667, height: 375 });
     // Reach our last tackle without assuming who receives the seeded kickoff.
     await page.waitForFunction(() => {
       const match = window.__nrlGame?.scene.getScene('Match'), pb = match?.playback;
