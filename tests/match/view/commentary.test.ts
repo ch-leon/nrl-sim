@@ -13,7 +13,7 @@ import type { Side, SimEvent } from '../../../src/match/core/snapshot';
 import type { MatchEvent, MatchResult } from '../../../src/sim/events';
 
 /** Every event kind the live sim emits, read off its source: a kind added there without lines fails here. */
-const LIVE_SRC = Object.values(import.meta.glob('../../../src/match/league/live.ts', { query: '?raw', import: 'default', eager: true }))[0] as string;
+const LIVE_SRC = (Object.values(import.meta.glob(['../../../src/match/league/live.ts', '../../../src/match/league/live/*.ts'], { query: '?raw', import: 'default', eager: true })) as string[]).join('\n');
 function emittedKinds(): string[] {
   const src = LIVE_SRC;
   const kinds = new Set<string>();
