@@ -14,6 +14,12 @@ npx vitest run     # unit tests
 npm run build      # typecheck + production build
 ```
 
+## Screenshots
+
+Don't commit screenshots. Use the webkit job's per-shard `e2e-webkit-<group>` artifact
+(kept 7 days), or drag images into the PR description. Only the reference sets in
+`docs/screenshots/18/` and `docs/screenshots/broadcast-quiet/` live in the repo.
+
 ## Where things are decided
 
 - `docs/specs/` holds one spec per ticket. The live match sim's design is

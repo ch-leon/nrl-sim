@@ -32,7 +32,7 @@ export function mount(node: HTMLElement): HTMLElement;
 // Inject the shared pixel-UI stylesheet once (idempotent). Called by mount().
 export function ensureStyles(): void;
 ```
-Pixel styling injected by `ensureStyles()`: monospace font stack (`'Courier New', monospace`), `image-rendering: pixelated`, chunky borders (`border: 3px solid #000; box-shadow: 3px 3px 0 #000`), panel bg `#e8e0c8` with dark text, buttons with `:active` inset offset. All HUD/nav elements set `pointer-events: auto` (the `#ui-root` container is `pointer-events:none` per BAK-157, so only real controls capture input and the world stays draggable underneath).
+Pixel styling injected by `ensureStyles()`: monospace font stack (`'Courier New', monospace`), `image-rendering: pixelated`, chunky borders (`border: 3px solid #000; box-shadow: 3px 3px 0 #000`), panel bg `#e8e0c8` with dark text, buttons with `:active` inset offset. All HUD/nav elements set `pointer-events: auto` (the `#ui-root` container is `pointer-events:none` in `index.html`'s inline style, so only real controls capture input and the world stays draggable underneath).
 
 `src/ui/hud.ts`:
 ```ts
