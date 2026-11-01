@@ -14,9 +14,9 @@ issues on [apps](https://github.com/ch-leon/nrl-sim/issues/335),
 **Open.** The game is still "NRL Sim". A league-neutral name is to come, shown with
 "a SuperCOOKED game" once it's chosen (the line is built but hidden). Renaming is a
 change to `src/brand.ts` and a rebuild; storage keys never change, so no career is
-lost. The [apps roadmap](https://github.com/ch-leon/nrl-sim/issues/335) flags naming
-and trademarks as its biggest risk. Players and clubs in the game are already
-fictional.
+lost. Naming and trademarks are the apps roadmap's biggest risk: stores often
+reject "NRL" and real club names (source: [issue #335](https://github.com/ch-leon/nrl-sim/issues/335)). Players and clubs
+in the game are already fictional.
 
 ## Disclaimer
 
@@ -56,4 +56,5 @@ Premium, with a free demo and a one-off unlock. Tiers in the code: **demo**,
 
 ## Store accounts
 
-Not set up (Apple Developer and Google Play).
+Not set up, as of 1 Nov 2026 (source: Leon). Apple Developer is about US$99 a
+year; Google Play is a one-off US$25 (source: [issue #335](https://github.com/ch-leon/nrl-sim/issues/335)).
