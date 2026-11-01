@@ -16,7 +16,8 @@ short version of its **Cloud environment** section.
    rather than rewriting.
 4. **Prove.** CI must be green: `check`, the `webkit (<group>)` shards and the
    `webkit` aggregate on the PR, plus the QA workflow (nightly, or run on demand).
-   Nothing is done on an agent's say-so.
+   Nothing is done on an agent's say-so. Screenshots go in the PR or the CI artifact,
+   never in a commit (`CLAUDE.md`, **Screenshots**).
 5. **Play-test.** Leon gets the live build link (https://ch-leon.github.io/nrl-sim/)
    and one line on what to try. Bugs he finds are batched into one fix-up PR.
 6. **Merge** after CI is green and Leon gives a thumbs up. Post one short update,
