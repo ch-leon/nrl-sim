@@ -425,7 +425,6 @@ export abstract class LiveBase {
     return this.roleMan(side, FULLBACK);
   }
 
-  // Defined in the layers above (live/*.ts) and called from below them.
   protected abstract announcePaid(vs: readonly CallVerdict[]): void;
   protected abstract playCall(): CoachCall | null;
   protected abstract swapIn(p: Player, bi: number, fresh?: boolean): void;
