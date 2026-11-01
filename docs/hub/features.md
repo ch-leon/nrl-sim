@@ -1,0 +1,76 @@
+# Features
+
+Last updated: 2026-11-01
+
+What's in the game, with the PR that added each.
+
+## Match
+
+- Live Nines match the screen draws ([PR](https://github.com/ch-leon/nrl-sim/pull/162))
+- Kick contests ([PR](https://github.com/ch-leon/nrl-sim/pull/430)); Short and Long kick-offs ([PR](https://github.com/ch-leon/nrl-sim/pull/403))
+- Bench of four ([PR](https://github.com/ch-leon/nrl-sim/pull/118)); traits on screen ([PR](https://github.com/ch-leon/nrl-sim/pull/105))
+- Momentum line, auto-slow key moments ([PR](https://github.com/ch-leon/nrl-sim/pull/376))
+- Steady tackle count ([PR](https://github.com/ch-leon/nrl-sim/pull/440))
+
+## Coach calls
+
+- Hit-up, shifts, kicks, Rush, Hold ([PR](https://github.com/ch-leon/nrl-sim/pull/159))
+- Offload, Gang tackle, Grubber, 40/20, penalty choice ([PR](https://github.com/ch-leon/nrl-sim/pull/405)); Fresh legs ([PR](https://github.com/ch-leon/nrl-sim/pull/379))
+- Unlocks explained, Coach calls page ([PR](https://github.com/ch-leon/nrl-sim/pull/441))
+
+## Club and grounds
+
+- Twelve facilities, gym to grandstand (`src/data/facility.ts`)
+- Aim then Build, footpaths ([PR](https://github.com/ch-leon/nrl-sim/pull/402))
+- Finance screen, season P&L ([PR](https://github.com/ch-leon/nrl-sim/pull/175))
+- Weekly summary, "Why did I lose?" ([PR](https://github.com/ch-leon/nrl-sim/pull/377))
+
+## Squad and recruitment
+
+- Free agents; stars cost a fee ([PR](https://github.com/ch-leon/nrl-sim/pull/147))
+- Player page, projected peak ([PR](https://github.com/ch-leon/nrl-sim/pull/378))
+- Lineup: the nine and bench ([PR](https://github.com/ch-leon/nrl-sim/pull/186))
+- Staff (`src/systems/staff.ts`): Assistant Coach, Analyst, Welfare Manager
+
+## League and season
+
+- 16 clubs, 24 rounds, top-8 finals (`src/content/au.ts`)
+- Rivals sign ([PR](https://github.com/ch-leon/nrl-sim/pull/386)) and switch plans ([PR](https://github.com/ch-leon/nrl-sim/pull/319))
+- Fictional names, rename in-game ([PR](https://github.com/ch-leon/nrl-sim/pull/401))
+- Easy, Normal, Hard ([PR](https://github.com/ch-leon/nrl-sim/pull/153))
+
+## Events
+
+- Events deck ([PR](https://github.com/ch-leon/nrl-sim/pull/117)); wildcards, Bali trip ([PR](https://github.com/ch-leon/nrl-sim/pull/332))
+
+## UI and accessibility
+
+- Broadcast Quiet look ([PR](https://github.com/ch-leon/nrl-sim/pull/381))
+- Upright menus, 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436))
+- Three-tap onboarding, Undo ([PR](https://github.com/ch-leon/nrl-sim/pull/380))
+- Text size, non-colour cues ([PR](https://github.com/ch-leon/nrl-sim/pull/385))
+
+## Labs
+
+- `?labs=1`, all off by default; Retro Bowl-style controls ([PR](https://github.com/ch-leon/nrl-sim/pull/438))
+
+## Under the hood
+
+- Content packs ([PR](https://github.com/ch-leon/nrl-sim/pull/375)); storage adapter ([PR](https://github.com/ch-leon/nrl-sim/pull/374))
+- Demo gate ([PR](https://github.com/ch-leon/nrl-sim/pull/373)), paywall ([PR](https://github.com/ch-leon/nrl-sim/pull/384)), behind the flag
+- Brand config ([PR](https://github.com/ch-leon/nrl-sim/pull/382))
+- Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
+
+## Recently added
+
+Newest first; merge dates in UTC.
+
+- CI test fixes ([PR](https://github.com/ch-leon/nrl-sim/pull/442)), 1 Nov
+- Steady tackle count ([PR](https://github.com/ch-leon/nrl-sim/pull/440)), 31 Oct
+- Coach calls clarity and page ([PR](https://github.com/ch-leon/nrl-sim/pull/441)), 31 Oct
+- Tackle count, easier Labs swipes ([PR](https://github.com/ch-leon/nrl-sim/pull/439)), 31 Oct
+- Labs panel, Retro Bowl-style controls ([PR](https://github.com/ch-leon/nrl-sim/pull/438)), 30 Oct
+- Coach-tray captions, iOS install hint ([PR](https://github.com/ch-leon/nrl-sim/pull/437)), 29 Oct
+- Upright menus ([PR](https://github.com/ch-leon/nrl-sim/pull/436)), 29 Oct
+- Play-test fixes ([PR](https://github.com/ch-leon/nrl-sim/pull/435)), 28 Oct
+- Kick contests ([PR](https://github.com/ch-leon/nrl-sim/pull/430)), 28 Oct
