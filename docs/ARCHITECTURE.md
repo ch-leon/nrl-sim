@@ -216,6 +216,11 @@ played out* on (`settings.liveRivals`), the rival round plays in a Web Worker
 record beside the save slot (`systems/liveMatchRecord.ts`: seed, calls, plan changes,
 tick) lets a match killed mid-way resume within 2 seconds of match time; Save & exit
 parks the match and Advance Week resumes it. A held week is never written to the save.
+Export during a hold writes this week's week-start save plus the live-match record,
+never the half-ticked week, and refuses when that save is missing or from another week
+(`downloadSave`). Deleting the slot, starting a new game in it, or importing over it
+drops the record (`deleteSlot`, `main.ts`, `installImportedSave`), so the next game
+never resumes the old match.
 
 **Multi-week advance** (`core/advance.ts`, the HUD's ×4 / to finals / to season end):
 one `advanceWeek()` per week under fast-forward, a frame between weeks so the page

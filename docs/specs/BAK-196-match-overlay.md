@@ -48,7 +48,7 @@ Wiring: on mount, `initLiveState()`, subscribe `bus.on('match:event', ev => { st
 
 ## Edge cases & risks
 - **Accumulator ↔ MatchResult parity:** the unit test folds every event of a real `simulateMatch` run through `reduceEvent` and asserts final score == `result.homeScore/awayScore` and stats == `result.stats` (possession within rounding). This is the core correctness guard.
-- **Conversion semantics:** engine emits `conversion` only on success (per BAK-191) — do NOT also add points on `try`'s conversion attempt separately. Confirm against engine; if engine emits conversion-miss events, gate on `ev.detail`/success flag.
+- **Conversion semantics:** the live sim emits every kick at goal (`conversion`, `penalty-goal`, `field-goal`) with `detail: 'good' | 'missed'` (`src/match/league/events.ts`) — add points only on `good`, and never on the `try` event for its conversion attempt.
 - **Duplicate subscriptions / leaks:** unsubscribe exactly the handlers added; guard against mounting twice (idempotent mount).
 - **Overlay only in Match scene:** must not appear over Grounds; teardown on `match:finished` and on manual 'Back to Club'.
 - **Determinism:** commentary uses the passed rng only; no `Math.random`, so tests are stable.
