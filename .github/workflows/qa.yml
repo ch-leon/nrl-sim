@@ -88,7 +88,8 @@ jobs:
   # N10 item 1 (#219): the phone performance budget as a gate. Its own runner, so the
   # timings are not taken on a machine still busy with the soak or a playthrough.
   # CPU throttled x4 at 844x390 (scripts/e2e-perf.mjs); a moment over its budget in
-  # scripts/perf-budget.json fails this job. Nightly and on demand, not on PRs.
+  # scripts/perf-budget.json fails this job. Nightly and on demand, not on PRs. On a
+  # failure the artifact also holds failure-<moment>.png and failure-<moment>-modals.html.
   perf:
     if: ${{ inputs.only != 'qa' }}
     runs-on: ubuntu-latest
@@ -109,6 +110,11 @@ jobs:
           {
             echo '## Perf budget'
             cat e2e-output/perf/report.md 2>/dev/null || tail -n 30 perf.log
+            # A moment or the run that broke leaves a screenshot and the open modals' HTML
+            # (e2e-perf.mjs, diagnose) in the e2e-perf artifact.
+            for f in e2e-output/perf/failure-*; do
+              if [ -e "$f" ]; then echo "- diagnostics in the e2e-perf artifact: \`${f#e2e-output/perf/}\`"; fi
+            done
           } >> "$GITHUB_STEP_SUMMARY"
           exit $status
       - name: Keep the report and screenshots

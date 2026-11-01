@@ -10,9 +10,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  # The checks, split across runners so each has headroom under its timeout; the `check`
+  # job below is their verdict (the name branch protection keys on). Typecheck, build and
+  # bundle size on one runner; the unit tests on three: the two slow QA files (the corpus
+  # and the soak, about four minutes between them) on their own, and the rest halved by
+  # vitest --shard. Every test file runs in exactly one part.
+  check-build:
+    name: check (typecheck, build)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,8 +28,6 @@ jobs:
       - run: npm ci
       - name: Typecheck
         run: npx tsc --noEmit
-      - name: Unit tests
-        run: npx vitest run
       - name: Production build
         run: npm run build
       # The gzipped bundle against its line in scripts/perf-budget.json (warn.bundleGzKb).
@@ -33,15 +37,20 @@ jobs:
       - name: Bundle size
         run: node scripts/bundle-size.mjs dist
 
-  # #206: the tutorial bubble and the Guide must fit a landscape iPhone in Safari
-  # (956×330, 844×390) with Skip / Next / Close on screen, even with Safari's
-  # landscape text boost reconstructed. #315: opening already upright (390×844)
-  # sleeps the loop, and turning sideways (844×390) wakes it with the canvas
-  # filling the screen, mid-match and with a parked match. The runner has no
-  # WebKit, so this job fetches Playwright's (the only job that downloads a browser).
-  webkit:
+  check-unit:
+    name: check (unit ${{ matrix.part }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: qa
+            args: tests/qa/corpus.test.ts tests/qa/soak.test.ts
+          - part: 1/2
+            args: --exclude tests/qa/corpus.test.ts --exclude tests/qa/soak.test.ts --shard=1/2
+          - part: 2/2
+            args: --exclude tests/qa/corpus.test.ts --exclude tests/qa/soak.test.ts --shard=2/2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,15 +58,84 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Unit tests
+        run: npx vitest run ${{ matrix.args }}
+
+  # The verdict on the checks: green only when the build and every unit part passed.
+  check:
+    name: check
+    needs: [check-build, check-unit]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every check passed
+        env:
+          BUILD: ${{ needs.check-build.result }}
+          UNIT: ${{ needs.check-unit.result }}
+        run: |
+          echo "check-build: $BUILD"
+          echo "check-unit:  $UNIT"
+          [ "$BUILD" = success ] && [ "$UNIT" = success ]
+
+  # #206: the tutorial bubble and the Guide must fit a landscape iPhone in Safari
+  # (956×330, 844×390) with Skip / Next / Close on screen, even with Safari's
+  # landscape text boost reconstructed. #315: opening already upright (390×844)
+  # sleeps the loop, and turning sideways (844×390) wakes it with the canvas
+  # filling the screen, mid-match and with a parked match. The runner has no
+  # WebKit, so these jobs fetch Playwright's (the only jobs that download a browser).
+  # Sharded four ways by section (scripts/e2e-webkit.mjs, GROUPS; the script fails if a
+  # section is in no group), so each shard runs in a few minutes; `webkit` below is
+  # their verdict.
+  webkit-shard:
+    name: webkit (${{ matrix.group }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [match, text, screens, portrait]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+      # The WebKit build is keyed on playwright-core's version; the system libraries it
+      # needs are installed every time (--with-deps), cached browser or not.
+      - name: Cache WebKit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-webkit-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - name: Fetch WebKit
         run: npx playwright-core install --with-deps webkit
-      - name: WebKit layout and portrait boot
-        run: npm run e2e:webkit
+      - name: WebKit layout and portrait boot (${{ matrix.group }})
+        run: npm run e2e:webkit -- --group ${{ matrix.group }}
       - name: Keep the screenshots
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-webkit
+          name: e2e-webkit-${{ matrix.group }}
           path: e2e-output/webkit
           retention-days: 7
           if-no-files-found: warn
+
+  # The verdict on the WebKit shards: green only when every shard passed.
+  webkit:
+    name: webkit
+    needs: webkit-shard
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every shard passed
+        env:
+          SHARDS: ${{ needs.webkit-shard.result }}
+        run: |
+          echo "webkit-shard: $SHARDS"
+          [ "$SHARDS" = success ]

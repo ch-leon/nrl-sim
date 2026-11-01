@@ -98,6 +98,23 @@ const state = () => page.evaluate(() => window.__nrlState?.() ?? null);
 const wait = (ms) => page.waitForTimeout(ms);
 const toastsGone = () => page.waitForFunction(() => document.querySelectorAll('.nrl-toast').length === 0, null, { timeout: 8000 }).catch(() => {});
 
+/**
+ * On a failure: a screenshot and the HTML of every open modal (a dialog-region card,
+ * a sheet) into e2e-output/perf, named for the moment, so the next red run says what
+ * was on screen. Best effort: never throws.
+ */
+async function diagnose(tag) {
+  if (!page) return;
+  const slug = tag.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'failure';
+  try {
+    await page.screenshot({ path: join(OUT, `failure-${slug}.png`) });
+    const html = await page.evaluate(() => [...document.querySelectorAll('.nrl-modal-backdrop')]
+      .map((b) => `<!-- ${b.className}; modal: ${b.querySelector('.nrl-modal')?.className ?? 'none'} -->\n${b.outerHTML}`).join('\n\n'));
+    writeFileSync(join(OUT, `failure-${slug}-modals.html`), html || '<!-- no modal open -->\n');
+    log(`  diagnostics: ${join(OUT, `failure-${slug}.png`)}, ${join(OUT, `failure-${slug}-modals.html`)}`);
+  } catch { /* the page is gone */ }
+}
+
 /** The page's clock: [its time origin, ms since then], or null between pages. */
 const pageNow = () => page.evaluate(() => [performance.timeOrigin, performance.now()]).catch(() => null);
 
@@ -126,7 +143,7 @@ async function timed(name, fn) {
   try {
     const r = await fn();
     if (typeof r === 'number') inPage = r; else if (r && typeof r === 'object') { inPage = r.ms; notes = r.notes; } else notes = r;
-  } catch (err) { result.errors.push(`${name}: ${err.message.split('\n')[0]}`); notes = 'FAILED'; }
+  } catch (err) { result.errors.push(`${name}: ${err.message.split('\n')[0]}`); notes = 'FAILED'; await diagnose(name); }
   const ms = inPage ?? Date.now() - t0;
   const p1 = await pageNow();
   // A navigation inside the moment starts a new page clock: count from its start.
@@ -155,8 +172,51 @@ const clickTimed = async (selector, { nth = 0, text } = {}) => {
   return ms;
 };
 
+/**
+ * Set when an advance has ended (Back to Club, each run): the weekly summary card
+ * (#368, src/ui/weekSummary.ts) is due. It opens in the shared dialog region once
+ * the club is back and nothing is in its way (a decision card, a sheet), up to one
+ * 400 ms poll later, and its backdrop takes every tap meant for the chip or the dock.
+ */
+let summaryDue = false;
+
+/**
+ * Close every dialog-region modal that is not a decision card, and wait until its
+ * backdrop is gone: before any tap on the decisions chip or the dock, and before each
+ * timed advance, so a run starts from the bare grounds and the mid-run tap probe hits
+ * the League tab. Never inside a timed moment. With the summary due and no decision
+ * card up, it is waited for first (it opens a task after the club is back).
+ */
+async function clearDialogs() {
+  const card = page.locator('.nrl-event-card');
+  if (summaryDue && !(await card.count())) {
+    const shown = await page.locator('[data-week-summary]').waitFor({ state: 'attached', timeout: 10000 }).then(() => true, () => false);
+    if (!shown) { log('  (no weekly summary after the advance)'); summaryDue = false; }
+  }
+  const region = page.locator('.nrl-modal-backdrop.nrl-dialog-region').filter({ hasNot: card });
+  for (let i = 0; i < 5; i++) {
+    if (!(await region.count())) return;
+    const backdrop = region.first();
+    // Held by handle: the wait below is for this backdrop, not whatever opens next.
+    const handle = await backdrop.elementHandle();
+    const kind = await backdrop.locator('.nrl-modal').first().getAttribute('class').catch(() => null);
+    // The weekly summary's Close, else the modal's ✕ or Close, else the backdrop itself (it closes on a tap).
+    const summary = backdrop.locator('[data-summary-close]');
+    const close = backdrop.locator('.nrl-screen-x').or(backdrop.getByRole('button', { name: /^close$/i }));
+    if (await summary.count()) await summary.first().tap();
+    else if (await close.count()) await close.first().tap();
+    else await backdrop.tap({ position: { x: 4, y: 4 } });
+    await page.waitForFunction((el) => !el.isConnected, handle, { timeout: 10000 });
+    await handle.dispose();
+    log(`  (closed ${kind ?? 'a dialog'} before the next tap)`);
+    if (kind?.includes('nrl-summary-modal')) summaryDue = false;
+  }
+  throw new Error('a dialog-region modal kept reopening');
+}
+
 /** Answer every waiting decision card (choice 0) so a multi-week advance can run. */
 async function answerCards() {
+  await clearDialogs();
   const s = await state();
   if (!s?.eventDeck?.pending?.length) return 0;
   // 3a: the decisions chip's REVIEW on the bare grounds; with a sheet up, Office → News's one-row banner (#345).
@@ -177,6 +237,8 @@ async function answerCards() {
   }
   await page.evaluate(() => { for (const b of document.querySelectorAll('.nrl-modal .nrl-btn')) if (/^(close|✕)$/i.test(b.textContent?.trim() ?? '')) { b.click(); break; } });
   await wait(150);
+  // The weekly summary waited behind the cards: it opens now.
+  await clearDialogs();
   return n;
 }
 
@@ -225,7 +287,9 @@ async function advance(index, { probe = false } = {}) {
   // A sheet has no ✕ (Broadcast Quiet): CLUB in the dock closes the League sheet the probe opened.
   if (probe) await page.evaluate(() => document.querySelector('.nrl-nav [data-nav-home]')?.click());
   const after = await state();
-  return { ms, weeks: (after.season - before.season) * 27 + (after.week - before.week), ...(tapMs !== undefined ? { tapMs, label } : {}) };
+  const weeks = (after.season - before.season) * 27 + (after.week - before.week);
+  if (weeks > 0) summaryDue = true;
+  return { ms, weeks, ...(tapMs !== undefined ? { tapMs, label } : {}) };
 }
 
 async function run() {
@@ -331,6 +395,7 @@ async function run() {
     await clickTimed('.nrl-mo-ft [data-back-to-club]');
     await page.waitForFunction(() => document.querySelector('body:not(.nrl-match-active) .nrl-dock [data-hud="advance"]') && window.__nrlGame?.scene.isActive('Grounds'));
   });
+  summaryDue = true; // the week's summary opens now the club is back
   await toastsGone();
 
   // ×4 advances: the tick pipeline per week (stops early on cards and injuries, so
@@ -396,6 +461,7 @@ try {
   await run();
 } catch (err) {
   result.errors.push(`script: ${err.message}`);
+  await diagnose('script');
 } finally {
   stopServer();
 }
