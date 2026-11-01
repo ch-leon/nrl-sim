@@ -44,12 +44,15 @@
 //   npm run e2e:webkit -- --size 956x330           (or E2E_SIZES="956x330 844x390")
 //   WEBKIT_PATH=/path/to/pw_run.sh npm run e2e:webkit
 //   E2E_URL=http://localhost:5173/ npm run e2e:webkit   (against a server you started)
+//   npm run e2e:webkit -- --group text              (one CI shard: match, text, screens, portrait;
+//                                                    see GROUPS at the end of this file)
 //
 // WebKit comes from WEBKIT_PATH or playwright-core's browser registry
 // (PLAYWRIGHT_BROWSERS_PATH); CI fetches it with `playwright-core install --with-deps webkit`.
 import { spawn } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { webkit, chromium } from 'playwright-core';
 
 /**
@@ -3710,33 +3713,102 @@ async function runCoachCalls(browser, sizes) {
   return failed;
 }
 
+// ── Sections and CI shards ──────────────────────────────────────────────────────
+// Every run* phase above, in the order a full run takes them. A full run (no flag)
+// plays them all; --group <name> plays one CI shard's list (ci.yml, job webkit-shard),
+// in this same order. Each section opens its own contexts and writes its own folder
+// under e2e-output/webkit, so a section plays the same alone as after the others.
+const SECTIONS = [
+  ['runSize', async (b) => { let f = 0; for (const [W, H] of SIZES) f += await runSize(b, W, H); return f; }],
+  ['runPortrait', (b) => runPortrait(b)],
+  ['runPlaytest', (b) => runPlaytest(b)],
+  ['runPauseSettings', (b) => runPauseSettings(b)],
+  ['runTutorialWalk', async (b) => { let f = 0; for (const run of WALK_RUNS) f += await runTutorialWalk(b, run); return f; }],
+  ['runScreens', async (b) => { let f = 0; for (const run of SCREEN_RUNS) f += await runScreens(b, run); return f; }],
+  ['runDockTextSize', (b) => runDockTextSize(b)],
+  ['runFlow', async (b) => { let f = 0; for (const run of FLOW_RUNS) f += await runFlow(b, run); return f; }],
+  ['runLargeTextTargets', (b) => runLargeTextTargets(b)],
+  ['runLadderForm', (b) => runLadderForm(b)],
+  ['runPortraitMenus', (b) => runPortraitMenus(b)],
+  ['runCoachCalls', (b) => runCoachCalls(b, [[844, 390]])],
+  ['runLabsControls', (b) => runLabsControls(b)],
+];
+/**
+ * The CI shards (ci.yml, job webkit-shard), balanced on section times from CI.
+ * Every section is in exactly one group; the guard below fails the run otherwise.
+ */
+const GROUPS = {
+  match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
+  text: ['runLargeTextTargets', 'runLadderForm'],
+  screens: ['runScreens', 'runFlow'],
+  portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
+};
+
+// Guard: a run* phase declared in this file but missing from SECTIONS, or a section
+// in no group (or two), would silently drop out of CI once it is sharded. Fail first.
+{
+  const declared = [...readFileSync(fileURLToPath(import.meta.url), 'utf8').matchAll(/^async function (run[A-Z]\w*)\(/gm)].map((m) => m[1]);
+  const listed = SECTIONS.map(([name]) => name);
+  const grouped = Object.values(GROUPS).flat();
+  const problems = [
+    ...declared.filter((n) => !listed.includes(n)).map((n) => `${n} is not in SECTIONS`),
+    ...listed.filter((n) => !declared.includes(n)).map((n) => `SECTIONS lists ${n}, which is not declared`),
+    ...listed.filter((n) => !grouped.includes(n)).map((n) => `${n} is in no --group`),
+    ...listed.filter((n) => grouped.filter((g) => g === n).length > 1).map((n) => `${n} is in more than one --group`),
+    ...grouped.filter((n) => !listed.includes(n)).map((n) => `a --group lists ${n}, which is not a section`),
+  ];
+  if (problems.length) {
+    console.error(`e2e-webkit sections and groups disagree:\n  ${[...new Set(problems)].join('\n  ')}`);
+    process.exit(2);
+  }
+}
+
 const SCREENS_ONLY = argv.includes('--screens-only');
 const CONTROLS_ONLY = argv.includes('--controls-only');
 const CALLS_ONLY = argv.includes('--coach-calls-only');
+const GROUP = argv.includes('--group') ? argv[argv.indexOf('--group') + 1] : null;
+if (argv.includes('--group') && !GROUPS[GROUP]) {
+  console.error(`bad --group "${GROUP ?? ''}": want one of ${Object.keys(GROUPS).join(', ')}`);
+  process.exit(2);
+}
+if (GROUP && (SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY)) {
+  console.error('--group does not combine with --screens-only, --controls-only or --coach-calls-only');
+  process.exit(2);
+}
+/** [name, run] pairs this invocation plays, in the full run's order. */
+const plan = CALLS_ONLY
+  ? [['runCoachCalls', (b) => runCoachCalls(b, [[390, 844], [844, 390]])]]
+  : CONTROLS_ONLY
+    ? SECTIONS.filter(([n]) => n === 'runLabsControls')
+    : SCREENS_ONLY
+      ? SECTIONS.filter(([n]) => ['runTutorialWalk', 'runScreens', 'runDockTextSize', 'runLargeTextTargets'].includes(n))
+      : GROUP
+        ? SECTIONS.filter(([n]) => GROUPS[GROUP].includes(n))
+        : SECTIONS;
+
+// Every step logs one `ok ` or `FAIL` line: count them per section for the closing tally.
+let okLines = 0, failLines = 0;
+const counted = (fn) => (...a) => {
+  if (typeof a[0] === 'string') { if (a[0].startsWith('ok ')) okLines++; else if (a[0].startsWith('FAIL')) failLines++; }
+  return fn(...a);
+};
+console.log = counted(console.log.bind(console));
+
 let failed = 0;
+const tally = [];
 try {
   await startServer();
   const browser = process.env.E2E_CHROMIUM_PATH
     ? await chromium.launch({ executablePath: process.env.E2E_CHROMIUM_PATH, args: ['--no-sandbox'] })
     : await webkit.launch(process.env.WEBKIT_PATH ? { executablePath: process.env.WEBKIT_PATH } : {});
-  if (CALLS_ONLY) failed += await runCoachCalls(browser, [[390, 844], [844, 390]]);
-  else if (!CONTROLS_ONLY) {
-    if (!SCREENS_ONLY) {
-      for (const [W, H] of SIZES) failed += await runSize(browser, W, H);
-      failed += await runPortrait(browser);
-      failed += await runPlaytest(browser);
-      failed += await runPauseSettings(browser);
-    }
-    for (const run of WALK_RUNS) failed += await runTutorialWalk(browser, run);
-    for (const run of SCREEN_RUNS) failed += await runScreens(browser, run);
-    failed += await runDockTextSize(browser);
-    if (!SCREENS_ONLY) for (const run of FLOW_RUNS) failed += await runFlow(browser, run);
-    failed += await runLargeTextTargets(browser);
-    if (!SCREENS_ONLY) failed += await runLadderForm(browser);
-    if (!SCREENS_ONLY) failed += await runPortraitMenus(browser);
-    if (!SCREENS_ONLY) failed += await runCoachCalls(browser, [[844, 390]]);
+  log(`sections${GROUP ? ` (--group ${GROUP})` : ''}: ${plan.map(([n]) => n).join(', ')}`);
+  for (const [name, run] of plan) {
+    const t0 = Date.now(), ok0 = okLines, fail0 = failLines;
+    const f = await run(browser);
+    failed += f;
+    tally.push({ name, s: Math.round((Date.now() - t0) / 1000), ok: okLines - ok0, fail: failLines - fail0, failed: f });
+    log(`section ${name}: ${tally.at(-1).s}s, ${tally.at(-1).ok} ok, ${tally.at(-1).fail} FAIL`);
   }
-  if (!CALLS_ONLY && (!SCREENS_ONLY || CONTROLS_ONLY)) failed += await runLabsControls(browser);
   await browser.close();
 } catch (err) {
   console.error(err);
@@ -3744,5 +3816,8 @@ try {
 } finally {
   stopServer();
 }
+log(`\nsection times${GROUP ? ` (--group ${GROUP})` : ''}:`);
+for (const t of tally) log(`  ${t.name.padEnd(20)} ${String(t.s).padStart(4)}s  ${String(t.ok).padStart(4)} ok  ${t.fail} FAIL`);
+log(`checks: ${okLines} ok, ${failLines} FAIL, ${tally.length}/${plan.length} sections played`);
 log(failed ? `\n${failed} failure(s)` : `\nall ${process.env.E2E_CHROMIUM_PATH ? 'Chromium fallback' : 'WebKit'} layout checks passed`);
 process.exit(failed ? 1 : 0);
