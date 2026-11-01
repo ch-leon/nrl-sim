@@ -100,6 +100,7 @@ scripts/
 tests/                     # Vitest specs mirroring src/; tests/qa/ (corpus, soak);
                            #   tests/fixtures/saves/ (the save corpus, §4)
 docs/specs/                # per-ticket technical specs
+docs/hub/                  # project hub: overview, features, roadmap
 ```
 
 ## 3. Constants (src/config.ts)
