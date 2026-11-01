@@ -1,6 +1,6 @@
 # NRL Sim
 
-Start with docs/hub/ (README.md) for what NRL Sim is, what's in it and what's next.
+Start with docs/hub/ ([README.md](docs/hub/README.md)) for what NRL Sim is, what's in it and what's next.
 
 This file covers how work moves through the repo. `CLAUDE.md` covers how the game
 is built, where decisions live, and the conventions. The cloud setup below is the

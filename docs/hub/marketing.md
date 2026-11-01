@@ -1,6 +1,6 @@
 # Marketing
 
-Last updated: 2026-11-01
+Last updated: 2026-11-01 (status as of 1 Nov 2026)
 
 Sources: `src/brand.ts`, `src/commercial/`, `docs/specs/commercial-*.md` and the
 issues on [apps](https://github.com/ch-leon/nrl-sim/issues/335),
@@ -14,8 +14,9 @@ issues on [apps](https://github.com/ch-leon/nrl-sim/issues/335),
 **Open.** The game is still "NRL Sim". A league-neutral name is to come, shown with
 "a SuperCOOKED game" once it's chosen (the line is built but hidden). Renaming is a
 change to `src/brand.ts` and a rebuild; storage keys never change, so no career is
-lost. Stores may reject "NRL" and real club names, so rename before store
-submission. Players and clubs in the game are already fictional.
+lost. The [apps roadmap](https://github.com/ch-leon/nrl-sim/issues/335) flags naming
+and trademarks as its biggest risk. Players and clubs in the game are already
+fictional.
 
 ## Disclaimer
 
@@ -25,9 +26,8 @@ From `src/brand.ts`, shown in Settings and meant for the store listing:
 
 ## Store copy and screenshots
 
-- **Store copy: Open.** None written yet.
-- **Screenshots: Open.** PR screenshots are leaving the repo; where store shots will
-  live is not decided.
+- **Store copy: Open.**
+- **Screenshots: Open.**
 
 ## Pricing
 
@@ -46,12 +46,14 @@ Premium, with a free demo and a one-off unlock. Tiers in the code: **demo**,
 
 ## Payments
 
-- RevenueCat tracks who owns what across Apple, Google and web.
-- Web checkout: leaning Paddle, not final. **Open:** Paddle or Stripe?
+- **RevenueCat: planned** for who owns what across Apple, Google and web. Today
+  the game uses a local stub with a RevenueCat-shaped seam: no account, SDK or keys.
+- **Web checkout: Open.** Paddle or Stripe?
 - Each country's store rules (in-app only, link out, "Already bought? Log in") drive
   what the paywall shows (`src/commercial/storeRules.ts`).
-- Everything commercial is off on the live build.
+- The demo gate, paywall and login sit behind the commercial switch, which is off on
+  the live build. The storage adapter, content packs and brand config are in use.
 
 ## Store accounts
 
-Not set up. Apple Developer is about US$99 a year; Google Play is a one-off US$25.
+Not set up (Apple Developer and Google Play).

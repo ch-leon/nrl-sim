@@ -2,12 +2,12 @@
 
 Last updated: 2026-11-01
 
-## Now
+## Now (as of 1 Nov 2026)
 
-- Split `live.ts` and `e2e-webkit.mjs` into modules, no behaviour change ([PR](https://github.com/ch-leon/nrl-sim/pull/443))
+- Split `live.ts` and `e2e-webkit.mjs` into modules, no behaviour change: open, waiting on Leon's thumbs up ([PR](https://github.com/ch-leon/nrl-sim/pull/443))
 - Repo slim Leon approved: planned, no PR yet
 
-## Next
+## Next (as of 1 Nov 2026)
 
 - **Open, waiting on Leon:** make the check and the iPhone browser test required before merging?
 - Reviewer polish, not yet filed:
@@ -18,7 +18,7 @@ Last updated: 2026-11-01
 
 ## Later
 
-Open issues:
+Open issues as of 1 Nov 2026:
 
 - Gameplay & UX pass, Leon's 12: all tasks done ([issue](https://github.com/ch-leon/nrl-sim/issues/372))
 - Commercial foundations: all five built ([issue](https://github.com/ch-leon/nrl-sim/issues/365))
@@ -43,20 +43,12 @@ Open issues:
 
 ## Ideas being discussed (not decided)
 
-**Recruitment talks. Open.** Kairosoft-style "keep talking" for stars and key
-re-signings; ordinary signings stay one tap. A new Scout staff role: cheaper approach
-fee, an extra talk round, renewal talks, a weekly report revealing hidden
-fast-developing "gems". Open: taps or an offer sheet? Stars only or all? What does
-failing cost? Can players refuse to re-sign? One Scout hire or levelled? What are
-gems? Does difficulty change it?
+**Recruitment talks. Open.** Longer talks for stars and key re-signings, and a
+Scout staff role. Open: how talks work, who they apply to and what a Scout does.
 
-**Hometown team. Open.** Pick a real town on a new game; it names your club and
-ground and gives a derby rival and local ticker and event lines. Leaning: a bundled
-offline Australian place list plus written templates first (free, offline), an
-optional online "local flavour" later; Google Places fits poorly (storage and
-attribution terms). Open: your club or a 17th? Australia first? How cheeky? Any
-online step? Picking a rival's town?
+**Hometown team. Open.** Pick a real town on a new game to name your club and
+ground. Open: whose club it names, where the place data comes from and whether any
+of it goes online.
 
-**Labs controls phase 2. Open.** Dive for the line, choose the runner, cut-out pass
-and offload, aimed goal kicks, defence calls, free-run on line breaks. Open: which
-of these, and in what order?
+**Labs controls phase 2. Open.** More hands-on match controls in Labs. Open: which
+controls, and in what order.
