@@ -1,8 +1,26 @@
 # NRL Sim
 
-Read `CLAUDE.md` for how the game is built, where decisions live, and the
-conventions. The cloud setup below is the short version of its **Cloud environment**
-section.
+This file covers how work moves through the repo. `CLAUDE.md` covers how the game
+is built, where decisions live, and the conventions. The cloud setup below is the
+short version of its **Cloud environment** section.
+
+## Development process
+
+1. **Issues.** Work comes in as GitHub issues, each with a plain "done when" line.
+   Leon sometimes opens issues himself straight from a Claude planning session.
+   Treat those like any other issue and pick them up from the issue list.
+2. **Build.** Any of Cursor cloud agents, Claude Code or Codex, whichever has usage
+   left (the split shifts with usage). One change per PR. Big refactors run alone.
+3. **Check.** Always a different tool from the one that built it. The checker
+   reviews against the issue's "done when" line and the diff, and lists problems
+   rather than rewriting.
+4. **Prove.** CI must be green: `check`, the `webkit (<group>)` shards and the
+   `webkit` aggregate on the PR, plus the QA workflow (nightly, or run on demand).
+   Nothing is done on an agent's say-so.
+5. **Play-test.** Leon gets the live build link (https://ch-leon.github.io/nrl-sim/)
+   and one line on what to try. Bugs he finds are batched into one fix-up PR.
+6. **Merge** after CI is green and Leon gives a thumbs up. Post one short update,
+   and stay quiet when nothing changed.
 
 ## Checks
 

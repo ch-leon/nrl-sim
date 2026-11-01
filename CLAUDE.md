@@ -4,6 +4,8 @@ A Kairosoft-style rugby league club sim: Phaser 3 + TypeScript, all art generate
 in code. Read `docs/ARCHITECTURE.md` for structure and conventions, `README.md` for
 running it.
 
+Follow AGENTS.md for the development process (issues, build, check, prove, play-test, merge).
+
 ## Checks (what CI runs on every PR)
 
 ```bash
