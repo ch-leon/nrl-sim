@@ -1,5 +1,7 @@
 # NRL Sim
 
+Start with docs/hub/ ([README.md](docs/hub/README.md)) for what NRL Sim is, what's in it and what's next.
+
 This file covers how work moves through the repo. `CLAUDE.md` covers how the game
 is built, where decisions live, and the conventions. The cloud setup below is the
 short version of its **Cloud environment** section.
@@ -21,6 +23,8 @@ short version of its **Cloud environment** section.
    and one line on what to try. Bugs he finds are batched into one fix-up PR.
 6. **Merge** after CI is green and Leon gives a thumbs up. Post one short update,
    and stay quiet when nothing changed.
+
+Update docs/hub/features.md Recently added (and roadmap.md if relevant) in every PR that changes the game.
 
 ## Checks
 
