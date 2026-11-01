@@ -36,25 +36,25 @@ result. Keep it in step with the code: when a constant changes, change the row.
 | `pace.extraPerStat` | `body.ts` | 0.03 m/s | Added per Speed point away from 60, then clamped to 6–9 m/s. The old slope was 0.03; the middle slope is now 0.06, with Speed 60 unchanged at 7.8 m/s. |
 | `ACCEL` | `body.ts` | 9 m/s² | Acceleration and braking cap. Drives the run-on lead (§5 below). |
 | `BODY_RADIUS` | `body.ts` | 0.9 m | Separation radius (nobody stands inside anyone). |
-| `live.separatePasses` / `live.decideEveryTicks` | `live.ts` | 2 / 1 | How many times a tick bodies are pushed apart, and how often players re-pick targets: speed knobs, §23. |
-| `live.carrySpeed` | `src/match/league/live.ts` | 0.95 | Carrier's top speed multiplier. 0.92 halved the tries; keep ≥ 0.94. |
-| `live.burstTicks` | `live.ts` | 16 | After a break, step or fend the carrier sprints (gas permitting) at least this long. The old ×1.15 burst is retired (F2, §10a); `gas.breakBurst` brings it back for experiments. |
-| `live.immuneTicks` | `live.ts` | 8 | Can't be tackled this long after beating a man. |
-| `live.beatenCooldown` | `live.ts` | 30 | A beaten tackler sits out before committing again. |
+| `live.separatePasses` / `live.decideEveryTicks` | `live/knobs.ts` | 2 / 1 | How many times a tick bodies are pushed apart, and how often players re-pick targets: speed knobs, §23. |
+| `live.carrySpeed` | `src/match/league/live/knobs.ts` | 0.95 | Carrier's top speed multiplier. 0.92 halved the tries; keep ≥ 0.94. |
+| `live.burstTicks` | `live/knobs.ts` | 16 | After a break, step or fend the carrier sprints (gas permitting) at least this long. The old ×1.15 burst is retired (F2, §10a); `gas.breakBurst` brings it back for experiments. |
+| `live.immuneTicks` | `live/knobs.ts` | 8 | Can't be tackled this long after beating a man. |
+| `live.beatenCooldown` | `live/knobs.ts` | 30 | A beaten tackler sits out before committing again. |
 | `ROLES` (lane / atk / def / pull / defPull) | `src/match/league/roles.ts` | table | Where each of the nine stands in attack and defence; `pull` is how far the lane slides toward the ball. Hooker `defPull` 0.4 keeps him in the line. |
 
 ## 3. The ruck and the set
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `live.contactTicks` / `live.downTicks` / `live.ptbTicks` / `live.rollTicks` / `live.dhHoldTicks` | `live.ts` | 9 / 10 / 11 / 4 / 6 | Tackle → down → play-the-ball → heel → dummy-half pause. Sum ≈ 2 s per ruck. `live.contactTicks` / `live.downTicks` now apply to a big hit only; a held tackle is the wrestle and its length sets "down" (§11). |
-| `live.onsideM` | `live.ts` | 10 | The defensive line stands 10 m off the ruck. |
-| `live.markerReleaseTicks` | `live.ts` | 14 | Markers hold at the ruck this long after the heel (× defence preset `markerHold`). Dropped marker tackles from ~50% to ~25%. |
-| `live.busyAfterPtb` | `live.ts` | 24 | The tackled man isn't a pass option this long. |
-| `live.passCooldown` | `live.ts` | 12 | No new pass this soon after a catch. |
-| `live.restartTicks` / `live.restartMaxTicks` | `live.ts` | 40 / 280 | Kick-off waits for everyone to be set, within these bounds. |
-| `live.tryTicks` | `live.ts` | 50 | Celebration before the restart. |
-| Dummy-half dart (`live.dartChance`) | `live.ts` `stepRuck` | 8% | Chance the hooker runs instead of passing (also when nobody is a pass option). |
+| `live.contactTicks` / `live.downTicks` / `live.ptbTicks` / `live.rollTicks` / `live.dhHoldTicks` | `live/knobs.ts` | 9 / 10 / 11 / 4 / 6 | Tackle → down → play-the-ball → heel → dummy-half pause. Sum ≈ 2 s per ruck. `live.contactTicks` / `live.downTicks` now apply to a big hit only; a held tackle is the wrestle and its length sets "down" (§11). |
+| `live.onsideM` | `live/knobs.ts` | 10 | The defensive line stands 10 m off the ruck. |
+| `live.markerReleaseTicks` | `live/knobs.ts` | 14 | Markers hold at the ruck this long after the heel (× defence preset `markerHold`). Dropped marker tackles from ~50% to ~25%. |
+| `live.busyAfterPtb` | `live/knobs.ts` | 24 | The tackled man isn't a pass option this long. |
+| `live.passCooldown` | `live/knobs.ts` | 12 | No new pass this soon after a catch. |
+| `live.restartTicks` / `live.restartMaxTicks` | `live/knobs.ts` | 40 / 280 | Kick-off waits for everyone to be set, within these bounds. |
+| `live.tryTicks` | `live/knobs.ts` | 50 | Celebration before the restart. |
+| Dummy-half dart (`live.dartChance`) | `live/restarts.ts` `stepRuck` | 8% | Chance the hooker runs instead of passing (also when nobody is a pass option). |
 
 Tests: `tests/match/league/live.test.ts`.
 
@@ -75,7 +75,7 @@ Baselines at even stats, one-on-one, square — `src/match/league/contest.ts`:
 | `knockOnChance` | 4% + (50 − Skill)/1000, pressured +4, rain +6, cap 0.5…40% | Catch on a pass. |
 | `interceptChance` | 6% + (IQ − 50)/1000, cut-out ×2, cap 1…60% | Defender inside `live.laneM` of the pass line. |
 
-Geometry that feeds it — `live.ts`: `live.engageM` 4.5 (carrier decides), `live.tackleReach` 1.2,
+Geometry that feeds it — `live/knobs.ts`: `live.engageM` 4.5 (carrier decides), `live.tackleReach` 1.2,
 `live.stepRange` 2.6, `live.secondManM` 3.5 (two-man tackle), `live.offloadM` 7 (support in reach; 5 before Phase 3),
 `live.laneM` 1.5 (intercept lane), `live.driveBack` 2.5 m (big hit), `live.stepJinkM` 1.6 over
 `live.stepJinkTicks` 4. `committed` sends 2 defenders, 3 if a third is within 5 m, 4 when the
@@ -89,14 +89,14 @@ Tests: `tests/match/league/live.test.ts` (contest block).
 |---|---|---|---|
 | `PASS_SPEED` | `src/match/core/ball.ts` | 16 m/s | Flat pass speed. |
 | `pickReceiver` window | `src/match/league/tactics.ts` | depth 0.3–8 m, lateral 2–`MAX_LAT_M` 12 | Score −\|lat − 6\|·(1 − width) − 0.7·depth + prefer. |
-| Pass vs carry (`live.passBase`) | `live.ts` `stepPlay` | 30% + Skill/300 (+ Playmaker, + preset) | When engaged, once per possession. |
-| `rolePreference` | `live.ts` | halves +1.5 off the ruck (+0.5 else), forwards +1.2 on tackles 1–3, fullback −0.5 (+ preset) | Who the ball goes to. |
-| `live.overlapPrefer` / `live.shiftM` | `live.ts` | 0.8 / 20 m | Receivers on the side with the numbers. |
-| `live.runOnM` | `live.ts` | 3 m | Receiver runs through the catch point by this much. |
-| `live.ruckAdvanceM` | `live.ts` | 3 m (capped at `atk` − 3 per role) | Backline comes up as the ball is heeled. |
-| `leadPoint` | `live.ts` | `runOn(v0, ACCEL, vMax, t)`, never ahead of the passer | Where the pass is thrown. |
-| `live.catchReach` | `live.ts` | 1.8 m | Receiver must be this close at landing. |
-| `live.pressureM` | `live.ts` | 2 m | A defender this close makes the catch pressured. |
+| Pass vs carry (`live.passBase`) | `live/play.ts` `stepPlay` | 30% + Skill/300 (+ Playmaker, + preset) | When engaged, once per possession. |
+| `rolePreference` | `live/positioning.ts` | halves +1.5 off the ruck (+0.5 else), forwards +1.2 on tackles 1–3, fullback −0.5 (+ preset) | Who the ball goes to. |
+| `live.overlapPrefer` / `live.shiftM` | `live/knobs.ts` | 0.8 / 20 m | Receivers on the side with the numbers. |
+| `live.runOnM` | `live/knobs.ts` | 3 m | Receiver runs through the catch point by this much. |
+| `live.ruckAdvanceM` | `live/knobs.ts` | 3 m (capped at `atk` − 3 per role) | Backline comes up as the ball is heeled. |
+| `leadPoint` | `live/contact.ts` | `runOn(v0, ACCEL, vMax, t)`, never ahead of the passer | Where the pass is thrown. |
+| `live.catchReach` | `live/knobs.ts` | 1.8 m | Receiver must be this close at landing. |
+| `live.pressureM` | `live/knobs.ts` | 2 m | A defender this close makes the catch pressured. |
 
 Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed).
 
@@ -108,15 +108,15 @@ Tests: `tests/match/league/flow.test.ts` (catch speed, loose passes, carry speed
 | `hangTime` | `ball.ts` | 2√(2·peak / 9.81) | Peaks: long 12 (3.1 s), bomb 20 (4 s), cross-field 13, chip 5, kick-off 18 (16 before #397; Short and Long kick-offs 20), grubber 0.9 (ground). |
 | `RUN_CLOSE_M` / `RUN_IT_ZONE_M` / `RUN_IT_CHANCE` / `ATTACK_KICK_M` | `tactics.ts` | 6 / 40 / 20% / 50 m | Run the last inside 6 m; 1 in 5 inside 40; territory beyond 50. |
 | `kickWeights(toLine)` | `tactics.ts` | table (§4.4) | Long / bomb / cross-field / grubber / chip weights by zone, × preset `kickBias`. |
-| `live.earlyKickM` + preset `earlyKick` | `live.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle. |
+| `live.earlyKickM` + preset `earlyKick` | `live/knobs.ts` / `presets.ts` | 25 m, 35% Balanced | Early grubber / chip on the second-last tackle. |
 | Targets | `tactics.ts` | grubber: inside 16 m, 3 m into the in-goal, else 8 m short; aimed on a winger's lane · chip 10–13 m · cross-field 2 m short, far winger · bomb 22–28 m · long 32 m (× Big Boot) | Where each kick lands. |
-| `live.kickCatchReach` | `live.ts` | 2.5 m | Whoever is nearest within this takes a kick (nominated man −0.3 m). |
-| `live.dropChance` / `live.dropPressured` | `live.ts` | 6% / 18% − (Skill − 50)/300 | Spill under a kick. |
-| `live.fullbackDeepM` / `live.fullbackLastM` | `live.ts` | 16 / 24 m | Fullback depth behind the line; he goes to the landing spot as the kicker shapes. |
-| `live.chaseThroughM` | `live.ts` | 2 m | Chasers run flat out until this close. |
-| `live.grubberChaseFromM` | `live.ts` | 24 m | Inside this, the wingers start the grubber chase on the second-last tackle. The fullback joins once the kick is aimed. 28 m (25 Oct, first cut) put a try on too many of them. |
-| `live.grubberChaseDepthM` | `live.ts` | 10 m | The chase does not sit closer than this to the try line until the kick is aimed. |
-| `live.grubberChaseLeadM` | `live.ts` | 3 m | How far in front of the ball the chase may lead before the kick is aimed. 4 m (25 Oct, first cut) did the same. |
+| `live.kickCatchReach` | `live/knobs.ts` | 2.5 m | Whoever is nearest within this takes a kick (nominated man −0.3 m). |
+| `live.dropChance` / `live.dropPressured` | `live/knobs.ts` | 6% / 18% − (Skill − 50)/300 | Spill under a kick. |
+| `live.fullbackDeepM` / `live.fullbackLastM` | `live/knobs.ts` | 16 / 24 m | Fullback depth behind the line; he goes to the landing spot as the kicker shapes. |
+| `live.chaseThroughM` | `live/knobs.ts` | 2 m | Chasers run flat out until this close. |
+| `live.grubberChaseFromM` | `live/knobs.ts` | 24 m | Inside this, the wingers start the grubber chase on the second-last tackle. The fullback joins once the kick is aimed. 28 m (25 Oct, first cut) put a try on too many of them. |
+| `live.grubberChaseDepthM` | `live/knobs.ts` | 10 m | The chase does not sit closer than this to the try line until the kick is aimed. |
+| `live.grubberChaseLeadM` | `live/knobs.ts` | 3 m | How far in front of the ball the chase may lead before the kick is aimed. 4 m (25 Oct, first cut) did the same. |
 | Kick-off target | `tactics.ts` / `kickoff.ts` | the receivers' 15–8 m line by the kicker's Skill (#397; was their 24 m line, about 26 m from halfway, peak 16), ±12 m across | Not chased for a regather. The old kick-off is `kickoff.deepDefault` 0 (`kickoff.today`). |
 | `kickoff.deepDefault` / `kickoff.deep` (#397) | `kickoff.ts` | 1 (on) · receivers' 15 m line at Skill ≤ 30 to 8 m at ≥ 90, peak 18 | The deeper default kick-off: 35–42 m from halfway (a real one goes 35–45 m), the kicker's Skill picking the depth, the same one draw across. On since 28 Oct; it re-pinned the match fingerprints. Before → after (`balance/plans/kickoff-depth.md`; runs `20261028-123504-kickoff-depth`, `20261028-124128-kickoff-depth-confirm`, `20261028-135316-kickoff-depth-gap`), even 60 v 60 over 1,000 matches: **points 25.5 → 28.6, tries 5.0 → 5.5** (+0.5 a match, beyond luck, inside 4–7), completion 69.5% → 69.7% (unchanged, the band's low edge as before), possession 50% → 50%. Every preset row gains 0.6–0.8 tries; the 45–55% preset wins hold or move in (Rush 48.5% → 51.7%, Compressed 48.5% → 54.0%, Grind 47.8% → 49.0%, All-out 39.3% → 46.0% on seeds 10001+); 70 v 50 76% → 73% (400 matches; ~70% target). |
 | `kickoff.short` (#397) | `kickoff.ts` | 12 m past halfway, peak 20 · regather 25% + 0.5%/pt (best of the 3 nearest chasers' Speed − the catcher's Skill), 15–40% | The Short kick-off call. One draw, only when called. A regather is the kicking side's ball near halfway; a miss is theirs about 12 m from halfway. Measured: 25% over 1,000 even kicks (`kickoff.test.ts`). |
@@ -134,8 +134,8 @@ Tests: `tests/match/league/kicks.test.ts`.
 | `TRAIT_PTS` (`traits.*`) | `src/match/league/traits.ts` | Dancing Feet .15 · Wrecking Ball .12 · Don't Argue .12 · Offload King .12 · Razzle Dazzle .20 · Finisher .10/.05/.10 · Hitman .12 · Hothead .12 · Pickpocket .08 · Brick Wall .10 · Last Line .10 · Poacher .10 · Gambler .15 · Playmaker pass .10 · Jets speed .08 · Last Line speed .10 · Big Boot dist .10 / acc .15 | Probability points (or multipliers) at level I. |
 | `EDGE_COST` (`edge.*`) | `traits.ts` | Hothead +8% busted/stepped · Razzle Dazzle +10% spill | Fixed downsides of the double-edged traits. |
 | `FINISHER_M` | `traits.ts` | 20 m | Red zone where the Finisher fires. |
-| `live.wreckDriveChance` / `wrestle.wreckFight` | `live.ts` / `wrestle.ts` | 30% / +30% fight per level | Wrecking Ball keeps driving in a held tackle (DRIVE!): more fight in the wrestle. |
-| `live.cutOutPerLevelM` / `live.playmakerWidth` / `live.cutOutChance` | `live.ts` | 4 m / 0.25 / 15% per level | Playmaker reach, width bias and deliberate cut-out. |
+| `live.wreckDriveChance` / `wrestle.wreckFight` | `live/knobs.ts` / `wrestle.ts` | 30% / +30% fight per level | Wrecking Ball keeps driving in a held tackle (DRIVE!): more fight in the wrestle. |
+| `live.cutOutPerLevelM` / `live.playmakerWidth` / `live.cutOutChance` | `live/knobs.ts` | 4 m / 0.25 / 15% per level | Playmaker reach, width bias and deliberate cut-out. |
 | Lab `stars` mode | `src/match/lab/sheets.ts` | two level-III fit traits each | Stress test; `#lab?traits=stars`. |
 
 **Whole matches, Phase 3** (no change made): a club's own generated traits against the same
@@ -232,7 +232,7 @@ Tests: `tests/match/view/popups.test.ts`, `tests/match/lab/stats.test.ts`, `test
 
 ## 10. Legs (§8)
 
-All in `src/match/league/fatigue.ts`; the tank lives on each player in `live.ts`.
+All in `src/match/league/fatigue.ts`; the tank lives on each player in `live/types.ts`.
 
 | Knob | Value | Effect |
 |---|---|---|
@@ -251,7 +251,7 @@ All in `src/match/league/fatigue.ts`; the tank lives on each player in `live.ts`
 
 ## 10a. Sprint and gas (§8.2)
 
-`src/match/league/gas.ts` (`gas.*`) and the who-sprints rules in `live.ts` `assignTargets` (`live.*`).
+`src/match/league/gas.ts` (`gas.*`) and the who-sprints rules in `live/positioning.ts` `assignTargets` (`live.*`).
 
 | Knob | Value | Effect |
 |---|---|---|
@@ -271,7 +271,7 @@ Tests: `tests/match/league/gas.test.ts` (the chase: Speed 90 / Stamina 30 caught
 
 ## 11. The wrestle (§8.1)
 
-All in `src/match/league/wrestle.ts`; `live.ts` `stepWrestle` runs it (and `live.joinM`).
+All in `src/match/league/wrestle.ts`; `live/contact.ts` `stepWrestle` runs it (and `live.joinM`).
 
 | Knob | Value | Effect |
 |---|---|---|
@@ -327,7 +327,7 @@ season stats and Player of the Match count it). The harness column `lineBreaks` 
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `live.lineBreakM` | `src/match/league/live.ts` | 1 m | How far goal-side of all but the last man counts as a line break (a measure, not play). |
+| `live.lineBreakM` | `src/match/league/live/knobs.ts` | 1 m | How far goal-side of all but the last man counts as a line break (a measure, not play). |
 
 **Tackles and the band** (Phase 3): between even sides the sim made about 196 tackles a
 match, a tackle every 5.5 s of game clock. A real NRL match runs at about 7.5 s a tackle of
@@ -465,7 +465,7 @@ instead. **Dead** (over the dead-ball line or into touch-in-goal) off the attack
 grounded by the defender in his own in-goal: a tap on the defence's 20 m line. Dead off the
 defence, or a defender held in his own in-goal: a goal-line drop-out (kicked from the middle
 of his try line, 38 ± 6 m). A set piece is a stoppage: the clock stops and the coaches can
-interchange (§14). All of it is `src/match/league/touch.ts`, played out in `live.ts`.
+interchange (§14). All of it is `src/match/league/touch.ts`, played out in `live/restarts.ts`.
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
@@ -912,8 +912,8 @@ matches nothing moves beyond luck (`20261019-230203-offloads-check` on main agai
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `live.decideEveryTicks` | `src/match/league/live.ts` | 1 | Players re-pick their targets every this many ticks (1 = 20 Hz). 2 is about a fifth faster but costs about a sixth of the line breaks and All-out's edge (38% v 48% against Balanced; `20261019-225416-decide-rate`), so it stays at 1. |
-| `live.separatePasses` | `live.ts` | 2 | Times a tick bodies are pushed apart. 1 saves little and costs about a sixth of the points. |
+| `live.decideEveryTicks` | `src/match/league/live/knobs.ts` | 1 | Players re-pick their targets every this many ticks (1 = 20 Hz). 2 is about a fifth faster but costs about a sixth of the line breaks and All-out's edge (38% v 48% against Balanced; `20261019-225416-decide-rate`), so it stays at 1. |
+| `live.separatePasses` | `live/knobs.ts` | 2 | Times a tick bodies are pushed apart. 1 saves little and costs about a sixth of the points. |
 
 | | main | N9.1 |
 |---|---|---|
@@ -972,9 +972,9 @@ rate's Stamina slope and the contest's fatigue weights are knobs (§10). The lab
 
 | Knob | File | Value | Effect |
 |---|---|---|---|
-| `live.territoryChaseSprint` | `src/match/league/live.ts` | 0 | 1 sends the chasers after a territory kick at a sprint too (before N9.3). |
-| `live.wingerChase` | `live.ts` | 1 | The winger nearest an attacking kick joins its chase (0 = only the two nearest and the kicker). |
-| `live.lineCruiseRef` | `live.ts` | 0.94 | The cruise the presets' line speeds were set at; the line moves at × `gas.cruise` / this. |
+| `live.territoryChaseSprint` | `src/match/league/live/knobs.ts` | 0 | 1 sends the chasers after a territory kick at a sprint too (before N9.3). |
+| `live.wingerChase` | `live/knobs.ts` | 1 | The winger nearest an attacking kick joins its chase (0 = only the two nearest and the kicker). |
+| `live.lineCruiseRef` | `live/knobs.ts` | 0.94 | The cruise the presets' line speeds were set at; the line moves at × `gas.cruise` / this. |
 | `fatigue.drain.*`, `fatigue.contest.*` | `fatigue.ts` | §10 | The drain's Stamina slope; the contest's fatigue weights. |
 
 **Kick chase** (`20261020-004010-kick-chase`, 120 whole matches a row, even 60 v 60, Slide v
@@ -1194,7 +1194,7 @@ play as much as before, the fullback no more than unnamed, and field goals still
 ## 30. The break rule (N13.5, #316)
 
 A side's plan can change at half-time and after a try. The rule lives in
-`src/match/league/breaks.ts` and the sim calls it from `live.ts` when the break
+`src/match/league/breaks.ts` and the sim calls it from `live/clock.ts` and `live/contact.ts` when the break
 opens (`endHalf`, and `score` once the phase is the try). It does not run on a
 penalty goal or a field goal. No dice of its own: a match that names no side
 is the match it was. The golden even Balanced / Slide match (seed 1) is
@@ -1261,7 +1261,7 @@ other presets on the N13.1 tables.
 ## 31. Kick contests (#99; BAK-208 §4.3–4.4)
 
 The contests a kick sets up (`src/match/league/kickContest.ts`, played by
-`live.ts`). One function, `chaserWins`, is the chaser's Speed against the
+`live/kicks.ts`). One function, `chaserWins`, is the chaser's Speed against the
 catcher's Skill for both the bomb and the Short kick-off's regather (#397,
 `kickoff.short`, unchanged). Overridable by name (`kickContest.bomb.won.base`,
 `kickContest.grubber.bounceS`, …). Plan and results:
@@ -1304,8 +1304,8 @@ path. Its timed controls share the seed replay contract with coach calls.
 
 | Name | File | Value | Meaning |
 | --- | --- | --- | --- |
-| `LIVE.controlsChipFromM` | `match/league/live.ts` | 12 m | Drag length at which a grubber becomes a chip. |
-| `LIVE.controlsBombFromM` | `match/league/live.ts` | 24 m | Drag length at which a chip becomes a bomb inside `ATTACK_KICK_M`, or a territory kick beyond it. |
+| `LIVE.controlsChipFromM` | `match/league/live/knobs.ts` | 12 m | Drag length at which a grubber becomes a chip. |
+| `LIVE.controlsBombFromM` | `match/league/live/knobs.ts` | 24 m | Drag length at which a chip becomes a bomb inside `ATTACK_KICK_M`, or a territory kick beyond it. |
 | `CONTROLS_ENGAGE_MS` | `match/view/livePlayback.ts` | 600 ms | First engagement's real-time slow beat. |
 | `CONTROLS_ENGAGE_FACTOR` | `match/view/livePlayback.ts` | 0.35 | Playback factor during that beat. |
 | `CONTROLS_SKIP_MAX_TICKS` | `match/view/livePlayback.ts` | 30,000 | Safety cap on one set skip; events remain connected to the recorder. |

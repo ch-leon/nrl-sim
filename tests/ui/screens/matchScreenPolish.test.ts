@@ -35,7 +35,7 @@ const raw = (glob: Record<string, unknown>): string => Object.values(glob)[0] as
 const SRC: Record<string, string> = {
   'src/ui/screens/matchOverlay.ts': raw(import.meta.glob('../../../src/ui/screens/matchOverlay.ts', { query: '?raw', import: 'default', eager: true })),
   'src/scenes/MatchScene.ts': raw(import.meta.glob('../../../src/scenes/MatchScene.ts', { query: '?raw', import: 'default', eager: true })),
-  'src/match/league/live.ts': raw(import.meta.glob('../../../src/match/league/live.ts', { query: '?raw', import: 'default', eager: true })),
+  'src/match/league/live.ts': (Object.values(import.meta.glob(['../../../src/match/league/live.ts', '../../../src/match/league/live/*.ts'], { query: '?raw', import: 'default', eager: true })) as string[]).join('\n'),
 };
 const readFileSync = (path: string, _enc: 'utf8'): string => SRC[path]!;
 
