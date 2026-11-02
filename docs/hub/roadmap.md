@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 ## Now (as of 1 Nov 2026)
 
@@ -15,6 +15,18 @@ Last updated: 2026-11-01
   - Locked Coach calls tray tiles are untested in CI.
   - A full tray covers more of the key-moment banner.
   - The Coach calls page scrolls in a short area in landscape.
+
+- **Launch plumbing (decided 2 Nov 2026):** hosting, push, analytics, pop-ups, flags, email and privacy. Tracking: [issue #456](https://github.com/ch-leon/nrl-sim/issues/456), which has Leon's setup checklist. Decisions are in [marketing.md](marketing.md#engagement-and-launch-plumbing).
+  - Buildable now: the pop-up itself, with a test message ([issue #451](https://github.com/ch-leon/nrl-sim/issues/451)).
+  - Waiting on Leon's setup:
+    - Firebase Hosting on our own domain ([issue #448](https://github.com/ch-leon/nrl-sim/issues/448))
+    - push ([issue #449](https://github.com/ch-leon/nrl-sim/issues/449))
+    - PostHog analytics ([issue #450](https://github.com/ch-leon/nrl-sim/issues/450))
+    - remote flags and A/B tests ([issue #452](https://github.com/ch-leon/nrl-sim/issues/452))
+    - EmailOctopus sign-up ([issue #453](https://github.com/ch-leon/nrl-sim/issues/453))
+    - Android tester build via App Distribution ([issue #454](https://github.com/ch-leon/nrl-sim/issues/454))
+    - privacy policy and the children's privacy code check ([issue #455](https://github.com/ch-leon/nrl-sim/issues/455))
+  - The repo goes private at launch, once hosting and the tester build have moved.
 
 ## Later
 

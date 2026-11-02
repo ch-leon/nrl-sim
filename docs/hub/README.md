@@ -1,6 +1,6 @@
 # Project hub
 
-Last updated: 2026-11-01
+Last updated: 2026-11-02
 
 The hub is the one place Leon and every agent read to see what NRL Sim is, what's
 in it and what's next. Each page is short and plain. Anything not decided yet is
@@ -10,7 +10,8 @@ marked **Open** with its question.
   things stand.
 - [Features](features.md): what's in the game today, and what was added recently.
 - [Roadmap](roadmap.md): Now, Next, Later, and ideas still being discussed.
-- [Marketing](marketing.md): name, store copy, pricing and payments.
+- [Marketing](marketing.md): name, store copy, pricing, payments, and the engagement
+  and launch plumbing (hosting, push, analytics, pop-ups, email, privacy).
 
 ## Keeping it current
 
