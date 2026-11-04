@@ -101,6 +101,8 @@ export interface ClubHomeDeps {
 const STYLE_ID = 'nrl-club-home-styles';
 const CSS = `
 .nrl-club-home .nrl-modal-scroll, .nrl-club-home-body { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+/* Long ground names and runway text wrap; scroll rather than compressing their rows. */
+.nrl-club-home-body > * { flex-shrink: 0; }
 .nrl-club-home-name { font-family: var(--nrl-f-label); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; overflow-wrap: anywhere; }
 .nrl-club-home-week { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); text-transform: uppercase; }
 .nrl-club-home-row {

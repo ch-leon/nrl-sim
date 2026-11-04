@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { BASE, OUT_ROOT, IPHONE_UA, log } from '../common.mjs';
+import { BASE, OUT_ROOT, IPHONE_UA, log, openNav } from '../common.mjs';
 
 export async function runTownSetup(browser) {
   const out = join(OUT_ROOT, 'webkit', 'town-setup');
@@ -46,6 +46,12 @@ export async function runTownSetup(browser) {
         } else if (typeof state.home.lat !== 'number' || typeof state.home.lon !== 'number') throw new Error('Listed town has no coordinates');
         if (mode === 'picked' && (state.home.town !== pick.name || state.home.lat !== pick.lat || state.home.lon !== pick.lon)) throw new Error('Picked town metadata was not stored');
         await page.locator('.nrl-tutorial-skip').click({ timeout: 1500 }).catch(() => {});
+        if (width < height) {
+          await openNav(page, 'club');
+          await page.locator('[data-club-home]').waitFor();
+          const next = state.league.fixtures.filter(f => f.round >= state.week && (f.homeId === 'player' || f.awayId === 'player')).sort((a, b) => a.round - b.round)[0];
+          if (next?.homeId === 'player' && !(await page.locator('.nrl-club-home-next').textContent()).includes(ground)) throw new Error('Home fixture is missing the saved ground name');
+        }
         await page.screenshot({ path: join(out, `${tag}-started.png`) });
         if (mode === 'listed') {
           townRequests = 0;
