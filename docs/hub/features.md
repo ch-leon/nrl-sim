@@ -65,8 +65,7 @@ What's in the game, with the PR that added each.
 
 - Finance opens after the first home game, Staff & Board at round 4 and Contracts at round 12. Office explains locked tiles; HUD and warning links stay available ([PR](https://github.com/ch-leon/nrl-sim/pull/498)).
 
-- Club home’s “Coach says” gives one practical next step; the weekly summary shares the same suggestion (#477).
-
+- Club home’s “Coach says” gives one practical next step; the weekly summary shares the same suggestion ([PR](https://github.com/ch-leon/nrl-sim/pull/499)).
 
 - New careers open facilities through season one, with a veteran setup skip and a confirmed Settings skip; old saves keep everything open ([PR](https://github.com/ch-leon/nrl-sim/pull/497)).
 
