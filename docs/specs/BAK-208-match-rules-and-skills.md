@@ -237,6 +237,8 @@ sim's defaults (`src/match/league/presets.ts`).
 
 The Tight offload rebuild (#460) is dormant (`counters.tight.on = 0`): the row above remains the default. With the switch at 1, pack carriers use the starting sheet’s Tight fit for second-phase offloads; hit-ups and territory kicks stay unchanged. See tuning §30.
 
+Own-style fit (#461) is independently dormant (`counters.fit.on = 0`). When enabled, starting-sheet attack fit helps carrying contests and defence fit helps tackling contests; fit 1 is neutral. A plan applied at a break selects the new styles’ fits. The same contest roll resolves contact; see tuning §31.
+
 *Pass* adds to the engaged carrier's chance of passing (base 30% + Skill/300). *Offloads*
 multiplies the offload odds (§4.1); 0 means support is ignored. *Step* is the chance he
 tries the step one-on-one rather than tucking it. *Width* softens the preference for the

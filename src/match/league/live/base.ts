@@ -22,7 +22,8 @@ import { CallJudge, callDefence, withAttackCall, withDefenceCall, type CallInput
 import type { KickoffCall } from '../kickoff';
 import { weatherEffect, type WeatherEffect } from '../weather';
 import type { MatchInjury, WeatherKind } from '../../../sim/events';
-import { styleFit } from '../fit';
+import { styleFit, type StyleFit } from '../fit';
+import { fitEdge } from '../counters';
 import { LIVE } from './knobs';
 import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput } from './types';
 
@@ -39,6 +40,8 @@ export abstract class LiveBase {
   readonly tactics: Record<Side, TeamTactics>;
   /** Tight fit of the selected starters, fixed before kick-off; bench and fatigue never rescore it. */
   protected readonly tightFit: Record<Side, number>;
+  protected readonly squadFit: Record<Side, StyleFit>;
+  protected readonly planFit: Record<Side, { attack: number; defence: number }>;
   /** The goal-kicker each side named (N11, a squad id); the slot-5 kicker when absent or off the field. */
   private readonly goalKickerKey: Record<Side, string | undefined>;
   /** Each side's captain, as the penalty call reads him (N11): neutral when the sheet names none. */
@@ -178,8 +181,19 @@ export abstract class LiveBase {
   protected readonly goldenPoint: boolean;
   protected golden = false;
 
+  /** Starting-sheet scores stay fixed; a break selects the newly played styles. */
+  protected refreshPlanFit(side: Side): void {
+    const plan = this.tactics[side];
+    this.planFit[side] = { attack: this.squadFit[side][plan.attack], defence: this.squadFit[side][plan.defence] };
+  }
+
+  protected contestFitEdge(attacker: Side, defender: Side): number {
+    return fitEdge(this.planFit[attacker].attack) - fitEdge(this.planFit[defender].defence);
+  }
+
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
-    this.tightFit = { home: styleFit(home.roster ?? []).grind, away: styleFit(away.roster ?? []).grind };
+    this.squadFit = { home: styleFit(home.roster ?? []), away: styleFit(away.roster ?? []) };
+    this.tightFit = { home: this.squadFit.home.grind, away: this.squadFit.away.grind };
     // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average;
     // then the difficulty's edge to the player's rival (N12.2), which the spread would mostly cancel.
     [home, away] = edgeSheets(...spreadSheets(home, away), opts.difficultyEdge);
@@ -208,6 +222,9 @@ export abstract class LiveBase {
     this.goldenPoint = opts.goldenPoint === true;
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: { ...(home.tactics ?? DEFAULT_TACTICS) }, away: { ...(away.tactics ?? DEFAULT_TACTICS) } };
+    this.planFit = { home: { attack: 1, defence: 1 }, away: { attack: 1, defence: 1 } };
+    this.refreshPlanFit('home');
+    this.refreshPlanFit('away');
     this.goalKickerKey = { home: home.kicker, away: away.kicker };
     this.captain = { home: captainOf(home), away: captainOf(away) };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
