@@ -16,7 +16,7 @@ import { rivalMatchSheet } from '../../systems/matchday';
 import { teamSheetFromSquad } from '../league/sheets';
 import { rivalEdge, type DifficultyEdge } from '../league/spread';
 import { TICK_S } from '../core/engine';
-import type { SimEvent } from '../core/snapshot';
+import type { Side, SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
 import { LiveSim, type PlanInput } from '../league/live';
 import { aiCoachSides, type CallInput } from '../league/calls';
@@ -216,18 +216,22 @@ const KICK_TRY_TICKS = 240;
 const LATE = (e: SimEvent): boolean => e.kind === 'break-tackle' && e.detail === 'wrestle';
 
 /** Per-match counts from one match's events. */
-function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
-  const c = Object.fromEntries(COUNTS.map((k) => [k, 0])) as Record<CountKey, number>;
+export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountKey, number> {
+  const counts = Object.fromEntries(COUNTS.map((k) => [k, 0])) as Record<CountKey, number>;
   // The kick in play (#99 close-out): a try by the kicking side within KICK_TRY_TICKS of its kick is a kick try.
   // A grubber's next act is one of: try, repeat set (the chase regathers), dropout, or turnover.
   let lastKick: { side: string | undefined; detail: string | undefined; tick: number } | null = null;
   let grubber: { side: string; tick: number; ours: boolean } | null = null;
   const closeGrubber = (kind: 'grubberTries' | 'grubberRepeats' | 'grubberDropouts' | 'grubberTurnovers'): void => {
     if (!grubber) return;
-    c[kind]++;
+    if (!side || grubber.side === side) counts[kind]++;
     grubber = null;
   };
+  // Keep the whole event stream for kick context; discard other sides' own counts.
+  // Filtering first can credit a regather after the opponent's next kick.
+  const ignored = { ...counts };
   for (const e of es) {
+    const c = !side || e.side === side ? counts : ignored;
     switch (e.kind) {
       case 'tackle':
         c.tackles++;
@@ -396,7 +400,7 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
     }
   }
   if (grubber) closeGrubber(grubber.ours ? 'grubberRepeats' : 'grubberTurnovers');
-  return c;
+  return counts;
 }
 
 /** Points a scoring event is worth, by the side named on it. */
@@ -552,7 +556,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       if (track) {
         const trackedSide = onSim(track);
         const sideCounts = (side: 'home' | 'away'): SideCounts => {
-          const c = countEvents(events.filter((e) => e.side === side));
+          const c = countEvents(events, side);
           return Object.fromEntries(SIDE_COUNTS.map((k) => [k, k === 'pointsFor' ? sim.points[side] : k === 'pointsAgainst' ? sim.points[flipSide(side)] : c[k]])) as SideCounts;
         };
         trackedPerMatch.push(sideCounts(trackedSide));
