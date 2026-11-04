@@ -69,6 +69,7 @@ import { runCoachVoice } from './e2e-webkit/screens/coachVoice.mjs';
 import { runOfficeUnlocks } from './e2e-webkit/screens/officeUnlocks.mjs';
 import { runCoachName } from './e2e-webkit/screens/coachName.mjs';
 import { runDifficulty } from './e2e-webkit/screens/difficulty.mjs';
+import { runTownSetup } from './e2e-webkit/screens/townSetup.mjs';
 import { FLOW_RUNS, runFlow } from './e2e-webkit/screens/flow.mjs';
 import { runLargeTextTargets } from './e2e-webkit/text/largeTextTargets.mjs';
 import { runLadderForm } from './e2e-webkit/text/ladderForm.mjs';
@@ -90,6 +91,7 @@ const SECTIONS = [
   ['runRecruit', (b) => runRecruit(b)],
   ['runScreens', async (b) => { let f = 0; for (const run of SCREEN_RUNS) f += await runScreens(b, run); return f; }],
   ['runDockTextSize', (b) => runDockTextSize(b)],
+  ['runTownSetup', (b) => runTownSetup(b)],
   ['runFlow', async (b) => { let f = 0; for (const run of FLOW_RUNS) f += await runFlow(b, run); return f; }],
   ['runCoachName', (b) => runCoachName(b)],
   ['runOfficeUnlocks', (b) => runOfficeUnlocks(b)],
@@ -109,7 +111,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
   text: ['runLargeTextTargets', 'runLadderForm'],
-  screens: ['runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
+  screens: ['runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 

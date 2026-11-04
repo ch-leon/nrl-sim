@@ -144,3 +144,16 @@ describe('Coach says row (#477)', () => {
     expect(reopened.textContent).toContain("can't play. Fix the lineup.");
   });
 });
+
+describe('the named home ground (#485)', () => {
+  it('appears for a home fixture only; older saves keep the original line', () => {
+    const s = createNewGame('Ground Club', 42);
+    s.league = initLeague(s);
+    const home = s.league.fixtures.find(f => f.homeId === 'player')!;
+    const away = s.league.fixtures.find(f => f.awayId === 'player')!;
+    const baseline = nextMatchLine({ ...s, week: home.round });
+    expect(nextMatchLine({ ...s, week: home.round, groundName: 'Valley Oval' })?.text).toBe(`${baseline?.text} · Valley Oval`);
+    expect(nextMatchLine({ ...s, week: home.round, groundName: 'Valley Oval' })?.label).toContain('home at Valley Oval');
+    expect(nextMatchLine({ ...s, week: away.round, groundName: 'Valley Oval' })).toEqual(nextMatchLine({ ...s, week: away.round }));
+  });
+});
