@@ -1,6 +1,6 @@
 {
   "name": "Compressed counters acceptance",
-  "description": "Full 5 by 3 matrix at flat 60 and neutral fit, all counters enabled only by overrides. 500 seeds both ways: 1000 whole matches per cell.",
+  "description": "Full 5 by 3 matrix at flat 60 and neutral fit, all counters enabled only by overrides. 500 seeds both ways per cell (1000 matches), except Tight v Rush: extended once to 1000 seeds both ways (2000 matches), matching task 6 neutral sampling and resolving a row-boundary estimate.",
   "report": "matrix",
   "seeds": 500,
   "scenarios": [
@@ -40,7 +40,8 @@
         }
       },
       "track": "home",
-      "bothWays": true
+      "bothWays": true,
+      "seeds": 1000
     },
     {
       "name": "grind v compressed",

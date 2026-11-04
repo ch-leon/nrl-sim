@@ -1522,5 +1522,7 @@ crossing the line; this uses the existing contact roll, not a new roll.
 Kick-chase, All-out and Balanced receive no Compressed counter effect.
 `balance/plans/counters-compressed.json` runs the entire 5 × 3 matrix at flat
 60, neutral fits and all counter switches overridden to 1: 500 seeds in both
-orientations, 1,000 whole matches per cell. Shipped switches remain 0. No new
+orientations, 1,000 whole matches per cell, except Tight v Rush: its initial
+1,000-match estimate is extended once with the next 500 seeds both ways
+(2,000 matches total, matching task 6 sampling). Shipped switches remain 0. No new
 stored fields, randomness, save version, Labs or commercial changes.

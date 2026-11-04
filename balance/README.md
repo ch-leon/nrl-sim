@@ -216,7 +216,10 @@ sample-variance pooling formula are preserved beside each pooled report on
 
 `counters-compressed.json` is the task-7 full-matrix acceptance plan (#464). It
 enables Tight, own-style fit, Slide, Rush and Compressed through overrides only.
-All 15 flat-60 cells use 500 seeds both ways (1,000 whole matches per cell).
+Flat-60 cells use 500 seeds both ways (1,000 whole matches per cell), except
+Tight v Rush: 1,000 seeds both ways (2,000 matches), retaining the complete
+initial sample and its one extension, as in task 6. The first Tight-row sum
+was −3.10 pp with the 1,000-match Rush estimate.
 Compressed targets are Tight 43–47%, Expansive 53–57% and the other three
 48–52%. Sum the signed swings from 50 in each row and column; every total
 should be within ±3 percentage points. The report also exposes tracked-side
