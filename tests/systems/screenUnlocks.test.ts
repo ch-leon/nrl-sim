@@ -85,3 +85,45 @@ it('keeps completed facilities through round 12, then clears the shared state on
   expect(isScreenOpen(getState(), 'contracts')).toBe(true);
   expect(getState().unlocks).toBeUndefined();
 });
+
+it.each(['easy', 'normal', 'hard'] as const)('walks both ladders together on %s and opens everything for veterans', async (difficulty) => {
+  const { registerUnlockSystem: registerBoth, isFacilityOpen } = await import('../../src/systems/unlocks');
+  bus.clear(); clearTickHooks(); clearSeasonHooks();
+  createNewGame('Combined season', 42, { difficulty });
+  setState({ league: { clubs: [], ladder: [], fixtures: [{ round: 2, homeId: 'player', awayId: 'away' }] } });
+  registerBoth();
+  expect(isFacilityOpen(getState(), 'trainingPaddock')).toBe(true);
+  expect(isFacilityOpen(getState(), 'videoRoom')).toBe(false);
+  expect(isScreenOpen(getState(), 'finance')).toBe(false);
+  for (let round = 1; round < 24; round++) {
+    if (round === 2) setState({ league: { ...getState().league, fixtures: [{ round: 2, homeId: 'player', awayId: 'away', result: { homeScore: 0, awayScore: 8 } }] } });
+    advanceWeek();
+    const state = getState();
+    expect(isFacilityOpen(state, 'videoRoom')).toBe(state.week >= 2);
+    expect(isFacilityOpen(state, 'coachsOffice')).toBe(state.week >= 3);
+    expect(isFacilityOpen(state, 'scoutOffice')).toBe(state.week >= 5);
+    expect(isFacilityOpen(state, 'teamGym')).toBe(state.week >= 8);
+    expect(isFacilityOpen(state, 'grandstand')).toBe(state.week >= 24);
+    expect(isScreenOpen(state, 'finance')).toBe(state.week >= 3);
+    expect(isScreenOpen(state, 'staff')).toBe(state.week >= 4);
+    expect(isScreenOpen(state, 'contracts')).toBe(state.week >= 12);
+    expect(state.unlocks === undefined).toBe(state.week >= 24);
+  }
+  createNewGame('Veteran', 42, { difficulty, openAll: true });
+  expect(getState().unlocks).toBeUndefined();
+  expect(isFacilityOpen(getState(), 'grandstand')).toBe(true);
+  for (const id of ['finance', 'staff', 'contracts']) expect(isScreenOpen(getState(), id)).toBe(true);
+});
+
+it('clears an already complete shared state without repeating announcements', async () => {
+  const { registerUnlockSystem: registerBoth } = await import('../../src/systems/unlocks');
+  const { FACILITY_CATALOG } = await import('../../src/data/facility');
+  bus.clear(); clearTickHooks(); clearSeasonHooks();
+  createNewGame('Complete', 42);
+  setState({ unlocks: { facilities: Object.keys(FACILITY_CATALOG) as (keyof typeof FACILITY_CATALOG)[], screens: ['finance', 'staff', 'contracts'] } });
+  const notes: string[] = [];
+  bus.on('ui:notify', ({ text }) => notes.push(text));
+  registerBoth(); advanceWeek();
+  expect(getState().unlocks).toBeUndefined();
+  expect(notes).toEqual([]);
+});

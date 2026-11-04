@@ -1,11 +1,12 @@
-import { SCREEN_UNLOCK_LADDER, registerScreenUnlockSystem } from './screenUnlocks';
-export { isScreenOpen, screenLockReason, screensDue } from './screenUnlocks';
 // New careers open facilities through season one. Absence preserves old-save behaviour.
 import { getState, setState, type GameState } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { SEASON_ROUNDS } from '../config';
 import { FACILITY_CATALOG, type FacilityDefId } from '../data/facility';
+import { SCREEN_UNLOCK_LADDER, isScreenOpen, registerScreenUnlockSystem } from './screenUnlocks';
+
+export { isScreenOpen, screenLockReason, screensDue } from './screenUnlocks';
 
 type Trigger = 'screen' | 'start' | 'roundOrWin' | 'home' | 'round' | 'lastRoundOrReputation';
 export const UNLOCK_LADDER: readonly {
@@ -20,7 +21,10 @@ export const UNLOCK_LADDER: readonly {
   { facilities: ['coachsOffice'], trigger: 'home', reason: 'Opens after your first home game' },
   { facilities: ['scoutOffice', 'medicalBay'], trigger: 'round', round: 5, reason: 'Opens at round 5' },
   { facilities: ['teamGym', 'academy'], trigger: 'round', round: 8, reason: 'Opens at round 8' },
-  ...SCREEN_UNLOCK_LADDER.map((row) => ({ facilities: [] as FacilityDefId[], screens: [row.id], trigger: 'screen' as const, ...(row.round === null ? {} : { round: row.round }), reason: row.reason })),
+  ...SCREEN_UNLOCK_LADDER.map((row) => ({
+    facilities: [] as FacilityDefId[], screens: [row.id], trigger: 'screen' as const,
+    ...(row.round === null ? {} : { round: row.round }), reason: row.reason,
+  })),
   { facilities: ['grandstand'], trigger: 'lastRoundOrReputation', reason: `Opens at round ${SEASON_ROUNDS}, or reputation 40` },
 ];
 
@@ -64,7 +68,8 @@ export function registerUnlockSystem(): void {
     const facilities = [...s.unlocks.facilities, ...due];
     const complete = Object.keys(FACILITY_CATALOG).every((id) => facilities.includes(id as FacilityDefId));
     if (!due.length && !complete) return;
-    setState({ unlocks: complete && s.unlocks.screens === undefined ? undefined : { ...s.unlocks, facilities } });
+    const screensComplete = SCREEN_UNLOCK_LADDER.every((row) => isScreenOpen(s, row.id));
+    setState({ unlocks: complete && screensComplete ? undefined : { ...s.unlocks, facilities } });
     if (due.length) {
       const names = due.map((id) => FACILITY_CATALOG[id].name).join(', ');
       bus.emit('ui:notify', { from: 'coach', kind: 'info', text: `${names} ${due.length === 1 ? "is" : "are"} open. Build when the club can afford it.` });

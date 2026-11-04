@@ -41,8 +41,8 @@ export function registerScreenUnlockSystem(): void {
     const screens = [...(state.unlocks.screens ?? []), ...due];
     const allOpen = SCREEN_UNLOCK_LADDER.every((row) => screens.includes(row.id));
     const unlocks = { ...state.unlocks, screens: allOpen ? undefined : screens };
-    // Never clear a facility ladder that is still running. #481 owns its completion.
-    setState({ unlocks: unlocks.facilities === undefined && allOpen ? undefined : unlocks });
+    // The shared system clears the state once facilities and screens are all open.
+    setState({ unlocks });
     for (const row of SCREEN_UNLOCK_LADDER) if (due.includes(row.id)) {
       bus.emit('ui:notify', { text: row.line, kind: 'info', from: 'coach' });
     }

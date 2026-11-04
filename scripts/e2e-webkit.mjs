@@ -107,7 +107,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
   text: ['runLargeTextTargets', 'runLadderForm'],
-  screens: ['runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice'],
+  screens: ['runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 
