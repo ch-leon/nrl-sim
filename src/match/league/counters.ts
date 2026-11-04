@@ -2,7 +2,7 @@
 export const COUNTERS = {
   fit: {
     on: 0,
-    edge: 0.2,
+    edge: 0.12,
   },
   tight: {
     on: 0,

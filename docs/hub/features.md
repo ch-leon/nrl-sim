@@ -67,7 +67,7 @@ What's in the game, with the PR that added each.
 
 Newest first; merge dates in UTC.
 
-- Own-style attack and defence fit can influence contact contests behind a switch that defaults off (#461); plan changes select the new fits, 4 Nov
+- Own-style attack and defence fit can influence contact contests behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/495)); plan changes select the new fits, 4 Nov
 - Grind is now named Tight; pack-fit offloads are available behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/473)), 4 Nov
 - CI test fixes ([PR](https://github.com/ch-leon/nrl-sim/pull/442)), 1 Nov
 - Steady tackle count ([PR](https://github.com/ch-leon/nrl-sim/pull/440)), 31 Oct
