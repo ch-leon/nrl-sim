@@ -15,6 +15,7 @@ export abstract class LiveKicks extends LiveClock {
   protected launchPendingKick(): void {
     const k = this.pendingKick;
     if (!k || this.tick < k.at) return;
+    this.offloadReceiver = null;
     this.pendingKick = null;
     const kicker = this.players[k.kicker]!;
     let to = k.to;

@@ -376,6 +376,7 @@ export abstract class LiveCalls extends LiveBase {
   /** A line break: in open play the carrier gets goal-side of every defender but the last man (the §7 count; a `break` to the contract). */
   protected watchLineBreak(h: Player | null): void {
     if (this.phase.kind !== 'play') {
+      this.offloadReceiver = null;
       this.lineBrokenBy = null;
       return;
     }

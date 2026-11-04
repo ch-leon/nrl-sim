@@ -44,6 +44,18 @@ class SlideSim extends LiveSim {
     this.pass(from, to);
     return this.ball.kind === 'flight' ? this.ball.receiver : null;
   }
+  endCarry(action: 'kick' | 'stoppage' | 'pass' | 'turnover') {
+    this.offloadReceiver = 7;
+    if (action === 'kick') {
+      this.pendingKick = { at: this.tick, kicker: 5, to: { x: 80, y: 34 }, receiver: 9, peak: 20, kickoff: false, kind: 'long' };
+      this.launchPendingKick();
+    } else if (action === 'stoppage') {
+      this.phase = { kind: 'full-time' };
+      this.watchLineBreak(null);
+    } else if (action === 'pass') this.pass(this.players[7]!, this.players[6]!);
+    else this.turnover();
+    return this.offloadReceiver;
+  }
   cover() { return this.kickCover('home'); }
 }
 
@@ -118,6 +130,12 @@ describe('dormant Slide counters', () => {
     expect(result.mods.broken).toBeGreaterThan(0); expect(result.receiver).toBeNull();
     expect(tuned(1, () => new SlideSim('balanced').contact(7, true).mods)).toEqual({});
   });
+
+  it('ends the second-phase advantage at a kick, stoppage, ordinary pass or turnover', () => tuned(1, () => {
+    for (const action of ['kick', 'stoppage', 'pass', 'turnover'] as const) {
+      expect(new SlideSim('all-out').endCarry(action)).toBeNull();
+    }
+  }));
 
   it('a fit-0.5 Slide changes the live mechanics less than a fit-1.5 Slide', () => tuned(1, () => {
     const contact = (attack: AttackPreset, fit: number, slot: number, second = false) =>
