@@ -13,7 +13,10 @@ export async function runUnlocks(browser) {
     const report = { width, height, problems: [], rounds: [] };
     const check = (ok, why) => { if (!ok) report.problems.push(why); };
     page.on('pageerror', (e) => report.problems.push(e.message));
-    const shot = (name) => page.screenshot({ path: join(out, `${width}x${height}-${name}.png`) });
+    const shot = async (name) => {
+      await page.waitForTimeout(350); // capture after the sheet's entry animation
+      return page.screenshot({ path: join(out, `${width}x${height}-${name}.png`) });
+    };
     try {
       await page.addInitScript(closeWeekSummary);
       await page.goto(BASE);
@@ -90,6 +93,7 @@ export async function runUnlocks(browser) {
       await openNav(veteran, 'build');
       check(await veteran.locator('.nrl-build-row').count() === 12, 'veteran missing tiles');
       check(!(await veteran.locator('.nrl-build-list').textContent()).includes('Opens '), 'veteran has closed tiles');
+      await veteran.waitForTimeout(350);
       await veteran.screenshot({ path: join(out, `${width}x${height}-veteran.png`) });
       await veteranContext.close();
     } catch (e) { report.problems.push(e.stack ?? String(e)); await shot('failure').catch(() => {}); }
