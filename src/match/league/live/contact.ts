@@ -3,7 +3,7 @@ import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_Y, clampToGround, inGoal } from
 import { PASS_SPEED, passFlight } from '../../core/ball';
 import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, dot, scale, sub, type Vec } from '../../core/vec';
-import { BASE, interceptChance, resolveContest, type ContestMods } from '../contest';
+import { BASE, compressedContact, interceptChance, resolveContest, type ContestMods } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
 import { MAX_LAT_M, pickReceiver } from '../tactics';
 import { EDGE_COST, FINISHER_M, announce, contestTraits, interceptTraits } from '../traits';
@@ -19,7 +19,7 @@ import { TOUCH } from '../touch';
 import { BIN } from '../sinbin';
 import { derivedRatings } from '../fit';
 import { COUNTERS, rushBroken } from '../counters';
-import { PACK } from '../presets';
+import { BACKS, PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
 import { other, type Player, type Phase } from './types';
 import { LivePenalties } from './penalties';
@@ -115,6 +115,7 @@ export abstract class LiveContact extends LivePenalties {
     tr.mods.broken = (tr.mods.broken ?? 0) + broken + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
     tr.mods.edge = this.contestFitEdge(c.side, t.side);
     this.applySlideContact(c, tr.mods, sit.support);
+    this.applyCompressedContact(c, committed, tr.mods, sit.support);
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
     // Contact costs both men legs, whatever happens.
@@ -230,6 +231,25 @@ export abstract class LiveContact extends LivePenalties {
   /** The rushed All-out offload uses the receiver's existing handling roll. */
   protected rushOffloadSpill(side: Side): number {
     return this.tactics[side].attack === 'all-out' ? this.rushEffect(side) : 0;
+  }
+
+  /** Middle gang tackles read the committed men's Contact D; edge backs exploit the overlap. */
+  protected applyCompressedContact(c: Player, committed: readonly Player[], mods: ContestMods, support: boolean): void {
+    const effect = this.compressedEffect(c.side);
+    if (effect <= 0) return;
+    const middle = Math.abs(c.body.pos.y - MID_Y) <= MAX_LAT_M;
+    if (this.tactics[c.side].attack === 'grind' && middle) {
+      const men = committed.filter((d) => dist(d.body.pos, c.body.pos) < LIVE.secondManM);
+      if (!men.length) return;
+      const contactD = men.reduce((sum, d) => sum + derivedRatings({ position: ROLES[d.slot]!.name,
+        stats: { ...d.stats, stamina: d.stamina }, traits: d.traits }).contactD, 0) / men.length;
+      const squeeze = compressedContact(effect, contactD, support);
+      mods.broken = (mods.broken ?? 0) + squeeze.broken!;
+      if (support) mods.offload = (mods.offload ?? 0) + squeeze.offload!;
+    } else if (this.tactics[c.side].attack === 'expansive' && !middle && BACKS.includes(ROLES[c.slot]!.name)) {
+      // Faster outside backs turn the missing edge defender into a break, on the existing roll.
+      mods.broken = (mods.broken ?? 0) + effect * c.stats.speed / 60;
+    }
   }
 
   /** Drift leaves an inside gap for the pack, and cannot reset for the offload receiver. */
@@ -382,6 +402,8 @@ export abstract class LiveContact extends LivePenalties {
     const ahead = free.filter((d) => !behind(d)).length;
     // A broken line (two or fewer still in front) sends everyone in range after him.
     const n = ahead <= 2 ? 4 : free[2] && dist(free[2].body.pos, h.body.pos) < 5 ? 3 : 2;
-    return free.slice(0, Math.min(4, n + dplan.commit));
+    const squeeze = this.tactics[h.side].attack === 'grind' && Math.abs(h.body.pos.y - MID_Y) <= MAX_LAT_M
+      && this.compressedEffect(h.side) > 0 ? 1 : 0;
+    return free.slice(0, Math.min(4, n + dplan.commit + squeeze));
   }
 }

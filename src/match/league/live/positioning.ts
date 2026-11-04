@@ -338,6 +338,7 @@ export abstract class LivePositioning extends LiveContact {
     // stays in the line during the earlier carries.
     const kickCover = this.tactics[atk].attack === 'kick-chase' && (this.lastPlay || this.tackles >= SET_TACKLES - 2) ? this.slideEffect() : 0;
     const rushDepth = this.tactics[atk].attack === 'kick-chase' ? Math.min(1, this.rushEffect()) : 0;
+    const compressed = this.tactics[atk].attack === 'expansive' ? Math.min(1, this.compressedEffect()) : 0;
     const coverDepth = Math.min(1, kickCover);
     if (ph.kind === 'play' && carrier) {
       const want = carrier.body.pos.x + this.dir * 2.5;
@@ -400,7 +401,8 @@ export abstract class LivePositioning extends LiveContact {
       } else {
         const slide = this.slideEffect();
         const expansive = this.tactics[atk].attack === 'expansive' ? slide : 0;
-        const y = clamp(role.lane + (anchor.y - MID_Y) * Math.min(1, (role.defPull ?? role.pull) * dplan.pull + expansive), 1.5, 66.5);
+        const y = clamp(role.lane + (anchor.y - MID_Y) * Math.min(1, (role.defPull ?? role.pull) * dplan.pull + expansive)
+          + (MID_Y - role.lane) * compressed, 1.5, 66.5);
         const depth = role.name === 'winger'
           ? (this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM) * coverDepth - LIVE.fullbackDeepM * rushDepth : 0;
         p.target = { x: clamp(this.lineX + this.dir * depth, -8, FIELD_LENGTH + 8), y };
