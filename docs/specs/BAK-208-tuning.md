@@ -1516,7 +1516,7 @@ crossing the line; this uses the existing contact roll, not a new roll.
 |---|---:|---|
 | `counters.compressed.on` | 0 | Only 1 enables these mechanics. |
 | `counters.compressed.tight` | 0.04 | Middle squeeze probability; a positive cell also commits the extra man. |
-| `counters.compressed.expansive` | 0.40 | Inward lane pull and speed-scaled edge bust probability. |
+| `counters.compressed.expansive` | 0.28 | Inward lane pull and speed-scaled edge bust probability. |
 | `counters.compressed.commitM` | 6 | Maximum reach in metres of the extra middle tackler at neutral fit; scaled by both fits. |
 
 Kick-chase, All-out and Balanced receive no Compressed counter effect.
@@ -1524,5 +1524,7 @@ Kick-chase, All-out and Balanced receive no Compressed counter effect.
 60, neutral fits and all counter switches overridden to 1: 500 seeds in both
 orientations, 1,000 whole matches per cell, except Tight v Rush: its initial
 1,000-match estimate is extended once with the next 500 seeds both ways
-(2,000 matches total, matching task 6 sampling). Shipped switches remain 0. No new
+(2,000 matches total, matching task 6 sampling). Balanced v Compressed adds
+one predefined extension of seeds 501–1,500 both ways after its initial
+47.55% estimate (3,000 matches total); every seed is retained. Shipped switches remain 0. No new
 stored fields, randomness, save version, Labs or commercial changes.

@@ -6,7 +6,7 @@ export const COUNTERS = {
   compressed: {
     on: 0,
     tight: 0.04,
-    expansive: 0.40,
+    expansive: 0.28,
     commitM: 6,
   },
   rush: {

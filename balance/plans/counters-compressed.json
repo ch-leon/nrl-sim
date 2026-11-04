@@ -1,6 +1,6 @@
 {
   "name": "Compressed counters acceptance",
-  "description": "Full 5 by 3 matrix at flat 60 and neutral fit, all counters enabled only by overrides. 500 seeds both ways per cell (1000 matches), except Tight v Rush: extended once to 1000 seeds both ways (2000 matches), matching task 6 neutral sampling and resolving a row-boundary estimate.",
+  "description": "Full 5 by 3 matrix at flat 60 and neutral fit, all counters enabled only by overrides. Most cells use 500 seeds both ways (1000 matches). Tight v Rush retains one extension to 1000 seeds both ways (2000 matches); Balanced v Compressed retains one predefined extension to 1500 seeds both ways (3000 matches).",
   "report": "matrix",
   "seeds": 500,
   "scenarios": [
@@ -117,7 +117,8 @@
         }
       },
       "track": "home",
-      "bothWays": true
+      "bothWays": true,
+      "seeds": 1500
     },
     {
       "name": "expansive v slide",
@@ -298,7 +299,7 @@
     "counters.rush.on": 1,
     "counters.compressed.on": 1,
     "counters.compressed.tight": 0.04,
-    "counters.compressed.expansive": 0.4,
+    "counters.compressed.expansive": 0.28,
     "counters.compressed.commitM": 6
   }
 }
