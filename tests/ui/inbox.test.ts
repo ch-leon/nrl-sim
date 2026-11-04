@@ -149,3 +149,31 @@ it('coach News shows the shared portrait and name; ordinary News stays plain (#4
     expect(rows[1]!.all().some((n) => n.tagName === 'IMG')).toBe(true);
   } finally { off(); vi.unstubAllGlobals(); }
 });
+
+it('keeps the guide portrait and a contract warning route together in News (#482, #476)', async () => {
+  const { coachDocument } = await import('./coachDom');
+  const { openInboxScreen, initNewsInbox } = await import('../../src/ui/inbox');
+  const { bus } = await import('../../src/core/events');
+  const { notifyContractWarning } = await import('../../src/systems/contracts');
+  const { COACH_NAME } = await import('../../src/ui/coachVoice');
+  createNewGame('Test Club', 482);
+  coachDocument();
+  const inbox = new NewsInbox();
+  const off = initNewsInbox(inbox);
+  const opened = vi.fn();
+  const offOpen = bus.on('ui:openScreen', opened);
+  try {
+    bus.emit('ui:notify', { text: 'Finance is open.', kind: 'info', from: 'coach' });
+    notifyContractWarning('A contract needs attention.');
+    const screen = openInboxScreen(inbox) as unknown as import('./stubDom').StubNode;
+    const rows = screen.all().filter((n) => n.className.includes('nrl-news-item'));
+    expect(rows[1]!.querySelectorAll('[data-coach-line]')).toHaveLength(1);
+    expect(rows[1]!.textContent).toContain(COACH_NAME);
+    expect(rows[1]!.all().some((n) => n.tagName === 'IMG')).toBe(true);
+    expect(rows[0]!.querySelectorAll('[data-coach-line]')).toHaveLength(0);
+    const contracts = rows[0]!.all().find((n) => n.tagName === 'BUTTON' && n.textContent === 'Contracts');
+    expect(contracts).toBeDefined();
+    contracts!.click();
+    expect(opened).toHaveBeenCalledWith({ id: 'contracts' });
+  } finally { off(); offOpen(); vi.unstubAllGlobals(); }
+});

@@ -17,15 +17,12 @@ export class StubNode {
   hidden = false;
   checked = false;
   get isConnected(): boolean { return typeof document !== 'undefined' && ((document.body as unknown) === this || (document.head as unknown) === this || this.parentNode?.isConnected === true); }
-  get classList() {
-    const set = (names: string[]) => { this.className = names.join(' '); };
-    return {
-      add: (...names: string[]) => set([...new Set([...this.className.split(' ').filter(Boolean), ...names])]),
-      remove: (...names: string[]) => set(this.className.split(' ').filter((n) => !names.includes(n))),
-      contains: (name: string) => this.className.split(' ').includes(name),
-      toggle: (name: string, on: boolean) => { if (on) this.classList.add(name); else this.classList.remove(name); },
-    };
-  }
+  classList = {
+    add: (...names: string[]) => { this.className = [...new Set([...this.className.split(' ').filter(Boolean), ...names])].join(' '); },
+    remove: (...names: string[]) => { this.className = this.className.split(' ').filter((n) => !names.includes(n)).join(' '); },
+    contains: (name: string) => this.className.split(' ').includes(name),
+    toggle: (name: string, on: boolean) => { if (on) this.classList.add(name); else this.classList.remove(name); },
+  };
   removeAttribute(k: string): void { delete this.attrs[k]; }
   toggleAttribute(k: string, on: boolean): void { if (on) this.setAttribute(k, ''); else this.removeAttribute(k); }
   remove(): void { this.parentNode?.removeChild(this); }
