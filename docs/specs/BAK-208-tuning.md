@@ -1516,7 +1516,7 @@ crossing the line; this uses the existing contact roll, not a new roll.
 |---|---:|---|
 | `counters.compressed.on` | 0 | Only 1 enables these mechanics. |
 | `counters.compressed.tight` | 0.04 | Middle squeeze probability; a positive cell also commits the extra man. |
-| `counters.compressed.expansive` | 0.10 | Inward lane pull and speed-scaled edge bust probability. |
+| `counters.compressed.expansive` | 0.40 | Inward lane pull and speed-scaled edge bust probability. |
 | `counters.compressed.commitM` | 6 | Maximum reach in metres of the extra middle tackler at neutral fit; scaled by both fits. |
 
 Kick-chase, All-out and Balanced receive no Compressed counter effect.
