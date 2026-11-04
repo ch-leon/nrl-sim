@@ -295,6 +295,9 @@
     "counters.fit.on": 1,
     "counters.slide.on": 1,
     "counters.rush.on": 1,
-    "counters.compressed.on": 1
+    "counters.compressed.on": 1,
+    "counters.compressed.tight": 0.04,
+    "counters.compressed.expansive": 0.4,
+    "counters.compressed.commitM": 6
   }
 }
