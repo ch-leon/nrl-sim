@@ -1,0 +1,9 @@
+{
+  "commit": "ede26ba",
+  "branch": "codex/458-strategy-counters-report",
+  "started": "2026-11-04T01:18:38.898Z",
+  "controlSource": "balance/runs/20261104-011708-counters-matrix",
+  "controlCellsReused": "11",
+  "independentlyMatchedControls": "4",
+  "reportCommit": "7accec8f89aecc5d3fcb6b84d8e965c5a73dd1c3"
+}
