@@ -99,7 +99,7 @@ export const TITLE_CSS = `
 .nrl-title-head .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-head h2 { margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 1.375rem; font-weight: 700;
   letter-spacing: 0.02em; text-transform: uppercase; flex: 1; min-width: 0; }
-.nrl-title-setup { display: grid; grid-template-columns: 9rem minmax(0, 1fr); grid-template-areas: "kit form" "start form";
+.nrl-title-setup { display: grid; grid-template-columns: 9rem minmax(0, 1fr); grid-template-areas: "kit form" "veteran form" "start form";
   gap: 10px 16px; align-items: start; padding: 14px; border-radius: 16px; background: rgba(14, 22, 48, 0.97);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
 .nrl-title-kit { grid-area: kit; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -107,7 +107,7 @@ export const TITLE_CSS = `
 .nrl-title-kit img { width: 84px; height: 90px; image-rendering: pixelated; }
 .nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .nrl-title-names { display: flex; flex-direction: column; gap: 8px; }
-.nrl-title-veteran { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.8125rem; cursor: pointer; }
+.nrl-title-veteran { grid-area: veteran; display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.8125rem; cursor: pointer; }
 .nrl-title-veteran input { width: 20px; height: 20px; flex: 0 0 auto; }
 .nrl-title-go { grid-area: start; display: flex; flex-direction: column; gap: 6px; }
 .nrl-title-go .nrl-title-btn { flex: 0 0 auto; }
@@ -140,6 +140,7 @@ export const TITLE_CSS = `
   .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
 }
 @media (max-height: 500px) {
+  .nrl-title-build { position: static; align-self: flex-end; margin-top: 8px; }
   .nrl-title h1 { font-size: 2.125rem; }
   .nrl-title h1::after { margin-top: 4px; font-size: 0.6875rem; }
   .nrl-title-logo { max-height: 48px; }
@@ -147,7 +148,12 @@ export const TITLE_CSS = `
   .nrl-title-main { gap: 10px; }
 }
 @media (max-height: 500px) {
-  /* Start over? and its buttons share a row where the column has room. */
+  .nrl-title-kit { padding: 6px; }
+  .nrl-title-kit img { width: 56px; height: 60px; }
+  .nrl-title-kit-note { display: none; }
+  .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "veteran form" "start form"; }
+  .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
+  /* Start over? and its two buttons in a row, so Cancel stays on screen under the kit. */
   .nrl-title-go:has(.nrl-title-confirm) { flex-direction: row; flex-wrap: wrap; }
   .nrl-title-go .nrl-title-confirm { flex: 1 1 100%; }
   .nrl-title-go:has(.nrl-title-confirm) .nrl-title-btn { flex: 1 1 0; padding: 0 8px; }
@@ -162,6 +168,9 @@ export const TITLE_CSS = `
   .nrl-title-form { gap: 6px; }
   .nrl-title-setup { padding: 10px; gap: 6px 16px; }
   .nrl-title-confirm { font-size: 0.75rem; line-height: 1.25; }
+  /* While Start over asks, the jersey makes room for the question and both buttons. */
+  .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "veteran form" "start form"; }
+  .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
 }
 /* An iPhone SE on its side (568×320, #350 T1): the setup scrolls, so the build label follows it
    instead of sitting in the corner over the panel. Landscape only: portrait is #350 P1's. */
@@ -169,10 +178,10 @@ export const TITLE_CSS = `
   .nrl-title-build { position: static; align-self: flex-end; margin-top: 8px; }
 }
 @media (max-width: 520px) {
-  .nrl-title-setup { grid-template-columns: minmax(0, 1fr); grid-template-areas: "kit" "form" "start"; }
-  /* Leave room for the guidance and Start above the home indicator at larger text sizes. */
+  /* Give the veteran switch room without pushing Start under the home indicator. */
   .nrl-title-kit { padding: 6px; }
-  .nrl-title-kit img { width: 56px; height: 60px; }
+  .nrl-title-kit img { width: 48px; height: 52px; }
+  .nrl-title-setup { grid-template-columns: minmax(0, 1fr); grid-template-areas: "kit" "form" "veteran" "start"; }
   .nrl-title-field { flex-wrap: wrap; }
   .nrl-title-field > span { flex-basis: 100%; text-align: left; }
 }
@@ -447,7 +456,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       const veteranRow = mk('label', 'nrl-title-veteran');
       veteranRow.appendChild(veteran);
       veteranRow.appendChild(mk('span', '', "I've played before: open everything"));
-      form.appendChild(veteranRow);
+      setup.appendChild(veteranRow);
       setup.appendChild(form);
 
       const refresh = (): void => {

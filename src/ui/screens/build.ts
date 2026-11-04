@@ -173,7 +173,9 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
           'div',
           {
             class: blocked ? 'nrl-build-row nrl-build-row-disabled' : 'nrl-build-row',
-            attrs: blocked ? { 'aria-disabled': 'true' } : { 'data-facility': def.id, role: 'button', tabindex: '0' },
+            // aria-disabled is inherited: the Office's separate calls button stays available.
+            attrs: blocked ? (def.id === 'coachsOffice' ? {} : { 'aria-disabled': 'true' })
+              : { 'data-facility': def.id, role: 'button', tabindex: '0' },
           },
           el('div', { class: 'nrl-build-top' },
             el('span', { class: 'nrl-build-title', text: def.name }),
@@ -182,7 +184,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
           el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation, officeLevel }) }),
           // Can't build: the meta line turns yellow and says why first.
           blocked
-            ? el('div', { class: 'nrl-build-meta nrl-build-why', text: built ? blocked : `${blocked} · ${meta}` })
+            ? el('div', { class: 'nrl-build-meta nrl-build-why', text: built || !isFacilityOpen(s, def.id) ? blocked : `${blocked} · ${meta}` })
             : el('div', { class: 'nrl-build-meta', text: meta }),
         );
         // The Coach's Office's tile opens the Coach calls page, built or not, buildable or not.
