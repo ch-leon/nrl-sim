@@ -1,0 +1,37 @@
+{
+  "name": "Slide tuned B grind acceptance 126-250",
+  "description": "grind v Slide tuned acceptance: seeds 126–250, both orientations, 250 whole matches, one disjoint quarter of the 1,000-match acceptance sample.",
+  "report": "matrix",
+  "seeds": 125,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.slide.expansive": 0.08,
+    "counters.slide.kickChase": 1,
+    "counters.slide.tight": 0.04,
+    "counters.slide.allOut": 0.6
+  },
+  "scenarios": [
+    {
+      "name": "grind v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "seedStart": 126
+}

@@ -208,3 +208,7 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-162715-slide-acceptance-kick-chase | Slide acceptance kick chase | 1fa7bf3 | feat/462-slide-counters | [report](runs/20261104-162715-slide-acceptance-kick-chase/report.md) |
 | 20261104-164735-slide-kick-recovery-control | Slide kick recovery control | 1fa7bf3 | feat/462-slide-counters | [report](runs/20261104-164735-slide-kick-recovery-control/report.md) |
 | 20261104-171024-slide-all-out-acceptance-pooled | Slide All-out acceptance pooled | 28c8054 | feat/462-slide-counters | [report](runs/20261104-171024-slide-all-out-acceptance-pooled/report.md) |
+| 20261104-173614-slide-kick-chase-acceptance-pooled | Slide Kick-chase acceptance pooled | 9fce051 | feat/462-slide-counters | [report](runs/20261104-173614-slide-kick-chase-acceptance-pooled/report.md) |
+| 20261104-173618-slide-all-out-acceptance-pooled | Slide All-out acceptance pooled | 9fce051 | feat/462-slide-counters | [report](runs/20261104-173618-slide-all-out-acceptance-pooled/report.md) |
+| 20261104-173631-slide-grind-acceptance-pooled | Slide Tight acceptance pooled | 9fce051 | feat/462-slide-counters | [report](runs/20261104-173631-slide-grind-acceptance-pooled/report.md) |
+| 20261104-173632-slide-expansive-acceptance-pooled | Slide Expansive acceptance pooled | 9fce051 | feat/462-slide-counters | [report](runs/20261104-173632-slide-expansive-acceptance-pooled/report.md) |
