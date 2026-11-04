@@ -218,3 +218,7 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-181052-slide-kick-chase-acceptance-pooled | Slide Kick-chase acceptance pooled | a81d385 | feat/462-slide-counters | [report](runs/20261104-181052-slide-kick-chase-acceptance-pooled/report.md) |
 | 20261104-182658-slide-kick-chase-acceptance-pooled | Slide Kick-chase acceptance pooled | befed47 | feat/462-slide-counters | [report](runs/20261104-182658-slide-kick-chase-acceptance-pooled/report.md) |
 | 20261104-192509-standard | standard | 0eea89a | main | [report](runs/20261104-192509-standard/report.md) |
+| 20261104-204430-rush-tight-acceptance-pooled | Rush Tight acceptance pooled | 086042f | feat/463-rush-counters | [report](runs/20261104-204430-rush-tight-acceptance-pooled/report.md) |
+| 20261104-204431-rush-expansive-acceptance | Rush Expansive acceptance | 086042f | feat/463-rush-counters | [report](runs/20261104-204431-rush-expansive-acceptance/report.md) |
+| 20261104-204432-rush-all-out-acceptance | Rush All-out acceptance | 086042f | feat/463-rush-counters | [report](runs/20261104-204432-rush-all-out-acceptance/report.md) |
+| 20261104-193151-rush-neutral-and-fit-acceptance | Rush neutral and fit acceptance | 8ac3403 | feat/463-rush-counters | [report](runs/20261104-193151-rush-neutral-and-fit-acceptance/report.md) |
