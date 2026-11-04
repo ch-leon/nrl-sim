@@ -202,3 +202,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-091704-presets | presets | f0d6ecc | feat/482-season-one-office | [report](runs/20261104-091704-presets/report.md) |
 | 20261104-093157-presets | presets | cb58aaa | feat/482-season-one-office | [report](runs/20261104-093157-presets/report.md) |
 | 20261104-155251-standard | standard | 0db465f | main | [report](runs/20261104-155251-standard/report.md) |
+| 20261104-155850-slide-counters-tuning | Slide counters tuning | 0db465f (uncommitted changes) | feat/462-slide-counters | [report](runs/20261104-155850-slide-counters-tuning/report.md) |
+| 20261104-162020-slide-kick-cover-correction | Slide kick cover correction | cceee55 (uncommitted changes) | feat/462-slide-counters | [report](runs/20261104-162020-slide-kick-cover-correction/report.md) |

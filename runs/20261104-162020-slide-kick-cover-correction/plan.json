@@ -1,0 +1,36 @@
+{
+  "name": "Slide kick cover correction",
+  "description": "Slide column of the task-1 matrix at neutral fit, with Tight, own-style fit and Slide counters enabled. 500 seeds both ways: 1,000 whole matches per cell. Targets: Tight and All-out 53–57%, Expansive and Kick-chase 43–47%, Balanced within 1 SE of 50%. Compare mechanism counts with the archived Slide-off tuning control.",
+  "report": "matrix",
+  "seeds": 60,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.slide.expansive": 0.03,
+    "counters.slide.kickChase": 0.6,
+    "counters.slide.tight": 0.1,
+    "counters.slide.allOut": 0.3
+  },
+  "scenarios": [
+    {
+      "name": "kick-chase v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}
