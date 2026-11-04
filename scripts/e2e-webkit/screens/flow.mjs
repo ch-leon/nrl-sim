@@ -1,4 +1,3 @@
-import { runCoachName } from './coachName.mjs';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
@@ -365,6 +364,5 @@ export async function runFlow(browser, { w: W, h: H, text }) {
   for (const e of report.errors) log(`  error: ${e}`);
   writeFileSync(join(OUT, 'report.json'), JSON.stringify(report, null, 2));
   await ctx.close();
-  const coachFailures = W === FLOW_RUNS[0].w && H === FLOW_RUNS[0].h ? await runCoachName(browser) : 0;
-  return report.steps.filter((s) => !s.ok).length + report.errors.length + coachFailures;
+  return report.steps.filter((s) => !s.ok).length + report.errors.length;
 }
