@@ -1497,7 +1497,8 @@ enabled by overrides.
 ## 34. Compressed matchup counters (#464)
 
 The switch ships at 0. With it on, Tight draws one extra available committed
-man (still capped at four) only within `MAX_LAT_M` of the middle of the pitch.
+man (still capped at four) only within `MAX_LAT_M` of the middle of the pitch,
+and only when that spare man is within `commitM` × both starting fits.
 Middle contact removes bust and supported offload probability by cell strength
 × both starting-sheet fits × the nearby committed defenders' mean derived
 Contact D / `fit.leagueAverage`. Only men within `live.secondManM` count toward
@@ -1516,6 +1517,7 @@ crossing the line; this uses the existing contact roll, not a new roll.
 | `counters.compressed.on` | 0 | Only 1 enables these mechanics. |
 | `counters.compressed.tight` | 0.04 | Middle squeeze probability; a positive cell also commits the extra man. |
 | `counters.compressed.expansive` | 0.10 | Inward lane pull and speed-scaled edge bust probability. |
+| `counters.compressed.commitM` | 6 | Maximum reach in metres of the extra middle tackler at neutral fit; scaled by both fits. |
 
 Kick-chase, All-out and Balanced receive no Compressed counter effect.
 `balance/plans/counters-compressed.json` runs the entire 5 × 3 matrix at flat

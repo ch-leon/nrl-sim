@@ -75,7 +75,7 @@ describe('dormant Compressed counters', () => {
     for (const attack of ['balanced', 'expansive', 'kick-chase', 'all-out'] as const) {
       expect(tuned(1, () => new CompressedSim(attack).commits())).toBe(tuned(0, () => new CompressedSim(attack).commits()));
     }
-    expect(tuned(1, () => new CompressedSim().fits(0, 1).commits())).toBe(tuned(0, () => new CompressedSim().commits()));
+    for (const fit of [0, 0.5]) expect(tuned(1, () => new CompressedSim().fits(1, fit).commits())).toBe(tuned(0, () => new CompressedSim().commits()));
   });
   it('reduces middle busts and supported offloads with Contact D and fit', () => {
     expect(tuned(0, () => new CompressedSim().contact())).toEqual({});
@@ -108,8 +108,8 @@ describe('dormant Compressed counters', () => {
     }
   });
   it('changes contact on the existing roll without adding a draw', () => {
-    const off = tuned(0, () => new CompressedSim().resolve(0.08));
-    const on = tuned(1, () => new CompressedSim().resolve(0.08));
+    const off = tuned(0, () => new CompressedSim().resolve(0.099));
+    const on = tuned(1, () => new CompressedSim().resolve(0.099));
     expect(off.events).toContain('break-tackle'); expect(on.events).not.toContain('break-tackle');
     expect(off.draws).toBe(1); expect(on.draws).toBe(off.draws);
   });
