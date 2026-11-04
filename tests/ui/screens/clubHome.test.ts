@@ -3,6 +3,7 @@ import { clubHomeView, nextMatchLine } from '../../../src/ui/screens/clubHome';
 import { createNewGame, getState, setState, type GameState, type Objective } from '../../../src/core/state';
 import { initLeague } from '../../../src/systems/fixtures';
 import { ordinal, placeName } from '../../../src/ui/hud';
+import { financeSummary } from '../../../src/ui/screens/finance';
 import { ECON, WEEKS_PER_SEASON } from '../../../src/config';
 
 // #350 P1: the Club home sheet, CLUB on a phone held upright.
@@ -42,9 +43,48 @@ describe('the Club home sheet (#350)', () => {
     const v = clubHomeView({ ...getState(), week: 3, season: 2, money: 123_456 });
     expect(v.club).toBe('Test Club');
     expect(v.week).toBe(`Week 3 of ${WEEKS_PER_SEASON} · Season 2`);
-    expect(v.money).toBe('$123,456');
+    expect(v.money).toBe('$123k · covering costs');
     expect(v.moneyLevel).toBe('ok');
-    expect(v.moneyLabel).toBe('Money $123,456. Tap for Finance');
+    expect(v.moneyLabel).toBe('Money $123k · covering costs. Tap for Finance');
+  });
+
+  it.each([
+    [31.7, 'about 31 weeks of runway'],
+    [1.2, 'about 1 week of runway'],
+    [0, 'about 1 week of runway'],
+    [99, 'about 99 weeks of runway'],
+    [99.1, '99+ weeks of runway'],
+    [150, '99+ weeks of runway'],
+    [null, 'covering costs'],
+  ])('always shows the runway for %s weeks (#479)', (runway, words) => {
+    const v = clubHomeView({ ...getState(), money: 200_000 }, { runwayWeeks: () => runway });
+    expect(v.money).toBe(`$200k · ${words}`);
+    expect(v.moneyLabel).toBe(`Money $200k · ${words}. Tap for Finance`);
+  });
+
+  it('shows a new Normal game’s day-one runway from Finance (#479)', () => {
+    createNewGame('Test Club', 1, { difficulty: 'normal' });
+    setState({ league: initLeague(getState()) });
+    const s = getState();
+    const runway = financeSummary(s).runwayWeeks;
+    expect(runway).not.toBeNull();
+    expect(runway!).toBeGreaterThanOrEqual(2);
+    expect(runway!).toBeLessThanOrEqual(99);
+    const v = clubHomeView(s, { runwayWeeks: (state) => financeSummary(state).runwayWeeks });
+    expect(v.money).toBe(`$200k · about ${Math.floor(runway!)} weeks of runway`);
+  });
+
+  it('shows covering costs when Finance projects no cash burn (#479)', () => {
+    const s = { ...getState(), squad: [], facilities: [], reputation: 100 };
+    expect(financeSummary(s).runwayWeeks).toBeNull();
+    expect(clubHomeView(s, { runwayWeeks: (state) => financeSummary(state).runwayWeeks }).money)
+      .toBe('$200k · covering costs');
+  });
+
+  it.each([
+    [20, 'ok'], [19.9, 'low'], [8, 'low'], [7.9, 'short'], [null, 'ok'],
+  ])('keeps the colour threshold for %s weeks (#479)', (runway, level) => {
+    expect(clubHomeView(getState(), { runwayWeeks: () => runway }).moneyLevel).toBe(level);
   });
 
   it('the money worries as the dock’s does: the runway, then debt', () => {
