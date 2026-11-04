@@ -65,7 +65,7 @@ What's in the game, with the PR that added each.
 
 - New careers open facilities through season one, with a veteran setup skip and a confirmed Settings skip; old saves keep everything open ([PR](https://github.com/ch-leon/nrl-sim/pull/497)).
 
-- Fictional football manager Mick Dorney gives the tutorial, first-visit hints, weekly summary, coach News and seven event cards one voice and pixel portrait ([issue](https://github.com/ch-leon/nrl-sim/issues/476)).
+- Fictional football manager Mick Dorney gives the tutorial, first-visit hints, weekly summary, coach News and seven event cards one voice and pixel portrait ([PR](https://github.com/ch-leon/nrl-sim/pull/494)).
 
 - Optional coach name at new-game setup; the first tutorial bubble and board objectives address you by name, with “Coach” for unnamed careers ([PR](https://github.com/ch-leon/nrl-sim/pull/491)).
 
