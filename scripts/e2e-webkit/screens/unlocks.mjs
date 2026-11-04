@@ -65,6 +65,8 @@ export async function runUnlocks(browser) {
         await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
         await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
         await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate((n) => n.click());
+        // The week settles before the scene switch; nav must see the visible dock.
+        await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
         await page.waitForFunction((week) => window.__nrlState().week === week, round + 1);
         report.rounds.push(await page.evaluate(() => ({ week: window.__nrlState().week, facilities: window.__nrlState().unlocks?.facilities })));
         if (round === 1) {
