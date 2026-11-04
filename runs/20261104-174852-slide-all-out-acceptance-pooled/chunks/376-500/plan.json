@@ -1,0 +1,37 @@
+{
+  "name": "Slide tuned C all-out acceptance 376-500",
+  "description": "all-out v Slide tuned acceptance: seeds 376–500, both orientations, 250 whole matches, one disjoint quarter of the 1,000-match acceptance sample.",
+  "report": "matrix",
+  "seeds": 125,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.slide.expansive": 0.08,
+    "counters.slide.kickChase": 1.5,
+    "counters.slide.tight": 0.04,
+    "counters.slide.allOut": 0.7
+  },
+  "scenarios": [
+    {
+      "name": "all-out v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "seedStart": 376
+}
