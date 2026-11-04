@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { POSITIONS } from '../../../src/data/player';
 import { cellsOf, checkPlan, POSITION_GROUPS, type Plan, type SideSpec } from '../../../src/match/balance/plan';
-import { measureCell, SIDE_COUNTS, sideSheet, squadSide } from '../../../src/match/balance/measure';
+import { countEvents, measureCell, SIDE_COUNTS, sideSheet, squadSide } from '../../../src/match/balance/measure';
 import { reportMarkdown } from '../../../src/match/balance/report';
 
 const even = { name: 'balanced v slide', home: { rating: 60 }, away: { rating: 60 }, track: 'home' as const };
@@ -49,6 +49,19 @@ describe('position stat overrides', () => {
 });
 
 describe('tracked counter measurements', () => {
+  it('keeps opposing kick and try context when attributing kick counts to one side', () => {
+    const events = [
+      { tick: 1, kind: 'kick', side: 'home' as const, detail: 'bomb', text: '' },
+      { tick: 2, kind: 'kick', side: 'away' as const, detail: 'long', text: '' },
+      { tick: 3, kind: 'regather', side: 'home' as const, text: '' },
+      { tick: 4, kind: 'kick', side: 'home' as const, detail: 'grubber', text: '' },
+      { tick: 5, kind: 'try', side: 'away' as const, text: '' },
+      { tick: 6, kind: 'try', side: 'home' as const, text: '' },
+    ];
+    expect(countEvents(events, 'home')).toMatchObject({ bombs: 1, bombsWon: 0, grubbers: 1, grubberTries: 0 });
+    expect(countEvents(events, 'away')).toMatchObject({ bombs: 0, bombsWon: 0, grubbers: 0, grubberTries: 0 });
+  });
+
   const cell = { variant: { name: 'baseline' }, scenario: { ...even, home: { rating: 60, tactics: { attack: 'expansive' as const } } } };
   it('pools both orientations per side while preserving legacy counts, including when tracking away', () => {
     const written = measureCell(cell, 2, 2);

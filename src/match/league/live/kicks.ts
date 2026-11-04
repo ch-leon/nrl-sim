@@ -4,8 +4,9 @@ import type { Side } from '../../core/snapshot';
 import { clamp, dist, sub, type Vec } from '../../core/vec';
 import { knockOnChance } from '../contest';
 import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall } from '../kickoff';
-import { KICK_CONTEST, grubberRace, highBall } from '../kickContest';
+import { KICK_CONTEST, fieldingRead, grubberRace, highBall } from '../kickContest';
 import { TOUCH, exitPoint, inOwnInGoal, outOfPlay, ownLineX, touchRestartSpot } from '../touch';
+import { ROLES } from '../roles';
 import { LIVE } from './knobs';
 import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase } from './types';
 import { LiveClock } from './clock';
@@ -15,6 +16,7 @@ export abstract class LiveKicks extends LiveClock {
   protected launchPendingKick(): void {
     const k = this.pendingKick;
     if (!k || this.tick < k.at) return;
+    this.offloadReceiver = null;
     this.pendingKick = null;
     const kicker = this.players[k.kicker]!;
     let to = k.to;
@@ -118,7 +120,8 @@ export abstract class LiveKicks extends LiveClock {
       if (contested === 'settled') return;
       if (contested) r = contested;
       const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < LIVE.pressureM);
-      if (b.via === 'kick' && !contested && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.skill - 50) / 300 : LIVE.dropChance) * this.wx.handling) {
+      const cover = !this.kickoffUp && r.side === this.attacking ? this.kickCover(other(r.side)) : 0;
+      if (b.via === 'kick' && !contested && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.skill - 50) / 300 : LIVE.dropChance) * this.wx.handling / (1 + cover)) {
         this.spillKick(r, b.to, `${r.name} spills the kick under pressure!`);
         return;
       }
@@ -203,12 +206,15 @@ export abstract class LiveKicks extends LiveClock {
   }
 
   /** Who takes a kick coming down at `at`: the nearest free player within reach, the nominated man on a near-tie. */
-  private underKick(at: Vec, nominated: number | null): Player | undefined {
+  protected underKick(at: Vec, nominated: number | null): Player | undefined {
+    const cover = this.kickoffUp ? 0 : this.kickCover(other(this.attacking));
+    const fullback = this.fullback(this.attacking);
     let best: Player | undefined;
     let bd = Infinity;
     for (const p of this.players) {
       if (this.locked(p) || !this.onField(p)) continue;
       let d = dist(p.body.pos, at);
+      if (cover > 0 && p.side === this.attacking && (p === fullback || ROLES[p.slot]!.name === 'winger')) d = fieldingRead(d, cover, LIVE.kickCatchReach);
       if (this.indexOf(p) === nominated) d -= 0.3;
       if (d < bd) {
         bd = d;
@@ -238,7 +244,7 @@ export abstract class LiveKicks extends LiveClock {
     const mine = nominated && nominated.side === this.attacking && !this.locked(nominated) && this.onField(nominated) && dist(nominated.body.pos, b.to) <= KICK_CONTEST.bomb.contestM;
     const catcher = mine ? nominated : under(this.attacking);
     if (!chaser || !catcher) return null;
-    const odds = highBall(chaser.stats.speed, catcher.stats.skill, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling);
+    const odds = highBall(chaser.stats.speed, catcher.stats.skill, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling, this.kickCover(kicking));
     const u = this.rng.next();
     if (u < odds.won) {
       this.ball = { kind: 'held', by: this.indexOf(chaser) };
@@ -317,7 +323,7 @@ export abstract class LiveKicks extends LiveClock {
       this.looseFor = this.attacking;
       return;
     }
-    const attackerWins = !d || this.rng.next() < grubberRace(secs(a), secs(d), this.tactics[kicking].attack === 'kick-chase');
+    const attackerWins = !d || this.rng.next() < grubberRace(secs(a), secs(d), this.tactics[kicking].attack === 'kick-chase', this.kickCover(kicking));
     this.raceFor = attackerWins ? kicking : this.attacking;
     this.scramble = true;
     this.emit('loose-ball', d ? `Loose in the in-goal — ${a.name} and ${d.name} race for it` : `Loose in the in-goal — ${a.name} is after it`, a);
@@ -326,6 +332,7 @@ export abstract class LiveKicks extends LiveClock {
 
   /** Possession changes hands where the ball is; a fresh set for the other side. */
   protected turnover(): void {
+    this.offloadReceiver = null;
     this.pendingControl.home = this.pendingControl.away = null;
     this.kickCall = this.fgCall = null;
     this.attacking = other(this.attacking);
