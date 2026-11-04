@@ -86,6 +86,7 @@ export interface Events {
    * queue, keeps its `ms` and closes only on its ✕ or its timer; `enabled` false hides the button.
    */
   'ui:notify': {
+    from?: 'coach';
     text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean; ms?: number;
     action?: { label: string; run: () => void; enabled?: () => boolean };
   };

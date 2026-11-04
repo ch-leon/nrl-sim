@@ -16,6 +16,7 @@ import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
 import { initToasts } from './ui/toasts';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
+import { registerUnlockSystem } from './systems/unlocks';
 import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
@@ -131,12 +132,12 @@ async function boot(): Promise<void> {
     else {
       // Continue on an empty slot still starts fresh: drop a match record left behind.
       clearLiveMatch();
-      createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty, coachName: choice.coachName });
+      createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll });
     }
   } else {
     // New Game must not resume a match that belonged to the save this slot had.
     clearLiveMatch();
-    createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty, coachName: choice.coachName });
+    createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
   // The demo gate's slot (#362), and the paywall at the demo's end (#364).
@@ -165,6 +166,7 @@ async function boot(): Promise<void> {
   registerBoardSystem();
   registerEventsSystem();
   registerRivalsSystem();
+  registerUnlockSystem();
   initMatchReport({ onReason: (screen) => nav.open(screen) }); // "Why did I lose?" (#368)
   initBoardUi();
   // The next fixture's match art, painted in a Worker during the week and uploaded in idle slices (N10.5).

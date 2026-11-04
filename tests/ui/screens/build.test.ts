@@ -63,3 +63,16 @@ describe('the Build menu (3c)', () => {
     expect(buildBlocker(paddock, { money: 1e7, facilities: [{ defId: 'trainingPaddock' }] })).toBeNull();
   });
 });
+
+describe('closed facility tiles (#481)', () => {
+  it('gives the opening reason before the money reason', async () => {
+    const { buildBlocker } = await import('../../../src/ui/screens/build');
+    const { createNewGame } = await import('../../../src/core/state');
+    const s = createNewGame('Test', 481);
+    s.money = 0;
+    expect(buildBlocker(FACILITY_CATALOG.teamGym, s)).toBe('Opens at round 8');
+    expect(buildBlocker(FACILITY_CATALOG.trainingPaddock, s)).toMatch(/^Need \$/);
+    s.unlocks = undefined;
+    expect(buildBlocker(FACILITY_CATALOG.teamGym, s)).toMatch(/^Need \$/);
+  });
+});

@@ -109,3 +109,18 @@ describe('optional coach name at setup (#475)', () => {
     if (expected === undefined) expect(choice).not.toHaveProperty('coachName');
   });
 });
+
+describe('veteran skip (#481)', () => {
+  beforeEach(() => { stubLocalStorage(); stubDocument(); });
+  afterEach(() => vi.unstubAllGlobals());
+  it.each([false, true])('passes openAll only when the toggle is checked (%s)', async (checked) => {
+    const root = new StubNode('div');
+    const result = showTitleFlow(root as unknown as HTMLElement);
+    const toggle = root.querySelector('[data-nrl-open-all]')! as unknown as HTMLInputElement;
+    expect(toggle.type).toBe('checkbox');
+    toggle.checked = checked;
+    root.querySelector('[data-nrl-start]')!.click();
+    const choice = await result;
+    expect(choice.openAll).toBe(checked ? true : undefined);
+  });
+});

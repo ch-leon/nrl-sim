@@ -50,6 +50,7 @@ describe('save corpus', () => {
         if (!res.ok) return;
         expect(res.state.version).toBe(SAVE_VERSION);
         expect(res.state).not.toHaveProperty('coachName');
+        expect(res.state).not.toHaveProperty('unlocks');
         expect(coachAddress(res.state)).toBe('Coach');
         expect(checkState(res.state)).toEqual([]);
       });

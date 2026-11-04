@@ -32,7 +32,10 @@ describe('soak checks', () => {
     for (const v of OLD_VERSIONS) {
       const res = migrateState(asOldSave(getState(), v));
       expect(res.ok, `v${v}`).toBe(true);
-      if (res.ok) expect(checkState(res.state), `v${v}`).toEqual([]);
+      if (res.ok) {
+        expect(checkState(res.state), `v${v}`).toEqual([]);
+        expect(res.state).not.toHaveProperty('unlocks');
+      }
     }
     // Each version's old save lacks what its migration adds, so the step really runs: v18's board
     // loan, v19's staff, and v20's playback speed (left absent, so an old save plays at ×4).
