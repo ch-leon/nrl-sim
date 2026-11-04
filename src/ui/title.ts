@@ -42,6 +42,12 @@ const COLOR_NAMES: Record<string, string> = {
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 
+export const DIFFICULTY_BLURB: Record<Difficulty, string> = {
+  easy: 'More money, cheaper wages, rivals a step slower.',
+  normal: "The game as it's meant to be played.",
+  hard: 'Less money, dearer wages, sharper rivals.',
+};
+
 // The overlay scrolls when its content is taller than the screen; the auto
 // margins on .nrl-title-main centre it only while it fits (justify-content:center
 // would push the top of tall content out of reach). Safe-area insets pad every
@@ -112,13 +118,16 @@ export const TITLE_CSS = `
 .nrl-title-swatch[aria-pressed="true"] { border-color: #0e1630; box-shadow: 0 0 0 2px #f4d03f; }
 .nrl-title-swatch:disabled { opacity: 0.25; cursor: default; }
 .nrl-title-pick { background: #1b264a; }
+.nrl-title-difficulty-copy { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: #c9d1ea; }
+.nrl-title-difficulty-hint { color: #f4d03f; }
 .nrl-title-pick[aria-pressed="true"], .nrl-title-pick[aria-pressed="true"]:hover { background: #f4d03f; color: #0e1630; }
 .nrl-title-input { min-height: 44px; padding: 0 12px; font: inherit; font-size: 1rem; flex: 1; min-width: 0; color: #fff;
   background: #1b264a; border: 2px solid #26325c; border-radius: 10px; }
 .nrl-title-input:focus { outline: none; border-color: #f4d03f; }
 @media (pointer: coarse) { .nrl-title-swatch { width: 44px; height: 44px; } }
 @media (max-height: 500px) and (min-width: 521px) {
-  .nrl-title-setup { padding: 10px; }
+  /* Keep the coarse-pointer swatches on one row at 667px, leaving room for both guidance lines. */
+  .nrl-title-setup { padding: 10px; grid-template-columns: 7rem minmax(0, 1fr); }
   .nrl-title-form { gap: 6px; }
   .nrl-title-names { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .nrl-title-names .nrl-title-field { flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; }
@@ -417,6 +426,15 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         diffBox.appendChild(b);
       }
       form.appendChild(field('Difficulty', diffBox));
+      const blurb = mk('p', 'nrl-title-difficulty-copy');
+      blurb.setAttribute('data-nrl-difficulty-blurb', '');
+      blurb.setAttribute('aria-live', 'polite');
+      form.appendChild(blurb);
+      if (getSlotSummaries().every((x) => x.status === 'empty')) {
+        const hint = mk('p', 'nrl-title-difficulty-copy nrl-title-difficulty-hint', 'First career? Start on Easy.');
+        hint.setAttribute('data-nrl-difficulty-hint', '');
+        form.appendChild(hint);
+      }
       setup.appendChild(form);
 
       const refresh = (): void => {
@@ -431,6 +449,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
           b.setAttribute('aria-pressed', String(c === secondary));
         });
         for (const [d, b] of diffButtons) b.setAttribute('aria-pressed', String(d === difficulty));
+        blurb.textContent = DIFFICULTY_BLURB[difficulty];
         const url = jerseyUrl([primary, secondary]);
         if (url) jersey.setAttribute('src', url);
       };

@@ -67,6 +67,7 @@ What's in the game, with the PR that added each.
 
 Newest first; merge dates in UTC.
 
+- Difficulty descriptions and a first-career Easy hint at setup ([issue](https://github.com/ch-leon/nrl-sim/issues/480)); Normal remains the default.
 - Grind is now named Tight; pack-fit offloads are available behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/473)), 4 Nov
 - Recruit shortlist of four with an affordable Coach’s pick and Show all ([PR](https://github.com/ch-leon/nrl-sim/pull/492)), 4 Nov
 
