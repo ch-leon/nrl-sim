@@ -132,6 +132,9 @@ export const TITLE_CSS = `
   .nrl-title-names { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .nrl-title-names .nrl-title-field { flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; }
   .nrl-title-names .nrl-title-field > span { flex: 0 0 auto; text-align: left; }
+  /* While Start over asks, the jersey makes room for the question and both buttons. */
+  .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "start form"; }
+  .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
 }
 @media (max-height: 500px) {
   .nrl-title h1 { font-size: 2.125rem; }
@@ -141,7 +144,7 @@ export const TITLE_CSS = `
   .nrl-title-main { gap: 10px; }
 }
 @media (max-height: 500px) {
-  /* Start over? and its two buttons in a row, so Cancel stays on screen under the kit. */
+  /* Start over? and its buttons share a row where the column has room. */
   .nrl-title-go:has(.nrl-title-confirm) { flex-direction: row; flex-wrap: wrap; }
   .nrl-title-go .nrl-title-confirm { flex: 1 1 100%; }
   .nrl-title-go:has(.nrl-title-confirm) .nrl-title-btn { flex: 1 1 0; padding: 0 8px; }
@@ -156,9 +159,6 @@ export const TITLE_CSS = `
   .nrl-title-form { gap: 6px; }
   .nrl-title-setup { padding: 10px; gap: 6px 16px; }
   .nrl-title-confirm { font-size: 0.75rem; line-height: 1.25; }
-  /* While Start over asks, the jersey makes room for the question and both buttons. */
-  .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "start form"; }
-  .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
 }
 /* An iPhone SE on its side (568×320, #350 T1): the setup scrolls, so the build label follows it
    instead of sitting in the corner over the panel. Landscape only: portrait is #350 P1's. */
@@ -167,6 +167,9 @@ export const TITLE_CSS = `
 }
 @media (max-width: 520px) {
   .nrl-title-setup { grid-template-columns: minmax(0, 1fr); grid-template-areas: "kit" "form" "start"; }
+  /* Leave room for the guidance and Start above the home indicator at larger text sizes. */
+  .nrl-title-kit { padding: 6px; }
+  .nrl-title-kit img { width: 56px; height: 60px; }
   .nrl-title-field { flex-wrap: wrap; }
   .nrl-title-field > span { flex-basis: 100%; text-align: left; }
 }
