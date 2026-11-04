@@ -196,3 +196,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-083803-standard | standard | f0d6ecc | main | [report](runs/20261104-083803-standard/report.md) |
 | 20261104-084058-own-style-fit-calibration | own style fit calibration | f0d6ecc (uncommitted changes) | codex/461-own-style-fit | [report](runs/20261104-084058-own-style-fit-calibration/report.md) |
 | 20261104-085643-own-style-fit-tuned | own style fit tuned | a3571da | codex/461-own-style-fit | [report](runs/20261104-085643-own-style-fit-tuned/report.md) |
+| 20261104-090453-own-style-fit-final-sweep | own style fit final sweep | 8c690d2 | codex/461-own-style-fit | [report](runs/20261104-090453-own-style-fit-final-sweep/report.md) |
