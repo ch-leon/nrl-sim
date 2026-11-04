@@ -2,6 +2,8 @@
 // scenarios (who plays whom, on what legs) × variants (knob overrides, by
 // hand or as a sweep) × seeds. Pure: parse, check and expand; the runner
 // (scripts/balance.ts) plays the cells and report.ts writes them up.
+import type { Position } from '../../core/state';
+import { POSITIONS } from '../../data/player';
 import type { RosterStats, WeatherKind } from '../../sim/events';
 import { DIFFICULTIES, type Difficulty } from '../../config';
 import { isCoachCall, type CoachCall } from '../league/calls';
@@ -10,6 +12,13 @@ import { isLegs, type Legs } from '../league/fatigue';
 import { isAttackPreset, isDefencePreset, type AttackPreset, type TeamTactics } from '../league/presets';
 import { checkTuning, type Overrides } from '../league/tuning';
 
+/** Position groups match league/presets.ts; exact positions override their group. */
+export const POSITION_GROUPS = {
+  backs: ['fullback', 'winger', 'centre'],
+  halves: ['five-eighth', 'halfback'],
+  pack: ['hooker', 'prop', 'second-row', 'lock'],
+} as const;
+
 export interface SideSpec {
   /** A league club's generated roster (lab sheets); otherwise a flat squad of `rating`. */
   club?: string;
@@ -17,6 +26,8 @@ export interface SideSpec {
   rating?: number;
   /** Per-stat overrides on the flat squad (e.g. stamina 30). */
   stats?: Partial<RosterStats>;
+  /** Applied after flat stats, to starters and bench; exact positions win over groups. */
+  positionStats?: Partial<Record<keyof typeof POSITION_GROUPS | Position, Partial<RosterStats>>>;
   tactics?: Partial<TeamTactics>;
   /** Special skills: none (default for a flat squad), as rolled (default for a club), all superstars. */
   traits?: 'none' | 'gen' | 'stars';
@@ -113,6 +124,8 @@ export interface Plan {
   /** Leave out for whole matches (two 7:00 halves, half-time, full time). A number plays one stretch of that many minutes instead, counts scaled to 14. */
   minutes?: number;
   seedStart?: number;
+  /** Opt-in attack × defence matrix and compact tracked-side tables. */
+  report?: 'matrix';
   /** Overrides under every variant (the experiment's fixed ground). */
   base?: Overrides;
   scenarios: ScenarioSpec[];
@@ -133,6 +146,7 @@ export const cellKey = (c: { variant: { name: string }; scenario: { name: string
 /** Problems with a plan, one line each (empty when it is fine). */
 export function checkPlan(p: Plan): string[] {
   const errs: string[] = [];
+  if (p.report !== undefined && p.report !== 'matrix') errs.push('report must be matrix');
   if (!p.name) errs.push('plan needs a name');
   if (!Number.isInteger(p.seeds) || p.seeds < 1) errs.push('seeds must be a whole number ≥ 1');
   if (p.minutes !== undefined && !(p.minutes > 0)) errs.push('minutes must be > 0 (or left out for whole matches)');
@@ -164,6 +178,17 @@ export function checkPlan(p: Plan): string[] {
       if (!spec) {
         errs.push(`${s.name}: missing ${side}`);
         continue;
+      }
+      if (spec.positionStats !== undefined) {
+        if (!spec.positionStats || typeof spec.positionStats !== 'object' || Array.isArray(spec.positionStats)) errs.push(`${s.name} ${side}: positionStats must be an object`);
+        else for (const [position, stats] of Object.entries(spec.positionStats)) {
+          if (![...POSITIONS, ...Object.keys(POSITION_GROUPS)].includes(position)) errs.push(`${s.name} ${side}: unknown position "${position}"`);
+          if (!stats || typeof stats !== 'object' || Array.isArray(stats)) errs.push(`${s.name} ${side}: ${position} stats must be an object`);
+          else for (const [key, value] of Object.entries(stats)) {
+            if (!['speed', 'strength', 'stamina', 'skill', 'footyIQ'].includes(key)) errs.push(`${s.name} ${side}: unknown stat "${key}"`);
+            else if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 100) errs.push(`${s.name} ${side}: ${position}.${key} must be a number 1–100`);
+          }
+        }
       }
       if (spec.tactics?.attack && !isAttackPreset(spec.tactics.attack)) errs.push(`${s.name} ${side}: unknown attack preset "${spec.tactics.attack}"`);
       if (spec.tactics?.defence && !isDefencePreset(spec.tactics.defence)) errs.push(`${s.name} ${side}: unknown defence preset "${spec.tactics.defence}"`);

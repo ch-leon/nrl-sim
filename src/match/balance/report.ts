@@ -2,7 +2,8 @@
 // per variant with the headline numbers, the §7 target bands marked, and the
 // change against the baseline (or a previous run) flagged when it is bigger
 // than luck would explain. Pure: results in, Markdown out.
-import { MATCH_MINUTES, type CellResult, type CountKey } from './measure';
+import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../league/presets';
+import { SIDE_COUNTS, MATCH_MINUTES, type CellResult, type CountKey, type Stat } from './measure';
 
 /**
  * §7 balance targets per full Nines match, both sides combined. Tackles, line
@@ -57,7 +58,7 @@ const legsEnd = (r: CellResult): string => {
 };
 
 export interface ReportInput {
-  plan: { name: string; description?: string; seeds: number; minutes?: number };
+  plan: { name: string; description?: string; seeds: number; minutes?: number; report?: 'matrix' };
   /** Commit, branch and date the run was made on. */
   meta: Record<string, string>;
   results: readonly CellResult[];
@@ -70,6 +71,12 @@ export function reportMarkdown(r: ReportInput): string {
   out.push(`# Balance: ${r.plan.name}`, '');
   if (r.plan.description) out.push(r.plan.description, '');
   out.push(Object.entries(r.meta).map(([k, v]) => `**${k}** ${v}`).join(' · '), '');
+  if (r.plan.report === 'matrix') {
+    out.push(...matrixReport(r.results));
+    const secs = r.results.reduce((a, x) => a + x.ms, 0) / 1000;
+    out.push(`_${r.results.length} cells in ${secs.toFixed(0)} s._`, '');
+    return out.join('\n');
+  }
   out.push(
     `${r.plan.seeds} matches per row, ${r.plan.minutes ? `${r.plan.minutes}-minute stretches, counts scaled to a ${MATCH_MINUTES}-minute match` : `whole matches (two ${MATCH_MINUTES / 2}:00 halves)`}; counts are both sides. Wins are on points. ` +
       `✓ inside the §7 target, ↑ above, ↓ below. A change marked * is bigger than luck explains (over 2 standard errors, flagged only with ${MIN_SEEDS_TO_FLAG}+ matches a row); unmarked ones may be noise.`,
@@ -121,4 +128,32 @@ export function reportMarkdown(r: ReportInput): string {
   const secs = r.results.reduce((a, x) => a + x.ms, 0) / 1000;
   out.push(`_${r.results.length} cells in ${secs.toFixed(0)} s._`, '');
   return out.join('\n');
+}
+
+/** Opt-in counter report. Matrix rows use the documented `<attack> v <defence>` names. */
+function matrixReport(results: readonly CellResult[]): string[] {
+  const out: string[] = [];
+  const share = (s: Stat | undefined): string => s ? `${pct1(s.mean)} ± ${pct1(s.se)}` : '—';
+  const variants = [...new Set(results.map((r) => r.variant))];
+  out.push('Points share = wins + half draws; ± is one sample standard error over matches. Tracked/opponent counts pool both orientations when bothWays is set; the legacy pooled counts remain the written orientation.', '');
+  for (const variant of variants) {
+    const rows = results.filter((r) => r.variant === variant);
+    out.push(`## Attack × defence points share — ${variant}`, '');
+    out.push(`| Attack | ${DEFENCE_PRESETS.map((d) => PRESET_LABEL[d]).join(' | ')} |`);
+    out.push('|---|---:|---:|---:|');
+    for (const attack of ATTACK_PRESETS) {
+      out.push(`| ${PRESET_LABEL[attack]} | ${DEFENCE_PRESETS.map((defence) => share(rows.find((r) => r.scenario === `${attack} v ${defence}`)?.pointsShare)).join(' | ')} |`);
+    }
+    out.push('', `## Tracked-side rows — ${variant}`, '');
+    out.push('| Scenario | Matches | Points share ± SE |', '|---|---:|---:|');
+    for (const row of rows) out.push(`| ${row.scenario} | ${row.trackedSeeds ?? '—'} | ${share(row.pointsShare)} |`);
+    out.push('', `## Per-side counts — ${variant}`, '', `| Scenario | Side | ${SIDE_COUNTS.join(' | ')} |`, `|---|---|${SIDE_COUNTS.map(() => '---:').join('|')}|`);
+    for (const row of rows) {
+      for (const [side, counts] of [['tracked', row.trackedCounts], ['opponent', row.opponentCounts]] as const) {
+        if (counts) out.push(`| ${row.scenario} | ${side} | ${SIDE_COUNTS.map((k) => counts[k].mean.toFixed(1)).join(' | ')} |`);
+      }
+    }
+    out.push('');
+  }
+  return out;
 }
