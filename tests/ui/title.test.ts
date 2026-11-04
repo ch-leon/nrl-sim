@@ -31,6 +31,7 @@ describe('difficulty guidance at setup (#480)', () => {
         expect(root.querySelector(`[data-nrl-difficulty-${other}]`)!.getAttribute('aria-pressed')).toBe(String(other === d));
       }
     }
+    await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
     expect((await result).difficulty).toBe('hard');
   });
@@ -42,6 +43,7 @@ describe('difficulty guidance at setup (#480)', () => {
     expect(DEFAULT_DIFFICULTY).toBe('normal');
     expect(root.querySelector('[data-nrl-difficulty-normal]')!.getAttribute('aria-pressed')).toBe('true');
     expect(root.querySelector('[data-nrl-difficulty-blurb]')!.textContent).toBe(DIFFICULTY_BLURB.normal);
+    await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
     expect((await result).difficulty).toBe('normal');
   });

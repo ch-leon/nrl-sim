@@ -104,13 +104,17 @@ export const TITLE_CSS = `
 .nrl-title-head .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-head h2 { margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 1.375rem; font-weight: 700;
   letter-spacing: 0.02em; text-transform: uppercase; flex: 1; min-width: 0; }
-.nrl-title-setup { display: grid; grid-template-columns: 9rem minmax(0, 1fr); grid-template-areas: "kit form" "veteran form" "start form";
+.nrl-title-setup { display: grid; grid-template-columns: 9rem minmax(0, 1fr); grid-template-areas: "kit form" "veteran form" "start form"; grid-template-rows: min-content min-content 1fr;
   gap: 10px 16px; align-items: start; padding: 14px; border-radius: 16px; background: rgba(14, 22, 48, 0.97);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
 .nrl-title-kit { grid-area: kit; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 6px; border-radius: 10px; background: #141d3a; text-align: center; font-size: 0.75rem; color: #9aa6c7; }
 .nrl-title-kit img { width: 84px; height: 90px; image-rendering: pixelated; }
-.nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  max-height: calc(100dvh - 110px - var(--nrl-safe-t, env(safe-area-inset-top, 0px)) - var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
+/* Details scroll on short phones; difficulty guidance and Start stay in view. */
+.nrl-title-details { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; padding: 3px; }
+.nrl-title-details > *, .nrl-title-form > :not(.nrl-title-details) { flex-shrink: 0; }
 .nrl-title-names { display: flex; flex-direction: column; gap: 8px; }
 .nrl-title-veteran { grid-area: veteran; display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.8125rem; cursor: pointer; }
 .nrl-title-veteran input { width: 20px; height: 20px; flex: 0 0 auto; }
@@ -189,6 +193,7 @@ export const TITLE_CSS = `
   .nrl-title-kit-note { display: none; }
   .nrl-title-setup { grid-template-columns: 5rem minmax(0, 1fr);
     grid-template-areas: "kit veteran" "form form" "start start"; }
+  .nrl-title-form { max-height: calc(100dvh - 280px - var(--nrl-safe-t, env(safe-area-inset-top, 0px)) - var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
   .nrl-title-field { flex-wrap: wrap; }
   .nrl-title-field > span { flex-basis: 100%; text-align: left; }
 }
@@ -391,6 +396,8 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       setup.appendChild(kit);
 
       const form = mk('div', 'nrl-title-form');
+      const details = mk('div', 'nrl-title-details');
+      form.appendChild(details);
       const field = (label: string, control: HTMLElement): HTMLElement => {
         const row = mk('div', 'nrl-title-field');
         row.appendChild(mk('span', 'nrl-title-label', label));
@@ -405,13 +412,13 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       townInput.setAttribute('maxlength', '80');
       townInput.setAttribute('list', 'nrl-towns');
       townInput.setAttribute('autocomplete', 'off');
-      form.appendChild(field('Home town', townInput));
+      details.appendChild(field('Home town', townInput));
       const results = mk('datalist', '');
       results.id = 'nrl-towns';
-      form.appendChild(results);
+      details.appendChild(results);
       const townNote = mk('div', 'nrl-title-kit-note', 'Loading offline towns…');
       townNote.setAttribute('data-nrl-town-status', '');
-      form.appendChild(townNote);
+      details.appendChild(townNote);
       const townLabel = (t: Town): string => `${t.name}, ${t.region}, ${t.country}`;
       const suggestions = (): void => {
         results.replaceChildren();
@@ -439,14 +446,14 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       coachInput.setAttribute('placeholder', 'Coach');
       coachInput.setAttribute('maxlength', String(NAME_MAX));
       names.appendChild(field('Your name', coachInput));
-      form.appendChild(names);
+      details.appendChild(names);
 
       const ground = mk('input', 'nrl-title-input');
       ground.type = 'text';
       ground.setAttribute('data-nrl-groundname', '');
       ground.setAttribute('aria-label', 'Ground name');
       ground.setAttribute('maxlength', '120');
-      form.appendChild(field('Ground name', ground));
+      details.appendChild(field('Ground name', ground));
       const applyTown = (): void => {
         const value = townInput.value.trim();
         selected = towns.find(t => townLabel(t) === value)
@@ -480,7 +487,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
           buttons.push(b);
           box.appendChild(b);
         }
-        form.appendChild(field(label, box));
+        details.appendChild(field(label, box));
         return { buttons, palette };
       };
       const prim = swatches('Primary', 'data-nrl-primary', PLAYER_PRIMARY_COLORS, (c) => {
