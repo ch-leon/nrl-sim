@@ -17,6 +17,8 @@ import { CALLS } from '../calls';
 import { injuryChance, lostInContactChance } from '../weather';
 import { TOUCH } from '../touch';
 import { BIN } from '../sinbin';
+import { derivedRatings } from '../fit';
+import { rushBroken } from '../counters';
 import { PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
 import { other, type Player, type Phase } from './types';
@@ -105,7 +107,8 @@ export abstract class LiveContact extends LivePenalties {
     if (sit.support) tr.mods.offload = (tr.mods.offload ?? 0) + (plan.offload - 1) * BASE.offload + dplan.offload;
     tr.mods.bigHit = (tr.mods.bigHit ?? 0) + dplan.bigHit;
     // A defence a man short (#71) is stretched: easier to bust.
-    tr.mods.broken = (tr.mods.broken ?? 0) + dplan.broken + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
+    tr.mods.broken = (tr.mods.broken ?? 0) + rushBroken(dplan.broken, this.tactics[t.side].defence,
+      derivedRatings({ position: ROLES[c.slot]!.name, stats: { ...c.stats, stamina: c.stamina }, traits: c.traits }).carry, this.planFit[t.side].defence) + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
     tr.mods.edge = this.contestFitEdge(c.side, t.side);
     this.applySlideContact(c, tr.mods, sit.support);
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
@@ -147,7 +150,8 @@ export abstract class LiveContact extends LivePenalties {
         if (r !== null) {
           this.emit('offload', `${c.name} gets the offload away to ${this.players[r]!.name}`, c, credit);
           // A Razzle Dazzle offload is the miracle ball — and the one that gets spilled; so is one the coach called for (#396).
-          this.pass(c, this.players[r]!, (tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0) + (this.playCall() === 'offload' ? CALLS.offload.spill : 0));
+          this.pass(c, this.players[r]!, (tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0) + (this.playCall() === 'offload' ? CALLS.offload.spill : 0)
+            + this.rushOffloadSpill(c.side));
           this.offloadReceiver = r;
           this.offloadUntil = this.tick + LIVE.beatenCooldown;
           this.lock(c, 'tackled', LIVE.contactTicks + LIVE.downTicks);
@@ -217,6 +221,11 @@ export abstract class LiveContact extends LivePenalties {
     this.hold(c, 'tackled');
     this.hold(t, 'tackle');
     this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big: false, wrestle, wreck };
+  }
+
+  /** The rushed All-out offload uses the receiver's existing handling roll. */
+  protected rushOffloadSpill(side: Side): number {
+    return this.tactics[side].attack === 'all-out' ? this.rushEffect(side) : 0;
   }
 
   /** Drift leaves an inside gap for the pack, and cannot reset for the offload receiver. */

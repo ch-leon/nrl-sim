@@ -244,7 +244,7 @@ export abstract class LiveKicks extends LiveClock {
     const mine = nominated && nominated.side === this.attacking && !this.locked(nominated) && this.onField(nominated) && dist(nominated.body.pos, b.to) <= KICK_CONTEST.bomb.contestM;
     const catcher = mine ? nominated : under(this.attacking);
     if (!chaser || !catcher) return null;
-    const odds = highBall(chaser.stats.speed, catcher.stats.skill, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling, this.kickCover(kicking));
+    const odds = highBall(chaser.stats.speed, catcher.stats.skill, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling, this.kickCover(kicking), this.rushKickGap(kicking));
     const u = this.rng.next();
     if (u < odds.won) {
       this.ball = { kind: 'held', by: this.indexOf(chaser) };
@@ -323,7 +323,7 @@ export abstract class LiveKicks extends LiveClock {
       this.looseFor = this.attacking;
       return;
     }
-    const attackerWins = !d || this.rng.next() < grubberRace(secs(a), secs(d), this.tactics[kicking].attack === 'kick-chase', this.kickCover(kicking));
+    const attackerWins = !d || this.rng.next() < grubberRace(secs(a), secs(d), this.tactics[kicking].attack === 'kick-chase', this.kickCover(kicking) - this.rushKickGap(kicking));
     this.raceFor = attackerWins ? kicking : this.attacking;
     this.scramble = true;
     this.emit('loose-ball', d ? `Loose in the in-goal — ${a.name} and ${d.name} race for it` : `Loose in the in-goal — ${a.name} is after it`, a);

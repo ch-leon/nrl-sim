@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Rush counters use carrier/defence fit, kick space and rushed All-out offload spills behind an off switch; normal matches are unchanged ([#463](https://github.com/ch-leon/nrl-sim/issues/463)).
+
 - Slide matchup mechanics for Expansive, Kick-chase, Tight and All-out are implemented behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/501)).
 
 - Finance opens after the first home game, Staff & Board at round 4 and Contracts at round 12. Office explains locked tiles; HUD and warning links stay available ([PR](https://github.com/ch-leon/nrl-sim/pull/498)).
