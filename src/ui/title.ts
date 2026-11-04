@@ -180,7 +180,9 @@ export const TITLE_CSS = `
   /* Give the veteran switch room without pushing Start under the home indicator. */
   .nrl-title-kit { padding: 6px; }
   .nrl-title-kit img { width: 48px; height: 52px; }
-  .nrl-title-setup { grid-template-columns: minmax(0, 1fr); grid-template-areas: "kit" "form" "veteran" "start"; }
+  .nrl-title-kit-note { display: none; }
+  .nrl-title-setup { grid-template-columns: 5rem minmax(0, 1fr);
+    grid-template-areas: "kit veteran" "form form" "start start"; }
   .nrl-title-field { flex-wrap: wrap; }
   .nrl-title-field > span { flex-basis: 100%; text-align: left; }
 }
