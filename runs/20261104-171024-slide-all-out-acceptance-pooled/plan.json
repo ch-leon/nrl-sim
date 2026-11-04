@@ -1,0 +1,37 @@
+{
+  "name": "Slide All-out acceptance pooled",
+  "description": "All-out v Slide: 500 distinct seeds, 1\u2013500, both orientations, 1,000 whole matches. Pooled from four disjoint 125-seed runs of the existing balance harness, with identical source, sheets and tuning.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.slide.expansive": 0.03,
+    "counters.slide.kickChase": 0.6,
+    "counters.slide.tight": 0.1,
+    "counters.slide.allOut": 0.3
+  },
+  "scenarios": [
+    {
+      "name": "all-out v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "seedStart": 1
+}

@@ -1,0 +1,36 @@
+{
+  "name": "Slide kick recovery control",
+  "description": "Dormant Slide control for per-side kick recoveries with the same flat-60 sheets, Tight rebuild and own-style fit enabled. 200 seeds both ways, 400 whole matches; compare bombs won and grubber tries with the 1,000-match enabled cell.",
+  "report": "matrix",
+  "seeds": 200,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 0,
+    "counters.slide.expansive": 0.03,
+    "counters.slide.kickChase": 0.6,
+    "counters.slide.tight": 0.1,
+    "counters.slide.allOut": 0.3
+  },
+  "scenarios": [
+    {
+      "name": "kick-chase v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}

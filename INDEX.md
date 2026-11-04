@@ -204,3 +204,7 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-155251-standard | standard | 0db465f | main | [report](runs/20261104-155251-standard/report.md) |
 | 20261104-155850-slide-counters-tuning | Slide counters tuning | 0db465f (uncommitted changes) | feat/462-slide-counters | [report](runs/20261104-155850-slide-counters-tuning/report.md) |
 | 20261104-162020-slide-kick-cover-correction | Slide kick cover correction | cceee55 (uncommitted changes) | feat/462-slide-counters | [report](runs/20261104-162020-slide-kick-cover-correction/report.md) |
+| 20261104-162135-slide-acceptance-carries | Slide acceptance carries | ad7094d | feat/462-slide-counters | [report](runs/20261104-162135-slide-acceptance-carries/report.md) |
+| 20261104-162715-slide-acceptance-kick-chase | Slide acceptance kick chase | 1fa7bf3 | feat/462-slide-counters | [report](runs/20261104-162715-slide-acceptance-kick-chase/report.md) |
+| 20261104-164735-slide-kick-recovery-control | Slide kick recovery control | 1fa7bf3 | feat/462-slide-counters | [report](runs/20261104-164735-slide-kick-recovery-control/report.md) |
+| 20261104-171024-slide-all-out-acceptance-pooled | Slide All-out acceptance pooled | 28c8054 | feat/462-slide-counters | [report](runs/20261104-171024-slide-all-out-acceptance-pooled/report.md) |

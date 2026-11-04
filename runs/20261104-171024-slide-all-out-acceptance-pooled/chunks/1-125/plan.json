@@ -1,0 +1,37 @@
+{
+  "name": "Slide All-out acceptance 1-125",
+  "description": "All-out v Slide on the corrected second-phase expiry: seeds 1–125, both orientations (250 whole matches), one disjoint quarter of the 1,000-match acceptance sample.",
+  "report": "matrix",
+  "seeds": 125,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.slide.expansive": 0.03,
+    "counters.slide.kickChase": 0.6,
+    "counters.slide.tight": 0.1,
+    "counters.slide.allOut": 0.3
+  },
+  "scenarios": [
+    {
+      "name": "all-out v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "seedStart": 1
+}
