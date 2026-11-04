@@ -1,0 +1,34 @@
+name: Club home screenshot evidence
+on:
+  push:
+    branches: [evidence/479-club-home-screenshots]
+permissions:
+  contents: read
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify feature source matches PR 490
+        run: |
+          git fetch --depth=1 origin 0b79c0ddaa6934cc16e8ce68e67692669376af47
+          git diff --exit-code 0b79c0ddaa6934cc16e8ce68e67692669376af47 -- src package.json package-lock.json index.html vite.config.ts
+      - run: npm ci
+      - run: npm run build
+      - name: Capture new Easy and Hard Club homes at 390x844
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4198 > /tmp/club-home-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid"' EXIT
+          node scripts/club-home-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: club-home-easy-hard-390x844
+          path: e2e-output/club-home-evidence
+          if-no-files-found: error
+          retention-days: 7
