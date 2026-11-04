@@ -1,9 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { clubHomeView, nextMatchLine } from '../../../src/ui/screens/clubHome';
+vi.mock('../../../src/art/coachFace', () => ({ coachFaceDataUrl: () => 'data:image/png;base64,face' }));
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { clubHomeView, nextMatchLine, openClubHome } from '../../../src/ui/screens/clubHome';
 import { createNewGame, getState, setState, type GameState, type Objective } from '../../../src/core/state';
 import { initLeague } from '../../../src/systems/fixtures';
 import { ordinal, placeName } from '../../../src/ui/hud';
 import { financeSummary } from '../../../src/ui/screens/finance';
+import { coachDocument } from '../coachDom';
+import { closeScreen } from '../../../src/ui/dom';
+import { coachSays } from '../../../src/ui/coachSays';
+import type { StubNode } from '../stubDom';
 import { ECON, WEEKS_PER_SEASON } from '../../../src/config';
 
 // #350 P1: the Club home sheet, CLUB on a phone held upright.
@@ -110,5 +115,32 @@ describe('the Club home sheet (#350)', () => {
     const v = clubHomeView({ ...s, money: 12_000, objectives: [solvent] }, { runwayWeeks: () => 3 });
     expect(v.board).toMatchObject({ title: 'Board: $20k', detail: 'You have $12k', risk: 'off-track' });
     expect(clubHomeView({ ...s, objectives: [] }).board).toBeNull();
+  });
+});
+
+
+describe('Coach says row (#477)', () => {
+  afterEach(() => { closeScreen(); vi.unstubAllGlobals(); });
+  it('includes the pure suggestion, renders it first and opens its destination; refreshes and reopens', () => {
+    createNewGame('Test Club', 1);
+    coachDocument();
+    const onCoach = vi.fn();
+    const deps = { onCoach, onMoney: vi.fn(), onNextMatch: vi.fn(), onDecisions: vi.fn(), onBoard: vi.fn(), onGrounds: vi.fn() };
+    const v = clubHomeView(getState());
+    expect(v.coach).toEqual(coachSays(getState(), { decisions: 0, runwayWeeks: null }));
+    const screen = openClubHome(deps) as unknown as StubNode;
+    const row = () => screen.all().find((n) => n.className.includes('nrl-club-home-coach'))!;
+    expect(row().parentNode!.children[1]).toBe(row()); // first row after club identity
+    expect(row().textContent).toContain(`Coach saysMick Dorney${v.coach.text}`);
+    row().click();
+    expect(onCoach).toHaveBeenCalledWith(v.coach.screen);
+    const squad = getState().squad.map((p) => ({ ...p, injuredWeeks: 2 }));
+    setState({ squad, week: 2 });
+    expect(row().textContent).toContain("can't play. Fix the lineup.");
+    row().click();
+    expect(onCoach).toHaveBeenLastCalledWith('lineup');
+    closeScreen();
+    const reopened = openClubHome(deps) as unknown as StubNode;
+    expect(reopened.textContent).toContain("can't play. Fix the lineup.");
   });
 });

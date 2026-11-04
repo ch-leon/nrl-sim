@@ -1,3 +1,10 @@
+vi.mock('../../src/art/coachFace', () => ({ coachFaceDataUrl: () => 'data:image/png;base64,face' }));
+import { vi, afterEach } from 'vitest';
+import { coachDocument } from './coachDom';
+import type { StubNode } from './stubDom';
+import { closeModal } from '../../src/ui/dom';
+import { openWeekSummary } from '../../src/ui/weekSummary';
+import { coachSays } from '../../src/ui/coachSays';
 import { summaryRemark, SUMMARY_REMARKS } from '../../src/ui/coachVoice';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -178,5 +185,29 @@ describe('summaryRemark (#476)', () => {
       expect(summaryRemark({ ...quiet(), board: { mood, text: '' } })).toBe(SUMMARY_REMARKS[mood]);
     }
     expect(summaryRemark({ ...quiet(), net: 1 })).toBe(SUMMARY_REMARKS.good);
+  });
+});
+
+
+describe('weekly Coach says (#477)', () => {
+  afterEach(() => { closeModal(); vi.unstubAllGlobals(); });
+  it('renders the same actionable suggestion as Club home, instead of the summary remark', () => {
+    createNewGame('Test Club', 1);
+    coachDocument();
+    const s = getState();
+    const coach = coachSays(s, { decisions: 0, runwayWeeks: 3 });
+    const v = weekSummary(weekSnapshot(s), weekSnapshot({ ...s, week: s.week + 1 }));
+    const card = openWeekSummary(v, { onAdvance: vi.fn(), coach }) as unknown as StubNode;
+    expect(card.textContent).toContain(coach.text);
+    expect(card.textContent).not.toContain(summaryRemark(v));
+  });
+  it('keeps the existing remark when rule 7 has no suggestion', () => {
+    createNewGame('Test Club', 1);
+    coachDocument();
+    const s = getState();
+    const v = weekSummary(weekSnapshot(s), weekSnapshot({ ...s, week: s.week + 1 }));
+    const card = openWeekSummary(v, { onAdvance: vi.fn(), coach: { text: 'Opponent next.', screen: null } }) as unknown as StubNode;
+    expect(card.textContent).toContain(summaryRemark(v));
+    expect(card.textContent).not.toContain('Opponent next.');
   });
 });

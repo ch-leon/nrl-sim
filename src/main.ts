@@ -325,6 +325,7 @@ async function boot(): Promise<void> {
   portrait = initPortraitMenus(guard, () => openClubHome({
     decisions: decisionChipItems,
     runwayWeeks,
+    onCoach: (screen) => nav.open(screen),
     onMoney: () => nav.open('finance'),
     onNextMatch: () => nav.open('fixtures'),
     onDecisions: () => void openDecisions(),

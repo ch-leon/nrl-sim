@@ -55,6 +55,13 @@ export class StubNode {
   append(...nodes: (StubNode | string)[]): void {
     for (const n of nodes) this.appendChild(typeof n === 'string' ? new StubNode('#text', n) : n);
   }
+  prepend(...nodes: StubNode[]): void {
+    for (const n of [...nodes].reverse()) {
+      n.parentNode?.removeChild(n);
+      n.parentNode = this;
+      this.childNodes.unshift(n);
+    }
+  }
   removeChild(c: StubNode): StubNode {
     this.childNodes = this.childNodes.filter((x) => x !== c);
     c.parentNode = null;
