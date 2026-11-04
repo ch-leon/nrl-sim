@@ -13,10 +13,12 @@ import {
   signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
 import { signWithUndo } from '../../systems/undo';
-import { SQUAD_CAP } from '../../config';
+import { SQUAD_CAP, difficultyMultipliers } from '../../config';
 import { POSITION_SHORT } from '../../systems/lineup';
 import { openPlayerPage, positionLabel } from './player';
 import { squadTabs } from './squad';
+import { recruitShortlist } from '../recruitShortlist';
+import { weeklyIncome } from '../../systems/economy';
 
 // ── Shared screen styling ───────────────────────────────────────────────────
 // Injected once alongside the base kit CSS (which holds the sheet, the
@@ -336,7 +338,9 @@ function onRecruitClosed(): void {
 export function openRecruitScreen(): void {
   ensureScreenStyles();
 
+  let showAll = false;
   const list = el('div', { class: 'nrl-grid-body nrl-screen-body' });
+  const more = el('div');
   const sub = el('div', { class: 'nrl-screen-sub' });
   const sort = popMenu<RecruitSort>({
     label: () => `Sort: ${RECRUIT_SORTS.find((s) => s.id === recruitSort)!.label}`,
@@ -351,6 +355,15 @@ export function openRecruitScreen(): void {
   const render = (): void => {
     list.replaceChildren();
     const s = getState();
+    const shortlist = recruitShortlist(s);
+    const fullView = showAll || s.freeAgents.length < 5;
+    sort.button.style.display = fullView ? '' : 'none';
+    more.replaceChildren();
+    if (!fullView) {
+      const all = button(`Show all ${s.freeAgents.length}`, () => { showAll = true; render(); });
+      all.setAttribute('data-show-all', '');
+      more.append(all);
+    }
     // R2 (#349): when the pool changes, in Advance Weeks.
     const n = weeksToPoolRefresh(s.week);
     const when = n === 1 ? 'after this week' : `in ${n} weeks`;
@@ -363,7 +376,12 @@ export function openRecruitScreen(): void {
     const full = s.squad.length >= SQUAD_CAP;
     const agents = s.freeAgents.map((p) => ({ p, fee: signingFee(s, p), ovr: overallRating(p) }));
     agents.sort((a, b) => (recruitSort === 'fee' ? a.fee - b.fee : recruitSort === 'age' ? a.p.age - b.p.age : b.ovr - a.ovr) || b.ovr - a.ovr);
-    for (const { p: agent, fee, ovr } of agents) {
+    const visible = fullView ? agents : shortlist.ids.map((id) => agents.find(({ p }) => p.id === id)!);
+    if (visible.length === 0) list.append(el('div', { class: 'nrl-screen-empty', text: full
+      ? 'Squad full: release or sell a player first, or show all free agents.'
+      : 'No affordable shortlist today. Show all free agents to browse the pool.' }));
+    for (const { p: agent, fee, ovr } of visible) {
+      const reach = !fullView && agent.id === shortlist.reachId;
       const short = fee - s.money;
       // The signing fee: a transfer-style fee by rating and age (#146).
       const action = button(full ? 'SQUAD FULL' : short > 0 ? `NEED ${shortMoney(short)}` : 'SIGN', () => {
@@ -379,16 +397,38 @@ export function openRecruitScreen(): void {
           : `Signing fee ${money(fee)} (${signingFeeBasis(s, agent)}), then ${money(agent.wage)}/wk`;
       const chips = traitChips(agent);
       if (agent.junior) chips.unshift(el('span', { class: 'nrl-chip nrl-chip-academy', text: 'Academy', attrs: { title: 'Academy prospect: a 4×wage fee' } }));
+      if (agent.id === shortlist.pickId) chips.unshift(el('span', {
+        class: 'nrl-chip', text: "Coach's pick",
+        attrs: { 'data-coach-pick': '', title: 'The biggest affordable improvement at his position in the starting side.' },
+      }));
+      const who = whoCell(agent.name, null, chips);
+      // Keep the badge and reach reason readable on landscape phones without
+      // changing the shared row/chip styles used by other squad screens.
+      who.style.flexWrap = 'wrap';
+      who.style.whiteSpace = 'normal';
+      if (reach) {
+        const income = weeklyIncome(s);
+        const gap = fee + 8 * agent.wage * difficultyMultipliers(s.settings.difficulty).wages - s.money;
+        const reason = income > 0 ? `Fee ${money(fee)}: about ${Math.ceil(gap / income)} weeks away`
+            : `Fee ${money(fee)}: more weekly income needed`;
+        const note = el('span', { text: reason, attrs: { title: 'Saving the fee plus eight weeks of wages, estimated from weekly income before expenses; gates and spending can change it.' } });
+        note.style.color = 'var(--nrl-alert)';
+        note.style.flexBasis = '100%';
+        who.append(note);
+      }
+      const feeCell = el('span', { class: 'nrl-num', text: money(fee), attrs: { title: `Signing fee (${signingFeeBasis(s, agent)})` } });
+      if (reach) feeCell.style.color = 'var(--nrl-alert)';
       list.appendChild(tableRow(agent, [
-        whoCell(agent.name, null, chips),
+        who,
         el('span', { class: 'nrl-row-pos', text: posShort(agent.position), attrs: { title: positionLabel(agent.position) } }),
         el('span', { class: 'nrl-num', text: String(agent.age) }),
         el('span', { class: 'nrl-num nrl-row-ovr', text: String(ovr), attrs: { title: 'Overall rating' } }),
-        el('span', { class: 'nrl-num', text: money(fee), attrs: { title: `Signing fee (${signingFeeBasis(s, agent)})` } }),
+        feeCell,
         el('span', { class: 'nrl-num nrl-row-dim', text: money(agent.wage), attrs: { title: 'Weekly wage' } }),
         action,
       ], () => openPlayerPage(agent, { kind: 'freeAgent' })));
     }
+    list.append(more);
   };
 
   const head = screenHead('', { lead: [squadTabs('recruit')], sub, controls: [sort.button] });
