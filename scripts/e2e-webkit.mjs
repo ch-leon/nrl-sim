@@ -79,7 +79,7 @@ import { runCoachCalls } from './e2e-webkit/match/coachCalls.mjs';
 const SECTIONS = [
   ['runSize', async (b) => { let f = 0; for (const [W, H] of SIZES) f += await runSize(b, W, H); return f; }],
   ['runPortrait', (b) => runPortrait(b)],
-  ['runPlaytest', (b) => runPlaytest(b)],
+  ['runPlaytest', async (b) => (await runPlaytest(b)) + (await runPlaytest(b, 844, 390))],
   ['runPauseSettings', (b) => runPauseSettings(b)],
   ['runTutorialWalk', async (b) => { let f = 0; for (const run of WALK_RUNS) f += await runTutorialWalk(b, run); return f; }],
   ['runRecruit', (b) => runRecruit(b)],

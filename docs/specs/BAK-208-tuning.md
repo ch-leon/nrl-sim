@@ -1424,3 +1424,23 @@ All eight preset cells match main exactly except elapsed time; both fingerprint
 pins and SAVE_VERSION 21 are unchanged. Local typecheck, all 2,539 unit tests and
 the production build pass. Phone play-tests at 667×375 and 844×390 reach full time;
 PR #473 links the CI screenshot artifacts (screenshots are never committed).
+
+## 31. Own-style fit bonus (#461; BAK-208 §5)
+
+The selected starting sheets supply attack and defence fit before rating spread or
+any difficulty edge. Bench, fatigue and substitutions do not rescore the sheets.
+At a break, the newly applied plan selects its attack and defence fits again.
+
+| Knob | Default | Meaning |
+|---|---|---|
+| `counters.fit.on` | 0 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
+| `counters.fit.edge` | 0.2 | Carrier-edge probability per point of fit away from 1.0. |
+
+Each contact adds `edge × (attackFit − 1) − edge × (defenceFit − 1)`
+to `carrierEdge`, clamped to 0–1 by `contestOdds`. Thus a side's attack fit
+helps it carry and its defence fit helps it tackle, whoever it faces. Fit 1
+adds zero. This uses the existing contest roll and outcome weights, adding no
+randomness. The Tight switch stays independent and off.
+
+Tests: `tests/match/league/fit-bonus.test.ts` covers neutral/off/signed edges,
+half-time reselection on the changing side, and exact neutral-match replay.

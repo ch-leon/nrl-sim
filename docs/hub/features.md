@@ -68,6 +68,7 @@ What's in the game, with the PR that added each.
 Newest first; merge dates in UTC.
 
 - Difficulty descriptions and a first-career Easy hint at setup ([PR](https://github.com/ch-leon/nrl-sim/pull/493)); Normal remains the default.
+- Own-style attack and defence fit can influence contact contests behind a switch that defaults off (#461); plan changes select the new fits, 4 Nov
 - Grind is now named Tight; pack-fit offloads are available behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/473)), 4 Nov
 - Recruit shortlist of four with an affordable Coach’s pick and Show all ([PR](https://github.com/ch-leon/nrl-sim/pull/492)), 4 Nov
 - Club home always shows cash runway in weeks, or “covering costs” ([PR](https://github.com/ch-leon/nrl-sim/pull/490)), 4 Nov
