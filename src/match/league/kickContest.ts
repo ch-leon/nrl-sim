@@ -64,14 +64,15 @@ export interface HighBall {
  * A contested bomb: the chaser's Speed against the catcher's Skill, the kick's
  * height (Big Boot puts it higher), a Kick-chase side, and the wet (`handling`,
  * 1 dry, more in rain) which makes the catcher spill more. The two always
- * leave some clean catches. Slide's fit-scaled `cover` reduces both risks.
+ * leave clean catches at normal strengths. Slide's fit-scaled `cover` reduces
+ * both risks; Rush's `gap` increases them, using the same contest roll.
  */
-export function highBall(chaserSpeed: number, catcherSkill: number, peak: number, kickChase: boolean, handling = 1, cover = 0): HighBall {
+export function highBall(chaserSpeed: number, catcherSkill: number, peak: number, kickChase: boolean, handling = 1, cover = 0, gap = 0): HighBall {
   const b = KICK_CONTEST.bomb;
   const extra = Math.max(0, peak - b.peak) * b.perPeakM + (kickChase ? b.kickChase : 0);
-  const won = chaserWins(b.won, chaserSpeed, catcherSkill, extra) / (1 + cover);
+  const won = Math.min(1, chaserWins(b.won, chaserSpeed, catcherSkill, extra) * (1 + gap) / (1 + cover));
   // Not beaten to it, the catcher still has to hold it with the chaser on him.
-  const spill = (1 - won) * Math.min(1, chaserWins(b.spill, chaserSpeed, catcherSkill, extra) * handling / (1 + cover));
+  const spill = (1 - won) * Math.min(1, chaserWins(b.spill, chaserSpeed, catcherSkill, extra) * handling * (1 + gap) / (1 + cover));
   return { won, spill };
 }
 

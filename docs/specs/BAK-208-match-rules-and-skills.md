@@ -239,6 +239,8 @@ The Tight offload rebuild (#460) is dormant (`counters.tight.on = 0`): the row a
 
 Slide counters (#462) are dormant (`counters.slide.on = 0`). When enabled, both sides’ style fits scale drift and cut-out reads against Expansive, deep kick cover against Kick-chase, inside pack offloads against Tight and busts in the line’s recovery window after an All-out offload. Balanced is neutral; the existing contest rolls decide outcomes. See tuning §32.
 
+Rush counters (#463) are dormant (`counters.rush.on = 0`). When enabled, Carry and starting-sheet Rush fit replace the flat bust concession; rushed back-three positioning and kick contests leave space for Kick-chase, while All-out offloads spill more. Tight and Expansive have no base counter cell. All outcomes use existing match rolls. See tuning §33.
+
 Own-style fit (#461) is independently dormant (`counters.fit.on = 0`). When enabled, starting-sheet attack fit helps carrying contests and defence fit helps tackling contests; fit 1 is neutral. A plan applied at a break selects the new styles’ fits. The same contest roll resolves contact; see tuning §31.
 
 *Pass* adds to the engaged carrier's chance of passing (base 30% + Skill/300). *Offloads*

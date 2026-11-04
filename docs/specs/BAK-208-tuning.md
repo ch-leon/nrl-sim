@@ -1467,3 +1467,29 @@ fit enabled, using the task-1 flat-60 matchups and both orientations. The archiv
 tuning control measures the same scenarios with Slide off.
 The matrix report includes per-side bombs won and grubber tries as well as
 line breaks, offloads and busts, so the mechanism is visible beside points share.
+
+
+## 33. Rush matchup counters (#463)
+
+The switch ships at 0. With it on, Rush's broken modifier is the preset's
+concession plus `(Carry − fit.leagueAverage) × carry − (Rush fit − 1) × defenceFit`.
+Carry uses the carrier's derived Strength/Speed/Wrecking Ball rating. Rush fit
+uses the starting sheet's Stamina, Contact D and Hitman, as in §29. At neutral
+Carry 60 and fit 1 the modifier is still 0.11; stronger carriers bust more and
+better-fitted Rush lines concede fewer busts. Tight and Expansive have no base
+cell; their own-style fit and carriers decide the contest.
+
+| Knob | Default | Effect when Rush is enabled |
+|---|---:|---|
+| `counters.rush.on` | 0 | Only 1 enables the Rush mechanics; 0 keeps the legacy flat bust modifier. |
+| `counters.rush.carry` | 0.004 | Bust probability per derived Carry point above neutral (negative below). |
+| `counters.rush.defenceFit` | 0.12 | Bust probability removed per Rush-fit point above 1 (added below). |
+| `counters.rush.kickChase` | 0.39 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
+| `counters.rush.allOut` | 0.06 | Cell × both fits added to handling spill chance on an All-out offload, using the receiver's existing pass-catch roll. Ordinary passes and other attacks receive no spill bonus. |
+
+No new RNG draws, stored stats, save changes or Labs/commercial flag changes.
+The reproducible acceptance plan is `balance/plans/counters-rush.json`: 500 seeds
+both ways per flat cell (1,000 matches), except Tight, which includes seeds
+1–1,000 both ways (2,000 matches) after extending a borderline first sample.
+Fit rows use task 1’s 200 seeds both ways (400 matches), with earlier counters
+enabled by overrides.

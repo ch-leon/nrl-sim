@@ -337,6 +337,7 @@ export abstract class LivePositioning extends LiveContact {
     // The back three drop as the last two tackles shape for a kick; the edge
     // stays in the line during the earlier carries.
     const kickCover = this.tactics[atk].attack === 'kick-chase' && (this.lastPlay || this.tackles >= SET_TACKLES - 2) ? this.slideEffect() : 0;
+    const rushDepth = this.tactics[atk].attack === 'kick-chase' ? Math.min(1, this.rushEffect()) : 0;
     const coverDepth = Math.min(1, kickCover);
     if (ph.kind === 'play' && carrier) {
       const want = carrier.body.pos.x + this.dir * 2.5;
@@ -393,6 +394,7 @@ export abstract class LivePositioning extends LiveContact {
         } else {
           let deep = this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM;
           if (!this.lastPlay && coverDepth > 0) deep += (LIVE.fullbackLastM - LIVE.fullbackDeepM) * coverDepth;
+          deep *= 1 - rushDepth;
           p.target = { x: clamp(this.lineX + this.dir * deep, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
         }
       } else {
@@ -400,7 +402,7 @@ export abstract class LivePositioning extends LiveContact {
         const expansive = this.tactics[atk].attack === 'expansive' ? slide : 0;
         const y = clamp(role.lane + (anchor.y - MID_Y) * Math.min(1, (role.defPull ?? role.pull) * dplan.pull + expansive), 1.5, 66.5);
         const depth = role.name === 'winger'
-          ? (this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM) * coverDepth : 0;
+          ? (this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM) * coverDepth - LIVE.fullbackDeepM * rushDepth : 0;
         p.target = { x: clamp(this.lineX + this.dir * depth, -8, FIELD_LENGTH + 8), y };
       }
     }
