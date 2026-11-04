@@ -4,9 +4,9 @@ import type { AttackPreset, DefencePreset } from './presets';
 export const COUNTERS = {
   slide: {
     on: 0,
-    expansive: 0.03,
-    kickChase: 0.6,
-    tight: 0.10,
+    expansive: 0.08,
+    kickChase: 1,
+    tight: 0.04,
     allOut: 0.60,
   },
   fit: {

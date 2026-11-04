@@ -1455,9 +1455,9 @@ styles. Balanced and defences other than Slide receive no cell effect.
 | Knob | Default | Effect when Slide is enabled |
 |---|---:|---|
 | `counters.slide.on` | 0 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
-| `counters.slide.expansive` | 0.03 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
-| `counters.slide.kickChase` | 0.6 | Extra fraction of fullback depth (also held by wingers) on the last two tackles, divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
-| `counters.slide.tight` | 0.10 | Adds inside bust probability and supported offload probability for pack carriers. |
+| `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
+| `counters.slide.kickChase` | 1 | On the last two tackles, adds up to fullbackLastM − fullbackDeepM to fullback depth and holds wingers up to the current fullback depth (depth fraction capped at 1); divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
+| `counters.slide.tight` | 0.04 | Adds inside bust probability and supported offload probability for pack carriers. |
 | `counters.slide.allOut` | 0.60 | Adds bust probability only at the offload receiver's first contact. A pass, kick, turnover or stoppage clears the receiver. |
 
 No new random draws: interception, contact, catches and races use their existing

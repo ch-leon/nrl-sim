@@ -7,9 +7,9 @@
     "counters.tight.on": 1,
     "counters.fit.on": 1,
     "counters.slide.on": 1,
-    "counters.slide.expansive": 0.03,
-    "counters.slide.kickChase": 0.6,
-    "counters.slide.tight": 0.1,
+    "counters.slide.expansive": 0.08,
+    "counters.slide.kickChase": 1,
+    "counters.slide.tight": 0.04,
     "counters.slide.allOut": 0.6
   },
   "scenarios": [
