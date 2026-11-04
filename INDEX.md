@@ -192,3 +192,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-060657-presets | presets | f15bc7c | codex/460-tight | [report](runs/20261104-060657-presets/report.md) |
 | 20261104-061234-presets | presets | 862c9ab | codex/460-tight | [report](runs/20261104-061234-presets/report.md) |
 | 20261104-061533-460-tight-acceptance | 460 Tight acceptance | 862c9ab | codex/460-tight | [report](runs/20261104-061533-460-tight-acceptance/report.md) |
+| 20261104-061207-counters-fit | counters fit | 30cd19e | codex/460-tight | [report](runs/20261104-061207-counters-fit/report.md) |
