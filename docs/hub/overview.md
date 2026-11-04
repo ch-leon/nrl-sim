@@ -1,6 +1,6 @@
 # Overview
 
-Last updated: 2026-11-01
+Last updated: 2026-11-04
 
 ## The pitch
 
@@ -30,23 +30,33 @@ premium game with a free demo and a one-off unlock
   ([PR](https://github.com/ch-leon/nrl-sim/pull/394)). Saves stay on the phone; no
   login or payments.
 
-## Where things stand (as of 1 Nov 2026)
+## Where things stand (as of 4 Nov 2026)
 
 - **UI cleanup:** done, in five chunks
   ([PR](https://github.com/ch-leon/nrl-sim/pull/353) to
   [PR](https://github.com/ch-leon/nrl-sim/pull/359)).
-- **Leon's 12 gameplay and UX tasks:** every checklist box is ticked; the issue is
-  still open (source: [issue #372](https://github.com/ch-leon/nrl-sim/issues/372)).
+- **Leon's 12 gameplay and UX tasks:** complete; the tracker is closed (source: [issue #372](https://github.com/ch-leon/nrl-sim/issues/372)).
 - **Commercial foundations:** built
   ([issue](https://github.com/ch-leon/nrl-sim/issues/365)). The storage adapter,
   content packs and brand config are in use in today's game. Only the demo gate,
   paywall and login sit behind the commercial switch, which is off on the live build.
 - **Save format:** version 21 (`SAVE_VERSION` in `src/core/state.ts`).
-- **In flight:** splitting `live.ts` and `e2e-webkit.mjs` into modules, no behaviour
-  change: open, awaiting Leon's thumbs up (source: [PR #443](https://github.com/ch-leon/nrl-sim/pull/443)).
-  The repo slim Leon approved has no PR yet (source: the open PR list). The
-  development process in AGENTS.md is merged (source: [PR #444](https://github.com/ch-leon/nrl-sim/pull/444)).
-  See [roadmap.md](roadmap.md).
+- **Repo maintenance:** the live-sim and WebKit module split is merged
+  ([PR #443](https://github.com/ch-leon/nrl-sim/pull/443)); the repo slim is also
+  merged ([PR #447](https://github.com/ch-leon/nrl-sim/pull/447)).
+- **Strategy counters:** the matchup-report tooling and pure fit-rating helpers
+  are merged ([PR #471](https://github.com/ch-leon/nrl-sim/pull/471),
+  [PR #472](https://github.com/ch-leon/nrl-sim/pull/472)). They do not switch on
+  counters in the live game. The Grind-to-Tight rebuild is in an open draft
+  ([PR #473](https://github.com/ch-leon/nrl-sim/pull/473)), with its new behaviour
+  behind a knob that defaults to 0. The remaining sequence is in
+  [tracker #470](https://github.com/ch-leon/nrl-sim/issues/470).
+- **Launch plumbing:** planned, not live. Firebase hosting/push, PostHog,
+  EmailOctopus, tester distribution and privacy work are tracked in
+  [#456](https://github.com/ch-leon/nrl-sim/issues/456), including Leon's setup
+  checklist. The launch-decision documentation is still in open
+  [PR #457](https://github.com/ch-leon/nrl-sim/pull/457); GitHub Pages remains the
+  current play link. See [roadmap.md](roadmap.md).
 
 ## How work moves
 
