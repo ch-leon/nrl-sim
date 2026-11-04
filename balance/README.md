@@ -193,3 +193,11 @@ Stretches scale counts to 14 minutes. The legacy `counts`, Home win and legs
 still describe only the written orientation, exactly as before. Thus the two
 new sides sum to the legacy counts for one orientation; for bothWays they sum
 to the average of the two orientations' legacy counts.
+
+`counters-slide.json` is the Slide-column acceptance plan (#462): flat 60,
+500 seeds each way (1,000 matches per cell), with Tight, own-style fit and Slide
+counters enabled only as plan overrides. Targets are 53–57% for Tight/All-out,
+43–47% for Expansive/Kick-chase, and Balanced within one SE of 50%. It also reports
+per-side bombs, bombs won, grubbers and grubber tries from existing kick events;
+these are harness counts, not new stored player stats. For a paired dormant
+control, override `counters.slide.on` to 0 in an experiment copy of the plan.

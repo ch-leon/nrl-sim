@@ -5,7 +5,7 @@ import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, dot, scale, sub, type Vec } from '../../core/vec';
 import { BASE, interceptChance, resolveContest, type ContestMods } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
-import { pickReceiver } from '../tactics';
+import { MAX_LAT_M, pickReceiver } from '../tactics';
 import { EDGE_COST, FINISHER_M, announce, contestTraits, interceptTraits } from '../traits';
 import { traitBoost } from '../../../data/traits';
 import { FATIGUE } from '../fatigue';
@@ -223,7 +223,7 @@ export abstract class LiveContact extends LivePenalties {
     const slide = this.slideEffect(c.side);
     if (slide > 0) {
       const attack = this.tactics[c.side].attack;
-      if (attack === 'expansive' && Math.abs(c.body.pos.y - MID_Y) > 12) mods.edge = (mods.edge ?? 0) - slide;
+      if (attack === 'expansive' && Math.abs(c.body.pos.y - MID_Y) > MAX_LAT_M) mods.edge = (mods.edge ?? 0) - slide;
       if (attack === 'grind' && PACK.includes(ROLES[c.slot]!.name)) {
         if (support) mods.offload = (mods.offload ?? 0) + slide;
         mods.broken = (mods.broken ?? 0) + slide;

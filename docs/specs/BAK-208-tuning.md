@@ -1455,14 +1455,15 @@ styles. Balanced and defences other than Slide receive no cell effect.
 | Knob | Default | Effect when Slide is enabled |
 |---|---:|---|
 | `counters.slide.on` | 0 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
-| `counters.slide.expansive` | 0.10 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
-| `counters.slide.kickChase` | 0.6 | Extra fraction of fullback depth (also held by wingers), divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
+| `counters.slide.expansive` | 0.03 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
+| `counters.slide.kickChase` | 0.6 | Extra fraction of fullback depth (also held by wingers) on the last two tackles, divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
 | `counters.slide.tight` | 0.10 | Adds inside bust probability and supported offload probability for pack carriers. |
 | `counters.slide.allOut` | 0.30 | Adds bust probability only at the offload receiver's first contact. A pass or turnover clears the receiver. |
 
 No new random draws: interception, contact, catches and races use their existing
 rolls. The receiver marker is transient match state; no stored stat or save change.
-`balance/plans/counters-slide.json` compares Slide off/on with Tight and own-style
-fit enabled in both, using the task-1 flat-60 matchups and both orientations.
+`balance/plans/counters-slide.json` measures Slide on with Tight and own-style
+fit enabled, using the task-1 flat-60 matchups and both orientations. The archived
+tuning control measures the same scenarios with Slide off.
 The matrix report includes per-side bombs won and grubber tries as well as
 line breaks, offloads and busts, so the mechanism is visible beside points share.

@@ -23,7 +23,8 @@ class SlideSim extends LiveSim {
     this.applySlideContact(carrier, mods, support);
     return { mods, receiver: this.offloadReceiver };
   }
-  targets() {
+  targets(lastPlay = false) {
+    this.lastPlay = lastPlay;
     this.phase = { kind: 'play' };
     this.attacking = 'home'; this.dir = 1; this.lineX = 60;
     this.ball = { kind: 'held', by: 5 };
@@ -71,18 +72,19 @@ describe('dormant Slide counters', () => {
     const off = tuned(0, () => new SlideSim('expansive').targets());
     const on = tuned(1, () => new SlideSim('expansive').targets());
     expect(on[2]!.y).toBeLessThan(off[2]!.y);
-    expect(tuned(0, () => new SlideSim('expansive').passRead(0.18))).toBe(1);
-    expect(tuned(1, () => new SlideSim('expansive').passRead(0.18))).toBe(10);
-    expect(tuned(1, () => new SlideSim('balanced').passRead(0.18))).toBe(1);
+    expect(tuned(0, () => new SlideSim('expansive').passRead(0.15))).toBe(1);
+    expect(tuned(1, () => new SlideSim('expansive').passRead(0.15))).toBe(10);
+    expect(tuned(1, () => new SlideSim('balanced').passRead(0.15))).toBe(1);
     expect(tuned(0, () => new SlideSim('expansive').contact(1).mods)).toEqual({});
     expect(tuned(1, () => new SlideSim('expansive').contact(1).mods.edge)).toBeLessThan(0);
     expect(tuned(1, () => new SlideSim('expansive').contact(7).mods)).toEqual({});
   });
 
   it('holds fullback and wingers deeper and improves bomb catches and grubber races', () => {
-    const off = tuned(0, () => new SlideSim('kick-chase').targets());
-    const on = tuned(1, () => new SlideSim('kick-chase').targets());
+    const off = tuned(0, () => new SlideSim('kick-chase').targets(true));
+    const on = tuned(1, () => new SlideSim('kick-chase').targets(true));
     for (const slot of [0, 1, 2]) expect(on[slot]!.x).toBeGreaterThan(off[slot]!.x);
+    expect(tuned(1, () => new SlideSim('kick-chase').targets())).toEqual(tuned(0, () => new SlideSim('kick-chase').targets()));
     for (const enabled of [0, 1]) tuned(enabled, () => {
       const cover = new SlideSim('kick-chase').cover();
       const bomb = highBall(60, 60, 20, true, 1, cover);
