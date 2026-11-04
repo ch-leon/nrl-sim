@@ -18,7 +18,7 @@ import { injuryChance, lostInContactChance } from '../weather';
 import { TOUCH } from '../touch';
 import { BIN } from '../sinbin';
 import { derivedRatings } from '../fit';
-import { rushBroken } from '../counters';
+import { COUNTERS, rushBroken } from '../counters';
 import { PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
 import { other, type Player, type Phase } from './types';
@@ -106,9 +106,13 @@ export abstract class LiveContact extends LivePenalties {
     const dplan = this.defPlan();
     if (sit.support) tr.mods.offload = (tr.mods.offload ?? 0) + (plan.offload - 1) * BASE.offload + dplan.offload;
     tr.mods.bigHit = (tr.mods.bigHit ?? 0) + dplan.bigHit;
+    let broken = dplan.broken;
+    if (COUNTERS.rush.on === 1 && this.tactics[t.side].defence === 'rush') {
+      const carry = derivedRatings({ position: ROLES[c.slot]!.name, stats: { ...c.stats, stamina: c.stamina }, traits: c.traits }).carry;
+      broken = rushBroken(broken, 'rush', carry, this.planFit[t.side].defence);
+    }
     // A defence a man short (#71) is stretched: easier to bust.
-    tr.mods.broken = (tr.mods.broken ?? 0) + rushBroken(dplan.broken, this.tactics[t.side].defence,
-      derivedRatings({ position: ROLES[c.slot]!.name, stats: { ...c.stats, stamina: c.stamina }, traits: c.traits }).carry, this.planFit[t.side].defence) + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
+    tr.mods.broken = (tr.mods.broken ?? 0) + broken + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
     tr.mods.edge = this.contestFitEdge(c.side, t.side);
     this.applySlideContact(c, tr.mods, sit.support);
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);

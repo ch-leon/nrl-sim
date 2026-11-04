@@ -5,6 +5,7 @@ import { highBall, grubberRace } from '../../../src/match/league/kickContest';
 import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { applyTuning } from '../../../src/match/league/tuning';
+import { BASE, contestOdds } from '../../../src/match/league/contest';
 import type { AttackPreset, DefencePreset } from '../../../src/match/league/presets';
 
 function tuned<T>(on: number, fn: () => T): T {
@@ -18,6 +19,23 @@ class RushSim extends LiveSim {
   gap() { return this.rushKickGap('home'); }
   spill() { return this.rushOffloadSpill('home'); }
   fits(a: number, d: number) { this.planFit.home.attack = a; this.planFit.away.defence = d; return this; }
+  offloadPass() {
+    this.attacking = 'home'; this.dir = 1;
+    const c = this.players[7]!, t = this.players[16]!;
+    for (const p of this.players) p.body.pos = { x: 90, y: 60 };
+    c.body.pos = { x: 50, y: 34 }; t.body.pos = { x: 51, y: 34 };
+    this.players[5]!.body.pos = { x: 49, y: 35 };
+    const sit = this.situation(c, t, [t]);
+    const plan = this.atkPlan(c), defence = this.defPlan();
+    const odds = contestOdds(0.5, sit, {
+      broken: defence.broken, bigHit: defence.bigHit,
+      offload: (plan.offload - 1) * BASE.offload + defence.offload,
+    });
+    let draws = 0;
+    this.rng.next = () => { draws++; return odds.broken + odds.fend + odds.offload / 2; };
+    this.contest(c, t, [t]);
+    return { extra: this.spillExtra, draws, offloaded: this.tickEvents.some((e) => e.kind === 'offload') };
+  }
   targets() {
     this.phase = { kind: 'play' }; this.attacking = 'home'; this.dir = 1;
     this.lineX = 60; this.tackles = 3; this.ball = { kind: 'held', by: 5 };
@@ -55,6 +73,13 @@ describe('dormant Rush counters', () => {
       for (const defence of ['slide', 'compressed'] as const) expect(new RushSim('all-out', defence).spill()).toBe(0);
     });
   });
+  it('passes the Rush spill bonus into a real offload without another RNG draw', () => {
+    const off = tuned(0, () => new RushSim().offloadPass());
+    const on = tuned(1, () => new RushSim().offloadPass());
+    expect(off.offloaded).toBe(true); expect(on.offloaded).toBe(true);
+    expect(off.extra).toBe(0); expect(on.extra).toBeGreaterThan(0);
+    expect(on.draws).toBe(off.draws);
+  });
   it('leaves Tight and Expansive without a base cell and gates other defences', () => tuned(1, () => {
     for (const attack of ['grind', 'expansive', 'balanced'] as const) expect(rushCounter(attack, 'rush', 1, 1)).toBe(0);
     expect(rushCounter('kick-chase', 'slide', 1, 1)).toBe(0);
@@ -69,4 +94,18 @@ describe('dormant Rush counters', () => {
     expect(highBall(60, 60, 20, true, 1, 0, gap).won).toBeGreaterThan(highBall(60, 60, 20, true).won);
     expect(grubberRace(1, 1, true, -gap)).toBeGreaterThan(grubberRace(1, 1, true));
   });
+  it('neutral Tight and Expansive replay exactly with Rush enabled', () => {
+    for (const attack of ['grind', 'expansive'] as const) {
+      const replay = (on: number) => tuned(on, () => {
+        const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }),
+          sideSheet('A', { rating: 60, tactics: { defence: 'rush' } }), 7,
+          { length: { halves: 2, halfMinutes: 0.2 } });
+        const events = [];
+        while (!sim.finished) { sim.step(); events.push(...sim.tickEvents); }
+        return events;
+      });
+      expect(replay(1)).toEqual(replay(0));
+    }
+  });
+
 });

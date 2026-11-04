@@ -11,7 +11,9 @@
     "counters.slide.kickChase": 1.5,
     "counters.slide.tight": 0.04,
     "counters.slide.allOut": 0.5,
-    "counters.rush.on": 1
+    "counters.rush.on": 1,
+    "counters.rush.kickChase": 0.25,
+    "counters.rush.allOut": 0.06
   },
   "scenarios": [
     {

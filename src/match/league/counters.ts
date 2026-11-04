@@ -7,8 +7,8 @@ export const COUNTERS = {
     on: 0,
     carry: 0.004,
     defenceFit: 0.12,
-    kickChase: 0.5,
-    allOut: 0.35,
+    kickChase: 0.25,
+    allOut: 0.06,
   },
   slide: {
     on: 0,
