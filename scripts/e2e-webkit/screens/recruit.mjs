@@ -18,7 +18,7 @@ export async function runRecruit(browser) {
       page.on('pageerror', (err) => report.errors.push(err.message));
       const check = (ok, text) => { if (!ok) throw new Error(text); };
       const shot = async (name) => {
-        await page.screenshot({ path: join(out, `${name}.png`) });
+        await page.screenshot({ path: join(out, `${name}.png`), animations: 'disabled' });
         report.screenshots.push(`${name}.png`);
       };
       try {
