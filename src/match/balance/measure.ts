@@ -24,7 +24,7 @@ import { NINES, fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
-import type { Cell, SideSpec } from './plan';
+import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
 
 /** A full match: two halves. Stretches scale their counts up to this. */
 export const MATCH_MINUTES = 2 * NINES.halfMinutes;
@@ -51,6 +51,11 @@ export interface Stat {
   se: number;
 }
 
+/** Event counts attributed to the side named by each event, plus its score. */
+export const SIDE_COUNTS = ['offloads', 'busts', 'lineBreaks', 'tries', 'kicks', 'steps', 'errors', 'pointsFor', 'pointsAgainst'] as const;
+export type SideCountKey = (typeof SIDE_COUNTS)[number];
+type SideCounts = Record<SideCountKey, number>;
+
 export interface CellResult {
   variant: string;
   scenario: string;
@@ -69,6 +74,10 @@ export interface CellResult {
    * rate is not just its home rate. Absent when the scenario tracks nobody.
    */
   trackedWin?: number;
+  /** Wins + half draws, with the sample standard error over matches (both orientations when requested). */
+  pointsShare?: Stat;
+  trackedCounts?: Record<SideCountKey, Stat>;
+  opponentCounts?: Record<SideCountKey, Stat>;
   trackedDraw?: number;
   /** Matches the tracked rate is over (twice `seeds` when the scenario plays both ways). */
   trackedSeeds?: number;
@@ -80,6 +89,13 @@ export interface CellResult {
   ms: number;
 }
 
+/** Overrides belong to the harness's sheets, never to the game's stored squad. */
+function positionEntry(entry: RosterEntry, spec: SideSpec): RosterEntry {
+  if (!spec.positionStats) return entry;
+  const group = Object.entries(POSITION_GROUPS).find(([, positions]) => (positions as readonly string[]).includes(entry.position))?.[0] as keyof typeof POSITION_GROUPS | undefined;
+  return { ...entry, stats: { ...entry.stats!, ...(group ? spec.positionStats?.[group] : {}), ...spec.positionStats?.[entry.position] } };
+}
+
 /** A team sheet for one side of a scenario. */
 export function sideSheet(id: string, spec: SideSpec): TeamSheet {
   const tactics = { ...DEFAULT_TACTICS, ...(spec.tactics ?? {}) };
@@ -87,13 +103,13 @@ export function sideSheet(id: string, spec: SideSpec): TeamSheet {
   const rotation = spec.rotation ?? 'standard';
   if (spec.club) {
     const s = labSheet(spec.club, spec.traits ?? 'gen', spec.tactics ?? {});
-    return { ...s, clubId: `${s.clubId}:${id}`, bench: (s.bench ?? []).slice(0, bench), rotation };
+    return { ...s, clubId: `${s.clubId}:${id}`, ...(s.roster ? { roster: s.roster.map((r) => positionEntry(r, spec)) } : {}), bench: (s.bench ?? []).slice(0, bench).map((r) => positionEntry(r, spec)), rotation };
   }
   const r = spec.rating ?? 60;
   const entry = (position: RosterEntry['position'], name: string, key: string): RosterEntry => {
     const e: RosterEntry = { name, position, stats: { speed: r, strength: r, stamina: r, skill: r, footyIQ: r, ...(spec.stats ?? {}) } };
     if (spec.traits === 'stars') e.traits = starTraits(position, key);
-    return e;
+    return positionEntry(e, spec);
   };
   const roster = POSITIONS.map((position, i) => entry(position, `${id} ${position} ${i}`, `${id}:${i}`));
   const reserves = BENCH_POSITIONS.slice(0, bench).map((position, i) => entry(position, `${id} bench ${position} ${i}`, `${id}:bench:${i}`));
@@ -151,8 +167,8 @@ export function squadSide(id: string, spec: SideSpec, seed: number, level: numbe
   };
   sheet = {
     ...sheet,
-    roster: (sheet.roster ?? []).map((r, i) => traits(r, `${id}:${i}`)),
-    bench: (sheet.bench ?? []).slice(0, spec.bench ?? 4).map((r, i) => traits(r, `${id}:bench:${i}`)),
+    roster: (sheet.roster ?? []).map((r, i) => positionEntry(traits(r, `${id}:${i}`), spec)),
+    bench: (sheet.bench ?? []).slice(0, spec.bench ?? 4).map((r, i) => positionEntry(traits(r, `${id}:bench:${i}`), spec)),
     ...(spec.rotation ? { rotation: spec.rotation } : {}),
     ...(spec.tactics ? { tactics: { ...DEFAULT_TACTICS, ...(sheet.tactics ?? {}), ...spec.tactics } } : {}),
   };
@@ -446,6 +462,9 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
     const nineSum = { home: 0, away: 0 };
     const edge = scenarioEdge(cell.scenario.home, cell.scenario.away);
     const perSeed: Record<CountKey, number>[] = [];
+    const trackedPerMatch: SideCounts[] = [];
+    const opponentPerMatch: SideCounts[] = [];
+    const shares: number[] = [];
     let wrestleTicks = 0;
     let wins = 0;
     let draws = 0;
@@ -500,7 +519,11 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
           });
         }
         sim.step();
-        if (flip) continue;
+        // Swapped events are needed only for the new tracked-side measurements.
+        if (flip) {
+          if (track && sim.tickEvents.length) events.push(...sim.tickEvents);
+          continue;
+        }
         // Read the tick straight off the sim: building a snapshot every tick cost a third of the run.
         const tickEvents = sim.tickEvents;
         if (tickEvents.length) events.push(...tickEvents);
@@ -525,6 +548,17 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
           legSum.set(nextLegs, acc);
           nextLegs += 3;
         }
+      }
+      if (track) {
+        const trackedSide = onSim(track);
+        const sideCounts = (side: 'home' | 'away'): SideCounts => {
+          const c = countEvents(events.filter((e) => e.side === side));
+          return Object.fromEntries(SIDE_COUNTS.map((k) => [k, k === 'pointsFor' ? sim.points[side] : k === 'pointsAgainst' ? sim.points[flipSide(side)] : c[k]])) as SideCounts;
+        };
+        trackedPerMatch.push(sideCounts(trackedSide));
+        opponentPerMatch.push(sideCounts(flipSide(trackedSide)));
+        const diff = sim.points[trackedSide] - sim.points[flipSide(trackedSide)];
+        shares.push(diff > 0 ? 1 : diff === 0 ? 0.5 : 0);
       }
       if (!flip) {
         const c = countEvents(events);
@@ -567,6 +601,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       if (bothWays) noteTracked(playOne(sides.away, sides.home, s, true), true);
     }
     const counts = Object.fromEntries(COUNTS.map((k) => [k, stat(perSeed.map((c) => c[k] * (k === 'completion' || k === 'possession' ? 1 : scale)))])) as Record<CountKey, Stat>;
+    const sideStats = (matches: SideCounts[]): Record<SideCountKey, Stat> => Object.fromEntries(SIDE_COUNTS.map((k) => [k, stat(matches.map((c) => c[k] * scale))])) as Record<SideCountKey, Stat>;
     const totalWrestles = perSeed.reduce((a, c) => a + c.wrestles, 0);
     return {
       variant: cell.variant.name,
@@ -578,7 +613,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       wrestleSecs: totalWrestles ? (wrestleTicks * TICK_S) / totalWrestles : 0,
       homeWin: wins / seeds,
       draw: draws / seeds,
-      ...(track && trackedN > 0 ? { trackedWin: trackedWins / trackedN, trackedDraw: trackedDraws / trackedN, trackedSeeds: trackedN } : {}),
+      ...(track && trackedN > 0 ? { trackedWin: trackedWins / trackedN, trackedDraw: trackedDraws / trackedN, trackedSeeds: trackedN, pointsShare: stat(shares), trackedCounts: sideStats(trackedPerMatch), opponentCounts: sideStats(opponentPerMatch) } : {}),
       legs: [...legSum.entries()].map(([minute, v]) => ({ minute, home: v.home / seeds, away: v.away / seeds })),
       ...(squads
         ? { nine: { ...(cell.scenario.home.squad ? { home: nineSum.home / seeds } : {}), ...(cell.scenario.away.squad ? { away: nineSum.away / seeds } : {}) } }

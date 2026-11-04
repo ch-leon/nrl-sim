@@ -156,3 +156,40 @@ touches the match code or a plan, compares it with the previous standard run, sh
 the report on the run's summary page and publishes it to `balance-log`. Run any plan
 from the Actions tab (**Balance → Run workflow**, plan path and optional seeds); jobs
 can run for up to about 5½ hours.
+
+## Strategy counter baselines (#458)
+
+- `counters-matrix.json`: all five current attacks (including **Grind**, whose
+  later rename is outside this task), each on Slide, against Balanced on Slide,
+  Rush and Compressed. Flat 60 squads, 200 seeds both ways (400 matches/cell).
+  Re-run with `--seeds 500` for 1,000 matches/cell.
+- `counters-fit.json`: the same matrix control, all five attacks with fast backs
+  (backs speed 80), strong pack (pack strength 80), or smart opposing D (opponent
+  footyIQ 75); fast-backs Expansive and every strong-pack attack also face Rush
+  and Compressed. Flat 62/65 against 60 yardsticks each use 500 seeds both ways,
+  regardless of `--seeds`. Other rows default to 200 seeds both ways.
+
+`positionStats` on a side overrides stats on starters **and bench**, after `stats`.
+Groups match `league/presets.ts`: `backs` = fullback/winger/centre, `halves` =
+five-eighth/halfback, `pack` = hooker/prop/second-row/lock. An exact `Position`
+(e.g. `"prop": { "strength": 90 }`) wins over its group. Stat values must be
+finite numbers from 1 to 100. These are sheet overrides, including club and
+squad-built sheets; stored players are unchanged. The existing `stats` field
+keeps its flat-squad-only behavior.
+
+`"report": "matrix"` opts into the compact report. Scenarios named exactly
+`<attack> v <defence>` (lower-case preset ids, e.g. `grind v slide`) fill the 5 × 3
+matrix; missing cells print —. Every scenario also appears in the tracked-side
+and per-side tables, including squad-fit and yardstick rows. Without this flag,
+the existing report is unchanged.
+
+For `track` rows, `pointsShare` is the mean of 1 for a win, ½ for a draw and 0
+for a loss. Its SE uses sample variance divided by the number of matches (zero
+for a single match); `bothWays` includes both orientations. `trackedCounts` and
+`opponentCounts` pool the same matches and include offloads, busts (excluding
+late wrestle busts), line breaks, tries, kicks, steps, errors, points for and
+against, with count SEs in JSON. Events are credited to their named side.
+Stretches scale counts to 14 minutes. The legacy `counts`, Home win and legs
+still describe only the written orientation, exactly as before. Thus the two
+new sides sum to the legacy counts for one orientation; for bothWays they sum
+to the average of the two orientations' legacy counts.
