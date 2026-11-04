@@ -1,0 +1,23 @@
+{
+  "name": "own style fit neutral final",
+  "description": "Final-edge neutral control: counters.fit.on=1, edge=0.11, flat 60 Balanced/Slide. Compare to the identical knob-off control in 20261104-084058-own-style-fit-calibration; zero delta required within one SE.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.fit.on": 1,
+    "counters.fit.edge": 0.11
+  },
+  "scenarios": [
+    {
+      "name": "fit 1: Balanced / Slide",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}
