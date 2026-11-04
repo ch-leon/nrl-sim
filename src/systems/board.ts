@@ -309,7 +309,7 @@ export function worstObjective(state: GameState, runwayWeeks: number | null = nu
 
 /** Register the new-season hook (after fixtures-season at order 10). */
 export function registerBoardSystem(): void {
-  const announceObjectives = (): void => {
+  const announceObjectives = (quiet = false): void => {
     const s = getState();
     if (s.sacked) return;
     const objectives = generateObjectives(s);
@@ -317,10 +317,12 @@ export function registerBoardSystem(): void {
     bus.emit('ui:notify', {
       text: `${coachAddress(s)}, the board's objectives for season ${s.season}: ${objectives.map((o) => o.text).join(' · ')}.`,
       kind: 'info',
+      quiet,
     });
   };
-  registerSeasonHook('board-season', 20, announceObjectives);
+  registerSeasonHook('board-season', 20, () => announceObjectives());
   const s = getState();
-  if (!s.sacked && s.objectives.length === 0 && s.league.clubs.length > 0) announceObjectives();
+  // The first goals belong in News without queuing a toast over the tutorial.
+  if (!s.sacked && s.objectives.length === 0 && s.league.clubs.length > 0) announceObjectives(true);
   else ensureObjectives();
 }
