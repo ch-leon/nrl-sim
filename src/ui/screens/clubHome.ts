@@ -11,7 +11,7 @@ import { bus } from '../../core/events';
 import { nextFixture } from '../../systems/league';
 import { WEEKS_PER_SEASON } from '../../config';
 import type { ObjectiveRisk } from '../../systems/board';
-import { boardChip, decisionsChipCount, moneyTile, moneyTileLabel, ordinal, placeName, runwayLevel, BOARD_RISK_CLASS } from '../hud';
+import { boardChip, decisionsChipCount, moneyTile, fmtMoneyShort, IN_DEBT_TEXT, ordinal, placeName, runwayLevel, BOARD_RISK_CLASS } from '../hud';
 import { button, el, openScreen, screenHead } from '../dom';
 import { HOME_ID } from '../nav';
 
@@ -61,15 +61,20 @@ export function clubHomeView(
 ): ClubHomeView {
   const runway = opts.runwayWeeks?.(s) ?? null;
   const tile = moneyTile(s.money);
+  const weeks = Math.max(1, Math.floor(runway ?? 0));
+  const runwayText = runway === null ? 'covering costs'
+    : runway > 99 ? '99+ weeks of runway'
+    : `about ${weeks} ${weeks === 1 ? 'week' : 'weeks'} of runway`;
+  const money = `${fmtMoneyShort(s.money)} · ${runwayText}`;
   const list = opts.decisions?.(s) ?? [];
   const first = list[0];
   const board = boardChip(s, runway);
   return {
     club: s.clubName,
     week: `Week ${s.week} of ${WEEKS_PER_SEASON} · Season ${s.season}`,
-    money: tile.text,
+    money,
     moneyLevel: tile.inDebt ? 'debt' : runwayLevel(runway),
-    moneyLabel: moneyTileLabel(s.money, runway, true),
+    moneyLabel: `Money ${money}${tile.inDebt ? `, ${IN_DEBT_TEXT}` : ''}. Tap for Finance`,
     next: nextMatchLine(s),
     decisions: first ? { count: decisionsChipCount(list.length), top: `${first.title}${first.note ? ` · ${first.note}` : ''}` } : null,
     board: board ? { title: board.title, detail: board.detail, label: board.label, risk: board.risk } : null,
