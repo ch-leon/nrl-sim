@@ -161,15 +161,14 @@ export const TITLE_CSS = `
 @media (max-height: 340px) {
   .nrl-title { padding-bottom: calc(18px + var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
   .nrl-title-main { gap: 6px; }
-  .nrl-title-kit { padding: 6px; }
-  .nrl-title-kit img { width: 56px; height: 60px; }
-  /* The caption gives its height to Start over / Cancel, which must clear Safari's bottom band. */
-  .nrl-title-kit-note { display: none; }
+  /* The compact left column keeps Start and the veteran switch above the fold. */
+  .nrl-title-kit { display: none; }
   .nrl-title-form { gap: 6px; }
-  .nrl-title-setup { padding: 10px; gap: 6px 16px; }
+  .nrl-title-setup { padding: 10px; gap: 6px 16px;
+    grid-template-areas: "start form" "veteran form"; grid-template-rows: max-content 1fr; }
   .nrl-title-confirm { font-size: 0.75rem; line-height: 1.25; }
-  /* While Start over asks, the jersey makes room for the question and both buttons. */
-  .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "veteran form" "start form"; }
+  /* Start over keeps the same two rows, including room for Cancel. */
+  .nrl-title-setup:has(.nrl-title-confirm) { grid-template-areas: "start form" "veteran form"; }
   .nrl-title-setup:has(.nrl-title-confirm) .nrl-title-kit { display: none; }
 }
 /* An iPhone SE on its side (568×320, #350 T1): the setup scrolls, so the build label follows it
