@@ -189,3 +189,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-011838-counters-fit | counters fit | ede26ba | codex/458-strategy-counters-report | [report](runs/20261104-011838-counters-fit/report.md) |
 | 20261104-050600-standard | standard | 282bf16 | main | [report](runs/20261104-050600-standard/report.md) |
 | 20261104-060358-standard | standard | f15bc7c | main | [report](runs/20261104-060358-standard/report.md) |
+| 20261104-060657-presets | presets | f15bc7c | codex/460-tight | [report](runs/20261104-060657-presets/report.md) |
