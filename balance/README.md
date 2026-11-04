@@ -201,3 +201,14 @@ counters enabled only as plan overrides. Targets are 53–57% for Tight/All-out,
 per-side bombs, bombs won, grubbers and grubber tries from existing kick events;
 these are harness counts, not new stored player stats. For a paired dormant
 control, override `counters.slide.on` to 0 in an experiment copy of the plan.
+
+
+`counters-rush.json` is the Rush-column acceptance plan (#463), with Tight,
+own-style fit, Slide and Rush enabled only by overrides. Flat rows use 500 seeds
+both ways (1,000 whole matches), except Tight: its initial 47.85% sample was
+extended once with the next 500 seeds both ways, so its acceptance estimate uses
+all seeds 1–1,000 (2,000 matches). Targets are Kick-chase 53–57%, All-out 43–47%,
+and Tight/Expansive 48–52%. The three fit rows use task 1's 200 seeds both ways
+(400 matches): pack strength 80/45 and backs speed 80. Raw chunk inputs and the
+sample-variance pooling formula are preserved beside each pooled report on
+`balance-log`; no seed or orientation is discarded.

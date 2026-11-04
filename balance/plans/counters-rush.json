@@ -1,6 +1,6 @@
 {
   "name": "Rush counters acceptance",
-  "description": "Rush column: 500 seeds both ways per flat cell (1,000 matches), earlier knobs on. Kick-chase 53\u201357%, All-out 43\u201347%, Tight/Expansive 48\u201352%. Fit rows use task 1 sampling: 200 seeds both ways (400 matches) for strong/weak pack and fast backs comparisons.",
+  "description": "Rush column: at least 1,000 whole matches per flat cell, earlier knobs on. Tight uses 1,000 seeds both ways (2,000 matches) to resolve a borderline first sample; all other flat cells use 500 seeds both ways. Targets: Kick-chase 53\u201357%, All-out 43\u201347%, Tight/Expansive 48\u201352%. Fit rows use task 1 sheets and 200 seeds both ways (400 matches).",
   "report": "matrix",
   "seeds": 500,
   "base": {
@@ -12,7 +12,7 @@
     "counters.slide.tight": 0.04,
     "counters.slide.allOut": 0.5,
     "counters.rush.on": 1,
-    "counters.rush.kickChase": 0.25,
+    "counters.rush.kickChase": 0.39,
     "counters.rush.allOut": 0.06
   },
   "scenarios": [
@@ -33,7 +33,8 @@
         }
       },
       "track": "home",
-      "bothWays": true
+      "bothWays": true,
+      "seeds": 1000
     },
     {
       "name": "balanced v rush",

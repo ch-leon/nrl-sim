@@ -1484,10 +1484,12 @@ cell; their own-style fit and carriers decide the contest.
 | `counters.rush.on` | 0 | Only 1 enables the Rush mechanics; 0 keeps the legacy flat bust modifier. |
 | `counters.rush.carry` | 0.004 | Bust probability per derived Carry point above neutral (negative below). |
 | `counters.rush.defenceFit` | 0.12 | Bust probability removed per Rush-fit point above 1 (added below). |
-| `counters.rush.kickChase` | 0.25 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
+| `counters.rush.kickChase` | 0.39 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
 | `counters.rush.allOut` | 0.06 | Cell × both fits added to handling spill chance on an All-out offload, using the receiver's existing pass-catch roll. Ordinary passes and other attacks receive no spill bonus. |
 
 No new RNG draws, stored stats, save changes or Labs/commercial flag changes.
 The reproducible acceptance plan is `balance/plans/counters-rush.json`: 500 seeds
-both ways per flat cell (1,000 matches), plus task 1’s 200 seeds both ways per
-fit row (400 matches), with earlier counters enabled by overrides.
+both ways per flat cell (1,000 matches), except Tight, which includes seeds
+1–1,000 both ways (2,000 matches) after extending a borderline first sample.
+Fit rows use task 1’s 200 seeds both ways (400 matches), with earlier counters
+enabled by overrides.
