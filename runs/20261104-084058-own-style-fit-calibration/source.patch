@@ -1,0 +1,123 @@
+diff --git a/src/match/league/contest.ts b/src/match/league/contest.ts
+index 6996d8b..150098b 100644
+--- a/src/match/league/contest.ts
++++ b/src/match/league/contest.ts
+@@ -56,6 +56,8 @@ export const MOMENTUM = { perMs: 0.01, cap: 0.04 };
+ 
+ /** Probability points traits add to (or take from) each outcome, already scaled by level (§3). */
+ export interface ContestMods {
++  /** Attack style edge minus defence style edge, in carrier-edge probability units. */
++  edge?: number;
+   broken?: number;
+   fend?: number;
+   offload?: number;
+@@ -72,7 +74,7 @@ const clamp01 = (v: number): number => Math.max(0, Math.min(0.95, v));
+  * plain held tackle.
+  */
+ export function contestOdds(edge: number, s: Situation, mods: ContestMods = {}): Record<ContestOutcome, number> {
+-  const e = Math.max(0, Math.min(1, edge)) - 0.5; // −0.5 … +0.5, 0 = even
++  const e = Math.max(0, Math.min(1, edge + (mods.edge ?? 0))) - 0.5; // −0.5 … +0.5, 0 = even
+   let broken = BASE.broken + 0.16 * e;
+   let fend = BASE.fend + 0.09 * e;
+   let offload = s.support ? BASE.offload + 0.1 * e : 0;
+diff --git a/src/match/league/counters.ts b/src/match/league/counters.ts
+index cb3af83..6f395d5 100644
+--- a/src/match/league/counters.ts
++++ b/src/match/league/counters.ts
+@@ -1,5 +1,9 @@
+ // Strategy counters ship dormant until the switch-on task (#465).
+ export const COUNTERS = {
++  fit: {
++    on: 0,
++    edge: 0.2,
++  },
+   tight: {
+     on: 0,
+     offloadBase: 1,
+@@ -7,3 +11,8 @@ export const COUNTERS = {
+     offloadPerFit: 12,
+   },
+ };
++
++/** Signed contest edge from a side’s own style; neutral fit and the dormant switch add nothing. */
++export function fitEdge(fit: number): number {
++  return COUNTERS.fit.on === 1 ? (fit - 1) * COUNTERS.fit.edge : 0;
++}
+diff --git a/src/match/league/live/base.ts b/src/match/league/live/base.ts
+index f12b0c9..4899848 100644
+--- a/src/match/league/live/base.ts
++++ b/src/match/league/live/base.ts
+@@ -22,7 +22,8 @@ import { CallJudge, callDefence, withAttackCall, withDefenceCall, type CallInput
+ import type { KickoffCall } from '../kickoff';
+ import { weatherEffect, type WeatherEffect } from '../weather';
+ import type { MatchInjury, WeatherKind } from '../../../sim/events';
+-import { styleFit } from '../fit';
++import { styleFit, type StyleFit } from '../fit';
++import { fitEdge } from '../counters';
+ import { LIVE } from './knobs';
+ import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput } from './types';
+ 
+@@ -39,6 +40,8 @@ export abstract class LiveBase {
+   readonly tactics: Record<Side, TeamTactics>;
+   /** Tight fit of the selected starters, fixed before kick-off; bench and fatigue never rescore it. */
+   protected readonly tightFit: Record<Side, number>;
++  protected readonly squadFit: Record<Side, StyleFit>;
++  protected readonly planFit: Record<Side, { attack: number; defence: number }>;
+   /** The goal-kicker each side named (N11, a squad id); the slot-5 kicker when absent or off the field. */
+   private readonly goalKickerKey: Record<Side, string | undefined>;
+   /** Each side's captain, as the penalty call reads him (N11): neutral when the sheet names none. */
+@@ -178,8 +181,19 @@ export abstract class LiveBase {
+   protected readonly goldenPoint: boolean;
+   protected golden = false;
+ 
++  /** Starting-sheet scores stay fixed; a break selects the newly played styles. */
++  protected refreshPlanFit(side: Side): void {
++    const plan = this.tactics[side];
++    this.planFit[side] = { attack: this.squadFit[side][plan.attack], defence: this.squadFit[side][plan.defence] };
++  }
++
++  protected contestFitEdge(attacker: Side, defender: Side): number {
++    return fitEdge(this.planFit[attacker].attack) - fitEdge(this.planFit[defender].defence);
++  }
++
+   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
+-    this.tightFit = { home: styleFit(home.roster ?? []).grind, away: styleFit(away.roster ?? []).grind };
++    this.squadFit = { home: styleFit(home.roster ?? []), away: styleFit(away.roster ?? []) };
++    this.tightFit = { home: this.squadFit.home.grind, away: this.squadFit.away.grind };
+     // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average;
+     // then the difficulty's edge to the player's rival (N12.2), which the spread would mostly cancel.
+     [home, away] = edgeSheets(...spreadSheets(home, away), opts.difficultyEdge);
+@@ -208,6 +222,9 @@ export abstract class LiveBase {
+     this.goldenPoint = opts.goldenPoint === true;
+     this.names = { home: home.name, away: away.name };
+     this.tactics = { home: { ...(home.tactics ?? DEFAULT_TACTICS) }, away: { ...(away.tactics ?? DEFAULT_TACTICS) } };
++    this.planFit = { home: { attack: 1, defence: 1 }, away: { attack: 1, defence: 1 } };
++    this.refreshPlanFit('home');
++    this.refreshPlanFit('away');
+     this.goalKickerKey = { home: home.kicker, away: away.kicker };
+     this.captain = { home: captainOf(home), away: captainOf(away) };
+     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
+diff --git a/src/match/league/live/calls.ts b/src/match/league/live/calls.ts
+index b5e4267..0fe1023 100644
+--- a/src/match/league/live/calls.ts
++++ b/src/match/league/live/calls.ts
+@@ -174,6 +174,7 @@ export abstract class LiveCalls extends LiveBase {
+       const t = queued.tactics;
+       if (t.attack === this.tactics[side].attack && t.defence === this.tactics[side].defence) continue;
+       this.tactics[side] = t;
++      this.refreshPlanFit(side);
+       this.planChanges.push({ minute: queued.minute, side, attack: t.attack, defence: t.defence, at: queued.at });
+       this.emit('plan', `${this.names[side]} change the plan: ${PRESET_LABEL[t.attack]} / ${PRESET_LABEL[t.defence]}`, this.kicker(side));
+       this.events[this.events.length - 1]!.detail = `${t.attack}/${t.defence}`;
+diff --git a/src/match/league/live/contact.ts b/src/match/league/live/contact.ts
+index a71361d..868938e 100644
+--- a/src/match/league/live/contact.ts
++++ b/src/match/league/live/contact.ts
+@@ -103,6 +103,7 @@ export abstract class LiveContact extends LivePenalties {
+     tr.mods.bigHit = (tr.mods.bigHit ?? 0) + dplan.bigHit;
+     // A defence a man short (#71) is stretched: easier to bust.
+     tr.mods.broken = (tr.mods.broken ?? 0) + dplan.broken + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
++    tr.mods.edge = this.contestFitEdge(c.side, t.side);
+     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
+     const credit = announce(tr.credit[outcome]);
+     // Contact costs both men legs, whatever happens.

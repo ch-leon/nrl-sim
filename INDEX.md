@@ -194,3 +194,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-061533-460-tight-acceptance | 460 Tight acceptance | 862c9ab | codex/460-tight | [report](runs/20261104-061533-460-tight-acceptance/report.md) |
 | 20261104-061207-counters-fit | counters fit | 30cd19e | codex/460-tight | [report](runs/20261104-061207-counters-fit/report.md) |
 | 20261104-083803-standard | standard | f0d6ecc | main | [report](runs/20261104-083803-standard/report.md) |
+| 20261104-084058-own-style-fit-calibration | own style fit calibration | f0d6ecc (uncommitted changes) | codex/461-own-style-fit | [report](runs/20261104-084058-own-style-fit-calibration/report.md) |
+| 20261104-085643-own-style-fit-tuned | own style fit tuned | a3571da | codex/461-own-style-fit | [report](runs/20261104-085643-own-style-fit-tuned/report.md) |

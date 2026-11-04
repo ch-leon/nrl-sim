@@ -1,0 +1,49 @@
+{
+  "name": "own style fit calibration",
+  "description": "Own-style fit 1.5 and 0.5 versus flat Balanced/Slide: points-share change from knob off; flat 60 neutral control. 500 seeds per orientation.",
+  "report": "matrix",
+  "seeds": 500,
+  "scenarios": [
+    {
+      "name": "fit 1.5: Balanced / Slide",
+      "home": {
+        "rating": 85
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "fit 0.5: Balanced / Slide",
+      "home": {
+        "rating": 35
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "fit 1: Balanced / Slide",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "variants": [
+    {
+      "name": "fit on edge 0.2",
+      "tuning": {
+        "counters.fit.on": 1
+      }
+    }
+  ]
+}
