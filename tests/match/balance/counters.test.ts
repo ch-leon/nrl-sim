@@ -13,16 +13,29 @@ describe('position stat overrides', () => {
     positionStats: { backs: { speed: 80 }, halves: { skill: 85 }, pack: { strength: 80 }, prop: { strength: 90 } },
   };
   it('applies groups and exact positions after flat stats to starters and bench on every sheet kind', () => {
-    const sheets = [sideSheet('H', overrides), sideSheet('H', { ...overrides, club: 'rival-wolves' }),
-      squadSide('H', { ...overrides, squad: 'player' }, 1).sheet,
-      squadSide('H', { ...overrides, squad: 'rival' }, 1).sheet];
-    for (const sheet of sheets) {
+    const builders = [
+      (spec: SideSpec) => sideSheet('H', spec),
+      (spec: SideSpec) => sideSheet('H', { ...spec, club: 'rival-wolves' }),
+      (spec: SideSpec) => squadSide('H', { ...spec, squad: 'player' }, 1).sheet,
+      (spec: SideSpec) => squadSide('H', { ...spec, squad: 'rival' }, 1).sheet,
+    ];
+    for (const build of builders) {
+      const sheet = build(overrides);
+      const baseline = build({ stats: overrides.stats! });
+      const before = [...baseline.roster!, ...baseline.bench!];
       expect(sheet.bench).toHaveLength(4);
-      for (const r of [...sheet.roster!, ...sheet.bench!]) {
-        expect(r.stats!.speed).toBe((POSITION_GROUPS.backs as readonly string[]).includes(r.position) ? 80 : 55);
-        expect(r.stats!.strength).toBe(r.position === 'prop' ? 90 : (POSITION_GROUPS.pack as readonly string[]).includes(r.position) ? 80 : 56);
-        if ((POSITION_GROUPS.halves as readonly string[]).includes(r.position)) expect(r.stats!.skill).toBe(85);
+      for (const [i, r] of [...sheet.roster!, ...sheet.bench!].entries()) {
+        expect(r.stats!.speed).toBe((POSITION_GROUPS.backs as readonly string[]).includes(r.position) ? 80 : before[i]!.stats!.speed);
+        expect(r.stats!.strength).toBe(r.position === 'prop' ? 90 : (POSITION_GROUPS.pack as readonly string[]).includes(r.position) ? 80 : before[i]!.stats!.strength);
+        expect(r.stats!.skill).toBe((POSITION_GROUPS.halves as readonly string[]).includes(r.position) ? 85 : before[i]!.stats!.skill);
       }
+    }
+  });
+  it('preserves legacy flat-only stats behavior when no positionStats are given', () => {
+    expect(sideSheet('H', { stats: { speed: 55 } }).roster![0]!.stats!.speed).toBe(55);
+    expect(sideSheet('H', { club: 'rival-wolves', stats: { speed: 55 } })).toEqual(sideSheet('H', { club: 'rival-wolves' }));
+    for (const squad of ['player', 'rival'] as const) {
+      expect(squadSide('H', { squad, stats: { speed: 55 } }, 1)).toEqual(squadSide('H', { squad }, 1));
     }
   });
   it('validates every position and rejects bad positions, stats and values', () => {

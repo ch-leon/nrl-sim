@@ -174,7 +174,8 @@ Groups match `league/presets.ts`: `backs` = fullback/winger/centre, `halves` =
 five-eighth/halfback, `pack` = hooker/prop/second-row/lock. An exact `Position`
 (e.g. `"prop": { "strength": 90 }`) wins over its group. Stat values must be
 finite numbers from 1 to 100. These are sheet overrides, including club and
-squad-built sheets; stored players are unchanged.
+squad-built sheets; stored players are unchanged. The existing `stats` field
+keeps its flat-squad-only behavior.
 
 `"report": "matrix"` opts into the compact report. Scenarios named exactly
 `<attack> v <defence>` (lower-case preset ids, e.g. `grind v slide`) fill the 5 × 3

@@ -91,9 +91,9 @@ export interface CellResult {
 
 /** Overrides belong to the harness's sheets, never to the game's stored squad. */
 function positionEntry(entry: RosterEntry, spec: SideSpec): RosterEntry {
-  if (!spec.positionStats && !spec.stats) return entry;
+  if (!spec.positionStats) return entry;
   const group = Object.entries(POSITION_GROUPS).find(([, positions]) => (positions as readonly string[]).includes(entry.position))?.[0] as keyof typeof POSITION_GROUPS | undefined;
-  return { ...entry, stats: { ...entry.stats!, ...spec.stats, ...(group ? spec.positionStats?.[group] : {}), ...spec.positionStats?.[entry.position] } };
+  return { ...entry, stats: { ...entry.stats!, ...(group ? spec.positionStats?.[group] : {}), ...spec.positionStats?.[entry.position] } };
 }
 
 /** A team sheet for one side of a scenario. */
