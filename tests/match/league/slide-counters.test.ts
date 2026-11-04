@@ -118,6 +118,10 @@ describe('dormant Slide counters', () => {
     const on = tuned(1, () => new SlideSim('kick-chase').targets(false, 3));
     for (const slot of [0, 1, 2]) expect(on[slot]!.x).toBeGreaterThan(off[slot]!.x);
     expect(tuned(1, () => new SlideSim('kick-chase').targets(true))[0]).toEqual(tuned(0, () => new SlideSim('kick-chase').targets(true))[0]);
+    const restoreDepth = applyTuning({ 'live.fullbackDeepM': 30, 'live.fullbackLastM': 12 });
+    try {
+      expect(tuned(1, () => new SlideSim('kick-chase').targets(true))[0]).toEqual(tuned(0, () => new SlideSim('kick-chase').targets(true))[0]);
+    } finally { restoreDepth(); }
     expect(tuned(1, () => new SlideSim('kick-chase').targets())).toEqual(tuned(0, () => new SlideSim('kick-chase').targets()));
     for (const enabled of [0, 1]) tuned(enabled, () => {
       const cover = new SlideSim('kick-chase').cover();
