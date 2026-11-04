@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-01
+Last updated: 2026-11-04
 
 What's in the game, with the PR that added each.
 
@@ -67,6 +67,7 @@ What's in the game, with the PR that added each.
 
 Newest first; merge dates in UTC.
 
+- Grind is now named Tight; pack-fit offloads are available behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/473)), 4 Nov
 - CI test fixes ([PR](https://github.com/ch-leon/nrl-sim/pull/442)), 1 Nov
 - Steady tackle count ([PR](https://github.com/ch-leon/nrl-sim/pull/440)), 31 Oct
 - Coach calls clarity and page ([PR](https://github.com/ch-leon/nrl-sim/pull/441)), 31 Oct

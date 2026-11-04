@@ -5,6 +5,7 @@
 // ("wrestle.gripBase", "presets.defence.rush.lineSpeed") and applies a set of
 // overrides with a way back. Overrides are module state: apply, run, restore
 // — one experiment at a time, never in the game.
+import { COUNTERS } from './counters';
 import { FIT } from './fit';
 import { BASE, MOMENTUM } from './contest';
 import { PACE } from '../core/body';
@@ -49,6 +50,7 @@ const DIFFICULTY_EDGE = Object.fromEntries(
 
 /** The knob groups, by the first segment of a path. */
 export const KNOBS = {
+  counters: COUNTERS,
   fit: FIT,
   pace: PACE,
   live: LIVE,

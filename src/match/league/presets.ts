@@ -3,6 +3,7 @@
 // defends. Attack and defence are separate presets (decision 2026-10-17). Pure
 // data and lookups; live.ts reads the plan for the carrier's zone each
 // decision and adds its numbers to the odds the contest already uses.
+import { COUNTERS } from './counters';
 import type { KickChoice } from './tactics';
 
 export type AttackPreset = 'grind' | 'balanced' | 'expansive' | 'kick-chase' | 'all-out';
@@ -22,7 +23,7 @@ export const isAttackPreset = (s: string | null | undefined): s is AttackPreset 
 export const isDefencePreset = (s: string | null | undefined): s is DefencePreset => DEFENCE_PRESETS.includes(s as DefencePreset);
 
 export const PRESET_LABEL: Readonly<Record<AttackPreset | DefencePreset, string>> = {
-  grind: 'Grind',
+  grind: 'Tight',
   balanced: 'Balanced',
   expansive: 'Expansive',
   'kick-chase': 'Kick-chase',
@@ -105,9 +106,14 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
   },
 };
 
-export function attackPlan(preset: AttackPreset, zone: Zone): AttackPlan {
+/** Tight uses the kickoff fit only for pack carriers; omitted context keeps the legacy lookup. */
+export function attackPlan(preset: AttackPreset, zone: Zone, tightFit = 1, carrierPosition?: string): AttackPlan {
   const p = ATTACK[preset];
-  return { ...BASE_PLAN, ...p.base, ...(p.zones?.[zone] ?? {}) };
+  const plan = { ...BASE_PLAN, ...p.base, ...(p.zones?.[zone] ?? {}) };
+  if (COUNTERS.tight.on === 1 && preset === 'grind' && carrierPosition && PACK.includes(carrierPosition)) {
+    plan.offload = Math.max(0, COUNTERS.tight.offloadBase + COUNTERS.tight.offloadPerFit * Math.max(0, tightFit - 1));
+  }
+  return plan;
 }
 
 /** How the line defends. */

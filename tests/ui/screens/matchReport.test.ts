@@ -99,7 +99,7 @@ describe('match report (N9.5)', () => {
       { minute: 14, side: 'home', attack: 'grind', defence: 'compressed', at: 'try' },
     ], { home: 'Larrikins', away: 'Gulls' })).toEqual([
       'Half-time: Gulls went Expansive · Rush.',
-      'Minute 14: Larrikins went Grind · Compressed.',
+      'Minute 14: Larrikins went Tight · Compressed.',
     ]);
     const changed: MatchResult = {
       ...result,
