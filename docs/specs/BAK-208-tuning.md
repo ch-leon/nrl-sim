@@ -1434,7 +1434,7 @@ At a break, the newly applied plan selects its attack and defence fits again.
 | Knob | Default | Meaning |
 |---|---|---|
 | `counters.fit.on` | 0 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
-| `counters.fit.edge` | 0.2 | Carrier-edge probability per point of fit away from 1.0. |
+| `counters.fit.edge` | 0.12 | Carrier-edge probability per point of fit away from 1.0. |
 
 Each contact adds `edge × (attackFit − 1) − edge × (defenceFit − 1)`
 to `carrierEdge`, clamped to 0–1 by `contestOdds`. Thus a side's attack fit
