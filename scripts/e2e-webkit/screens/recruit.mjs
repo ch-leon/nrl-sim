@@ -18,6 +18,9 @@ export async function runRecruit(browser) {
       page.on('pageerror', (err) => report.errors.push(err.message));
       const check = (ok, text) => { if (!ok) throw new Error(text); };
       const shot = async (name) => {
+        // Dismiss plain hints so four rows are visible on the short phones.
+        // Keep the signing's action toast in the signed screenshot.
+        for (const toast of await page.locator('.nrl-toast:not(:has(.nrl-toast-btn))').all()) await toast.tap();
         await page.screenshot({ path: join(out, `${name}.png`), animations: 'disabled' });
         report.screenshots.push(`${name}.png`);
       };
