@@ -1,0 +1,40 @@
+{
+  "name": "Rush Kick 0.375 acceptance 4",
+  "description": "Kick-chase v Rush, strength 0.375; seeds 376–500, both orientations (250 whole matches). Pool all four disjoint blocks for the 1,000-match acceptance estimate.",
+  "report": "matrix",
+  "seeds": 125,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.slide.expansive": 0.08,
+    "counters.slide.kickChase": 1.5,
+    "counters.slide.tight": 0.04,
+    "counters.slide.allOut": 0.5,
+    "counters.rush.on": 1,
+    "counters.rush.kickChase": 0.375,
+    "counters.rush.allOut": 0.06
+  },
+  "scenarios": [
+    {
+      "name": "kick-chase v rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "seedStart": 376
+}

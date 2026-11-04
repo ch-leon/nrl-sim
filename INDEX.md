@@ -222,3 +222,17 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-204431-rush-expansive-acceptance | Rush Expansive acceptance | 086042f | feat/463-rush-counters | [report](runs/20261104-204431-rush-expansive-acceptance/report.md) |
 | 20261104-204432-rush-all-out-acceptance | Rush All-out acceptance | 086042f | feat/463-rush-counters | [report](runs/20261104-204432-rush-all-out-acceptance/report.md) |
 | 20261104-193151-rush-neutral-and-fit-acceptance | Rush neutral and fit acceptance | 8ac3403 | feat/463-rush-counters | [report](runs/20261104-193151-rush-neutral-and-fit-acceptance/report.md) |
+| 20261104-210843-rush-kick-chase-acceptance-pooled | Rush Kick-chase acceptance pooled | 26f466a | feat/463-rush-counters | [report](runs/20261104-210843-rush-kick-chase-acceptance-pooled/report.md) |
+| 20261104-193409-rush-counter-cells-acceptance | Rush counter cells acceptance | 8ac3403 (uncommitted changes) | feat/463-rush-counters | [report](runs/20261104-193409-rush-counter-cells-acceptance/report.md) |
+| 20261104-202648-rush-kick-0-5-acceptance-1 | Rush Kick 0.5 acceptance 1 | 086042f | feat/463-rush-counters | [report](runs/20261104-202648-rush-kick-0-5-acceptance-1/report.md) |
+| 20261104-202649-rush-kick-0-5-acceptance-2 | Rush Kick 0.5 acceptance 2 | 086042f | feat/463-rush-counters | [report](runs/20261104-202649-rush-kick-0-5-acceptance-2/report.md) |
+| 20261104-202649-rush-kick-0-5-acceptance-4 | Rush Kick 0.5 acceptance 4 | 086042f | feat/463-rush-counters | [report](runs/20261104-202649-rush-kick-0-5-acceptance-4/report.md) |
+| 20261104-202651-rush-kick-0-5-acceptance-3 | Rush Kick 0.5 acceptance 3 | 086042f | feat/463-rush-counters | [report](runs/20261104-202651-rush-kick-0-5-acceptance-3/report.md) |
+| 20261104-204056-rush-kick-0-375-acceptance-2 | Rush Kick 0.375 acceptance 2 | 086042f | feat/463-rush-counters | [report](runs/20261104-204056-rush-kick-0-375-acceptance-2/report.md) |
+| 20261104-204057-rush-kick-0-375-acceptance-4 | Rush Kick 0.375 acceptance 4 | 086042f | feat/463-rush-counters | [report](runs/20261104-204057-rush-kick-0-375-acceptance-4/report.md) |
+| 20261104-204059-rush-kick-0-375-acceptance-1 | Rush Kick 0.375 acceptance 1 | 086042f | feat/463-rush-counters | [report](runs/20261104-204059-rush-kick-0-375-acceptance-1/report.md) |
+| 20261104-204059-rush-kick-0-375-acceptance-3 | Rush Kick 0.375 acceptance 3 | 086042f | feat/463-rush-counters | [report](runs/20261104-204059-rush-kick-0-375-acceptance-3/report.md) |
+| 20261104-205025-rush-kick-0-42-acceptance-2 | Rush Kick 0.42 acceptance 2 | 086042f | feat/463-rush-counters | [report](runs/20261104-205025-rush-kick-0-42-acceptance-2/report.md) |
+| 20261104-205025-rush-kick-0-42-acceptance-3 | Rush Kick 0.42 acceptance 3 | 086042f | feat/463-rush-counters | [report](runs/20261104-205025-rush-kick-0-42-acceptance-3/report.md) |
+| 20261104-205025-rush-kick-0-42-acceptance-4 | Rush Kick 0.42 acceptance 4 | 086042f | feat/463-rush-counters | [report](runs/20261104-205025-rush-kick-0-42-acceptance-4/report.md) |
+| 20261104-205026-rush-kick-0-42-acceptance-1 | Rush Kick 0.42 acceptance 1 | 086042f | feat/463-rush-counters | [report](runs/20261104-205026-rush-kick-0-42-acceptance-1/report.md) |
