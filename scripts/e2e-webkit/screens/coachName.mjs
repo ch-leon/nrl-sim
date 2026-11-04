@@ -23,9 +23,13 @@ export async function runCoachName(browser) {
         await page.locator('[data-nrl-coachname]').blur();
         record.layout = await page.evaluate(() => {
           const b = document.querySelector('[data-nrl-start]').getBoundingClientRect();
-          return { top: b.top, bottom: b.bottom, viewport: innerHeight, scroll: document.querySelector('.nrl-title').scrollTop };
+          const label = document.querySelector('[data-nrl-build]').getBoundingClientRect();
+          const panel = document.querySelector('.nrl-title-setup').getBoundingClientRect();
+          const buildOverlap = label.right > panel.left && label.left < panel.right && label.bottom > panel.top && label.top < panel.bottom;
+          return { top: b.top, bottom: b.bottom, viewport: innerHeight, scroll: document.querySelector('.nrl-title').scrollTop, buildOverlap };
         });
         if (width > height && (record.layout.top < 0 || record.layout.bottom > height || record.layout.scroll !== 0)) record.problems.push('Start requires scrolling');
+        if (record.layout.buildOverlap) record.problems.push('build label overlaps setup');
         await page.screenshot({ path: join(out, `${tag}-setup.png`) });
         await page.locator('[data-nrl-start]').tap();
         await page.waitForSelector('.nrl-tutorial-text');

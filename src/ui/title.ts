@@ -118,8 +118,10 @@ export const TITLE_CSS = `
 .nrl-title-input:focus { outline: none; border-color: #f4d03f; }
 @media (pointer: coarse) { .nrl-title-swatch { width: 44px; height: 44px; } }
 @media (max-height: 500px) and (min-width: 521px) {
+  .nrl-title-setup { padding: 10px; }
+  .nrl-title-form { gap: 6px; }
   .nrl-title-names { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .nrl-title-names .nrl-title-field { flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
+  .nrl-title-names .nrl-title-field { flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; }
   .nrl-title-names .nrl-title-field > span { flex: 0 0 auto; text-align: left; }
 }
 @media (max-height: 500px) {
