@@ -24,11 +24,11 @@ class CompressedSim extends LiveSim {
     this.applyCompressedContact(c, [t], mods, support);
     return mods;
   }
-  commits(y = 34) {
+  commits(y = 34, far = false) {
     this.attacking = 'home'; this.dir = 1;
     const c = this.players[7]!; c.body.pos = { x: 50, y };
     const defs = this.players.filter((p) => p.side === 'away');
-    defs.forEach((p, i) => { p.body.pos = { x: 60 + i * 3, y }; });
+    defs.forEach((p, i) => { p.body.pos = { x: far ? 60 + i * 3 : 51 + i * 2.25, y }; });
     return this.committed(c, defs).length;
   }
   targets() {
@@ -70,6 +70,7 @@ describe('dormant Compressed counters', () => {
   });
   it('commits one extra real defender only against Tight in the middle', () => {
     expect(tuned(1, () => new CompressedSim().commits())).toBe(tuned(0, () => new CompressedSim().commits()) + 1);
+    expect(tuned(1, () => new CompressedSim().commits(34, true))).toBe(tuned(0, () => new CompressedSim().commits(34, true)));
     for (const y of [5, 63]) expect(tuned(1, () => new CompressedSim().commits(y))).toBe(tuned(0, () => new CompressedSim().commits(y)));
     for (const attack of ['balanced', 'expansive', 'kick-chase', 'all-out'] as const) {
       expect(tuned(1, () => new CompressedSim(attack).commits())).toBe(tuned(0, () => new CompressedSim(attack).commits()));

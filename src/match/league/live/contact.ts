@@ -402,8 +402,12 @@ export abstract class LiveContact extends LivePenalties {
     const ahead = free.filter((d) => !behind(d)).length;
     // A broken line (two or fewer still in front) sends everyone in range after him.
     const n = ahead <= 2 ? 4 : free[2] && dist(free[2].body.pos, h.body.pos) < 5 ? 3 : 2;
+    // Gang-tackle with a nearby spare man, rather than dragging an edge defender
+    // across the pitch. Both starting fits set how far the help can reach.
+    const help = free[n + dplan.commit];
+    const reach = COUNTERS.compressed.commitM * this.planFit[h.side].attack * this.planFit[other(h.side)].defence;
     const squeeze = this.tactics[h.side].attack === 'grind' && Math.abs(h.body.pos.y - MID_Y) <= MAX_LAT_M
-      && this.compressedEffect(h.side) > 0 ? 1 : 0;
+      && this.compressedEffect(h.side) > 0 && help && dist(help.body.pos, h.body.pos) <= reach ? 1 : 0;
     return free.slice(0, Math.min(4, n + dplan.commit + squeeze));
   }
 }
