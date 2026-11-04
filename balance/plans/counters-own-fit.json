@@ -43,7 +43,7 @@
       "name": "fit on",
       "tuning": {
         "counters.fit.on": 1,
-        "counters.fit.edge": 0.12
+        "counters.fit.edge": 0.11
       }
     }
   ]
