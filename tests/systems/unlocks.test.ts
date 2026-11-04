@@ -14,7 +14,7 @@ const start: FacilityDefId[] = ['trainingPaddock', 'weightsRoom', 'canteen', 'sp
 const open = () => all.filter((id) => isFacilityOpen(getState(), id)).sort();
 const played = (homeId: string, awayId: string, homeScore = 0, awayScore = 2): Fixture =>
   ({ round: 1, homeId, awayId, result: { homeScore, awayScore } });
-beforeEach(() => { bus.clear(); clearTickHooks(); createNewGame('Test', 481); });
+beforeEach(() => { bus.clear(); clearTickHooks(); createNewGame('Test', 481); setState({ unlocks: { facilities: [...start] } }); });
 
 describe('facility unlock ladder (#481)', () => {
   it.each(DIFFICULTIES)('walks every round of a scripted season on %s', (difficulty) => {

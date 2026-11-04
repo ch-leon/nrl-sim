@@ -27,9 +27,11 @@ export const NEWS_KINDS: readonly NewsKind[] = ['info', 'success', 'danger'];
 export interface NewsItem {
   /** Monotonic id; never reused, so it orders messages even across wraps. */
   seq: number;
+  from?: 'coach';
+  /** Durable route for contract warnings after their toast expires. */
+  screen?: string;
   text: string;
   kind: NewsKind;
-  from?: 'coach';
   season: number;
   week: number;
 }
@@ -61,7 +63,7 @@ export class NewsInbox {
   }
 
   /** Append a message, overwriting the oldest once the ring is full. */
-  push(msg: { text: string; kind: NewsKind; from?: 'coach' } & NewsStamp): NewsItem {
+  push(msg: { text: string; kind: NewsKind; from?: 'coach'; screen?: string } & NewsStamp): NewsItem {
     const item: NewsItem = { seq: ++this.seq, ...msg };
     this.slots[this.next] = item;
     this.next = (this.next + 1) % this.capacity;
@@ -134,8 +136,8 @@ function currentStamp(): NewsStamp {
  * season/week. Call once from main.ts. Returns the unsubscribe.
  */
 export function initNewsInbox(inbox: NewsInbox = newsInbox): () => void {
-  return bus.on('ui:notify', ({ text, kind, from }) => {
-    inbox.push({ text, kind, ...(from ? { from } : {}), ...currentStamp() });
+  return bus.on('ui:notify', ({ text, kind, from, action }) => {
+    inbox.push({ text, kind, ...(from ? { from } : {}), ...(action?.screen ? { screen: action.screen } : {}), ...currentStamp() });
   });
 }
 
@@ -220,9 +222,11 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
       const section = el('section', { class: 'nrl-news-week' });
       section.append(el('h3', { text: `S${g.season} · Week ${g.week}` }));
       for (const item of g.items) {
-        section.append(el('div', {
+        const row = el('div', {
           class: `nrl-news-item nrl-news-${item.kind}`,
-        }, item.from === 'coach' ? coachLine(item.text) : item.text));
+        }, item.from === 'coach' ? coachLine(item.text) : item.text);
+        if (item.screen) row.append(button('Contracts', () => bus.emit('ui:openScreen', { id: item.screen! })));
+        section.append(row);
       }
       list.append(section);
     }

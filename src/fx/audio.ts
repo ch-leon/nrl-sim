@@ -808,7 +808,7 @@ export function initAudioUi(): () => void {
     if (!getState().unlocks) return;
     openAllRow.append(button('Open everything now', () => {
       openAllRow.replaceChildren(
-        el('span', { text: 'Open every facility now?' }),
+        el('span', { text: 'Open every facility and Office tile now?' }),
         button('Confirm', () => { setState({ unlocks: undefined }); syncUnlocks(); }),
         button('Cancel', syncUnlocks),
       );

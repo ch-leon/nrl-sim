@@ -65,6 +65,7 @@ import { WALK_RUNS, runTutorialWalk } from './e2e-webkit/match/tutorialWalk.mjs'
 import { runDockTextSize } from './e2e-webkit/portrait/dockTextSize.mjs';
 import { runPlaytest } from './e2e-webkit/match/playtest.mjs';
 import { runCoachVoice } from './e2e-webkit/screens/coachVoice.mjs';
+import { runOfficeUnlocks } from './e2e-webkit/screens/officeUnlocks.mjs';
 import { runCoachName } from './e2e-webkit/screens/coachName.mjs';
 import { runDifficulty } from './e2e-webkit/screens/difficulty.mjs';
 import { FLOW_RUNS, runFlow } from './e2e-webkit/screens/flow.mjs';
@@ -90,6 +91,7 @@ const SECTIONS = [
   ['runDockTextSize', (b) => runDockTextSize(b)],
   ['runFlow', async (b) => { let f = 0; for (const run of FLOW_RUNS) f += await runFlow(b, run); return f; }],
   ['runCoachName', (b) => runCoachName(b)],
+  ['runOfficeUnlocks', (b) => runOfficeUnlocks(b)],
   ['runDifficulty', (b) => runDifficulty(b)],
   ['runCoachVoice', (b) => runCoachVoice(b)],
   ['runLargeTextTargets', (b) => runLargeTextTargets(b)],

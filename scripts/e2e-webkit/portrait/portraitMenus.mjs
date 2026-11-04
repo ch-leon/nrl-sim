@@ -254,6 +254,7 @@ export async function runPortraitMenus(browser) {
         for (const k of ['t', 'b']) document.documentElement.style.setProperty(`--nrl-safe-${k}`, `${s[k]}px`);
       }, safe);
       await page.waitForSelector('[data-nrl-start]');
+    await page.locator('[data-nrl-open-all]').check();
       const out = [];
       for (const t of Object.keys(TEXT_SIZES)) {
         await textSize(t);

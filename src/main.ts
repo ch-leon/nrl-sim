@@ -16,7 +16,7 @@ import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
 import { initToasts } from './ui/toasts';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
-import { registerUnlockSystem } from './systems/unlocks';
+import { registerUnlockSystem, screenLockReason } from './systems/unlocks';
 import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
@@ -253,15 +253,16 @@ async function boot(): Promise<void> {
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { hidden: true });
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), {
     more: true,
-    holds: ['contracts'],
+    locked: () => screenLockReason(getState(), 'finance'),
     status: () => {
       const net = Math.round(financeSummary(getState()).netWeekly);
       return { text: `${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))} / week`, attn: net < 0 };
     },
   });
-  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { hidden: true }); // from Finance's VIEW ▸
+  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { more: true, locked: () => screenLockReason(getState(), 'contracts') }); // also from Finance's VIEW ▸
   nav.registerScreen('staff', STAFF_SCREEN_TITLE, () => openStaffScreen(), {
     more: true,
+    locked: () => screenLockReason(getState(), 'staff'),
     status: () => {
       const p = getState().boardPatience;
       return { text: `Board patience ${p}/${BOARD.MAX_PATIENCE}`, attn: p <= 2 };
@@ -310,6 +311,8 @@ async function boot(): Promise<void> {
   newsInbox.onChange(refreshNewsBadge);
   bus.on('state:changed', refreshNewsBadge);
   refreshNewsBadge();
+  bus.on('ui:openScreen', ({ id }) => nav.open(id));
+
   // Squad's red dot (#369): a contract ends within 4 weeks. Looking doesn't clear it; renewing, selling or releasing does.
   const refreshSquadDot = (): void => {
     const n = contractsEndingSoon(getState()).length;

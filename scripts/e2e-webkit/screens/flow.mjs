@@ -111,6 +111,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
   await step('t1-setup', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
+    await page.locator('[data-nrl-open-all]').check();
     await page.waitForTimeout(250);
     const out = await flowReach(page, ['[data-nrl-clubname]', '[data-nrl-start]']);
     out.push(...await page.evaluate(() => {

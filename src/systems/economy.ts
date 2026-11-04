@@ -19,7 +19,7 @@ import { FACILITY_CATALOG, facilityUpkeep, levelMult } from '../data/facility';
 import { closedGatesFlag, EVENT_CARDS } from '../data/events';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { staffWages } from './staff';
-import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks } from './contracts';
+import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks, notifyContractWarning } from './contracts';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -228,7 +228,7 @@ export function tickContracts(state: GameState): GameState {
     if (weeks > 0) {
       keep.push({ ...p, contractWeeks: weeks });
       const warning = warnForWeeks(p.name, weeks);
-      if (warning) bus.emit('ui:notify', { text: warning, kind: 'info' });
+      if (warning) notifyContractWarning(warning);
       continue;
     }
 

@@ -268,3 +268,37 @@ describe('the board chip (#368)', () => {
     expect(BOARD_RISK_CLASS['off-track']).toBe('nrl-hud-board-off');
   });
 });
+
+import { afterEach, vi } from 'vitest';
+import { createHud } from '../../src/ui/hud';
+import { createNav } from '../../src/ui/nav';
+import { stubDocument, StubNode } from './stubDom';
+import { screenLockReason } from '../../src/systems/unlocks';
+import { tickContracts } from '../../src/systems/economy';
+
+describe('essential routes bypass Office locks (#482)', () => {
+  beforeEach(() => { stubDocument(); bus.clear(); createNewGame('Locked', 2); });
+  afterEach(() => vi.unstubAllGlobals());
+  it('money and the visible board chip still open Finance and Staff; an early contract warning opens Contracts', () => {
+    setState({ money: -1, objectives: [{ id: 'solvent', kind: 'solvent', text: 'Stay solvent', target: 0, status: 'pending' }] });
+    const nav = createNav();
+    const finance = vi.fn(), staff = vi.fn(), contracts = vi.fn();
+    for (const [id, open] of [['finance', finance], ['staff', staff], ['contracts', contracts]] as const) {
+      nav.registerScreen(id, id, open, { more: true, locked: () => screenLockReason(getState(), id) });
+      expect(screenLockReason(getState(), id)).not.toBeNull();
+    }
+    const hud = createHud({ onMoney: () => nav.open('finance'), onBoard: () => nav.open('staff') });
+    const body = document.body as unknown as StubNode;
+    body.querySelector('.nrl-dock-statusbox')!.click();
+    expect(finance).toHaveBeenCalledOnce();
+    const board = body.querySelector('[data-hud="board"]')!;
+    expect(board.hidden).toBe(false); board.click(); expect(staff).toHaveBeenCalledOnce();
+    bus.on('ui:openScreen', ({ id }) => nav.open(id));
+    let action: (() => void) | undefined;
+    bus.on('ui:notify', (n) => { if (n.action?.label === 'Contracts') action = n.action.run; });
+    setState({ squad: getState().squad.map((p, i) => i === 0 ? { ...p, contractWeeks: 9 } : p) });
+    tickContracts(getState());
+    expect(action).toBeDefined(); action!(); expect(contracts).toHaveBeenCalledOnce();
+    hud.destroy(); nav.destroy();
+  });
+});

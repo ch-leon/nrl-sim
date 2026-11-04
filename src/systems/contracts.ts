@@ -18,6 +18,14 @@ export function warnForWeeks(name: string, weeks: number): string | null {
   return `${name}'s contract expires in ${weeks} week${weeks === 1 ? '' : 's'}.`;
 }
 
+/** The warning remains a route to Contracts, even before its Office tile opens. */
+export function notifyContractWarning(text: string): void {
+  bus.emit('ui:notify', {
+    text, kind: 'info',
+    action: { label: 'Contracts', screen: 'contracts', run: () => bus.emit('ui:openScreen', { id: 'contracts' }) },
+  });
+}
+
 /** Market wage for a player's overall: data/player.ts owns it (#146); kept here for existing imports. */
 export { marketWage };
 

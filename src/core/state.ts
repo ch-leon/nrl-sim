@@ -247,7 +247,7 @@ export interface GameState {
   squad: Player[];
   facilities: PlacedFacility[];
   /** Absent means everything is open: old saves and the veteran skip. */
-  unlocks?: { facilities: FacilityDefId[] } | undefined;
+  unlocks?: { facilities: FacilityDefId[]; screens?: string[] | undefined } | undefined;
   freeAgents: Player[];
   league: LeagueState;
   weather?: WeatherKind; // set for current round by fixtures system
@@ -379,7 +379,7 @@ export function createNewGame(
     season: 1,
     squad,
     facilities: [],
-    ...(options.openAll ? {} : { unlocks: { facilities: ['trainingPaddock', 'weightsRoom', 'canteen', 'sponsorBoard'] as FacilityDefId[] } }),
+    ...(options.openAll ? {} : { unlocks: { facilities: ['trainingPaddock', 'weightsRoom', 'canteen', 'sponsorBoard'] as FacilityDefId[], screens: [] } }),
     freeAgents,
     league,
     settings: { muted: false, volume: 0.8, tutorialDone: false, difficulty },
