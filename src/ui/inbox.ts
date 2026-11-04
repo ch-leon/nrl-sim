@@ -9,6 +9,7 @@
 // (ui/decisions.ts, #345). News keeps one row for them at the top, which opens it,
 // so the feed below always has the screen.
 
+import { coachLine } from './coachVoice';
 import { bus, type Events } from '../core/events';
 import { getState } from '../core/state';
 import { decisionViews, openDecisions } from './decisions';
@@ -60,7 +61,7 @@ export class NewsInbox {
   }
 
   /** Append a message, overwriting the oldest once the ring is full. */
-  push(msg: { text: string; kind: NewsKind } & NewsStamp): NewsItem {
+  push(msg: { text: string; kind: NewsKind; from?: 'coach' } & NewsStamp): NewsItem {
     const item: NewsItem = { seq: ++this.seq, ...msg };
     this.slots[this.next] = item;
     this.next = (this.next + 1) % this.capacity;
@@ -221,8 +222,7 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
       for (const item of g.items) {
         section.append(el('div', {
           class: `nrl-news-item nrl-news-${item.kind}`,
-          text: item.text,
-        }));
+        }, item.from === 'coach' ? coachLine(item.text) : item.text));
       }
       list.append(section);
     }

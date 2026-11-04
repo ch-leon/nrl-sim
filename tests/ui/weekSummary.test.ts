@@ -1,3 +1,4 @@
+import { summaryRemark, SUMMARY_REMARKS } from '../../src/ui/coachVoice';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   weekSummary, weekSnapshot, boardMood, capList, fmtSigned, summaryCanShow, TOP_GAINS,
@@ -157,5 +158,25 @@ describe('the card waits (#368)', () => {
   it('folds a long list into "+n more"', () => {
     expect(capList(['a', 'b', 'c'])).toEqual(['a', 'b', 'c']);
     expect(capList(['a', 'b', 'c', 'd', 'e'])).toEqual(['a', 'b', '+3 more']);
+  });
+});
+
+
+describe('summaryRemark (#476)', () => {
+  const quiet = () => weekSummary(snap(), snap({ week: 6 }));
+  it('picks a heavy net loss before an injury, with a boundary at income or $5k', () => {
+    expect(summaryRemark({ ...quiet(), moneyIn: 6_000, net: -6_000, injuries: ['A out 2 wks'] })).toBe(SUMMARY_REMARKS.loss);
+    expect(summaryRemark({ ...quiet(), net: -4_999 })).toBe(SUMMARY_REMARKS.quiet);
+    expect(summaryRemark({ ...quiet(), net: -5_000 })).toBe(SUMMARY_REMARKS.loss);
+  });
+  it('picks an injury week and a quiet week from the existing card data', () => {
+    expect(summaryRemark({ ...quiet(), injuries: ['A out 2 wks'] })).toBe(SUMMARY_REMARKS.injury);
+    expect(summaryRemark(quiet())).toBe(SUMMARY_REMARKS.quiet);
+  });
+  it('uses board mood and a good financial week without inventing a match result', () => {
+    for (const mood of ['worried', 'watching'] as const) {
+      expect(summaryRemark({ ...quiet(), board: { mood, text: '' } })).toBe(SUMMARY_REMARKS[mood]);
+    }
+    expect(summaryRemark({ ...quiet(), net: 1 })).toBe(SUMMARY_REMARKS.good);
   });
 });
