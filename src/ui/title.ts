@@ -29,6 +29,7 @@ export interface TitleChoice {
   mode: 'continue' | 'new';
   clubName?: string;
   coachName?: string;
+  openAll?: boolean;
   difficulty?: Difficulty;
   colors?: [string, string];
 }
@@ -106,6 +107,8 @@ export const TITLE_CSS = `
 .nrl-title-kit img { width: 84px; height: 90px; image-rendering: pixelated; }
 .nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .nrl-title-names { display: flex; flex-direction: column; gap: 8px; }
+.nrl-title-veteran { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.8125rem; cursor: pointer; }
+.nrl-title-veteran input { width: 20px; height: 20px; flex: 0 0 auto; }
 .nrl-title-go { grid-area: start; display: flex; flex-direction: column; gap: 6px; }
 .nrl-title-go .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-confirm { font-size: 0.8125rem; color: #f4d03f; }
@@ -438,6 +441,13 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         hint.setAttribute('data-nrl-difficulty-hint', '');
         form.appendChild(hint);
       }
+      const veteran = mk('input', '');
+      veteran.type = 'checkbox';
+      veteran.setAttribute('data-nrl-open-all', '');
+      const veteranRow = mk('label', 'nrl-title-veteran');
+      veteranRow.appendChild(veteran);
+      veteranRow.appendChild(mk('span', '', "I've played before: open everything"));
+      form.appendChild(veteranRow);
       setup.appendChild(form);
 
       const refresh = (): void => {
@@ -463,7 +473,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         const name = input.value.trim() || DEFAULT_CLUB_NAME;
         const coach = cleanName(coachInput.value);
         // Optional identity: blank or invalid input never prevents starting a game.
-        finish(s.slot, { mode: 'new', clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, colors: [primary, secondary] });
+        finish(s.slot, { mode: 'new', clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary] });
       };
       const start = mkButton('Start', 'data-nrl-start', 'nrl-title-btn-go');
       start.addEventListener('click', () => {

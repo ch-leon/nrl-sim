@@ -25,6 +25,7 @@ import {
   type FacilityDef,
 } from '../../data/facility';
 import type { PlayerStats, PlacedFacility } from '../../core/state';
+import { isFacilityOpen, unlockReason } from '../../systems/unlocks';
 import { getState, setState } from '../../core/state';
 import { spendMoney } from '../../data/club';
 import { ECON } from '../../config';
@@ -135,7 +136,8 @@ export function facilityCategory(def: Pick<FacilityDef, 'trains'>): Exclude<Buil
  * Why a facility can't be built now, or null when it can: a unique one already
  * on the grounds, or the money short ("Need $23,390 more"). Pure.
  */
-export function buildBlocker(def: Pick<FacilityDef, 'id' | 'cost' | 'unique'>, state: { money: number; facilities: readonly { defId: string }[] }): string | null {
+export function buildBlocker(def: Pick<FacilityDef, 'id' | 'cost' | 'unique'>, state: { money: number; facilities: readonly { defId: string }[]; unlocks?: { facilities: FacilityDefId[] } | undefined }): string | null {
+  if (!isFacilityOpen(state, def.id)) return unlockReason(def.id);
   if (def.unique && state.facilities.some((f) => f.defId === def.id)) return 'Built: upgrade it on the grounds';
   if (state.money < def.cost) return `Need ${fmtMoney(def.cost - Math.max(0, state.money))} more`;
   return null;

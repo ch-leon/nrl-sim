@@ -800,6 +800,21 @@ export function initAudioUi(): () => void {
     }), button('Names file…', () => namesAsk(), { class: 'nrl-settings-names' }));
   };
 
+  const openAllRow = el('div', { class: 'nrl-audio-row nrl-unlocks-row' });
+  const syncUnlocks = (): void => {
+    openAllRow.replaceChildren();
+    openAllRow.hidden = !getState().unlocks;
+    openAllRow.style.display = getState().unlocks ? '' : 'none';
+    if (!getState().unlocks) return;
+    openAllRow.append(button('Open everything now', () => {
+      openAllRow.replaceChildren(
+        el('span', { text: 'Open every facility now?' }),
+        button('Confirm', () => { setState({ unlocks: undefined }); syncUnlocks(); }),
+        button('Cancel', syncUnlocks),
+      );
+    }, { class: 'nrl-unlocks-open' }));
+  };
+
   const content = el(
     'div',
     { class: 'nrl-audio-settings' },
@@ -818,7 +833,7 @@ export function initAudioUi(): () => void {
         importRow,
         keyMoments.row,
         weekSummary.row,
-        installRow),
+        installRow, openAllRow),
     ),
   );
 
@@ -827,6 +842,7 @@ export function initAudioUi(): () => void {
   labs.style.minHeight = '44px';
   ensureAudioStyles();
   return () => {
+    syncUnlocks();
     labs.remove();
     if (labsVisible()) content.querySelector('.nrl-settings-col:last-child')?.append(labs);
     syncInstallVisibility();

@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- New careers open facilities through season one, with a veteran setup skip and a confirmed Settings skip; old saves keep everything open ([issue #481](https://github.com/ch-leon/nrl-sim/issues/481)).
+
 - Optional coach name at new-game setup; the first tutorial bubble and board objectives address you by name, with “Coach” for unnamed careers ([PR](https://github.com/ch-leon/nrl-sim/pull/491)).
 
 Newest first; merge dates in UTC.

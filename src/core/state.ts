@@ -246,6 +246,8 @@ export interface GameState {
   season: number; // starts at 1
   squad: Player[];
   facilities: PlacedFacility[];
+  /** Absent means everything is open: old saves and the veteran skip. */
+  unlocks?: { facilities: FacilityDefId[] } | undefined;
   freeAgents: Player[];
   league: LeagueState;
   weather?: WeatherKind; // set for current round by fixtures system
@@ -329,7 +331,7 @@ export function loadState(next: GameState): void {
 export function createNewGame(
   clubName: string,
   seed: number = Date.now() >>> 0,
-  options: { difficulty?: Difficulty | undefined; coachName?: string | undefined } = {},
+  options: { difficulty?: Difficulty | undefined; coachName?: string | undefined; openAll?: boolean | undefined } = {},
 ): GameState {
   const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
   const rng = makeRng(seed);
@@ -377,6 +379,7 @@ export function createNewGame(
     season: 1,
     squad,
     facilities: [],
+    ...(options.openAll ? {} : { unlocks: { facilities: ['trainingPaddock', 'weightsRoom', 'canteen', 'sponsorBoard'] as FacilityDefId[] } }),
     freeAgents,
     league,
     settings: { muted: false, volume: 0.8, tutorialDone: false, difficulty },

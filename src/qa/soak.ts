@@ -14,6 +14,7 @@ import { bus, type Events } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
+import { registerUnlockSystem, isFacilityOpen } from '../systems/unlocks';
 import { isTrainingFocus, registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
 import { hasStaff, hireStaff, staffWage } from '../systems/staff';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyOverhead, weeklyUpkeep, weeklyWages } from '../systems/economy';
@@ -223,6 +224,7 @@ export function registerAllSystems(): void {
   registerBoardSystem();
   registerEventsSystem();
   registerRivalsSystem();
+  registerUnlockSystem();
 }
 
 /** Paths of every number in `v` that is NaN or ±Infinity. */
@@ -333,6 +335,8 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  // Synthetic old saves predate the new-career ladder, just like the real corpus.
+  delete out.unlocks;
   if (version < 20) {
     const settings = out.settings;
     if (settings && typeof settings === 'object') {
@@ -460,6 +464,7 @@ function seatTheCrowd(): void {
 /** Build `defId` on the first free spot (top-left scan), paying its cost. */
 function buildFirstFree(defId: FacilityDefId): boolean {
   const s = getState();
+  if (!isFacilityOpen(s, defId)) return false;
   const def = FACILITY_CATALOG[defId];
   const taken = new Set<string>();
   for (const f of s.facilities) {
@@ -508,7 +513,7 @@ function manage(): Signed {
   setTrainingFocus(weakestStat(getState().squad));
   for (const defId of MANAGED.BUILDS) {
     const st = getState();
-    if (st.facilities.some((f) => f.defId === defId)) continue;
+    if (!isFacilityOpen(st, defId) || st.facilities.some((f) => f.defId === defId)) continue;
     if (st.money - FACILITY_CATALOG[defId].cost < MANAGED.BUILD_RESERVE) break;
     buildFirstFree(defId);
   }

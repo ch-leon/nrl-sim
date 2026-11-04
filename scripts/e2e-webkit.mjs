@@ -49,6 +49,7 @@
 //
 // WebKit comes from WEBKIT_PATH or playwright-core's browser registry
 // (PLAYWRIGHT_BROWSERS_PATH); CI fetches it with `playwright-core install --with-deps webkit`.
+import { runUnlocks } from './e2e-webkit/screens/unlocks.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,6 +78,7 @@ import { runCoachCalls } from './e2e-webkit/match/coachCalls.mjs';
 // in this same order. Each section opens its own contexts and writes its own folder
 // under e2e-output/webkit, so a section plays the same alone as after the others.
 const SECTIONS = [
+  ['runUnlocks', (b) => runUnlocks(b)],
   ['runSize', async (b) => { let f = 0; for (const [W, H] of SIZES) f += await runSize(b, W, H); return f; }],
   ['runPortrait', (b) => runPortrait(b)],
   ['runPlaytest', (b) => runPlaytest(b)],
@@ -101,7 +103,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
   text: ['runLargeTextTargets', 'runLadderForm'],
-  screens: ['runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty'],
+  screens: ['runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 

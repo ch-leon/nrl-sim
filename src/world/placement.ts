@@ -17,6 +17,7 @@
 
 import type Phaser from 'phaser';
 import { GRID_W, GRID_H } from '../config';
+import { isFacilityOpen, unlockReason } from '../systems/unlocks';
 import { getState, setState, type GameState, type PlacedFacility } from '../core/state';
 import { bus } from '../core/events';
 import { spendMoney, addFacility, earnMoney } from '../data/club';
@@ -33,9 +34,10 @@ export interface PlaceValidation {
 }
 
 // Machine reasons (exact strings per spec) mapped to human copy for ui:notify.
-export type PlaceReason = 'out-of-bounds' | 'overlap' | 'path' | 'duplicate' | 'insufficient-funds' | 'missing';
+export type PlaceReason = 'out-of-bounds' | 'overlap' | 'path' | 'duplicate' | 'insufficient-funds' | 'missing' | 'locked';
 
 const REASON_TEXT: Record<PlaceReason, string> = {
+  locked: 'This facility has not opened yet.',
   'out-of-bounds': "It won't fit there.",
   overlap: 'Something is already built there.',
   path: 'Keep the entrance path clear.',
@@ -521,6 +523,11 @@ export class PlacementController {
     const defId = this.defId;
     const def = FACILITY_CATALOG[defId];
     if (this.moving) return this.confirmMove(def);
+    if (!isFacilityOpen(getState(), defId)) {
+      bus.emit('ui:notify', { text: unlockReason(defId), kind: 'info' });
+      return { ok: false, reason: 'locked' };
+    }
+
     const v = validatePlacement(getState(), defId, this.gx, this.gy);
     if (!v.ok) {
       bus.emit('ui:notify', {

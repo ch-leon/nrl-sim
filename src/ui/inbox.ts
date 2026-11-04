@@ -28,6 +28,7 @@ export interface NewsItem {
   seq: number;
   text: string;
   kind: NewsKind;
+  from?: 'coach';
   season: number;
   week: number;
 }
@@ -132,8 +133,8 @@ function currentStamp(): NewsStamp {
  * season/week. Call once from main.ts. Returns the unsubscribe.
  */
 export function initNewsInbox(inbox: NewsInbox = newsInbox): () => void {
-  return bus.on('ui:notify', ({ text, kind }) => {
-    inbox.push({ text, kind, ...currentStamp() });
+  return bus.on('ui:notify', ({ text, kind, from }) => {
+    inbox.push({ text, kind, ...(from ? { from } : {}), ...currentStamp() });
   });
 }
 
