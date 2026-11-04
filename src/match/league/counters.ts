@@ -5,9 +5,9 @@ export const COUNTERS = {
   slide: {
     on: 0,
     expansive: 0.08,
-    kickChase: 1,
+    kickChase: 1.5,
     tight: 0.04,
-    allOut: 0.60,
+    allOut: 0.70,
   },
   fit: {
     on: 0,

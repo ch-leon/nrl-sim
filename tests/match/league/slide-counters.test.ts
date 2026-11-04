@@ -145,7 +145,7 @@ describe('dormant Slide counters', () => {
     expect(contact('all-out', 0.5, 7, true).broken).toBeLessThan(contact('all-out', 1.5, 7, true).broken!);
     const cover = (fit: number) => new SlideSim('kick-chase').fits(1, fit).cover();
     expect(highBall(60, 60, 20, true, 1, cover(0.5)).won).toBeGreaterThan(highBall(60, 60, 20, true, 1, cover(1.5)).won);
-    expect(grubberRace(1, 1, true, cover(0.5))).toBeGreaterThan(grubberRace(1, 1, true, cover(1.5)));
+    expect(grubberRace(1, 1.5, true, cover(0.5))).toBeGreaterThan(grubberRace(1, 1.5, true, cover(1.5)));
   }));
 
   it('Balanced replays exactly with Slide on at non-neutral fit', () => {
