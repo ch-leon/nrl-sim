@@ -9,8 +9,7 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav }
  * Normal, and two matches in one session at ×8: the half-time card comes up in both
  * (Phaser kept the first match's "card shown" for the second, so it never did, #408).
  */
-export async function runPlaytest(browser) {
-  const [W, H] = [667, 375];
+export async function runPlaytest(browser, W = 667, H = 375) {
   const OUT = join(OUT_ROOT, 'webkit', `playtest-${W}x${H}`);
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
@@ -52,6 +51,16 @@ export async function runPlaytest(browser) {
     await page.locator('[data-nrl-start]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
   });
+  await step('lineup', async () => {
+    await openNav(page, 'lineup');
+    await page.waitForSelector('.nrl-lineup-row');
+  });
+  await step('plan-sheet', async () => {
+    await page.locator('.nrl-screen-tools [data-plan]').tap();
+    await page.waitForSelector('.nrl-lineup-plan');
+    if (await page.locator('.nrl-lineup-tac [data-tactic="grind"]').textContent() !== 'Tight') return ['Tight label missing'];
+  });
+  await page.locator('.nrl-lineup-plan [data-plan-done]').tap();
   for (const size of ['large', 'larger']) {
     await step(`ladder-${size}`, async (rec) => {
       await textSize(size);
@@ -85,10 +94,20 @@ export async function runPlaytest(browser) {
         return pb && pb.half >= 2 && pb.breakKind !== 'half-time' ? 'missed' : null;
       }, null, { timeout: 300000, polling: 50 }).then((h) => h.jsonValue());
       rec.notes.push(seen === 'card' ? 'half-time card up' : 'second half kicked off with no card');
-      if (seen === 'card') await page.locator('.nrl-mo-plan .nrl-mo-plan-go').tap();
-      await page.locator('.nrl-mo-skip').tap();
-      await page.locator('.nrl-mo-skip').tap();
-      await page.locator('[data-back-to-club]:visible').first().tap({ timeout: 30000 });
+      if (seen === 'card') {
+        await page.screenshot({ path: join(OUT, `half-time-match-${m}.png`) });
+        await page.locator('.nrl-mo-plan .nrl-mo-plan-go').tap();
+      }
+      if (m === 1) {
+        await page.waitForSelector('[data-back-to-club]:visible', { timeout: 300000 });
+        rec.notes.push('played through full time at ×8');
+      } else {
+        await page.locator('.nrl-mo-skip').tap();
+        await page.locator('.nrl-mo-skip').tap();
+      }
+      await page.waitForSelector('[data-back-to-club]:visible', { timeout: 30000 });
+      await page.screenshot({ path: join(OUT, `full-time-match-${m}.png`) });
+      await page.locator('[data-back-to-club]:visible').first().tap();
       await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
       return seen === 'card' ? [] : [`match ${m}: no half-time card`];
     });

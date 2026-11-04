@@ -174,6 +174,7 @@ export abstract class LiveCalls extends LiveBase {
       const t = queued.tactics;
       if (t.attack === this.tactics[side].attack && t.defence === this.tactics[side].defence) continue;
       this.tactics[side] = t;
+      this.refreshPlanFit(side);
       this.planChanges.push({ minute: queued.minute, side, attack: t.attack, defence: t.defence, at: queued.at });
       this.emit('plan', `${this.names[side]} change the plan: ${PRESET_LABEL[t.attack]} / ${PRESET_LABEL[t.defence]}`, this.kicker(side));
       this.events[this.events.length - 1]!.detail = `${t.attack}/${t.defence}`;

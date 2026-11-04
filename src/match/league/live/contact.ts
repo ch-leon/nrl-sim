@@ -103,6 +103,7 @@ export abstract class LiveContact extends LivePenalties {
     tr.mods.bigHit = (tr.mods.bigHit ?? 0) + dplan.bigHit;
     // A defence a man short (#71) is stretched: easier to bust.
     tr.mods.broken = (tr.mods.broken ?? 0) + dplan.broken + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
+    tr.mods.edge = this.contestFitEdge(c.side, t.side);
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
     // Contact costs both men legs, whatever happens.
