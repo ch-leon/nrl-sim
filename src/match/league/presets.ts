@@ -179,9 +179,9 @@ export const RIVAL_STYLE = {
   compressedStamina: 1,
 };
 
-const BACKS: readonly string[] = ['fullback', 'winger', 'centre'];
-const HALVES: readonly string[] = ['five-eighth', 'halfback'];
-const PACK: readonly string[] = ['hooker', 'prop', 'second-row', 'lock'];
+export const BACKS: readonly string[] = ['fullback', 'winger', 'centre'];
+export const HALVES: readonly string[] = ['five-eighth', 'halfback'];
+export const PACK: readonly string[] = ['hooker', 'prop', 'second-row', 'lock'];
 
 /** A man of the nine, as the style reads him (a team sheet's roster entry). */
 export interface StyleEntry {

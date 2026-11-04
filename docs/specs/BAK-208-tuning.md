@@ -1350,3 +1350,34 @@ and dead-ball phases clear unused inputs. A last-tackle kick waits through the
 ruck or catch lock and applies on the next movable carry. A manual input also
 replaces an AI kick already winding up, including on its launch tick; an already completed
 last tackle still hands over normally (a queued input cannot undo contact).
+
+## 29. Squad fit descriptions (#459, not used by the sim yet)
+
+`src/match/league/fit.ts` exports pure derived ratings, `styleFit(roster)` and
+`archetype(player)`. These describe fixed team-sheet inputs only; no saved fields,
+RNG, preset display rename or gameplay effects. Tests: `tests/match/league/fit.test.ts`.
+All paths below appear under `fit` in `npm run balance -- --list`.
+
+| Knob | Value | Effect |
+|---|---|---|
+| `fit.leagueAverage` / `fit.pointsPerFit` / `fit.maxFit` | 60 / 50 / 1.5 | Fit = 1 + (style rating − 60)/50, clamped to 0–1.5. Missing stats or role groups use 60. |
+| `fit.archetypeThreshold` | 80 | Below this top derived rating, no UI label. Ties use Carry, Offload, Ball-play, Footwork, Edge D, Contact D order. |
+| `fit.carry.strength` / `fit.carry.speed` / `fit.carry.wreckingBall` | 3 / 1 / 8 | Weighted mean of Strength and Speed, plus Wrecking Ball. |
+| `fit.offload.skill` / `fit.offload.strength` / `fit.offload.offloadKing` / `fit.offload.razzleDazzle` | 1 / 1 / 8 / 6 | Weighted mean of Skill and Strength, plus each named trait. |
+| `fit.ballPlay.skill` / `fit.ballPlay.footyIQ` / `fit.ballPlay.playmaker` | 1 / 1 / 8 | Weighted mean of Skill and IQ, plus Playmaker. |
+| `fit.footwork.speed` / `fit.footwork.skill` / `fit.footwork.dancingFeet` | 1 / 1 / 8 | Weighted mean of Speed and Skill, plus Dancing Feet. |
+| `fit.edgeD.speed` / `fit.edgeD.footyIQ` / `fit.edgeD.lastLine` / `fit.edgeD.poacher` | 1 / 1 / 8 / 6 | Weighted mean of Speed and IQ, plus each named trait. |
+| `fit.contactD.strength` / `fit.contactD.footyIQ` / `fit.contactD.brickWall` / `fit.contactD.hitman` | 1 / 1 / 8 / 6 | Weighted mean of Strength and IQ, plus each named trait. |
+| `fit.tight.carry` / `fit.tight.offload` | 1 / 1 | Pack Carry and Offload weights for Tight (internal `grind`). |
+| `fit.expansive.speed` / `fit.expansive.footwork` / `fit.expansive.ballPlay` | 2 / 1 / 1 | Backs' Speed, backs' Footwork and halves' Ball-play weights. |
+| `fit.kickChase.kicker` / `fit.kickChase.chasers` / `fit.kickChase.bigBoot` | 1 / 1 / 8 | Best kicker's Skill (any role), backs' Speed weights, and Big Boot kicker bonus. |
+| `fit.allOut.offload` / `fit.allOut.footwork` / `fit.allOut.stamina` | 1 / 1 / 1 | Whole-side Offload, Footwork and Stamina weights. |
+| `fit.rush.stamina` / `fit.rush.contactD` / `fit.rush.hitman` | 1 / 1 / 4 | Whole-line Stamina and Contact D weights; extra Hitman bonus to Contact D for Rush. |
+
+Balanced uses the mean of all five stats across the side. Slide uses backs' Edge D;
+Compressed uses pack Contact D. All weighted means divide by the sum of their
+weights, keeping a traitless flat-60 side exactly neutral. Fast backs (Speed 80)
+score Expansive **1.25**; a strong pack (Strength 80) scores Tight **1.25**.
+Archetypes follow the highest derived rating: Carry/Offload → Wrecking forward,
+Ball-play → Ball-playing half, Footwork → Strike winger, Edge D → Sweeper for a
+fullback or Edge defender otherwise, Contact D → Enforcer. They are UI labels only.
