@@ -14,12 +14,15 @@ import type { ObjectiveRisk } from '../../systems/board';
 import { boardChip, decisionsChipCount, moneyTile, fmtMoneyShort, IN_DEBT_TEXT, ordinal, placeName, runwayLevel, BOARD_RISK_CLASS } from '../hud';
 import { button, el, openScreen, screenHead } from '../dom';
 import { HOME_ID } from '../nav';
+import { coachSays, type CoachSuggestion } from '../coachSays';
+import { coachLine } from '../coachVoice';
 
 /** The sheet's screen key: the dock marks CLUB for it. */
 export const CLUB_HOME_KEY = HOME_ID;
 
 /** What the Club home sheet shows. */
 export interface ClubHomeView {
+  coach: CoachSuggestion;
   club: string;
   /** "Week 3 of 26 · Season 1". */
   week: string;
@@ -70,6 +73,7 @@ export function clubHomeView(
   const first = list[0];
   const board = boardChip(s, runway);
   return {
+    coach: coachSays(s, { decisions: list.length, runwayWeeks: runway }),
     club: s.clubName,
     week: `Week ${s.week} of ${WEEKS_PER_SEASON} · Season ${s.season}`,
     money,
@@ -85,6 +89,7 @@ export function clubHomeView(
 export interface ClubHomeDeps {
   decisions?: (s: GameState) => readonly { title: string; note: string }[];
   runwayWeeks?: (s: GameState) => number | null;
+  onCoach: (screen: string) => void;
   onMoney: () => void;
   onNextMatch: () => void;
   onDecisions: () => void;
@@ -142,6 +147,7 @@ export function openClubHome(deps: ClubHomeDeps): HTMLElement {
     const money = el('span', { class: 'nrl-club-home-v nrl-club-home-money', text: v.money, attrs: { 'data-level': v.moneyLevel } });
     const rows: HTMLElement[] = [
       el('div', {}, el('div', { class: 'nrl-club-home-name', text: v.club }), el('div', { class: 'nrl-club-home-week', text: v.week })),
+      row('nrl-club-home-coach', 'Coach says', coachLine(v.coach.text), v.coach.screen ? () => deps.onCoach(v.coach.screen!) : undefined),
       row('nrl-club-home-cash', 'Money', money, deps.onMoney, v.moneyLabel),
       v.next
         ? row('nrl-club-home-next', 'Fixtures', v.next.text, deps.onNextMatch, `${v.next.label}. Tap for the League`)

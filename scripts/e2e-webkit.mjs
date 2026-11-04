@@ -64,6 +64,7 @@ import { SCREEN_RUNS, runScreens } from './e2e-webkit/screens/screens.mjs';
 import { WALK_RUNS, runTutorialWalk } from './e2e-webkit/match/tutorialWalk.mjs';
 import { runDockTextSize } from './e2e-webkit/portrait/dockTextSize.mjs';
 import { runPlaytest } from './e2e-webkit/match/playtest.mjs';
+import { runCoachSays } from './e2e-webkit/screens/coachSays.mjs';
 import { runCoachVoice } from './e2e-webkit/screens/coachVoice.mjs';
 import { runOfficeUnlocks } from './e2e-webkit/screens/officeUnlocks.mjs';
 import { runCoachName } from './e2e-webkit/screens/coachName.mjs';
@@ -93,6 +94,7 @@ const SECTIONS = [
   ['runCoachName', (b) => runCoachName(b)],
   ['runOfficeUnlocks', (b) => runOfficeUnlocks(b)],
   ['runDifficulty', (b) => runDifficulty(b)],
+  ['runCoachSays', (b) => runCoachSays(b)],
   ['runCoachVoice', (b) => runCoachVoice(b)],
   ['runLargeTextTargets', (b) => runLargeTextTargets(b)],
   ['runLadderForm', (b) => runLadderForm(b)],
@@ -107,7 +109,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
   text: ['runLargeTextTargets', 'runLadderForm'],
-  screens: ['runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice'],
+  screens: ['runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 

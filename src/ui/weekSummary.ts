@@ -12,6 +12,8 @@
 // (settings.weekSummary; absent = on). No Phaser.
 
 import { coachLine, summaryRemark } from './coachVoice';
+import { coachSays, type CoachSuggestion } from './coachSays';
+import { pendingDecisionCount } from './decisions';
 import { bus } from '../core/events';
 import { getState, FINANCE_LINES, type FinanceLine, type GameState, type PlayerStats } from '../core/state';
 import { advanceInProgress } from '../core/advance';
@@ -194,7 +196,7 @@ function section(title: string, lines: readonly string[], empty: string): HTMLEl
 }
 
 /** The card: two columns (the squad, then the money and the board) over Advance Week and Close. */
-export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void }): HTMLElement {
+export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; coach?: CoachSuggestion }): HTMLElement {
   const squad = [
     ...capList(v.injuries),
     ...capList(v.bans),
@@ -217,7 +219,7 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void })
   close.setAttribute('data-summary-close', '');
   const content = el('div', { class: 'nrl-summary', attrs: { 'data-week-summary': '' } },
     el('h2', { text: `${v.title} summary` }),
-    coachLine(summaryRemark(v)),
+    coachLine(opts.coach?.screen ? opts.coach.text : summaryRemark(v)),
     el('div', { class: 'nrl-summary-cols' },
       el('div', { class: 'nrl-summary-col' },
         section('Training', v.gains, 'No gains to speak of.'),
@@ -267,7 +269,10 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
     due = false;
     if (poll) clearInterval(poll);
     poll = undefined;
-    openWeekSummary(weekSummary(before, after), { onAdvance: opts.onAdvance });
+    openWeekSummary(weekSummary(before, after), {
+      onAdvance: opts.onAdvance,
+      coach: coachSays(s, { decisions: pendingDecisionCount(s), runwayWeeks: opts.runwayWeeks(s) }),
+    });
     before = after;
   };
   // A task later, so whatever the advance opens on its way out (a decision card,
