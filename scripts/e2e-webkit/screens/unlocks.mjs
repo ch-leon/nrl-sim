@@ -60,8 +60,9 @@ export async function runUnlocks(browser) {
         await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
         if (await ask.isVisible()) await ask.tap();
         await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
-        await page.locator('.nrl-mo-controls [data-pause]').tap();
-        await page.locator('.nrl-mo-sheet [data-skip]').tap();
+        await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
+        await page.waitForSelector('[data-skip-pill][data-armed]');
+        await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
         await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
         await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate((n) => n.click());
         await page.waitForFunction((week) => window.__nrlState().week === week, round + 1);
