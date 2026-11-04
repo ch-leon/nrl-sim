@@ -391,7 +391,7 @@ export abstract class LivePositioning extends LiveContact {
           p.target = { ...pk.to };
           p.wantsSprint = true;
         } else {
-          const deep = (this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM) + (LIVE.fullbackLastM - LIVE.fullbackDeepM) * coverDepth;
+          const deep = Math.max(this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM, LIVE.fullbackDeepM + (LIVE.fullbackLastM - LIVE.fullbackDeepM) * coverDepth);
           p.target = { x: clamp(this.lineX + this.dir * deep, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
         }
       } else {

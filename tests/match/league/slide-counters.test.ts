@@ -25,8 +25,8 @@ class SlideSim extends LiveSim {
     this.applySlideContact(carrier, mods, support);
     return { mods, receiver: this.offloadReceiver };
   }
-  targets(lastPlay = false) {
-    this.lastPlay = lastPlay;
+  targets(lastPlay = false, tackles = 0) {
+    this.lastPlay = lastPlay; this.tackles = tackles;
     this.phase = { kind: 'play' };
     this.attacking = 'home'; this.dir = 1; this.lineX = 60;
     this.ball = { kind: 'held', by: 5 };
@@ -114,9 +114,10 @@ describe('dormant Slide counters', () => {
   });
 
   it('holds fullback and wingers deeper and improves bomb catches and grubber races', () => {
-    const off = tuned(0, () => new SlideSim('kick-chase').targets(true));
-    const on = tuned(1, () => new SlideSim('kick-chase').targets(true));
+    const off = tuned(0, () => new SlideSim('kick-chase').targets(false, 3));
+    const on = tuned(1, () => new SlideSim('kick-chase').targets(false, 3));
     for (const slot of [0, 1, 2]) expect(on[slot]!.x).toBeGreaterThan(off[slot]!.x);
+    expect(tuned(1, () => new SlideSim('kick-chase').targets(true))[0]).toEqual(tuned(0, () => new SlideSim('kick-chase').targets(true))[0]);
     expect(tuned(1, () => new SlideSim('kick-chase').targets())).toEqual(tuned(0, () => new SlideSim('kick-chase').targets()));
     for (const enabled of [0, 1]) tuned(enabled, () => {
       const cover = new SlideSim('kick-chase').cover();
