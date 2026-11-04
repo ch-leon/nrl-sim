@@ -53,8 +53,8 @@ export async function runUnlocks(browser) {
       };
       await build('build-start', 4);
       // Menus support portrait; the live grounds/match asks for landscape.
-      if (width < height) await page.setViewportSize({ width: 844, height: 390 });
       for (let round = 1; round < 8; round++) {
+        if (width < height) await page.setViewportSize({ width: 844, height: 390 });
         await page.locator('[data-hud="advance"]').tap();
         const ask = page.locator('[data-ask-proceed]');
         await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
@@ -68,6 +68,10 @@ export async function runUnlocks(browser) {
         // The week settles before the scene switch; nav must see the visible dock.
         await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
         await page.waitForFunction((week) => window.__nrlState().week === week, round + 1);
+        if (width < height) {
+          await page.setViewportSize({ width, height });
+          await page.waitForSelector('[data-club-home]');
+        }
         report.rounds.push(await page.evaluate(() => ({ week: window.__nrlState().week, facilities: window.__nrlState().unlocks?.facilities })));
         if (round === 1) {
           await openNav(page, 'news');
