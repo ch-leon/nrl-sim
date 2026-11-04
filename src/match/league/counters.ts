@@ -7,7 +7,7 @@ export const COUNTERS = {
     expansive: 0.03,
     kickChase: 0.6,
     tight: 0.10,
-    allOut: 0.30,
+    allOut: 0.60,
   },
   fit: {
     on: 0,
