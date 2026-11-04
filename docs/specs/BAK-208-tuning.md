@@ -1489,4 +1489,5 @@ cell; their own-style fit and carriers decide the contest.
 
 No new RNG draws, stored stats, save changes or Labs/commercial flag changes.
 The reproducible acceptance plan is `balance/plans/counters-rush.json`: 500 seeds
-both ways per flat cell and fit row, with earlier counters enabled by overrides.
+both ways per flat cell (1,000 matches), plus task 1’s 200 seeds both ways per
+fit row (400 matches), with earlier counters enabled by overrides.

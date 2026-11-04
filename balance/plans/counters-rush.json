@@ -1,6 +1,6 @@
 {
   "name": "Rush counters acceptance",
-  "description": "Rush column: 500 seeds in both orientations, earlier knobs on. Kick-chase 53\u201357%, All-out 43\u201347%, Tight/Expansive 48\u201352%; strong/weak pack and fast backs fit comparisons.",
+  "description": "Rush column: 500 seeds both ways per flat cell (1,000 matches), earlier knobs on. Kick-chase 53\u201357%, All-out 43\u201347%, Tight/Expansive 48\u201352%. Fit rows use task 1 sampling: 200 seeds both ways (400 matches) for strong/weak pack and fast backs comparisons.",
   "report": "matrix",
   "seeds": 500,
   "base": {
@@ -133,7 +133,8 @@
         }
       },
       "track": "home",
-      "bothWays": true
+      "bothWays": true,
+      "seeds": 200
     },
     {
       "name": "weak pack: grind v rush",
@@ -157,7 +158,8 @@
         }
       },
       "track": "home",
-      "bothWays": true
+      "bothWays": true,
+      "seeds": 200
     },
     {
       "name": "fast backs: expansive v rush",
@@ -181,7 +183,8 @@
         }
       },
       "track": "home",
-      "bothWays": true
+      "bothWays": true,
+      "seeds": 200
     }
   ]
 }
