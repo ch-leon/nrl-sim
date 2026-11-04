@@ -94,9 +94,17 @@ export async function runPlaytest(browser, W = 667, H = 375) {
         return pb && pb.half >= 2 && pb.breakKind !== 'half-time' ? 'missed' : null;
       }, null, { timeout: 300000, polling: 50 }).then((h) => h.jsonValue());
       rec.notes.push(seen === 'card' ? 'half-time card up' : 'second half kicked off with no card');
-      if (seen === 'card') await page.locator('.nrl-mo-plan .nrl-mo-plan-go').tap();
-      await page.locator('.nrl-mo-skip').tap();
-      await page.locator('.nrl-mo-skip').tap();
+      if (seen === 'card') {
+        await page.screenshot({ path: join(OUT, `half-time-match-${m}.png`) });
+        await page.locator('.nrl-mo-plan .nrl-mo-plan-go').tap();
+      }
+      if (m === 1) {
+        await page.waitForSelector('[data-back-to-club]:visible', { timeout: 300000 });
+        rec.notes.push('played through full time at ×8');
+      } else {
+        await page.locator('.nrl-mo-skip').tap();
+        await page.locator('.nrl-mo-skip').tap();
+      }
       await page.waitForSelector('[data-back-to-club]:visible', { timeout: 30000 });
       await page.screenshot({ path: join(OUT, `full-time-match-${m}.png`) });
       await page.locator('[data-back-to-club]:visible').first().tap();
