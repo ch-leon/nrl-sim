@@ -1,0 +1,150 @@
+{
+  "name": "460 Tight acceptance",
+  "description": "Priority 200-seed both-ways acceptance: flat Tight neutral and all five strong-pack attacks on Slide, with Tight enabled.",
+  "report": "matrix",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "grind v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "strong pack: grind v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        },
+        "positionStats": {
+          "pack": {
+            "strength": 80
+          }
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "strong pack: balanced v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        },
+        "positionStats": {
+          "pack": {
+            "strength": 80
+          }
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "strong pack: expansive v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        },
+        "positionStats": {
+          "pack": {
+            "strength": 80
+          }
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "strong pack: kick-chase v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        },
+        "positionStats": {
+          "pack": {
+            "strength": 80
+          }
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "strong pack: all-out v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        },
+        "positionStats": {
+          "pack": {
+            "strength": 80
+          }
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "base": {
+    "counters.tight.on": 1
+  }
+}
