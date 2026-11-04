@@ -1,5 +1,5 @@
-// Pure squad descriptions for strategy counters (#459). Nothing in the sim reads
-// these yet: no RNG, saved fields, or imports from the live match engine.
+// Pure squad descriptions for strategy counters (#459): no RNG, saved fields,
+// or imports from the live match engine.
 import { BACKS, HALVES, PACK, type AttackPreset, type DefencePreset, type StyleEntry } from './presets';
 
 /**

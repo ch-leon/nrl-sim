@@ -1351,11 +1351,11 @@ ruck or catch lock and applies on the next movable carry. A manual input also
 replaces an AI kick already winding up, including on its launch tick; an already completed
 last tackle still hands over normally (a queued input cannot undo contact).
 
-## 29. Squad fit descriptions (#459, not used by the sim yet)
+## 29. Squad fit descriptions (#459)
 
 `src/match/league/fit.ts` exports pure derived ratings, `styleFit(roster)` and
 `archetype(player)`. These describe fixed team-sheet inputs only; no saved fields,
-RNG, preset display rename or gameplay effects. Tests: `tests/match/league/fit.test.ts`.
+RNG or stored changes. Tight reads its kickoff fit only behind the switch in §30. Tests: `tests/match/league/fit.test.ts`.
 All paths below appear under `fit` in `npm run balance -- --list`.
 
 | Knob | Value | Effect |
@@ -1381,3 +1381,21 @@ score Expansive **1.25**; a strong pack (Strength 80) scores Tight **1.25**.
 Archetypes follow the highest derived rating: Carry/Offload → Wrecking forward,
 Ball-play → Ball-playing half, Footwork → Strike winger, Edge D → Sweeper for a
 fullback or Edge defender otherwise, Contact D → Enforcer. They are UI labels only.
+
+## 30. Tight pack offloads (#460; BAK-208 §5)
+
+Grind is displayed as **Tight**; the saved preset key stays `grind`. At kickoff,
+`live/base.ts` caches each selected starting roster's `styleFit(...).grind` before
+rating spread and difficulty adjustments. Bench players do not rescore it. On-field
+`PACK` roles (including replacements in those slots) use the cached value through
+`attackPlan()`; backs and halves retain their old zone offloads. No new RNG.
+
+| Knob | Default | Effect |
+|---|---|---|
+| `counters.tight.on` | 0 | Only 1 enables the rebuild. At 0 all old zone plans and match fingerprints are unchanged. |
+| `counters.tight.offloadBase` | 1 | Pack offload multiplier at or below neutral fit, approximately Balanced. |
+| `counters.tight.offloadPerFit` | 12 | Added multiplier per fit above 1: base + perFit × max(0, fit − 1), floored at 0. Strength-80 pack fit 1.25 gives ×4. |
+
+Hit-ups, passes, steps, early territory kicks and kick bias stay as in the legacy
+plan. `balance/plans/counters-fit.json` compares the default with `Tight on`, at
+200 seeds both ways (yardsticks at 500). The switch remains off until #465.

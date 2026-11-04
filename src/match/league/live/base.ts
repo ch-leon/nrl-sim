@@ -22,6 +22,7 @@ import { CallJudge, callDefence, withAttackCall, withDefenceCall, type CallInput
 import type { KickoffCall } from '../kickoff';
 import { weatherEffect, type WeatherEffect } from '../weather';
 import type { MatchInjury, WeatherKind } from '../../../sim/events';
+import { styleFit } from '../fit';
 import { LIVE } from './knobs';
 import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput } from './types';
 
@@ -36,6 +37,8 @@ export abstract class LiveBase {
   protected readonly names: Record<Side, string>;
   /** How each side plays (BAK-208 §5), changed at the breaks (N11). */
   readonly tactics: Record<Side, TeamTactics>;
+  /** Tight fit of the selected starters, fixed before kick-off; bench and fatigue never rescore it. */
+  protected readonly tightFit: Record<Side, number>;
   /** The goal-kicker each side named (N11, a squad id); the slot-5 kicker when absent or off the field. */
   private readonly goalKickerKey: Record<Side, string | undefined>;
   /** Each side's captain, as the penalty call reads him (N11): neutral when the sheet names none. */
@@ -176,6 +179,7 @@ export abstract class LiveBase {
   protected golden = false;
 
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
+    this.tightFit = { home: styleFit(home.roster ?? []).grind, away: styleFit(away.roster ?? []).grind };
     // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average;
     // then the difficulty's edge to the player's rival (N12.2), which the spread would mostly cancel.
     [home, away] = edgeSheets(...spreadSheets(home, away), opts.difficultyEdge);
@@ -341,7 +345,7 @@ export abstract class LiveBase {
   }
   /** The attacking side's plan for the zone the carrier is in. */
   protected atkPlan(h: Player): AttackPlan {
-    return withAttackCall(attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h))), this.playCall());
+    return withAttackCall(attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h)), this.tightFit[this.attacking], ROLES[h.slot]!.name), this.playCall());
   }
   /** How the defending side's line is set. */
   protected defPlan(): DefencePlan {
