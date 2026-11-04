@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   generateObjectives, evaluateObjective, reviewObjectives, finalsPrize, finalsTarget,
-  applyBoardReview, ensureObjectives, sackedSummary, type SeasonOutcome,
+  applyBoardReview, ensureObjectives, registerBoardSystem, sackedSummary, type SeasonOutcome,
 } from '../../src/systems/board';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { createNewGame, getState, setState, type Objective } from '../../src/core/state';
 import { bus } from '../../src/core/events';
+import { clearSeasonHooks, clearTickHooks, advanceWeeks } from '../../src/core/time';
 import { BOARD, DIFFICULTY, PRIZE, scaledMoney } from '../../src/config';
 
 beforeEach(() => bus.clear());
@@ -183,5 +184,26 @@ describe('season rollover integration', () => {
     expect(s.season).toBe(2);
     expect(s.objectives.every((o) => o.id.startsWith('s2-') && o.status === 'pending')).toBe(true);
     expect(s.boardPatience).toBeLessThanOrEqual(BOARD.MAX_PATIENCE);
+  });
+});
+
+
+describe('board objectives address (#475)', () => {
+  it.each([['Sam Hale', 'Sam Hale'], ['', 'Coach']])('announces season 1 to %j and keeps the name at rollover', (coachName, address) => {
+    clearSeasonHooks(); clearTickHooks();
+    createNewGame('Test FC', 42, { coachName });
+    initLeague(getState());
+    const lines: string[] = [];
+    const quiet: (boolean | undefined)[] = [];
+    bus.on('ui:notify', (notice) => { lines.push(notice.text); quiet.push(notice.quiet); });
+    registerBoardSystem();
+    expect(lines).toEqual([`${address}, the board's objectives for season 1: ${getState().objectives.map((o) => o.text).join(' · ')}.`]);
+    expect(quiet).toEqual([true]); // News only while the first tutorial is teaching
+    registerBoardSystem();
+    expect(lines).toHaveLength(1); // loading existing goals never announces them again
+    advanceWeeks(27);
+    expect(lines.some((line) => line.startsWith(`${address}, the board's objectives for season 2:`))).toBe(true);
+    expect(quiet).toEqual([true, false]);
+    clearSeasonHooks(); clearTickHooks();
   });
 });

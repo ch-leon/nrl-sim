@@ -15,6 +15,7 @@
 // explained about Lineup, News, Finance and Contracts is a one-line hint the
 // first time each screen opens (HINTS, settings.hintsSeen). DECISION (Leon).
 
+import { coachAddress } from './coachName';
 import { bus, type Events } from '../core/events';
 import { getState, setState, type GameState } from '../core/state';
 import { FACILITY_CATALOG } from '../data/facility';
@@ -75,7 +76,7 @@ const PADDOCK = FACILITY_CATALOG.trainingPaddock.name;
 export const STEPS: readonly TutorialStep[] = [
   {
     id: 'build',
-    text: `Tap ${PADDOCK} to build one.`,
+    get text() { return `${coachAddress(getState())}, tap ${PADDOCK} to build one.`; },
     anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], ${tab('build')}`,
     advanceOn: 'facility:placed',
     opens: 'build',

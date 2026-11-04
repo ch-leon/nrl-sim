@@ -2,6 +2,7 @@
 // (GitHub #47, part of #49). Pure functions plus one season hook. Deterministic:
 // objectives come from a private RNG seeded by season + club count, so the same
 // state always yields the same goals and the main rngSeed stream is untouched.
+import { coachAddress } from '../ui/coachName';
 import { getState, setState, type GameState, type Objective } from '../core/state';
 import { bus } from '../core/events';
 import { registerSeasonHook } from '../core/time';
@@ -308,15 +309,20 @@ export function worstObjective(state: GameState, runwayWeeks: number | null = nu
 
 /** Register the new-season hook (after fixtures-season at order 10). */
 export function registerBoardSystem(): void {
-  registerSeasonHook('board-season', 20, () => {
+  const announceObjectives = (quiet = false): void => {
     const s = getState();
     if (s.sacked) return;
     const objectives = generateObjectives(s);
     setState({ objectives });
     bus.emit('ui:notify', {
-      text: `Board objectives, season ${s.season}: ${objectives.map((o) => o.text).join(' · ')}.`,
+      text: `${coachAddress(s)}, the board's objectives for season ${s.season}: ${objectives.map((o) => o.text).join(' · ')}.`,
       kind: 'info',
+      quiet,
     });
-  });
-  ensureObjectives();
+  };
+  registerSeasonHook('board-season', 20, () => announceObjectives());
+  const s = getState();
+  // The first goals belong in News without queuing a toast over the tutorial.
+  if (!s.sacked && s.objectives.length === 0 && s.league.clubs.length > 0) announceObjectives(true);
+  else ensureObjectives();
 }

@@ -44,6 +44,15 @@ const KNOWN_EVENTS: readonly (keyof Events)[] = [
 const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
 
 describe('STEPS: three guided taps (#370)', () => {
+  beforeEach(() => { createNewGame('Test Club', 1); });
+
+  it('addresses the current coach in the first bubble, including an unnamed next game', () => {
+    createNewGame('Test Club', 1, { coachName: 'Sam Hale' });
+    expect(STEPS[0]!.text).toBe(`Sam Hale, tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
+    createNewGame('Test Club', 1);
+    expect(STEPS[0]!.text).toBe(`Coach, tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
+  });
+
   it('is build, place, recruit and advance, grouped into three taps', () => {
     expect(STEPS.map((s) => s.id)).toEqual(['build', 'place', 'recruit', 'advance']);
     expect(STEPS.map((s) => s.tap)).toEqual([1, 1, 2, 3]);
@@ -62,7 +71,7 @@ describe('STEPS: three guided taps (#370)', () => {
   });
 
   it('names the paddock as the catalog does, and says what each tap does', () => {
-    expect(byId.get('build')!.text).toBe(`Tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
+    expect(byId.get('build')!.text).toBe(`Coach, tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
     expect(byId.get('place')!.text).toBe('Tap a green spot, then Build here.');
     expect(byId.get('recruit')!.text).toMatch(/Sign on the best player you can afford/);
     expect(byId.get('advance')!.text).toMatch(/Play Week/);
