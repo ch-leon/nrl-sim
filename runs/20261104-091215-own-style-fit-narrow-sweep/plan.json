@@ -1,0 +1,42 @@
+{
+  "name": "own style fit narrow sweep",
+  "description": "Bracket the acceptance band between tested edges 0.10 and 0.12: compare 0.11 and 0.115 to the same knob-off baselines, 500 seeds in each orientation.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.fit.on": 1,
+    "counters.fit.edge": 0.11
+  },
+  "scenarios": [
+    {
+      "name": "fit 1.5: Balanced / Slide",
+      "home": {
+        "rating": 85
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "fit 0.5: Balanced / Slide",
+      "home": {
+        "rating": 35
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "variants": [
+    {
+      "name": "edge 0.115",
+      "tuning": {
+        "counters.fit.edge": 0.115
+      }
+    }
+  ]
+}
