@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { createNewGame } from '../../src/core/state';
+import { COACH_NAME, COACH_ROLE, SUMMARY_REMARKS, EVENT_COMMENTS } from '../../src/ui/coachVoice';
+import { STEPS, HINTS, TUTORIAL_END_TEXT } from '../../src/ui/tutorial';
 import { AU_PACK } from '../../src/content/au';
 import { RIVAL_CLUBS } from '../../src/data/league';
 import { generatedBench, generatedRoster } from '../../src/match/league/sheets';
@@ -195,7 +198,8 @@ describe('the name pools (#398)', () => {
 });
 
 describe('the pack text (#398)', () => {
-  const text = strings({ clubs: AU_PACK.clubs.map((c) => c.name), names: AU_PACK.names, vocab: AU_PACK.vocab, events: AU_PACK.events });
+  createNewGame('Test Club', 1);
+  const text = strings({ coach: { name: COACH_NAME, role: COACH_ROLE, summary: SUMMARY_REMARKS, events: EVENT_COMMENTS, tutorial: STEPS.map((s) => s.text), hints: HINTS, end: TUTORIAL_END_TEXT }, clubs: AU_PACK.clubs.map((c) => c.name), names: AU_PACK.names, vocab: AU_PACK.vocab, events: AU_PACK.events });
 
   it.each(BLOCKED_WORDS)('never says %s', (word) => {
     const re = new RegExp(`\\b${word.replace(/ /g, '\\s+')}\\b`, 'i');
@@ -208,4 +212,8 @@ describe('the pack text (#398)', () => {
     expect(names).toContain('Mackay Marlins');
     expect(names.filter((n) => /Brumbies|Mariners/.test(n))).toEqual([]);
   });
+});
+
+it('the fictional guide surname passes the same real-name and near-miss guard', () => {
+  expect(realProblem(COACH_NAME.split(' ').slice(1).join(' '))).toBeNull();
 });

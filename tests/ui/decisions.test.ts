@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+vi.mock('../../src/art/coachFace', () => ({ coachFaceDataUrl: () => 'data:image/png;base64,face' }));
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   advanceAsk, advancesLeft, decisionViews, deadlineText, keepAdvancingLabel, longAdvanceQuestion, pendingDecisionCount,
   CONFIRM_SPAN,
@@ -105,4 +106,27 @@ describe('long advances (#350 H3) and Keep advancing (N4)', () => {
     expect(keepAdvancingLabel({ kind: 'finals' })).toBe('Keep advancing to finals');
     expect(keepAdvancingLabel({ kind: 'seasonEnd' })).toBe('Keep advancing to season end');
   });
+});
+
+// Render the actual card, retaining all existing choice callbacks.
+it('only cards in the coach table show his portrait and comment (#476)', async () => {
+  const { coachDocument } = await import('./coachDom');
+  const { decisionCard } = await import('../../src/ui/decisions');
+  const { EVENT_COMMENTS, COACH_NAME } = await import('../../src/ui/coachVoice');
+  coachDocument();
+  try {
+    for (const cardId of [...Object.keys(EVENT_COMMENTS), 'merchDeal']) {
+      setState({ eventDeck: { ...getState().eventDeck, pending: [] } });
+      plantPending(cardId);
+      const view = decisionViews(getState())[0]!;
+      const card = decisionCard(view, () => {}) as unknown as import('./stubDom').StubNode;
+      const blocks = card.querySelectorAll('[data-coach-line]');
+      expect(blocks.length, cardId).toBe(EVENT_COMMENTS[cardId] ? 1 : 0);
+      if (EVENT_COMMENTS[cardId]) {
+        expect(blocks[0]!.textContent).toContain(COACH_NAME);
+        expect(blocks[0]!.textContent).toContain(EVENT_COMMENTS[cardId]);
+        expect(blocks[0]!.all().some((n) => n.tagName === 'IMG')).toBe(true);
+      }
+    }
+  } finally { vi.unstubAllGlobals(); }
 });

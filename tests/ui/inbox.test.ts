@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { createNewGame } from '../../src/core/state';
+vi.mock('../../src/art/coachFace', () => ({ coachFaceDataUrl: () => 'data:image/png;base64,face' }));
+import { vi, describe, it, expect } from 'vitest';
 import {
   NewsInbox, INBOX_CAPACITY, filterNews, groupByWeek, type NewsItem,
 } from '../../src/ui/inbox';
@@ -118,4 +120,32 @@ describe('news view-model', () => {
     expect(groups.map((g) => [g.season, g.week])).toEqual([[1, 3], [1, 2], [0, 9]]);
     expect(groups[0].items.map((i) => i.text)).toEqual(['win', 'injury']);
   });
+});
+
+vi.mock('../../src/ui/dom', async (original) => ({
+  ...await original<typeof import('../../src/ui/dom')>(),
+  openModal: (node: HTMLElement) => node,
+}));
+
+it('coach News shows the shared portrait and name; ordinary News stays plain (#476)', async () => {
+  const { coachDocument } = await import('./coachDom');
+  const { openInboxScreen, initNewsInbox } = await import('../../src/ui/inbox');
+  const { bus } = await import('../../src/core/events');
+  const { COACH_NAME } = await import('../../src/ui/coachVoice');
+  createNewGame('Test Club', 1);
+  coachDocument();
+  const inbox = new NewsInbox();
+  const off = initNewsInbox(inbox);
+  try {
+    bus.emit('ui:notify', { text: 'Coach message', kind: 'info', from: 'coach' });
+    bus.emit('ui:notify', { text: 'Other message', kind: 'success' });
+    expect(inbox.items().map((i) => i.from)).toEqual([undefined, 'coach']);
+    const screen = openInboxScreen(inbox) as unknown as import('./stubDom').StubNode;
+    const rows = screen.all().filter((n) => n.className.includes('nrl-news-item'));
+    expect(rows[0]!.textContent).toBe('Other message');
+    expect(rows[0]!.all().some((n) => n.tagName === 'IMG')).toBe(false);
+    expect(rows[1]!.textContent).toContain(COACH_NAME);
+    expect(rows[1]!.querySelectorAll('[data-coach-line]')).toHaveLength(1);
+    expect(rows[1]!.all().some((n) => n.tagName === 'IMG')).toBe(true);
+  } finally { off(); vi.unstubAllGlobals(); }
 });

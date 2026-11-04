@@ -34,7 +34,7 @@ export async function runCoachName(browser) {
         await page.locator('[data-nrl-start]').tap();
         await page.waitForSelector('.nrl-tutorial-text');
         const address = name || 'Coach';
-        record.bubble = await page.locator('.nrl-tutorial-text').textContent();
+        record.bubble = await page.locator('.nrl-tutorial-text .nrl-coach-text').textContent();
         if (!record.bubble.startsWith(`${address}, tap `)) record.problems.push(`wrong bubble: ${record.bubble}`);
         await page.screenshot({ path: join(out, `${tag}-tutorial.png`) });
         const state = await page.evaluate(() => window.__nrlState());

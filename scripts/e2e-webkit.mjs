@@ -64,6 +64,7 @@ import { SCREEN_RUNS, runScreens } from './e2e-webkit/screens/screens.mjs';
 import { WALK_RUNS, runTutorialWalk } from './e2e-webkit/match/tutorialWalk.mjs';
 import { runDockTextSize } from './e2e-webkit/portrait/dockTextSize.mjs';
 import { runPlaytest } from './e2e-webkit/match/playtest.mjs';
+import { runCoachVoice } from './e2e-webkit/screens/coachVoice.mjs';
 import { runCoachName } from './e2e-webkit/screens/coachName.mjs';
 import { runDifficulty } from './e2e-webkit/screens/difficulty.mjs';
 import { FLOW_RUNS, runFlow } from './e2e-webkit/screens/flow.mjs';
@@ -90,6 +91,7 @@ const SECTIONS = [
   ['runFlow', async (b) => { let f = 0; for (const run of FLOW_RUNS) f += await runFlow(b, run); return f; }],
   ['runCoachName', (b) => runCoachName(b)],
   ['runDifficulty', (b) => runDifficulty(b)],
+  ['runCoachVoice', (b) => runCoachVoice(b)],
   ['runLargeTextTargets', (b) => runLargeTextTargets(b)],
   ['runLadderForm', (b) => runLadderForm(b)],
   ['runPortraitMenus', (b) => runPortraitMenus(b)],
@@ -103,7 +105,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
   text: ['runLargeTextTargets', 'runLadderForm'],
-  screens: ['runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty'],
+  screens: ['runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 

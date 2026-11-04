@@ -318,6 +318,7 @@ export function registerBoardSystem(): void {
       text: `${coachAddress(s)}, the board's objectives for season ${s.season}: ${objectives.map((o) => o.text).join(' · ')}.`,
       kind: 'info',
       quiet,
+      from: 'coach',
     });
   };
   registerSeasonHook('board-season', 20, () => announceObjectives());

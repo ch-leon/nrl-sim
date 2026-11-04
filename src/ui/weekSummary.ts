@@ -11,6 +11,7 @@
 // screen and the tutorial. The Settings popup can switch it off
 // (settings.weekSummary; absent = on). No Phaser.
 
+import { coachLine, summaryRemark } from './coachVoice';
 import { bus } from '../core/events';
 import { getState, FINANCE_LINES, type FinanceLine, type GameState, type PlayerStats } from '../core/state';
 import { advanceInProgress } from '../core/advance';
@@ -216,6 +217,7 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void })
   close.setAttribute('data-summary-close', '');
   const content = el('div', { class: 'nrl-summary', attrs: { 'data-week-summary': '' } },
     el('h2', { text: `${v.title} summary` }),
+    coachLine(summaryRemark(v)),
     el('div', { class: 'nrl-summary-cols' },
       el('div', { class: 'nrl-summary-col' },
         section('Training', v.gains, 'No gains to speak of.'),
