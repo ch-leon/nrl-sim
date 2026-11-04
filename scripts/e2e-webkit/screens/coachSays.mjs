@@ -33,6 +33,8 @@ export async function runCoachSays(browser) {
         s.eventDeck.pending = [];
         s.settings.weekSummary = true;
         s.money = 200000;
+        // These planted scenarios exercise rules 3/4 after their destinations open.
+        s.unlocks.screens = ['finance', 'staff'];
       });
       if (width < height) {
         const cases = [

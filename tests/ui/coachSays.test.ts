@@ -12,7 +12,7 @@ function readyClub(): GameState {
   const s = getState();
   // Enough natural players for every position; all higher-priority problems cleared.
   const squad = s.squad.map((p, i) => ({ ...p, position: LINEUP_SLOTS[i % LINEUP_SLOTS.length]!, injuredWeeks: 0, suspendedWeeks: 0 }));
-  return { ...s, squad, lineup: { ...s.lineup, starters: squad.slice(0, 9).map((p) => p.id) }, objectives: [], facilities: [], league: initLeague(s) };
+  return { ...s, unlocks: { facilities: s.unlocks!.facilities, screens: ['finance', 'staff'] }, squad, lineup: { ...s.lineup, starters: squad.slice(0, 9).map((p) => p.id) }, objectives: [], facilities: [], league: initLeague(s) };
 }
 
 describe('coachSays (#477)', () => {
@@ -79,6 +79,45 @@ describe('coachSays (#477)', () => {
     expect(coachSays(s, ctx).screen).toBe('staff');
     s.objectives = [];
     expect(coachSays(s, ctx).screen).toBe('recruit');
+  });
+  describe('Office unlocks (#482)', () => {
+    const atRisk = (s: GameState): void => {
+      s.objectives = [{ id: 'cash', kind: 'solvent', text: 'Keep $300,000', target: 300_000, status: 'pending' }];
+    };
+    it('skips locked Finance and continues to an open Staff suggestion', () => {
+      atRisk(s);
+      s.unlocks!.screens = ['staff'];
+      expect(coachSays(s, { ...ctx, runwayWeeks: 3 }).screen).toBe('staff');
+      s.unlocks!.screens.push('finance');
+      expect(coachSays(s, { ...ctx, runwayWeeks: 3 }).screen).toBe('finance');
+    });
+    it('skips locked Staff and continues to recruitment', () => {
+      atRisk(s);
+      s.squad = s.squad.map((p) => p.position === 'winger' ? { ...p, position: 'centre' } : p);
+      s.unlocks!.screens = [];
+      expect(coachSays(s, ctx).screen).toBe('recruit');
+      s.unlocks!.screens.push('staff');
+      expect(coachSays(s, ctx).screen).toBe('staff');
+    });
+    it('skips both locked destinations and reaches the next applicable rule', () => {
+      atRisk(s);
+      s.unlocks!.screens = [];
+      expect(coachSays(s, { ...ctx, runwayWeeks: 3 }).screen).toBe('build');
+      s.money = 0;
+      expect(coachSays(s, { ...ctx, runwayWeeks: 3 }).screen).toBeNull();
+    });
+    it.each(['old save', 'facility-only legacy save', 'veteran skip'] as const)('keeps Finance and Staff suggestions for %s', (mode) => {
+      if (mode === 'old save') delete s.unlocks;
+      else if (mode === 'facility-only legacy save') delete s.unlocks!.screens;
+      else {
+        createNewGame('Veteran Club', 1, { openAll: true });
+        expect(getState().unlocks).toBeUndefined();
+        s.unlocks = getState().unlocks;
+      }
+      atRisk(s);
+      expect(coachSays(s, { ...ctx, runwayWeeks: 3 }).screen).toBe('finance');
+      expect(coachSays(s, ctx).screen).toBe('staff');
+    });
   });
   it('is deterministic and leaves its inputs unchanged', () => {
     const before = JSON.stringify(s);

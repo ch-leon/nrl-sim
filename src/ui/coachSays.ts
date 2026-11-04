@@ -4,6 +4,7 @@ import { FACILITY_CATALOG } from '../data/facility';
 import { worstObjective } from '../systems/board';
 import { isFieldable, LINEUP_SLOTS } from '../systems/lineup';
 import { BENCH } from '../match/league/bench';
+import { isScreenOpen } from '../systems/unlocks';
 import { nextFixture } from '../systems/league';
 import { decisionViews } from './decisions';
 import { runwayLevel } from './hud';
@@ -19,7 +20,6 @@ export interface CoachSuggestion {
 
 /** First match wins; slot order breaks ties, with no state writes or dice. */
 export function coachSays(state: GameState, ctx: CoachContext): CoachSuggestion {
-  // TODO(task 8): filter Office suggestions by the unlocked destinations once #482 lands.
   if (ctx.decisions > 0) {
     const card = decisionViews(state)[0];
     if (card) return { text: `Answer the ${card.title} card before we play.`, screen: 'news' };
@@ -33,12 +33,12 @@ export function coachSays(state: GameState, ctx: CoachContext): CoachSuggestion 
     if (!player) return { text: `The ${spot.position} spot is empty. Fix the lineup.`, screen: 'lineup' };
     if (!isFieldable(player)) return { text: `${player.name} can't play. Fix the lineup.`, screen: 'lineup' };
   }
-  if (runwayLevel(ctx.runwayWeeks) !== 'ok') {
+  if (isScreenOpen(state, 'finance') && runwayLevel(ctx.runwayWeeks) !== 'ok') {
     const weeks = Math.max(0, Math.floor(ctx.runwayWeeks!));
     return { text: `${weeks} weeks of cash left. No building till that's sorted.`, screen: 'finance' };
   }
   const board = worstObjective(state, ctx.runwayWeeks);
-  if (board) return { text: `The board's goal is at risk: ${board.objective.text}.`, screen: 'staff' };
+  if (board && isScreenOpen(state, 'staff')) return { text: `The board's goal is at risk: ${board.objective.text}.`, screen: 'staff' };
   for (const position of new Set(LINEUP_SLOTS)) {
     const needed = LINEUP_SLOTS.filter((p) => p === position).length;
     if (state.squad.filter((p) => p.position === position && isFieldable(p)).length < needed) {
