@@ -1456,9 +1456,9 @@ styles. Balanced and defences other than Slide receive no cell effect.
 |---|---:|---|
 | `counters.slide.on` | 0 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
 | `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
-| `counters.slide.kickChase` | 1.5 | On the last two tackles, adds up to fullbackLastM − fullbackDeepM to fullback depth and holds wingers up to the current fullback depth (depth fraction capped at 1); divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
+| `counters.slide.kickChase` | 1.5 | On the last two tackles, adds up to fullbackLastM − fullbackDeepM to fullback depth and holds wingers up to the current fullback depth (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
 | `counters.slide.tight` | 0.04 | Adds inside bust probability and supported offload probability for pack carriers. |
-| `counters.slide.allOut` | 0.70 | Adds bust probability only at the offload receiver's first contact. A pass, kick, turnover or stoppage clears the receiver. |
+| `counters.slide.allOut` | 0.50 | Adds bust probability for the offload receiver during `live.beatenCooldown` ticks after the offload, so another defender arriving before the line resets is still exposed. A pass, kick, turnover or stoppage clears the receiver. |
 
 No new random draws: interception, contact, catches and races use their existing
 rolls. The receiver marker is transient match state; no stored stat or save change.

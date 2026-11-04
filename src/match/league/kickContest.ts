@@ -87,3 +87,8 @@ export function grubberRace(attackerS: number, defenderS: number, kickChase = fa
   const edge = defenderS - attackerS + (kickChase ? g.kickChaseS : 0) - cover;
   return clamp((edge + g.bounceS) / (2 * g.bounceS), 0, 1);
 }
+
+/** Earlier read under an in-play kick, only while already inside the normal catch reach. */
+export function fieldingRead(distance: number, cover: number, reach: number): number {
+  return distance <= reach ? distance / (1 + cover) : distance;
+}

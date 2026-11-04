@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COUNTERS, slideCounter } from '../../../src/match/league/counters';
 import { highBall, grubberRace } from '../../../src/match/league/kickContest';
+import { LIVE } from '../../../src/match/league/live/knobs';
 import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { applyTuning } from '../../../src/match/league/tuning';
@@ -19,6 +20,7 @@ class SlideSim extends LiveSim {
     const carrier = this.players[slot]!;
     carrier.body.pos = { x: 50, y: slot === 1 ? 5 : 34 };
     this.offloadReceiver = afterOffload ? slot : null;
+    this.offloadUntil = this.tick + LIVE.beatenCooldown;
     const mods: ContestMods = {};
     this.applySlideContact(carrier, mods, support);
     return { mods, receiver: this.offloadReceiver };
@@ -43,6 +45,25 @@ class SlideSim extends LiveSim {
     this.rng.next = () => roll;
     this.pass(from, to);
     return this.ball.kind === 'flight' ? this.ball.receiver : null;
+  }
+  recoveryContacts() {
+    this.phase = { kind: 'play' };
+    this.offloadReceiver = 7; this.offloadUntil = LIVE.beatenCooldown;
+    const mods = [0, LIVE.immuneTicks, LIVE.beatenCooldown + 1].map((tick) => {
+      this.tick = tick;
+      const result: ContestMods = {};
+      this.applySlideContact(this.players[7]!, result, true);
+      return result;
+    });
+    return { mods, receiver: this.offloadReceiver };
+  }
+  fielding(defenderDistance = 2, kickoff = false) {
+    this.attacking = 'away'; this.kickoffUp = kickoff;
+    for (const p of this.players) p.body.pos = { x: 80, y: 60 };
+    this.players[5]!.body.pos = { x: 49, y: 34 };
+    this.players[9]!.body.pos = { x: 50 + defenderDistance, y: 34 };
+    const catcher = this.underKick({ x: 50, y: 34 }, null);
+    return catcher ? this.indexOf(catcher) : null;
   }
   endCarry(action: 'kick' | 'stoppage' | 'pass' | 'turnover') {
     this.offloadReceiver = 7;
@@ -115,6 +136,18 @@ describe('dormant Slide counters', () => {
     });
   });
 
+  it('reads near-tied in-play catches for the back three without extending catch reach', () => {
+    expect(tuned(0, () => new SlideSim('kick-chase').fielding())).toBe(5);
+    tuned(1, () => {
+      expect(new SlideSim('kick-chase').fielding()).toBe(9);
+      expect(new SlideSim('kick-chase').fits(1, 0.5).fielding()).toBe(5);
+      expect(new SlideSim('kick-chase').fits(1, 1.5).fielding()).toBe(9);
+      expect(new SlideSim('kick-chase').fielding(5)).toBe(5);
+      expect(new SlideSim('kick-chase').fielding(2, true)).toBe(5);
+      expect(new SlideSim('balanced').fielding()).toBe(5);
+    });
+  });
+
   it('opens the inside gap and pack offloads only for Tight with support', () => {
     expect(tuned(0, () => new SlideSim('grind').contact(7).mods)).toEqual({});
     const mods = tuned(1, () => new SlideSim('grind').contact(7).mods);
@@ -123,11 +156,13 @@ describe('dormant Slide counters', () => {
     expect(tuned(1, () => new SlideSim('grind').contact(7, false, false).mods.offload)).toBeUndefined();
   });
 
-  it('helps All-out only at the offload receiver’s first contact', () => {
+  it('helps All-out only during the offload receiver’s recovery window', () => {
     expect(tuned(0, () => new SlideSim('all-out').contact(7, true).mods)).toEqual({});
     expect(tuned(1, () => new SlideSim('all-out').contact(7).mods)).toEqual({});
-    const result = tuned(1, () => new SlideSim('all-out').contact(7, true));
-    expect(result.mods.broken).toBeGreaterThan(0); expect(result.receiver).toBeNull();
+    const result = tuned(1, () => new SlideSim('all-out').recoveryContacts());
+    expect(result.mods[0]!.broken).toBeGreaterThan(0);
+    expect(result.mods[1]!.broken).toBe(result.mods[0]!.broken);
+    expect(result.mods[2]).toEqual({}); expect(result.receiver).toBeNull();
     expect(tuned(1, () => new SlideSim('balanced').contact(7, true).mods)).toEqual({});
   });
 

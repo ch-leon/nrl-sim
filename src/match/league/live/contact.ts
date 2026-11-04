@@ -149,6 +149,7 @@ export abstract class LiveContact extends LivePenalties {
           // A Razzle Dazzle offload is the miracle ball — and the one that gets spilled; so is one the coach called for (#396).
           this.pass(c, this.players[r]!, (tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0) + (this.playCall() === 'offload' ? CALLS.offload.spill : 0));
           this.offloadReceiver = r;
+          this.offloadUntil = this.tick + LIVE.beatenCooldown;
           this.lock(c, 'tackled', LIVE.contactTicks + LIVE.downTicks);
           this.lock(t, 'tackle', LIVE.contactTicks + LIVE.downTicks);
           c.busyUntil = this.tick + LIVE.contactTicks + LIVE.downTicks + 10;
@@ -220,6 +221,7 @@ export abstract class LiveContact extends LivePenalties {
 
   /** Drift leaves an inside gap for the pack, and cannot reset for the offload receiver. */
   protected applySlideContact(c: Player, mods: ContestMods, support: boolean): void {
+    if (this.tick > this.offloadUntil) this.offloadReceiver = null;
     const slide = this.slideEffect(c.side);
     if (slide > 0) {
       const attack = this.tactics[c.side].attack;
@@ -230,7 +232,6 @@ export abstract class LiveContact extends LivePenalties {
       }
       if (attack === 'all-out' && this.offloadReceiver === this.indexOf(c)) mods.broken = (mods.broken ?? 0) + slide;
     }
-    this.offloadReceiver = null;
   }
 
   /** Keep a man in the wrestle: locked where he stands, for another tick or two. */

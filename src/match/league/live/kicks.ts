@@ -4,8 +4,9 @@ import type { Side } from '../../core/snapshot';
 import { clamp, dist, sub, type Vec } from '../../core/vec';
 import { knockOnChance } from '../contest';
 import { KICKOFF, kickoffLanding, pinnedDeep, regatherChance, type KickoffCall } from '../kickoff';
-import { KICK_CONTEST, grubberRace, highBall } from '../kickContest';
+import { KICK_CONTEST, fieldingRead, grubberRace, highBall } from '../kickContest';
 import { TOUCH, exitPoint, inOwnInGoal, outOfPlay, ownLineX, touchRestartSpot } from '../touch';
+import { ROLES } from '../roles';
 import { LIVE } from './knobs';
 import { other, AIM_TEXT, KICK_TEXT, type Player, type Phase } from './types';
 import { LiveClock } from './clock';
@@ -205,12 +206,15 @@ export abstract class LiveKicks extends LiveClock {
   }
 
   /** Who takes a kick coming down at `at`: the nearest free player within reach, the nominated man on a near-tie. */
-  private underKick(at: Vec, nominated: number | null): Player | undefined {
+  protected underKick(at: Vec, nominated: number | null): Player | undefined {
+    const cover = this.kickoffUp ? 0 : this.kickCover(other(this.attacking));
+    const fullback = this.fullback(this.attacking);
     let best: Player | undefined;
     let bd = Infinity;
     for (const p of this.players) {
       if (this.locked(p) || !this.onField(p)) continue;
       let d = dist(p.body.pos, at);
+      if (cover > 0 && p.side === this.attacking && (p === fullback || ROLES[p.slot]!.name === 'winger')) d = fieldingRead(d, cover, LIVE.kickCatchReach);
       if (this.indexOf(p) === nominated) d -= 0.3;
       if (d < bd) {
         bd = d;

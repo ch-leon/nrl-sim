@@ -159,8 +159,9 @@ export abstract class LiveBase {
   protected ruckPlayedAt = -1000;
   /** Extra spill chance on the pass in the air (a Razzle Dazzle offload). */
   protected spillExtra = 0;
-  /** Only the first contact by an offload receiver can exploit the drifting line. */
+  /** The latest offload receiver, while the drifting line is still recovering. */
   protected offloadReceiver: number | null = null;
+  protected offloadUntil = -1;
   /** The trait to credit when the pass in the air is picked off. */
   protected interceptTrait: string | undefined;
   protected events: SimEvent[] = [];

@@ -237,7 +237,7 @@ sim's defaults (`src/match/league/presets.ts`).
 
 The Tight offload rebuild (#460) is dormant (`counters.tight.on = 0`): the row above remains the default. With the switch at 1, pack carriers use the starting sheet’s Tight fit for second-phase offloads; hit-ups and territory kicks stay unchanged. See tuning §30.
 
-Slide counters (#462) are dormant (`counters.slide.on = 0`). When enabled, both sides’ style fits scale drift and cut-out reads against Expansive, deep kick cover against Kick-chase, inside pack offloads against Tight and first-contact busts after an All-out offload. Balanced is neutral; the existing contest rolls decide outcomes. See tuning §32.
+Slide counters (#462) are dormant (`counters.slide.on = 0`). When enabled, both sides’ style fits scale drift and cut-out reads against Expansive, deep kick cover against Kick-chase, inside pack offloads against Tight and busts in the line’s recovery window after an All-out offload. Balanced is neutral; the existing contest rolls decide outcomes. See tuning §32.
 
 Own-style fit (#461) is independently dormant (`counters.fit.on = 0`). When enabled, starting-sheet attack fit helps carrying contests and defence fit helps tackling contests; fit 1 is neutral. A plan applied at a break selects the new styles’ fits. The same contest roll resolves contact; see tuning §31.
 
