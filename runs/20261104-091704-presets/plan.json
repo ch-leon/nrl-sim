@@ -1,0 +1,126 @@
+{
+  "name": "presets",
+  "description": "N13.1: each attack preset against Balanced and each defence preset against Slide, even 60-rated sides, calls and the AI coach off, both ways. The preset's win rate is Side win (45–55% is the band). The last two rows check that a half-time change from Grind to Expansive still offloads more than staying on Grind.",
+  "seeds": 200,
+  "scenarios": [
+    {
+      "name": "grind v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "expansive v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "kick-chase v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "all-out v balanced",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "rush v slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "compressed v slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "grind stays",
+      "seeds": 40,
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "grind to expansive at half-time",
+      "seeds": 40,
+      "plans": [
+        {
+          "side": "home",
+          "at": "half-time",
+          "tactics": {
+            "attack": "expansive"
+          }
+        }
+      ],
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ]
+}
