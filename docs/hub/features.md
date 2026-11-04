@@ -63,7 +63,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- Optional coach name at new-game setup; the first tutorial bubble and board objectives address you by name, with “Coach” for unnamed careers.
+- Optional coach name at new-game setup; the first tutorial bubble and board objectives address you by name, with “Coach” for unnamed careers ([PR](https://github.com/ch-leon/nrl-sim/pull/491)).
 
 Newest first; merge dates in UTC.
 
