@@ -10,6 +10,7 @@ export async function runOfficeUnlocks(browser) {
   for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
     const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, userAgent: IPHONE_UA });
     const page = await context.newPage();
+    page.setDefaultTimeout(20000);
     const record = { size: `${width}x${height}`, problems: [], rounds: [] };
     page.on('pageerror', (e) => record.problems.push(e.message));
     await page.addInitScript(closeWeekSummary);
@@ -45,14 +46,16 @@ export async function runOfficeUnlocks(browser) {
       while (await page.evaluate(() => window.__nrlState().week < 12)) {
         const week = await page.evaluate(() => window.__nrlState().week);
         await page.locator('[data-hud="advance"]').tap();
-        await page.waitForFunction(() => document.querySelector('.nrl-mo-controls') || document.querySelector('[data-ask-proceed]'), { timeout: 60000 });
+        await page.waitForFunction(() => document.querySelector('.nrl-mo-controls') || document.querySelector('[data-ask-proceed]'), null, { timeout: 60000 });
         if (await page.locator('[data-ask-proceed]').count()) await page.locator('[data-ask-proceed]').tap();
         console.log(`Office ${width}x${height} playing round ${week}`);
         await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
         const plan = page.locator('.nrl-mo-plan .nrl-mo-plan-go');
         if (await plan.isVisible()) await plan.tap();
         await page.locator('.nrl-mo-controls [data-pause]').tap();
+        console.log(`Office ${width}x${height} round ${week} paused`);
         await page.locator('.nrl-mo-sheet [data-skip]').tap();
+        console.log(`Office ${width}x${height} round ${week} skipping`);
         await page.locator('[data-back-to-club]:visible').first().tap({ timeout: 60000 });
         await page.waitForFunction((w) => window.__nrlState().week > w, week, { timeout: 60000 });
         const state = await page.evaluate(() => window.__nrlState());
