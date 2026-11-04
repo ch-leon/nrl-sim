@@ -850,6 +850,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-office-status { font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .nrl-office-status[data-attn] { color: var(--nrl-accent); }
 .nrl-office-status:empty { display: none; }
+.nrl-nav-sheet > .nrl-btn.nrl-office-locked { cursor: default; opacity: 0.55; }
+.nrl-office-locked .nrl-office-status { white-space: normal; }
 @media (max-width: 560px) { .nrl-nav-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(12px); } }
 @media (prefers-reduced-motion: reduce) { .nrl-nav-sheet, .nrl-screen-region { animation: none !important; } }

@@ -107,6 +107,9 @@ export interface SeasonSample extends GapSample {
   season: number;
   money: number;
   minMoney: number;
+  /** QA economy diagnostics: debt warnings and players sold by bankruptcy. */
+  debtWeeks?: number;
+  forcedSales?: number;
   squad: number;
   freeAgents: number;
   saveBytes: number;
@@ -631,6 +634,8 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (open) for (const l of FINANCE_LINES) opening[l] = open[l];
   }
   bus.on('money:changed', ({ delta, reason }) => { tally[classifyReason(reason)] += delta; });
+  let debtWeeks = 0, forcedSales = 0;
+  bus.on('bankruptcy:warning', (e) => { debtWeeks++; forcedSales += e.forcedSales?.length ?? 0; });
   // A forfeit leaves only the score on the fixture; matchday says so in a danger toast (finding 20).
   let forfeits = 0;
   bus.on('ui:notify', ({ text, kind }) => { if (kind === 'danger' && FORFEITED.test(text)) forfeits++; });
@@ -708,6 +713,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
           season: before,
           money: s.money,
           minMoney,
+          debtWeeks, forcedSales,
           squad: s.squad.length,
           freeAgents: s.freeAgents.length,
           saveBytes: text.length,
@@ -738,6 +744,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
         gap = gapSample(s);
         regular = null;
         forfeits = 0;
+        debtWeeks = 0; forcedSales = 0;
         signed = { count: 0, fees: 0, overall: 0 };
       }
     }

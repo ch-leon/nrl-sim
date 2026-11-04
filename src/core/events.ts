@@ -85,10 +85,11 @@ export interface Events {
    * `action` (#370): a button in the toast (the 5-second Undo). Such a toast jumps the
    * queue, keeps its `ms` and closes only on its ✕ or its timer; `enabled` false hides the button.
    */
+  'ui:openScreen': { id: string };
   'ui:notify': {
     from?: 'coach';
     text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean; ms?: number;
-    action?: { label: string; run: () => void; enabled?: () => boolean };
+    action?: { label: string; screen?: string; run: () => void; enabled?: () => boolean };
   };
   /** The demo stopped an advance at the week the club is on (#362; commercial flag on only). The paywall opens on it (#364). */
   'commercial:demoEnded': { season: number; week: number };

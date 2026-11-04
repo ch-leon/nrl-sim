@@ -301,6 +301,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
   await step('title-setup', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
+    await page.locator('[data-nrl-open-all]').check();
     await setInsets();
     await page.waitForTimeout(250);
     return controlsProblems(page, ['[data-nrl-clubname]', '.nrl-title-swatch', '.nrl-title-pick', '[data-nrl-start]'], safe);
@@ -767,6 +768,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
   await step('title-overwrite-confirm', async () => {
     await tap('[data-nrl-new-1]');
     await page.waitForSelector('[data-nrl-start]');
+    await page.locator('[data-nrl-open-all]').check();
     await tap('[data-nrl-start]');
     await page.waitForSelector('[data-nrl-confirm]');
     await page.waitForTimeout(200);
