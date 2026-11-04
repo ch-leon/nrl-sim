@@ -104,6 +104,7 @@ describe('optional coach name at setup (#475)', () => {
     expect(name.getAttribute('aria-label')).toBe('Your name');
     expect(name.className).toBe(root.querySelector('[data-nrl-clubname]')!.className);
     name.value = raw;
+    await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
     const choice = await result;
     expect(choice.mode).toBe('new');
@@ -121,6 +122,7 @@ describe('veteran skip (#481)', () => {
     const toggle = root.querySelector('[data-nrl-open-all]')! as unknown as HTMLInputElement;
     expect(toggle.type).toBe('checkbox');
     toggle.checked = checked;
+    await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
     const choice = await result;
     expect(choice.openAll).toBe(checked ? true : undefined);
@@ -156,6 +158,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('offline town setup (#485)', () => {
+  it('keeps names edited while the offline catalogue is loading', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    (root.querySelector('[data-nrl-clubname]')! as InputNode).enter('My Early Club');
+    (root.querySelector('[data-nrl-groundname]')! as InputNode).enter('My Early Ground');
+    await settleTowns();
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(await choice).toMatchObject({ clubName: 'My Early Club', groundName: 'My Early Ground' });
+  });
+
   it('preselects a listed town and starts with one tap and both names', async () => {
     const root = new StubNode('div');
     const choice = showTitleFlow(root as unknown as HTMLElement);

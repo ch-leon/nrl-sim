@@ -82,7 +82,7 @@ Newest first; merge dates in UTC.
 - Grind is now named Tight; pack-fit offloads are available behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/473)), 4 Nov
 - Recruit shortlist of four with an affordable Coach’s pick and Show all ([PR](https://github.com/ch-leon/nrl-sim/pull/492)), 4 Nov
 - Club home always shows cash runway in weeks, or “covering costs” ([PR](https://github.com/ch-leon/nrl-sim/pull/490)), 4 Nov
-- Offline home-town setup, editable club and ground names ([draft PR](https://github.com/ch-leon/nrl-sim/pull/496); catalogue source required), 4 Nov
+- Offline home-town setup, editable club and ground names ([PR](https://github.com/ch-leon/nrl-sim/pull/496)), 4 Nov
 
 - CI test fixes ([PR](https://github.com/ch-leon/nrl-sim/pull/442)), 1 Nov
 - Steady tackle count ([PR](https://github.com/ch-leon/nrl-sim/pull/440)), 31 Oct

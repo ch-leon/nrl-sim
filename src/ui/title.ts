@@ -430,7 +430,10 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         }
       };
 
+      let clubEdited = false;
+      let groundEdited = false;
       const input = mk('input', 'nrl-title-input');
+      input.addEventListener('input', () => { clubEdited = true; });
       input.type = 'text';
       input.value = DEFAULT_CLUB_NAME;
       input.setAttribute('data-nrl-clubname', '');
@@ -449,6 +452,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       details.appendChild(names);
 
       const ground = mk('input', 'nrl-title-input');
+      ground.addEventListener('input', () => { groundEdited = true; });
       ground.type = 'text';
       ground.setAttribute('data-nrl-groundname', '');
       ground.setAttribute('aria-label', 'Ground name');
@@ -582,8 +586,12 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         const initial = towns[seed % towns.length];
         // A player can type while the chunk is loading; don't overwrite their town.
         if (!townInput.value && initial) townInput.value = townLabel(initial);
+        const editedClub = clubEdited ? input.value : undefined;
+        const editedGround = groundEdited ? ground.value : undefined;
         suggestions();
         applyTown();
+        if (editedClub !== undefined) input.value = editedClub;
+        if (editedGround !== undefined) ground.value = editedGround;
         start.disabled = false;
       }).catch(() => {
         townNote.textContent = 'Town list unavailable. Type your own town to start.';
