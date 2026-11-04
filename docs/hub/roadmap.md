@@ -4,7 +4,7 @@ Last updated: 2026-11-05
 
 ## Now
 
-- Hometown setup: curated offline towns plus free text, with editable club and ground names; ready for review ([PR #496](https://github.com/ch-leon/nrl-sim/pull/496)). Google Maps remains deferred ([tracker #489](https://github.com/ch-leon/nrl-sim/issues/489)).
+- Hometown setup: curated offline Australia and New Zealand towns plus free text, with editable club and ground names; ready for review ([PR #496](https://github.com/ch-leon/nrl-sim/pull/496)). Google Maps remains deferred ([tracker #489](https://github.com/ch-leon/nrl-sim/issues/489)).
 - Split `live.ts` and `e2e-webkit.mjs` into modules, no behaviour change: open, awaiting Leon's thumbs up (source: [PR #443](https://github.com/ch-leon/nrl-sim/pull/443))
 - Repo slim Leon approved: planned, no PR yet (source: the open PR list)
 

@@ -8,8 +8,8 @@ import { colorsForTown, townColorsAllowed } from '../../src/data/townSetup';
 import { generateTowns } from '../../scripts/gen-towns.mjs';
 
 describe('curated offline towns (#485)', () => {
-  it('has populated places in all four countries above the floor with complete fields and unique ids', () => {
-    expect([...new Set(towns.map(t => t.country))].sort()).toEqual(['AU', 'GB', 'NZ', 'PG']);
+  it('has populated places in AU and NZ only above the floor with complete fields and unique ids', () => {
+    expect([...new Set(towns.map(t => t.country))].sort()).toEqual(['AU', 'NZ']);
     expect(new Set(towns.map(t => t.id)).size).toBe(towns.length);
     for (const t of towns) {
       expect(t.name.length).toBeGreaterThan(0);
@@ -33,7 +33,7 @@ describe('curated offline towns (#485)', () => {
   it('generates deterministically from a local GeoNames TSV and filters by country, population and feature', () => {
     const row = (id: number, country: string, population: number, feature = 'P') =>
       [id, 'Example', '', '', -30, 150, feature, 'PPL', country, '', '01', '', '', '', population].join('\t');
-    const source = [row(3, 'NZ', 6000), row(1, 'AU', 5000), row(2, 'US', 7000), row(4, 'PG', 4999), row(5, 'GB', 6000, 'A')].join('\n');
+    const source = [row(3, 'NZ', 6000), row(1, 'AU', 5000), row(2, 'US', 7000), row(4, 'PG', 10000), row(5, 'GB', 10000), row(6, 'AU', 4999), row(7, 'NZ', 10000, 'A')].join('\n');
     expect(generateTowns(source, 5000).map(t => t.id)).toEqual(['1', '3']);
     expect(generateTowns(source, 5000)).toEqual(generateTowns(source.split('\n').reverse().join('\n'), 5000));
   });
