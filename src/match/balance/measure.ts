@@ -52,7 +52,7 @@ export interface Stat {
 }
 
 /** Event counts attributed to the side named by each event, plus its score. */
-export const SIDE_COUNTS = ['offloads', 'busts', 'lineBreaks', 'tries', 'kicks', 'steps', 'errors', 'pointsFor', 'pointsAgainst'] as const;
+export const SIDE_COUNTS = ['offloads', 'busts', 'lineBreaks', 'tries', 'kicks', 'steps', 'errors', 'bombs', 'bombsWon', 'grubbers', 'grubberTries', 'pointsFor', 'pointsAgainst'] as const;
 export type SideCountKey = (typeof SIDE_COUNTS)[number];
 type SideCounts = Record<SideCountKey, number>;
 

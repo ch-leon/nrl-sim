@@ -64,14 +64,14 @@ export interface HighBall {
  * A contested bomb: the chaser's Speed against the catcher's Skill, the kick's
  * height (Big Boot puts it higher), a Kick-chase side, and the wet (`handling`,
  * 1 dry, more in rain) which makes the catcher spill more. The two always
- * leave some clean catches.
+ * leave some clean catches. Slide's fit-scaled `cover` reduces both risks.
  */
-export function highBall(chaserSpeed: number, catcherSkill: number, peak: number, kickChase: boolean, handling = 1): HighBall {
+export function highBall(chaserSpeed: number, catcherSkill: number, peak: number, kickChase: boolean, handling = 1, cover = 0): HighBall {
   const b = KICK_CONTEST.bomb;
   const extra = Math.max(0, peak - b.peak) * b.perPeakM + (kickChase ? b.kickChase : 0);
-  const won = chaserWins(b.won, chaserSpeed, catcherSkill, extra);
+  const won = chaserWins(b.won, chaserSpeed, catcherSkill, extra) / (1 + cover);
   // Not beaten to it, the catcher still has to hold it with the chaser on him.
-  const spill = (1 - won) * Math.min(1, chaserWins(b.spill, chaserSpeed, catcherSkill, extra) * handling);
+  const spill = (1 - won) * Math.min(1, chaserWins(b.spill, chaserSpeed, catcherSkill, extra) * handling / (1 + cover));
   return { won, spill };
 }
 
@@ -79,10 +79,11 @@ export function highBall(chaserSpeed: number, catcherSkill: number, peak: number
  * The race to a grubber in the in-goal: the chance the attacker gets there
  * first, from each man's time to the ball (seconds). The bounce moves the
  * difference by up to `bounceS` either way, so a man who is that much
- * quicker always wins it, and a dead heat is a coin toss.
+ * quicker always wins it, and a dead heat is a coin toss. Slide's `cover` is
+ * seconds of defensive anticipation, using the same race draw.
  */
-export function grubberRace(attackerS: number, defenderS: number, kickChase = false): number {
+export function grubberRace(attackerS: number, defenderS: number, kickChase = false, cover = 0): number {
   const g = KICK_CONTEST.grubber;
-  const edge = defenderS - attackerS + (kickChase ? g.kickChaseS : 0);
+  const edge = defenderS - attackerS + (kickChase ? g.kickChaseS : 0) - cover;
   return clamp((edge + g.bounceS) / (2 * g.bounceS), 0, 1);
 }

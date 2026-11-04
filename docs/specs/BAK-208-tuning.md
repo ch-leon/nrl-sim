@@ -1444,3 +1444,25 @@ randomness. The Tight switch stays independent and off.
 
 Tests: `tests/match/league/fit-bonus.test.ts` covers neutral/off/signed edges,
 half-time reselection on the changing side, and exact neutral-match replay.
+
+## 32. Slide matchup counters (#462)
+
+All four cells use `cell strength × attacking style fit × defending Slide fit`,
+selected from the starting-sheet fits (#459). Slide fit is the backs' derived
+Edge D (Speed, footy IQ and existing traits). Plan changes select the newly played
+styles. Balanced and defences other than Slide receive no cell effect.
+
+| Knob | Default | Effect when Slide is enabled |
+|---|---:|---|
+| `counters.slide.on` | 0 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
+| `counters.slide.expansive` | 0.10 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
+| `counters.slide.kickChase` | 0.6 | Extra fraction of fullback depth (also held by wingers), divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
+| `counters.slide.tight` | 0.10 | Adds inside bust probability and supported offload probability for pack carriers. |
+| `counters.slide.allOut` | 0.30 | Adds bust probability only at the offload receiver's first contact. A pass or turnover clears the receiver. |
+
+No new random draws: interception, contact, catches and races use their existing
+rolls. The receiver marker is transient match state; no stored stat or save change.
+`balance/plans/counters-slide.json` compares Slide off/on with Tight and own-style
+fit enabled in both, using the task-1 flat-60 matchups and both orientations.
+The matrix report includes per-side bombs won and grubber tries as well as
+line breaks, offloads and busts, so the mechanism is visible beside points share.

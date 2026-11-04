@@ -387,12 +387,16 @@ export abstract class LivePositioning extends LiveContact {
           p.target = { ...pk.to };
           p.wantsSprint = true;
         } else {
-          const deep = this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM;
+          const deep = (this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM) * (1 + (this.tactics[atk].attack === 'kick-chase' ? this.slideEffect() : 0));
           p.target = { x: clamp(this.lineX + this.dir * deep, -8, FIELD_LENGTH + 8), y: clamp(MID_Y + (anchor.y - MID_Y) * 0.6, 4, 64) };
         }
       } else {
-        const y = clamp(role.lane + (anchor.y - MID_Y) * Math.min(1, (role.defPull ?? role.pull) * dplan.pull), 1.5, 66.5);
-        p.target = { x: clamp(this.lineX, -8, FIELD_LENGTH + 8), y };
+        const slide = this.slideEffect();
+        const expansive = this.tactics[atk].attack === 'expansive' ? slide : 0;
+        const y = clamp(role.lane + (anchor.y - MID_Y) * Math.min(1, (role.defPull ?? role.pull) * dplan.pull + expansive), 1.5, 66.5);
+        const depth = this.tactics[atk].attack === 'kick-chase' && role.name === 'winger'
+          ? (this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM) * slide : 0;
+        p.target = { x: clamp(this.lineX + this.dir * depth, -8, FIELD_LENGTH + 8), y };
       }
     }
   }

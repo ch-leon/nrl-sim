@@ -23,7 +23,7 @@ import type { KickoffCall } from '../kickoff';
 import { weatherEffect, type WeatherEffect } from '../weather';
 import type { MatchInjury, WeatherKind } from '../../../sim/events';
 import { styleFit, type StyleFit } from '../fit';
-import { fitEdge } from '../counters';
+import { fitEdge, slideCounter } from '../counters';
 import { LIVE } from './knobs';
 import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput } from './types';
 
@@ -159,6 +159,8 @@ export abstract class LiveBase {
   protected ruckPlayedAt = -1000;
   /** Extra spill chance on the pass in the air (a Razzle Dazzle offload). */
   protected spillExtra = 0;
+  /** Only the first contact by an offload receiver can exploit the drifting line. */
+  protected offloadReceiver: number | null = null;
   /** The trait to credit when the pass in the air is picked off. */
   protected interceptTrait: string | undefined;
   protected events: SimEvent[] = [];
@@ -185,6 +187,16 @@ export abstract class LiveBase {
   protected refreshPlanFit(side: Side): void {
     const plan = this.tactics[side];
     this.planFit[side] = { attack: this.squadFit[side][plan.attack], defence: this.squadFit[side][plan.defence] };
+  }
+
+  protected slideEffect(attacker: Side = this.attacking): number {
+    const defender = other(attacker);
+    return slideCounter(this.tactics[attacker].attack, this.tactics[defender].defence,
+      this.planFit[attacker].attack, this.planFit[defender].defence);
+  }
+
+  protected kickCover(kicking: Side): number {
+    return this.tactics[kicking].attack === 'kick-chase' ? this.slideEffect(kicking) : 0;
   }
 
   protected contestFitEdge(attacker: Side, defender: Side): number {

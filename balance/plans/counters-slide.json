@@ -1,0 +1,115 @@
+{
+  "name": "Slide counters tuning",
+  "description": "Slide column at neutral fit. Tight rebuild and own-style fit enabled in every row. Compare dormant Slide to enabled mechanics, 500 seeds both ways for acceptance.",
+  "report": "matrix",
+  "seeds": 60,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1
+  },
+  "scenarios": [
+    {
+      "name": "grind v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "all-out v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "variants": [
+    {
+      "name": "Slide on",
+      "tuning": {
+        "counters.slide.on": 1
+      }
+    }
+  ]
+}
