@@ -10,6 +10,7 @@
 import {
   deleteSlot, getSlotSummaries, installImportedSave, pickSaveFile, setActiveSlot, type SlotSummary,
 } from '../core/save';
+import { cleanName, NAME_MAX } from '../data/names';
 import { buildLabel } from './buildInfo';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -27,6 +28,7 @@ import { openLoginDialog, openPaywall } from './screens/paywall';
 export interface TitleChoice {
   mode: 'continue' | 'new';
   clubName?: string;
+  coachName?: string;
   difficulty?: Difficulty;
   colors?: [string, string];
 }
@@ -97,6 +99,7 @@ export const TITLE_CSS = `
   padding: 10px 6px; border-radius: 10px; background: #141d3a; text-align: center; font-size: 0.75rem; color: #9aa6c7; }
 .nrl-title-kit img { width: 84px; height: 90px; image-rendering: pixelated; }
 .nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.nrl-title-names { display: flex; flex-direction: column; gap: 8px; }
 .nrl-title-go { grid-area: start; display: flex; flex-direction: column; gap: 6px; }
 .nrl-title-go .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-confirm { font-size: 0.8125rem; color: #f4d03f; }
@@ -114,6 +117,11 @@ export const TITLE_CSS = `
   background: #1b264a; border: 2px solid #26325c; border-radius: 10px; }
 .nrl-title-input:focus { outline: none; border-color: #f4d03f; }
 @media (pointer: coarse) { .nrl-title-swatch { width: 44px; height: 44px; } }
+@media (max-height: 500px) and (min-width: 521px) {
+  .nrl-title-names { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .nrl-title-names .nrl-title-field { flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
+  .nrl-title-names .nrl-title-field > span { flex: 0 0 auto; text-align: left; }
+}
 @media (max-height: 500px) {
   .nrl-title h1 { font-size: 2.125rem; }
   .nrl-title h1::after { margin-top: 4px; font-size: 0.6875rem; }
@@ -359,7 +367,17 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       input.setAttribute('data-nrl-clubname', '');
       input.setAttribute('aria-label', 'Club name');
       input.setAttribute('maxlength', '32');
-      form.appendChild(field('Club name', input));
+      const names = mk('div', 'nrl-title-names');
+      names.appendChild(field('Club name', input));
+
+      const coachInput = mk('input', 'nrl-title-input');
+      coachInput.type = 'text';
+      coachInput.setAttribute('data-nrl-coachname', '');
+      coachInput.setAttribute('aria-label', 'Your name');
+      coachInput.setAttribute('placeholder', 'Coach');
+      coachInput.setAttribute('maxlength', String(NAME_MAX));
+      names.appendChild(field('Your name', coachInput));
+      form.appendChild(names);
 
       // Curated swatches only; a secondary too close to the primary is disabled.
       const swatches = (label: string, attr: string, palette: readonly string[], pick: (c: string) => void) => {
@@ -419,7 +437,9 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       const go = mk('div', 'nrl-title-go');
       const begin = (): void => {
         const name = input.value.trim() || DEFAULT_CLUB_NAME;
-        finish(s.slot, { mode: 'new', clubName: name, difficulty, colors: [primary, secondary] });
+        const coach = cleanName(coachInput.value);
+        // Optional identity: blank or invalid input never prevents starting a game.
+        finish(s.slot, { mode: 'new', clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, colors: [primary, secondary] });
       };
       const start = mkButton('Start', 'data-nrl-start', 'nrl-title-btn-go');
       start.addEventListener('click', () => {

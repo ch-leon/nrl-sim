@@ -239,6 +239,7 @@ export interface GameState {
   version: typeof SAVE_VERSION;
   clubId: 'player';
   clubName: string;
+  coachName?: string;
   money: number;
   reputation: number; // 1-100, drives attendance & sponsors
   week: number; // 1..WEEKS_PER_SEASON
@@ -328,7 +329,7 @@ export function loadState(next: GameState): void {
 export function createNewGame(
   clubName: string,
   seed: number = Date.now() >>> 0,
-  options: { difficulty?: Difficulty | undefined } = {},
+  options: { difficulty?: Difficulty | undefined; coachName?: string | undefined } = {},
 ): GameState {
   const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
   const rng = makeRng(seed);
@@ -369,6 +370,7 @@ export function createNewGame(
     version: SAVE_VERSION,
     clubId: 'player',
     clubName,
+    ...(options.coachName?.trim() ? { coachName: options.coachName } : {}),
     money: Math.round(STARTING_MONEY * difficultyMultipliers(difficulty).startingMoney),
     reputation: 30,
     week: 1,
