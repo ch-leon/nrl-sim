@@ -186,7 +186,7 @@ same 400 matches, on `35afd04`). After:
 | Grind | 49.2% | 49.2% | unchanged |
 | Expansive | 35.0% | 46.2% | pass +0.15 → 0, cut-out 0.08 → 0.02 (own 20 0.03 → 0.01, so it stays under the new base), width 0.35 → 0.28, early kick 0.30 → 0.18 |
 | Kick-chase | 46.5% | 46.5% | unchanged here; step 0.9 → 1 in N13.5 once the other side changes plan (§30) |
-| All-out | 38.0% | 54.8% | pass +0.15 → 0, offload ×1.6 → ×1.5, cut-out 0.12 → 0.03, width 0.45 → 0.35, early kick 0.30 → 0.15. 54.8% is seeds 1–200; five blocks of 400 pool to 48.3% (see `docs/status/2026-10-balance.md`) |
+| All-out | 38.0% | 54.8% | pass +0.15 → 0, offload ×1.6 → ×1.5, cut-out 0.11 → 0.03, width 0.45 → 0.35, early kick 0.30 → 0.15. 54.8% is seeds 1–200; five blocks of 400 pool to 48.3% (see `docs/status/2026-10-balance.md`) |
 | Rush | 57.2% | 49.8% | line speed 6.5 → 6.2 m/s (busts stayed at +0.11: 0.115 already fell to about 45%) |
 | Compressed | 64.0% | 49.0% | pull ×1.4 → ×1.1, markers ×1.2 → ×1.05, busts −0.04 → −0.02, step-against −0.02 → +0.03 |
 
@@ -218,7 +218,7 @@ Tests: `tests/match/league/presets.test.ts` (direction of each preset, §7 bands
 | `KICK_HOLD_MS` / `KICK_RETURN_MS` | `kickLayer.ts` | 200 / 800 ms (real) | The framing holds this long after the catch or the bounce, then has this long to get back: back within a second. **Assumed (needs Leon)**: the return time. |
 | `TRAIL_FADE_MS` | `kickLayer.ts` | 900 ms (real) | The ball's trail fades out after the kick comes down. **Assumed (needs Leon)**: the trail's look. |
 | `CONTEST_M` | `kickLayer.ts` | 9 m | A bomb's or cross-field kick's contest is drawn from the top of its flight: the nearest man of each side within 9 m of where it lands, a ring each in his side's colours; the one who takes it gets a white ring that grows, the others' fade. **Assumed (needs Leon)**: the contest's look. |
-| `SKID_LIFT_M` | `kickLayer.ts` | 0.12 m | A grubber's hop that comes down under this leaves a skid mark. **Assumed (needs Leon)**: the skid's look. |
+| `SKID_LIFT_M` | `kickLayer.ts` | 0.11 m | A grubber's hop that comes down under this leaves a skid mark. **Assumed (needs Leon)**: the skid's look. |
 | `TRAIT_MOVE_MS` | `src/match/view/traitLayer.ts` | 1000 ms (real) | How long a trait's move stays up (N15.4): the fend's arm, the step's cut, the cut-out line, the drive, the shock. It fades over the last 280 ms. At ×4 and ×8 (`TRAIT_FAST_FROM`, `TRAIT_FAST_HOLD` 2) it stays up twice as long, and the match eases for `TRAIT_SLOW_MS` 420 ms at factor `TRAIT_SLOW_FACTOR` 0.4, so the camera does not run past it. **Assumed (needs Leon)**: a second, and the longer hold at the fast speeds. |
 | `CUT_NEAR_M` / `CUT_END_M` | `traitLayer.ts` | 2.5 m / 0.4 m | A Playmaker's line goes through the teammate nearest him who is within 2.5 m of the line and at least 0.4 m clear of either end. The man beside the ball, not a trailer closer to the line. |
 | `trailStyle` | `kickLayer.ts` | plain 5/3 px white; Big Boot 9/5 px `#d9a5ff` | Big Boot's trail is wider and in the trait colour. The kick is already longer in the sim. **Assumed (needs Leon)**: the look. |
@@ -1408,11 +1408,11 @@ Baseline switch 0 → variant switch 1:
 
 | Tight / Slide vs flat Balanced / Slide | Offloads before → after | Busts before → after | Line breaks before → after | Points share before → after |
 |---|---:|---:|---:|---:|
-| Flat 60 | 0.5975 → 2.2825 | 8.5350 → 8.9225 | 5.3350 → 5.5525 | 47.250% → 50.125% |
+| Flat 60 | 0.5975 → 2.2825 | 8.5350 → 8.9225 | 5.3350 → 5.5525 | 47.250% → 50.115% |
 | Strong pack (strength 80) | 0.7125 → 10.8925 | 9.4325 → 10.0975 | 5.6250 → 6.2950 | 55.875% → 63.750% |
 | Fast backs (speed 80) | 0.5350 → 2.2150 | 8.0775 → 8.4500 | 6.0025 → 6.1450 | 43.375% → 45.250% |
 
-Flat 60 Tight wins **46.750%** (points share **50.125%**), within the 45–55% band.
+Flat 60 Tight wins **46.750%** (points share **50.115%**), within the 45–55% band.
 The strong pack's best attack against Balanced / Slide is Tight at **63.750%**
 points share; Expansive is next at **63.000%**. The shipped switch remains **0**.
 
@@ -1434,7 +1434,7 @@ At a break, the newly applied plan selects its attack and defence fits again.
 | Knob | Default | Meaning |
 |---|---|---|
 | `counters.fit.on` | 0 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
-| `counters.fit.edge` | 0.12 | Carrier-edge probability per point of fit away from 1.0. |
+| `counters.fit.edge` | 0.11 | Carrier-edge probability per point of fit away from 1.0. |
 
 Each contact adds `edge × (attackFit − 1) − edge × (defenceFit − 1)`
 to `carrierEdge`, clamped to 0–1 by `contestOdds`. Thus a side's attack fit
