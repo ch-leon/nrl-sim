@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Compressed counters pack middle tackles against Tight and leave edge overlaps for Expansive, behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/503)).
+
 - Rush counters use carrier/defence fit, kick space and rushed All-out offload spills behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/502)).
 
 - Slide matchup mechanics for Expansive, Kick-chase, Tight and All-out are implemented behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/501)).

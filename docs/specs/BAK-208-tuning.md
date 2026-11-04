@@ -1493,3 +1493,32 @@ both ways per flat cell (1,000 matches), except Tight, which includes seeds
 1–1,000 both ways (2,000 matches) after extending a borderline first sample.
 Fit rows use task 1’s 200 seeds both ways (400 matches), with earlier counters
 enabled by overrides.
+
+## 34. Compressed matchup counters (#464)
+
+The switch ships at 0. With it on, Tight draws one extra available committed
+man (still capped at four) only within `MAX_LAT_M` of the middle of the pitch.
+Middle contact removes bust and supported offload probability by cell strength
+× both starting-sheet fits × the nearby committed defenders' mean derived
+Contact D / `fit.leagueAverage`. Only men within `live.secondManM` count toward
+that mean. Stronger Strength/Footy IQ and Brick Wall/Hitman improve the squeeze.
+No unsupported offload is created.
+
+Against Expansive, non-committed line defenders move toward the middle by cell
+× both fits (capped at 1) of their lane's distance from the middle. Outside
+`MAX_LAT_M`, fullbacks, wingers and centres add cell × both fits × Speed / 60
+to busted-tackle odds, turning overlaps into line-break opportunities. Forwards
+and halves receive no edge bonus. Line breaks are still detected from bodies
+crossing the line; this uses the existing contact roll, not a new roll.
+
+| Knob | Default | Effect when Compressed is enabled |
+|---|---:|---|
+| `counters.compressed.on` | 0 | Only 1 enables these mechanics. |
+| `counters.compressed.tight` | 0.04 | Middle squeeze probability; a positive cell also commits the extra man. |
+| `counters.compressed.expansive` | 0.10 | Inward lane pull and speed-scaled edge bust probability. |
+
+Kick-chase, All-out and Balanced receive no Compressed counter effect.
+`balance/plans/counters-compressed.json` runs the entire 5 × 3 matrix at flat
+60, neutral fits and all counter switches overridden to 1: 500 seeds in both
+orientations, 1,000 whole matches per cell. Shipped switches remain 0. No new
+stored fields, randomness, save version, Labs or commercial changes.
