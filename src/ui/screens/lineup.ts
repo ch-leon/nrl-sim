@@ -23,7 +23,7 @@ import { renderPlanFit, PLAN_FIT_CSS } from '../planFit';
 import { TACTIC_BLURB, styleLine } from '../tacticsBlurbs';
 import { nextFixture } from '../../systems/league';
 import { PLAYER_ID } from '../../systems/fixtures';
-import { rivalStyle } from '../../systems/rivalRound';
+import { playerRivalContext, rivalStyle } from '../../systems/rivalRound';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import {
   LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
@@ -491,7 +491,7 @@ export function openLineupScreen(): void {
     planSub.textContent = next && opp ? `${roundLabel(next.round)} · v ${opp.name} · ${next.homeId === PLAYER_ID ? 'home' : 'away'}` : 'Before kick-off';
     oppLine.hidden = !opp;
     if (opp) {
-      oppLine.textContent = `${opp.name} play ${styleLine(rivalStyle(opp))}`;
+      oppLine.textContent = `${opp.name} play ${styleLine(rivalStyle(opp, playerRivalContext(s)))}`;
       oppLine.title = oppLine.textContent;
     }
     planBtn.textContent = `Plan: ${PRESET_LABEL[tactics.attack]} · ${PRESET_LABEL[tactics.defence]}`;

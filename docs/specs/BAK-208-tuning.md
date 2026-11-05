@@ -1602,7 +1602,7 @@ These do not change contest rolls or match fingerprint fixtures.
 | `counters.ai.hardHalfTime` | 1 | Hard may counter the most-played observed first-half plan at half-time |
 | `counters.ai.keyDeficit` | 1 | Minimum deficit versus the opponent in the attack style's key count |
 
-Easy maximises its own attack and defence fit. Normal uses the joint mode of
+Easy retains the existing squad/club-identity selector unchanged. Normal uses the joint mode of
 three past kick-off plans (ties: newest first); no history means Balanced / Slide.
 Hard averages all three, weighting each by the mean of the player's attack and
 defence fits. All fifteen candidates use the signed matrix and both starting

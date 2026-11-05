@@ -23,7 +23,7 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { formGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
-import { rivalSheet, rivalStyle } from '../../systems/rivalRound';
+import { playerRivalContext, rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { styleLine, whenBehindLine } from '../tacticsBlurbs';
 import { shortName } from './matchReport';
@@ -457,9 +457,10 @@ function nextMatchCard(state: GameState): HTMLElement {
   };
   // How they play (N11): the style of the nine they would field today; the Guide's Tactics page explains the words.
   if (oppClub) {
-    const style = rivalStyle(oppClub);
     const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
-    const theirs = rivalSheet(oppClub).roster ?? [];
+    const context = playerRivalContext(state, ours);
+    const style = rivalStyle(oppClub, context);
+    const theirs = rivalSheet(oppClub, context).roster ?? [];
     line('They play', `${styleLine(style)} · ${fitRead(theirs, style.attack).stars} / ${fitRead(theirs, style.defence).stars}`);
     line('Matchup', matchupRead(ours, theirs, validTactics(state.lineup.tactics), style));
     line('Counters', counterRead(ours, style.defence));

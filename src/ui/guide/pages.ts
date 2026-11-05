@@ -238,7 +238,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Reading the opposition',
         bullets: [
-          'Every rival plays a style. On Easy it picks the best fit for its nine. On Normal and Hard rivals read your last three league plans, never your upcoming pick; Hard also weighs your squad fit and can react to the plan seen in the first half. Vary your plans to keep them guessing.',
+          'Every rival plays a style. On Easy it keeps its own squad style. On Normal and Hard rivals read your last three league plans, never your upcoming pick; Hard also weighs your squad fit and can react to the plan seen in the first half. Vary your plans to keep them guessing.',
           'The next-match card says how they play (“They play Expansive · Rush”); the ladder tags each club (EXP·RSH) and a rival’s squad page names it.',
         ],
       },

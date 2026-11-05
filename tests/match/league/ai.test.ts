@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { COUNTER_MATRIX, pickRivalPlan, planValue, usualPlan } from '../../../src/match/league/ai';
 import { styleFit, type StyleFit } from '../../../src/match/league/fit';
-import { ATTACK_PRESETS, DEFENCE_PRESETS, DEFAULT_TACTICS, rivalTactics, type TeamTactics } from '../../../src/match/league/presets';
+import { ATTACK_PRESETS, DEFENCE_PRESETS, DEFAULT_TACTICS, rivalTactics, type StyleEntry, type TeamTactics } from '../../../src/match/league/presets';
+import { STANDARD_POSITIONS, teamSheetFromRival } from '../../../src/match/league/sheets';
 import { applyTuning } from '../../../src/match/league/tuning';
 
 const neutral = styleFit([]);
@@ -9,11 +10,36 @@ const wide: TeamTactics = { attack: 'expansive', defence: 'compressed' };
 const tight: TeamTactics = { attack: 'grind', defence: 'slide' };
 
 describe('rival plans from three past kick-offs', () => {
-  it('Easy picks its own best fit regardless of history or player fit', () => {
-    const own = { ...neutral, grind: 1.4, rush: 1.3 };
-    for (const recent of [[], [wide], [tight]]) {
-      expect(pickRivalPlan(own, neutral, 'easy', recent)).toEqual({ attack: 'grind', defence: 'rush' });
+  it('Easy preserves main’s All-out / Slide for a flat-60 nine at strength 70', () => {
+    const club = { id: 'flat-contender', strength: 70 };
+    const nine: StyleEntry[] = STANDARD_POSITIONS.map(position => ({ position,
+      stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 } }));
+    const legacy = rivalTactics(club, nine);
+    expect(legacy).toEqual({ attack: 'all-out', defence: 'slide' });
+    for (const recentPlans of [[], [wide, wide, wide], [tight, tight, tight]]) {
+      expect(rivalTactics(club, nine, { difficulty: 'easy', recentPlans, playerRoster: [] })).toEqual(legacy);
     }
+  });
+  it('Easy matches the legacy selector across squad styles, strengths and histories', () => {
+    const flat: StyleEntry[] = STANDARD_POSITIONS.map(position => ({ position,
+      stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 } }));
+    const nines = [undefined, [], flat,
+      flat.map(p => ({ ...p, stats: { ...p.stats!, strength: ['hooker', 'prop', 'second-row'].includes(p.position) ? 85 : 60 } })),
+      flat.map(p => ({ ...p, stats: { ...p.stats!, speed: ['fullback', 'winger', 'centre'].includes(p.position) ? 85 : 60 } })),
+      flat.map(p => ({ ...p, stats: { ...p.stats!, stamina: 85 } })),
+      flat.map(p => ({ ...p, traits: p.position === 'halfback' ? [{ id: 'bigBoot' }] : [] }))];
+    for (const strength of [35, 55, 70]) for (const nine of nines) for (const recentPlans of [[], [wide, wide, wide], [tight, tight, tight]]) {
+      const club = { id: 'legacy', strength };
+      expect(rivalTactics(club, nine, { difficulty: 'easy', recentPlans, playerRoster: flat })).toEqual(rivalTactics(club, nine));
+    }
+  });
+  it('Easy and the AI off switch preserve generated fallback sheets, including identity tactics', () => {
+    const club = { id: 'legacy-generated', name: 'Legacy', strength: 70, colors: ['#000', '#fff'] as [string, string] };
+    const legacy = teamSheetFromRival(club);
+    expect(teamSheetFromRival(club, { difficulty: 'easy', recentPlans: [wide], playerRoster: [] })).toEqual(legacy);
+    const restore = applyTuning({ 'counters.ai.on': 0 });
+    try { expect(teamSheetFromRival(club, { difficulty: 'normal', recentPlans: [wide], playerRoster: [] })).toEqual(legacy); }
+    finally { restore(); }
   });
   it.each(['normal', 'hard'] as const)('%s changes its best counter when history changes', difficulty => {
     const a = pickRivalPlan(neutral, neutral, difficulty, [wide, wide, tight]);
@@ -23,7 +49,7 @@ describe('rival plans from three past kick-offs', () => {
     expect(b.defence).toBe('compressed');
     expect(a).not.toEqual(b);
   });
-  it.each(['easy', 'normal', 'hard'] as const)('%s has a deterministic no-history Balanced / Slide default', difficulty => {
+  it.each(['normal', 'hard'] as const)('%s has a deterministic no-history Balanced / Slide default', difficulty => {
     expect(pickRivalPlan(neutral, neutral, difficulty, [])).toEqual(pickRivalPlan(neutral, neutral, difficulty, [DEFAULT_TACTICS]));
   });
   it('uses the joint mode of only the last three, breaking ties newest first', () => {

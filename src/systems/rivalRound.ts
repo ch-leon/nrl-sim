@@ -9,11 +9,12 @@ import { currentRound } from '../core/season';
 import type { GameState, RivalClub } from '../core/state';
 import type { MatchResult, TeamSheet, WeatherKind } from '../sim/events';
 import type { Rng } from '../utils/rng';
-import { ON_FIELD, SEASON_ROUNDS } from '../config';
+import { DEFAULT_PLAYER_COLORS, ON_FIELD, SEASON_ROUNDS } from '../config';
 import { canUseWorker, playMatchJob, playMatchesInWorker, type MatchJob } from './matchJobs';
 import { aiCoachSides } from '../match/league/calls';
 import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
-import type { TeamTactics } from '../match/league/presets';
+import type { RivalPlanContext } from '../match/league/ai';
+import type { StyleEntry, TeamTactics } from '../match/league/presets';
 import { autoPick, isFieldable, resolveLineup } from './lineup';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
@@ -42,15 +43,27 @@ export interface RivalJob {
  * the nine it fields (N11). No difficulty scaling: that is for the sides the
  * player faces.
  */
-export function rivalSheet(club: RivalClub): TeamSheet {
+export function rivalSheet(club: RivalClub, context?: RivalPlanContext): TeamSheet {
   const fit = (club.squad ?? []).filter(isFieldable);
-  if (fit.length >= ON_FIELD) return withRivalStyle(teamSheetFromSquad(fit, club.id, club.name, club.colors, resolveLineup(autoPick(fit), fit)), club);
-  return teamSheetFromRival(club);
+  if (fit.length >= ON_FIELD) return withRivalStyle(teamSheetFromSquad(fit, club.id, club.name, club.colors, resolveLineup(autoPick(fit), fit)), club, context);
+  return teamSheetFromRival(club, context);
 }
 
-/** How a rival plays this week (N11): the style of the nine it would field today, for the next-match card, its squad page and the ladder. */
-export function rivalStyle(club: RivalClub): TeamTactics {
-  return rivalSheet(club).tactics ?? { attack: 'balanced', defence: 'slide' };
+/** Shared fixed inputs for player-match scouting and kick-off; never includes upcoming tactics. */
+export function playerRivalContext(
+  state: Pick<GameState, 'clubId' | 'clubName' | 'settings' | 'recentPlans' | 'lineup' | 'squad'>,
+  playerRoster?: readonly StyleEntry[],
+): RivalPlanContext {
+  const roster = playerRoster ?? (state.squad.some(isFieldable)
+    ? teamSheetFromSquad(state.squad, state.clubId, state.clubName, DEFAULT_PLAYER_COLORS,
+      resolveLineup(state.lineup ?? autoPick(state.squad), state.squad)).roster ?? []
+    : []);
+  return { difficulty: state.settings.difficulty, recentPlans: state.recentPlans, playerRoster: roster };
+}
+
+/** With player context, the plan it will face us with; without it, the legacy rival-v-rival style. */
+export function rivalStyle(club: RivalClub, context?: RivalPlanContext): TeamTactics {
+  return rivalSheet(club, context).tactics ?? { attack: 'balanced', defence: 'slide' };
 }
 
 /** The round's unplayed rival-v-rival fixtures as jobs, one seed each from `rng` in fixture order. */

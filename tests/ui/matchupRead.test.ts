@@ -6,7 +6,7 @@ import { createNewGame, getState, setState, type RivalClub } from '../../src/cor
 import { styleFit } from '../../src/match/league/fit';
 import { teamSheetFromRival, teamSheetFromSquad } from '../../src/match/league/sheets';
 import { rivalMatchSheet } from '../../src/systems/matchday';
-import { rivalSheet } from '../../src/systems/rivalRound';
+import { playerRivalContext, rivalSheet } from '../../src/systems/rivalRound';
 import { resolveLineup, validTactics } from '../../src/systems/lineup';
 import { styleLine } from '../../src/ui/tacticsBlurbs';
 import { initLeague } from '../../src/systems/fixtures';
@@ -23,8 +23,9 @@ function expectScoutingMatchesKickoff(rival: RivalClub) {
     clubs: state.league.clubs.map(c => c.id === rival.id ? rival : c),
     fixtures: [{ round: state.week, homeId: state.clubId, awayId: rival.id }],
   } });
-  const kickoff = rivalMatchSheet(rival);
-  expect(rivalSheet(rival)).toEqual(kickoff);
+  const context = playerRivalContext(getState());
+  const kickoff = rivalMatchSheet(rival, context);
+  expect(rivalSheet(rival, context)).toEqual(kickoff);
   const theirs = kickoff.roster ?? [];
   const style = kickoff.tactics!;
   const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
@@ -92,7 +93,7 @@ describe('strategy readouts #467', () => {
     setState({ league: initLeague(getState()) });
     const cairns = getState().league.clubs.find(c => c.id === 'rival-cyclones')!;
     const kickoff = expectScoutingMatchesKickoff(cairns);
-    expect(kickoff.tactics!.defence).toBe('slide');
+    expect(kickoff.tactics!.defence).toBe('compressed'); // Normal's habit-aware choice; the selected nine stays the same.
     expect(styleFit(kickoff.roster ?? []).slide).toBeCloseTo(0.97, 2);
     expect(fitRead(kickoff.roster ?? [], 'slide').stars).toBe('★☆☆');
     expect(fitRead(teamSheetFromRival(cairns).roster ?? [], 'slide').stars).toBe('★★☆');
@@ -109,7 +110,7 @@ describe('strategy readouts #467', () => {
     const kickoff = expectScoutingMatchesKickoff(rival);
     if (mode === 'unavailable starters') {
       for (const id of excluded) expect(kickoff.roster!.some(p => p.id === id)).toBe(false);
-    } else expect(kickoff).toEqual(teamSheetFromRival(rival));
+    } else expect(kickoff).toEqual(teamSheetFromRival(rival, playerRivalContext(getState())));
   });
   it('renders eight fitted plan buttons and three half-time counts', () => {
     stubDocument();

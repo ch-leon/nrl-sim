@@ -12,7 +12,7 @@ import { clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type
 import { NINES } from '../match/league/rules';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, SEASON_ROUNDS, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
-import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
+import { teamSheetFromSquad } from '../match/league/sheets';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
@@ -22,8 +22,8 @@ import { aiCoachSides, unlockedCalls } from '../match/league/calls';
 import { hasStaff } from './staff';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
-import { ON_FIELD } from '../config';
-import { autoPick, isFieldable, describeFills, resolveLineup } from './lineup';
+import { playerRivalContext, rivalSheet } from './rivalRound';
+import { autoPick, describeFills, resolveLineup } from './lineup';
 
 /**
  * Who changes plan at the breaks. The rival always. The player's side too when
@@ -154,17 +154,12 @@ function sheetFor(clubId: string): TeamSheet {
  * their own players through the same sheet builder as the player's club: their coach
  * auto-picks his nine by slot with the same positional fit (#69), so both sides pay
  * for a man out of position. Too few fit players (or an old rival with none) falls
- * back to the strength-based sheet. Either way the style is the one the screens show
- * (`rivalStyle`, N11): read from the nine, or from the club's own strength. The sheet
- * is the rival as he is on every difficulty: the difficulty plays in the match, as
- * his edge after the rating spread (N12.2, `rivalEdge`).
+ * back to the strength-based sheet. Player-match callers and previews pass the same
+ * habit context; omitted context retains rival-v-rival styles. The difficulty
+ * edge is applied after the rating spread (N12.2, `rivalEdge`).
  */
 export function rivalMatchSheet(rival: RivalClub, context?: RivalPlanContext): TeamSheet {
-  const fit = (rival.squad ?? []).filter(isFieldable);
-  if (fit.length >= ON_FIELD) {
-    return withRivalStyle(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), rival, context);
-  }
-  return teamSheetFromRival(rival, context);
+  return rivalSheet(rival, context);
 }
 
 /** Fit (non-injured) squad size. */
@@ -279,7 +274,7 @@ export function registerPlayerMatchSystem(): void {
     const player = sheetFor(PLAYER_ID);
     const rivalId = fixture.homeId === PLAYER_ID ? fixture.awayId : fixture.homeId;
     const rival = state.league.clubs.find(c => c.id === rivalId)!;
-    const opponent = rivalMatchSheet(rival, { difficulty: state.settings.difficulty, recentPlans: state.recentPlans, playerRoster: player.roster ?? [] });
+    const opponent = rivalMatchSheet(rival, playerRivalContext(state, player.roster ?? []));
     const home = fixture.homeId === PLAYER_ID ? player : opponent;
     const away = fixture.awayId === PLAYER_ID ? player : opponent;
     const rivalSide = fixture.homeId === PLAYER_ID ? 'away' as const : 'home' as const;

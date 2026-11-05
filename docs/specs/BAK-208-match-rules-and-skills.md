@@ -245,7 +245,7 @@ Compressed counters (#464) are on by default from #465 (`counters.compressed.on 
 
 Own-style fit (#461) is independently switched on by #465 (`counters.fit.on = 1`). Starting-sheet attack fit helps carrying contests and defence fit helps tackling contests; fit 1 is neutral. A plan applied at a break selects the new styles’ fits. The same contest roll resolves contact; see tuning §31.
 
-Rival habit counters (#469): Easy chooses its nine's best attack/defence fit.
+Rival habit counters (#469): Easy retains its existing squad/club-identity style selection.
 Normal counters the most common of the player's last three played league kick-off
 plans (ties go to the newest); Hard weighs the three by the player's squad fit.
 An empty history means Balanced / Slide. Upcoming lineup tactics are never an

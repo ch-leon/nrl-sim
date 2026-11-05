@@ -12,7 +12,7 @@ import { overallRating } from '../../data/player';
 import { traitLabel } from '../../data/traits';
 import { button, el, ensureStyles, openModal, screenKey } from '../dom';
 import { openFixturesScreen, openLadderScreen } from './fixtures';
-import { rivalSheet, rivalStyle } from '../../systems/rivalRound';
+import { playerRivalContext, rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { getState, setState } from '../../core/state';
 import { save } from '../../core/save';
@@ -218,10 +218,11 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
   const render = (): void => {
     const club = live();
     const rows = rivalSquadRows(club);
-    const style = rivalStyle(club);
     const state = getState();
     const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
-    const theirs = rivalSheet(club).roster ?? [];
+    const context = playerRivalContext(state, ours);
+    const style = rivalStyle(club, context);
+    const theirs = rivalSheet(club, context).roster ?? [];
     const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
     const line = (text: string, attrs: Record<string, string>): HTMLElement => el('p', { text, attrs: { ...attrs, title: text } });
     const title = el('h2', { text: club.name });

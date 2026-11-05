@@ -10,7 +10,7 @@ import { ON_FIELD, STAT_MAX } from '../../config';
 import type { Player, Position, RivalClub } from '../../core/state';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { rollTraits, type TraitQuality } from '../../data/traits';
-import type { RivalPlanContext } from './ai';
+import { usesHabitCounters, type RivalPlanContext } from './ai';
 import { rivalTactics } from './presets';
 import { BENCH } from './bench';
 import { LINEUP_SLOTS, statsAt, type Selection } from '../../systems/lineup';
@@ -216,6 +216,6 @@ export function teamSheetFromRival(club: RivalClub, context?: RivalPlanContext):
     colors: club.colors,
     roster,
     bench,
-    tactics: context ? rivalTactics(club, roster, context) : rivalTactics(club),
+    tactics: usesHabitCounters(context) ? rivalTactics(club, roster, context) : rivalTactics(club),
   };
 }

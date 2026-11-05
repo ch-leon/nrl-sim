@@ -98,9 +98,9 @@ export function planWhenBehind(plan: TeamTactics): TeamTactics {
 export function defaultBreakRule(facts: BreakFacts): TeamTactics | null {
   const margin = facts.score[facts.side] - facts.score[facts.side === 'home' ? 'away' : 'home'];
   const reaction = facts.reaction;
-  if (COUNTERS.ai.on === 1 && reaction && reaction.observed.length) {
+  if (COUNTERS.ai.on === 1 && reaction && reaction.difficulty !== 'easy' && reaction.observed.length) {
     const hard = reaction.difficulty === 'hard' && facts.at === 'half-time' && COUNTERS.ai.hardHalfTime === 1;
-    const failing = reaction.difficulty !== 'easy' && COUNTERS.ai.normalBreak === 1
+    const failing = COUNTERS.ai.normalBreak === 1
       && margin <= -BREAKS.downBy && reaction.keyDown;
     if (hard || failing) {
       const next = pickRivalPlan(reaction.ownFit, reaction.playerFit, reaction.difficulty, reaction.observed);

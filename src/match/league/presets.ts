@@ -3,7 +3,7 @@
 // defends. Attack and defence are separate presets (decision 2026-10-17). Pure
 // data and lookups; live.ts reads the plan for the carrier's zone each
 // decision and adds its numbers to the odds the contest already uses.
-import { learnedRivalPlan, type RivalPlanContext } from './ai';
+import { learnedRivalPlan, usesHabitCounters, type RivalPlanContext } from './ai';
 import { COUNTERS } from './counters';
 import type { KickChoice } from './tactics';
 
@@ -213,7 +213,7 @@ export interface StyleEntry {
  * fixed per club from a roll of its identity, by strength tier.
  */
 export function rivalTactics(club: { id: string; strength: number }, nine?: readonly StyleEntry[], context?: RivalPlanContext): TeamTactics {
-  if (context && COUNTERS.ai.on === 1) return learnedRivalPlan(nine ?? [], context);
+  if (usesHabitCounters(context)) return learnedRivalPlan(nine ?? [], context);
   if (nine && nine.length > 0 && nine.every((e) => e.stats)) return styleOfNine(club.strength, nine);
   const h = hash(club.id);
   const a = h % 3;

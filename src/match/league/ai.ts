@@ -13,6 +13,11 @@ export interface RivalPlanContext {
   playerRoster: readonly StyleEntry[];
 }
 
+/** Only Normal/Hard player-match callers use habit counters. */
+export function usesHabitCounters(context?: RivalPlanContext): context is RivalPlanContext & { difficulty: 'normal' | 'hard' } {
+  return !!context && context.difficulty !== 'easy' && COUNTERS.ai.on === 1;
+}
+
 /** Joint-plan mode. Equal counts favour the most recently played plan. */
 export function usualPlan(recent: readonly TeamTactics[]): TeamTactics {
   const window = recent.slice(0, 3);
@@ -27,15 +32,14 @@ export function planValue(plan: TeamTactics, opponent: TeamTactics, own: StyleFi
       - COUNTER_MATRIX[opponent.attack][plan.defence] * theirs[opponent.attack] * own[plan.defence]);
 }
 
-/** Easy maximises its own fit. Normal counters the mode; Hard weights all three habits by player fit. */
-export function pickRivalPlan(own: StyleFit, theirs: StyleFit, difficulty: Difficulty, recent: readonly TeamTactics[]): TeamTactics {
+/** Normal counters the mode; Hard weights all three habits by player fit. Easy retains the legacy selector. */
+export function pickRivalPlan(own: StyleFit, theirs: StyleFit, difficulty: Exclude<Difficulty, 'easy'>, recent: readonly TeamTactics[]): TeamTactics {
   const history = recent.slice(0, 3);
   const usual = usualPlan(history);
   const habits = difficulty === 'hard' && history.length ? history : [usual];
   // Balanced / Slide wins a completely equal tie; remaining ties use preset order.
   let best: TeamTactics = { ...DEFAULT_TACTICS };
   const value = (p: TeamTactics): number => {
-    if (difficulty === 'easy') return own[p.attack] + own[p.defence];
     let total = 0, weights = 0;
     for (const habit of habits) {
       const weight = difficulty === 'hard' ? (theirs[habit.attack] + theirs[habit.defence]) / 2 : 1;
@@ -52,6 +56,6 @@ export function pickRivalPlan(own: StyleFit, theirs: StyleFit, difficulty: Diffi
   return best;
 }
 
-export function learnedRivalPlan(nine: readonly StyleEntry[], context: RivalPlanContext): TeamTactics {
+export function learnedRivalPlan(nine: readonly StyleEntry[], context: RivalPlanContext & { difficulty: 'normal' | 'hard' }): TeamTactics {
   return pickRivalPlan(styleFit(nine), styleFit(context.playerRoster), context.difficulty, context.recentPlans);
 }
