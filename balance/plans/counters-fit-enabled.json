@@ -1,6 +1,6 @@
 {
-  "name": "465 own fit isolation",
-  "description": "Original starting sheets retain fit 1.5/0.5/1, while rating.spread=0 levels every playing stat; paired fit-off controls remove the rating advantage. 1000 matches a cell.",
+  "name": "465 own style fit",
+  "description": "Flat 60 playing squads; exact harness-only attack or defence fit varied independently. The other selected fit stays 1. Paired fit-off/on controls; 1000 matches per cell.",
   "report": "matrix",
   "seeds": 500,
   "base": {
@@ -8,8 +8,7 @@
     "counters.fit.on": 0,
     "counters.slide.on": 1,
     "counters.rush.on": 1,
-    "counters.compressed.on": 1,
-    "rating.spread": 0
+    "counters.compressed.on": 1
   },
   "variants": [
     {
@@ -20,8 +19,10 @@
     }
   ],
   "scenarios": [
-    {"name": "own fit 1.5 v 1", "home": {"rating": 85}, "away": {"rating": 60}, "track": "home", "bothWays": true},
-    {"name": "own fit 0.5 v 1", "home": {"rating": 35}, "away": {"rating": 60}, "track": "home", "bothWays": true},
-    {"name": "own fit 1 v 1", "home": {"rating": 60}, "away": {"rating": 60}, "track": "home", "bothWays": true}
+    {"name": "attack fit 1.5", "home": {"rating": 60, "fit": {"balanced": 1.5}}, "away": {"rating": 60}, "track": "home", "bothWays": true},
+    {"name": "defence fit 1.5", "home": {"rating": 60, "fit": {"slide": 1.5}}, "away": {"rating": 60}, "track": "home", "bothWays": true},
+    {"name": "attack fit 0.5", "home": {"rating": 60, "fit": {"balanced": 0.5}}, "away": {"rating": 60}, "track": "home", "bothWays": true},
+    {"name": "defence fit 0.5", "home": {"rating": 60, "fit": {"slide": 0.5}}, "away": {"rating": 60}, "track": "home", "bothWays": true},
+    {"name": "neutral fit 1", "home": {"rating": 60}, "away": {"rating": 60}, "track": "home", "bothWays": true}
   ]
 }

@@ -230,3 +230,13 @@ within ±3 percentage points. The report exposes per-side offloads, contact bust
 and line breaks. Runs use disjoint 125-seed checkpoint blocks; pooled reports
 preserve every source plan/result and the sample-variance formula. The committed
 plan reruns each complete consecutive range directly. Tuned values are in §34.
+
+`SideSpec.fit` is a **headless harness fixture** for #465: e.g.
+`"home": {"rating":60,"fit":{"balanced":1.5}}`. It replaces only the named
+starting-sheet style fit in `BalanceSim`, leaving playing stats and every other
+fit unchanged. `"away":{"rating":60,"fit":{"slide":0.5}}` isolates the opposing
+defence fit. Fixtures follow their written side when orientations swap and
+remain cached when a break selects a different style. The opening positions are
+reset with the existing receiver, without an RNG draw. Omitted fits replay the
+live sim exactly. This field is not on `TeamSheet`, `LiveOptions` or any save;
+the game cannot supply it. `fitFixtures.test.ts` guards that boundary.

@@ -1,0 +1,77 @@
+name: Counter fit measurements
+
+# Dedicated to #465 calibration. Each scenario gets its own runner, keeping the
+# 1,000-match samples practical. Future use is manual; no other branch auto-runs it.
+on:
+  workflow_dispatch:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths:
+      - '.github/workflows/counters-fit-acceptance.yml'
+      - 'balance/plans/counters-full-fit.json'
+      - 'balance/plans/counters-fit-enabled.json'
+      - 'src/match/balance/measure.ts'
+      - 'src/match/balance/plan.ts'
+      - 'src/match/league/counters.ts'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: counter-fit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fit:
+    name: ${{ matrix.plan }} (${{ matrix.cell }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { plan: full-fit, cell: 0 }
+          - { plan: full-fit, cell: 1 }
+          - { plan: full-fit, cell: 2 }
+          - { plan: full-fit, cell: 3 }
+          - { plan: full-fit, cell: 4 }
+          - { plan: full-fit, cell: 5 }
+          - { plan: full-fit, cell: 6 }
+          - { plan: full-fit, cell: 7 }
+          - { plan: fit-enabled, cell: 0 }
+          - { plan: fit-enabled, cell: 1 }
+          - { plan: fit-enabled, cell: 2 }
+          - { plan: fit-enabled, cell: 3 }
+          - { plan: fit-enabled, cell: 4 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Select the scenario without changing its samples or tuning
+        env:
+          PLAN: ${{ matrix.plan }}
+          CELL: ${{ matrix.cell }}
+        run: |
+          mkdir -p work
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const p = JSON.parse(readFileSync(`balance/plans/counters-${process.env.PLAN}.json`, 'utf8'));
+          const scenario = p.scenarios[Number(process.env.CELL)];
+          if (!scenario) throw new Error('missing scenario');
+          p.scenarios = [scenario];
+          p.name += ` - ${scenario.name}`;
+          writeFileSync('work/fit-plan.json', JSON.stringify(p, null, 2));
+          JS
+      - run: npm run balance -- --check --plan work/fit-plan.json
+      - run: npm run balance -- --plan work/fit-plan.json --jobs 2 2>&1 | tee fit.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-${{ matrix.plan }}-${{ matrix.cell }}
+          path: |
+            balance/runs
+            fit.log
+          retention-days: 7

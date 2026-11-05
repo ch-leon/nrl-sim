@@ -18,13 +18,32 @@ import { rivalEdge, type DifficultyEdge } from '../league/spread';
 import { TICK_S } from '../core/engine';
 import type { Side, SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
-import { LiveSim, type PlanInput } from '../league/live';
+import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { aiCoachSides, type CallInput } from '../league/calls';
 import { NINES, fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
+
+/** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
+export class BalanceSim extends LiveSim {
+  constructor(home: TeamSheet, away: TeamSheet, seed: number, options: LiveOptions = {},
+    fits: Record<Side, SideSpec['fit']> = { home: undefined, away: undefined }) {
+    super(home, away, seed, options);
+    let changed = false;
+    for (const side of ['home', 'away'] as const) {
+      if (!fits[side] || !Object.keys(fits[side]).length) continue;
+      this.squadFit[side] = { ...this.squadFit[side], ...fits[side] };
+      this.tightFit[side] = this.squadFit[side].grind;
+      this.refreshPlanFit(side);
+      changed = true;
+    }
+    // Re-place the opening sides with their fixture fits before the first tick.
+    // setForKickoff reads the existing receiver and consumes no random draw.
+    if (changed) this.setForKickoff(this.firstReceiver === 'home' ? 'away' : 'home');
+  }
+}
 
 /** A full match: two halves. Stretches scale their counts up to this. */
 export const MATCH_MINUTES = 2 * NINES.halfMinutes;
@@ -494,7 +513,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const planDone = planRules.map(() => false);
       const simEdge = edge && flip ? { ...edge, side: flipSide(edge.side) } : edge;
       const ruleSides = (cell.scenario.breakRule ?? []).map(onSim);
-      const sim = new LiveSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(ruleSides.length ? { breakRuleSides: ruleSides } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) });
+      const sim = new BalanceSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(ruleSides.length ? { breakRuleSides: ruleSides } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) }, {
+        home: cell.scenario[flip ? 'away' : 'home'].fit,
+        away: cell.scenario[flip ? 'home' : 'away'].fit,
+      });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();
