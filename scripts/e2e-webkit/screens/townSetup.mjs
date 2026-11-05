@@ -50,7 +50,7 @@ export async function runTownSetup(browser) {
         if (width < height) {
           await openNav(page, 'club');
           await page.locator('[data-club-home]').waitFor();
-          const next = state.league.fixtures.filter(f => f.round >= state.week && (f.homeId === 'player' || f.awayId === 'player')).sort((a, b) => a.round - b.round)[0];
+          const next = state.league.fixtures.filter(f => (f.round >= state.week || state.week === 1 && f.round <= 0) && !f.result && (f.homeId === 'player' || f.awayId === 'player')).sort((a, b) => a.round - b.round)[0];
           if (next?.homeId === 'player' && !(await page.locator('.nrl-club-home-next').textContent()).includes(ground)) throw new Error('Home fixture is missing the saved ground name');
         }
         await page.screenshot({ path: join(out, `${tag}-started.png`) });

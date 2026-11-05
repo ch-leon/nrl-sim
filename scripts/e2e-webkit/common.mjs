@@ -139,6 +139,7 @@ const NAV_VIA = {
  * sheet is open closes it (the dock is a toggle), so an open sheet is left as it is.
  */
 export async function openNav(page, id) {
+  if (id === 'club') { await page.locator(SHEET_EXIT).tap(); return; }
   if (await page.locator(`.nrl-screen-region[data-screen-key="${id}"]`).count()) return;
   if (NAV_VIA[id]) {
     const [via, sel] = NAV_VIA[id];
