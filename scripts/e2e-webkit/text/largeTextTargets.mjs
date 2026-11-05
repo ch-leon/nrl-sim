@@ -155,7 +155,16 @@ export async function runLargeTextTargets(browser) {
       await step('onboarding-sign-undo', async (rec) => {
         await page.waitForSelector('.nrl-tutorial-bubble[data-step="recruit"]');
         await page.waitForTimeout(700);
-        await page.locator('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)').first().tap();
+        const before = await page.evaluate(() => window.__nrlState().squad.length);
+        // The tutorial polls its anchor while this tiny viewport scrolls the row.
+        // As on the player-page walk below, retry a missed tap once; never sign twice.
+        for (let attempt = 0; attempt < 2; attempt++) {
+          await page.locator('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)').first().tap();
+          const signed = await page.waitForFunction((count) => window.__nrlState().squad.length > count,
+            before, { timeout: 2000 }).then(() => true, () => false);
+          if (signed) break;
+          rec.notes.push(`sign tap ${attempt + 1} missed during anchor refresh`);
+        }
         await page.waitForSelector('.nrl-tutorial-bubble[data-step="advance"]');
         return undoClear(rec, 'signing');
       });
