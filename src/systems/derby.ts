@@ -1,4 +1,5 @@
 // Geography only: no RNG, saved derby flag, or online lookup.
+import { currentRound, inTrials } from '../core/season';
 import { getState, type GameState, type Fixture } from '../core/state';
 import { bus } from '../core/events';
 import { registerTickHook, registerSeasonHook, TICK_ORDER } from '../core/time';
@@ -51,9 +52,14 @@ function announceDerby(week: number): void {
 
 /** Runs after results and next week's finals ties land; works for watched and skipped games. */
 export function registerDerbySystem(): void {
-  announceDerby(getState().week);
-  registerTickHook('derby-news', TICK_ORDER.ladder + 2, ({ week }) => {
+  if (!inTrials(getState())) announceDerby(getState().week);
+  registerTickHook('derby-news', TICK_ORDER.ladder + 2, () => {
     const s = getState();
+    const week = currentRound(s);
+    if (week <= 0) {
+      if (week === 0) announceDerby(1);
+      return;
+    }
     for (const f of s.league.fixtures) {
       if (f.round !== week || !f.result || !isDerbyFixture(s, f)) continue;
       const rival = s.league.clubs.find((c) => c.id === derbyRival(s))!;
@@ -68,6 +74,6 @@ export function registerDerbySystem(): void {
       });
     }
     announceDerby(week + 1);
-  });
-  registerSeasonHook('derby-season', 21, () => announceDerby(1));
+  }, { trials: true });
+  registerSeasonHook('derby-season', 21, () => { if (!inTrials(getState())) announceDerby(1); });
 }
