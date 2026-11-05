@@ -119,7 +119,9 @@ it('shows the seeded forecast and quarter home-gate projection during trials', a
   const { financeSummary } = await import('../../src/ui/screens/finance');
   createNewGame('Trials', 42);
   initLeague(getState());
-  setState({ preseason: 2, weather: 'rain' });
+  setState({ preseason: 2, weather: 'rain', league: { ...getState().league,
+    fixtures: getState().league.fixtures.map((f) => f.round === -1 ? { ...f, result: { homeScore: 0, awayScore: 0 } } : f),
+  } });
   const s = getState();
   expect(forecastFor(s)).toBe('rain');
   const home = s.league.fixtures.find((f) => f.round >= 0 && f.homeId === s.clubId)!;

@@ -246,6 +246,21 @@ describe('export and import during a held week', () => {
     expect(notes).toContain(EXPORT_HELD_FAILED_TEXT);
   });
 
+  it.each([[1, 2], [2, 0]] as const)('refuses a held phase %s snapshot when phase %s is now playing in week 1', (saved, current) => {
+    setState({ preseason: saved });
+    save(getState());
+    setState({ preseason: current });
+    registerTickHook('hold-phase', 40, (ctx) => { ctx.hold?.(); }, { trials: true });
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+    expect(getState().week).toBe(1);
+    const notes: string[] = [];
+    const offNote = bus.on('ui:notify', (n) => notes.push(n.text));
+    downloadSave(getState());
+    offNote();
+    expect(notes).toContain(EXPORT_HELD_FAILED_TEXT);
+  });
+
   it('deletes the live-match record with the slot', () => {
     shareLocalStorage();
     save(getState());
