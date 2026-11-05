@@ -1460,7 +1460,6 @@ styles. Balanced and defences other than Slide receive no cell effect.
 | `counters.slide.kickChase` | 1.5 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
 | `counters.slide.tight` | 0.04 | Adds inside bust probability and supported offload probability for pack carriers. |
 | `counters.slide.allOut` | 0.50 | Adds bust probability for the offload receiver during the existing recovery window after the offload, so another defender arriving before the line resets is still exposed. A pass, kick, turnover or stoppage clears the receiver. |
-
 | `counters.slide.allOutRecovery` | 3 | All-out/Slide recovery ticks are `round(live.beatenCooldown × (1 + allOutRecovery × max(0, attackFit − defenceFit)))`. Neutral fits keep 30 ticks; fit 1.5 v 0.5 gives 120 ticks. Uses the existing receiver marker/window; normal clearing events still apply. |
 
 No new random draws: interception, contact, catches and races use their existing
@@ -1523,7 +1522,7 @@ rolls and the geometric line-break detector decide outcomes; no roll is added.
 |---|---:|---|
 | `counters.compressed.on` | 1 | Only 1 enables the profile and mechanics. |
 | `counters.compressed.tight` | 0.04 | Middle squeeze; a positive cell also recruits nearby help. |
-| `counters.compressed.tightFit` | 0.6 | Tight cell multiplier: `max(0, 1 + tightFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. The resulting strength controls both middle squeeze and help reach. |
+| `counters.compressed.tightFit` | 0.6 | Tight cell multiplier: `max(0, 1 + tightFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. This scales the middle contact squeeze; helper reach stays `commitM × attackFit × defenceFit`. |
 | `counters.compressed.expansive` | 0.26 | Inward lane pull and speed-scaled edge bust probability. |
 | `counters.compressed.commitM` | 6 | Extra middle tackler's neutral-fit reach in metres, scaled by both fits. |
 | `counters.compressed.brokenBase` | −0.015 | Common enabled bust modifier; off preserves legacy −0.02. |

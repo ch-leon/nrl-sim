@@ -85,6 +85,12 @@ moves (#322).
   `none` (flat squads' default), `gen` (clubs' default), `stars`. `bench` is how many
   interchange players (0–4, default 4; a flat squad's bench has its stats) and
   `rotation` how hard the coach uses them: `off`, `standard` (default), `heavy`.
+- **Exact style-fit fixtures** (#465): `"fit": { "expansive": 1.5, "slide": 0.5 }`
+  overrides only those cached starting-sheet fits in the headless harness. Values
+  must be finite and within 0–1.5; omitted styles keep their derived fit. Playing
+  stats stay unchanged, the fixture follows its written side when swapped, and
+  break-time plan changes select the corresponding cached fit. This is for
+  isolating counter/own-fit effects, not a live-game or saved-sheet override.
 - **Squads as the game builds them** (N12.2): `"squad": "player"` is a new game's squad
   (one star, a first-grader and a depth man a position; `difficulty` sets its start
   rating) through its opening lineup, and `"squad": "rival"` a rival club's generated

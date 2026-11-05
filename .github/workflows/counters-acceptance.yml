@@ -5,13 +5,9 @@ name: Strategy counters acceptance
 # Run manually after tuning; ordinary pushes must not discard these long runs.
 on:
   workflow_dispatch:
-  push:
-    branches: [issue-465-strategy-counters]
-    paths: ['src/match/league/counters.ts']
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
   group: counters-acceptance-${{ github.ref }}
@@ -28,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        plan: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["enabled","yardstick","fit-enabled","full-fit","round-robin","strong-pack"]' || '["yardstick","strong-pack"]') }}
+        plan: [enabled, yardstick, fit-enabled, full-fit, round-robin, strong-pack]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,29 +46,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      # The full baseline completed before calibration; reuse its immutable raw
-      # evidence on the final push. Manual reproduction runs it afresh at that ref.
-      - uses: actions/download-artifact@v4
-        if: github.event_name == 'push'
-        with:
-          name: counters-soak-main
-          run-id: 41960460765
-          github-token: ${{ github.token }}
+      # Reproduce the original pre-switch main baseline at its immutable ref.
       - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_dispatch'
         with:
           ref: e8b88be4ca94a2a9651688bdb55ae1832e0e5a61
       - uses: actions/setup-node@v4
-        if: github.event_name == 'workflow_dispatch'
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-        if: github.event_name == 'workflow_dispatch'
       - run: git rev-parse HEAD > baseline-commit.txt
-        if: github.event_name == 'workflow_dispatch'
       - run: npm run soak -- --difficulties easy,normal,hard --jobs 4 --json soak-main.json 2>&1 | tee soak-main.log
-        if: github.event_name == 'workflow_dispatch'
       - name: Verify the complete baseline, including all old saves
         run: |
           python3 <<'PY'

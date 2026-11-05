@@ -237,11 +237,11 @@ sim's defaults (`src/match/league/presets.ts`).
 
 The Tight offload rebuild (#460, enabled by #465 with `counters.tight.on = 1`) supplies the pack offloads above; backs and halves keep the legacy zone values (0 deep, ×½ attacking half, ×0.7 red zone). With the switch on, pack carriers use the starting sheet’s Tight fit for second-phase offloads; hit-ups and territory kicks stay unchanged. See tuning §30.
 
-Slide counters (#462) are on by default from #465 (`counters.slide.on = 1`). Both sides’ style fits scale drift and cut-out reads against Expansive, deep kick cover against Kick-chase, inside pack offloads against Tight and busts in the line’s recovery window after an All-out offload. Balanced is neutral; the existing contest rolls decide outcomes. See tuning §32.
+Slide counters (#462) are on by default from #465 (`counters.slide.on = 1`). Both sides’ style fits scale drift and cut-out reads against Expansive, deep kick cover against Kick-chase, inside pack offloads against Tight and busts in the line’s recovery window after an All-out offload. Unequal starting fits strengthen the Expansive cell. A fitted All-out second phase extends the existing recovery window against an ill-fitted Slide line; neutral fits keep its original duration, and a pass, kick, turnover or stoppage still clears it. Balanced is neutral; the existing contest rolls decide outcomes. See tuning §32.
 
 Rush counters (#463) are on by default from #465 (`counters.rush.on = 1`). Carry and starting-sheet Rush fit replace the flat bust concession; rushed back-three positioning and kick contests leave space for Kick-chase, while All-out offloads spill more. Tight and Expansive have no base counter cell. All outcomes use existing match rolls. See tuning §33.
 
-Compressed counters (#464) are on by default from #465 (`counters.compressed.on = 1`). Tight draws an extra committed middle tackler and Contact D-scaled reductions to busts and offloads; Expansive finds edge overlaps through inward lane pull and speed-scaled outside-back bust odds. Kick-chase, All-out and Balanced have no cell. All outcomes use existing rolls. See tuning §34.
+Compressed counters (#464) are on by default from #465 (`counters.compressed.on = 1`). Tight draws an extra committed middle tackler and Contact D-scaled reductions to busts and offloads; Expansive finds edge overlaps through inward lane pull and speed-scaled outside-back bust odds. The unequal-fit response strengthens the Tight contact squeeze; nearby help keeps its existing both-fit reach. Kick-chase, All-out and Balanced have no cell. All outcomes use existing rolls. See tuning §34.
 
 Own-style fit (#461) is independently switched on by #465 (`counters.fit.on = 1`). Starting-sheet attack fit helps carrying contests and defence fit helps tackling contests; fit 1 is neutral. A plan applied at a break selects the new styles’ fits. The same contest roll resolves contact; see tuning §31.
 
@@ -274,9 +274,9 @@ defence preset, saved in the lineup (save v14) and carried on the team sheet. Mi
 defence ("club" keeps the club's own), `#lab?hatk=grind&hdef=rush&aatk=…&adef=…`, and the
 hint line names what each side is playing.
 
-Measured (12 seeds × 2½ min, 60-rated sheets, v Balanced / Slide): Expansive throws
-more than twice Grind's offloads and more cut-outs, Grind kicks long more often and steps
-less; Kick-chase kicks more and bombs more; All-out offloads 1.5× Balanced; Rush makes
+The original 12-seed × 2½-minute preset sample predates #465's Tight rebuild.
+Tight now offloads heavily with a fitted strong pack; Expansive throws more cut-outs,
+and Tight kicks long more often and steps less; Kick-chase kicks more and bombs more; All-out offloads 1.5× Balanced; Rush makes
 15%+ more big hits but concedes more busts and steps than Slide.
 
 ## 6. Readability (how it is shown)
