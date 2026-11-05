@@ -1,0 +1,8774 @@
+{
+ "seasons": 5,
+ "seeds": 20,
+ "liveRivals": false,
+ "results": [
+  {
+   "seed": 7919,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 56.2,
+    "rivalMean": 55.3,
+    "rivalRange": [
+     42,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": -96985,
+     "minMoney": -108879,
+     "debtWeeks": 15,
+     "forcedSales": 2,
+     "squad": 18,
+     "freeAgents": 14,
+     "saveBytes": 133106,
+     "rivalStrength": [
+      46,
+      67
+     ],
+     "reputation": 36,
+     "sacked": false,
+     "wins": 16,
+     "draws": 1,
+     "losses": 7,
+     "marginPerGame": 6.8,
+     "ladderPosition": 2,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.1,
+     "rivalMean": 55.8,
+     "rivalRange": [
+      45,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -529086,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 31920,
+      "gate": 387933,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": -67392,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": -7319,
+     "minMoney": -114885,
+     "debtWeeks": 27,
+     "forcedSales": 5,
+     "squad": 13,
+     "freeAgents": 11,
+     "saveBytes": 129878,
+     "rivalStrength": [
+      47,
+      66
+     ],
+     "reputation": 46,
+     "sacked": false,
+     "wins": 14,
+     "draws": 1,
+     "losses": 9,
+     "marginPerGame": 3.5,
+     "ladderPosition": 5,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 68.9,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      46,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -345454,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 40760,
+      "gate": 409920,
+      "prize": 70000,
+      "boardGrant": 10000,
+      "events": 14600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 244250,
+     "minMoney": -10426,
+     "debtWeeks": 10,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 9,
+     "saveBytes": 136082,
+     "rivalStrength": [
+      46,
+      65
+     ],
+     "reputation": 73,
+     "sacked": false,
+     "wins": 16,
+     "draws": 1,
+     "losses": 7,
+     "marginPerGame": 11.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 69.9,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      48,
+      65
+     ],
+     "signings": 4,
+     "signingFees": 42711,
+     "signedOverall": 43.3,
+     "finance": {
+      "wages": -453552,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 52360,
+      "gate": 613032,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 17600,
+      "transfers": -42711,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 421145,
+     "minMoney": 99422,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 10,
+     "saveBytes": 141923,
+     "rivalStrength": [
+      49,
+      63
+     ],
+     "reputation": 92,
+     "sacked": false,
+     "wins": 18,
+     "draws": 0,
+     "losses": 6,
+     "marginPerGame": 8.9,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 73.1,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      49,
+      63
+     ],
+     "signings": 4,
+     "signingFees": 119118,
+     "signedOverall": 66.8,
+     "finance": {
+      "wages": -672425,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 78680,
+      "gate": 990318,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -3000,
+      "transfers": -119118,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 232171,
+     "minMoney": 186369,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 14,
+     "saveBytes": 140178,
+     "rivalStrength": [
+      52,
+      60
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 16,
+     "draws": 0,
+     "losses": 8,
+     "marginPerGame": 7.5,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.6,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 74.7,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      52,
+      61
+     ],
+     "signings": 1,
+     "signingFees": 53290,
+     "signedOverall": 73,
+     "finance": {
+      "wages": -818329,
+      "upkeep": -61560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 103480,
+      "gate": 1235325,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": 12600,
+      "transfers": -53290,
+      "contracts": 0,
+      "facilities": -600000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 83626
+  },
+  {
+   "seed": 15838,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 54.9,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 199969,
+     "minMoney": 36678,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 11,
+     "saveBytes": 129507,
+     "rivalStrength": [
+      43,
+      66
+     ],
+     "reputation": 47,
+     "sacked": false,
+     "wins": 18,
+     "draws": 0,
+     "losses": 6,
+     "marginPerGame": 8.6,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 69.4,
+     "rivalMean": 55.8,
+     "rivalRange": [
+      44,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -485469,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34520,
+      "gate": 502278,
+      "prize": 70000,
+      "boardGrant": 30000,
+      "events": 4000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 213498,
+     "minMoney": 66889,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 7,
+     "saveBytes": 131576,
+     "rivalStrength": [
+      47,
+      64
+     ],
+     "reputation": 60,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 12.3,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 72.8,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      48,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -531630,
+      "upkeep": -44160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 54080,
+      "gate": 698439,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": 4000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 512192,
+     "minMoney": 152132,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 10,
+     "saveBytes": 132546,
+     "rivalStrength": [
+      47,
+      64
+     ],
+     "reputation": 86,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 21.3,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 74.8,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      48,
+      62
+     ],
+     "signings": 3,
+     "signingFees": 100918,
+     "signedOverall": 56.7,
+     "finance": {
+      "wages": -608960,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 67320,
+      "gate": 919212,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -10400,
+      "transfers": -100918,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 149936,
+     "minMoney": 138918,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 8,
+     "saveBytes": 137026,
+     "rivalStrength": [
+      50,
+      63
+     ],
+     "reputation": 92,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 18.6,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.8,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 77.3,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      49,
+      63
+     ],
+     "signings": 2,
+     "signingFees": 84375,
+     "signedOverall": 75,
+     "finance": {
+      "wages": -831861,
+      "upkeep": -61560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 94800,
+      "gate": 1157940,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": 10000,
+      "transfers": -84375,
+      "contracts": 0,
+      "facilities": -600000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 152650,
+     "minMoney": 109427,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 10,
+     "saveBytes": 137275,
+     "rivalStrength": [
+      51,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 18,
+     "draws": 1,
+     "losses": 5,
+     "marginPerGame": 10.6,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.6,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 79.4,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      52,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 71188,
+     "signedOverall": 74,
+     "finance": {
+      "wages": -960700,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 101840,
+      "gate": 1072722,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": 0,
+      "transfers": -71188,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 83123
+  },
+  {
+   "seed": 23757,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.6,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     41,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 231395,
+     "minMoney": -8029,
+     "debtWeeks": 1,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 12,
+     "saveBytes": 135336,
+     "rivalStrength": [
+      45,
+      67
+     ],
+     "reputation": 58,
+     "sacked": false,
+     "wins": 20,
+     "draws": 1,
+     "losses": 3,
+     "marginPerGame": 14,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.6,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      46,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -501416,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33920,
+      "gate": 512211,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -32960,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 481434,
+     "minMoney": 88397,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 13,
+     "saveBytes": 137154,
+     "rivalStrength": [
+      50,
+      63
+     ],
+     "reputation": 77,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 20.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.333,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 74.7,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      50,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -497426,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 63160,
+      "gate": 840798,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -58933,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 436012,
+     "minMoney": 186203,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 12,
+     "saveBytes": 138974,
+     "rivalStrength": [
+      53,
+      62
+     ],
+     "reputation": 99,
+     "sacked": false,
+     "wins": 23,
+     "draws": 0,
+     "losses": 1,
+     "marginPerGame": 27.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 77.1,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      52,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 69277,
+     "signedOverall": 73,
+     "finance": {
+      "wages": -684564,
+      "upkeep": -60960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 85440,
+      "gate": 1204539,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 1600,
+      "transfers": -69277,
+      "contracts": 0,
+      "facilities": -600000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 1036523,
+     "minMoney": 432888,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 11,
+     "saveBytes": 140935,
+     "rivalStrength": [
+      51,
+      63
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 21,
+     "draws": 1,
+     "losses": 2,
+     "marginPerGame": 24.5,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 77.4,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      52,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 71188,
+     "signedOverall": 74,
+     "finance": {
+      "wages": -911375,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 107800,
+      "gate": 1473234,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 12000,
+      "transfers": -71188,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 1472497,
+     "minMoney": 1023159,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 11,
+     "saveBytes": 140979,
+     "rivalStrength": [
+      50,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 22,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.8,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 79.4,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      50,
+      61
+     ],
+     "signings": 1,
+     "signingFees": 39968,
+     "signedOverall": 73,
+     "finance": {
+      "wages": -1055780,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 105320,
+      "gate": 1426362,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 10000,
+      "transfers": -39968,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 84664
+  },
+  {
+   "seed": 31676,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 56,
+    "rivalMean": 55.3,
+    "rivalRange": [
+     42,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 226328,
+     "minMoney": -9555,
+     "debtWeeks": 2,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 14,
+     "saveBytes": 138328,
+     "rivalStrength": [
+      45,
+      68
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 12.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.7,
+     "rivalMean": 56,
+     "rivalRange": [
+      45,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -513333,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34680,
+      "gate": 508011,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -22670,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 300571,
+     "minMoney": 102780,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 8,
+     "saveBytes": 135725,
+     "rivalStrength": [
+      50,
+      66
+     ],
+     "reputation": 85,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 17,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.2,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      49,
+      67
+     ],
+     "signings": 1,
+     "signingFees": 15987,
+     "signedOverall": 73,
+     "finance": {
+      "wages": -561432,
+      "upkeep": -45960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 66640,
+      "gate": 931182,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -8000,
+      "transfers": -15987,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 602355,
+     "minMoney": 245313,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 12,
+     "saveBytes": 136966,
+     "rivalStrength": [
+      50,
+      66
+     ],
+     "reputation": 99,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 17,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.7,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      49,
+      66
+     ],
+     "signings": 3,
+     "signingFees": 60713,
+     "signedOverall": 61,
+     "finance": {
+      "wages": -662052,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 95680,
+      "gate": 1269429,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 5000,
+      "transfers": -60713,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 1151698,
+     "minMoney": 602355,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 12,
+     "saveBytes": 136470,
+     "rivalStrength": [
+      50,
+      63
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 21,
+     "draws": 1,
+     "losses": 2,
+     "marginPerGame": 23.4,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 76,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      51,
+      63
+     ],
+     "signings": 1,
+     "signingFees": 28125,
+     "signedOverall": 75,
+     "finance": {
+      "wages": -941199,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 106240,
+      "gate": 1416387,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 6000,
+      "transfers": -28125,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 1383803,
+     "minMoney": 1048024,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 12,
+     "saveBytes": 142416,
+     "rivalStrength": [
+      49,
+      61
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 20,
+     "draws": 1,
+     "losses": 3,
+     "marginPerGame": 19.3,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 77.3,
+     "rivalMean": 56.7,
+     "rivalRange": [
+      50,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 77077,
+     "signedOverall": 77,
+     "finance": {
+      "wages": -1104964,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 107640,
+      "gate": 1397466,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": -6000,
+      "transfers": -77077,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 84146
+  },
+  {
+   "seed": 39595,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 54.9,
+    "rivalMean": 55.3,
+    "rivalRange": [
+     43,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 246522,
+     "minMoney": 12450,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 12,
+     "saveBytes": 133174,
+     "rivalStrength": [
+      47,
+      67
+     ],
+     "reputation": 64,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 17.4,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 69.1,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      47,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -505327,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 39280,
+      "gate": 553686,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -60757,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 508716,
+     "minMoney": 125448,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 11,
+     "saveBytes": 134650,
+     "rivalStrength": [
+      48,
+      65
+     ],
+     "reputation": 91,
+     "sacked": false,
+     "wins": 24,
+     "draws": 0,
+     "losses": 0,
+     "marginPerGame": 26.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.1,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      49,
+      66
+     ],
+     "signings": 2,
+     "signingFees": 109940,
+     "signedOverall": 69,
+     "finance": {
+      "wages": -617163,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 72760,
+      "gate": 1007097,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 7000,
+      "transfers": -109940,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 441009,
+     "minMoney": 182388,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 21,
+     "freeAgents": 9,
+     "saveBytes": 137553,
+     "rivalStrength": [
+      49,
+      65
+     ],
+     "reputation": 99,
+     "sacked": false,
+     "wins": 24,
+     "draws": 0,
+     "losses": 0,
+     "marginPerGame": 23.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 78.7,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      49,
+      65
+     ],
+     "signings": 3,
+     "signingFees": 120682,
+     "signedOverall": 72.3,
+     "finance": {
+      "wages": -830906,
+      "upkeep": -62160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 99840,
+      "gate": 1381401,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -13000,
+      "transfers": -120682,
+      "contracts": 0,
+      "facilities": -600000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 865906,
+     "minMoney": 408872,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 13,
+     "saveBytes": 139027,
+     "rivalStrength": [
+      48,
+      64
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 26.3,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 79.2,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      49,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -1072995,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 107440,
+      "gate": 1406412,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -6000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 1116451,
+     "minMoney": 719457,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 12,
+     "saveBytes": 138029,
+     "rivalStrength": [
+      50,
+      63
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 24,
+     "draws": 0,
+     "losses": 0,
+     "marginPerGame": 25.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 80.4,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      50,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -1171371,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 102720,
+      "gate": 1408281,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -79125,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 77458
+  },
+  {
+   "seed": 47514,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.4,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     41,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 215686,
+     "minMoney": 18366,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 11,
+     "saveBytes": 134421,
+     "rivalStrength": [
+      47,
+      67
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 16,
+     "draws": 0,
+     "losses": 8,
+     "marginPerGame": 9,
+     "ladderPosition": 2,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 69.7,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      47,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -483840,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34760,
+      "gate": 441126,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 4000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 265093,
+     "minMoney": 95126,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 11,
+     "saveBytes": 133808,
+     "rivalStrength": [
+      49,
+      65
+     ],
+     "reputation": 71,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 18.7,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 72.8,
+     "rivalMean": 56,
+     "rivalRange": [
+      49,
+      65
+     ],
+     "signings": 2,
+     "signingFees": 99410,
+     "signedOverall": 70.5,
+     "finance": {
+      "wages": -464212,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 67800,
+      "gate": 777189,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": -4400,
+      "transfers": -99410,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 567687,
+     "minMoney": 86815,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 7,
+     "saveBytes": 138080,
+     "rivalStrength": [
+      50,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 22.3,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.7,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      50,
+      63
+     ],
+     "signings": 1,
+     "signingFees": 26645,
+     "signedOverall": 73,
+     "finance": {
+      "wages": -563509,
+      "upkeep": -56160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 77800,
+      "gate": 1046808,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -13500,
+      "transfers": -26645,
+      "contracts": 0,
+      "facilities": -240000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 494662,
+     "minMoney": 420368,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 12,
+     "saveBytes": 143312,
+     "rivalStrength": [
+      52,
+      63
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 19,
+     "draws": 1,
+     "losses": 4,
+     "marginPerGame": 10.7,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 76.4,
+     "rivalMean": 56.7,
+     "rivalRange": [
+      52,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 27380,
+     "signedOverall": 74,
+     "finance": {
+      "wages": -900862,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 105400,
+      "gate": 1218777,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": 1600,
+      "transfers": -27380,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 981282,
+     "minMoney": 431273,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 14,
+     "saveBytes": 145267,
+     "rivalStrength": [
+      52,
+      63
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 19.7,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.8,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 77.1,
+     "rivalMean": 57,
+     "rivalRange": [
+      53,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 54925,
+     "signedOverall": 65,
+     "finance": {
+      "wages": -960523,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 106120,
+      "gate": 1405908,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 0,
+      "transfers": -54925,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 76309
+  },
+  {
+   "seed": 55433,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.9,
+    "rivalMean": 55.4,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 15658,
+     "minMoney": -49189,
+     "debtWeeks": 9,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 11,
+     "saveBytes": 136609,
+     "rivalStrength": [
+      46,
+      65
+     ],
+     "reputation": 40,
+     "sacked": false,
+     "wins": 18,
+     "draws": 0,
+     "losses": 6,
+     "marginPerGame": 11.3,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      46,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -531849,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33880,
+      "gate": 455427,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": -36440,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 152272,
+     "minMoney": -69587,
+     "debtWeeks": 23,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 10,
+     "saveBytes": 138285,
+     "rivalStrength": [
+      49,
+      63
+     ],
+     "reputation": 63,
+     "sacked": false,
+     "wins": 18,
+     "draws": 1,
+     "losses": 5,
+     "marginPerGame": 10,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74,
+     "rivalMean": 56,
+     "rivalRange": [
+      49,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -547989,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 42400,
+      "gate": 573363,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 14000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 186307,
+     "minMoney": 41072,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 12,
+     "saveBytes": 137076,
+     "rivalStrength": [
+      51,
+      63
+     ],
+     "reputation": 75,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 12.4,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.9,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      51,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -656885,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 68480,
+      "gate": 630000,
+      "prize": 70000,
+      "boardGrant": 30000,
+      "events": 2600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 368313,
+     "minMoney": 56621,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 14,
+     "freeAgents": 8,
+     "saveBytes": 139619,
+     "rivalStrength": [
+      51,
+      61
+     ],
+     "reputation": 94,
+     "sacked": false,
+     "wins": 18,
+     "draws": 1,
+     "losses": 5,
+     "marginPerGame": 8.5,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.2,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      50,
+      62
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -799731,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 81600,
+      "gate": 988197,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 9500,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 455870,
+     "minMoney": 21482,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 13,
+     "saveBytes": 141697,
+     "rivalStrength": [
+      51,
+      60
+     ],
+     "reputation": 97,
+     "sacked": true,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 12.9,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 77,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      52,
+      61
+     ],
+     "signings": 4,
+     "signingFees": 152847,
+     "signedOverall": 60.8,
+     "finance": {
+      "wages": -894276,
+      "upkeep": -60960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 100840,
+      "gate": 1270500,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -3500,
+      "transfers": -152847,
+      "contracts": 0,
+      "facilities": -240000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 75152
+  },
+  {
+   "seed": 63352,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 54.9,
+    "rivalMean": 54.8,
+    "rivalRange": [
+     41,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 287024,
+     "minMoney": 54460,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 13,
+     "saveBytes": 132856,
+     "rivalStrength": [
+      44,
+      67
+     ],
+     "reputation": 62,
+     "sacked": false,
+     "wins": 23,
+     "draws": 1,
+     "losses": 0,
+     "marginPerGame": 21,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.4,
+     "rivalMean": 55.8,
+     "rivalRange": [
+      44,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -497844,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34640,
+      "gate": 525588,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 5000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 507697,
+     "minMoney": 118373,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 9,
+     "saveBytes": 136172,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 78,
+     "sacked": false,
+     "wins": 23,
+     "draws": 0,
+     "losses": 1,
+     "marginPerGame": 28.7,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.8,
+     "rivalMean": 56,
+     "rivalRange": [
+      46,
+      64
+     ],
+     "signings": 2,
+     "signingFees": 56413,
+     "signedOverall": 66,
+     "finance": {
+      "wages": -540723,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 64560,
+      "gate": 901509,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -50700,
+      "transfers": -56413,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 410006,
+     "minMoney": 161004,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 11,
+     "saveBytes": 137333,
+     "rivalStrength": [
+      46,
+      63
+     ],
+     "reputation": 89,
+     "sacked": false,
+     "wins": 23,
+     "draws": 1,
+     "losses": 0,
+     "marginPerGame": 24.4,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 78.4,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      46,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -677392,
+      "upkeep": -61560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 85560,
+      "gate": 1224489,
+      "prize": 70000,
+      "boardGrant": 30000,
+      "events": -71588,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -600000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 869695,
+     "minMoney": 397284,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 10,
+     "saveBytes": 139682,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 21.5,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 79.1,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      47,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -965815,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 98840,
+      "gate": 1338624,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -2000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 1341106,
+     "minMoney": 855587,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 14,
+     "saveBytes": 139388,
+     "rivalStrength": [
+      49,
+      63
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 23,
+     "draws": 1,
+     "losses": 0,
+     "marginPerGame": 29.7,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 79.2,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      47,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -1074549,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 103360,
+      "gate": 1464960,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -12400,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 76977
+  },
+  {
+   "seed": 71271,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.3,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     41,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 124789,
+     "minMoney": 43669,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 10,
+     "saveBytes": 135663,
+     "rivalStrength": [
+      45,
+      67
+     ],
+     "reputation": 42,
+     "sacked": false,
+     "wins": 17,
+     "draws": 1,
+     "losses": 6,
+     "marginPerGame": 9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.3,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      45,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -490320,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34280,
+      "gate": 470589,
+      "prize": 30000,
+      "boardGrant": 30000,
+      "events": 5600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 271561,
+     "minMoney": 41676,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 10,
+     "saveBytes": 133022,
+     "rivalStrength": [
+      46,
+      65
+     ],
+     "reputation": 71,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 16.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.6,
+     "rivalMean": 56,
+     "rivalRange": [
+      47,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -489015,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 49120,
+      "gate": 591927,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -60100,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 328603,
+     "minMoney": 116705,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 11,
+     "saveBytes": 135520,
+     "rivalStrength": [
+      48,
+      63
+     ],
+     "reputation": 95,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 19.2,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.4,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      49,
+      63
+     ],
+     "signings": 1,
+     "signingFees": 30250,
+     "signedOverall": 55,
+     "finance": {
+      "wages": -636068,
+      "upkeep": -45960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 76160,
+      "gate": 988260,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -12900,
+      "transfers": -30250,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 118712,
+     "minMoney": 118712,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 13,
+     "saveBytes": 139970,
+     "rivalStrength": [
+      52,
+      61
+     ],
+     "reputation": 95,
+     "sacked": false,
+     "wins": 21,
+     "draws": 1,
+     "losses": 2,
+     "marginPerGame": 16.2,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 77,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      52,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 42188,
+     "signedOverall": 75,
+     "finance": {
+      "wages": -907259,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 100960,
+      "gate": 1122156,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": 2000,
+      "transfers": -42188,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 574876,
+     "minMoney": 89057,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 12,
+     "saveBytes": 141557,
+     "rivalStrength": [
+      51,
+      61
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 20,
+     "draws": 1,
+     "losses": 3,
+     "marginPerGame": 15.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 77.4,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      52,
+      61
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -1041094,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 105920,
+      "gate": 1405698,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -4400,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 75239
+  },
+  {
+   "seed": 79190,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.1,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     43,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 233941,
+     "minMoney": 2925,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 11,
+     "saveBytes": 134256,
+     "rivalStrength": [
+      47,
+      67
+     ],
+     "reputation": 53,
+     "sacked": false,
+     "wins": 19,
+     "draws": 1,
+     "losses": 4,
+     "marginPerGame": 16.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.4,
+     "rivalMean": 56,
+     "rivalRange": [
+      46,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -495936,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 31680,
+      "gate": 487557,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -9000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 189773,
+     "minMoney": 113103,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 9,
+     "saveBytes": 135546,
+     "rivalStrength": [
+      48,
+      64
+     ],
+     "reputation": 68,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 17.4,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.9,
+     "rivalMean": 56,
+     "rivalRange": [
+      48,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -480608,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 63840,
+      "gate": 847560,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": -22400,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 565697,
+     "minMoney": 185981,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 11,
+     "saveBytes": 139807,
+     "rivalStrength": [
+      48,
+      62
+     ],
+     "reputation": 79,
+     "sacked": false,
+     "wins": 21,
+     "draws": 1,
+     "losses": 2,
+     "marginPerGame": 18.4,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 72.7,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      51,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 71188,
+     "signedOverall": 74,
+     "finance": {
+      "wages": -608270,
+      "upkeep": -61560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 73520,
+      "gate": 1039122,
+      "prize": 70000,
+      "boardGrant": 30000,
+      "events": 1500,
+      "transfers": -71188,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 752287,
+     "minMoney": 420867,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 10,
+     "saveBytes": 140310,
+     "rivalStrength": [
+      51,
+      62
+     ],
+     "reputation": 93,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 22.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 76.7,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      52,
+      63
+     ],
+     "signings": 2,
+     "signingFees": 83250,
+     "signedOverall": 67.5,
+     "finance": {
+      "wages": -865523,
+      "upkeep": -61560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 82400,
+      "gate": 1144500,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -97777,
+      "transfers": -83250,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 1014197,
+     "minMoney": 674040,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 13,
+     "saveBytes": 141164,
+     "rivalStrength": [
+      51,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 23.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 77.7,
+     "rivalMean": 56.6,
+     "rivalRange": [
+      51,
+      62
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -915271,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 105640,
+      "gate": 1417101,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 10000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 76689
+  },
+  {
+   "seed": 87109,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.7,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 298228,
+     "minMoney": 58935,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 8,
+     "saveBytes": 132840,
+     "rivalStrength": [
+      45,
+      67
+     ],
+     "reputation": 60,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 12,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71,
+     "rivalMean": 56,
+     "rivalRange": [
+      45,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -484083,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34960,
+      "gate": 522711,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 5000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 386333,
+     "minMoney": 165584,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 9,
+     "saveBytes": 135298,
+     "rivalStrength": [
+      50,
+      64
+     ],
+     "reputation": 82,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 14.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 73.9,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      50,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -515619,
+      "upkeep": -46560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 66640,
+      "gate": 872844,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 3000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 332756,
+     "minMoney": 223886,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 8,
+     "saveBytes": 138204,
+     "rivalStrength": [
+      50,
+      63
+     ],
+     "reputation": 90,
+     "sacked": false,
+     "wins": 18,
+     "draws": 0,
+     "losses": 6,
+     "marginPerGame": 13.3,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.333,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 76.2,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      50,
+      64
+     ],
+     "signings": 1,
+     "signingFees": 73125,
+     "signedOverall": 75,
+     "finance": {
+      "wages": -676819,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 90680,
+      "gate": 1073247,
+      "prize": 30000,
+      "boardGrant": 30000,
+      "events": -7000,
+      "transfers": -73125,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 394333,
+     "minMoney": 226193,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 9,
+     "saveBytes": 142201,
+     "rivalStrength": [
+      47,
+      60
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 16,
+     "draws": 1,
+     "losses": 7,
+     "marginPerGame": 11.4,
+     "ladderPosition": 2,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 76.9,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      47,
+      61
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -1037552,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 99320,
+      "gate": 1121169,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": 3600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 760517,
+     "minMoney": 342598,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 11,
+     "saveBytes": 141212,
+     "rivalStrength": [
+      44,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 22,
+     "draws": 1,
+     "losses": 1,
+     "marginPerGame": 14.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 77,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      45,
+      62
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -1154221,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 106720,
+      "gate": 1431045,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -7400,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 75316
+  },
+  {
+   "seed": 95028,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.4,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     41,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 71659,
+     "minMoney": -72431,
+     "debtWeeks": 7,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 12,
+     "saveBytes": 135714,
+     "rivalStrength": [
+      44,
+      66
+     ],
+     "reputation": 50,
+     "sacked": false,
+     "wins": 13,
+     "draws": 0,
+     "losses": 11,
+     "marginPerGame": 5,
+     "ladderPosition": 8,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.1,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      46,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -487890,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 32600,
+      "gate": 330309,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -13000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 72403,
+     "minMoney": 7146,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 12,
+     "saveBytes": 138466,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 17,
+     "draws": 0,
+     "losses": 7,
+     "marginPerGame": 11.3,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 73.7,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      46,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -570267,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 55760,
+      "gate": 577311,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": -1900,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 104683,
+     "minMoney": -116341,
+     "debtWeeks": 17,
+     "forcedSales": 2,
+     "squad": 14,
+     "freeAgents": 16,
+     "saveBytes": 140069,
+     "rivalStrength": [
+      48,
+      62
+     ],
+     "reputation": 87,
+     "sacked": false,
+     "wins": 22,
+     "draws": 1,
+     "losses": 1,
+     "marginPerGame": 12.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 72.4,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      48,
+      62
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -731100,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 67040,
+      "gate": 630000,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 1500,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 116346,
+     "minMoney": -119185,
+     "debtWeeks": 26,
+     "forcedSales": 4,
+     "squad": 12,
+     "freeAgents": 13,
+     "saveBytes": 143100,
+     "rivalStrength": [
+      48,
+      60
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 19.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.8,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 70,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      47,
+      60
+     ],
+     "signings": 3,
+     "signingFees": 107288,
+     "signedOverall": 67,
+     "finance": {
+      "wages": -660879,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 96640,
+      "gate": 630000,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -1650,
+      "transfers": -107288,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": -129040,
+     "minMoney": -129040,
+     "debtWeeks": 26,
+     "forcedSales": 1,
+     "squad": 15,
+     "freeAgents": 9,
+     "saveBytes": 139805,
+     "rivalStrength": [
+      51,
+      59
+     ],
+     "reputation": 95,
+     "sacked": true,
+     "wins": 21,
+     "draws": 1,
+     "losses": 2,
+     "marginPerGame": 13.8,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.6,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      50,
+      60
+     ],
+     "signings": 5,
+     "signingFees": 129470,
+     "signedOverall": 58.4,
+     "finance": {
+      "wages": -685706,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 107200,
+      "gate": 546000,
+      "prize": 15000,
+      "boardGrant": 10000,
+      "events": 1750,
+      "transfers": -129470,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 74484
+  },
+  {
+   "seed": 102947,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.1,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     41,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 222222,
+     "minMoney": -13192,
+     "debtWeeks": 2,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 13,
+     "saveBytes": 133945,
+     "rivalStrength": [
+      43,
+      68
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 21.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.2,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      44,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -493884,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33200,
+      "gate": 520191,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -56925,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 342142,
+     "minMoney": 79872,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 8,
+     "saveBytes": 135909,
+     "rivalStrength": [
+      44,
+      67
+     ],
+     "reputation": 70,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 23.7,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.3,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      46,
+      68
+     ],
+     "signings": 2,
+     "signingFees": 86118,
+     "signedOverall": 70,
+     "finance": {
+      "wages": -594525,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 64160,
+      "gate": 900963,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": 8000,
+      "transfers": -86118,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 280830,
+     "minMoney": 123539,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 12,
+     "saveBytes": 139990,
+     "rivalStrength": [
+      47,
+      67
+     ],
+     "reputation": 81,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 21.9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 76.6,
+     "rivalMean": 56.7,
+     "rivalRange": [
+      49,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -739257,
+      "upkeep": -59160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 80320,
+      "gate": 943635,
+      "prize": 15000,
+      "boardGrant": 30000,
+      "events": 5350,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -240000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 586853,
+     "minMoney": 252403,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 12,
+     "saveBytes": 140428,
+     "rivalStrength": [
+      47,
+      64
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 24,
+     "draws": 0,
+     "losses": 0,
+     "marginPerGame": 27.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 77.4,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      47,
+      65
+     ],
+     "signings": 1,
+     "signingFees": 71188,
+     "signedOverall": 74,
+     "finance": {
+      "wages": -1027806,
+      "upkeep": -61560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 93480,
+      "gate": 1329447,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -24150,
+      "transfers": -71188,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 359922,
+     "minMoney": 274360,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 13,
+     "saveBytes": 140598,
+     "rivalStrength": [
+      49,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 21,
+     "draws": 2,
+     "losses": 1,
+     "marginPerGame": 21.9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 78.7,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      49,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -1154976,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 106720,
+      "gate": 1293285,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": -1400,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 75949
+  },
+  {
+   "seed": 110866,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 54.9,
+    "rivalMean": 55.3,
+    "rivalRange": [
+     42,
+     71
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 243238,
+     "minMoney": 4572,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 11,
+     "saveBytes": 134178,
+     "rivalStrength": [
+      46,
+      68
+     ],
+     "reputation": 56,
+     "sacked": false,
+     "wins": 19,
+     "draws": 1,
+     "losses": 4,
+     "marginPerGame": 16.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 69.1,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      46,
+      69
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -491076,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 32120,
+      "gate": 487704,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -5150,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 385549,
+     "minMoney": 125062,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 10,
+     "saveBytes": 136129,
+     "rivalStrength": [
+      48,
+      65
+     ],
+     "reputation": 81,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 22.9,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.9,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      46,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -477576,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 64200,
+      "gate": 889497,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 3750,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 594130,
+     "minMoney": 270874,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 12,
+     "saveBytes": 138198,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 99,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 20.4,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.8,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      48,
+      64
+     ],
+     "signings": 4,
+     "signingFees": 130813,
+     "signedOverall": 65.3,
+     "finance": {
+      "wages": -622497,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 91080,
+      "gate": 1212771,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 3600,
+      "transfers": -130813,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 1307127,
+     "minMoney": 594130,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 10,
+     "saveBytes": 141545,
+     "rivalStrength": [
+      48,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 24,
+     "draws": 0,
+     "losses": 0,
+     "marginPerGame": 22,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 76.6,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      48,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 42188,
+     "signedOverall": 75,
+     "finance": {
+      "wages": -882262,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 107480,
+      "gate": 1545327,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -5400,
+      "transfers": -42188,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 1743707,
+     "minMoney": 1294699,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 13,
+     "saveBytes": 141873,
+     "rivalStrength": [
+      50,
+      61
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 23,
+     "draws": 0,
+     "losses": 1,
+     "marginPerGame": 17.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 77.2,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      48,
+      61
+     ],
+     "signings": 1,
+     "signingFees": 41070,
+     "signedOverall": 74,
+     "finance": {
+      "wages": -1059274,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 106680,
+      "gate": 1430604,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 9600,
+      "transfers": -41070,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 76773
+  },
+  {
+   "seed": 118785,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.2,
+    "rivalMean": 55.3,
+    "rivalRange": [
+     41,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 105678,
+     "minMoney": 76548,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 10,
+     "saveBytes": 131977,
+     "rivalStrength": [
+      45,
+      66
+     ],
+     "reputation": 44,
+     "sacked": false,
+     "wins": 20,
+     "draws": 1,
+     "losses": 3,
+     "marginPerGame": 13,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.7,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      42,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -484650,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 36880,
+      "gate": 458808,
+      "prize": 15000,
+      "boardGrant": 30000,
+      "events": 5000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 212413,
+     "minMoney": 61730,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 8,
+     "saveBytes": 133023,
+     "rivalStrength": [
+      48,
+      67
+     ],
+     "reputation": 60,
+     "sacked": false,
+     "wins": 18,
+     "draws": 1,
+     "losses": 5,
+     "marginPerGame": 13.2,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.8,
+     "rivalMean": 55.8,
+     "rivalRange": [
+      48,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -530253,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 48960,
+      "gate": 601188,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": 7000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 359596,
+     "minMoney": 31433,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 12,
+     "saveBytes": 138989,
+     "rivalStrength": [
+      51,
+      65
+     ],
+     "reputation": 82,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 16.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.6,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      51,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -688608,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 64800,
+      "gate": 864801,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -6250,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 432206,
+     "minMoney": 109154,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 9,
+     "saveBytes": 140429,
+     "rivalStrength": [
+      51,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 7.7,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.9,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      51,
+      62
+     ],
+     "signings": 1,
+     "signingFees": 42188,
+     "signedOverall": 75,
+     "finance": {
+      "wages": -883505,
+      "upkeep": -59760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 87440,
+      "gate": 1145823,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -3000,
+      "transfers": -42188,
+      "contracts": 0,
+      "facilities": -240000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 560219,
+     "minMoney": 233191,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 8,
+     "saveBytes": 140742,
+     "rivalStrength": [
+      51,
+      61
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 21,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 78.1,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      51,
+      61
+     ],
+     "signings": 1,
+     "signingFees": 17328,
+     "signedOverall": 76,
+     "finance": {
+      "wages": -1025110,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 105680,
+      "gate": 1412481,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 7850,
+      "transfers": -17328,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 75041
+  },
+  {
+   "seed": 126704,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 56,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": -10405,
+     "minMoney": -23293,
+     "debtWeeks": 5,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 8,
+     "saveBytes": 139178,
+     "rivalStrength": [
+      42,
+      67
+     ],
+     "reputation": 38,
+     "sacked": false,
+     "wins": 19,
+     "draws": 1,
+     "losses": 4,
+     "marginPerGame": 15.9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.6,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      44,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -512742,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 31400,
+      "gate": 404460,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": -13163,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 228527,
+     "minMoney": -20305,
+     "debtWeeks": 13,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 9,
+     "saveBytes": 137608,
+     "rivalStrength": [
+      44,
+      66
+     ],
+     "reputation": 64,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 22.4,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.1,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      44,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -476531,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 44640,
+      "gate": 607383,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 8600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 234111,
+     "minMoney": 36745,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 12,
+     "saveBytes": 140058,
+     "rivalStrength": [
+      47,
+      64
+     ],
+     "reputation": 78,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 20,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 74.6,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      47,
+      64
+     ],
+     "signings": 1,
+     "signingFees": 18000,
+     "signedOverall": 60,
+     "finance": {
+      "wages": -572088,
+      "upkeep": -48960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 73280,
+      "gate": 972552,
+      "prize": 30000,
+      "boardGrant": 30000,
+      "events": -4000,
+      "transfers": -18000,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 616601,
+     "minMoney": 211630,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 14,
+     "saveBytes": 141318,
+     "rivalStrength": [
+      51,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 16,
+     "draws": 2,
+     "losses": 6,
+     "marginPerGame": 13.8,
+     "ladderPosition": 2,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.1,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      51,
+      62
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -818387,
+      "upkeep": -61560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 85720,
+      "gate": 1108317,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 666048,
+     "minMoney": 333102,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 12,
+     "saveBytes": 143372,
+     "rivalStrength": [
+      49,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 20,
+     "draws": 2,
+     "losses": 2,
+     "marginPerGame": 13.4,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.8,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 76.3,
+     "rivalMean": 56.7,
+     "rivalRange": [
+      49,
+      61
+     ],
+     "signings": 3,
+     "signingFees": 121073,
+     "signedOverall": 70.3,
+     "finance": {
+      "wages": -965604,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 106360,
+      "gate": 1387974,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -2650,
+      "transfers": -121073,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 74329
+  },
+  {
+   "seed": 134623,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 54.6,
+    "rivalMean": 55.5,
+    "rivalRange": [
+     42,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 198909,
+     "minMoney": 30705,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 11,
+     "saveBytes": 135338,
+     "rivalStrength": [
+      43,
+      67
+     ],
+     "reputation": 44,
+     "sacked": false,
+     "wins": 18,
+     "draws": 1,
+     "losses": 5,
+     "marginPerGame": 8.8,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.1,
+     "rivalMean": 56,
+     "rivalRange": [
+      43,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -487404,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 32240,
+      "gate": 503433,
+      "prize": 70000,
+      "boardGrant": 30000,
+      "events": 6000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 132069,
+     "minMoney": 118241,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 7,
+     "saveBytes": 134287,
+     "rivalStrength": [
+      47,
+      65
+     ],
+     "reputation": 52,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 12.7,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 73.2,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      46,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -553068,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 48920,
+      "gate": 510468,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": 2000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 105725,
+     "minMoney": 87450,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 9,
+     "saveBytes": 136953,
+     "rivalStrength": [
+      45,
+      64
+     ],
+     "reputation": 63,
+     "sacked": false,
+     "wins": 18,
+     "draws": 1,
+     "losses": 5,
+     "marginPerGame": 13.9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 74.3,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      47,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -573245,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 58600,
+      "gate": 538461,
+      "prize": 15000,
+      "boardGrant": 30000,
+      "events": 15000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 20657,
+     "minMoney": -137138,
+     "debtWeeks": 19,
+     "forcedSales": 5,
+     "squad": 13,
+     "freeAgents": 12,
+     "saveBytes": 138877,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 73,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 18,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.4,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      46,
+      64
+     ],
+     "signings": 1,
+     "signingFees": 18605,
+     "signedOverall": 61,
+     "finance": {
+      "wages": -741583,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 69280,
+      "gate": 630000,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": -4000,
+      "transfers": -18605,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": -21309,
+     "minMoney": -36704,
+     "debtWeeks": 20,
+     "forcedSales": 0,
+     "squad": 11,
+     "freeAgents": 13,
+     "saveBytes": 139673,
+     "rivalStrength": [
+      49,
+      63
+     ],
+     "reputation": 74,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 14.5,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 71,
+     "rivalMean": 56,
+     "rivalRange": [
+      49,
+      64
+     ],
+     "signings": 6,
+     "signingFees": 56609,
+     "signedOverall": 34.8,
+     "finance": {
+      "wages": -590617,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 77320,
+      "gate": 588000,
+      "prize": 30000,
+      "boardGrant": 10000,
+      "events": 10100,
+      "transfers": -56609,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 73022
+  },
+  {
+   "seed": 142542,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 54.8,
+    "rivalMean": 54.9,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 240980,
+     "minMoney": 12180,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 11,
+     "saveBytes": 133670,
+     "rivalStrength": [
+      44,
+      66
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 17.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.2,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      43,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -499512,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34480,
+      "gate": 524412,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -38040,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 237138,
+     "minMoney": 119384,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 10,
+     "saveBytes": 137420,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 75,
+     "sacked": false,
+     "wins": 20,
+     "draws": 1,
+     "losses": 3,
+     "marginPerGame": 20.2,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 73,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      49,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -556551,
+      "upkeep": -45960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 67080,
+      "gate": 894789,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": 4000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 779464,
+     "minMoney": 236352,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 11,
+     "saveBytes": 137974,
+     "rivalStrength": [
+      45,
+      62
+     ],
+     "reputation": 99,
+     "sacked": false,
+     "wins": 23,
+     "draws": 1,
+     "losses": 0,
+     "marginPerGame": 23.5,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 73.8,
+     "rivalMean": 56.5,
+     "rivalRange": [
+      46,
+      62
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -698371,
+      "upkeep": -61560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 82440,
+      "gate": 1144017,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -2000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 1104339,
+     "minMoney": 754685,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 10,
+     "saveBytes": 141281,
+     "rivalStrength": [
+      50,
+      62
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 23,
+     "draws": 1,
+     "losses": 0,
+     "marginPerGame": 25.2,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.4,
+     "rivalMean": 56.7,
+     "rivalRange": [
+      48,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -903057,
+      "upkeep": -63360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 107720,
+      "gate": 1472772,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 3000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 1573067,
+     "minMoney": 1080194,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 14,
+     "saveBytes": 141735,
+     "rivalStrength": [
+      50,
+      63
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 20.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.8,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 74.9,
+     "rivalMean": 56.7,
+     "rivalRange": [
+      50,
+      64
+     ],
+     "signings": 1,
+     "signingFees": 28125,
+     "signedOverall": 75,
+     "finance": {
+      "wages": -1015649,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 104720,
+      "gate": 1432242,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -14500,
+      "transfers": -28125,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 77735
+  },
+  {
+   "seed": 150461,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 56.2,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     42,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 231088,
+     "minMoney": -6787,
+     "debtWeeks": 1,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 11,
+     "saveBytes": 133621,
+     "rivalStrength": [
+      45,
+      68
+     ],
+     "reputation": 56,
+     "sacked": false,
+     "wins": 18,
+     "draws": 0,
+     "losses": 6,
+     "marginPerGame": 7.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 69.8,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      44,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -490725,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 30240,
+      "gate": 471933,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 0,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 197469,
+     "minMoney": 49478,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 9,
+     "saveBytes": 134584,
+     "rivalStrength": [
+      47,
+      66
+     ],
+     "reputation": 65,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 9.7,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.333,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 73.9,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      46,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -539607,
+      "upkeep": -44160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 61200,
+      "gate": 729540,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": -73392,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 257516,
+     "minMoney": 154581,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 11,
+     "saveBytes": 134740,
+     "rivalStrength": [
+      51,
+      64
+     ],
+     "reputation": 76,
+     "sacked": false,
+     "wins": 14,
+     "draws": 1,
+     "losses": 9,
+     "marginPerGame": 3.8,
+     "ladderPosition": 3,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 75.7,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      49,
+      64
+     ],
+     "signings": 1,
+     "signingFees": 36000,
+     "signedOverall": 60,
+     "finance": {
+      "wages": -622075,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 74400,
+      "gate": 744282,
+      "prize": 15000,
+      "boardGrant": 30000,
+      "events": -3000,
+      "transfers": -36000,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 149032,
+     "minMoney": 148133,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 10,
+     "saveBytes": 139289,
+     "rivalStrength": [
+      50,
+      62
+     ],
+     "reputation": 78,
+     "sacked": false,
+     "wins": 14,
+     "draws": 1,
+     "losses": 9,
+     "marginPerGame": 2,
+     "ladderPosition": 4,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 77.1,
+     "rivalMean": 56.8,
+     "rivalRange": [
+      51,
+      64
+     ],
+     "signings": 2,
+     "signingFees": 74481,
+     "signedOverall": 60,
+     "finance": {
+      "wages": -850017,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 83920,
+      "gate": 827904,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": 11750,
+      "transfers": -74481,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": -97259,
+     "minMoney": -97259,
+     "debtWeeks": 2,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 12,
+     "saveBytes": 141775,
+     "rivalStrength": [
+      53,
+      60
+     ],
+     "reputation": 78,
+     "sacked": false,
+     "wins": 12,
+     "draws": 5,
+     "losses": 7,
+     "marginPerGame": 2.8,
+     "ladderPosition": 5,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.2,
+     "nearRivalGames": 5,
+     "forfeits": 0,
+     "bestNine": 78.2,
+     "rivalMean": 56.6,
+     "rivalRange": [
+      53,
+      60
+     ],
+     "signings": 1,
+     "signingFees": 51597,
+     "signedOverall": 63,
+     "finance": {
+      "wages": -926864,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 87960,
+      "gate": 779520,
+      "prize": 15000,
+      "boardGrant": 0,
+      "events": -7750,
+      "transfers": -51597,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 70886
+  },
+  {
+   "seed": 158380,
+   "mode": "managed",
+   "difficulty": "normal",
+   "start": {
+    "bestNine": 55.9,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     42,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 300200,
+     "minMoney": 61374,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 10,
+     "saveBytes": 134164,
+     "rivalStrength": [
+      44,
+      66
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 17,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 67.7,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      43,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -496746,
+      "upkeep": -10160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34440,
+      "gate": 532266,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 10600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 119924,
+     "minMoney": 108667,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 10,
+     "saveBytes": 133034,
+     "rivalStrength": [
+      44,
+      66
+     ],
+     "reputation": 66,
+     "sacked": false,
+     "wins": 20,
+     "draws": 1,
+     "losses": 3,
+     "marginPerGame": 15.1,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 73.3,
+     "rivalMean": 56,
+     "rivalRange": [
+      46,
+      66
+     ],
+     "signings": 5,
+     "signingFees": 156071,
+     "signedOverall": 65.8,
+     "finance": {
+      "wages": -542289,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 65560,
+      "gate": 739977,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": -59893,
+      "transfers": -156071,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 3,
+     "money": 489265,
+     "minMoney": 101804,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 11,
+     "saveBytes": 134063,
+     "rivalStrength": [
+      49,
+      64
+     ],
+     "reputation": 94,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 19.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 76.7,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      49,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -698462,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 74320,
+      "gate": 974043,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -13000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 4,
+     "money": 465179,
+     "minMoney": 144291,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 10,
+     "saveBytes": 135980,
+     "rivalStrength": [
+      53,
+      61
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 13,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 77.6,
+     "rivalMean": 56.7,
+     "rivalRange": [
+      52,
+      62
+     ],
+     "signings": 2,
+     "signingFees": 66605,
+     "signedOverall": 57,
+     "finance": {
+      "wages": -852787,
+      "upkeep": -62760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 103440,
+      "gate": 1379826,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 7000,
+      "transfers": -66605,
+      "contracts": 0,
+      "facilities": -600000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 5,
+     "money": 828703,
+     "minMoney": 394207,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 12,
+     "freeAgents": 11,
+     "saveBytes": 138171,
+     "rivalStrength": [
+      50,
+      61
+     ],
+     "reputation": 97,
+     "sacked": false,
+     "wins": 20,
+     "draws": 1,
+     "losses": 3,
+     "marginPerGame": 17.9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 78.1,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      50,
+      61
+     ],
+     "signings": 2,
+     "signingFees": 62780,
+     "signedOverall": 64,
+     "finance": {
+      "wages": -910245,
+      "upkeep": -77760,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 102000,
+      "gate": 1337259,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": -17750,
+      "transfers": -62780,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 74248
+  },
+  {
+   "seed": 4243,
+   "mode": "managed",
+   "fromVersion": 1,
+   "start": {
+    "bestNine": 54.6,
+    "rivalMean": 54.8,
+    "rivalRange": [
+     40,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 24318,
+     "minMoney": 9478,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 10,
+     "saveBytes": 136438,
+     "rivalStrength": [
+      42,
+      67
+     ],
+     "reputation": 39,
+     "sacked": false,
+     "wins": 18,
+     "draws": 0,
+     "losses": 6,
+     "marginPerGame": 8.3,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.7,
+     "rivalMean": 55.5,
+     "rivalRange": [
+      44,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -483840,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 32760,
+      "gate": 411558,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": -13000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 174812,
+     "minMoney": -48175,
+     "debtWeeks": 16,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 9,
+     "saveBytes": 135445,
+     "rivalStrength": [
+      47,
+      65
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 18.4,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 72,
+     "rivalMean": 56,
+     "rivalRange": [
+      47,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -537123,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 42520,
+      "gate": 586257,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 4000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29479
+  },
+  {
+   "seed": 4244,
+   "mode": "managed",
+   "fromVersion": 2,
+   "start": {
+    "bestNine": 54.4,
+    "rivalMean": 54.9,
+    "rivalRange": [
+     41,
+     71
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 146122,
+     "minMoney": 1474,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 12,
+     "saveBytes": 134793,
+     "rivalStrength": [
+      46,
+      69
+     ],
+     "reputation": 52,
+     "sacked": false,
+     "wins": 14,
+     "draws": 0,
+     "losses": 10,
+     "marginPerGame": 4.8,
+     "ladderPosition": 4,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.8,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      44,
+      69
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -473904,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33560,
+      "gate": 376026,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 3600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 166738,
+     "minMoney": 77238,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 8,
+     "saveBytes": 137771,
+     "rivalStrength": [
+      49,
+      67
+     ],
+     "reputation": 63,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 15.3,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.1,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      45,
+      67
+     ],
+     "signings": 1,
+     "signingFees": 53248,
+     "signedOverall": 64,
+     "finance": {
+      "wages": -496476,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 58600,
+      "gate": 583800,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": -11900,
+      "transfers": -53248,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29724
+  },
+  {
+   "seed": 4245,
+   "mode": "managed",
+   "fromVersion": 3,
+   "start": {
+    "bestNine": 54.8,
+    "rivalMean": 54.7,
+    "rivalRange": [
+     40,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 72305,
+     "minMoney": -79869,
+     "debtWeeks": 11,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 8,
+     "saveBytes": 135699,
+     "rivalStrength": [
+      47,
+      67
+     ],
+     "reputation": 39,
+     "sacked": false,
+     "wins": 17,
+     "draws": 1,
+     "losses": 6,
+     "marginPerGame": 7.9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 73.3,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      43,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -525769,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 30120,
+      "gate": 481362,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": -45248,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 138730,
+     "minMoney": -73046,
+     "debtWeeks": 12,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 10,
+     "saveBytes": 138171,
+     "rivalStrength": [
+      48,
+      64
+     ],
+     "reputation": 60,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 15.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 75.6,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      50,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -589896,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 40640,
+      "gate": 554841,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 6000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29999
+  },
+  {
+   "seed": 4246,
+   "mode": "managed",
+   "fromVersion": 4,
+   "start": {
+    "bestNine": 55.6,
+    "rivalMean": 54.8,
+    "rivalRange": [
+     41,
+     68
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 188157,
+     "minMoney": -34666,
+     "debtWeeks": 6,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 13,
+     "saveBytes": 133749,
+     "rivalStrength": [
+      45,
+      67
+     ],
+     "reputation": 55,
+     "sacked": false,
+     "wins": 17,
+     "draws": 2,
+     "losses": 5,
+     "marginPerGame": 9,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 72.8,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      44,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -513326,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34040,
+      "gate": 510363,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -49760,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 515061,
+     "minMoney": 66367,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 11,
+     "saveBytes": 133613,
+     "rivalStrength": [
+      46,
+      65
+     ],
+     "reputation": 78,
+     "sacked": false,
+     "wins": 24,
+     "draws": 0,
+     "losses": 0,
+     "marginPerGame": 21.5,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 75.1,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      49,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -523614,
+      "upkeep": -44160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 60440,
+      "gate": 884688,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 1750,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 30055
+  },
+  {
+   "seed": 4247,
+   "mode": "managed",
+   "fromVersion": 5,
+   "start": {
+    "bestNine": 55.1,
+    "rivalMean": 54.7,
+    "rivalRange": [
+     41,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 280369,
+     "minMoney": 41004,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 10,
+     "saveBytes": 133697,
+     "rivalStrength": [
+      45,
+      67
+     ],
+     "reputation": 63,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 9.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.8,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      45,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -486675,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 35960,
+      "gate": 511644,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 2600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 319028,
+     "minMoney": 163675,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 11,
+     "saveBytes": 135416,
+     "rivalStrength": [
+      47,
+      64
+     ],
+     "reputation": 74,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 16.5,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.1,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      48,
+      64
+     ],
+     "signings": 1,
+     "signingFees": 39968,
+     "signedOverall": 73,
+     "finance": {
+      "wages": -524338,
+      "upkeep": -46560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 69040,
+      "gate": 953085,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": -5400,
+      "transfers": -39968,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 30214
+  },
+  {
+   "seed": 4248,
+   "mode": "managed",
+   "fromVersion": 6,
+   "start": {
+    "bestNine": 56.2,
+    "rivalMean": 54.7,
+    "rivalRange": [
+     42,
+     68
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 10097,
+     "minMoney": -3598,
+     "debtWeeks": 1,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 11,
+     "saveBytes": 133981,
+     "rivalStrength": [
+      43,
+      66
+     ],
+     "reputation": 40,
+     "sacked": false,
+     "wins": 17,
+     "draws": 3,
+     "losses": 4,
+     "marginPerGame": 8.9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      43,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -495736,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33040,
+      "gate": 409353,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": -13400,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 214987,
+     "minMoney": -17842,
+     "debtWeeks": 12,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 9,
+     "saveBytes": 130386,
+     "rivalStrength": [
+      45,
+      64
+     ],
+     "reputation": 65,
+     "sacked": false,
+     "wins": 22,
+     "draws": 1,
+     "losses": 1,
+     "marginPerGame": 16,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 72.2,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      45,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -489867,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 43920,
+      "gate": 595497,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 500,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29039
+  },
+  {
+   "seed": 4249,
+   "mode": "managed",
+   "fromVersion": 7,
+   "start": {
+    "bestNine": 54.3,
+    "rivalMean": 54.8,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 33681,
+     "minMoney": -44700,
+     "debtWeeks": 8,
+     "forcedSales": 0,
+     "squad": 21,
+     "freeAgents": 12,
+     "saveBytes": 136694,
+     "rivalStrength": [
+      46,
+      66
+     ],
+     "reputation": 40,
+     "sacked": false,
+     "wins": 23,
+     "draws": 0,
+     "losses": 1,
+     "marginPerGame": 12.8,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 72.8,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      46,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -493622,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 30720,
+      "gate": 451500,
+      "prize": 30000,
+      "boardGrant": 30000,
+      "events": -56757,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 135326,
+     "minMoney": -80961,
+     "debtWeeks": 19,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 9,
+     "saveBytes": 135270,
+     "rivalStrength": [
+      45,
+      64
+     ],
+     "reputation": 66,
+     "sacked": false,
+     "wins": 21,
+     "draws": 1,
+     "losses": 2,
+     "marginPerGame": 16.3,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.1,
+     "rivalMean": 56,
+     "rivalRange": [
+      45,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -609417,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 44720,
+      "gate": 601902,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 9600,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29644
+  },
+  {
+   "seed": 4250,
+   "mode": "managed",
+   "fromVersion": 8,
+   "start": {
+    "bestNine": 56.3,
+    "rivalMean": 55.3,
+    "rivalRange": [
+     41,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 251039,
+     "minMoney": 15465,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 12,
+     "saveBytes": 132964,
+     "rivalStrength": [
+      44,
+      68
+     ],
+     "reputation": 57,
+     "sacked": false,
+     "wins": 17,
+     "draws": 2,
+     "losses": 5,
+     "marginPerGame": 12.2,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 72.7,
+     "rivalMean": 56,
+     "rivalRange": [
+      45,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -501984,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 32960,
+      "gate": 497973,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 5250,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 371739,
+     "minMoney": 128581,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 8,
+     "saveBytes": 137547,
+     "rivalStrength": [
+      46,
+      66
+     ],
+     "reputation": 63,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 19.9,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.6,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      46,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -492048,
+      "upkeep": -44160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 60000,
+      "gate": 774858,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": -10750,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29787
+  },
+  {
+   "seed": 4251,
+   "mode": "managed",
+   "fromVersion": 9,
+   "start": {
+    "bestNine": 55.9,
+    "rivalMean": 54.9,
+    "rivalRange": [
+     41,
+     68
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 84415,
+     "minMoney": -69463,
+     "debtWeeks": 6,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 10,
+     "saveBytes": 131575,
+     "rivalStrength": [
+      47,
+      67
+     ],
+     "reputation": 56,
+     "sacked": false,
+     "wins": 13,
+     "draws": 1,
+     "losses": 10,
+     "marginPerGame": 8.5,
+     "ladderPosition": 5,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      45,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -497934,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34640,
+      "gate": 337869,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -7000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 254421,
+     "minMoney": 28211,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 7,
+     "saveBytes": 134294,
+     "rivalStrength": [
+      49,
+      65
+     ],
+     "reputation": 70,
+     "sacked": false,
+     "wins": 16,
+     "draws": 1,
+     "losses": 7,
+     "marginPerGame": 9.6,
+     "ladderPosition": 2,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.333,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 72,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      49,
+      65
+     ],
+     "signings": 2,
+     "signingFees": 67808,
+     "signedOverall": 54,
+     "finance": {
+      "wages": -422496,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 61600,
+      "gate": 627270,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": -8400,
+      "transfers": -67808,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 30372
+  },
+  {
+   "seed": 4252,
+   "mode": "managed",
+   "fromVersion": 10,
+   "start": {
+    "bestNine": 54.4,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     41,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 265808,
+     "minMoney": 31072,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 11,
+     "saveBytes": 132571,
+     "rivalStrength": [
+      44,
+      67
+     ],
+     "reputation": 53,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 21.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.1,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      44,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -482136,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 30920,
+      "gate": 506184,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -6000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 292982,
+     "minMoney": 152384,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 8,
+     "saveBytes": 133384,
+     "rivalStrength": [
+      48,
+      65
+     ],
+     "reputation": 61,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 18.3,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 73.2,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      48,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -520344,
+      "upkeep": -42960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 60040,
+      "gate": 715638,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": -3000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29506
+  },
+  {
+   "seed": 4253,
+   "mode": "managed",
+   "fromVersion": 11,
+   "start": {
+    "bestNine": 55.8,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     41,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 270101,
+     "minMoney": 34951,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 11,
+     "saveBytes": 136697,
+     "rivalStrength": [
+      46,
+      68
+     ],
+     "reputation": 58,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 18.4,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71.4,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      46,
+      68
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -491130,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34160,
+      "gate": 504231,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 6000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 342357,
+     "minMoney": 122229,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 8,
+     "saveBytes": 135822,
+     "rivalStrength": [
+      48,
+      66
+     ],
+     "reputation": 83,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 17.4,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 73.6,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      47,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -558354,
+      "upkeep": -46560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 65720,
+      "gate": 895650,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 8000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 30306
+  },
+  {
+   "seed": 4254,
+   "mode": "managed",
+   "fromVersion": 12,
+   "start": {
+    "bestNine": 55.8,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     42,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 273921,
+     "minMoney": 31752,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 14,
+     "saveBytes": 131980,
+     "rivalStrength": [
+      44,
+      69
+     ],
+     "reputation": 58,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 12.8,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.1,
+     "rivalMean": 56,
+     "rivalRange": [
+      42,
+      69
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -499959,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33840,
+      "gate": 529200,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -6000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 296544,
+     "minMoney": 129714,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 8,
+     "saveBytes": 135891,
+     "rivalStrength": [
+      47,
+      66
+     ],
+     "reputation": 65,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 16.4,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.3,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      47,
+      66
+     ],
+     "signings": 1,
+     "signingFees": 22445,
+     "signedOverall": 67,
+     "finance": {
+      "wages": -541545,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 63000,
+      "gate": 803565,
+      "prize": 30000,
+      "boardGrant": 20000,
+      "events": -67392,
+      "transfers": -22445,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29206
+  },
+  {
+   "seed": 4255,
+   "mode": "managed",
+   "fromVersion": 13,
+   "start": {
+    "bestNine": 55.3,
+    "rivalMean": 55.3,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 128496,
+     "minMoney": -38129,
+     "debtWeeks": 7,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 9,
+     "saveBytes": 132316,
+     "rivalStrength": [
+      45,
+      67
+     ],
+     "reputation": 50,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 8.8,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.5,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 73.8,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      47,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -503697,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 35560,
+      "gate": 508326,
+      "prize": 70000,
+      "boardGrant": 30000,
+      "events": -53533,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 24290,
+     "minMoney": 13834,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 10,
+     "saveBytes": 135058,
+     "rivalStrength": [
+      48,
+      66
+     ],
+     "reputation": 57,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 19.8,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75.9,
+     "rivalMean": 56.2,
+     "rivalRange": [
+      47,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -607608,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 54400,
+      "gate": 540162,
+      "prize": 15000,
+      "boardGrant": 20000,
+      "events": -16000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29639
+  },
+  {
+   "seed": 4256,
+   "mode": "managed",
+   "fromVersion": 14,
+   "start": {
+    "bestNine": 55.7,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     41,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 236736,
+     "minMoney": 1204,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 12,
+     "saveBytes": 134406,
+     "rivalStrength": [
+      43,
+      67
+     ],
+     "reputation": 58,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 13.9,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 72.8,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      43,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -510588,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34080,
+      "gate": 514311,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -17907,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 319650,
+     "minMoney": 115406,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 15,
+     "freeAgents": 11,
+     "saveBytes": 136603,
+     "rivalStrength": [
+      47,
+      64
+     ],
+     "reputation": 80,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 18.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75,
+     "rivalMean": 56.3,
+     "rivalRange": [
+      47,
+      64
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -543375,
+      "upkeep": -45960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 63720,
+      "gate": 897729,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 3000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 30920
+  },
+  {
+   "seed": 4257,
+   "mode": "managed",
+   "fromVersion": 15,
+   "start": {
+    "bestNine": 56.7,
+    "rivalMean": 55.2,
+    "rivalRange": [
+     43,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 175996,
+     "minMoney": -56481,
+     "debtWeeks": 12,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 10,
+     "saveBytes": 134037,
+     "rivalStrength": [
+      46,
+      65
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 26.3,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.75,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 73.4,
+     "rivalMean": 55.8,
+     "rivalRange": [
+      47,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -534105,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33840,
+      "gate": 517314,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -57893,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 487196,
+     "minMoney": 52444,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 17,
+     "freeAgents": 13,
+     "saveBytes": 135911,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 81,
+     "sacked": false,
+     "wins": 22,
+     "draws": 1,
+     "losses": 1,
+     "marginPerGame": 26.1,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 75.4,
+     "rivalMean": 56.4,
+     "rivalRange": [
+      46,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -555504,
+      "upkeep": -44160,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 63920,
+      "gate": 900144,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -1000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 30691
+  },
+  {
+   "seed": 4258,
+   "mode": "managed",
+   "fromVersion": 16,
+   "start": {
+    "bestNine": 55.2,
+    "rivalMean": 54.9,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 201820,
+     "minMoney": -38465,
+     "debtWeeks": 9,
+     "forcedSales": 0,
+     "squad": 21,
+     "freeAgents": 10,
+     "saveBytes": 133179,
+     "rivalStrength": [
+      46,
+      66
+     ],
+     "reputation": 58,
+     "sacked": false,
+     "wins": 19,
+     "draws": 0,
+     "losses": 5,
+     "marginPerGame": 12,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 72.6,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      44,
+      66
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -505715,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33240,
+      "gate": 513555,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -56100,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 502719,
+     "minMoney": 69670,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 9,
+     "saveBytes": 137833,
+     "rivalStrength": [
+      46,
+      63
+     ],
+     "reputation": 81,
+     "sacked": false,
+     "wins": 21,
+     "draws": 0,
+     "losses": 3,
+     "marginPerGame": 16.7,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 75,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      46,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -581445,
+      "upkeep": -45360,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 66440,
+      "gate": 919464,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -6000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -120000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 30223
+  },
+  {
+   "seed": 4259,
+   "mode": "managed",
+   "fromVersion": 17,
+   "start": {
+    "bestNine": 56.4,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     41,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 254361,
+     "minMoney": 20303,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 9,
+     "saveBytes": 133655,
+     "rivalStrength": [
+      46,
+      67
+     ],
+     "reputation": 59,
+     "sacked": false,
+     "wins": 19,
+     "draws": 2,
+     "losses": 3,
+     "marginPerGame": 12.5,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.667,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 72.6,
+     "rivalMean": 55.8,
+     "rivalRange": [
+      46,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -502038,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 34840,
+      "gate": 502719,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 2000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 236954,
+     "minMoney": 139613,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 7,
+     "saveBytes": 135616,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 72,
+     "sacked": false,
+     "wins": 22,
+     "draws": 1,
+     "losses": 1,
+     "marginPerGame": 20.2,
+     "ladderPosition": 1,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 3,
+     "forfeits": 0,
+     "bestNine": 74.9,
+     "rivalMean": 55.8,
+     "rivalRange": [
+      46,
+      65
+     ],
+     "signings": 1,
+     "signingFees": 27380,
+     "signedOverall": 74,
+     "finance": {
+      "wages": -575060,
+      "upkeep": -45960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 65160,
+      "gate": 936033,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": -3000,
+      "transfers": -27380,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 28700
+  },
+  {
+   "seed": 4260,
+   "mode": "managed",
+   "fromVersion": 18,
+   "start": {
+    "bestNine": 54.3,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     42,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 200045,
+     "minMoney": -37644,
+     "debtWeeks": 7,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 9,
+     "saveBytes": 133255,
+     "rivalStrength": [
+      46,
+      64
+     ],
+     "reputation": 56,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 14.9,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.1,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      47,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -505935,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33320,
+      "gate": 524097,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": -68277,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 292307,
+     "minMoney": 77373,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 8,
+     "saveBytes": 134348,
+     "rivalStrength": [
+      46,
+      63
+     ],
+     "reputation": 80,
+     "sacked": false,
+     "wins": 22,
+     "draws": 1,
+     "losses": 1,
+     "marginPerGame": 24.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 76.2,
+     "rivalMean": 56,
+     "rivalRange": [
+      46,
+      63
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -534492,
+      "upkeep": -45960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 63720,
+      "gate": 901194,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": 0,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 27089
+  },
+  {
+   "seed": 4261,
+   "mode": "managed",
+   "fromVersion": 19,
+   "start": {
+    "bestNine": 55.8,
+    "rivalMean": 55.1,
+    "rivalRange": [
+     41,
+     69
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 296016,
+     "minMoney": 53289,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 20,
+     "freeAgents": 11,
+     "saveBytes": 136048,
+     "rivalStrength": [
+      48,
+      66
+     ],
+     "reputation": 58,
+     "sacked": false,
+     "wins": 22,
+     "draws": 0,
+     "losses": 2,
+     "marginPerGame": 18.6,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 71,
+     "rivalMean": 55.9,
+     "rivalRange": [
+      45,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -492273,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 33320,
+      "gate": 528129,
+      "prize": 145000,
+      "boardGrant": 30000,
+      "events": 10000,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 281119,
+     "minMoney": 132918,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 19,
+     "freeAgents": 11,
+     "saveBytes": 138107,
+     "rivalStrength": [
+      48,
+      65
+     ],
+     "reputation": 68,
+     "sacked": false,
+     "wins": 18,
+     "draws": 1,
+     "losses": 5,
+     "marginPerGame": 13.8,
+     "ladderPosition": 2,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 72.9,
+     "rivalMean": 56.1,
+     "rivalRange": [
+      49,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -561714,
+      "upkeep": -46560,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 65200,
+      "gate": 895377,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": 0,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -360000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29916
+  },
+  {
+   "seed": 4262,
+   "mode": "managed",
+   "fromVersion": 20,
+   "start": {
+    "bestNine": 55.3,
+    "rivalMean": 55.5,
+    "rivalRange": [
+     42,
+     70
+    ]
+   },
+   "seasons": [
+    {
+     "season": 1,
+     "money": 123023,
+     "minMoney": 10832,
+     "debtWeeks": 0,
+     "forcedSales": 0,
+     "squad": 18,
+     "freeAgents": 9,
+     "saveBytes": 130308,
+     "rivalStrength": [
+      43,
+      67
+     ],
+     "reputation": 41,
+     "sacked": false,
+     "wins": 16,
+     "draws": 0,
+     "losses": 8,
+     "marginPerGame": 6.4,
+     "ladderPosition": 3,
+     "premiership": false,
+     "madeFinals": true,
+     "nearRivalWinRate": 0.25,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 70.1,
+     "rivalMean": 55.7,
+     "rivalRange": [
+      43,
+      67
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -479355,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 32880,
+      "gate": 439908,
+      "prize": 70000,
+      "boardGrant": 20000,
+      "events": -2250,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": -48000,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    },
+    {
+     "season": 2,
+     "money": 221892,
+     "minMoney": -3941,
+     "debtWeeks": 1,
+     "forcedSales": 0,
+     "squad": 16,
+     "freeAgents": 8,
+     "saveBytes": 131653,
+     "rivalStrength": [
+      47,
+      65
+     ],
+     "reputation": 61,
+     "sacked": false,
+     "wins": 20,
+     "draws": 0,
+     "losses": 4,
+     "marginPerGame": 13.7,
+     "ladderPosition": 1,
+     "premiership": true,
+     "madeFinals": true,
+     "nearRivalWinRate": 1,
+     "nearRivalGames": 4,
+     "forfeits": 0,
+     "bestNine": 74.4,
+     "rivalMean": 56,
+     "rivalRange": [
+      45,
+      65
+     ],
+     "signings": 0,
+     "signingFees": 0,
+     "signedOverall": 0,
+     "finance": {
+      "wages": -516171,
+      "upkeep": -12960,
+      "overhead": -97200,
+      "sponsor": 0,
+      "grant": 43640,
+      "gate": 582498,
+      "prize": 145000,
+      "boardGrant": 20000,
+      "events": -65938,
+      "transfers": 0,
+      "contracts": 0,
+      "facilities": 0,
+      "other": 0
+     },
+     "styleMix": {
+      "attacks": 0,
+      "defences": 0,
+      "switches": 0,
+      "games": 0
+     }
+    }
+   ],
+   "problems": [],
+   "ms": 29599
+  }
+ ],
+ "summary": [
+  {
+   "mode": "managed",
+   "difficulty": "normal",
+   "season": 1,
+   "runs": 20,
+   "wins": 19.1,
+   "draws": 0.5,
+   "losses": 4.5,
+   "marginPerGame": 13.1,
+   "ladderPosition": 1.5,
+   "finals": 1,
+   "finalsAppearances": 1,
+   "premierships": 0.65,
+   "sacked": 0,
+   "bestNine": 70.3,
+   "rivalMean": 55.9,
+   "gap": 14.4,
+   "nearRivalWinRate": 0.69,
+   "nearRivalGames": 78,
+   "forfeits": 0,
+   "rivalRange": [
+    42,
+    69
+   ],
+   "money": 179306,
+   "signings": 0,
+   "signingFees": 0,
+   "signedOverall": 0,
+   "startGap": 0.2,
+   "finance": {
+    "wages": -498157,
+    "upkeep": -10160,
+    "overhead": -97200,
+    "sponsor": 0,
+    "grant": 33806,
+    "gate": 480032,
+    "prize": 106500,
+    "boardGrant": 28000,
+    "events": -15515,
+    "transfers": 0,
+    "contracts": 0,
+    "facilities": -48000,
+    "other": 0
+   },
+   "attackStyles": 0,
+   "defenceStyles": 0,
+   "breakSwitches": 0,
+   "rivalGames": 0
+  },
+  {
+   "mode": "managed",
+   "difficulty": "normal",
+   "season": 2,
+   "runs": 20,
+   "wins": 20.2,
+   "draws": 0.3,
+   "losses": 3.6,
+   "marginPerGame": 16.9,
+   "ladderPosition": 1.2,
+   "finals": 1,
+   "finalsAppearances": 2,
+   "premierships": 0.45,
+   "sacked": 0,
+   "bestNine": 73.6,
+   "rivalMean": 56.1,
+   "gap": 17.5,
+   "nearRivalWinRate": 0.68,
+   "nearRivalGames": 74,
+   "forfeits": 0,
+   "rivalRange": [
+    44,
+    68
+   ],
+   "money": 259863,
+   "signings": 0.7,
+   "signingFees": 26197,
+   "signedOverall": 69.1,
+   "startGap": 0.2,
+   "finance": {
+    "wages": -521597,
+    "upkeep": -34020,
+    "overhead": -97200,
+    "sponsor": 0,
+    "grant": 58612,
+    "gate": 745147,
+    "prize": 87500,
+    "boardGrant": 19500,
+    "events": -13188,
+    "transfers": -26197,
+    "contracts": 0,
+    "facilities": -138000,
+    "other": 0
+   },
+   "attackStyles": 0,
+   "defenceStyles": 0,
+   "breakSwitches": 0,
+   "rivalGames": 0
+  },
+  {
+   "mode": "managed",
+   "difficulty": "normal",
+   "season": 3,
+   "runs": 20,
+   "wins": 20.4,
+   "draws": 0.4,
+   "losses": 3.3,
+   "marginPerGame": 18.1,
+   "ladderPosition": 1.1,
+   "finals": 1,
+   "finalsAppearances": 3,
+   "premierships": 0.6,
+   "sacked": 0,
+   "bestNine": 75.1,
+   "rivalMean": 56.3,
+   "gap": 18.8,
+   "nearRivalWinRate": 0.77,
+   "nearRivalGames": 73,
+   "forfeits": 0,
+   "rivalRange": [
+    46,
+    67
+   ],
+   "money": 391610,
+   "signings": 1.2,
+   "signingFees": 39016,
+   "signedOverall": 64.1,
+   "startGap": 0.2,
+   "finance": {
+    "wages": -650234,
+    "upkeep": -47070,
+    "overhead": -97200,
+    "sponsor": 0,
+    "grant": 76956,
+    "gate": 970705,
+    "prize": 102750,
+    "boardGrant": 30000,
+    "events": -5144,
+    "transfers": -39016,
+    "contracts": 0,
+    "facilities": -210000,
+    "other": 0
+   },
+   "attackStyles": 0,
+   "defenceStyles": 0,
+   "breakSwitches": 0,
+   "rivalGames": 0
+  },
+  {
+   "mode": "managed",
+   "difficulty": "normal",
+   "season": 4,
+   "runs": 20,
+   "wins": 20.2,
+   "draws": 0.5,
+   "losses": 3.4,
+   "marginPerGame": 17,
+   "ladderPosition": 1.3,
+   "finals": 1,
+   "finalsAppearances": 4,
+   "premierships": 0.7,
+   "sacked": 0,
+   "bestNine": 75.9,
+   "rivalMean": 56.4,
+   "gap": 19.5,
+   "nearRivalWinRate": 0.74,
+   "nearRivalGames": 81,
+   "forfeits": 0,
+   "rivalRange": [
+    46,
+    65
+   ],
+   "money": 571078,
+   "signings": 1.2,
+   "signingFees": 43908,
+   "signedOverall": 69.7,
+   "startGap": 0.2,
+   "finance": {
+    "wages": -876344,
+    "upkeep": -59370,
+    "overhead": -97200,
+    "sponsor": 0,
+    "grant": 94930,
+    "gate": 1172357,
+    "prize": 111000,
+    "boardGrant": 20000,
+    "events": -3996,
+    "transfers": -43908,
+    "contracts": 0,
+    "facilities": -138000,
+    "other": 0
+   },
+   "attackStyles": 0,
+   "defenceStyles": 0,
+   "breakSwitches": 0,
+   "rivalGames": 0
+  },
+  {
+   "mode": "managed",
+   "difficulty": "normal",
+   "season": 5,
+   "runs": 20,
+   "wins": 20.3,
+   "draws": 0.8,
+   "losses": 2.9,
+   "marginPerGame": 17.2,
+   "ladderPosition": 1.2,
+   "finals": 1,
+   "finalsAppearances": 5,
+   "premierships": 0.6,
+   "sacked": 0.1,
+   "bestNine": 77,
+   "rivalMean": 56.4,
+   "gap": 20.6,
+   "nearRivalWinRate": 0.81,
+   "nearRivalGames": 84,
+   "forfeits": 0,
+   "rivalRange": [
+    45,
+    64
+   ],
+   "money": 748474,
+   "signings": 1.5,
+   "signingFees": 47867,
+   "signedOverall": 67,
+   "startGap": 0.2,
+   "finance": {
+    "wages": -974256,
+    "upkeep": -65130,
+    "overhead": -97200,
+    "sponsor": 0,
+    "grant": 102712,
+    "gate": 1257137,
+    "prize": 102750,
+    "boardGrant": 18000,
+    "events": -4749,
+    "transfers": -47867,
+    "contracts": 0,
+    "facilities": -114000,
+    "other": 0
+   },
+   "attackStyles": 0,
+   "defenceStyles": 0,
+   "breakSwitches": 0,
+   "rivalGames": 0
+  }
+ ]
+}

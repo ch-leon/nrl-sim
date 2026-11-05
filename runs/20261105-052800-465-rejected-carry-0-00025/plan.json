@@ -1,0 +1,10 @@
+{
+  "name": "465 rejected carry 0.00025",
+  "kind": "soak",
+  "command": "npm run soak -- --managed-only --difficulties normal --jobs 4 --tune counters.rush.carry=0.00025",
+  "seeds": 20,
+  "seasons": 5,
+  "tuning": {
+    "counters.rush.carry": 0.00025
+  }
+}
