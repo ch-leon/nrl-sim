@@ -653,6 +653,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       for (let i = 0; i < 24000 && pb.breakKind !== 'half-time'; i++) pb.runner.step();
       pb.release();
       if (pb.breakKind !== 'half-time') throw new Error('did not reach half-time');
+      sc.planCardHalf = pb.half; // mirror refreshPlan's once-per-half latch
       sc.overlay.offerReplay(() => {});
       sc.openPlanCard('Half-time', ['Landscape FC 4 – 0 Rivals', 'Legs 80% / 78%', 'Calls paid off – / –']);
     });
