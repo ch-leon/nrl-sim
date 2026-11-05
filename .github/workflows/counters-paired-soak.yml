@@ -1,0 +1,39 @@
+name: Counters paired full soak
+on:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['.github/workflows/counters-paired-soak.yml']
+permissions:
+  contents: read
+  actions: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  enabled-soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run soak -- --difficulties easy,normal,hard --jobs 4 --json soak-enabled.json 2>&1 | tee soak-enabled.log
+      - uses: actions/download-artifact@v4
+        with:
+          name: counters-soak-main
+          run-id: 41960460765
+          github-token: ${{ github.token }}
+          path: baseline
+      - run: python3 scripts/check-counters-soak.py baseline/soak-main.json soak-enabled.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: final-soak-enabled
+          path: |
+            soak-enabled.json
+            soak-enabled.log
+          retention-days: 7
+
