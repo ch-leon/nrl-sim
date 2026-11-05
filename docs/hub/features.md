@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
 
 What's in the game, with the PR that added each.
 
@@ -62,6 +62,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- Counter moments get varied, rate-limited live commentary; losses can explain an unfavourable plan matchup with an out-schemed reason and a plan action ([PR](https://github.com/ch-leon/nrl-sim/pull/512)).
 
 - Plan buttons show squad-fit stars and a named contributor; pre-match scouting uses the selected rival nine and shows counters, and half-time shows breaks, kicks and errors against style guides ([PR](https://github.com/ch-leon/nrl-sim/pull/510)).
 

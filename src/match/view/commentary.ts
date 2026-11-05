@@ -16,9 +16,14 @@
 //
 // The match report's summary (matchReport.ts) takes its first lines from here too.
 import type { Side, SimEvent } from '../core/snapshot';
-import type { MatchEvent, MatchResult } from '../../sim/events';
+import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { CALL_LABEL, callIsPenalty, isCoachCall } from '../league/calls';
-import { PRESET_LABEL } from '../league/presets';
+import { MID_Y } from '../core/field';
+import { MAX_LAT_M } from '../league/tactics';
+import { ROLES } from '../league/roles';
+import { COUNTERS } from '../league/counters';
+import { styleFit } from '../league/fit';
+import { DEFAULT_TACTICS, isAttackPreset, isDefencePreset, type TeamTactics, PACK, BACKS, PRESET_LABEL } from '../league/presets';
 
 /**
  * Characters a ticker line stays within. At 844×390 the commentary strip is
@@ -107,6 +112,14 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'break-tackle:wrestle': ['{player} fights out of the tackle!', '{player} wrestles free!', "Broke free! {player} won't go down."],
   offload: ['{player} gets the offload away!', 'Offload! {player} keeps it alive.', '{player} slips the ball out of the tackle.'],
   'cut-out': ['{player} throws the cut-out ball.', 'A cut-out pass from {player}.', '{player} skips a man with the pass.'],
+  // Counter reads describe observed moments, never add sim events (#468).
+  'counter:slide': ["Slide shuts down the wide play.", "Slide has the numbers out wide.", "The wide ball meets a set Slide line."],
+  'counter:compressed': ['Compressed swallows another hit-up.', 'Tight meets a packed Compressed middle.', 'Compressed holds the Tight runners.'],
+  'counter:kick-chase': ['Rush comes up; Kick-chase turns them around.', 'Kick-chase puts the ball behind Rush.', 'Over the Rush line goes the kick.'],
+  'counter:tight': ['Tight offload keeps it alive against Slide.', 'Tight slips an offload through Slide.', 'Slide leaves room for the Tight offload.'],
+  'counter:expansive': ['Expansive breaks the Compressed line.', 'Expansive finds room against Compressed.', 'Compressed cannot hold the Expansive runner.'],
+  'counter:rush': ['Rush stops the All-out runner.', 'All-out meets the Rush line.', 'Rush holds firm against All-out.'],
+  'counter:all-out': ['All-out breaks through Slide.', 'All-out gets through the Slide line.', 'All-out finds a gap in Slide.'],
   // ── Defence ──
   tackle: ['{player} wraps him up.', '{player} makes the tackle.', 'Held. {player} brings him down.', '{player} stops him in his tracks.'],
   // A Wrecking Ball drives on through it (§3); the tackler holds on.
@@ -316,7 +329,14 @@ export const GROUNDED_LIFT = 1e-4;
  * not (a resumed match's silent stretch too), and every tick's ball, so it knows
  * what is in the air and what it said last.
  */
+/** Match-clock minutes between counter lines credited to the same side. */
+export const COUNTER_WINDOW_MINUTES = 3;
+
 export class Commentator {
+  private readonly plans: Record<Side, TeamTactics>;
+  private readonly fits: Record<Side, ReturnType<typeof styleFit>>;
+  private readonly counterAt: Record<Side, number> = { home: -Infinity, away: -Infinity };
+
   private readonly words: Record<Side, string>;
   private kickInAir = false;
   /** The tick the kick in the air was struck on, and the last tick the ball lay on the ground unheld. */
@@ -330,15 +350,23 @@ export class Commentator {
   constructor(
     private readonly seed: number,
     names: Readonly<Record<Side, string>>,
+    sheets?: Readonly<Record<Side, TeamSheet>>,
   ) {
+    this.plans = { home: { ...(sheets?.home.tactics ?? DEFAULT_TACTICS) }, away: { ...(sheets?.away.tactics ?? DEFAULT_TACTICS) } };
+    this.fits = { home: styleFit(sheets?.home.roster ?? []), away: styleFit(sheets?.away.roster ?? []) };
     this.words = { home: shortName(names.home), away: shortName(names.away) };
   }
 
   /** The line for an event ('' for nothing to say), given the score after it. */
-  line(e: SimEvent, score?: Readonly<Record<Side, number>>): string {
+  line(e: SimEvent, score?: Readonly<Record<Side, number>>, minute?: number, ballY?: number): string {
     const ordinal = e.tick === this.tick ? ++this.ordinal : (this.ordinal = 0);
     this.tick = e.tick;
-    const key = lineKey(e, this.kickInAir, score);
+    if (e.kind === 'plan' && e.side) {
+      const [attack, defence] = (e.detail ?? '').split('/');
+      if (isAttackPreset(attack) && isDefencePreset(defence)) this.plans[e.side] = { attack, defence };
+    }
+    const counter = minute === undefined ? null : this.counter(e, minute, ballY);
+    const key = counter ?? lineKey(e, this.kickInAir, score);
     if (KICKS.has(e.kind)) {
       this.kickInAir = true;
       this.kickTick = e.tick;
@@ -355,7 +383,44 @@ export class Commentator {
       ...(plan ? { plan } : {}),
       ...(score ? this.scoreFill(score) : {}),
     };
-    return this.say(key, lines, f, e.tick, ordinal) ?? e.text;
+    return this.say(key, lines, f, e.tick, ordinal, counter ? side : undefined) ?? e.text;
+  }
+
+  /** Read existing successful actions against the active plans; credit the acting side.
+   * A tackle names the defender, while a kick, offload or bust names the attacker.
+   * No counter attribution is possible without a match clock. */
+  private counter(e: SimEvent, minute: number, ballY?: number): string | null {
+    if (!e.side || !Number.isFinite(minute) || minute - this.counterAt[e.side] < COUNTER_WINDOW_MINUTES) return null;
+    const defending = e.kind === 'tackle' || e.kind === 'big-hit';
+    const other = e.side === 'home' ? 'away' : 'home';
+    const atk = defending ? other : e.side;
+    const def = defending ? e.side : other;
+    const attack = this.plans[atk].attack, defence = this.plans[def].defence;
+    if (this.fits[atk][attack] === 0 || this.fits[def][defence] === 0) return null;
+    // Contact counters have a location: Slide's wide defence and Compressed's
+    // middle. Read the rendered ball, never manufacture a tag in the live sim.
+    const wide = ballY !== undefined && Math.abs(ballY - MID_Y) > MAX_LAT_M;
+    const position = e.slot === undefined ? undefined : ROLES[e.slot]?.name;
+    if (ballY !== undefined) {
+      if (defending && attack === 'expansive' && defence === 'slide' && !wide) return null;
+      if (defending && attack === 'grind' && defence === 'compressed' && wide) return null;
+      if (!defending && attack === 'expansive' && defence === 'compressed' && (!wide || !position || !BACKS.includes(position))) return null;
+      if (!defending && attack === 'grind' && (!position || !PACK.includes(position))) return null;
+    }
+    let key: string | null = null;
+    if (defending) {
+      if (defence === 'slide' && attack === 'expansive' && COUNTERS.slide.on === 1) key = 'slide';
+      if (defence === 'compressed' && attack === 'grind' && COUNTERS.compressed.on === 1) key = 'compressed';
+      if (defence === 'rush' && attack === 'all-out' && COUNTERS.rush.on === 1) key = 'rush';
+    } else {
+      if (e.kind === 'kick' && attack === 'kick-chase' && defence === 'rush' && COUNTERS.rush.on === 1) key = 'kick-chase';
+      if (e.kind === 'offload' && attack === 'grind' && defence === 'slide' && COUNTERS.slide.on === 1) key = 'tight';
+      if (e.kind === 'break-tackle' && attack === 'expansive' && defence === 'compressed' && COUNTERS.compressed.on === 1) key = 'expansive';
+      if (e.kind === 'break-tackle' && attack === 'all-out' && defence === 'slide' && COUNTERS.slide.on === 1) key = 'all-out';
+    }
+    if (!key) return null;
+    this.counterAt[e.side] = minute;
+    return `counter:${key}`;
   }
 
   /**
@@ -379,9 +444,12 @@ export class Commentator {
     return { hi: s.hi, lo: s.lo, margin: s.hi - s.lo, ...(s.leader ? { leader: this.words[s.leader], winner: this.words[s.leader] } : {}) };
   }
 
-  private say(key: string, lines: readonly string[], f: LineFill, tick: number, ordinal: number): string | null {
+  private say(key: string, lines: readonly string[], f: LineFill, tick: number, ordinal: number, side?: Side): string | null {
     let i = variantIndex(lines.length, this.seed, key, tick, ordinal);
-    if (lines.length > 1 && this.last.get(key) === i) i = (i + 1) % lines.length;
+    const memory = side ? `${key}:${side}` : key;
+    for (let tries = 0; tries < lines.length - 1 &&
+      (this.last.get(memory) === i || this.last.get(key) === i); tries++) i = (i + 1) % lines.length;
+    this.last.set(memory, i);
     this.last.set(key, i);
     return fillLine(lines[i]!, f);
   }

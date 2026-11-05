@@ -324,7 +324,7 @@ export class LivePlayback {
     this.plans = opts.plans ?? [];
     this.controls = opts.controls ?? [];
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
-    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name });
+    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name }, { home, away });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
     const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, controls: this.controls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.simOpts = simOpts;
@@ -816,7 +816,7 @@ export class LivePlayback {
         if (this.opts.keyMoments?.()) this.keyMoments.note(e);
       }
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
-      const line = this.commentator.line(e, cur.score);
+      const line = this.commentator.line(e, cur.score, cur.clock?.minute, cur.ball.y);
       if (line && !this.skipping) this.opts.overlay?.comment(line);
       else if (line && e.kind === 'full-time') this.finalLine = line;
       if (e.kind === 'try' && !this.skipping) this.offerTryReplay(e.tick);

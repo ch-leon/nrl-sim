@@ -1,3 +1,4 @@
+import { runCounterText } from './e2e-webkit/match/counterText.mjs';
 import { runTrials } from './e2e-webkit/screens/trials.mjs';
 import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 // scripts/e2e-webkit.mjs — Safari-shaped checks: long DOM panels (#206, #203) and
@@ -85,6 +86,7 @@ import { runCoachCalls } from './e2e-webkit/match/coachCalls.mjs';
 // in this same order. Each section opens its own contexts and writes its own folder
 // under e2e-output/webkit, so a section plays the same alone as after the others.
 const SECTIONS = [
+  ['runCounterText', (b) => runCounterText(b)],
   ['runTrials', (b) => runTrials(b)],
   ['runExpansionIntro', (b) => runExpansionIntro(b)],
   ['runDerby', (b) => runDerby(b)],
@@ -116,7 +118,7 @@ const SECTIONS = [
  */
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
-  text: ['runLargeTextTargets', 'runLadderForm'],
+  text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
   screens: ['runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
