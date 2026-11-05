@@ -423,3 +423,24 @@ describe('rival styles over a season (#249, N11)', () => {
   });
 });
 
+
+it('plays and reloads a full UK season and rolls into another with the UK shape (#488)', async () => {
+  const { preparePack, selectPack } = await import('../../src/content');
+  await preparePack('uk');
+  try {
+    const r = runSoak({ seed: 101, seasons: 2, mode: 'managed', pack: 'uk' });
+    expect(r.problems).toEqual([]);
+    expect(r.seasons).toHaveLength(2);
+    for (const season of r.seasons) {
+      expect(season.wins + season.draws + season.losses).toBe(22);
+      expect(season.ladderPosition).toBeGreaterThanOrEqual(1);
+      expect(season.ladderPosition).toBeLessThanOrEqual(12);
+    }
+    expect(getState().pack).toBe('uk');
+    expect(getState().league.clubs).toHaveLength(12);
+    const loaded = runSoak({ seed: 101, seasons: 1, mode: 'idle', fromSave: JSON.parse(JSON.stringify(getState())) });
+    expect(loaded.problems).toEqual([]);
+    expect(loaded.seasons).toHaveLength(1);
+    expect(getState().pack).toBe('uk');
+  } finally { selectPack('au'); }
+}, 180_000);

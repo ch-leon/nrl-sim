@@ -43,6 +43,8 @@ export type SoakMode = 'idle' | 'managed';
 export interface SoakOptions {
   seed: number;
   seasons: number;
+  /** Prepared content pack for fresh careers. */
+  pack?: 'au' | 'uk';
   /**
    * Stop after this many weeks instead of `seasons` whole seasons: the save corpus's
    * short runs from the versions in between (tests/qa/corpus.test.ts), which only
@@ -195,6 +197,7 @@ export interface StyleGame {
 }
 
 export interface SoakResult {
+  pack?: 'au' | 'uk';
   seed: number;
   mode: SoakMode;
   difficulty?: Difficulty;
@@ -611,7 +614,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (!res.ok) return { seed: opts.seed, mode: opts.mode, start: { bestNine: 0, rivalMean: 0, rivalRange: [0, 0] }, seasons: [], problems: [`save failed to migrate: ${res.message}`], ms: 0 };
     loadState(res.state);
   } else {
-    createNewGame(`Soak ${opts.seed}`, opts.seed, { difficulty: opts.difficulty });
+    createNewGame(`Soak ${opts.seed}`, opts.seed, { difficulty: opts.difficulty, ...(opts.pack === 'uk' ? { home: { town: 'Ashcombe', country: 'GB' } } : {}) });
     initLeague(getState());
     if (opts.fromVersion !== undefined) {
       const res = migrateState(asOldSave(getState(), opts.fromVersion));
@@ -758,7 +761,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (last > first * 1.5) note(`save grew ${Math.round((last / first) * 100)}% over ${seasons.length} seasons (${first} → ${last} bytes)`);
   }
   setState({});
-  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
+  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.pack ? { pack: opts.pack } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
   } finally {
     stopPlanChanges?.();
   }

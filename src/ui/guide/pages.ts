@@ -11,7 +11,7 @@ import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../match/leagu
 import { NINES } from '../../match/league/rules';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { getState, type GameState } from '../../core/state';
-import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, TRAINING_FOCUS, WILDCARDS } from '../../config';
+import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, TRAINING_FOCUS, WILDCARDS } from '../../config';
 import { activePack } from '../../content';
 import { inlineIqStat } from '../../content/pack';
 import { STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
@@ -93,7 +93,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     title: 'Your week',
     sections: [
       {
-        text: 'New careers begin each season with two pre-season trials: try a lineup, earn a small home gate, with no ladder points or contract weeks used. Then come 27 competitive weeks: 24 rounds and three finals weeks if you make the eight. Older careers keep their existing season shape. Play Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.',
+        text: `New careers begin each season with two pre-season trials: try a lineup, earn a small home gate, with no ladder points or contract weeks used. Then come ${WEEKS_PER_SEASON} competitive weeks: ${SEASON_ROUNDS} rounds and ${FINALS_WEEKS} finals weeks if you make the eight. Older careers keep their existing season shape. Play Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.`,
       },
       {
         heading: 'Advancing further',
@@ -271,7 +271,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'ladder',
     sections: [
       {
-        text: '16 clubs play 24 rounds: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.',
+        text: `${activePack().clubs.length + 1} clubs play ${SEASON_ROUNDS} rounds: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.`,
       },
       {
         heading: 'Finals',

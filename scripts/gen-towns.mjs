@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib';
 import { pathToFileURL } from 'node:url';
 
 export const NICKNAMES = ['Wombats', 'Kestrels', 'Quarries', 'Ironworkers', 'Otters', 'Badgers', 'Ospreys', 'Founders'];
-const COUNTRIES = new Set(['AU', 'NZ']);
+const COUNTRIES = new Set(['AU', 'NZ', 'GB']);
 export function generateTowns(text, floor = 10000) {
   // geonamescache publishes the same populated-place export as keyed JSON.
   // Accept either local format; neither path performs a network request.
@@ -30,7 +30,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (!source) throw new Error('Provide a local GeoNames TSV path; no network requests are made.');
   if (!Number.isFinite(Number(floor)) || Number(floor) < 5000) throw new Error('Population floor must be at least 5000.');
   const towns = generateTowns(readFileSync(source, 'utf8'), Number(floor));
-  if ([...COUNTRIES].some(country => !towns.some(t => t.country === country))) throw new Error('Source must contain AU and NZ towns.');
+  if ([...COUNTRIES].some(country => !towns.some(t => t.country === country))) throw new Error('Source must contain AU, NZ and GB towns.');
   const json = JSON.stringify(towns) + '\n';
   const bytes = gzipSync(json).length;
   if (bytes >= 100_000) throw new Error(`${bytes} gzipped bytes exceeds budget; raise the population floor.`);

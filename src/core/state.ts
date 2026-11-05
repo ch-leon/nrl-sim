@@ -3,6 +3,7 @@
 // instances in state (must JSON round-trip).
 
 import { bus } from './events';
+import { packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
 import { generateFreeAgent, generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
@@ -238,6 +239,8 @@ export interface EventDeckState {
 export interface SackedInfo { season: number; reason: string }
 
 export interface GameState {
+  /** Content id; absent in old saves means AU, regardless of home or build default. */
+  pack?: string;
   version: typeof SAVE_VERSION;
   clubId: 'player';
   clubName: string;
@@ -317,12 +320,14 @@ export function getState(): GameState {
  */
 export function setState(patch: Partial<GameState>): void {
   const current = getState();
+  if ('pack' in patch) selectPack(patch.pack);
   state = { ...current, ...patch };
   bus.emit('state:changed', state);
 }
 
 /** Replace the whole state (used by save.ts / tests). Emits 'state:changed'. */
 export function loadState(next: GameState): void {
+  selectPack(next.pack);
   state = next;
   bus.emit('state:changed', state);
 }
@@ -339,6 +344,8 @@ export function createNewGame(
   seed: number = Date.now() >>> 0,
   options: { difficulty?: Difficulty | undefined; coachName?: string | undefined; openAll?: boolean | undefined; home?: GameState['home']; groundName?: string | undefined } = {},
 ): GameState {
+  const pack = packForCountry(options.home?.country);
+  selectPack(pack);
   const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
   const rng = makeRng(seed);
 
@@ -376,6 +383,7 @@ export function createNewGame(
 
   const result: GameState = {
     version: SAVE_VERSION,
+    pack,
     clubId: 'player',
     clubName,
     ...(options.coachName?.trim() ? { coachName: options.coachName } : {}),

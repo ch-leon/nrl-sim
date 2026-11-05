@@ -111,7 +111,7 @@ export function headroom(stat: number): number {
 export const TRAINING_FOCI: readonly TrainingFocus[] = ['balanced', 'speed', 'strength', 'stamina', 'skill', 'footyIQ'];
 
 const LABEL: Readonly<Record<TrainingFocus, string>> = {
-  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', skill: 'Skill', footyIQ: activePack().vocab.iqStat,
+  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', skill: 'Skill', get footyIQ() { return activePack().vocab.iqStat; },
 };
 
 export function focusLabel(f: TrainingFocus): string {

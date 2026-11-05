@@ -1,5 +1,6 @@
 import { currentRound } from './core/season';
 import Phaser from 'phaser';
+import { packForCountry, preparePack } from './content';
 import './ui/fonts';
 import { BootScene } from './scenes/BootScene';
 import { GroundsScene } from './scenes/GroundsScene';
@@ -134,16 +135,18 @@ async function boot(): Promise<void> {
   let freshGame = choice.mode !== 'continue';
   if (choice.mode === 'continue') {
     const saved = load();
-    if (saved) loadState(saved);
+    if (saved) { await preparePack(saved.pack ?? 'au'); loadState(saved); }
     else {
       freshGame = true;
       // Continue on an empty slot still starts fresh: drop a match record left behind.
       clearLiveMatch();
+      await preparePack(packForCountry(choice.home?.country));
       createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
     }
   } else {
     // New Game must not resume a match that belonged to the save this slot had.
     clearLiveMatch();
+    await preparePack(packForCountry(choice.home?.country));
     createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
