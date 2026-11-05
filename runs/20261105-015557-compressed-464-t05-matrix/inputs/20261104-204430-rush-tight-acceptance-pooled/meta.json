@@ -1,0 +1,40 @@
+{
+  "commit": "086042f",
+  "branch": "feat/463-rush-counters",
+  "started": "2026-11-04T20:44:59.449533+00:00",
+  "pooled": true,
+  "sourceRuns": [
+    "20261104-193151-rush-neutral-and-fit-acceptance",
+    "20261104-202535-rush-tight-extension-1",
+    "20261104-202535-rush-tight-extension-2",
+    "20261104-202533-rush-tight-extension-3",
+    "20261104-202534-rush-tight-extension-4"
+  ],
+  "seedRanges": [
+    [
+      1,
+      500,
+      "20261104-193151-rush-neutral-and-fit-acceptance"
+    ],
+    [
+      501,
+      625,
+      "20261104-202535-rush-tight-extension-1"
+    ],
+    [
+      626,
+      750,
+      "20261104-202535-rush-tight-extension-2"
+    ],
+    [
+      751,
+      875,
+      "20261104-202533-rush-tight-extension-3"
+    ],
+    [
+      876,
+      1000,
+      "20261104-202534-rush-tight-extension-4"
+    ]
+  ]
+}
