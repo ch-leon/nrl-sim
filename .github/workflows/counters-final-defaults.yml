@@ -1,4 +1,4 @@
-name: Counters final defaults acceptance
+name: Counters final defaults acceptance / fit 0.06
 'on':
   push:
     branches:

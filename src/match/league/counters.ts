@@ -33,7 +33,7 @@ export const COUNTERS = {
   },
   fit: {
     on: 1,
-    edge: 0.065,
+    edge: 0.06,
     counterResponse: 1,
   },
   tight: {

@@ -5,9 +5,11 @@ swing **4–6 win-share points paired against dormant main**, flat preset contro
 within **42–58%**, and full-fit swings of **9 points or stronger** (9–12 nominal).
 Distance from 50% is not the acceptance measurement.
 
-The lower Rush 0.61 candidate meets the neutral target (+4.50pp); its complete
-round-robin pool and actual-default acceptance run are in progress. The preceding
-0.7 candidate missed the 53% round-robin cap at 53.160714%.
+Rush 0.61 passes its neutral target (+4.50pp) and all fifteen round-robin averages
+(maximum 52.671429%). The complete 140-case fit-edge 0.065 soak passes Normal
+win-rate limits and all invariants but exceeds the Easy managed cash band.
+Fit edge 0.06 passes both Easy/Normal managed cash probes and all eight full-fit
+cells; its complete actual-default validation is now running.
 PR #506 remains draft until all numeric, complete-soak, CI and phone guards pass.
 The final before/after tables and permanent raw-run links will replace this
 validation checkpoint before the PR is marked ready.
@@ -17,7 +19,7 @@ validation checkpoint before the PR is marked ready.
 | Group | Values |
 |---|---|
 | Tight | on 1; offloadBase 1; offloadPerFit 9.5 |
-| Own fit | on 1; edge 0.065; counterResponse 1 |
+| Own fit | on 1; edge 0.06; counterResponse 1 |
 | Slide | on 1; expansive 0.08; expansiveFit 0.2; kickChase 0.4; kickChaseFit 0.7; tight 0.025; allOut 0.5; allOutRecovery 3; allOutReset 3 |
 | Rush | on 1; carry 0.0005; defenceFit 0.029; kickChase 0.61; allOut 0.1 |
 | Compressed | on 1; tight 0.06; tightFit 0.6; expansive 0.09; brokenBase 0; offloadBase 0; commitM 10; commitFit 0.5 |

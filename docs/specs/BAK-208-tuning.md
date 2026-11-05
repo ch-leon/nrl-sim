@@ -1435,7 +1435,7 @@ At a break, the newly applied plan selects its attack and defence fits again.
 |---|---|---|
 | `counters.fit.on` | 1 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
 | `counters.fit.counterResponse` | 1 | Shared unequal-fit response on all nonzero cells while own fit is enabled; formula below. |
-| `counters.fit.edge` | 0.065 | Carrier-edge probability per point of fit away from 1.0. |
+| `counters.fit.edge` | 0.06 | Carrier-edge probability per point of fit away from 1.0. |
 
 Each contact adds `edge × (attackFit − 1) − edge × (defenceFit − 1)`
 to `carrierEdge`, clamped to 0–1 by `contestOdds`. Thus a side's attack fit
@@ -1571,7 +1571,7 @@ whole dormant-to-enabled change.
 |---|---|
 | `presets.attack.kick-chase.base.pass` | `0.04` |
 | `counters.tight` | `on=1`, `offloadBase=1`, `offloadPerFit=9.5` |
-| `counters.fit` | `on=1`, `edge=0.065`, `counterResponse=1` |
+| `counters.fit` | `on=1`, `edge=0.06`, `counterResponse=1` |
 | `counters.slide` | `on=1`, `expansive=0.08`, `expansiveFit=0.2`, `kickChase=0.4`, `kickChaseFit=0.7`, `tight=0.025`, `allOut=0.50`, `allOutRecovery=3`, `allOutReset=3` |
 | `counters.rush` | `on=1`, `carry=0.0005`, `defenceFit=0.029`, `kickChase=0.61`, `allOut=0.1` |
 | `counters.compressed` | `on=1`, `tight=0.06`, `tightFit=0.6`, `expansive=0.09`, `brokenBase=0`, `offloadBase=0`, `commitM=10`, `commitFit=0.5` |
