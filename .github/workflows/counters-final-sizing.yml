@@ -1,6 +1,6 @@
-name: Rush carry season parity calibration
+name: Fitted Tight season parity calibration
 
-# #465 only: diagnose the remaining Normal managed drift with the existing soak.
+# #465: hold neutral fits fixed and measure the independent fitted-pack rebuild.
 on:
   workflow_dispatch:
   push:
@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        carry: [0.00025, 0.0001]
+        perFit: [8, 10]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,13 +27,50 @@ jobs:
           cache: npm
       - run: npm ci
       - run: git rev-parse HEAD > candidate-commit.txt
-      - run: npm run soak -- --managed-only --difficulties normal --jobs 4 --tune counters.rush.carry=${{ matrix.carry }} --json soak-candidate.json 2>&1 | tee soak-candidate.log
+      - run: npm run soak -- --managed-only --difficulties normal --jobs 4 --tune counters.tight.offloadPerFit=${{ matrix.perFit }} --json soak-candidate.json 2>&1 | tee soak-candidate.log
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: counters-carry-${{ matrix.carry }}
+          name: counters-tight-soak-${{ matrix.perFit }}
           path: |
             candidate-commit.txt
             soak-candidate.json
             soak-candidate.log
+          retention-days: 7
+  fit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        perFit: [8, 10]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Retain every seed and comparator for Tight / Slide
+        env:
+          PER_FIT: ${{ matrix.perFit }}
+        run: |
+          mkdir -p work
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const p = JSON.parse(readFileSync('balance/plans/counters-full-fit.json', 'utf8'));
+          p.scenarios = p.scenarios.slice(0, 1);
+          p.base['counters.tight.offloadPerFit'] = Number(process.env.PER_FIT);
+          p.name += ` - Tight offload per fit ${process.env.PER_FIT}`;
+          writeFileSync('work/fit-plan.json', JSON.stringify(p, null, 2));
+          JS
+      - run: npm run balance -- --check --plan work/fit-plan.json
+      - run: npm run balance -- --plan work/fit-plan.json --jobs 4 2>&1 | tee fit.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-tight-fit-${{ matrix.perFit }}
+          path: |
+            balance/runs
+            fit.log
           retention-days: 7
