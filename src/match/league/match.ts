@@ -36,6 +36,8 @@ export interface RunMatchOptions {
    * Absent: no rule, and the match is unchanged.
    */
   breakRuleSides?: readonly ('home' | 'away')[];
+  /** Rival-only difficulty context; serialisable for workers and replays (#469). */
+  aiRival?: { side: 'home' | 'away'; difficulty: import('../../config').Difficulty };
   /** The difficulty's edge to the player's rival, after the spread (N12.2); absent on Normal. */
   difficultyEdge?: DifficultyEdge;
 }
@@ -109,6 +111,7 @@ export function runMatch(home: TeamSheet, away: TeamSheet, opts: RunMatchOptions
     ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}),
     ...(opts.goldenPoint ? { goldenPoint: true } : {}),
     ...(opts.plans?.length ? { plans: opts.plans } : {}),
+    ...(opts.aiRival ? { aiRival: opts.aiRival } : {}),
     ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}),
     ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}),
   });

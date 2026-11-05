@@ -245,6 +245,15 @@ Compressed counters (#464) are on by default from #465 (`counters.compressed.on 
 
 Own-style fit (#461) is independently switched on by #465 (`counters.fit.on = 1`). Starting-sheet attack fit helps carrying contests and defence fit helps tackling contests; fit 1 is neutral. A plan applied at a break selects the new styles’ fits. The same contest roll resolves contact; see tuning §31.
 
+Rival habit counters (#469): Easy chooses its nine's best attack/defence fit.
+Normal counters the most common of the player's last three played league kick-off
+plans (ties go to the newest); Hard weighs the three by the player's squad fit.
+An empty history means Balanced / Slide. Upcoming lineup tactics are never an
+input. Normal may abandon a failing counter when behind by the existing margin
+and its key count is down; Hard may counter the plan observed in first-half open
+play at half-time. Rival-v-rival picks and live RNG stay unchanged. See tuning §36.
+
+
 *Pass* adds to the engaged carrier's chance of passing (base 30% + Skill/300). *Offloads*
 multiplies the offload odds (§4.1); 0 means support is ignored. *Step* is the chance he
 tries the step one-on-one rather than tucking it. *Width* softens the preference for the

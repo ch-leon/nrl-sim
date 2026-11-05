@@ -2,6 +2,7 @@
 // module-singleton store. See ARCHITECTURE §4 and BAK-172. No Phaser, no class
 // instances in state (must JSON round-trip).
 
+import type { TeamTactics } from '../match/league/presets';
 import { bus } from './events';
 import { packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
@@ -95,7 +96,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 21;
+export const SAVE_VERSION = 22;
 
 /** The three hires the facilities don't cover (N14.5). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare';
@@ -289,6 +290,8 @@ export interface GameState {
   finance: SeasonFinance[];
   /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
   lineup: Lineup;
+  /** Kick-off plans from played league matches, newest first, at most three. */
+  recentPlans: TeamTactics[];
   /** What the squad trains hardest (N11): one stat, or Balanced (every stat as it always trained). */
   training: { focus: TrainingFocus };
   /** What the club owes the board (N14.3): renewals it couldn't afford, advanced and repaid at the rollover. */
@@ -407,6 +410,7 @@ export function createNewGame(
     finance: [emptyFinance(1)],
     // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
     lineup: autoPick(squad),
+    recentPlans: [],
     training: { focus: 'balanced' },
     boardLoan: { owed: 0 },
     staff: [],

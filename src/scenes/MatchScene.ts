@@ -498,6 +498,7 @@ export class MatchScene extends Phaser.Scene {
         ...(experimentOn('match-controls') && live.planSide ? { controlsSide: live.planSide } : {}),
         ...(live.plans ? { plans: live.plans } : {}),
         ...(live.aiCoach?.length ? { aiCoach: live.aiCoach } : {}),
+        ...(live.aiRival ? { aiRival: live.aiRival } : {}),
         ...(live.breakRuleSides?.length ? { breakRuleSides: live.breakRuleSides } : {}),
         ...(live.goldenPoint ? { goldenPoint: true } : {}),
         ...(live.resumeAt ? { resumeAt: live.resumeAt } : {}),

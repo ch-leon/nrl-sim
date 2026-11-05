@@ -4,6 +4,10 @@
 // that were given it, and takes the plan it returns from the next restart.
 // No dice: with no side named, a match is the match it was. The thresholds
 // are knobs (`breaks.*`). Which rival gets the rule is the club's (N14).
+import { COUNTERS } from './counters';
+import { pickRivalPlan } from './ai';
+import type { StyleFit } from './fit';
+import type { Difficulty } from '../../config';
 import type { Side } from '../core/snapshot';
 import type { AttackPreset, DefencePreset, TeamTactics } from './presets';
 
@@ -34,6 +38,8 @@ export interface BreakFacts {
   at: 'half-time' | 'try';
   /** Tries the other side has scored without this side scoring in between. */
   concededInARow: number;
+  /** Rival-only: recorded play, never the opponent's pending plan. */
+  reaction?: { difficulty: Difficulty; observed: TeamTactics[]; ownFit: StyleFit; playerFit: StyleFit; keyDown: boolean };
 }
 
 /** Null keeps the plan. A returned plan is in force from the next restart. */
@@ -91,6 +97,16 @@ export function planWhenBehind(plan: TeamTactics): TeamTactics {
  */
 export function defaultBreakRule(facts: BreakFacts): TeamTactics | null {
   const margin = facts.score[facts.side] - facts.score[facts.side === 'home' ? 'away' : 'home'];
+  const reaction = facts.reaction;
+  if (COUNTERS.ai.on === 1 && reaction && reaction.observed.length) {
+    const hard = reaction.difficulty === 'hard' && facts.at === 'half-time' && COUNTERS.ai.hardHalfTime === 1;
+    const failing = reaction.difficulty !== 'easy' && COUNTERS.ai.normalBreak === 1
+      && margin <= -BREAKS.downBy && reaction.keyDown;
+    if (hard || failing) {
+      const next = pickRivalPlan(reaction.ownFit, reaction.playerFit, reaction.difficulty, reaction.observed);
+      if (next.attack !== facts.plan.attack || next.defence !== facts.plan.defence) return next;
+    }
+  }
   const behind = facts.at === 'half-time' && margin <= -BREAKS.downBy;
   const run = facts.concededInARow >= BREAKS.concededRun;
   const ahead = facts.minute >= BREAKS.tightenFromMinute && margin >= BREAKS.upBy;

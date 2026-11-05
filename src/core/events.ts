@@ -43,6 +43,8 @@ export interface LiveMatchData {
    * the player plays (N14.1). A list, so a resume and a Skip replay the same match.
    */
   breakRuleSides?: ('home' | 'away')[];
+  /** Rival-only difficulty context; serialisable for workers and replays (#469). */
+  aiRival?: { side: 'home' | 'away'; difficulty: import('../config').Difficulty };
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
   /** The difficulty's edge to the rival, after the rating spread (N12.2); absent on Normal. */

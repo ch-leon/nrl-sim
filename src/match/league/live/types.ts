@@ -180,6 +180,8 @@ export interface LiveOptions {
   breakRule?: BreakRule;
   /** Sides the break rule runs for. Empty or absent, with no function: nobody. */
   breakRuleSides?: readonly Side[];
+  /** Rival-only difficulty context; serialisable for workers and replays (#469). */
+  aiRival?: { side: 'home' | 'away'; difficulty: import('../../../config').Difficulty };
   /** The difficulty (N12.2): rating points the player's rival plays with on every stat, after the spread (spread.ts). Absent on Normal. */
   difficultyEdge?: DifficultyEdge;
 }

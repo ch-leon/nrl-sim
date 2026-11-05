@@ -268,6 +268,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       };
     },
   },
+  // v21 → v22: rivals learn only from league plans actually played (#469).
+  { from: 21, to: 22, run: (old) => ({ ...old, recentPlans: [] }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

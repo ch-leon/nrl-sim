@@ -3,6 +3,8 @@
 // (BAK-207): the week holds at kick-off, 'match:started' hands the Match scene
 // the seed, and the result — what the player watched and called — lands with
 // the rest of the week at 'match:finished'. Fast-forward plays it headless.
+import { DEFAULT_TACTICS } from '../match/league/presets';
+import type { RivalPlanContext } from '../match/league/ai';
 import { bus, type LiveMatchData } from '../core/events';
 import { getState, setState, type Fixture, type GameState, type RivalClub } from '../core/state';
 import { registerTickHook, resumeWeek, weekHeld, TICK_ORDER } from '../core/time';
@@ -157,12 +159,12 @@ function sheetFor(clubId: string): TeamSheet {
  * is the rival as he is on every difficulty: the difficulty plays in the match, as
  * his edge after the rating spread (N12.2, `rivalEdge`).
  */
-export function rivalMatchSheet(rival: RivalClub): TeamSheet {
+export function rivalMatchSheet(rival: RivalClub, context?: RivalPlanContext): TeamSheet {
   const fit = (rival.squad ?? []).filter(isFieldable);
   if (fit.length >= ON_FIELD) {
-    return withRivalStyle(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), rival);
+    return withRivalStyle(teamSheetFromSquad(fit, rival.id, rival.name, rival.colors, resolveLineup(autoPick(fit), fit)), rival, context);
   }
-  return teamSheetFromRival(rival);
+  return teamSheetFromRival(rival, context);
 }
 
 /** Fit (non-injured) squad size. */
@@ -211,6 +213,7 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   });
   setState({
     league: applied.league,
+    ...(fixture.round > 0 ? { recentPlans: [{ ...(ownSheet.tactics ?? DEFAULT_TACTICS) }, ...getState().recentPlans].slice(0, 3) } : {}),
     squad: applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
   });
 
@@ -273,8 +276,12 @@ export function registerPlayerMatchSystem(): void {
     const seed = rng.int(1, 2 ** 31);
     setState({ rngSeed: rng.state() });
 
-    const home = sheetFor(fixture.homeId);
-    const away = sheetFor(fixture.awayId);
+    const player = sheetFor(PLAYER_ID);
+    const rivalId = fixture.homeId === PLAYER_ID ? fixture.awayId : fixture.homeId;
+    const rival = state.league.clubs.find(c => c.id === rivalId)!;
+    const opponent = rivalMatchSheet(rival, { difficulty: state.settings.difficulty, recentPlans: state.recentPlans, playerRoster: player.roster ?? [] });
+    const home = fixture.homeId === PLAYER_ID ? player : opponent;
+    const away = fixture.awayId === PLAYER_ID ? player : opponent;
     const rivalSide = fixture.homeId === PLAYER_ID ? 'away' as const : 'home' as const;
     // The difficulty's edge to the rival, after the rating spread (N12.2); none on Normal.
     const edge = rivalEdge(rivalSide, state.settings.difficulty);
@@ -288,6 +295,7 @@ export function registerPlayerMatchSystem(): void {
       ...(edge ? { difficultyEdge: edge } : {}),
       ...(state.weather ? { weather: state.weather } : {}),
       aiCoach: aiCoachSides([rivalSide], state.settings.difficulty === 'hard'),
+      aiRival: { side: rivalSide, difficulty: state.settings.difficulty },
       breakRuleSides: breakRuleSidesFor(state, rivalSide, !!ctx.fastForward),
       // A drawn final goes to golden point (N9.4).
       ...(isFinalsRound(fixture.round) ? { goldenPoint: true } : {}),
@@ -330,6 +338,7 @@ export function registerPlayerMatchSystem(): void {
         ...(state.settings.coachCalls !== false ? { coachSide: fixture.homeId === PLAYER_ID ? ('home' as const) : ('away' as const), unlockedCalls: unlockedCalls(coachsOfficeLevel(state)) } : {}),
         ...(matchOpts.aiCoach.length ? { aiCoach: matchOpts.aiCoach } : {}),
         breakRuleSides: matchOpts.breakRuleSides,
+        aiRival: matchOpts.aiRival,
       };
       // Keep the tick on the parked match too, so Resume still has it if the
       // stored record is later missing or unreadable.

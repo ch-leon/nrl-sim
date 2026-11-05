@@ -1586,3 +1586,32 @@ retains its fingerprint: flat fit is exactly 1 and the cell is zero. These
 active defaults and the new pins become the guard for subsequent tasks.
 SAVE_VERSION remains 21. Labs/commercial defaults and live RNG call sites are
 unchanged.
+
+
+## 36. Rival habit counters (#469)
+
+Fixed-input choices in `match/league/ai.ts`; break reactions in `breaks.ts`.
+These do not change contest rolls or match fingerprint fixtures.
+
+| Knob | Default | Meaning |
+|---|---|---|
+| `counters.ai.on` | 1 | Enable player-match habit choices and break observations; 0 restores legacy rival choices |
+| `counters.ai.matrix` | 5 | Expected win-share points per signed matrix cell, multiplied by both starting fits |
+| `counters.ai.fit` | 5 | Expected win-share points per fit advantage, summed over attack and defence |
+| `counters.ai.normalBreak` | 1 | Normal/Hard may replace a failing counter at a break, behind by `breaks.downBy` and with its key number down |
+| `counters.ai.hardHalfTime` | 1 | Hard may counter the most-played observed first-half plan at half-time |
+| `counters.ai.keyDeficit` | 1 | Minimum deficit versus the opponent in the attack style's key count |
+
+Easy maximises its own attack and defence fit. Normal uses the joint mode of
+three past kick-off plans (ties: newest first); no history means Balanced / Slide.
+Hard averages all three, weighting each by the mean of the player's attack and
+defence fits. All fifteen candidates use the signed matrix and both starting
+fits. Exact ties favour Balanced / Slide, then preset declaration order.
+
+Key counts are offloads for Tight, kicks for Kick-chase, line breaks for
+Expansive/All-out, and fewer errors for Balanced. Observations count ticks in
+first-half open play, excluding pending picks. Easy retains the existing score
+rule; all difficulties retain it as fallback. Rival-v-rival matches have no
+habit context. Watched, fast-forwarded and resumed matches carry identical
+serialisable rival context. SAVE_VERSION 22 adds only `recentPlans` (newest first,
+at most three played league kick-offs); v21 migrates to an empty history.
