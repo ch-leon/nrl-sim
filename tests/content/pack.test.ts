@@ -283,7 +283,10 @@ describe('UK careers (#488)', () => {
     expect(MAX_RUN_WEEKS).toBe(50);
     expect(unlockReason('grandstand')).toContain('round 22');
     expect(getState().league.clubs).toHaveLength(12);
-    expect(getState().league.fixtures).toHaveLength(132);
+    expect(getState().preseason).toBe(1);
+    expect(getState().league.fixtures.filter(f => f.round > 0)).toHaveLength(132);
+    expect(getState().league.fixtures.filter(f => f.round <= 0)).toHaveLength(12);
+    expect([-1, 0].map(roundLabel)).toEqual(['Pre-season trial 1', 'Pre-season trial 2']);
     for (const p of s.squad) expect(UK_PACK.names.last).toContain(p.name.split(' ').slice(-1)[0]);
     expect(cardById('baliTrip')?.title).toBe(UK_PACK.events.trip.title);
     const saved = migrateState(JSON.parse(JSON.stringify(getState())));

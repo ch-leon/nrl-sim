@@ -2,7 +2,7 @@
 // Screenshots are kept by the existing CI artifact, never committed.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, openNav, closeWeekSummary, log } from '../common.mjs';
+import { BASE, OUT_ROOT, openNav, closeWeekSummary, playTrials, log } from '../common.mjs';
 
 export async function runContentPacks(browser) {
   const out = join(OUT_ROOT, 'webkit', 'content-packs');
@@ -45,6 +45,7 @@ export async function runContentPacks(browser) {
           await page.locator('[data-club-home]').waitFor();
           await shot('club-home');
         }
+        await playTrials(page);
         await openNav(page, 'ladder');
         await page.locator('.nrl-ladder-table').waitFor();
         await shot('ladder');
