@@ -1,0 +1,90 @@
+name: Counters joint plan calibration
+on:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['.github/workflows/counters-joint-calibration.yml']
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        cell: [0, 1, 2, 3, 4, 5, 6]
+        candidate: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare paired neutral and full-fit candidate
+        env:
+          CELL: ${{ matrix.cell }}
+          CANDIDATE: ${{ matrix.candidate }}
+        run: |
+          python3 <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          index=int(os.environ['CELL']); profile=int(os.environ['CANDIDATE'])
+          neutral=json.load(open('balance/plans/counters-enabled.json'))
+          rr=json.load(open('balance/plans/counters-round-robin.json'))
+          base={'counters.fit.edge':.07,'counters.fit.counterResponse':.5,'counters.slide.kickChase':.624,'counters.rush.kickChase':[.42,.4225,.425][profile],'counters.rush.allOut':.1,'counters.compressed.commitM':10,'counters.compressed.tight':.06,'counters.compressed.tightFit':1.5,'counters.compressed.expansive':.1,'counters.compressed.brokenBase':[-.015,-.0175,-.02][profile],'counters.compressed.offloadBase':-.03,'counters.tight.offloadPerFit':9.5}
+          names=['grind v compressed','expansive v compressed','kick-chase v rush','kick-chase v slide']
+          if index < 4:
+            scenarios=[next(s for s in neutral['scenarios'] if s['name']==names[index])]; seeds=500
+          else:
+            target=['kick-chase/slide','kick-chase/rush','kick-chase/compressed'][index-4]
+            scenarios=[s for s in rr['scenarios'] if target in s['name'].split(' v ')]; seeds=100
+          control=neutral['scenarios'][3].copy();control['seeds']=10
+          p=dict(name=f'465 joint plan profile {profile} fixture {index}',description='Jointly constrain all three Kick-chase combinations while retaining the exact neutral Rush replay gates and signed paired cells.',report='matrix',seeds=seeds,base=base,scenarios=[control]+scenarios)
+          Path('balance/plans/experiments').mkdir(exist_ok=True)
+          Path('balance/plans/experiments/20261105-paired.json').write_text(json.dumps(p,indent=2))
+          PYCODE
+      - run: npm run balance -- --plan balance/plans/experiments/20261105-paired.json --jobs 4 2>&1 | tee balance.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: joint-${{ matrix.candidate }}-${{ matrix.cell }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
+
+  career:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - env:
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          python3 <<'PYCODE'
+          import os,subprocess
+          i=int(os.environ['PROFILE'])
+          knobs={'counters.fit.edge':.07,'counters.fit.counterResponse':.5,'counters.slide.kickChase':.624,'counters.rush.kickChase':[.42,.4225,.425][i],'counters.rush.allOut':.1,'counters.compressed.commitM':10,'counters.compressed.tight':.06,'counters.compressed.tightFit':1.5,'counters.compressed.expansive':.1,'counters.compressed.brokenBase':[-.015,-.0175,-.02][i],'counters.compressed.offloadBase':-.03,'counters.tight.offloadPerFit':9.5}
+          command=['npm','run','soak','--','--difficulties','normal','--managed-only','--jobs','4','--json','normal.json']
+          for key,value in knobs.items():command+=['--tune',f'{key}={value}']
+          subprocess.run(command,check=True)
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: joint-career-${{ matrix.profile }}
+          path: normal.json
+          retention-days: 7
