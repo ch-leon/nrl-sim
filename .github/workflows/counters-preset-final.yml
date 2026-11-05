@@ -1,0 +1,52 @@
+name: Counters preset joint final retune
+on:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['.github/workflows/counters-preset-final.yml']
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - env:
+          PROFILE: ${{ matrix.profile }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          python3 <<'PYCODE'
+          import os,json
+          from pathlib import Path
+          profile=int(os.environ['PROFILE']); i=int(os.environ['SHARD'])
+          base={'presets.attack.kick-chase.base.pass':[.02,.04,.06,.08][profile],'counters.fit.edge':.065,'counters.fit.counterResponse':1,'counters.slide.kickChase':.4,'counters.slide.kickChaseFit':.7,'counters.rush.kickChase':.6,'counters.rush.allOut':.1,'counters.compressed.commitM':10,'counters.compressed.commitFit':.5,'counters.compressed.tight':.06,'counters.compressed.tightFit':.6,'counters.compressed.expansive':.09,'counters.compressed.brokenBase':0,'counters.compressed.offloadBase':0,'counters.tight.offloadPerFit':9.5}
+          rr=json.load(open('balance/plans/counters-round-robin.json'))
+          rows=[s for s in rr['scenarios'] if any(x.startswith('kick-chase/') for x in s['name'].split(' v '))]
+          neutral=json.load(open('balance/plans/counters-enabled.json'))
+          rows += [s for s in neutral['scenarios'] if s['name'] in ['kick-chase v slide','kick-chase v rush']]
+          p=dict(name=f'465 preset final {profile} / shard {i}',description='Full-size affected 39 round-robin pairs plus two signed neutral cells. Retain all 500 consecutive seeds and both orientations.',report='matrix',seeds=500,base=base,scenarios=[s for j,s in enumerate(rows) if j%7==i])
+          Path('balance/plans/experiments').mkdir(exist_ok=True)
+          Path('balance/plans/experiments/20261105-preset-final.json').write_text(json.dumps(p,indent=2))
+          PYCODE
+      - run: npm run balance -- --plan balance/plans/experiments/20261105-preset-final.json --jobs 4 2>&1 | tee balance.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: preset-final-${{ matrix.profile }}-${{ matrix.shard }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
