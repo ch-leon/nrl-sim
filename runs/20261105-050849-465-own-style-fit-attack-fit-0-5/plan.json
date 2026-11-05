@@ -1,0 +1,37 @@
+{
+  "name": "465 own style fit - attack fit 0.5",
+  "description": "Flat 60 playing squads; exact harness-only attack or defence fit varied independently. The other selected fit stays 1. Paired fit-off/on controls; 1000 matches per cell.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 0,
+    "counters.slide.on": 1,
+    "counters.rush.on": 1,
+    "counters.compressed.on": 1
+  },
+  "variants": [
+    {
+      "name": "enabled defaults",
+      "tuning": {
+        "counters.fit.on": 1
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "attack fit 0.5",
+      "home": {
+        "rating": 60,
+        "fit": {
+          "balanced": 0.5
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}

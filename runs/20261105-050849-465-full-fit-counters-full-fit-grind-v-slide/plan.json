@@ -1,0 +1,58 @@
+{
+  "name": "465 full fit counters - full fit grind v slide",
+  "description": "Flat 60 playing squads; exact harness-only attack/defence fits 1.5 v .5 for positive cells, reverse for negative cells. Other selected fits remain 1. Counter/fit comparison holds the independent Tight offload rebuild on; dormant variant also reports the total switch-on change. 1000 matches per cell.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 0,
+    "counters.slide.on": 0,
+    "counters.rush.on": 0,
+    "counters.compressed.on": 0
+  },
+  "variants": [
+    {
+      "name": "fully dormant",
+      "tuning": {
+        "counters.tight.on": 0
+      }
+    },
+    {
+      "name": "enabled defaults",
+      "tuning": {
+        "counters.tight.on": 1,
+        "counters.fit.on": 1,
+        "counters.slide.on": 1,
+        "counters.rush.on": 1,
+        "counters.compressed.on": 1
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "full fit grind v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        },
+        "fit": {
+          "grind": 1.5
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        },
+        "fit": {
+          "slide": 0.5
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}
