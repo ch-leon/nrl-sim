@@ -12,88 +12,42 @@
   },
   "variants": [
     {
-      "name": "enabled",
+      "name": "fit edge 0.085",
       "tuning": {
         "counters.tight.on": 1,
         "counters.fit.on": 1,
         "counters.slide.on": 1,
         "counters.rush.on": 1,
-        "counters.compressed.on": 1
+        "counters.compressed.on": 1,
+        "counters.fit.edge": 0.085
+      }
+    },
+    {
+      "name": "fit edge 0.095",
+      "tuning": {
+        "counters.tight.on": 1,
+        "counters.fit.on": 1,
+        "counters.slide.on": 1,
+        "counters.rush.on": 1,
+        "counters.compressed.on": 1,
+        "counters.fit.edge": 0.095
+      }
+    },
+    {
+      "name": "fit edge 0.1",
+      "tuning": {
+        "counters.tight.on": 1,
+        "counters.fit.on": 1,
+        "counters.slide.on": 1,
+        "counters.rush.on": 1,
+        "counters.compressed.on": 1,
+        "counters.fit.edge": 0.1
       }
     }
   ],
   "scenarios": [
-    {
-      "name": "strong pack Tight v slide",
-      "home": {
-        "rating": 60,
-        "positionStats": {
-          "pack": {
-            "strength": 80
-          }
-        },
-        "tactics": {
-          "attack": "grind",
-          "defence": "slide"
-        }
-      },
-      "away": {
-        "rating": 60,
-        "tactics": {
-          "attack": "balanced",
-          "defence": "slide"
-        }
-      },
-      "track": "home",
-      "bothWays": true
-    },
-    {
-      "name": "strong pack Tight v rush",
-      "home": {
-        "rating": 60,
-        "positionStats": {
-          "pack": {
-            "strength": 80
-          }
-        },
-        "tactics": {
-          "attack": "grind",
-          "defence": "slide"
-        }
-      },
-      "away": {
-        "rating": 60,
-        "tactics": {
-          "attack": "balanced",
-          "defence": "rush"
-        }
-      },
-      "track": "home",
-      "bothWays": true
-    },
-    {
-      "name": "strong pack Tight v compressed",
-      "home": {
-        "rating": 60,
-        "positionStats": {
-          "pack": {
-            "strength": 80
-          }
-        },
-        "tactics": {
-          "attack": "grind",
-          "defence": "slide"
-        }
-      },
-      "away": {
-        "rating": 60,
-        "tactics": {
-          "attack": "balanced",
-          "defence": "compressed"
-        }
-      },
-      "track": "home",
-      "bothWays": true
-    }
+    {"name": "strong pack Tight v slide", "home": {"rating": 60, "positionStats": {"pack": {"strength": 80}}, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "track": "home", "bothWays": true},
+    {"name": "strong pack Tight v rush", "home": {"rating": 60, "positionStats": {"pack": {"strength": 80}}, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "track": "home", "bothWays": true},
+    {"name": "strong pack Tight v compressed", "home": {"rating": 60, "positionStats": {"pack": {"strength": 80}}, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "track": "home", "bothWays": true}
   ]
 }

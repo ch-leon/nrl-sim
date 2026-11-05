@@ -10,6 +10,7 @@ on:
       - '.github/workflows/counters-fit-acceptance.yml'
       - 'balance/plans/counters-full-fit.json'
       - 'balance/plans/counters-fit-enabled.json'
+      - 'balance/plans/counters-strong-pack.json'
       - 'src/match/balance/measure.ts'
       - 'src/match/balance/plan.ts'
       - 'src/match/league/counters.ts'
@@ -18,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: counter-fit-${{ github.ref }}
+  group: counter-fit-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -43,6 +44,9 @@ jobs:
           - { plan: fit-enabled, cell: 2 }
           - { plan: fit-enabled, cell: 3 }
           - { plan: fit-enabled, cell: 4 }
+          - { plan: strong-pack, cell: 0 }
+          - { plan: strong-pack, cell: 1 }
+          - { plan: strong-pack, cell: 2 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

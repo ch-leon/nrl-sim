@@ -12,9 +12,24 @@
   },
   "variants": [
     {
-      "name": "fit on",
+      "name": "fit edge 0.085",
       "tuning": {
-        "counters.fit.on": 1
+        "counters.fit.on": 1,
+        "counters.fit.edge": 0.085
+      }
+    },
+    {
+      "name": "fit edge 0.095",
+      "tuning": {
+        "counters.fit.on": 1,
+        "counters.fit.edge": 0.095
+      }
+    },
+    {
+      "name": "fit edge 0.1",
+      "tuning": {
+        "counters.fit.on": 1,
+        "counters.fit.edge": 0.1
       }
     }
   ],

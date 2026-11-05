@@ -12,19 +12,36 @@
   },
   "variants": [
     {
-      "name": "dormant",
-      "tuning": {
-        "counters.tight.on": 0
-      }
-    },
-    {
-      "name": "enabled",
+      "name": "fit edge 0.085",
       "tuning": {
         "counters.tight.on": 1,
         "counters.fit.on": 1,
         "counters.slide.on": 1,
         "counters.rush.on": 1,
-        "counters.compressed.on": 1
+        "counters.compressed.on": 1,
+        "counters.fit.edge": 0.085
+      }
+    },
+    {
+      "name": "fit edge 0.095",
+      "tuning": {
+        "counters.tight.on": 1,
+        "counters.fit.on": 1,
+        "counters.slide.on": 1,
+        "counters.rush.on": 1,
+        "counters.compressed.on": 1,
+        "counters.fit.edge": 0.095
+      }
+    },
+    {
+      "name": "fit edge 0.1",
+      "tuning": {
+        "counters.tight.on": 1,
+        "counters.fit.on": 1,
+        "counters.slide.on": 1,
+        "counters.rush.on": 1,
+        "counters.compressed.on": 1,
+        "counters.fit.edge": 0.1
       }
     }
   ],
