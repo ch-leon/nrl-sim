@@ -272,6 +272,10 @@ ${PLAN_FIT_CSS}
 .nrl-lineup-tac-hint b { color: var(--nrl-text); font-weight: 600; }
 .nrl-lineup-plan-foot .nrl-btn-primary { flex: 0 0 auto; min-height: 48px; padding: 0 24px; font-size: 1.1875rem; }
 @media (max-height: 440px) {
+  .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal { padding-top: 6px; padding-bottom: 8px; }
+  .nrl-lineup-plan { gap: 2px; }
+  .nrl-lineup-plan-rows { row-gap: 2px; }
+  .nrl-lineup-plan-foot { margin-top: 0; }
   .nrl-lineup-rot-tip { display: none; }
   .nrl-lineup-rot-row .nrl-seg { max-width: 100%; }
   .nrl-lineup-plan-grab { display: none; }

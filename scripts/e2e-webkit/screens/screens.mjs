@@ -647,6 +647,12 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     // A try's offer, then the half-time card over it (the scene's own calls, as the playback makes them).
     await page.evaluate(() => {
       const sc = window.__nrlGame.scene.getScene('Match');
+      // Reach the real break through the playback runner, keeping its event recorder connected.
+      const pb = sc.playback;
+      pb.hold();
+      for (let i = 0; i < 24000 && pb.breakKind !== 'half-time'; i++) pb.runner.step();
+      pb.release();
+      if (pb.breakKind !== 'half-time') throw new Error('did not reach half-time');
       sc.overlay.offerReplay(() => {});
       sc.openPlanCard('Half-time', ['Landscape FC 4 – 0 Rivals', 'Legs 80% / 78%', 'Calls paid off – / –']);
     });
