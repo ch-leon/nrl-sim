@@ -31,6 +31,7 @@ describe('difficulty guidance at setup (#480)', () => {
         expect(root.querySelector(`[data-nrl-difficulty-${other}]`)!.getAttribute('aria-pressed')).toBe(String(other === d));
       }
     }
+    await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
     expect((await result).difficulty).toBe('hard');
   });
@@ -42,6 +43,7 @@ describe('difficulty guidance at setup (#480)', () => {
     expect(DEFAULT_DIFFICULTY).toBe('normal');
     expect(root.querySelector('[data-nrl-difficulty-normal]')!.getAttribute('aria-pressed')).toBe('true');
     expect(root.querySelector('[data-nrl-difficulty-blurb]')!.textContent).toBe(DIFFICULTY_BLURB.normal);
+    await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
     expect((await result).difficulty).toBe('normal');
   });
@@ -102,6 +104,7 @@ describe('optional coach name at setup (#475)', () => {
     expect(name.getAttribute('aria-label')).toBe('Your name');
     expect(name.className).toBe(root.querySelector('[data-nrl-clubname]')!.className);
     name.value = raw;
+    await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
     const choice = await result;
     expect(choice.mode).toBe('new');
@@ -119,8 +122,85 @@ describe('veteran skip (#481)', () => {
     const toggle = root.querySelector('[data-nrl-open-all]')! as unknown as HTMLInputElement;
     expect(toggle.type).toBe('checkbox');
     toggle.checked = checked;
+    await vi.dynamicImportSettled();
     root.querySelector('[data-nrl-start]')!.click();
     const choice = await result;
     expect(choice.openAll).toBe(checked ? true : undefined);
+  });
+});
+
+import { groundForTown } from '../../src/data/townSetup';
+
+const fixture = vi.hoisted(() => [
+  { id: '1', name: 'Exampleton', region: '01', country: 'AU', lat: -30, lon: 150, population: 6000, nickname: 'Wombats' },
+  { id: '2', name: 'Sample Bay', region: '02', country: 'NZ', lat: -40, lon: 175, population: 7000, nickname: 'Otters' },
+]);
+vi.mock('../../src/data/towns.json', () => ({ default: fixture }));
+
+class InputNode extends StubNode {
+  events: Record<string, (() => void)[]> = {};
+  override addEventListener(event: string, fn: () => void): void {
+    super.addEventListener(event, fn);
+    (this.events[event] ??= []).push(fn);
+  }
+  enter(value: string): void {
+    this.value = value;
+    for (const fn of this.events.input ?? []) fn();
+  }
+}
+const settleTowns = async (): Promise<void> => { await vi.dynamicImportSettled(); };
+beforeEach(() => {
+  stubLocalStorage();
+  stubDocument();
+  // Native input events, on top of the same tiny DOM the other title tests use.
+  document.createElement = ((tag: string) => new InputNode(tag)) as typeof document.createElement;
+});
+afterEach(() => vi.unstubAllGlobals());
+
+describe('offline town setup (#485)', () => {
+  it('keeps names edited while the offline catalogue is loading', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    (root.querySelector('[data-nrl-clubname]')! as InputNode).enter('My Early Club');
+    (root.querySelector('[data-nrl-groundname]')! as InputNode).enter('My Early Ground');
+    await settleTowns();
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(await choice).toMatchObject({ clubName: 'My Early Club', groundName: 'My Early Ground' });
+  });
+
+  it('preselects a listed town and starts with one tap and both names', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    const town = root.querySelector('[data-nrl-town]')!;
+    expect(town.value).toMatch(/Exampleton|Sample Bay/);
+    const club = root.querySelector('[data-nrl-clubname]')!.value;
+    const ground = root.querySelector('[data-nrl-groundname]')!.value;
+    root.querySelector('[data-nrl-start]')!.click();
+    const result = await choice;
+    expect(result).toMatchObject({ mode: 'new', clubName: club, groundName: ground });
+    expect(result.home?.lat).toBeDefined();
+    expect(result.home?.lon).toBeDefined();
+  });
+  it('picking a town fills both names; edits survive Start', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    (root.querySelector('[data-nrl-town]')! as InputNode).enter('Sample Bay, 02, NZ');
+    expect(root.querySelector('[data-nrl-clubname]')!.value).toBe('Sample Bay Otters');
+    expect(root.querySelector('[data-nrl-groundname]')!.value).toBe(groundForTown('Sample Bay', '2'));
+    root.querySelector('[data-nrl-clubname]')!.value = 'My Club';
+    root.querySelector('[data-nrl-groundname]')!.value = 'My Ground';
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(await choice).toMatchObject({ clubName: 'My Club', groundName: 'My Ground', home: { town: 'Sample Bay', country: 'NZ', lat: -40, lon: 175 } });
+  });
+  it('typing an unlisted town starts without stale coordinates, region or country', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    (root.querySelector('[data-nrl-town]')! as InputNode).enter('A New Place');
+    expect(root.querySelector('[data-nrl-clubname]')!.value).toContain('A New Place');
+    root.querySelector('[data-nrl-start]')!.click();
+    expect((await choice).home).toEqual({ town: 'A New Place' });
   });
 });

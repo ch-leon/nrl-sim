@@ -39,7 +39,7 @@ export interface ClubHomeView {
 }
 
 /** The next-match line (#350 H1): "Next: v Darwin (A) · 5th", the place once a round is in. Pure. */
-export function nextMatchLine(s: Pick<GameState, 'league' | 'week'>): { text: string; label: string } | null {
+export function nextMatchLine(s: Pick<GameState, 'league' | 'week' | 'groundName'>): { text: string; label: string } | null {
   const f = nextFixture(s.league.fixtures, s.week, 'player');
   if (!f) return null;
   const home = f.homeId === 'player';
@@ -49,8 +49,8 @@ export function nextMatchLine(s: Pick<GameState, 'league' | 'week'>): { text: st
   const row = i < 0 ? undefined : s.league.ladder[i];
   const place = row && row.played > 0 ? ordinal(i + 1) : '';
   return {
-    text: `Next: v ${placeName(opp.name)} (${home ? 'H' : 'A'})${place ? ` · ${place}` : ''}`,
-    label: `Next match: ${opp.name}, ${home ? 'home' : 'away'}${place ? `. You are ${place} on the ladder` : ''}`,
+    text: `Next: v ${placeName(opp.name)} (${home ? 'H' : 'A'})${place ? ` · ${place}` : ''}${home && s.groundName ? ` · ${s.groundName}` : ''}`,
+    label: `Next match: ${opp.name}, ${home ? `home${s.groundName ? ` at ${s.groundName}` : ''}` : 'away'}${place ? `. You are ${place} on the ladder` : ''}`,
   };
 }
 
@@ -101,6 +101,8 @@ export interface ClubHomeDeps {
 const STYLE_ID = 'nrl-club-home-styles';
 const CSS = `
 .nrl-club-home .nrl-modal-scroll, .nrl-club-home-body { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+/* Long ground names and runway text wrap; scroll rather than compressing their rows. */
+.nrl-club-home-body > * { flex-shrink: 0; }
 .nrl-club-home-name { font-family: var(--nrl-f-label); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; overflow-wrap: anywhere; }
 .nrl-club-home-week { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); text-transform: uppercase; }
 .nrl-club-home-row {

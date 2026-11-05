@@ -143,3 +143,17 @@ describe('resetForNewSeason', () => {
     expect(getState().week).toBe(1);
   });
 });
+
+
+describe('optional home metadata (#485)', () => {
+  it('preserves home metadata without consuming simulation randomness', () => {
+    const original = createNewGame('Town Club', 42);
+    const located = createNewGame('Town Club', 42, { home: { town: 'A Town', country: 'AU', lat: -30, lon: 150 }, groundName: 'A Town Oval' });
+    const { home, groundName, ...rest } = located;
+    expect(home).toEqual({ town: 'A Town', country: 'AU', lat: -30, lon: 150 });
+    expect(groundName).toBe('A Town Oval');
+    expect(rest).toEqual(original);
+    expect(original.home).toBeUndefined();
+    expect(original.groundName).toBeUndefined();
+  });
+});

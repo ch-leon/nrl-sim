@@ -132,12 +132,12 @@ async function boot(): Promise<void> {
     else {
       // Continue on an empty slot still starts fresh: drop a match record left behind.
       clearLiveMatch();
-      createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll });
+      createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
     }
   } else {
     // New Game must not resume a match that belonged to the save this slot had.
     clearLiveMatch();
-    createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll });
+    createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
   // The demo gate's slot (#362), and the paywall at the demo's end (#364).

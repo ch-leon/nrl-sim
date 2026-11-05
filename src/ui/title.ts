@@ -11,6 +11,8 @@ import {
   deleteSlot, getSlotSummaries, installImportedSave, pickSaveFile, setActiveSlot, type SlotSummary,
 } from '../core/save';
 import { cleanName, NAME_MAX } from '../data/names';
+import type { GameState } from '../core/state';
+import { colorsForTown, foldTown, groundForTown, townColorsAllowed, townHash, type Town } from '../data/townSetup';
 import { buildLabel } from './buildInfo';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -32,6 +34,9 @@ export interface TitleChoice {
   openAll?: boolean;
   difficulty?: Difficulty;
   colors?: [string, string];
+  seed?: number;
+  home?: GameState['home'];
+  groundName?: string;
 }
 
 const DEFAULT_CLUB_NAME = 'Cavehole Crushers';
@@ -99,13 +104,17 @@ export const TITLE_CSS = `
 .nrl-title-head .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-head h2 { margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 1.375rem; font-weight: 700;
   letter-spacing: 0.02em; text-transform: uppercase; flex: 1; min-width: 0; }
-.nrl-title-setup { display: grid; grid-template-columns: 9rem minmax(0, 1fr); grid-template-areas: "kit form" "veteran form" "start form";
+.nrl-title-setup { display: grid; grid-template-columns: 9rem minmax(0, 1fr); grid-template-areas: "kit form" "veteran form" "start form"; grid-template-rows: min-content min-content 1fr;
   gap: 10px 16px; align-items: start; padding: 14px; border-radius: 16px; background: rgba(14, 22, 48, 0.97);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
 .nrl-title-kit { grid-area: kit; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 6px; border-radius: 10px; background: #141d3a; text-align: center; font-size: 0.75rem; color: #9aa6c7; }
 .nrl-title-kit img { width: 84px; height: 90px; image-rendering: pixelated; }
-.nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  max-height: calc(100dvh - 110px - var(--nrl-safe-t, env(safe-area-inset-top, 0px)) - var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
+/* Details scroll on short phones; difficulty guidance and Start stay in view. */
+.nrl-title-details { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; padding: 3px; }
+.nrl-title-details > *, .nrl-title-form > :not(.nrl-title-details) { flex-shrink: 0; }
 .nrl-title-names { display: flex; flex-direction: column; gap: 8px; }
 .nrl-title-veteran { grid-area: veteran; display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.8125rem; cursor: pointer; }
 .nrl-title-veteran input { width: 20px; height: 20px; flex: 0 0 auto; }
@@ -146,6 +155,7 @@ export const TITLE_CSS = `
   .nrl-title-logo { max-height: 48px; }
   .nrl-title-parent { margin-top: -6px; font-size: 0.6875rem; }
   .nrl-title-main { gap: 10px; }
+  .nrl-title-build { position: static; align-self: flex-end; margin-top: 8px; }
 }
 @media (max-height: 500px) {
   .nrl-title-kit { padding: 6px; }
@@ -183,6 +193,7 @@ export const TITLE_CSS = `
   .nrl-title-kit-note { display: none; }
   .nrl-title-setup { grid-template-columns: 5rem minmax(0, 1fr);
     grid-template-areas: "kit veteran" "form form" "start start"; }
+  .nrl-title-form { max-height: calc(100dvh - 280px - var(--nrl-safe-t, env(safe-area-inset-top, 0px)) - var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
   .nrl-title-field { flex-wrap: wrap; }
   .nrl-title-field > span { flex-basis: 100%; text-align: left; }
 }
@@ -366,6 +377,10 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       head.appendChild(mk('h2', 'nrl-title-step', `New club · Slot ${s.slot}`));
       main.appendChild(head);
 
+      // Reuse the game's existing seed, without drawing from its simulation stream.
+      const seed = Date.now() >>> 0;
+      let towns: Town[] = [];
+      let selected: Town | undefined;
       let primary = DEFAULT_PLAYER_COLORS[0];
       let secondary = DEFAULT_PLAYER_COLORS[1];
       let difficulty: Difficulty = DEFAULT_DIFFICULTY;
@@ -381,6 +396,8 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       setup.appendChild(kit);
 
       const form = mk('div', 'nrl-title-form');
+      const details = mk('div', 'nrl-title-details');
+      form.appendChild(details);
       const field = (label: string, control: HTMLElement): HTMLElement => {
         const row = mk('div', 'nrl-title-field');
         row.appendChild(mk('span', 'nrl-title-label', label));
@@ -388,12 +405,40 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         return row;
       };
 
+      const townInput = mk('input', 'nrl-title-input');
+      townInput.type = 'text';
+      townInput.setAttribute('data-nrl-town', '');
+      townInput.setAttribute('aria-label', 'Home town');
+      townInput.setAttribute('maxlength', '80');
+      townInput.setAttribute('list', 'nrl-towns');
+      townInput.setAttribute('autocomplete', 'off');
+      details.appendChild(field('Home town', townInput));
+      const results = mk('datalist', '');
+      results.id = 'nrl-towns';
+      details.appendChild(results);
+      const townNote = mk('div', 'nrl-title-kit-note', 'Loading offline towns…');
+      townNote.setAttribute('data-nrl-town-status', '');
+      details.appendChild(townNote);
+      const townLabel = (t: Town): string => `${t.name}, ${t.region}, ${t.country}`;
+      const suggestions = (): void => {
+        results.replaceChildren();
+        const query = foldTown(townInput.value);
+        for (const t of towns.filter(t => foldTown(townLabel(t)).includes(query)).slice(0, 20)) {
+          const option = mk('option', '');
+          option.value = townLabel(t);
+          results.appendChild(option);
+        }
+      };
+
+      let clubEdited = false;
+      let groundEdited = false;
       const input = mk('input', 'nrl-title-input');
+      input.addEventListener('input', () => { clubEdited = true; });
       input.type = 'text';
       input.value = DEFAULT_CLUB_NAME;
       input.setAttribute('data-nrl-clubname', '');
       input.setAttribute('aria-label', 'Club name');
-      input.setAttribute('maxlength', '32');
+      input.setAttribute('maxlength', '120');
       const names = mk('div', 'nrl-title-names');
       names.appendChild(field('Club name', input));
 
@@ -404,7 +449,31 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       coachInput.setAttribute('placeholder', 'Coach');
       coachInput.setAttribute('maxlength', String(NAME_MAX));
       names.appendChild(field('Your name', coachInput));
-      form.appendChild(names);
+      details.appendChild(names);
+
+      const ground = mk('input', 'nrl-title-input');
+      ground.addEventListener('input', () => { groundEdited = true; });
+      ground.type = 'text';
+      ground.setAttribute('data-nrl-groundname', '');
+      ground.setAttribute('aria-label', 'Ground name');
+      ground.setAttribute('maxlength', '120');
+      details.appendChild(field('Ground name', ground));
+      const applyTown = (): void => {
+        const value = townInput.value.trim();
+        selected = towns.find(t => townLabel(t) === value)
+          ?? towns.find(t => foldTown(t.name) === foldTown(value));
+        const name = selected?.name ?? value;
+        const nickname = selected?.nickname ?? ['Wombats', 'Kestrels', 'Otters', 'Ironworkers'][townHash(name) % 4];
+        input.value = name ? `${name} ${nickname}` : DEFAULT_CLUB_NAME;
+        ground.value = name ? groundForTown(name, selected?.id ?? name) : '';
+        if (!townColorsAllowed(name, selected?.country, primary, secondary)) {
+          [primary, secondary] = colorsForTown(name, selected?.country);
+        }
+        townNote.textContent = selected ? `${selected.region} · ${selected.country}` : 'Your own town · no coordinates';
+        refresh();
+      };
+      townInput.addEventListener('input', () => { suggestions(); applyTown(); });
+      townInput.addEventListener('change', applyTown);
 
       // Curated swatches only; a secondary too close to the primary is disabled.
       const swatches = (label: string, attr: string, palette: readonly string[], pick: (c: string) => void) => {
@@ -422,13 +491,13 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
           buttons.push(b);
           box.appendChild(b);
         }
-        form.appendChild(field(label, box));
+        details.appendChild(field(label, box));
         return { buttons, palette };
       };
       const prim = swatches('Primary', 'data-nrl-primary', PLAYER_PRIMARY_COLORS, (c) => {
         primary = c;
-        if (!isValidColorPair(primary, secondary)) {
-          secondary = PLAYER_SECONDARY_COLORS.find((x) => isValidColorPair(primary, x)) ?? secondary;
+        if (!isValidColorPair(primary, secondary) || !townColorsAllowed(selected?.name ?? townInput.value, selected?.country, primary, secondary)) {
+          secondary = PLAYER_SECONDARY_COLORS.find((x) => isValidColorPair(primary, x) && townColorsAllowed(selected?.name ?? townInput.value, selected?.country, primary, x)) ?? secondary;
         }
       });
       const sec = swatches('Secondary', 'data-nrl-secondary', PLAYER_SECONDARY_COLORS, (c) => { secondary = c; });
@@ -463,12 +532,12 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       const refresh = (): void => {
         prim.buttons.forEach((b, i) => {
           const c = prim.palette[i]!;
-          b.disabled = !PLAYER_SECONDARY_COLORS.some((x) => isValidColorPair(c, x));
+          b.disabled = !PLAYER_SECONDARY_COLORS.some((x) => isValidColorPair(c, x) && townColorsAllowed(selected?.name ?? townInput.value, selected?.country, c, x));
           b.setAttribute('aria-pressed', String(c === primary));
         });
         sec.buttons.forEach((b, i) => {
           const c = sec.palette[i]!;
-          b.disabled = !isValidColorPair(primary, c);
+          b.disabled = !isValidColorPair(primary, c) || !townColorsAllowed(selected?.name ?? townInput.value, selected?.country, primary, c);
           b.setAttribute('aria-pressed', String(c === secondary));
         });
         for (const [d, b] of diffButtons) b.setAttribute('aria-pressed', String(d === difficulty));
@@ -482,11 +551,17 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       const begin = (): void => {
         const name = input.value.trim() || DEFAULT_CLUB_NAME;
         const coach = cleanName(coachInput.value);
-        // Optional identity: blank or invalid input never prevents starting a game.
-        finish(s.slot, { mode: 'new', clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary] });
+        const town = selected?.name ?? townInput.value.trim();
+        const home = selected
+          ? { town, region: selected.region, country: selected.country, lat: selected.lat, lon: selected.lon }
+          : { town };
+        finish(s.slot, { mode: 'new', seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
+          home, groundName: ground.value.trim() || groundForTown(town || name, selected?.id ?? town) });
       };
       const start = mkButton('Start', 'data-nrl-start', 'nrl-title-btn-go');
+      start.disabled = true;
       start.addEventListener('click', () => {
+        if (start.disabled) return;
         if (s.status === 'empty') return begin();
         // A season (or an unreadable save) is in this slot: say what Start replaces first.
         go.replaceChildren();
@@ -504,7 +579,24 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       go.appendChild(start);
       setup.appendChild(go);
       main.appendChild(setup);
-      input.focus();
+      // This is the sole runtime import of the data: opening setup starts it.
+      void import('../data/towns.json').then(({ default: data }) => {
+        towns = data;
+        if (!towns.length) throw new Error('Offline town catalogue is empty');
+        const initial = towns[seed % towns.length];
+        // A player can type while the chunk is loading; don't overwrite their town.
+        if (!townInput.value && initial) townInput.value = townLabel(initial);
+        const editedClub = clubEdited ? input.value : undefined;
+        const editedGround = groundEdited ? ground.value : undefined;
+        suggestions();
+        applyTown();
+        if (editedClub !== undefined) input.value = editedClub;
+        if (editedGround !== undefined) ground.value = editedGround;
+        start.disabled = false;
+      }).catch(() => {
+        townNote.textContent = 'Town list unavailable. Type your own town to start.';
+        start.disabled = false;
+      });
     };
 
     // Fresh install (all slots empty): go straight to setting up a club in slot 1.
