@@ -4,27 +4,7 @@
   "report": "matrix",
   "seeds": 500,
   "scenarios": [
-    {
-      "name": "yardstick 62 v 60",
-      "home": {
-        "rating": 62
-      },
-      "away": {
-        "rating": 60
-      },
-      "track": "home",
-      "bothWays": true
-    },
-    {
-      "name": "yardstick 65 v 60",
-      "home": {
-        "rating": 65
-      },
-      "away": {
-        "rating": 60
-      },
-      "track": "home",
-      "bothWays": true
-    }
+    {"name": "yardstick 62 v 60", "home": {"rating": 62}, "away": {"rating": 60}, "track": "home", "bothWays": true},
+    {"name": "yardstick 65 v 60", "home": {"rating": 65}, "away": {"rating": 60}, "track": "home", "bothWays": true}
   ]
 }

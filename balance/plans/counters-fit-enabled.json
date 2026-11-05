@@ -20,38 +20,8 @@
     }
   ],
   "scenarios": [
-    {
-      "name": "own fit 1.5 v 1",
-      "home": {
-        "rating": 85
-      },
-      "away": {
-        "rating": 60
-      },
-      "track": "home",
-      "bothWays": true
-    },
-    {
-      "name": "own fit 0.5 v 1",
-      "home": {
-        "rating": 35
-      },
-      "away": {
-        "rating": 60
-      },
-      "track": "home",
-      "bothWays": true
-    },
-    {
-      "name": "own fit 1 v 1",
-      "home": {
-        "rating": 60
-      },
-      "away": {
-        "rating": 60
-      },
-      "track": "home",
-      "bothWays": true
-    }
+    {"name": "own fit 1.5 v 1", "home": {"rating": 85}, "away": {"rating": 60}, "track": "home", "bothWays": true},
+    {"name": "own fit 0.5 v 1", "home": {"rating": 35}, "away": {"rating": 60}, "track": "home", "bothWays": true},
+    {"name": "own fit 1 v 1", "home": {"rating": 60}, "away": {"rating": 60}, "track": "home", "bothWays": true}
   ]
 }
