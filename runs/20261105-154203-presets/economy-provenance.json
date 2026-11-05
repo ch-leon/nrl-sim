@@ -1,0 +1,12 @@
+{
+  "command": "npm run soak -- --seasons 3 --seeds 10 --difficulties easy,normal,hard --jobs 4 --json <output>",
+  "baseline_commit": "ce2c57b214ca9a838ce18c786336e679ea045973",
+  "latest_main_with_identical_economy_and_match_sources": "33de8a7",
+  "branch_equivalent_game_sources": "b7ac6a325581a9cd637f3fb180b3c808cec2a8f2",
+  "note": "The final branch soak includes emergency academy call-ups during trials. Its game sources are identical to c0d77b1 and b7ac6a3. Main ce2c57b to 33de8a7 changes only UI, docs and display tests.",
+  "cases_each": 80,
+  "fresh_cases_each": 60,
+  "legacy_cases_each": 20,
+  "legacy_results_identical_excluding_runtime": true,
+  "columns": "Main \u2192 branch. Cash is mean bank balance; closing debt is mean max(0,-cash); warnings and fire sales are totals for the sampled season; sackings are cumulative out of 10 careers per row. Finals fractions and sample counts disclose early-ended careers."
+}
