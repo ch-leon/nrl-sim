@@ -25,6 +25,7 @@ export const COUNTERS = {
     expansive: 0.08,
     expansiveFit: 0.2,
     kickChase: 0.6,
+    kickChaseFit: 0,
     tight: 0.025,
     allOut: 0.50,
     allOutRecovery: 3,
@@ -59,7 +60,8 @@ export function slideCounter(attack: AttackPreset, defence: DefencePreset, attac
   if (COUNTERS.slide.on !== 1 || defence !== 'slide' || attack === 'balanced') return 0;
   const cell = attack === 'grind' ? COUNTERS.slide.tight : attack === 'kick-chase' ? COUNTERS.slide.kickChase
     : attack === 'all-out' ? COUNTERS.slide.allOut : COUNTERS.slide.expansive;
-  const response = attack === 'expansive' ? COUNTERS.slide.expansiveFit : 0;
+  const response = attack === 'expansive' ? COUNTERS.slide.expansiveFit
+    : attack === 'kick-chase' ? COUNTERS.slide.kickChaseFit : 0;
   return matchupStrength(cell, attackFit, defenceFit, response);
 }
 

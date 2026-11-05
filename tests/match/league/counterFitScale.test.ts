@@ -72,4 +72,20 @@ describe('counter calibration for unequal fits (#465)', () => {
     } finally { restore(); }
   });
 
+  it('calibrates fitted kick cover without moving neutral cover or another cell', () => {
+    const restore = applyTuning({ 'counters.slide.on': 1, 'counters.slide.kickChaseFit': 0 });
+    try {
+      const neutral = slideCounter('kick-chase', 'slide', 1, 1);
+      const full = slideCounter('kick-chase', 'slide', .5, 1.5);
+      const tight = slideCounter('grind', 'slide', .5, 1.5);
+      const on = applyTuning({ 'counters.slide.kickChaseFit': .6 });
+      try {
+        expect(slideCounter('kick-chase', 'slide', 1, 1)).toBe(neutral);
+        expect(slideCounter('kick-chase', 'slide', .5, 1.5)).toBeGreaterThan(full);
+        expect(slideCounter('grind', 'slide', .5, 1.5)).toBe(tight);
+        expect(slideCounter('kick-chase', 'rush', .5, 1.5)).toBe(0);
+      } finally { on(); }
+    } finally { restore(); }
+  });
+
 });
