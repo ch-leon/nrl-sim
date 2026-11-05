@@ -21,8 +21,8 @@ const early = { half: 1, seconds: 60 };
 const saves = import.meta.glob('../../fixtures/saves/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
 
 describe('the setting (#366)', () => {
-  it('is on when absent: every old save in the corpus migrates to v21 with no keyMoments and slows down', () => {
-    expect(SAVE_VERSION).toBe(21);
+  it('is on when absent: every old save in the corpus migrates to the current version with no keyMoments and slows down', () => {
+    expect(SAVE_VERSION).toBe(22);
     const files = Object.keys(saves);
     expect(files.length).toBeGreaterThan(10);
     for (const f of files) {

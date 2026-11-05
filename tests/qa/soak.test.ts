@@ -10,7 +10,7 @@ import {
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
-import { getState, setState, type Fixture, type GameState } from '../../src/core/state';
+import { getState, setState, SAVE_VERSION, type Fixture, type GameState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { migrateState } from '../../src/core/save';
 import { advanceWeek, weekHeld, withFastForward } from '../../src/core/time';
@@ -56,6 +56,8 @@ describe('soak checks', () => {
     expect(oldSpeed.playbackSpeed).toBeUndefined();
     const kept = migrateState(asOldSave(sped, 19));
     expect(kept.ok && kept.state.settings.playbackSpeed).toBeUndefined();
+    // A v21 fixture must lack the new habit history (#469).
+    expect(asOldSave(getState(), 21)).not.toHaveProperty('recentPlans');
     // v20 has no bans and no event-chain flags; v21 fills both (#324).
     const v20 = asOldSave(getState(), 20);
     const deck = v20.eventDeck as { flags?: string[] };
@@ -64,7 +66,8 @@ describe('soak checks', () => {
     const v21 = migrateState(v20);
     expect(v21.ok).toBe(true);
     if (v21.ok) {
-      expect(v21.state.version).toBe(21);
+      expect(v21.state.version).toBe(SAVE_VERSION);
+      expect(v21.state.recentPlans).toEqual([]);
       expect(v21.state.eventDeck.flags).toEqual([]);
       expect(v21.state.squad.every((p) => p.suspendedWeeks === 0)).toBe(true);
       expect(v21.state.freeAgents.every((p) => p.suspendedWeeks === 0)).toBe(true);

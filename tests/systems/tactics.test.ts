@@ -3,7 +3,7 @@
 // the day's resolve, and ride on the sheet into the match. Untouched, a side plays
 // Balanced / Slide exactly as before.
 import { describe, it, expect } from 'vitest';
-import { createNewGame } from '../../src/core/state';
+import { createNewGame, SAVE_VERSION } from '../../src/core/state';
 import { migrateState } from '../../src/core/save';
 import { autoPick, resolveLineup, setTactics, validTactics } from '../../src/systems/lineup';
 import { teamSheetFromSquad } from '../../src/match/league/sheets';
@@ -75,7 +75,7 @@ describe('team tactics (N11.1)', () => {
     expect(isAttackPreset('grind')).toBe(true);
     expect(isAttackPreset('tight')).toBe(false);
     if (!res.ok) throw new Error('old save did not load');
-    expect(res.state.version).toBe(21);
+    expect(res.state.version).toBe(SAVE_VERSION);
     expect(res.state.lineup.tactics).toEqual({ attack: 'grind', defence: 'compressed' });
     expect(PRESET_LABEL[res.state.lineup.tactics.attack]).toBe('Tight');
   });
