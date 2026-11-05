@@ -113,3 +113,17 @@ it('counts trials in multi-week estimates and stamps their money separately from
   setState({ preseason: 0 });
   expect(stampMovement(getState(), 'wages')).toMatchObject({ season: 1, week: 1 });
 });
+
+it('shows the seeded forecast and quarter home-gate projection during trials', async () => {
+  const { forecastFor } = await import('../../src/ui/screens/fixtures');
+  const { financeSummary } = await import('../../src/ui/screens/finance');
+  createNewGame('Trials', 42);
+  initLeague(getState());
+  setState({ preseason: 2, weather: 'rain' });
+  const s = getState();
+  expect(forecastFor(s)).toBe('rain');
+  const home = s.league.fixtures.find((f) => f.round >= 0 && f.homeId === s.clubId)!;
+  const summary = financeSummary(s);
+  expect(summary.nextHome?.round).toBe(home.round);
+  expect(summary.nextHome?.projectedGate).toBe(homeGate(s, home).receipts);
+});

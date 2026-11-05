@@ -193,9 +193,9 @@ export function myFixtureRows(state: Pick<GameState, 'league' | 'week'>, names: 
  * coming week's (rolled at the end of the last), so it counts only when the next
  * fixture is this coming week's. Pure.
  */
-export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather'>): WeatherKind | undefined {
+export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather' | 'preseason'>): WeatherKind | undefined {
   const f = nextFixture(state.league.fixtures, state.week, 'player');
-  return f && f.round === state.week ? state.weather : undefined;
+  return f && f.round === currentRound(state) ? state.weather : undefined;
 }
 
 /** No club's name on the ladder is longer than this (QA finding 3: long names wrapped at 844px). */
