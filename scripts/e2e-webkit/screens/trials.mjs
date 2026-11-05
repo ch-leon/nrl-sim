@@ -8,7 +8,7 @@ export async function runTrials(browser) {
   mkdirSync(out, { recursive: true });
   const results = [];
   for (const [width, height] of [[667, 375], [844, 390], [390, 844]]) {
-    const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true });
+    const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: true, serviceWorkers: 'block' });
     await ctx.addInitScript(closeWeekSummary);
     const page = await ctx.newPage();
     const tag = `${width}x${height}`;
