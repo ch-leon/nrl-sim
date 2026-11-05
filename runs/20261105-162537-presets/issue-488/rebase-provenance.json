@@ -1,0 +1,32 @@
+{
+  "main": {
+    "measured_commit": "ce2c57b214ca9a838ce18c786336e679ea045973",
+    "rebased_commit": "33de8a7cd121389bea3b96ddb7510db09da5aa61",
+    "non_ui_source_and_harness_files": 197,
+    "tree_entries_sha256": "7695b30840a5dd270e0798915a802479a07f7ff2412d5ab7fe8c6c7c89bd71be",
+    "identical": true,
+    "changed_files": [
+      "docs/hub/features.md",
+      "scripts/e2e-webkit/match/playtest.mjs",
+      "src/ui/guide/pages.ts",
+      "src/ui/tacticsBlurbs.ts",
+      "tests/systems/tactics.test.ts",
+      "tests/ui/tacticsBlurbs.test.ts"
+    ]
+  },
+  "branch": {
+    "measured_commit": "a0b5a0abf6f69590a897b93d1fa664143335cd87",
+    "rebased_commit": "6dcb29fc519560294db436998511be72adb1c3a5",
+    "non_ui_source_and_harness_files": 198,
+    "tree_entries_sha256": "402bcf784b9f95f5339adc6283e2f41c32062a66120153ab3ab5652038a4182b",
+    "identical": true,
+    "changed_files": [
+      "docs/hub/features.md",
+      "scripts/e2e-webkit/match/playtest.mjs",
+      "src/ui/guide/pages.ts",
+      "src/ui/tacticsBlurbs.ts",
+      "tests/systems/tactics.test.ts",
+      "tests/ui/tacticsBlurbs.test.ts"
+    ]
+  }
+}
