@@ -63,7 +63,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- UK home towns start a 12-club English-style league with invented clubs and players, 22 rounds, local match vocabulary and a seaside season-end trip. Other countries and old saves keep the AU league; the UK content loads only when needed (#488).
+- UK home towns start a 12-club English-style league with invented clubs and players, 22 rounds, local match vocabulary and a seaside season-end trip. Other countries and old saves keep the AU league; the UK content loads only when needed ([PR](https://github.com/ch-leon/nrl-sim/pull/509)).
 
 - Counter moments get varied, rate-limited live commentary; losses can explain an unfavourable plan matchup with an out-schemed reason and a plan action ([PR](https://github.com/ch-leon/nrl-sim/pull/512)).
 
