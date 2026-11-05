@@ -23,6 +23,12 @@ describe('strategy readouts #467', () => {
     expect(b.textContent).toBe('Tight★★★Jones 85');
     expect(fitRead([], 'slide').reason).toBe('No players');
   });
+  it('names the best available kicker even outside the halves', () => {
+    const roster = nine(40);
+    roster[0] = { ...roster[0]!, name: 'Tui Jones', stats: { ...roster[0]!.stats!, skill: 90 } };
+    roster[2] = { ...roster[2]!, name: 'Kai Smith' };
+    expect(fitRead(roster, 'kick-chase').reason).toBe('Jones 90');
+  });
   it('reads positive, negative and neutral cells with both fits', () => {
     const them = { attack: 'balanced', defence: 'slide' } as const;
     expect(matchupRead(nine(60), nine(60), {attack:'grind',defence:'slide'}, them)).toBe('Tight v Slide: has room. Fits are close.');

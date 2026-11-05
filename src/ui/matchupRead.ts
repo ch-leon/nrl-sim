@@ -1,6 +1,6 @@
 // Readouts only: fixed team sheets and events; no sim state or saved fields.
 import { derivedRatings, styleFit } from '../match/league/fit';
-import { ATTACK_PRESETS, BACKS, HALVES, PACK, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../match/league/presets';
+import { ATTACK_PRESETS, BACKS, PACK, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../match/league/presets';
 import type { MatchEvent, RosterEntry } from '../sim/events';
 
 export type Plan = AttackPreset | DefencePreset;
@@ -11,7 +11,7 @@ export function fitStars(fit: number): number {
 export function fitRead(roster: readonly RosterEntry[], plan: Plan): { stars: string; reason: string } {
   const fit = styleFit(roster)[plan];
   const roles = plan === 'grind' || plan === 'compressed' ? PACK
-    : plan === 'expansive' || plan === 'slide' ? BACKS : plan === 'kick-chase' ? HALVES : null;
+    : plan === 'expansive' || plan === 'slide' ? BACKS : null;
   const rating = (p: RosterEntry): number => {
     const r = derivedRatings(p);
     const s = p.stats;
