@@ -1,38 +1,24 @@
-name: Final counter fit acceptance
+name: Rush carry season parity calibration
 
-# One-off #465 evidence on the frozen defaults, including the fully dormant
-# comparator. Every scenario retains all 500 seeds in both orientations.
+# #465 only: diagnose the remaining Normal managed drift with the existing soak.
 on:
   workflow_dispatch:
   push:
     branches: [issue-465-strategy-counters]
     paths: ['.github/workflows/counters-final-sizing.yml']
-
 permissions:
   contents: read
-
+defaults:
+  run:
+    shell: bash
 jobs:
-  fit:
-    name: ${{ matrix.plan }} cell ${{ matrix.cell }}
+  soak:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { plan: full-fit, cell: 0 }
-          - { plan: full-fit, cell: 1 }
-          - { plan: full-fit, cell: 2 }
-          - { plan: full-fit, cell: 3 }
-          - { plan: full-fit, cell: 4 }
-          - { plan: full-fit, cell: 5 }
-          - { plan: full-fit, cell: 6 }
-          - { plan: full-fit, cell: 7 }
-          - { plan: fit-enabled, cell: 0 }
-          - { plan: fit-enabled, cell: 1 }
-          - { plan: fit-enabled, cell: 2 }
-          - { plan: fit-enabled, cell: 3 }
-          - { plan: fit-enabled, cell: 4 }
+        carry: [0.00025, 0.0001]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,27 +26,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Select one unchanged scenario
-        env:
-          PLAN: ${{ matrix.plan }}
-          CELL: ${{ matrix.cell }}
-        run: |
-          mkdir -p work
-          node --input-type=module <<'JS'
-          import { readFileSync, writeFileSync } from 'node:fs';
-          const p = JSON.parse(readFileSync(`balance/plans/counters-${process.env.PLAN}.json`, 'utf8'));
-          p.scenarios = [p.scenarios[Number(process.env.CELL)]];
-          if (!p.scenarios[0]) throw new Error('missing scenario');
-          p.name += ` - ${p.scenarios[0].name}`;
-          writeFileSync('work/fit-plan.json', JSON.stringify(p, null, 2));
-          JS
-      - run: npm run balance -- --check --plan work/fit-plan.json
-      - run: npm run balance -- --plan work/fit-plan.json --jobs 2 2>&1 | tee fit.log
+      - run: git rev-parse HEAD > candidate-commit.txt
+      - run: npm run soak -- --managed-only --difficulties normal --jobs 4 --tune counters.rush.carry=${{ matrix.carry }} --json soak-candidate.json 2>&1 | tee soak-candidate.log
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: counters-final-${{ matrix.plan }}-${{ matrix.cell }}
+          name: counters-carry-${{ matrix.carry }}
           path: |
-            balance/runs
-            fit.log
+            candidate-commit.txt
+            soak-candidate.json
+            soak-candidate.log
           retention-days: 7
