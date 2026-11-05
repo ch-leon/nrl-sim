@@ -76,6 +76,8 @@ export interface RivalClub {
   strength: number;
   /** The rival's own players (#74); absent on the player's club entry and in RIVAL_CLUBS. */
   squad?: Player[];
+  /** Fictional club home; absent in older saves. Derby status is derived, never saved. */
+  home?: { town: string; country?: string; lat: number; lon: number };
 }
 
 export interface LeagueState {

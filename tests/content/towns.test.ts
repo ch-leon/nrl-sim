@@ -1,3 +1,4 @@
+import { RIVAL_CLUBS } from '../../src/data/league';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -45,4 +46,20 @@ it('accepts a local GeoNames cache export and drops records without a region', (
   const towns = generateTowns(JSON.stringify({ 1: record, 2: { ...record, geonameid: 2, admin1code: '' } }));
   expect(towns).toHaveLength(1);
   expect(towns[0]).toMatchObject({ id: '1', name: 'Example', region: '01', country: 'AU', lat: -30, lon: 150, population: 10000 });
+});
+
+// The only rival homes in real top-flight cities/suburbs have distinct palettes.
+// Map the existing rival swatches to the setup palette's equivalent families.
+it('keeps fictional rival home nicknames and colours distinct from real city clubs (#486)', () => {
+  const city = { 'rival-reapers': 'Redcliffe', 'rival-wolves': 'Sydney', 'rival-stingrays': 'Gold Coast' };
+  const equivalent: Record<string, string> = {
+    '#8e1c1c': '#c0392b', '#f2c14e': '#f4d03f', // crimson / gold, not crimson / white
+    '#37474f': '#1a1a2e', '#b0bec5': '#b0bec5', // slate / grey
+    '#006064': '#16a0b8', '#80deea': '#16a0b8', // dark / pale teal
+  };
+  for (const [id, town] of Object.entries(city)) {
+    const rival = RIVAL_CLUBS.find(c => c.id === id)!;
+    expect(townColorsAllowed(town, 'AU', equivalent[rival.colors[0]]!, equivalent[rival.colors[1]]!)).toBe(true);
+  }
+  // All rival nicknames also pass the shared NRL nickname block list in names.test.ts.
 });

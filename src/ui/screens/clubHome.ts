@@ -8,6 +8,7 @@
 
 import { getState, type GameState } from '../../core/state';
 import { bus } from '../../core/events';
+import { derbyRival } from '../../systems/derby';
 import { nextFixture } from '../../systems/league';
 import { WEEKS_PER_SEASON } from '../../config';
 import type { ObjectiveRisk } from '../../systems/board';
@@ -39,7 +40,7 @@ export interface ClubHomeView {
 }
 
 /** The next-match line (#350 H1): "Next: v Darwin (A) · 5th", the place once a round is in. Pure. */
-export function nextMatchLine(s: Pick<GameState, 'league' | 'week' | 'groundName'>): { text: string; label: string } | null {
+export function nextMatchLine(s: Pick<GameState, 'league' | 'week' | 'groundName' | 'home'>): { text: string; label: string } | null {
   const f = nextFixture(s.league.fixtures, s.week, 'player');
   if (!f) return null;
   const home = f.homeId === 'player';
@@ -47,10 +48,11 @@ export function nextMatchLine(s: Pick<GameState, 'league' | 'week' | 'groundName
   if (!opp) return null;
   const i = s.league.ladder.findIndex((r) => r.clubId === 'player');
   const row = i < 0 ? undefined : s.league.ladder[i];
+  const derby = opp.id === derbyRival({ ...s, clubId: 'player' });
   const place = row && row.played > 0 ? ordinal(i + 1) : '';
   return {
-    text: `Next: v ${placeName(opp.name)} (${home ? 'H' : 'A'})${place ? ` · ${place}` : ''}${home && s.groundName ? ` · ${s.groundName}` : ''}`,
-    label: `Next match: ${opp.name}, ${home ? `home${s.groundName ? ` at ${s.groundName}` : ''}` : 'away'}${place ? `. You are ${place} on the ladder` : ''}`,
+    text: `Next: v ${placeName(opp.name)} (${home ? 'H' : 'A'})${derby ? ' · Derby' : ''}${place ? ` · ${place}` : ''}${home && s.groundName ? ` · ${s.groundName}` : ''}`,
+    label: `Next match: ${opp.name}${derby ? ', Derby' : ''}, ${home ? `home${s.groundName ? ` at ${s.groundName}` : ''}` : 'away'}${place ? `. You are ${place} on the ladder` : ''}`,
   };
 }
 
