@@ -249,3 +249,6 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261105-015557-compressed-464-t05-matrix | Compressed 464 passing alternative | c2a5755 | feat/464-compressed-counters | [report](runs/20261105-015557-compressed-464-t05-matrix/report.md) |
 | 20261105-015548-compressed-464-t06-matrix | Compressed 464 rejected calibration | c2a5755 | feat/464-compressed-counters | [report](runs/20261105-015548-compressed-464-t06-matrix/report.md) |
 | 20261105-025812-standard | standard | e8b88be | main | [report](runs/20261105-025812-standard/report.md) |
+| 20261105-031629-465-main-soak | 465 main soak | e8b88be4ca94a2a9651688bdb55ae1832e0e5a61 | main | [report](runs/20261105-031629-465-main-soak/report.md) |
+| 20261105-031641-465-before-and-enabled-matrix | 465 before and enabled matrix | eefbaaa | HEAD | [report](runs/20261105-031641-465-before-and-enabled-matrix/report.md) |
+| 20261105-031642-465-fifteen-plan-round-robin | 465 fifteen plan round robin | eefbaaa | HEAD | [report](runs/20261105-031642-465-fifteen-plan-round-robin/report.md) |
