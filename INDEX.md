@@ -281,3 +281,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261105-151919-standard | standard | ce2c57b | main | [report](runs/20261105-151919-standard/report.md) |
 | 20261105-153317-presets | presets | ce2c57b | HEAD | [report](runs/20261105-153317-presets/report.md) |
 | 20261105-154203-presets | presets | ce2c57b (uncommitted changes) | codex/487-preseason-trials | [report](runs/20261105-154203-presets/report.md) |
+| 20261105-153308-presets | presets | ce2c57b | HEAD | [report](runs/20261105-153308-presets/report.md) |
+| 20261105-162537-presets | presets | a0b5a0a | codex/488-english-content-pack | [report](runs/20261105-162537-presets/report.md) |
