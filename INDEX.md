@@ -238,3 +238,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-205026-rush-kick-0-42-acceptance-1 | Rush Kick 0.42 acceptance 1 | 086042f | feat/463-rush-counters | [report](runs/20261104-205026-rush-kick-0-42-acceptance-1/report.md) |
 | 20261104-222934-standard | standard | cc956b2 | main | [report](runs/20261104-222934-standard/report.md) |
 | 20261105-002944-standard | standard | eba6d46 | main | [report](runs/20261105-002944-standard/report.md) |
+| 20261105-013647-compressed-464-final-matrix | Compressed 464 calibration (rejected) | cd5ffce | feat/464-compressed-counters | [report](runs/20261105-013647-compressed-464-final-matrix/report.md) |
