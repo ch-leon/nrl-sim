@@ -284,6 +284,9 @@ ${PLAN_FIT_CSS}
   .nrl-lineup-plan-foot .nrl-btn-primary { min-height: 44px; }
   .nrl-lineup-tac-hint { font-size: 0.75rem; }
 }
+@media (max-height: 340px) {
+  .nrl-lineup-plan .nrl-seg { padding: 1px; }
+}
 @media (max-width: 760px) {
   .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal { padding: 8px 14px 12px; }
   .nrl-lineup-plan .nrl-seg > .nrl-btn { font-size: 0.9375rem; padding: 0 4px; }
