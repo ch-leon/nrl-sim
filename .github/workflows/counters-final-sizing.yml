@@ -1,4 +1,4 @@
-name: Counter unequal fit calibration
+name: Final counter size calibration
 
 # Dedicated to #465 calibration. Each scenario gets its own runner, keeping the
 # 1,000-match samples practical. Future use is manual; no other branch auto-runs it.
@@ -7,14 +7,14 @@ on:
   push:
     branches: [issue-465-strategy-counters]
     paths:
-      - '.github/workflows/counters-fit-response.yml'
-      - 'balance/plans/counters-fit-response.json'
+      - '.github/workflows/counters-final-sizing.yml'
+      - 'balance/plans/counters-final-sizing.json'
 
 permissions:
   contents: read
 
 concurrency:
-  group: counter-response-${{ github.sha }}
+  group: counter-final-size-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -26,12 +26,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 0.2 }
-          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 0.4 }
-          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 0.6 }
-          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: -0.2 }
-          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: -0.4 }
-          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: -0.6 }
+          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 0.5 }
+          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 1.0 }
+          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 1.5 }
+          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.025 }
+          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.030 }
+          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.035 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,8 +50,8 @@ jobs:
           node --input-type=module <<'JS'
           import { readFileSync, writeFileSync } from 'node:fs';
           const p = JSON.parse(readFileSync(`balance/plans/counters-${process.env.PLAN}.json`, 'utf8'));
-          p.scenarios = p.scenarios.slice(Number(process.env.CELL), Number(process.env.CELL) + 1);
-          if (p.scenarios.length !== 1) throw new Error('missing scenario');
+          p.scenarios = Number(process.env.CELL) === 0 ? p.scenarios.slice(0, 1) : p.scenarios.slice(1);
+          if (!p.scenarios.length) throw new Error('missing scenario');
           p.base[process.env.KNOB] = Number(process.env.VALUE);
           p.name += ` - ${process.env.KNOB} ${process.env.VALUE}`;
           writeFileSync('work/fit-plan.json', JSON.stringify(p, null, 2));
@@ -61,7 +61,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: counters-response-${{ matrix.cell }}-${{ matrix.value }}
+          name: counters-final-size-${{ matrix.cell }}-${{ matrix.value }}
           path: |
             balance/runs
             fit.log

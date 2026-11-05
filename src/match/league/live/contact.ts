@@ -18,7 +18,7 @@ import { injuryChance, lostInContactChance } from '../weather';
 import { TOUCH } from '../touch';
 import { BIN } from '../sinbin';
 import { derivedRatings } from '../fit';
-import { COUNTERS, rushBroken } from '../counters';
+import { COUNTERS, allOutRecoveryTicks, rushBroken } from '../counters';
 import { BACKS, PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
 import { other, type Player, type Phase } from './types';
@@ -158,7 +158,10 @@ export abstract class LiveContact extends LivePenalties {
           this.pass(c, this.players[r]!, (tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0) + (this.playCall() === 'offload' ? CALLS.offload.spill : 0)
             + this.rushOffloadSpill(c.side));
           this.offloadReceiver = r;
-          this.offloadUntil = this.tick + LIVE.beatenCooldown;
+          const defending = other(c.side);
+          this.offloadUntil = this.tick + allOutRecoveryTicks(LIVE.beatenCooldown,
+            this.tactics[c.side].attack, this.tactics[defending].defence,
+            this.planFit[c.side].attack, this.planFit[defending].defence);
           this.lock(c, 'tackled', LIVE.contactTicks + LIVE.downTicks);
           this.lock(t, 'tackle', LIVE.contactTicks + LIVE.downTicks);
           c.busyUntil = this.tick + LIVE.contactTicks + LIVE.downTicks + 10;
