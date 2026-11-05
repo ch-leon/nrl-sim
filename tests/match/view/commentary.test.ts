@@ -311,3 +311,94 @@ describe('the report summary', () => {
     expect(LINES['full-time:golden-point']!.map((l) => fillLine(l, { winner: 'Larrikins', hi: 5, lo: 4 }))).toContain(summaryLines(gp, H, A)[0]);
   });
 });
+
+describe('counter commentary (#468)', () => {
+  const sheets = (attack = 'grind' as import('../../../src/match/league/presets').AttackPreset,
+    defence = 'slide' as import('../../../src/match/league/presets').DefencePreset) => ({
+    home: sideSheet('H', { rating: 60, tactics: { attack } }),
+    away: sideSheet('A', { rating: 60, tactics: { defence } }),
+  });
+  const counterLines = new Set(Object.entries(LINES).filter(([k]) => k.startsWith('counter:')).flatMap(([, ls]) => [...ls]));
+
+  it.each([
+    ['grind', 'slide', 'offload', 'home', 'tight'],
+    ['grind', 'compressed', 'tackle', 'away', 'compressed'],
+    ['expansive', 'slide', 'tackle', 'away', 'slide'],
+    ['kick-chase', 'rush', 'kick', 'home', 'kick-chase'],
+    ['expansive', 'compressed', 'break-tackle', 'home', 'expansive'],
+    ['all-out', 'rush', 'big-hit', 'away', 'rush'],
+    ['all-out', 'slide', 'break-tackle', 'home', 'all-out'],
+  ] as const)('reads %s v %s from an existing %s', (attack, defence, kind, side, key) => {
+    const c = new Commentator(9, { home: 'H', away: 'A' }, sheets(attack, defence));
+    expect(LINES[`counter:${key}`]).toContain(c.line(ev(kind, { side }), undefined, 0));
+  });
+
+  it('uses match clock, credits each side separately, and never repeats a variant consecutively', () => {
+    const s = sheets('expansive', 'compressed');
+    s.home.tactics = { attack: 'expansive', defence: 'compressed' };
+    s.away.tactics = { attack: 'expansive', defence: 'compressed' };
+    const c = new Commentator(7, { home: 'H', away: 'A' }, s);
+    let previous = '';
+    for (let minute = 0; minute <= 12; minute += 3) {
+      const line = c.line(ev('break-tackle', { tick: minute + 1 }), undefined, minute);
+      expect(counterLines.has(line)).toBe(true);
+      expect(line).not.toBe(previous);
+      previous = line;
+      // Same clock even after many simulation ticks; then just before cooldown.
+      expect(counterLines.has(c.line(ev('break-tackle', { tick: 100_000 + minute }), undefined, minute))).toBe(false);
+      expect(counterLines.has(c.line(ev('break-tackle'), undefined, minute + 2))).toBe(false);
+      expect(counterLines.has(c.line(ev('break-tackle', { side: 'away' }), undefined, minute))).toBe(true);
+    }
+  });
+
+  it('reads the ball location: wide Slide defence and a Compressed middle', () => {
+    const slide = new Commentator(1, { home: 'H', away: 'A' }, sheets('expansive', 'slide'));
+    expect(counterLines.has(slide.line(ev('tackle', { side: 'away' }), undefined, 0, 34))).toBe(false);
+    expect(counterLines.has(slide.line(ev('tackle', { side: 'away' }), undefined, 0, 5))).toBe(true);
+    const compressed = new Commentator(1, { home: 'H', away: 'A' }, sheets('grind', 'compressed'));
+    expect(counterLines.has(compressed.line(ev('tackle', { side: 'away' }), undefined, 0, 5))).toBe(false);
+    expect(counterLines.has(compressed.line(ev('tackle', { side: 'away' }), undefined, 0, 34))).toBe(true);
+  });
+
+  it('tracks plan events, ignores absent clocks, and leaves neutral moments alone', () => {
+    const c = new Commentator(1, { home: 'H', away: 'A' }, sheets('balanced'));
+    expect(counterLines.has(c.line(ev('offload'), undefined, 0))).toBe(false);
+    c.line(ev('plan', { detail: 'grind/slide' }), undefined, 1);
+    expect(counterLines.has(c.line(ev('offload')))).toBe(false);
+    expect(counterLines.has(c.line(ev('offload'), undefined, 1))).toBe(true);
+    c.line(ev('plan', { side: 'away', detail: 'balanced/compressed' }), undefined, 2);
+    expect(counterLines.has(c.line(ev('offload'), undefined, 4))).toBe(false);
+    expect(counterLines.has(c.line(ev('tackle', { side: 'away' }), undefined, 4))).toBe(true);
+  });
+
+  it('replays deterministically and rate-limits both sides over six headless matches', () => {
+    let total = 0;
+    for (const seed of [1, 2, 3]) for (const defence of ['slide', 'compressed'] as const) {
+      const s = sheets('grind', defence);
+      s.away.tactics = { attack: 'expansive', defence };
+      const sim = new LiveSim(s.home, s.away, seed);
+      const a = new Commentator(seed, { home: 'H', away: 'A' }, s);
+      const b = new Commentator(seed, { home: 'H', away: 'A' }, s);
+      const last: Record<Side, number> = { home: -Infinity, away: -Infinity };
+      let count = 0;
+      while (!sim.finished && sim.tick < 100_000) {
+        sim.step();
+        const frame = sim.snapshot();
+        for (const e of sim.tickEvents) {
+          const minute = frame.clock!.minute;
+          const line = a.line(e, frame.score, minute, frame.ball.y);
+          expect(b.line(e, frame.score, minute, frame.ball.y)).toBe(line);
+          if (counterLines.has(line)) {
+            expect(minute - last[e.side!]).toBeGreaterThanOrEqual(3);
+            last[e.side!] = minute;
+            count++;
+          }
+        }
+      }
+      expect(sim.finished).toBe(true);
+      expect(count).toBeGreaterThan(0);
+      total += count;
+    }
+    expect(total).toBeGreaterThanOrEqual(6);
+  });
+});

@@ -1,4 +1,5 @@
 // Readouts only: fixed team sheets and events; no sim state or saved fields.
+import { COUNTER_MATRIX as MATRIX } from '../match/view/counterRead';
 import { derivedRatings, styleFit } from '../match/league/fit';
 import { ATTACK_PRESETS, BACKS, PACK, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../match/league/presets';
 import type { MatchEvent, RosterEntry } from '../sim/events';
@@ -31,11 +32,6 @@ export function fitRead(roster: readonly RosterEntry[], plan: Plan): { stars: st
     reason: best ? `${best.p.name.split(' ').slice(-1)[0]} ${Math.round(best.n)}` : 'No players' };
 }
 
-const MATRIX: Record<AttackPreset, Record<DefencePreset, number>> = {
-  grind: { slide: 1, rush: 0, compressed: -1 }, balanced: { slide: 0, rush: 0, compressed: 0 },
-  expansive: { slide: -1, rush: 0, compressed: 1 }, 'kick-chase': { slide: -1, rush: 1, compressed: 0 },
-  'all-out': { slide: 1, rush: -1, compressed: 0 },
-};
 /** Matrix direction, qualified by both starting fits; never promises a win. */
 export function matchupRead(yours: readonly RosterEntry[], theirs: readonly RosterEntry[], you: TeamTactics, them: TeamTactics): string {
   const a = styleFit(yours)[you.attack], d = styleFit(theirs)[them.defence];
