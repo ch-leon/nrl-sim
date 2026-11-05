@@ -51,6 +51,14 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     await page.locator('[data-nrl-start]').tap();
     await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
+    // A fixed strong-pack rival fixture makes the displayed style deterministic.
+    await page.evaluate(() => {
+      for (const club of window.__nrlState().league.clubs) for (const p of club.squad ?? []) {
+        p.traits = [];
+        p.stats = { speed: 60, strength: ['hooker', 'prop', 'second-row', 'lock'].includes(p.position) ? 90 : 60,
+          stamina: 60, skill: 60, footyIQ: 60 };
+      }
+    });
   });
   await step('lineup', async () => {
     await openNav(page, 'lineup');
@@ -101,6 +109,19 @@ export async function runPlaytest(browser, W = 667, H = 375) {
         return [...(/grind/i.test(text) ? ['retired name in guide'] : []), ...(text.includes('Tight') ? [] : ['Tight missing from guide'])];
       });
     }
+    await page.locator(SHEET_EXIT).tap();
+    await openNav(page, 'fixtures');
+    await step(`fixtures-tight-${size}`, async () => {
+      await page.locator('[data-next-row]').tap();
+      const text = await page.locator('[data-next-match]').textContent();
+      return text.includes('Tight') && !/grind/i.test(text) ? [] : ['They play did not display Tight'];
+    });
+    await step(`rival-tight-${size}`, async () => {
+      await page.locator('[data-next-opponent] button').tap();
+      const text = await page.locator('[data-rival-squad] [data-style]').textContent();
+      return text.includes('Tight') && !/grind/i.test(text) ? [] : ['rival style did not display Tight'];
+    });
+    await page.locator('.nrl-modal .nrl-screen-x').first().tap();
     await page.locator(SHEET_EXIT).tap();
   }
   for (const size of ['large', 'larger']) {
