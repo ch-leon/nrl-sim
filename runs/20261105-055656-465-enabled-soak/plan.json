@@ -1,0 +1,16 @@
+{
+  "name": "465 enabled soak",
+  "kind": "soak",
+  "command": "npm run soak -- --difficulties easy,normal,hard --jobs 4 --json soak-enabled.json",
+  "seeds": 20,
+  "seasons": 5,
+  "difficulties": [
+    "easy",
+    "normal",
+    "hard"
+  ],
+  "modes": [
+    "idle",
+    "managed"
+  ]
+}

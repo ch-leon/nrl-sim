@@ -276,3 +276,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261105-053917-465-full-fit-counters-tight-offload-per-fit-10 | 465 full fit counters - Tight offload per fit 10 | 370109a | issue-465-strategy-counters | [report](runs/20261105-053917-465-full-fit-counters-tight-offload-per-fit-10/report.md) |
 | 20261105-055651-465-rating-yardstick | 465 rating yardstick | 9e93548 | issue-465-strategy-counters | [report](runs/20261105-055651-465-rating-yardstick/report.md) |
 | 20261105-055646-465-strong-pack-offloads | 465 strong pack offloads | 9e93548 | issue-465-strategy-counters | [report](runs/20261105-055646-465-strong-pack-offloads/report.md) |
+| 20261105-055656-465-enabled-soak | 465 enabled soak | 9e93548fb87e870205877d8cfa6f3e5157be80b8 | issue-465-strategy-counters | [report](runs/20261105-055656-465-enabled-soak/report.md) |
