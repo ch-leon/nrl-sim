@@ -2,17 +2,9 @@ name: Strategy counters acceptance
 
 # The switch-on acceptance is much larger than the routine PR checks. Keep its
 # raw balance/soak evidence and phone screenshots as artifacts, never commits.
+# Run manually after tuning; ordinary pushes must not discard these long runs.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - '.github/workflows/counters-acceptance.yml'
-      - 'balance/plans/counters-enabled.json'
-      - 'balance/plans/counters-fit-enabled.json'
-      - 'balance/plans/counters-full-fit.json'
-      - 'balance/plans/counters-round-robin.json'
-      - 'balance/plans/counters-strong-pack.json'
-      - 'balance/plans/counters-yardstick.json'
 
 permissions:
   contents: read
