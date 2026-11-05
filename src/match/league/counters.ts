@@ -6,6 +6,7 @@ export const COUNTERS = {
   compressed: {
     on: 1,
     tight: 0.04,
+    tightFit: 0,
     expansive: 0.26,
     brokenBase: -0.015,
     offloadBase: -0.03,
@@ -21,9 +22,11 @@ export const COUNTERS = {
   slide: {
     on: 1,
     expansive: 0.08,
+    expansiveFit: 0,
     kickChase: 1.5,
     tight: 0.04,
     allOut: 0.50,
+    allOutFit: 0,
   },
   fit: {
     on: 1,
@@ -42,12 +45,18 @@ export function fitEdge(fit: number): number {
   return COUNTERS.fit.on === 1 ? (fit - 1) * COUNTERS.fit.edge : 0;
 }
 
+/** Calibrate unequal-fit cells without moving the already-tuned neutral matrix. */
+function matchupStrength(cell: number, attackFit: number, defenceFit: number, response = 0): number {
+  return cell * attackFit * defenceFit * Math.max(0, 1 + response * Math.abs(attackFit - defenceFit));
+}
+
 /** Cell strength × both starting-sheet fits. Balanced and other defences have no Slide effects. */
 export function slideCounter(attack: AttackPreset, defence: DefencePreset, attackFit: number, defenceFit: number): number {
   if (COUNTERS.slide.on !== 1 || defence !== 'slide' || attack === 'balanced') return 0;
   const cell = attack === 'grind' ? COUNTERS.slide.tight : attack === 'kick-chase' ? COUNTERS.slide.kickChase
     : attack === 'all-out' ? COUNTERS.slide.allOut : COUNTERS.slide.expansive;
-  return cell * attackFit * defenceFit;
+  const response = attack === 'expansive' ? COUNTERS.slide.expansiveFit : attack === 'all-out' ? COUNTERS.slide.allOutFit : 0;
+  return matchupStrength(cell, attackFit, defenceFit, response);
 }
 
 /** Rush's flat bust concession becomes a carrier v starting-sheet fit contest. */
@@ -67,5 +76,5 @@ export function rushCounter(attack: AttackPreset, defence: DefencePreset, attack
 export function compressedCounter(attack: AttackPreset, defence: DefencePreset, attackFit: number, defenceFit: number): number {
   if (COUNTERS.compressed.on !== 1 || defence !== 'compressed') return 0;
   const cell = attack === 'grind' ? COUNTERS.compressed.tight : attack === 'expansive' ? COUNTERS.compressed.expansive : 0;
-  return cell * attackFit * defenceFit;
+  return matchupStrength(cell, attackFit, defenceFit, attack === 'grind' ? COUNTERS.compressed.tightFit : 0);
 }
