@@ -5,7 +5,7 @@ import { planWhenBehind } from '../match/league/breaks';
 import { PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../match/league/presets';
 
 export const TACTIC_BLURB: Readonly<Record<AttackPreset | DefencePreset, string>> = {
-  grind: 'Middle carries, few passes; kick for territory from deep.',
+  grind: 'Forwards carry through the middle and offload in the tackle; kick for territory from deep.',
   balanced: 'A bit of everything: the halves first, the forwards early in the set.',
   expansive: 'More passes and offloads, out to the edges and the cut-out ball.',
   'kick-chase': 'Kick early and often: bombs and grubbers to chase, fewer offloads.',

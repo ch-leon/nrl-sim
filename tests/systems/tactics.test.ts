@@ -9,7 +9,7 @@ import { autoPick, resolveLineup, setTactics, validTactics } from '../../src/sys
 import { teamSheetFromSquad } from '../../src/match/league/sheets';
 import { teamSheetFromRival } from '../../src/match/league/sheets';
 import { runMatch } from '../../src/match/league/match';
-import { DEFAULT_TACTICS } from '../../src/match/league/presets';
+import { DEFAULT_TACTICS, isAttackPreset, PRESET_LABEL } from '../../src/match/league/presets';
 
 const game = () => createNewGame('Tactics FC', 21);
 const sheetWith = (tactics?: { attack: 'expansive' | 'balanced'; defence: 'rush' | 'slide' }) => {
@@ -64,6 +64,21 @@ describe('team tactics (N11.1)', () => {
     const away = teamSheetFromRival({ id: 'rival-gulls', name: 'Gulls', strength: 60, colors: ['#222', '#ddd'] } as never);
     expect(runMatch(withDefault, away, { seed: 4 })).toEqual(runMatch(withoutTactics, away, { seed: 4 }));
   }, 60_000);
+
+  it('an old save keeps the grind id and displays Tight without a save change (#466)', () => {
+    const base = game();
+    const raw = JSON.parse(JSON.stringify({ ...base, version: 19,
+      lineup: setTactics(base.lineup, { attack: 'grind', defence: 'compressed' }),
+    }));
+    const res = migrateState(raw);
+    expect(res.ok).toBe(true);
+    expect(isAttackPreset('grind')).toBe(true);
+    expect(isAttackPreset('tight')).toBe(false);
+    if (!res.ok) throw new Error('old save did not load');
+    expect(res.state.version).toBe(21);
+    expect(res.state.lineup.tactics).toEqual({ attack: 'grind', defence: 'compressed' });
+    expect(PRESET_LABEL[res.state.lineup.tactics.attack]).toBe('Tight');
+  });
 
   it('a v13 save loads with Balanced / Slide on its lineup', () => {
     const base = game();
