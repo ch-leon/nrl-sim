@@ -229,7 +229,7 @@ sim's defaults (`src/match/league/presets.ts`).
 ### 5.1 Attack presets
 | Preset | Pass | Offloads | Step | Width / cut-out | Prefers | Early kicks | Kick bias |
 |---|---|---|---|---|---|---|---|
-| **Tight** (stored `grind`) | −15% (−25% own 20) | pack: ×(1 + 12 × max(0, Tight fit − 1)); backs/halves: legacy zone values | tries 60% | — | hit-ups +1.0 | territory 25% from deep (40% own 20); red zone 20% | long ×1.6, bomb ×0.7, chip/cross ×0.5 |
+| **Tight** (stored `grind`) | −15% (−25% own 20) | pack: ×(1 + 8 × max(0, Tight fit − 1)); backs/halves: legacy zone values | tries 60% | — | hit-ups +1.0 | territory 25% from deep (40% own 20); red zone 20% | long ×1.6, bomb ×0.7, chip/cross ×0.5 |
 | **Balanced** (default) | 0 | normal (0.6 own 20) | always | — | halves first, forwards early | red zone 35% | — |
 | **Expansive** | −10% (was 0) | ×1.3 (0.8 own 20) | always | width 0.28, cut-out 2% (1% own 20), reach +3 m (N13: was 0.35 / 8%) | edges +0.8 | red zone 18% (N13: was 30%) | cross-field ×1.5, long ×0.8 |
 | **Kick-chase** | −5% | ×0.6 | tries 90% | — | — | territory 35% from deep (bomb 40% of those); red zone 55% | bomb ×1.8, grubber ×1.3, long ×1.2 |

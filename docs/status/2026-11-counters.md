@@ -1,5 +1,9 @@
 # Strategy counters switch-on (#465)
 
+Review status: **neutral acceptance blocked pending definition reconciliation**.
+The measured endpoints and paired swings are distinguished below; the previous
+distance-from-50 acceptance claim was insufficient for the issue’s swing wording.
+
 Started from main `e8b88be` (prerequisite #464 merged), then rebased onto
 `cd70565` (#504). That intervening change adds expansion-club introductory UI
 and board notification text; it changes neither the headless match nor economy.
@@ -88,9 +92,9 @@ All three exceed six Tight offloads a match. Run:
 ### Neutral matrix
 
 Attack points share, before → after, with flat 60 sheets and every fit exactly 1.
-Each cell has 1,000 matches. Nonzero target cells finish 4–6 points from 50 with
-the required sign. These are absolute points shares; the paired change is also
-visible, rather than conflating the two units.
+Each cell has 1,000 matches. Values below are absolute points-share endpoints.
+Their distance from 50% is not the paired swing required by the issue’s current
+wording; that acceptance claim is withdrawn.
 
 | Attack | Slide | Rush | Compressed |
 |---|---:|---:|---:|
@@ -99,6 +103,30 @@ visible, rather than conflating the two units.
 | Kick-chase | 52.75 → 45.20 | 52.15 → 55.15 | 49.25 → 50.70 |
 | All-out | 51.70 → 54.10 | 46.80 → 45.00 | 47.80 → 50.40 |
 | Balanced | 50.00 → 50.00 | 48.60 → 48.60 | 47.55 → 49.80 |
+
+The preceding table reports endpoints. A paired swing is **enabled minus
+its dormant-main control**, not enabled minus 50%. The raw paired swings are:
+
+| Attack | Slide swing | Rush swing | Compressed swing |
+|---|---:|---:|---:|
+| Tight | +6.40 | +1.15 | -1.95 |
+| Expansive | -4.15 | +0.00 | +6.75 |
+| Kick-chase | -7.55 | +3.00 | +1.45 |
+| All-out | +2.40 | -1.80 | +2.60 |
+| Balanced | +0.00 | +0.00 | +2.25 |
+
+Under a literal dormant-main ±4–6-point swing criterion, only Expansive/Slide
+passes among the eight nonzero target cells. The other seven do not pass:
+Tight/Slide +6.40, Tight/Compressed −1.95, Expansive/Compressed +6.75,
+Kick-chase/Slide −7.55, Kick-chase/Rush +3.00, All-out/Slide +2.40 and
+All-out/Rush −1.80. The earlier distance-from-50 check is diagnostic and does
+not establish this paired-swing requirement.
+
+The acceptance definitions need owner resolution before this PR is ready:
+All-out/Slide's dormant endpoint is 51.70%, so its minimum +4-point paired
+swing requires an enabled endpoint of 55.70%. That conflicts with the unchanged
+45–55% preset-versus-Balanced/Slide ceiling for the same fixture and sample.
+Neither the preset band nor a replay pin is being loosened to hide this conflict.
 
 Run: `20261105-031641-465-before-and-enabled-matrix`, Actions run
 [41960460765](https://github.com/ch-leon/nrl-sim/actions/runs/41960460765).
@@ -132,6 +160,9 @@ head `8d499e5`, repeats every row with the selected defaults.
 
 The winning style has fit 1.5, the losing style 0.5, and the other two selected
 fits remain 1. Flat 60 playing stats isolate fits from physical superiority.
+The owner explicitly clarified the full-fit comparison: “Isolate counter + fit;
+hold Tight rebuild on in both runs.” This clarification is the basis of the
+full-fit ±9–12 check; it is not a claim about total switch-on change.
 The comparator holds the independent Tight offload rebuild on, disables
 counter/own-fit bonuses, and then enables those bonuses. The committed plan also
 includes a fully dormant variant so the total switch-on difference is retained.
@@ -148,7 +179,7 @@ Each reported row has 1,000 matches per variant; no seeds were selected or dropp
 | Kick-chase / Slide | 52.75 | 40.90 | −11.85 | [full-fit-6](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261105-050847-465-full-fit-counters-full-fit-kick-chase-v-slide/report.md) |
 | All-out / Rush | 46.80 | 36.30 | −10.50 | [full-fit-7](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261105-050846-465-full-fit-counters-full-fit-all-out-v-rush/report.md) |
 
-The fully dormant Tight/Slide control is 48.30% (total switch-on change +16.20 points); Tight/Compressed is 47.40% (total −8.00). The independent fitted Tight offload rebuild accounts for the difference from the counter/fit comparator. Other rows have identical dormant and comparator controls. Both comparisons are retained in the raw report.
+The fully dormant Tight/Slide control is 48.30% (total switch-on change +16.20 points); Tight/Compressed is 47.40% (total −8.00). Those totals fall outside ±9–12 and must not be described as passing that band. The owner-confirmed counter/fit deltas are +11.50 and −9.70 respectively. The independent fitted Tight offload rebuild accounts for the difference from the counter/fit comparator. Other rows have identical dormant and comparator controls. Both comparisons are retained in the raw report.
 
 The selected Tight/Slide row is from [41975335567](https://github.com/ch-leon/nrl-sim/actions/runs/41975335567),
 head `370109a` with the explicit selected `offloadPerFit=8` override. The other
