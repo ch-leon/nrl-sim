@@ -46,7 +46,8 @@ describe('AU pack', () => {
   });
 
   it("holds today's 15 clubs with their ids, colours and strengths", () => {
-    expect(AU_PACK.clubs).toEqual([
+    // Home coordinates are additive; the original identities and balance stay pinned.
+    expect(AU_PACK.clubs.map(({ id, name, colors, strength }) => ({ id, name, colors, strength }))).toEqual([
       { id: 'rival-reapers', name: 'Redcliffe Reapers', colors: ['#8e1c1c', '#f2c14e'], strength: 70 },
       { id: 'rival-wolves', name: 'Woolloomooloo Wolves', colors: ['#37474f', '#b0bec5'], strength: 68 },
       { id: 'rival-thunder', name: 'Toowoomba Thunder', colors: ['#1a237e', '#ffd54f'], strength: 63 },

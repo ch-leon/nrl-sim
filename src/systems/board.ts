@@ -2,6 +2,7 @@
 // (GitHub #47, part of #49). Pure functions plus one season hook. Deterministic:
 // objectives come from a private RNG seeded by season + club count, so the same
 // state always yields the same goals and the main rngSeed stream is untouched.
+import { derbyRival } from './derby';
 import { coachAddress } from '../ui/coachName';
 import { getState, setState, type GameState, type Objective } from '../core/state';
 import { bus } from '../core/events';
@@ -43,7 +44,7 @@ export function finalsTarget(state: Pick<GameState, 'reputation' | 'settings'>):
 
 /**
  * The board's 2–3 goals for `state.season`: always a finals target and a
- * solvency floor; clubs with reputation ≥ 25 get a third (rival or build).
+ * solvency floor; clubs with a derby or reputation ≥ 25 get a third.
  */
 export function generateObjectives(state: GameState): Objective[] {
   const rng = makeRng(state.season * 7919 + state.league.clubs.length * 31 + 17);
@@ -57,17 +58,20 @@ export function generateObjectives(state: GameState): Objective[] {
       text: floor > 0 ? `Finish the season with at least $${floor.toLocaleString()}` : 'Finish the season solvent',
     },
   ];
-  if (state.reputation < 25) return out;
+  const derby = derbyRival(state);
+  if (state.reputation < 25 && !derby) return out;
 
   const rivals = state.league.clubs.filter((c) => c.id !== state.clubId)
     .sort((a, b) => b.strength - a.strength || a.id.localeCompare(b.id));
-  if (rivals.length > 0 && rng.next() < 0.5) {
+  // Consume precisely the old draw, even when geography chooses the objective.
+  const rivalDraw = state.reputation >= 25 && rivals.length > 0 && rng.next() < 0.5;
+  if (rivals.length > 0 && (rivalDraw || derby)) {
     // Reach for a rival a little above the club: better reputation → stronger rival.
     const idx = Math.min(rivals.length - 1, Math.round((1 - state.reputation / 100) * (rivals.length - 1) * 0.7));
-    const rival = rivals[idx]!;
+    const rival = rivals.find((c) => c.id === derby) ?? rivals[idx]!;
     out.push({
       id: `s${season}-rival`, kind: 'beatRival', target: 0, rivalId: rival.id, status: 'pending',
-      text: `Finish above ${rival.name}`,
+      text: `Finish above ${rival.name}${derby ? ", our derby rival" : ""}`,
     });
   } else {
     const target = state.facilities.length + BOARD.BUILD_TARGET_EXTRA;
