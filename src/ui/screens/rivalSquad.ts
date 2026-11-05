@@ -1,3 +1,6 @@
+import { matchupRead, counterRead, fitRead } from '../matchupRead';
+import { teamSheetFromSquad, teamSheetFromRival } from '../../match/league/sheets';
+import { resolveLineup, validTactics } from '../../systems/lineup';
 // src/ui/screens/rivalSquad.ts — read-only view of a rival club's squad, opened
 // from the Ladder (GitHub #74). A sheet over the League (Broadcast Quiet, like
 // the Squad table 3d): the club and how it plays in the header row, the squad
@@ -89,10 +92,12 @@ const RIVAL_CSS = `
 }
 .nrl-rival-squad { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 /* The header row: the club, how it plays (and, with an Analyst, when behind), beside the ✕. */
-.nrl-rival-head { flex: 0 0 auto; min-height: 44px; display: flex; align-items: center; gap: 12px; margin-bottom: 6px; padding-right: 48px; min-width: 0; }
+.nrl-rival-head { flex: 0 0 auto; min-height: 44px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; margin-bottom: 4px; padding-right: 48px; min-width: 0; }
 .nrl-rival-head h2 { flex: 0 0 auto; margin: 0; font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; }
-.nrl-rival-lines { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.nrl-rival-head .nrl-rival-edit { grid-column: 2; grid-row: 1; }
+.nrl-rival-lines { grid-column: 1 / -1; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
 .nrl-rival-head p { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-rival-head p[data-matchup], .nrl-rival-head p[data-counters] { white-space: normal; overflow: visible; }
 .nrl-rival-head p[data-when-behind] { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-rival-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 /* The squad: PLAYER · POS · AGE · OVR · SKILLS, rows open the player page (N7, #185). */
@@ -215,6 +220,9 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
     const club = live();
     const rows = rivalSquadRows(club);
     const style = rivalStyle(club);
+    const state = getState();
+    const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
+    const theirs = teamSheetFromRival(club).roster ?? [];
     const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
     const line = (text: string, attrs: Record<string, string>): HTMLElement => el('p', { text, attrs: { ...attrs, title: text } });
     const title = el('h2', { text: club.name });
@@ -236,7 +244,8 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
         el('div', { class: 'nrl-rival-lines' },
           draft
             ? line('Rename the club and pick its kit. Results already played keep the old name.', {})
-            : line(`Strength ${club.strength} · plays ${tacticsLabel(style)} · ${rows.length} players · tap a player for his page`, { 'data-style': `${style.attack}/${style.defence}` }),
+            : line(`Usual: ${tacticsLabel(style)} · fit ${fitRead(theirs, style.attack).stars} / ${fitRead(theirs, style.defence).stars}`, { 'data-style': `${style.attack}/${style.defence}`, 'data-usual-fit': '' }),
+          ...(!draft ? [line(matchupRead(ours, theirs, validTactics(state.lineup.tactics), style), { 'data-matchup': '' }), line(counterRead(ours, style.defence), { 'data-counters': '' })] : []),
           ...(!draft && behind ? [line(`When behind: ${behind}`, { 'data-when-behind': '' })] : []),
         ),
         ...(draft ? [] : [edit]),

@@ -454,6 +454,53 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       return check(rec, spec, spec.id);
     });
   }
+  // #467: every new readout at both requested text sizes. Images stay in CI artifacts.
+  const textSize = (size) => page.evaluate((size) => {
+    if (size === 'normal') document.documentElement.removeAttribute('data-text-size');
+    else document.documentElement.setAttribute('data-text-size', size);
+    document.documentElement.style.setProperty('--nrl-text-scale', size === 'large' ? '1.15' : '1');
+  }, size);
+  const readoutProblems = () => page.evaluate(() => {
+    const out = [];
+    for (const e of document.querySelectorAll('[data-plan-done], .nrl-mo-plan-go, [data-fit] > span, [data-matchup], [data-counters], [data-usual-fit], [data-working]')) {
+      const r = e.getBoundingClientRect();
+      if (r.width < 1) continue;
+      if (r.left < 0 || r.right > innerWidth + 1 || r.top < 0 || r.bottom > innerHeight + 1) out.push(`off screen: ${e.textContent}`);
+      for (let a = e.parentElement; a; a = a.parentElement) {
+        const cs = getComputedStyle(a), ar = a.getBoundingClientRect();
+        if (/(auto|scroll|hidden|clip)/.test(cs.overflowY) && (r.top < ar.top - 1 || r.bottom > ar.bottom + 1)) out.push(`ancestor clips: ${e.textContent}`);
+      }
+      if (e.scrollWidth > e.clientWidth + 1) out.push(`clipped: ${e.textContent}`);
+    }
+    return out;
+  });
+  for (const size of ['normal', 'large']) {
+    await textSize(size);
+    await step(`fit-lineup-${size}`, async () => {
+      await openNav(page, 'lineup');
+      await tap('[data-plan]');
+      await page.waitForSelector('.nrl-lineup-plan');
+      const out = await readoutProblems();
+      if (await page.locator('.nrl-lineup-plan [data-fit]').count() !== 8) out.push('missing fit buttons');
+      return out;
+    });
+    await tap('[data-plan-done]');
+    await step(`matchup-fixtures-${size}`, async () => {
+      await openNav(page, 'fixtures');
+      await tap('[data-next-row]');
+      await page.waitForSelector('[data-next-match]');
+      const text = await page.locator('[data-next-match]').innerText();
+      return /Matchup/i.test(text) && /Counters/i.test(text) ? [] : ['missing matchup or counters'];
+    });
+    await step(`matchup-rival-${size}`, async () => {
+      await tap('[data-next-opponent] button');
+      await page.waitForSelector('[data-matchup]');
+      return readoutProblems();
+    });
+    await closeAll();
+  }
+  await textSize('normal');
+
   // Popups: the player page, the kit designer, a rival's squad, a decision card.
   await step('popup-player', async (rec) => {
     await openNav(page, 'squad');
@@ -604,6 +651,14 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       sc.openPlanCard('Half-time', ['Landscape FC 4 – 0 Rivals', 'Legs 80% / 78%', 'Calls paid off – / –']);
     });
     if (!(await page.locator('.nrl-mo-plan').count())) return ['no plan card (no plan side in this match)'];
+    for (const size of ['normal', 'large']) {
+      await textSize(size);
+      const problems = await readoutProblems();
+      out.push(...problems);
+      if (await page.locator('.nrl-mo-plan [data-fit]').count() !== 8 || !(await page.locator('[data-working]').count())) out.push('missing half-time fit or numbers');
+      await page.screenshot({ path: join(OUT, `fit-half-time-${size}.png`) });
+    }
+    await textSize('normal');
     const at = await clock();
     await page.waitForTimeout(6000);
     if (!(await page.locator('.nrl-mo-plan').count())) out.push('the half-time card closed by itself');

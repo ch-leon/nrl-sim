@@ -1,3 +1,6 @@
+import { matchupRead, counterRead, fitRead } from '../matchupRead';
+import { teamSheetFromSquad, teamSheetFromRival } from '../../match/league/sheets';
+import { resolveLineup, validTactics } from '../../systems/lineup';
 // src/ui/screens/fixtures.ts — the League sheet: ladder + fixtures (BAK-184, WU-7;
 // Broadcast Quiet 3h). Built from the src/ui/dom.ts helper kit (no Phaser).
 // One sheet, two columns: the ladder on the left (the club's row starred, a
@@ -453,7 +456,11 @@ function nextMatchCard(state: GameState): HTMLElement {
   // How they play (N11): the style of the nine they would field today; the Guide's Tactics page explains the words.
   if (oppClub) {
     const style = rivalStyle(oppClub);
-    line('They play', styleLine(style));
+    const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
+    const theirs = teamSheetFromRival(oppClub).roster ?? [];
+    line('They play', `${styleLine(style)} · ${fitRead(theirs, style.attack).stars} / ${fitRead(theirs, style.defence).stars}`);
+    line('Matchup', matchupRead(ours, theirs, validTactics(state.lineup.tactics), style));
+    line('Counters', counterRead(ours, style.defence));
     // The Analyst (N14): what they step to when they go more open. Everyone else just sees how they play.
     if (hasStaff(state, 'analyst')) {
       const behind = whenBehindLine(style);

@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Plan buttons show squad-fit stars and a named contributor; pre-match scouting shows counters, and half-time shows breaks, kicks and errors against style guides ([issue](https://github.com/ch-leon/nrl-sim/issues/467)).
+
 - Tight tactics now describe forward carries and offloads throughout the plan sheets and guides; old saves keep their plan ([PR](https://github.com/ch-leon/nrl-sim/pull/507)).
 
 - Plans now counter each other by default, with squad fit and offload-heavy Tight for strong packs ([PR](https://github.com/ch-leon/nrl-sim/pull/506); see `docs/status/2026-11-counters.md`).
