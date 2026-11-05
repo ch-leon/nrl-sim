@@ -9,6 +9,24 @@ export const COUNTER_SIGNS: Readonly<Record<string, number>> = {
   'all-out v slide': 1, 'all-out v rush': -1,
 };
 
+// Deterministic controls at e8b88be: seeds 1–500, both orientations, 1,000 matches.
+// These are dormant-main fingerprints, separate from the acceptance targets.
+const DORMANT_MAIN_SHARES: Readonly<Record<string, number>> = {
+  'grind v slide': .483, 'grind v rush': .467, 'grind v compressed': .474,
+  'balanced v slide': .5, 'balanced v rush': .486, 'balanced v compressed': .4755,
+  'expansive v slide': .5, 'expansive v rush': .5145, 'expansive v compressed': .4745,
+  'kick-chase v slide': .5275, 'kick-chase v rush': .5215, 'kick-chase v compressed': .4925,
+  'all-out v slide': .517, 'all-out v rush': .468, 'all-out v compressed': .478,
+};
+
+export function dormantShareProblem(scenario: string, share: number): string | undefined {
+  const expected = DORMANT_MAIN_SHARES[scenario.replace(/^full fit /, '')];
+  if (expected === undefined || !Number.isFinite(share) || Math.abs(share - expected) > 1e-10) {
+    return `${scenario}: dormant control must reproduce main (${expected === undefined ? 'unknown fixture' : (expected * 100).toFixed(2) + '%'}); got ${(share * 100).toFixed(2)}%`;
+  }
+  return undefined;
+}
+
 export function counterSwingProblem(before: number, after: number, sign: number, fullFit = false): string | undefined {
   const signed = sign * (after - before) * 100;
   // Numerical tolerance only; a reported 3.95pp does not meet a 4pp floor.

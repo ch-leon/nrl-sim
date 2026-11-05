@@ -1,0 +1,86 @@
+name: Counters final unequal-fit refinement
+on:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['.github/workflows/counters-fitted-refinement.yml']
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        response: [1.25, 1.5]
+        fixture: [tight-full, kick-full, tight-pack]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - env:
+          RESPONSE: ${{ matrix.response }}
+          FIXTURE: ${{ matrix.fixture }}
+        run: |
+          python3 <<'PY'
+          import os,json
+          from pathlib import Path
+          r=float(os.environ['RESPONSE']);f=os.environ['FIXTURE']
+          base={'presets.attack.kick-chase.base.pass':0,'counters.fit.edge':.065,'counters.fit.counterResponse':r,'counters.slide.kickChase':.4,'counters.rush.kickChase':.6,'counters.rush.allOut':.1,'counters.compressed.commitM':10,'counters.compressed.tight':.06,'counters.compressed.tightFit':2.5,'counters.compressed.expansive':.09,'counters.compressed.brokenBase':0,'counters.compressed.offloadBase':0,'counters.tight.offloadPerFit':9.5}
+          full=json.load(open('balance/plans/counters-full-fit.json'))
+          if f=='tight-full':s=full['scenarios'][4]
+          elif f=='kick-full':s=full['scenarios'][6]
+          else:s=json.load(open('balance/plans/counters-strong-pack.json'))['scenarios'][2]
+          control={'name':'balanced v slide','home':{'rating':60},'away':{'rating':60},'track':'home','bothWays':True,'seeds':10}
+          p=dict(name=f'465 final fitted {r} {f}',description='Candidate-enabled full fit compared with recorded unchanged Tight-on/pass-zero fit-off controls: Tight/Compressed49.10%, Kick-chase/Slide50.40%. Strong-pack floor remains6. No seed exclusions.',report='matrix',seeds=500,base=base,scenarios=[control,s])
+          Path('balance/plans/experiments').mkdir(exist_ok=True)
+          Path('balance/plans/experiments/20261105-final-fit.json').write_text(json.dumps(p,indent=2))
+          PY
+      - run: npm run balance -- --plan balance/plans/experiments/20261105-final-fit.json --jobs 4 2>&1 | tee balance.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: final-fit-${{ matrix.response }}-${{ matrix.fixture }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
+
+  career:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        response: [1.25, 1.5]
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - env:
+          RESPONSE: ${{ matrix.response }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          python3 <<'PY'
+          import os,subprocess
+          knobs={'presets.attack.kick-chase.base.pass':0,'counters.fit.edge':.065,'counters.fit.counterResponse':float(os.environ['RESPONSE']),'counters.slide.kickChase':.4,'counters.rush.kickChase':.6,'counters.rush.allOut':.1,'counters.compressed.commitM':10,'counters.compressed.tight':.06,'counters.compressed.tightFit':2.5,'counters.compressed.expansive':.09,'counters.compressed.brokenBase':0,'counters.compressed.offloadBase':0,'counters.tight.offloadPerFit':9.5}
+          command=['npm','run','soak','--','--difficulties','normal','--managed-only','--jobs','4','--shard',os.environ['SHARD']+'/2','--json','normal.json']
+          for key,value in knobs.items():command+=['--tune',f'{key}={value}']
+          subprocess.run(command,check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: final-career-${{ matrix.response }}-${{ matrix.shard }}
+          path: normal.json
+          retention-days: 7

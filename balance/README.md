@@ -272,3 +272,11 @@ fresh careers and saves v1–20 remain included; Normal idle and managed each
 must stay within three win points. Mean final money in each mode/difficulty
 must remain within the baseline mean ±2 baseline standard errors, including
 careers that ended early. Both six-row tables belong in the PR.
+
+`npm run soak -- --difficulties easy,normal,hard --jobs 4 --shard i/7`
+partitions the original case list across seven runners (1 ≤ i ≤ 7). It preserves
+every case's seed, difficulty, mode and planned seasons, including saves v1–20.
+The unsharded command is unchanged. Pool all seven JSON files and enforce the
+complete 140-case guard before reporting an acceptance result; individual shards
+are not a complete soak. `tests/qa/shard.test.ts` verifies exact partition coverage
+and preserves case objects and their order within each shard.

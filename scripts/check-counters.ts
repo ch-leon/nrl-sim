@@ -2,7 +2,7 @@
 // vite-node scripts/check-counters.ts -- <kind> <artifact-or-run-directory>
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkCounterRows, presetShareProblem } from '../src/match/balance/acceptance';
+import { checkCounterRows, dormantShareProblem, presetShareProblem } from '../src/match/balance/acceptance';
 import type { CellResult } from '../src/match/balance/measure';
 
 const args = process.argv.slice(2).filter((x) => x !== '--');
@@ -28,9 +28,13 @@ const requireRows = (variant: string, count: number, matches = 1000): CellResult
 };
 if (kind === 'enabled' || kind === 'full-fit') {
   const full = kind === 'full-fit';
-  requireRows('baseline', full ? 8 : 15);
+  const baseline = requireRows('baseline', full ? 8 : 15);
   requireRows(full ? 'enabled defaults' : 'enabled', full ? 8 : 15);
-  if (full) requireRows('fully dormant', 8);
+  const dormant = full ? requireRows('fully dormant', 8) : baseline;
+  for (const row of dormant) {
+    const problem = dormantShareProblem(row.scenario, row.pointsShare!.mean);
+    if (problem) problems.push(problem);
+  }
   problems.push(...checkCounterRows(rows, full));
   if (!full) {
     for (const row of rows.filter((r) => r.variant === 'enabled' && (r.scenario.endsWith('v slide') || r.scenario.startsWith('balanced v ')))) {
