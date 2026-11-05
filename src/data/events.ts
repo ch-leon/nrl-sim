@@ -486,7 +486,7 @@ const makeDeck = (TRIP = activePack().events.trip): readonly EventCardDef[] => [
     id: 'baliTrip',
     title: TRIP.title,
     text: TRIP.text,
-    weight: 1, cooldown: 27, when: { offer: 'rollover' },
+    weight: 1, cooldown: activePack().league.seasonRounds + activePack().league.finalsWeeks, when: { offer: 'rollover' },
     choices: [
       {
         label: 'Let them go',

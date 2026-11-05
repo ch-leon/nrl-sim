@@ -8,7 +8,7 @@ import { getState, setState, type Fixture, type GameState, type RivalClub } from
 import { registerTickHook, resumeWeek, weekHeld, TICK_ORDER } from '../core/time';
 import { clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
 import { NINES } from '../match/league/rules';
-import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, difficultyMultipliers } from '../config';
+import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, SEASON_ROUNDS, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { teamSheetFromRival, teamSheetFromSquad, withRivalStyle } from '../match/league/sheets';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
@@ -191,9 +191,9 @@ export function coachsOfficeLevel(state: { facilities: readonly { defId: string;
 
 export function roundLabel(round: number): string {
   if (round <= 0) return `Pre-season trial ${round + 2}`;
-  if (round === 25) return 'Qualifying Final';
-  if (round === 26) return 'Semi Final';
-  if (round === 27) return 'Grand Final';
+  if (round === SEASON_ROUNDS + 1) return 'Qualifying Final';
+  if (round === SEASON_ROUNDS + 2) return 'Semi Final';
+  if (round === SEASON_ROUNDS + 3) return 'Grand Final';
   return `Round ${round}`;
 }
 

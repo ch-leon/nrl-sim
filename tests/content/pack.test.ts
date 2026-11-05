@@ -249,6 +249,8 @@ import { packForCountry, preparePack, selectPack } from '../../src/content';
 import { createNewGame, getState, loadState, SAVE_VERSION } from '../../src/core/state';
 import { initLeague, FINALS_ROUNDS } from '../../src/systems/fixtures';
 import { FINALS_START_WEEK, MAX_RUN_WEEKS } from '../../src/core/advanceRules';
+import { roundLabel } from '../../src/systems/matchday';
+import { applySeasonEvents } from '../../src/systems/events';
 import { unlockReason } from '../../src/systems/unlocks';
 import { migrateState } from '../../src/core/save';
 
@@ -277,6 +279,7 @@ describe('UK careers (#488)', () => {
     expect(config.WEEKS_PER_SEASON).toBe(25);
     expect(FINALS_START_WEEK).toBe(23);
     expect(FINALS_ROUNDS.GF).toBe(25);
+    expect([22, 23, 24, 25].map(roundLabel)).toEqual(['Round 22', 'Qualifying Final', 'Semi Final', 'Grand Final']);
     expect(MAX_RUN_WEEKS).toBe(50);
     expect(unlockReason('grandstand')).toContain('round 22');
     expect(getState().league.clubs).toHaveLength(12);
@@ -295,6 +298,15 @@ describe('UK careers (#488)', () => {
     expect(s.squad).toEqual(baseline.squad);
     expect(s.rngSeed).toBe(baseline.rngSeed);
     expect(activePack()).toBe(AU_PACK);
+  });
+
+  it('offers the UK seaside trip in consecutive 25-week seasons', () => {
+    const fresh = createNewGame('Test Club', 71, { home: { town: 'Test Town', country: 'GB' } });
+    const first = applySeasonEvents({ ...fresh, season: 2 });
+    expect(first.eventDeck.pending.filter(p => p.cardId === 'baliTrip')).toHaveLength(1);
+    const next = applySeasonEvents({ ...first, season: 3, eventDeck: { ...first.eventDeck, pending: [] } });
+    expect(next.eventDeck.pending.filter(p => p.cardId === 'baliTrip')).toHaveLength(1);
+    expect(cardById('baliTrip')?.cooldown).toBe(25);
   });
 
   it('an old save without pack loads as AU even after a UK career, without migration or a version bump', () => {

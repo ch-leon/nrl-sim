@@ -276,7 +276,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Finals',
         bullets: [
-          `The top eight play quarter finals (1 v 8, 2 v 7, 3 v 6, 4 v 5), the winners are re-seeded for the semis, and the grand final is week 27. A final level at full time goes to golden point: ${NINES.goldenPointMinutes} more minutes, and the next score wins (a try needs no conversion). Still level after that, the higher seed goes through. Finals are night games.`,
+          `The top eight play quarter finals (1 v 8, 2 v 7, 3 v 6, 4 v 5), the winners are re-seeded for the semis, and the grand final is week ${WEEKS_PER_SEASON}. A final level at full time goes to golden point: ${NINES.goldenPointMinutes} more minutes, and the next score wins (a try needs no conversion). Still level after that, the higher seed goes through. Finals are night games.`,
           'Prize money is paid at the rollover; the premiership is worth 15 reputation on top.',
         ],
       },
