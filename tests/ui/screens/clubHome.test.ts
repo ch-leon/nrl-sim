@@ -38,6 +38,15 @@ describe('the Club home sheet (#350)', () => {
     expect(line.label).toContain(`You are ${place} on the ladder`);
   });
 
+  it('tags only the derby opponent in the next-fixture line and spoken label', () => {
+    const s = getState();
+    const { opp } = next(s);
+    const home = { town: opp.home!.town, lat: opp.home!.lat, lon: opp.home!.lon };
+    expect(nextMatchLine({ ...s, home })!.text).toContain(' · Derby');
+    expect(nextMatchLine({ ...s, home })!.label).toContain(', Derby,');
+    expect(nextMatchLine({ ...s, home: { town: 'Free text' } })!.text).not.toContain('Derby');
+  });
+
   it('no next match with the season done', () => {
     const s = getState();
     expect(nextMatchLine({ ...s, league: { ...s.league, fixtures: [] } })).toBeNull();
@@ -142,5 +151,18 @@ describe('Coach says row (#477)', () => {
     closeScreen();
     const reopened = openClubHome(deps) as unknown as StubNode;
     expect(reopened.textContent).toContain("can't play. Fix the lineup.");
+  });
+});
+
+describe('the named home ground (#485)', () => {
+  it('appears for a home fixture only; older saves keep the original line', () => {
+    const s = createNewGame('Ground Club', 42);
+    s.league = initLeague(s);
+    const home = s.league.fixtures.find(f => f.homeId === 'player')!;
+    const away = s.league.fixtures.find(f => f.awayId === 'player')!;
+    const baseline = nextMatchLine({ ...s, week: home.round });
+    expect(nextMatchLine({ ...s, week: home.round, groundName: 'Valley Oval' })?.text).toBe(`${baseline?.text} · Valley Oval`);
+    expect(nextMatchLine({ ...s, week: home.round, groundName: 'Valley Oval' })?.label).toContain('home at Valley Oval');
+    expect(nextMatchLine({ ...s, week: away.round, groundName: 'Valley Oval' })).toEqual(nextMatchLine({ ...s, week: away.round }));
   });
 });

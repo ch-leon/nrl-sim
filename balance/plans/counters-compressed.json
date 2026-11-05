@@ -1,6 +1,6 @@
 {
   "name": "Compressed counters acceptance",
-  "description": "Full 5 by 3 matrix at flat 60 and neutral fit with all counters enabled. Compressed uses its enabled neutral contact baseline; middle benefits belong to the Tight cell. Most cells use 500 seeds both ways (1000 matches); Tight v Rush and Balanced v Rush retain 1000 seeds both ways (2000 matches).",
+  "description": "Full 5 by 3 matrix at flat 60 and neutral fit with all counters enabled. Compressed uses its enabled common contact baseline; the additional Contact D-scaled middle benefit belongs to the Tight cell. Most cells use 500 seeds both ways (1000 matches); Tight v Rush and Balanced v Rush retain 1000 seeds both ways (2000 matches).",
   "report": "matrix",
   "seeds": 500,
   "scenarios": [
@@ -298,10 +298,10 @@
     "counters.slide.on": 1,
     "counters.rush.on": 1,
     "counters.compressed.on": 1,
-    "counters.compressed.tight": 0.07,
-    "counters.compressed.expansive": 0.2,
+    "counters.compressed.tight": 0.04,
+    "counters.compressed.expansive": 0.26,
     "counters.compressed.commitM": 6,
-    "counters.compressed.brokenBase": 0,
-    "counters.compressed.offloadBase": 0
+    "counters.compressed.brokenBase": -0.015,
+    "counters.compressed.offloadBase": -0.03
   }
 }

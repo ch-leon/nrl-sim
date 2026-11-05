@@ -13,11 +13,11 @@ export async function runLabsControls(browser) {
   const OUT = join(OUT_ROOT, 'webkit', 'labs-controls');
   mkdirSync(OUT, { recursive: true });
   try {
-    await page.goto(`${BASE}&labs=1`);
-    // createNewGame defaults its seed to Date.now() >>> 0. Pin only career
-    // creation to seed 1; real timers/animation continue and wall time resumes
-    // before playing. Other WebKit phases keep their existing clock behaviour.
+    // Setup captures the career seed for town preselection. Pin before it opens
+    // so setup and createNewGame both use seed 1. Timers/animation keep running,
+    // and wall time resumes before playing; other phases keep their own clocks.
     await page.clock.setFixedTime(1);
+    await page.goto(`${BASE}&labs=1`);
     await page.locator('[data-nrl-start]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
     await page.clock.setSystemTime(Date.now());

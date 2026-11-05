@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { createNewGame } from '../../src/core/state';
 import { COACH_NAME, COACH_ROLE, SUMMARY_REMARKS, EVENT_COMMENTS } from '../../src/ui/coachVoice';
 import { STEPS, HINTS, TUTORIAL_END_TEXT } from '../../src/ui/tutorial';
+import { NICKNAMES } from '../../scripts/gen-towns.mjs';
+import towns from '../../src/data/towns.json';
+import type { Town } from '../../src/data/townSetup';
 import { AU_PACK } from '../../src/content/au';
 import { RIVAL_CLUBS } from '../../src/data/league';
 import { generatedBench, generatedRoster } from '../../src/match/league/sheets';
@@ -216,4 +219,12 @@ describe('the pack text (#398)', () => {
 
 it('the fictional guide surname passes the same real-name and near-miss guard', () => {
   expect(realProblem(COACH_NAME.split(' ').slice(1).join(' '))).toBeNull();
+});
+
+// Cities may be real; all suggested nicknames obey the same pack block list.
+describe('town suggestions (#485)', () => {
+  it.each(BLOCKED_WORDS)('never suggests %s', word => {
+    const re = new RegExp(`\\b${word.replace(/ /g, '\\s+')}\\b`, 'i');
+    expect([...NICKNAMES, ...(towns as Town[]).map(t => t.nickname)].filter(n => re.test(n))).toEqual([]);
+  });
 });

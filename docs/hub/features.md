@@ -65,6 +65,8 @@ What's in the game, with the PR that added each.
 
 - Compressed counters pack middle tackles against Tight and leave edge overlaps for Expansive, behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/503)).
 
+- Listed home towns now choose the nearest fictional derby rival: a board target, guide News before the fixture, result News afterwards, and a Derby tag on Club home ([PR](https://github.com/ch-leon/nrl-sim/pull/505)). Old saves and free-text towns keep their existing objectives.
+
 - Rush counters use carrier/defence fit, kick space and rushed All-out offload spills behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/502)).
 
 - Slide matchup mechanics for Expansive, Kick-chase, Tight and All-out are implemented behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/501)).
@@ -86,6 +88,7 @@ Newest first; merge dates in UTC.
 - Grind is now named Tight; pack-fit offloads are available behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/473)), 4 Nov
 - Recruit shortlist of four with an affordable Coach’s pick and Show all ([PR](https://github.com/ch-leon/nrl-sim/pull/492)), 4 Nov
 - Club home always shows cash runway in weeks, or “covering costs” ([PR](https://github.com/ch-leon/nrl-sim/pull/490)), 4 Nov
+- Offline Australia and New Zealand home-town setup, editable club and ground names ([PR](https://github.com/ch-leon/nrl-sim/pull/496)), 4 Nov
 
 - CI test fixes ([PR](https://github.com/ch-leon/nrl-sim/pull/442)), 1 Nov
 - Steady tackle count ([PR](https://github.com/ch-leon/nrl-sim/pull/440)), 31 Oct

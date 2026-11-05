@@ -49,6 +49,7 @@
 //
 // WebKit comes from WEBKIT_PATH or playwright-core's browser registry
 // (PLAYWRIGHT_BROWSERS_PATH); CI fetches it with `playwright-core install --with-deps webkit`.
+import { runDerby } from './e2e-webkit/screens/derby.mjs';
 import { runUnlocks } from './e2e-webkit/screens/unlocks.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -69,6 +70,7 @@ import { runCoachVoice } from './e2e-webkit/screens/coachVoice.mjs';
 import { runOfficeUnlocks } from './e2e-webkit/screens/officeUnlocks.mjs';
 import { runCoachName } from './e2e-webkit/screens/coachName.mjs';
 import { runDifficulty } from './e2e-webkit/screens/difficulty.mjs';
+import { runTownSetup } from './e2e-webkit/screens/townSetup.mjs';
 import { FLOW_RUNS, runFlow } from './e2e-webkit/screens/flow.mjs';
 import { runLargeTextTargets } from './e2e-webkit/text/largeTextTargets.mjs';
 import { runLadderForm } from './e2e-webkit/text/ladderForm.mjs';
@@ -81,6 +83,7 @@ import { runCoachCalls } from './e2e-webkit/match/coachCalls.mjs';
 // in this same order. Each section opens its own contexts and writes its own folder
 // under e2e-output/webkit, so a section plays the same alone as after the others.
 const SECTIONS = [
+  ['runDerby', (b) => runDerby(b)],
   ['runUnlocks', (b) => runUnlocks(b)],
   ['runSize', async (b) => { let f = 0; for (const [W, H] of SIZES) f += await runSize(b, W, H); return f; }],
   ['runPortrait', (b) => runPortrait(b)],
@@ -90,6 +93,7 @@ const SECTIONS = [
   ['runRecruit', (b) => runRecruit(b)],
   ['runScreens', async (b) => { let f = 0; for (const run of SCREEN_RUNS) f += await runScreens(b, run); return f; }],
   ['runDockTextSize', (b) => runDockTextSize(b)],
+  ['runTownSetup', (b) => runTownSetup(b)],
   ['runFlow', async (b) => { let f = 0; for (const run of FLOW_RUNS) f += await runFlow(b, run); return f; }],
   ['runCoachName', (b) => runCoachName(b)],
   ['runOfficeUnlocks', (b) => runOfficeUnlocks(b)],
@@ -109,7 +113,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
   text: ['runLargeTextTargets', 'runLadderForm'],
-  screens: ['runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
+  screens: ['runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 

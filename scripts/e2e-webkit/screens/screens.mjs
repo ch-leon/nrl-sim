@@ -297,14 +297,21 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
   }, safe);
   // The title (#350 T1, #347): a fresh install opens on the new club's setup, every
-  // field and Start on screen with no scrolling, clear of the notch.
+  // detail field reachable by scrolling its panel; difficulty and Start stay in view, clear of the notch.
   await step('title-setup', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
     await page.locator('[data-nrl-open-all]').check();
     await setInsets();
     await page.waitForTimeout(250);
-    return controlsProblems(page, ['[data-nrl-clubname]', '.nrl-title-swatch', '.nrl-title-pick', '[data-nrl-start]'], safe);
+    const problems = await controlsProblems(page, ['.nrl-title-pick', '[data-nrl-start]'], safe);
+    for (const control of await page.locator('.nrl-title-details input, .nrl-title-swatch').all()) {
+      await control.evaluate(e => { e.setAttribute('data-nrl-reach-probe', ''); e.scrollIntoView({ block: 'center', inline: 'nearest' }); });
+      problems.push(...await controlsProblems(page, ['[data-nrl-reach-probe]'], safe));
+      await control.evaluate(e => e.removeAttribute('data-nrl-reach-probe'));
+    }
+    await page.evaluate(() => { document.querySelector('.nrl-title-details').scrollTop = 0; });
+    return problems;
   });
   await step('hub', async (rec) => {
     await page.fill('[data-nrl-clubname]', 'Landscape FC');

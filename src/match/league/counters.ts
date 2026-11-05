@@ -5,10 +5,10 @@ import type { AttackPreset, DefencePreset } from './presets';
 export const COUNTERS = {
   compressed: {
     on: 0,
-    tight: 0.07,
-    expansive: 0.20,
-    brokenBase: 0,
-    offloadBase: 0,
+    tight: 0.04,
+    expansive: 0.26,
+    brokenBase: -0.015,
+    offloadBase: -0.03,
     commitM: 6,
   },
   rush: {
