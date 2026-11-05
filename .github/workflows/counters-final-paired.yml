@@ -1,0 +1,241 @@
+name: Counters final paired acceptance
+on:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['src/match/league/counters.ts', '.github/workflows/counters-final-paired.yml']
+permissions:
+  contents: read
+  actions: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  measurements:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: enabled
+            shard: 0
+            shards: 15
+          - kind: enabled
+            shard: 1
+            shards: 15
+          - kind: enabled
+            shard: 2
+            shards: 15
+          - kind: enabled
+            shard: 3
+            shards: 15
+          - kind: enabled
+            shard: 4
+            shards: 15
+          - kind: enabled
+            shard: 5
+            shards: 15
+          - kind: enabled
+            shard: 6
+            shards: 15
+          - kind: enabled
+            shard: 7
+            shards: 15
+          - kind: enabled
+            shard: 8
+            shards: 15
+          - kind: enabled
+            shard: 9
+            shards: 15
+          - kind: enabled
+            shard: 10
+            shards: 15
+          - kind: enabled
+            shard: 11
+            shards: 15
+          - kind: enabled
+            shard: 12
+            shards: 15
+          - kind: enabled
+            shard: 13
+            shards: 15
+          - kind: enabled
+            shard: 14
+            shards: 15
+          - kind: full-fit
+            shard: 0
+            shards: 8
+          - kind: full-fit
+            shard: 1
+            shards: 8
+          - kind: full-fit
+            shard: 2
+            shards: 8
+          - kind: full-fit
+            shard: 3
+            shards: 8
+          - kind: full-fit
+            shard: 4
+            shards: 8
+          - kind: full-fit
+            shard: 5
+            shards: 8
+          - kind: full-fit
+            shard: 6
+            shards: 8
+          - kind: full-fit
+            shard: 7
+            shards: 8
+          - kind: round-robin
+            shard: 0
+            shards: 15
+          - kind: round-robin
+            shard: 1
+            shards: 15
+          - kind: round-robin
+            shard: 2
+            shards: 15
+          - kind: round-robin
+            shard: 3
+            shards: 15
+          - kind: round-robin
+            shard: 4
+            shards: 15
+          - kind: round-robin
+            shard: 5
+            shards: 15
+          - kind: round-robin
+            shard: 6
+            shards: 15
+          - kind: round-robin
+            shard: 7
+            shards: 15
+          - kind: round-robin
+            shard: 8
+            shards: 15
+          - kind: round-robin
+            shard: 9
+            shards: 15
+          - kind: round-robin
+            shard: 10
+            shards: 15
+          - kind: round-robin
+            shard: 11
+            shards: 15
+          - kind: round-robin
+            shard: 12
+            shards: 15
+          - kind: round-robin
+            shard: 13
+            shards: 15
+          - kind: round-robin
+            shard: 14
+            shards: 15
+          - kind: fit-enabled
+            shard: 0
+            shards: 5
+          - kind: fit-enabled
+            shard: 1
+            shards: 5
+          - kind: fit-enabled
+            shard: 2
+            shards: 5
+          - kind: fit-enabled
+            shard: 3
+            shards: 5
+          - kind: fit-enabled
+            shard: 4
+            shards: 5
+          - kind: strong-pack
+            shard: 0
+            shards: 3
+          - kind: strong-pack
+            shard: 1
+            shards: 3
+          - kind: strong-pack
+            shard: 2
+            shards: 3
+          - kind: yardstick
+            shard: 0
+            shards: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Split consecutive fixture cells without changing seeds or orientations
+        env:
+          KIND: ${{ matrix.kind }}
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ matrix.shards }}
+        run: |
+          python3 <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          kind=os.environ['KIND']; i=int(os.environ['SHARD']); n=int(os.environ['SHARDS'])
+          p=json.load(open(f'balance/plans/counters-{kind}.json'))
+          p['name'] += f' / final paired {kind} shard {i}'
+          p['scenarios']=[s for j,s in enumerate(p['scenarios']) if j%n==i]
+          Path('balance/plans/experiments').mkdir(exist_ok=True)
+          Path('balance/plans/experiments/20261105-final-paired.json').write_text(json.dumps(p,indent=2))
+          PYCODE
+      - run: npm run balance -- --plan balance/plans/experiments/20261105-final-paired.json --jobs 4 2>&1 | tee balance.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: final-data-${{ matrix.kind }}-${{ matrix.shard }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
+
+  measurement-guards:
+    needs: measurements
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [enabled, full-fit, round-robin, fit-enabled, strong-pack, yardstick]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: final-data-${{ matrix.kind }}-*
+          path: evidence
+          merge-multiple: true
+      - run: npx vite-node scripts/check-counters.ts -- ${{ matrix.kind }} evidence
+
+
+  phone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [667x375, 844x390]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run e2e:season -- --size ${{ matrix.size }} 2>&1 | tee phone.log
+        env:
+          CHROMIUM_PATH: /usr/bin/google-chrome
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: final-phone-${{ matrix.size }}
+          path: |
+            e2e-output
+            !e2e-output/**/dist/**
+            phone.log
+          retention-days: 7

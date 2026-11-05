@@ -1553,9 +1553,9 @@ independently controllable by name; the full set is calibrated together.
 |---|---|
 | `counters.tight` | `on=1`, `offloadBase=1`, `offloadPerFit=8` |
 | `counters.fit` | `on=1`, `edge=0.095` |
-| `counters.slide` | `on=1`, `expansive=0.08`, `expansiveFit=0.2`, `kickChase=1.5`, `tight=0.04`, `allOut=0.50`, `allOutRecovery=3` |
-| `counters.rush` | `on=1`, `carry=0.0005`, `defenceFit=0.029`, `kickChase=0.39`, `allOut=0.06` |
-| `counters.compressed` | `on=1`, `tight=0.04`, `tightFit=0.6`, `expansive=0.26`, `brokenBase=−0.015`, `offloadBase=−0.03`, `commitM=6` |
+| `counters.slide` | `on=1`, `expansive=0.08`, `expansiveFit=0.2`, `kickChase=0.6`, `tight=0.025`, `allOut=0.50`, `allOutRecovery=3`, `allOutReset=3` |
+| `counters.rush` | `on=1`, `carry=0.0005`, `defenceFit=0.029`, `kickChase=0.55`, `allOut=0.15` |
+| `counters.compressed` | `on=1`, `tight=0.04`, `tightFit=0.6`, `expansive=0.19`, `brokenBase=−0.015`, `offloadBase=−0.03`, `commitM=10` |
 
 The run record and acceptance tables are in
 [2026-11-counters](../status/2026-11-counters.md). `SideSpec.fit` in the balance
