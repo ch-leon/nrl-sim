@@ -53,9 +53,9 @@ class CompressedSim extends LiveSim {
   }
 }
 
-describe('dormant Compressed counters', () => {
-  it('ships off, gates other cells and defences, and scales both fits', () => {
-    expect(COUNTERS.compressed.on).toBe(0);
+describe('Compressed counters', () => {
+  it('ships on, gates other cells and defences, and scales both fits', () => {
+    expect(COUNTERS.compressed.on).toBe(1);
     for (const attack of ['grind', 'expansive'] as const) {
       expect(tuned(0, () => compressedCounter(attack, 'compressed', 1.5, 1.5))).toBe(0);
       tuned(1, () => {

@@ -23,9 +23,9 @@ class ReadPlans extends LiveSim {
   }
 }
 
-describe('dormant Tight rebuild', () => {
-  it('registers the switch at zero and preserves every legacy zone, even for a strong pack', () => {
-    expect(listKnobs().find((k) => k.path === 'counters.tight.on')?.value).toBe(0);
+describe('Tight rebuild', () => {
+  it('registers the switch on and the disabled switch preserves every legacy zone, even for a strong pack', () => {
+    expect(listKnobs().find((k) => k.path === 'counters.tight.on')?.value).toBe(1);
     const restore = applyTuning({ 'counters.tight.on': 0 });
     try {
       for (const [i, zone] of zones.entries()) {

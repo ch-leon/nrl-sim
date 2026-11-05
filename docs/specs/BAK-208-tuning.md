@@ -1392,13 +1392,13 @@ rating spread and difficulty adjustments. Bench players do not rescore it. On-fi
 
 | Knob | Default | Effect |
 |---|---|---|
-| `counters.tight.on` | 0 | Only 1 enables the rebuild. At 0 all old zone plans and match fingerprints are unchanged. |
+| `counters.tight.on` | 1 | Only 1 enables the rebuild. At 0 all old zone plans and match fingerprints are unchanged. |
 | `counters.tight.offloadBase` | 1 | Pack offload multiplier at or below neutral fit, approximately Balanced. |
 | `counters.tight.offloadPerFit` | 12 | Added multiplier per fit above 1: base + perFit × max(0, fit − 1), floored at 0. Strength-80 pack fit 1.25 gives ×4. |
 
 Hit-ups, passes, steps, early territory kicks and kick bias stay as in the legacy
 plan. `balance/plans/counters-fit.json` compares the default with `Tight on`, at
-200 seeds both ways (yardsticks at 500). The switch remains off until #465.
+200 seeds both ways (yardsticks at 500). The switch is on by default from #465; the pre-switch measurements below remain historical evidence.
 
 ### Tight validation (#460)
 
@@ -1433,14 +1433,14 @@ At a break, the newly applied plan selects its attack and defence fits again.
 
 | Knob | Default | Meaning |
 |---|---|---|
-| `counters.fit.on` | 0 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
+| `counters.fit.on` | 1 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
 | `counters.fit.edge` | 0.11 | Carrier-edge probability per point of fit away from 1.0. |
 
 Each contact adds `edge × (attackFit − 1) − edge × (defenceFit − 1)`
 to `carrierEdge`, clamped to 0–1 by `contestOdds`. Thus a side's attack fit
 helps it carry and its defence fit helps it tackle, whoever it faces. Fit 1
 adds zero. This uses the existing contest roll and outcome weights, adding no
-randomness. The Tight switch stays independent and off.
+randomness. The Tight switch stays independent; both are on by default from #465.
 
 Tests: `tests/match/league/fit-bonus.test.ts` covers neutral/off/signed edges,
 half-time reselection on the changing side, and exact neutral-match replay.
@@ -1454,7 +1454,7 @@ styles. Balanced and defences other than Slide receive no cell effect.
 
 | Knob | Default | Effect when Slide is enabled |
 |---|---:|---|
-| `counters.slide.on` | 0 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
+| `counters.slide.on` | 1 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
 | `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
 | `counters.slide.kickChase` | 1.5 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
 | `counters.slide.tight` | 0.04 | Adds inside bust probability and supported offload probability for pack carriers. |
@@ -1471,7 +1471,7 @@ line breaks, offloads and busts, so the mechanism is visible beside points share
 
 ## 33. Rush matchup counters (#463)
 
-The switch ships at 0. With it on, Rush's broken modifier is the preset's
+The switch ships at 1 from #465. Rush's broken modifier is the preset's
 concession plus `(Carry − fit.leagueAverage) × carry − (Rush fit − 1) × defenceFit`.
 Carry uses the carrier's derived Strength/Speed/Wrecking Ball rating. Rush fit
 uses the starting sheet's Stamina, Contact D and Hitman, as in §29. At neutral
@@ -1481,7 +1481,7 @@ cell; their own-style fit and carriers decide the contest.
 
 | Knob | Default | Effect when Rush is enabled |
 |---|---:|---|
-| `counters.rush.on` | 0 | Only 1 enables the Rush mechanics; 0 keeps the legacy flat bust modifier. |
+| `counters.rush.on` | 1 | Only 1 enables the Rush mechanics; 0 keeps the legacy flat bust modifier. |
 | `counters.rush.carry` | 0.004 | Bust probability per derived Carry point above neutral (negative below). |
 | `counters.rush.defenceFit` | 0.12 | Bust probability removed per Rush-fit point above 1 (added below). |
 | `counters.rush.kickChase` | 0.39 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
@@ -1496,7 +1496,7 @@ enabled by overrides.
 
 ## 34. Compressed matchup counters (#464)
 
-The switch ships at 0, retaining the exact legacy Compressed preset. With it on,
+The switch ships at 1 from #465. At 0 it retains the exact legacy Compressed preset. Enabled,
 `defencePlan` selects a common contact baseline: busts −0.015 (legacy −0.02)
 and offloads −0.03 (unchanged). The legacy Balanced control measured 47.55%
 over 1,000 matches, outside the neutral 48–52% band. The enabled baseline is
@@ -1518,7 +1518,7 @@ rolls and the geometric line-break detector decide outcomes; no roll is added.
 
 | Knob | Default | Effect when Compressed is enabled |
 |---|---:|---|
-| `counters.compressed.on` | 0 | Only 1 enables the profile and mechanics. |
+| `counters.compressed.on` | 1 | Only 1 enables the profile and mechanics. |
 | `counters.compressed.tight` | 0.04 | Middle squeeze; a positive cell also recruits nearby help. |
 | `counters.compressed.expansive` | 0.26 | Inward lane pull and speed-scaled edge bust probability. |
 | `counters.compressed.commitM` | 6 | Extra middle tackler's neutral-fit reach in metres, scaled by both fits. |
@@ -1536,5 +1536,5 @@ switches overridden to 1 and 500 seeds both ways per cell (1,000 matches),
 except the retained 2,000-match Tight/Rush and Balanced/Rush neutral samples.
 Checkpoint pools retain disjoint consecutive seed ranges and all source results.
 Unchanged cells reuse controls with identical active settings; provenance and
-raw inputs are preserved beside the report. Shipped switches remain 0. No
+raw inputs are preserved beside the report. That task shipped switches at 0; #465 switches them to 1. No
 stored stats, randomness, save version, Labs or commercial changes.

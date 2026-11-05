@@ -1,10 +1,10 @@
 import { FIT } from './fit';
 import type { AttackPreset, DefencePreset } from './presets';
 
-// Strategy counters ship dormant until the switch-on task (#465).
+// Strategy counters enabled and calibrated in #465; these defaults now guard replay.
 export const COUNTERS = {
   compressed: {
-    on: 0,
+    on: 1,
     tight: 0.04,
     expansive: 0.26,
     brokenBase: -0.015,
@@ -12,25 +12,25 @@ export const COUNTERS = {
     commitM: 6,
   },
   rush: {
-    on: 0,
+    on: 1,
     carry: 0.004,
     defenceFit: 0.12,
     kickChase: 0.39,
     allOut: 0.06,
   },
   slide: {
-    on: 0,
+    on: 1,
     expansive: 0.08,
     kickChase: 1.5,
     tight: 0.04,
     allOut: 0.50,
   },
   fit: {
-    on: 0,
+    on: 1,
     edge: 0.11,
   },
   tight: {
-    on: 0,
+    on: 1,
     offloadBase: 1,
     // Fit 1 is neutral; a strength-80 pack has Tight fit 1.25.
     offloadPerFit: 12,

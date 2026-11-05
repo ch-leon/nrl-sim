@@ -46,9 +46,9 @@ class RushSim extends LiveSim {
     return this.players.filter((p) => p.side === 'away').map((p) => p.target.x);
   }
 }
-describe('dormant Rush counters', () => {
-  it('ships off and preserves the flat 0.11 for every carrier and fit', () => {
-    expect(COUNTERS.rush.on).toBe(0);
+describe('Rush counters', () => {
+  it('ships on and the disabled switch preserves the flat 0.11 for every carrier and fit', () => {
+    expect(COUNTERS.rush.on).toBe(1);
     for (const carry of [30, 60, 90]) for (const fit of [0.5, 1, 1.5]) {
       expect(tuned(0, () => rushBroken(0.11, 'rush', carry, fit))).toBe(0.11);
     }

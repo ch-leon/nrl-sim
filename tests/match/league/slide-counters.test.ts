@@ -85,9 +85,9 @@ function tuned<T>(on: number, fn: () => T): T {
   try { return fn(); } finally { restore(); }
 }
 
-describe('dormant Slide counters', () => {
-  it('ships off, gates every cell and scales by both fits', () => {
-    expect(COUNTERS.slide.on).toBe(0);
+describe('Slide counters', () => {
+  it('ships on, gates every cell and scales by both fits', () => {
+    expect(COUNTERS.slide.on).toBe(1);
     for (const attack of ['grind', 'expansive', 'kick-chase', 'all-out'] as const) {
       expect(tuned(0, () => slideCounter(attack, 'slide', 1.5, 1.5))).toBe(0);
       tuned(1, () => {

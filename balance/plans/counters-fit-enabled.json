@@ -1,0 +1,57 @@
+{
+  "name": "465 own fit isolation",
+  "description": "Original starting sheets retain fit 1.5/0.5/1, while rating.spread=0 levels every playing stat; paired fit-off controls remove the rating advantage. 1000 matches a cell.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 0,
+    "counters.slide.on": 1,
+    "counters.rush.on": 1,
+    "counters.compressed.on": 1,
+    "rating.spread": 0
+  },
+  "variants": [
+    {
+      "name": "fit on",
+      "tuning": {
+        "counters.fit.on": 1
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "own fit 1.5 v 1",
+      "home": {
+        "rating": 85
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "own fit 0.5 v 1",
+      "home": {
+        "rating": 35
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "own fit 1 v 1",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}

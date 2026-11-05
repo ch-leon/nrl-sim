@@ -1,0 +1,180 @@
+{
+  "name": "465 full fit isolation",
+  "description": "Perfect counter: winning style fit 1.5 versus losing style fit 0.5; rating.spread=0 plays both flat sheets at 60, retaining their pre-spread fits. Paired dormant control. 1000 matches per cell.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.tight.on": 0,
+    "counters.fit.on": 0,
+    "counters.slide.on": 0,
+    "counters.rush.on": 0,
+    "counters.compressed.on": 0,
+    "rating.spread": 0
+  },
+  "variants": [
+    {
+      "name": "enabled",
+      "tuning": {
+        "counters.tight.on": 1,
+        "counters.fit.on": 1,
+        "counters.slide.on": 1,
+        "counters.rush.on": 1,
+        "counters.compressed.on": 1
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "full fit grind v slide",
+      "home": {
+        "rating": 85,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 35,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "full fit expansive v compressed",
+      "home": {
+        "rating": 85,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 35,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "full fit kick-chase v rush",
+      "home": {
+        "rating": 85,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 35,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "full fit all-out v slide",
+      "home": {
+        "rating": 85,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 35,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "full fit grind v compressed",
+      "home": {
+        "rating": 35,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 85,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "full fit expansive v slide",
+      "home": {
+        "rating": 35,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 85,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "full fit kick-chase v slide",
+      "home": {
+        "rating": 35,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 85,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "full fit all-out v rush",
+      "home": {
+        "rating": 35,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 85,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}
