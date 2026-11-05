@@ -6,9 +6,6 @@ name: QA
 # (no browser download, never `playwright install`); the screenshots, report and save
 # dumps are kept as an artifact for a week, and the summary shows on the run's page.
 on:
-  push:
-    branches: [issue-465-strategy-counters]
-    paths: ['src/match/league/counters.ts', '.github/workflows/qa.yml']
   schedule:
     - cron: '20 16 * * *' # 02:20 AEST, after the day's merges
   workflow_dispatch:

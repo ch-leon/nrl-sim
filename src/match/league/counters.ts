@@ -32,6 +32,7 @@ export const COUNTERS = {
   fit: {
     on: 1,
     edge: 0.095,
+    counterResponse: 0,
   },
   tight: {
     on: 1,
@@ -48,7 +49,8 @@ export function fitEdge(fit: number): number {
 
 /** Calibrate unequal-fit cells without moving the already-tuned neutral matrix. */
 function matchupStrength(cell: number, attackFit: number, defenceFit: number, response = 0): number {
-  return cell * attackFit * defenceFit * Math.max(0, 1 + response * Math.abs(attackFit - defenceFit));
+  const fitted = COUNTERS.fit.on === 1 ? COUNTERS.fit.counterResponse : 0;
+  return cell * attackFit * defenceFit * Math.max(0, 1 + (response + fitted) * Math.abs(attackFit - defenceFit));
 }
 
 /** Cell strength × both starting-sheet fits. Balanced and other defences have no Slide effects. */
@@ -76,7 +78,7 @@ export function rushBroken(flat: number, defence: DefencePreset, carry: number, 
 export function rushCounter(attack: AttackPreset, defence: DefencePreset, attackFit: number, defenceFit: number): number {
   if (COUNTERS.rush.on !== 1 || defence !== 'rush') return 0;
   const cell = attack === 'kick-chase' ? COUNTERS.rush.kickChase : attack === 'all-out' ? COUNTERS.rush.allOut : 0;
-  return cell * attackFit * defenceFit;
+  return matchupStrength(cell, attackFit, defenceFit);
 }
 
 /** Only the two Compressed cells have mechanics; both starting fits scale them. */

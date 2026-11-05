@@ -1445,6 +1445,12 @@ randomness. The Tight switch stays independent; both are on by default from #465
 Tests: `tests/match/league/fit-bonus.test.ts` covers neutral/off/signed edges,
 half-time reselection on the changing side, and exact neutral-match replay.
 
+`counters.fit.counterResponse` (currently 0 during calibration) adds a shared
+unequal-fit response to every nonzero cell while own fit is on. Cell strength is
+`cell × attackFit × defenceFit × max(0, 1 + (localResponse + counterResponse) × abs(attackFit − defenceFit))`.
+Equal neutral fits preserve every cell exactly. This separates the full-fit
+counter target from the own-style contest edge when calibrating career parity.
+
 ## 32. Slide matchup counters (#462)
 
 All four cells start with `cell strength × attacking style fit × defending Slide fit`,
