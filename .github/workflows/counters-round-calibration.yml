@@ -1,0 +1,68 @@
+name: Counters round-robin balance calibration
+on:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['.github/workflows/counters-round-calibration.yml']
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        cell: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        candidate: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prepare paired neutral and full-fit candidate
+        env:
+          CELL: ${{ matrix.cell }}
+          CANDIDATE: ${{ matrix.candidate }}
+        run: |
+          python3 <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          index=int(os.environ['CELL']); profile=int(os.environ['CANDIDATE'])
+          neutral=json.load(open('balance/plans/counters-enabled.json'))
+          full=json.load(open('balance/plans/counters-full-fit.json'))
+          pack=json.load(open('balance/plans/counters-strong-pack.json'))
+          rr=json.load(open('balance/plans/counters-round-robin.json'))
+          base={'counters.slide.kickChase':.62,'counters.rush.kickChase':[.41,.43,.45][profile],'counters.compressed.tightFit':1.5}
+          profiles=[
+            {'counters.compressed.commitM':8,'counters.compressed.tight':.04,'counters.compressed.expansive':.20},
+            {'counters.compressed.commitM':10,'counters.compressed.tight':.06,'counters.compressed.expansive':.10,'counters.compressed.brokenBase':0,'counters.compressed.offloadBase':0},
+            {'counters.compressed.commitM':12,'counters.compressed.tight':.08,'counters.compressed.expansive':.05,'counters.compressed.brokenBase':.015,'counters.compressed.offloadBase':0},
+          ]
+          base.update(profiles[profile])
+          fixtures=[neutral['scenarios'][2],neutral['scenarios'][8],neutral['scenarios'][10],full['scenarios'][4],full['scenarios'][1],full['scenarios'][2],pack['scenarios'][2],neutral['scenarios'][5]]
+          if index < 8:
+            scenarios=[fixtures[index]]; seeds=500
+          else:
+            target=['kick-chase/compressed','kick-chase/rush'][index-8]
+            scenarios=[x for x in rr['scenarios'] if target in x['name'].split(' v ')]
+            seeds=100
+          control=next(x for x in neutral['scenarios'] if x['name']=='balanced v slide').copy(); control['seeds']=10
+          scenarios=[control]+scenarios
+          p=dict(name=f'465 round balance profile {profile} fixture {index}',description='Keep paired neutral/full-fit targets while checking the strongest Kick-chase combinations and Compressed base concessions.',report='matrix',seeds=seeds,base=base,scenarios=scenarios)
+          Path('balance/plans/experiments').mkdir(exist_ok=True)
+          Path('balance/plans/experiments/20261105-paired.json').write_text(json.dumps(p,indent=2))
+          PYCODE
+      - run: npm run balance -- --plan balance/plans/experiments/20261105-paired.json --jobs 4 2>&1 | tee balance.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: round-${{ matrix.candidate }}-${{ matrix.cell }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
