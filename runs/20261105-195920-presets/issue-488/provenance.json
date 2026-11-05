@@ -1,0 +1,26 @@
+{
+  "baseline_source": "https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261105-154203-presets/economy-soak.json",
+  "upstream_provenance": "https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261105-154203-presets/economy-provenance.json",
+  "baseline_equivalent_game_revision": "b7ac6a325581a9cd637f3fb180b3c808cec2a8f2",
+  "current_main": "6bb6cc05456c331f6ec047e8510d2619bc084d85",
+  "unchanged_paths": [
+    "src/core",
+    "src/systems",
+    "src/data",
+    "src/qa",
+    "src/config.ts",
+    "src/content",
+    "src/match/league",
+    "src/match/core",
+    "src/match/balance",
+    "src/sim",
+    "src/utils",
+    "scripts/soak.ts",
+    "scripts/balance.ts",
+    "balance/plans/presets.json"
+  ],
+  "files": 115,
+  "git_blob_entries_sha256": "2905281ccc2cb8f5b0e859bf9b0827399378b0646d038ba15295b7ccfe83066c",
+  "source_identity_verified": true,
+  "branch": "1fecccf130920b4b617bd367b4fd1208f7f749fc"
+}
