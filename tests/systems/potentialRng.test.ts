@@ -24,8 +24,11 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * outcomes change the season’s existing draws; no new match RNG call is added.
  * 1010310188 before the paired-neutral #465 retune (Leon, 5 Nov); the
  * no-reads and weekly UI-read seasons still finish on the identical stream.
+ * 1989516855 for the rejected paired-neutral candidate. The final #465 retune
+ * deliberately restores 3040797444, matching pre-switch main for this season.
+ * Both UI-read and no-read runs still agree; no RNG call site was added.
  */
-const MAIN_SEED_AFTER_SEASON = 1989516855;
+const MAIN_SEED_AFTER_SEASON = 3040797444;
 
 describe('the rng stream (#369)', () => {
   it('a season leaves rngSeed where main left it, the projection and the dot looked at every week', () => {

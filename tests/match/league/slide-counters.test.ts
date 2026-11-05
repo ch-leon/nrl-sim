@@ -57,7 +57,7 @@ class SlideSim extends LiveSim {
     });
     return { mods, receiver: this.offloadReceiver };
   }
-  fielding(defenderDistance = 1.4, kickoff = false) {
+  fielding(defenderDistance = 1.39, kickoff = false) {
     this.attacking = 'away'; this.kickoffUp = kickoff;
     for (const p of this.players) p.body.pos = { x: 80, y: 60 };
     this.players[5]!.body.pos = { x: 49, y: 34 };

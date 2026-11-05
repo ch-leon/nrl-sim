@@ -255,8 +255,12 @@ in both orientations (1,000 matches)**, with signed 4–6 point win-share swings
 in all eight nonzero cells. Distance from 50% does not measure that swing.
 Flat preset controls versus Balanced/Slide use **42–58%** (previously 45–55%).
 Full-fit counters use the exact 1.5 v 0.5 fixtures, hold Tight’s independent
-rebuild on in both runs as Leon specified, and require **9 points or stronger**;
-9–12 is the nominal target. The fully dormant variant also exposes total change.
+rebuild on in both runs as Leon specified, hold the independent Kick-chase
+preset adjustment fixed in both, and require **9 points or stronger**;
+9–12 is the nominal target. The fully dormant variant also restores the legacy
+Kick-chase pass weight and exposes total change. Neutral controls restore that
+legacy weight too, and the guard checks all 15 against immutable dormant-main
+shares; counter-off with a retuned preset is not a main baseline.
 
 After running each committed `counters-*.json` acceptance plan, check the saved
 measurements with `npx vite-node scripts/check-counters.ts -- <kind> <run-dir>`.

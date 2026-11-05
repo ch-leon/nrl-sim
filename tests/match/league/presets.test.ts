@@ -82,7 +82,8 @@ describe('presets (pure)', () => {
     expect(r.stepAgainst).toBeGreaterThan(0);
     const c = defencePlan('compressed');
     expect(c.pull).toBeGreaterThan(1);
-    expect(c.broken).toBeLessThan(0);
+    // #465: the enabled middle advantage belongs to its Tight counter.
+    expect(c).toMatchObject({ broken: 0, offload: 0 });
     expect(c.lineSpeed).toBeLessThan(5);
     for (const d of DEFENCE_PRESETS) expect(defencePlan(d).lineSpeed).toBeGreaterThan(3);
   });

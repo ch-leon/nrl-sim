@@ -1,0 +1,287 @@
+name: Counters final defaults acceptance
+'on':
+  push:
+    branches:
+    - issue-465-strategy-counters
+    paths:
+    - .github/workflows/counters-final-defaults.yml
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: counters-final-defaults-${{ github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - plan: enabled
+          index: 0
+          parts: 5
+        - plan: enabled
+          index: 1
+          parts: 5
+        - plan: enabled
+          index: 2
+          parts: 5
+        - plan: enabled
+          index: 3
+          parts: 5
+        - plan: enabled
+          index: 4
+          parts: 5
+        - plan: full-fit
+          index: 0
+          parts: 4
+        - plan: full-fit
+          index: 1
+          parts: 4
+        - plan: full-fit
+          index: 2
+          parts: 4
+        - plan: full-fit
+          index: 3
+          parts: 4
+        - plan: fit-enabled
+          index: 0
+          parts: 3
+        - plan: fit-enabled
+          index: 1
+          parts: 3
+        - plan: fit-enabled
+          index: 2
+          parts: 3
+        - plan: strong-pack
+          index: 0
+          parts: 3
+        - plan: strong-pack
+          index: 1
+          parts: 3
+        - plan: strong-pack
+          index: 2
+          parts: 3
+        - plan: yardstick
+          index: 0
+          parts: 2
+        - plan: yardstick
+          index: 1
+          parts: 2
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci
+    - name: Partition the complete canonical plan without changing cases or seeds
+      env:
+        KIND: ${{ matrix.plan }}
+        INDEX: ${{ matrix.index }}
+        PARTS: ${{ matrix.parts }}
+      run: 'python3 <<''PYCODE''
+
+        import json,os
+
+        from pathlib import Path
+
+        kind=os.environ[''KIND'']; i=int(os.environ[''INDEX'']); n=int(os.environ[''PARTS''])
+
+        p=json.load(open(f''balance/plans/counters-{kind}.json''))
+
+        p[''name'']+=f'' / acceptance shard {i} of {n}''
+
+        p[''scenarios'']=[s for j,s in enumerate(p[''scenarios'']) if j%n==i]
+
+        Path(''balance/plans/experiments'').mkdir(exist_ok=True)
+
+        Path(''balance/plans/experiments/20261105-acceptance.json'').write_text(json.dumps(p,indent=2))
+
+        PYCODE'
+    - run: npm run balance -- --plan balance/plans/experiments/20261105-acceptance.json --jobs 4 2>&1 | tee balance.log
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: acceptance-${{ matrix.plan }}-${{ matrix.index }}
+        path: 'balance/runs
+
+          balance.log
+
+          '
+        retention-days: 7
+  balance-guards:
+    needs: balance
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: acceptance-*
+        path: evidence
+    - run: for kind in enabled full-fit fit-enabled strong-pack yardstick; do mkdir -p pooled/$kind; cp -r evidence/acceptance-$kind-*
+        pooled/$kind/; npx vite-node scripts/check-counters.ts -- $kind pooled/$kind; done
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci
+    - run: git rev-parse HEAD > source-commit.txt
+    - run: npm run soak -- --difficulties easy,normal,hard --jobs 4 --shard ${{ matrix.shard }}/7 --json soak-enabled.json
+        2>&1 | tee soak-enabled.log
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: acceptance-soak-${{ matrix.shard }}
+        path: 'soak-enabled.json
+
+          soak-enabled.log
+
+          source-commit.txt'
+        retention-days: 7
+  soak-guards:
+    needs: soak
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: acceptance-soak-*
+        path: evidence/parts
+    - uses: actions/download-artifact@v4
+      with:
+        name: counters-soak-main
+        run-id: 41960460765
+        github-token: ${{ github.token }}
+        path: evidence/main
+    - run: 'python3 scripts/merge-soak.py --out evidence/enabled.json evidence/parts/*/soak-enabled.json
+
+        python3 scripts/check-counters-soak.py evidence/main/soak-main.json evidence/enabled.json 2>&1 | tee evidence/guard.log'
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: acceptance-complete-soak
+        path: evidence
+        retention-days: 7
+  phone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        size:
+        - 667x375
+        - 844x390
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci
+    - run: npm run e2e:season -- --size ${{ matrix.size }} 2>&1 | tee phone.log
+      env:
+        CHROMIUM_PATH: /usr/bin/google-chrome
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: acceptance-phone-${{ matrix.size }}
+        path: 'e2e-output
+
+          !e2e-output/**/dist/**
+
+          phone.log
+
+          '
+        retention-days: 7
+  qa:
+    if: ${{ inputs.only != 'perf' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci
+    - name: "Soak (3 seasons \xD7 10 seeds, idle, managed, Hard, old saves)"
+      run: "npm run soak -- --seasons 3 --seeds 10 --jobs \"$(nproc)\" 2>&1 | tee soak.log\n{\n  echo '## Soak'\n  echo '```'\n\
+        \  tail -n 12 soak.log\n  echo '```'\n} >> \"$GITHUB_STEP_SUMMARY\"\n"
+    - name: Playthrough (phone and desktop)
+      if: ${{ !cancelled() }}
+      env:
+        CHROMIUM_PATH: /usr/bin/google-chrome
+        SIZES: ${{ inputs.sizes || '844x390 1280x800' }}
+      run: "status=0\nfor size in $SIZES; do\n  npm run e2e:season -- --size \"$size\" 2>&1 | tee \"e2e-$size.log\" || status=1\n\
+        \  {\n    echo \"## Playthrough $size\"\n    echo '```'\n    tail -n 12 \"e2e-$size.log\"\n    echo '```'\n  } >>\
+        \ \"$GITHUB_STEP_SUMMARY\"\ndone\nexit $status\n"
+    - name: Keep the screenshots, reports and save dumps
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-output
+        path: 'e2e-output
+
+          !e2e-output/dist
+
+          !e2e-output/*/dist
+
+          '
+        retention-days: 7
+        if-no-files-found: warn
+  perf:
+    if: ${{ inputs.only != 'qa' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+    - run: npm ci
+    - name: Perf budget (CPU x4, 844x390)
+      env:
+        CHROMIUM_PATH: /usr/bin/google-chrome
+      run: "status=0\nnpm run e2e:perf -- --budget 2>&1 | tee perf.log || status=1\n{\n  echo '## Perf budget'\n  cat e2e-output/perf/report.md\
+        \ 2>/dev/null || tail -n 30 perf.log\n  # A moment or the run that broke leaves a screenshot and the open modals'\
+        \ HTML\n  # (e2e-perf.mjs, diagnose) in the e2e-perf artifact.\n  for f in e2e-output/perf/failure-*; do\n    if [\
+        \ -e \"$f\" ]; then echo \"- diagnostics in the e2e-perf artifact: \\`${f#e2e-output/perf/}\\`\"; fi\n  done\n} >>\
+        \ \"$GITHUB_STEP_SUMMARY\"\nexit $status\n"
+    - name: Keep the report and screenshots
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-perf
+        path: 'e2e-output/perf
+
+          '
+        retention-days: 7
+        if-no-files-found: warn

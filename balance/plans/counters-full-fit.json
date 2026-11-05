@@ -1,6 +1,6 @@
 {
   "name": "465 full fit counters",
-  "description": "Flat 60 playing squads; exact harness-only attack/defence fits 1.5 v .5 for positive cells, reverse for negative cells. Other selected fits remain 1. Counter/fit comparison holds the independent Tight offload rebuild on; dormant variant also reports the total switch-on change. 1000 matches per cell.",
+  "description": "Flat 60 playing squads; exact harness-only winning/losing fits 1.5 v .5. Counter/fit comparison holds the independent Tight rebuild and current Kick-chase preset fixed in both runs; fully dormant restores the legacy Kick-chase pass weight and reports the total switch-on change. 1000 matches per cell.",
   "report": "matrix",
   "seeds": 500,
   "base": {
@@ -14,7 +14,8 @@
     {
       "name": "fully dormant",
       "tuning": {
-        "counters.tight.on": 0
+        "counters.tight.on": 0,
+        "presets.attack.kick-chase.base.pass": -0.05
       }
     },
     {

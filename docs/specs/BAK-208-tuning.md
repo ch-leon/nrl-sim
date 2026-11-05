@@ -1394,7 +1394,7 @@ rating spread and difficulty adjustments. Bench players do not rescore it. On-fi
 |---|---|---|
 | `counters.tight.on` | 1 | Only 1 enables the rebuild. At 0 all old zone plans and match fingerprints are unchanged. |
 | `counters.tight.offloadBase` | 1 | Pack offload multiplier at or below neutral fit, approximately Balanced. |
-| `counters.tight.offloadPerFit` | 8 | Added multiplier per fit above 1: base + perFit × max(0, fit − 1), floored at 0. Strength-80 pack fit 1.25 gives ×3. |
+| `counters.tight.offloadPerFit` | 9.5 | Added multiplier per fit above 1: base + perFit × max(0, fit − 1), floored at 0. Strength-80 pack fit 1.25 gives ×3.375. |
 
 Hit-ups, passes, steps, early territory kicks and kick bias stay as in the legacy
 plan. `balance/plans/counters-fit.json` compares the default with `Tight on`, at
@@ -1414,7 +1414,7 @@ Baseline switch 0 → variant switch 1:
 
 Flat 60 Tight wins **46.750%** (points share **50.125%**), within the 45–55% band.
 The strong pack's best attack against Balanced / Slide is Tight at **63.750%**
-points share; Expansive is next at **63.000%**. The shipped switch remains **0**.
+points share; Expansive is next at **63.000%**. The #460 prerequisite shipped the switch at **0**; #465 switches it on.
 
 Evidence on `balance-log`: [full counters-fit run](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261104-061207-counters-fit/report.md),
 [priority acceptance](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261104-061533-460-tight-acceptance/report.md),
@@ -1434,7 +1434,8 @@ At a break, the newly applied plan selects its attack and defence fits again.
 | Knob | Default | Meaning |
 |---|---|---|
 | `counters.fit.on` | 1 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
-| `counters.fit.edge` | 0.095 | Carrier-edge probability per point of fit away from 1.0. |
+| `counters.fit.counterResponse` | 1 | Shared unequal-fit response on all nonzero cells while own fit is enabled; formula below. |
+| `counters.fit.edge` | 0.065 | Carrier-edge probability per point of fit away from 1.0. |
 
 Each contact adds `edge × (attackFit − 1) − edge × (defenceFit − 1)`
 to `carrierEdge`, clamped to 0–1 by `contestOdds`. Thus a side's attack fit
@@ -1445,7 +1446,7 @@ randomness. The Tight switch stays independent; both are on by default from #465
 Tests: `tests/match/league/fit-bonus.test.ts` covers neutral/off/signed edges,
 half-time reselection on the changing side, and exact neutral-match replay.
 
-`counters.fit.counterResponse` (currently 0 during calibration) adds a shared
+`counters.fit.counterResponse` (default 1) adds a shared
 unequal-fit response to every nonzero cell while own fit is on. Cell strength is
 `cell × attackFit × defenceFit × max(0, 1 + (localResponse + counterResponse) × abs(attackFit − defenceFit))`.
 Equal neutral fits preserve every cell exactly. This separates the full-fit
@@ -1463,7 +1464,8 @@ styles. Balanced and defences other than Slide receive no cell effect.
 | `counters.slide.on` | 1 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
 | `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
 | `counters.slide.expansiveFit` | 0.2 | Expansive cell multiplier: `max(0, 1 + expansiveFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. |
-| `counters.slide.kickChase` | 0.6 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
+| `counters.slide.kickChase` | 0.4 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
+| `counters.slide.kickChaseFit` | 0.7 | Local unequal-fit response for kick cover; added to `fit.counterResponse` in the shared cell-strength formula. Equal neutral fits are unchanged. |
 | `counters.slide.tight` | 0.025 | Adds inside bust probability and supported offload probability for pack carriers. |
 | `counters.slide.allOut` | 0.50 | Adds bust probability for the offload receiver during the existing recovery window after the offload, so another defender arriving before the line resets is still exposed. A pass, kick, turnover or stoppage clears the receiver. |
 | `counters.slide.allOutRecovery` | 3 | All-out/Slide recovery ticks are `round(live.beatenCooldown × (1 + allOutReset × attackFit × defenceFit + allOutRecovery × max(0, attackFit − defenceFit)))`. At current defaults neutral fits give 120 ticks; fit 1.5 v 0.5 gives 188 ticks. Uses the existing receiver marker/window; normal clearing events still apply. |
@@ -1493,8 +1495,8 @@ cell; their own-style fit and carriers decide the contest.
 | `counters.rush.on` | 1 | Only 1 enables the Rush mechanics; 0 keeps the legacy flat bust modifier. |
 | `counters.rush.carry` | 0.0005 | Bust probability per derived Carry point above neutral (negative below). |
 | `counters.rush.defenceFit` | 0.029 | Bust probability removed per Rush-fit point above 1 (added below). |
-| `counters.rush.kickChase` | 0.55 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
-| `counters.rush.allOut` | 0.15 | Cell × both fits added to handling spill chance on an All-out offload, using the receiver's existing pass-catch roll. Ordinary passes and other attacks receive no spill bonus. |
+| `counters.rush.kickChase` | 0.61 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
+| `counters.rush.allOut` | 0.1 | Cell × both fits added to handling spill chance on an All-out offload, using the receiver's existing pass-catch roll. Ordinary passes and other attacks receive no spill bonus. |
 
 No new RNG draws, stored stats, save changes or Labs/commercial flag changes.
 The reproducible acceptance plan is `balance/plans/counters-rush.json`: 500 seeds
@@ -1506,15 +1508,17 @@ enabled by overrides.
 ## 34. Compressed matchup counters (#464)
 
 The switch ships at 1 from #465. At 0 it retains the exact legacy Compressed preset. Enabled,
-`defencePlan` selects a common contact baseline: busts −0.015 (legacy −0.02)
-and offloads −0.03 (unchanged). The legacy Balanced control measured 47.55%
+`defencePlan` selects a common contact baseline: busts 0 (legacy −0.02)
+and offloads 0 (legacy −0.03). The legacy Balanced control measured 47.55%
 over 1,000 matches, outside the neutral 48–52% band. The enabled baseline is
 shared by every attack; only Tight and Expansive receive matchup-cell modifiers.
 The additional middle contact advantage belongs to the Tight mechanic.
 
 Tight draws one extra available committed man, capped at four, only within
-`MAX_LAT_M` of the middle and when the spare man is within `commitM` × both
-starting fits. Middle contact removes bust and supported offload probability
+`MAX_LAT_M` of the middle and when the spare man is within
+`commitM × attackFit × defenceFit × max(0, 1 + commitFit × max(0, defenceFit − attackFit))`.
+A better-fitted defence reads the middle help earlier; neutral reach and a strong
+attacking pack against a neutral defence keep the original both-fit reach. Middle contact removes bust and supported offload probability
 by cell × both fits × nearby committed defenders' mean derived Contact D /
 `fit.leagueAverage`. Only men within `live.secondManM` enter that mean. Strength,
 Footy IQ and Brick Wall/Hitman improve the squeeze. Unsupported offloads stay 0.
@@ -1528,14 +1532,16 @@ rolls and the geometric line-break detector decide outcomes; no roll is added.
 | Knob | Default | Effect when Compressed is enabled |
 |---|---:|---|
 | `counters.compressed.on` | 1 | Only 1 enables the profile and mechanics. |
-| `counters.compressed.tight` | 0.04 | Middle squeeze; a positive cell also recruits nearby help. |
-| `counters.compressed.tightFit` | 0.6 | Tight cell multiplier: `max(0, 1 + tightFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. This scales the middle contact squeeze; helper reach stays `commitM × attackFit × defenceFit`. |
-| `counters.compressed.expansive` | 0.19 | Inward lane pull and speed-scaled edge bust probability. |
+| `counters.compressed.tight` | 0.06 | Middle squeeze; a positive cell also recruits nearby help. |
+| `counters.compressed.tightFit` | 0.6 | Tight cell multiplier: `max(0, 1 + tightFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. This scales the middle contact squeeze; the separate `commitFit` knob scales helper reach. |
+| `counters.compressed.expansive` | 0.09 | Inward lane pull and speed-scaled edge bust probability. |
 | `counters.compressed.commitM` | 10 | Extra middle tackler's neutral-fit reach in metres, scaled by both fits. |
-| `counters.compressed.brokenBase` | −0.015 | Common enabled bust modifier; off preserves legacy −0.02. |
-| `counters.compressed.offloadBase` | −0.03 | Common enabled offload modifier; off preserves legacy −0.03. |
+| `counters.compressed.commitFit` | 0.5 | Extra help-read reach per positive defending-fit advantage; multiplied by `commitM × attackFit × defenceFit`. Neutral reach is unchanged. |
+| `counters.compressed.brokenBase` | 0 | Common enabled bust modifier; off preserves legacy −0.02. |
+| `counters.compressed.offloadBase` | 0 | Common enabled offload modifier; off preserves legacy −0.03. |
 
-Kick-chase, All-out and Balanced have zero matchup-cell modifiers. The selected
+Kick-chase, All-out and Balanced have zero matchup-cell modifiers. In the historical
+#464 acceptance run (before the joint #465 retune), the selected
 1,000-match Compressed column is Tight 45.45%, Expansive 54.20%, Kick-chase
 50.70%, All-out 50.40% and Balanced 49.80%. Every full-matrix row and column
 sum is within ±3 points; the largest absolute total is 2.65 points. Acceptance:
@@ -1554,14 +1560,21 @@ stored stats, randomness, save version, Labs or commercial changes.
 
 All five switches in §30–34 now default to **1**. Their numeric mechanics remain
 independently controllable by name; the full set is calibrated together.
+Kick-chase’s base pass modifier is **+0.04** (previously −0.05), using the same
+engaged passing roll. Bomb weights, early kicks and step 1 are unchanged. This
+common preset adjustment constrains the fifteen-plan round robin; controls
+restore the legacy modifier when comparing against dormant main. Full-fit
+counter/fit comparisons hold the adjusted preset fixed and also report the
+whole dormant-to-enabled change.
 
 | Group | Tuned values |
 |---|---|
-| `counters.tight` | `on=1`, `offloadBase=1`, `offloadPerFit=8` |
-| `counters.fit` | `on=1`, `edge=0.095` |
-| `counters.slide` | `on=1`, `expansive=0.08`, `expansiveFit=0.2`, `kickChase=0.6`, `tight=0.025`, `allOut=0.50`, `allOutRecovery=3`, `allOutReset=3` |
-| `counters.rush` | `on=1`, `carry=0.0005`, `defenceFit=0.029`, `kickChase=0.55`, `allOut=0.15` |
-| `counters.compressed` | `on=1`, `tight=0.04`, `tightFit=0.6`, `expansive=0.19`, `brokenBase=−0.015`, `offloadBase=−0.03`, `commitM=10` |
+| `presets.attack.kick-chase.base.pass` | `0.04` |
+| `counters.tight` | `on=1`, `offloadBase=1`, `offloadPerFit=9.5` |
+| `counters.fit` | `on=1`, `edge=0.065`, `counterResponse=1` |
+| `counters.slide` | `on=1`, `expansive=0.08`, `expansiveFit=0.2`, `kickChase=0.4`, `kickChaseFit=0.7`, `tight=0.025`, `allOut=0.50`, `allOutRecovery=3`, `allOutReset=3` |
+| `counters.rush` | `on=1`, `carry=0.0005`, `defenceFit=0.029`, `kickChase=0.61`, `allOut=0.1` |
+| `counters.compressed` | `on=1`, `tight=0.06`, `tightFit=0.6`, `expansive=0.09`, `brokenBase=0`, `offloadBase=0`, `commitM=10`, `commitFit=0.5` |
 
 The run record and acceptance tables are in
 [2026-11-counters](../status/2026-11-counters.md). `SideSpec.fit` in the balance

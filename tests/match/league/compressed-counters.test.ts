@@ -117,7 +117,7 @@ describe('Compressed counters', () => {
   it('keeps legacy contact off and separates the enabled baseline from neutral cell modifiers', () => {
     expect(tuned(0, () => new CompressedSim().base())).toMatchObject({ broken: -0.02, offload: -0.03 });
     for (const attack of ['balanced', 'kick-chase', 'all-out'] as const) {
-      expect(tuned(1, () => new CompressedSim(attack).base())).toMatchObject({ broken: -0.015, offload: -0.03 });
+      expect(tuned(1, () => new CompressedSim(attack).base())).toMatchObject({ broken: 0, offload: 0 });
       for (const y of [5, 34, 63]) expect(tuned(1, () => new CompressedSim(attack).contact(7, y))).toEqual({});
     }
     for (const defence of ['slide', 'rush'] as const) {

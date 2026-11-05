@@ -3,6 +3,7 @@
 // expanded in order, the report's bands and luck test, and a measured cell
 // that is deterministic and actually feels its overrides.
 import { describe, it, expect } from 'vitest';
+import enabledPlan from '../../../balance/plans/counters-enabled.json';
 import { BASE, MOMENTUM, OPEN, contestOdds } from '../../../src/match/league/contest';
 import { COUNTERS, fitEdge, slideCounter } from '../../../src/match/league/counters';
 import { styleFit } from '../../../src/match/league/fit';
@@ -22,6 +23,9 @@ const plan = (over: Partial<Plan> = {}): Plan => ({ name: 'p', seeds: 2, minutes
 describe('knobs by name', () => {
   it('enables strategy counters by default and leaves flat Balanced / Slide neutral (#465)', () => {
     for (const group of Object.values(COUNTERS)) expect(group.on).toBe(1);
+    // The paired control restores the legacy preset; enabled must restore the actual live default.
+    expect(enabledPlan.variants[0]!.tuning['presets.attack.kick-chase.base.pass'])
+      .toBe(attackPlan('kick-chase', 'midfield').pass);
     const fit = styleFit(sideSheet('H', { rating: 60 }).roster!);
     for (const value of Object.values(fit)) expect(value).toBe(1);
     expect(fitEdge(fit.balanced) - fitEdge(fit.slide)).toBe(0);
