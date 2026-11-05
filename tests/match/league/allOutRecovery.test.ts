@@ -23,7 +23,7 @@ class OffloadSim extends LiveSim {
 }
 
 it('extends the real All-out offload window only for a fit advantage over Slide, without another RNG draw', () => {
-  const restore = applyTuning({ 'counters.slide.on': 1, 'counters.slide.allOutRecovery': 0 });
+  const restore = applyTuning({ 'counters.slide.on': 1, 'counters.slide.allOutReset': 0, 'counters.slide.allOutRecovery': 0 });
   try {
     const cases: [AttackPreset, DefencePreset, number, number, number][] = [
       ['all-out', 'slide', 1.5, 0.5, 2], ['all-out', 'slide', 1, 1, 1],
@@ -41,6 +41,29 @@ it('extends the real All-out offload window only for a fit advantage over Slide,
         const after = make(roll);
         expect(after.offloaded).toBe(true);
         expect(after.ticks).toBe(LIVE.beatenCooldown * multiplier);
+        expect(after.draws).toBe(before.draws);
+      } finally { on(); }
+    }
+  } finally { restore(); }
+});
+
+
+it('extends the neutral Slide reset after an actual All-out offload, with both fits and the same draws', () => {
+  const restore = applyTuning({ 'counters.slide.on': 1, 'counters.slide.allOutReset': 0, 'counters.slide.allOutRecovery': 0 });
+  try {
+    for (const [attack, defence, a, d] of [
+      ['all-out', 'slide', 1, 1], ['all-out', 'slide', 1.5, .5],
+      ['all-out', 'slide', 0, 1.5], ['all-out', 'rush', 1, 1], ['balanced', 'slide', 1, 1],
+    ] as [AttackPreset, DefencePreset, number, number][]) {
+      const make = (roll: number) => new OffloadSim(attack, defence, a, d).contact(roll);
+      let roll = .01, before = make(roll);
+      while (!before.offloaded && roll < .99) { roll += .01; before = make(roll); }
+      expect(before.offloaded).toBe(true);
+      const on = applyTuning({ 'counters.slide.allOutReset': 2 });
+      try {
+        const after = make(roll);
+        const fits = attack === 'all-out' && defence === 'slide' ? a * d : 0;
+        expect(after.ticks).toBe(Math.round(LIVE.beatenCooldown * (1 + 2 * fits)));
         expect(after.draws).toBe(before.draws);
       } finally { on(); }
     }

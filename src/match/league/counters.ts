@@ -27,6 +27,7 @@ export const COUNTERS = {
     tight: 0.04,
     allOut: 0.50,
     allOutRecovery: 3,
+    allOutReset: 0,
   },
   fit: {
     on: 1,
@@ -62,7 +63,7 @@ export function slideCounter(attack: AttackPreset, defence: DefencePreset, attac
 /** A fitted second phase keeps an ill-fitted Slide line recovering longer; no new clock or roll. */
 export function allOutRecoveryTicks(base: number, attack: AttackPreset, defence: DefencePreset, attackFit: number, defenceFit: number): number {
   if (COUNTERS.slide.on !== 1 || attack !== 'all-out' || defence !== 'slide') return base;
-  return Math.max(0, Math.round(base * (1 + COUNTERS.slide.allOutRecovery * Math.max(0, attackFit - defenceFit))));
+  return Math.max(0, Math.round(base * (1 + COUNTERS.slide.allOutReset * attackFit * defenceFit + COUNTERS.slide.allOutRecovery * Math.max(0, attackFit - defenceFit))));
 }
 
 /** Rush's flat bust concession becomes a carrier v starting-sheet fit contest. */

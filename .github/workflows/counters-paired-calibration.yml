@@ -12,8 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cell: [0, 1, 2, 3, 4, 5, 6]
-        candidate: [0, 1, 2]
+        cell: [0]
+        candidate: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,13 +30,7 @@ jobs:
           import json, os
           from pathlib import Path
           cells = [
-            ('grind v slide', 'counters.slide.tight', [.015,.025,.035]),
-            ('grind v compressed', 'counters.compressed.commitM', [8,10,12]),
-            ('expansive v compressed', 'counters.compressed.expansive', [.15,.19,.22]),
-            ('kick-chase v slide', 'counters.slide.kickChase', [.5,.7,.9]),
-            ('kick-chase v rush', 'counters.rush.kickChase', [.55,.7,.85]),
-            ('all-out v slide', 'counters.slide.allOut', [.8,1.1,1.4]),
-            ('all-out v rush', 'counters.rush.allOut', [.10,.15,.20]),
+            ('all-out v slide', 'counters.slide.allOutReset', [.5,1,2,3]),
           ]
           name,knob,values=cells[int(os.environ['CELL'])]
           value=values[int(os.environ['CANDIDATE'])]
