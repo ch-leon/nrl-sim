@@ -23,7 +23,7 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * 3040797444 before strategy counters switched on, #465. Different match
  * outcomes change the season’s existing draws; no new match RNG call is added.
  */
-const MAIN_SEED_AFTER_SEASON = 1989516855;
+const MAIN_SEED_AFTER_SEASON = 1010310188;
 
 describe('the rng stream (#369)', () => {
   it('a season leaves rngSeed where main left it, the projection and the dot looked at every week', () => {
