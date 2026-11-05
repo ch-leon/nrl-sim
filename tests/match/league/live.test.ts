@@ -355,7 +355,17 @@ describe('LiveSim', () => {
         const e = s.events.find((x) => x.kind === 'strip' || x.kind === 'intercept');
         if (e) {
           // The side that took it now has the ball and the label says so.
-          expect(s.ball.holder?.side).toBe(e.side);
+          expect(sim.inPossession).toBe(e.side);
+          if (s.ball.holder) expect(s.ball.holder.side).toBe(e.side);
+          else {
+            // The interceptor can be tackled and offload in this same tick.
+            // His side still owns the flight, starting at the interception spot.
+            expect(s.events.some((x) => x.kind === 'offload' && x.side === e.side && x.slot === e.slot)).toBe(true);
+            const thief = s.players.find((p) => p.side === e.side && p.slot === e.slot)!;
+            expect(s.ball.lift).toBeGreaterThan(0);
+            expect(s.ball.x).toBeCloseTo(thief.x);
+            expect(s.ball.y).toBeCloseTo(thief.y);
+          }
           expect(s.label.startsWith(e.side === 'home' ? 'H ball' : 'A ball')).toBe(true);
           expect(prevLabel.startsWith(e.side === 'home' ? 'A ball' : 'H ball')).toBe(true);
           checked++;

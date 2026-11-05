@@ -11,8 +11,8 @@ class ReadFit extends LiveSim {
 }
 
 describe('own-style fit bonus', () => {
-  it('ships off and gives zero edge at fit 1, with signed edges above and below it', () => {
-    expect(listKnobs().find((k) => k.path === 'counters.fit.on')?.value).toBe(0);
+  it('ships on and gives zero edge at fit 1, with signed edges above and below it', () => {
+    expect(listKnobs().find((k) => k.path === 'counters.fit.on')?.value).toBe(1);
     const restore = applyTuning({ 'counters.fit.on': 1 });
     try {
       expect(fitEdge(1)).toBe(0);

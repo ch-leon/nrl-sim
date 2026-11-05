@@ -78,14 +78,15 @@ describe('tracked counter measurements', () => {
     expect(both.trackedCounts!.pointsFor).toEqual(both.opponentCounts!.pointsAgainst);
   });
   it('calculates wins plus half draws and its sample SE on a two-seed cell', () => {
-    // These short seeds give one win and one loss; a one-minute cell below draws.
+    // These short seeds give one draw and one loss with counters enabled (#465);
+    // before switch-on they gave [1, 0]. A neutral one-minute control draws.
     const tiny = cell;
     const first = measureCell(tiny, 1, 4, 1);
     const second = measureCell(tiny, 1, 4, 2);
     const both = measureCell(tiny, 2, 4, 1);
     const xs = [first, second].map((r) => r.trackedWin! + r.trackedDraw! / 2);
-    expect(xs).toEqual([1, 0]);
-    expect(measureCell(tiny, 1, 1).pointsShare).toEqual({ mean: 0.5, se: 0 });
+    expect(xs).toEqual([0.5, 0]);
+    expect(measureCell({ ...cell, scenario: even }, 1, 1).pointsShare).toEqual({ mean: 0.5, se: 0 });
     expect(new Set(xs).size).toBe(2);
     const mean = (xs[0]! + xs[1]!) / 2;
     expect(both.pointsShare!.mean).toBe(mean);

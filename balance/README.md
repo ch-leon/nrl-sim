@@ -85,6 +85,12 @@ moves (#322).
   `none` (flat squads' default), `gen` (clubs' default), `stars`. `bench` is how many
   interchange players (0–4, default 4; a flat squad's bench has its stats) and
   `rotation` how hard the coach uses them: `off`, `standard` (default), `heavy`.
+- **Exact style-fit fixtures** (#465): `"fit": { "expansive": 1.5, "slide": 0.5 }`
+  overrides only those cached starting-sheet fits in the headless harness. Values
+  must be finite and within 0–1.5; omitted styles keep their derived fit. Playing
+  stats stay unchanged, the fixture follows its written side when swapped, and
+  break-time plan changes select the corresponding cached fit. This is for
+  isolating counter/own-fit effects, not a live-game or saved-sheet override.
 - **Squads as the game builds them** (N12.2): `"squad": "player"` is a new game's squad
   (one star, a first-grader and a depth man a position; `difficulty` sets its start
   rating) through its opening lineup, and `"squad": "rival"` a rival club's generated
@@ -230,3 +236,51 @@ within ±3 percentage points. The report exposes per-side offloads, contact bust
 and line breaks. Runs use disjoint 125-seed checkpoint blocks; pooled reports
 preserve every source plan/result and the sample-variance formula. The committed
 plan reruns each complete consecutive range directly. Tuned values are in §34.
+
+`SideSpec.fit` is a **headless harness fixture** for #465: e.g.
+`"home": {"rating":60,"fit":{"balanced":1.5}}`. It replaces only the named
+starting-sheet style fit in `BalanceSim`, leaving playing stats and every other
+fit unchanged. `"away":{"rating":60,"fit":{"slide":0.5}}` isolates the opposing
+defence fit. Fixtures follow their written side when orientations swap and
+remain cached when a break selects a different style. The opening positions are
+reset with the existing receiver, without an RNG draw. Omitted fits replay the
+live sim exactly. This field is not on `TeamSheet`, `LiveOptions` or any save;
+the game cannot supply it. `fitFixtures.test.ts` guards that boundary.
+
+
+### #465 switch-on acceptance (Leon, 5 Nov 2026)
+
+The final neutral comparison is **enabled minus dormant on the same 500 seeds
+in both orientations (1,000 matches)**, with signed 4–6 point win-share swings
+in all eight nonzero cells. Distance from 50% does not measure that swing.
+Flat preset controls versus Balanced/Slide use **42–58%** (previously 45–55%).
+Full-fit counters use the exact 1.5 v 0.5 fixtures, hold Tight’s independent
+rebuild on in both runs as Leon specified, hold the independent Kick-chase
+preset adjustment fixed in both, and require **9 points or stronger**;
+9–12 is the nominal target. The fully dormant variant also restores the legacy
+Kick-chase pass weight and exposes total change. Neutral controls restore that
+legacy weight too, and the guard checks all 15 against immutable dormant-main
+shares; counter-off with a retuned preset is not a main baseline.
+
+After running each committed `counters-*.json` acceptance plan, check the saved
+measurements with `npx vite-node scripts/check-counters.ts -- <kind> <run-dir>`.
+Kinds are `enabled`, `full-fit`, `fit-enabled`, `strong-pack`, `round-robin` and
+`yardstick`. The checker rejects missing, duplicate or undersized evidence and
+checks each signed counter, own-fit cap, six-offload floor and 53% plan average.
+`tests/match/balance/acceptance.test.ts` guards paired swings and the revised
+42–58% preset bounds. The manual acceptance workflow runs these guards.
+
+Compare complete soak JSON with
+`python3 scripts/check-counters-soak.py <main.json> <enabled.json>`: all 120
+fresh careers and saves v1–20 remain included; Normal idle and managed each
+must stay within three win points. Mean final money in each mode/difficulty
+must remain within the baseline mean ±2 baseline standard errors, including
+careers that ended early. Both six-row tables belong in the PR.
+
+`npm run soak -- --difficulties easy,normal,hard --jobs 4 --shard i/7`
+partitions the original case list across seven runners (1 ≤ i ≤ 7). It preserves
+every case's seed, difficulty, mode and planned seasons, including saves v1–20.
+The unsharded command is unchanged. Pool all seven JSON files and enforce the
+complete 140-case guard before reporting an acceptance result; individual shards
+are not a complete soak. `tests/qa/shard.test.ts` verifies exact partition coverage
+and preserves case objects and their order within each shard.

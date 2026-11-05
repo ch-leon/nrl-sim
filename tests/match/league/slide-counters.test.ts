@@ -57,7 +57,7 @@ class SlideSim extends LiveSim {
     });
     return { mods, receiver: this.offloadReceiver };
   }
-  fielding(defenderDistance = 2, kickoff = false) {
+  fielding(defenderDistance = 1.39, kickoff = false) {
     this.attacking = 'away'; this.kickoffUp = kickoff;
     for (const p of this.players) p.body.pos = { x: 80, y: 60 };
     this.players[5]!.body.pos = { x: 49, y: 34 };
@@ -85,9 +85,9 @@ function tuned<T>(on: number, fn: () => T): T {
   try { return fn(); } finally { restore(); }
 }
 
-describe('dormant Slide counters', () => {
-  it('ships off, gates every cell and scales by both fits', () => {
-    expect(COUNTERS.slide.on).toBe(0);
+describe('Slide counters', () => {
+  it('ships on, gates every cell and scales by both fits', () => {
+    expect(COUNTERS.slide.on).toBe(1);
     for (const attack of ['grind', 'expansive', 'kick-chase', 'all-out'] as const) {
       expect(tuned(0, () => slideCounter(attack, 'slide', 1.5, 1.5))).toBe(0);
       tuned(1, () => {
@@ -142,6 +142,7 @@ describe('dormant Slide counters', () => {
   });
 
   it('reads near-tied in-play catches for the back three without extending catch reach', () => {
+    // At the tuned .6 strength, 1.4 m v 1 m separates neutral and half-fit reads.
     expect(tuned(0, () => new SlideSim('kick-chase').fielding())).toBe(5);
     tuned(1, () => {
       expect(new SlideSim('kick-chase').fielding()).toBe(9);

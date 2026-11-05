@@ -158,12 +158,12 @@ describe('kick contests in the live sim (#99)', () => {
       }
       return { scored, grounded };
     };
-    let r = races(es);
-    // Seeds 1–8 hold both; if a sim change moves them, look a little further than these.
-    if (r.scored === 0 || r.grounded === 0) {
-      const more = races(play([9, 10, 11, 12, 13, 14, 15, 16], () => false).es);
-      r = { scored: r.scored + more.scored, grounded: r.grounded + more.grounded };
-    }
+    // Exercise the race on neutral Balanced / Slide. Enabled Slide deliberately
+    // shuts Kick-chase attackers out of these races; its coverage is tested separately.
+    const r = races(play(Array.from({ length: 32 }, (_, i) => i + 1), (all) => {
+      const next = races(all);
+      return next.scored > 0 && next.grounded > 0;
+    }, 'balanced').es);
     expect(r.scored).toBeGreaterThan(0);
     expect(r.grounded).toBeGreaterThan(0);
   }, 60_000);
