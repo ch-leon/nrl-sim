@@ -56,12 +56,53 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     await openNav(page, 'lineup');
     await page.waitForSelector('.nrl-lineup-row');
   });
-  await step('plan-sheet', async () => {
-    await page.locator('.nrl-screen-tools [data-plan]').tap();
-    await page.waitForSelector('.nrl-lineup-plan');
-    if (await page.locator('.nrl-lineup-tac [data-tactic="grind"]').textContent() !== 'Tight') return ['Tight label missing'];
+  // #466: the legacy id renders the new name and offload explanation at both
+  // requested text sizes. These screenshots are kept by the match CI artifact.
+  const tightProblems = async (root) => page.locator(root).evaluate((sheet) => {
+    const out = [];
+    if (/grind/i.test(sheet.textContent)) out.push('retired name in plan sheet');
+    const b = sheet.querySelector('[data-tactic="grind"]');
+    if (b?.textContent !== 'Tight') out.push('Tight label missing');
+    // TACTIC_SHORT.grind is pinned to TGT by the rendering test. Check it
+    // against the real plan chip's font, spacing and available content width.
+    if (b) {
+      const cs = getComputedStyle(b);
+      const c = document.createElement('canvas').getContext('2d');
+      c.font = cs.font;
+      const shortWidth = c.measureText('TGT').width + 3 * (parseFloat(cs.letterSpacing) || 0);
+      const available = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (shortWidth > available + 1) out.push('TGT short label exceeds chip width');
+    }
+    if (!sheet.textContent.includes('offload in the tackle')) out.push('offload explanation missing');
+    for (const e of [b, sheet.querySelector('.nrl-lineup-tac-hint, .nrl-mo-plan-hint')].filter(Boolean)) {
+      const r = e.getBoundingClientRect();
+      if (r.left < 0 || r.right > innerWidth || r.top < 0 || r.bottom > innerHeight) out.push('Tight label or explanation outside viewport');
+      if (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1) out.push('Tight label or explanation clipped');
+      const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+      if (!hit || !(e.contains(hit) || hit.contains(e))) out.push('Tight label or explanation covered');
+    }
+    return out;
   });
-  await page.locator('.nrl-lineup-plan [data-plan-done]').tap();
+  for (const size of ['normal', 'large']) {
+    await textSize(size);
+    await openNav(page, 'lineup');
+    await step(`plan-sheet-${size}`, async () => {
+      await page.locator('.nrl-screen-tools [data-plan]').tap();
+      await page.locator('.nrl-lineup-tac [data-tactic="grind"]').tap();
+      return tightProblems('.nrl-lineup-plan');
+    });
+    await page.locator('.nrl-lineup-plan [data-plan-done]').tap();
+    await page.locator(SHEET_EXIT).tap();
+    await openNav(page, 'help');
+    for (const id of ['tactics', 'nines']) {
+      await step(`guide-${id}-${size}`, async () => {
+        await page.locator(`[data-guide-tab="${id}"]`).tap();
+        const text = await page.locator(`[data-guide-page="${id}"]`).textContent();
+        return [...(/grind/i.test(text) ? ['retired name in guide'] : []), ...(text.includes('Tight') ? [] : ['Tight missing from guide'])];
+      });
+    }
+    await page.locator(SHEET_EXIT).tap();
+  }
   for (const size of ['large', 'larger']) {
     await step(`ladder-${size}`, async (rec) => {
       await textSize(size);
@@ -77,8 +118,8 @@ export async function runPlaytest(browser, W = 667, H = 375) {
       ];
     });
   }
-  await step('text-normal', () => textSize('normal'));
   for (const m of [1, 2]) {
+    await textSize(m === 1 ? 'normal' : 'large');
     await step(`half-time-match-${m}`, async (rec) => {
       if (await page.locator('.nrl-screen-region').count()) await page.locator(SHEET_EXIT).tap();
       await page.locator('.nrl-dock [data-hud="advance"]').tap();
@@ -96,6 +137,12 @@ export async function runPlaytest(browser, W = 667, H = 375) {
       }, null, { timeout: 300000, polling: 50 }).then((h) => h.jsonValue());
       rec.notes.push(seen === 'card' ? 'half-time card up' : 'second half kicked off with no card');
       if (seen === 'card') {
+        // Select another plan first so the change back to Tight also reaches
+        // commentary and the match report with the historical grind event id.
+        await page.locator('.nrl-mo-plan [data-tactic="balanced"]').tap();
+        await page.locator('.nrl-mo-plan [data-tactic="grind"]').tap();
+        const problems = await tightProblems('.nrl-mo-plan');
+        if (problems.length) throw new Error(problems.join('; '));
         await page.screenshot({ path: join(OUT, `half-time-match-${m}.png`) });
         await page.locator('.nrl-mo-plan .nrl-mo-plan-go').tap();
       }
@@ -107,6 +154,8 @@ export async function runPlaytest(browser, W = 667, H = 375) {
         await page.locator('.nrl-mo-skip').tap();
       }
       await page.waitForSelector('[data-back-to-club]:visible', { timeout: 30000 });
+      const reportText = await page.locator('.nrl-report').textContent();
+      if (/grind/i.test(reportText) || !reportText.includes('Tight')) throw new Error('report did not display the plan change as Tight');
       await page.screenshot({ path: join(OUT, `full-time-match-${m}.png`) });
       await page.locator('[data-back-to-club]:visible').first().tap();
       await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
