@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Plan buttons show squad-fit stars and a named contributor; pre-match scouting uses the selected rival nine and shows counters, and half-time shows breaks, kicks and errors against style guides ([PR](https://github.com/ch-leon/nrl-sim/pull/510)).
+
 - Tight tactics now describe forward carries and offloads throughout the plan sheets and guides; old saves keep their plan ([PR](https://github.com/ch-leon/nrl-sim/pull/507)).
 
 - Two pre-season trial weeks in new careers: try a lineup, earn a small home gate, then start round 1 with a clean ladder. Existing saves keep their season shape ([PR](https://github.com/ch-leon/nrl-sim/pull/508)).

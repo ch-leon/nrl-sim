@@ -1,3 +1,6 @@
+import { matchupRead, counterRead, fitRead } from '../matchupRead';
+import { teamSheetFromSquad } from '../../match/league/sheets';
+import { resolveLineup, validTactics } from '../../systems/lineup';
 // src/ui/screens/fixtures.ts — the League sheet: ladder + fixtures (BAK-184, WU-7;
 // Broadcast Quiet 3h). Built from the src/ui/dom.ts helper kit (no Phaser).
 // One sheet, two columns: the ladder on the left (the club's row starred, a
@@ -20,7 +23,7 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { formGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
-import { rivalStyle } from '../../systems/rivalRound';
+import { rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { styleLine, whenBehindLine } from '../tacticsBlurbs';
 import { shortName } from './matchReport';
@@ -450,12 +453,16 @@ function nextMatchCard(state: GameState): HTMLElement {
 
   const lines = el('div', { class: 'nrl-next-lines' });
   const line = (label: string, text: string): void => {
-    lines.append(el('div', { class: 'nrl-next-line' }, el('span', { class: 'nrl-label', text: label }), el('span', { text })));
+    lines.append(el('div', { class: 'nrl-next-line', attrs: { 'data-preview-line': label } }, el('span', { class: 'nrl-label', text: label }), el('span', { text })));
   };
   // How they play (N11): the style of the nine they would field today; the Guide's Tactics page explains the words.
   if (oppClub) {
     const style = rivalStyle(oppClub);
-    line('They play', styleLine(style));
+    const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
+    const theirs = rivalSheet(oppClub).roster ?? [];
+    line('They play', `${styleLine(style)} · ${fitRead(theirs, style.attack).stars} / ${fitRead(theirs, style.defence).stars}`);
+    line('Matchup', matchupRead(ours, theirs, validTactics(state.lineup.tactics), style));
+    line('Counters', counterRead(ours, style.defence));
     // The Analyst (N14): what they step to when they go more open. Everyone else just sees how they play.
     if (hasStaff(state, 'analyst')) {
       const behind = whenBehindLine(style);
@@ -614,6 +621,15 @@ button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); out
 .nrl-next-form small { font-size: 0.6875rem; }
 .nrl-next-lines { display: flex; flex-direction: column; }
 .nrl-next-line { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--nrl-button); color: var(--nrl-text-2); overflow-wrap: anywhere; }
+@media (max-height: 440px) {
+  .nrl-next-match { gap: 4px; }
+  .nrl-next-side { padding: 4px 8px; }
+  .nrl-next-line { padding: 2px 0; }
+}
+@media (max-height: 340px) {
+  .nrl-next-match { gap: 2px; }
+  .nrl-next-line { padding: 1px 0; }
+}
 /* The opponent's name: a text link with a 44px hit area (#194). */
 .nrl-next-side .nrl-ladder-club { padding: 12px 0; margin: -12px 0; text-decoration: underline dotted; text-underline-offset: 3px; }
 `;

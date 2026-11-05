@@ -373,6 +373,9 @@ export class LivePlayback {
     this.view.draw(this.runner.prev, this.runner.cur, 0, 1);
   }
 
+  /** Events already recorded, for UI readouts only. */
+  get recordedEvents(): readonly import('../../sim/events').MatchEvent[] { return this.recorder.events; }
+
   get finished(): boolean {
     return this.finishEmitted;
   }

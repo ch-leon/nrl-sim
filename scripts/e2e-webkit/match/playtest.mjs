@@ -74,7 +74,9 @@ export async function runPlaytest(browser, W = 667, H = 375) {
       const out = [];
       if (/grind/i.test(sheet.textContent)) out.push('retired name in plan sheet');
       const b = sheet.querySelector('[data-tactic="grind"]');
-      if (b?.textContent !== 'Tight') out.push('Tight label missing');
+      if (b?.firstElementChild?.textContent !== 'Tight') out.push('Tight label missing');
+      if (!/^[★☆]{3}$/.test(b?.querySelector('.nrl-fit-stars')?.textContent ?? '')) out.push('Tight fit stars missing');
+      if (!b?.querySelector('.nrl-fit-reason')?.textContent?.trim()) out.push('Tight fit reason missing');
       // TACTIC_SHORT.grind is pinned to TGT by the rendering test. Check it
       // against the real plan chip's font, spacing and available content width.
       if (b) {
