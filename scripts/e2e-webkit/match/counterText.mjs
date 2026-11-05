@@ -35,12 +35,14 @@ export async function runCounterText(browser) {
         s.rngSeed = 468;
         s.lineup.tactics = { attack: 'grind', defence: 'slide' };
         s.lineup.rotation = 'standard';
+        // Normal reads recent habits (#469): this fixture needs Compressed v Tight.
+        s.recentPlans = Array.from({ length: 3 }, () => ({ attack: 'grind', defence: 'slide' }));
         s.facilities.push({ id: 'counter-training', defId: 'trainingPaddock', level: 3, x: 10, y: 10 });
         for (const p of s.squad) {
           p.stats = { speed: 80, strength: 80, stamina: 100, skill: 80, footyIQ: 80 };
           p.traits = []; p.injuredWeeks = 0; p.suspendedWeeks = 0;
         }
-        // Flat stronger contact stats plus stamina select Compressed, not Rush.
+        // Flat stronger stats keep fits predictable; the Tight habit selects Compressed.
         for (const c of s.league.clubs) {
           c.strength = 90;
           for (const p of c.squad ?? []) {

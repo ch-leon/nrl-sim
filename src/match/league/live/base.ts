@@ -97,6 +97,7 @@ export abstract class LiveBase {
   protected planRead = 0;
   protected readonly nextPlan: Record<Side, { tactics: TeamTactics; at: PlanChange['at']; minute: number } | null> = { home: null, away: null };
   /** The break rule (N13.5), and the sides it runs for. Null when the match has none. */
+  protected readonly aiRival: LiveOptions['aiRival'];
   protected readonly breakRule: BreakRule | null;
   protected readonly breakRuleSides: ReadonlySet<Side>;
   /** Tries conceded in a row, without this side scoring in between. */
@@ -232,6 +233,7 @@ export abstract class LiveBase {
     this.controlList = opts.controls ?? [];
     this.aiCoach = opts.aiCoach ?? [];
     this.planList = opts.plans ?? [];
+    this.aiRival = opts.aiRival;
     const listed = opts.breakRuleSides;
     if (opts.breakRule) {
       this.breakRule = opts.breakRule;

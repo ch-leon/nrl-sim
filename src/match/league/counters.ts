@@ -3,6 +3,14 @@ import type { AttackPreset, DefencePreset } from './presets';
 
 // Strategy counters enabled and calibrated in #465; these defaults now guard replay.
 export const COUNTERS = {
+  ai: {
+    on: 1,
+    matrix: 5,
+    fit: 5,
+    normalBreak: 1,
+    hardHalfTime: 1,
+    keyDeficit: 1,
+  },
   compressed: {
     on: 1,
     tight: 0.06,

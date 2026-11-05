@@ -26,7 +26,8 @@ describe('Tight display name with the legacy grind id (#466)', () => {
 
   it('renders both guides without the retired name', () => {
     for (const page of GUIDE_PAGES) expect(renderGuidePage(page).textContent).not.toMatch(/grind/i);
-    expect(renderGuidePage(GUIDE_PAGES.find((p) => p.id === 'tactics')!).textContent).toContain('a heavy pack plays Tight');
+    expect(renderGuidePage(GUIDE_PAGES.find((p) => p.id === 'tactics')!).textContent).toContain('Tight: Forwards');
+    expect(renderGuidePage(GUIDE_PAGES.find((p) => p.id === 'tactics')!).textContent).toContain('On Normal and Hard rivals read your last three league plans, never your upcoming pick');
     expect(renderGuidePage(GUIDE_PAGES.find((p) => p.id === 'nines')!).textContent).toContain('Tight, Balanced');
   });
 

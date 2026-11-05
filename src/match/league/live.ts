@@ -54,6 +54,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       this.events = [];
       return;
     }
+    this.observeRivalPlay();
     this.tick++;
     this.events = [];
     const beforeSide = this.attacking;

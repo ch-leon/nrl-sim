@@ -73,7 +73,7 @@ describe('rival styles from their squads (N11)', () => {
     expect(defences.size).toBe(3);
   });
 
-  it('the player sees the style his opponent plays, squad-built or strength-built', () => {
+  it('omitting player context preserves legacy rival-v-rival styles, squad-built or strength-built', () => {
     // Every difficulty plays the same sheet: the difficulty is the rival's edge after the spread (N12.2), not his sheet.
     const league = initLeague(createNewGame('X', 5));
     const rivals = league.clubs.filter((c) => c.id !== 'player');

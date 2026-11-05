@@ -382,6 +382,7 @@ export function asOldSave(s: GameState, version: number): Record<string, unknown
   if (version < 3) out.settings = { ...(raw.settings as object), difficulty: undefined };
   // v21: bans and chain flags (#324). Stripped last so an earlier step that
   // rebuilds the squad from `raw` does not put suspendedWeeks back.
+  if (version < 22) delete out.recentPlans;
   if (version < 21) {
     const stripBan = (list: unknown): unknown =>
       Array.isArray(list)
@@ -587,7 +588,7 @@ export function advanceWeekAsTapped(): void {
   }
   const m = kickOff.match;
   if (!m) return;
-  const { seed, weather, injuryRate, goldenPoint, aiCoach, difficultyEdge, breakRuleSides } = m.live;
+  const { seed, weather, injuryRate, goldenPoint, aiCoach, difficultyEdge, breakRuleSides, aiRival } = m.live;
   const result = runMatch(m.home, m.away, {
     seed, weather,
     ...(injuryRate !== undefined ? { injuryRate } : {}),
@@ -595,6 +596,7 @@ export function advanceWeekAsTapped(): void {
     ...(difficultyEdge ? { difficultyEdge } : {}),
     ...(aiCoach?.length ? { aiCoach } : {}),
     // The rival's plan changes at the breaks (N14.1), as fast-forward plays it.
+    ...(aiRival ? { aiRival } : {}),
     ...(breakRuleSides?.length ? { breakRuleSides } : {}),
     ...(goldenPoint ? { goldenPoint } : {}),
   });
