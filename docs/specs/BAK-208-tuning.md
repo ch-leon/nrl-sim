@@ -1525,6 +1525,7 @@ Kick-chase, All-out and Balanced receive no Compressed counter effect.
 orientations, 1,000 whole matches per cell, except Tight v Rush: its initial
 1,000-match estimate is extended once with the next 500 seeds both ways
 (2,000 matches total, matching task 6 sampling). Balanced v Compressed adds
-one predefined extension of seeds 501–1,500 both ways after its initial
-47.55% estimate (3,000 matches total); every seed is retained. Shipped switches remain 0. No new
+precision extensions after its initial 47.55% and 3,000-match 47.90% estimates,
+retaining seeds 1–2,000 both ways (4,000 matches). Balanced v Rush retains
+seeds 1–1,000 both ways (2,000 matches) to refine the row total. Every seed is retained. Shipped switches remain 0. No new
 stored fields, randomness, save version, Labs or commercial changes.

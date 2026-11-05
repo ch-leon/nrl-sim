@@ -220,8 +220,10 @@ Flat-60 cells use 500 seeds both ways (1,000 whole matches per cell), except
 Tight v Rush: 1,000 seeds both ways (2,000 matches), retaining the complete
 initial sample and its one extension, as in task 6. The first Tight-row sum
 was −3.10 pp with the 1,000-match Rush estimate. Balanced v Compressed uses
-1,500 seeds both ways (3,000 matches): its initial 47.55% estimate is retained
-with one predefined extension, seeds 501–1,500 both ways.
+2,000 seeds both ways (4,000 matches): its initial 47.55% estimate and the
+3,000-match 47.90% estimate are retained with the next fixed seed block.
+Balanced v Rush also retains seeds 1–1,000 both ways (2,000 matches) to refine
+the Balanced-row total. All extensions use disjoint consecutive ranges.
 Compressed targets are Tight 43–47%, Expansive 53–57% and the other three
 48–52%. Sum the signed swings from 50 in each row and column; every total
 should be within ±3 percentage points. The report also exposes tracked-side
