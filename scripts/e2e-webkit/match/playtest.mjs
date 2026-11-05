@@ -105,6 +105,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     for (const id of ['tactics', 'nines']) {
       await step(`guide-${id}-${size}`, async () => {
         await page.locator(`[data-guide-tab="${id}"]`).tap();
+        await page.locator(`[data-guide-page="${id}"] li`).filter({ hasText: 'Tight' }).last().scrollIntoViewIfNeeded();
         const text = await page.locator(`[data-guide-page="${id}"]`).textContent();
         return [...(/grind/i.test(text) ? ['retired name in guide'] : []), ...(text.includes('Tight') ? [] : ['Tight missing from guide'])];
       });
