@@ -1,3 +1,4 @@
+import { currentRound } from './core/season';
 import Phaser from 'phaser';
 import './ui/fonts';
 import { BootScene } from './scenes/BootScene';
@@ -355,7 +356,7 @@ async function boot(): Promise<void> {
   // week before it, so advancing again rebuilds the same match, which picks up
   // the record and plays on from where it was, calls and all.
   const pending = readLiveMatch();
-  if (pending && pending.season === getState().season && pending.week === getState().week) {
+  if (pending && pending.season === getState().season && pending.week === getState().week && pending.round === currentRound(getState())) {
     const resume = (): void => void setTimeout(() => advanceWeek(), 0);
     if (g.isBooted) resume();
     else g.events.once(Phaser.Core.Events.READY, resume);

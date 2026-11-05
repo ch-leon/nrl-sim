@@ -230,14 +230,15 @@ export function remainingTarget(target: AdvanceTarget, p: RunProgress): AdvanceT
 }
 
 /** How many weeks a target plays from `week` (a run with no stops). */
-export function targetSpan(target: AdvanceTarget, week: number): number {
+export function targetSpan(target: AdvanceTarget, week: number, preseason?: 0 | 1 | 2): number {
+  const trialsLeft = week === 1 && preseason ? 3 - preseason : 0;
   switch (target.kind) {
     case 'weeks':
       return target.weeks;
     case 'finals':
-      return week < FINALS_START_WEEK ? FINALS_START_WEEK - week : WEEKS_PER_SEASON - week + FINALS_START_WEEK;
+      return trialsLeft + (week < FINALS_START_WEEK ? FINALS_START_WEEK - week : WEEKS_PER_SEASON - week + FINALS_START_WEEK + (preseason === undefined ? 0 : 2));
     case 'seasonEnd':
-      return WEEKS_PER_SEASON - week + 1;
+      return trialsLeft + WEEKS_PER_SEASON - week + 1;
   }
 }
 

@@ -224,7 +224,7 @@ describe('season rollover integration', () => {
     registerFixturesSystem(); registerPlayerMatchSystem(); registerBoardSystem();
     const first = getState().objectives.map((o) => o.id);
     expect(first.every((id) => id.startsWith('s1-'))).toBe(true);
-    advanceWeeks(WEEKS_PER_SEASON);
+    advanceWeeks(WEEKS_PER_SEASON + 2);
     const s = getState();
     expect(s.season).toBe(2);
     expect(s.objectives.every((o) => o.id.startsWith('s2-') && o.status === 'pending')).toBe(true);
@@ -246,7 +246,7 @@ describe('board objectives address (#475)', () => {
     expect(quiet).toEqual([true]); // News only while the first tutorial is teaching
     registerBoardSystem();
     expect(lines).toHaveLength(1); // loading existing goals never announces them again
-    advanceWeeks(27);
+    advanceWeeks(29);
     expect(lines.some((line) => line.startsWith(`${address}, the board's objectives for season 2:`))).toBe(true);
     expect(quiet).toEqual([true, false]);
     clearSeasonHooks(); clearTickHooks();

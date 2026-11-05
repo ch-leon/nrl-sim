@@ -1,5 +1,6 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createNewGame, getState, setState, type RivalClub } from '../../src/core/state';
+import { getState, setState, type RivalClub } from '../../src/core/state';
 import { bus, type Events } from '../../src/core/events';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER } from '../../src/core/time';
 import { derbyRival, isDerbyFixture, registerDerbySystem } from '../../src/systems/derby';
@@ -93,4 +94,24 @@ describe('derby News hook', () => {
     setState({ home: { town: 'Free text' } }); news.length = 0;
     registerDerbySystem(); advanceWeek(); expect(news).toEqual([]);
   });
+});
+
+
+it('waits through both trials before previewing a competitive round-one derby', () => {
+  const s = getState();
+  setState({ preseason: 1, league: { ...s.league, fixtures: [
+    { round: -1, homeId: 'player', awayId: 'rival-wolves' },
+    { round: 0, homeId: 'rival-wolves', awayId: 'player' },
+    { round: 1, homeId: 'player', awayId: 'rival-cyclones' },
+  ] } });
+  const news: string[] = [];
+  bus.on('ui:notify', n => news.push(n.text));
+  registerDerbySystem();
+  expect(news).toEqual([]);
+  advanceWeek();
+  expect(news).toEqual([]);
+  advanceWeek();
+  expect(getState().preseason).toBe(0);
+  expect(news).toHaveLength(1);
+  expect(news[0]).toContain('Derby week against');
 });

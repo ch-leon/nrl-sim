@@ -1,3 +1,4 @@
+import { currentRound } from './season';
 // src/core/save.ts — persistence, migration, slots + title flow
 // (BAK-174, WU-4; migration/export/import/slots: GitHub #34; storage seam: #360).
 //
@@ -545,7 +546,7 @@ export function hasSave(slot: number = activeSlot): boolean {
 function heldWeekSnapshot(): GameState | null {
   if (!weekHeld() || !lastSaved) return null;
   const now = getState();
-  if (lastSaved.season !== now.season || lastSaved.week !== now.week) return null;
+  if (lastSaved.season !== now.season || lastSaved.week !== now.week || currentRound(lastSaved) !== currentRound(now)) return null;
   return lastSaved;
 }
 
@@ -813,7 +814,7 @@ export function enableAutosave(page: PageEvents = {
   // A held week (the live match, the rival round) is never written, so a change made since the
   // last save is saved as the next week starts, before its first hook: a tab that dies mid-match
   // comes back at the week's start with the change, and the live-match record still matches it.
-  registerTickHook(WEEK_START_HOOK, TICK_ORDER.weekStart, () => { if (getState() !== lastSaved) persist(); });
+  registerTickHook(WEEK_START_HOOK, TICK_ORDER.weekStart, () => { if (getState() !== lastSaved) persist(); }, { trials: true });
   const onVisibility = (): void => { if (page.doc?.visibilityState === 'hidden') persist(); };
   page.doc?.addEventListener('visibilitychange', onVisibility);
   page.win?.addEventListener('pagehide', persist);

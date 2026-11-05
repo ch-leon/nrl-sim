@@ -20,6 +20,7 @@ import {
   type LeagueState,
   type RivalClub,
 } from '../core/state';
+import { currentRound } from '../core/season';
 import { makeRng, type Rng } from '../utils/rng';
 import { rollWeather } from '../sim/weather';
 import { topTryScorer } from './stats';
@@ -118,6 +119,21 @@ export function generateFixtures(clubIds: string[], rng: Rng): Fixture[] {
   return fixtures;
 }
 
+/** Two friendlies per club, one home and one away, on a private seeded stream. */
+export function generateTrialFixtures(clubIds: string[], seed: number): Fixture[] {
+  const ids = makeRng((seed ^ 0x74726961) >>> 0).shuffle([...clubIds]);
+  const fixtures: Fixture[] = [];
+  if (ids.length < 4 || ids.length % 2 !== 0) throw new Error('Trials need an even club count >= 4');
+  const half = ids.length / 2;
+  for (let i = 0; i < half; i++) {
+    fixtures.push(
+      { round: -1, homeId: ids[i]!, awayId: ids[i + half]! },
+      { round: 0, homeId: ids[i + half]!, awayId: ids[(i + 1) % half]! },
+    );
+  }
+  return fixtures.sort((a, b) => a.round - b.round);
+}
+
 /** Rotate all but the first element one step (circle-method step). */
 function rotate(ids: string[]): void {
   if (ids.length <= 2) return;
@@ -202,7 +218,7 @@ export function applyResult(
   fixture: Fixture,
   result: { homeScore: number; awayScore: number },
 ): GameState {
-  if (isFinalsRound(fixture.round)) {
+  if (fixture.round <= 0 || isFinalsRound(fixture.round)) {
     return stampFixtureResult(state, fixture, result);
   }
 
@@ -264,8 +280,8 @@ export function ladderPosition(state: GameState, clubId: string): number {
  * to the round number for weeks 1..WEEKS_PER_SEASON (regular season + finals).
  */
 export function getCurrentFixture(state: GameState, clubId: string): Fixture | undefined {
-  const round = state.week;
-  if (round < 1 || round > WEEKS_PER_SEASON) return undefined;
+  const round = currentRound(state);
+  if (round < -1 || round > WEEKS_PER_SEASON) return undefined;
   return state.league.fixtures.find(
     (f) => f.round === round && (f.homeId === clubId || f.awayId === clubId),
   );
@@ -315,8 +331,8 @@ export function cheapSimScore(
  * Already-played fixtures are skipped. Returns a NEW GameState. Deterministic.
  */
 export function simulateRivalRound(state: GameState, rng: Rng): GameState {
-  const round = state.week;
-  if (round < 1 || round > WEEKS_PER_SEASON) return state;
+  const round = currentRound(state);
+  if (round < -1 || round > WEEKS_PER_SEASON) return state;
   const byId = new Map(state.league.clubs.map((c) => [c.id, c] as const));
 
   let next = state;
@@ -541,6 +557,7 @@ export function initLeague(
 
   const rng = makeRng(state.rngSeed);
   const fixtures = generateFixtures(clubIds, rng);
+  if (state.preseason !== undefined) fixtures.unshift(...generateTrialFixtures(clubIds, state.rngSeed));
   const league: LeagueState = { clubs, fixtures, ladder: emptyLadder(clubIds) };
 
   setState({ league, rngSeed: rng.state() });
@@ -583,7 +600,7 @@ export function registerFixturesSystem(): void {
     const rng = makeRng(s.rngSeed);
     const weather = rollWeather(rng.next);
     setState({ weather, rngSeed: rng.state() });
-  });
+  }, { trials: true });
 
   // (e) The forecast (N14, #263): next week's conditions, rolled once the round is in,
   // from the same seeded stream as before (one roll a week, a week early).
@@ -592,7 +609,7 @@ export function registerFixturesSystem(): void {
     const rng = makeRng(s.rngSeed);
     const weather = rollWeather(rng.next);
     setState({ weather, rngSeed: rng.state() });
-  });
+  }, { trials: true });
 
   // (a2) Generate this week's finals bracket ties before rivals/player match.
   registerTickHook('fixtures-finals', TICK_ORDER.match - 2, (ctx: TickContext) => {
@@ -609,7 +626,7 @@ export function registerFixturesSystem(): void {
   // the week until they're in — and fast-forward keeps the cheap sim.
   registerTickHook('fixtures-rivals', TICK_ORDER.match, (ctx: TickContext) => {
     const s = getState();
-    if (ctx.week < 1 || ctx.week > WEEKS_PER_SEASON) return;
+    if (currentRound(s) < -1 || ctx.week > WEEKS_PER_SEASON) return;
     if (s.league.clubs.length === 0) return; // league not initialised yet
     const rng = makeRng(s.rngSeed);
     if (s.settings.liveRivals === true && !ctx.fastForward) {
@@ -643,7 +660,7 @@ export function registerFixturesSystem(): void {
     }
     const next = simulateRivalRound(s, rng);
     setState({ league: next.league, rngSeed: rng.state() });
-  });
+  }, { trials: true });
 
   // (c) Ladder refresh — defensive re-sort after the round's results land.
   registerTickHook('fixtures-ladder', TICK_ORDER.ladder, () => {
@@ -724,6 +741,7 @@ export function registerFixturesSystem(): void {
     const clubIds = s2.league.clubs.map((c) => c.id);
     const rng = makeRng(s2.rngSeed);
     const fixtures = generateFixtures(clubIds, rng);
+    if (s2.preseason !== undefined) fixtures.unshift(...generateTrialFixtures(clubIds, s2.rngSeed));
     const clubs = rolloverRivals(withRivalSquads(s2.league.clubs, s2.rngSeed, PLAYER_ID), rng, PLAYER_ID).clubs;
     setState({
       league: { ...s2.league, clubs, fixtures, ladder: emptyLadder(clubIds) },

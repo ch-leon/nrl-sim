@@ -318,7 +318,7 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: { rou
 
   // The ladder after the round: it moves once the week has finished.
   let offWeek: (() => void) | null = null;
-  if (mine && fixture.round <= SEASON_ROUNDS) {
+  if (mine && fixture.round > 0 && fixture.round <= SEASON_ROUNDS) {
     let before = 0;
     try {
       before = ladderPosition(getState(), PLAYER_ID);

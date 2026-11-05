@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log } from '../common.mjs';
+import { playTrials, BASE, OUT_ROOT, openNav, SHEET_EXIT, closeWeekSummary, log } from '../common.mjs';
 
 /** Facility ladder + both veteran exits, played through round 8 on the required phones. */
 export async function runUnlocks(browser) {
@@ -32,6 +32,7 @@ export async function runUnlocks(browser) {
       await page.locator('[data-expansion-work]').tap();
       await page.waitForFunction(() => window.__nrlState);
       await page.locator('.nrl-tutorial-skip').tap();
+      await playTrials(page);
       await page.locator(SHEET_EXIT).tap();
       await shot('club-home');
       const build = async (name, expected) => {

@@ -1,10 +1,11 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/matchday.test.ts — player match tick: result toast timing (the
 // result comes at full time from the match played on screen, BAK-207),
 // SQUAD_MIN forfeit (GitHub #4), big-hit injuries applied to squad (GitHub #7),
 // the difficulty's edge on the rival (N12.2).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bus } from '../../src/core/events';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import {

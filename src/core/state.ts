@@ -246,7 +246,9 @@ export interface GameState {
   groundName?: string;
   money: number;
   reputation: number; // 1-100, drives attendance & sponsors
-  week: number; // 1..WEEKS_PER_SEASON
+  /** Absent: legacy 27-week seasons forever. 1/2: trials; 0: regular season. */
+  preseason?: 0 | 1 | 2;
+  week: number; // competitive round, 1..WEEKS_PER_SEASON
   season: number; // starts at 1
   squad: Player[];
   facilities: PlacedFacility[];
@@ -382,6 +384,7 @@ export function createNewGame(
     money: Math.round(STARTING_MONEY * difficultyMultipliers(difficulty).startingMoney),
     reputation: 30,
     week: 1,
+    preseason: 1,
     season: 1,
     squad,
     facilities: [],
@@ -419,5 +422,5 @@ export function newEventDeck(seed: number): EventDeckState {
  */
 export function resetForNewSeason(): void {
   const current = getState();
-  setState({ season: current.season + 1, week: 1 });
+  setState({ season: current.season + 1, week: 1, ...(current.preseason === undefined ? {} : { preseason: 1 as const }) });
 }

@@ -161,7 +161,7 @@ describe('a season through the real hooks', () => {
     const off = initSeasonEndFeedback();
     const toasts: string[] = [];
     bus.on('ui:notify', ({ text }) => toasts.push(text));
-    advanceWeeks(WEEKS_PER_SEASON);
+    advanceWeeks(WEEKS_PER_SEASON + 2);
     const s = getState();
     expect(s.season).toBe(2);
     const entry = s.history.find((h) => h.season === 1)!;
@@ -194,7 +194,7 @@ describe('a season through the real hooks', () => {
     off();
     const toasts: string[] = [];
     bus.on('ui:notify', ({ text }) => toasts.push(text));
-    advanceWeeks(WEEKS_PER_SEASON);
+    advanceWeeks(WEEKS_PER_SEASON + 2);
     expect(toasts.some((t) => t.startsWith('Season 1 complete'))).toBe(false);
     expect(getState().history[0]!.review).toBeDefined();
   });

@@ -249,8 +249,8 @@ export function applyInjuries(state: GameState): GameState {
 export function registerTrainingSystem(): void {
   registerTickHook('training', TICK_ORDER.training, () => {
     applyTraining(getState());
-  });
+  }, { trials: true });
   registerTickHook('injuries', TICK_ORDER.injuries, () => {
     applyInjuries(getState());
-  });
+  }, { trials: true });
 }

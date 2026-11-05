@@ -1,6 +1,7 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { advanceUntil, advanceInProgress, stopAdvance, nextFrame, STOPPED_BY_YOU } from '../../src/core/advance';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import {
   registerTickHook, clearTickHooks, clearSeasonHooks, clearHeldWeek, advanceWeek, weekHeld, TICK_ORDER,
 } from '../../src/core/time';

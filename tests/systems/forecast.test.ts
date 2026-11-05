@@ -1,8 +1,9 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // N14 (#263): the forecast on the next-match card. The fixtures system rolls next
 // week's weather at the end of this week, so the card can say it and the match plays in it.
 import { describe, it, expect, afterEach } from 'vitest';
 import { bus } from '../../src/core/events';
-import { createNewGame, getState } from '../../src/core/state';
+import { getState } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER, withFastForward } from '../../src/core/time';
 import { initLeague, registerFixturesSystem } from '../../src/systems/fixtures';
 import { forecastFor } from '../../src/ui/screens/fixtures';

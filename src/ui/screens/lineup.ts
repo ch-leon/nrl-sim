@@ -1,3 +1,4 @@
+import { roundLabel } from '../../systems/matchday';
 // src/ui/screens/lineup.ts — the Lineup screen (GitHub #69; 3e Broadcast Quiet):
 // pick the nine starters and the interchange bench, and how hard the bench is
 // rotated. Nine tiles on a mini-pitch laid out like the formation (the hooker
@@ -475,7 +476,7 @@ export function openLineupScreen(): void {
     );
     const next = nextFixture(s.league.fixtures, s.week, PLAYER_ID);
     const opp = next ? s.league.clubs.find((c) => c.id === (next.homeId === PLAYER_ID ? next.awayId : next.homeId)) : undefined;
-    planSub.textContent = next && opp ? `Round ${next.round} · v ${opp.name} · ${next.homeId === PLAYER_ID ? 'home' : 'away'}` : 'Before kick-off';
+    planSub.textContent = next && opp ? `${roundLabel(next.round)} · v ${opp.name} · ${next.homeId === PLAYER_ID ? 'home' : 'away'}` : 'Before kick-off';
     oppLine.hidden = !opp;
     if (opp) {
       oppLine.textContent = `${opp.name} play ${styleLine(rivalStyle(opp))}`;

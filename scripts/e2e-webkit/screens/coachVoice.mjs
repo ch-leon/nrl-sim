@@ -133,7 +133,7 @@ export async function runCoachVoice(browser) {
       await finishMatch();
       await summary(2);
       rec.week = await page.evaluate(() => window.__nrlState().week);
-      if (rec.week !== 3) rec.problems.push(`expected two weeks played, got week ${rec.week}`);
+      if (rec.week !== 1 || await page.evaluate(() => window.__nrlState().preseason) !== 0) rec.problems.push(`expected both trials played before round 1, got week ${rec.week}`);
     } catch (e) {
       rec.problems.push(`${phase}: ${e.message}`);
       rec.failure = await page.evaluate(() => ({

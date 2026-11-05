@@ -282,7 +282,7 @@ export function nearestRivals(s: GameState, n = NEAR_RIVALS): string[] {
 export function recordAgainst(s: GameState, rivals: readonly string[]): { wins: number; games: number } {
   const out = { wins: 0, games: 0 };
   for (const f of s.league.fixtures) {
-    if (!f.result || isFinalsRound(f.round)) continue;
+    if (!f.result || f.round <= 0 || isFinalsRound(f.round)) continue;
     const home = f.homeId === s.clubId;
     const other = home ? f.awayId : f.homeId;
     if (!(home || f.awayId === s.clubId) || !rivals.includes(other)) continue;
@@ -340,6 +340,8 @@ export function asOldSave(s: GameState, version: number): Record<string, unknown
   const out: Record<string, unknown> = raw;
   // Synthetic old saves predate the new-career ladder, just like the real corpus.
   delete out.unlocks;
+  delete out.preseason;
+  raw.league.fixtures = raw.league.fixtures.filter((f) => f.round > 0);
   if (version < 20) {
     const settings = out.settings;
     if (settings && typeof settings === 'object') {
@@ -666,7 +668,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
   const playWeek = opts.liveRivals ? advanceWeekAsTapped : advanceWeek;
   try {
   play(() => {
-    for (let i = 0; i < (opts.weeks ?? opts.seasons * WEEKS_PER_SEASON); i++) {
+    for (let i = 0; i < (opts.weeks ?? opts.seasons * (WEEKS_PER_SEASON + (getState().preseason === undefined ? 0 : 2))); i++) {
       if (getState().sacked) break;
       if (opts.mode === 'managed') {
         const w = manage();

@@ -15,6 +15,7 @@
 
 import { el, button, openModal, openScreen, ensureStyles } from '../dom';
 import { getState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
+import { currentRound } from '../../core/season';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { formGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { SEASON_ROUNDS } from '../../config';
@@ -42,9 +43,9 @@ export function fmtFixtureLine(f: Fixture, names: Record<string, string>): strin
   const home = names[f.homeId] ?? f.homeId;
   const away = names[f.awayId] ?? f.awayId;
   if (f.result) {
-    return `R${f.round} · ${home} ${f.result.homeScore}–${f.result.awayScore} ${away}`;
+    return `${roundShort(f.round)} · ${home} ${f.result.homeScore}–${f.result.awayScore} ${away}`;
   }
-  return `R${f.round} · ${home} v ${away}`;
+  return `${roundShort(f.round)} · ${home} v ${away}`;
 }
 
 /** A ladder row projected for display, including 1-based position and diff. */
@@ -150,6 +151,7 @@ export function ladderHasDraws(rows: readonly Pick<LadderViewRow, 'draws'>[]): b
 
 /** A round's short label for a 24px column: R7, QF, SF, GF. */
 export function roundShort(round: number): string {
+  if (round <= 0) return `T${round + 2}`;
   if (round <= SEASON_ROUNDS) return `R${round}`;
   return { 'Quarter final': 'QF', 'Semi final': 'SF', 'Grand final': 'GF' }[matchStage(round) as string] ?? `R${round}`;
 }
@@ -178,7 +180,7 @@ export function myFixtureRows(state: Pick<GameState, 'league' | 'week'>, names: 
     const opponentId = home ? f.awayId : f.homeId;
     const m = fmtMyFixture(f, names, playerId);
     const tone: MyFixtureRow['tone'] = m.result ?? (f === next ? 'next' : 'later');
-    const res = m.result ? `${m.result} ${m.score}` : tone === 'next' ? 'NEXT' : `Wk ${f.round}`;
+    const res = m.result ? `${m.result} ${m.score}` : tone === 'next' ? 'NEXT' : f.round <= 0 ? `Trial ${f.round + 2}` : `Wk ${f.round}`;
     out.push({ round: f.round, rd: roundShort(f.round), opponentId, opponent: names[opponentId] ?? opponentId, home, tone, res });
   }
   return out;
@@ -191,9 +193,9 @@ export function myFixtureRows(state: Pick<GameState, 'league' | 'week'>, names: 
  * coming week's (rolled at the end of the last), so it counts only when the next
  * fixture is this coming week's. Pure.
  */
-export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather'>): WeatherKind | undefined {
+export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather' | 'preseason'>): WeatherKind | undefined {
   const f = nextFixture(state.league.fixtures, state.week, 'player');
-  return f && f.round === state.week ? state.weather : undefined;
+  return f && f.round === currentRound(state) ? state.weather : undefined;
 }
 
 /** No club's name on the ladder is longer than this (QA finding 3: long names wrapped at 844px). */
@@ -325,7 +327,7 @@ let fixturesView: 'mine' | 'all' = 'mine';
 export function fmtMyFixture(f: Fixture, names: Record<string, string>, playerId: string = PLAYER_ID): { label: string; result: FormResult | null; score: string } {
   const home = f.homeId === playerId;
   const opp = names[home ? f.awayId : f.homeId] ?? (home ? f.awayId : f.homeId);
-  const stage = f.round > SEASON_ROUNDS ? matchStage(f.round) : `R${f.round}`;
+  const stage = f.round <= 0 ? `Trial ${f.round + 2}` : f.round > SEASON_ROUNDS ? matchStage(f.round) : `R${f.round}`;
   const label = `${stage} · ${home ? 'v' : 'at'} ${opp}`;
   if (!f.result) return { label, result: null, score: '' };
   const us = home ? f.result.homeScore : f.result.awayScore;
@@ -367,7 +369,7 @@ function buildFixtures(state: GameState): { el: HTMLElement; reveal: () => void 
         ];
         // The coming match opens its preview: who, form, how they play, their best, head to head.
         const row = r.tone === 'next'
-          ? el('button', { class: 'nrl-fixture-row nrl-fixture-mine', attrs: { type: 'button', 'data-next-row': '', 'aria-label': `Next: round ${r.round} v ${r.opponent}, preview` }, onClick: () => openNextMatch() }, ...parts)
+          ? el('button', { class: 'nrl-fixture-row nrl-fixture-mine', attrs: { type: 'button', 'data-next-row': '', 'aria-label': `Next: ${r.round <= 0 ? `trial ${r.round + 2}` : `round ${r.round}`} v ${r.opponent}, preview` }, onClick: () => openNextMatch() }, ...parts)
           : el('div', { class: 'nrl-fixture-row nrl-fixture-mine' }, ...parts);
         row.setAttribute('data-player', 'true');
         row.setAttribute('data-round', String(r.round));
@@ -381,11 +383,11 @@ function buildFixtures(state: GameState): { el: HTMLElement; reveal: () => void 
     label.textContent = 'All games';
     toggle.textContent = '◂ Yours';
     for (const { round, fixtures } of fixturesByRound(state.league.fixtures)) {
-      const header = el('div', { class: 'nrl-label nrl-fixtures-round', text: round > SEASON_ROUNDS ? `Finals · ${roundShort(round)}` : `Round ${round}` });
-      if (round === state.week) { header.setAttribute('data-current', 'true'); current = header; }
+      const header = el('div', { class: 'nrl-label nrl-fixtures-round', text: round <= 0 ? `Pre-season trial ${round + 2}` : round > SEASON_ROUNDS ? `Finals · ${roundShort(round)}` : `Round ${round}` });
+      if (round === currentRound(state)) { header.setAttribute('data-current', 'true'); current = header; }
       list.append(header);
       for (const f of fixtures) {
-        const line = el('div', { class: 'nrl-fixture', text: fmtFixtureLine(f, names).replace(/^R\d+ · /, '') });
+        const line = el('div', { class: 'nrl-fixture', text: fmtFixtureLine(f, names).replace(/^[RT]\d+ · /, '') });
         if (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID) line.setAttribute('data-player', 'true');
         list.append(line);
       }
@@ -423,7 +425,7 @@ function nextMatchCard(state: GameState): HTMLElement {
     card.append(el('div', { class: 'nrl-next-head' }, el('span', { class: 'nrl-next-label', text: 'Next match' }), el('span', { class: 'nrl-next-where', text })));
     return card;
   }
-  const stage = p.stage === 'Round' ? `Round ${p.round}` : p.stage;
+  const stage = p.stage === 'Trial' ? `Pre-season trial ${p.round + 2}` : p.stage === 'Round' ? `Round ${p.round}` : p.stage;
   card.append(el('div', { class: 'nrl-next-head' },
     el('span', { class: 'nrl-next-label', text: 'Next match' }),
     el('span', { class: 'nrl-next-where', text: `${stage} · ${p.home ? 'Home' : 'Away'}` }),

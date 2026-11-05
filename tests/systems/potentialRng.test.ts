@@ -1,8 +1,9 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/potentialRng.test.ts — #369 adds no dice: a season through every
 // system leaves the same rngSeed as main did before it, with the player page's
 // projection and the Squad dot worked out every week as if they were on screen.
 import { describe, it, expect } from 'vitest';
-import { createNewGame, getState } from '../../src/core/state';
+import { getState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { initLeague } from '../../src/systems/fixtures';
 import { advanceWeeks, registerTickHook, TICK_ORDER } from '../../src/core/time';

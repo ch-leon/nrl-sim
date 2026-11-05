@@ -252,7 +252,7 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
  * the HUD does for its own runs.
  */
 export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget) => Promise<AdvanceRun>, opts: { confirmed?: boolean } = {}): void {
-  const span = targetSpan(target, getState().week);
+  const span = targetSpan(target, getState().week, getState().preseason);
   // With a card waiting, the ask below puts this question instead (one dialog, not two).
   const question = pendingDecisionCount(getState()) === 0 && !opts.confirmed && !demoBlocked() ? longAdvanceQuestion(span) : null;
   if (question) {

@@ -106,7 +106,7 @@ export function registerYouthSystem(): void {
       text: `Academy call-up: ${called.map((p) => p.name).join(', ')} ${called.length === 1 ? 'comes' : 'come'} up to make the side, on the junior wage to the season's end.`,
       kind: 'info',
     });
-  });
+  }, { trials: true });
 
   registerSeasonHook('youth', 6, ({ season }) => {
     const state = getState();

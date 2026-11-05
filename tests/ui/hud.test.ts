@@ -1,8 +1,9 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { fmtMoney, moneyTile, moneyTileLabel, runwayLevel, RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel, placeName, boardChip, fmtMoneyShort, BOARD_RISK_CLASS } from '../../src/ui/hud';
 import type { GameState, Objective } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
 import { bus } from '../../src/core/events';
 import { CSS } from '../../src/ui/dom';

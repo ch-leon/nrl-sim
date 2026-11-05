@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/qa/soak.test.ts — a small slice of the headless soak (npm run soak runs the full
 // 5 seasons × 20 seeds): whole seasons through every system with the invariant checks,
 // and old saves of every version migrating and playing on.
@@ -9,7 +10,7 @@ import {
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
-import { createNewGame, getState, setState, type Fixture, type GameState } from '../../src/core/state';
+import { getState, setState, type Fixture, type GameState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { migrateState } from '../../src/core/save';
 import { advanceWeek, weekHeld, withFastForward } from '../../src/core/time';

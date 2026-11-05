@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/rivals.test.ts — rival squads and rival free agency (GitHub #74).
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -10,7 +11,7 @@ import {
 import { STRENGTH_MIN, STRENGTH_MAX } from '../../src/systems/league';
 import { RIVAL_CLUBS } from '../../src/data/league';
 import { POSITIONS, overallRating, generatePlayer } from '../../src/data/player';
-import { createNewGame, getState, setState, type Player, type RivalClub } from '../../src/core/state';
+import { getState, setState, type Player, type RivalClub } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { makeRng } from '../../src/utils/rng';
 import { initLeague, registerFixturesSystem, knockoutWinner, PLAYER_ID, FINALS_ROUNDS } from '../../src/systems/fixtures';

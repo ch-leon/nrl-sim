@@ -1,8 +1,9 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { registerScreenUnlockSystem as registerUnlockSystem } from '../../src/systems/screenUnlocks';
 import { SCREEN_UNLOCK_LADDER as UNLOCK_LADDER } from '../../src/systems/screenUnlocks';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
-import { createNewGame, getState, loadState, setState } from '../../src/core/state';
+import { getState, loadState, setState } from '../../src/core/state';
 import { advanceWeek, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
 import { bus, type Events } from '../../src/core/events';
 import { migrateState } from '../../src/core/save';

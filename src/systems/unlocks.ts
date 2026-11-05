@@ -39,7 +39,7 @@ export function unlockReason(id: FacilityDefId): string {
 /** Pure: fixtures with results are played; scheduled home games and draws are not wins. */
 export function unlocksDue(state: GameState): FacilityDefId[] {
   if (!state.unlocks) return [];
-  const played = state.league.fixtures.filter((f) => f.result);
+  const played = state.league.fixtures.filter((f) => f.round > 0 && f.result);
   const home = played.some((f) => f.homeId === state.clubId);
   const win = played.some((f) => f.homeId === state.clubId
     ? f.result!.homeScore > f.result!.awayScore

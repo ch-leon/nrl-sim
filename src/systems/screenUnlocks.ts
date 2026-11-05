@@ -26,7 +26,7 @@ export function screenLockReason(state: GameState, id: string): string | null {
 export function screensDue(state: GameState, round = state.week): string[] {
   return SCREEN_UNLOCK_LADDER.filter((row) => !isScreenOpen(state, row.id) && (
     state.season > 1 || (row.round === null
-      ? state.league.fixtures.some((f) => f.homeId === state.clubId && f.result !== undefined)
+      ? state.league.fixtures.some((f) => f.round > 0 && f.homeId === state.clubId && f.result !== undefined)
       : round >= row.round)
   )).map((row) => row.id);
 }
