@@ -1,7 +1,8 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // N14.3: the Academy calls up juniors before a round the club would forfeit.
 import { describe, it, expect, afterEach } from 'vitest';
 import { bus } from '../../src/core/events';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER, withFastForward } from '../../src/core/time';
 import { getCurrentFixture, initLeague, PLAYER_ID, registerFixturesSystem } from '../../src/systems/fixtures';
 import { callUpJuniors, generateProspects, registerYouthSystem } from '../../src/systems/youth';

@@ -1,8 +1,9 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { enableAutosave, exportSave, deleteSlot, downloadSave, EXPORT_HELD_FAILED_TEXT, getActiveSlot, importIntoSlot, load, save, slotKey, __setStorage, type StorageLike } from '../../src/core/save';
 import { bus } from '../../src/core/events';
 import { readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
 
 // QA finding 21: a change made between weeks (here, money) was saved only by the next

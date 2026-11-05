@@ -1,5 +1,6 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createNewGame, getState, loadState, setState, type Fixture } from '../../src/core/state';
+import { getState, loadState, setState, type Fixture } from '../../src/core/state';
 import { advanceWeek, clearTickHooks, registerTickHook } from '../../src/core/time';
 import { bus, type Events } from '../../src/core/events';
 import { FACILITY_CATALOG, type FacilityDefId } from '../../src/data/facility';

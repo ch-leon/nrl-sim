@@ -98,3 +98,18 @@ it('starts two trials again after all 27 competitive weeks of a new career', () 
   expect(getState().history).toHaveLength(1);
   expect(getState().league.fixtures.filter((f) => f.round <= 0)).toHaveLength(16);
 });
+
+it('counts trials in multi-week estimates and stamps their money separately from round 1', async () => {
+  const { targetSpan } = await import('../../src/core/advanceRules');
+  const { stampMovement } = await import('../../src/systems/economy');
+  createNewGame('Trials', 42);
+  expect(targetSpan({ kind: 'seasonEnd' }, 1, 1)).toBe(29);
+  expect(targetSpan({ kind: 'finals' }, 1, 1)).toBe(26);
+  expect(targetSpan({ kind: 'seasonEnd' }, 1, 2)).toBe(28);
+  expect(targetSpan({ kind: 'seasonEnd' }, 1, 0)).toBe(27);
+  expect(stampMovement(getState(), 'wages')).toMatchObject({ season: 1, week: -1 });
+  setState({ preseason: 2 });
+  expect(stampMovement(getState(), 'wages')).toMatchObject({ season: 1, week: 0 });
+  setState({ preseason: 0 });
+  expect(stampMovement(getState(), 'wages')).toMatchObject({ season: 1, week: 1 });
+});

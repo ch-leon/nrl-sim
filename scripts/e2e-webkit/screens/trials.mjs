@@ -28,6 +28,7 @@ export async function runTrials(browser) {
       }
       await openNav(page, 'fixtures');
       await page.locator('[data-next-row][data-round="-1"]').waitFor();
+      await page.locator('[data-next-row]').scrollIntoViewIfNeeded();
       await shot('fixtures-before');
       rec.problems.push(...await reachProblems(page, '.nrl-screen-region', ['[data-next-row]']));
       const contracts = await page.evaluate(() => window.__nrlState().squad.map(p => p.contractWeeks));
@@ -44,6 +45,7 @@ export async function runTrials(browser) {
       if (JSON.stringify(contracts) !== JSON.stringify(state.squad.map(p => p.contractWeeks))) throw new Error('Trials consumed contracts');
       await openNav(page, 'fixtures');
       await page.locator('[data-next-row][data-round="1"]').waitFor();
+      await page.locator('[data-next-row]').scrollIntoViewIfNeeded();
       await shot('fixtures-round1');
       if (height > width) await page.setViewportSize({ width: 844, height: 390 });
       await playPhoneWeek(page);

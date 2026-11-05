@@ -1,5 +1,6 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createNewGame, getState, setState, type RivalClub } from '../../src/core/state';
+import { getState, setState, type RivalClub } from '../../src/core/state';
 import { bus, type Events } from '../../src/core/events';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER } from '../../src/core/time';
 import { derbyRival, isDerbyFixture, registerDerbySystem } from '../../src/systems/derby';

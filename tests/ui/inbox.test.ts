@@ -1,4 +1,4 @@
-import { createNewGame } from '../../src/core/state';
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 vi.mock('../../src/art/coachFace', () => ({ coachFaceDataUrl: () => 'data:image/png;base64,face' }));
 import { vi, describe, it, expect } from 'vitest';
 import {

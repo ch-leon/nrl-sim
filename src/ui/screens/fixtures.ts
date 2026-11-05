@@ -327,7 +327,7 @@ let fixturesView: 'mine' | 'all' = 'mine';
 export function fmtMyFixture(f: Fixture, names: Record<string, string>, playerId: string = PLAYER_ID): { label: string; result: FormResult | null; score: string } {
   const home = f.homeId === playerId;
   const opp = names[home ? f.awayId : f.homeId] ?? (home ? f.awayId : f.homeId);
-  const stage = f.round > SEASON_ROUNDS ? matchStage(f.round) : `R${f.round}`;
+  const stage = f.round <= 0 ? `Trial ${f.round + 2}` : f.round > SEASON_ROUNDS ? matchStage(f.round) : `R${f.round}`;
   const label = `${stage} · ${home ? 'v' : 'at'} ${opp}`;
   if (!f.result) return { label, result: null, score: '' };
   const us = home ? f.result.homeScore : f.result.awayScore;
