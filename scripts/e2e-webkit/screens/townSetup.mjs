@@ -38,6 +38,7 @@ export async function runTownSetup(browser) {
         if (!town || !club || !ground) throw new Error('Town, club and ground must be filled before Start');
         if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Horizontal overflow');
         await start.tap();
+        await page.locator('[data-expansion-work]').tap();
         await page.waitForFunction(() => window.__nrlState?.()?.home);
         const state = await page.evaluate(() => window.__nrlState());
         if (state.clubName !== club || state.groundName !== ground) throw new Error('Names not passed to game');
