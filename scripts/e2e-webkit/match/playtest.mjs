@@ -18,6 +18,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
   });
   await ctx.addInitScript(closeWeekSummary);
+  await ctx.addInitScript(() => localStorage.setItem('nrlsim.iosInstallHintShown', '1'));
   const page = await ctx.newPage();
   page.setDefaultTimeout(10000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
@@ -66,31 +67,35 @@ export async function runPlaytest(browser, W = 667, H = 375) {
   });
   // #466: the legacy id renders the new name and offload explanation at both
   // requested text sizes. These screenshots are kept by the match CI artifact.
-  const tightProblems = async (root) => page.locator(root).evaluate((sheet) => {
-    const out = [];
-    if (/grind/i.test(sheet.textContent)) out.push('retired name in plan sheet');
-    const b = sheet.querySelector('[data-tactic="grind"]');
-    if (b?.textContent !== 'Tight') out.push('Tight label missing');
-    // TACTIC_SHORT.grind is pinned to TGT by the rendering test. Check it
-    // against the real plan chip's font, spacing and available content width.
-    if (b) {
-      const cs = getComputedStyle(b);
-      const c = document.createElement('canvas').getContext('2d');
-      c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-      const shortWidth = c.measureText('TGT').width + 3 * (parseFloat(cs.letterSpacing) || 0);
-      const available = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      if (shortWidth > available + 1) out.push('TGT short label exceeds chip width');
-    }
-    if (!sheet.textContent.includes('offload in the tackle')) out.push('offload explanation missing');
-    for (const e of [b, sheet.querySelector('.nrl-lineup-tac-hint, .nrl-mo-plan-hint')].filter(Boolean)) {
-      const r = e.getBoundingClientRect();
-      if (r.left < 0 || r.right > innerWidth || r.top < 0 || r.bottom > innerHeight) out.push('Tight label or explanation outside viewport');
-      if (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1) out.push('Tight label or explanation clipped');
-      const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
-      if (!hit || !(e.contains(hit) || hit.contains(e))) out.push('Tight label or explanation covered');
-    }
-    return out;
-  });
+  const tightProblems = async (root) => {
+    // Let the opening animation and the frame's layout finish before hit-testing.
+    await page.waitForTimeout(250);
+    return page.locator(root).evaluate((sheet) => {
+      const out = [];
+      if (/grind/i.test(sheet.textContent)) out.push('retired name in plan sheet');
+      const b = sheet.querySelector('[data-tactic="grind"]');
+      if (b?.textContent !== 'Tight') out.push('Tight label missing');
+      // TACTIC_SHORT.grind is pinned to TGT by the rendering test. Check it
+      // against the real plan chip's font, spacing and available content width.
+      if (b) {
+        const cs = getComputedStyle(b);
+        const c = document.createElement('canvas').getContext('2d');
+        c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const shortWidth = c.measureText('TGT').width + 3 * (parseFloat(cs.letterSpacing) || 0);
+        const available = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        if (shortWidth > available + 1) out.push('TGT short label exceeds chip width');
+      }
+      if (!sheet.textContent.includes('offload in the tackle')) out.push('offload explanation missing');
+      for (const e of [b, sheet.querySelector('.nrl-lineup-tac-hint, .nrl-mo-plan-hint')].filter(Boolean)) {
+        const r = e.getBoundingClientRect();
+        if (r.left < 0 || r.right > innerWidth || r.top < 0 || r.bottom > innerHeight) out.push('Tight label or explanation outside viewport');
+        if (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1) out.push('Tight label or explanation clipped');
+        const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+        if (!hit || !(e.contains(hit) || hit.contains(e))) out.push('Tight label or explanation covered');
+      }
+      return out;
+    });
+  };
   for (const size of ['normal', 'large']) {
     await textSize(size);
     await openNav(page, 'lineup');
