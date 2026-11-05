@@ -26,12 +26,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 0.5 }
-          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 1.0 }
-          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 1.5 }
-          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.025 }
-          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.030 }
-          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.035 }
+          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 2.0 }
+          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 3.0 }
+          - { plan: final-sizing, cell: 0, knob: counters.slide.allOutRecovery, value: 5.0 }
+          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.029 }
+          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.031 }
+          - { plan: final-sizing, cell: 1, knob: counters.rush.defenceFit, value: 0.032 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
