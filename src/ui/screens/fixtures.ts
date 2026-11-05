@@ -451,7 +451,7 @@ function nextMatchCard(state: GameState): HTMLElement {
 
   const lines = el('div', { class: 'nrl-next-lines' });
   const line = (label: string, text: string): void => {
-    lines.append(el('div', { class: 'nrl-next-line' }, el('span', { class: 'nrl-label', text: label }), el('span', { text })));
+    lines.append(el('div', { class: 'nrl-next-line', attrs: { 'data-preview-line': label } }, el('span', { class: 'nrl-label', text: label }), el('span', { text })));
   };
   // How they play (N11): the style of the nine they would field today; the Guide's Tactics page explains the words.
   if (oppClub) {

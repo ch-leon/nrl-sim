@@ -92,12 +92,11 @@ const RIVAL_CSS = `
 }
 .nrl-rival-squad { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 /* The header row: the club, how it plays (and, with an Analyst, when behind), beside the ✕. */
-.nrl-rival-head { flex: 0 0 auto; min-height: 44px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; margin-bottom: 4px; padding-right: 48px; min-width: 0; }
-.nrl-rival-head h2 { flex: 0 0 auto; margin: 0; font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; }
-.nrl-rival-head .nrl-rival-edit { grid-column: 2; grid-row: 1; }
-.nrl-rival-lines { grid-column: 1 / -1; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
-.nrl-rival-head p { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nrl-rival-head p[data-matchup], .nrl-rival-head p[data-counters] { white-space: normal; overflow: visible; }
+.nrl-rival-head { flex: 0 0 auto; min-height: 44px; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; padding-right: 48px; min-width: 0; }
+.nrl-rival-head h2 { flex: 0 1 170px; margin: 0; font-family: var(--nrl-f-label); font-size: 1.1875rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; }
+.nrl-rival-lines { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.nrl-rival-head p { margin: 0; font-size: 0.75rem; line-height: 1.3; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrl-rival-head p[data-usual-fit], .nrl-rival-head p[data-matchup], .nrl-rival-head p[data-counters] { white-space: normal; overflow: visible; }
 .nrl-rival-head p[data-when-behind] { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-rival-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 /* The squad: PLAYER · POS · AGE · OVR · SKILLS, rows open the player page (N7, #185). */
@@ -244,7 +243,7 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
         el('div', { class: 'nrl-rival-lines' },
           draft
             ? line('Rename the club and pick its kit. Results already played keep the old name.', {})
-            : line(`Usual: ${tacticsLabel(style)} · fit ${fitRead(theirs, style.attack).stars} / ${fitRead(theirs, style.defence).stars}`, { 'data-style': `${style.attack}/${style.defence}`, 'data-usual-fit': '' }),
+            : line(`Usual: ${tacticsLabel(style).replace(' / ', '/')} ${fitRead(theirs, style.attack).stars}/${fitRead(theirs, style.defence).stars}`, { 'data-style': `${style.attack}/${style.defence}`, 'data-usual-fit': '' }),
           ...(!draft ? [line(matchupRead(ours, theirs, validTactics(state.lineup.tactics), style), { 'data-matchup': '' }), line(counterRead(ours, style.defence), { 'data-counters': '' })] : []),
           ...(!draft && behind ? [line(`When behind: ${behind}`, { 'data-when-behind': '' })] : []),
         ),

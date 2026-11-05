@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fitStars, fitRead, matchupRead, counterRead, halfTimeNumbers } from '../../src/ui/matchupRead';
 import { renderPlanFit } from '../../src/ui/planFit';
 import { stubDocument, type StubNode } from './stubDom';
+import { createNewGame, getState, setState } from '../../src/core/state';
+import { initLeague } from '../../src/systems/fixtures';
+import { openNextMatch } from '../../src/ui/screens/fixtures';
+import { openRivalSquad } from '../../src/ui/screens/rivalSquad';
 import { showPlanCard } from '../../src/ui/screens/matchOverlay';
 import type { RosterEntry, MatchEvent } from '../../src/sim/events';
 const nine = (n: number): RosterEntry[] => ['prop', 'winger', 'halfback'].map(position => ({ name: 'Kai Jones', position: position as RosterEntry['position'], stats: { speed:n, strength:n, skill:n, stamina:n, footyIQ:n } }));
@@ -33,6 +37,18 @@ describe('strategy readouts #467', () => {
     expect(halfTimeNumbers(events,'you','balanced').map(n => [n.count,n.arrow])).toEqual([[0,'↓'],[4,'↑'],[0,'↑']]);
     expect(halfTimeNumbers(events,'you','kick-chase')[1]!.arrow).toBe('↓');
     expect(halfTimeNumbers([...events,{t:2,kind:'break',teamId:'you'},{t:3,kind:'break',teamId:'you'}],'you','balanced')[0]!.arrow).toBe('→');
+  });
+  it('renders fixture and rival scouting rows', () => {
+    stubDocument();
+    createNewGame('Readouts', 467);
+    setState({ league: initLeague(getState()) });
+    const rival = getState().league.clubs.find(c => c.id !== getState().clubId)!;
+    const modal = openNextMatch() as unknown as StubNode;
+    expect(modal.words()).toContain('Matchup');
+    expect(modal.words()).toContain('Counters');
+    openRivalSquad(rival);
+    expect(document.body.textContent).toContain('Usual:');
+    expect(document.body.textContent).toContain('Try ');
   });
   it('renders eight fitted plan buttons and three half-time counts', () => {
     stubDocument();

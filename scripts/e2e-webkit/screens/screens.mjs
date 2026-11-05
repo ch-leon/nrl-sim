@@ -462,7 +462,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
   }, size);
   const readoutProblems = () => page.evaluate(() => {
     const out = [];
-    for (const e of document.querySelectorAll('[data-plan-done], .nrl-mo-plan-go, [data-fit] > span, [data-matchup], [data-counters], [data-usual-fit], [data-working]')) {
+    for (const e of document.querySelectorAll('[data-plan-done], .nrl-mo-plan-go, [data-fit] > span, [data-matchup], [data-counters], [data-usual-fit], [data-working], [data-preview-line]')) {
       const r = e.getBoundingClientRect();
       if (r.width < 1) continue;
       if (r.left < 0 || r.right > innerWidth + 1 || r.top < 0 || r.bottom > innerHeight + 1) out.push(`off screen: ${e.textContent}`);
@@ -490,7 +490,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       await tap('[data-next-row]');
       await page.waitForSelector('[data-next-match]');
       const text = await page.locator('[data-next-match]').innerText();
-      return /Matchup/i.test(text) && /Counters/i.test(text) ? [] : ['missing matchup or counters'];
+      return /Matchup/i.test(text) && /Counters/i.test(text) ? await readoutProblems() : ['missing matchup or counters'];
     });
     await step(`matchup-rival-${size}`, async () => {
       await tap('[data-next-opponent] button');
@@ -655,7 +655,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       await textSize(size);
       const problems = await readoutProblems();
       out.push(...problems);
-      if (await page.locator('.nrl-mo-plan [data-fit]').count() !== 8 || !(await page.locator('[data-working]').count())) out.push('missing half-time fit or numbers');
+      if (await page.locator('.nrl-mo-plan [data-fit]').count() !== 8 || !(await page.locator('[data-working], [data-preview-line]').count())) out.push('missing half-time fit or numbers');
       await page.screenshot({ path: join(OUT, `fit-half-time-${size}.png`) });
     }
     await textSize('normal');
