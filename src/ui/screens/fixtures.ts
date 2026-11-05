@@ -624,6 +624,10 @@ button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); out
   .nrl-next-side { padding: 4px 8px; }
   .nrl-next-line { padding: 2px 0; }
 }
+@media (max-height: 340px) {
+  .nrl-next-match { gap: 2px; }
+  .nrl-next-line { padding: 1px 0; }
+}
 /* The opponent's name: a text link with a 44px hit area (#194). */
 .nrl-next-side .nrl-ladder-club { padding: 12px 0; margin: -12px 0; text-decoration: underline dotted; text-underline-offset: 3px; }
 `;
