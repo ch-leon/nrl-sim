@@ -1,0 +1,16 @@
+{
+  "name": "465 rejected fitted Tight 12 soak",
+  "kind": "soak",
+  "command": "npm run soak -- --difficulties easy,normal,hard --jobs 4",
+  "seeds": 20,
+  "seasons": 5,
+  "defaults": {
+    "counters.fit.edge": 0.095,
+    "counters.rush.carry": 0.0005,
+    "counters.rush.defenceFit": 0.029,
+    "counters.tight.offloadPerFit": 12,
+    "counters.slide.expansiveFit": 0.2,
+    "counters.compressed.tightFit": 0.6,
+    "counters.slide.allOutRecovery": 3
+  }
+}

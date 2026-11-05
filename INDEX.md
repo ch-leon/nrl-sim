@@ -268,3 +268,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261105-050714-465-rating-yardstick | 465 rating yardstick | e5cf6c9 | issue-465-strategy-counters | [report](runs/20261105-050714-465-rating-yardstick/report.md) |
 | 20261105-052800-465-rejected-carry-0-00025 | 465 rejected carry 0.00025 | de0146cd48c9061f227c237984cf59a71c1d27f6 | issue-465-strategy-counters | [report](runs/20261105-052800-465-rejected-carry-0-00025/report.md) |
 | 20261105-052800-465-rejected-carry-0-0001 | 465 rejected carry 0.0001 | de0146cd48c9061f227c237984cf59a71c1d27f6 | issue-465-strategy-counters | [report](runs/20261105-052800-465-rejected-carry-0-0001/report.md) |
+| 20261105-050700-465-rejected-fitted-tight-12-soak | 465 rejected fitted Tight 12 soak | e5cf6c9fd4efe1f65a2b9e77c7750c1273855c68 | issue-465-strategy-counters | [report](runs/20261105-050700-465-rejected-fitted-tight-12-soak/report.md) |
+| 20261105-050713-465-strong-pack-offloads | 465 strong pack offloads | e5cf6c9 | issue-465-strategy-counters | [report](runs/20261105-050713-465-strong-pack-offloads/report.md) |
