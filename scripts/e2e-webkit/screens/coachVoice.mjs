@@ -98,6 +98,7 @@ export async function runCoachVoice(browser) {
     try {
       await page.goto(BASE);
       await page.locator('[data-nrl-start]').tap();
+      await page.locator('[data-expansion-work]').tap();
       await page.waitForSelector('[data-step="build"]');
       await shot('tutorial', '.nrl-tutorial-bubble');
       // Club home works upright; placement and live matches use landscape, as today.

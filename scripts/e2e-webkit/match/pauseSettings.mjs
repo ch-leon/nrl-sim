@@ -40,6 +40,7 @@ export async function runPauseSettings(browser) {
       await page.goto(BASE);
       await page.waitForSelector('[data-nrl-start]');
       await page.locator('[data-nrl-start]').tap();
+      await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       await page.locator('.nrl-dock [data-hud="advance"]').tap();
       for (let i = 0; i < 2; i++) {

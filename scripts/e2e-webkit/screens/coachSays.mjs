@@ -21,6 +21,7 @@ export async function runCoachSays(browser) {
     try {
       await page.goto(BASE);
       await page.locator('[data-nrl-start]').tap();
+      await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       // Set up complete, fit starters and enough natural cover. All changes are
       // to this test game's in-memory state, exposed by the existing ?e2e hook.

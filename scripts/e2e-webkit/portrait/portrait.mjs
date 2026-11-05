@@ -100,6 +100,7 @@ export async function runPortrait(browser) {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
     await press('[data-nrl-start]');
+    await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-dock');
     await asleepOnMenu('opened upright', '[data-club-home], [data-screen-key="build"]');
     const o = await state();

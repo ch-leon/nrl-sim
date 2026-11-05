@@ -133,6 +133,7 @@ export async function runLargeTextTargets(browser) {
         }, safe);
         await page.fill('[data-nrl-clubname]', 'Targets FC');
         await page.locator('[data-nrl-start]').tap();
+        await page.locator('[data-expansion-work]').tap();
         await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
         await page.evaluate((size) => {
           window.__nrlState().settings.textSize = size;

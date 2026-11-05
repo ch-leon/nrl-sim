@@ -268,6 +268,7 @@ export async function runPortraitMenus(browser) {
     await step('club-home', async (rec) => {
       await page.fill('[data-nrl-clubname]', 'Upright FC');
       await press('[data-nrl-start]');
+      await page.locator('[data-expansion-work]').tap();
       await press('.nrl-tutorial-skip');
       await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
       // A decision waiting: PLAY WEEK carries its count, the dock's widest row (and Club home its row).

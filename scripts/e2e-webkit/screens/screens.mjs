@@ -316,6 +316,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
   await step('hub', async (rec) => {
     await page.fill('[data-nrl-clubname]', 'Landscape FC');
     await tap('[data-nrl-start]');
+    await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
     await tap('.nrl-tutorial-skip');
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });

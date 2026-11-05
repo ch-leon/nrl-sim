@@ -80,6 +80,7 @@ export async function runTutorialWalk(browser, { w: W, h: H, safe }) {
     }
     await page.fill('[data-nrl-clubname]', 'Tutorial FC');
     await page.locator('[data-nrl-start]').tap();
+    await page.locator('[data-expansion-work]').tap();
     await atStep('build');
     const count = (await page.locator('.nrl-tutorial-count').textContent())?.trim();
     return count === '1 of 3' ? [] : [`the first tap reads "${count}"`];

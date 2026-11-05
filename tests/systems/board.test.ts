@@ -197,7 +197,7 @@ describe('board objectives address (#475)', () => {
     const quiet: (boolean | undefined)[] = [];
     bus.on('ui:notify', (notice) => { lines.push(notice.text); quiet.push(notice.quiet); });
     registerBoardSystem();
-    expect(lines).toEqual([`${address}, the board's objectives for season 1: ${getState().objectives.map((o) => o.text).join(' · ')}.`]);
+    expect(lines).toEqual([`${address}, the board's objectives for our first season in the league: ${getState().objectives.map((o) => o.text).join(' · ')}.`]);
     expect(quiet).toEqual([true]); // News only while the first tutorial is teaching
     registerBoardSystem();
     expect(lines).toHaveLength(1); // loading existing goals never announces them again

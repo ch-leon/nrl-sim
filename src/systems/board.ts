@@ -2,6 +2,7 @@
 // (GitHub #47, part of #49). Pure functions plus one season hook. Deterministic:
 // objectives come from a private RNG seeded by season + club count, so the same
 // state always yields the same goals and the main rngSeed stream is untouched.
+import { EXPANSION_COPY } from '../ui/expansionCopy';
 import { coachAddress } from '../ui/coachName';
 import { getState, setState, type GameState, type Objective } from '../core/state';
 import { bus } from '../core/events';
@@ -315,7 +316,9 @@ export function registerBoardSystem(): void {
     const objectives = generateObjectives(s);
     setState({ objectives });
     bus.emit('ui:notify', {
-      text: `${coachAddress(s)}, the board's objectives for season ${s.season}: ${objectives.map((o) => o.text).join(' · ')}.`,
+      text: s.season === 1
+        ? EXPANSION_COPY.objectives(objectives, coachAddress(s))
+        : `${coachAddress(s)}, the board's objectives for season ${s.season}: ${objectives.map((o) => o.text).join(' · ')}.`,
       kind: 'info',
       quiet,
       from: 'coach',
