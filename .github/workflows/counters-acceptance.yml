@@ -5,9 +5,13 @@ name: Strategy counters acceptance
 # Run manually after tuning; ordinary pushes must not discard these long runs.
 on:
   workflow_dispatch:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['src/match/league/counters.ts']
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: counters-acceptance-${{ github.ref }}
@@ -24,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        plan: [enabled, yardstick, fit-enabled, full-fit, round-robin, strong-pack]
+        plan: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["enabled","yardstick","fit-enabled","full-fit","round-robin","strong-pack"]' || '["yardstick","strong-pack"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,16 +50,45 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
+      # The full baseline completed before calibration; reuse its immutable raw
+      # evidence on the final push. Manual reproduction runs it afresh at that ref.
+      - uses: actions/download-artifact@v4
+        if: github.event_name == 'push'
         with:
-          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          name: counters-soak-main
+          run-id: 41960460765
+          github-token: ${{ github.token }}
+      - uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          ref: e8b88be4ca94a2a9651688bdb55ae1832e0e5a61
       - uses: actions/setup-node@v4
+        if: github.event_name == 'workflow_dispatch'
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+        if: github.event_name == 'workflow_dispatch'
       - run: git rev-parse HEAD > baseline-commit.txt
+        if: github.event_name == 'workflow_dispatch'
       - run: npm run soak -- --difficulties easy,normal,hard --jobs 4 --json soak-main.json 2>&1 | tee soak-main.log
+        if: github.event_name == 'workflow_dispatch'
+      - name: Verify the complete baseline, including all old saves
+        run: |
+          python3 <<'PY'
+          import json
+          assert open('baseline-commit.txt').read().strip() == 'e8b88be4ca94a2a9651688bdb55ae1832e0e5a61'
+          r = json.load(open('soak-main.json'))
+          assert r['seeds'] == 20 and r['seasons'] == 5
+          fresh = [x for x in r['results'] if x.get('fromVersion') is None]
+          expected = {(s * 7919, mode, difficulty) for s in range(1, 21) for mode in ['idle', 'managed'] for difficulty in ['easy', 'normal', 'hard']}
+          assert {(x['seed'], x['mode'], x.get('difficulty', 'normal')) for x in fresh} == expected
+          assert len(fresh) == 120
+          assert sorted(x['fromVersion'] for x in r['results'] if x.get('fromVersion') is not None) == list(range(1, 21))
+          assert not any(x['problems'] for x in r['results'])
+          assert not any(s['forfeits'] for x in r['results'] for s in x['seasons'])
+          print('Complete 20-seed, five-season baseline: no problems or forfeits; saves v1–20 loaded.')
+          PY
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:

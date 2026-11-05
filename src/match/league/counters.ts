@@ -6,7 +6,7 @@ export const COUNTERS = {
   compressed: {
     on: 1,
     tight: 0.04,
-    tightFit: 0,
+    tightFit: 0.6,
     expansive: 0.26,
     brokenBase: -0.015,
     offloadBase: -0.03,
@@ -14,23 +14,23 @@ export const COUNTERS = {
   },
   rush: {
     on: 1,
-    carry: 0.004,
-    defenceFit: 0.12,
+    carry: 0.0005,
+    defenceFit: 0.029,
     kickChase: 0.39,
     allOut: 0.06,
   },
   slide: {
     on: 1,
     expansive: 0.08,
-    expansiveFit: 0,
+    expansiveFit: 0.2,
     kickChase: 1.5,
     tight: 0.04,
     allOut: 0.50,
-    allOutRecovery: 0,
+    allOutRecovery: 3,
   },
   fit: {
     on: 1,
-    edge: 0.11,
+    edge: 0.095,
   },
   tight: {
     on: 1,

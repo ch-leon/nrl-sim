@@ -1434,7 +1434,7 @@ At a break, the newly applied plan selects its attack and defence fits again.
 | Knob | Default | Meaning |
 |---|---|---|
 | `counters.fit.on` | 1 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
-| `counters.fit.edge` | 0.11 | Carrier-edge probability per point of fit away from 1.0. |
+| `counters.fit.edge` | 0.095 | Carrier-edge probability per point of fit away from 1.0. |
 
 Each contact adds `edge × (attackFit − 1) − edge × (defenceFit − 1)`
 to `carrierEdge`, clamped to 0–1 by `contestOdds`. Thus a side's attack fit
@@ -1447,7 +1447,7 @@ half-time reselection on the changing side, and exact neutral-match replay.
 
 ## 32. Slide matchup counters (#462)
 
-All four cells use `cell strength × attacking style fit × defending Slide fit`,
+All four cells start with `cell strength × attacking style fit × defending Slide fit`,
 selected from the starting-sheet fits (#459). Slide fit is the backs' derived
 Edge D (Speed, footy IQ and existing traits). Plan changes select the newly played
 styles. Balanced and defences other than Slide receive no cell effect.
@@ -1456,9 +1456,12 @@ styles. Balanced and defences other than Slide receive no cell effect.
 |---|---:|---|
 | `counters.slide.on` | 1 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
 | `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
+| `counters.slide.expansiveFit` | 0.2 | Expansive cell multiplier: `max(0, 1 + expansiveFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. |
 | `counters.slide.kickChase` | 1.5 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
 | `counters.slide.tight` | 0.04 | Adds inside bust probability and supported offload probability for pack carriers. |
-| `counters.slide.allOut` | 0.50 | Adds bust probability for the offload receiver during `live.beatenCooldown` ticks after the offload, so another defender arriving before the line resets is still exposed. A pass, kick, turnover or stoppage clears the receiver. |
+| `counters.slide.allOut` | 0.50 | Adds bust probability for the offload receiver during the existing recovery window after the offload, so another defender arriving before the line resets is still exposed. A pass, kick, turnover or stoppage clears the receiver. |
+
+| `counters.slide.allOutRecovery` | 3 | All-out/Slide recovery ticks are `round(live.beatenCooldown × (1 + allOutRecovery × max(0, attackFit − defenceFit)))`. Neutral fits keep 30 ticks; fit 1.5 v 0.5 gives 120 ticks. Uses the existing receiver marker/window; normal clearing events still apply. |
 
 No new random draws: interception, contact, catches and races use their existing
 rolls. The receiver marker is transient match state; no stored stat or save change.
@@ -1482,8 +1485,8 @@ cell; their own-style fit and carriers decide the contest.
 | Knob | Default | Effect when Rush is enabled |
 |---|---:|---|
 | `counters.rush.on` | 1 | Only 1 enables the Rush mechanics; 0 keeps the legacy flat bust modifier. |
-| `counters.rush.carry` | 0.004 | Bust probability per derived Carry point above neutral (negative below). |
-| `counters.rush.defenceFit` | 0.12 | Bust probability removed per Rush-fit point above 1 (added below). |
+| `counters.rush.carry` | 0.0005 | Bust probability per derived Carry point above neutral (negative below). |
+| `counters.rush.defenceFit` | 0.029 | Bust probability removed per Rush-fit point above 1 (added below). |
 | `counters.rush.kickChase` | 0.39 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
 | `counters.rush.allOut` | 0.06 | Cell × both fits added to handling spill chance on an All-out offload, using the receiver's existing pass-catch roll. Ordinary passes and other attacks receive no spill bonus. |
 
@@ -1520,6 +1523,7 @@ rolls and the geometric line-break detector decide outcomes; no roll is added.
 |---|---:|---|
 | `counters.compressed.on` | 1 | Only 1 enables the profile and mechanics. |
 | `counters.compressed.tight` | 0.04 | Middle squeeze; a positive cell also recruits nearby help. |
+| `counters.compressed.tightFit` | 0.6 | Tight cell multiplier: `max(0, 1 + tightFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. The resulting strength controls both middle squeeze and help reach. |
 | `counters.compressed.expansive` | 0.26 | Inward lane pull and speed-scaled edge bust probability. |
 | `counters.compressed.commitM` | 6 | Extra middle tackler's neutral-fit reach in metres, scaled by both fits. |
 | `counters.compressed.brokenBase` | −0.015 | Common enabled bust modifier; off preserves legacy −0.02. |
@@ -1538,3 +1542,28 @@ Checkpoint pools retain disjoint consecutive seed ranges and all source results.
 Unchanged cells reuse controls with identical active settings; provenance and
 raw inputs are preserved beside the report. That task shipped switches at 0; #465 switches them to 1. No
 stored stats, randomness, save version, Labs or commercial changes.
+
+
+## 35. Enabled strategy counters (#465)
+
+All five switches in §30–34 now default to **1**. Their numeric mechanics remain
+independently controllable by name; the full set is calibrated together.
+
+| Group | Tuned values |
+|---|---|
+| `counters.tight` | `on=1`, `offloadBase=1`, `offloadPerFit=12` |
+| `counters.fit` | `on=1`, `edge=0.095` |
+| `counters.slide` | `on=1`, `expansive=0.08`, `expansiveFit=0.2`, `kickChase=1.5`, `tight=0.04`, `allOut=0.50`, `allOutRecovery=3` |
+| `counters.rush` | `on=1`, `carry=0.0005`, `defenceFit=0.029`, `kickChase=0.39`, `allOut=0.06` |
+| `counters.compressed` | `on=1`, `tight=0.04`, `tightFit=0.6`, `expansive=0.26`, `brokenBase=−0.015`, `offloadBase=−0.03`, `commitM=6` |
+
+The run record and acceptance tables are in
+[2026-11-counters](../status/2026-11-counters.md). `SideSpec.fit` in the balance
+plans is a harness fixture, not a live tuning knob: flat playing squads can test
+one style fit without also changing stats or the other selected style.
+
+Expansive / Slide is deliberately re-pinned for switch-on. Balanced / Slide
+retains its fingerprint: flat fit is exactly 1 and the cell is zero. These
+active defaults and the new pins become the guard for subsequent tasks.
+SAVE_VERSION remains 21. Labs/commercial defaults and live RNG call sites are
+unchanged.

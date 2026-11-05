@@ -12,32 +12,79 @@
   },
   "variants": [
     {
-      "name": "fit edge 0.085",
+      "name": "enabled defaults",
       "tuning": {
-        "counters.fit.on": 1,
-        "counters.fit.edge": 0.085
-      }
-    },
-    {
-      "name": "fit edge 0.095",
-      "tuning": {
-        "counters.fit.on": 1,
-        "counters.fit.edge": 0.095
-      }
-    },
-    {
-      "name": "fit edge 0.1",
-      "tuning": {
-        "counters.fit.on": 1,
-        "counters.fit.edge": 0.1
+        "counters.fit.on": 1
       }
     }
   ],
   "scenarios": [
-    {"name": "attack fit 1.5", "home": {"rating": 60, "fit": {"balanced": 1.5}}, "away": {"rating": 60}, "track": "home", "bothWays": true},
-    {"name": "defence fit 1.5", "home": {"rating": 60, "fit": {"slide": 1.5}}, "away": {"rating": 60}, "track": "home", "bothWays": true},
-    {"name": "attack fit 0.5", "home": {"rating": 60, "fit": {"balanced": 0.5}}, "away": {"rating": 60}, "track": "home", "bothWays": true},
-    {"name": "defence fit 0.5", "home": {"rating": 60, "fit": {"slide": 0.5}}, "away": {"rating": 60}, "track": "home", "bothWays": true},
-    {"name": "neutral fit 1", "home": {"rating": 60}, "away": {"rating": 60}, "track": "home", "bothWays": true}
+    {
+      "name": "attack fit 1.5",
+      "home": {
+        "rating": 60,
+        "fit": {
+          "balanced": 1.5
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "defence fit 1.5",
+      "home": {
+        "rating": 60,
+        "fit": {
+          "slide": 1.5
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "attack fit 0.5",
+      "home": {
+        "rating": 60,
+        "fit": {
+          "balanced": 0.5
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "defence fit 0.5",
+      "home": {
+        "rating": 60,
+        "fit": {
+          "slide": 0.5
+        }
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "neutral fit 1",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      },
+      "track": "home",
+      "bothWays": true
+    }
   ]
 }
