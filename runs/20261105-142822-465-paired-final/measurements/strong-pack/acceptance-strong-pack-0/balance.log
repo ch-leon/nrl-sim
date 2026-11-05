@@ -1,0 +1,8 @@
+
+> nrl-sim@0.0.0 balance
+> vite-node scripts/balance.ts -- --plan balance/plans/experiments/20261105-acceptance.json --jobs 4
+
+465 strong pack offloads / acceptance shard 0 of 3: 2 cells, 2 to run on 4 workers → balance/runs/20261105-140419-465-strong-pack-offloads-acceptance-shard-0-of-3
+[worker 1/4] [1/1] baseline | strong pack Tight v slide — 366.1 s, about 0 min left
+[worker 2/4] [1/1] enabled defaults | strong pack Tight v slide — 374.4 s, about 0 min left
+Report: balance/runs/20261105-140419-465-strong-pack-offloads-acceptance-shard-0-of-3/report.md

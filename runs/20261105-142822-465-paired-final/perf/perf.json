@@ -1,0 +1,153 @@
+{
+  "throttle": 4,
+  "size": "844x390",
+  "timings": {
+    "load → title": {
+      "ms": 1111,
+      "blockMs": 546,
+      "notes": "1048 ms since navigation start in-page"
+    },
+    "Start → grounds (textures painted, HUD up)": {
+      "ms": 1275,
+      "blockMs": 307
+    },
+    "grounds fps": {
+      "fps": 36
+    },
+    "grounds frame rate (3 s)": {
+      "ms": 3069,
+      "blockMs": 0,
+      "notes": "36 fps"
+    },
+    "Advance Week → match scene (hand-off)": {
+      "ms": 653,
+      "blockMs": 176,
+      "notes": "of which the tick itself 158 ms"
+    },
+    "match play at ×4 (15 s): longest frame": {
+      "ms": 50,
+      "blockMs": 59,
+      "notes": "527 frames, 0 over 100 ms"
+    },
+    "Skip → full time": {
+      "ms": 3152,
+      "blockMs": 186
+    },
+    "Back to Club → grounds": {
+      "ms": 304,
+      "blockMs": 153
+    },
+    "×4 advance #1": {
+      "ms": 6309,
+      "blockMs": 70,
+      "notes": "3 weeks"
+    },
+    "×4 advance #2": {
+      "ms": 4066,
+      "blockMs": 68,
+      "notes": "3 weeks"
+    },
+    "×4 advance #3": {
+      "ms": 2651,
+      "blockMs": 76,
+      "notes": "2 weeks"
+    },
+    "tick per week (×4 advances)": {
+      "ms": 1628,
+      "notes": "8 weeks in 13026 ms"
+    },
+    "tap mid-advance (touch to its handler)": {
+      "ms": 116,
+      "notes": "progress line read \"WEEK 10 OF 27…\""
+    },
+    "to finals (call 1)": {
+      "ms": 2015,
+      "blockMs": 106,
+      "notes": "2 weeks, now week 12"
+    },
+    "to finals (call 2)": {
+      "ms": 2801,
+      "blockMs": 53,
+      "notes": "2 weeks, now week 14"
+    },
+    "to finals (call 3)": {
+      "ms": 1929,
+      "blockMs": 66,
+      "notes": "1 weeks, now week 15"
+    },
+    "to finals (call 4)": {
+      "ms": 2923,
+      "blockMs": 66,
+      "notes": "2 weeks, now week 17"
+    },
+    "to finals (call 5)": {
+      "ms": 3312,
+      "blockMs": 67,
+      "notes": "3 weeks, now week 20"
+    },
+    "to finals (call 6)": {
+      "ms": 1395,
+      "blockMs": 63,
+      "notes": "1 weeks, now week 21"
+    },
+    "to finals (call 7)": {
+      "ms": 2464,
+      "blockMs": 72,
+      "notes": "2 weeks, now week 23"
+    },
+    "to finals (call 8)": {
+      "ms": 3849,
+      "blockMs": 78,
+      "notes": "2 weeks, now week 25"
+    },
+    "to season end (call 1)": {
+      "ms": 251,
+      "blockMs": 78,
+      "notes": "2 weeks"
+    },
+    "to season end (call 2)": {
+      "ms": 219,
+      "blockMs": 111,
+      "notes": "1 weeks"
+    },
+    "rollover (season end call minus its weeks)": {
+      "ms": 219,
+      "notes": "219 ms call, 0 plain weeks before it"
+    }
+  },
+  "errors": [],
+  "bundle": {
+    "files": 10,
+    "rawKb": 1863,
+    "gzBytes": 551600,
+    "gzKb": 539,
+    "biggest": [
+      {
+        "file": "index-DgqwFz8u.js",
+        "kb": 1571,
+        "gzKb": 449
+      },
+      {
+        "file": "matchWorker-BTPRYz_6.js",
+        "kb": 124,
+        "gzKb": 40
+      },
+      {
+        "file": "towns-ChIH3guL.js",
+        "kb": 86,
+        "gzKb": 18
+      }
+    ],
+    "initial": {
+      "files": 2,
+      "rawKb": 1573,
+      "gzBytes": 460284,
+      "gzKb": 449
+    }
+  },
+  "end": {
+    "season": 2,
+    "week": 1,
+    "money": 45072
+  }
+}

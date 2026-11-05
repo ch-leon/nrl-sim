@@ -1,0 +1,12 @@
+
+> nrl-sim@0.0.0 balance
+> vite-node scripts/balance.ts -- --plan balance/plans/experiments/20261105-preset-final.json --jobs 4
+
+465 preset final 1 / shard 4: 6 cells, 6 to run on 4 workers → balance/runs/20261105-120222-465-preset-final-1-shard-4
+[worker 2/4] [1/2] baseline | balanced/slide v kick-chase/compressed — 778.2 s, about 13 min left
+[worker 3/4] [1/1] baseline | expansive/slide v kick-chase/slide — 779.8 s, about 0 min left
+[worker 4/4] [1/1] baseline | expansive/compressed v kick-chase/rush — 783.8 s, about 0 min left
+[worker 1/4] [1/2] baseline | grind/rush v kick-chase/rush — 787.0 s, about 14 min left
+[worker 2/4] [2/2] baseline | kick-chase v slide — 394.2 s, about 0 min left
+[worker 1/4] [2/2] baseline | kick-chase/rush v kick-chase/compressed — 399.4 s, about 0 min left
+Report: balance/runs/20261105-120222-465-preset-final-1-shard-4/report.md

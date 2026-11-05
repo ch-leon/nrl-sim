@@ -1,0 +1,458 @@
+{
+  "variant": "baseline",
+  "scenario": "kick-chase v rush",
+  "tuning": {
+    "presets.attack.kick-chase.base.pass": 0.04,
+    "counters.fit.edge": 0.065,
+    "counters.fit.counterResponse": 1,
+    "counters.slide.kickChase": 0.4,
+    "counters.slide.kickChaseFit": 0.7,
+    "counters.rush.kickChase": 0.61,
+    "counters.rush.allOut": 0.1,
+    "counters.compressed.commitM": 10,
+    "counters.compressed.commitFit": 0.5,
+    "counters.compressed.tight": 0.06,
+    "counters.compressed.tightFit": 0.6,
+    "counters.compressed.expansive": 0.09,
+    "counters.compressed.brokenBase": 0,
+    "counters.compressed.offloadBase": 0,
+    "counters.tight.offloadPerFit": 9.5
+  },
+  "seeds": 500,
+  "minutes": 14,
+  "counts": {
+    "tackles": {
+      "mean": 146.856,
+      "se": 0.26948798776773425
+    },
+    "bigHits": {
+      "mean": 25.648,
+      "se": 0.21484065027368554
+    },
+    "busts": {
+      "mean": 29.27,
+      "se": 0.2678239334313444
+    },
+    "lateBusts": {
+      "mean": 1.546,
+      "se": 0.056693883204324357
+    },
+    "fends": {
+      "mean": 11.99,
+      "se": 0.15716616176775985
+    },
+    "steps": {
+      "mean": 16.628,
+      "se": 0.19222156554487055
+    },
+    "breaks": {
+      "mean": 59.434,
+      "se": 0.38981431271413547
+    },
+    "offloads": {
+      "mean": 6.224,
+      "se": 0.11879339941043426
+    },
+    "errors": {
+      "mean": 10.728,
+      "se": 0.14012602401128213
+    },
+    "kicks": {
+      "mean": 17.706,
+      "se": 0.1324016177271014
+    },
+    "tries": {
+      "mean": 6.588,
+      "se": 0.0974037318276251
+    },
+    "intercepts": {
+      "mean": 2.628,
+      "se": 0.07363474826672925
+    },
+    "strips": {
+      "mean": 2.01,
+      "se": 0.06384318212469993
+    },
+    "quickPtb": {
+      "mean": 5.386,
+      "se": 0.09950784704356984
+    },
+    "slowPtb": {
+      "mean": 4.424,
+      "se": 0.09496570417756009
+    },
+    "gassed": {
+      "mean": 0.004,
+      "se": 0.004000000000000003
+    },
+    "wrestles": {
+      "mean": 122.962,
+      "se": 0.3178224886135924
+    },
+    "held1": {
+      "mean": 16.938,
+      "se": 0.17698293114261512
+    },
+    "held2": {
+      "mean": 93.602,
+      "se": 0.3346987279284966
+    },
+    "held3": {
+      "mean": 10.668,
+      "se": 0.14275963233789338
+    },
+    "runDowns": {
+      "mean": 3.144,
+      "se": 0.07824815363377054
+    },
+    "blown": {
+      "mean": 9.08,
+      "se": 0.14886073706009972
+    },
+    "subs": {
+      "mean": 3.914,
+      "se": 0.10667693253872515
+    },
+    "goals": {
+      "mean": 3.746,
+      "se": 0.0786341825756374
+    },
+    "goalMisses": {
+      "mean": 2.842,
+      "se": 0.06878615463987116
+    },
+    "fieldGoals": {
+      "mean": 0.028,
+      "se": 0.007909305546535444
+    },
+    "fgMisses": {
+      "mean": 0.014,
+      "se": 0.005973220129664977
+    },
+    "chargeDowns": {
+      "mean": 0.002,
+      "se": 0.002
+    },
+    "bonusTries": {
+      "mean": 0.502,
+      "se": 0.031208009865409874
+    },
+    "touchFinds": {
+      "mean": 2.03,
+      "se": 0.06007843904160086
+    },
+    "fortyTwenties": {
+      "mean": 0.1,
+      "se": 0.013429844431075363
+    },
+    "onTheFull": {
+      "mean": 0.398,
+      "se": 0.027288850520413056
+    },
+    "bundled": {
+      "mean": 0.232,
+      "se": 0.020909960614640424
+    },
+    "deadBalls": {
+      "mean": 1.088,
+      "se": 0.04503963963306716
+    },
+    "dropOuts": {
+      "mean": 0.328,
+      "se": 0.024207519658486984
+    },
+    "kickMetres": {
+      "mean": 416.97141178001544,
+      "se": 4.204188218589721
+    },
+    "penalties": {
+      "mean": 2.336,
+      "se": 0.06442444425865126
+    },
+    "sixAgains": {
+      "mean": 1.594,
+      "se": 0.05607688681149267
+    },
+    "penaltyGoals": {
+      "mean": 0.02,
+      "se": 0.006267260734501837
+    },
+    "penGoalMisses": {
+      "mean": 0.004,
+      "se": 0.0028255916081188653
+    },
+    "offsides": {
+      "mean": 2.022,
+      "se": 0.05954934297284059
+    },
+    "highShots": {
+      "mean": 0.314,
+      "se": 0.0238315733382324
+    },
+    "penTaps": {
+      "mean": 0.39,
+      "se": 0.028379760774948054
+    },
+    "penTouch": {
+      "mean": 1.916,
+      "se": 0.05967419894761978
+    },
+    "penShots": {
+      "mean": 0.024,
+      "se": 0.00685141472745119
+    },
+    "penConcededHome": {
+      "mean": 0.726,
+      "se": 0.03666792977723592
+    },
+    "penConcededAway": {
+      "mean": 1.61,
+      "se": 0.05722192497107027
+    },
+    "lostInContact": {
+      "mean": 1.434,
+      "se": 0.05284764656533902
+    },
+    "injuries": {
+      "mean": 0.3,
+      "se": 0.025559863325660754
+    },
+    "lineBreaks": {
+      "mean": 14.222,
+      "se": 0.1561608286633291
+    },
+    "coachCalls": {
+      "mean": 0,
+      "se": 0
+    },
+    "callsPaid": {
+      "mean": 0,
+      "se": 0
+    },
+    "completion": {
+      "mean": 69.47089064011539,
+      "se": 0.28458858770486256
+    },
+    "sinBins": {
+      "mean": 0.252,
+      "se": 0.021210652596446267
+    },
+    "shortMin": {
+      "mean": 0.8662733333333333,
+      "se": 0.07739770323579874
+    },
+    "binSwing": {
+      "mean": 0.866,
+      "se": 0.14400542741942923
+    },
+    "points": {
+      "mean": 34.414,
+      "se": 0.5230682640130591
+    },
+    "margin": {
+      "mean": 9.082,
+      "se": 0.3152988721158309
+    },
+    "homeMargin": {
+      "mean": 2.13,
+      "se": 0.5055862289162351
+    },
+    "goldenPoint": {
+      "mean": 0,
+      "se": 0
+    },
+    "goldenPointWon": {
+      "mean": 0,
+      "se": 0
+    },
+    "draws": {
+      "mean": 0.062,
+      "se": 0.01079560513266218
+    },
+    "possession": {
+      "mean": 50.63536421504725,
+      "se": 0.12524256454484398
+    },
+    "bombs": {
+      "mean": 4.024,
+      "se": 0.08794496366061254
+    },
+    "bombsWon": {
+      "mean": 0.628,
+      "se": 0.035633853890453294
+    },
+    "bombsSpilled": {
+      "mean": 0.728,
+      "se": 0.03866551492076863
+    },
+    "grubbers": {
+      "mean": 2.202,
+      "se": 0.06414531348808691
+    },
+    "grubberTries": {
+      "mean": 0.658,
+      "se": 0.038012654785580295
+    },
+    "grubberRepeats": {
+      "mean": 0.054,
+      "se": 0.010506606376709379
+    },
+    "grubberDropouts": {
+      "mean": 0,
+      "se": 0
+    },
+    "grubberTurnovers": {
+      "mean": 1.49,
+      "se": 0.052852500163635456
+    },
+    "kickTries": {
+      "mean": 1.718,
+      "se": 0.05624303118711003
+    },
+    "scrambles": {
+      "mean": 1.818,
+      "se": 0.05656988867418091
+    }
+  },
+  "wrestleSecs": 0.6518151949382737,
+  "homeWin": 0.532,
+  "draw": 0.062,
+  "trackedWin": 0.538,
+  "trackedDraw": 0.057,
+  "trackedSeeds": 1000,
+  "pointsShare": {
+    "mean": 0.5665,
+    "se": 0.01521707295472133
+  },
+  "trackedCounts": {
+    "offloads": {
+      "mean": 2.426,
+      "se": 0.04980968786295514
+    },
+    "busts": {
+      "mean": 20.878,
+      "se": 0.17199621710578059
+    },
+    "lineBreaks": {
+      "mean": 7.131,
+      "se": 0.0832993263945022
+    },
+    "tries": {
+      "mean": 3.445,
+      "se": 0.05043330763016156
+    },
+    "kicks": {
+      "mean": 9.241,
+      "se": 0.0736365489505138
+    },
+    "steps": {
+      "mean": 9.781,
+      "se": 0.11181028816947294
+    },
+    "errors": {
+      "mean": 5.35,
+      "se": 0.0669924472458501
+    },
+    "bombs": {
+      "mean": 2.443,
+      "se": 0.046096375951650496
+    },
+    "bombsWon": {
+      "mean": 0.454,
+      "se": 0.021079096952391716
+    },
+    "grubbers": {
+      "mean": 1.189,
+      "se": 0.03496428894603031
+    },
+    "grubberTries": {
+      "mean": 0.511,
+      "se": 0.02250300836300315
+    },
+    "pointsFor": {
+      "mean": 18.02,
+      "se": 0.27237435229438867
+    },
+    "pointsAgainst": {
+      "mean": 15.905,
+      "se": 0.25090023102007286
+    }
+  },
+  "opponentCounts": {
+    "offloads": {
+      "mean": 3.611,
+      "se": 0.06569623273061385
+    },
+    "busts": {
+      "mean": 8.538,
+      "se": 0.10571533347500603
+    },
+    "lineBreaks": {
+      "mean": 6.886,
+      "se": 0.08493655407548784
+    },
+    "tries": {
+      "mean": 3.064,
+      "se": 0.04692660339408868
+    },
+    "kicks": {
+      "mean": 8.433,
+      "se": 0.07088395823834531
+    },
+    "steps": {
+      "mean": 6.816,
+      "se": 0.09110677496456802
+    },
+    "errors": {
+      "mean": 5.307,
+      "se": 0.06664227031090855
+    },
+    "bombs": {
+      "mean": 1.613,
+      "se": 0.03991019699054163
+    },
+    "bombsWon": {
+      "mean": 0.155,
+      "se": 0.012455124653335608
+    },
+    "grubbers": {
+      "mean": 0.962,
+      "se": 0.03126553267631195
+    },
+    "grubberTries": {
+      "mean": 0.144,
+      "se": 0.012705330590953736
+    },
+    "pointsFor": {
+      "mean": 15.905,
+      "se": 0.25090023102007286
+    },
+    "pointsAgainst": {
+      "mean": 18.02,
+      "se": 0.27237435229438867
+    }
+  },
+  "legs": [
+    {
+      "minute": 3,
+      "home": 0.886572799572059,
+      "away": 0.8819930520309546
+    },
+    {
+      "minute": 6,
+      "home": 0.7901490124808207,
+      "away": 0.7795950420587453
+    },
+    {
+      "minute": 9,
+      "home": 0.8181677676585315,
+      "away": 0.807903383913737
+    },
+    {
+      "minute": 12,
+      "home": 0.7436849415020443,
+      "away": 0.7310579785290467
+    }
+  ],
+  "ms": 541875
+}

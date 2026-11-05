@@ -1,0 +1,8 @@
+
+> nrl-sim@0.0.0 balance
+> vite-node scripts/balance.ts -- --plan balance/plans/experiments/20261105-acceptance.json --jobs 4
+
+465 own style fit / acceptance shard 2 of 3: 2 cells, 2 to run on 4 workers → balance/runs/20261105-140418-465-own-style-fit-acceptance-shard-2-of-3
+[worker 1/4] [1/1] baseline | attack fit 0.5 — 385.3 s, about 0 min left
+[worker 2/4] [1/1] enabled defaults | attack fit 0.5 — 386.1 s, about 0 min left
+Report: balance/runs/20261105-140418-465-own-style-fit-acceptance-shard-2-of-3/report.md

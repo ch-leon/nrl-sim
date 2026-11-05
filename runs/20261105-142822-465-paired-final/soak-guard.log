@@ -1,0 +1,7 @@
+easy/idle: wins 69.107744% → 70.117845% (+1.010101pp); cash shift $+114,942.35, baseline SE $102,516.34
+easy/managed: wins 86.791667% → 89.000000% (+2.208333pp); cash shift $+92,158.35, baseline SE $124,085.42
+normal/idle: wins 55.637255% → 55.520833% (-0.116422pp); cash shift $-124,278.40, baseline SE $139,193.72
+normal/managed: wins 79.470486% → 81.505102% (+2.034616pp); cash shift $+186,164.15, baseline SE $96,362.23
+hard/idle: wins 47.336066% → 50.069444% (+2.733379pp); cash shift $-46,299.10, baseline SE $119,574.97
+hard/managed: wins 73.885659% → 74.473180% (+0.587521pp); cash shift $+20,835.80, baseline SE $66,588.79
+Complete baseline/enabled soak guards passed; saves v1–20, no problems or forfeits.

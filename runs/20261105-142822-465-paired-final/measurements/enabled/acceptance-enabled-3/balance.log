@@ -1,0 +1,12 @@
+
+> nrl-sim@0.0.0 balance
+> vite-node scripts/balance.ts -- --plan balance/plans/experiments/20261105-acceptance.json --jobs 4
+
+465 before and enabled matrix / acceptance shard 3 of 5: 6 cells, 6 to run on 4 workers → balance/runs/20261105-140414-465-before-and-enabled-matrix-acceptance-shard-3-of-5
+[worker 1/4] [1/2] baseline | balanced v slide — 748.2 s, about 13 min left
+[worker 2/4] [1/2] baseline | expansive v compressed — 748.0 s, about 13 min left
+[worker 4/4] [1/1] enabled | balanced v slide — 749.8 s, about 0 min left
+[worker 3/4] [1/1] baseline | all-out v rush — 763.8 s, about 0 min left
+[worker 1/4] [2/2] enabled | expansive v compressed — 387.6 s, about 0 min left
+[worker 2/4] [2/2] enabled | all-out v rush — 389.7 s, about 0 min left
+Report: balance/runs/20261105-140414-465-before-and-enabled-matrix-acceptance-shard-3-of-5/report.md

@@ -1,0 +1,14 @@
+{
+  "name": "465 final paired counters acceptance",
+  "kind": "evidence manifest; original runnable harness plans are preserved in canonical-plans and each measurement run",
+  "balanceCommands": [
+    "npm run balance -- --plan balance/plans/counters-enabled.json --jobs 4",
+    "npm run balance -- --plan balance/plans/counters-full-fit.json --jobs 4",
+    "npm run balance -- --plan balance/plans/counters-fit-enabled.json --jobs 4",
+    "npm run balance -- --plan balance/plans/counters-strong-pack.json --jobs 4",
+    "npm run balance -- --plan balance/plans/counters-yardstick.json --jobs 4",
+    "npm run balance -- --plan balance/plans/counters-round-robin.json --jobs 4"
+  ],
+  "soakCommand": "npm run soak -- --difficulties easy,normal,hard --jobs 4",
+  "parallelSoak": "Same original140cases partitioned with --shard i/7 and pooled without altering case payloads; run the complete-case guard."
+}

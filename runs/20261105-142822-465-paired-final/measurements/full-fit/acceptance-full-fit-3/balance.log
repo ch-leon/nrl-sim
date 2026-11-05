@@ -1,0 +1,12 @@
+
+> nrl-sim@0.0.0 balance
+> vite-node scripts/balance.ts -- --plan balance/plans/experiments/20261105-acceptance.json --jobs 4
+
+465 full fit counters / acceptance shard 3 of 4: 6 cells, 6 to run on 4 workers → balance/runs/20261105-140458-465-full-fit-counters-acceptance-shard-3-of-4
+[worker 3/4] [1/1] fully dormant | full fit all-out v slide — 756.9 s, about 0 min left
+[worker 1/4] [1/2] baseline | full fit all-out v slide — 757.6 s, about 13 min left
+[worker 2/4] [1/2] baseline | full fit all-out v rush — 766.4 s, about 13 min left
+[worker 4/4] [1/1] fully dormant | full fit all-out v rush — 766.6 s, about 0 min left
+[worker 1/4] [2/2] enabled defaults | full fit all-out v slide — 393.2 s, about 0 min left
+[worker 2/4] [2/2] enabled defaults | full fit all-out v rush — 389.2 s, about 0 min left
+Report: balance/runs/20261105-140458-465-full-fit-counters-acceptance-shard-3-of-4/report.md

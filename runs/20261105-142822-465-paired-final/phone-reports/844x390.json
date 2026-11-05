@@ -1,0 +1,642 @@
+{
+  "size": "844x390",
+  "phone": true,
+  "steps": [
+    {
+      "n": 1,
+      "name": "title",
+      "file": "01-title.png",
+      "ok": true,
+      "notes": [
+        "Build 2026-11-05 137d483",
+        "swatches 44×44"
+      ]
+    },
+    {
+      "n": 2,
+      "name": "new-game",
+      "file": "02-new-game.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 3,
+      "name": "tutorial",
+      "file": "03-tutorial.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 4,
+      "name": "tutorial-skipped",
+      "file": "04-tutorial-skipped.png",
+      "ok": true,
+      "notes": [
+        "dumped saves/v21-after-tutorial.json (133 KB)"
+      ]
+    },
+    {
+      "n": 5,
+      "name": "portrait",
+      "file": "05-portrait.png",
+      "ok": true,
+      "notes": [
+        "the open sheet, no rotate card, loop asleep"
+      ]
+    },
+    {
+      "n": 6,
+      "name": "landscape-again",
+      "file": "06-landscape-again.png",
+      "ok": true,
+      "notes": [
+        "loop awake, canvas 844x390"
+      ]
+    },
+    {
+      "n": 7,
+      "name": "build-menu",
+      "file": "07-build-menu.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 8,
+      "name": "build-placing",
+      "file": "08-build-placing.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 9,
+      "name": "built-paddock",
+      "file": "09-built-paddock.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 10,
+      "name": "build-second",
+      "file": "10-build-second.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 11,
+      "name": "facility-popup",
+      "file": "11-facility-popup.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 12,
+      "name": "moving",
+      "file": "12-moving.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 13,
+      "name": "moved",
+      "file": "13-moved.png",
+      "ok": true,
+      "notes": [
+        "money (not saved yet)"
+      ]
+    },
+    {
+      "n": 14,
+      "name": "demolish-undo-toast",
+      "file": "14-demolish-undo-toast.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 15,
+      "name": "demolished",
+      "file": "15-demolished.png",
+      "ok": true,
+      "notes": [
+        "1 facility left once the Undo lapsed"
+      ]
+    },
+    {
+      "n": 16,
+      "name": "recruit",
+      "file": "16-recruit.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 17,
+      "name": "signed",
+      "file": "17-signed.png",
+      "ok": true,
+      "notes": [
+        "signed Ollie Ashgrove"
+      ]
+    },
+    {
+      "n": 18,
+      "name": "squad",
+      "file": "18-squad.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 19,
+      "name": "training-focus",
+      "file": "19-training-focus.png",
+      "ok": true,
+      "notes": [
+        "focus Speed"
+      ]
+    },
+    {
+      "n": 20,
+      "name": "player-page",
+      "file": "20-player-page.png",
+      "ok": true,
+      "notes": [
+        "player p_1tbym3f_207518; actions renew, sell, release"
+      ]
+    },
+    {
+      "n": 21,
+      "name": "player-page-closed",
+      "file": "21-player-page-closed.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 22,
+      "name": "kit-designer",
+      "file": "22-kit-designer.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 23,
+      "name": "kit-saved",
+      "file": "23-kit-saved.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 24,
+      "name": "match-classic",
+      "file": "24-match-classic.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 25,
+      "name": "save-exit",
+      "file": "25-save-exit.png",
+      "ok": true,
+      "notes": [
+        "left at 00:18; button \"RESUME MATCH ▸\"; week still 1; menu: Your match is still on. Tap Resume match to carry on."
+      ]
+    },
+    {
+      "n": 26,
+      "name": "resume-match",
+      "file": "26-resume-match.png",
+      "ok": true,
+      "notes": [
+        "resumed at 00:19"
+      ]
+    },
+    {
+      "n": 27,
+      "name": "match-fulltime",
+      "file": "27-match-fulltime.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 28,
+      "name": "update-held",
+      "file": "28-update-held.png",
+      "ok": true,
+      "notes": [
+        "build raised mid-match, bar held"
+      ]
+    },
+    {
+      "n": 29,
+      "name": "back-to-club",
+      "file": "29-back-to-club.png",
+      "ok": true,
+      "notes": [
+        "facilities drawn 1/1"
+      ]
+    },
+    {
+      "n": 30,
+      "name": "week-summary",
+      "file": "30-week-summary.png",
+      "ok": true,
+      "notes": [
+        "Week 1 summary"
+      ]
+    },
+    {
+      "n": 31,
+      "name": "update-bar",
+      "file": "31-update-bar.png",
+      "ok": true,
+      "notes": [
+        "bar shown after Back to Club; Later dismissed it"
+      ]
+    },
+    {
+      "n": 32,
+      "name": "lineup-plan",
+      "file": "32-lineup-plan.png",
+      "ok": true,
+      "notes": [
+        "Grind / slide; kicker p_1fl2cmq_193263 (s7)"
+      ]
+    },
+    {
+      "n": 33,
+      "name": "live-toggle",
+      "file": "33-live-toggle.png",
+      "ok": true,
+      "notes": [
+        "no setting: every match is live"
+      ]
+    },
+    {
+      "n": 34,
+      "name": "live-match",
+      "file": "34-live-match.png",
+      "ok": true,
+      "notes": [
+        "×8, clock 00:31"
+      ]
+    },
+    {
+      "n": 35,
+      "name": "try-replay",
+      "file": "35-try-replay.png",
+      "ok": true,
+      "notes": [
+        "chip under the sheet: hidden, held at 6 s",
+        "Replay tapped at 00:31, live again at 00:31; main-thread block 0 ms"
+      ]
+    },
+    {
+      "n": 36,
+      "name": "live-kill",
+      "file": "36-live-kill.png",
+      "ok": true,
+      "notes": [
+        "killed at 00:31 (tick 800); resumed at 00:31 (tick 801)"
+      ]
+    },
+    {
+      "n": 37,
+      "name": "coach-call",
+      "file": "37-coach-call.png",
+      "ok": true,
+      "notes": [
+        "called hit-up; badge reads \"Hit-up\"; 14 looks at an empty tray"
+      ]
+    },
+    {
+      "n": 38,
+      "name": "half-time-plan",
+      "file": "38-half-time-plan.png",
+      "ok": true,
+      "notes": [
+        "half-time: waited 6 s, Expansive, Continue"
+      ]
+    },
+    {
+      "n": 39,
+      "name": "live-fulltime",
+      "file": "39-live-fulltime.png",
+      "ok": true,
+      "notes": [
+        "overlay 24 – 27, saved 24 – 27"
+      ]
+    },
+    {
+      "n": 40,
+      "name": "live-back-to-club",
+      "file": "40-live-back-to-club.png",
+      "ok": true,
+      "notes": [
+        "facilities drawn 1/1"
+      ]
+    },
+    {
+      "n": 41,
+      "name": "advance-block-1",
+      "file": "41-advance-block-1.png",
+      "ok": true,
+      "notes": [
+        "answered \"Win bonus sponsor\" with choice 0",
+        "now S1 W4, $127082"
+      ]
+    },
+    {
+      "n": 42,
+      "name": "advance-block-2",
+      "file": "42-advance-block-2.png",
+      "ok": true,
+      "notes": [
+        "answered \"Pay rise demand\" with choice 0",
+        "now S1 W6, $122164"
+      ]
+    },
+    {
+      "n": 43,
+      "name": "advance-block-3",
+      "file": "43-advance-block-3.png",
+      "ok": true,
+      "notes": [
+        "answered \"Radio gaffe\" with choice 0",
+        "now S1 W8, $124431"
+      ]
+    },
+    {
+      "n": 44,
+      "name": "rival-signings",
+      "file": "44-rival-signings.png",
+      "ok": true,
+      "notes": [
+        "dumped saves/v21-mid-season.json (138 KB)",
+        "Mackay Marlins took Flynn Ashgrove"
+      ]
+    },
+    {
+      "n": 45,
+      "name": "next-match",
+      "file": "45-next-match.png",
+      "ok": true,
+      "notes": [
+        "next: Shellharbour Scorpions13th · strength 48Last 5LWLWL; 10 form cells"
+      ]
+    },
+    {
+      "n": 46,
+      "name": "ladder",
+      "file": "46-ladder.png",
+      "ok": true,
+      "notes": [
+        "form column on 16 rows"
+      ]
+    },
+    {
+      "n": 47,
+      "name": "rival-squad",
+      "file": "47-rival-squad.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 48,
+      "name": "contracts",
+      "file": "48-contracts.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 49,
+      "name": "renewed",
+      "file": "49-renewed.png",
+      "ok": true,
+      "notes": [
+        "tapped RENEW $3,552"
+      ]
+    },
+    {
+      "n": 50,
+      "name": "finance",
+      "file": "50-finance.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 51,
+      "name": "staff-hire",
+      "file": "51-staff-hire.png",
+      "ok": true,
+      "notes": [
+        "hired Cruz Gallagan, $700/wk"
+      ]
+    },
+    {
+      "n": 52,
+      "name": "guide-nines",
+      "file": "52-guide-nines.png",
+      "ok": true,
+      "notes": [
+        "8 Guide pages; How Nines works open"
+      ]
+    },
+    {
+      "n": 53,
+      "name": "guide-closed",
+      "file": "53-guide-closed.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 54,
+      "name": "control-sizes",
+      "file": "54-control-sizes.png",
+      "ok": true,
+      "notes": [
+        "mute 52×44",
+        "lineup rows 269×44",
+        "ladder scrolled inside the sheet; CLUB and LEAGUE in view"
+      ]
+    },
+    {
+      "n": 55,
+      "name": "reload-title",
+      "file": "55-reload-title.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 56,
+      "name": "continued",
+      "file": "56-continued.png",
+      "ok": true,
+      "notes": [
+        "same week 8, money, staff (welfare), squad, facilities, cards and kit after reload",
+        "facilities drawn 1/1"
+      ]
+    },
+    {
+      "n": 57,
+      "name": "to-finals-1",
+      "file": "57-to-finals-1.png",
+      "ok": true,
+      "notes": [
+        "answered \"Junior clinics\" with choice 0",
+        "S1 W11 $96693 · \"Stopped after 3 weeks: Decision needed: Charity gala.\""
+      ]
+    },
+    {
+      "n": 58,
+      "name": "to-finals-2",
+      "file": "58-to-finals-2.png",
+      "ok": true,
+      "notes": [
+        "answered \"Charity gala\" with choice 0",
+        "S1 W19 $63813 · \"Stopped after 8 weeks: Decision needed: Sponsor jitters.\""
+      ]
+    },
+    {
+      "n": 59,
+      "name": "to-finals-3",
+      "file": "59-to-finals-3.png",
+      "ok": true,
+      "notes": [
+        "answered \"Sponsor jitters\" with choice 0",
+        "S1 W20 $71259 · \"Stopped after 1 week: Regular starter injured: Sully Steplock.\""
+      ]
+    },
+    {
+      "n": 60,
+      "name": "to-finals-4",
+      "file": "60-to-finals-4.png",
+      "ok": true,
+      "notes": [
+        "S1 W22 $61602 · \"Stopped after 2 weeks: Decision needed: Fan day.\""
+      ]
+    },
+    {
+      "n": 61,
+      "name": "to-finals-5",
+      "file": "61-to-finals-5.png",
+      "ok": true,
+      "notes": [
+        "answered \"Fan day\" with choice 0",
+        "S1 W23 $36956 · \"Stopped after 1 week: Regular starter injured: Ollie Iliffe.\""
+      ]
+    },
+    {
+      "n": 62,
+      "name": "to-finals-6",
+      "file": "62-to-finals-6.png",
+      "ok": true,
+      "notes": [
+        "S1 W24 $47739 · \"Stopped after 1 week: Decision needed: Jet-ski photo.\""
+      ]
+    },
+    {
+      "n": 63,
+      "name": "to-finals-7",
+      "file": "63-to-finals-7.png",
+      "ok": true,
+      "notes": [
+        "answered \"Jet-ski photo\" with choice 0",
+        "S1 W25 $28133 · \"Advanced to finals.\""
+      ]
+    },
+    {
+      "n": 64,
+      "name": "to-season-end-8",
+      "file": "64-to-season-end-8.png",
+      "ok": true,
+      "notes": [
+        "S1 W27 $72921 · \"Stopped after 2 weeks: Decision needed: Storm damage.\""
+      ]
+    },
+    {
+      "n": 65,
+      "name": "to-season-end-9",
+      "file": "65-to-season-end-9.png",
+      "ok": true,
+      "notes": [
+        "answered \"Storm damage\" with choice 0",
+        "S2 W1 $147315 · \"Stopped after 1 week: Decision needed: Trip to Bali.\""
+      ]
+    },
+    {
+      "n": 66,
+      "name": "season-2",
+      "file": "66-season-2.png",
+      "ok": true,
+      "notes": [
+        "season 2 week 1, 1 season(s) in history, board patience 5",
+        "dumped saves/v21-after-rollover.json (134 KB)"
+      ]
+    },
+    {
+      "n": 67,
+      "name": "season-review",
+      "file": "67-season-review.png",
+      "ok": true,
+      "notes": [
+        "finished 2nd · lost the Grand Final"
+      ]
+    },
+    {
+      "n": 68,
+      "name": "history",
+      "file": "68-history.png",
+      "ok": true,
+      "notes": []
+    },
+    {
+      "n": 69,
+      "name": "history-review",
+      "file": "69-history-review.png",
+      "ok": true,
+      "notes": [
+        "season 1 review reopened from History, and back to History from its header"
+      ]
+    },
+    {
+      "n": 70,
+      "name": "season-2-week-2",
+      "file": "70-season-2-week-2.png",
+      "ok": true,
+      "notes": [
+        "answered \"Trip to Bali\" with choice 0",
+        "S2 W2",
+        "facilities drawn 1/1",
+        "dumped saves/v21-season-2.json (135 KB)"
+      ]
+    },
+    {
+      "n": 71,
+      "name": "held-week",
+      "file": "71-held-week.png",
+      "ok": true,
+      "notes": [
+        "focus → balanced during the hold",
+        "held at W2 after Back to Club; both taps said so; W3, round 2 8/8 results",
+        "dumped saves/v21-live-rivals.json (147 KB)"
+      ]
+    },
+    {
+      "n": 72,
+      "name": "import-save",
+      "file": "72-import-save.png",
+      "ok": true,
+      "notes": [
+        "slot 1 holds \"Imported FC\" at S2 W3 after the reload"
+      ]
+    },
+    {
+      "n": 73,
+      "name": "import-continued",
+      "file": "73-import-continued.png",
+      "ok": true,
+      "notes": [
+        "Continue opened the imported club"
+      ]
+    }
+  ],
+  "errors": [],
+  "findings": []
+}

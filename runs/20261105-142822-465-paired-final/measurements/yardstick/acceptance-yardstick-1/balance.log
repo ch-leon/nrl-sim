@@ -1,0 +1,7 @@
+
+> nrl-sim@0.0.0 balance
+> vite-node scripts/balance.ts -- --plan balance/plans/experiments/20261105-acceptance.json --jobs 4
+
+465 rating yardstick / acceptance shard 1 of 2: 1 cells, 1 to run on 4 workers → balance/runs/20261105-141108-465-rating-yardstick-acceptance-shard-1-of-2
+[worker 1/4] [1/1] baseline | yardstick 65 v 60 — 316.4 s, about 0 min left
+Report: balance/runs/20261105-141108-465-rating-yardstick-acceptance-shard-1-of-2/report.md

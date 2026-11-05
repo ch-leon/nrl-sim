@@ -1,0 +1,92 @@
+{
+  "throttle": 4,
+  "size": "844x390",
+  "metrics": {
+    "titleMs": 1111,
+    "groundsMs": 1275,
+    "handoffMs": 653,
+    "handoffBlockMs": 176,
+    "matchFrameMs": 50,
+    "skipMs": 3152,
+    "skipBlockMs": 186,
+    "backToClubMs": 304,
+    "weekMs": 1628,
+    "advanceCallMaxMs": 6309,
+    "advanceBlockMs": 111,
+    "midAdvanceTapMs": 116,
+    "longestBlockMs": 546,
+    "bundleGzKb": 539
+  },
+  "budget": "scripts/perf-budget.json",
+  "verdicts": [
+    {
+      "metric": "titleMs",
+      "value": 1111,
+      "max": 3500,
+      "ok": true
+    },
+    {
+      "metric": "groundsMs",
+      "value": 1275,
+      "max": 2750,
+      "ok": true
+    },
+    {
+      "metric": "handoffMs",
+      "value": 653,
+      "max": 1000,
+      "ok": true
+    },
+    {
+      "metric": "handoffBlockMs",
+      "value": 176,
+      "max": 300,
+      "ok": true
+    },
+    {
+      "metric": "skipMs",
+      "value": 3152,
+      "max": 5000,
+      "ok": true
+    },
+    {
+      "metric": "skipBlockMs",
+      "value": 186,
+      "max": 300,
+      "ok": true
+    },
+    {
+      "metric": "backToClubMs",
+      "value": 304,
+      "max": 1000,
+      "ok": true
+    },
+    {
+      "metric": "weekMs",
+      "value": 1628,
+      "max": 2250,
+      "ok": true
+    },
+    {
+      "metric": "advanceBlockMs",
+      "value": 111,
+      "max": 300,
+      "ok": true
+    },
+    {
+      "metric": "midAdvanceTapMs",
+      "value": 116,
+      "max": 300,
+      "ok": true
+    },
+    {
+      "metric": "bundleGzKb",
+      "value": 539,
+      "max": 590,
+      "ok": true,
+      "warn": true
+    }
+  ],
+  "ok": true,
+  "errors": []
+}

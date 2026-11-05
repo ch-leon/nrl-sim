@@ -1,0 +1,10 @@
+
+> nrl-sim@0.0.0 balance
+> vite-node scripts/balance.ts -- --plan balance/plans/experiments/20261105-preset-final.json --jobs 4
+
+465 middle joint Rush 0 / shard 2: 4 cells, 4 to run on 4 workers → balance/runs/20261105-130024-465-middle-joint-rush-0-shard-2
+[worker 4/4] [1/1] baseline | kick-chase v rush — 541.9 s, about 0 min left
+[worker 3/4] [1/1] baseline | kick-chase/slide v all-out/rush — 542.9 s, about 0 min left
+[worker 2/4] [1/1] baseline | expansive/rush v kick-chase/slide — 543.5 s, about 0 min left
+[worker 1/4] [1/1] baseline | grind/rush v kick-chase/compressed — 544.7 s, about 0 min left
+Report: balance/runs/20261105-130024-465-middle-joint-rush-0-shard-2/report.md

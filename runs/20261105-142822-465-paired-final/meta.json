@@ -1,0 +1,20 @@
+{
+  "commit": "137d48309d3d5832744e41d9b69afe3c12fb82de",
+  "branch": "issue-465-strategy-counters",
+  "kind": "acceptance-bundle",
+  "saveVersion": 21,
+  "proofRun": 42041401829,
+  "mainSoakCommit": "e8b88be4ca94a2a9651688bdb55ae1832e0e5a61",
+  "mainBase": "cd70565da710f06fc1f679a64a6d16005b7c2b1b",
+  "roundRobin": {
+    "pairs": 105,
+    "matchesPerPair": 1000,
+    "matchesPerPlan": 14000,
+    "sourceRuns": [
+      42018895938,
+      42023741332,
+      42031855951
+    ],
+    "invariance": "Only named fit coefficients differ in reused flat-60 inputs; all cached fits are exactly1, so own-fit edge and unequal-fit terms are zero. Every affected Kick-chase/Rush pair was rerun at the selected parameters."
+  }
+}

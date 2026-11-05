@@ -1,0 +1,13 @@
+
+> nrl-sim@0.0.0 balance
+> vite-node scripts/balance.ts -- --plan balance/plans/experiments/20261105-selected-round.json --jobs 4
+
+465 fifteen plan round robin / selected full shard 12: 7 cells, 7 to run on 4 workers → balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12
+[worker 2/4] [1/2] baseline | grind/compressed v balanced/slide — 397.2 s, about 7 min left
+[worker 1/4] [1/2] baseline | grind/slide v all-out/rush — 398.7 s, about 7 min left
+[worker 3/4] [1/2] baseline | balanced/slide v expansive/rush — 402.5 s, about 7 min left
+[worker 4/4] [1/1] baseline | balanced/rush v all-out/slide — 405.4 s, about 0 min left
+[worker 2/4] [2/2] baseline | expansive/compressed v all-out/slide — 291.1 s, about 0 min left
+[worker 3/4] [2/2] baseline | all-out/slide v all-out/rush — 305.6 s, about 0 min left
+[worker 1/4] [2/2] baseline | expansive/slide v kick-chase/rush — 313.2 s, about 0 min left
+Report: balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/report.md

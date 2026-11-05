@@ -1,0 +1,84 @@
+{
+  "name": "465 full fit counters / acceptance shard 0 of 4",
+  "description": "Flat 60 playing squads; exact harness-only winning/losing fits 1.5 v .5. Counter/fit comparison holds the independent Tight rebuild and current Kick-chase preset fixed in both runs; fully dormant restores the legacy Kick-chase pass weight and reports the total switch-on change. 1000 matches per cell.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 0,
+    "counters.slide.on": 0,
+    "counters.rush.on": 0,
+    "counters.compressed.on": 0
+  },
+  "variants": [
+    {
+      "name": "fully dormant",
+      "tuning": {
+        "counters.tight.on": 0,
+        "presets.attack.kick-chase.base.pass": -0.05
+      }
+    },
+    {
+      "name": "enabled defaults",
+      "tuning": {
+        "counters.tight.on": 1,
+        "counters.fit.on": 1,
+        "counters.slide.on": 1,
+        "counters.rush.on": 1,
+        "counters.compressed.on": 1
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "full fit grind v slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        },
+        "fit": {
+          "grind": 1.5
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        },
+        "fit": {
+          "slide": 0.5
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "full fit grind v compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        },
+        "fit": {
+          "grind": 0.5
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        },
+        "fit": {
+          "compressed": 1.5
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}

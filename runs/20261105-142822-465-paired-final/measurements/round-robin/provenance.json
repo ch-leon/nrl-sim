@@ -1,0 +1,551 @@
+{
+  "presetPass": 0.04,
+  "rushKickChase": 0.61,
+  "protocol": "66 pairs without Kick-chase have identical active parameters at exact neutral fits; rerun all39 Kick-chase pairs at pass.04; rerun all14 affected Rush pairs at selected counter strength. Every pair keeps all500 consecutive seeds both orientations.",
+  "cells": [
+    {
+      "scenario": "balanced/rush v expansive/rush",
+      "source": "raw-inputs/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "expansive/rush v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v expansive/compressed",
+      "source": "raw-inputs/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-7/balance/runs/20261105-112614-465-fifteen-plan-round-robin-selected-full-shard-7/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-4/balance/runs/20261105-112608-465-fifteen-plan-round-robin-selected-full-shard-4/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-4/balance/runs/20261105-112608-465-fifteen-plan-round-robin-selected-full-shard-4/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "grind/rush v expansive/rush",
+      "source": "raw-inputs/42018895938/selected-round-4/balance/runs/20261105-112608-465-fifteen-plan-round-robin-selected-full-shard-4/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-4/balance/runs/20261105-112608-465-fifteen-plan-round-robin-selected-full-shard-4/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/slide v balanced/compressed",
+      "source": "raw-inputs/42018895938/selected-round-4/balance/runs/20261105-112608-465-fifteen-plan-round-robin-selected-full-shard-4/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-4/balance/runs/20261105-112608-465-fifteen-plan-round-robin-selected-full-shard-4/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v balanced/compressed",
+      "source": "raw-inputs/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "expansive/compressed v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "all-out/rush v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/rush v grind/compressed",
+      "source": "raw-inputs/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "expansive/slide v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-14/balance/runs/20261105-113035-465-fifteen-plan-round-robin-selected-full-shard-14/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-3/balance/runs/20261105-113118-465-fifteen-plan-round-robin-selected-full-shard-3/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-3/balance/runs/20261105-113118-465-fifteen-plan-round-robin-selected-full-shard-3/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "grind/rush v expansive/slide",
+      "source": "raw-inputs/42018895938/selected-round-3/balance/runs/20261105-113118-465-fifteen-plan-round-robin-selected-full-shard-3/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-3/balance/runs/20261105-113118-465-fifteen-plan-round-robin-selected-full-shard-3/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/slide v balanced/rush",
+      "source": "raw-inputs/42018895938/selected-round-3/balance/runs/20261105-113118-465-fifteen-plan-round-robin-selected-full-shard-3/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-3/balance/runs/20261105-113118-465-fifteen-plan-round-robin-selected-full-shard-3/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "grind/rush v balanced/compressed",
+      "source": "raw-inputs/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "expansive/rush v expansive/compressed",
+      "source": "raw-inputs/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v expansive/compressed",
+      "source": "raw-inputs/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v balanced/slide",
+      "source": "raw-inputs/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v expansive/compressed",
+      "source": "raw-inputs/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-2/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-2/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v expansive/compressed",
+      "source": "raw-inputs/42018895938/selected-round-8/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-8/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-8/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-8/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "expansive/rush v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-8/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-8/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-8/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-8/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-8/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-8/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-8/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-8/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-8/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-8/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-8/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-8/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "grind/rush v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-9/balance/runs/20261105-112607-465-fifteen-plan-round-robin-selected-full-shard-9/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-9/balance/runs/20261105-112607-465-fifteen-plan-round-robin-selected-full-shard-9/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v balanced/rush",
+      "source": "raw-inputs/42018895938/selected-round-9/balance/runs/20261105-112607-465-fifteen-plan-round-robin-selected-full-shard-9/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-9/balance/runs/20261105-112607-465-fifteen-plan-round-robin-selected-full-shard-9/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "expansive/slide v expansive/rush",
+      "source": "raw-inputs/42018895938/selected-round-9/balance/runs/20261105-112607-465-fifteen-plan-round-robin-selected-full-shard-9/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-9/balance/runs/20261105-112607-465-fifteen-plan-round-robin-selected-full-shard-9/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v balanced/compressed",
+      "source": "raw-inputs/42018895938/selected-round-5/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-5/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-5/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-5/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "grind/rush v expansive/compressed",
+      "source": "raw-inputs/42018895938/selected-round-5/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-5/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-5/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-5/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/slide v expansive/slide",
+      "source": "raw-inputs/42018895938/selected-round-5/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-5/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-5/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-5/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "grind/rush v balanced/slide",
+      "source": "raw-inputs/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "expansive/slide v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v expansive/slide",
+      "source": "raw-inputs/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v grind/rush",
+      "source": "raw-inputs/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v expansive/slide",
+      "source": "raw-inputs/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-0/balance/runs/20261105-112611-465-fifteen-plan-round-robin-selected-full-shard-0/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "grind/rush v balanced/rush",
+      "source": "raw-inputs/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "expansive/slide v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v expansive/rush",
+      "source": "raw-inputs/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v grind/compressed",
+      "source": "raw-inputs/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v expansive/rush",
+      "source": "raw-inputs/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-1/balance/runs/20261105-112612-465-fifteen-plan-round-robin-selected-full-shard-1/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v balanced/rush",
+      "source": "raw-inputs/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "expansive/compressed v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v expansive/compressed",
+      "source": "raw-inputs/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "all-out/slide v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-13/balance/runs/20261105-113115-465-fifteen-plan-round-robin-selected-full-shard-13/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v expansive/slide",
+      "source": "raw-inputs/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "expansive/rush v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v expansive/rush",
+      "source": "raw-inputs/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-6/balance/runs/20261105-112609-465-fifteen-plan-round-robin-selected-full-shard-6/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "grind/rush v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-10/balance/runs/20261105-112604-465-fifteen-plan-round-robin-selected-full-shard-10/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-10/balance/runs/20261105-112604-465-fifteen-plan-round-robin-selected-full-shard-10/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v balanced/compressed",
+      "source": "raw-inputs/42018895938/selected-round-10/balance/runs/20261105-112604-465-fifteen-plan-round-robin-selected-full-shard-10/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-10/balance/runs/20261105-112604-465-fifteen-plan-round-robin-selected-full-shard-10/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "expansive/slide v expansive/compressed",
+      "source": "raw-inputs/42018895938/selected-round-10/balance/runs/20261105-112604-465-fifteen-plan-round-robin-selected-full-shard-10/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-10/balance/runs/20261105-112604-465-fifteen-plan-round-robin-selected-full-shard-10/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v balanced/slide",
+      "source": "raw-inputs/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "expansive/compressed v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v expansive/rush",
+      "source": "raw-inputs/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "all-out/slide v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v all-out/rush",
+      "source": "raw-inputs/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-12/balance/runs/20261105-113249-465-fifteen-plan-round-robin-selected-full-shard-12/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "grind/rush v all-out/compressed",
+      "source": "raw-inputs/42018895938/selected-round-11/balance/runs/20261105-113057-465-fifteen-plan-round-robin-selected-full-shard-11/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-11/balance/runs/20261105-113057-465-fifteen-plan-round-robin-selected-full-shard-11/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v expansive/slide",
+      "source": "raw-inputs/42018895938/selected-round-11/balance/runs/20261105-113057-465-fifteen-plan-round-robin-selected-full-shard-11/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-11/balance/runs/20261105-113057-465-fifteen-plan-round-robin-selected-full-shard-11/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v all-out/slide",
+      "source": "raw-inputs/42018895938/selected-round-11/balance/runs/20261105-113057-465-fifteen-plan-round-robin-selected-full-shard-11/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42018895938/selected-round-11/balance/runs/20261105-113057-465-fifteen-plan-round-robin-selected-full-shard-11/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v kick-chase/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-2/balance/runs/20261105-121448-465-preset-final-1-shard-2/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-2/balance/runs/20261105-121448-465-preset-final-1-shard-2/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v kick-chase/rush",
+      "source": "raw-inputs/42023741332/preset-final-1-2/balance/runs/20261105-121448-465-preset-final-1-shard-2/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-2/balance/runs/20261105-121448-465-preset-final-1-shard-2/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v kick-chase/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-2/balance/runs/20261105-121448-465-preset-final-1-shard-2/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-2/balance/runs/20261105-121448-465-preset-final-1-shard-2/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "expansive/compressed v kick-chase/rush",
+      "source": "raw-inputs/42023741332/preset-final-1-4/balance/runs/20261105-120222-465-preset-final-1-shard-4/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-4/balance/runs/20261105-120222-465-preset-final-1-shard-4/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v kick-chase/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-4/balance/runs/20261105-120222-465-preset-final-1-shard-4/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-4/balance/runs/20261105-120222-465-preset-final-1-shard-4/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "expansive/slide v kick-chase/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-4/balance/runs/20261105-120222-465-preset-final-1-shard-4/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-4/balance/runs/20261105-120222-465-preset-final-1-shard-4/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "expansive/slide v kick-chase/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-6/balance/runs/20261105-122117-465-preset-final-1-shard-6/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-6/balance/runs/20261105-122117-465-preset-final-1-shard-6/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v kick-chase/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-6/balance/runs/20261105-122117-465-preset-final-1-shard-6/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-6/balance/runs/20261105-122117-465-preset-final-1-shard-6/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v kick-chase/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "kick-chase/compressed v all-out/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v kick-chase/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/slide v kick-chase/rush",
+      "source": "raw-inputs/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "kick-chase/slide v all-out/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-1/balance/runs/20261105-120219-465-preset-final-1-shard-1/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "grind/compressed v kick-chase/rush",
+      "source": "raw-inputs/42023741332/preset-final-1-0/balance/runs/20261105-120231-465-preset-final-1-shard-0/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-0/balance/runs/20261105-120231-465-preset-final-1-shard-0/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "kick-chase/rush v all-out/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-0/balance/runs/20261105-120231-465-preset-final-1-shard-0/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-0/balance/runs/20261105-120231-465-preset-final-1-shard-0/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "grind/slide v kick-chase/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-0/balance/runs/20261105-120231-465-preset-final-1-shard-0/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-0/balance/runs/20261105-120231-465-preset-final-1-shard-0/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "kick-chase/slide v kick-chase/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-0/balance/runs/20261105-120231-465-preset-final-1-shard-0/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-0/balance/runs/20261105-120231-465-preset-final-1-shard-0/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "expansive/compressed v kick-chase/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "balanced/slide v kick-chase/rush",
+      "source": "raw-inputs/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "kick-chase/compressed v all-out/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "balanced/compressed v kick-chase/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "kick-chase/slide v all-out/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-3/balance/runs/20261105-120219-465-preset-final-1-shard-3/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "expansive/compressed v kick-chase/compressed",
+      "source": "raw-inputs/42023741332/preset-final-1-5/balance/runs/20261105-120221-465-preset-final-1-shard-5/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-5/balance/runs/20261105-120221-465-preset-final-1-shard-5/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "expansive/slide v kick-chase/rush",
+      "source": "raw-inputs/42023741332/preset-final-1-5/balance/runs/20261105-120221-465-preset-final-1-shard-5/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-5/balance/runs/20261105-120221-465-preset-final-1-shard-5/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "kick-chase/rush v all-out/slide",
+      "source": "raw-inputs/42023741332/preset-final-1-5/balance/runs/20261105-120221-465-preset-final-1-shard-5/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42023741332/preset-final-1-5/balance/runs/20261105-120221-465-preset-final-1-shard-5/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "expansive/rush v kick-chase/rush",
+      "source": "raw-inputs/42031855951/rush-middle-0-3/balance/runs/20261105-130501-465-middle-joint-rush-0-shard-3/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-3/balance/runs/20261105-130501-465-middle-joint-rush-0-shard-3/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "kick-chase/rush v kick-chase/compressed",
+      "source": "raw-inputs/42031855951/rush-middle-0-3/balance/runs/20261105-130501-465-middle-joint-rush-0-shard-3/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-3/balance/runs/20261105-130501-465-middle-joint-rush-0-shard-3/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v kick-chase/slide",
+      "source": "raw-inputs/42031855951/rush-middle-0-3/balance/runs/20261105-130501-465-middle-joint-rush-0-shard-3/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-3/balance/runs/20261105-130501-465-middle-joint-rush-0-shard-3/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "expansive/rush v kick-chase/slide",
+      "source": "raw-inputs/42031855951/rush-middle-0-2/balance/runs/20261105-130024-465-middle-joint-rush-0-shard-2/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-2/balance/runs/20261105-130024-465-middle-joint-rush-0-shard-2/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "kick-chase/slide v all-out/rush",
+      "source": "raw-inputs/42031855951/rush-middle-0-2/balance/runs/20261105-130024-465-middle-joint-rush-0-shard-2/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-2/balance/runs/20261105-130024-465-middle-joint-rush-0-shard-2/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/rush v kick-chase/compressed",
+      "source": "raw-inputs/42031855951/rush-middle-0-2/balance/runs/20261105-130024-465-middle-joint-rush-0-shard-2/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-2/balance/runs/20261105-130024-465-middle-joint-rush-0-shard-2/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "kick-chase/compressed v all-out/rush",
+      "source": "raw-inputs/42031855951/rush-middle-0-1/balance/runs/20261105-131207-465-middle-joint-rush-0-shard-1/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-1/balance/runs/20261105-131207-465-middle-joint-rush-0-shard-1/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v kick-chase/compressed",
+      "source": "raw-inputs/42031855951/rush-middle-0-1/balance/runs/20261105-131207-465-middle-joint-rush-0-shard-1/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-1/balance/runs/20261105-131207-465-middle-joint-rush-0-shard-1/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "kick-chase/slide v kick-chase/rush",
+      "source": "raw-inputs/42031855951/rush-middle-0-1/balance/runs/20261105-131207-465-middle-joint-rush-0-shard-1/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-1/balance/runs/20261105-131207-465-middle-joint-rush-0-shard-1/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/rush v kick-chase/rush",
+      "source": "raw-inputs/42031855951/rush-middle-0-1/balance/runs/20261105-131207-465-middle-joint-rush-0-shard-1/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-1/balance/runs/20261105-131207-465-middle-joint-rush-0-shard-1/results.shard-0.jsonl"
+    },
+    {
+      "scenario": "kick-chase/rush v all-out/rush",
+      "source": "raw-inputs/42031855951/rush-middle-0-0/balance/runs/20261105-130912-465-middle-joint-rush-0-shard-0/results.shard-3.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-0/balance/runs/20261105-130912-465-middle-joint-rush-0-shard-0/results.shard-3.jsonl"
+    },
+    {
+      "scenario": "balanced/rush v kick-chase/rush",
+      "source": "raw-inputs/42031855951/rush-middle-0-0/balance/runs/20261105-130912-465-middle-joint-rush-0-shard-0/results.shard-1.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-0/balance/runs/20261105-130912-465-middle-joint-rush-0-shard-0/results.shard-1.jsonl"
+    },
+    {
+      "scenario": "expansive/rush v kick-chase/compressed",
+      "source": "raw-inputs/42031855951/rush-middle-0-0/balance/runs/20261105-130912-465-middle-joint-rush-0-shard-0/results.shard-2.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-0/balance/runs/20261105-130912-465-middle-joint-rush-0-shard-0/results.shard-2.jsonl"
+    },
+    {
+      "scenario": "grind/rush v kick-chase/slide",
+      "source": "raw-inputs/42031855951/rush-middle-0-0/balance/runs/20261105-130912-465-middle-joint-rush-0-shard-0/results.shard-0.jsonl",
+      "workspaceSource": "work/465/ci/42031855951/rush-middle-0-0/balance/runs/20261105-130912-465-middle-joint-rush-0-shard-0/results.shard-0.jsonl"
+    }
+  ],
+  "planShares": {
+    "balanced/rush": 50.175000000000004,
+    "expansive/rush": 51.410714285714285,
+    "all-out/rush": 51.72857142857142,
+    "grind/compressed": 47.753571428571426,
+    "grind/slide": 47.42142857142857,
+    "expansive/compressed": 50.307142857142864,
+    "balanced/compressed": 49.57142857142857,
+    "balanced/slide": 48.83571428571428,
+    "all-out/compressed": 49.83571428571428,
+    "grind/rush": 49.38928571428571,
+    "expansive/slide": 49.471428571428575,
+    "all-out/slide": 50.3,
+    "kick-chase/slide": 50.35000000000001,
+    "kick-chase/rush": 52.67142857142857,
+    "kick-chase/compressed": 50.778571428571425
+  },
+  "neutralSwing": 4.5,
+  "passesBoth": true
+}
