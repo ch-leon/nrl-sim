@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         chunk: [0, 1, 2, 3]
-        profile: [b10-o30, b15-o30, b10-o15, b15-o15]
+        profile: [t04, t05, t06]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,10 +36,11 @@ jobs:
           import fs from 'node:fs';
           const p=JSON.parse(fs.readFileSync('balance/plans/counters-compressed.json','utf8'));
           const c=Number(process.env.COUNTER_CHUNK), profile=process.env.COUNTER_PROFILE;
-          p.base['counters.compressed.brokenBase']=-Number(profile.match(/^b(\d+)/)[1])/1000;
-          p.base['counters.compressed.offloadBase']=-Number(profile.match(/o(\d+)$/)[1])/1000;
+          p.base['counters.compressed.brokenBase']=-0.015;
+          p.base['counters.compressed.offloadBase']=-0.03;
           p.base['counters.compressed.expansive']=0.26;
-          const names=['balanced v compressed','kick-chase v compressed','all-out v compressed','grind v compressed','expansive v compressed'];
+          p.base['counters.compressed.tight']=Number(profile.slice(1))/100;
+          const names=['grind v compressed'];
           const main=structuredClone(p); main.name='Compressed 464 '+profile+' fresh part '+c; main.seeds=125; main.seedStart=1+c*125;
           main.scenarios=names.map(n=>structuredClone(p.scenarios.find(s=>s.name===n))); for(const s of main.scenarios)delete s.seeds;
           const extra=structuredClone(p);extra.name='Compressed 464 Rush extension part '+c;extra.seeds=125;extra.seedStart=501+c*125;extra.scenarios=[structuredClone(p.scenarios.find(s=>s.name==='balanced v rush'))];delete extra.scenarios[0].seeds;
@@ -59,7 +60,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [b10-o30, b15-o30, b10-o15, b15-o15]
+        profile: [t04, t05, t06]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -114,11 +115,13 @@ jobs:
            'all-out v rush':'20261104-204432-rush-all-out-acceptance'};
           const sourceMap={};
           const previous='20261105-013647-compressed-464-final-matrix';
-          for(const key of ['balanced v slide','balanced v rush'])controls[key]=previous;for(const [key,name]of Object.entries(controls)){const rs=rowsOf('.balance-log/runs/'+name).filter(r=>r.scenario===key&&r.variant==='baseline');if(rs.length!==1)throw Error('Missing control '+key);measured[key]=rs[0];sourceMap[key]='balance-log/runs/'+name;}
+          for(const key of ['balanced v slide','balanced v rush'])controls[key]=previous;
+          for(const key of ['balanced v compressed','kick-chase v compressed','all-out v compressed','expansive v compressed'])controls[key]='20261105-015204-compressed-464-b15-o30-matrix';for(const [key,name]of Object.entries(controls)){const rs=rowsOf('.balance-log/runs/'+name).filter(r=>r.scenario===key&&r.variant==='baseline');if(rs.length!==1)throw Error('Missing control '+key);measured[key]=rs[0];sourceMap[key]='balance-log/runs/'+name;}
           const plan=JSON.parse(fs.readFileSync('balance/plans/counters-compressed.json','utf8'));plan.name='Compressed 464 '+process.env.COUNTER_PROFILE+' acceptance matrix';
-          plan.base['counters.compressed.brokenBase']=-Number(process.env.COUNTER_PROFILE.match(/^b(\d+)/)[1])/1000;
-          plan.base['counters.compressed.offloadBase']=-Number(process.env.COUNTER_PROFILE.match(/o(\d+)$/)[1])/1000;
+          plan.base['counters.compressed.brokenBase']=-0.015;
+          plan.base['counters.compressed.offloadBase']=-0.03;
           plan.base['counters.compressed.expansive']=0.26;
+          plan.base['counters.compressed.tight']=Number(process.env.COUNTER_PROFILE.slice(1))/100;
           const results=plan.scenarios.map(s=>{const r=measured[s.name];if(!r||r.trackedSeeds!==2*(s.seeds??plan.seeds))throw Error('Wrong sample '+s.name);return r;});
           const by=Object.fromEntries(results.map(r=>[r.scenario,r])),aa=['grind','expansive','kick-chase','all-out','balanced'],dd=['slide','rush','compressed'],swing=(a,d)=>(by[a+' v '+d].pointsShare.mean-.5)*100;
           const rowSums=Object.fromEntries(aa.map(a=>[a,dd.reduce((n,d)=>n+swing(a,d),0)])),columnSums=Object.fromEntries(dd.map(d=>[d,aa.reduce((n,a)=>n+swing(a,d),0)])),errors=[];
@@ -134,7 +137,7 @@ jobs:
           for(const [name,obj]of [['plan.json',plan],['meta.json',meta],['ACCEPTANCE.json',summary],['TUNED_VALUES.json',{shipped:COUNTERS,enabledOverrides:plan.base}]])fs.writeFileSync(dir+'/'+name,JSON.stringify(obj,null,2)+'\n');
           fs.writeFileSync(dir+'/results.jsonl',results.map(r=>JSON.stringify(r)).join('\n')+'\n');fs.writeFileSync(dir+'/report.md',reportMarkdown({plan,meta,results}));
           if(legacy)fs.writeFileSync(dir+'/legacy-control.json',JSON.stringify(legacy,null,2)+'\n');
-          fs.writeFileSync(dir+'/PROVENANCE.md','# Acceptance provenance\n\nFresh official-harness checkpoints retain every seed 1–500 in both orientations for the five Compressed cells. Balanced/Slide (1000 matches) and Balanced/Rush (2000 matches) reuse the preceding unchanged final-range checkpoints from 20261105-013647-compressed-464-final-matrix. Every block has 125 seeds, played both ways. No seed/orientation is discarded. Source plans, metadata, reports and raw JSON are in inputs/.\n\nEight previously accepted non-balanced Slide/Rush controls and the two unchanged Balanced controls are reused from the balance-log runs listed in meta.json. Neither side has Compressed defence, so the new Compressed profile/counter cannot apply. Their active Tight/fit/Slide/Rush settings exactly match the final plan; changed inactive Compressed defaults cannot alter a replay. Tight/Rush retains all 2000 matches from its existing approved extension.\n\nThe legacy Compressed flat contact profile is a separate calibration control, never pooled into final acceptance. The enabled profile normalizes the flat baseline and localizes its Contact D-scaled middle advantage to Tight; neutral attacks still receive zero matchup-cell modifiers.\n\nPooling: M2_i=SE_i²×n_i×(n_i−1). With pooled mean m, M2=Σ[M2_i+n_i×(mean_i−m)²], SE=sqrt(M2/[N×(N−1)]). Tracked statistics use trackedSeeds; legacy counts use seeds. Rates/legs are match-weighted; wrestle seconds are weighted by wrestle counts. ms sums source cell wall times.\n\nThe committed full plan reproduces the complete consecutive ranges. All signed totals are checked unrounded in ACCEPTANCE.json.\n');
+          fs.writeFileSync(dir+'/PROVENANCE.md','# Acceptance provenance\n\nFresh official-harness checkpoints retain every seed 1–500 in both orientations for Tight/Compressed. The four other Compressed cells reuse unchanged accepted cell settings from 20261105-015204-compressed-464-b15-o30-matrix; changing the Tight knob cannot affect those attacks. Balanced/Slide (1000 matches) and Balanced/Rush (2000 matches) reuse the preceding unchanged final-range checkpoints from 20261105-013647-compressed-464-final-matrix. Every block has 125 seeds, played both ways. No seed/orientation is discarded. Source plans, metadata, reports and raw JSON are in inputs/.\n\nEight previously accepted non-balanced Slide/Rush controls and the two unchanged Balanced controls are reused from the balance-log runs listed in meta.json. The reused Slide/Rush controls have no Compressed defence; the four reused Compressed cells have no Tight/Compressed interaction. Every active counter/profile setting matches the final plan. Their active Tight/fit/Slide/Rush settings exactly match the final plan; changed inactive Compressed defaults cannot alter a replay. Tight/Rush retains all 2000 matches from its existing approved extension.\n\nThe legacy Compressed flat contact profile is a separate calibration control, never pooled into final acceptance. The enabled profile normalizes the flat baseline and localizes its Contact D-scaled middle advantage to Tight; neutral attacks still receive zero matchup-cell modifiers.\n\nPooling: M2_i=SE_i²×n_i×(n_i−1). With pooled mean m, M2=Σ[M2_i+n_i×(mean_i−m)²], SE=sqrt(M2/[N×(N−1)]). Tracked statistics use trackedSeeds; legacy counts use seeds. Rates/legs are match-weighted; wrestle seconds are weighted by wrestle counts. ms sums source cell wall times.\n\nThe committed full plan reproduces the complete consecutive ranges. All signed totals are checked unrounded in ACCEPTANCE.json.\n');
           console.log('ACCEPTANCE_JSON:'+JSON.stringify(summary));console.log(fs.readFileSync(dir+'/report.md','utf8'));
           for(const f of walk(dir)){const content=fs.readFileSync(f,'utf8'),rel=f.slice(dir.length+1),count=Math.ceil(content.length/3000);for(let i=0;i<count;i++)console.log('FILE_PART_JSON:'+JSON.stringify({path:rel,part:i,count,data:content.slice(i*3000,(i+1)*3000)}));}
           fs.writeFileSync('final-run-path.txt',dir+'\n');if(errors.length)process.exitCode=2;
