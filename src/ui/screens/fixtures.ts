@@ -1,5 +1,5 @@
 import { matchupRead, counterRead, fitRead } from '../matchupRead';
-import { teamSheetFromSquad, teamSheetFromRival } from '../../match/league/sheets';
+import { teamSheetFromSquad } from '../../match/league/sheets';
 import { resolveLineup, validTactics } from '../../systems/lineup';
 // src/ui/screens/fixtures.ts — the League sheet: ladder + fixtures (BAK-184, WU-7;
 // Broadcast Quiet 3h). Built from the src/ui/dom.ts helper kit (no Phaser).
@@ -22,7 +22,7 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { formGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
-import { rivalStyle } from '../../systems/rivalRound';
+import { rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { styleLine, whenBehindLine } from '../tacticsBlurbs';
 import { shortName } from './matchReport';
@@ -457,7 +457,7 @@ function nextMatchCard(state: GameState): HTMLElement {
   if (oppClub) {
     const style = rivalStyle(oppClub);
     const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
-    const theirs = teamSheetFromRival(oppClub).roster ?? [];
+    const theirs = rivalSheet(oppClub).roster ?? [];
     line('They play', `${styleLine(style)} · ${fitRead(theirs, style.attack).stars} / ${fitRead(theirs, style.defence).stars}`);
     line('Matchup', matchupRead(ours, theirs, validTactics(state.lineup.tactics), style));
     line('Counters', counterRead(ours, style.defence));

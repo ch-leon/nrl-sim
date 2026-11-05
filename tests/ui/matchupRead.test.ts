@@ -2,13 +2,43 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fitStars, fitRead, matchupRead, counterRead, halfTimeNumbers } from '../../src/ui/matchupRead';
 import { renderPlanFit } from '../../src/ui/planFit';
 import { stubDocument, type StubNode } from './stubDom';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { createNewGame, getState, setState, type RivalClub } from '../../src/core/state';
+import { styleFit } from '../../src/match/league/fit';
+import { teamSheetFromRival, teamSheetFromSquad } from '../../src/match/league/sheets';
+import { rivalMatchSheet } from '../../src/systems/matchday';
+import { rivalSheet } from '../../src/systems/rivalRound';
+import { resolveLineup, validTactics } from '../../src/systems/lineup';
+import { styleLine } from '../../src/ui/tacticsBlurbs';
 import { initLeague } from '../../src/systems/fixtures';
 import { openNextMatch } from '../../src/ui/screens/fixtures';
 import { openRivalSquad } from '../../src/ui/screens/rivalSquad';
 import { showPlanCard } from '../../src/ui/screens/matchOverlay';
 import type { RosterEntry, MatchEvent } from '../../src/sim/events';
 const nine = (n: number): RosterEntry[] => ['prop', 'winger', 'halfback'].map(position => ({ name: 'Kai Jones', position: position as RosterEntry['position'], stats: { speed:n, strength:n, skill:n, stamina:n, footyIQ:n } }));
+
+/** Assert the rendered fit and comparison use the same nine that will kick off. */
+function expectScoutingMatchesKickoff(rival: RivalClub) {
+  const state = getState();
+  setState({ league: { ...state.league,
+    clubs: state.league.clubs.map(c => c.id === rival.id ? rival : c),
+    fixtures: [{ round: state.week, homeId: state.clubId, awayId: rival.id }],
+  } });
+  const kickoff = rivalMatchSheet(rival);
+  expect(rivalSheet(rival)).toEqual(kickoff);
+  const theirs = kickoff.roster ?? [];
+  const style = kickoff.tactics!;
+  const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
+  const stars = `${fitRead(theirs, style.attack).stars} / ${fitRead(theirs, style.defence).stars}`;
+  const read = matchupRead(ours, theirs, validTactics(state.lineup.tactics), style);
+  const fixture = openNextMatch() as unknown as StubNode;
+  expect(fixture.querySelector('[data-preview-line="They play"]')?.textContent).toBe(`They play${styleLine(style)} · ${stars}`);
+  expect(fixture.querySelector('[data-preview-line="Matchup"]')?.textContent).toBe(`Matchup${read}`);
+  openRivalSquad(rival);
+  const body = document.body as unknown as StubNode;
+  expect(body.querySelector('[data-usual-fit]')?.textContent).toContain(stars.replace(' / ', '/'));
+  expect(body.querySelector('[data-matchup]')?.textContent).toBe(read);
+  return kickoff;
+}
 afterEach(() => vi.unstubAllGlobals());
 describe('strategy readouts #467', () => {
   it('maps fit bands, clamped at zero and three stars', () => {
@@ -55,6 +85,31 @@ describe('strategy readouts #467', () => {
     openRivalSquad(rival);
     expect(document.body.textContent).toContain('Usual:');
     expect(document.body.textContent).toContain('Try ');
+  });
+  it('scouts seed 467 Cairns from its selected nine, not synthetic players', () => {
+    stubDocument();
+    createNewGame('Readouts', 467);
+    setState({ league: initLeague(getState()) });
+    const cairns = getState().league.clubs.find(c => c.id === 'rival-cyclones')!;
+    const kickoff = expectScoutingMatchesKickoff(cairns);
+    expect(kickoff.tactics!.defence).toBe('slide');
+    expect(styleFit(kickoff.roster ?? []).slide).toBeCloseTo(0.97, 2);
+    expect(fitRead(kickoff.roster ?? [], 'slide').stars).toBe('★☆☆');
+    expect(fitRead(teamSheetFromRival(cairns).roster ?? [], 'slide').stars).toBe('★★☆');
+  });
+  it.each(['unavailable starters', 'missing squad', 'short squad'] as const)('scouting follows kick-off selection with %s', (mode) => {
+    stubDocument();
+    createNewGame('Readouts', 467);
+    setState({ league: initLeague(getState()) });
+    const cairns = getState().league.clubs.find(c => c.id === 'rival-cyclones')!;
+    const excluded = rivalMatchSheet(cairns).roster!.slice(0, 2).map(p => p.id);
+    const { squad, ...legacy } = cairns;
+    const rival = mode === 'missing squad' ? legacy : { ...cairns, squad: mode === 'short squad' ? squad!.slice(0, 8) : squad!.map(p =>
+      p.id === excluded[0] ? { ...p, injuredWeeks: 2 } : p.id === excluded[1] ? { ...p, suspendedWeeks: 2 } : p) };
+    const kickoff = expectScoutingMatchesKickoff(rival);
+    if (mode === 'unavailable starters') {
+      for (const id of excluded) expect(kickoff.roster!.some(p => p.id === id)).toBe(false);
+    } else expect(kickoff).toEqual(teamSheetFromRival(rival));
   });
   it('renders eight fitted plan buttons and three half-time counts', () => {
     stubDocument();

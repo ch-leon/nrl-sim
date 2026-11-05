@@ -1,5 +1,5 @@
 import { matchupRead, counterRead, fitRead } from '../matchupRead';
-import { teamSheetFromSquad, teamSheetFromRival } from '../../match/league/sheets';
+import { teamSheetFromSquad } from '../../match/league/sheets';
 import { resolveLineup, validTactics } from '../../systems/lineup';
 // src/ui/screens/rivalSquad.ts — read-only view of a rival club's squad, opened
 // from the Ladder (GitHub #74). A sheet over the League (Broadcast Quiet, like
@@ -12,7 +12,7 @@ import { overallRating } from '../../data/player';
 import { traitLabel } from '../../data/traits';
 import { button, el, ensureStyles, openModal, screenKey } from '../dom';
 import { openFixturesScreen, openLadderScreen } from './fixtures';
-import { rivalStyle } from '../../systems/rivalRound';
+import { rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { getState, setState } from '../../core/state';
 import { save } from '../../core/save';
@@ -221,7 +221,7 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
     const style = rivalStyle(club);
     const state = getState();
     const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
-    const theirs = teamSheetFromRival(club).roster ?? [];
+    const theirs = rivalSheet(club).roster ?? [];
     const behind = hasStaff(getState(), 'analyst') ? whenBehindLine(style) : null;
     const line = (text: string, attrs: Record<string, string>): HTMLElement => el('p', { text, attrs: { ...attrs, title: text } });
     const title = el('h2', { text: club.name });
