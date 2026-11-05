@@ -25,9 +25,9 @@ describe('strategy readouts #467', () => {
   });
   it('reads positive, negative and neutral cells with both fits', () => {
     const them = { attack: 'balanced', defence: 'slide' } as const;
-    expect(matchupRead(nine(60), nine(60), {attack:'grind',defence:'slide'}, them)).toBe('Tight v Slide: has a gap. Fits are close.');
-    expect(matchupRead(nine(40), nine(80), {attack:'expansive',defence:'slide'}, them)).toBe('Expansive v Slide: faces a counter. Their fit is stronger.');
-    expect(matchupRead(nine(80), nine(40), {attack:'balanced',defence:'slide'}, them)).toContain('fit decides. Your fit is stronger.');
+    expect(matchupRead(nine(60), nine(60), {attack:'grind',defence:'slide'}, them)).toBe('Tight v Slide: has room. Fits are close.');
+    expect(matchupRead(nine(40), nine(80), {attack:'expansive',defence:'slide'}, them)).toBe('Expansive v Slide: countered. They fit better.');
+    expect(matchupRead(nine(80), nine(40), {attack:'balanced',defence:'slide'}, them)).toContain('even. You fit better.');
     expect(counterRead(nine(60), 'slide')).toBe('Try Tight ★★☆ or All-out ★★☆.');
     expect(counterRead(nine(60), 'rush')).toBe('Try Kick-chase ★★☆.');
     expect(counterRead(nine(60), 'compressed')).toBe('Try Expansive ★★☆.');

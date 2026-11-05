@@ -40,8 +40,8 @@ const MATRIX: Record<AttackPreset, Record<DefencePreset, number>> = {
 export function matchupRead(yours: readonly RosterEntry[], theirs: readonly RosterEntry[], you: TeamTactics, them: TeamTactics): string {
   const a = styleFit(yours)[you.attack], d = styleFit(theirs)[them.defence];
   const cell = MATRIX[you.attack][them.defence];
-  const read = cell === 0 || a === 0 || d === 0 ? 'fit decides' : cell > 0 ? 'has a gap' : 'faces a counter';
-  const fit = a > d + 0.1 ? 'Your fit is stronger.' : d > a + 0.1 ? 'Their fit is stronger.' : 'Fits are close.';
+  const read = cell === 0 || a === 0 || d === 0 ? 'even' : cell > 0 ? 'has room' : 'countered';
+  const fit = a > d + 0.1 ? 'You fit better.' : d > a + 0.1 ? 'They fit better.' : 'Fits are close.';
   return `${PRESET_LABEL[you.attack]} v ${PRESET_LABEL[them.defence]}: ${read}. ${fit}`;
 }
 export function counterRead(yours: readonly RosterEntry[], defence: DefencePreset): string {
