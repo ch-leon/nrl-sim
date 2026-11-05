@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Tight tactics now describe forward carries and offloads throughout the plan sheets and guides; old saves keep their plan ([PR](https://github.com/ch-leon/nrl-sim/pull/507)).
+
 - Plans now counter each other by default, with squad fit and offload-heavy Tight for strong packs ([PR](https://github.com/ch-leon/nrl-sim/pull/506); see `docs/status/2026-11-counters.md`).
 
 - New careers arrive as an expansion club: the football manager introduces the club, bank and first-year board goals before the grounds; News and the first season review carry the same framing ([PR](https://github.com/ch-leon/nrl-sim/pull/504)).
