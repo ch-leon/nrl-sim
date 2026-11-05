@@ -279,3 +279,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261105-055656-465-enabled-soak | 465 enabled soak | 9e93548fb87e870205877d8cfa6f3e5157be80b8 | issue-465-strategy-counters | [report](runs/20261105-055656-465-enabled-soak/report.md) |
 | 20261105-142822-465-paired-final | 465 final paired counters acceptance | 137d483 | issue-465-strategy-counters | [report](runs/20261105-142822-465-paired-final/report.md) |
 | 20261105-151919-standard | standard | ce2c57b | main | [report](runs/20261105-151919-standard/report.md) |
+| 20261105-153317-presets | presets | ce2c57b | HEAD | [report](runs/20261105-153317-presets/report.md) |
+| 20261105-154203-presets | presets | ce2c57b (uncommitted changes) | codex/487-preseason-trials | [report](runs/20261105-154203-presets/report.md) |
