@@ -1,0 +1,34 @@
+{
+  "commit": "26f466a",
+  "branch": "feat/463-rush-counters",
+  "started": "2026-11-04T21:08:43.958803+00:00",
+  "pooled": true,
+  "sourceRuns": [
+    "20261104-205756-rush-kick-0-39-acceptance-1",
+    "20261104-205756-rush-kick-0-39-acceptance-3",
+    "20261104-205758-rush-kick-0-39-acceptance-2",
+    "20261104-205758-rush-kick-0-39-acceptance-4"
+  ],
+  "seedRanges": [
+    [
+      1,
+      125,
+      "20261104-205756-rush-kick-0-39-acceptance-1"
+    ],
+    [
+      251,
+      375,
+      "20261104-205756-rush-kick-0-39-acceptance-3"
+    ],
+    [
+      126,
+      250,
+      "20261104-205758-rush-kick-0-39-acceptance-2"
+    ],
+    [
+      376,
+      500,
+      "20261104-205758-rush-kick-0-39-acceptance-4"
+    ]
+  ]
+}

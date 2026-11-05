@@ -1,0 +1,116 @@
+{
+  "name": "Compressed 464 retain-bust fresh part 2",
+  "description": "Full 5 by 3 matrix at flat 60 and neutral fit with all counters enabled. Compressed uses its enabled neutral contact baseline; middle benefits belong to the Tight cell. Most cells use 500 seeds both ways (1000 matches); Tight v Rush and Balanced v Rush retain 1000 seeds both ways (2000 matches).",
+  "report": "matrix",
+  "seeds": 125,
+  "scenarios": [
+    {
+      "name": "balanced v compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase v compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "all-out v compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind v compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive v compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ],
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.rush.on": 1,
+    "counters.compressed.on": 1,
+    "counters.compressed.tight": 0.07,
+    "counters.compressed.expansive": 0.2,
+    "counters.compressed.commitM": 6,
+    "counters.compressed.brokenBase": -0.02,
+    "counters.compressed.offloadBase": 0
+  },
+  "seedStart": 251
+}

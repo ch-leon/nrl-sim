@@ -239,3 +239,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261104-222934-standard | standard | cc956b2 | main | [report](runs/20261104-222934-standard/report.md) |
 | 20261105-002944-standard | standard | eba6d46 | main | [report](runs/20261105-002944-standard/report.md) |
 | 20261105-013647-compressed-464-final-matrix | Compressed 464 calibration (rejected) | cd5ffce | feat/464-compressed-counters | [report](runs/20261105-013647-compressed-464-final-matrix/report.md) |
+| 20261105-014435-compressed-464-retain-bust-matrix | Compressed 464 retain-bust calibration (rejected) | 376cfa7 | feat/464-compressed-counters | [report](runs/20261105-014435-compressed-464-retain-bust-matrix/report.md) |
+| 20261105-014435-compressed-464-retain-offload-matrix | Compressed 464 retain-offload calibration (rejected) | 376cfa7 | feat/464-compressed-counters | [report](runs/20261105-014435-compressed-464-retain-offload-matrix/report.md) |

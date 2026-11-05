@@ -1,0 +1,40 @@
+{
+  "name": "Rush Kick-chase acceptance pooled",
+  "description": "kick-chase v rush: 1000 whole matches, consecutive seeds 1\u2013500 in both orientations. Pooled completed harness runs; original inputs and sample-variance formula are preserved in PROVENANCE.md.",
+  "report": "matrix",
+  "seeds": 500,
+  "seedStart": 1,
+  "base": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.slide.expansive": 0.08,
+    "counters.slide.kickChase": 1.5,
+    "counters.slide.tight": 0.04,
+    "counters.slide.allOut": 0.5,
+    "counters.rush.on": 1,
+    "counters.rush.kickChase": 0.39,
+    "counters.rush.allOut": 0.06
+  },
+  "scenarios": [
+    {
+      "name": "kick-chase v rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}

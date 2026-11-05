@@ -1,0 +1,47 @@
+{
+  "shipped": {
+    "compressed": {
+      "on": 0,
+      "tight": 0.07,
+      "expansive": 0.2,
+      "brokenBase": 0,
+      "offloadBase": 0,
+      "commitM": 6
+    },
+    "rush": {
+      "on": 0,
+      "carry": 0.004,
+      "defenceFit": 0.12,
+      "kickChase": 0.39,
+      "allOut": 0.06
+    },
+    "slide": {
+      "on": 0,
+      "expansive": 0.08,
+      "kickChase": 1.5,
+      "tight": 0.04,
+      "allOut": 0.5
+    },
+    "fit": {
+      "on": 0,
+      "edge": 0.11
+    },
+    "tight": {
+      "on": 0,
+      "offloadBase": 1,
+      "offloadPerFit": 12
+    }
+  },
+  "enabledOverrides": {
+    "counters.tight.on": 1,
+    "counters.fit.on": 1,
+    "counters.slide.on": 1,
+    "counters.rush.on": 1,
+    "counters.compressed.on": 1,
+    "counters.compressed.tight": 0.07,
+    "counters.compressed.expansive": 0.2,
+    "counters.compressed.commitM": 6,
+    "counters.compressed.brokenBase": 0,
+    "counters.compressed.offloadBase": -0.03
+  }
+}
