@@ -26,15 +26,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 0.8 }
-          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 1.2 }
-          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 1.6 }
-          - { plan: fit-response, cell: 1, knob: counters.compressed.tightFit, value: 0.6 }
-          - { plan: fit-response, cell: 1, knob: counters.compressed.tightFit, value: 1.0 }
-          - { plan: fit-response, cell: 1, knob: counters.compressed.tightFit, value: 1.4 }
-          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: 1.0 }
-          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: 1.5 }
-          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: 2.0 }
+          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 0.2 }
+          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 0.4 }
+          - { plan: fit-response, cell: 0, knob: counters.slide.expansiveFit, value: 0.6 }
+          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: -0.2 }
+          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: -0.4 }
+          - { plan: fit-response, cell: 2, knob: counters.slide.allOutFit, value: -0.6 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
