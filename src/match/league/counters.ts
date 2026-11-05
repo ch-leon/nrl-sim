@@ -11,6 +11,7 @@ export const COUNTERS = {
     brokenBase: -0.015,
     offloadBase: -0.03,
     commitM: 10,
+    commitFit: 0,
   },
   rush: {
     on: 1,
@@ -86,4 +87,11 @@ export function compressedCounter(attack: AttackPreset, defence: DefencePreset, 
   if (COUNTERS.compressed.on !== 1 || defence !== 'compressed') return 0;
   const cell = attack === 'grind' ? COUNTERS.compressed.tight : attack === 'expansive' ? COUNTERS.compressed.expansive : 0;
   return matchupStrength(cell, attackFit, defenceFit, attack === 'grind' ? COUNTERS.compressed.tightFit : 0);
+}
+
+/** A better-fitted Compressed middle reads help earlier; neutral reach is unchanged. */
+export function compressedCommitReach(attackFit: number, defenceFit: number): number {
+  if (COUNTERS.compressed.on !== 1) return 0;
+  return COUNTERS.compressed.commitM * attackFit * defenceFit *
+    Math.max(0, 1 + COUNTERS.compressed.commitFit * Math.max(0, defenceFit - attackFit));
 }

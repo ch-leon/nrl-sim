@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compressedCounter, rushCounter, slideCounter } from '../../../src/match/league/counters';
+import { compressedCommitReach, compressedCounter, rushCounter, slideCounter } from '../../../src/match/league/counters';
 import { applyTuning } from '../../../src/match/league/tuning';
 
 describe('counter calibration for unequal fits (#465)', () => {
@@ -55,6 +55,20 @@ describe('counter calibration for unequal fits (#465)', () => {
         try { expect(cells.map((cell) => cell(.5, 1.5))).toEqual(unequal); }
         finally { off(); }
       } finally { on(); }
+    } finally { restore(); }
+  });
+
+  it('extends existing middle help only for a Compressed fit advantage, preserving neutral and strong-pack reach', () => {
+    const restore = applyTuning({ 'counters.compressed.on': 1, 'counters.compressed.commitM': 10, 'counters.compressed.commitFit': 1.5 });
+    try {
+      expect(compressedCommitReach(1, 1)).toBe(10);
+      expect(compressedCommitReach(1.25, 1)).toBe(12.5);
+      expect(compressedCommitReach(.5, 1.5)).toBe(18.75);
+      expect(compressedCommitReach(1.5, .5)).toBe(7.5);
+      expect(compressedCommitReach(0, 1.5)).toBe(0);
+      const off = applyTuning({ 'counters.compressed.on': 0 });
+      try { expect(compressedCommitReach(.5, 1.5)).toBe(0); }
+      finally { off(); }
     } finally { restore(); }
   });
 

@@ -18,7 +18,7 @@ import { injuryChance, lostInContactChance } from '../weather';
 import { TOUCH } from '../touch';
 import { BIN } from '../sinbin';
 import { derivedRatings } from '../fit';
-import { COUNTERS, allOutRecoveryTicks, rushBroken } from '../counters';
+import { COUNTERS, allOutRecoveryTicks, compressedCommitReach, rushBroken } from '../counters';
 import { BACKS, PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
 import { other, type Player, type Phase } from './types';
@@ -406,11 +406,11 @@ export abstract class LiveContact extends LivePenalties {
     // A broken line (two or fewer still in front) sends everyone in range after him.
     const n = ahead <= 2 ? 4 : free[2] && dist(free[2].body.pos, h.body.pos) < 5 ? 3 : 2;
     // Gang-tackle with a nearby spare man, rather than dragging an edge defender
-    // across the pitch. Both starting fits set how far the help can reach.
+    // across the pitch. Both fits set reach; a fitted middle reads help earlier.
     let squeeze = 0;
     if (this.tactics[h.side].attack === 'grind' && Math.abs(h.body.pos.y - MID_Y) <= MAX_LAT_M && this.compressedEffect(h.side) > 0) {
       const help = free[n + dplan.commit];
-      const reach = COUNTERS.compressed.commitM * this.planFit[h.side].attack * this.planFit[other(h.side)].defence;
+      const reach = compressedCommitReach(this.planFit[h.side].attack, this.planFit[other(h.side)].defence);
       if (help && dist(help.body.pos, h.body.pos) <= reach) squeeze = 1;
     }
     return free.slice(0, Math.min(4, n + dplan.commit + squeeze));
