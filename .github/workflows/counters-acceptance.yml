@@ -1,0 +1,123 @@
+name: Strategy counters acceptance
+
+# The switch-on acceptance is much larger than the routine PR checks. Keep its
+# raw balance/soak evidence and phone screenshots as artifacts, never commits.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/counters-acceptance.yml'
+      - 'balance/plans/counters-enabled.json'
+      - 'balance/plans/counters-fit-enabled.json'
+      - 'balance/plans/counters-full-fit.json'
+      - 'balance/plans/counters-round-robin.json'
+      - 'balance/plans/counters-strong-pack.json'
+      - 'balance/plans/counters-yardstick.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: counters-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        plan: [enabled, yardstick, fit-enabled, full-fit, round-robin, strong-pack]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run balance -- --plan balance/plans/counters-${{ matrix.plan }}.json --jobs 4 2>&1 | tee balance.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-${{ matrix.plan }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
+
+  baseline-soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: git rev-parse HEAD > baseline-commit.txt
+      - run: npm run soak -- --difficulties easy,normal,hard --jobs 4 --json soak-main.json 2>&1 | tee soak-main.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-soak-main
+          path: |
+            baseline-commit.txt
+            soak-main.json
+            soak-main.log
+          retention-days: 7
+
+  enabled-soak:
+    needs: baseline-soak
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run soak -- --difficulties easy,normal,hard --jobs 4 --json soak-enabled.json 2>&1 | tee soak-enabled.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-soak-enabled
+          path: |
+            soak-enabled.json
+            soak-enabled.log
+          retention-days: 7
+
+  phone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [667x375, 844x390]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run e2e:season -- --size ${{ matrix.size }} 2>&1 | tee phone.log
+        env:
+          CHROMIUM_PATH: /usr/bin/google-chrome
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-phone-${{ matrix.size }}
+          path: |
+            e2e-output
+            !e2e-output/**/dist/**
+            phone.log
+          retention-days: 7

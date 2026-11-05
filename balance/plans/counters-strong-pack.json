@@ -1,0 +1,99 @@
+{
+  "name": "465 strong pack offloads",
+  "description": "Strength-80 pack Tight against each defence, paired dormant/enabled controls; 1000 matches per cell.",
+  "report": "matrix",
+  "seeds": 500,
+  "base": {
+    "counters.tight.on": 0,
+    "counters.fit.on": 0,
+    "counters.slide.on": 0,
+    "counters.rush.on": 0,
+    "counters.compressed.on": 0
+  },
+  "variants": [
+    {
+      "name": "enabled",
+      "tuning": {
+        "counters.tight.on": 1,
+        "counters.fit.on": 1,
+        "counters.slide.on": 1,
+        "counters.rush.on": 1,
+        "counters.compressed.on": 1
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "strong pack Tight v slide",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "pack": {
+            "strength": 80
+          }
+        },
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "strong pack Tight v rush",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "pack": {
+            "strength": 80
+          }
+        },
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "strong pack Tight v compressed",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "pack": {
+            "strength": 80
+          }
+        },
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
+  ]
+}
