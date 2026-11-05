@@ -458,7 +458,12 @@ async function play() {
     if (!(await skip.count())) return 'no tutorial shown';
   });
   await step('tutorial-skipped', async (rec) => { await tap('.nrl-tutorial-skip'); await dumpSave('after-tutorial', rec); });
-  await step('pre-season-trials', async () => { await playTrials(page); });
+  await step('pre-season-trials', async () => {
+    await page.evaluate(() => sessionStorage.setItem('nrlE2eCloseSummary', '1'));
+    await playTrials(page);
+    await wait(500);
+    await page.evaluate(() => sessionStorage.removeItem('nrlE2eCloseSummary'));
+  });
 
   // A phone held upright: the menus work (#350), so the sheet left open (the tour's
   // Build) stays up, or Club home stands in for the grounds, with no rotate card; the

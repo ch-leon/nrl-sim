@@ -115,7 +115,9 @@ export function boardMood(patience: number, risk: ObjectiveRisk | null): BoardMo
 export function weekSummary(before: WeekSnapshot, after: WeekSnapshot): WeekSummary {
   const weeks = weeksBetween(before, after);
   const lastWeek = after.week - 1;
-  const title = weeks <= 1 && before.preseason && before.week === 1 ? `Pre-season trial ${before.preseason}` : weeks <= 1 ? `Week ${before.week}` : before.season === after.season && lastWeek >= before.week
+  const trialStart = before.week === 1 && before.preseason;
+  const title = trialStart ? (weeks <= 1 ? `Pre-season trial ${before.preseason}` : `Last ${weeks} weeks`)
+    : weeks <= 1 ? `Week ${before.week}` : before.season === after.season && lastWeek >= before.week
     ? `Weeks ${before.week}–${lastWeek}` : `Last ${weeks} weeks`;
 
   const was = new Map(before.squad.map((p) => [p.id, p] as const));

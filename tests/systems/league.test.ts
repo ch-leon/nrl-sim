@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/league.test.ts — rival strength drift + reputation from results (#37).
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -5,7 +6,7 @@ import {
 } from '../../src/systems/league';
 import { RIVAL_CLUBS } from '../../src/data/league';
 import { registerFixturesSystem, initLeague } from '../../src/systems/fixtures';
-import { createNewGame, getState, setState, type RivalClub } from '../../src/core/state';
+import { getState, setState, type RivalClub } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { advanceWeeks, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
 import { WEEKS_PER_SEASON } from '../../src/config';

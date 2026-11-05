@@ -131,7 +131,7 @@ export function generateTrialFixtures(clubIds: string[], seed: number): Fixture[
       { round: 0, homeId: ids[i + half]!, awayId: ids[(i + 1) % half]! },
     );
   }
-  return fixtures;
+  return fixtures.sort((a, b) => a.round - b.round);
 }
 
 /** Rotate all but the first element one step (circle-method step). */
