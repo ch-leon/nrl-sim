@@ -177,6 +177,7 @@ export async function playPhoneWeek(page, onResult = async () => {}) {
   await page.locator('.nrl-mo-ft [data-back-to-club]').waitFor({ timeout: 120000 });
   await onResult();
   await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate(n => n.click());
+  await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
   await page.waitForFunction(b => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason}` !== b; }, before);
 }
 
