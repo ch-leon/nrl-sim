@@ -68,7 +68,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     if (b) {
       const cs = getComputedStyle(b);
       const c = document.createElement('canvas').getContext('2d');
-      c.font = cs.font;
+      c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
       const shortWidth = c.measureText('TGT').width + 3 * (parseFloat(cs.letterSpacing) || 0);
       const available = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       if (shortWidth > available + 1) out.push('TGT short label exceeds chip width');
@@ -120,6 +120,11 @@ export async function runPlaytest(browser, W = 667, H = 375) {
   }
   for (const m of [1, 2]) {
     await textSize(m === 1 ? 'normal' : 'large');
+    // Start Balanced so selecting Tight at half-time records a real change.
+    await openNav(page, 'lineup');
+    await page.locator('.nrl-screen-tools [data-plan]').tap();
+    await page.locator('.nrl-lineup-tac [data-tactic="balanced"]').tap();
+    await page.locator('.nrl-lineup-plan [data-plan-done]').tap();
     await step(`half-time-match-${m}`, async (rec) => {
       if (await page.locator('.nrl-screen-region').count()) await page.locator(SHEET_EXIT).tap();
       await page.locator('.nrl-dock [data-hud="advance"]').tap();
@@ -137,9 +142,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
       }, null, { timeout: 300000, polling: 50 }).then((h) => h.jsonValue());
       rec.notes.push(seen === 'card' ? 'half-time card up' : 'second half kicked off with no card');
       if (seen === 'card') {
-        // Select another plan first so the change back to Tight also reaches
-        // commentary and the match report with the historical grind event id.
-        await page.locator('.nrl-mo-plan [data-tactic="balanced"]').tap();
+        // The real change reaches commentary and the report as grind/<defence>.
         await page.locator('.nrl-mo-plan [data-tactic="grind"]').tap();
         const problems = await tightProblems('.nrl-mo-plan');
         if (problems.length) throw new Error(problems.join('; '));
