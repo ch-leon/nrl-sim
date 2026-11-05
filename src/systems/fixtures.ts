@@ -28,6 +28,7 @@ import { registerTickHook, registerSeasonHook, resumeWeek, TICK_ORDER, type Tick
 import { applyRivalResults, canUseWorker, playRivalJob, playRivalJobsInWorker, rivalJobs } from './rivalRound';
 import { applyBoardReview } from './board';
 import { SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, DEFAULT_PLAYER_COLORS } from '../config';
+import { activePack, onPackChange } from '../content';
 import { RIVAL_CLUBS } from '../data/league';
 import { bus } from '../core/events';
 import { strengthChanges, applySeasonReputation } from './league';
@@ -39,15 +40,15 @@ import { rolloverRivals, withRivalSquads } from './rivals';
 export const PLAYER_ID = 'player';
 
 /** Fixtures per round for a 16-club, no-bye competition. */
-export const FIXTURES_PER_ROUND = 8;
+export let FIXTURES_PER_ROUND = 8;
 
 /** Number of clubs in the competition (15 rivals + player). */
-export const LEAGUE_SIZE = RIVAL_CLUBS.length + 1;
+export let LEAGUE_SIZE = RIVAL_CLUBS.length + 1;
 
 // Finals round numbers (weeks 25..27 = SEASON_ROUNDS + 1..3).
-const QF_ROUND = SEASON_ROUNDS + 1; // 25
-const SF_ROUND = SEASON_ROUNDS + 2; // 26
-const GF_ROUND = SEASON_ROUNDS + 3; // 27
+let QF_ROUND = SEASON_ROUNDS + 1; // 25
+let SF_ROUND = SEASON_ROUNDS + 2; // 26
+let GF_ROUND = SEASON_ROUNDS + 3; // 27
 
 /** Reputation granted for winning the premiership (grand final). */
 export const PREMIERSHIP_REP_BONUS = 15;
@@ -763,5 +764,14 @@ export function registerFixturesSystem(): void {
 }
 
 /** Finals round numbers, exported for the orchestrator / UI. */
-export const FINALS_ROUNDS = { QF: QF_ROUND, SF: SF_ROUND, GF: GF_ROUND } as const;
+export const FINALS_ROUNDS = { get QF() { return QF_ROUND; }, get SF() { return SF_ROUND; }, get GF() { return GF_ROUND; } } as const;
 export { FINALS_WEEKS };
+
+onPackChange(() => {
+  const pack = activePack();
+  LEAGUE_SIZE = pack.clubs.length + 1;
+  FIXTURES_PER_ROUND = LEAGUE_SIZE / 2;
+  QF_ROUND = pack.league.seasonRounds + 1;
+  SF_ROUND = pack.league.seasonRounds + 2;
+  GF_ROUND = pack.league.seasonRounds + 3;
+});

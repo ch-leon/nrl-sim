@@ -34,7 +34,7 @@ import { inlineIqStat } from '../content/pack';
 const STAT_KEYS: readonly (keyof PlayerStats)[] = ['speed', 'strength', 'stamina', 'skill', 'footyIQ'];
 // The IQ stat's name comes from the content pack (#361), as on the player page.
 const STAT_WORD: Readonly<Record<keyof PlayerStats, string>> = {
-  speed: 'speed', strength: 'strength', stamina: 'stamina', skill: 'skill', footyIQ: inlineIqStat(activePack()),
+  speed: 'speed', strength: 'strength', stamina: 'stamina', skill: 'skill', get footyIQ() { return inlineIqStat(activePack()); },
 };
 
 /** What the card compares: the club as it stood at one moment. Plain data, kept in memory only. */

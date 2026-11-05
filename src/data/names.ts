@@ -3,11 +3,11 @@
 // deterministic name picker. No Phaser.
 
 import type { Rng } from '../utils/rng';
-import { activePack } from '../content';
+import { activePack, onPackChange } from '../content';
 
-export const FIRST_NAMES: readonly string[] = activePack().names.first;
+export let FIRST_NAMES: readonly string[] = activePack().names.first;
 
-export const SURNAMES: readonly string[] = activePack().names.last;
+export let SURNAMES: readonly string[] = activePack().names.last;
 
 /** `${pick(FIRST_NAMES)} ${pick(SURNAMES)}` using the seeded RNG. */
 export function randomName(rng: Rng): string {
@@ -36,3 +36,8 @@ export function cleanName(raw: string): NameCheck {
   if (length > NAME_MAX) return { ok: false, why: `At most ${NAME_MAX} characters` };
   return { ok: true, name };
 }
+
+onPackChange(() => {
+  FIRST_NAMES = activePack().names.first;
+  SURNAMES = activePack().names.last;
+});

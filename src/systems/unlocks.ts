@@ -25,7 +25,7 @@ export const UNLOCK_LADDER: readonly {
     facilities: [] as FacilityDefId[], screens: [row.id], trigger: 'screen' as const,
     ...(row.round === null ? {} : { round: row.round }), reason: row.reason,
   })),
-  { facilities: ['grandstand'], trigger: 'lastRoundOrReputation', reason: `Opens at round ${SEASON_ROUNDS}, or reputation 40` },
+  { facilities: ['grandstand'], trigger: 'lastRoundOrReputation', get reason() { return `Opens at round ${SEASON_ROUNDS}, or reputation 40`; } },
 ];
 
 export function isFacilityOpen(state: Pick<GameState, 'unlocks'>, id: FacilityDefId): boolean {

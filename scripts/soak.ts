@@ -5,6 +5,7 @@
 //   npm run soak -- --seasons 3 --seeds 5
 //   npm run soak -- --difficulties easy,normal,hard   idle + managed on each difficulty (#148)
 //   npm run soak -- --managed-only --difficulties easy,normal,hard   managed career guardrails
+//   npm run soak -- --pack uk               UK careers (old saves remain AU)
 //   npm run soak -- --json out.json      also write every run's samples to a file
 //   npm run soak -- --jobs 4             split the runs over 4 processes (same results, in order)
 //   npm run soak -- --live-rivals        rival rounds on the live sim too (N9.2's setting; several times slower),
@@ -28,6 +29,7 @@
 // fresh-game runs. The game plays those only in a week that is not
 // fast-forwarded, so the runs advance a week at a time like a player tapping
 // Advance Week, and in Node (no Worker) each round's seven matches play in place.
+import { preparePack } from '../src/content';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,6 +50,9 @@ const str = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : undefined;
 };
+const pack = str('pack') ?? 'au';
+if (pack !== 'au' && pack !== 'uk') throw new Error('--pack must be au or uk');
+await preparePack(pack);
 const jsonOut = str('json');
 const shard = str('shard');
 if (args.includes('--shard') && !shard) throw new Error('--shard requires i/n');
@@ -69,6 +74,7 @@ const childIn = str('child');
 if (childIn) {
   const out = str('out')!;
   const specs = JSON.parse(readFileSync(childIn, 'utf8')) as SoakOptions[];
+  for (const spec of specs) await preparePack(spec.pack ?? 'au');
   writeFileSync(out, JSON.stringify(specs.map((o) => runSoak(o))));
   process.exit(0);
 }
@@ -79,14 +85,15 @@ const specs: SoakOptions[] = [];
 for (let seed = 1; seed <= seeds; seed++) {
   if (difficulties) {
     for (const difficulty of difficulties) {
-      for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, difficulty, ...live });
+      for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, difficulty, ...live, pack });
     }
   } else {
-    for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, ...live });
-    if (!args.includes('--managed-only')) specs.push({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard', ...live });
+    for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, ...live, pack });
+    if (!args.includes('--managed-only')) specs.push({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard', ...live, pack });
   }
 }
-for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
+// Old saves have no pack id and remain AU. UK runs contain only UK careers.
+if (pack === 'au') for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
 const selectedSpecs = shardCases(specs, shard);
 if (shard) console.log(`Soak case shard ${shard}: ${selectedSpecs.length} of ${specs.length} unchanged cases.`);
 

@@ -231,3 +231,33 @@ describe('town suggestions (#485)', () => {
     expect([...NICKNAMES, ...(towns as Town[]).map(t => t.nickname)].filter(n => re.test(n))).toEqual([]);
   });
 });
+
+import { UK_PACK } from '../../src/content/uk';
+import { townColorsAllowed } from '../../src/data/townSetup';
+
+// Super League / Championship identities, past as well as current. Towns may be
+// real but no club takes their name, nickname or city/kit identity.
+const UK_CLUB_MARKS = ['Wigan Warriors', 'St Helens', 'Leeds Rhinos', 'Warrington Wolves', 'Hull FC', 'Hull KR', 'Hull Kingston Rovers', 'Castleford Tigers', 'Wakefield Trinity', 'Bradford Bulls', 'Salford Red Devils', 'Huddersfield Giants', 'Leigh Leopards', 'London Broncos', 'Catalans Dragons', 'Toulouse Olympique', 'Featherstone Rovers', 'Halifax Panthers', 'Batley Bulldogs', 'Dewsbury Rams', 'Barrow Raiders', 'Whitehaven', 'Workington Town', 'Widnes Vikings', 'Swinton Lions', 'Oldham Roughyeds', 'Rochdale Hornets', 'Sheffield Eagles', 'Doncaster', 'Hunslet', 'York Knights', 'Rhinos', 'Trinity', 'Bulls', 'Red Devils', 'Giants', 'Leopards', 'Olympique', 'Rovers', 'Rams', 'Vikings', 'Lions', 'Roughyeds', 'Hornets'];
+const UK_PLAYER_SURNAMES = ['Welsby', 'Makinson', 'Percival', 'Walmsley', 'Roby', 'Lomax', 'Farrell', 'O’Loughlin', 'O\'Loughlin', 'Charnley', 'Hampshire', 'Handley', 'Oledzki', 'Ikahihifo', 'Lafai', 'Yates', 'Sutcliffe', 'McShane', 'Watkins', 'Sneyd', 'Briers', 'Myler', 'Sinfield', 'Burrow', 'McGuire', 'Hanley', 'Schofield', 'Offiah', 'Sculthorpe', 'Long', 'Cunningham', 'Newlove', 'Wellens', 'Morley', 'Peacock', 'Burgess', 'Brough', 'McGillvary', 'Hall', 'Lunt', 'Leeming', 'Minchella', 'Parcell', 'Lewis', 'Williams', 'French', 'Field', 'Marshall', 'Wardle', 'Ashton', 'Thewlis', 'Dufty', 'Drinkwater', 'Hedges', 'Hodgson', 'Briscoe', 'Hardaker', 'Tomkins'];
+
+describe('UK invented content (#488)', () => {
+  it('passes the existing real-player and near-miss guards and the UK surname list', () => {
+    const real = new Set(UK_PLAYER_SURNAMES.flatMap(parts));
+    expect(UK_PACK.names.last.flatMap(s => {
+      const why = realProblem(s);
+      return why || [...real].some(r => fold(s) === r || (r.length >= 5 && (fold(s).includes(r) || r.includes(fold(s)) || distance(fold(s), r) <= 1))) ? [s] : [];
+    })).toEqual([]);
+  });
+  it('uses no blocked AU or UK club marks anywhere in the pack', () => {
+    for (const mark of [...BLOCKED_WORDS, ...UK_CLUB_MARKS]) {
+      const re = new RegExp(`\\b${mark.replace(/ /g, '\\s+')}\\b`, 'i');
+      expect(strings(UK_PACK).filter(t => re.test(t)), mark).toEqual([]);
+    }
+  });
+  it('avoids real city and colour matches', () => {
+    for (const club of UK_PACK.clubs) {
+      const town = club.home?.town ?? club.name.split(' ').slice(0, -1).join(' ');
+      expect(townColorsAllowed(town, 'GB', ...club.colors)).toBe(true);
+    }
+  });
+});

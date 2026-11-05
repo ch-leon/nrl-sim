@@ -241,3 +241,90 @@ describe('validatePack', () => {
     expect(validatePack(fakePack({ clubs: [] }))).toEqual(['pack has no clubs']);
   });
 });
+
+// Runtime selection is exercised through the same state boundaries as boot.
+import { afterEach, beforeAll } from 'vitest';
+import { UK_PACK } from '../../src/content/uk';
+import { packForCountry, preparePack, selectPack } from '../../src/content';
+import { createNewGame, getState, loadState, SAVE_VERSION } from '../../src/core/state';
+import { initLeague, FINALS_ROUNDS } from '../../src/systems/fixtures';
+import { FINALS_START_WEEK, MAX_RUN_WEEKS } from '../../src/core/advanceRules';
+import { roundLabel } from '../../src/systems/matchday';
+import { applySeasonEvents } from '../../src/systems/events';
+import { unlockReason } from '../../src/systems/unlocks';
+import { migrateState } from '../../src/core/save';
+
+describe('UK careers (#488)', () => {
+  beforeAll(() => preparePack('uk'));
+  afterEach(() => selectPack('au'));
+
+  it('validates the 12-club, double round-robin, three-week finals shape without changing match rules', () => {
+    expect(validatePack(UK_PACK)).toEqual([]);
+    expect(UK_PACK.clubs).toHaveLength(11);
+    expect(UK_PACK.league).toMatchObject({ seasonRounds: 22, finalsWeeks: 3 });
+    expect(UK_PACK.rules).toBe(AU_PACK.rules);
+    expect(UK_PACK.vocab.iqStat).toBe('Rugby IQ');
+  });
+
+  it.each(['GB', 'UK', 'gb'])('selects UK from country %s before generating names and fixtures', country => {
+    expect(packForCountry(country)).toBe('uk');
+    const s = createNewGame('Test Club', 71, { home: { town: 'Test Town', country } });
+    initLeague(s);
+    expect(getState().pack).toBe('uk');
+    expect(activePack()).toBe(UK_PACK);
+    expect(activeLeague()).toBe(UK_PACK.league);
+    expect(activeRules()).toBe(AU_PACK.rules);
+    expect(activeVocab()).toBe(UK_PACK.vocab);
+    expect(config.SEASON_ROUNDS).toBe(22);
+    expect(config.WEEKS_PER_SEASON).toBe(25);
+    expect(FINALS_START_WEEK).toBe(23);
+    expect(FINALS_ROUNDS.GF).toBe(25);
+    expect([22, 23, 24, 25].map(roundLabel)).toEqual(['Round 22', 'Qualifying Final', 'Semi Final', 'Grand Final']);
+    expect(MAX_RUN_WEEKS).toBe(50);
+    expect(unlockReason('grandstand')).toContain('round 22');
+    expect(getState().league.clubs).toHaveLength(12);
+    expect(getState().preseason).toBe(1);
+    expect(getState().league.fixtures.filter(f => f.round > 0)).toHaveLength(132);
+    expect(getState().league.fixtures.filter(f => f.round <= 0)).toHaveLength(12);
+    expect([-1, 0].map(roundLabel)).toEqual(['Pre-season trial 1', 'Pre-season trial 2']);
+    for (const p of s.squad) expect(UK_PACK.names.last).toContain(p.name.split(' ').slice(-1)[0]);
+    expect(cardById('baliTrip')?.title).toBe(UK_PACK.events.trip.title);
+    const saved = migrateState(JSON.parse(JSON.stringify(getState())));
+    expect(saved.ok).toBe(true);
+    if (saved.ok) { loadState(saved.state); expect(activePack()).toBe(UK_PACK); }
+  });
+
+  it.each(['AU', 'NZ', 'PG', 'US'])('keeps country %s identical to AU', country => {
+    const baseline = createNewGame('Test Club', 71);
+    const s = createNewGame('Test Club', 71, { home: { town: 'Test Town', country } });
+    expect(s.pack).toBe('au');
+    expect(s.squad).toEqual(baseline.squad);
+    expect(s.rngSeed).toBe(baseline.rngSeed);
+    expect(activePack()).toBe(AU_PACK);
+  });
+
+  it('offers the UK seaside trip in consecutive 25-week seasons', () => {
+    const fresh = createNewGame('Test Club', 71, { home: { town: 'Test Town', country: 'GB' } });
+    const first = applySeasonEvents({ ...fresh, season: 2 });
+    expect(first.eventDeck.pending.filter(p => p.cardId === 'baliTrip')).toHaveLength(1);
+    const next = applySeasonEvents({ ...first, season: 3, eventDeck: { ...first.eventDeck, pending: [] } });
+    expect(next.eventDeck.pending.filter(p => p.cardId === 'baliTrip')).toHaveLength(1);
+    expect(cardById('baliTrip')?.cooldown).toBe(25);
+  });
+
+  it('an old save without pack loads as AU even after a UK career, without migration or a version bump', () => {
+    const old = createNewGame('Test Club', 71);
+    delete old.pack;
+    createNewGame('Test Club', 71, { home: { town: 'Test Town', country: 'GB' } });
+    const migrated = migrateState(JSON.parse(JSON.stringify(old)));
+    expect(migrated.ok).toBe(true);
+    if (migrated.ok) {
+      expect(migrated.state.pack).toBeUndefined();
+      loadState(migrated.state);
+      expect(activePack()).toBe(AU_PACK);
+      expect(config.SEASON_ROUNDS).toBe(24);
+      expect(cardById('baliTrip')?.title).toBe(AU_PACK.events.trip.title);
+    }
+    expect(SAVE_VERSION).toBe(21);
+  });
+});

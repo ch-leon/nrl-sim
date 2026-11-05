@@ -3,7 +3,7 @@
 // league's shape (rounds, finals, players on field, squad size, the rating
 // centre) comes from the active content pack (src/content, #361) and is
 // re-exported here under its old names.
-import { activeLeague } from './content';
+import { activeLeague, onPackChange } from './content';
 
 const league = activeLeague();
 
@@ -11,21 +11,21 @@ export const GRID_W = 20;            // club grounds grid (tiles)
 export const GRID_H = 20;
 export const TILE_W = 64;            // iso tile screen width (2:1 diamond)
 export const TILE_H = 32;
-export const SEASON_ROUNDS = league.seasonRounds;  // AU: 24, home & away vs 15 rivals + repeats
-export const FINALS_WEEKS = league.finalsWeeks;    // AU: 3, weeks 25-27 if qualified
-export const WEEKS_PER_SEASON = SEASON_ROUNDS + FINALS_WEEKS;
-export const SQUAD_CAP = league.squadCap;
-export const SQUAD_MIN = league.squadMin;          // cannot play a match below this (club management)
+export let SEASON_ROUNDS = league.seasonRounds;  // AU: 24, home & away vs 15 rivals + repeats
+export let FINALS_WEEKS = league.finalsWeeks;    // AU: 3, weeks 25-27 if qualified
+export let WEEKS_PER_SEASON = SEASON_ROUNDS + FINALS_WEEKS;
+export let SQUAD_CAP = league.squadCap;
+export let SQUAD_MIN = league.squadMin;          // cannot play a match below this (club management)
 /** Points awarded to the non-forfeiting side (fit squad < SQUAD_MIN). */
-export const FORFEIT_SCORE = league.forfeitScore;
+export let FORFEIT_SCORE = league.forfeitScore;
 /** Soft retirement age — chance ramps from here to RETIRE_HARD_AGE (GitHub #5). */
 export const RETIRE_SOFT_AGE = 34;
 /** Hard retirement age — players at/above this always retire at season rollover. */
 export const RETIRE_HARD_AGE = 38;
 /** Players on the field per side in a match (Nines trial — BAK-206 / #1). */
-export const ON_FIELD = league.onField;
+export let ON_FIELD = league.onField;
 /** Tackles per set before a last-tackle kick (Nines trial — BAK-206 / #1). */
-export const SET_TACKLES = league.setTackles;
+export let SET_TACKLES = league.setTackles;
 export const STARTING_MONEY = 200_000;
 export const STAT_MAX = 100;
 
@@ -46,7 +46,7 @@ export const STAT_MAX = 100;
  * content pack's (AU: MEAN 55, one star, first grade 52, depth 8 below, pool 3
  * below; src/content/au.ts).
  */
-export const LEAGUE = league.rating;
+export let LEAGUE = league.rating;
 
 // Training curve (GitHub #35). Each week's stat gain is multiplied by headroom:
 //   GAIN_RATE × (1 − stat / STAT_MAX) ^ HEADROOM_EXP
@@ -300,3 +300,16 @@ export function isValidColorPair(primary: string, secondary: string): boolean {
 export function colorsContrast(a: string, b: string, min = MIN_COLOR_PAIR_DISTANCE): boolean {
   return hexDistance(a, b) >= min;
 }
+
+onPackChange(() => {
+  const league = activeLeague();
+  SEASON_ROUNDS = league.seasonRounds;
+  FINALS_WEEKS = league.finalsWeeks;
+  SQUAD_CAP = league.squadCap;
+  SQUAD_MIN = league.squadMin;
+  FORFEIT_SCORE = league.forfeitScore;
+  ON_FIELD = league.onField;
+  SET_TACKLES = league.setTackles;
+  LEAGUE = league.rating;
+  WEEKS_PER_SEASON = SEASON_ROUNDS + FINALS_WEEKS;
+});

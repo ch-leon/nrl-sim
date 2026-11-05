@@ -61,7 +61,7 @@ const STAT_LABEL: Record<keyof PlayerStats, string> = {
   strength: 'Strength',
   stamina: 'Stamina',
   skill: 'Skill',
-  footyIQ: activePack().vocab.iqStat,
+  get footyIQ() { return activePack().vocab.iqStat; },
 };
 
 /** The free-agent pool's lift a level, in overall points (freeagency.poolTarget). */
