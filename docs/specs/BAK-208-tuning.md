@@ -1496,36 +1496,39 @@ enabled by overrides.
 
 ## 34. Compressed matchup counters (#464)
 
-The switch ships at 0. With it on, Tight draws one extra available committed
-man (still capped at four) only within `MAX_LAT_M` of the middle of the pitch,
-and only when that spare man is within `commitM` × both starting fits.
-Middle contact removes bust and supported offload probability by cell strength
-× both starting-sheet fits × the nearby committed defenders' mean derived
-Contact D / `fit.leagueAverage`. Only men within `live.secondManM` count toward
-that mean. Stronger Strength/Footy IQ and Brick Wall/Hitman improve the squeeze.
-No unsupported offload is created.
+The switch ships at 0, retaining the exact legacy Compressed preset. With it on,
+`defencePlan` selects the enabled contact baseline. The old global −0.02 bust and
+−0.03 offload modifiers otherwise also favour Compressed in its three zero
+matchup cells (the legacy Balanced control measured 47.625% over 4,000 matches).
+The enabled neutral baseline puts the middle contact advantage in the Tight
+mechanic, rather than granting that advantage across every cell and lane.
+
+Tight draws one extra available committed man, capped at four, only within
+`MAX_LAT_M` of the middle and when the spare man is within `commitM` × both
+starting fits. Middle contact removes bust and supported offload probability
+by cell × both fits × nearby committed defenders' mean derived Contact D /
+`fit.leagueAverage`. Only men within `live.secondManM` enter that mean. Strength,
+Footy IQ and Brick Wall/Hitman improve the squeeze. Unsupported offloads stay 0.
 
 Against Expansive, non-committed line defenders move toward the middle by cell
 × both fits (capped at 1) of their lane's distance from the middle. Outside
-`MAX_LAT_M`, fullbacks, wingers and centres add cell × both fits × Speed / 60
-to busted-tackle odds, turning overlaps into line-break opportunities. Forwards
-and halves receive no edge bonus. Line breaks are still detected from bodies
-crossing the line; this uses the existing contact roll, not a new roll.
+`MAX_LAT_M`, fullbacks, wingers and centres add cell × both fits × Speed / 60 to
+busted-tackle odds. Forwards and halves get no edge bonus. Existing contact
+rolls and the geometric line-break detector decide outcomes; no roll is added.
 
 | Knob | Default | Effect when Compressed is enabled |
 |---|---:|---|
-| `counters.compressed.on` | 0 | Only 1 enables these mechanics. |
-| `counters.compressed.tight` | 0.025 | Middle squeeze probability; a positive cell also commits the extra man. |
-| `counters.compressed.expansive` | 0.26 | Inward lane pull and speed-scaled edge bust probability. |
-| `counters.compressed.commitM` | 6 | Maximum reach in metres of the extra middle tackler at neutral fit; scaled by both fits. |
+| `counters.compressed.on` | 0 | Only 1 enables the profile and mechanics. |
+| `counters.compressed.tight` | 0.07 | Middle squeeze; a positive cell also recruits nearby help. |
+| `counters.compressed.expansive` | 0.20 | Inward lane pull and speed-scaled edge bust probability. |
+| `counters.compressed.commitM` | 6 | Extra middle tackler's neutral-fit reach in metres, scaled by both fits. |
+| `counters.compressed.brokenBase` | 0 | Enabled Compressed base bust modifier; off preserves legacy −0.02. |
+| `counters.compressed.offloadBase` | 0 | Enabled Compressed base offload modifier; off preserves legacy −0.03. |
 
-Kick-chase, All-out and Balanced receive no Compressed counter effect.
-`balance/plans/counters-compressed.json` runs the entire 5 × 3 matrix at flat
-60, neutral fits and all counter switches overridden to 1: 500 seeds in both
-orientations, 1,000 whole matches per cell, except Tight v Rush: its initial
-1,000-match estimate is extended once with the next 500 seeds both ways
-(2,000 matches total, matching task 6 sampling). Balanced v Compressed adds
-precision extensions after its initial 47.55% and 3,000-match 47.90% estimates,
-retaining seeds 1–2,000 both ways (4,000 matches). Balanced v Rush retains
-seeds 1–1,000 both ways (2,000 matches) to refine the row total. Every seed is retained. Shipped switches remain 0. No new
-stored fields, randomness, save version, Labs or commercial changes.
+Kick-chase, All-out and Balanced have no matchup-cell modifier. Their enabled
+Compressed contact baseline is common to all attacks. `balance/plans/counters-compressed.json`
+runs the full flat-60 matrix with all switches overridden to 1 and 500 seeds
+both ways per cell (1,000 matches), except the retained 2,000-match Tight/Rush
+and Balanced/Rush neutral samples. Checkpoint pools retain disjoint consecutive
+seed ranges and every source result. Shipped switches remain 0. No stored stats,
+randomness, save version, Labs or commercial changes.

@@ -15,6 +15,7 @@ class CompressedSim extends LiveSim {
   constructor(attack: AttackPreset = 'grind', defence: DefencePreset = 'compressed') {
     super(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60, tactics: { defence } }), 1);
   }
+  base() { this.attacking = 'home'; return this.defPlan(); }
   fits(a: number, d: number) { this.planFit.home.attack = a; this.planFit.away.defence = d; return this; }
   contact(slot = 7, y = 34, contactD = 60, speed = 60, support = true) {
     const c = this.players[slot]!; c.body.pos = { x: 50, y }; c.stats.speed = speed;
@@ -113,17 +114,14 @@ describe('dormant Compressed counters', () => {
     expect(off.events).toContain('break-tackle'); expect(on.events).not.toContain('break-tackle');
     expect(off.draws).toBe(1); expect(on.draws).toBe(off.draws);
   });
-  it('neutral attacks replay exactly with Compressed enabled and earlier counters on', () => {
+  it('keeps legacy contact off and gives neutral cells no flat contact advantage when enabled', () => {
+    expect(tuned(0, () => new CompressedSim().base())).toMatchObject({ broken: -0.02, offload: -0.03 });
     for (const attack of ['balanced', 'kick-chase', 'all-out'] as const) {
-      const replay = (on: number) => tuned(on, () => {
-        const sim = new LiveSim(sideSheet('H', { rating: 80, tactics: { attack } }),
-          sideSheet('A', { rating: 35, tactics: { defence: 'compressed' } }), 7,
-          { length: { halves: 2, halfMinutes: 0.2 } });
-        const events = [];
-        while (!sim.finished) { sim.step(); events.push(...sim.tickEvents); }
-        return events;
-      });
-      expect(replay(1)).toEqual(replay(0));
+      expect(tuned(1, () => new CompressedSim(attack).base())).toMatchObject({ broken: 0, offload: 0 });
+      for (const y of [5, 34, 63]) expect(tuned(1, () => new CompressedSim(attack).contact(7, y))).toEqual({});
+    }
+    for (const defence of ['slide', 'rush'] as const) {
+      expect(tuned(1, () => new CompressedSim('balanced', defence).base())).toEqual(tuned(0, () => new CompressedSim('balanced', defence).base()));
     }
   });
 });

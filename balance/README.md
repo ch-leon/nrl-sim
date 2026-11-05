@@ -216,15 +216,16 @@ sample-variance pooling formula are preserved beside each pooled report on
 
 `counters-compressed.json` is the task-7 full-matrix acceptance plan (#464). It
 enables Tight, own-style fit, Slide, Rush and Compressed through overrides only.
-Flat-60 cells use 500 seeds both ways (1,000 whole matches per cell), except
-Tight v Rush: 1,000 seeds both ways (2,000 matches), retaining the complete
-initial sample and its one extension, as in task 6. The first Tight-row sum
-was −3.10 pp with the 1,000-match Rush estimate. Balanced v Compressed uses
-2,000 seeds both ways (4,000 matches): its initial 47.55% estimate and the
-3,000-match 47.90% estimate are retained with the next fixed seed block.
-Balanced v Rush also retains seeds 1–1,000 both ways (2,000 matches) to refine
-the Balanced-row total. All extensions use disjoint consecutive ranges.
-Compressed targets are Tight 43–47%, Expansive 53–57% and the other three
-48–52%. Sum the signed swings from 50 in each row and column; every total
-should be within ±3 percentage points. The report also exposes tracked-side
-offloads, contact busts and line breaks. Tuned values are documented in §34.
+Flat-60 cells use 500 seeds both ways (1,000 whole matches), except Tight v Rush
+and Balanced v Rush: both retain seeds 1–1,000 in both orientations (2,000 matches).
+The enabled Compressed plan replaces its legacy flat contact bonuses with the
+recorded neutral baseline; the Contact D-scaled middle benefit belongs to Tight.
+The legacy flat profile measured Balanced v Compressed at 47.625% over 4,000
+matches, so its calibration controls remain separate from final acceptance.
+
+Compressed targets are Tight 43–47%, Expansive 53–57% and the other three 48–52%.
+Sum unrounded signed swings from 50 in each row and column; each total must be
+within ±3 percentage points. The report exposes per-side offloads, contact busts
+and line breaks. Runs use disjoint 125-seed checkpoint blocks; pooled reports
+preserve every source plan/result and the sample-variance formula. The committed
+plan reruns each complete consecutive range directly. Tuned values are in §34.
