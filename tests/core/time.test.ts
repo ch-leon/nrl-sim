@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   registerTickHook, unregisterTickHook, clearTickHooks,
@@ -5,7 +6,7 @@ import {
   advanceWeek, advanceWeeks, TICK_ORDER, clearHeldWeek, resumeWeek, weekHeld,
   type TickContext,
 } from '../../src/core/time';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { WEEKS_PER_SEASON } from '../../src/config';
 

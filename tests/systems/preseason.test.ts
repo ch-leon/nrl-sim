@@ -1,0 +1,100 @@
+import { beforeEach, expect, it } from 'vitest';
+import { bus } from '../../src/core/events';
+import { createNewGame, getState, loadState, setState, SAVE_VERSION } from '../../src/core/state';
+import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, TICK_ORDER, weekHeld } from '../../src/core/time';
+import { currentRound } from '../../src/core/season';
+import { migrateState } from '../../src/core/save';
+import { getCurrentFixture, initLeague, registerFixturesSystem } from '../../src/systems/fixtures';
+import { registerPlayerMatchSystem } from '../../src/systems/matchday';
+import { registerEconomySystem, gateReceipts, homeGate } from '../../src/systems/economy';
+import { registerUnlockSystem } from '../../src/systems/unlocks';
+import { weekSnapshot, weekSummary } from '../../src/ui/weekSummary';
+
+beforeEach(() => { bus.clear(); clearTickHooks(); clearSeasonHooks(); clearHeldWeek(); });
+
+it('preserves optional phase on save/reload and leaves a v21 legacy season unchanged forever', () => {
+  createNewGame('Trials', 42);
+  initLeague(getState());
+  for (const phase of [1, 2, 0] as const) {
+    setState({ preseason: phase });
+    const s = getState();
+    const back = migrateState(JSON.parse(JSON.stringify(s)));
+    expect(back.ok).toBe(true);
+    if (back.ok) expect(back.state).toEqual(s);
+  }
+  const { preseason: _phase, ...legacy } = createNewGame('Legacy', 42);
+  loadState(legacy);
+  initLeague(getState());
+  registerFixturesSystem();
+  const back = migrateState(JSON.parse(JSON.stringify(getState())));
+  expect(back.ok).toBe(true);
+  if (back.ok) loadState(back.state);
+  advanceWeeks(27);
+  expect(getState().version).toBe(SAVE_VERSION);
+  expect(SAVE_VERSION).toBe(21);
+  expect(getState().season).toBe(2);
+  expect(getState()).not.toHaveProperty('preseason');
+  expect(getState().league.fixtures.every((f) => f.round > 0)).toBe(true);
+});
+
+it('pays a small gate, leaves contracts and unlocks alone, then resumes normal contracts in round 1', () => {
+  createNewGame('Trials', 42);
+  initLeague(getState());
+  const contracts = getState().squad.map((p) => p.contractWeeks);
+  const unlocks = getState().unlocks;
+  registerFixturesSystem();
+  registerEconomySystem();
+  registerUnlockSystem();
+  // Stamp player wins without the match cost to isolate economy and unlock rules.
+  registerTickHook('test-win', TICK_ORDER.match, () => {
+    const s = getState();
+    const f = getCurrentFixture(s, s.clubId)!;
+    setState({ league: { ...s.league, fixtures: s.league.fixtures.map((x) => x === f ? { ...x, result: { homeScore: 40, awayScore: 0 } } : x) } });
+  }, { trials: true });
+  for (let i = 0; i < 2; i++) {
+    const s = getState();
+    const f = getCurrentFixture(s, s.clubId)!;
+    expect(gateReceipts(s)).toBe(f.homeId === s.clubId ? Math.round(homeGate(s, { ...f, round: 1 }).receipts * 0.25) : 0);
+    advanceWeeks(1);
+    expect(getState().squad.map((p) => p.contractWeeks)).toEqual(contracts);
+    expect(getState().unlocks).toEqual(unlocks);
+  }
+  advanceWeeks(1);
+  expect(getState().squad.map((p) => p.contractWeeks)).toEqual(contracts.map((w) => w - 1));
+});
+
+it('holds a live trial until its result lands and can reload/replay between trials', () => {
+  createNewGame('Trials', 42);
+  initLeague(getState());
+  registerFixturesSystem();
+  registerPlayerMatchSystem();
+  let started: Parameters<typeof bus.emit<'match:started'>>[1] | undefined;
+  bus.on('match:started', (m) => { started = m; });
+  advanceWeek();
+  expect(weekHeld()).toBe(true);
+  expect(getState().preseason).toBe(1);
+  expect(started?.fixture.round).toBe(-1);
+  const result = { homeScore: 12, awayScore: 4, events: [], stats: { possession: [50, 50], tackles: [0, 0], errors: [0, 0], tries: [0, 0] }, weather: 'clear', momentumTimeline: [], injuries: [] } as const;
+  bus.emit('match:finished', { fixture: started!.fixture, result: JSON.parse(JSON.stringify(result)) });
+  expect(weekHeld()).toBe(false);
+  expect(getState().preseason).toBe(2);
+  const before = weekSnapshot(getState());
+  const saved = JSON.parse(JSON.stringify(getState()));
+  advanceWeeks(1);
+  const end = getState();
+  expect(weekSummary(before, weekSnapshot(end))).toMatchObject({ title: 'Pre-season trial 2', weeks: 1 });
+  loadState(saved);
+  advanceWeeks(1);
+  expect(getState()).toEqual(end);
+  expect(currentRound(end)).toBe(1);
+});
+
+it('starts two trials again after all 27 competitive weeks of a new career', () => {
+  createNewGame('Trials', 42);
+  initLeague(getState());
+  registerFixturesSystem();
+  advanceWeeks(29);
+  expect(getState()).toMatchObject({ season: 2, week: 1, preseason: 1 });
+  expect(getState().history).toHaveLength(1);
+  expect(getState().league.fixtures.filter((f) => f.round <= 0)).toHaveLength(16);
+});

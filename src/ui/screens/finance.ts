@@ -521,7 +521,7 @@ function buildLedger(ledgerRows: LedgerWeek[]): HTMLElement {
   table.append(el('thead', {}, head));
   const tbody = el('tbody');
   for (const r of ledgerRows) {
-    const tr = el('tr', {}, el('td', { class: 'nrl-num nrl-finance-wk', text: `S${r.season} W${r.week}` }));
+    const tr = el('tr', {}, el('td', { class: 'nrl-num nrl-finance-wk', text: `S${r.season} ${r.week <= 0 ? `T${r.week + 2}` : `W${r.week}`}` }));
     for (const v of [r.wages, r.upkeep, r.overhead, r.income, r.gate, r.other, r.net]) tr.append(moneyCell(v));
     tbody.append(tr);
     // What "Other" was, in the P&L's words (prize money, a signing, the grounds).

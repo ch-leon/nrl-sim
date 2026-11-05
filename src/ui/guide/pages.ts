@@ -93,7 +93,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     title: 'Your week',
     sections: [
       {
-        text: 'The season is 27 weeks: 24 rounds, then three finals weeks if you make the eight. Play Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.',
+        text: 'New careers begin each season with two pre-season trials: try a lineup, earn a small home gate, with no ladder points or contract weeks used. Then come 27 competitive weeks: 24 rounds and three finals weeks if you make the eight. Older careers keep their existing season shape. Play Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.',
       },
       {
         heading: 'Advancing further',

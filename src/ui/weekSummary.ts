@@ -41,6 +41,7 @@ const STAT_WORD: Readonly<Record<keyof PlayerStats, string>> = {
 export interface WeekSnapshot {
   season: number;
   week: number;
+  preseason?: GameState['preseason'];
   squad: { id: string; name: string; stats: PlayerStats; injuredWeeks: number; suspendedWeeks: number }[];
   /** Each season's books on the snapshot, by line (GameState.finance). */
   finance: { season: number; lines: Record<FinanceLine, number> }[];
@@ -55,6 +56,7 @@ export function weekSnapshot(s: GameState, runwayWeeks: number | null = null): W
   return {
     season: s.season,
     week: s.week,
+    ...(s.preseason === undefined ? {} : { preseason: s.preseason }),
     squad: s.squad.map((p) => ({ id: p.id, name: p.name, stats: { ...p.stats }, injuredWeeks: p.injuredWeeks, suspendedWeeks: p.suspendedWeeks ?? 0 })),
     finance: s.finance.map((f) => ({ season: f.season, lines: Object.fromEntries(FINANCE_LINES.map((l) => [l, f[l]])) as Record<FinanceLine, number> })),
     boardPatience: s.boardPatience,
@@ -91,8 +93,10 @@ export interface WeekSummary {
 }
 
 /** Weeks from one snapshot to the next, across a season's end. */
-function weeksBetween(a: Pick<WeekSnapshot, 'season' | 'week'>, b: Pick<WeekSnapshot, 'season' | 'week'>): number {
-  return (b.season - a.season) * WEEKS_PER_SEASON + (b.week - a.week);
+function weeksBetween(a: Pick<WeekSnapshot, 'season' | 'week' | 'preseason'>, b: Pick<WeekSnapshot, 'season' | 'week' | 'preseason'>): number {
+  const offset = (s: typeof a): number => s.preseason === undefined ? s.week
+    : s.week === 1 && s.preseason ? s.preseason - 2 : s.week;
+  return (b.season - a.season) * (WEEKS_PER_SEASON + (a.preseason === undefined ? 0 : 2)) + offset(b) - offset(a);
 }
 
 const plural = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`;
@@ -111,7 +115,7 @@ export function boardMood(patience: number, risk: ObjectiveRisk | null): BoardMo
 export function weekSummary(before: WeekSnapshot, after: WeekSnapshot): WeekSummary {
   const weeks = weeksBetween(before, after);
   const lastWeek = after.week - 1;
-  const title = weeks <= 1 ? `Week ${before.week}` : before.season === after.season && lastWeek >= before.week
+  const title = weeks <= 1 && before.preseason && before.week === 1 ? `Pre-season trial ${before.preseason}` : weeks <= 1 ? `Week ${before.week}` : before.season === after.season && lastWeek >= before.week
     ? `Weeks ${before.week}–${lastWeek}` : `Last ${weeks} weeks`;
 
   const was = new Map(before.squad.map((p) => [p.id, p] as const));

@@ -5,6 +5,7 @@
 // watches his own match, and the week waits for both. Fast-forward keeps the
 // cheap sim (fixtures.ts, on the live sim's scale). Pure apart from the Worker
 // glue at the bottom: jobs from state, results back into state.
+import { currentRound } from '../core/season';
 import type { GameState, RivalClub } from '../core/state';
 import type { MatchResult, TeamSheet, WeatherKind } from '../sim/events';
 import type { Rng } from '../utils/rng';
@@ -54,7 +55,7 @@ export function rivalStyle(club: RivalClub): TeamTactics {
 
 /** The round's unplayed rival-v-rival fixtures as jobs, one seed each from `rng` in fixture order. */
 export function rivalJobs(state: GameState, rng: Rng, playerId: string): RivalJob[] {
-  const round = state.week;
+  const round = currentRound(state);
   const byId = new Map(state.league.clubs.map((c) => [c.id, c] as const));
   const jobs: RivalJob[] = [];
   for (const f of state.league.fixtures) {

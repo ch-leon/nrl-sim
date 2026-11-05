@@ -1,7 +1,7 @@
 // #482: real season-one Office play-through; screenshots live in the CI artifact.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, SHEET_EXIT } from '../common.mjs';
+import { playTrials, BASE, OUT_ROOT, IPHONE_UA, closeWeekSummary, SHEET_EXIT } from '../common.mjs';
 
 export async function runOfficeUnlocks(browser) {
   const out = join(OUT_ROOT, 'webkit', 'office-unlocks');
@@ -35,6 +35,7 @@ export async function runOfficeUnlocks(browser) {
       await page.locator('[data-nrl-start]').tap();
       await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
+      await playTrials(page);
       await page.waitForFunction(() => !!window.__nrlState);
       const start = await shot('start');
       for (const id of ['finance', 'staff', 'contracts']) if (!start.find((t) => t.id === id)?.locked) record.problems.push(`${id} not locked at start`);

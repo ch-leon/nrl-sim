@@ -1,3 +1,4 @@
+import { currentRound } from '../core/season';
 // src/ui/inbox.ts — News inbox nav screen (GitHub #45, part of #49).
 // Keeps the last INBOX_CAPACITY 'ui:notify' messages in memory so toasts that
 // vanish after 4s can still be read later. Each message is stamped with the
@@ -124,8 +125,8 @@ export const newsInbox = new NewsInbox();
 /** Season/week for a new message. Falls back to 1/1 before a game exists. */
 function currentStamp(): NewsStamp {
   try {
-    const { season, week } = getState();
-    return { season, week };
+    const s = getState();
+    return { season: s.season, week: currentRound(s) };
   } catch {
     return { season: 1, week: 1 };
   }
@@ -220,7 +221,7 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
     }
     for (const g of groups) {
       const section = el('section', { class: 'nrl-news-week' });
-      section.append(el('h3', { text: `S${g.season} · Week ${g.week}` }));
+      section.append(el('h3', { text: `S${g.season} · ${g.week <= 0 ? `Pre-season trial ${g.week + 2}` : `Week ${g.week}`}` }));
       for (const item of g.items) {
         const row = el('div', {
           class: `nrl-news-item nrl-news-${item.kind}`,

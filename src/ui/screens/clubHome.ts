@@ -1,3 +1,4 @@
+import { seasonWeekLabel } from '../../core/season';
 // src/ui/screens/clubHome.ts — the Club home sheet (#350 P1): what CLUB shows on a
 // phone held upright, where the grounds can't be (they need landscape). The same
 // facts the landscape hub gives (#368's H1): the club, the week and season, the
@@ -10,7 +11,6 @@ import { getState, type GameState } from '../../core/state';
 import { bus } from '../../core/events';
 import { derbyRival } from '../../systems/derby';
 import { nextFixture } from '../../systems/league';
-import { WEEKS_PER_SEASON } from '../../config';
 import type { ObjectiveRisk } from '../../systems/board';
 import { boardChip, decisionsChipCount, moneyTile, fmtMoneyShort, IN_DEBT_TEXT, ordinal, placeName, runwayLevel, BOARD_RISK_CLASS } from '../hud';
 import { button, el, openScreen, screenHead } from '../dom';
@@ -77,7 +77,7 @@ export function clubHomeView(
   return {
     coach: coachSays(s, { decisions: list.length, runwayWeeks: runway }),
     club: s.clubName,
-    week: `Week ${s.week} of ${WEEKS_PER_SEASON} · Season ${s.season}`,
+    week: seasonWeekLabel(s),
     money,
     moneyLevel: tile.inDebt ? 'debt' : runwayLevel(runway),
     moneyLabel: `Money ${money}${tile.inDebt ? `, ${IN_DEBT_TEXT}` : ''}. Tap for Finance`,

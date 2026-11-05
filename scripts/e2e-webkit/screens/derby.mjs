@@ -1,7 +1,7 @@
 // Real new-game setup and watched/skip result, with screenshots in the CI artifact only.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BASE, OUT_ROOT, openNav, closeWeekSummary, log } from '../common.mjs';
+import { playTrials, BASE, OUT_ROOT, openNav, closeWeekSummary, log } from '../common.mjs';
 
 export async function runDerby(browser) {
   const out = join(OUT_ROOT, 'webkit', 'derby');
@@ -29,6 +29,7 @@ export async function runDerby(browser) {
       await page.locator('[data-expansion-work]').tap();
       await page.waitForFunction(() => window.__nrlState);
       await page.locator('.nrl-tutorial-skip').tap();
+      await playTrials(page);
       const state = await page.evaluate(() => window.__nrlState());
       if (state.home.lat !== town.lat || !state.objectives.some(o => o.rivalId === 'rival-larrikins' && o.text.endsWith(', our derby rival'))) throw new Error('Listed town did not produce its nearest derby objective');
       // Club home is intentionally portrait-only; turning sideways returns to the grounds.

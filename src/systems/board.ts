@@ -250,7 +250,7 @@ export function ladderStanding(state: Pick<GameState, 'league' | 'clubId'>, club
     rank: started && i >= 0 ? i + 1 : 0,
     points: i >= 0 ? order[i]!.points : 0,
     pointsAt: (n) => order[n - 1]?.points ?? 0,
-    roundsLeft: state.league.fixtures.filter((f) => !f.result && f.round <= SEASON_ROUNDS
+    roundsLeft: state.league.fixtures.filter((f) => !f.result && f.round > 0 && f.round <= SEASON_ROUNDS
       && (f.homeId === clubId || f.awayId === clubId)).length,
   };
 }

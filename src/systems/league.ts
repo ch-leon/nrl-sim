@@ -115,7 +115,7 @@ export interface ClubResult {
 export function clubResults(fixtures: readonly Fixture[], clubId: string): ClubResult[] {
   const out: ClubResult[] = [];
   for (const f of fixtures) {
-    if (!f.result) continue;
+    if (!f.result || f.round <= 0) continue;
     const home = f.homeId === clubId;
     if (!home && f.awayId !== clubId) continue;
     const pointsFor = home ? f.result.homeScore : f.result.awayScore;
@@ -143,14 +143,15 @@ export function formGuide(fixtures: readonly Fixture[], clubId: string, n: numbe
 /** The club's first unplayed fixture from `week` on, if it has one. */
 export function nextFixture(fixtures: readonly Fixture[], week: number, clubId: string): Fixture | undefined {
   return fixtures
-    .filter((f) => !f.result && f.round >= week && (f.homeId === clubId || f.awayId === clubId))
+    .filter((f) => !f.result && (f.round >= week || week === 1 && f.round <= 0) && (f.homeId === clubId || f.awayId === clubId))
     .sort((a, b) => a.round - b.round)[0];
 }
 
 /** What a round is called on the card. */
-export type MatchStage = 'Round' | 'Quarter final' | 'Semi final' | 'Grand final';
+export type MatchStage = 'Trial' | 'Round' | 'Quarter final' | 'Semi final' | 'Grand final';
 
 export function matchStage(round: number): MatchStage {
+  if (round <= 0) return 'Trial';
   if (round <= SEASON_ROUNDS) return 'Round';
   const finals: MatchStage[] = ['Quarter final', 'Semi final', 'Grand final'];
   return finals[Math.min(finals.length, round - SEASON_ROUNDS) - 1] as MatchStage;

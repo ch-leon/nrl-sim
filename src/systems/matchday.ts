@@ -190,6 +190,7 @@ export function coachsOfficeLevel(state: { facilities: readonly { defId: string;
 }
 
 export function roundLabel(round: number): string {
+  if (round <= 0) return `Pre-season trial ${round + 2}`;
   if (round === 25) return 'Qualifying Final';
   if (round === 26) return 'Semi Final';
   if (round === 27) return 'Grand Final';
@@ -361,5 +362,5 @@ export function registerPlayerMatchSystem(): void {
     }
     // Fast-forward elsewhere (the soak, the tests, advanceWeeks): the same match, headless, here.
     applyPlayerResult(fixture, home, away, runMatch(home, away, matchOpts))();
-  });
+  }, { trials: true });
 }
