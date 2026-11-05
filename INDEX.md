@@ -248,3 +248,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261105-015550-compressed-464-t04-matrix | Compressed 464 selected acceptance | c2a5755 | feat/464-compressed-counters | [report](runs/20261105-015550-compressed-464-t04-matrix/report.md) |
 | 20261105-015557-compressed-464-t05-matrix | Compressed 464 passing alternative | c2a5755 | feat/464-compressed-counters | [report](runs/20261105-015557-compressed-464-t05-matrix/report.md) |
 | 20261105-015548-compressed-464-t06-matrix | Compressed 464 rejected calibration | c2a5755 | feat/464-compressed-counters | [report](runs/20261105-015548-compressed-464-t06-matrix/report.md) |
+| 20261105-025812-standard | standard | e8b88be | main | [report](runs/20261105-025812-standard/report.md) |
