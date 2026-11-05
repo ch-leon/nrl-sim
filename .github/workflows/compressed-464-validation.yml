@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         chunk: [0, 1, 2, 3]
-        profile: [retain-bust, retain-offload]
+        profile: [b10-o30, b15-o30, b10-o15, b15-o15]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,8 +36,9 @@ jobs:
           import fs from 'node:fs';
           const p=JSON.parse(fs.readFileSync('balance/plans/counters-compressed.json','utf8'));
           const c=Number(process.env.COUNTER_CHUNK), profile=process.env.COUNTER_PROFILE;
-          p.base['counters.compressed.brokenBase']=profile==='retain-bust'?-0.02:0;
-          p.base['counters.compressed.offloadBase']=profile==='retain-offload'?-0.03:0;
+          p.base['counters.compressed.brokenBase']=-Number(profile.match(/^b(\d+)/)[1])/1000;
+          p.base['counters.compressed.offloadBase']=-Number(profile.match(/o(\d+)$/)[1])/1000;
+          p.base['counters.compressed.expansive']=0.26;
           const names=['balanced v compressed','kick-chase v compressed','all-out v compressed','grind v compressed','expansive v compressed'];
           const main=structuredClone(p); main.name='Compressed 464 '+profile+' fresh part '+c; main.seeds=125; main.seedStart=1+c*125;
           main.scenarios=names.map(n=>structuredClone(p.scenarios.find(s=>s.name===n))); for(const s of main.scenarios)delete s.seeds;
@@ -58,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [retain-bust, retain-offload]
+        profile: [b10-o30, b15-o30, b10-o15, b15-o15]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -115,8 +116,9 @@ jobs:
           const previous='20261105-013647-compressed-464-final-matrix';
           for(const key of ['balanced v slide','balanced v rush'])controls[key]=previous;for(const [key,name]of Object.entries(controls)){const rs=rowsOf('.balance-log/runs/'+name).filter(r=>r.scenario===key&&r.variant==='baseline');if(rs.length!==1)throw Error('Missing control '+key);measured[key]=rs[0];sourceMap[key]='balance-log/runs/'+name;}
           const plan=JSON.parse(fs.readFileSync('balance/plans/counters-compressed.json','utf8'));plan.name='Compressed 464 '+process.env.COUNTER_PROFILE+' acceptance matrix';
-          plan.base['counters.compressed.brokenBase']=process.env.COUNTER_PROFILE==='retain-bust'?-0.02:0;
-          plan.base['counters.compressed.offloadBase']=process.env.COUNTER_PROFILE==='retain-offload'?-0.03:0;
+          plan.base['counters.compressed.brokenBase']=-Number(process.env.COUNTER_PROFILE.match(/^b(\d+)/)[1])/1000;
+          plan.base['counters.compressed.offloadBase']=-Number(process.env.COUNTER_PROFILE.match(/o(\d+)$/)[1])/1000;
+          plan.base['counters.compressed.expansive']=0.26;
           const results=plan.scenarios.map(s=>{const r=measured[s.name];if(!r||r.trackedSeeds!==2*(s.seeds??plan.seeds))throw Error('Wrong sample '+s.name);return r;});
           const by=Object.fromEntries(results.map(r=>[r.scenario,r])),aa=['grind','expansive','kick-chase','all-out','balanced'],dd=['slide','rush','compressed'],swing=(a,d)=>(by[a+' v '+d].pointsShare.mean-.5)*100;
           const rowSums=Object.fromEntries(aa.map(a=>[a,dd.reduce((n,d)=>n+swing(a,d),0)])),columnSums=Object.fromEntries(dd.map(d=>[d,aa.reduce((n,a)=>n+swing(a,d),0)])),errors=[];
