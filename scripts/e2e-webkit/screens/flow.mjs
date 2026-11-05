@@ -123,6 +123,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     await shot('t1-at-check');
     await page.fill('[data-nrl-clubname]', 'Flow FC');
     await tap('[data-nrl-start]');
+    await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
     await tap('.nrl-tutorial-skip');
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });

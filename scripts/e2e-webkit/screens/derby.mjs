@@ -26,6 +26,7 @@ export async function runDerby(browser) {
       await page.locator('[data-nrl-town]').fill(`${town.name}, ${town.region}, ${town.country}`);
       await page.locator('[data-nrl-open-all]').check(); // expose Staff & Board for its screenshot
       await page.locator('[data-nrl-start]').tap();
+      await page.locator('[data-expansion-work]').tap();
       await page.waitForFunction(() => window.__nrlState);
       await page.locator('.nrl-tutorial-skip').tap();
       const state = await page.evaluate(() => window.__nrlState());

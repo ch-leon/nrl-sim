@@ -32,6 +32,7 @@ export async function runCoachName(browser) {
         if (record.layout.buildOverlap) record.problems.push('build label overlaps setup');
         await page.screenshot({ path: join(out, `${tag}-setup.png`) });
         await page.locator('[data-nrl-start]').tap();
+        await page.locator('[data-expansion-work]').tap();
         await page.waitForSelector('.nrl-tutorial-text');
         const address = name || 'Coach';
         record.bubble = await page.locator('.nrl-tutorial-text .nrl-coach-text').textContent();
@@ -43,7 +44,7 @@ export async function runCoachName(browser) {
         await openNav(page, 'news');
         await page.waitForSelector('.nrl-news');
         const news = await page.locator('.nrl-news').textContent();
-        record.board = `${address}, the board's objectives for season 1:`;
+        record.board = `${address}, the board's objectives for our first season in the league:`;
         if (!news.includes(record.board)) record.problems.push('season-1 board objectives missing from News');
         await page.screenshot({ path: join(out, `${tag}-news.png`) });
         // Reload through the real save path and confirm identity survives (or stays absent).

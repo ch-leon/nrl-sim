@@ -33,6 +33,7 @@ export async function runOfficeUnlocks(browser) {
       await page.waitForSelector('[data-nrl-start]');
       await page.locator('[data-nrl-difficulty-easy]').tap();
       await page.locator('[data-nrl-start]').tap();
+      await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       await page.waitForFunction(() => !!window.__nrlState);
       const start = await shot('start');

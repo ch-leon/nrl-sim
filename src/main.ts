@@ -7,6 +7,9 @@ import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
 import { enableAutosave, getActiveSlot, getSlotSummaries, load, save } from './core/save';
 import { showTitleFlow } from './ui/title';
+import { showExpansionIntro } from './ui/expansionIntro';
+import { expansionIntroLines } from './ui/expansionCopy';
+import { generateObjectives } from './systems/board';
 import { advanceWeek } from './core/time';
 import { advanceInProgress, advanceUntil } from './core/advance';
 import { advanceFromClub, createHud } from './ui/hud';
@@ -127,10 +130,12 @@ async function boot(): Promise<void> {
   // #362: the careers already here before the first commercial run keep the full game.
   if (commercialEnabled()) recordFirstRun(getSlotSummaries());
   const choice = await showTitleFlow(uiRoot);
+  let freshGame = choice.mode !== 'continue';
   if (choice.mode === 'continue') {
     const saved = load();
     if (saved) loadState(saved);
     else {
+      freshGame = true;
       // Continue on an empty slot still starts fresh: drop a match record left behind.
       clearLiveMatch();
       createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
@@ -141,6 +146,12 @@ async function boot(): Promise<void> {
     createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
+  if (freshGame) {
+    for (const text of expansionIntroLines(getState(), generateObjectives(getState())).slice(0, 2)) {
+      bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
+    }
+    await showExpansionIntro();
+  }
   // The demo gate's slot (#362), and the paywall at the demo's end (#364).
   if (commercialEnabled()) initCommercial(getActiveSlot(), () => void openPaywall({ reason: 'demo' }));
   // The player's kit design (#79) feeds every kit drawn from here on.

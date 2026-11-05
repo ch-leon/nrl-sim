@@ -49,6 +49,7 @@ export async function runLadderForm(browser) {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
     await page.locator('[data-nrl-start]').tap();
+    await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
   });
   await step('five-rounds', async (rec) => {

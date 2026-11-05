@@ -29,6 +29,7 @@ export async function runRecruit(browser) {
         await page.locator(`[data-nrl-difficulty-${difficulty}]`).tap();
         await page.locator('[data-nrl-clubname]').fill('Shortlist FC');
         await page.locator('[data-nrl-start]').tap();
+        await page.locator('[data-expansion-work]').tap();
         await page.locator('.nrl-tutorial-skip').tap();
         await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
         await page.waitForSelector('.nrl-nav');

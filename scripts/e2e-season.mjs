@@ -448,6 +448,7 @@ async function play() {
   await step('new-game', async () => {
     await page.fill('[data-nrl-clubname]', 'Phone Test FC');
     await tap('[data-nrl-start]');
+    await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-dock');
     await wait(1000);
   });

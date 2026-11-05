@@ -49,6 +49,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
     await page.locator('[data-nrl-start]').tap();
+    await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
   });
   await step('lineup', async () => {

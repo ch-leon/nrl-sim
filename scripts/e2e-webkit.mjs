@@ -1,3 +1,4 @@
+import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 // scripts/e2e-webkit.mjs — Safari-shaped checks: long DOM panels (#206, #203) and
 // a phone that opens already upright (#315).
 // Builds the game, serves it with `vite preview`, and in Playwright's WebKit as an
@@ -83,6 +84,7 @@ import { runCoachCalls } from './e2e-webkit/match/coachCalls.mjs';
 // in this same order. Each section opens its own contexts and writes its own folder
 // under e2e-output/webkit, so a section plays the same alone as after the others.
 const SECTIONS = [
+  ['runExpansionIntro', (b) => runExpansionIntro(b)],
   ['runDerby', (b) => runDerby(b)],
   ['runUnlocks', (b) => runUnlocks(b)],
   ['runSize', async (b) => { let f = 0; for (const [W, H] of SIZES) f += await runSize(b, W, H); return f; }],
@@ -113,7 +115,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
   text: ['runLargeTextTargets', 'runLadderForm'],
-  screens: ['runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
+  screens: ['runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 

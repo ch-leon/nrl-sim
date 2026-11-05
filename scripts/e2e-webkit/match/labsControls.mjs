@@ -19,6 +19,7 @@ export async function runLabsControls(browser) {
     await page.clock.setFixedTime(1);
     await page.goto(`${BASE}&labs=1`);
     await page.locator('[data-nrl-start]').tap();
+    await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
     await page.clock.setSystemTime(Date.now());
     await openNav(page, 'settings');

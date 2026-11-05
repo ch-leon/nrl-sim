@@ -339,6 +339,7 @@ async function run() {
   await timed('Start → grounds (textures painted, HUD up)', async () => {
     await page.fill('[data-nrl-clubname]', 'Budget FC');
     await clickTimed('[data-nrl-start]');
+    await page.locator('[data-expansion-work]').tap();
     await page.waitForFunction(() => document.querySelector('.nrl-dock') && window.__nrlGame?.scene.isActive('Grounds'));
   });
   if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();

@@ -5,6 +5,8 @@ import { STEPS, HINTS, TUTORIAL_END_TEXT } from '../../src/ui/tutorial';
 import { NICKNAMES } from '../../scripts/gen-towns.mjs';
 import towns from '../../src/data/towns.json';
 import type { Town } from '../../src/data/townSetup';
+import { EXPANSION_COPY, expansionIntroLines } from '../../src/ui/expansionCopy';
+import { generateObjectives } from '../../src/systems/board';
 import { AU_PACK } from '../../src/content/au';
 import { RIVAL_CLUBS } from '../../src/data/league';
 import { generatedBench, generatedRoster } from '../../src/match/league/sheets';
@@ -202,7 +204,8 @@ describe('the name pools (#398)', () => {
 
 describe('the pack text (#398)', () => {
   createNewGame('Test Club', 1);
-  const text = strings({ coach: { name: COACH_NAME, role: COACH_ROLE, summary: SUMMARY_REMARKS, events: EVENT_COMMENTS, tutorial: STEPS.map((s) => s.text), hints: HINTS, end: TUTORIAL_END_TEXT }, clubs: AU_PACK.clubs.map((c) => c.name), names: AU_PACK.names, vocab: AU_PACK.vocab, events: AU_PACK.events });
+  const expansionState = createNewGame('Test Club', 1);
+  const text = strings({ expansion: [EXPANSION_COPY.title, EXPANSION_COPY.work, EXPANSION_COPY.skip, EXPANSION_COPY.review, ...expansionIntroLines(expansionState, generateObjectives(expansionState))], coach: { name: COACH_NAME, role: COACH_ROLE, summary: SUMMARY_REMARKS, events: EVENT_COMMENTS, tutorial: STEPS.map((s) => s.text), hints: HINTS, end: TUTORIAL_END_TEXT }, clubs: AU_PACK.clubs.map((c) => c.name), names: AU_PACK.names, vocab: AU_PACK.vocab, events: AU_PACK.events });
 
   it.each(BLOCKED_WORDS)('never says %s', (word) => {
     const re = new RegExp(`\\b${word.replace(/ /g, '\\s+')}\\b`, 'i');

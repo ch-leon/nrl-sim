@@ -182,6 +182,7 @@ export async function runDockTextSize(browser) {
       }, safe);
       await page.fill('[data-nrl-clubname]', 'Dock FC');
       await press('[data-nrl-start]');
+      await press('[data-expansion-work]');
       await page.waitForSelector('.nrl-tutorial-skip');
       await press('.nrl-tutorial-skip');
       await page.waitForSelector('.nrl-tutorial', { state: 'detached' });

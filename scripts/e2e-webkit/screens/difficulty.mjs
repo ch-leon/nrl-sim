@@ -60,6 +60,7 @@ export async function runDifficulty(browser) {
           // Reopen a fresh setup, then Start without touching any difficulty.
           await page.reload();
           await page.locator('[data-nrl-start]').tap();
+          await page.locator('[data-expansion-work]').tap();
           await page.waitForSelector('.nrl-tutorial-skip');
           const difficulty = await page.evaluate(() => window.__nrlState().settings.difficulty);
           if (difficulty !== 'normal') record.problems.push(`untouched Start used ${difficulty}`);

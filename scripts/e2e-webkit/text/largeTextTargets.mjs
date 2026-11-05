@@ -133,6 +133,7 @@ export async function runLargeTextTargets(browser) {
         }, safe);
         await page.fill('[data-nrl-clubname]', 'Targets FC');
         await page.locator('[data-nrl-start]').tap();
+        await page.locator('[data-expansion-work]').tap();
         await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
         await page.evaluate((size) => {
           window.__nrlState().settings.textSize = size;
@@ -155,7 +156,9 @@ export async function runLargeTextTargets(browser) {
         await page.waitForSelector('.nrl-tutorial-bubble[data-step="recruit"]');
         await page.waitForTimeout(700);
         await page.locator('[data-screen-key="recruit"] .nrl-row-action:not(:disabled)').first().tap();
-        await page.waitForSelector('.nrl-tutorial-bubble[data-step="advance"]');
+        // The bubble may stand aside for Undo at 568×320 / Larger. Waiting for it
+        // to become visible would consume the very offer this step measures.
+        await page.waitForSelector('.nrl-tutorial-bubble[data-step="advance"]', { state: 'attached' });
         return undoClear(rec, 'signing');
       });
       await step('skip-tutorial', async () => {

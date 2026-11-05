@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 
 What's in the game, with the PR that added each.
 
@@ -62,6 +62,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- New careers arrive as an expansion club: the football manager introduces the club, bank and first-year board goals before the grounds; News and the first season review carry the same framing ([PR](https://github.com/ch-leon/nrl-sim/pull/504)).
 
 - Compressed counters pack middle tackles against Tight and leave edge overlaps for Expansive, behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/503)).
 

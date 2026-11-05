@@ -29,6 +29,7 @@ export async function runUnlocks(browser) {
       check(start && start.y + start.height <= height, 'Start is visible');
       await shot('setup');
       await page.locator('[data-nrl-start]').tap();
+      await page.locator('[data-expansion-work]').tap();
       await page.waitForFunction(() => window.__nrlState);
       await page.locator('.nrl-tutorial-skip').tap();
       await page.locator(SHEET_EXIT).tap();
@@ -99,6 +100,7 @@ export async function runUnlocks(browser) {
       await veteran.waitForSelector('[data-nrl-start]');
       await veteran.locator('[data-nrl-open-all]').check();
       await veteran.locator('[data-nrl-start]').tap();
+      await veteran.locator('[data-expansion-work]').tap();
       await veteran.waitForFunction(() => window.__nrlState);
       await veteran.locator('.nrl-tutorial-skip').tap();
       check(await veteran.evaluate(() => !window.__nrlState().unlocks), 'veteran setup omits unlocks');
