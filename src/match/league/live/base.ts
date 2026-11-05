@@ -23,7 +23,7 @@ import type { KickoffCall } from '../kickoff';
 import { weatherEffect, type WeatherEffect } from '../weather';
 import type { MatchInjury, WeatherKind } from '../../../sim/events';
 import { styleFit, type StyleFit } from '../fit';
-import { fitEdge, rushCounter, slideCounter } from '../counters';
+import { compressedCounter, fitEdge, rushCounter, slideCounter } from '../counters';
 import { LIVE } from './knobs';
 import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput } from './types';
 
@@ -199,6 +199,12 @@ export abstract class LiveBase {
   protected rushEffect(attacker: Side = this.attacking): number {
     const defender = other(attacker);
     return rushCounter(this.tactics[attacker].attack, this.tactics[defender].defence,
+      this.planFit[attacker].attack, this.planFit[defender].defence);
+  }
+
+  protected compressedEffect(attacker: Side = this.attacking): number {
+    const defender = other(attacker);
+    return compressedCounter(this.tactics[attacker].attack, this.tactics[defender].defence,
       this.planFit[attacker].attack, this.planFit[defender].defence);
   }
 

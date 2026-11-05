@@ -28,6 +28,7 @@ import { registerAgingSystem } from './systems/aging';
 import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
 import { registerStatsSystem } from './systems/stats';
+import { registerDerbySystem } from './systems/derby';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
@@ -175,6 +176,7 @@ async function boot(): Promise<void> {
   registerYouthSystem();
   registerStatsSystem();
   registerBoardSystem();
+  registerDerbySystem();
   registerEventsSystem();
   registerRivalsSystem();
   registerUnlockSystem();

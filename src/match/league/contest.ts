@@ -5,6 +5,7 @@
 // fatigue), the two players' STATS shift it, traits will add their bonus on
 // top (C, §3), and ONE seeded roll decides. Pure and unit-tested so the
 // numbers in the design doc are the numbers in the game.
+import { FIT } from './fit';
 import { FATIGUE } from './fatigue';
 
 export type ContestOutcome = 'held' | 'big-hit' | 'broken' | 'fend' | 'offload' | 'strip';
@@ -189,4 +190,10 @@ export function interceptChance(defenderIQ: number, cutOut: boolean, traitBonus 
   if (cutOut) p *= 2;
   p += traitBonus;
   return Math.max(0.01, Math.min(0.6, p));
+}
+
+/** The middle squeeze removes busts and available offloads using the same contact roll. */
+export function compressedContact(effect: number, contactD: number, support: boolean): ContestMods {
+  const squeeze = effect * Math.max(0, contactD) / FIT.leagueAverage;
+  return { broken: -squeeze, offload: support ? -squeeze : 0 };
 }

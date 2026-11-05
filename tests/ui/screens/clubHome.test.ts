@@ -38,6 +38,15 @@ describe('the Club home sheet (#350)', () => {
     expect(line.label).toContain(`You are ${place} on the ladder`);
   });
 
+  it('tags only the derby opponent in the next-fixture line and spoken label', () => {
+    const s = getState();
+    const { opp } = next(s);
+    const home = { town: opp.home!.town, lat: opp.home!.lat, lon: opp.home!.lon };
+    expect(nextMatchLine({ ...s, home })!.text).toContain(' · Derby');
+    expect(nextMatchLine({ ...s, home })!.label).toContain(', Derby,');
+    expect(nextMatchLine({ ...s, home: { town: 'Free text' } })!.text).not.toContain('Derby');
+  });
+
   it('no next match with the season done', () => {
     const s = getState();
     expect(nextMatchLine({ ...s, league: { ...s.league, fixtures: [] } })).toBeNull();
