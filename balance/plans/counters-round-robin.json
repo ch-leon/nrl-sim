@@ -1,113 +1,2003 @@
 {
   "name": "465 fifteen plan round robin",
-  "description": "Every unordered pair of the 15 plans on flat 60; 100 seeds in each orientation (200 matches per pairing, 2800 per plan). Report both sides points share for each plan and aggregate attack/defence styles; no average above 53%.",
+  "description": "All 15 plans, every unordered pairing: 500 consecutive seeds both orientations (1000 matches per cell, 14000 per plan). Defaults enabled; no style may average above 53%.",
   "report": "matrix",
-  "seeds": 100,
+  "seeds": 500,
   "scenarios": [
-    {"name": "grind/slide v grind/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v grind/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v balanced/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v balanced/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v balanced/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v expansive/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v expansive/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v expansive/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/slide v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v grind/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v balanced/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v balanced/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v balanced/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v expansive/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v expansive/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v expansive/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/rush v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v balanced/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v balanced/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v balanced/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v expansive/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v expansive/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v expansive/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "grind/compressed v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v balanced/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v balanced/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v expansive/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v expansive/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v expansive/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/slide v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v balanced/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v expansive/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v expansive/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v expansive/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/rush v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v expansive/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v expansive/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v expansive/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "balanced/compressed v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "balanced", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/slide v expansive/rush", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/slide v expansive/compressed", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/slide v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/slide v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/slide v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/slide v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/slide v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/slide v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/rush v expansive/compressed", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/rush v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/rush v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/rush v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/rush v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/rush v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/rush v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/compressed v kick-chase/slide", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/compressed v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/compressed v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/compressed v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/compressed v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "expansive/compressed v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "expansive", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/slide v kick-chase/rush", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/slide v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/slide v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/slide v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/slide v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/rush v kick-chase/compressed", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/rush v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/rush v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/rush v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/compressed v all-out/slide", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/compressed v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "kick-chase/compressed v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "kick-chase", "defence": "compressed"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "all-out/slide v all-out/rush", "home": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "track": "home", "bothWays": true},
-    {"name": "all-out/slide v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "all-out", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true},
-    {"name": "all-out/rush v all-out/compressed", "home": {"rating": 60, "tactics": {"attack": "all-out", "defence": "rush"}}, "away": {"rating": 60, "tactics": {"attack": "all-out", "defence": "compressed"}}, "track": "home", "bothWays": true}
+    {
+      "name": "grind/slide v grind/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v grind/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v balanced/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v balanced/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v balanced/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v expansive/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v expansive/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v expansive/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/slide v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v grind/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v balanced/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v balanced/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v balanced/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v expansive/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v expansive/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v expansive/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/rush v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v balanced/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v balanced/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v balanced/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v expansive/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v expansive/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v expansive/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "grind/compressed v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "grind",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v balanced/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v balanced/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v expansive/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v expansive/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v expansive/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/slide v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v balanced/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v expansive/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v expansive/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v expansive/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/rush v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v expansive/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v expansive/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v expansive/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "balanced/compressed v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "balanced",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/slide v expansive/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/slide v expansive/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/slide v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/slide v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/slide v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/slide v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/slide v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/slide v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/rush v expansive/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/rush v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/rush v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/rush v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/rush v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/rush v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/rush v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/compressed v kick-chase/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/compressed v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/compressed v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/compressed v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/compressed v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "expansive/compressed v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "expansive",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/slide v kick-chase/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/slide v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/slide v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/slide v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/slide v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/rush v kick-chase/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/rush v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/rush v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/rush v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/compressed v all-out/slide",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/compressed v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "kick-chase/compressed v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "kick-chase",
+          "defence": "compressed"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "all-out/slide v all-out/rush",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "all-out/slide v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "slide"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    },
+    {
+      "name": "all-out/rush v all-out/compressed",
+      "home": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "rush"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "attack": "all-out",
+          "defence": "compressed"
+        }
+      },
+      "track": "home",
+      "bothWays": true
+    }
   ]
 }

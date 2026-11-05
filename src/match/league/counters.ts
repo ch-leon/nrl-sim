@@ -7,27 +7,27 @@ export const COUNTERS = {
     on: 1,
     tight: 0.04,
     tightFit: 0.6,
-    expansive: 0.26,
+    expansive: 0.19,
     brokenBase: -0.015,
     offloadBase: -0.03,
-    commitM: 6,
+    commitM: 10,
   },
   rush: {
     on: 1,
     carry: 0.0005,
     defenceFit: 0.029,
-    kickChase: 0.39,
-    allOut: 0.06,
+    kickChase: 0.55,
+    allOut: 0.15,
   },
   slide: {
     on: 1,
     expansive: 0.08,
     expansiveFit: 0.2,
-    kickChase: 1.5,
-    tight: 0.04,
+    kickChase: 0.6,
+    tight: 0.025,
     allOut: 0.50,
     allOutRecovery: 3,
-    allOutReset: 0,
+    allOutReset: 3,
   },
   fit: {
     on: 1,
@@ -60,7 +60,7 @@ export function slideCounter(attack: AttackPreset, defence: DefencePreset, attac
   return matchupStrength(cell, attackFit, defenceFit, response);
 }
 
-/** A fitted second phase keeps an ill-fitted Slide line recovering longer; no new clock or roll. */
+/** Both fits scale Slide’s recovery after an All-out offload, using the existing window and roll. */
 export function allOutRecoveryTicks(base: number, attack: AttackPreset, defence: DefencePreset, attackFit: number, defenceFit: number): number {
   if (COUNTERS.slide.on !== 1 || attack !== 'all-out' || defence !== 'slide') return base;
   return Math.max(0, Math.round(base * (1 + COUNTERS.slide.allOutReset * attackFit * defenceFit + COUNTERS.slide.allOutRecovery * Math.max(0, attackFit - defenceFit))));

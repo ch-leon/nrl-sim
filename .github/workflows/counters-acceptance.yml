@@ -33,6 +33,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run balance -- --plan balance/plans/counters-${{ matrix.plan }}.json --jobs 4 2>&1 | tee balance.log
+      - name: Check the measured acceptance targets
+        run: npx vite-node scripts/check-counters.ts -- ${{ matrix.plan }} balance/runs
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -103,6 +105,21 @@ jobs:
             soak-enabled.json
             soak-enabled.log
           retention-days: 7
+
+  soak-guards:
+    needs: [baseline-soak, enabled-soak]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: counters-soak-main
+          path: evidence/main
+      - uses: actions/download-artifact@v4
+        with:
+          name: counters-soak-enabled
+          path: evidence/enabled
+      - run: python3 scripts/check-counters-soak.py evidence/main/soak-main.json evidence/enabled/soak-enabled.json
 
   phone:
     runs-on: ubuntu-latest

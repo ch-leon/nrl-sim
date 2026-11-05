@@ -246,3 +246,29 @@ remain cached when a break selects a different style. The opening positions are
 reset with the existing receiver, without an RNG draw. Omitted fits replay the
 live sim exactly. This field is not on `TeamSheet`, `LiveOptions` or any save;
 the game cannot supply it. `fitFixtures.test.ts` guards that boundary.
+
+
+### #465 switch-on acceptance (Leon, 5 Nov 2026)
+
+The final neutral comparison is **enabled minus dormant on the same 500 seeds
+in both orientations (1,000 matches)**, with signed 4–6 point win-share swings
+in all eight nonzero cells. Distance from 50% does not measure that swing.
+Flat preset controls versus Balanced/Slide use **42–58%** (previously 45–55%).
+Full-fit counters use the exact 1.5 v 0.5 fixtures, hold Tight’s independent
+rebuild on in both runs as Leon specified, and require **9 points or stronger**;
+9–12 is the nominal target. The fully dormant variant also exposes total change.
+
+After running each committed `counters-*.json` acceptance plan, check the saved
+measurements with `npx vite-node scripts/check-counters.ts -- <kind> <run-dir>`.
+Kinds are `enabled`, `full-fit`, `fit-enabled`, `strong-pack`, `round-robin` and
+`yardstick`. The checker rejects missing, duplicate or undersized evidence and
+checks each signed counter, own-fit cap, six-offload floor and 53% plan average.
+`tests/match/balance/acceptance.test.ts` guards paired swings and the revised
+42–58% preset bounds. The manual acceptance workflow runs these guards.
+
+Compare complete soak JSON with
+`python3 scripts/check-counters-soak.py <main.json> <enabled.json>`: all 120
+fresh careers and saves v1–20 remain included; Normal idle and managed each
+must stay within three win points. Mean final money in each mode/difficulty
+must remain within the baseline mean ±2 baseline standard errors, including
+careers that ended early. Both six-row tables belong in the PR.

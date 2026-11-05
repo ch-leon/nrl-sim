@@ -1457,10 +1457,11 @@ styles. Balanced and defences other than Slide receive no cell effect.
 | `counters.slide.on` | 1 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
 | `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
 | `counters.slide.expansiveFit` | 0.2 | Expansive cell multiplier: `max(0, 1 + expansiveFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. |
-| `counters.slide.kickChase` | 1.5 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
-| `counters.slide.tight` | 0.04 | Adds inside bust probability and supported offload probability for pack carriers. |
+| `counters.slide.kickChase` | 0.6 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
+| `counters.slide.tight` | 0.025 | Adds inside bust probability and supported offload probability for pack carriers. |
 | `counters.slide.allOut` | 0.50 | Adds bust probability for the offload receiver during the existing recovery window after the offload, so another defender arriving before the line resets is still exposed. A pass, kick, turnover or stoppage clears the receiver. |
-| `counters.slide.allOutRecovery` | 3 | All-out/Slide recovery ticks are `round(live.beatenCooldown × (1 + allOutRecovery × max(0, attackFit − defenceFit)))`. Neutral fits keep 30 ticks; fit 1.5 v 0.5 gives 120 ticks. Uses the existing receiver marker/window; normal clearing events still apply. |
+| `counters.slide.allOutRecovery` | 3 | All-out/Slide recovery ticks are `round(live.beatenCooldown × (1 + allOutReset × attackFit × defenceFit + allOutRecovery × max(0, attackFit − defenceFit)))`. At current defaults neutral fits give 120 ticks; fit 1.5 v 0.5 gives 188 ticks. Uses the existing receiver marker/window; normal clearing events still apply. |
+| `counters.slide.allOutReset` | 3 | Both fits scale the neutral recovery extension after an All-out offload against Slide. Uses the same receiver marker and existing window; a pass, kick, turnover or stoppage still clears it. Needed for the paired neutral +4–6pp target: raising the bust term alone saturates below it. |
 
 No new random draws: interception, contact, catches and races use their existing
 rolls. The receiver marker is transient match state; no stored stat or save change.
@@ -1486,8 +1487,8 @@ cell; their own-style fit and carriers decide the contest.
 | `counters.rush.on` | 1 | Only 1 enables the Rush mechanics; 0 keeps the legacy flat bust modifier. |
 | `counters.rush.carry` | 0.0005 | Bust probability per derived Carry point above neutral (negative below). |
 | `counters.rush.defenceFit` | 0.029 | Bust probability removed per Rush-fit point above 1 (added below). |
-| `counters.rush.kickChase` | 0.39 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
-| `counters.rush.allOut` | 0.06 | Cell × both fits added to handling spill chance on an All-out offload, using the receiver's existing pass-catch roll. Ordinary passes and other attacks receive no spill bonus. |
+| `counters.rush.kickChase` | 0.55 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
+| `counters.rush.allOut` | 0.15 | Cell × both fits added to handling spill chance on an All-out offload, using the receiver's existing pass-catch roll. Ordinary passes and other attacks receive no spill bonus. |
 
 No new RNG draws, stored stats, save changes or Labs/commercial flag changes.
 The reproducible acceptance plan is `balance/plans/counters-rush.json`: 500 seeds
@@ -1523,8 +1524,8 @@ rolls and the geometric line-break detector decide outcomes; no roll is added.
 | `counters.compressed.on` | 1 | Only 1 enables the profile and mechanics. |
 | `counters.compressed.tight` | 0.04 | Middle squeeze; a positive cell also recruits nearby help. |
 | `counters.compressed.tightFit` | 0.6 | Tight cell multiplier: `max(0, 1 + tightFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. This scales the middle contact squeeze; helper reach stays `commitM × attackFit × defenceFit`. |
-| `counters.compressed.expansive` | 0.26 | Inward lane pull and speed-scaled edge bust probability. |
-| `counters.compressed.commitM` | 6 | Extra middle tackler's neutral-fit reach in metres, scaled by both fits. |
+| `counters.compressed.expansive` | 0.19 | Inward lane pull and speed-scaled edge bust probability. |
+| `counters.compressed.commitM` | 10 | Extra middle tackler's neutral-fit reach in metres, scaled by both fits. |
 | `counters.compressed.brokenBase` | −0.015 | Common enabled bust modifier; off preserves legacy −0.02. |
 | `counters.compressed.offloadBase` | −0.03 | Common enabled offload modifier; off preserves legacy −0.03. |
 

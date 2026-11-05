@@ -230,7 +230,7 @@ describe('measuring and reporting', () => {
     expect(tracked).toContain('Side win');
     expect(tracked).toContain('50.0% (10.0% drawn)');
     expect(tracked).toContain('both ways round');
-    // A whole percent would print 54.8% as 55%, on the wrong side of the preset band's top.
+    // Keep tenths so the revised 42–58% preset band can be assessed precisely.
     const edge = reportMarkdown({
       plan: plan(),
       meta: {},

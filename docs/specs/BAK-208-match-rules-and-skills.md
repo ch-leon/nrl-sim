@@ -315,6 +315,14 @@ and kicks were already in the old bands; those three bands are scaled to its tem
 Measured by the balance harness (`balance/README.md`): every report marks these bands,
 and the standard plan re-runs on each match-code change to `main`.
 
+For strategy counters (#465; Leon, 5 Nov 2026), neutral cell acceptance is a
+paired **4–6 point win-share swing versus dormant**, with the matrix’s sign.
+Flat preset controls versus Balanced/Slide use **42–58%**. A full-fit counter
+(1.5 v 0.5) must swing **9 points or stronger** (9–12 nominal), holding Tight’s
+independent rebuild on in both comparisons. Own-style fit remains capped at
+four points, strong-pack Tight must offload six times a match, and every plan’s
+15-plan round-robin average stays at or below 53%.
+
 ## 8. Fatigue — *implemented in F*
 
 Every player has **legs**, an energy tank from 1 (fresh) to 0 (spent)
