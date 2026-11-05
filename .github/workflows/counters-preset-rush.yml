@@ -1,0 +1,50 @@
+name: Counters preset Rush cell completion
+on:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['.github/workflows/counters-preset-rush.yml']
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - env:
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          python3 <<'PY'
+          import os,json
+          from pathlib import Path
+          r=int(os.environ['PROFILE'])
+          base={'presets.attack.kick-chase.base.pass':[.02,.04,.06,.08][r],'counters.fit.edge':.065,'counters.fit.counterResponse':1,'counters.slide.kickChase':.4,'counters.slide.kickChaseFit':.7,'counters.rush.kickChase':.6,'counters.rush.allOut':.1,'counters.compressed.commitM':10,'counters.compressed.commitFit':.5,'counters.compressed.tight':.06,'counters.compressed.tightFit':.6,'counters.compressed.expansive':.09,'counters.compressed.brokenBase':0,'counters.compressed.offloadBase':0,'counters.tight.offloadPerFit':9.5}
+          source=json.load(open('balance/plans/counters-enabled.json'))
+          base['counters.rush.kickChase']=.65
+          scenario=next(s for s in source['scenarios'] if s['name']=='kick-chase v rush')
+          control=next(s.copy() for s in source['scenarios'] if s['name']=='balanced v slide');control['seeds']=10
+          p=dict(name=f'465 preset Rush cell {r}',description='Signed neutral Rush response at the retuned preset weights, fixed 500 seeds both orientations.',report='matrix',seeds=500,base=base,scenarios=[control,scenario],variants=[{'name':f'rush {v}','tuning':{'counters.rush.kickChase':v}} for v in [.7,.75,.8]])
+          Path('balance/plans/experiments').mkdir(exist_ok=True)
+          Path('balance/plans/experiments/20261105-kick-fit.json').write_text(json.dumps(p,indent=2))
+          PY
+      - run: npm run balance -- --plan balance/plans/experiments/20261105-kick-fit.json --jobs 4 2>&1 | tee balance.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: preset-rush-${{ matrix.profile }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
