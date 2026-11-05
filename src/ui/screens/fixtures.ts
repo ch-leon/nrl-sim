@@ -619,6 +619,11 @@ button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); out
 .nrl-next-form small { font-size: 0.6875rem; }
 .nrl-next-lines { display: flex; flex-direction: column; }
 .nrl-next-line { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--nrl-button); color: var(--nrl-text-2); overflow-wrap: anywhere; }
+@media (max-height: 440px) {
+  .nrl-next-match { gap: 4px; }
+  .nrl-next-side { padding: 4px 8px; }
+  .nrl-next-line { padding: 2px 0; }
+}
 /* The opponent's name: a text link with a 44px hit area (#194). */
 .nrl-next-side .nrl-ladder-club { padding: 12px 0; margin: -12px 0; text-decoration: underline dotted; text-underline-offset: 3px; }
 `;
