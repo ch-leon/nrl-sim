@@ -36,7 +36,7 @@ export const COUNTERS = {
     on: 1,
     offloadBase: 1,
     // Fit 1 is neutral; a strength-80 pack has Tight fit 1.25.
-    offloadPerFit: 12,
+    offloadPerFit: 8,
   },
 };
 

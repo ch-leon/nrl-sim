@@ -1394,7 +1394,7 @@ rating spread and difficulty adjustments. Bench players do not rescore it. On-fi
 |---|---|---|
 | `counters.tight.on` | 1 | Only 1 enables the rebuild. At 0 all old zone plans and match fingerprints are unchanged. |
 | `counters.tight.offloadBase` | 1 | Pack offload multiplier at or below neutral fit, approximately Balanced. |
-| `counters.tight.offloadPerFit` | 12 | Added multiplier per fit above 1: base + perFit × max(0, fit − 1), floored at 0. Strength-80 pack fit 1.25 gives ×4. |
+| `counters.tight.offloadPerFit` | 8 | Added multiplier per fit above 1: base + perFit × max(0, fit − 1), floored at 0. Strength-80 pack fit 1.25 gives ×3. |
 
 Hit-ups, passes, steps, early territory kicks and kick bias stay as in the legacy
 plan. `balance/plans/counters-fit.json` compares the default with `Tight on`, at
@@ -1551,7 +1551,7 @@ independently controllable by name; the full set is calibrated together.
 
 | Group | Tuned values |
 |---|---|
-| `counters.tight` | `on=1`, `offloadBase=1`, `offloadPerFit=12` |
+| `counters.tight` | `on=1`, `offloadBase=1`, `offloadPerFit=8` |
 | `counters.fit` | `on=1`, `edge=0.095` |
 | `counters.slide` | `on=1`, `expansive=0.08`, `expansiveFit=0.2`, `kickChase=1.5`, `tight=0.04`, `allOut=0.50`, `allOutRecovery=3` |
 | `counters.rush` | `on=1`, `carry=0.0005`, `defenceFit=0.029`, `kickChase=0.39`, `allOut=0.06` |
