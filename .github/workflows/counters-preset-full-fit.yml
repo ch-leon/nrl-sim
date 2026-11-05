@@ -1,0 +1,52 @@
+name: Counters preset fitted effects
+on:
+  push:
+    branches: [issue-465-strategy-counters]
+    paths: ['.github/workflows/counters-preset-full-fit.yml']
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - env:
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          python3 <<'PY'
+          import os,json
+          from pathlib import Path
+          r=int(os.environ['PROFILE'])
+          base={'presets.attack.kick-chase.base.pass':[.02,.04,.06,.08][r],'counters.fit.edge':.065,'counters.fit.counterResponse':1,'counters.slide.kickChase':.4,'counters.slide.kickChaseFit':.7,'counters.rush.kickChase':.6,'counters.rush.allOut':.1,'counters.compressed.commitM':10,'counters.compressed.commitFit':.5,'counters.compressed.tight':.06,'counters.compressed.tightFit':.6,'counters.compressed.expansive':.09,'counters.compressed.brokenBase':0,'counters.compressed.offloadBase':0,'counters.tight.offloadPerFit':9.5}
+          source=json.load(open('balance/plans/counters-full-fit.json'))
+          p=source
+          p['name']=f'465 preset fitted effects {r}'
+          p['base'].update(base)
+          for key in ['fit','slide','rush','compressed']:p['base'][f'counters.{key}.on']=0
+          p['scenarios']=[s for s in p['scenarios'] if 'kick-chase' in s['name']]
+          p['variants'][0]['tuning']['presets.attack.kick-chase.base.pass']=-.05
+          Path('balance/plans/experiments').mkdir(exist_ok=True)
+          Path('balance/plans/experiments/20261105-kick-fit.json').write_text(json.dumps(p,indent=2))
+          PY
+      - run: npm run balance -- --plan balance/plans/experiments/20261105-kick-fit.json --jobs 4 2>&1 | tee balance.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: preset-full-fit-${{ matrix.profile }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
