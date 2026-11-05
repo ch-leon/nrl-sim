@@ -1,0 +1,10 @@
+{
+  "name": "465 Tight scale 10 soak calibration",
+  "kind": "soak",
+  "command": "npm run soak -- --managed-only --difficulties normal --jobs 4 --tune counters.tight.offloadPerFit=10",
+  "seeds": 20,
+  "seasons": 5,
+  "tuning": {
+    "counters.tight.offloadPerFit": 10
+  }
+}
