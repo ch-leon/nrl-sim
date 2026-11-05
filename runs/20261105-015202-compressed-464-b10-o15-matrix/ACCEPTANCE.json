@@ -1,0 +1,118 @@
+{
+  "runFolder": "balance/runs/20261105-015202-compressed-464-b10-o15-matrix",
+  "commit": "19c381a",
+  "rowSums": {
+    "grind": -3.074999999999994,
+    "expansive": -0.9000000000000012,
+    "kick-chase": 4.099999999999998,
+    "all-out": -0.5999999999999956,
+    "balanced": -1.5500000000000012
+  },
+  "columnSums": {
+    "slide": -0.1499999999999897,
+    "rush": -2.175000000000005,
+    "compressed": 0.30000000000000027
+  },
+  "errors": [
+    "expansive v Compressed 51.800000000000004% outside 53–57",
+    "kick-chase v Compressed 53.75% outside 48–52",
+    "grind sum -3.074999999999994 outside ±3",
+    "kick-chase sum 4.099999999999998 outside ±3"
+  ],
+  "cells": [
+    {
+      "scenario": "grind v slide",
+      "matches": 1000,
+      "share": 0.547,
+      "se": 0.015215864172715357
+    },
+    {
+      "scenario": "grind v rush",
+      "matches": 2000,
+      "share": 0.48675,
+      "se": 0.010812408281063836
+    },
+    {
+      "scenario": "grind v compressed",
+      "matches": 1000,
+      "share": 0.4355,
+      "se": 0.01511019748607105
+    },
+    {
+      "scenario": "balanced v slide",
+      "matches": 1000,
+      "share": 0.5,
+      "se": 0.015304712811230215
+    },
+    {
+      "scenario": "balanced v rush",
+      "matches": 2000,
+      "share": 0.4755,
+      "se": 0.010828596596610578
+    },
+    {
+      "scenario": "balanced v compressed",
+      "matches": 1000,
+      "share": 0.509,
+      "se": 0.01538361646868695
+    },
+    {
+      "scenario": "expansive v slide",
+      "matches": 1000,
+      "share": 0.4585,
+      "se": 0.015321961771017188
+    },
+    {
+      "scenario": "expansive v rush",
+      "matches": 1000,
+      "share": 0.5145,
+      "se": 0.015338677420984761
+    },
+    {
+      "scenario": "expansive v compressed",
+      "matches": 1000,
+      "share": 0.518,
+      "se": 0.015456872740464495
+    },
+    {
+      "scenario": "kick-chase v slide",
+      "matches": 1000,
+      "share": 0.452,
+      "se": 0.015262009334583989
+    },
+    {
+      "scenario": "kick-chase v rush",
+      "matches": 1000,
+      "share": 0.5515,
+      "se": 0.015307909134891091
+    },
+    {
+      "scenario": "kick-chase v compressed",
+      "matches": 1000,
+      "share": 0.5375,
+      "se": 0.015250453315437102
+    },
+    {
+      "scenario": "all-out v slide",
+      "matches": 1000,
+      "share": 0.541,
+      "se": 0.01526604244891427
+    },
+    {
+      "scenario": "all-out v rush",
+      "matches": 1000,
+      "share": 0.45,
+      "se": 0.015337380325050089
+    },
+    {
+      "scenario": "all-out v compressed",
+      "matches": 1000,
+      "share": 0.503,
+      "se": 0.0152880582391854
+    }
+  ],
+  "legacy": {
+    "mean": 0.4755,
+    "se": 0.015391122007073972
+  }
+}

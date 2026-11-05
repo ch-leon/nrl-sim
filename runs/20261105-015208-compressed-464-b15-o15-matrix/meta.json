@@ -1,0 +1,24 @@
+{
+  "commit": "19c381a",
+  "branch": "feat/464-compressed-counters",
+  "started": "2026-11-05T01:52:08.328Z",
+  "assembled": true,
+  "sourceMap": {
+    "grind v slide": "balance-log/runs/20261104-173631-slide-grind-acceptance-pooled",
+    "expansive v slide": "balance-log/runs/20261104-173632-slide-expansive-acceptance-pooled",
+    "kick-chase v slide": "balance-log/runs/20261104-182658-slide-kick-chase-acceptance-pooled",
+    "all-out v slide": "balance-log/runs/20261104-181028-slide-all-out-acceptance-pooled",
+    "grind v rush": "balance-log/runs/20261104-204430-rush-tight-acceptance-pooled",
+    "expansive v rush": "balance-log/runs/20261104-204431-rush-expansive-acceptance",
+    "kick-chase v rush": "balance-log/runs/20261104-210843-rush-kick-chase-acceptance-pooled",
+    "all-out v rush": "balance-log/runs/20261104-204432-rush-all-out-acceptance",
+    "balanced v slide": "balance-log/runs/20261105-013647-compressed-464-final-matrix",
+    "balanced v rush": "balance-log/runs/20261105-013647-compressed-464-final-matrix",
+    "grind v compressed": "fresh Actions checkpoints, seeds 1–500 both ways",
+    "balanced v compressed": "fresh Actions checkpoints, seeds 1–500 both ways",
+    "expansive v compressed": "fresh Actions checkpoints, seeds 1–500 both ways",
+    "kick-chase v compressed": "fresh Actions checkpoints, seeds 1–500 both ways",
+    "all-out v compressed": "fresh Actions checkpoints, seeds 1–500 both ways"
+  },
+  "actionsRun": "41950761899"
+}

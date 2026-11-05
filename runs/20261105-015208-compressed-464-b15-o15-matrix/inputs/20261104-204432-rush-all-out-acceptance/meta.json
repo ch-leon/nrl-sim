@@ -1,0 +1,16 @@
+{
+  "commit": "086042f",
+  "branch": "feat/463-rush-counters",
+  "started": "2026-11-04T20:45:00.332826+00:00",
+  "pooled": true,
+  "sourceRuns": [
+    "20261104-193409-rush-counter-cells-acceptance"
+  ],
+  "seedRanges": [
+    [
+      1,
+      500,
+      "20261104-193409-rush-counter-cells-acceptance"
+    ]
+  ]
+}
