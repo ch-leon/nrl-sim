@@ -212,3 +212,21 @@ and Tight/Expansive 48–52%. The three fit rows use task 1's 200 seeds both way
 (400 matches): pack strength 80/45 and backs speed 80. Raw chunk inputs and the
 sample-variance pooling formula are preserved beside each pooled report on
 `balance-log`; no seed or orientation is discarded.
+
+
+`counters-compressed.json` is the task-7 full-matrix acceptance plan (#464). It
+enables Tight, own-style fit, Slide, Rush and Compressed through overrides only.
+Flat-60 cells use 500 seeds both ways (1,000 whole matches), except Tight v Rush
+and Balanced v Rush: both retain seeds 1–1,000 in both orientations (2,000 matches).
+The enabled Compressed plan uses the recorded common contact baseline
+(busts -0.015, offloads -0.03); the additional Contact D-scaled middle benefit
+belongs to Tight. The legacy flat profile measured Balanced v Compressed at
+47.55% over 1,000 matches, so calibration controls remain separate from final
+acceptance.
+
+Compressed targets are Tight 43–47%, Expansive 53–57% and the other three 48–52%.
+Sum unrounded signed swings from 50 in each row and column; each total must be
+within ±3 percentage points. The report exposes per-side offloads, contact busts
+and line breaks. Runs use disjoint 125-seed checkpoint blocks; pooled reports
+preserve every source plan/result and the sample-variance formula. The committed
+plan reruns each complete consecutive range directly. Tuned values are in §34.

@@ -144,7 +144,13 @@ const DEFENCE: Readonly<Record<DefencePreset, DefencePlan>> = {
 };
 
 export function defencePlan(preset: DefencePreset): DefencePlan {
-  return DEFENCE[preset];
+  const plan = DEFENCE[preset];
+  // The enabled counter owns the middle advantage; the legacy flat contact
+  // bonuses otherwise also favour Compressed in its three neutral cells.
+  if (preset === 'compressed' && COUNTERS.compressed.on === 1) {
+    return { ...plan, broken: COUNTERS.compressed.brokenBase, offload: COUNTERS.compressed.offloadBase };
+  }
+  return plan;
 }
 
 /** The preset tables as data, for balance experiments (tuning.ts): the default attack plan, each attack preset's base and zone overrides, and the defence plans. */

@@ -241,6 +241,8 @@ Slide counters (#462) are dormant (`counters.slide.on = 0`). When enabled, both 
 
 Rush counters (#463) are dormant (`counters.rush.on = 0`). When enabled, Carry and starting-sheet Rush fit replace the flat bust concession; rushed back-three positioning and kick contests leave space for Kick-chase, while All-out offloads spill more. Tight and Expansive have no base counter cell. All outcomes use existing match rolls. See tuning §33.
 
+Compressed counters (#464) are dormant (`counters.compressed.on = 0`). When enabled, Tight draws an extra committed middle tackler and Contact D-scaled reductions to busts and offloads; Expansive finds edge overlaps through inward lane pull and speed-scaled outside-back bust odds. Kick-chase, All-out and Balanced have no cell. All outcomes use existing rolls. See tuning §34.
+
 Own-style fit (#461) is independently dormant (`counters.fit.on = 0`). When enabled, starting-sheet attack fit helps carrying contests and defence fit helps tackling contests; fit 1 is neutral. A plan applied at a break selects the new styles’ fits. The same contest roll resolves contact; see tuning §31.
 
 *Pass* adds to the engaged carrier's chance of passing (base 30% + Skill/300). *Offloads*

@@ -3,6 +3,14 @@ import type { AttackPreset, DefencePreset } from './presets';
 
 // Strategy counters ship dormant until the switch-on task (#465).
 export const COUNTERS = {
+  compressed: {
+    on: 0,
+    tight: 0.04,
+    expansive: 0.26,
+    brokenBase: -0.015,
+    offloadBase: -0.03,
+    commitM: 6,
+  },
   rush: {
     on: 0,
     carry: 0.004,
@@ -52,5 +60,12 @@ export function rushBroken(flat: number, defence: DefencePreset, carry: number, 
 export function rushCounter(attack: AttackPreset, defence: DefencePreset, attackFit: number, defenceFit: number): number {
   if (COUNTERS.rush.on !== 1 || defence !== 'rush') return 0;
   const cell = attack === 'kick-chase' ? COUNTERS.rush.kickChase : attack === 'all-out' ? COUNTERS.rush.allOut : 0;
+  return cell * attackFit * defenceFit;
+}
+
+/** Only the two Compressed cells have mechanics; both starting fits scale them. */
+export function compressedCounter(attack: AttackPreset, defence: DefencePreset, attackFit: number, defenceFit: number): number {
+  if (COUNTERS.compressed.on !== 1 || defence !== 'compressed') return 0;
+  const cell = attack === 'grind' ? COUNTERS.compressed.tight : attack === 'expansive' ? COUNTERS.compressed.expansive : 0;
   return cell * attackFit * defenceFit;
 }
