@@ -11,7 +11,7 @@ function tuned<T>(over: Overrides, fn: () => T): T {
   const restore = applyTuning(over);
   try { return fn(); } finally { restore(); }
 }
-const ON = { 'race.on': 1, 'race.perPoint': 0.008, 'race.cap': 0.12, 'race.fendShare': 0.5, 'race.wide': 1, 'race.backsOnly': 1 };
+const ON = { 'race.on': 1, 'race.perPoint': 0.008, 'race.cap': 0.12, 'race.fendShare': 0.5, 'race.wide': 1, 'race.backsOnly': 1, 'race.single': 1 };
 
 class RaceSim extends LiveSim {
   constructor(attack: AttackPreset = 'expansive', defence: DefencePreset = 'rush') {
@@ -52,6 +52,7 @@ describe('the edge race (#322)', () => {
     });
     tuned({ ...ON, 'race.wide': 0 }, () => expect(new RaceSim().race(1, MID_Y, 75, 60).broken).toBeCloseTo(0.12));
     tuned({ ...ON, 'race.backsOnly': 0 }, () => expect(new RaceSim().race(7, MID_Y - 30, 75, 60).broken).toBeCloseTo(0.12));
+    tuned({ ...ON, 'race.single': 0 }, () => expect(new RaceSim().race(1, MID_Y - 30, 75, 60, 2).broken).toBeCloseTo(0.12));
     tuned({ ...ON, 'race.on': 0 }, () => expect(new RaceSim().race(1, wide, 80, 40)).toEqual({}));
   });
   it('does not care which attack plan he plays: a fast Balanced back races too', () => {

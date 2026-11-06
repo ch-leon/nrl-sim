@@ -238,12 +238,13 @@ export abstract class LiveContact extends LivePenalties {
   }
 
   /**
-   * The edge race (#322): an outside back carrying wide, one-on-one, busts and
-   * fends more the more Speed he has over the man tackling him (less when the
-   * tackler is the quicker). Zero at equal Speed; no roll of its own.
+   * The edge race (#322): an outside back carrying wide, one-on-one (or into any
+   * number with `race.single` 0), busts and fends more the more Speed he has over
+   * the man tackling him (less when the tackler is the quicker). Zero at equal
+   * Speed; no roll of its own.
    */
   protected applyEdgeRace(c: Player, t: Player, defenders: number, mods: ContestMods): void {
-    if (RACE.on !== 1 || defenders !== 1) return;
+    if (RACE.on !== 1 || (RACE.single === 1 && defenders !== 1)) return;
     if (RACE.backsOnly === 1 && !BACKS.includes(ROLES[c.slot]!.name)) return;
     if (RACE.wide === 1 && Math.abs(c.body.pos.y - MID_Y) <= MAX_LAT_M) return;
     const race = edgeRace(c.stats.speed, t.stats.speed);

@@ -33,7 +33,7 @@ describe('knobs by name', () => {
   });
   it('lists every group and applies overrides with an exact way back', () => {
     const paths = listKnobs().map((k) => k.path);
-    for (const p of ['live.carrySpeed', 'contest.broken', 'fatigue.runCost', 'fatigue.contactCost.carrier', 'wrestle.gripBase', 'wrestle.gang.1', 'traits.hitman', 'edge.hothead', 'presets.defence.rush.lineSpeed', 'presets.attackDefault.earlyKick', 'race.on', 'race.perPoint', 'race.cap', 'race.fendShare', 'race.wide', 'race.backsOnly', 'contest.stepSlope', 'counters.slide.expansiveSigned', 'counters.slide.expansiveByDefence', 'counters.compressed.expansiveRelative']) {
+    for (const p of ['live.carrySpeed', 'contest.broken', 'fatigue.runCost', 'fatigue.contactCost.carrier', 'wrestle.gripBase', 'wrestle.gang.1', 'traits.hitman', 'edge.hothead', 'presets.defence.rush.lineSpeed', 'presets.attackDefault.earlyKick', 'race.on', 'race.perPoint', 'race.cap', 'race.fendShare', 'race.wide', 'race.backsOnly', 'race.single', 'contest.stepSlope', 'counters.slide.expansiveSigned', 'counters.slide.expansiveByDefence', 'counters.compressed.expansiveRelative']) {
       expect(paths).toContain(p);
     }
     const before = JSON.stringify(PRESET_TABLES);

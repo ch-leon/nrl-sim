@@ -64,9 +64,10 @@ export const MOMENTUM = { perMs: 0.01, cap: 0.04 };
  * tackler, capped either way, and `fendShare` of that again on the fend. Relative,
  * so it is zero at equal Speed and pays a side that is faster everywhere little
  * (the spread keeps a fifth of that). `wide` 0 lets any back's one-on-one carry
- * race; `backsOnly` 0 lets anyone's. Overridable by name (`race.perPoint`).
+ * race; `backsOnly` 0 lets anyone's; `single` 0 races the first tackler when two
+ * or more commit too (a rushing line commits two). Overridable by name (`race.perPoint`).
  */
-export const RACE = { on: 0, perPoint: 0.008, cap: 0.12, fendShare: 0.5, wide: 1, backsOnly: 1 };
+export const RACE = { on: 0, perPoint: 0.008, cap: 0.12, fendShare: 0.5, wide: 1, backsOnly: 1, single: 1 };
 
 /** Bust and fend points from the Speed race between the carrier and his tackler (#322). Zero when off or level. */
 export function edgeRace(carrierSpeed: number, tacklerSpeed: number): { broken: number; fend: number } {
