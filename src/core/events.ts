@@ -43,6 +43,8 @@ export interface LiveMatchData {
    * the player plays (N14.1). A list, so a resume and a Skip replay the same match.
    */
   breakRuleSides?: ('home' | 'away')[];
+  /** Rival-only difficulty context; serialisable for workers and replays (#469). */
+  aiRival?: { side: 'home' | 'away'; difficulty: import('../config').Difficulty };
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
   /** The difficulty's edge to the rival, after the rating spread (N12.2); absent on Normal. */
@@ -85,9 +87,11 @@ export interface Events {
    * `action` (#370): a button in the toast (the 5-second Undo). Such a toast jumps the
    * queue, keeps its `ms` and closes only on its ✕ or its timer; `enabled` false hides the button.
    */
+  'ui:openScreen': { id: string };
   'ui:notify': {
+    from?: 'coach';
     text: string; kind: 'info' | 'success' | 'danger'; quiet?: boolean; match?: boolean; ms?: number;
-    action?: { label: string; run: () => void; enabled?: () => boolean };
+    action?: { label: string; screen?: string; run: () => void; enabled?: () => boolean };
   };
   /** The demo stopped an advance at the week the club is on (#362; commercial flag on only). The paywall opens on it (#364). */
   'commercial:demoEnded': { season: number; week: number };

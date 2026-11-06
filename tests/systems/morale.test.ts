@@ -1,9 +1,10 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   moraleTick, nextMorale, unhappiness, facilityMoraleBonus, registerMoraleSystem,
 } from '../../src/systems/morale';
 import {
-  createNewGame, getState, loadState,
+  getState, loadState,
   type Player, type PlacedFacility, type GameState,
 } from '../../src/core/state';
 import { PLAYER_ID } from '../../src/systems/fixtures';

@@ -1,10 +1,11 @@
+import { createLegacyGame as createNewGame } from '../../helpers/legacyGame';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   financeSummary, FinanceLedger, initFinanceLedger, fmtMoney, fmtMoneyCompact,
   fmtRunway, fmtCrowd, fmtStand, ledgerNote, fmtFireSale, seasonPnl, FINANCE_LINE_LABELS, EXPIRY_WINDOW_WEEKS,
 } from '../../../src/ui/screens/finance';
 import {
-  createNewGame, getState, loadState, setState, emptyFinance, FINANCE_LINES,
+  getState, loadState, setState, emptyFinance, FINANCE_LINES,
   type Player, type PlacedFacility, type GameState, type Fixture,
 } from '../../../src/core/state';
 import { bus, type Events } from '../../../src/core/events';

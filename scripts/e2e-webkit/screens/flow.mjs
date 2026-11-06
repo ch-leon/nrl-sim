@@ -1,3 +1,4 @@
+import { playTrials } from '../common.mjs';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
@@ -111,6 +112,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
   await step('t1-setup', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
+    await page.locator('[data-nrl-open-all]').check();
     await page.waitForTimeout(250);
     const out = await flowReach(page, ['[data-nrl-clubname]', '[data-nrl-start]']);
     out.push(...await page.evaluate(() => {
@@ -122,8 +124,10 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     await shot('t1-at-check');
     await page.fill('[data-nrl-clubname]', 'Flow FC');
     await tap('[data-nrl-start]');
+    await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
     await tap('.nrl-tutorial-skip');
+      await playTrials(page);
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
     await club();
     return out;

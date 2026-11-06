@@ -1,4 +1,6 @@
+import { currentRound } from './core/season';
 import Phaser from 'phaser';
+import { packForCountry, preparePack } from './content';
 import './ui/fonts';
 import { BootScene } from './scenes/BootScene';
 import { GroundsScene } from './scenes/GroundsScene';
@@ -7,6 +9,9 @@ import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
 import { enableAutosave, getActiveSlot, getSlotSummaries, load, save } from './core/save';
 import { showTitleFlow } from './ui/title';
+import { showExpansionIntro } from './ui/expansionIntro';
+import { expansionIntroLines } from './ui/expansionCopy';
+import { generateObjectives } from './systems/board';
 import { advanceWeek } from './core/time';
 import { advanceInProgress, advanceUntil } from './core/advance';
 import { advanceFromClub, createHud } from './ui/hud';
@@ -16,6 +21,7 @@ import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
 import { initToasts } from './ui/toasts';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
+import { registerUnlockSystem, screenLockReason } from './systems/unlocks';
 import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
@@ -24,6 +30,7 @@ import { registerAgingSystem } from './systems/aging';
 import { registerMoraleSystem } from './systems/morale';
 import { registerYouthSystem } from './systems/youth';
 import { registerStatsSystem } from './systems/stats';
+import { registerDerbySystem } from './systems/derby';
 import { registerBoardSystem } from './systems/board';
 import { plantPending, registerEventsSystem } from './systems/events';
 import { registerRivalsSystem } from './systems/rivals';
@@ -125,20 +132,30 @@ async function boot(): Promise<void> {
   // #362: the careers already here before the first commercial run keep the full game.
   if (commercialEnabled()) recordFirstRun(getSlotSummaries());
   const choice = await showTitleFlow(uiRoot);
+  let freshGame = choice.mode !== 'continue';
   if (choice.mode === 'continue') {
     const saved = load();
-    if (saved) loadState(saved);
+    if (saved) { await preparePack(saved.pack ?? 'au'); loadState(saved); }
     else {
+      freshGame = true;
       // Continue on an empty slot still starts fresh: drop a match record left behind.
       clearLiveMatch();
-      createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
+      await preparePack(packForCountry(choice.home?.country));
+      createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
     }
   } else {
     // New Game must not resume a match that belonged to the save this slot had.
     clearLiveMatch();
-    createNewGame(choice.clubName ?? 'Cavehole Crushers', undefined, { difficulty: choice.difficulty });
+    await preparePack(packForCountry(choice.home?.country));
+    createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
+  if (freshGame) {
+    for (const text of expansionIntroLines(getState(), generateObjectives(getState())).slice(0, 2)) {
+      bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
+    }
+    await showExpansionIntro();
+  }
   // The demo gate's slot (#362), and the paywall at the demo's end (#364).
   if (commercialEnabled()) initCommercial(getActiveSlot(), () => void openPaywall({ reason: 'demo' }));
   // The player's kit design (#79) feeds every kit drawn from here on.
@@ -163,8 +180,10 @@ async function boot(): Promise<void> {
   registerYouthSystem();
   registerStatsSystem();
   registerBoardSystem();
+  registerDerbySystem();
   registerEventsSystem();
   registerRivalsSystem();
+  registerUnlockSystem();
   initMatchReport({ onReason: (screen) => nav.open(screen) }); // "Why did I lose?" (#368)
   initBoardUi();
   // The next fixture's match art, painted in a Worker during the week and uploaded in idle slices (N10.5).
@@ -251,15 +270,16 @@ async function boot(): Promise<void> {
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { hidden: true });
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), {
     more: true,
-    holds: ['contracts'],
+    locked: () => screenLockReason(getState(), 'finance'),
     status: () => {
       const net = Math.round(financeSummary(getState()).netWeekly);
       return { text: `${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))} / week`, attn: net < 0 };
     },
   });
-  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { hidden: true }); // from Finance's VIEW ▸
+  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { more: true, locked: () => screenLockReason(getState(), 'contracts') }); // also from Finance's VIEW ▸
   nav.registerScreen('staff', STAFF_SCREEN_TITLE, () => openStaffScreen(), {
     more: true,
+    locked: () => screenLockReason(getState(), 'staff'),
     status: () => {
       const p = getState().boardPatience;
       return { text: `Board patience ${p}/${BOARD.MAX_PATIENCE}`, attn: p <= 2 };
@@ -308,6 +328,8 @@ async function boot(): Promise<void> {
   newsInbox.onChange(refreshNewsBadge);
   bus.on('state:changed', refreshNewsBadge);
   refreshNewsBadge();
+  bus.on('ui:openScreen', ({ id }) => nav.open(id));
+
   // Squad's red dot (#369): a contract ends within 4 weeks. Looking doesn't clear it; renewing, selling or releasing does.
   const refreshSquadDot = (): void => {
     const n = contractsEndingSoon(getState()).length;
@@ -320,6 +342,7 @@ async function boot(): Promise<void> {
   portrait = initPortraitMenus(guard, () => openClubHome({
     decisions: decisionChipItems,
     runwayWeeks,
+    onCoach: (screen) => nav.open(screen),
     onMoney: () => nav.open('finance'),
     onNextMatch: () => nav.open('fixtures'),
     onDecisions: () => void openDecisions(),
@@ -336,7 +359,7 @@ async function boot(): Promise<void> {
   // week before it, so advancing again rebuilds the same match, which picks up
   // the record and plays on from where it was, calls and all.
   const pending = readLiveMatch();
-  if (pending && pending.season === getState().season && pending.week === getState().week) {
+  if (pending && pending.season === getState().season && pending.week === getState().week && pending.round === currentRound(getState())) {
     const resume = (): void => void setTimeout(() => advanceWeek(), 0);
     if (g.isBooted) resume();
     else g.events.once(Phaser.Core.Events.READY, resume);

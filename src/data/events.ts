@@ -10,11 +10,11 @@
 // in points.
 import type { TraitId } from './traits';
 import { WILDCARDS } from '../config';
-import { activePack } from '../content';
+import { activePack, onPackChange } from '../content';
 import type { CardText } from '../content/pack';
 
 /** The season-end trip's text is the content pack's (#361); its id and flag stay here. */
-const TRIP = activePack().events.trip;
+
 
 /** Where a ban came from. #328's Club Lawyer will tell these apart. */
 export type BanSource = 'event' | 'trip' | 'judiciary';
@@ -121,7 +121,7 @@ export interface EventCardDef {
 }
 
 /** The starter deck. Order is irrelevant; ids must be unique and stable (saves keep them). */
-const DECK: readonly EventCardDef[] = [
+const makeDeck = (TRIP = activePack().events.trip): readonly EventCardDef[] => [
   {
     id: 'billboardSponsor',
     title: 'Billboard offer',
@@ -486,7 +486,7 @@ const DECK: readonly EventCardDef[] = [
     id: 'baliTrip',
     title: TRIP.title,
     text: TRIP.text,
-    weight: 1, cooldown: 27, when: { offer: 'rollover' },
+    weight: 1, cooldown: activePack().league.seasonRounds + activePack().league.finalsWeeks, when: { offer: 'rollover' },
     choices: [
       {
         label: 'Let them go',
@@ -534,7 +534,8 @@ export function withCardText(deck: readonly EventCardDef[], text: Readonly<Recor
 }
 
 /** The deck the game draws from: the starter deck in the active pack's words. */
-export const EVENT_CARDS: readonly EventCardDef[] = withCardText(DECK, activePack().events.cardText);
+export let EVENT_CARDS: readonly EventCardDef[] = withCardText(makeDeck(), activePack().events.cardText);
+onPackChange(() => { EVENT_CARDS = withCardText(makeDeck(), activePack().events.cardText); });
 
 /** Card by id (undefined for an id no longer in the deck, e.g. from an old save). */
 export function cardById(id: string): EventCardDef | undefined {

@@ -1,3 +1,4 @@
+import { currentRound, inTrials } from '../../core/season';
 // src/ui/screens/finance.ts — Finance nav screen (GitHub #39, part of #49;
 // Broadcast Quiet 3j). Three key tiles on the left (net weekly with the runway,
 // the next home gate, the contracts ending soon and the way to Contracts); on
@@ -94,7 +95,7 @@ export function financeSummary(state: GameState): FinanceSummary {
   const grantWeekly = incomeWeekly - sponsorWeekly;
 
   const nextFixture = state.league.fixtures
-    .filter((f) => f.homeId === state.clubId && f.round >= state.week)
+    .filter((f) => f.homeId === state.clubId && f.round >= currentRound(state))
     .reduce<typeof state.league.fixtures[number] | undefined>(
       (best, f) => (!best || f.round < best.round ? f : best),
       undefined,
@@ -150,8 +151,13 @@ export function financeSummary(state: GameState): FinanceSummary {
  * divides by the weeks left in the regular season, or in the finals once there.
  */
 export function averageGateWeekly(state: GameState, projectedGate: number): number {
+  if (inTrials(state)) {
+    const gates = state.league.fixtures.filter((f) => f.homeId === state.clubId && f.round >= currentRound(state))
+      .reduce((sum, f) => sum + homeGate(state, f).receipts, 0);
+    return Math.round(gates / (SEASON_ROUNDS + 3 - state.preseason!));
+  }
   if (projectedGate <= 0) return 0;
-  const homeLeft = state.league.fixtures.filter((f) => f.homeId === state.clubId && f.round >= state.week).length;
+  const homeLeft = state.league.fixtures.filter((f) => f.homeId === state.clubId && f.round >= currentRound(state)).length;
   if (homeLeft === 0) return 0;
   const end = state.week <= SEASON_ROUNDS ? SEASON_ROUNDS : WEEKS_PER_SEASON;
   const weeksLeft = Math.max(1, end - state.week + 1);
@@ -521,7 +527,7 @@ function buildLedger(ledgerRows: LedgerWeek[]): HTMLElement {
   table.append(el('thead', {}, head));
   const tbody = el('tbody');
   for (const r of ledgerRows) {
-    const tr = el('tr', {}, el('td', { class: 'nrl-num nrl-finance-wk', text: `S${r.season} W${r.week}` }));
+    const tr = el('tr', {}, el('td', { class: 'nrl-num nrl-finance-wk', text: `S${r.season} ${r.week <= 0 ? `T${r.week + 2}` : `W${r.week}`}` }));
     for (const v of [r.wages, r.upkeep, r.overhead, r.income, r.gate, r.other, r.net]) tr.append(moneyCell(v));
     tbody.append(tr);
     // What "Other" was, in the P&L's words (prize money, a signing, the grounds).
@@ -538,7 +544,7 @@ function buildKeyTiles(state: GameState, s: FinanceSummary): HTMLElement {
   const net = keyTile('Net weekly (avg)', fmtSigned(s.netWeekly), fmtNetNote(s), s.netWeekly < 0 ? 'nrl-finance-losing' : 'nrl-finance-making');
   if (s.weeksToFloor !== null || s.runwayWeeks === 0) net.classList.add('nrl-finance-warn');
   const gate = s.nextHome
-    ? keyTile(`Next home gate · ${s.nextHome.round > SEASON_ROUNDS ? 'final' : `R${s.nextHome.round}`}`, fmtMoney(s.nextHome.projectedGate), fmtCrowd(s.nextHome))
+    ? keyTile(`Next home gate · ${s.nextHome.round <= 0 ? `trial ${s.nextHome.round + 2}` : s.nextHome.round > SEASON_ROUNDS ? 'final' : `R${s.nextHome.round}`}`, fmtMoney(s.nextHome.projectedGate), fmtCrowd(s.nextHome))
     : keyTile('Next home gate', 'None left', `${groundCapacity(state).toLocaleString('en-US')} seats`);
   gate.classList.add('nrl-finance-gate');
   // Sold out: what a bigger stand would earn (N12, #169).

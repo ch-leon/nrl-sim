@@ -5,6 +5,7 @@
 // fatigue), the two players' STATS shift it, traits will add their bonus on
 // top (C, §3), and ONE seeded roll decides. Pure and unit-tested so the
 // numbers in the design doc are the numbers in the game.
+import { FIT } from './fit';
 import { FATIGUE } from './fatigue';
 
 export type ContestOutcome = 'held' | 'big-hit' | 'broken' | 'fend' | 'offload' | 'strip';
@@ -56,6 +57,8 @@ export const MOMENTUM = { perMs: 0.01, cap: 0.04 };
 
 /** Probability points traits add to (or take from) each outcome, already scaled by level (§3). */
 export interface ContestMods {
+  /** Attack style edge minus defence style edge, in carrier-edge probability units. */
+  edge?: number;
   broken?: number;
   fend?: number;
   offload?: number;
@@ -72,7 +75,7 @@ const clamp01 = (v: number): number => Math.max(0, Math.min(0.95, v));
  * plain held tackle.
  */
 export function contestOdds(edge: number, s: Situation, mods: ContestMods = {}): Record<ContestOutcome, number> {
-  const e = Math.max(0, Math.min(1, edge)) - 0.5; // −0.5 … +0.5, 0 = even
+  const e = Math.max(0, Math.min(1, edge + (mods.edge ?? 0))) - 0.5; // −0.5 … +0.5, 0 = even
   let broken = BASE.broken + 0.16 * e;
   let fend = BASE.fend + 0.09 * e;
   let offload = s.support ? BASE.offload + 0.1 * e : 0;
@@ -187,4 +190,10 @@ export function interceptChance(defenderIQ: number, cutOut: boolean, traitBonus 
   if (cutOut) p *= 2;
   p += traitBonus;
   return Math.max(0.01, Math.min(0.6, p));
+}
+
+/** The middle squeeze removes busts and available offloads using the same contact roll. */
+export function compressedContact(effect: number, contactD: number, support: boolean): ContestMods {
+  const squeeze = effect * Math.max(0, contactD) / FIT.leagueAverage;
+  return { broken: -squeeze, offload: support ? -squeeze : 0 };
 }

@@ -14,6 +14,7 @@ import { bus, type Events } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
 import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_SEASON, difficultyMultipliers, type Difficulty } from '../config';
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
+import { registerUnlockSystem, isFacilityOpen } from '../systems/unlocks';
 import { isTrainingFocus, registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
 import { hasStaff, hireStaff, staffWage } from '../systems/staff';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyOverhead, weeklyUpkeep, weeklyWages } from '../systems/economy';
@@ -42,6 +43,8 @@ export type SoakMode = 'idle' | 'managed';
 export interface SoakOptions {
   seed: number;
   seasons: number;
+  /** Prepared content pack for fresh careers. */
+  pack?: 'au' | 'uk';
   /**
    * Stop after this many weeks instead of `seasons` whole seasons: the save corpus's
    * short runs from the versions in between (tests/qa/corpus.test.ts), which only
@@ -106,6 +109,9 @@ export interface SeasonSample extends GapSample {
   season: number;
   money: number;
   minMoney: number;
+  /** QA economy diagnostics: debt warnings and players sold by bankruptcy. */
+  debtWeeks?: number;
+  forcedSales?: number;
   squad: number;
   freeAgents: number;
   saveBytes: number;
@@ -191,6 +197,7 @@ export interface StyleGame {
 }
 
 export interface SoakResult {
+  pack?: 'au' | 'uk';
   seed: number;
   mode: SoakMode;
   difficulty?: Difficulty;
@@ -223,6 +230,7 @@ export function registerAllSystems(): void {
   registerBoardSystem();
   registerEventsSystem();
   registerRivalsSystem();
+  registerUnlockSystem();
 }
 
 /** Paths of every number in `v` that is NaN or ±Infinity. */
@@ -277,7 +285,7 @@ export function nearestRivals(s: GameState, n = NEAR_RIVALS): string[] {
 export function recordAgainst(s: GameState, rivals: readonly string[]): { wins: number; games: number } {
   const out = { wins: 0, games: 0 };
   for (const f of s.league.fixtures) {
-    if (!f.result || isFinalsRound(f.round)) continue;
+    if (!f.result || f.round <= 0 || isFinalsRound(f.round)) continue;
     const home = f.homeId === s.clubId;
     const other = home ? f.awayId : f.homeId;
     if (!(home || f.awayId === s.clubId) || !rivals.includes(other)) continue;
@@ -333,6 +341,10 @@ export function checkState(s: GameState): string[] {
 export function asOldSave(s: GameState, version: number): Record<string, unknown> {
   const raw = JSON.parse(JSON.stringify(s)) as Record<string, unknown> & GameState;
   const out: Record<string, unknown> = raw;
+  // Synthetic old saves predate the new-career ladder, just like the real corpus.
+  delete out.unlocks;
+  delete out.preseason;
+  raw.league.fixtures = raw.league.fixtures.filter((f) => f.round > 0);
   if (version < 20) {
     const settings = out.settings;
     if (settings && typeof settings === 'object') {
@@ -370,6 +382,7 @@ export function asOldSave(s: GameState, version: number): Record<string, unknown
   if (version < 3) out.settings = { ...(raw.settings as object), difficulty: undefined };
   // v21: bans and chain flags (#324). Stripped last so an earlier step that
   // rebuilds the squad from `raw` does not put suspendedWeeks back.
+  if (version < 22) delete out.recentPlans;
   if (version < 21) {
     const stripBan = (list: unknown): unknown =>
       Array.isArray(list)
@@ -460,6 +473,7 @@ function seatTheCrowd(): void {
 /** Build `defId` on the first free spot (top-left scan), paying its cost. */
 function buildFirstFree(defId: FacilityDefId): boolean {
   const s = getState();
+  if (!isFacilityOpen(s, defId)) return false;
   const def = FACILITY_CATALOG[defId];
   const taken = new Set<string>();
   for (const f of s.facilities) {
@@ -508,7 +522,7 @@ function manage(): Signed {
   setTrainingFocus(weakestStat(getState().squad));
   for (const defId of MANAGED.BUILDS) {
     const st = getState();
-    if (st.facilities.some((f) => f.defId === defId)) continue;
+    if (!isFacilityOpen(st, defId) || st.facilities.some((f) => f.defId === defId)) continue;
     if (st.money - FACILITY_CATALOG[defId].cost < MANAGED.BUILD_RESERVE) break;
     buildFirstFree(defId);
   }
@@ -574,7 +588,7 @@ export function advanceWeekAsTapped(): void {
   }
   const m = kickOff.match;
   if (!m) return;
-  const { seed, weather, injuryRate, goldenPoint, aiCoach, difficultyEdge, breakRuleSides } = m.live;
+  const { seed, weather, injuryRate, goldenPoint, aiCoach, difficultyEdge, breakRuleSides, aiRival } = m.live;
   const result = runMatch(m.home, m.away, {
     seed, weather,
     ...(injuryRate !== undefined ? { injuryRate } : {}),
@@ -582,6 +596,7 @@ export function advanceWeekAsTapped(): void {
     ...(difficultyEdge ? { difficultyEdge } : {}),
     ...(aiCoach?.length ? { aiCoach } : {}),
     // The rival's plan changes at the breaks (N14.1), as fast-forward plays it.
+    ...(aiRival ? { aiRival } : {}),
     ...(breakRuleSides?.length ? { breakRuleSides } : {}),
     ...(goldenPoint ? { goldenPoint } : {}),
   });
@@ -601,7 +616,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (!res.ok) return { seed: opts.seed, mode: opts.mode, start: { bestNine: 0, rivalMean: 0, rivalRange: [0, 0] }, seasons: [], problems: [`save failed to migrate: ${res.message}`], ms: 0 };
     loadState(res.state);
   } else {
-    createNewGame(`Soak ${opts.seed}`, opts.seed, { difficulty: opts.difficulty });
+    createNewGame(`Soak ${opts.seed}`, opts.seed, { difficulty: opts.difficulty, ...(opts.pack === 'uk' ? { home: { town: 'Ashcombe', country: 'GB' } } : {}) });
     initLeague(getState());
     if (opts.fromVersion !== undefined) {
       const res = migrateState(asOldSave(getState(), opts.fromVersion));
@@ -626,6 +641,8 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (open) for (const l of FINANCE_LINES) opening[l] = open[l];
   }
   bus.on('money:changed', ({ delta, reason }) => { tally[classifyReason(reason)] += delta; });
+  let debtWeeks = 0, forcedSales = 0;
+  bus.on('bankruptcy:warning', (e) => { debtWeeks++; forcedSales += e.forcedSales?.length ?? 0; });
   // A forfeit leaves only the score on the fixture; matchday says so in a danger toast (finding 20).
   let forfeits = 0;
   bus.on('ui:notify', ({ text, kind }) => { if (kind === 'danger' && FORFEITED.test(text)) forfeits++; });
@@ -656,7 +673,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
   const playWeek = opts.liveRivals ? advanceWeekAsTapped : advanceWeek;
   try {
   play(() => {
-    for (let i = 0; i < (opts.weeks ?? opts.seasons * WEEKS_PER_SEASON); i++) {
+    for (let i = 0; i < (opts.weeks ?? opts.seasons * (WEEKS_PER_SEASON + (getState().preseason === undefined ? 0 : 2))); i++) {
       if (getState().sacked) break;
       if (opts.mode === 'managed') {
         const w = manage();
@@ -703,6 +720,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
           season: before,
           money: s.money,
           minMoney,
+          debtWeeks, forcedSales,
           squad: s.squad.length,
           freeAgents: s.freeAgents.length,
           saveBytes: text.length,
@@ -733,6 +751,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
         gap = gapSample(s);
         regular = null;
         forfeits = 0;
+        debtWeeks = 0; forcedSales = 0;
         signed = { count: 0, fees: 0, overall: 0 };
       }
     }
@@ -744,7 +763,7 @@ export function runSoak(opts: SoakOptions): SoakResult {
     if (last > first * 1.5) note(`save grew ${Math.round((last / first) * 100)}% over ${seasons.length} seasons (${first} → ${last} bytes)`);
   }
   setState({});
-  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
+  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.pack ? { pack: opts.pack } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
   } finally {
     stopPlanChanges?.();
   }

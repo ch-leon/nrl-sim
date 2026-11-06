@@ -9,6 +9,7 @@
 // never edited after it lands (tests/fixtures/saves/README.md).
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
+import { coachAddress } from '../../src/ui/coachName';
 import { SAVE_VERSION } from '../../src/core/state';
 import { WEEKS_PER_SEASON } from '../../src/config';
 import { migrateState } from '../../src/core/save';
@@ -48,6 +49,9 @@ describe('save corpus', () => {
         expect(res.ok, res.ok ? '' : res.message).toBe(true);
         if (!res.ok) return;
         expect(res.state.version).toBe(SAVE_VERSION);
+        expect(res.state).not.toHaveProperty('coachName');
+        expect(res.state).not.toHaveProperty('unlocks');
+        expect(coachAddress(res.state)).toBe('Coach');
         expect(checkState(res.state)).toEqual([]);
       });
 

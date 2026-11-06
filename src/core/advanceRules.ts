@@ -4,6 +4,7 @@
 // verdict, so the whole decision table is unit-tested in isolation. The impure
 // loop that gathers these inputs lives in ./advance.ts.
 
+import { activeLeague, onPackChange } from '../content';
 import { ECON, MORALE, ON_FIELD, SEASON_ROUNDS, WEEKS_PER_SEASON, SQUAD_MIN } from '../config';
 
 /** How far a multi-advance runs. */
@@ -32,7 +33,7 @@ export interface SquadMember {
 }
 
 /** First week of the finals block (QF). */
-export const FINALS_START_WEEK = SEASON_ROUNDS + 1;
+export let FINALS_START_WEEK = SEASON_ROUNDS + 1;
 
 /** Contract with this many weeks or fewer left counts as unsettled (shared with morale). */
 const EXPIRING_WEEKS = MORALE.EXPIRING_WEEKS;
@@ -230,14 +231,15 @@ export function remainingTarget(target: AdvanceTarget, p: RunProgress): AdvanceT
 }
 
 /** How many weeks a target plays from `week` (a run with no stops). */
-export function targetSpan(target: AdvanceTarget, week: number): number {
+export function targetSpan(target: AdvanceTarget, week: number, preseason?: 0 | 1 | 2): number {
+  const trialsLeft = week === 1 && preseason ? 3 - preseason : 0;
   switch (target.kind) {
     case 'weeks':
       return target.weeks;
     case 'finals':
-      return week < FINALS_START_WEEK ? FINALS_START_WEEK - week : WEEKS_PER_SEASON - week + FINALS_START_WEEK;
+      return trialsLeft + (week < FINALS_START_WEEK ? FINALS_START_WEEK - week : WEEKS_PER_SEASON - week + FINALS_START_WEEK + (preseason === undefined ? 0 : 2));
     case 'seasonEnd':
-      return WEEKS_PER_SEASON - week + 1;
+      return trialsLeft + WEEKS_PER_SEASON - week + 1;
   }
 }
 
@@ -254,4 +256,10 @@ export function targetLabel(target: AdvanceTarget): string {
 }
 
 /** Maximum weeks any target can span from the start of a season. */
-export const MAX_RUN_WEEKS = 2 * WEEKS_PER_SEASON;
+export let MAX_RUN_WEEKS = 2 * WEEKS_PER_SEASON;
+
+onPackChange(() => {
+  const league = activeLeague();
+  FINALS_START_WEEK = league.seasonRounds + 1;
+  MAX_RUN_WEEKS = 2 * (league.seasonRounds + league.finalsWeeks);
+});

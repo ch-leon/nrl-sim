@@ -1,3 +1,4 @@
+import { halfTimeNumbers } from '../ui/matchupRead';
 // src/scenes/MatchScene.ts — isometric rugby-league match day (BAK-189, WU-11;
 // playback/overlay WU-12).
 //
@@ -497,6 +498,7 @@ export class MatchScene extends Phaser.Scene {
         ...(experimentOn('match-controls') && live.planSide ? { controlsSide: live.planSide } : {}),
         ...(live.plans ? { plans: live.plans } : {}),
         ...(live.aiCoach?.length ? { aiCoach: live.aiCoach } : {}),
+        ...(live.aiRival ? { aiRival: live.aiRival } : {}),
         ...(live.breakRuleSides?.length ? { breakRuleSides: live.breakRuleSides } : {}),
         ...(live.goldenPoint ? { goldenPoint: true } : {}),
         ...(live.resumeAt ? { resumeAt: live.resumeAt } : {}),
@@ -1198,6 +1200,8 @@ export class MatchScene extends Phaser.Scene {
       tendency: `${shortName(other === 'home' ? this.home.name : this.away.name)} play ${styleLine(pb.planFor(other))}`,
       go: head === 'Half-time' ? 'Start 2nd half ▸' : head === 'Golden point' ? 'Golden point ▸' : 'Continue ▸',
       tactics: pb.planFor(side),
+      roster: (side === 'home' ? this.home : this.away).roster,
+      numbers: head === 'Half-time' ? halfTimeNumbers(pb.recordedEvents, (side === 'home' ? this.home : this.away).clubId, pb.planFor(side).attack) : undefined,
       onPick: (t) => pb.setTactics(side, t),
       onDone: () => {
         this.planCard = null;

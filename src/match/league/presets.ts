@@ -3,6 +3,8 @@
 // defends. Attack and defence are separate presets (decision 2026-10-17). Pure
 // data and lookups; live.ts reads the plan for the carrier's zone each
 // decision and adds its numbers to the odds the contest already uses.
+import { learnedRivalPlan, usesHabitCounters, type RivalPlanContext } from './ai';
+import { COUNTERS } from './counters';
 import type { KickChoice } from './tactics';
 
 export type AttackPreset = 'grind' | 'balanced' | 'expansive' | 'kick-chase' | 'all-out';
@@ -22,7 +24,7 @@ export const isAttackPreset = (s: string | null | undefined): s is AttackPreset 
 export const isDefencePreset = (s: string | null | undefined): s is DefencePreset => DEFENCE_PRESETS.includes(s as DefencePreset);
 
 export const PRESET_LABEL: Readonly<Record<AttackPreset | DefencePreset, string>> = {
-  grind: 'Grind',
+  grind: 'Tight',
   balanced: 'Balanced',
   expansive: 'Expansive',
   'kick-chase': 'Kick-chase',
@@ -94,7 +96,9 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
     // 43.0% (seeds 1–200) and 41.8% (seeds 10001–10200). Stepping the
     // one-on-one every time, as Balanced does, brings those blocks to 48.8%
     // and 45.5%. The bombs stay; a match still has about 24 kicks.
-    base: { pass: -0.05, offload: 0.6, step: 1, earlyKick: 0.55, earlyTerritory: 0.35, kickBias: { bomb: 1.8, long: 1.2, grubber: 1.3, 'cross-field': 0.8, chip: 0.8 } },
+    // #465: more passing rebalances the fifteen-plan round robin.
+    // The kick weights and existing passing roll are unchanged.
+    base: { pass: 0.04, offload: 0.6, step: 1, earlyKick: 0.55, earlyTerritory: 0.35, kickBias: { bomb: 1.8, long: 1.2, grubber: 1.3, 'cross-field': 0.8, chip: 0.8 } },
     zones: { redZone: { offload: 0.8 } },
   },
   'all-out': {
@@ -105,9 +109,14 @@ const ATTACK: Readonly<Record<AttackPreset, { base: Partial<AttackPlan>; zones?:
   },
 };
 
-export function attackPlan(preset: AttackPreset, zone: Zone): AttackPlan {
+/** Tight uses the kickoff fit only for pack carriers; omitted context keeps the legacy lookup. */
+export function attackPlan(preset: AttackPreset, zone: Zone, tightFit = 1, carrierPosition?: string): AttackPlan {
   const p = ATTACK[preset];
-  return { ...BASE_PLAN, ...p.base, ...(p.zones?.[zone] ?? {}) };
+  const plan = { ...BASE_PLAN, ...p.base, ...(p.zones?.[zone] ?? {}) };
+  if (COUNTERS.tight.on === 1 && preset === 'grind' && carrierPosition && PACK.includes(carrierPosition)) {
+    plan.offload = Math.max(0, COUNTERS.tight.offloadBase + COUNTERS.tight.offloadPerFit * Math.max(0, tightFit - 1));
+  }
+  return plan;
 }
 
 /** How the line defends. */
@@ -138,7 +147,13 @@ const DEFENCE: Readonly<Record<DefencePreset, DefencePlan>> = {
 };
 
 export function defencePlan(preset: DefencePreset): DefencePlan {
-  return DEFENCE[preset];
+  const plan = DEFENCE[preset];
+  // The enabled counter owns the middle advantage; the legacy flat contact
+  // bonuses otherwise also favour Compressed in its three neutral cells.
+  if (preset === 'compressed' && COUNTERS.compressed.on === 1) {
+    return { ...plan, broken: COUNTERS.compressed.brokenBase, offload: COUNTERS.compressed.offloadBase };
+  }
+  return plan;
 }
 
 /** The preset tables as data, for balance experiments (tuning.ts): the default attack plan, each attack preset's base and zone overrides, and the defence plans. */
@@ -179,9 +194,9 @@ export const RIVAL_STYLE = {
   compressedStamina: 1,
 };
 
-const BACKS: readonly string[] = ['fullback', 'winger', 'centre'];
-const HALVES: readonly string[] = ['five-eighth', 'halfback'];
-const PACK: readonly string[] = ['hooker', 'prop', 'second-row', 'lock'];
+export const BACKS: readonly string[] = ['fullback', 'winger', 'centre'];
+export const HALVES: readonly string[] = ['five-eighth', 'halfback'];
+export const PACK: readonly string[] = ['hooker', 'prop', 'second-row', 'lock'];
 
 /** A man of the nine, as the style reads him (a team sheet's roster entry). */
 export interface StyleEntry {
@@ -197,7 +212,8 @@ export interface StyleEntry {
  * a fit line compresses. Without a nine (a strength-built sheet) it stays as it was:
  * fixed per club from a roll of its identity, by strength tier.
  */
-export function rivalTactics(club: { id: string; strength: number }, nine?: readonly StyleEntry[]): TeamTactics {
+export function rivalTactics(club: { id: string; strength: number }, nine?: readonly StyleEntry[], context?: RivalPlanContext): TeamTactics {
+  if (usesHabitCounters(context)) return learnedRivalPlan(nine ?? [], context);
   if (nine && nine.length > 0 && nine.every((e) => e.stats)) return styleOfNine(club.strength, nine);
   const h = hash(club.id);
   const a = h % 3;

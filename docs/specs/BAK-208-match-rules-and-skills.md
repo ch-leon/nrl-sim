@@ -229,11 +229,30 @@ sim's defaults (`src/match/league/presets.ts`).
 ### 5.1 Attack presets
 | Preset | Pass | Offloads | Step | Width / cut-out | Prefers | Early kicks | Kick bias |
 |---|---|---|---|---|---|---|---|
-| **Grind** | −15% (−25% own 20) | never (½ in the attacking half, 0.7 red zone) | tries 60% | — | hit-ups +1.0 | territory 25% from deep (40% own 20); red zone 20% | long ×1.6, bomb ×0.7, chip/cross ×0.5 |
+| **Tight** (stored `grind`) | −15% (−25% own 20) | pack: ×(1 + 9.5 × max(0, Tight fit − 1)); backs/halves: legacy zone values | tries 60% | — | hit-ups +1.0 | territory 25% from deep (40% own 20); red zone 20% | long ×1.6, bomb ×0.7, chip/cross ×0.5 |
 | **Balanced** (default) | 0 | normal (0.6 own 20) | always | — | halves first, forwards early | red zone 35% | — |
 | **Expansive** | −10% (was 0) | ×1.3 (0.8 own 20) | always | width 0.28, cut-out 2% (1% own 20), reach +3 m (N13: was 0.35 / 8%) | edges +0.8 | red zone 18% (N13: was 30%) | cross-field ×1.5, long ×0.8 |
-| **Kick-chase** | −5% | ×0.6 | tries 90% | — | — | territory 35% from deep (bomb 40% of those); red zone 55% | bomb ×1.8, grubber ×1.3, long ×1.2 |
+| **Kick-chase** | +4% | ×0.6 | always | — | — | territory 35% from deep (bomb 40% of those); red zone 55% | bomb ×1.8, grubber ×1.3, long ×1.2 |
 | **All-out** | 0 (N13: was +15%; Phase 3 had cut +20% to +15%) | ×1.5 (1.2 own 20; N13: was ×1.6) | always | width 0.35, cut-out 3% (N13: was 0.45 / 12%) | edges +0.5 | red zone 15% (N13: was 30%) | chip ×1.6, cross ×1.3, grubber ×1.2, long ×0.6 |
+
+The Tight offload rebuild (#460, enabled by #465 with `counters.tight.on = 1`) supplies the pack offloads above; backs and halves keep the legacy zone values (0 deep, ×½ attacking half, ×0.7 red zone). With the switch on, pack carriers use the starting sheet’s Tight fit for second-phase offloads; hit-ups and territory kicks stay unchanged. See tuning §30.
+
+Slide counters (#462) are on by default from #465 (`counters.slide.on = 1`). Both sides’ style fits scale drift and cut-out reads against Expansive, deep kick cover against Kick-chase, inside pack offloads against Tight and busts in the line’s recovery window after an All-out offload. Unequal starting fits strengthen all nonzero cells, with extra local responses for Expansive and Kick-chase. All-out extends the existing receiver recovery window by both style fits, with a further extension for an attack-fit advantage: neutral fits give 120 ticks and fit 1.5 v 0.5 gives 188. A pass, kick, turnover or stoppage still clears it. Balanced is neutral; the existing contest rolls decide outcomes. See tuning §32.
+
+Rush counters (#463) are on by default from #465 (`counters.rush.on = 1`). Carry and starting-sheet Rush fit replace the flat bust concession; rushed back-three positioning and kick contests leave space for Kick-chase, while All-out offloads spill more. Tight and Expansive have no base counter cell. All outcomes use existing match rolls. See tuning §33.
+
+Compressed counters (#464) are on by default from #465 (`counters.compressed.on = 1`). Tight draws an extra committed middle tackler and Contact D-scaled reductions to busts and offloads; Expansive finds edge overlaps through inward lane pull and speed-scaled outside-back bust odds. The unequal-fit response strengthens the Tight contact squeeze; better-fitted Compressed defences also read nearby help earlier. Neutral help reach is unchanged. Kick-chase, All-out and Balanced have no cell. All outcomes use existing rolls. See tuning §34.
+
+Own-style fit (#461) is independently switched on by #465 (`counters.fit.on = 1`). Starting-sheet attack fit helps carrying contests and defence fit helps tackling contests; fit 1 is neutral. A plan applied at a break selects the new styles’ fits. The same contest roll resolves contact; see tuning §31.
+
+Rival habit counters (#469): Easy retains its existing squad/club-identity style selection.
+Normal counters the most common of the player's last three played league kick-off
+plans (ties go to the newest); Hard weighs the three by the player's squad fit.
+An empty history means Balanced / Slide. Upcoming lineup tactics are never an
+input. Normal may abandon a failing counter when behind by the existing margin
+and its key count is down; Hard may counter the plan observed in first-half open
+play at half-time. Rival-v-rival picks and live RNG stay unchanged. See tuning §36.
+
 
 *Pass* adds to the engaged carrier's chance of passing (base 30% + Skill/300). *Offloads*
 multiplies the offload odds (§4.1); 0 means support is ignored. *Step* is the chance he
@@ -264,9 +283,9 @@ defence preset, saved in the lineup (save v14) and carried on the team sheet. Mi
 defence ("club" keeps the club's own), `#lab?hatk=grind&hdef=rush&aatk=…&adef=…`, and the
 hint line names what each side is playing.
 
-Measured (12 seeds × 2½ min, 60-rated sheets, v Balanced / Slide): Expansive throws
-more than twice Grind's offloads and more cut-outs, Grind kicks long more often and steps
-less; Kick-chase kicks more and bombs more; All-out offloads 1.5× Balanced; Rush makes
+The original 12-seed × 2½-minute preset sample predates #465's Tight rebuild.
+Tight now offloads heavily with a fitted strong pack; Expansive throws more cut-outs,
+and Tight kicks long more often and steps less; Kick-chase kicks more and bombs more; All-out offloads 1.5× Balanced; Rush makes
 15%+ more big hits but concedes more busts and steps than Slide.
 
 ## 6. Readability (how it is shown)
@@ -304,6 +323,14 @@ and kicks were already in the old bands; those three bands are scaled to its tem
 (×1.67 low, ×1.75 high) rather than slowing the game and re-tuning the legs.
 Measured by the balance harness (`balance/README.md`): every report marks these bands,
 and the standard plan re-runs on each match-code change to `main`.
+
+For strategy counters (#465; Leon, 5 Nov 2026), neutral cell acceptance is a
+paired **4–6 point win-share swing versus dormant**, with the matrix’s sign.
+Flat preset controls versus Balanced/Slide use **42–58%**. A full-fit counter
+(1.5 v 0.5) must swing **9 points or stronger** (9–12 nominal), holding Tight’s
+independent rebuild on in both comparisons. Own-style fit remains capped at
+four points, strong-pack Tight must offload six times a match, and every plan’s
+15-plan round-robin average stays at or below 53%.
 
 ## 8. Fatigue — *implemented in F*
 

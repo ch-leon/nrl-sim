@@ -1,3 +1,4 @@
+import { seasonWeekLabel } from '../../core/season';
 // src/ui/screens/clubHome.ts — the Club home sheet (#350 P1): what CLUB shows on a
 // phone held upright, where the grounds can't be (they need landscape). The same
 // facts the landscape hub gives (#368's H1): the club, the week and season, the
@@ -8,18 +9,21 @@
 
 import { getState, type GameState } from '../../core/state';
 import { bus } from '../../core/events';
+import { derbyRival } from '../../systems/derby';
 import { nextFixture } from '../../systems/league';
-import { WEEKS_PER_SEASON } from '../../config';
 import type { ObjectiveRisk } from '../../systems/board';
-import { boardChip, decisionsChipCount, moneyTile, moneyTileLabel, ordinal, placeName, runwayLevel, BOARD_RISK_CLASS } from '../hud';
+import { boardChip, decisionsChipCount, moneyTile, fmtMoneyShort, IN_DEBT_TEXT, ordinal, placeName, runwayLevel, BOARD_RISK_CLASS } from '../hud';
 import { button, el, openScreen, screenHead } from '../dom';
 import { HOME_ID } from '../nav';
+import { coachSays, type CoachSuggestion } from '../coachSays';
+import { coachLine } from '../coachVoice';
 
 /** The sheet's screen key: the dock marks CLUB for it. */
 export const CLUB_HOME_KEY = HOME_ID;
 
 /** What the Club home sheet shows. */
 export interface ClubHomeView {
+  coach: CoachSuggestion;
   club: string;
   /** "Week 3 of 26 · Season 1". */
   week: string;
@@ -36,7 +40,7 @@ export interface ClubHomeView {
 }
 
 /** The next-match line (#350 H1): "Next: v Darwin (A) · 5th", the place once a round is in. Pure. */
-export function nextMatchLine(s: Pick<GameState, 'league' | 'week'>): { text: string; label: string } | null {
+export function nextMatchLine(s: Pick<GameState, 'league' | 'week' | 'groundName' | 'home'>): { text: string; label: string } | null {
   const f = nextFixture(s.league.fixtures, s.week, 'player');
   if (!f) return null;
   const home = f.homeId === 'player';
@@ -44,10 +48,11 @@ export function nextMatchLine(s: Pick<GameState, 'league' | 'week'>): { text: st
   if (!opp) return null;
   const i = s.league.ladder.findIndex((r) => r.clubId === 'player');
   const row = i < 0 ? undefined : s.league.ladder[i];
+  const derby = opp.id === derbyRival({ ...s, clubId: 'player' });
   const place = row && row.played > 0 ? ordinal(i + 1) : '';
   return {
-    text: `Next: v ${placeName(opp.name)} (${home ? 'H' : 'A'})${place ? ` · ${place}` : ''}`,
-    label: `Next match: ${opp.name}, ${home ? 'home' : 'away'}${place ? `. You are ${place} on the ladder` : ''}`,
+    text: `Next: v ${placeName(opp.name)} (${home ? 'H' : 'A'})${derby ? ' · Derby' : ''}${place ? ` · ${place}` : ''}${home && s.groundName ? ` · ${s.groundName}` : ''}`,
+    label: `Next match: ${opp.name}${derby ? ', Derby' : ''}, ${home ? `home${s.groundName ? ` at ${s.groundName}` : ''}` : 'away'}${place ? `. You are ${place} on the ladder` : ''}`,
   };
 }
 
@@ -61,15 +66,21 @@ export function clubHomeView(
 ): ClubHomeView {
   const runway = opts.runwayWeeks?.(s) ?? null;
   const tile = moneyTile(s.money);
+  const weeks = Math.max(1, Math.floor(runway ?? 0));
+  const runwayText = runway === null ? 'covering costs'
+    : runway > 99 ? '99+ weeks of runway'
+    : `about ${weeks} ${weeks === 1 ? 'week' : 'weeks'} of runway`;
+  const money = `${fmtMoneyShort(s.money)} · ${runwayText}`;
   const list = opts.decisions?.(s) ?? [];
   const first = list[0];
   const board = boardChip(s, runway);
   return {
+    coach: coachSays(s, { decisions: list.length, runwayWeeks: runway }),
     club: s.clubName,
-    week: `Week ${s.week} of ${WEEKS_PER_SEASON} · Season ${s.season}`,
-    money: tile.text,
+    week: seasonWeekLabel(s),
+    money,
     moneyLevel: tile.inDebt ? 'debt' : runwayLevel(runway),
-    moneyLabel: moneyTileLabel(s.money, runway, true),
+    moneyLabel: `Money ${money}${tile.inDebt ? `, ${IN_DEBT_TEXT}` : ''}. Tap for Finance`,
     next: nextMatchLine(s),
     decisions: first ? { count: decisionsChipCount(list.length), top: `${first.title}${first.note ? ` · ${first.note}` : ''}` } : null,
     board: board ? { title: board.title, detail: board.detail, label: board.label, risk: board.risk } : null,
@@ -80,6 +91,7 @@ export function clubHomeView(
 export interface ClubHomeDeps {
   decisions?: (s: GameState) => readonly { title: string; note: string }[];
   runwayWeeks?: (s: GameState) => number | null;
+  onCoach: (screen: string) => void;
   onMoney: () => void;
   onNextMatch: () => void;
   onDecisions: () => void;
@@ -91,6 +103,8 @@ export interface ClubHomeDeps {
 const STYLE_ID = 'nrl-club-home-styles';
 const CSS = `
 .nrl-club-home .nrl-modal-scroll, .nrl-club-home-body { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+/* Long ground names and runway text wrap; scroll rather than compressing their rows. */
+.nrl-club-home-body > * { flex-shrink: 0; }
 .nrl-club-home-name { font-family: var(--nrl-f-label); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.1; overflow-wrap: anywhere; }
 .nrl-club-home-week { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); text-transform: uppercase; }
 .nrl-club-home-row {
@@ -137,6 +151,7 @@ export function openClubHome(deps: ClubHomeDeps): HTMLElement {
     const money = el('span', { class: 'nrl-club-home-v nrl-club-home-money', text: v.money, attrs: { 'data-level': v.moneyLevel } });
     const rows: HTMLElement[] = [
       el('div', {}, el('div', { class: 'nrl-club-home-name', text: v.club }), el('div', { class: 'nrl-club-home-week', text: v.week })),
+      row('nrl-club-home-coach', 'Coach says', coachLine(v.coach.text), v.coach.screen ? () => deps.onCoach(v.coach.screen!) : undefined),
       row('nrl-club-home-cash', 'Money', money, deps.onMoney, v.moneyLabel),
       v.next
         ? row('nrl-club-home-next', 'Fixtures', v.next.text, deps.onNextMatch, `${v.next.label}. Tap for the League`)

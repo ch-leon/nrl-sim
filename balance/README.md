@@ -85,6 +85,12 @@ moves (#322).
   `none` (flat squads' default), `gen` (clubs' default), `stars`. `bench` is how many
   interchange players (0–4, default 4; a flat squad's bench has its stats) and
   `rotation` how hard the coach uses them: `off`, `standard` (default), `heavy`.
+- **Exact style-fit fixtures** (#465): `"fit": { "expansive": 1.5, "slide": 0.5 }`
+  overrides only those cached starting-sheet fits in the headless harness. Values
+  must be finite and within 0–1.5; omitted styles keep their derived fit. Playing
+  stats stay unchanged, the fixture follows its written side when swapped, and
+  break-time plan changes select the corresponding cached fit. This is for
+  isolating counter/own-fit effects, not a live-game or saved-sheet override.
 - **Squads as the game builds them** (N12.2): `"squad": "player"` is a new game's squad
   (one star, a first-grader and a depth man a position; `difficulty` sets its start
   rating) through its opening lineup, and `"squad": "rival"` a rival club's generated
@@ -156,3 +162,125 @@ touches the match code or a plan, compares it with the previous standard run, sh
 the report on the run's summary page and publishes it to `balance-log`. Run any plan
 from the Actions tab (**Balance → Run workflow**, plan path and optional seeds); jobs
 can run for up to about 5½ hours.
+
+## Strategy counter baselines (#458)
+
+- `counters-matrix.json`: all five current attacks (including **Grind**, whose
+  later rename is outside this task), each on Slide, against Balanced on Slide,
+  Rush and Compressed. Flat 60 squads, 200 seeds both ways (400 matches/cell).
+  Re-run with `--seeds 500` for 1,000 matches/cell.
+- `counters-fit.json`: the same matrix control, all five attacks with fast backs
+  (backs speed 80), strong pack (pack strength 80), or smart opposing D (opponent
+  footyIQ 75); fast-backs Expansive and every strong-pack attack also face Rush
+  and Compressed. Flat 62/65 against 60 yardsticks each use 500 seeds both ways,
+  regardless of `--seeds`. Other rows default to 200 seeds both ways.
+
+`positionStats` on a side overrides stats on starters **and bench**, after `stats`.
+Groups match `league/presets.ts`: `backs` = fullback/winger/centre, `halves` =
+five-eighth/halfback, `pack` = hooker/prop/second-row/lock. An exact `Position`
+(e.g. `"prop": { "strength": 90 }`) wins over its group. Stat values must be
+finite numbers from 1 to 100. These are sheet overrides, including club and
+squad-built sheets; stored players are unchanged. The existing `stats` field
+keeps its flat-squad-only behavior.
+
+`"report": "matrix"` opts into the compact report. Scenarios named exactly
+`<attack> v <defence>` (lower-case preset ids, e.g. `grind v slide`) fill the 5 × 3
+matrix; missing cells print —. Every scenario also appears in the tracked-side
+and per-side tables, including squad-fit and yardstick rows. Without this flag,
+the existing report is unchanged.
+
+For `track` rows, `pointsShare` is the mean of 1 for a win, ½ for a draw and 0
+for a loss. Its SE uses sample variance divided by the number of matches (zero
+for a single match); `bothWays` includes both orientations. `trackedCounts` and
+`opponentCounts` pool the same matches and include offloads, busts (excluding
+late wrestle busts), line breaks, tries, kicks, steps, errors, points for and
+against, with count SEs in JSON. Events are credited to their named side.
+Stretches scale counts to 14 minutes. The legacy `counts`, Home win and legs
+still describe only the written orientation, exactly as before. Thus the two
+new sides sum to the legacy counts for one orientation; for bothWays they sum
+to the average of the two orientations' legacy counts.
+
+`counters-slide.json` is the Slide-column acceptance plan (#462): flat 60,
+500 seeds each way (1,000 matches per cell), with Tight, own-style fit and Slide
+counters enabled only as plan overrides. Targets are 53–57% for Tight/All-out,
+43–47% for Expansive/Kick-chase, and Balanced within one SE of 50%. It also reports
+per-side bombs, bombs won, grubbers and grubber tries from existing kick events;
+these are harness counts, not new stored player stats. For a paired dormant
+control, override `counters.slide.on` to 0 in an experiment copy of the plan.
+
+
+`counters-rush.json` is the Rush-column acceptance plan (#463), with Tight,
+own-style fit, Slide and Rush enabled only by overrides. Flat rows use 500 seeds
+both ways (1,000 whole matches), except Tight: its initial 47.85% sample was
+extended once with the next 500 seeds both ways, so its acceptance estimate uses
+all seeds 1–1,000 (2,000 matches). Targets are Kick-chase 53–57%, All-out 43–47%,
+and Tight/Expansive 48–52%. The three fit rows use task 1's 200 seeds both ways
+(400 matches): pack strength 80/45 and backs speed 80. Raw chunk inputs and the
+sample-variance pooling formula are preserved beside each pooled report on
+`balance-log`; no seed or orientation is discarded.
+
+
+`counters-compressed.json` is the task-7 full-matrix acceptance plan (#464). It
+enables Tight, own-style fit, Slide, Rush and Compressed through overrides only.
+Flat-60 cells use 500 seeds both ways (1,000 whole matches), except Tight v Rush
+and Balanced v Rush: both retain seeds 1–1,000 in both orientations (2,000 matches).
+The enabled Compressed plan uses the recorded common contact baseline
+(busts -0.015, offloads -0.03); the additional Contact D-scaled middle benefit
+belongs to Tight. The legacy flat profile measured Balanced v Compressed at
+47.55% over 1,000 matches, so calibration controls remain separate from final
+acceptance.
+
+Compressed targets are Tight 43–47%, Expansive 53–57% and the other three 48–52%.
+Sum unrounded signed swings from 50 in each row and column; each total must be
+within ±3 percentage points. The report exposes per-side offloads, contact busts
+and line breaks. Runs use disjoint 125-seed checkpoint blocks; pooled reports
+preserve every source plan/result and the sample-variance formula. The committed
+plan reruns each complete consecutive range directly. Tuned values are in §34.
+
+`SideSpec.fit` is a **headless harness fixture** for #465: e.g.
+`"home": {"rating":60,"fit":{"balanced":1.5}}`. It replaces only the named
+starting-sheet style fit in `BalanceSim`, leaving playing stats and every other
+fit unchanged. `"away":{"rating":60,"fit":{"slide":0.5}}` isolates the opposing
+defence fit. Fixtures follow their written side when orientations swap and
+remain cached when a break selects a different style. The opening positions are
+reset with the existing receiver, without an RNG draw. Omitted fits replay the
+live sim exactly. This field is not on `TeamSheet`, `LiveOptions` or any save;
+the game cannot supply it. `fitFixtures.test.ts` guards that boundary.
+
+
+### #465 switch-on acceptance (Leon, 5 Nov 2026)
+
+The final neutral comparison is **enabled minus dormant on the same 500 seeds
+in both orientations (1,000 matches)**, with signed 4–6 point win-share swings
+in all eight nonzero cells. Distance from 50% does not measure that swing.
+Flat preset controls versus Balanced/Slide use **42–58%** (previously 45–55%).
+Full-fit counters use the exact 1.5 v 0.5 fixtures, hold Tight’s independent
+rebuild on in both runs as Leon specified, hold the independent Kick-chase
+preset adjustment fixed in both, and require **9 points or stronger**;
+9–12 is the nominal target. The fully dormant variant also restores the legacy
+Kick-chase pass weight and exposes total change. Neutral controls restore that
+legacy weight too, and the guard checks all 15 against immutable dormant-main
+shares; counter-off with a retuned preset is not a main baseline.
+
+After running each committed `counters-*.json` acceptance plan, check the saved
+measurements with `npx vite-node scripts/check-counters.ts -- <kind> <run-dir>`.
+Kinds are `enabled`, `full-fit`, `fit-enabled`, `strong-pack`, `round-robin` and
+`yardstick`. The checker rejects missing, duplicate or undersized evidence and
+checks each signed counter, own-fit cap, six-offload floor and 53% plan average.
+`tests/match/balance/acceptance.test.ts` guards paired swings and the revised
+42–58% preset bounds. The manual acceptance workflow runs these guards.
+
+Compare complete soak JSON with
+`python3 scripts/check-counters-soak.py <main.json> <enabled.json>`: all 120
+fresh careers and saves v1–20 remain included; Normal idle and managed each
+must stay within three win points. Mean final money in each mode/difficulty
+must remain within the baseline mean ±2 baseline standard errors, including
+careers that ended early. Both six-row tables belong in the PR.
+
+`npm run soak -- --difficulties easy,normal,hard --jobs 4 --shard i/7`
+partitions the original case list across seven runners (1 ≤ i ≤ 7). It preserves
+every case's seed, difficulty, mode and planned seasons, including saves v1–20.
+The unsharded command is unchanged. Pool all seven JSON files and enforce the
+complete 140-case guard before reporting an acceptance result; individual shards
+are not a complete soak. `tests/qa/shard.test.ts` verifies exact partition coverage
+and preserves case objects and their order within each shard.

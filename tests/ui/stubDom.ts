@@ -13,7 +13,19 @@ export class StubNode {
   type = '';
   value = '';
   id = '';
-  style: Record<string, string> = {};
+  style = { setProperty: (_key: string, _value: string): void => {} } as Record<string, string> & { setProperty: (key: string, value: string) => void };
+  hidden = false;
+  checked = false;
+  get isConnected(): boolean { return typeof document !== 'undefined' && ((document.body as unknown) === this || (document.head as unknown) === this || this.parentNode?.isConnected === true); }
+  classList = {
+    add: (...names: string[]) => { this.className = [...new Set([...this.className.split(' ').filter(Boolean), ...names])].join(' '); },
+    remove: (...names: string[]) => { this.className = this.className.split(' ').filter((n) => !names.includes(n)).join(' '); },
+    contains: (name: string) => this.className.split(' ').includes(name),
+    toggle: (name: string, on: boolean) => { if (on) this.classList.add(name); else this.classList.remove(name); },
+  };
+  removeAttribute(k: string): void { delete this.attrs[k]; }
+  toggleAttribute(k: string, on: boolean): void { if (on) this.setAttribute(k, ''); else this.removeAttribute(k); }
+  remove(): void { this.parentNode?.removeChild(this); }
   private text = '';
   private listeners: Record<string, (() => void)[]> = {};
 
@@ -43,6 +55,13 @@ export class StubNode {
   append(...nodes: (StubNode | string)[]): void {
     for (const n of nodes) this.appendChild(typeof n === 'string' ? new StubNode('#text', n) : n);
   }
+  prepend(...nodes: StubNode[]): void {
+    for (const n of [...nodes].reverse()) {
+      n.parentNode?.removeChild(n);
+      n.parentNode = this;
+      this.childNodes.unshift(n);
+    }
+  }
   removeChild(c: StubNode): StubNode {
     this.childNodes = this.childNodes.filter((x) => x !== c);
     c.parentNode = null;
@@ -60,6 +79,7 @@ export class StubNode {
   }
   /** `[data-x]` or `[data-x="v"]` only. */
   querySelectorAll(sel: string): StubNode[] {
+    if (sel.startsWith('.')) return this.all().filter((n) => n.className.split(' ').includes(sel.slice(1)));
     const m = sel.match(/^\[([^\]=]+)(?:="([^"]*)")?\]$/);
     if (!m) throw new Error(`stub DOM: unsupported selector ${sel}`);
     const [, key, want] = m;
@@ -74,11 +94,18 @@ export class StubNode {
 
 /** Install a `document` that builds StubNodes. Undo with vi.unstubAllGlobals(). */
 export function stubDocument(): void {
+  const body = new StubNode('body');
+  const head = new StubNode('head');
   vi.stubGlobal('document', {
+    body,
+    documentElement: new StubNode('html'),
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    querySelector: (sel: string) => body.querySelector(sel),
     createElement: (tag: string) => new StubNode(tag),
     createTextNode: (text: string) => new StubNode('#text', text),
     // A screen's own stylesheet (ensure…Styles): never found, so injected into head.
-    getElementById: () => null,
-    head: new StubNode('head'),
+    getElementById: (id: string) => [...body.all(), ...head.all()].find((n) => n.id === id) ?? null,
+    head,
   });
 }

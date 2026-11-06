@@ -13,6 +13,7 @@
 // The cards live in GameState (systems/events.ts); this module renders them and
 // passes the tapped choice back through chooseEvent(). No Phaser.
 
+import { coachLine, EVENT_COMMENTS } from './coachVoice';
 import { bus } from '../core/events';
 import { getState, type GameState, type PendingEvent } from '../core/state';
 import type { AdvanceRun } from '../core/advance';
@@ -155,6 +156,9 @@ export function decisionCard(view: DecisionView, onChoose: (id: string, index: n
       el('div', { class: 'nrl-event-meta', text: `${view.stamp} · ${deadlineText(view)}` })),
     el('p', { class: 'nrl-event-text', text: view.text }),
   );
+  const cardId = getState().eventDeck.pending.find((ev) => ev.id === view.id)?.cardId;
+  const comment = cardId ? EVENT_COMMENTS[cardId] : undefined;
+  if (comment) card.append(coachLine(comment));
   const choices = el('div', { class: 'nrl-event-choices' });
   for (const c of view.choices) {
     const b = button('', () => onChoose(view.id, c.index), { class: 'nrl-event-choice' });
@@ -248,7 +252,7 @@ export function askBeforeAdvance(span: number, proceed: () => void): void {
  * the HUD does for its own runs.
  */
 export function advanceUntilAsked(target: AdvanceTarget, run: (t: AdvanceTarget) => Promise<AdvanceRun>, opts: { confirmed?: boolean } = {}): void {
-  const span = targetSpan(target, getState().week);
+  const span = targetSpan(target, getState().week, getState().preseason);
   // With a card waiting, the ask below puts this question instead (one dialog, not two).
   const question = pendingDecisionCount(getState()) === 0 && !opts.confirmed && !demoBlocked() ? longAdvanceQuestion(span) : null;
   if (question) {

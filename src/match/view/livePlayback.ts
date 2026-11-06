@@ -238,6 +238,8 @@ export interface LivePlaybackOptions {
   aiCoach?: ('home' | 'away')[];
   /** Sides whose plan changes at the breaks (N13.5). The watched match, a resume and a Skip all use it. */
   breakRuleSides?: ('home' | 'away')[];
+  /** Rival-only difficulty context; serialisable for workers and replays (#469). */
+  aiRival?: { side: 'home' | 'away'; difficulty: import('../../config').Difficulty };
   /** A final (N9.4): golden point if level at full time. */
   goldenPoint?: boolean;
   /** The speed the player last picked. Absent: ×4. */
@@ -324,9 +326,9 @@ export class LivePlayback {
     this.plans = opts.plans ?? [];
     this.controls = opts.controls ?? [];
     this.recorder = new MatchRecorder({ home: home.clubId, away: away.clubId });
-    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name });
+    this.commentator = new Commentator(opts.seed, { home: home.name, away: away.name }, { home, away });
     // Exactly the sim runMatch would play: same sheets, seed, weather, injury rate, difficulty and calls.
-    const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, controls: this.controls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
+    const simOpts: LiveOptions = { weather: opts.weather, calls: opts.calls, plans: this.plans, controls: this.controls, ...(opts.injuryRate !== undefined ? { injuryRate: opts.injuryRate } : {}), ...(opts.difficultyEdge ? { difficultyEdge: opts.difficultyEdge } : {}), ...(opts.aiCoach?.length ? { aiCoach: opts.aiCoach } : {}), ...(opts.aiRival ? { aiRival: opts.aiRival } : {}), ...(opts.breakRuleSides?.length ? { breakRuleSides: opts.breakRuleSides } : {}), ...(opts.goldenPoint ? { goldenPoint: true } : {}) };
     this.simOpts = simOpts;
     this.factory = (seed) => new LiveSim(home, away, seed, simOpts);
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
@@ -372,6 +374,9 @@ export class LivePlayback {
     this.kickLayer = new KickLayer(scene, { air: DEPTH_KICK_AIR, ground: DEPTH_KICK_GROUND }, () => scene.sideColors ?? { home: 0xffffff, away: 0xffffff });
     this.view.draw(this.runner.prev, this.runner.cur, 0, 1);
   }
+
+  /** Events already recorded, for UI readouts only. */
+  get recordedEvents(): readonly import('../../sim/events').MatchEvent[] { return this.recorder.events; }
 
   get finished(): boolean {
     return this.finishEmitted;
@@ -655,6 +660,7 @@ export class LivePlayback {
       ...(o.injuryRate !== undefined ? { injuryRate: o.injuryRate } : {}),
       ...(o.difficultyEdge ? { difficultyEdge: o.difficultyEdge } : {}),
       ...(o.aiCoach?.length ? { aiCoach: o.aiCoach } : {}),
+      ...(o.aiRival ? { aiRival: o.aiRival } : {}),
       ...(o.breakRuleSides?.length ? { breakRuleSides: o.breakRuleSides } : {}),
       ...(o.goldenPoint ? { goldenPoint: true } : {}),
     };
@@ -813,7 +819,7 @@ export class LivePlayback {
         if (this.opts.keyMoments?.()) this.keyMoments.note(e);
       }
       // The ticker reads the commentator (commentary.ts). It hears a resumed or skipped stretch too, silently, so the match reads the same.
-      const line = this.commentator.line(e, cur.score);
+      const line = this.commentator.line(e, cur.score, cur.clock?.minute, cur.ball.y);
       if (line && !this.skipping) this.opts.overlay?.comment(line);
       else if (line && e.kind === 'full-time') this.finalLine = line;
       if (e.kind === 'try' && !this.skipping) this.offerTryReplay(e.tick);

@@ -1,3 +1,6 @@
+import { renderPlanFit, PLAN_FIT_CSS } from '../planFit';
+import { halfTimeNumbers } from '../matchupRead';
+import type { RosterEntry } from '../../sim/events';
 // src/ui/screens/matchOverlay.ts — the live match HUD (BAK-196, WU-12; Broadcast
 // Quiet 3m–3r, docs/specs/ui-broadcast-quiet.md). DOM-only (ARCHITECTURE §1.6),
 // mounted into #ui-root when the Match scene starts and removed on scene exit.
@@ -718,6 +721,8 @@ export function matchSettingsOpener(): (() => void) | null {
 export interface PlanCardOptions {
   /** "Half-time", "Golden point" or "Change the plan". */
   head: string;
+  roster?: readonly RosterEntry[] | undefined;
+  numbers?: ReturnType<typeof halfTimeNumbers> | undefined;
   /** The score beside the head ("4–6"). */
   score?: string;
   /** One line: who leads, possession, legs, calls. */
@@ -775,7 +780,7 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
       },
       { label, repeat: true },
     );
-    for (const [p, b] of seg.buttons) b.setAttribute('data-tactic', p);
+    for (const [p, b] of seg.buttons) { b.setAttribute('data-tactic', p); renderPlanFit(b, o.roster ?? [], p); }
     segs.push(seg);
     return [el('span', { class: 'nrl-mo-plan-label', text: label }), seg.el];
   };
@@ -798,6 +803,7 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
       ...(summary ? [el('span', { class: 'nrl-mo-plan-line', text: summary })] : []),
       ...(o.tendency ? [el('span', { class: 'nrl-mo-plan-tend', text: o.tendency })] : []),
     ),
+    ...(o.numbers ? [el('div', { class: 'nrl-mo-working', attrs: { 'data-working': '' }, text: `What’s working · half-time guide: ${o.numbers.map(n => `${n.label} ${n.count} ${n.arrow} (aim ${n.label === 'Errors' ? '≤' : '≥'}${n.target})`).join(' · ')}` })] : []),
     el('div', { class: 'nrl-mo-plan-rows' },
       ...row('Attack', ATTACK_PRESETS, (p) => ({ attack: p as AttackPreset })),
       ...row('Defence', DEFENCE_PRESETS, (p) => ({ defence: p as DefencePreset })),
@@ -1973,6 +1979,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
    and the toasts, under a dialog. The plan sheet waits for its primary (#341). */
 .nrl-mo-plan, .nrl-mo-sheet { position: fixed; inset: 0; z-index: 65; display: flex; pointer-events: auto; background: rgba(5, 9, 22, 0.5); }
 .nrl-mo-plan { align-items: flex-end; justify-content: center; }
+${PLAN_FIT_CSS}
+.nrl-mo-working { font-size: 0.8125rem; flex: 0 0 auto; }
 .nrl-mo-plan-sheet {
   width: 100%; max-width: 1180px; min-height: min(296px, 100%); max-height: 100%; overflow: hidden; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 10px;

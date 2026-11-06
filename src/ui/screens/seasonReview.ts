@@ -10,6 +10,7 @@
 // screen. History reopens the review of any season that has one. The
 // builders are pure and unit-tested; the DOM renders them. No Phaser.
 
+import { EXPANSION_COPY } from '../expansionCopy';
 import { bus } from '../../core/events';
 import {
   getState, setState, type Fixture, type GameState, type PotmTally, type RivalClub, type SeasonRecord, type SeasonReview,
@@ -227,6 +228,7 @@ export function openSeasonReview(entry: SeasonRecord, opts: { back?: () => void 
   head.classList.add('nrl-review-head');
 
   body.append(el('div', { class: `nrl-review-finish${entry.premiership ? ' nrl-review-premiers' : ''}`, text: fmtSeasonSummary(entry).replace(/^Season \d+ — /, '') }));
+  if (entry.season === 1) body.append(el('p', { text: EXPANSION_COPY.review, attrs: { 'data-expansion-review': '' } }));
   // Two columns on a landscape phone: how the club did, then the club around it.
   const season = el('div', { class: 'nrl-review-col' });
   const club = el('div', { class: 'nrl-review-col' });

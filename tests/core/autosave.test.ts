@@ -1,8 +1,9 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { enableAutosave, exportSave, deleteSlot, downloadSave, EXPORT_HELD_FAILED_TEXT, getActiveSlot, importIntoSlot, load, save, slotKey, __setStorage, type StorageLike } from '../../src/core/save';
 import { bus } from '../../src/core/events';
 import { readLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearTickHooks, registerTickHook, resumeWeek, weekHeld } from '../../src/core/time';
 
 // QA finding 21: a change made between weeks (here, money) was saved only by the next
@@ -238,6 +239,21 @@ describe('export and import during a held week', () => {
     advanceWeek();
     expect(weekHeld()).toBe(true);
     expect(getState().week).toBe(2);
+    const notes: string[] = [];
+    const offNote = bus.on('ui:notify', (n) => notes.push(n.text));
+    downloadSave(getState());
+    offNote();
+    expect(notes).toContain(EXPORT_HELD_FAILED_TEXT);
+  });
+
+  it.each([[1, 2], [2, 0]] as const)('refuses a held phase %s snapshot when phase %s is now playing in week 1', (saved, current) => {
+    setState({ preseason: saved });
+    save(getState());
+    setState({ preseason: current });
+    registerTickHook('hold-phase', 40, (ctx) => { ctx.hold?.(); }, { trials: true });
+    advanceWeek();
+    expect(weekHeld()).toBe(true);
+    expect(getState().week).toBe(1);
     const notes: string[] = [];
     const offNote = bus.on('ui:notify', (n) => notes.push(n.text));
     downloadSave(getState());

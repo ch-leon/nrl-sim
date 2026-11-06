@@ -2,6 +2,9 @@
 // (GitHub #47, part of #49). Pure functions plus one season hook. Deterministic:
 // objectives come from a private RNG seeded by season + club count, so the same
 // state always yields the same goals and the main rngSeed stream is untouched.
+import { EXPANSION_COPY } from '../ui/expansionCopy';
+import { derbyRival } from './derby';
+import { coachAddress } from '../ui/coachName';
 import { getState, setState, type GameState, type Objective } from '../core/state';
 import { bus } from '../core/events';
 import { registerSeasonHook } from '../core/time';
@@ -42,7 +45,7 @@ export function finalsTarget(state: Pick<GameState, 'reputation' | 'settings'>):
 
 /**
  * The board's 2–3 goals for `state.season`: always a finals target and a
- * solvency floor; clubs with reputation ≥ 25 get a third (rival or build).
+ * solvency floor; clubs with a derby or reputation ≥ 25 get a third.
  */
 export function generateObjectives(state: GameState): Objective[] {
   const rng = makeRng(state.season * 7919 + state.league.clubs.length * 31 + 17);
@@ -56,17 +59,20 @@ export function generateObjectives(state: GameState): Objective[] {
       text: floor > 0 ? `Finish the season with at least $${floor.toLocaleString()}` : 'Finish the season solvent',
     },
   ];
-  if (state.reputation < 25) return out;
+  const derby = derbyRival(state);
+  if (state.reputation < 25 && !derby) return out;
 
   const rivals = state.league.clubs.filter((c) => c.id !== state.clubId)
     .sort((a, b) => b.strength - a.strength || a.id.localeCompare(b.id));
-  if (rivals.length > 0 && rng.next() < 0.5) {
+  // Consume precisely the old draw, even when geography chooses the objective.
+  const rivalDraw = state.reputation >= 25 && rivals.length > 0 && rng.next() < 0.5;
+  if (rivals.length > 0 && (rivalDraw || derby)) {
     // Reach for a rival a little above the club: better reputation → stronger rival.
     const idx = Math.min(rivals.length - 1, Math.round((1 - state.reputation / 100) * (rivals.length - 1) * 0.7));
-    const rival = rivals[idx]!;
+    const rival = rivals.find((c) => c.id === derby) ?? rivals[idx]!;
     out.push({
       id: `s${season}-rival`, kind: 'beatRival', target: 0, rivalId: rival.id, status: 'pending',
-      text: `Finish above ${rival.name}`,
+      text: `Finish above ${rival.name}${derby ? ", our derby rival" : ""}`,
     });
   } else {
     const target = state.facilities.length + BOARD.BUILD_TARGET_EXTRA;
@@ -244,7 +250,7 @@ export function ladderStanding(state: Pick<GameState, 'league' | 'clubId'>, club
     rank: started && i >= 0 ? i + 1 : 0,
     points: i >= 0 ? order[i]!.points : 0,
     pointsAt: (n) => order[n - 1]?.points ?? 0,
-    roundsLeft: state.league.fixtures.filter((f) => !f.result && f.round <= SEASON_ROUNDS
+    roundsLeft: state.league.fixtures.filter((f) => !f.result && f.round > 0 && f.round <= SEASON_ROUNDS
       && (f.homeId === clubId || f.awayId === clubId)).length,
   };
 }
@@ -308,15 +314,23 @@ export function worstObjective(state: GameState, runwayWeeks: number | null = nu
 
 /** Register the new-season hook (after fixtures-season at order 10). */
 export function registerBoardSystem(): void {
-  registerSeasonHook('board-season', 20, () => {
+  const announceObjectives = (quiet = false): void => {
     const s = getState();
     if (s.sacked) return;
     const objectives = generateObjectives(s);
     setState({ objectives });
     bus.emit('ui:notify', {
-      text: `Board objectives, season ${s.season}: ${objectives.map((o) => o.text).join(' · ')}.`,
+      text: s.season === 1
+        ? EXPANSION_COPY.objectives(objectives, coachAddress(s))
+        : `${coachAddress(s)}, the board's objectives for season ${s.season}: ${objectives.map((o) => o.text).join(' · ')}.`,
       kind: 'info',
+      quiet,
+      from: 'coach',
     });
-  });
-  ensureObjectives();
+  };
+  registerSeasonHook('board-season', 20, () => announceObjectives());
+  const s = getState();
+  // The first goals belong in News without queuing a toast over the tutorial.
+  if (!s.sacked && s.objectives.length === 0 && s.league.clubs.length > 0) announceObjectives(true);
+  else ensureObjectives();
 }

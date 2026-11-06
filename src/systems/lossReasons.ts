@@ -9,6 +9,8 @@
 // with fewer than two tops up with the nearest misses, then a plain fallback.
 import type { GameState } from '../core/state';
 import type { MatchEvent, MatchResult, TeamSheet } from '../sim/events';
+import { expectedCounterSwing, COUNTER_MATRIX } from '../match/view/counterRead';
+import { DEFAULT_TACTICS, PRESET_LABEL, isAttackPreset, isDefencePreset } from '../match/league/presets';
 import { BENCH } from '../match/league/bench';
 import { FACILITY_CATALOG } from '../data/facility';
 import { LINEUP_SLOTS, positionFit } from './lineup';
@@ -25,6 +27,9 @@ export interface LossReason {
 
 /** Out-gunned: their attack or defence rated this many points over ours. */
 export const OUTGUNNED_GAP = 6;
+/** Out-schemed: at least five expected win-share points against us, averaged
+ * over the plans actually played. A read of the matrix, not proof of causation. */
+export const OUTSCHEMED_SWING = 5;
 /** Sloppy: this many more errors than them… */
 export const ERROR_GAP = 3;
 /** …or less of the ball than this (%). */
@@ -63,6 +68,44 @@ function outgunned(us: TeamSheet, them: TeamSheet): Scored {
   return attack >= defence
     ? { score: attack / OUTGUNNED_GAP, screen: 'recruit', text: `Their attack rated ${them.attack} to your ${us.attack}`, cta: 'Find a strike player' }
     : { score: defence / OUTGUNNED_GAP, screen: 'recruit', text: `Their defence rated ${them.defense} to your ${us.defense}`, cta: 'Find a hard defender' };
+}
+
+/** Weight each plan by match-clock exposure so a late switch cannot explain
+ * a whole loss. Starting rosters supply fit, just as at kickoff in the sim. */
+function outschemed(result: MatchResult, us: TeamSheet, them: TeamSheet, mine: 0 | 1): Scored | null {
+  const plans = { home: { ...((mine === 0 ? us : them).tactics ?? DEFAULT_TACTICS) },
+    away: { ...((mine === 0 ? them : us).tactics ?? DEFAULT_TACTICS) } };
+  const own = mine === 0 ? 'home' : 'away', other = mine === 0 ? 'away' : 'home';
+  const end = result.events.find(e => e.kind === 'full-time')?.t ?? 0;
+  if (end <= 0) return null;
+  let at = 0, total = 0, strongest = 0;
+  let explanation = '';
+  const segment = (until: number): void => {
+    const duration = Math.max(0, until - at);
+    const swing = expectedCounterSwing(us, them, plans[own], plans[other]);
+    total += swing * duration;
+    if (-swing * duration > strongest) {
+      strongest = -swing * duration;
+      const you = plans[own], they = plans[other];
+      explanation = COUNTER_MATRIX[you.attack][they.defence] < 0
+        ? `their ${PRESET_LABEL[they.defence]} countered your ${PRESET_LABEL[you.attack]}`
+        : `their ${PRESET_LABEL[they.attack]} found room against your ${PRESET_LABEL[you.defence]}`;
+    }
+    at = until;
+  };
+  for (const change of [...(result.planChanges ?? [])].sort((a, b) => a.minute - b.minute)) {
+    if (change.minute < at || change.minute > end || !isAttackPreset(change.attack) || !isDefencePreset(change.defence)) continue;
+    segment(change.minute);
+    plans[change.side] = { attack: change.attack, defence: change.defence };
+  }
+  segment(end);
+  const swing = -total / end;
+  // Never include this as a nearest miss: a weak/flat matchup must stay silent.
+  if (swing < OUTSCHEMED_SWING) return null;
+  const breaks = result.events.filter(e => e.kind === 'break' && e.teamId === us.clubId).length;
+  return { score: swing / OUTSCHEMED_SWING, screen: 'lineup',
+    text: `Out-schemed: ${explanation}. You made ${breaks} line break${breaks === 1 ? '' : 's'}`,
+    cta: 'Try a different plan' };
 }
 
 function sloppy(result: MatchResult, mine: 0 | 1, theirs: 0 | 1): Scored {
@@ -181,7 +224,9 @@ export function lossReasons(
   if (scores[s.mine]! >= scores[s.theirs]!) return [];
   const us = s.mine === 0 ? sheets.home : sheets.away;
   const them = s.mine === 0 ? sheets.away : sheets.home;
+  const counter = outschemed(result, us, them, s.mine);
   const all: Scored[] = [
+    ...(counter ? [counter] : []),
     outgunned(us, them),
     sloppy(result, s.mine, s.theirs),
     outOfLegs(result, us, them),

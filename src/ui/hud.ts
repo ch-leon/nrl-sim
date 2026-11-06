@@ -1,3 +1,4 @@
+import { inTrials, seasonWeekLabel } from '../core/season';
 // src/ui/hud.ts — the dock's status block (money, week) and PLAY WEEK, and the
 // club home's decisions chip. See ARCHITECTURE §4 (store), §5 (events), §7 (DOM
 // persists across scenes), BAK-163 and docs/specs/ui-broadcast-quiet.md (the
@@ -430,11 +431,11 @@ export function createHud(opts: HudOpts = {}): Hud {
     renderMoney(s.money);
     // "/total" is a separate span so a narrow dock can drop it.
     weekEl.replaceChildren(
-      document.createTextNode(`WEEK ${s.week}`),
-      el('span', { class: 'nrl-dock-week-total', text: `/${WEEKS_PER_SEASON}` }),
+      document.createTextNode(inTrials(s) ? `TRIAL ${s.preseason}` : `WEEK ${s.week}`),
+      el('span', { class: 'nrl-dock-week-total', text: inTrials(s) ? '/2' : `/${WEEKS_PER_SEASON}` }),
       document.createTextNode(` · S${s.season}`),
     );
-    weekEl.setAttribute('aria-label', `Week ${s.week} of ${WEEKS_PER_SEASON}, season ${s.season}`);
+    weekEl.setAttribute('aria-label', seasonWeekLabel(s));
     const chipInfo = nextMatchChip(s);
     advanceSub.textContent = playWeekSub(s);
     advanceBtn.title = chipInfo?.label ?? '';

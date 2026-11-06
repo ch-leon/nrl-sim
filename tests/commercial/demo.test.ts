@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   DEMO, DEMO_ENDED_TEXT, FIRST_RUN_KEY, GRANDFATHER_EXISTING_SAVES,
@@ -7,7 +8,7 @@ import { entitlementsFor, getEntitlementService, LocalStubProvider, __resetEntit
 import { __setCommercial } from '../../src/commercial/flags';
 import { advanceUntil } from '../../src/core/advance';
 import { bus, type Events } from '../../src/core/events';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { getSlotSummaries, slotKey, SAVE_KEY, CORRUPT_KEY } from '../../src/core/save';
 import {
   advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, weekHeld, TICK_ORDER,

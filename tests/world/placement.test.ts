@@ -220,3 +220,22 @@ describe('demolishFacility', () => {
     expect(demolishFacility('a')).toBeNull();
   });
 });
+
+describe('closed facilities (#481)', () => {
+  it('refuses placement before charging or adding a facility, even if entered outside Build', async () => {
+    const { PlacementController } = await import('../../src/world/placement');
+    // confirm's closed-facility guard runs before it uses any scene/path methods.
+    const controller = new PlacementController(
+      {} as ConstructorParameters<typeof PlacementController>[0],
+      {} as ConstructorParameters<typeof PlacementController>[1],
+      { cellToWorld: () => ({ x: 0, y: 0 }), depth: () => 0 },
+    );
+    (controller as unknown as { defId: string }).defId = 'teamGym';
+    const before = structuredClone(getState());
+    const notices: string[] = [];
+    bus.on('ui:notify', (n) => notices.push(n.text));
+    expect(controller.confirm()).toEqual({ ok: false, reason: 'locked' });
+    expect(getState()).toEqual(before);
+    expect(notices).toEqual(['Opens at round 8']);
+  });
+});

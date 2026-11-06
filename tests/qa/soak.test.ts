@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/qa/soak.test.ts — a small slice of the headless soak (npm run soak runs the full
 // 5 seasons × 20 seeds): whole seasons through every system with the invariant checks,
 // and old saves of every version migrating and playing on.
@@ -9,7 +10,7 @@ import {
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
-import { createNewGame, getState, setState, type Fixture, type GameState } from '../../src/core/state';
+import { getState, setState, SAVE_VERSION, type Fixture, type GameState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { migrateState } from '../../src/core/save';
 import { advanceWeek, weekHeld, withFastForward } from '../../src/core/time';
@@ -32,7 +33,10 @@ describe('soak checks', () => {
     for (const v of OLD_VERSIONS) {
       const res = migrateState(asOldSave(getState(), v));
       expect(res.ok, `v${v}`).toBe(true);
-      if (res.ok) expect(checkState(res.state), `v${v}`).toEqual([]);
+      if (res.ok) {
+        expect(checkState(res.state), `v${v}`).toEqual([]);
+        expect(res.state).not.toHaveProperty('unlocks');
+      }
     }
     // Each version's old save lacks what its migration adds, so the step really runs: v18's board
     // loan, v19's staff, and v20's playback speed (left absent, so an old save plays at ×4).
@@ -52,6 +56,8 @@ describe('soak checks', () => {
     expect(oldSpeed.playbackSpeed).toBeUndefined();
     const kept = migrateState(asOldSave(sped, 19));
     expect(kept.ok && kept.state.settings.playbackSpeed).toBeUndefined();
+    // A v21 fixture must lack the new habit history (#469).
+    expect(asOldSave(getState(), 21)).not.toHaveProperty('recentPlans');
     // v20 has no bans and no event-chain flags; v21 fills both (#324).
     const v20 = asOldSave(getState(), 20);
     const deck = v20.eventDeck as { flags?: string[] };
@@ -60,7 +66,8 @@ describe('soak checks', () => {
     const v21 = migrateState(v20);
     expect(v21.ok).toBe(true);
     if (v21.ok) {
-      expect(v21.state.version).toBe(21);
+      expect(v21.state.version).toBe(SAVE_VERSION);
+      expect(v21.state.recentPlans).toEqual([]);
       expect(v21.state.eventDeck.flags).toEqual([]);
       expect(v21.state.squad.every((p) => p.suspendedWeeks === 0)).toBe(true);
       expect(v21.state.freeAgents.every((p) => p.suspendedWeeks === 0)).toBe(true);
@@ -419,3 +426,24 @@ describe('rival styles over a season (#249, N11)', () => {
   });
 });
 
+
+it('plays and reloads a full UK season and rolls into another with the UK shape (#488)', async () => {
+  const { preparePack, selectPack } = await import('../../src/content');
+  await preparePack('uk');
+  try {
+    const r = runSoak({ seed: 101, seasons: 2, mode: 'managed', pack: 'uk' });
+    expect(r.problems).toEqual([]);
+    expect(r.seasons).toHaveLength(2);
+    for (const season of r.seasons) {
+      expect(season.wins + season.draws + season.losses).toBe(22);
+      expect(season.ladderPosition).toBeGreaterThanOrEqual(1);
+      expect(season.ladderPosition).toBeLessThanOrEqual(12);
+    }
+    expect(getState().pack).toBe('uk');
+    expect(getState().league.clubs).toHaveLength(12);
+    const loaded = runSoak({ seed: 101, seasons: 1, mode: 'idle', fromSave: JSON.parse(JSON.stringify(getState())) });
+    expect(loaded.problems).toEqual([]);
+    expect(loaded.seasons).toHaveLength(1);
+    expect(getState().pack).toBe('uk');
+  } finally { selectPack('au'); }
+}, 180_000);

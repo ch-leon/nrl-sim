@@ -9,8 +9,7 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav }
  * Normal, and two matches in one session at ×8: the half-time card comes up in both
  * (Phaser kept the first match's "card shown" for the second, so it never did, #408).
  */
-export async function runPlaytest(browser) {
-  const [W, H] = [667, 375];
+export async function runPlaytest(browser, W = 667, H = 375) {
   const OUT = join(OUT_ROOT, 'webkit', `playtest-${W}x${H}`);
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
@@ -19,6 +18,7 @@ export async function runPlaytest(browser) {
     viewport: { width: W, height: H }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, userAgent: IPHONE_UA,
   });
   await ctx.addInitScript(closeWeekSummary);
+  await ctx.addInitScript(() => localStorage.setItem('nrlsim.iosInstallHintShown', '1'));
   const page = await ctx.newPage();
   page.setDefaultTimeout(10000);
   page.on('pageerror', (e) => report.errors.push(`pageerror: ${e.message}`));
@@ -50,8 +50,88 @@ export async function runPlaytest(browser) {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
     await page.locator('[data-nrl-start]').tap();
+    await page.locator('[data-expansion-work]').tap();
     await page.locator('.nrl-tutorial-skip').tap();
+    // A fixed strong-pack rival fixture makes the displayed style deterministic.
+    await page.evaluate(() => {
+      for (const club of window.__nrlState().league.clubs) for (const p of club.squad ?? []) {
+        p.traits = [];
+        p.stats = { speed: 60, strength: ['hooker', 'prop', 'second-row', 'lock'].includes(p.position) ? 90 : 60,
+          stamina: 60, skill: 60, footyIQ: 60 };
+      }
+    });
   });
+  await step('lineup', async () => {
+    await openNav(page, 'lineup');
+    await page.waitForSelector('.nrl-lineup-row');
+  });
+  // #466: the legacy id renders the new name and offload explanation at both
+  // requested text sizes. These screenshots are kept by the match CI artifact.
+  const tightProblems = async (root) => {
+    // Let the opening animation and the frame's layout finish before hit-testing.
+    await page.waitForTimeout(250);
+    return page.locator(root).evaluate((sheet) => {
+      const out = [];
+      if (/grind/i.test(sheet.textContent)) out.push('retired name in plan sheet');
+      const b = sheet.querySelector('[data-tactic="grind"]');
+      if (b?.firstElementChild?.textContent !== 'Tight') out.push('Tight label missing');
+      if (!/^[★☆]{3}$/.test(b?.querySelector('.nrl-fit-stars')?.textContent ?? '')) out.push('Tight fit stars missing');
+      if (!b?.querySelector('.nrl-fit-reason')?.textContent?.trim()) out.push('Tight fit reason missing');
+      // TACTIC_SHORT.grind is pinned to TGT by the rendering test. Check it
+      // against the real plan chip's font, spacing and available content width.
+      if (b) {
+        const cs = getComputedStyle(b);
+        const c = document.createElement('canvas').getContext('2d');
+        c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const shortWidth = c.measureText('TGT').width + 3 * (parseFloat(cs.letterSpacing) || 0);
+        const available = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        if (shortWidth > available + 1) out.push('TGT short label exceeds chip width');
+      }
+      if (!sheet.textContent.includes('offload in the tackle')) out.push('offload explanation missing');
+      for (const e of [b, sheet.querySelector('.nrl-lineup-tac-hint, .nrl-mo-plan-hint')].filter(Boolean)) {
+        const r = e.getBoundingClientRect();
+        if (r.left < 0 || r.right > innerWidth || r.top < 0 || r.bottom > innerHeight) out.push('Tight label or explanation outside viewport');
+        if (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1) out.push('Tight label or explanation clipped');
+        const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+        if (!hit || !(e.contains(hit) || hit.contains(e))) out.push('Tight label or explanation covered');
+      }
+      return out;
+    });
+  };
+  for (const size of ['normal', 'large']) {
+    await textSize(size);
+    await openNav(page, 'lineup');
+    await step(`plan-sheet-${size}`, async () => {
+      await page.locator('.nrl-screen-tools [data-plan]').tap();
+      await page.locator('.nrl-lineup-tac [data-tactic="grind"]').tap();
+      return tightProblems('.nrl-lineup-plan');
+    });
+    await page.locator('.nrl-lineup-plan [data-plan-done]').tap();
+    await page.locator(SHEET_EXIT).tap();
+    await openNav(page, 'help');
+    for (const id of ['tactics', 'nines']) {
+      await step(`guide-${id}-${size}`, async () => {
+        await page.locator(`[data-guide-tab="${id}"]`).tap();
+        await page.locator(`[data-guide-page="${id}"] li`).filter({ hasText: 'Tight' }).last().scrollIntoViewIfNeeded();
+        const text = await page.locator(`[data-guide-page="${id}"]`).textContent();
+        return [...(/grind/i.test(text) ? ['retired name in guide'] : []), ...(text.includes('Tight') ? [] : ['Tight missing from guide'])];
+      });
+    }
+    await page.locator(SHEET_EXIT).tap();
+    await openNav(page, 'fixtures');
+    await step(`fixtures-tight-${size}`, async () => {
+      await page.locator('[data-next-row]').tap();
+      const text = await page.locator('[data-next-match]').textContent();
+      return text.includes('Tight') && !/grind/i.test(text) ? [] : ['They play did not display Tight'];
+    });
+    await step(`rival-tight-${size}`, async () => {
+      await page.locator('[data-next-opponent] button').tap();
+      const text = await page.locator('[data-rival-squad] [data-style]').textContent();
+      return text.includes('Tight') && !/grind/i.test(text) ? [] : ['rival style did not display Tight'];
+    });
+    await page.locator('.nrl-modal .nrl-screen-x').first().tap();
+    await page.locator(SHEET_EXIT).tap();
+  }
   for (const size of ['large', 'larger']) {
     await step(`ladder-${size}`, async (rec) => {
       await textSize(size);
@@ -67,8 +147,13 @@ export async function runPlaytest(browser) {
       ];
     });
   }
-  await step('text-normal', () => textSize('normal'));
   for (const m of [1, 2]) {
+    await textSize(m === 1 ? 'normal' : 'large');
+    // Start Balanced so selecting Tight at half-time records a real change.
+    await openNav(page, 'lineup');
+    await page.locator('.nrl-screen-tools [data-plan]').tap();
+    await page.locator('.nrl-lineup-tac [data-tactic="balanced"]').tap();
+    await page.locator('.nrl-lineup-plan [data-plan-done]').tap();
     await step(`half-time-match-${m}`, async (rec) => {
       if (await page.locator('.nrl-screen-region').count()) await page.locator(SHEET_EXIT).tap();
       await page.locator('.nrl-dock [data-hud="advance"]').tap();
@@ -85,10 +170,29 @@ export async function runPlaytest(browser) {
         return pb && pb.half >= 2 && pb.breakKind !== 'half-time' ? 'missed' : null;
       }, null, { timeout: 300000, polling: 50 }).then((h) => h.jsonValue());
       rec.notes.push(seen === 'card' ? 'half-time card up' : 'second half kicked off with no card');
-      if (seen === 'card') await page.locator('.nrl-mo-plan .nrl-mo-plan-go').tap();
-      await page.locator('.nrl-mo-skip').tap();
-      await page.locator('.nrl-mo-skip').tap();
-      await page.locator('[data-back-to-club]:visible').first().tap({ timeout: 30000 });
+      if (seen === 'card') {
+        // The real change reaches commentary and the report as grind/<defence>.
+        await page.locator('.nrl-mo-plan [data-tactic="grind"]').tap();
+        const problems = await tightProblems('.nrl-mo-plan');
+        if (problems.length) throw new Error(problems.join('; '));
+        await page.screenshot({ path: join(OUT, `half-time-match-${m}.png`) });
+        await page.locator('.nrl-mo-plan .nrl-mo-plan-go').tap();
+      }
+      if (m === 1) {
+        await page.waitForSelector('[data-back-to-club]:visible', { timeout: 300000 });
+        rec.notes.push('played through full time at ×8');
+      } else {
+        await page.locator('.nrl-mo-skip').tap();
+        await page.locator('.nrl-mo-skip').tap();
+      }
+      await page.waitForSelector('[data-back-to-club]:visible', { timeout: 30000 });
+      await page.locator('.nrl-mo-ft [data-report]').tap();
+      await page.locator('.nrl-report-changes:not(.nrl-report-why) summary').tap();
+      await page.locator('.nrl-report-change').filter({ hasText: 'Tight' }).last().scrollIntoViewIfNeeded();
+      const reportText = await page.locator('.nrl-report').textContent();
+      if (/grind/i.test(reportText) || !reportText.includes('Tight')) throw new Error('report did not display the plan change as Tight');
+      await page.screenshot({ path: join(OUT, `full-time-match-${m}.png`) });
+      await page.locator('[data-back-to-club]:visible').first().tap();
       await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
       return seen === 'card' ? [] : [`match ${m}: no half-time card`];
     });

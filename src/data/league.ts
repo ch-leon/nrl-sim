@@ -11,11 +11,15 @@
 // this list.
 
 import type { RivalClub } from '../core/state';
-import { activePack } from '../content';
+import { activePack, onPackChange } from '../content';
 
 /**
  * The rival clubs, 15 in the AU pack. ids are stable, kebab-case, and prefixed
  * `rival-` so they never collide with the player's `'player'` id. New games
  * only — a save's rivals keep the strength their squads give them.
  */
-export const RIVAL_CLUBS: readonly RivalClub[] = activePack().clubs;
+export let RIVAL_CLUBS: readonly RivalClub[] = activePack().clubs;
+
+onPackChange(() => {
+  RIVAL_CLUBS = activePack().clubs;
+});

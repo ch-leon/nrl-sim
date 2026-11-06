@@ -1,3 +1,4 @@
+import { roundLabel } from '../../systems/matchday';
 // src/ui/screens/lineup.ts — the Lineup screen (GitHub #69; 3e Broadcast Quiet):
 // pick the nine starters and the interchange bench, and how hard the bench is
 // rotated. Nine tiles on a mini-pitch laid out like the formation (the hooker
@@ -18,10 +19,11 @@ import { save } from '../../core/save';
 import { overallRating } from '../../data/player';
 import { BENCH, ROTATIONS, type Rotation } from '../../match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset } from '../../match/league/presets';
+import { renderPlanFit, PLAN_FIT_CSS } from '../planFit';
 import { TACTIC_BLURB, styleLine } from '../tacticsBlurbs';
 import { nextFixture } from '../../systems/league';
 import { PLAYER_ID } from '../../systems/fixtures';
-import { rivalStyle } from '../../systems/rivalRound';
+import { playerRivalContext, rivalStyle } from '../../systems/rivalRound';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import {
   LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
@@ -250,13 +252,14 @@ const LINEUP_CSS = `
   background: var(--nrl-navy);
   padding: 8px 24px 14px;
 }
-.nrl-lineup-plan { display: flex; flex-direction: column; gap: 8px; }
+.nrl-lineup-plan { display: flex; flex-direction: column; gap: 4px; }
 .nrl-lineup-plan-grab { align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--nrl-line); }
 .nrl-lineup-plan-head { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
 .nrl-lineup-plan-title { flex: 0 0 auto; font-family: var(--nrl-f-label); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nrl-accent); }
 .nrl-lineup-plan-sub { flex: 0 1 auto; min-width: 0; font-size: 0.8125rem; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-lineup-opp { margin-left: auto; flex: 0 1 auto; min-width: 0; font-size: 0.75rem; color: var(--nrl-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-lineup-opp[hidden] { display: none; }
+${PLAN_FIT_CSS}
 .nrl-lineup-plan-rows { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 6px 12px; }
 .nrl-lineup-plan-label { font-family: var(--nrl-f-label); font-size: 0.875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-lineup-plan .nrl-seg { display: flex; padding: 3px; }
@@ -269,12 +272,21 @@ const LINEUP_CSS = `
 .nrl-lineup-tac-hint { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 0.8125rem; line-height: 1.35; color: var(--nrl-text-2); }
 .nrl-lineup-tac-hint b { color: var(--nrl-text); font-weight: 600; }
 .nrl-lineup-plan-foot .nrl-btn-primary { flex: 0 0 auto; min-height: 48px; padding: 0 24px; font-size: 1.1875rem; }
-@media (max-height: 380px) {
+@media (max-height: 440px) {
+  .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal { padding-top: 6px; padding-bottom: 8px; }
+  .nrl-lineup-plan { gap: 2px; }
+  .nrl-lineup-plan-rows { row-gap: 2px; }
+  .nrl-lineup-plan-foot { margin-top: 0; }
+  .nrl-lineup-rot-tip { display: none; }
+  .nrl-lineup-rot-row .nrl-seg { max-width: 100%; }
   .nrl-lineup-plan-grab { display: none; }
   .nrl-lineup-plan-title { font-size: 1.375rem; }
   .nrl-lineup-plan .nrl-seg > .nrl-btn { min-height: 36px; font-size: 1rem; }
   .nrl-lineup-plan-foot .nrl-btn-primary { min-height: 44px; }
   .nrl-lineup-tac-hint { font-size: 0.75rem; }
+}
+@media (max-height: 340px) {
+  .nrl-lineup-plan .nrl-seg { padding: 1px; }
 }
 @media (max-width: 760px) {
   .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal { padding: 8px 14px 12px; }
@@ -465,6 +477,7 @@ export function openLineupScreen(): void {
 
     // The plan sheet's state (it may be open over the screen).
     const tactics = validTactics(lineup.tactics);
+    for (const seg of [attack, defence]) for (const [p, b] of seg.buttons) renderPlanFit(b, nine, p);
     attack.set(tactics.attack);
     defence.set(tactics.defence);
     rotation.set(lineup.rotation);
@@ -475,10 +488,10 @@ export function openLineupScreen(): void {
     );
     const next = nextFixture(s.league.fixtures, s.week, PLAYER_ID);
     const opp = next ? s.league.clubs.find((c) => c.id === (next.homeId === PLAYER_ID ? next.awayId : next.homeId)) : undefined;
-    planSub.textContent = next && opp ? `Round ${next.round} · v ${opp.name} · ${next.homeId === PLAYER_ID ? 'home' : 'away'}` : 'Before kick-off';
+    planSub.textContent = next && opp ? `${roundLabel(next.round)} · v ${opp.name} · ${next.homeId === PLAYER_ID ? 'home' : 'away'}` : 'Before kick-off';
     oppLine.hidden = !opp;
     if (opp) {
-      oppLine.textContent = `${opp.name} play ${styleLine(rivalStyle(opp))}`;
+      oppLine.textContent = `${opp.name} play ${styleLine(rivalStyle(opp, playerRivalContext(s)))}`;
       oppLine.title = oppLine.textContent;
     }
     planBtn.textContent = `Plan: ${PRESET_LABEL[tactics.attack]} · ${PRESET_LABEL[tactics.defence]}`;

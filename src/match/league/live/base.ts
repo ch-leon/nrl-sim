@@ -22,6 +22,8 @@ import { CallJudge, callDefence, withAttackCall, withDefenceCall, type CallInput
 import type { KickoffCall } from '../kickoff';
 import { weatherEffect, type WeatherEffect } from '../weather';
 import type { MatchInjury, WeatherKind } from '../../../sim/events';
+import { styleFit, type StyleFit } from '../fit';
+import { compressedCounter, fitEdge, rushCounter, slideCounter } from '../counters';
 import { LIVE } from './knobs';
 import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput } from './types';
 
@@ -36,6 +38,10 @@ export abstract class LiveBase {
   protected readonly names: Record<Side, string>;
   /** How each side plays (BAK-208 §5), changed at the breaks (N11). */
   readonly tactics: Record<Side, TeamTactics>;
+  /** Tight fit of the selected starters, fixed before kick-off; bench and fatigue never rescore it. */
+  protected readonly tightFit: Record<Side, number>;
+  protected readonly squadFit: Record<Side, StyleFit>;
+  protected readonly planFit: Record<Side, { attack: number; defence: number }>;
   /** The goal-kicker each side named (N11, a squad id); the slot-5 kicker when absent or off the field. */
   private readonly goalKickerKey: Record<Side, string | undefined>;
   /** Each side's captain, as the penalty call reads him (N11): neutral when the sheet names none. */
@@ -91,6 +97,7 @@ export abstract class LiveBase {
   protected planRead = 0;
   protected readonly nextPlan: Record<Side, { tactics: TeamTactics; at: PlanChange['at']; minute: number } | null> = { home: null, away: null };
   /** The break rule (N13.5), and the sides it runs for. Null when the match has none. */
+  protected readonly aiRival: LiveOptions['aiRival'];
   protected readonly breakRule: BreakRule | null;
   protected readonly breakRuleSides: ReadonlySet<Side>;
   /** Tries conceded in a row, without this side scoring in between. */
@@ -153,6 +160,9 @@ export abstract class LiveBase {
   protected ruckPlayedAt = -1000;
   /** Extra spill chance on the pass in the air (a Razzle Dazzle offload). */
   protected spillExtra = 0;
+  /** The latest offload receiver, while the drifting line is still recovering. */
+  protected offloadReceiver: number | null = null;
+  protected offloadUntil = -1;
   /** The trait to credit when the pass in the air is picked off. */
   protected interceptTrait: string | undefined;
   protected events: SimEvent[] = [];
@@ -175,7 +185,45 @@ export abstract class LiveBase {
   protected readonly goldenPoint: boolean;
   protected golden = false;
 
+  /** Starting-sheet scores stay fixed; a break selects the newly played styles. */
+  protected refreshPlanFit(side: Side): void {
+    const plan = this.tactics[side];
+    this.planFit[side] = { attack: this.squadFit[side][plan.attack], defence: this.squadFit[side][plan.defence] };
+  }
+
+  protected slideEffect(attacker: Side = this.attacking): number {
+    const defender = other(attacker);
+    return slideCounter(this.tactics[attacker].attack, this.tactics[defender].defence,
+      this.planFit[attacker].attack, this.planFit[defender].defence);
+  }
+
+  protected rushEffect(attacker: Side = this.attacking): number {
+    const defender = other(attacker);
+    return rushCounter(this.tactics[attacker].attack, this.tactics[defender].defence,
+      this.planFit[attacker].attack, this.planFit[defender].defence);
+  }
+
+  protected compressedEffect(attacker: Side = this.attacking): number {
+    const defender = other(attacker);
+    return compressedCounter(this.tactics[attacker].attack, this.tactics[defender].defence,
+      this.planFit[attacker].attack, this.planFit[defender].defence);
+  }
+
+  protected kickCover(kicking: Side): number {
+    return this.tactics[kicking].attack === 'kick-chase' ? this.slideEffect(kicking) : 0;
+  }
+
+  protected rushKickGap(kicking: Side): number {
+    return this.tactics[kicking].attack === 'kick-chase' ? this.rushEffect(kicking) : 0;
+  }
+
+  protected contestFitEdge(attacker: Side, defender: Side): number {
+    return fitEdge(this.planFit[attacker].attack) - fitEdge(this.planFit[defender].defence);
+  }
+
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
+    this.squadFit = { home: styleFit(home.roster ?? []), away: styleFit(away.roster ?? []) };
+    this.tightFit = { home: this.squadFit.home.grind, away: this.squadFit.away.grind };
     // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average;
     // then the difficulty's edge to the player's rival (N12.2), which the spread would mostly cancel.
     [home, away] = edgeSheets(...spreadSheets(home, away), opts.difficultyEdge);
@@ -185,6 +233,7 @@ export abstract class LiveBase {
     this.controlList = opts.controls ?? [];
     this.aiCoach = opts.aiCoach ?? [];
     this.planList = opts.plans ?? [];
+    this.aiRival = opts.aiRival;
     const listed = opts.breakRuleSides;
     if (opts.breakRule) {
       this.breakRule = opts.breakRule;
@@ -204,6 +253,9 @@ export abstract class LiveBase {
     this.goldenPoint = opts.goldenPoint === true;
     this.names = { home: home.name, away: away.name };
     this.tactics = { home: { ...(home.tactics ?? DEFAULT_TACTICS) }, away: { ...(away.tactics ?? DEFAULT_TACTICS) } };
+    this.planFit = { home: { attack: 1, defence: 1 }, away: { attack: 1, defence: 1 } };
+    this.refreshPlanFit('home');
+    this.refreshPlanFit('away');
     this.goalKickerKey = { home: home.kicker, away: away.kicker };
     this.captain = { home: captainOf(home), away: captainOf(away) };
     this.players = [...this.buildSide(home, 'home'), ...this.buildSide(away, 'away')];
@@ -341,7 +393,7 @@ export abstract class LiveBase {
   }
   /** The attacking side's plan for the zone the carrier is in. */
   protected atkPlan(h: Player): AttackPlan {
-    return withAttackCall(attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h))), this.playCall());
+    return withAttackCall(attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h)), this.tightFit[this.attacking], ROLES[h.slot]!.name), this.playCall());
   }
   /** How the defending side's line is set. */
   protected defPlan(): DefencePlan {

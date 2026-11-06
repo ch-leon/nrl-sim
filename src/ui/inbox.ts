@@ -1,3 +1,4 @@
+import { currentRound } from '../core/season';
 // src/ui/inbox.ts — News inbox nav screen (GitHub #45, part of #49).
 // Keeps the last INBOX_CAPACITY 'ui:notify' messages in memory so toasts that
 // vanish after 4s can still be read later. Each message is stamped with the
@@ -9,6 +10,7 @@
 // (ui/decisions.ts, #345). News keeps one row for them at the top, which opens it,
 // so the feed below always has the screen.
 
+import { coachLine } from './coachVoice';
 import { bus, type Events } from '../core/events';
 import { getState } from '../core/state';
 import { decisionViews, openDecisions } from './decisions';
@@ -26,6 +28,9 @@ export const NEWS_KINDS: readonly NewsKind[] = ['info', 'success', 'danger'];
 export interface NewsItem {
   /** Monotonic id; never reused, so it orders messages even across wraps. */
   seq: number;
+  from?: 'coach';
+  /** Durable route for contract warnings after their toast expires. */
+  screen?: string;
   text: string;
   kind: NewsKind;
   season: number;
@@ -59,7 +64,7 @@ export class NewsInbox {
   }
 
   /** Append a message, overwriting the oldest once the ring is full. */
-  push(msg: { text: string; kind: NewsKind } & NewsStamp): NewsItem {
+  push(msg: { text: string; kind: NewsKind; from?: 'coach'; screen?: string } & NewsStamp): NewsItem {
     const item: NewsItem = { seq: ++this.seq, ...msg };
     this.slots[this.next] = item;
     this.next = (this.next + 1) % this.capacity;
@@ -120,8 +125,8 @@ export const newsInbox = new NewsInbox();
 /** Season/week for a new message. Falls back to 1/1 before a game exists. */
 function currentStamp(): NewsStamp {
   try {
-    const { season, week } = getState();
-    return { season, week };
+    const s = getState();
+    return { season: s.season, week: currentRound(s) };
   } catch {
     return { season: 1, week: 1 };
   }
@@ -132,8 +137,8 @@ function currentStamp(): NewsStamp {
  * season/week. Call once from main.ts. Returns the unsubscribe.
  */
 export function initNewsInbox(inbox: NewsInbox = newsInbox): () => void {
-  return bus.on('ui:notify', ({ text, kind }) => {
-    inbox.push({ text, kind, ...currentStamp() });
+  return bus.on('ui:notify', ({ text, kind, from, action }) => {
+    inbox.push({ text, kind, ...(from ? { from } : {}), ...(action?.screen ? { screen: action.screen } : {}), ...currentStamp() });
   });
 }
 
@@ -216,12 +221,13 @@ export function openInboxScreen(inbox: NewsInbox = newsInbox): HTMLElement {
     }
     for (const g of groups) {
       const section = el('section', { class: 'nrl-news-week' });
-      section.append(el('h3', { text: `S${g.season} · Week ${g.week}` }));
+      section.append(el('h3', { text: `S${g.season} · ${g.week <= 0 ? `Pre-season trial ${g.week + 2}` : `Week ${g.week}`}` }));
       for (const item of g.items) {
-        section.append(el('div', {
+        const row = el('div', {
           class: `nrl-news-item nrl-news-${item.kind}`,
-          text: item.text,
-        }));
+        }, item.from === 'coach' ? coachLine(item.text) : item.text);
+        if (item.screen) row.append(button('Contracts', () => bus.emit('ui:openScreen', { id: item.screen! })));
+        section.append(row);
       }
       list.append(section);
     }

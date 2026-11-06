@@ -137,7 +137,6 @@ describe('lazyOpener', () => {
 
 /** The stand-in DOM plus what dom.ts's screen slot needs: ids, head/body, classList, remove(). */
 class SlotNode extends StubNode {
-  classList = { add: (c: string) => { this.className = `${this.className} ${c}`.trim(); } };
   remove(): void { this.parentNode?.removeChild(this); }
   /** Also `.class` (the Guide marks its selected tab across `.nrl-btn`). */
   override querySelectorAll(sel: string): StubNode[] {

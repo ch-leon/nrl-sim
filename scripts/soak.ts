@@ -1,9 +1,11 @@
 // scripts/soak.ts — headless multi-season soak of the club/league systems.
 //
 //   npm run soak                         5 seasons × 20 seeds, idle + managed + idle Hard, plus old saves
+//   npm run soak -- --shard 1/7 --jobs 4   one partition of the same complete case set
 //   npm run soak -- --seasons 3 --seeds 5
 //   npm run soak -- --difficulties easy,normal,hard   idle + managed on each difficulty (#148)
 //   npm run soak -- --managed-only --difficulties easy,normal,hard   managed career guardrails
+//   npm run soak -- --pack uk               UK careers (old saves remain AU)
 //   npm run soak -- --json out.json      also write every run's samples to a file
 //   npm run soak -- --jobs 4             split the runs over 4 processes (same results, in order)
 //   npm run soak -- --live-rivals        rival rounds on the live sim too (N9.2's setting; several times slower),
@@ -27,6 +29,7 @@
 // fresh-game runs. The game plays those only in a week that is not
 // fast-forwarded, so the runs advance a week at a time like a player tapping
 // Advance Week, and in Node (no Worker) each round's seven matches play in place.
+import { preparePack } from '../src/content';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -34,6 +37,7 @@ import { join } from 'node:path';
 import { fieldedTable, levelWinRates, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 import { applyTuning } from '../src/match/league/tuning';
+import { shardCases } from '../src/qa/shard';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const opt = (name: string, dflt: number): number => {
@@ -46,7 +50,12 @@ const str = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : undefined;
 };
+const pack = str('pack') ?? 'au';
+if (pack !== 'au' && pack !== 'uk') throw new Error('--pack must be au or uk');
+await preparePack(pack);
 const jsonOut = str('json');
+const shard = str('shard');
+if (args.includes('--shard') && !shard) throw new Error('--shard requires i/n');
 // Without --difficulties: idle and managed on Normal plus idle on Hard (the original soak).
 const difficulties = str('difficulties')?.split(',').filter((d): d is Difficulty => DIFFICULTIES.includes(d as Difficulty));
 const liveRivals = args.includes('--live-rivals');
@@ -65,6 +74,7 @@ const childIn = str('child');
 if (childIn) {
   const out = str('out')!;
   const specs = JSON.parse(readFileSync(childIn, 'utf8')) as SoakOptions[];
+  for (const spec of specs) await preparePack(spec.pack ?? 'au');
   writeFileSync(out, JSON.stringify(specs.map((o) => runSoak(o))));
   process.exit(0);
 }
@@ -75,14 +85,17 @@ const specs: SoakOptions[] = [];
 for (let seed = 1; seed <= seeds; seed++) {
   if (difficulties) {
     for (const difficulty of difficulties) {
-      for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, difficulty, ...live });
+      for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, difficulty, ...live, pack });
     }
   } else {
-    for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, ...live });
-    if (!args.includes('--managed-only')) specs.push({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard', ...live });
+    for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, ...live, pack });
+    if (!args.includes('--managed-only')) specs.push({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard', ...live, pack });
   }
 }
-for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
+// Old saves have no pack id and remain AU. UK runs contain only UK careers.
+if (pack === 'au') for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
+const selectedSpecs = shardCases(specs, shard);
+if (shard) console.log(`Soak case shard ${shard}: ${selectedSpecs.length} of ${specs.length} unchanged cases.`);
 
 /** Play the runs over `jobs` child processes (round-robin), and return the results in run order. */
 async function runInJobs(all: SoakOptions[], jobs: number): Promise<SoakResult[]> {
@@ -106,8 +119,8 @@ async function runInJobs(all: SoakOptions[], jobs: number): Promise<SoakResult[]
   }
 }
 
-const jobs = Math.max(1, Math.min(opt('jobs', 1), specs.length));
-const results: SoakResult[] = jobs > 1 ? await runInJobs(specs, jobs) : specs.map((o) => runSoak(o));
+const jobs = Math.max(1, Math.min(opt('jobs', 1), selectedSpecs.length));
+const results: SoakResult[] = jobs > 1 ? await runInJobs(selectedSpecs, jobs) : selectedSpecs.map((o) => runSoak(o));
 
 const pad = (s: string | number, n: number): string => String(s).padStart(n);
 const signed = (n: number, digits = 1): string => `${n >= 0 ? '+' : ''}${n.toFixed(digits)}`;
@@ -234,7 +247,7 @@ if (liveRivals) {
 }
 
 if (jsonOut) {
-  writeFileSync(jsonOut, JSON.stringify({ seasons, seeds, liveRivals, results, summary }, null, 1));
+  writeFileSync(jsonOut, JSON.stringify({ seasons, seeds, liveRivals, ...(shard ? { shard } : {}), results, summary }, null, 1));
   console.log(`\nWrote ${jsonOut}`);
 }
 

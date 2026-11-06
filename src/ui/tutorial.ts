@@ -15,6 +15,8 @@
 // explained about Lineup, News, Finance and Contracts is a one-line hint the
 // first time each screen opens (HINTS, settings.hintsSeen). DECISION (Leon).
 
+import { coachLine } from './coachVoice';
+import { coachAddress } from './coachName';
 import { bus, type Events } from '../core/events';
 import { getState, setState, type GameState } from '../core/state';
 import { FACILITY_CATALOG } from '../data/facility';
@@ -75,7 +77,7 @@ const PADDOCK = FACILITY_CATALOG.trainingPaddock.name;
 export const STEPS: readonly TutorialStep[] = [
   {
     id: 'build',
-    text: `Tap ${PADDOCK} to build one.`,
+    get text() { return `${coachAddress(getState())}, tap ${PADDOCK} to build one.`; },
     anchor: `[data-screen-key="build"] [data-facility="trainingPaddock"], ${tab('build')}`,
     advanceOn: 'facility:placed',
     opens: 'build',
@@ -85,7 +87,7 @@ export const STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'place',
-    text: 'Tap a green spot, then Build here.',
+    text: 'Pick a green spot, then Build here.',
     anchor: `.nrl-placebar:not([hidden]), ${tab('build')}`,
     advanceOn: 'facility:placed',
     tap: 1,
@@ -93,7 +95,7 @@ export const STEPS: readonly TutorialStep[] = [
   {
     id: 'recruit',
     // The default sort is by rating, so the first enabled SIGN is the best player the club can afford.
-    text: 'Tap Sign on the best player you can afford.',
+    text: 'Tap Sign on the best player you can afford; leave enough for the bills.',
     anchor:
       `[data-screen-key="recruit"] .nrl-row:has(.nrl-row-action:not(:disabled)), ` +
       `[data-screen-key="recruit"] .nrl-row-action:not(:disabled), ${inSquad('recruit')}`,
@@ -104,7 +106,7 @@ export const STEPS: readonly TutorialStep[] = [
   },
   {
     id: 'advance',
-    text: 'Tap Play Week to play your first match.',
+    text: 'Tap Play Week; time for your first match.',
     anchor: '.nrl-hud-actions .nrl-btn',
     advanceOn: 'week:advanced',
     tap: 3,
@@ -120,14 +122,14 @@ export const TAP_COUNT = Math.max(...STEPS.map((s) => s.tap));
  * screen's nav key. They carry what the old tour's steps for these screens said.
  */
 export const HINTS: Readonly<Record<string, string>> = {
-  lineup: 'Lineup sets your nine, kicker, captain and game plan; you can change the plan at half-time.',
-  news: 'News keeps results and warnings; a decision shows here, on the grounds and as a red count on Play Week.',
-  finance: "Money in and out by line; the board's season goals are on Staff & Board.",
-  contracts: 'Deals by expiry: renew before a player walks, or sell him for a fee.',
+  lineup: 'Set your nine, kicker, captain and game plan in Lineup; you can change the plan at half-time.',
+  news: 'Keep an eye on News for results and warnings; decisions also show on the grounds and as a red count on Play Week.',
+  finance: "Check each line of money in and out here; the board's season goals are on Staff & Board.",
+  contracts: 'Watch the expiry dates; renew before a player walks, or sell him for a fee.',
 };
 
 /** The end of a completed run (#370): what the old wrap step said, as a club toast. */
-export const TUTORIAL_END_TEXT = "That's the loop. The Guide in Office explains the rest.";
+export const TUTORIAL_END_TEXT = "That is the weekly job done. The Guide in Office covers the rest.";
 
 // ── Pure logic (unit-tested; no DOM) ───────────────────────────────────────
 
@@ -326,7 +328,7 @@ export function endTutorial(completed = false): void {
   if (!s.settings.tutorialDone) {
     setState({ settings: { ...s.settings, tutorialDone: true } });
   }
-  if (completed) bus.emit('ui:notify', { text: TUTORIAL_END_TEXT, kind: 'info' });
+  if (completed) bus.emit('ui:notify', { text: TUTORIAL_END_TEXT, kind: 'info', from: 'coach' });
 }
 
 // ── Step lifecycle (DOM) ───────────────────────────────────────────────────
@@ -604,7 +606,7 @@ function renderBubble(
 ): HTMLElement {
   const wantsNext = step.advanceOn === 'next-button' || opts.forceNext || a.replay;
 
-  const body = el('div', { class: 'nrl-tutorial-text', text: step.text });
+  const body = coachLine(step.text, { class: 'nrl-tutorial-text' });
 
   // "1 of 3" (#370) at the start of the button row, so it costs the copy no room.
   const actions = el('div', { class: 'nrl-tutorial-actions' },
@@ -632,7 +634,7 @@ function renderBubble(
 
 /** The hint line for screen `key`: the text and a 44px ✕. */
 function hintLine(key: string, text: string): HTMLElement {
-  const line = el('div', { class: 'nrl-hint', attrs: { 'data-hint': key, role: 'note' } }, el('span', { class: 'nrl-hint-text', text }));
+  const line = el('div', { class: 'nrl-hint', attrs: { 'data-hint': key, role: 'note' } }, coachLine(text, { class: 'nrl-hint-text' }));
   const x = button('✕', () => line.remove(), { class: 'nrl-hint-x' });
   x.setAttribute('aria-label', 'Dismiss hint');
   line.append(x);

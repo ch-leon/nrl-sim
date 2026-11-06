@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/events.test.ts — random events deck (GitHub #75).
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -6,7 +7,7 @@ import {
 } from '../../src/systems/events';
 import { EVENT_CARDS, cardById, type EventCardDef, type EventEffect } from '../../src/data/events';
 import { initLeague, registerFixturesSystem, PLAYER_ID } from '../../src/systems/fixtures';
-import { createNewGame, getState, setState, type GameState, type PendingEvent } from '../../src/core/state';
+import { getState, setState, type GameState, type PendingEvent } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, withFastForward } from '../../src/core/time';
 import { makeRng } from '../../src/utils/rng';

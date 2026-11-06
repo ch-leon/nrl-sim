@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   weeklyWages, weeklyUpkeep, weeklyIncome, gateReceipts, homeGate, recentForm, tickContracts,
@@ -9,7 +10,7 @@ import { earnMoney, spendMoney } from '../../src/data/club';
 import { FACILITY_CATALOG, LEVEL_MULT, facilityUpkeep, upgradeCost } from '../../src/data/facility';
 import { renewalWage } from '../../src/systems/contracts';
 import {
-  createNewGame, getState, loadState,
+  getState, loadState,
   type Player, type PlacedFacility, type GameState, type Fixture,
 } from '../../src/core/state';
 import { bus } from '../../src/core/events';

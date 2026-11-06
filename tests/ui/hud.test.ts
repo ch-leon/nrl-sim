@@ -1,8 +1,9 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { fmtMoney, moneyTile, moneyTileLabel, runwayLevel, RUNWAY_LOW_WEEKS, RUNWAY_SHORT_WEEKS, IN_DEBT_CLASS, IN_DEBT_TEXT, ADVANCE_MENU, HELD_WEEK_TEXT, MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, MATCH_STILL_ON_TEXT, RESUME_MATCH_LABEL, SKIPPING_EXIT_TEXT, weekStillFinishing, advanceProgressLabel, clubAdvanceChoice, clubMenuChoice, nextMatchChip, ordinal, decisionsBadgeLabel, placeName, boardChip, fmtMoneyShort, BOARD_RISK_CLASS } from '../../src/ui/hud';
 import type { GameState, Objective } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { initLeague } from '../../src/systems/fixtures';
 import { bus } from '../../src/core/events';
 import { CSS } from '../../src/ui/dom';
@@ -266,5 +267,39 @@ describe('the board chip (#368)', () => {
     expect(CSS).toContain('.nrl-board-chip');
     expect(CSS).toMatch(/\.nrl-board-chip\.nrl-hud-board-off \.nrl-decisions-chip-count \{[^}]*var\(--nrl-neg\)/);
     expect(BOARD_RISK_CLASS['off-track']).toBe('nrl-hud-board-off');
+  });
+});
+
+import { afterEach, vi } from 'vitest';
+import { createHud } from '../../src/ui/hud';
+import { createNav } from '../../src/ui/nav';
+import { stubDocument, StubNode } from './stubDom';
+import { screenLockReason } from '../../src/systems/unlocks';
+import { tickContracts } from '../../src/systems/economy';
+
+describe('essential routes bypass Office locks (#482)', () => {
+  beforeEach(() => { stubDocument(); bus.clear(); createNewGame('Locked', 2); });
+  afterEach(() => vi.unstubAllGlobals());
+  it('money and the visible board chip still open Finance and Staff; an early contract warning opens Contracts', () => {
+    setState({ money: -1, objectives: [{ id: 'solvent', kind: 'solvent', text: 'Stay solvent', target: 0, status: 'pending' }] });
+    const nav = createNav();
+    const finance = vi.fn(), staff = vi.fn(), contracts = vi.fn();
+    for (const [id, open] of [['finance', finance], ['staff', staff], ['contracts', contracts]] as const) {
+      nav.registerScreen(id, id, open, { more: true, locked: () => screenLockReason(getState(), id) });
+      expect(screenLockReason(getState(), id)).not.toBeNull();
+    }
+    const hud = createHud({ onMoney: () => nav.open('finance'), onBoard: () => nav.open('staff') });
+    const body = document.body as unknown as StubNode;
+    body.querySelector('.nrl-dock-statusbox')!.click();
+    expect(finance).toHaveBeenCalledOnce();
+    const board = body.querySelector('[data-hud="board"]')!;
+    expect(board.hidden).toBe(false); board.click(); expect(staff).toHaveBeenCalledOnce();
+    bus.on('ui:openScreen', ({ id }) => nav.open(id));
+    let action: (() => void) | undefined;
+    bus.on('ui:notify', (n) => { if (n.action?.label === 'Contracts') action = n.action.run; });
+    setState({ squad: getState().squad.map((p, i) => i === 0 ? { ...p, contractWeeks: 9 } : p) });
+    tickContracts(getState());
+    expect(action).toBeDefined(); action!(); expect(contracts).toHaveBeenCalledOnce();
+    hud.destroy(); nav.destroy();
   });
 });
