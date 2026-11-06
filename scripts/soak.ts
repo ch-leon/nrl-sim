@@ -34,7 +34,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fieldedTable, levelWinRates, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
+import { attackVsDefence, fieldedTable, levelWinRates, shapeTable, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 import { applyTuning } from '../src/match/league/tuning';
 import { shardCases } from '../src/qa/shard';
@@ -243,6 +243,18 @@ if (liveRivals) {
     for (const row of fieldedTable(games, key)) {
       console.log([pad(row.style, 11), pad(row.sides, 6), pad(row.shortfall.toFixed(2), 6), pad(row.level, 6), pad(pct(row.levelScore), 6)].join(' '));
     }
+  }
+  console.log(`\nThe fielded nine's shape by attack (#322): bSpd = backs' Speed − the nine's, pStr = pack Strength − the nine's, then the nine's mean of each stat and its mean age.`);
+  console.log(`${pad('attack', 11)} ${pad('sides', 6)} ${['bSpd', 'pStr', 'spd', 'str', 'skl', 'iq', 'sta', 'age'].map((h) => pad(h, 6)).join(' ')}`);
+  for (const row of shapeTable(games, 'attack')) {
+    const sh = row.shape;
+    console.log([pad(row.style, 11), pad(row.sides, 6), ...[sh.backsSpeed, sh.packStrength, sh.speed, sh.strength, sh.skill, sh.footyIQ, sh.stamina, sh.age].map((n) => pad(n.toFixed(1), 6))].join(' '));
+  }
+  console.log(`\nExpansive by the defence it faced (#322): against strength (score − expect, se) and at a level rating (clubs within ${STYLE_GAP_BAND} points).`);
+  console.log(`${pad('defence', 11)} ${pad('sides', 6)} ${pad('score', 6)} ${pad('expect', 6)} ${pad('diff', 6)} ${pad('se', 5)} ${pad('level', 6)} ${pad('score', 6)}`);
+  for (const row of attackVsDefence(games, 'expansive')) {
+    const d = row.score - row.expected;
+    console.log([pad(row.defence, 11), pad(row.sides, 6), pad(pct(row.score), 6), pad(pct(row.expected), 6), pad(`${signed(d * 100)}${Math.abs(d) > 2 * row.se ? '*' : ''}`, 6), pad((row.se * 100).toFixed(1), 5), pad(row.level, 6), pad(pct(row.levelScore), 6)].join(' '));
   }
 }
 

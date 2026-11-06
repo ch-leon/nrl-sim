@@ -30,7 +30,7 @@ import { registerRivalsSystem, RIVAL_SQUAD_MIN } from '../systems/rivals';
 import { STRENGTH_MAX, STRENGTH_MIN } from '../systems/league';
 import { BENCH } from '../match/league/bench';
 import { onRivalPlanChanges, rivalSheet } from '../systems/rivalRound';
-import type { TeamTactics } from '../match/league/presets';
+import { BACKS, PACK, type StyleEntry, type TeamTactics } from '../match/league/presets';
 import { runMatch } from '../match/league/match';
 import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
@@ -194,6 +194,44 @@ export interface StyleGame {
    */
   homeFielded?: number;
   awayFielded?: number;
+  /** Each side's fielded nine by shape (#322 diagnostic). Absent on games recorded before it. */
+  homeShape?: NineShape;
+  awayShape?: NineShape;
+}
+
+/**
+ * What a fielded nine looks like (#322): the backs' Speed over the nine's, the
+ * pack's Strength over the nine's, the nine's mean of each stat, and its mean age.
+ * Read beside the style so a label that picks weak (or old) squads shows up.
+ */
+export interface NineShape {
+  backsSpeed: number;
+  packStrength: number;
+  speed: number;
+  strength: number;
+  skill: number;
+  footyIQ: number;
+  stamina: number;
+  age: number;
+}
+
+const SHAPE_KEYS: readonly (keyof NineShape)[] = ['backsSpeed', 'packStrength', 'speed', 'strength', 'skill', 'footyIQ', 'stamina', 'age'];
+
+/** A nine's shape from its roster entries; ages by id from the squad (0 when none match). Pure. */
+export function nineShape(roster: readonly (StyleEntry & { id?: string })[], ages: ReadonlyMap<string, number> = new Map()): NineShape {
+  const men = roster.filter((e) => e.stats);
+  const avg = (xs: readonly number[]): number => xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : 0;
+  const stat = (k: 'speed' | 'strength' | 'skill' | 'footyIQ' | 'stamina', roles?: readonly string[]): number =>
+    avg(men.filter((e) => !roles || roles.includes(e.position)).map((e) => e.stats![k]));
+  const speed = stat('speed');
+  const strength = stat('strength');
+  const backs = men.some((e) => BACKS.includes(e.position)) ? stat('speed', BACKS) - speed : 0;
+  const pack = men.some((e) => PACK.includes(e.position)) ? stat('strength', PACK) - strength : 0;
+  const known = men.flatMap((e) => {
+    const age = e.id !== undefined ? ages.get(e.id) : undefined;
+    return age === undefined ? [] : [age];
+  });
+  return { backsSpeed: backs, packStrength: pack, speed, strength, skill: stat('skill'), footyIQ: stat('footyIQ'), stamina: stat('stamina'), age: avg(known) };
 }
 
 export interface SoakResult {
@@ -771,14 +809,14 @@ export function runSoak(opts: SoakOptions): SoakResult {
 
 interface RivalStylesNow {
   /** Each rival's style and strength as the week begins. */
-  clubs: Map<string, { tactics: TeamTactics; strength: number; fielded: number }>;
+  clubs: Map<string, { tactics: TeamTactics; strength: number; fielded: number; shape: NineShape }>;
   /** The rival-v-rival fixtures still to be played, by index. */
   open: number[];
 }
 
 /** The rivals' styles and the unplayed rival-v-rival fixtures, before a week is played (#249). */
 function rivalStylesNow(s: GameState): RivalStylesNow {
-  const clubs = new Map<string, { tactics: TeamTactics; strength: number; fielded: number }>();
+  const clubs = new Map<string, { tactics: TeamTactics; strength: number; fielded: number; shape: NineShape }>();
   for (const c of s.league.clubs) {
     if (c.id === s.clubId) continue;
     const sheet = rivalSheet(c);
@@ -787,6 +825,7 @@ function rivalStylesNow(s: GameState): RivalStylesNow {
       tactics: sheet.tactics ?? { attack: 'balanced', defence: 'slide' },
       strength: c.strength,
       fielded: nine.length ? nine.reduce((t, x) => t + x, 0) / nine.length : c.strength,
+      shape: nineShape(sheet.roster ?? [], new Map((c.squad ?? []).map((p) => [p.id, p.age] as const))),
     });
   }
   const open: number[] = [];
@@ -810,6 +849,7 @@ function newStyleGames(was: RivalStylesNow, s: GameState, planChanges: ReadonlyM
       homeScore: h > a ? 1 : h === a ? 0.5 : 0,
       switches: planChanges.get(`${f.round}:${f.homeId}`) ?? 0,
       homeFielded: home.fielded, awayFielded: away.fielded,
+      homeShape: home.shape, awayShape: away.shape,
     });
   }
   return out;
@@ -853,22 +893,7 @@ export const STYLE_GAP_MAX = 10;
  * error is the binomial one on the games; beyond two of them is beyond luck.
  */
 export function styleTable(games: readonly StyleGame[], key: keyof TeamTactics): StyleRow[] {
-  const band = (gap: number): number => Math.max(-STYLE_GAP_MAX, Math.min(STYLE_GAP_MAX, Math.round(gap / STYLE_GAP_BAND) * STYLE_GAP_BAND));
-  const sides = games.flatMap((g) => [
-    { style: g.home[key], band: band(g.homeStrength - g.awayStrength), score: g.homeScore },
-    { style: g.away[key], band: band(g.awayStrength - g.homeStrength), score: 1 - g.homeScore },
-  ]);
-  const byBand = new Map<number, { n: number; sum: number }>();
-  for (const x of sides) {
-    const b = byBand.get(x.band) ?? { n: 0, sum: 0 };
-    b.n++;
-    b.sum += x.score;
-    byBand.set(x.band, b);
-  }
-  const expect = (b: number): number => {
-    const t = byBand.get(b)!;
-    return t.sum / t.n;
-  };
+  const { sides, expect } = bandedSides(games, key);
   const byStyle = new Map<string, { n: number; score: number; expected: number }>();
   for (const x of sides) {
     const t = byStyle.get(x.style) ?? { n: 0, score: 0, expected: 0 };
@@ -883,6 +908,83 @@ export function styleTable(games: readonly StyleGame[], key: keyof TeamTactics):
       return { style, games: t.n, score, expected: t.expected / t.n, se: Math.sqrt(Math.max(score * (1 - score), 0.01) / t.n) };
     })
     .sort((a, b) => b.games - a.games);
+}
+
+/** Both sides of every game with their strength band, and the mean score of each band (#249). */
+function bandedSides(games: readonly StyleGame[], key: keyof TeamTactics) {
+  const band = (gap: number): number => Math.max(-STYLE_GAP_MAX, Math.min(STYLE_GAP_MAX, Math.round(gap / STYLE_GAP_BAND) * STYLE_GAP_BAND));
+  const sides = games.flatMap((g) => [
+    { style: g.home[key], against: g.away, gap: g.homeStrength - g.awayStrength, band: band(g.homeStrength - g.awayStrength), score: g.homeScore, shape: g.homeShape },
+    { style: g.away[key], against: g.home, gap: g.awayStrength - g.homeStrength, band: band(g.awayStrength - g.homeStrength), score: 1 - g.homeScore, shape: g.awayShape },
+  ]);
+  const byBand = new Map<number, { n: number; sum: number }>();
+  for (const x of sides) {
+    const b = byBand.get(x.band) ?? { n: 0, sum: 0 };
+    b.n++;
+    b.sum += x.score;
+    byBand.set(x.band, b);
+  }
+  const expect = (b: number): number => {
+    const t = byBand.get(b)!;
+    return t.sum / t.n;
+  };
+  return { sides, expect };
+}
+
+/** One style's mean nine shape over the sides that played it (#322 diagnostic). */
+export interface ShapeRow {
+  style: string;
+  sides: number;
+  shape: NineShape;
+}
+
+/** Each style's mean fielded-nine shape. Sides recorded without a shape are skipped. */
+export function shapeTable(games: readonly StyleGame[], key: keyof TeamTactics): ShapeRow[] {
+  const by = new Map<string, { n: number; sum: NineShape }>();
+  for (const x of bandedSides(games, key).sides) {
+    if (!x.shape) continue;
+    const t = by.get(x.style) ?? { n: 0, sum: Object.fromEntries(SHAPE_KEYS.map((k) => [k, 0])) as unknown as NineShape };
+    t.n++;
+    for (const k of SHAPE_KEYS) t.sum[k] += x.shape[k];
+    by.set(x.style, t);
+  }
+  return [...by].map(([style, t]) => ({ style, sides: t.n,
+    shape: Object.fromEntries(SHAPE_KEYS.map((k) => [k, t.sum[k] / t.n])) as unknown as NineShape }))
+    .sort((a, b) => b.sides - a.sides);
+}
+
+/** One attack's record against one opposing defence: level rating and against strength (#322 diagnostic). */
+export interface VsDefenceRow {
+  defence: string;
+  sides: number;
+  score: number;
+  expected: number;
+  se: number;
+  level: number;
+  levelScore: number;
+}
+
+/** An attack style's score split by the defence it faced, both season measures (#322). */
+export function attackVsDefence(games: readonly StyleGame[], attack: string, within = STYLE_GAP_BAND): VsDefenceRow[] {
+  const { sides, expect } = bandedSides(games, 'attack');
+  const by = new Map<string, { n: number; score: number; expected: number; level: number; levelScore: number }>();
+  for (const x of sides) {
+    if (x.style !== attack) continue;
+    const t = by.get(x.against.defence) ?? { n: 0, score: 0, expected: 0, level: 0, levelScore: 0 };
+    t.n++;
+    t.score += x.score;
+    t.expected += expect(x.band);
+    if (Math.abs(x.gap) <= within) {
+      t.level++;
+      t.levelScore += x.score;
+    }
+    by.set(x.against.defence, t);
+  }
+  return [...by].map(([defence, t]) => {
+    const score = t.score / t.n;
+    return { defence, sides: t.n, score, expected: t.expected / t.n, se: Math.sqrt(Math.max(score * (1 - score), 0.01) / t.n),
+      level: t.level, levelScore: t.level ? t.levelScore / t.level : 0.5 };
+  }).sort((a, b) => b.sides - a.sides);
 }
 
 /** Games whose clubs began the week within this many rating points: a level rating (N14.2). */
