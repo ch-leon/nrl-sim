@@ -20,6 +20,8 @@ export const COUNTERS = {
     offloadBase: 0,
     commitM: 10,
     commitFit: 0.5,
+    // #322: 1 = the Expansive edge bust reads the carrier's Speed over his tackler's, not his Speed alone.
+    expansiveRelative: 0,
   },
   rush: {
     on: 1,
@@ -32,6 +34,10 @@ export const COUNTERS = {
     on: 1,
     expansive: 0.08,
     expansiveFit: 0.2,
+    // #322: 1 = the Expansive cell's fit response grows only when the Slide line out-fits the backs.
+    expansiveSigned: 0,
+    // #322 variant: 1 = scale the Expansive cell by defence ÷ attack fit instead of their product.
+    expansiveByDefence: 0,
     kickChase: 0.4,
     kickChaseFit: 0.7,
     tight: 0.025,
@@ -57,10 +63,16 @@ export function fitEdge(fit: number): number {
   return COUNTERS.fit.on === 1 ? (fit - 1) * COUNTERS.fit.edge : 0;
 }
 
-/** Calibrate unequal-fit cells without moving the already-tuned neutral matrix. */
-function matchupStrength(cell: number, attackFit: number, defenceFit: number, response = 0): number {
+/**
+ * Calibrate unequal-fit cells without moving the already-tuned neutral matrix.
+ * `signed` grows the response only when the defence out-fits the attack (#322);
+ * `byDefence` scales the cell by defence ÷ attack fit instead of their product.
+ */
+function matchupStrength(cell: number, attackFit: number, defenceFit: number, response = 0, signed = false, byDefence = false): number {
   const fitted = COUNTERS.fit.on === 1 ? COUNTERS.fit.counterResponse : 0;
-  return cell * attackFit * defenceFit * Math.max(0, 1 + (response + fitted) * Math.abs(attackFit - defenceFit));
+  const gap = signed ? Math.max(0, defenceFit - attackFit) : Math.abs(attackFit - defenceFit);
+  const scale = byDefence ? (attackFit > 0 ? defenceFit / attackFit : 0) : attackFit * defenceFit;
+  return cell * scale * Math.max(0, 1 + (response + fitted) * gap);
 }
 
 /** Cell strength × both starting-sheet fits. Balanced and other defences have no Slide effects. */
@@ -70,7 +82,9 @@ export function slideCounter(attack: AttackPreset, defence: DefencePreset, attac
     : attack === 'all-out' ? COUNTERS.slide.allOut : COUNTERS.slide.expansive;
   const response = attack === 'expansive' ? COUNTERS.slide.expansiveFit
     : attack === 'kick-chase' ? COUNTERS.slide.kickChaseFit : 0;
-  return matchupStrength(cell, attackFit, defenceFit, response);
+  const expansive = attack === 'expansive';
+  return matchupStrength(cell, attackFit, defenceFit, response,
+    expansive && COUNTERS.slide.expansiveSigned === 1, expansive && COUNTERS.slide.expansiveByDefence === 1);
 }
 
 /** Both fits scale Slide’s recovery after an All-out offload, using the existing window and roll. */

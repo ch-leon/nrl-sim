@@ -159,3 +159,28 @@ The report Player of the Match row stays beside the fixed exit while outcome-dep
 Reproduce with the six committed `balance/plans/counters-{enabled,full-fit,fit-enabled,strong-pack,yardstick,round-robin}.json` plans and `npm run balance -- --plan <path> --jobs 4`. Check saved output with `npx vite-node scripts/check-counters.ts -- <kind> <run-dir>`. Run `npm run soak -- --difficulties easy,normal,hard --jobs 4`; `--shard i/7` partitions the same case list, and `scripts/merge-soak.py --out <master> <all seven JSONs>` pools it before `scripts/check-counters-soak.py <main.json> <master>`.
 
 [Live build after merge](https://ch-leon.github.io/nrl-sim/): try Tight with a strong pack against Slide, then change plan at half-time. A separate checker on a different tool reviews this PR before merge.
+
+## Speed on the edge (#322, 6 Nov)
+
+Plan: issue #322, 6 Nov comment. Season measure: `npm run soak -- --live-rivals --seasons 3 --seeds 10 --difficulties normal --jobs 7` (about 11,000 rival-v-rival games; 10 seeds, not the plan's 20, for run time).
+
+**Diagnostic first (no sim change).** The soak now prints each attack's fielded-nine shape and Expansive split by the defence it faced. Expansive nines are not weaker or older than the rest: stat means 53.5–54, age 24.9, the same as Balanced and Grind. Their backs are only +2.7 Speed over their own nine. The gap sits against Rush (−13.7 against strength) and Slide (−8.1); against Compressed Expansive is even (+1.1). So the gap is mostly not about Speed, and the plan's Slide-only lever B cannot carry it.
+
+**Season soaks** (against strength, diff ± SE; level = wins ÷ games, clubs within 2):
+
+| Run | Expansive | level | v Slide | v Rush | v Compressed | Tight | Balanced | Kick-chase | All-out | Rush D | Compressed D |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Before (main) | −8.4 ± 1.0 | 41% | −8.1 | −13.7 | +1.1 | +2.6 | −2.5 | +3.4 | +4.3 | +3.0 | −2.9 |
+| A 0.012 wide one-on-one + B + C | −7.4 ± 1.1 | 39% | −6.6 | −12.0 | −0.1 | +3.0 | −2.9 | +3.7 | +2.6 | +3.5 | −2.7 |
+| A 0.012 any numbers + B + C | −6.6 ± 1.0 | 43% | −4.8 | −11.9 | −1.8 | +4.2 | −3.2 | +1.5 | +2.7 | +3.7 | −3.1 |
+| A 0.02 any numbers + B + C | −5.9 ± 1.0 | 44% | −4.6 | −9.3 | −3.1 | +3.5 | −3.8 | +2.9 | +4.0 | +3.3 | −2.0 |
+| B + C only (not shipped) | −8.4 ± 1.1 | 41% | −6.9 | −14.2 | −3.9 | +3.7 | −2.5 | +1.8 | +3.6 | +4.0 | −1.7 |
+
+**Why the edge race (A) ships off.** In the harness (`balance/plans/expansive-edge.json` and a guard run of A 0.02 any numbers), it moves the strength gap: 70 v 50 77% → 83% over 300 matches. It also pays fast-backs Balanced (49.2% → 57.3% share) more than fast-backs Expansive (46.0% → 51.5%), which is the must-pick risk. Fast backs on both sides stay near where they were (43.0% → 42.2%). Weaker settings barely move the season (−7.4).
+
+**Why B and C ship off too.** B (`counters.slide.expansiveSigned`) and C (`counters.compressed.expansiveRelative`) left the season measure where it was (−8.4 → −8.4, 41% → 41%), while Tight's level row (+3.8 → +4.7) and Rush's against-strength row (+3.0 → +4.0) drifted outside one SE. A change to gameplay with no measured benefit does not ship (checker, #514). C is also not neutral away from Speed 60: at flat 70 v 70 the old Speed / 60 term paid 1.17× and the relative one 1.0×, so Expansive v Compressed changes at every rating but 60.
+
+**What ships.** The soak diagnostic (nine shape and Expansive by defence) and the named knobs, every one off or at its old value: `race.*` (on 0), `contest.stepSlope` 200, `counters.slide.expansiveSigned` 0, `counters.slide.expansiveByDefence` 0, `counters.compressed.expansiveRelative` 0. No match changes: the season rng-stream pin, both match pins and the dormant shares hold untouched. The flat 60 cells play bit for bit the same with every lever on (`tests/match/balance/edgeRace.test.ts`), so a later pass can switch any of them on by name.
+
+**Still off.** Expansive stays −8.4 against strength and 41% level, mostly against Rush. The next pass is a Rush matchup question (why a rushing line shuts out the wide game; `rushBroken`'s Strength-weighted carry), not Speed.
+
