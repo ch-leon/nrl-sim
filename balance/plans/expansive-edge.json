@@ -1,0 +1,191 @@
+{
+  "name": "expansive edge",
+  "description": "#322 (plan: issue comment 6 Nov): do the relative Speed levers (race.* the edge race, the signed Slide v Expansive response, the relative Compressed edge term) pay a fast-backs Expansive side against a flat Slide line, while fast backs on both sides land near even, a fast-backs Balanced side gains less, and the even match and 70 v 50 hold? (The flat presets are zero by construction; the counters-enabled acceptance run proves it.) Rival rows draw squads whose nine reads as the style, break rule on both sides.",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "seeds": 100,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "fast-backs expansive v flat slide",
+      "seeds": 150,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    },
+    {
+      "name": "fast-backs expansive v fast-backs slide",
+      "seeds": 100,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    },
+    {
+      "name": "fast-backs balanced v flat slide",
+      "seeds": 150,
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "attack": "balanced"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    },
+    {
+      "name": "70 v 50",
+      "track": "home",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      },
+      "seeds": 100
+    },
+    {
+      "name": "expansive rival v level rival",
+      "seeds": 150,
+      "track": "home",
+      "bothWays": true,
+      "breakRule": [
+        "home",
+        "away"
+      ],
+      "home": {
+        "squad": "rival",
+        "style": "expansive"
+      },
+      "away": {
+        "squad": "rival"
+      }
+    },
+    {
+      "name": "fliers v stayers",
+      "home": {
+        "rating": 60,
+        "stats": {
+          "speed": 85,
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "speed": 65,
+          "stamina": 80
+        }
+      },
+      "seeds": 50
+    }
+  ],
+  "variants": [
+    {
+      "name": "B+C only",
+      "tuning": {
+        "counters.slide.expansiveSigned": 1,
+        "counters.compressed.expansiveRelative": 1
+      }
+    },
+    {
+      "name": "A 0.004",
+      "tuning": {
+        "race.on": 1,
+        "race.perPoint": 0.004,
+        "race.cap": 0.12,
+        "counters.slide.expansiveSigned": 1,
+        "counters.compressed.expansiveRelative": 1
+      }
+    },
+    {
+      "name": "A 0.008",
+      "tuning": {
+        "race.on": 1,
+        "race.perPoint": 0.008,
+        "race.cap": 0.12,
+        "counters.slide.expansiveSigned": 1,
+        "counters.compressed.expansiveRelative": 1
+      }
+    },
+    {
+      "name": "A 0.012",
+      "tuning": {
+        "race.on": 1,
+        "race.perPoint": 0.012,
+        "race.cap": 0.12,
+        "counters.slide.expansiveSigned": 1,
+        "counters.compressed.expansiveRelative": 1
+      }
+    },
+    {
+      "name": "A 0.008 any back",
+      "tuning": {
+        "race.on": 1,
+        "race.perPoint": 0.008,
+        "race.cap": 0.12,
+        "race.wide": 0,
+        "counters.slide.expansiveSigned": 1,
+        "counters.compressed.expansiveRelative": 1
+      }
+    }
+  ]
+}
