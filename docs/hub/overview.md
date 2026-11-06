@@ -18,6 +18,8 @@ premium game with a free demo and a one-off unlock
 ## Play it
 
 - **Live build:** https://ch-leon.github.io/nrl-sim/ (deployed from `main` on every merge).
+  Before launch it moves to Firebase Hosting on our own domain, and the repo goes
+  private ([issue #448](https://github.com/ch-leon/nrl-sim/issues/448)).
 - **How Leon plays it:** installed as a Home Screen web app on iPhone. The menus work
   held upright, with a 5-tab bar along the bottom; the match and the grounds turn
   landscape ([PR](https://github.com/ch-leon/nrl-sim/pull/436)).
