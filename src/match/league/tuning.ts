@@ -7,7 +7,7 @@
 // — one experiment at a time, never in the game.
 import { COUNTERS } from './counters';
 import { FIT } from './fit';
-import { BASE, MOMENTUM } from './contest';
+import { BASE, MOMENTUM, RACE } from './contest';
 import { PACE } from '../core/body';
 import { TOUCH } from './touch';
 import { PENALTY } from './penalties';
@@ -56,6 +56,7 @@ export const KNOBS = {
   live: LIVE,
   contest: BASE,
   momentum: MOMENTUM,
+  race: RACE,
   fatigue: FATIGUE,
   gas: GAS,
   wrestle: WRESTLE,

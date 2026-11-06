@@ -3,7 +3,7 @@ import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_Y, clampToGround, inGoal } from
 import { PASS_SPEED, passFlight } from '../../core/ball';
 import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, dot, scale, sub, type Vec } from '../../core/vec';
-import { BASE, compressedContact, interceptChance, resolveContest, type ContestMods } from '../contest';
+import { BASE, RACE, compressedContact, edgeRace, interceptChance, resolveContest, type ContestMods } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
 import { MAX_LAT_M, pickReceiver } from '../tactics';
 import { EDGE_COST, FINISHER_M, announce, contestTraits, interceptTraits } from '../traits';
@@ -17,7 +17,7 @@ import { CALLS } from '../calls';
 import { injuryChance, lostInContactChance } from '../weather';
 import { TOUCH } from '../touch';
 import { BIN } from '../sinbin';
-import { derivedRatings } from '../fit';
+import { FIT, derivedRatings } from '../fit';
 import { COUNTERS, allOutRecoveryTicks, compressedCommitReach, rushBroken } from '../counters';
 import { BACKS, PACK } from '../presets';
 import { LIVE, runOn } from './knobs';
@@ -114,8 +114,9 @@ export abstract class LiveContact extends LivePenalties {
     // A defence a man short (#71) is stretched: easier to bust.
     tr.mods.broken = (tr.mods.broken ?? 0) + broken + (this.side(t.side).length < PLAYERS ? BIN.shortBroken : 0);
     tr.mods.edge = this.contestFitEdge(c.side, t.side);
+    this.applyEdgeRace(c, t, sit.defenders, tr.mods);
     this.applySlideContact(c, tr.mods, sit.support);
-    this.applyCompressedContact(c, committed, tr.mods, sit.support);
+    this.applyCompressedContact(c, t, committed, tr.mods, sit.support);
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
     // Contact costs both men legs, whatever happens.
@@ -236,8 +237,23 @@ export abstract class LiveContact extends LivePenalties {
     return this.tactics[side].attack === 'all-out' ? this.rushEffect(side) : 0;
   }
 
+  /**
+   * The edge race (#322): an outside back carrying wide, one-on-one, busts and
+   * fends more the more Speed he has over the man tackling him (less when the
+   * tackler is the quicker). Zero at equal Speed; no roll of its own.
+   */
+  protected applyEdgeRace(c: Player, t: Player, defenders: number, mods: ContestMods): void {
+    if (RACE.on !== 1 || defenders !== 1) return;
+    if (RACE.backsOnly === 1 && !BACKS.includes(ROLES[c.slot]!.name)) return;
+    if (RACE.wide === 1 && Math.abs(c.body.pos.y - MID_Y) <= MAX_LAT_M) return;
+    const race = edgeRace(c.stats.speed, t.stats.speed);
+    if (race.broken === 0) return;
+    mods.broken = (mods.broken ?? 0) + race.broken;
+    mods.fend = (mods.fend ?? 0) + race.fend;
+  }
+
   /** Middle gang tackles read the committed men's Contact D; edge backs exploit the overlap. */
-  protected applyCompressedContact(c: Player, committed: readonly Player[], mods: ContestMods, support: boolean): void {
+  protected applyCompressedContact(c: Player, t: Player, committed: readonly Player[], mods: ContestMods, support: boolean): void {
     const effect = this.compressedEffect(c.side);
     if (effect <= 0) return;
     const middle = Math.abs(c.body.pos.y - MID_Y) <= MAX_LAT_M;
@@ -250,8 +266,11 @@ export abstract class LiveContact extends LivePenalties {
       mods.broken = (mods.broken ?? 0) + squeeze.broken!;
       if (support) mods.offload = (mods.offload ?? 0) + squeeze.offload!;
     } else if (this.tactics[c.side].attack === 'expansive' && !middle && BACKS.includes(ROLES[c.slot]!.name)) {
-      // Faster outside backs turn the missing edge defender into a break, on the existing roll.
-      mods.broken = (mods.broken ?? 0) + effect * c.stats.speed / 60;
+      // Faster outside backs turn the missing edge defender into a break, on the existing roll:
+      // by his Speed (#465), or by his Speed over his tackler's (#322, `expansiveRelative`).
+      const pace = COUNTERS.compressed.expansiveRelative === 1
+        ? Math.max(0, 1 + (c.stats.speed - t.stats.speed) / FIT.leagueAverage) : c.stats.speed / 60;
+      mods.broken = (mods.broken ?? 0) + effect * pace;
     }
   }
 

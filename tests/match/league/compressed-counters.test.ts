@@ -11,18 +11,22 @@ function tuned<T>(on: number, fn: () => T): T {
     'counters.fit.on': 1, 'counters.slide.on': 1, 'counters.rush.on': 1 });
   try { return fn(); } finally { restore(); }
 }
+function tuned2<T>(over: Record<string, number>, fn: () => T): T {
+  const restore = applyTuning(over);
+  try { return fn(); } finally { restore(); }
+}
 class CompressedSim extends LiveSim {
   constructor(attack: AttackPreset = 'grind', defence: DefencePreset = 'compressed') {
     super(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60, tactics: { defence } }), 1);
   }
   base() { this.attacking = 'home'; return this.defPlan(); }
   fits(a: number, d: number) { this.planFit.home.attack = a; this.planFit.away.defence = d; return this; }
-  contact(slot = 7, y = 34, contactD = 60, speed = 60, support = true) {
+  contact(slot = 7, y = 34, contactD = 60, speed = 60, support = true, tacklerSpeed = 60) {
     const c = this.players[slot]!; c.body.pos = { x: 50, y }; c.stats.speed = speed;
-    const t = this.players[16]!; t.body.pos = { x: 51, y };
+    const t = this.players[16]!; t.body.pos = { x: 51, y }; t.stats.speed = tacklerSpeed;
     t.stats.strength = contactD; t.stats.footyIQ = contactD;
     const mods: ContestMods = {};
-    this.applyCompressedContact(c, [t], mods, support);
+    this.applyCompressedContact(c, t, [t], mods, support);
     return mods;
   }
   commits(y = 34, far = false) {
@@ -107,6 +111,15 @@ describe('Compressed counters', () => {
     for (const attack of ['balanced', 'kick-chase', 'all-out'] as const) {
       expect(tuned(1, () => new CompressedSim(attack).targets())).toEqual(tuned(0, () => new CompressedSim(attack).targets()));
     }
+  });
+  it('the relative edge term (#322) reads his Speed over his tackler\'s, and is unchanged at level Speed', () => {
+    const at = (relative: number, speed: number, tackler: number) =>
+      tuned(1, () => tuned2({ 'counters.compressed.expansiveRelative': relative }, () => new CompressedSim('expansive').contact(1, 5, 60, speed, true, tackler).broken!));
+    expect(at(1, 60, 60)).toBeCloseTo(at(0, 60, 60));
+    expect(at(1, 72, 72)).toBeCloseTo(at(0, 60, 60)); // fast v fast is level
+    expect(at(0, 72, 72)).toBeGreaterThan(at(0, 60, 60)); // where the absolute term paid him
+    expect(at(1, 72, 60)).toBeGreaterThan(at(1, 60, 60));
+    expect(at(1, 60, 72)).toBeLessThan(at(1, 60, 60));
   });
   it('changes contact on the existing roll without adding a draw', () => {
     const off = tuned(0, () => new CompressedSim().resolve(0.099));
