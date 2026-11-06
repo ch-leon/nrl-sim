@@ -159,6 +159,8 @@ function callWhen(call: CoachCall): string {
     case 'kickoff-short':
     case 'kickoff-long':
       return 'At your kick-offs';
+    case 'set-play':
+      return 'From the play-the-ball or a tap, as each play says';
   }
 }
 
@@ -183,6 +185,7 @@ function callDoes(call: CoachCall): string {
     case 'tap-go': return 'Overrule your captain: tap it and run.';
     case 'kickoff-short': return 'Short and high: your chasers try to win it back.';
     case 'kickoff-long': return 'Deep for the in-goal to pin them in (it can go dead).';
+    case 'set-play': return 'Run one of the plays you took into the match.';
   }
 }
 

@@ -164,7 +164,8 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
   });
   it('M6: every refusal the sim gives has a short caption', () => {
     const live = readFileSync('src/match/league/live.ts', 'utf8');
-    const body = live.slice(live.indexOf('callRefusal(side: Side, call: CoachCall)'));
+    // A set play (#326) names its play: its refusals are the tray's (phase 3), not a chip's.
+    const body = live.slice(live.indexOf('callRefusal(side: Side, call: CoachCall, play?: PlayId)'));
     const reasons = [...body.slice(0, body.indexOf('\n  }\n')).matchAll(/return '([^']+)'/g)].map((m) => m[1]!);
     expect(reasons.length).toBeGreaterThanOrEqual(6);
     for (const why of [...reasons, 'full time']) {

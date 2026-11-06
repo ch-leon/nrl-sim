@@ -12,6 +12,7 @@ import { pickFreshLegs } from '../bench';
 import { GOALS } from '../goals';
 import { CALLS, CALL_LABEL, callIsBench, callIsDefence, callIsPenalty, callIsPlay, callScope, paidOffText, penaltyChoiceOf, type CallVerdict, type CoachCall } from '../calls';
 import { FORTY_TWENTY_INTO_M, TOUCH } from '../touch';
+import type { PlayId } from '../../../data/plays';
 import { LIVE } from './knobs';
 import { other, type Player } from './types';
 import { LiveBase } from './base';
@@ -66,8 +67,9 @@ export abstract class LiveCalls extends LiveBase {
     return nearest && dist(nearest.body.pos, h.body.pos) < LIVE.engageM ? `${h.side}:${this.indexOf(h)}:${h.catchTick}` : null;
   }
 
-  /** Why a side can't make this call now, or null when it can. */
-  callRefusal(side: Side, call: CoachCall): string | null {
+  /** Why a side can't make this call now, or null when it can. A set play (#326) names the play. */
+  callRefusal(side: Side, call: CoachCall, play?: PlayId): string | null {
+    if (call === 'set-play') return this.setPlayRefusal(side, play);
     const k = this.phase.kind;
     if (!this.finished && (call === 'kickoff-short' || call === 'kickoff-long')) return this.kickoffRefusal(side);
     // Take the two / Tap and go (#396): only on a penalty his side has won and not yet taken, with the shot on.
@@ -216,9 +218,14 @@ export abstract class LiveCalls extends LiveBase {
   }
 
   /** The coach makes a call: in force from now for its scope (a play or the set). Returns why not, or null when it is made. */
-  call(side: Side, call: CoachCall): string | null {
-    const why = this.callRefusal(side, call);
+  call(side: Side, call: CoachCall, play?: PlayId): string | null {
+    const why = this.callRefusal(side, call, play);
     if (why) return why;
+    if (call === 'set-play') {
+      // Its own channel (#326): neither of the set's calls; it waits for the next play-the-ball or tap.
+      this.callSetPlay(side, play!);
+      return null;
+    }
     if (callIsPenalty(call)) {
       // Neither of the set's calls (#396): the captain's choice is overruled and the penalty taken the coach's way.
       const pen = this.penaltyUp!;
@@ -283,6 +290,8 @@ export abstract class LiveCalls extends LiveBase {
       return;
     }
     if (this.fieldGoalSoon(side)) return;
+    // One of his side's plays (#326) before a shift.
+    if (this.sheetPlays[side].length > 0 && this.aiCallPlay(side)) return;
     const by = this.ballPos().y;
     const count = (ps: readonly Player[], sign: number): number => ps.filter((p) => this.onField(p) && Math.sign(p.body.pos.y - by) === sign).length;
     const atk = this.side(side);
@@ -359,7 +368,7 @@ export abstract class LiveCalls extends LiveBase {
   protected announcePaid(vs: readonly CallVerdict[]): void {
     for (const v of vs) {
       this.verdicts.push(v);
-      if (v.paid) this.events.push({ tick: this.tick, kind: 'call-paid', text: paidOffText(this.names[v.side], v.call), side: v.side, detail: v.call });
+      if (v.paid) this.events.push({ tick: this.tick, kind: 'call-paid', text: paidOffText(this.names[v.side], v.call, v.play), side: v.side, detail: v.call });
     }
   }
 
@@ -369,6 +378,7 @@ export abstract class LiveCalls extends LiveBase {
     const tackled = this.tackles !== this.callTackles;
     this.countSet(newSet);
     this.announcePaid(this.judge.observe([...this.events], this.ballPos().x, !newSet && this.tackles > this.callTackles, newSet));
+    this.expirePlays(newSet);
     if (newSet) {
       for (const st of [this.callState.home, this.callState.away]) {
         st.attack = st.defence = null;

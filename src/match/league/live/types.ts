@@ -18,6 +18,8 @@ import { NEUTRAL_CAPTAIN, type CaptainRead } from '../penalties';
 import type { DifficultyEdge } from '../spread';
 import type { CallInput } from '../calls';
 import type { WeatherKind } from '../../../sim/events';
+import type { PlayId, PlayMods } from '../../../data/plays';
+import type { Edge } from '../plays';
 
 interface Stats extends ContestStats {}
 
@@ -128,6 +130,29 @@ export interface PendingKick {
   aim?: 'touch' | '40-20';
   /** A goal-line drop-out (2d): a kick-off from the try line. */
   dropOut?: boolean;
+}
+
+/**
+ * A set play being run (#326): who it is for, the edge it goes to (and its
+ * sign across the field), the men taking the ball in order (player indices;
+ * `step` is the next to take it) and running decoy lines, the one roll's
+ * outcome, and the bonus the last man carries into his first contact.
+ */
+export interface ScriptedPlay {
+  side: Side;
+  id: PlayId;
+  by: 'coach' | 'half';
+  edge: Edge;
+  ySign: 1 | -1;
+  men: number[];
+  step: number;
+  decoys: { idx: number; latM: number }[];
+  outcome: 'ok' | 'breakdown' | 'intercept';
+  bonus: PlayMods;
+  /** The man carrying the bonus (−1 until the last man has the ball), and whether his first contact has used it. */
+  bonusFor: number;
+  bonusUsed: boolean;
+  until: number;
 }
 
 export const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');

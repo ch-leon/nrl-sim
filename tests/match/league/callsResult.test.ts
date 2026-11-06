@@ -81,7 +81,8 @@ describe('the result tag’s copy (#366)', () => {
         }
       }
     }
-    expect(Object.keys(CALL_RESULT).sort()).toEqual([...COACH_CALLS].sort());
+    // A set play (#326) has its result too, though it is not one of the chips.
+    expect(Object.keys(CALL_RESULT).sort()).toEqual([...COACH_CALLS, 'set-play'].sort());
   });
 
   it('reads as the spec’s examples', () => {

@@ -7,7 +7,8 @@ import { POOL_IDS, TRAITS, type TraitInstance } from '../../data/traits';
 import { teamSheetFromRival } from '../league/sheets';
 import { makeRng } from '../../utils/rng';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
-import type { TeamTactics } from '../league/presets';
+import { DEFAULT_TACTICS, type TeamTactics } from '../league/presets';
+import { PLAYS, stylePlays } from '../league/plays';
 
 export interface LabClub {
   id: string;
@@ -62,4 +63,10 @@ export function starTraits(position: RosterEntry['position'], key: string): Trai
   const fit = POOL_IDS.filter((id) => TRAITS[id].fit === null || TRAITS[id].fit!.includes(position));
   const pool = rng.shuffle(fit.length >= 2 ? fit : POOL_IDS);
   return pool.slice(0, 2).map((id) => ({ id, level: 3 as const }));
+}
+
+/** The lab's `plays=1` (#326): the sheet takes the first three plays of its style's family (Balanced borrows the width coach's). */
+export function withPlays(sheet: TeamSheet, on: boolean | undefined): TeamSheet {
+  if (!on) return sheet;
+  return { ...sheet, plays: stylePlays((sheet.tactics ?? DEFAULT_TACTICS).attack).slice(0, PLAYS.takeMax) };
 }

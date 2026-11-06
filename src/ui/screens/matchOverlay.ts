@@ -425,6 +425,7 @@ export const CALL_WHEN: Readonly<Record<CoachCall, string>> = {
   'tap-go': 'a penalty won, in range: tap it and run',
   'kickoff-short': 'your kick-off: short and high, the chase tries to win it back',
   'kickoff-long': 'your kick-off: deep for the in-goal, pins them in (can go dead)',
+  'set-play': 'with the ball: run one of your plays at the next play-the-ball',
 };
 
 /** What a call does, in plain English, on its row in the coach tray (3o): CALL_WHEN less its "when". */
@@ -454,6 +455,7 @@ export const CALL_TILE: Readonly<Record<CoachCall, string>> = {
   'tap-go': 'tap it and run',
   'kickoff-short': 'high, chase to win it',
   'kickoff-long': 'deep, pin them in',
+  'set-play': 'run one of your plays',
 };
 
 /** When a call that is not on yet comes on, from the sim's refusal (the coach tray's footer). */
