@@ -71,7 +71,12 @@ Baselines at even stats, one-on-one, square — `src/match/league/contest.ts`:
 | Angle | side: fend +5, big hit −4 · behind: bust +4, fend +3, big hit −6 | From `angleFrom` (cos ±0.5). |
 | `momentum.perMs` / `momentum.cap` | ±1 pt bust per m/s, cap ±4 | Carrier speed − tackler speed (`MOMENTUM`). Named knobs since #322. |
 | Last tackle | big hit +3 | The defence is set. |
-| `stepChance` | 10% + (footwork − defence)/200, side +5, behind −5, cap 0.7 | Pre-contact step, one-on-one only. |
+| `stepChance` | 10% + (footwork − defence)/`contest.stepSlope`, side +5, behind −5, cap 0.7 | Pre-contact step, one-on-one only. |
+| `contest.stepSlope` | 200 | Points of footwork-v-defence edge per 1% of step chance. Named in #322, unchanged. |
+| `race.on` | 0 | The edge race (#322): bust points from the carrier's Speed stat over his tackler's. Off: at strengths that move the season gap it feeds 70 v 50 (77% → 83%) and pays fast-backs Balanced more than Expansive (`balance/plans/expansive-edge.json`, #322 PR). |
+| `race.perPoint` / `race.cap` | 0.008 / 0.12 | Bust points per Speed point over the tackler, capped either way. Zero at equal Speed. |
+| `race.fendShare` | 0.5 | Share of the race's bust points added to the fend too. |
+| `race.wide` / `race.backsOnly` / `race.single` | 1 / 1 / 1 | Gates: outside the middle 24 m (`MAX_LAT_M`); fullbacks, wingers and centres only; one-on-one only (0 also races the first tackler when two or more commit). |
 | `knockOnChance` | 4% + (50 − Skill)/1000, pressured +4, rain +6, cap 0.5…40% | Catch on a pass. |
 | `interceptChance` | 6% + (IQ − 50)/1000, cut-out ×2, cap 1…60% | Defender inside `live.laneM` of the pass line. |
 
@@ -1463,7 +1468,9 @@ styles. Balanced and defences other than Slide receive no cell effect.
 |---|---:|---|
 | `counters.slide.on` | 1 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
 | `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
-| `counters.slide.expansiveFit` | 0.2 | Expansive cell multiplier: `max(0, 1 + expansiveFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. |
+| `counters.slide.expansiveFit` | 0.2 | Expansive cell multiplier: `max(0, 1 + (expansiveFit + fit.counterResponse) × gap)`; neutral equal fits remain unchanged. The gap is `max(0, defenceFit − attackFit)` with `expansiveSigned` 1, else `abs(attackFit − defenceFit)`. |
+| `counters.slide.expansiveSigned` | 1 | #322: the Expansive response grows only when the Slide line out-fits the backs. Before it, fast backs (fit 1.3) into an ordinary Slide line (1.0) paid 0.14 of carrier edge on every wide contact against 0.08 for a flat side; now 0.104. Neutral fits and the 0.5 v 1.5 full-fit cell are unchanged. 0 restores the absolute gap. |
+| `counters.slide.expansiveByDefence` | 0 | #322 variant, not shipped: 1 scales the Expansive cell by defence ÷ attack fit instead of their product. |
 | `counters.slide.kickChase` | 0.4 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
 | `counters.slide.kickChaseFit` | 0.7 | Local unequal-fit response for kick cover; added to `fit.counterResponse` in the shared cell-strength formula. Equal neutral fits are unchanged. |
 | `counters.slide.tight` | 0.025 | Adds inside bust probability and supported offload probability for pack carriers. |
@@ -1525,8 +1532,9 @@ Footy IQ and Brick Wall/Hitman improve the squeeze. Unsupported offloads stay 0.
 
 Against Expansive, non-committed line defenders move toward the middle by cell
 × both fits (capped at 1) of their lane's distance from the middle. Outside
-`MAX_LAT_M`, fullbacks, wingers and centres add cell × both fits × Speed / 60 to
-busted-tackle odds. Forwards and halves get no edge bonus. Existing contact
+`MAX_LAT_M`, fullbacks, wingers and centres add cell × both fits ×
+max(0, 1 + (Speed − tackler's Speed) / 60) to busted-tackle odds (#322,
+`expansiveRelative`; Speed / 60 before it, so a fast edge man now takes it away). Forwards and halves get no edge bonus. Existing contact
 rolls and the geometric line-break detector decide outcomes; no roll is added.
 
 | Knob | Default | Effect when Compressed is enabled |
@@ -1539,6 +1547,7 @@ rolls and the geometric line-break detector decide outcomes; no roll is added.
 | `counters.compressed.commitFit` | 0.5 | Extra help-read reach per positive defending-fit advantage; multiplied by `commitM × attackFit × defenceFit`. Neutral reach is unchanged. |
 | `counters.compressed.brokenBase` | 0 | Common enabled bust modifier; off preserves legacy −0.02. |
 | `counters.compressed.offloadBase` | 0 | Common enabled offload modifier; off preserves legacy −0.03. |
+| `counters.compressed.expansiveRelative` | 1 | #322: the Expansive edge bust reads the carrier's Speed over his tackler's (1 + gap / 60, floored at 0) instead of Speed / 60. Identical at flat stats; 0 restores the absolute term. |
 
 Kick-chase, All-out and Balanced have zero matchup-cell modifiers. In the historical
 #464 acceptance run (before the joint #465 retune), the selected

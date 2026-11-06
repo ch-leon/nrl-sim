@@ -4,7 +4,8 @@ import { applyTuning } from '../../../src/match/league/tuning';
 
 describe('counter calibration for unequal fits (#465)', () => {
   it('keeps neutral cells and unrelated styles fixed while strengthening the unequal-fit contact cells', () => {
-    const off = applyTuning({ 'counters.slide.expansiveFit': 0, 'counters.compressed.tightFit': 0 });
+    // The symmetric (unsigned) response; #322's signed Expansive response is tested in edgeRace.test.ts.
+    const off = applyTuning({ 'counters.slide.expansiveFit': 0, 'counters.compressed.tightFit': 0, 'counters.slide.expansiveSigned': 0 });
     try {
       const cells = [
         (a: number, d: number) => slideCounter('expansive', 'slide', a, d),
@@ -29,7 +30,7 @@ describe('counter calibration for unequal fits (#465)', () => {
     } finally { off(); }
   });
   it('can strengthen all eight unequal-fit counters while preserving every neutral cell and own-fit gate', () => {
-    const restore = applyTuning({ 'counters.fit.on': 1, 'counters.fit.counterResponse': 0 });
+    const restore = applyTuning({ 'counters.fit.on': 1, 'counters.fit.counterResponse': 0, 'counters.slide.expansiveSigned': 0 });
     try {
       const cells = [
         (a: number, d: number) => slideCounter('grind', 'slide', a, d),

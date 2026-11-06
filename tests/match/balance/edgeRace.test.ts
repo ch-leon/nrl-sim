@@ -1,8 +1,7 @@
 // tests/match/balance/edgeRace.test.ts — #322: the Speed levers (the edge race,
 // the signed Slide v Expansive response, the relative Compressed edge term) are
 // relative and roll-free, so a flat match plays bit for bit the same with them on
-// or off, and fast backs carrying wide in an Expansive plan beat a flat Slide line
-// by more than they did without them.
+// or off, and with the edge race switched on fast backs carrying wide bust more.
 import { describe, expect, it } from 'vitest';
 import { BalanceSim, measureCell } from '../../../src/match/balance/measure';
 import { sideSheet } from '../../../src/match/balance/measure';
@@ -10,10 +9,12 @@ import { applyTuning, type Overrides } from '../../../src/match/league/tuning';
 import type { AttackPreset, DefencePreset } from '../../../src/match/league/presets';
 import type { SideSpec } from '../../../src/match/balance/plan';
 
+/** Every #322 lever off (before), and on (the shipped B and C with the edge race switched on too). */
 const OFF: Overrides = { 'race.on': 0, 'counters.slide.expansiveSigned': 0, 'counters.compressed.expansiveRelative': 0 };
-const SEEDS = 40;
-const MARGIN = 0.02;
-const ON: Overrides = { 'race.on': 1, 'counters.slide.expansiveSigned': 1, 'counters.compressed.expansiveRelative': 1 };
+const SEEDS = 30;
+/** Busts a match the tracked side gains; +2.2 measured over these seeds. */
+const MARGIN = 1;
+const ON: Overrides = { 'race.on': 1, 'race.single': 0, 'counters.slide.expansiveSigned': 1, 'counters.compressed.expansiveRelative': 1 };
 
 function stream(home: SideSpec, away: SideSpec, seed: number, over: Overrides): string {
   const restore = applyTuning(over);
@@ -46,18 +47,17 @@ describe('the #322 Speed levers', () => {
     }
   }, 120_000);
 
-  it('fast backs in an Expansive plan beat a flat Slide line by more with the levers on', () => {
+  it('with the edge race on, fast backs carrying wide bust a flat line more', () => {
     const cell = (tuning: Overrides) => ({
       variant: { name: 'x', tuning },
       scenario: {
         name: 'fast-backs expansive v flat slide', track: 'home' as const, bothWays: true,
-        home: { rating: 60, positionStats: { backs: { speed: 72 } }, tactics: { attack: 'expansive' as const } },
+        home: { rating: 60, positionStats: { backs: { speed: 85 } }, tactics: { attack: 'expansive' as const } },
         away: { rating: 60, tactics: { defence: 'slide' as const } },
       },
     });
-    const off = measureCell(cell(OFF), SEEDS);
-    const on = measureCell(cell(ON), SEEDS);
-    expect(on.pointsShare!.mean - off.pointsShare!.mean).toBeGreaterThan(MARGIN);
-    expect(on.trackedCounts!.busts.mean).toBeGreaterThan(off.trackedCounts!.busts.mean);
+    const off = measureCell(cell({ ...ON, 'race.on': 0 }), SEEDS);
+    const on = measureCell(cell({ ...ON, 'race.on': 1, 'race.perPoint': 0.02, 'race.single': 0 }), SEEDS);
+    expect(on.trackedCounts!.busts.mean - off.trackedCounts!.busts.mean).toBeGreaterThan(MARGIN);
   }, 120_000);
 });

@@ -28,7 +28,8 @@ class RaceSim extends LiveSim {
 }
 
 describe('the edge race (#322)', () => {
-  it('is zero at equal Speed, signed by the Speed gap, capped, with a fend share, and off by the switch', () => {
+  it('ships off; is zero at equal Speed, signed by the Speed gap, capped, with a fend share', () => {
+    expect(RACE.on).toBe(0);
     tuned(ON, () => {
       expect(edgeRace(60, 60)).toEqual({ broken: 0, fend: 0 });
       expect(edgeRace(70, 60).broken).toBeCloseTo(0.08);
@@ -70,14 +71,15 @@ describe('the signed Slide v Expansive response (#322)', () => {
   const cell = COUNTERS.slide.expansive;
   const response = COUNTERS.slide.expansiveFit + COUNTERS.fit.counterResponse;
   it('leaves neutral fits and the full-fit acceptance cell where they were', () => {
-    const was = [slideCounter('expansive', 'slide', 1, 1), slideCounter('expansive', 'slide', 0.5, 1.5)];
+    const was = tuned({ 'counters.slide.expansiveSigned': 0 }, () => [slideCounter('expansive', 'slide', 1, 1), slideCounter('expansive', 'slide', 0.5, 1.5)]);
     tuned({ 'counters.slide.expansiveSigned': 1 }, () => {
       expect(slideCounter('expansive', 'slide', 1, 1)).toBeCloseTo(was[0]!);
       expect(slideCounter('expansive', 'slide', 0.5, 1.5)).toBeCloseTo(was[1]!);
     });
   });
-  it('stops paying a slower Slide line for the attack being quicker', () => {
-    const before = slideCounter('expansive', 'slide', 1.3, 1);
+  it('ships on, and stops paying a slower Slide line for the attack being quicker', () => {
+    expect(COUNTERS.slide.expansiveSigned).toBe(1);
+    const before = tuned({ 'counters.slide.expansiveSigned': 0 }, () => slideCounter('expansive', 'slide', 1.3, 1));
     expect(before).toBeCloseTo(cell * 1.3 * (1 + response * 0.3));
     tuned({ 'counters.slide.expansiveSigned': 1 }, () => {
       expect(slideCounter('expansive', 'slide', 1.3, 1)).toBeCloseTo(cell * 1.3);
