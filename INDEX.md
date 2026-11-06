@@ -288,3 +288,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261105-195920-presets | presets | 1fecccf | codex/488-english-content-pack | [report](runs/20261105-195920-presets/report.md) |
 | 20261105-204653-standard | standard | 58131d9 | main | [report](runs/20261105-204653-standard/report.md) |
 | 20261105-224946-standard | standard | 5b20ddf | main | [report](runs/20261105-224946-standard/report.md) |
+| 20261105-235925-standard | standard | ca21c68 | main | [report](runs/20261105-235925-standard/report.md) |
