@@ -289,3 +289,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261105-204653-standard | standard | 58131d9 | main | [report](runs/20261105-204653-standard/report.md) |
 | 20261105-224946-standard | standard | 5b20ddf | main | [report](runs/20261105-224946-standard/report.md) |
 | 20261105-235925-standard | standard | ca21c68 | main | [report](runs/20261105-235925-standard/report.md) |
+| 20261106-105546-expansive-edge | expansive edge | 7bc21b5 | HEAD | [report](runs/20261106-105546-expansive-edge/report.md) |
+| 20261106-124230-expansive-edge-guards | expansive edge guards | cd7b067 | HEAD | [report](runs/20261106-124230-expansive-edge-guards/report.md) |

@@ -1,0 +1,138 @@
+{
+  "name": "expansive edge guards",
+  "description": "#322: guard check of the shipped edge race (race.perPoint 0.02, race.single 0, signed Slide response, relative Compressed term) against the levers off: the even match, 70 v 50, and the fast-backs rows (v flat Slide, v flat Rush, v fast-backs Slide, fast-backs Balanced).",
+  "seeds": 100,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "70 v 50",
+      "seeds": 300,
+      "track": "home",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    },
+    {
+      "name": "fast-backs expansive v flat slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    },
+    {
+      "name": "fast-backs expansive v flat rush",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      }
+    },
+    {
+      "name": "fast-backs expansive v fast-backs slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "attack": "expansive"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    },
+    {
+      "name": "fast-backs balanced v flat slide",
+      "track": "home",
+      "bothWays": true,
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "backs": {
+            "speed": 72
+          }
+        },
+        "tactics": {
+          "attack": "balanced"
+        }
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "slide"
+        }
+      }
+    }
+  ],
+  "base": {
+    "race.on": 0,
+    "counters.slide.expansiveSigned": 0,
+    "counters.compressed.expansiveRelative": 0
+  },
+  "variants": [
+    {
+      "name": "edge race 0.02 any numbers",
+      "tuning": {
+        "race.on": 1,
+        "race.perPoint": 0.02,
+        "race.cap": 0.12,
+        "race.single": 0,
+        "counters.slide.expansiveSigned": 1,
+        "counters.compressed.expansiveRelative": 1
+      }
+    }
+  ]
+}
