@@ -174,11 +174,13 @@ Plan: issue #322, 6 Nov comment. Season measure: `npm run soak -- --live-rivals 
 | A 0.012 wide one-on-one + B + C | −7.4 ± 1.1 | 39% | −6.6 | −12.0 | −0.1 | +3.0 | −2.9 | +3.7 | +2.6 | +3.5 | −2.7 |
 | A 0.012 any numbers + B + C | −6.6 ± 1.0 | 43% | −4.8 | −11.9 | −1.8 | +4.2 | −3.2 | +1.5 | +2.7 | +3.7 | −3.1 |
 | A 0.02 any numbers + B + C | −5.9 ± 1.0 | 44% | −4.6 | −9.3 | −3.1 | +3.5 | −3.8 | +2.9 | +4.0 | +3.3 | −2.0 |
-| **Shipped: B + C** | −8.4 ± 1.1 | 41% | −6.9 | −14.2 | −3.9 | +3.7 | −2.5 | +1.8 | +3.6 | +4.0 | −1.7 |
+| B + C only (not shipped) | −8.4 ± 1.1 | 41% | −6.9 | −14.2 | −3.9 | +3.7 | −2.5 | +1.8 | +3.6 | +4.0 | −1.7 |
 
 **Why the edge race (A) ships off.** In the harness (`balance/plans/expansive-edge.json` and a guard run of A 0.02 any numbers), it moves the strength gap: 70 v 50 77% → 83% over 300 matches. It also pays fast-backs Balanced (49.2% → 57.3% share) more than fast-backs Expansive (46.0% → 51.5%), which is the must-pick risk. Fast backs on both sides stay near where they were (43.0% → 42.2%). Weaker settings barely move the season (−7.4).
 
-**What ships.** `counters.slide.expansiveSigned` 1 and `counters.compressed.expansiveRelative` 1. Both are exactly zero at flat stats and equal fits. The 15 flat preset cells and the full-fit Expansive cells play bit for bit the same (`tests/match/balance/edgeRace.test.ts`), so the flat 42–58% shares, the neutral +4–6 swings, the full-fit 9+ swings, the dormant shares and both match pins are unchanged. They correct a sign: fast backs into an ordinary Slide line were charged more than a flat side. On the season they are inside luck.
+**Why B and C ship off too.** B (`counters.slide.expansiveSigned`) and C (`counters.compressed.expansiveRelative`) left the season measure where it was (−8.4 → −8.4, 41% → 41%), while Tight's level row (+3.8 → +4.7) and Rush's against-strength row (+3.0 → +4.0) drifted outside one SE. A change to gameplay with no measured benefit does not ship (checker, #514). C is also not neutral away from Speed 60: at flat 70 v 70 the old Speed / 60 term paid 1.17× and the relative one 1.0×, so Expansive v Compressed changes at every rating but 60.
 
-**Still off.** Expansive stays −8.4 against strength and 41% level, mostly against Rush. A fix there is a Rush matchup question, not Speed.
+**What ships.** The soak diagnostic (nine shape and Expansive by defence) and the named knobs, every one off or at its old value: `race.*` (on 0), `contest.stepSlope` 200, `counters.slide.expansiveSigned` 0, `counters.slide.expansiveByDefence` 0, `counters.compressed.expansiveRelative` 0. No match changes: the season rng-stream pin, both match pins and the dormant shares hold untouched. The flat 60 cells play bit for bit the same with every lever on (`tests/match/balance/edgeRace.test.ts`), so a later pass can switch any of them on by name.
+
+**Still off.** Expansive stays −8.4 against strength and 41% level, mostly against Rush. The next pass is a Rush matchup question (why a rushing line shuts out the wide game; `rushBroken`'s Strength-weighted carry), not Speed.
 

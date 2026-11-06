@@ -271,9 +271,9 @@ wingers). **Overlap** (all presets): when a side has more players than the defen
 | **Rush** | 6.2 m/s (N13: was 6.5) | +1 | normal | ×0.6 | big hit +4%, bust +11% (Phase 3: was +5%) | +4% |
 | **Compressed** | 4.5 m/s | — | pull ×1.1 toward the ball (N13: was ×1.4) | ×1.05 (N13: was ×1.2) | bust −2% (N13: was −4%), offload −3% | +3% (N13: was −2%; the open edges can be stepped) |
 
-Against Slide, the Expansive counter's fit response grows only when the Slide line out-fits
-the attack's backs, and against Compressed the edge bust reads the carrier's Speed over his
-tackler's, not his Speed alone (#322; tuning §32, §34).
+Two #322 options are built and measured but ship off: a Slide response to Expansive that
+grows only when the Slide line out-fits the backs, and a Compressed edge bust that reads the
+carrier's Speed over his tackler's (tuning §32, §34).
 
 ### 5.3 Who plays what
 Rivals' styles follow from the nine they field (N11, tuning reference §28): a half with Big

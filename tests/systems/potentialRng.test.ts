@@ -32,13 +32,8 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * #469 changes rival plans and therefore season outcomes. Keep this historical
  * pin with habit AI off, and compare UI-read/no-read streams with it on too.
  * The two match fingerprint pins remain unchanged.
- * 3040797444 before #322 (the signed Slide v Expansive response and the relative
- * Compressed edge term): Expansive games with unequal fits or Speeds play out
- * differently, so the season's existing draws fall differently. No RNG call site
- * was added, the flat matches and both fingerprint pins are unchanged, and the
- * UI-read and no-read seasons still finish on the identical stream.
  */
-const MAIN_SEED_AFTER_SEASON = 301411385;
+const MAIN_SEED_AFTER_SEASON = 3040797444;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly projection and dot reads preserve the season stream with habit AI=%i', (ai) => {

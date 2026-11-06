@@ -17,9 +17,9 @@ is the plan. Nothing in `src/` changes until Leon signs it off.
 
 > **Superseded (6 Nov, #322).** The relative-Speed plan (issue #322, 6 Nov
 > comment) replaced this one: `balance/plans/expansive-edge.json` and
-> `docs/status/2026-11-counters.md` ("Speed on the edge, #322"). It ships the
-> signed Slide response and the relative Compressed term; the edge race stays
-> off, and Expansive is still −8.4 against strength.
+> `docs/status/2026-11-counters.md` ("Speed on the edge, #322"). It names and
+> measures the levers but ships every one off: none closed the gap without
+> breaking a guard, and Expansive is still −8.4 against strength.
 
 ## Where it stands
 

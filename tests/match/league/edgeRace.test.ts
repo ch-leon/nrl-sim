@@ -77,8 +77,9 @@ describe('the signed Slide v Expansive response (#322)', () => {
       expect(slideCounter('expansive', 'slide', 0.5, 1.5)).toBeCloseTo(was[1]!);
     });
   });
-  it('ships on, and stops paying a slower Slide line for the attack being quicker', () => {
-    expect(COUNTERS.slide.expansiveSigned).toBe(1);
+  it('ships off, and when on stops paying a slower Slide line for the attack being quicker', () => {
+    expect(COUNTERS.slide.expansiveSigned).toBe(0);
+    expect(COUNTERS.compressed.expansiveRelative).toBe(0);
     const before = tuned({ 'counters.slide.expansiveSigned': 0 }, () => slideCounter('expansive', 'slide', 1.3, 1));
     expect(before).toBeCloseTo(cell * 1.3 * (1 + response * 0.3));
     tuned({ 'counters.slide.expansiveSigned': 1 }, () => {

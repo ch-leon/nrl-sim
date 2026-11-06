@@ -1468,8 +1468,8 @@ styles. Balanced and defences other than Slide receive no cell effect.
 |---|---:|---|
 | `counters.slide.on` | 1 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
 | `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
-| `counters.slide.expansiveFit` | 0.2 | Expansive cell multiplier: `max(0, 1 + (expansiveFit + fit.counterResponse) × gap)`; neutral equal fits remain unchanged. The gap is `max(0, defenceFit − attackFit)` with `expansiveSigned` 1, else `abs(attackFit − defenceFit)`. |
-| `counters.slide.expansiveSigned` | 1 | #322: the Expansive response grows only when the Slide line out-fits the backs. Before it, fast backs (fit 1.3) into an ordinary Slide line (1.0) paid 0.14 of carrier edge on every wide contact against 0.08 for a flat side; now 0.104. Neutral fits and the 0.5 v 1.5 full-fit cell are unchanged. 0 restores the absolute gap. |
+| `counters.slide.expansiveFit` | 0.2 | Expansive cell multiplier: `max(0, 1 + (expansiveFit + fit.counterResponse) × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. With `expansiveSigned` 1 the gap is `max(0, defenceFit − attackFit)`. |
+| `counters.slide.expansiveSigned` | 0 | #322, built and measured, ships off: 1 grows the Expansive response only when the Slide line out-fits the backs (fast backs, fit 1.3, into an ordinary Slide line, 1.0: 0.14 → 0.104 of carrier edge on each wide contact). Neutral fits and the 0.5 v 1.5 full-fit cell are unchanged. Off because the season soak did not move Expansive with it (−8.4 → −8.4 against strength, `docs/status/2026-11-counters.md`). |
 | `counters.slide.expansiveByDefence` | 0 | #322 variant, not shipped: 1 scales the Expansive cell by defence ÷ attack fit instead of their product. |
 | `counters.slide.kickChase` | 0.4 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
 | `counters.slide.kickChaseFit` | 0.7 | Local unequal-fit response for kick cover; added to `fit.counterResponse` in the shared cell-strength formula. Equal neutral fits are unchanged. |
@@ -1532,9 +1532,9 @@ Footy IQ and Brick Wall/Hitman improve the squeeze. Unsupported offloads stay 0.
 
 Against Expansive, non-committed line defenders move toward the middle by cell
 × both fits (capped at 1) of their lane's distance from the middle. Outside
-`MAX_LAT_M`, fullbacks, wingers and centres add cell × both fits ×
-max(0, 1 + (Speed − tackler's Speed) / 60) to busted-tackle odds (#322,
-`expansiveRelative`; Speed / 60 before it, so a fast edge man now takes it away). Forwards and halves get no edge bonus. Existing contact
+`MAX_LAT_M`, fullbacks, wingers and centres add cell × both fits × Speed / 60 to
+busted-tackle odds (with `expansiveRelative` 1, #322, off: max(0, 1 + (Speed −
+tackler's Speed) / 60), so a fast edge man would take it away). Forwards and halves get no edge bonus. Existing contact
 rolls and the geometric line-break detector decide outcomes; no roll is added.
 
 | Knob | Default | Effect when Compressed is enabled |
@@ -1547,7 +1547,7 @@ rolls and the geometric line-break detector decide outcomes; no roll is added.
 | `counters.compressed.commitFit` | 0.5 | Extra help-read reach per positive defending-fit advantage; multiplied by `commitM × attackFit × defenceFit`. Neutral reach is unchanged. |
 | `counters.compressed.brokenBase` | 0 | Common enabled bust modifier; off preserves legacy −0.02. |
 | `counters.compressed.offloadBase` | 0 | Common enabled offload modifier; off preserves legacy −0.03. |
-| `counters.compressed.expansiveRelative` | 1 | #322: the Expansive edge bust reads the carrier's Speed over his tackler's (1 + gap / 60, floored at 0) instead of Speed / 60. Identical at flat stats; 0 restores the absolute term. |
+| `counters.compressed.expansiveRelative` | 0 | #322, built and measured, ships off: 1 makes the Expansive edge bust read max(0, 1 + (Speed − tackler's Speed) / 60) instead of Speed / 60. The two agree only at Speed 60 v 60: at flat 70 v 70 the old term paid 1.17× and the relative one 1.0×, and a 70 v 50 Expansive v Compressed match changes too. |
 
 Kick-chase, All-out and Balanced have zero matchup-cell modifiers. In the historical
 #464 acceptance run (before the joint #465 retune), the selected

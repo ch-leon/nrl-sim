@@ -91,12 +91,8 @@ describe('Slide counters', () => {
     for (const attack of ['grind', 'expansive', 'kick-chase', 'all-out'] as const) {
       expect(tuned(0, () => slideCounter(attack, 'slide', 1.5, 1.5))).toBe(0);
       tuned(1, () => {
-        // Expansive's response is signed (#322): an out-fitted Slide line gets no extra; tested in edgeRace.test.ts.
-        const symmetric = attack === 'expansive' ? applyTuning({ 'counters.slide.expansiveSigned': 0 }) : () => {};
-        try {
-          expect(slideCounter(attack, 'slide', 1, 1.5)).toBeCloseTo(3 * slideCounter(attack, 'slide', 1, 0.5));
-          expect(slideCounter(attack, 'slide', 0.5, 1)).toBeCloseTo(slideCounter(attack, 'slide', 1, 0.5));
-        } finally { symmetric(); }
+        expect(slideCounter(attack, 'slide', 1, 1.5)).toBeCloseTo(3 * slideCounter(attack, 'slide', 1, 0.5));
+        expect(slideCounter(attack, 'slide', 0.5, 1)).toBeCloseTo(slideCounter(attack, 'slide', 1, 0.5));
         expect(slideCounter(attack, 'slide', 0, 1.5)).toBe(0);
         expect(slideCounter(attack, 'rush', 1.5, 1.5)).toBe(0);
         expect(slideCounter(attack, 'compressed', 1.5, 1.5)).toBe(0);

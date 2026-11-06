@@ -21,7 +21,7 @@ export const COUNTERS = {
     commitM: 10,
     commitFit: 0.5,
     // #322: 1 = the Expansive edge bust reads the carrier's Speed over his tackler's, not his Speed alone.
-    expansiveRelative: 1,
+    expansiveRelative: 0,
   },
   rush: {
     on: 1,
@@ -35,7 +35,7 @@ export const COUNTERS = {
     expansive: 0.08,
     expansiveFit: 0.2,
     // #322: 1 = the Expansive cell's fit response grows only when the Slide line out-fits the backs.
-    expansiveSigned: 1,
+    expansiveSigned: 0,
     // #322 variant: 1 = scale the Expansive cell by defence ÷ attack fit instead of their product.
     expansiveByDefence: 0,
     kickChase: 0.4,

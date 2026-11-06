@@ -1,7 +1,9 @@
 // tests/match/balance/edgeRace.test.ts — #322: the Speed levers (the edge race,
 // the signed Slide v Expansive response, the relative Compressed edge term) are
-// relative and roll-free, so a flat match plays bit for bit the same with them on
-// or off, and with the edge race switched on fast backs carrying wide bust more.
+// relative and roll-free, so a flat 60 v 60 match plays bit for bit the same with
+// them on or off (at Speed 60 the relative Compressed term equals the old Speed / 60;
+// at other flat Speeds it does not), and with the edge race on fast backs carrying
+// wide bust more.
 import { describe, expect, it } from 'vitest';
 import { BalanceSim, measureCell } from '../../../src/match/balance/measure';
 import { sideSheet } from '../../../src/match/balance/measure';
@@ -9,7 +11,7 @@ import { applyTuning, type Overrides } from '../../../src/match/league/tuning';
 import type { AttackPreset, DefencePreset } from '../../../src/match/league/presets';
 import type { SideSpec } from '../../../src/match/balance/plan';
 
-/** Every #322 lever off (before), and on (the shipped B and C with the edge race switched on too). */
+/** Every #322 lever off (the shipped defaults), and every one on. */
 const OFF: Overrides = { 'race.on': 0, 'counters.slide.expansiveSigned': 0, 'counters.compressed.expansiveRelative': 0 };
 const SEEDS = 30;
 /** Busts a match the tracked side gains; +2.2 measured over these seeds. */
@@ -35,17 +37,17 @@ const ATTACKS: readonly AttackPreset[] = ['balanced', 'grind', 'expansive', 'kic
 const DEFENCES: readonly DefencePreset[] = ['slide', 'rush', 'compressed'];
 
 describe('the #322 Speed levers', () => {
-  it('leave every flat preset cell and the full-fit Expansive cells bit for bit the same', () => {
+  it('leave every flat 60 preset cell and the full-fit Expansive cells bit for bit the same', () => {
     const cells: [SideSpec, SideSpec][] = [];
     for (const attack of ATTACKS) for (const defence of DEFENCES) {
       cells.push([{ rating: 60, tactics: { attack } }, { rating: 60, tactics: { defence } }]);
     }
     cells.push([{ rating: 60, tactics: { attack: 'expansive' }, fit: { expansive: 0.5 } }, { rating: 60, tactics: { defence: 'slide' }, fit: { slide: 1.5 } }]);
     cells.push([{ rating: 60, tactics: { attack: 'expansive' }, fit: { expansive: 1.5 } }, { rating: 60, tactics: { defence: 'compressed' }, fit: { compressed: 0.5 } }]);
-    for (const [home, away] of cells) {
-      expect(stream(home, away, 3, ON), `${home.tactics?.attack} v ${away.tactics?.defence}`).toBe(stream(home, away, 3, OFF));
+    for (const seed of [3, 8]) for (const [home, away] of cells) {
+      expect(stream(home, away, seed, ON), `${home.tactics?.attack} v ${away.tactics?.defence} seed ${seed}`).toBe(stream(home, away, seed, OFF));
     }
-  }, 120_000);
+  }, 240_000);
 
   it('with the edge race on, fast backs carrying wide bust a flat line more', () => {
     const cell = (tuning: Overrides) => ({
