@@ -41,6 +41,8 @@ export async function runCoachCalls(browser, sizes) {
         };
       });
       if (p.groups !== '0,1,2,3') throw new Error(`groups ${p.groups}`);
+      // Set plays are called from the tray but not unlocked here (#326): the page's footnote says where they come from.
+      if (!/^Set plays come from the Playbook/.test(await page.locator('[data-coach-calls] [data-calls-plays]').textContent())) throw new Error('no "Set plays come from the Playbook" footnote');
       if (p.locked < 3) throw new Error(`${p.locked} locked groups shown, want 3 for a new club`);
       if (p.wide) throw new Error('the page is wider than the screen');
       if (p.scrolls !== 'fits' && p.scrolls !== 'auto') throw new Error(`the body overflows without scrolling (${p.scrolls})`);
