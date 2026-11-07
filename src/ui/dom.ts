@@ -806,8 +806,10 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  max-height: calc(100vh - var(--nrl-nav-h, 0px) - 20px);
-  max-height: calc(100dvh - var(--nrl-nav-h, 0px) - 20px);
+  /* Clear of the status bar too (--nrl-safe-t): at Large text on a 320×568 phone the eleven
+     tiles overflow, and without it the sheet's top row sat in the band under the notch. */
+  max-height: calc(100vh - var(--nrl-nav-h, 0px) - 20px - var(--nrl-safe-t, 0px));
+  max-height: calc(100dvh - var(--nrl-nav-h, 0px) - 20px - var(--nrl-safe-t, 0px));
   overflow-y: auto;
   box-sizing: border-box;
   padding: 10px 12px;
