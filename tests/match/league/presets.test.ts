@@ -82,7 +82,8 @@ describe('presets (pure)', () => {
     expect(r.stepAgainst).toBeGreaterThan(0);
     const c = defencePlan('compressed');
     expect(c.pull).toBeGreaterThan(1);
-    expect(c.broken).toBeLessThan(0);
+    // #465: the enabled middle advantage belongs to its Tight counter.
+    expect(c).toMatchObject({ broken: 0, offload: 0 });
     expect(c.lineSpeed).toBeLessThan(5);
     for (const d of DEFENCE_PRESETS) expect(defencePlan(d).lineSpeed).toBeGreaterThan(3);
   });
@@ -104,11 +105,14 @@ describe('tactics in the live sim', () => {
   const SECS = 150;
   const away = sheet('A');
 
-  it('Grind and Expansive look different: offloads and cut-outs for the wide side, long kicks and fewer offloads for the grinders', () => {
+  it('Tight and Expansive both offload, while the wide side uses cut-outs and Tight prefers long kicks', () => {
     // Four times the seeds: cut-outs and steps are rare enough that a couple of dozen short matches is within the noise.
     const grind = events(sheet('H', 'grind'), away, SEEDS * 4, SECS);
     const wide = events(sheet('H', 'expansive'), away, SEEDS * 4, SECS);
-    expect(count(wide, 'offload', 'home')).toBeGreaterThan(count(grind, 'offload', 'home') * 2);
+    // Tight is now offload-heavy for its pack (#465); the old wide > 2× Tight
+    // assertion described the retired Grind mechanic. Both styles offload.
+    expect(count(grind, 'offload', 'home')).toBeGreaterThan(0);
+    expect(count(wide, 'offload', 'home')).toBeGreaterThan(0);
     // Cut-outs need a man more than 12 m wide and behind the ball. The grubber
     // chase pulls the wingers up in the red zone, so the opening minutes can
     // pass without one. Over whole matches the wide side still throws them.

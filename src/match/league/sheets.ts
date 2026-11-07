@@ -10,6 +10,7 @@ import { ON_FIELD, STAT_MAX } from '../../config';
 import type { Player, Position, RivalClub } from '../../core/state';
 import type { RosterEntry, TeamSheet } from '../../sim/events';
 import { rollTraits, type TraitQuality } from '../../data/traits';
+import { usesHabitCounters, type RivalPlanContext } from './ai';
 import { rivalTactics } from './presets';
 import { BENCH } from './bench';
 import { LINEUP_SLOTS, statsAt, type Selection } from '../../systems/lineup';
@@ -145,8 +146,8 @@ export function teamSheetFromSquad(
 }
 
 /** A rival's squad-built sheet with the style its nine gives it (N11, `rivalTactics`). */
-export function withRivalStyle(sheet: TeamSheet, club: { id: string; strength: number }): TeamSheet {
-  return { ...sheet, tactics: rivalTactics(club, sheet.roster) };
+export function withRivalStyle(sheet: TeamSheet, club: { id: string; strength: number }, context?: RivalPlanContext): TeamSheet {
+  return { ...sheet, tactics: rivalTactics(club, sheet.roster, context) };
 }
 
 /**
@@ -171,7 +172,7 @@ export function kickerAndCaptain(nine: readonly Player[], selection?: Pick<Selec
  * Build a TeamSheet from a rival club. Aggregates derive from club.strength
  * with ±5 jitter; roster is a generated Nines side with synthetic stats.
  */
-export function teamSheetFromRival(club: RivalClub): TeamSheet {
+export function teamSheetFromRival(club: RivalClub, context?: RivalPlanContext): TeamSheet {
   const rng = makeRng(hashString(club.id));
   const jitter = (): number => clampStat(Math.round(club.strength + rng.int(-5, 5)));
   const attack = jitter();
@@ -215,6 +216,6 @@ export function teamSheetFromRival(club: RivalClub): TeamSheet {
     colors: club.colors,
     roster,
     bench,
-    tactics: rivalTactics(club),
+    tactics: usesHabitCounters(context) ? rivalTactics(club, roster, context) : rivalTactics(club),
   };
 }

@@ -209,3 +209,49 @@ describe('the dock at every text size (#344)', () => {
     expect(narrow).toMatch(/\.nrl-nav-caret \{ display: none; \}/);
   });
 });
+
+import { beforeEach, afterEach, vi } from 'vitest';
+import { createNav } from '../../src/ui/nav';
+import { stubDocument, StubNode } from './stubDom';
+import { bus } from '../../src/core/events';
+
+describe('Office locks (#482)', () => {
+  beforeEach(() => { stubDocument(); bus.clear(); });
+  afterEach(() => vi.unstubAllGlobals());
+  it('keeps a locked tile dimmed with its reason; tapping explains, direct open bypasses; unlocking restores the tile', () => {
+    const nav = createNav();
+    const open = vi.fn();
+    let reason: string | null = 'Opens after your first home game';
+    nav.registerScreen('finance', 'Finance', open, { more: true, locked: () => reason, status: () => ({ text: '+$100 / week', attn: true }) });
+    const body = document.body as unknown as StubNode;
+    const office = body.querySelector('[data-nav-more]')!;
+    const tile = body.querySelector('[data-screen="finance"]')!;
+    office.click();
+    expect(tile.classList.contains('nrl-office-locked')).toBe(true);
+    expect(tile.getAttribute('aria-disabled')).toBe('true');
+    expect(tile.textContent).toContain(reason);
+    expect(tile.querySelector('.nrl-office-status')?.hasAttribute('data-attn')).toBe(false);
+    const notify = vi.fn(); bus.on('ui:notify', notify);
+    tile.click();
+    expect(open).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith({ text: reason, kind: 'info' });
+    nav.open('finance');
+    expect(open).toHaveBeenCalledTimes(1);
+    reason = null; office.click();
+    expect(tile.classList.contains('nrl-office-locked')).toBe(false);
+    expect(tile.hasAttribute('aria-disabled')).toBe(false);
+    expect(tile.textContent).toContain('+$100 / week');
+    tile.click(); expect(open).toHaveBeenCalledTimes(2);
+    nav.destroy();
+  });
+  it('leaves a tile without a lock callback unchanged', () => {
+    const nav = createNav(); const open = vi.fn();
+    nav.registerScreen('news', 'News', open, { more: true });
+    const body = document.body as unknown as StubNode;
+    body.querySelector('[data-nav-more]')!.click();
+    const tile = body.querySelector('[data-screen="news"]')!;
+    expect(tile.hasAttribute('aria-disabled')).toBe(false);
+    tile.click(); expect(open).toHaveBeenCalledOnce();
+    nav.destroy();
+  });
+});

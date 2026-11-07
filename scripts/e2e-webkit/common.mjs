@@ -139,6 +139,7 @@ const NAV_VIA = {
  * sheet is open closes it (the dock is a toggle), so an open sheet is left as it is.
  */
 export async function openNav(page, id) {
+  if (id === 'club') { await page.locator(SHEET_EXIT).tap(); return; }
   if (await page.locator(`.nrl-screen-region[data-screen-key="${id}"]`).count()) return;
   if (NAV_VIA[id]) {
     const [via, sel] = NAV_VIA[id];
@@ -161,3 +162,29 @@ export async function openNav(page, id) {
 }
 
 export const NO_INSETS = { l: 0, t: 0, r: 0, b: 0 };
+
+/** Play a real match through the phone controls, then wait for its held week. */
+export async function playPhoneWeek(page, onResult = async () => {}) {
+  const before = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason}`; });
+  await openNav(page, 'club');
+  await page.locator('[data-hud="advance"]').tap();
+  await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
+  if (await page.locator('[data-ask-proceed]').isVisible()) await page.locator('[data-ask-proceed]').tap();
+  await page.locator('.nrl-mo-controls [data-skip-pill]').waitFor({ timeout: 60000 });
+  await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
+  await page.locator('[data-skip-pill][data-armed]').waitFor();
+  await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
+  await page.locator('.nrl-mo-ft [data-back-to-club]').waitFor({ timeout: 120000 });
+  await onResult();
+  await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate(n => n.click());
+  await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');
+  await page.waitForFunction(b => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason}` !== b; }, before);
+}
+
+/** Play the separate trial phase so existing probes still start at round 1. */
+export async function playTrials(page, onResult) {
+  const size = page.viewportSize();
+  if (size.width < size.height) await page.setViewportSize({ width: 844, height: 390 });
+  while (await page.evaluate(() => [1, 2].includes(window.__nrlState().preseason))) await playPhoneWeek(page, onResult);
+  if (size.width < size.height) await page.setViewportSize(size);
+}

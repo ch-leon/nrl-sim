@@ -1,3 +1,5 @@
+import { COUNTERS } from '../counters';
+import type { AttackPreset } from '../presets';
 import { SET_TACKLES } from '../../../config';
 import { TICK_S } from '../../core/engine';
 import type { Side } from '../../core/snapshot';
@@ -15,6 +17,32 @@ import { other, type Player } from './types';
 import { LiveBase } from './base';
 
 export abstract class LiveCalls extends LiveBase {
+  private readonly observedHabits = new Map<string, { plan: TeamTactics; ticks: number }>();
+  private readonly keyCounts: Record<Side, Record<string, number>> = { home: {}, away: {} };
+
+  /** Sample only a plan already on the field in first-half open play. */
+  protected observeRivalPlay(): void {
+    if (!this.aiRival || COUNTERS.ai.on !== 1) return;
+    if (this.half === 1 && this.phase.kind === 'play') {
+      const plan = this.tactics[other(this.aiRival.side)];
+      const key = `${plan.attack}/${plan.defence}`;
+      const entry = this.observedHabits.get(key) ?? { plan: { ...plan }, ticks: 0 };
+      entry.ticks++;
+      this.observedHabits.set(key, entry);
+    }
+    for (const event of this.events) if (event.side) {
+      const counts = this.keyCounts[event.side];
+      counts[event.kind] = (counts[event.kind] ?? 0) + 1;
+    }
+  }
+
+  private counterKeyDown(side: Side, attack: AttackPreset): boolean {
+    const key = attack === 'grind' ? 'offload' : attack === 'kick-chase' ? 'kick'
+      : attack === 'balanced' ? 'error' : 'line-break';
+    const us = this.keyCounts[side][key] ?? 0, them = this.keyCounts[other(side)][key] ?? 0;
+    return (key === 'error' ? us - them : them - us) >= COUNTERS.ai.keyDeficit;
+  }
+
   // ── Coach calls (#73) ─────────────────────────────────────────────────────
   /** Tackles made in the set so far (a call's timing: "on tackle 2"). */
   get tackleCount(): number {
@@ -160,6 +188,12 @@ export abstract class LiveCalls extends LiveBase {
         side,
         at,
         concededInARow: this.concededRun[side],
+        ...(this.aiRival?.side === side ? { reaction: {
+          difficulty: this.aiRival.difficulty,
+          observed: [...this.observedHabits.values()].sort((a, b) => b.ticks - a.ticks).slice(0, 1).map(e => e.plan),
+          ownFit: this.squadFit[side], playerFit: this.squadFit[other(side)],
+          keyDown: this.counterKeyDown(side, this.tactics[side].attack),
+        } } : {}),
       });
       if (next) this.setTactics(side, next);
     }
@@ -174,6 +208,7 @@ export abstract class LiveCalls extends LiveBase {
       const t = queued.tactics;
       if (t.attack === this.tactics[side].attack && t.defence === this.tactics[side].defence) continue;
       this.tactics[side] = t;
+      this.refreshPlanFit(side);
       this.planChanges.push({ minute: queued.minute, side, attack: t.attack, defence: t.defence, at: queued.at });
       this.emit('plan', `${this.names[side]} change the plan: ${PRESET_LABEL[t.attack]} / ${PRESET_LABEL[t.defence]}`, this.kicker(side));
       this.events[this.events.length - 1]!.detail = `${t.attack}/${t.defence}`;
@@ -375,6 +410,7 @@ export abstract class LiveCalls extends LiveBase {
   /** A line break: in open play the carrier gets goal-side of every defender but the last man (the §7 count; a `break` to the contract). */
   protected watchLineBreak(h: Player | null): void {
     if (this.phase.kind !== 'play') {
+      this.offloadReceiver = null;
       this.lineBrokenBy = null;
       return;
     }

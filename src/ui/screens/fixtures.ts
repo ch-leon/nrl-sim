@@ -1,3 +1,6 @@
+import { matchupRead, counterRead, fitRead } from '../matchupRead';
+import { teamSheetFromSquad } from '../../match/league/sheets';
+import { resolveLineup, validTactics } from '../../systems/lineup';
 // src/ui/screens/fixtures.ts — the League sheet: ladder + fixtures (BAK-184, WU-7;
 // Broadcast Quiet 3h). Built from the src/ui/dom.ts helper kit (no Phaser).
 // One sheet, two columns: the ladder on the left (the club's row starred, a
@@ -15,11 +18,12 @@
 
 import { el, button, openModal, openScreen, ensureStyles } from '../dom';
 import { getState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
+import { currentRound } from '../../core/season';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { formGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
 import { SEASON_ROUNDS } from '../../config';
 import { openRivalSquad } from './rivalSquad';
-import { rivalStyle } from '../../systems/rivalRound';
+import { playerRivalContext, rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { styleLine, whenBehindLine } from '../tacticsBlurbs';
 import { shortName } from './matchReport';
@@ -42,9 +46,9 @@ export function fmtFixtureLine(f: Fixture, names: Record<string, string>): strin
   const home = names[f.homeId] ?? f.homeId;
   const away = names[f.awayId] ?? f.awayId;
   if (f.result) {
-    return `R${f.round} · ${home} ${f.result.homeScore}–${f.result.awayScore} ${away}`;
+    return `${roundShort(f.round)} · ${home} ${f.result.homeScore}–${f.result.awayScore} ${away}`;
   }
-  return `R${f.round} · ${home} v ${away}`;
+  return `${roundShort(f.round)} · ${home} v ${away}`;
 }
 
 /** A ladder row projected for display, including 1-based position and diff. */
@@ -150,6 +154,7 @@ export function ladderHasDraws(rows: readonly Pick<LadderViewRow, 'draws'>[]): b
 
 /** A round's short label for a 24px column: R7, QF, SF, GF. */
 export function roundShort(round: number): string {
+  if (round <= 0) return `T${round + 2}`;
   if (round <= SEASON_ROUNDS) return `R${round}`;
   return { 'Quarter final': 'QF', 'Semi final': 'SF', 'Grand final': 'GF' }[matchStage(round) as string] ?? `R${round}`;
 }
@@ -178,7 +183,7 @@ export function myFixtureRows(state: Pick<GameState, 'league' | 'week'>, names: 
     const opponentId = home ? f.awayId : f.homeId;
     const m = fmtMyFixture(f, names, playerId);
     const tone: MyFixtureRow['tone'] = m.result ?? (f === next ? 'next' : 'later');
-    const res = m.result ? `${m.result} ${m.score}` : tone === 'next' ? 'NEXT' : `Wk ${f.round}`;
+    const res = m.result ? `${m.result} ${m.score}` : tone === 'next' ? 'NEXT' : f.round <= 0 ? `Trial ${f.round + 2}` : `Wk ${f.round}`;
     out.push({ round: f.round, rd: roundShort(f.round), opponentId, opponent: names[opponentId] ?? opponentId, home, tone, res });
   }
   return out;
@@ -191,9 +196,9 @@ export function myFixtureRows(state: Pick<GameState, 'league' | 'week'>, names: 
  * coming week's (rolled at the end of the last), so it counts only when the next
  * fixture is this coming week's. Pure.
  */
-export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather'>): WeatherKind | undefined {
+export function forecastFor(state: Pick<GameState, 'league' | 'week' | 'weather' | 'preseason'>): WeatherKind | undefined {
   const f = nextFixture(state.league.fixtures, state.week, 'player');
-  return f && f.round === state.week ? state.weather : undefined;
+  return f && f.round === currentRound(state) ? state.weather : undefined;
 }
 
 /** No club's name on the ladder is longer than this (QA finding 3: long names wrapped at 844px). */
@@ -325,7 +330,7 @@ let fixturesView: 'mine' | 'all' = 'mine';
 export function fmtMyFixture(f: Fixture, names: Record<string, string>, playerId: string = PLAYER_ID): { label: string; result: FormResult | null; score: string } {
   const home = f.homeId === playerId;
   const opp = names[home ? f.awayId : f.homeId] ?? (home ? f.awayId : f.homeId);
-  const stage = f.round > SEASON_ROUNDS ? matchStage(f.round) : `R${f.round}`;
+  const stage = f.round <= 0 ? `Trial ${f.round + 2}` : f.round > SEASON_ROUNDS ? matchStage(f.round) : `R${f.round}`;
   const label = `${stage} · ${home ? 'v' : 'at'} ${opp}`;
   if (!f.result) return { label, result: null, score: '' };
   const us = home ? f.result.homeScore : f.result.awayScore;
@@ -367,7 +372,7 @@ function buildFixtures(state: GameState): { el: HTMLElement; reveal: () => void 
         ];
         // The coming match opens its preview: who, form, how they play, their best, head to head.
         const row = r.tone === 'next'
-          ? el('button', { class: 'nrl-fixture-row nrl-fixture-mine', attrs: { type: 'button', 'data-next-row': '', 'aria-label': `Next: round ${r.round} v ${r.opponent}, preview` }, onClick: () => openNextMatch() }, ...parts)
+          ? el('button', { class: 'nrl-fixture-row nrl-fixture-mine', attrs: { type: 'button', 'data-next-row': '', 'aria-label': `Next: ${r.round <= 0 ? `trial ${r.round + 2}` : `round ${r.round}`} v ${r.opponent}, preview` }, onClick: () => openNextMatch() }, ...parts)
           : el('div', { class: 'nrl-fixture-row nrl-fixture-mine' }, ...parts);
         row.setAttribute('data-player', 'true');
         row.setAttribute('data-round', String(r.round));
@@ -381,11 +386,11 @@ function buildFixtures(state: GameState): { el: HTMLElement; reveal: () => void 
     label.textContent = 'All games';
     toggle.textContent = '◂ Yours';
     for (const { round, fixtures } of fixturesByRound(state.league.fixtures)) {
-      const header = el('div', { class: 'nrl-label nrl-fixtures-round', text: round > SEASON_ROUNDS ? `Finals · ${roundShort(round)}` : `Round ${round}` });
-      if (round === state.week) { header.setAttribute('data-current', 'true'); current = header; }
+      const header = el('div', { class: 'nrl-label nrl-fixtures-round', text: round <= 0 ? `Pre-season trial ${round + 2}` : round > SEASON_ROUNDS ? `Finals · ${roundShort(round)}` : `Round ${round}` });
+      if (round === currentRound(state)) { header.setAttribute('data-current', 'true'); current = header; }
       list.append(header);
       for (const f of fixtures) {
-        const line = el('div', { class: 'nrl-fixture', text: fmtFixtureLine(f, names).replace(/^R\d+ · /, '') });
+        const line = el('div', { class: 'nrl-fixture', text: fmtFixtureLine(f, names).replace(/^[RT]\d+ · /, '') });
         if (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID) line.setAttribute('data-player', 'true');
         list.append(line);
       }
@@ -423,7 +428,7 @@ function nextMatchCard(state: GameState): HTMLElement {
     card.append(el('div', { class: 'nrl-next-head' }, el('span', { class: 'nrl-next-label', text: 'Next match' }), el('span', { class: 'nrl-next-where', text })));
     return card;
   }
-  const stage = p.stage === 'Round' ? `Round ${p.round}` : p.stage;
+  const stage = p.stage === 'Trial' ? `Pre-season trial ${p.round + 2}` : p.stage === 'Round' ? `Round ${p.round}` : p.stage;
   card.append(el('div', { class: 'nrl-next-head' },
     el('span', { class: 'nrl-next-label', text: 'Next match' }),
     el('span', { class: 'nrl-next-where', text: `${stage} · ${p.home ? 'Home' : 'Away'}` }),
@@ -448,12 +453,17 @@ function nextMatchCard(state: GameState): HTMLElement {
 
   const lines = el('div', { class: 'nrl-next-lines' });
   const line = (label: string, text: string): void => {
-    lines.append(el('div', { class: 'nrl-next-line' }, el('span', { class: 'nrl-label', text: label }), el('span', { text })));
+    lines.append(el('div', { class: 'nrl-next-line', attrs: { 'data-preview-line': label } }, el('span', { class: 'nrl-label', text: label }), el('span', { text })));
   };
   // How they play (N11): the style of the nine they would field today; the Guide's Tactics page explains the words.
   if (oppClub) {
-    const style = rivalStyle(oppClub);
-    line('They play', styleLine(style));
+    const ours = teamSheetFromSquad(state.squad, state.clubId, state.clubName, ['#000000', '#ffffff'], resolveLineup(state.lineup, state.squad)).roster ?? [];
+    const context = playerRivalContext(state, ours);
+    const style = rivalStyle(oppClub, context);
+    const theirs = rivalSheet(oppClub, context).roster ?? [];
+    line('They play', `${styleLine(style)} · ${fitRead(theirs, style.attack).stars} / ${fitRead(theirs, style.defence).stars}`);
+    line('Matchup', matchupRead(ours, theirs, validTactics(state.lineup.tactics), style));
+    line('Counters', counterRead(ours, style.defence));
     // The Analyst (N14): what they step to when they go more open. Everyone else just sees how they play.
     if (hasStaff(state, 'analyst')) {
       const behind = whenBehindLine(style);
@@ -612,6 +622,15 @@ button.nrl-fixture-row:focus-visible { outline: 2px solid var(--nrl-accent); out
 .nrl-next-form small { font-size: 0.6875rem; }
 .nrl-next-lines { display: flex; flex-direction: column; }
 .nrl-next-line { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--nrl-button); color: var(--nrl-text-2); overflow-wrap: anywhere; }
+@media (max-height: 440px) {
+  .nrl-next-match { gap: 4px; }
+  .nrl-next-side { padding: 4px 8px; }
+  .nrl-next-line { padding: 2px 0; }
+}
+@media (max-height: 340px) {
+  .nrl-next-match { gap: 2px; }
+  .nrl-next-line { padding: 1px 0; }
+}
 /* The opponent's name: a text link with a 44px hit area (#194). */
 .nrl-next-side .nrl-ladder-club { padding: 12px 0; margin: -12px 0; text-decoration: underline dotted; text-underline-offset: 3px; }
 `;

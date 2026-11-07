@@ -133,7 +133,9 @@ describe('legs and the wrestle in the live sim', () => {
     let home = 0;
     let away = 0;
     // The mechanic on the sheets as written: in a real match the gap between the sides counts for less (rating.spread, Phase 3).
-    const restore = applyTuning({ 'rating.spread': 1 });
+    // Isolate fatigue: unequal Stamina also changes Balanced style fit now (#465).
+    // The fit bonus has its own integration coverage in fit-bonus.test.ts.
+    const restore = applyTuning({ 'rating.spread': 1, 'counters.fit.on': 0 });
     try {
       // Four seeds: two left the mean within a few hundredths of the line whenever the seeds reshuffle.
       // Seeds 5–8 since the kick contests (#99) reshuffled every match: seeds 1–4 now leave the

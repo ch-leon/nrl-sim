@@ -1,4 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { createNewGame } from '../../src/core/state';
+import { COACH_NAME, COACH_ROLE, SUMMARY_REMARKS, EVENT_COMMENTS } from '../../src/ui/coachVoice';
+import { STEPS, HINTS, TUTORIAL_END_TEXT } from '../../src/ui/tutorial';
+import { NICKNAMES } from '../../scripts/gen-towns.mjs';
+import towns from '../../src/data/towns.json';
+import type { Town } from '../../src/data/townSetup';
+import { EXPANSION_COPY, expansionIntroLines } from '../../src/ui/expansionCopy';
+import { generateObjectives } from '../../src/systems/board';
 import { AU_PACK } from '../../src/content/au';
 import { RIVAL_CLUBS } from '../../src/data/league';
 import { generatedBench, generatedRoster } from '../../src/match/league/sheets';
@@ -195,7 +203,9 @@ describe('the name pools (#398)', () => {
 });
 
 describe('the pack text (#398)', () => {
-  const text = strings({ clubs: AU_PACK.clubs.map((c) => c.name), names: AU_PACK.names, vocab: AU_PACK.vocab, events: AU_PACK.events });
+  createNewGame('Test Club', 1);
+  const expansionState = createNewGame('Test Club', 1);
+  const text = strings({ expansion: [EXPANSION_COPY.title, EXPANSION_COPY.work, EXPANSION_COPY.skip, EXPANSION_COPY.review, ...expansionIntroLines(expansionState, generateObjectives(expansionState))], coach: { name: COACH_NAME, role: COACH_ROLE, summary: SUMMARY_REMARKS, events: EVENT_COMMENTS, tutorial: STEPS.map((s) => s.text), hints: HINTS, end: TUTORIAL_END_TEXT }, clubs: AU_PACK.clubs.map((c) => c.name), names: AU_PACK.names, vocab: AU_PACK.vocab, events: AU_PACK.events });
 
   it.each(BLOCKED_WORDS)('never says %s', (word) => {
     const re = new RegExp(`\\b${word.replace(/ /g, '\\s+')}\\b`, 'i');
@@ -207,5 +217,47 @@ describe('the pack text (#398)', () => {
     expect(names).toContain('Ballarat Bushrangers');
     expect(names).toContain('Mackay Marlins');
     expect(names.filter((n) => /Brumbies|Mariners/.test(n))).toEqual([]);
+  });
+});
+
+it('the fictional guide surname passes the same real-name and near-miss guard', () => {
+  expect(realProblem(COACH_NAME.split(' ').slice(1).join(' '))).toBeNull();
+});
+
+// Cities may be real; all suggested nicknames obey the same pack block list.
+describe('town suggestions (#485)', () => {
+  it.each(BLOCKED_WORDS)('never suggests %s', word => {
+    const re = new RegExp(`\\b${word.replace(/ /g, '\\s+')}\\b`, 'i');
+    expect([...NICKNAMES, ...(towns as Town[]).map(t => t.nickname)].filter(n => re.test(n))).toEqual([]);
+  });
+});
+
+import { UK_PACK } from '../../src/content/uk';
+import { townColorsAllowed } from '../../src/data/townSetup';
+
+// Super League / Championship identities, past as well as current. Towns may be
+// real but no club takes their name, nickname or city/kit identity.
+const UK_CLUB_MARKS = ['Wigan Warriors', 'St Helens', 'Leeds Rhinos', 'Warrington Wolves', 'Hull FC', 'Hull KR', 'Hull Kingston Rovers', 'Castleford Tigers', 'Wakefield Trinity', 'Bradford Bulls', 'Salford Red Devils', 'Huddersfield Giants', 'Leigh Leopards', 'London Broncos', 'Catalans Dragons', 'Toulouse Olympique', 'Featherstone Rovers', 'Halifax Panthers', 'Batley Bulldogs', 'Dewsbury Rams', 'Barrow Raiders', 'Whitehaven', 'Workington Town', 'Widnes Vikings', 'Swinton Lions', 'Oldham Roughyeds', 'Rochdale Hornets', 'Sheffield Eagles', 'Doncaster', 'Hunslet', 'York Knights', 'Rhinos', 'Trinity', 'Bulls', 'Red Devils', 'Giants', 'Leopards', 'Olympique', 'Rovers', 'Rams', 'Vikings', 'Lions', 'Roughyeds', 'Hornets'];
+const UK_PLAYER_SURNAMES = ['Welsby', 'Makinson', 'Percival', 'Walmsley', 'Roby', 'Lomax', 'Farrell', 'O’Loughlin', 'O\'Loughlin', 'Charnley', 'Hampshire', 'Handley', 'Oledzki', 'Ikahihifo', 'Lafai', 'Yates', 'Sutcliffe', 'McShane', 'Watkins', 'Sneyd', 'Briers', 'Myler', 'Sinfield', 'Burrow', 'McGuire', 'Hanley', 'Schofield', 'Offiah', 'Sculthorpe', 'Long', 'Cunningham', 'Newlove', 'Wellens', 'Morley', 'Peacock', 'Burgess', 'Brough', 'McGillvary', 'Hall', 'Lunt', 'Leeming', 'Minchella', 'Parcell', 'Lewis', 'Williams', 'French', 'Field', 'Marshall', 'Wardle', 'Ashton', 'Thewlis', 'Dufty', 'Drinkwater', 'Hedges', 'Hodgson', 'Briscoe', 'Hardaker', 'Tomkins'];
+
+describe('UK invented content (#488)', () => {
+  it('passes the existing real-player and near-miss guards and the UK surname list', () => {
+    const real = new Set(UK_PLAYER_SURNAMES.flatMap(parts));
+    expect(UK_PACK.names.last.flatMap(s => {
+      const why = realProblem(s);
+      return why || [...real].some(r => fold(s) === r || (r.length >= 5 && (fold(s).includes(r) || r.includes(fold(s)) || distance(fold(s), r) <= 1))) ? [s] : [];
+    })).toEqual([]);
+  });
+  it('uses no blocked AU or UK club marks anywhere in the pack', () => {
+    for (const mark of [...BLOCKED_WORDS, ...UK_CLUB_MARKS]) {
+      const re = new RegExp(`\\b${mark.replace(/ /g, '\\s+')}\\b`, 'i');
+      expect(strings(UK_PACK).filter(t => re.test(t)), mark).toEqual([]);
+    }
+  });
+  it('avoids real city and colour matches', () => {
+    for (const club of UK_PACK.clubs) {
+      const town = club.home?.town ?? club.name.split(' ').slice(0, -1).join(' ');
+      expect(townColorsAllowed(town, 'GB', ...club.colors)).toBe(true);
+    }
   });
 });

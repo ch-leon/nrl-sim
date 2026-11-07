@@ -50,7 +50,7 @@ export function delta(cur: { mean: number; se: number }, base: { mean: number; s
 }
 
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
-/** A tenth. Side win is read against the 45–55% band, and a whole percent prints 54.8% as 55%. */
+/** A tenth. Side win is read against the 42–58% band; retain a tenth when reading endpoints. */
 const pct1 = (v: number): string => `${(v * 100).toFixed(1)}%`;
 const legsEnd = (r: CellResult): string => {
   const l = r.legs[r.legs.length - 1];

@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/rivalRound.test.ts — rival rounds on the live sim (N9.2): with
 // "Rival matches on the match engine" on, an interactive week plays the rival
 // fixtures on the live sim (here on the main thread: the tests have no Worker),
@@ -5,7 +6,7 @@
 // the games, stats and injuries; fast-forward and the default keep the cheap sim.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { bus } from '../../src/core/events';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, registerTickHook, resumeWeek, TICK_ORDER } from '../../src/core/time';
 import type { GameState } from '../../src/core/state';
 import { applyResult, initLeague, PLAYER_ID, registerFixturesSystem, simulateRivalRound } from '../../src/systems/fixtures';

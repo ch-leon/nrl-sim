@@ -12,6 +12,7 @@
 // Office marks OFFICE and its own tile. The mark is a fill and a bar under the
 // label, so it reads without its colour (#344).
 
+import { bus } from '../core/events';
 import {
   button,
   el,
@@ -36,6 +37,8 @@ export interface NavStatus {
 export interface NavPlacement {
   /** A tile in Office's sheet rather than a tab of its own. */
   more?: boolean;
+  /** Office only: a visible tile explains why it has not opened yet. */
+  locked?: () => string | null;
   /** Other screen keys this entry stands for (League holds the ladder, Squad the lineup). */
   holds?: string[];
   /** Office tiles: the line under the name, read each time the sheet opens. */
@@ -53,6 +56,7 @@ export interface NavScreen {
   holds: string[];
   hidden: boolean;
   status?: () => NavStatus | null;
+  locked?: () => string | null;
 }
 
 /** Handle to the mounted tabs. */
@@ -66,7 +70,7 @@ export interface Nav {
    * `label`; off hides it. Unlike a count it never rolls up into OFFICE.
    */
   setDot(id: string, on: boolean, label?: string): void;
-  /** Open a registered screen as its tab or tile would (the tutorial, the money readout). */
+  /** Open directly, bypassing Office locks (the HUD, tutorial and warning links). */
   open(id: string): void;
   destroy(): void;
 }
@@ -90,6 +94,7 @@ export class ScreenRegistry {
     this.map.set(id, {
       id, label, open, more: placement.more === true, holds: placement.holds ?? [], hidden: placement.hidden === true,
       ...(placement.status ? { status: placement.status } : {}),
+      ...(placement.locked ? { locked: placement.locked } : {}),
     });
     if (!existed) this.order.push(id);
     return existed;
@@ -303,7 +308,14 @@ export function createNav(): Nav {
     registry.set(id, label, open, placement);
     let btn: HTMLButtonElement;
     if (placement.more) {
-      btn = button('', () => pick(id));
+      btn = button('', () => {
+        const reason = registry.get(id)?.locked?.();
+        if (reason) {
+          bus.emit('ui:notify', { text: reason, kind: 'info' });
+          return;
+        }
+        pick(id);
+      });
       btn.append(el('span', { class: 'nrl-office-name', text: label }), el('span', { class: 'nrl-office-status' }));
       btn.setAttribute('role', 'menuitem');
     } else {
@@ -328,8 +340,13 @@ export function createNav(): Nav {
       } catch {
         st = null; // no game loaded yet
       }
-      line.textContent = st?.text ?? '';
-      line.toggleAttribute('data-attn', st?.attn === true);
+      const reason = s.locked?.() ?? null;
+      const btn = buttons.get(s.id)!;
+      btn.classList.toggle('nrl-office-locked', reason !== null);
+      if (reason) btn.setAttribute('aria-disabled', 'true');
+      else btn.removeAttribute('aria-disabled');
+      line.textContent = reason ?? st?.text ?? '';
+      line.toggleAttribute('data-attn', !reason && st?.attn === true);
     }
   }
 

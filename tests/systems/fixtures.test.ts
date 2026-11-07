@@ -1,3 +1,4 @@
+import { createLegacyGame } from '../helpers/legacyGame';
 // tests/systems/fixtures.test.ts — fixture completeness/no-dupes/no self-play,
 // ladder math + tie-breaks, cheap-sim determinism, finals bracket. See BAK-184.
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -169,7 +170,7 @@ describe('generateFixtures', () => {
 // ── applyResult / ladder math ─────────────────────────────────────────────────
 
 function stateWithLadder(rows: LadderRow[]): GameState {
-  createNewGame('Tester', 42);
+  createLegacyGame('Tester', 42);
   setState({ league: { clubs: [], fixtures: [], ladder: rows } });
   return getState();
 }
@@ -206,7 +207,7 @@ describe('applyResult — points & re-sort', () => {
   });
 
   it('stamps the result onto the matching fixture', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     const fx: Fixture = { round: 3, homeId: 'a', awayId: 'b' };
     setState({ league: { clubs: [], fixtures: [fx], ladder: emptyLadder(['a', 'b']) } });
     const next = applyResult(getState(), fx, { homeScore: 8, awayScore: 4 });
@@ -244,7 +245,7 @@ describe('applyResult — points & re-sort', () => {
 
 describe('getCurrentFixture', () => {
   it('returns the player fixture for the current week', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     setState({ week: 5 });
     const fx = getCurrentFixture(getState(), PLAYER_ID);
@@ -254,7 +255,7 @@ describe('getCurrentFixture', () => {
   });
 
   it('returns undefined in finals weeks when the player has no tie', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     setState({ week: SEASON_ROUNDS + 1 });
     // No QF fixtures generated yet / player not in bracket → no fixture.
@@ -262,7 +263,7 @@ describe('getCurrentFixture', () => {
   });
 
   it('returns the player finals fixture when one exists for the week', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     const fx: Fixture = {
       round: SEASON_ROUNDS + 1,
@@ -334,7 +335,7 @@ describe('cheapSimScore', () => {
 
 describe('simulateRivalRound', () => {
   it('is deterministic and skips player fixtures', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     setState({ week: 1 });
     const before = getState();
@@ -350,7 +351,7 @@ describe('simulateRivalRound', () => {
   });
 
   it('applies exactly the 7 rival games of the round to the ladder', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     setState({ week: 1 });
     const next = simulateRivalRound(getState(), makeRng(5));
@@ -367,7 +368,7 @@ describe('simulateRivalRound', () => {
 describe('runFinals', () => {
   function ladderTop(playerRank: number): GameState {
     // Build a league where the player sits at ladder position `playerRank`.
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     const clubs = getState().league.clubs;
     // Give descending points so ordering is deterministic; player gets a chosen slot.
@@ -443,7 +444,7 @@ describe('runFinals', () => {
 
 describe('ensureFinalsRound / playable finals', () => {
   function ladderTop(playerRank: number): GameState {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     const clubs = getState().league.clubs;
     const others = clubs.filter((c) => c.id !== PLAYER_ID);
@@ -508,7 +509,7 @@ describe('ensureFinalsRound / playable finals', () => {
 
 describe('initLeague', () => {
   it('populates 16 clubs (player first), 192 fixtures and a zeroed ladder', () => {
-    createNewGame('Cavehole Crushers', 42);
+    createLegacyGame('Cavehole Crushers', 42);
     const league = initLeague(getState());
     expect(league.clubs).toHaveLength(LEAGUE_SIZE);
     expect(league.clubs[0]?.id).toBe(PLAYER_ID);
@@ -521,7 +522,7 @@ describe('initLeague', () => {
   });
 
   it('advances the rng seed (deterministic per starting seed)', () => {
-    createNewGame('A', 42);
+    createLegacyGame('A', 42);
     const seedBefore = getState().rngSeed;
     initLeague(getState());
     expect(getState().rngSeed).not.toBe(seedBefore);
@@ -544,7 +545,7 @@ describe('ladderPosition', () => {
 
 describe('registerFixturesSystem', () => {
   it('rolls weather and simulates the rival round on a tick', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     setState({ week: 1 });
     registerFixturesSystem();
@@ -558,7 +559,7 @@ describe('registerFixturesSystem', () => {
   });
 
   it('keeps the ladder sorted after a tick', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     setState({ week: 1 });
     registerFixturesSystem();
@@ -572,7 +573,7 @@ describe('registerFixturesSystem', () => {
 
 describe('playable finals via the week tick', () => {
   it('pre-generates each finals round, plays it, and records history at rollover', () => {
-    createNewGame('Tester', 42);
+    createLegacyGame('Tester', 42);
     initLeague(getState());
     registerFixturesSystem();
     registerPlayerMatchSystem();
@@ -613,5 +614,50 @@ describe('playable finals via the week tick', () => {
     expect(ended).toEqual([{ season: 1, ladderPosition: posBefore, premiership: s.history[0]!.premiership }]);
     // New season has no finals ties yet.
     expect(s.league.fixtures.every((f) => f.round <= SEASON_ROUNDS)).toBe(true);
+  });
+});
+
+describe('separate pre-season trials (#487)', () => {
+  it('gives every club two deterministic trials against distinct rivals, one home and one away, without changing main fixtures or RNG', () => {
+    for (const seed of [1, 42, 7919]) {
+      const fresh = createNewGame('Trial Club', seed);
+      initLeague(fresh);
+      const withTrials = getState();
+      const { preseason: _phase, ...legacy } = fresh;
+      initLeague(legacy);
+      const withoutTrials = getState();
+      expect(withTrials.league.fixtures.filter((f) => f.round > 0)).toEqual(withoutTrials.league.fixtures);
+      expect(withTrials.rngSeed).toBe(withoutTrials.rngSeed);
+      expect(withTrials.league.clubs).toEqual(withoutTrials.league.clubs);
+      for (const club of withTrials.league.clubs) {
+        const trials = withTrials.league.fixtures.filter((f) => f.round <= 0 && [f.homeId, f.awayId].includes(club.id));
+        expect(trials).toHaveLength(2);
+        expect(trials.filter((f) => f.homeId === club.id)).toHaveLength(1);
+        expect(new Set(trials.map((f) => f.homeId === club.id ? f.awayId : f.homeId)).size).toBe(2);
+        expect(trials.every((f) => f.homeId !== f.awayId)).toBe(true);
+      }
+      initLeague(fresh);
+      expect(getState().league).toEqual(withTrials.league);
+    }
+  });
+
+  it('plays both trials then round 1; trials stamp scores without ladder points', () => {
+    createNewGame('Trial Club', 42);
+    initLeague(getState());
+    registerFixturesSystem();
+    registerPlayerMatchSystem();
+    for (const phase of [1, 2]) {
+      expect(getState().preseason).toBe(phase);
+      expect(getCurrentFixture(getState(), PLAYER_ID)?.round).toBe(phase - 2);
+      advanceWeeks(1);
+      expect(getState().week).toBe(1);
+      expect(getState().league.ladder.every((r) => r.played === 0 && r.points === 0)).toBe(true);
+      expect(getState().league.fixtures.filter((f) => f.round === phase - 2).every((f) => f.result)).toBe(true);
+    }
+    expect(getState().preseason).toBe(0);
+    expect(getCurrentFixture(getState(), PLAYER_ID)?.round).toBe(1);
+    advanceWeeks(1);
+    expect(getState().week).toBe(2);
+    expect(getState().league.ladder.every((r) => r.played === 1)).toBe(true);
   });
 });

@@ -11,6 +11,9 @@
 // screen and the tutorial. The Settings popup can switch it off
 // (settings.weekSummary; absent = on). No Phaser.
 
+import { coachLine, summaryRemark } from './coachVoice';
+import { coachSays, type CoachSuggestion } from './coachSays';
+import { pendingDecisionCount } from './decisions';
 import { bus } from '../core/events';
 import { getState, FINANCE_LINES, type FinanceLine, type GameState, type PlayerStats } from '../core/state';
 import { advanceInProgress } from '../core/advance';
@@ -31,13 +34,14 @@ import { inlineIqStat } from '../content/pack';
 const STAT_KEYS: readonly (keyof PlayerStats)[] = ['speed', 'strength', 'stamina', 'skill', 'footyIQ'];
 // The IQ stat's name comes from the content pack (#361), as on the player page.
 const STAT_WORD: Readonly<Record<keyof PlayerStats, string>> = {
-  speed: 'speed', strength: 'strength', stamina: 'stamina', skill: 'skill', footyIQ: inlineIqStat(activePack()),
+  speed: 'speed', strength: 'strength', stamina: 'stamina', skill: 'skill', get footyIQ() { return inlineIqStat(activePack()); },
 };
 
 /** What the card compares: the club as it stood at one moment. Plain data, kept in memory only. */
 export interface WeekSnapshot {
   season: number;
   week: number;
+  preseason?: GameState['preseason'];
   squad: { id: string; name: string; stats: PlayerStats; injuredWeeks: number; suspendedWeeks: number }[];
   /** Each season's books on the snapshot, by line (GameState.finance). */
   finance: { season: number; lines: Record<FinanceLine, number> }[];
@@ -52,6 +56,7 @@ export function weekSnapshot(s: GameState, runwayWeeks: number | null = null): W
   return {
     season: s.season,
     week: s.week,
+    ...(s.preseason === undefined ? {} : { preseason: s.preseason }),
     squad: s.squad.map((p) => ({ id: p.id, name: p.name, stats: { ...p.stats }, injuredWeeks: p.injuredWeeks, suspendedWeeks: p.suspendedWeeks ?? 0 })),
     finance: s.finance.map((f) => ({ season: f.season, lines: Object.fromEntries(FINANCE_LINES.map((l) => [l, f[l]])) as Record<FinanceLine, number> })),
     boardPatience: s.boardPatience,
@@ -88,8 +93,10 @@ export interface WeekSummary {
 }
 
 /** Weeks from one snapshot to the next, across a season's end. */
-function weeksBetween(a: Pick<WeekSnapshot, 'season' | 'week'>, b: Pick<WeekSnapshot, 'season' | 'week'>): number {
-  return (b.season - a.season) * WEEKS_PER_SEASON + (b.week - a.week);
+function weeksBetween(a: Pick<WeekSnapshot, 'season' | 'week' | 'preseason'>, b: Pick<WeekSnapshot, 'season' | 'week' | 'preseason'>): number {
+  const offset = (s: typeof a): number => s.preseason === undefined ? s.week
+    : s.week === 1 && s.preseason ? s.preseason - 2 : s.week;
+  return (b.season - a.season) * (WEEKS_PER_SEASON + (a.preseason === undefined ? 0 : 2)) + offset(b) - offset(a);
 }
 
 const plural = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`;
@@ -108,7 +115,9 @@ export function boardMood(patience: number, risk: ObjectiveRisk | null): BoardMo
 export function weekSummary(before: WeekSnapshot, after: WeekSnapshot): WeekSummary {
   const weeks = weeksBetween(before, after);
   const lastWeek = after.week - 1;
-  const title = weeks <= 1 ? `Week ${before.week}` : before.season === after.season && lastWeek >= before.week
+  const trialStart = before.week === 1 && before.preseason;
+  const title = trialStart ? (weeks <= 1 ? `Pre-season trial ${before.preseason}` : `Last ${weeks} weeks`)
+    : weeks <= 1 ? `Week ${before.week}` : before.season === after.season && lastWeek >= before.week
     ? `Weeks ${before.week}–${lastWeek}` : `Last ${weeks} weeks`;
 
   const was = new Map(before.squad.map((p) => [p.id, p] as const));
@@ -193,7 +202,7 @@ function section(title: string, lines: readonly string[], empty: string): HTMLEl
 }
 
 /** The card: two columns (the squad, then the money and the board) over Advance Week and Close. */
-export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void }): HTMLElement {
+export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void; coach?: CoachSuggestion }): HTMLElement {
   const squad = [
     ...capList(v.injuries),
     ...capList(v.bans),
@@ -216,6 +225,7 @@ export function openWeekSummary(v: WeekSummary, opts: { onAdvance: () => void })
   close.setAttribute('data-summary-close', '');
   const content = el('div', { class: 'nrl-summary', attrs: { 'data-week-summary': '' } },
     el('h2', { text: `${v.title} summary` }),
+    coachLine(opts.coach?.screen ? opts.coach.text : summaryRemark(v)),
     el('div', { class: 'nrl-summary-cols' },
       el('div', { class: 'nrl-summary-col' },
         section('Training', v.gains, 'No gains to speak of.'),
@@ -265,7 +275,10 @@ export function initWeekSummary(opts: { onAdvance: () => void; runwayWeeks: (s: 
     due = false;
     if (poll) clearInterval(poll);
     poll = undefined;
-    openWeekSummary(weekSummary(before, after), { onAdvance: opts.onAdvance });
+    openWeekSummary(weekSummary(before, after), {
+      onAdvance: opts.onAdvance,
+      coach: coachSays(s, { decisions: pendingDecisionCount(s), runwayWeeks: opts.runwayWeeks(s) }),
+    });
     before = after;
   };
   // A task later, so whatever the advance opens on its way out (a decision card,

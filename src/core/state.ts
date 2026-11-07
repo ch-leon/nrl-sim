@@ -2,7 +2,9 @@
 // module-singleton store. See ARCHITECTURE §4 and BAK-172. No Phaser, no class
 // instances in state (must JSON round-trip).
 
+import type { TeamTactics } from '../match/league/presets';
 import { bus } from './events';
+import { packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
 import { generateFreeAgent, generatePlayer, generatePlayerAround, POSITIONS } from '../data/player';
 import type { FacilityDefId } from '../data/facility';
@@ -76,6 +78,8 @@ export interface RivalClub {
   strength: number;
   /** The rival's own players (#74); absent on the player's club entry and in RIVAL_CLUBS. */
   squad?: Player[];
+  /** Fictional club home; absent in older saves. Derby status is derived, never saved. */
+  home?: { town: string; country?: string; lat: number; lon: number };
 }
 
 export interface LeagueState {
@@ -92,7 +96,7 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 21;
+export const SAVE_VERSION = 22;
 
 /** The three hires the facilities don't cover (N14.5). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare';
@@ -236,15 +240,24 @@ export interface EventDeckState {
 export interface SackedInfo { season: number; reason: string }
 
 export interface GameState {
+  /** Content id; absent in old saves means AU, regardless of home or build default. */
+  pack?: string;
   version: typeof SAVE_VERSION;
   clubId: 'player';
   clubName: string;
+  coachName?: string;
+  home?: { town: string; region?: string; country?: string; lat?: number; lon?: number };
+  groundName?: string;
   money: number;
   reputation: number; // 1-100, drives attendance & sponsors
-  week: number; // 1..WEEKS_PER_SEASON
+  /** Absent: legacy 27-week seasons forever. 1/2: trials; 0: regular season. */
+  preseason?: 0 | 1 | 2;
+  week: number; // competitive round, 1..WEEKS_PER_SEASON
   season: number; // starts at 1
   squad: Player[];
   facilities: PlacedFacility[];
+  /** Absent means everything is open: old saves and the veteran skip. */
+  unlocks?: { facilities: FacilityDefId[]; screens?: string[] | undefined } | undefined;
   freeAgents: Player[];
   league: LeagueState;
   weather?: WeatherKind; // set for current round by fixtures system
@@ -277,6 +290,8 @@ export interface GameState {
   finance: SeasonFinance[];
   /** The coach's nine, bench and rotation (#69); old saves get today's auto pick. */
   lineup: Lineup;
+  /** Kick-off plans from played league matches, newest first, at most three. */
+  recentPlans: TeamTactics[];
   /** What the squad trains hardest (N11): one stat, or Balanced (every stat as it always trained). */
   training: { focus: TrainingFocus };
   /** What the club owes the board (N14.3): renewals it couldn't afford, advanced and repaid at the rollover. */
@@ -308,12 +323,14 @@ export function getState(): GameState {
  */
 export function setState(patch: Partial<GameState>): void {
   const current = getState();
+  if ('pack' in patch) selectPack(patch.pack);
   state = { ...current, ...patch };
   bus.emit('state:changed', state);
 }
 
 /** Replace the whole state (used by save.ts / tests). Emits 'state:changed'. */
 export function loadState(next: GameState): void {
+  selectPack(next.pack);
   state = next;
   bus.emit('state:changed', state);
 }
@@ -328,8 +345,10 @@ export function loadState(next: GameState): void {
 export function createNewGame(
   clubName: string,
   seed: number = Date.now() >>> 0,
-  options: { difficulty?: Difficulty | undefined } = {},
+  options: { difficulty?: Difficulty | undefined; coachName?: string | undefined; openAll?: boolean | undefined; home?: GameState['home']; groundName?: string | undefined } = {},
 ): GameState {
+  const pack = packForCountry(options.home?.country);
+  selectPack(pack);
   const difficulty = options.difficulty ?? DEFAULT_DIFFICULTY;
   const rng = makeRng(seed);
 
@@ -367,14 +386,20 @@ export function createNewGame(
 
   const result: GameState = {
     version: SAVE_VERSION,
+    pack,
     clubId: 'player',
     clubName,
+    ...(options.coachName?.trim() ? { coachName: options.coachName } : {}),
+    ...(options.home ? { home: { ...options.home } } : {}),
+    ...(options.groundName ? { groundName: options.groundName } : {}),
     money: Math.round(STARTING_MONEY * difficultyMultipliers(difficulty).startingMoney),
     reputation: 30,
     week: 1,
+    preseason: 1,
     season: 1,
     squad,
     facilities: [],
+    ...(options.openAll ? {} : { unlocks: { facilities: ['trainingPaddock', 'weightsRoom', 'canteen', 'sponsorBoard'] as FacilityDefId[], screens: [] } }),
     freeAgents,
     league,
     settings: { muted: false, volume: 0.8, tutorialDone: false, difficulty },
@@ -385,6 +410,7 @@ export function createNewGame(
     finance: [emptyFinance(1)],
     // The opening side: today's best nine by slot and the next four (#69). No dice: the squad is unchanged.
     lineup: autoPick(squad),
+    recentPlans: [],
     training: { focus: 'balanced' },
     boardLoan: { owed: 0 },
     staff: [],
@@ -408,5 +434,5 @@ export function newEventDeck(seed: number): EventDeckState {
  */
 export function resetForNewSeason(): void {
   const current = getState();
-  setState({ season: current.season + 1, week: 1 });
+  setState({ season: current.season + 1, week: 1, ...(current.preseason === undefined ? {} : { preseason: 1 as const }) });
 }

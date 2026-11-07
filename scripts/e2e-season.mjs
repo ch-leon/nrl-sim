@@ -1,3 +1,4 @@
+import { playTrials } from './e2e-webkit/common.mjs';
 // scripts/e2e-season.mjs — end-to-end playthrough of a full season on a phone
 // (QA pass). Builds the game and serves it with `vite preview`, then in
 // Chromium at 844×390 (touch) or 1280×800 (a desktop window, mouse):
@@ -448,6 +449,7 @@ async function play() {
   await step('new-game', async () => {
     await page.fill('[data-nrl-clubname]', 'Phone Test FC');
     await tap('[data-nrl-start]');
+    await tap('[data-expansion-work]');
     await page.waitForSelector('.nrl-dock');
     await wait(1000);
   });
@@ -456,6 +458,12 @@ async function play() {
     if (!(await skip.count())) return 'no tutorial shown';
   });
   await step('tutorial-skipped', async (rec) => { await tap('.nrl-tutorial-skip'); await dumpSave('after-tutorial', rec); });
+  await step('pre-season-trials', async () => {
+    await page.evaluate(() => sessionStorage.setItem('nrlE2eCloseSummary', '1'));
+    await playTrials(page);
+    await wait(500);
+    await page.evaluate(() => sessionStorage.removeItem('nrlE2eCloseSummary'));
+  });
 
   // A phone held upright: the menus work (#350), so the sheet left open (the tour's
   // Build) stays up, or Club home stands in for the grounds, with no rotate card; the

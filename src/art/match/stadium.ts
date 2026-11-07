@@ -24,7 +24,8 @@ import { FIELD_LONG, FIELD_WIDE, IN_GOAL_DEPTH, TEN_METRES, bonusZoneGrid } from
 import { Canvas3D, isoProject, isoUnproject, noiseTile, sampleTile, whiteTile, type NoiseTile, type P3 } from './iso3d';
 import { drawText, textWidth } from './font';
 import type { Kit } from './kit';
-import { activeVocab } from '../../content';
+import type { StadiumSigns } from '../../content/pack';
+import { activeVocab, onPackChange } from '../../content';
 import { BRAND, signText } from '../../brand';
 
 // ── Geometry (grid units, z in px) ──────────────────────────────────────────
@@ -328,7 +329,7 @@ export interface Panel {
  * sign is the brand's (#363); the colours are the art's. Exported for tests.
  */
 export function panelsFor(home: Kit, away: Kit): Panel[] {
-  const signs = activeVocab().stadiumSigns;
+  const signs = workerSigns ?? activeVocab().stadiumSigns;
   return [
     { bg: 0xd8443a, fg: 0xffffff, text: signs.food },
     { bg: 0x2b5fd9, fg: 0xffe14d, text: signs.sport },
@@ -795,4 +796,13 @@ export function crowdSeats(): CrowdSeat[] {
     }
   }
   return seats;
+}
+
+onPackChange(clearGroundCache);
+
+// Workers receive just the display words, never the clubs and player pools.
+let workerSigns: StadiumSigns | undefined;
+export function setStadiumSigns(signs: StadiumSigns): void {
+  if (JSON.stringify(workerSigns) !== JSON.stringify(signs)) clearGroundCache();
+  workerSigns = signs;
 }

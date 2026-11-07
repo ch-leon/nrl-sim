@@ -23,6 +23,7 @@ export async function runCoachCalls(browser, sizes) {
     try {
       await page.goto(BASE);
       await page.locator('[data-nrl-start]').tap();
+      await page.locator('[data-expansion-work]').tap();
       await page.locator('.nrl-tutorial-skip').tap();
       await openNav(page, 'calls');
       await page.locator('[data-coach-calls] [data-calls-group]').first().waitFor();

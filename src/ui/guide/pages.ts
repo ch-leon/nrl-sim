@@ -11,7 +11,7 @@ import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL } from '../../match/leagu
 import { NINES } from '../../match/league/rules';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { getState, type GameState } from '../../core/state';
-import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, TRAINING_FOCUS, WILDCARDS } from '../../config';
+import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, TRAINING_FOCUS, WILDCARDS } from '../../config';
 import { activePack } from '../../content';
 import { inlineIqStat } from '../../content/pack';
 import { STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
@@ -93,7 +93,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     title: 'Your week',
     sections: [
       {
-        text: 'The season is 27 weeks: 24 rounds, then three finals weeks if you make the eight. Play Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.',
+        text: `New careers begin each season with two pre-season trials: try a lineup, earn a small home gate, with no ladder points or contract weeks used. Then come ${WEEKS_PER_SEASON} competitive weeks: ${SEASON_ROUNDS} rounds and ${FINALS_WEEKS} finals weeks if you make the eight. Older careers keep their existing season shape. Play Week runs one week: training and injuries, wages and income, your match and the rivals’, the ladder, the free-agent pool (it refreshes every 4 weeks), then an autosave.`,
       },
       {
         heading: 'Advancing further',
@@ -238,7 +238,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       {
         heading: 'Reading the opposition',
         bullets: [
-          'Every rival plays a style that follows from its nine: a kicking half kicks and chases, quick backs go wide, a heavy pack grinds; a strong pack rushes in defence and a fit side compresses.',
+          'Every rival plays a style. On Easy it keeps its own squad style. On Normal and Hard rivals read your last three league plans, never your upcoming pick; Hard also weighs your squad fit and can react to the plan seen in the first half. Vary your plans to keep them guessing.',
           'The next-match card says how they play (“They play Expansive · Rush”); the ladder tags each club (EXP·RSH) and a rival’s squad page names it.',
         ],
       },
@@ -271,12 +271,12 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'ladder',
     sections: [
       {
-        text: '16 clubs play 24 rounds: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.',
+        text: `${activePack().clubs.length + 1} clubs play ${SEASON_ROUNDS} rounds: 2 points for a win, 1 for a draw, points difference splits ties. The Ladder tab shows every club’s form (the last five), and a club’s name opens its squad. The Fixtures tab previews your next match.`,
       },
       {
         heading: 'Finals',
         bullets: [
-          `The top eight play quarter finals (1 v 8, 2 v 7, 3 v 6, 4 v 5), the winners are re-seeded for the semis, and the grand final is week 27. A final level at full time goes to golden point: ${NINES.goldenPointMinutes} more minutes, and the next score wins (a try needs no conversion). Still level after that, the higher seed goes through. Finals are night games.`,
+          `The top eight play quarter finals (1 v 8, 2 v 7, 3 v 6, 4 v 5), the winners are re-seeded for the semis, and the grand final is week ${WEEKS_PER_SEASON}. A final level at full time goes to golden point: ${NINES.goldenPointMinutes} more minutes, and the next score wins (a try needs no conversion). Still level after that, the higher seed goes through. Finals are night games.`,
           'Prize money is paid at the rollover; the premiership is worth 15 reputation on top.',
         ],
       },

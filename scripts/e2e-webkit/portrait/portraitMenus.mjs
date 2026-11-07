@@ -254,6 +254,7 @@ export async function runPortraitMenus(browser) {
         for (const k of ['t', 'b']) document.documentElement.style.setProperty(`--nrl-safe-${k}`, `${s[k]}px`);
       }, safe);
       await page.waitForSelector('[data-nrl-start]');
+    await page.locator('[data-nrl-open-all]').check();
       const out = [];
       for (const t of Object.keys(TEXT_SIZES)) {
         await textSize(t);
@@ -267,6 +268,7 @@ export async function runPortraitMenus(browser) {
     await step('club-home', async (rec) => {
       await page.fill('[data-nrl-clubname]', 'Upright FC');
       await press('[data-nrl-start]');
+      await page.locator('[data-expansion-work]').tap();
       await press('.nrl-tutorial-skip');
       await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
       // A decision waiting: PLAY WEEK carries its count, the dock's widest row (and Club home its row).

@@ -1,3 +1,4 @@
+import { activePack } from '../content';
 // src/scenes/matchArtAhead.ts — the next fixture's match art, painted ahead (N10.5,
 // #154). After each week (and when a game starts or loads) the player's next
 // fixture is looked up and its stadium, crowd and kit atlases are painted in the
@@ -112,7 +113,7 @@ function paintElsewhere(offsetX: number, kits: FixtureKits): Promise<FixtureArt>
     w.onmessage = (e: MessageEvent<FixtureArt>) => done(reviveFixtureArt(e.data));
     w.onerror = fail;
     try {
-      w.postMessage({ offsetX, kits });
+      w.postMessage({ offsetX, kits, signs: activePack().vocab.stadiumSigns });
     } catch {
       fail();
     }

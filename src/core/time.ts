@@ -12,6 +12,7 @@
 import { getState, setState, resetForNewSeason } from './state';
 import { bus } from './events';
 import { WEEKS_PER_SEASON } from '../config';
+import { inTrials } from './season';
 import { demoStops } from '../commercial/demo';
 
 // ── Public hook contracts ──────────────────────────────────────────────────
@@ -66,6 +67,7 @@ interface TickEntry {
   order: number;
   seq: number;
   fn: TickHook;
+  trials: boolean;
 }
 
 interface SeasonEntry {
@@ -99,9 +101,10 @@ let fastForwardHolds = false;
 /**
  * Register (or replace) a weekly hook. Ascending `order` is execution order;
  * ties break by insertion order. Re-registering an existing `name` replaces it.
+ * Trial weeks run only hooks that opt in; round-based events/unlocks stay paused.
  */
-export function registerTickHook(name: string, order: number, fn: TickHook): void {
-  tickHooks.set(name, { name, order, seq: seqCounter++, fn });
+export function registerTickHook(name: string, order: number, fn: TickHook, options: { trials?: boolean } = {}): void {
+  tickHooks.set(name, { name, order, seq: seqCounter++, fn, trials: options.trials === true });
 }
 
 export function unregisterTickHook(name: string): void {
@@ -161,7 +164,7 @@ export function advanceWeek(): void {
   const canHold = !fastForwardFlag || fastForwardHolds;
   const ctx: TickContext = { week, season, fastForward: fastForwardFlag, ...(canHold ? { hold: () => void holding++ } : {}) };
 
-  const entries = sortedEntries(tickHooks);
+  const entries = sortedEntries(tickHooks).filter((entry) => !inTrials(getState()) || entry.trials);
   for (let i = 0; i < entries.length; i++) {
     entries[i]!.fn(ctx);
     // Held: finish this order's hooks (the player's match and the rival round
@@ -201,6 +204,12 @@ export function clearHeldWeek(): void {
 }
 
 function finishWeek(week: number): void {
+  const s = getState();
+  if (inTrials(s)) {
+    setState({ preseason: s.preseason === 1 ? 2 : 0 });
+    bus.emit('week:advanced', { week: s.week, season: s.season });
+    return;
+  }
   const nextWeek = week + 1;
   if (nextWeek > WEEKS_PER_SEASON) {
     rollSeasonOver();

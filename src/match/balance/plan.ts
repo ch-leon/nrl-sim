@@ -11,6 +11,7 @@ import { isRotation, type Rotation } from '../league/bench';
 import { isLegs, type Legs } from '../league/fatigue';
 import { isAttackPreset, isDefencePreset, type AttackPreset, type TeamTactics } from '../league/presets';
 import { checkTuning, type Overrides } from '../league/tuning';
+import type { StyleFit } from '../league/fit';
 
 /** Position groups match league/presets.ts; exact positions override their group. */
 export const POSITION_GROUPS = {
@@ -29,6 +30,8 @@ export interface SideSpec {
   /** Applied after flat stats, to starters and bench; exact positions win over groups. */
   positionStats?: Partial<Record<keyof typeof POSITION_GROUPS | Position, Partial<RosterStats>>>;
   tactics?: Partial<TeamTactics>;
+  /** Harness-only starting fit fixture; playing stats stay unchanged. Unspecified styles still read the sheet. */
+  fit?: Partial<StyleFit>;
   /** Special skills: none (default for a flat squad), as rolled (default for a club), all superstars. */
   traits?: 'none' | 'gen' | 'stars';
   /** Interchange players, 0–4 (default 4; a flat squad's bench has the squad's stats). */
@@ -188,6 +191,13 @@ export function checkPlan(p: Plan): string[] {
             if (!['speed', 'strength', 'stamina', 'skill', 'footyIQ'].includes(key)) errs.push(`${s.name} ${side}: unknown stat "${key}"`);
             else if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 100) errs.push(`${s.name} ${side}: ${position}.${key} must be a number 1–100`);
           }
+        }
+      }
+      if (spec.fit !== undefined) {
+        if (!spec.fit || typeof spec.fit !== 'object' || Array.isArray(spec.fit)) errs.push(`${s.name} ${side}: fit must be an object`);
+        else for (const [style, value] of Object.entries(spec.fit)) {
+          if (!isAttackPreset(style) && !isDefencePreset(style)) errs.push(`${s.name} ${side}: unknown fit style "${style}"`);
+          else if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1.5) errs.push(`${s.name} ${side}: fit.${style} must be a number 0–1.5`);
         }
       }
       if (spec.tactics?.attack && !isAttackPreset(spec.tactics.attack)) errs.push(`${s.name} ${side}: unknown attack preset "${spec.tactics.attack}"`);

@@ -5,6 +5,7 @@
 // fatigue), the two players' STATS shift it, traits will add their bonus on
 // top (C, §3), and ONE seeded roll decides. Pure and unit-tested so the
 // numbers in the design doc are the numbers in the game.
+import { FIT } from './fit';
 import { FATIGUE } from './fatigue';
 
 export type ContestOutcome = 'held' | 'big-hit' | 'broken' | 'fend' | 'offload' | 'strip';
@@ -45,8 +46,11 @@ export function carrierEdge(atk: ContestStats, def: ContestStats): number {
   return 1 / (1 + Math.exp(-(a - d) / 22));
 }
 
-/** Even-stats, one-on-one, square baseline (design doc §4.1). */
-export const BASE = { bigHit: 0.1, broken: 0.12, fend: 0.07, offload: 0.12, strip: 0.02 };
+/**
+ * Even-stats, one-on-one, square baseline (design doc §4.1). `stepSlope` is the
+ * step's footwork-v-defence slope: points of edge per 1% of step chance (#322).
+ */
+export const BASE = { bigHit: 0.1, broken: 0.12, fend: 0.07, offload: 0.12, strip: 0.02, stepSlope: 200 };
 
 /**
  * Momentum at contact (§4.1, #322): bust points per m/s the carrier is quicker
@@ -54,8 +58,28 @@ export const BASE = { bigHit: 0.1, broken: 0.12, fend: 0.07, offload: 0.12, stri
  */
 export const MOMENTUM = { perMs: 0.01, cap: 0.04 };
 
+/**
+ * The edge race (#322): an outside back carrying wide, one-on-one, against the
+ * man actually tackling him. Bust points per point of Speed stat he has over his
+ * tackler, capped either way, and `fendShare` of that again on the fend. Relative,
+ * so it is zero at equal Speed and pays a side that is faster everywhere little
+ * (the spread keeps a fifth of that). `wide` 0 lets any back's one-on-one carry
+ * race; `backsOnly` 0 lets anyone's; `single` 0 races the first tackler when two
+ * or more commit too (a rushing line commits two). Overridable by name (`race.perPoint`).
+ */
+export const RACE = { on: 0, perPoint: 0.008, cap: 0.12, fendShare: 0.5, wide: 1, backsOnly: 1, single: 1 };
+
+/** Bust and fend points from the Speed race between the carrier and his tackler (#322). Zero when off or level. */
+export function edgeRace(carrierSpeed: number, tacklerSpeed: number): { broken: number; fend: number } {
+  if (RACE.on !== 1 || carrierSpeed === tacklerSpeed) return { broken: 0, fend: 0 };
+  const broken = Math.max(-RACE.cap, Math.min(RACE.cap, RACE.perPoint * (carrierSpeed - tacklerSpeed)));
+  return { broken, fend: broken * RACE.fendShare };
+}
+
 /** Probability points traits add to (or take from) each outcome, already scaled by level (§3). */
 export interface ContestMods {
+  /** Attack style edge minus defence style edge, in carrier-edge probability units. */
+  edge?: number;
   broken?: number;
   fend?: number;
   offload?: number;
@@ -72,7 +96,7 @@ const clamp01 = (v: number): number => Math.max(0, Math.min(0.95, v));
  * plain held tackle.
  */
 export function contestOdds(edge: number, s: Situation, mods: ContestMods = {}): Record<ContestOutcome, number> {
-  const e = Math.max(0, Math.min(1, edge)) - 0.5; // −0.5 … +0.5, 0 = even
+  const e = Math.max(0, Math.min(1, edge + (mods.edge ?? 0))) - 0.5; // −0.5 … +0.5, 0 = even
   let broken = BASE.broken + 0.16 * e;
   let fend = BASE.fend + 0.09 * e;
   let offload = s.support ? BASE.offload + 0.1 * e : 0;
@@ -148,13 +172,13 @@ export const defence = (s: ContestStats): number => (s.strength + s.footyIQ) / 2
 
 /**
  * Chance the carrier steps a lone defender before contact (§4.1): 10% at even
- * footwork vs defence, ±1% per 2 points of edge, +5% when the defender comes
+ * footwork vs defence, ±1% per 2 points of edge (`contest.stepSlope` 200), +5% when the defender comes
  * from the side, less when the carrier is spent, plus any trait bonus (§3).
  * Never against two defenders.
  */
 export function stepChance(atk: ContestStats, def: ContestStats, s: Situation, traitBonus = 0): number {
   if (s.defenders !== 1) return 0;
-  let p = 0.1 + (footwork(atk) - defence(def)) / 200;
+  let p = 0.1 + (footwork(atk) - defence(def)) / BASE.stepSlope;
   if (s.angle === 'side') p += 0.05;
   if (s.angle === 'behind') p -= 0.05; // can't step what you can't see
   p -= 0.08 * s.carrierFatigue;
@@ -187,4 +211,10 @@ export function interceptChance(defenderIQ: number, cutOut: boolean, traitBonus 
   if (cutOut) p *= 2;
   p += traitBonus;
   return Math.max(0.01, Math.min(0.6, p));
+}
+
+/** The middle squeeze removes busts and available offloads using the same contact roll. */
+export function compressedContact(effect: number, contactD: number, support: boolean): ContestMods {
+  const squeeze = effect * Math.max(0, contactD) / FIT.leagueAverage;
+  return { broken: -squeeze, offload: support ? -squeeze : 0 };
 }

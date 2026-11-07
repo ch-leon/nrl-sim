@@ -1,10 +1,12 @@
+import { stubDocument, type StubNode } from '../stubDom';
+import { EXPANSION_COPY } from '../../../src/ui/expansionCopy';
 // tests/ui/screens/seasonReview.test.ts — the season review (N7, #190): the pure
 // builders, and a headless season through the real hooks to see the record
 // stamped. The modal itself is not rendered (the vitest env is 'node').
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   addPotm, buildSeasonReview, finalsRun, fmtMoneyInOut, fmtMovers, fmtPotmTotal, fmtRecord, initSeasonReview, moneyLineBad,
-  MOVERS_SHOWN, potmSummary, snapshotBeforeRollover,
+  openSeasonReview, MOVERS_SHOWN, potmSummary, snapshotBeforeRollover,
 } from '../../../src/ui/screens/seasonReview';
 import { initSeasonEndFeedback } from '../../../src/ui/screens/history';
 import { createNewGame, getState, setState, type GameState } from '../../../src/core/state';
@@ -159,7 +161,7 @@ describe('a season through the real hooks', () => {
     const off = initSeasonEndFeedback();
     const toasts: string[] = [];
     bus.on('ui:notify', ({ text }) => toasts.push(text));
-    advanceWeeks(WEEKS_PER_SEASON);
+    advanceWeeks(WEEKS_PER_SEASON + 2);
     const s = getState();
     expect(s.season).toBe(2);
     const entry = s.history.find((h) => h.season === 1)!;
@@ -192,8 +194,21 @@ describe('a season through the real hooks', () => {
     off();
     const toasts: string[] = [];
     bus.on('ui:notify', ({ text }) => toasts.push(text));
-    advanceWeeks(WEEKS_PER_SEASON);
+    advanceWeeks(WEEKS_PER_SEASON + 2);
     expect(toasts.some((t) => t.startsWith('Season 1 complete'))).toBe(false);
     expect(getState().history[0]!.review).toBeDefined();
   });
+});
+
+// The review uses the record's season, including when reopened from History.
+it('shows the first-season line for season 1 only, even after rollover', () => {
+  stubDocument();
+  setState(createNewGame('Test Club', 484));
+  setState({ season: 3 });
+  try {
+    const first = openSeasonReview({ season: 1, ladderPosition: 10, premiership: false }) as unknown as StubNode;
+    expect(first.words()).toContain(EXPANSION_COPY.review);
+    const second = openSeasonReview({ season: 2, ladderPosition: 10, premiership: false }) as unknown as StubNode;
+    expect(second.words()).not.toContain(EXPANSION_COPY.review);
+  } finally { vi.unstubAllGlobals(); }
 });

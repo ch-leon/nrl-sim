@@ -1,8 +1,9 @@
 {
   "name": "counters fit",
-  "description": "Squad-fit baseline: fast backs (speed 80), strong pack (strength 80), smart opposing defence (footy IQ 75), plus Rush/Compressed rows and 500-seed 62/65 v 60 yardsticks. Includes the flat 60 matrix as a control. No tuning overrides.",
+  "description": "Squad-fit baseline: fast backs (speed 80), strong pack (strength 80), smart opposing defence (footy IQ 75), plus Rush/Compressed rows and 500-seed 62/65 v 60 yardsticks. Includes the flat 60 matrix as a control. Compares dormant defaults with the pack-fit Tight offload rebuild.",
   "report": "matrix",
   "seeds": 200,
+  "variants": [{"name": "Tight on", "tuning": {"counters.tight.on": 1}}],
   "scenarios": [
     {"name": "grind v slide", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "slide"}}, "track": "home", "bothWays": true},
     {"name": "grind v rush", "home": {"rating": 60, "tactics": {"attack": "grind", "defence": "slide"}}, "away": {"rating": 60, "tactics": {"attack": "balanced", "defence": "rush"}}, "track": "home", "bothWays": true},

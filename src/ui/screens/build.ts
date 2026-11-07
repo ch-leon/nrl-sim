@@ -25,6 +25,7 @@ import {
   type FacilityDef,
 } from '../../data/facility';
 import type { PlayerStats, PlacedFacility } from '../../core/state';
+import { isFacilityOpen, unlockReason } from '../../systems/unlocks';
 import { getState, setState } from '../../core/state';
 import { spendMoney } from '../../data/club';
 import { ECON } from '../../config';
@@ -60,7 +61,7 @@ const STAT_LABEL: Record<keyof PlayerStats, string> = {
   strength: 'Strength',
   stamina: 'Stamina',
   skill: 'Skill',
-  footyIQ: activePack().vocab.iqStat,
+  get footyIQ() { return activePack().vocab.iqStat; },
 };
 
 /** The free-agent pool's lift a level, in overall points (freeagency.poolTarget). */
@@ -135,7 +136,8 @@ export function facilityCategory(def: Pick<FacilityDef, 'trains'>): Exclude<Buil
  * Why a facility can't be built now, or null when it can: a unique one already
  * on the grounds, or the money short ("Need $23,390 more"). Pure.
  */
-export function buildBlocker(def: Pick<FacilityDef, 'id' | 'cost' | 'unique'>, state: { money: number; facilities: readonly { defId: string }[] }): string | null {
+export function buildBlocker(def: Pick<FacilityDef, 'id' | 'cost' | 'unique'>, state: { money: number; facilities: readonly { defId: string }[]; unlocks?: { facilities: FacilityDefId[] } | undefined }): string | null {
+  if (!isFacilityOpen(state, def.id)) return unlockReason(def.id);
   if (def.unique && state.facilities.some((f) => f.defId === def.id)) return 'Built: upgrade it on the grounds';
   if (state.money < def.cost) return `Need ${fmtMoney(def.cost - Math.max(0, state.money))} more`;
   return null;
@@ -171,7 +173,9 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
           'div',
           {
             class: blocked ? 'nrl-build-row nrl-build-row-disabled' : 'nrl-build-row',
-            attrs: blocked ? { 'aria-disabled': 'true' } : { 'data-facility': def.id, role: 'button', tabindex: '0' },
+            // aria-disabled is inherited: the Office's separate calls button stays available.
+            attrs: blocked ? (def.id === 'coachsOffice' ? {} : { 'aria-disabled': 'true' })
+              : { 'data-facility': def.id, role: 'button', tabindex: '0' },
           },
           el('div', { class: 'nrl-build-top' },
             el('span', { class: 'nrl-build-title', text: def.name }),
@@ -180,7 +184,7 @@ export function openBuildScreen(scene: GroundsSceneLike | null = activeGroundsSc
           el('div', { class: 'nrl-build-blurb', text: facilityBlurb(def, { level: 1, reputation, officeLevel }) }),
           // Can't build: the meta line turns yellow and says why first.
           blocked
-            ? el('div', { class: 'nrl-build-meta nrl-build-why', text: built ? blocked : `${blocked} · ${meta}` })
+            ? el('div', { class: 'nrl-build-meta nrl-build-why', text: built || !isFacilityOpen(s, def.id) ? blocked : `${blocked} · ${meta}` })
             : el('div', { class: 'nrl-build-meta', text: meta }),
         );
         // The Coach's Office's tile opens the Coach calls page, built or not, buildable or not.

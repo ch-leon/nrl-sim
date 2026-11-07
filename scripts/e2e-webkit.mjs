@@ -1,3 +1,6 @@
+import { runCounterText } from './e2e-webkit/match/counterText.mjs';
+import { runTrials } from './e2e-webkit/screens/trials.mjs';
+import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 // scripts/e2e-webkit.mjs — Safari-shaped checks: long DOM panels (#206, #203) and
 // a phone that opens already upright (#315).
 // Builds the game, serves it with `vite preview`, and in Playwright's WebKit as an
@@ -49,6 +52,8 @@
 //
 // WebKit comes from WEBKIT_PATH or playwright-core's browser registry
 // (PLAYWRIGHT_BROWSERS_PATH); CI fetches it with `playwright-core install --with-deps webkit`.
+import { runDerby } from './e2e-webkit/screens/derby.mjs';
+import { runUnlocks } from './e2e-webkit/screens/unlocks.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,10 +63,18 @@ import { runSize } from './e2e-webkit/portrait/size.mjs';
 import { runPortrait } from './e2e-webkit/portrait/portrait.mjs';
 import { runPortraitMenus } from './e2e-webkit/portrait/portraitMenus.mjs';
 import { runPauseSettings } from './e2e-webkit/match/pauseSettings.mjs';
+import { runRecruit } from './e2e-webkit/screens/recruit.mjs';
 import { SCREEN_RUNS, runScreens } from './e2e-webkit/screens/screens.mjs';
 import { WALK_RUNS, runTutorialWalk } from './e2e-webkit/match/tutorialWalk.mjs';
 import { runDockTextSize } from './e2e-webkit/portrait/dockTextSize.mjs';
 import { runPlaytest } from './e2e-webkit/match/playtest.mjs';
+import { runCoachSays } from './e2e-webkit/screens/coachSays.mjs';
+import { runCoachVoice } from './e2e-webkit/screens/coachVoice.mjs';
+import { runOfficeUnlocks } from './e2e-webkit/screens/officeUnlocks.mjs';
+import { runCoachName } from './e2e-webkit/screens/coachName.mjs';
+import { runDifficulty } from './e2e-webkit/screens/difficulty.mjs';
+import { runContentPacks } from './e2e-webkit/screens/contentPacks.mjs';
+import { runTownSetup } from './e2e-webkit/screens/townSetup.mjs';
 import { FLOW_RUNS, runFlow } from './e2e-webkit/screens/flow.mjs';
 import { runLargeTextTargets } from './e2e-webkit/text/largeTextTargets.mjs';
 import { runLadderForm } from './e2e-webkit/text/ladderForm.mjs';
@@ -74,14 +87,27 @@ import { runCoachCalls } from './e2e-webkit/match/coachCalls.mjs';
 // in this same order. Each section opens its own contexts and writes its own folder
 // under e2e-output/webkit, so a section plays the same alone as after the others.
 const SECTIONS = [
+  ['runCounterText', (b) => runCounterText(b)],
+  ['runTrials', (b) => runTrials(b)],
+  ['runExpansionIntro', (b) => runExpansionIntro(b)],
+  ['runDerby', (b) => runDerby(b)],
+  ['runUnlocks', (b) => runUnlocks(b)],
   ['runSize', async (b) => { let f = 0; for (const [W, H] of SIZES) f += await runSize(b, W, H); return f; }],
   ['runPortrait', (b) => runPortrait(b)],
-  ['runPlaytest', (b) => runPlaytest(b)],
+  ['runPlaytest', async (b) => (await runPlaytest(b)) + (await runPlaytest(b, 844, 390))],
   ['runPauseSettings', (b) => runPauseSettings(b)],
   ['runTutorialWalk', async (b) => { let f = 0; for (const run of WALK_RUNS) f += await runTutorialWalk(b, run); return f; }],
+  ['runRecruit', (b) => runRecruit(b)],
   ['runScreens', async (b) => { let f = 0; for (const run of SCREEN_RUNS) f += await runScreens(b, run); return f; }],
   ['runDockTextSize', (b) => runDockTextSize(b)],
+  ['runContentPacks', (b) => runContentPacks(b)],
+  ['runTownSetup', (b) => runTownSetup(b)],
   ['runFlow', async (b) => { let f = 0; for (const run of FLOW_RUNS) f += await runFlow(b, run); return f; }],
+  ['runCoachName', (b) => runCoachName(b)],
+  ['runOfficeUnlocks', (b) => runOfficeUnlocks(b)],
+  ['runDifficulty', (b) => runDifficulty(b)],
+  ['runCoachSays', (b) => runCoachSays(b)],
+  ['runCoachVoice', (b) => runCoachVoice(b)],
   ['runLargeTextTargets', (b) => runLargeTextTargets(b)],
   ['runLadderForm', (b) => runLadderForm(b)],
   ['runPortraitMenus', (b) => runPortraitMenus(b)],
@@ -94,8 +120,8 @@ const SECTIONS = [
  */
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
-  text: ['runLargeTextTargets', 'runLadderForm'],
-  screens: ['runScreens', 'runFlow'],
+  text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
+  screens: ['runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 

@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/ui/paywall.test.ts — the paywall and "Already bought? Log in" (#364), built
 // in the stand-in DOM (tests/ui/stubDom.ts): which buttons each country gets, that
 // AU and the default never mention the web, the tier cards, and Buy, Restore and
@@ -15,7 +16,7 @@ import { PRICE_PLACEHOLDER } from '../../src/commercial/prices';
 import { STORE_RULES, type Storefront } from '../../src/commercial/storeRules';
 import { BRAND } from '../../src/brand';
 import { bus, type Events } from '../../src/core/events';
-import { createNewGame, getState } from '../../src/core/state';
+import { getState } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearSeasonHooks, clearTickHooks } from '../../src/core/time';
 import { initLeague } from '../../src/systems/fixtures';
 import { stubLocalStorage, type MemStorage } from '../commercial/memStorage';

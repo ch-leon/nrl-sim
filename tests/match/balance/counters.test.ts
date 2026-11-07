@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { POSITIONS } from '../../../src/data/player';
 import { cellsOf, checkPlan, POSITION_GROUPS, type Plan, type SideSpec } from '../../../src/match/balance/plan';
-import { measureCell, SIDE_COUNTS, sideSheet, squadSide } from '../../../src/match/balance/measure';
+import { countEvents, measureCell, SIDE_COUNTS, sideSheet, squadSide } from '../../../src/match/balance/measure';
 import { reportMarkdown } from '../../../src/match/balance/report';
 
 const even = { name: 'balanced v slide', home: { rating: 60 }, away: { rating: 60 }, track: 'home' as const };
@@ -49,6 +49,19 @@ describe('position stat overrides', () => {
 });
 
 describe('tracked counter measurements', () => {
+  it('keeps opposing kick and try context when attributing kick counts to one side', () => {
+    const events = [
+      { tick: 1, kind: 'kick', side: 'home' as const, detail: 'bomb', text: '' },
+      { tick: 2, kind: 'kick', side: 'away' as const, detail: 'long', text: '' },
+      { tick: 3, kind: 'regather', side: 'home' as const, text: '' },
+      { tick: 4, kind: 'kick', side: 'home' as const, detail: 'grubber', text: '' },
+      { tick: 5, kind: 'try', side: 'away' as const, text: '' },
+      { tick: 6, kind: 'try', side: 'home' as const, text: '' },
+    ];
+    expect(countEvents(events, 'home')).toMatchObject({ bombs: 1, bombsWon: 0, grubbers: 1, grubberTries: 0 });
+    expect(countEvents(events, 'away')).toMatchObject({ bombs: 0, bombsWon: 0, grubbers: 0, grubberTries: 0 });
+  });
+
   const cell = { variant: { name: 'baseline' }, scenario: { ...even, home: { rating: 60, tactics: { attack: 'expansive' as const } } } };
   it('pools both orientations per side while preserving legacy counts, including when tracking away', () => {
     const written = measureCell(cell, 2, 2);
@@ -65,14 +78,15 @@ describe('tracked counter measurements', () => {
     expect(both.trackedCounts!.pointsFor).toEqual(both.opponentCounts!.pointsAgainst);
   });
   it('calculates wins plus half draws and its sample SE on a two-seed cell', () => {
-    // These short seeds give one win and one loss; a one-minute cell below draws.
+    // These short seeds give one draw and one loss with counters enabled (#465);
+    // before switch-on they gave [1, 0]. A neutral one-minute control draws.
     const tiny = cell;
     const first = measureCell(tiny, 1, 4, 1);
     const second = measureCell(tiny, 1, 4, 2);
     const both = measureCell(tiny, 2, 4, 1);
     const xs = [first, second].map((r) => r.trackedWin! + r.trackedDraw! / 2);
-    expect(xs).toEqual([1, 0]);
-    expect(measureCell(tiny, 1, 1).pointsShare).toEqual({ mean: 0.5, se: 0 });
+    expect(xs).toEqual([0.5, 0]);
+    expect(measureCell({ ...cell, scenario: even }, 1, 1).pointsShare).toEqual({ mean: 0.5, se: 0 });
     expect(new Set(xs).size).toBe(2);
     const mean = (xs[0]! + xs[1]!) / 2;
     expect(both.pointsShare!.mean).toBe(mean);

@@ -149,3 +149,83 @@ describe('lossReasons: ranking (#368)', () => {
     expect(r.map((x) => x.cta)).toEqual(['Find a strike player', 'Pick surer hands']);
   });
 });
+
+describe('out-schemed (#468)', () => {
+  const ended = (over: Partial<MatchResult> = {}) => result({ events: [{ t: 18, kind: 'full-time', teamId: PLAYER_ID }], ...over });
+  const countered = (s: GameState) => ({ us: ours(s, { tactics: { attack: 'grind', defence: 'slide' } }),
+    them: theirs(s, { tactics: { attack: 'balanced', defence: 'compressed' } }) });
+  const hasReason = (rs: ReturnType<typeof why>) => rs.some(r => r.cta === 'Try a different plan');
+
+  it('fires at the expected swing threshold with factual event evidence and a Lineup CTA', () => {
+    const s = club(), { us, them } = countered(s);
+    expect(why(s, ended(), us, them)[0]).toEqual({
+      text: 'Out-schemed: their Compressed countered your Tight. You made 0 line breaks',
+      screen: 'lineup', cta: 'Try a different plan',
+    });
+    const r = why(s, ended(), us, them);
+    expect(r.length).toBeGreaterThanOrEqual(MIN_REASONS);
+    expect(r.length).toBeLessThanOrEqual(MAX_REASONS);
+  });
+
+  it('does not fire for flat Balanced / Slide, a win, a draw, or the counter losing', () => {
+    const s = club(), { us, them } = countered(s);
+    expect(hasReason(why(s, ended()))).toBe(false);
+    expect(hasReason(why(s, ended({ homeScore: 20, awayScore: 10 }), us, them))).toBe(false);
+    expect(hasReason(why(s, ended({ homeScore: 20, awayScore: 20 }), us, them))).toBe(false);
+    expect(hasReason(why(s, ended(), { ...us, tactics: { attack: 'expansive', defence: 'slide' } }, them))).toBe(false);
+  });
+
+  it('does not fire below threshold, including zero fit', () => {
+    const s = club(), { us, them } = countered(s);
+    const roster = (rating: number) => ours(s).roster!.map(p => ({ ...p,
+      stats: { speed: rating, strength: rating, stamina: rating, skill: rating, footyIQ: rating } }));
+    expect(hasReason(why(s, ended(), { ...us, roster: roster(59) }, them))).toBe(false);
+    expect(hasReason(why(s, ended(), { ...us, roster: roster(0) }, them))).toBe(false);
+  });
+
+  it('nets both matchups: equally countered sides do not explain a loss', () => {
+    const s = club(), { us, them } = countered(s);
+    expect(hasReason(why(s, ended(), { ...us, tactics: { attack: 'grind', defence: 'compressed' } },
+      { ...them, tactics: { attack: 'grind', defence: 'compressed' } }))).toBe(false);
+  });
+
+  it('weights plan changes by exposure and never tops up with a below-threshold counter', () => {
+    const s = club(), { us, them } = countered(s);
+    const changes: MatchResult['planChanges'] = [{ minute: 1, side: 'away', attack: 'balanced', defence: 'slide', at: 'try' }];
+    expect(hasReason(why(s, ended({ planChanges: changes }), us, them))).toBe(false);
+    // A final-minute switch into a counter also cannot explain the match.
+    expect(hasReason(why(s, ended({ planChanges: [{ ...changes[0]!, minute: 17, defence: 'compressed' }] }),
+      us, { ...them, tactics: { attack: 'balanced', defence: 'slide' } }))).toBe(false);
+  });
+
+  it('works away and identifies the opponent attack beating our defence', () => {
+    const s = club();
+    const rs = lossReasons(ended({ homeScore: 20, awayScore: 10 }),
+      { homeId: rivalId(s), awayId: PLAYER_ID }, {
+        home: theirs(s, { tactics: { attack: 'kick-chase', defence: 'slide' } }),
+        away: ours(s, { tactics: { attack: 'balanced', defence: 'rush' } }),
+      }, s);
+    expect(rs[0]).toMatchObject({ text: 'Out-schemed: their Kick-chase found room against your Rush. You made 0 line breaks', cta: 'Try a different plan' });
+  });
+
+  it('fires in a headless strong-counter loss and stays silent in flat Balanced / Slide', async () => {
+    const { runMatch } = await import('../../src/match/league/match');
+    const { sideSheet } = await import('../../src/match/balance/measure');
+    const s = club();
+    const us = sideSheet(PLAYER_ID, { rating: 60, tactics: { attack: 'grind', defence: 'slide' } });
+    const them = sideSheet(rivalId(s), { rating: 60, tactics: { attack: 'balanced', defence: 'compressed' } });
+    let losses = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const r = runMatch(us, them, { seed });
+      const lost = r.awayScore > r.homeScore;
+      expect(hasReason(why(s, r, us, them))).toBe(lost);
+      if (lost) losses++;
+    }
+    expect(losses).toBeGreaterThan(0);
+    const flatUs = { ...us, tactics: { attack: 'balanced', defence: 'slide' } as const };
+    const flatThem = { ...them, tactics: { attack: 'balanced', defence: 'slide' } as const };
+    const flat = runMatch(flatUs, flatThem, { seed: 1 });
+    expect(flat.awayScore).toBeGreaterThan(flat.homeScore);
+    expect(hasReason(why(s, flat, flatUs, flatThem))).toBe(false);
+  });
+});

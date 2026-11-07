@@ -17,9 +17,10 @@ import { ECON, SEASON_ROUNDS, SQUAD_MIN, WEEKS_PER_SEASON, difficultyMultipliers
 import { sortLadder } from './fixtures';
 import { FACILITY_CATALOG, facilityUpkeep, levelMult } from '../data/facility';
 import { closedGatesFlag, EVENT_CARDS } from '../data/events';
+import { currentRound, inTrials } from '../core/season';
 import { registerTickHook, TICK_ORDER } from '../core/time';
 import { staffWages } from './staff';
-import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks } from './contracts';
+import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks, notifyContractWarning } from './contracts';
 
 /**
  * Level of the built facility with `defId`, or 0 if none is built. Placement
@@ -93,7 +94,7 @@ export function weeklyIncome(state: GameState): number {
 function currentFixture(state: GameState): GameState['league']['fixtures'][number] | undefined {
   const fixtures = state.league?.fixtures ?? [];
   return fixtures.find(
-    (f) => f.round === state.week
+    (f) => f.round === currentRound(state)
       && (f.homeId === state.clubId || f.awayId === state.clubId),
   );
 }
@@ -112,7 +113,7 @@ export function groundCapacity(state: GameState): number {
  */
 export function recentForm(state: GameState, round = state.week): number {
   const mine = state.league.fixtures
-    .filter((f) => f.result && f.round < round && (f.homeId === state.clubId || f.awayId === state.clubId))
+    .filter((f) => f.result && f.round > 0 && f.round < round && (f.homeId === state.clubId || f.awayId === state.clubId))
     .sort((a, b) => b.round - a.round)
     .slice(0, ECON.FORM_GAMES);
   let score = 0;
@@ -164,7 +165,7 @@ export function homeGate(state: GameState, fixture: Fixture): GateEstimate {
   const attendance = closed ? 0 : Math.min(capacity, demand);
   // Easy pays a little less at the gate (DIFFICULTY.easy.gate). Normal and Hard
   // are ×1, so the crowd, the form and the occasion still decide the receipt.
-  const receipts = scaledMoney(attendance * ECON.TICKET_PRICE, difficultyMultipliers(state.settings.difficulty).gate);
+  const receipts = Math.round(scaledMoney(attendance * ECON.TICKET_PRICE, difficultyMultipliers(state.settings.difficulty).gate) * (fixture.round <= 0 ? 0.25 : 1));
   return { capacity, demand, attendance, receipts, soldOut: !closed && demand > capacity };
 }
 
@@ -228,7 +229,7 @@ export function tickContracts(state: GameState): GameState {
     if (weeks > 0) {
       keep.push({ ...p, contractWeeks: weeks });
       const warning = warnForWeeks(p.name, weeks);
-      if (warning) bus.emit('ui:notify', { text: warning, kind: 'info' });
+      if (warning) notifyContractWarning(warning);
       continue;
     }
 
@@ -349,7 +350,7 @@ export function applyEconomy(state: GameState): GameState {
   const gate = gateReceipts(getState());
   if (gate !== 0) earnMoney(gate, 'gate');
 
-  tickContracts(getState());
+  if (!inTrials(state)) tickContracts(getState());
   handleBankruptcy(getState());
   return getState();
 }
@@ -362,7 +363,7 @@ export function applyEconomy(state: GameState): GameState {
 export function registerEconomySystem(): void {
   registerTickHook('economy', TICK_ORDER.economy, () => {
     applyEconomy(getState());
-  });
+  }, { trials: true });
 }
 
 // ── The club's books (N6, #172) ───────────────────────────────────────────────
@@ -417,13 +418,13 @@ export interface MovementStamp { line: FinanceLine; season: number; week: number
  * (registerFinanceSystem) and the Finance screen's weekly ledger both stamp with
  * this, so the two always agree on where the rollover's money belongs (N12).
  */
-export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance'>, reason: string): MovementStamp {
+export function stampMovement(state: Pick<GameState, 'season' | 'week' | 'finance' | 'preseason'>, reason: string): MovementStamp {
   const line = classifyReason(reason);
   // A loan taken in week 1 is that season's; its repayment, like the grant, closes the one before.
   const closing = state.week === 1 && CLOSING_LINES.has(line) && reason !== BOARD_LOAN && state.finance.some((e) => e.season === state.season - 1);
   return closing
     ? { line, season: state.season - 1, week: WEEKS_PER_SEASON }
-    : { line, season: state.season, week: state.week };
+    : { line, season: state.season, week: currentRound(state) };
 }
 
 /**

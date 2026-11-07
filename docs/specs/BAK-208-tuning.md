@@ -71,7 +71,12 @@ Baselines at even stats, one-on-one, square — `src/match/league/contest.ts`:
 | Angle | side: fend +5, big hit −4 · behind: bust +4, fend +3, big hit −6 | From `angleFrom` (cos ±0.5). |
 | `momentum.perMs` / `momentum.cap` | ±1 pt bust per m/s, cap ±4 | Carrier speed − tackler speed (`MOMENTUM`). Named knobs since #322. |
 | Last tackle | big hit +3 | The defence is set. |
-| `stepChance` | 10% + (footwork − defence)/200, side +5, behind −5, cap 0.7 | Pre-contact step, one-on-one only. |
+| `stepChance` | 10% + (footwork − defence)/`contest.stepSlope`, side +5, behind −5, cap 0.7 | Pre-contact step, one-on-one only. |
+| `contest.stepSlope` | 200 | Points of footwork-v-defence edge per 1% of step chance. Named in #322, unchanged. |
+| `race.on` | 0 | The edge race (#322): bust points from the carrier's Speed stat over his tackler's. Off: at strengths that move the season gap it feeds 70 v 50 (77% → 83%) and pays fast-backs Balanced more than Expansive (`balance/plans/expansive-edge.json`, #322 PR). |
+| `race.perPoint` / `race.cap` | 0.008 / 0.12 | Bust points per Speed point over the tackler, capped either way. Zero at equal Speed. |
+| `race.fendShare` | 0.5 | Share of the race's bust points added to the fend too. |
+| `race.wide` / `race.backsOnly` / `race.single` | 1 / 1 / 1 | Gates: outside the middle 24 m (`MAX_LAT_M`); fullbacks, wingers and centres only; one-on-one only (0 also races the first tackler when two or more commit). |
 | `knockOnChance` | 4% + (50 − Skill)/1000, pressured +4, rain +6, cap 0.5…40% | Catch on a pass. |
 | `interceptChance` | 6% + (IQ − 50)/1000, cut-out ×2, cap 1…60% | Defender inside `live.laneM` of the pass line. |
 
@@ -1351,11 +1356,11 @@ ruck or catch lock and applies on the next movable carry. A manual input also
 replaces an AI kick already winding up, including on its launch tick; an already completed
 last tackle still hands over normally (a queued input cannot undo contact).
 
-## 29. Squad fit descriptions (#459, not used by the sim yet)
+## 29. Squad fit descriptions (#459)
 
 `src/match/league/fit.ts` exports pure derived ratings, `styleFit(roster)` and
 `archetype(player)`. These describe fixed team-sheet inputs only; no saved fields,
-RNG, preset display rename or gameplay effects. Tests: `tests/match/league/fit.test.ts`.
+RNG or stored changes. Tight reads its kickoff fit only behind the switch in §30. Tests: `tests/match/league/fit.test.ts`.
 All paths below appear under `fit` in `npm run balance -- --list`.
 
 | Knob | Value | Effect |
@@ -1381,3 +1386,241 @@ score Expansive **1.25**; a strong pack (Strength 80) scores Tight **1.25**.
 Archetypes follow the highest derived rating: Carry/Offload → Wrecking forward,
 Ball-play → Ball-playing half, Footwork → Strike winger, Edge D → Sweeper for a
 fullback or Edge defender otherwise, Contact D → Enforcer. They are UI labels only.
+
+## 30. Tight pack offloads (#460; BAK-208 §5)
+
+Grind is displayed as **Tight**; the saved preset key stays `grind`. At kickoff,
+`live/base.ts` caches each selected starting roster's `styleFit(...).grind` before
+rating spread and difficulty adjustments. Bench players do not rescore it. On-field
+`PACK` roles (including replacements in those slots) use the cached value through
+`attackPlan()`; backs and halves retain their old zone offloads. No new RNG.
+
+| Knob | Default | Effect |
+|---|---|---|
+| `counters.tight.on` | 1 | Only 1 enables the rebuild. At 0 all old zone plans and match fingerprints are unchanged. |
+| `counters.tight.offloadBase` | 1 | Pack offload multiplier at or below neutral fit, approximately Balanced. |
+| `counters.tight.offloadPerFit` | 9.5 | Added multiplier per fit above 1: base + perFit × max(0, fit − 1), floored at 0. Strength-80 pack fit 1.25 gives ×3.375. |
+
+Hit-ups, passes, steps, early territory kicks and kick bias stay as in the legacy
+plan. `balance/plans/counters-fit.json` compares the default with `Tight on`, at
+200 seeds both ways (yardsticks at 500). The switch is on by default from #465; the pre-switch measurements below remain historical evidence.
+
+### Tight validation (#460)
+
+Measured on the latest-main implementation, with 200 seeds both ways (400 matches
+per row). Counts are per tracked side per match; points share counts a draw as ½.
+Baseline switch 0 → variant switch 1:
+
+| Tight / Slide vs flat Balanced / Slide | Offloads before → after | Busts before → after | Line breaks before → after | Points share before → after |
+|---|---:|---:|---:|---:|
+| Flat 60 | 0.5975 → 2.2825 | 8.5350 → 8.9225 | 5.3350 → 5.5525 | 47.250% → 50.125% |
+| Strong pack (strength 80) | 0.7125 → 10.8925 | 9.4325 → 10.0975 | 5.6250 → 6.2950 | 55.875% → 63.750% |
+| Fast backs (speed 80) | 0.5350 → 2.2150 | 8.0775 → 8.4500 | 6.0025 → 6.1450 | 43.375% → 45.250% |
+
+Flat 60 Tight wins **46.750%** (points share **50.125%**), within the 45–55% band.
+The strong pack's best attack against Balanced / Slide is Tight at **63.750%**
+points share; Expansive is next at **63.000%**. The #460 prerequisite shipped the switch at **0**; #465 switches it on.
+
+Evidence on `balance-log`: [full counters-fit run](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261104-061207-counters-fit/report.md),
+[priority acceptance](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261104-061533-460-tight-acceptance/report.md),
+[main presets](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261104-060657-presets/report.md),
+and [PR presets off](https://github.com/ch-leon/nrl-sim/blob/balance-log/runs/20261104-061234-presets/report.md).
+All eight preset cells match main exactly except elapsed time; both fingerprint
+pins and SAVE_VERSION 21 are unchanged. Local typecheck, all 2,539 unit tests and
+the production build pass. Phone play-tests at 667×375 and 844×390 reach full time;
+PR #473 links the CI screenshot artifacts (screenshots are never committed).
+
+## 31. Own-style fit bonus (#461; BAK-208 §5)
+
+The selected starting sheets supply attack and defence fit before rating spread or
+any difficulty edge. Bench, fatigue and substitutions do not rescore the sheets.
+At a break, the newly applied plan selects its attack and defence fits again.
+
+| Knob | Default | Meaning |
+|---|---|---|
+| `counters.fit.on` | 1 | Only 1 enables the own-style bonus. Off preserves the legacy fingerprints. |
+| `counters.fit.counterResponse` | 1 | Shared unequal-fit response on all nonzero cells while own fit is enabled; formula below. |
+| `counters.fit.edge` | 0.06 | Carrier-edge probability per point of fit away from 1.0. |
+
+Each contact adds `edge × (attackFit − 1) − edge × (defenceFit − 1)`
+to `carrierEdge`, clamped to 0–1 by `contestOdds`. Thus a side's attack fit
+helps it carry and its defence fit helps it tackle, whoever it faces. Fit 1
+adds zero. This uses the existing contest roll and outcome weights, adding no
+randomness. The Tight switch stays independent; both are on by default from #465.
+
+Tests: `tests/match/league/fit-bonus.test.ts` covers neutral/off/signed edges,
+half-time reselection on the changing side, and exact neutral-match replay.
+
+`counters.fit.counterResponse` (default 1) adds a shared
+unequal-fit response to every nonzero cell while own fit is on. Cell strength is
+`cell × attackFit × defenceFit × max(0, 1 + (localResponse + counterResponse) × abs(attackFit − defenceFit))`.
+Equal neutral fits preserve every cell exactly. This separates the full-fit
+counter target from the own-style contest edge when calibrating career parity.
+
+## 32. Slide matchup counters (#462)
+
+All four cells start with `cell strength × attacking style fit × defending Slide fit`,
+selected from the starting-sheet fits (#459). Slide fit is the backs' derived
+Edge D (Speed, footy IQ and existing traits). Plan changes select the newly played
+styles. Balanced and defences other than Slide receive no cell effect.
+
+| Knob | Default | Effect when Slide is enabled |
+|---|---:|---|
+| `counters.slide.on` | 1 | Only 1 enables Slide counters; 0 preserves both fingerprint pins. |
+| `counters.slide.expansive` | 0.08 | Adds to lane pull and cut-out interception probability; subtracts carrier edge at contact outside the middle 24 m. |
+| `counters.slide.expansiveFit` | 0.2 | Expansive cell multiplier: `max(0, 1 + (expansiveFit + fit.counterResponse) × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. With `expansiveSigned` 1 the gap is `max(0, defenceFit − attackFit)`. |
+| `counters.slide.expansiveSigned` | 0 | #322, built and measured, ships off: 1 grows the Expansive response only when the Slide line out-fits the backs (fast backs, fit 1.3, into an ordinary Slide line, 1.0: 0.14 → 0.104 of carrier edge on each wide contact). Neutral fits and the 0.5 v 1.5 full-fit cell are unchanged. Off because the season soak did not move Expansive with it (−8.4 → −8.4 against strength, `docs/status/2026-11-counters.md`). |
+| `counters.slide.expansiveByDefence` | 0 | #322 variant, not shipped: 1 scales the Expansive cell by defence ÷ attack fit instead of their product. |
+| `counters.slide.kickChase` | 0.4 | On the last two tackles, brings the fullback toward fullbackLastM early and holds wingers up to fullbackDeepM/fullbackLastM behind the line (depth fraction capped at 1); gives back-three fielders already inside catch reach a faster read; divides bomb win/spill and ordinary kick-drop chances by 1 + effect; subtracts effect seconds from the grubber chaser's race edge. |
+| `counters.slide.kickChaseFit` | 0.7 | Local unequal-fit response for kick cover; added to `fit.counterResponse` in the shared cell-strength formula. Equal neutral fits are unchanged. |
+| `counters.slide.tight` | 0.025 | Adds inside bust probability and supported offload probability for pack carriers. |
+| `counters.slide.allOut` | 0.50 | Adds bust probability for the offload receiver during the existing recovery window after the offload, so another defender arriving before the line resets is still exposed. A pass, kick, turnover or stoppage clears the receiver. |
+| `counters.slide.allOutRecovery` | 3 | All-out/Slide recovery ticks are `round(live.beatenCooldown × (1 + allOutReset × attackFit × defenceFit + allOutRecovery × max(0, attackFit − defenceFit)))`. At current defaults neutral fits give 120 ticks; fit 1.5 v 0.5 gives 188 ticks. Uses the existing receiver marker/window; normal clearing events still apply. |
+| `counters.slide.allOutReset` | 3 | Both fits scale the neutral recovery extension after an All-out offload against Slide. Uses the same receiver marker and existing window; a pass, kick, turnover or stoppage still clears it. Needed for the paired neutral +4–6pp target: raising the bust term alone saturates below it. |
+
+No new random draws: interception, contact, catches and races use their existing
+rolls. The receiver marker is transient match state; no stored stat or save change.
+`balance/plans/counters-slide.json` measures Slide on with Tight and own-style
+fit enabled, using the task-1 flat-60 matchups and both orientations. The archived
+tuning control measures the same scenarios with Slide off.
+The matrix report includes per-side bombs won and grubber tries as well as
+line breaks, offloads and busts, so the mechanism is visible beside points share.
+
+
+## 33. Rush matchup counters (#463)
+
+The switch ships at 1 from #465. Rush's broken modifier is the preset's
+concession plus `(Carry − fit.leagueAverage) × carry − (Rush fit − 1) × defenceFit`.
+Carry uses the carrier's derived Strength/Speed/Wrecking Ball rating. Rush fit
+uses the starting sheet's Stamina, Contact D and Hitman, as in §29. At neutral
+Carry 60 and fit 1 the modifier is still 0.11; stronger carriers bust more and
+better-fitted Rush lines concede fewer busts. Tight and Expansive have no base
+cell; their own-style fit and carriers decide the contest.
+
+| Knob | Default | Effect when Rush is enabled |
+|---|---:|---|
+| `counters.rush.on` | 1 | Only 1 enables the Rush mechanics; 0 keeps the legacy flat bust modifier. |
+| `counters.rush.carry` | 0.0005 | Bust probability per derived Carry point above neutral (negative below). |
+| `counters.rush.defenceFit` | 0.029 | Bust probability removed per Rush-fit point above 1 (added below). |
+| `counters.rush.kickChase` | 0.61 | Cell × both fits. Brings fullback and wingers toward the rushing line (depth fraction capped at 1); multiplies contested bomb win/spill chances by 1 + effect; adds effect seconds to the grubber chaser's race edge. |
+| `counters.rush.allOut` | 0.1 | Cell × both fits added to handling spill chance on an All-out offload, using the receiver's existing pass-catch roll. Ordinary passes and other attacks receive no spill bonus. |
+
+No new RNG draws, stored stats, save changes or Labs/commercial flag changes.
+The reproducible acceptance plan is `balance/plans/counters-rush.json`: 500 seeds
+both ways per flat cell (1,000 matches), except Tight, which includes seeds
+1–1,000 both ways (2,000 matches) after extending a borderline first sample.
+Fit rows use task 1’s 200 seeds both ways (400 matches), with earlier counters
+enabled by overrides.
+
+## 34. Compressed matchup counters (#464)
+
+The switch ships at 1 from #465. At 0 it retains the exact legacy Compressed preset. Enabled,
+`defencePlan` selects a common contact baseline: busts 0 (legacy −0.02)
+and offloads 0 (legacy −0.03). The legacy Balanced control measured 47.55%
+over 1,000 matches, outside the neutral 48–52% band. The enabled baseline is
+shared by every attack; only Tight and Expansive receive matchup-cell modifiers.
+The additional middle contact advantage belongs to the Tight mechanic.
+
+Tight draws one extra available committed man, capped at four, only within
+`MAX_LAT_M` of the middle and when the spare man is within
+`commitM × attackFit × defenceFit × max(0, 1 + commitFit × max(0, defenceFit − attackFit))`.
+A better-fitted defence reads the middle help earlier; neutral reach and a strong
+attacking pack against a neutral defence keep the original both-fit reach. Middle contact removes bust and supported offload probability
+by cell × both fits × nearby committed defenders' mean derived Contact D /
+`fit.leagueAverage`. Only men within `live.secondManM` enter that mean. Strength,
+Footy IQ and Brick Wall/Hitman improve the squeeze. Unsupported offloads stay 0.
+
+Against Expansive, non-committed line defenders move toward the middle by cell
+× both fits (capped at 1) of their lane's distance from the middle. Outside
+`MAX_LAT_M`, fullbacks, wingers and centres add cell × both fits × Speed / 60 to
+busted-tackle odds (with `expansiveRelative` 1, #322, off: max(0, 1 + (Speed −
+tackler's Speed) / 60), so a fast edge man would take it away). Forwards and halves get no edge bonus. Existing contact
+rolls and the geometric line-break detector decide outcomes; no roll is added.
+
+| Knob | Default | Effect when Compressed is enabled |
+|---|---:|---|
+| `counters.compressed.on` | 1 | Only 1 enables the profile and mechanics. |
+| `counters.compressed.tight` | 0.06 | Middle squeeze; a positive cell also recruits nearby help. |
+| `counters.compressed.tightFit` | 0.6 | Tight cell multiplier: `max(0, 1 + tightFit × abs(attackFit − defenceFit))`; neutral equal fits remain unchanged. This scales the middle contact squeeze; the separate `commitFit` knob scales helper reach. |
+| `counters.compressed.expansive` | 0.09 | Inward lane pull and speed-scaled edge bust probability. |
+| `counters.compressed.commitM` | 10 | Extra middle tackler's neutral-fit reach in metres, scaled by both fits. |
+| `counters.compressed.commitFit` | 0.5 | Extra help-read reach per positive defending-fit advantage; multiplied by `commitM × attackFit × defenceFit`. Neutral reach is unchanged. |
+| `counters.compressed.brokenBase` | 0 | Common enabled bust modifier; off preserves legacy −0.02. |
+| `counters.compressed.offloadBase` | 0 | Common enabled offload modifier; off preserves legacy −0.03. |
+| `counters.compressed.expansiveRelative` | 0 | #322, built and measured, ships off: 1 makes the Expansive edge bust read max(0, 1 + (Speed − tackler's Speed) / 60) instead of Speed / 60. The two agree only at Speed 60 v 60: at flat 70 v 70 the old term paid 1.17× and the relative one 1.0×, and a 70 v 50 Expansive v Compressed match changes too. |
+
+Kick-chase, All-out and Balanced have zero matchup-cell modifiers. In the historical
+#464 acceptance run (before the joint #465 retune), the selected
+1,000-match Compressed column is Tight 45.45%, Expansive 54.20%, Kick-chase
+50.70%, All-out 50.40% and Balanced 49.80%. Every full-matrix row and column
+sum is within ±3 points; the largest absolute total is 2.65 points. Acceptance:
+`balance-log/runs/20261105-015550-compressed-464-t04-matrix`.
+
+`balance/plans/counters-compressed.json` runs the full flat-60 matrix with all
+switches overridden to 1 and 500 seeds both ways per cell (1,000 matches),
+except the retained 2,000-match Tight/Rush and Balanced/Rush neutral samples.
+Checkpoint pools retain disjoint consecutive seed ranges and all source results.
+Unchanged cells reuse controls with identical active settings; provenance and
+raw inputs are preserved beside the report. That task shipped switches at 0; #465 switches them to 1. No
+stored stats, randomness, save version, Labs or commercial changes.
+
+
+## 35. Enabled strategy counters (#465)
+
+All five switches in §30–34 now default to **1**. Their numeric mechanics remain
+independently controllable by name; the full set is calibrated together.
+Kick-chase’s base pass modifier is **+0.04** (previously −0.05), using the same
+engaged passing roll. Bomb weights, early kicks and step 1 are unchanged. This
+common preset adjustment constrains the fifteen-plan round robin; controls
+restore the legacy modifier when comparing against dormant main. Full-fit
+counter/fit comparisons hold the adjusted preset fixed and also report the
+whole dormant-to-enabled change.
+
+| Group | Tuned values |
+|---|---|
+| `presets.attack.kick-chase.base.pass` | `0.04` |
+| `counters.tight` | `on=1`, `offloadBase=1`, `offloadPerFit=9.5` |
+| `counters.fit` | `on=1`, `edge=0.06`, `counterResponse=1` |
+| `counters.slide` | `on=1`, `expansive=0.08`, `expansiveFit=0.2`, `kickChase=0.4`, `kickChaseFit=0.7`, `tight=0.025`, `allOut=0.50`, `allOutRecovery=3`, `allOutReset=3` |
+| `counters.rush` | `on=1`, `carry=0.0005`, `defenceFit=0.029`, `kickChase=0.61`, `allOut=0.1` |
+| `counters.compressed` | `on=1`, `tight=0.06`, `tightFit=0.6`, `expansive=0.09`, `brokenBase=0`, `offloadBase=0`, `commitM=10`, `commitFit=0.5` |
+
+The run record and acceptance tables are in
+[2026-11-counters](../status/2026-11-counters.md). `SideSpec.fit` in the balance
+plans is a harness fixture, not a live tuning knob: flat playing squads can test
+one style fit without also changing stats or the other selected style.
+
+Expansive / Slide is deliberately re-pinned for switch-on. Balanced / Slide
+retains its fingerprint: flat fit is exactly 1 and the cell is zero. These
+active defaults and the new pins become the guard for subsequent tasks.
+SAVE_VERSION remains 21. Labs/commercial defaults and live RNG call sites are
+unchanged.
+
+
+## 36. Rival habit counters (#469)
+
+Fixed-input choices in `match/league/ai.ts`; break reactions in `breaks.ts`.
+These do not change contest rolls or match fingerprint fixtures.
+
+| Knob | Default | Meaning |
+|---|---|---|
+| `counters.ai.on` | 1 | Enable player-match habit choices and break observations; 0 restores legacy rival choices |
+| `counters.ai.matrix` | 5 | Expected win-share points per signed matrix cell, multiplied by both starting fits |
+| `counters.ai.fit` | 5 | Expected win-share points per fit advantage, summed over attack and defence |
+| `counters.ai.normalBreak` | 1 | Normal/Hard may replace a failing counter at a break, behind by `breaks.downBy` and with its key number down |
+| `counters.ai.hardHalfTime` | 1 | Hard may counter the most-played observed first-half plan at half-time |
+| `counters.ai.keyDeficit` | 1 | Minimum deficit versus the opponent in the attack style's key count |
+
+Easy retains the existing squad/club-identity selector unchanged. Normal uses the joint mode of
+three past kick-off plans (ties: newest first); no history means Balanced / Slide.
+Hard averages all three, weighting each by the mean of the player's attack and
+defence fits. All fifteen candidates use the signed matrix and both starting
+fits. Exact ties favour Balanced / Slide, then preset declaration order.
+
+Key counts are offloads for Tight, kicks for Kick-chase, line breaks for
+Expansive/All-out, and fewer errors for Balanced. Observations count ticks in
+first-half open play, excluding pending picks. Easy retains the existing score
+rule; all difficulties retain it as fallback. Rival-v-rival matches have no
+habit context. Watched, fast-forwarded and resumed matches carry identical
+serialisable rival context. SAVE_VERSION 22 adds only `recentPlans` (newest first,
+at most three played league kick-offs); v21 migrates to an empty history.

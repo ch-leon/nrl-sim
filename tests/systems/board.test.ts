@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   generateObjectives, evaluateObjective, reviewObjectives, finalsPrize, finalsTarget,
-  applyBoardReview, ensureObjectives, sackedSummary, type SeasonOutcome,
+  applyBoardReview, ensureObjectives, registerBoardSystem, sackedSummary, type SeasonOutcome,
 } from '../../src/systems/board';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { createNewGame, getState, setState, type Objective } from '../../src/core/state';
 import { bus } from '../../src/core/events';
+import { clearSeasonHooks, clearTickHooks, advanceWeeks } from '../../src/core/time';
+import * as rngUtils from '../../src/utils/rng';
 import { BOARD, DIFFICULTY, PRIZE, scaledMoney } from '../../src/config';
 
 beforeEach(() => bus.clear());
@@ -30,6 +32,50 @@ describe('generateObjectives', () => {
     const n = generateObjectives(s).length;
     expect(n === 2 || n === 3).toBe(true);
     expect(generateObjectives({ ...s, reputation: 10 })).toHaveLength(2);
+  });
+
+  it('keeps the no-derby seed-7 objectives captured from main (eba6d46)', () => {
+    createNewGame('Test FC', 7); initLeague(getState());
+    const s = getState();
+    const expected = [
+      { id: 's1-finals', kind: 'finals', text: 'Finish in the top 9', target: 9, status: 'pending' },
+      { id: 's1-solvent', kind: 'solvent', target: 0, status: 'pending', text: 'Finish the season solvent' },
+      { id: 's1-rival', kind: 'beatRival', target: 0, rivalId: 'rival-brumbies', status: 'pending', text: 'Finish above Ballarat Bushrangers' },
+    ];
+    expect(generateObjectives(s)).toEqual(expected);
+    expect(generateObjectives({ ...s, home: { town: 'Unlisted' } })).toEqual(expected);
+    expect(getState().rngSeed).toBe(s.rngSeed);
+  });
+
+  it('names the derby in season one, even when the old draw would choose a build goal', () => {
+    const s = fresh();
+    const home = { town: 'Cairns', lat: -16.9203, lon: 145.771 };
+    expect(generateObjectives({ ...s, home }).find(o => o.kind === 'beatRival')).toMatchObject({
+      rivalId: 'rival-cyclones', text: 'Finish above Cairns Cyclones, our derby rival',
+    });
+    const buildSeason = Array.from({ length: 20 }, (_, i) => i + 1)
+      .find(season => generateObjectives({ ...s, season }).some(o => o.kind === 'build'))!;
+    expect(buildSeason).toBeDefined();
+    expect(generateObjectives({ ...s, season: buildSeason, home }).some(o => o.kind === 'beatRival')).toBe(true);
+  });
+
+  it('consumes the same private RNG draws with and without a derby', () => {
+    const s = fresh();
+    const original = rngUtils.makeRng;
+    const draws: ReturnType<typeof vi.fn>[] = [];
+    const spy = vi.spyOn(rngUtils, 'makeRng').mockImplementation(seed => {
+      const rng = original(seed);
+      const next = vi.fn(rng.next); draws.push(next);
+      return { ...rng, next };
+    });
+    try {
+      for (const reputation of [10, 30, 60]) for (const season of [1, 2, 3]) {
+        generateObjectives({ ...s, reputation, season });
+        generateObjectives({ ...s, reputation, season, home: { town: 'Cairns', lat: -16.92, lon: 145.77 } });
+        expect(draws[draws.length - 1]!.mock.calls.length).toBe(draws[draws.length - 2]!.mock.calls.length);
+        expect(draws[draws.length - 1]!.mock.calls.length).toBe(reputation < 25 ? 0 : 1);
+      }
+    } finally { spy.mockRestore(); }
   });
 
   it('scales the finals target to reputation and difficulty', () => {
@@ -178,10 +224,31 @@ describe('season rollover integration', () => {
     registerFixturesSystem(); registerPlayerMatchSystem(); registerBoardSystem();
     const first = getState().objectives.map((o) => o.id);
     expect(first.every((id) => id.startsWith('s1-'))).toBe(true);
-    advanceWeeks(WEEKS_PER_SEASON);
+    advanceWeeks(WEEKS_PER_SEASON + 2);
     const s = getState();
     expect(s.season).toBe(2);
     expect(s.objectives.every((o) => o.id.startsWith('s2-') && o.status === 'pending')).toBe(true);
     expect(s.boardPatience).toBeLessThanOrEqual(BOARD.MAX_PATIENCE);
+  });
+});
+
+
+describe('board objectives address (#475)', () => {
+  it.each([['Sam Hale', 'Sam Hale'], ['', 'Coach']])('announces season 1 to %j and keeps the name at rollover', (coachName, address) => {
+    clearSeasonHooks(); clearTickHooks();
+    createNewGame('Test FC', 42, { coachName });
+    initLeague(getState());
+    const lines: string[] = [];
+    const quiet: (boolean | undefined)[] = [];
+    bus.on('ui:notify', (notice) => { lines.push(notice.text); quiet.push(notice.quiet); });
+    registerBoardSystem();
+    expect(lines).toEqual([`${address}, the board's objectives for our first season in the league: ${getState().objectives.map((o) => o.text).join(' · ')}.`]);
+    expect(quiet).toEqual([true]); // News only while the first tutorial is teaching
+    registerBoardSystem();
+    expect(lines).toHaveLength(1); // loading existing goals never announces them again
+    advanceWeeks(29);
+    expect(lines.some((line) => line.startsWith(`${address}, the board's objectives for season 2:`))).toBe(true);
+    expect(quiet).toEqual([true, false]);
+    clearSeasonHooks(); clearTickHooks();
   });
 });

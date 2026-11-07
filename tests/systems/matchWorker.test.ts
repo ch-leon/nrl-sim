@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/matchWorker.test.ts — the player's fast-forwarded match in the Worker
 // (N10.3). The tests have no Worker, so a stub plays the jobs exactly as
 // matchWorker.ts does (runMatch on each job, results back in a later task): an
@@ -5,7 +6,7 @@
 // byte for byte, as one that plays in place; a failing Worker falls back in place.
 import { describe, it, expect, afterEach } from 'vitest';
 import { bus } from '../../src/core/events';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks, registerTickHook, resumeWeek, TICK_ORDER, weekHeld, withFastForward } from '../../src/core/time';
 import { advanceUntil } from '../../src/core/advance';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';

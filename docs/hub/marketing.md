@@ -1,6 +1,6 @@
 # Marketing
 
-Last updated: 2026-11-01 (status as of 1 Nov 2026)
+Last updated: 2026-11-06 (status as of 6 Nov 2026)
 
 Sources: `src/brand.ts`, `src/commercial/`, `docs/specs/commercial-*.md` and the
 issues on [apps](https://github.com/ch-leon/nrl-sim/issues/335),
@@ -58,3 +58,43 @@ Premium, with a free demo and a one-off unlock. Tiers in the code: **demo**,
 
 Not set up, as of 1 Nov 2026 (source: Leon). Apple Developer is about US$99 a
 year; Google Play is a one-off US$25 (source: [issue #335](https://github.com/ch-leon/nrl-sim/issues/335)).
+
+## Engagement and launch plumbing
+
+Decided by Leon on 2 Nov 2026. Work is tracked in
+[issue #456](https://github.com/ch-leon/nrl-sim/issues/456), which also holds
+Leon's setup checklist. Free-tier numbers were checked on 2 Nov 2026 and link to
+the official pricing pages.
+
+| What | Decision | Why | Free tier (official source) | Issue |
+| --- | --- | --- | --- | --- |
+| Hosting | **Firebase Hosting** on our own domain. Nothing player-facing on GitHub or GitHub Pages. | The repo goes private at launch, and on GitHub's free plan Pages needs a public repo ([GitHub pricing](https://github.com/pricing)). Firebase is already the push provider, so it's one project. | Spark: 10 GB stored, 360 MB/day transfer, custom domain + SSL. Blaze: $0.15/GB after ([Firebase pricing](https://firebase.google.com/pricing)) | [#448](https://github.com/ch-leon/nrl-sim/issues/448) |
+| Push | **Firebase Cloud Messaging (FCM)** on web and Android. | Leon's pick. It's free and can be sent from the Firebase console. On iPhone it only works once the game is added to the Home Screen (iOS 16.4+) ([WebKit](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)). | No cost ([Firebase pricing](https://firebase.google.com/pricing)) | [#449](https://github.com/ch-leon/nrl-sim/issues/449) |
+| Analytics | **PostHog**, EU cloud, free plan, anonymous and cookieless (`cookieless_mode: 'always'`), loaded after the title screen. **No Google Analytics.** | One tool covers analytics, flags and A/B tests. Session replay and surveys stay off while cookieless is on (PostHog does not support them in cookieless mode); we'd revisit cookieless if we need them. Over-limit usage is dropped, not billed. Cookieless helps with consent banners; whether it keeps us clear of children's-data rules stays pending the legal check in [#455](https://github.com/ch-leon/nrl-sim/issues/455) ([PostHog data collection](https://posthog.com/docs/privacy/data-collection)). | 1M events, 5K recordings, 1M flag requests, 1,500 survey responses a month. 1 project, 1-year retention ([PostHog pricing](https://posthog.com/pricing)) | [#450](https://github.com/ch-leon/nrl-sim/issues/450) |
+| Pop-ups | **Our own styled pop-up** (text, button, image). **Firebase Remote Config** decides who sees it while cookieless is on; PostHog surveys stay off under cookieless. | Leon wants pop-ups, not inbox items. Firebase In-App Messaging has no web support ([docs](https://firebase.google.com/docs/in-app-messaging)). PostHog surveys are unsupported in cookieless mode, so Remote Config is the primary targeting while cookieless stays on. | Remote Config: 100k fetches/day free ([Firebase pricing](https://firebase.google.com/pricing)) | [#451](https://github.com/ch-leon/nrl-sim/issues/451) |
+| Flags and A/B tests | **PostHog remote flags**, for presentation only. They **never** change match results, the RNG, sim knobs, the save or what you own. `src/commercial/flags.ts` stays as the build-time switches. | This keeps matches and saves reproducible and keeps the fingerprint pins and `SAVE_VERSION` stable. | Included in the 1M flag requests above | [#452](https://github.com/ch-leon/nrl-sim/issues/452) |
+| Email | **EmailOctopus**, sending from our own verified domain. One shared list for all SuperCOOKED games, tagged per game. Export the list regularly. Backups: Loops, then Plunk. | It has the biggest free tier of those compared. The list can move if we switch. | EmailOctopus: 2,500 subscribers, 10,000 emails/mo, 3 automations ([pricing](https://emailoctopus.com/pricing)). Loops: 1,000 contacts, 4,000 sends/30 days ([pricing](https://loops.so/pricing)). Plunk: 1,000 emails/mo ([pricing](https://www.useplunk.com/pricing)) | [#453](https://github.com/ch-leon/nrl-sim/issues/453) |
+| Android tester build | **Firebase App Distribution**, replacing the `android-test-latest` GitHub release. Final app id decided 4 Nov 2026: `au.com.supercooked.bigrugbycoach` (replaces placeholder `au.supercooked.nrlsim.test`). Wiring it into the Android build is still to do. | The repo goes private. Changing the app id makes it a new app, so testers reinstall. | No cost ([Firebase pricing](https://firebase.google.com/pricing)) | [#454](https://github.com/ch-leon/nrl-sim/issues/454) |
+| Privacy | A **privacy policy page** covering analytics, push, email and overseas storage (EU/US). A **legal check** against the OAIC Children's Online Privacy Code before launch. | Some NRL fans are under 18. The code must be registered by 10 Dec 2026 ([OAIC](https://www.oaic.gov.au/privacy/privacy-registers/privacy-codes/childrens-online-privacy-code)). | n/a | [#455](https://github.com/ch-leon/nrl-sim/issues/455) |
+
+**Email rules (Spam Act).** We only email people who opted in: the consent box
+starts unticked, and double opt-in keeps the record. Every email identifies the
+sender (business name/ABN and contact details) and has a working unsubscribe that is
+honoured within 5 working days ([ACMA](https://www.acma.gov.au/avoid-sending-spam)).
+No email address goes in the save or in analytics.
+
+**X.** Used for announcements and for cross-promoting future games. The agent
+drafts posts; Leon posts them. No repo work, so there's no issue for this.
+
+**Cross-promotion of future games.** Every SuperCOOKED game uses the same Firebase
+project, the same EmailOctopus list (tagged per game) and X. The pop-up (#451)
+can promote a new game to current players.
+
+**Moving off GitHub Pages.** No "we've moved" notice: Leon is the only player
+today and will move his career with save export/import.
+
+**Open.** The custom domain and the result of the children's privacy code
+check. Both are on Leon's checklist in
+[issue #456](https://github.com/ch-leon/nrl-sim/issues/456). Wiring the decided
+Android app id into the build is still to do
+([issue #454](https://github.com/ch-leon/nrl-sim/issues/454)).

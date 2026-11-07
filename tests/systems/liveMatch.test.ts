@@ -1,3 +1,4 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/liveMatch.test.ts — live matches (BAK-207; every match since the
 // Phase 4 switch-over) with the result at full time (coach calls #73,
 // docs/specs/coach-calls.md §5): matchday holds the week at kick-off and hands the
@@ -9,7 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { exportSave, __setStorage, save } from '../../src/core/save';
 import { bus, type LiveMatchData } from '../../src/core/events';
-import { createNewGame, getState, setState, type Fixture } from '../../src/core/state';
+import { getState, setState, type Fixture } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks, weekHeld } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';

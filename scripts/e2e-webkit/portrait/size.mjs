@@ -41,6 +41,7 @@ export async function runSize(browser, W, H) {
     await page.waitForSelector('[data-nrl-start]');
     await page.fill('[data-nrl-clubname]', 'Safari FC');
     await tap('[data-nrl-start]');
+    await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-bubble[data-step="build"]');
     await page.waitForTimeout(700);
     // WebKit on Linux has no text autosizer and drops the property from computed

@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+vi.mock('../../src/art/coachFace', () => ({ coachFaceDataUrl: () => 'data:image/png;base64,face' }));
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   STEPS,
   shouldAutoStart,
@@ -28,11 +29,9 @@ import { createNewGame, getState, setState, type GameState } from '../../src/cor
 import { addFacility } from '../../src/data/club';
 import { FACILITY_CATALOG } from '../../src/data/facility';
 
-// DOM rendering (bubble / cutout / anchor scrolling) is NOT unit-tested: jsdom is
-// not installed and the vitest environment is 'node' (see vite.config.ts). Those
-// paths self-guard on `typeof document` and are covered by manual/preview QA.
-// These specs cover the pure, DOM-free contract: the declarative step list (three
-// taps since #370), the first-visit hints, and tutorialDone gating.
+// Node tests cover the declarative three-tap flow, hint gating and the shared
+// speaker block (with the existing stub DOM). Browser checks cover placement,
+// anchor scrolling, geometry and the real taps; jsdom is not installed.
 
 // The bus events an event-driven step may reference (#370 adds the Undo's two).
 const KNOWN_EVENTS: readonly (keyof Events)[] = [
@@ -44,6 +43,15 @@ const KNOWN_EVENTS: readonly (keyof Events)[] = [
 const byId = new Map<string, TutorialStep>(STEPS.map((s) => [s.id, s]));
 
 describe('STEPS: three guided taps (#370)', () => {
+  beforeEach(() => { createNewGame('Test Club', 1); });
+
+  it('addresses the current coach in the first bubble, including an unnamed next game', () => {
+    createNewGame('Test Club', 1, { coachName: 'Sam Hale' });
+    expect(STEPS[0]!.text).toBe(`Sam Hale, tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
+    createNewGame('Test Club', 1);
+    expect(STEPS[0]!.text).toBe(`Coach, tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
+  });
+
   it('is build, place, recruit and advance, grouped into three taps', () => {
     expect(STEPS.map((s) => s.id)).toEqual(['build', 'place', 'recruit', 'advance']);
     expect(STEPS.map((s) => s.tap)).toEqual([1, 1, 2, 3]);
@@ -62,8 +70,8 @@ describe('STEPS: three guided taps (#370)', () => {
   });
 
   it('names the paddock as the catalog does, and says what each tap does', () => {
-    expect(byId.get('build')!.text).toBe(`Tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
-    expect(byId.get('place')!.text).toBe('Tap a green spot, then Build here.');
+    expect(byId.get('build')!.text).toBe(`Coach, tap ${FACILITY_CATALOG.trainingPaddock.name} to build one.`);
+    expect(byId.get('place')!.text).toBe('Pick a green spot, then Build here.');
     expect(byId.get('recruit')!.text).toMatch(/Sign on the best player you can afford/);
     expect(byId.get('advance')!.text).toMatch(/Play Week/);
   });
@@ -288,4 +296,37 @@ describe('pickDock: clear of the anchor and the Undo toast (#337 U2, #412)', () 
     const big = box(0, 30, 667, 280);
     expect(pickDock(bar, big, null)).toBe(3);
   });
+});
+
+const screenListener = vi.hoisted(() => ({ fn: null as null | ((key: string | null) => void) }));
+vi.mock('../../src/ui/dom', async (original) => ({
+  ...await original<typeof import('../../src/ui/dom')>(),
+  mount: (node: HTMLElement) => document.body.appendChild(node),
+  onScreenChange: (fn: (key: string | null) => void) => { screenListener.fn = fn; return () => { screenListener.fn = null; }; },
+}));
+
+it('bubbles and first-visit hints contain the shared coach block (#476)', async () => {
+  const { coachDocument } = await import('./coachDom');
+  const { initFirstVisitHints } = await import('../../src/ui/tutorial');
+  const { COACH_NAME } = await import('../../src/ui/coachVoice');
+  createNewGame('Test Club', 1);
+  const root = coachDocument();
+  const off = initFirstVisitHints();
+  try {
+    startTutorial();
+    expect(root.querySelectorAll('[data-coach-line]')).toHaveLength(1);
+    expect(root.textContent).toContain(COACH_NAME);
+    expect(root.querySelectorAll('[data-step="build"]')).toHaveLength(1);
+    endTutorial();
+    const screen = document.createElement('div');
+    screen.querySelector = () => null;
+    (screen as unknown as import('./stubDom').StubNode & { prepend: (n: import('./stubDom').StubNode) => void }).prepend = (n) => (screen as unknown as import('./stubDom').StubNode).appendChild(n);
+    root.appendChild(screen as unknown as import('./stubDom').StubNode);
+    document.querySelector = (() => screen) as typeof document.querySelector;
+    screenListener.fn?.('lineup');
+    expect(root.querySelectorAll('[data-hint="lineup"]')).toHaveLength(1);
+    expect(root.querySelectorAll('[data-coach-line]')).toHaveLength(1);
+    expect(root.textContent).toContain(HINTS.lineup);
+    expect(root.textContent).toContain(COACH_NAME);
+  } finally { endTutorial(); off(); vi.unstubAllGlobals(); }
 });

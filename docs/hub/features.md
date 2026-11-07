@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-01
+Last updated: 2026-11-06
 
 What's in the game, with the PR that added each.
 
@@ -63,7 +63,48 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Normal and Hard rivals counter your last three league plans; Easy keeps its existing squad style. Player-match scouting shows the same habit-based plan as kick-off. Old saves start with no plan history ([PR](https://github.com/ch-leon/nrl-sim/pull/511)).
+
+- UK home towns start a 12-club English-style league with invented clubs and players, 22 rounds, local match vocabulary and a seaside season-end trip. Other countries and old saves keep the AU league; the UK content loads only when needed ([PR](https://github.com/ch-leon/nrl-sim/pull/509)).
+
+- Counter moments get varied, rate-limited live commentary; losses can explain an unfavourable plan matchup with an out-schemed reason and a plan action ([PR](https://github.com/ch-leon/nrl-sim/pull/512)).
+
+- Plan buttons show squad-fit stars and a named contributor; pre-match scouting uses the selected rival nine and shows counters, and half-time shows breaks, kicks and errors against style guides ([PR](https://github.com/ch-leon/nrl-sim/pull/510)).
+
+- Tight tactics now describe forward carries and offloads throughout the plan sheets and guides; old saves keep their plan ([PR](https://github.com/ch-leon/nrl-sim/pull/507)).
+
+- Two pre-season trial weeks in new careers: try a lineup, earn a small home gate, then start round 1 with a clean ladder. Existing saves keep their season shape ([PR](https://github.com/ch-leon/nrl-sim/pull/508)).
+
+- Plans now counter each other by default, with squad fit and offload-heavy Tight for strong packs ([PR](https://github.com/ch-leon/nrl-sim/pull/506); see `docs/status/2026-11-counters.md`).
+
+- New careers arrive as an expansion club: the football manager introduces the club, bank and first-year board goals before the grounds; News and the first season review carry the same framing ([PR](https://github.com/ch-leon/nrl-sim/pull/504)).
+
+- Compressed counters pack middle tackles against Tight and leave edge overlaps for Expansive, behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/503)).
+
+- Listed home towns now choose the nearest fictional derby rival: a board target, guide News before the fixture, result News afterwards, and a Derby tag on Club home ([PR](https://github.com/ch-leon/nrl-sim/pull/505)). Old saves and free-text towns keep their existing objectives.
+
+- Rush counters use carrier/defence fit, kick space and rushed All-out offload spills behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/502)).
+
+- Slide matchup mechanics for Expansive, Kick-chase, Tight and All-out are implemented behind an off switch; normal matches are unchanged ([PR](https://github.com/ch-leon/nrl-sim/pull/501)).
+
+- Finance opens after the first home game, Staff & Board at round 4 and Contracts at round 12. Office explains locked tiles; HUD and warning links stay available ([PR](https://github.com/ch-leon/nrl-sim/pull/498)).
+
+- Club home’s “Coach says” gives one practical next step; the weekly summary shares the same suggestion ([PR](https://github.com/ch-leon/nrl-sim/pull/499)).
+
+- New careers open facilities through season one, with a veteran setup skip and a confirmed Settings skip; old saves keep everything open ([PR](https://github.com/ch-leon/nrl-sim/pull/497)).
+
+- Fictional football manager Mick Dorney gives the tutorial, first-visit hints, weekly summary, coach News and seven event cards one voice and pixel portrait ([PR](https://github.com/ch-leon/nrl-sim/pull/494)).
+
+- Optional coach name at new-game setup; the first tutorial bubble and board objectives address you by name, with “Coach” for unnamed careers ([PR](https://github.com/ch-leon/nrl-sim/pull/491)).
+
 Newest first; merge dates in UTC.
+
+- Difficulty descriptions and a first-career Easy hint at setup ([PR](https://github.com/ch-leon/nrl-sim/pull/493)); Normal remains the default.
+- Own-style attack and defence fit can influence contact contests behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/495)); plan changes select the new fits, 4 Nov
+- Grind is now named Tight; pack-fit offloads are available behind a switch that defaults off ([PR](https://github.com/ch-leon/nrl-sim/pull/473)), 4 Nov
+- Recruit shortlist of four with an affordable Coach’s pick and Show all ([PR](https://github.com/ch-leon/nrl-sim/pull/492)), 4 Nov
+- Club home always shows cash runway in weeks, or “covering costs” ([PR](https://github.com/ch-leon/nrl-sim/pull/490)), 4 Nov
+- Offline Australia and New Zealand home-town setup, editable club and ground names ([PR](https://github.com/ch-leon/nrl-sim/pull/496)), 4 Nov
 
 - CI test fixes ([PR](https://github.com/ch-leon/nrl-sim/pull/442)), 1 Nov
 - Steady tackle count ([PR](https://github.com/ch-leon/nrl-sim/pull/440)), 31 Oct

@@ -16,15 +16,34 @@ import { rivalMatchSheet } from '../../systems/matchday';
 import { teamSheetFromSquad } from '../league/sheets';
 import { rivalEdge, type DifficultyEdge } from '../league/spread';
 import { TICK_S } from '../core/engine';
-import type { SimEvent } from '../core/snapshot';
+import type { Side, SimEvent } from '../core/snapshot';
 import { LEGS_ENERGY } from '../league/fatigue';
-import { LiveSim, type PlanInput } from '../league/live';
+import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { aiCoachSides, type CallInput } from '../league/calls';
 import { NINES, fullMatch, type MatchLength } from '../league/rules';
 import { DEFAULT_TACTICS } from '../league/presets';
 import { applyTuning } from '../league/tuning';
 import { labSheet, starTraits } from '../lab/sheets';
 import { POSITION_GROUPS, type Cell, type SideSpec } from './plan';
+
+/** Exact fit fixtures belong to the headless harness, never the live game or saved sheets. */
+export class BalanceSim extends LiveSim {
+  constructor(home: TeamSheet, away: TeamSheet, seed: number, options: LiveOptions = {},
+    fits: Record<Side, SideSpec['fit']> = { home: undefined, away: undefined }) {
+    super(home, away, seed, options);
+    let changed = false;
+    for (const side of ['home', 'away'] as const) {
+      if (!fits[side] || !Object.keys(fits[side]).length) continue;
+      this.squadFit[side] = { ...this.squadFit[side], ...fits[side] };
+      this.tightFit[side] = this.squadFit[side].grind;
+      this.refreshPlanFit(side);
+      changed = true;
+    }
+    // Re-place the opening sides with their fixture fits before the first tick.
+    // setForKickoff reads the existing receiver and consumes no random draw.
+    if (changed) this.setForKickoff(this.firstReceiver === 'home' ? 'away' : 'home');
+  }
+}
 
 /** A full match: two halves. Stretches scale their counts up to this. */
 export const MATCH_MINUTES = 2 * NINES.halfMinutes;
@@ -52,7 +71,7 @@ export interface Stat {
 }
 
 /** Event counts attributed to the side named by each event, plus its score. */
-export const SIDE_COUNTS = ['offloads', 'busts', 'lineBreaks', 'tries', 'kicks', 'steps', 'errors', 'pointsFor', 'pointsAgainst'] as const;
+export const SIDE_COUNTS = ['offloads', 'busts', 'lineBreaks', 'tries', 'kicks', 'steps', 'errors', 'bombs', 'bombsWon', 'grubbers', 'grubberTries', 'pointsFor', 'pointsAgainst'] as const;
 export type SideCountKey = (typeof SIDE_COUNTS)[number];
 type SideCounts = Record<SideCountKey, number>;
 
@@ -216,18 +235,22 @@ const KICK_TRY_TICKS = 240;
 const LATE = (e: SimEvent): boolean => e.kind === 'break-tackle' && e.detail === 'wrestle';
 
 /** Per-match counts from one match's events. */
-function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
-  const c = Object.fromEntries(COUNTS.map((k) => [k, 0])) as Record<CountKey, number>;
+export function countEvents(es: readonly SimEvent[], side?: Side): Record<CountKey, number> {
+  const counts = Object.fromEntries(COUNTS.map((k) => [k, 0])) as Record<CountKey, number>;
   // The kick in play (#99 close-out): a try by the kicking side within KICK_TRY_TICKS of its kick is a kick try.
   // A grubber's next act is one of: try, repeat set (the chase regathers), dropout, or turnover.
   let lastKick: { side: string | undefined; detail: string | undefined; tick: number } | null = null;
   let grubber: { side: string; tick: number; ours: boolean } | null = null;
   const closeGrubber = (kind: 'grubberTries' | 'grubberRepeats' | 'grubberDropouts' | 'grubberTurnovers'): void => {
     if (!grubber) return;
-    c[kind]++;
+    if (!side || grubber.side === side) counts[kind]++;
     grubber = null;
   };
+  // Keep the whole event stream for kick context; discard other sides' own counts.
+  // Filtering first can credit a regather after the opponent's next kick.
+  const ignored = { ...counts };
   for (const e of es) {
+    const c = !side || e.side === side ? counts : ignored;
     switch (e.kind) {
       case 'tackle':
         c.tackles++;
@@ -396,7 +419,7 @@ function countEvents(es: readonly SimEvent[]): Record<CountKey, number> {
     }
   }
   if (grubber) closeGrubber(grubber.ours ? 'grubberRepeats' : 'grubberTurnovers');
-  return c;
+  return counts;
 }
 
 /** Points a scoring event is worth, by the side named on it. */
@@ -490,7 +513,10 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       const planDone = planRules.map(() => false);
       const simEdge = edge && flip ? { ...edge, side: flipSide(edge.side) } : edge;
       const ruleSides = (cell.scenario.breakRule ?? []).map(onSim);
-      const sim = new LiveSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(ruleSides.length ? { breakRuleSides: ruleSides } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) });
+      const sim = new BalanceSim(homeSheet, awaySheet, seed, { energy: legsAt, length, ...(cell.scenario.weather ? { weather: cell.scenario.weather } : {}), ...(rules ? { calls: callList } : {}), ...(aiSides.length ? { aiCoach: aiSides } : {}), ...(cell.scenario.finals ? { goldenPoint: true } : {}), ...(planRules.length ? { plans: planList } : {}), ...(ruleSides.length ? { breakRuleSides: ruleSides } : {}), ...(simEdge ? { difficultyEdge: simEdge } : {}) }, {
+        home: cell.scenario[flip ? 'away' : 'home'].fit,
+        away: cell.scenario[flip ? 'home' : 'away'].fit,
+      });
       const events: SimEvent[] = [];
       const held = [0, 0, 0, 0];
       const bins = new BinSwing();
@@ -552,7 +578,7 @@ export function measureCell(cell: Cell, seeds: number, planMinutes?: number, see
       if (track) {
         const trackedSide = onSim(track);
         const sideCounts = (side: 'home' | 'away'): SideCounts => {
-          const c = countEvents(events.filter((e) => e.side === side));
+          const c = countEvents(events, side);
           return Object.fromEntries(SIDE_COUNTS.map((k) => [k, k === 'pointsFor' ? sim.points[side] : k === 'pointsAgainst' ? sim.points[flipSide(side)] : c[k]])) as SideCounts;
         };
         trackedPerMatch.push(sideCounts(trackedSide));

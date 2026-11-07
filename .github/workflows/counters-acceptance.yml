@@ -1,0 +1,149 @@
+name: Strategy counters acceptance
+
+# The switch-on acceptance is much larger than the routine PR checks. Keep its
+# raw balance/soak evidence and phone screenshots as artifacts, never commits.
+# Run manually after tuning; ordinary pushes must not discard these long runs.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: counters-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        plan: [enabled, yardstick, fit-enabled, full-fit, round-robin, strong-pack]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run balance -- --plan balance/plans/counters-${{ matrix.plan }}.json --jobs 4 2>&1 | tee balance.log
+      - name: Check the measured acceptance targets
+        run: npx vite-node scripts/check-counters.ts -- ${{ matrix.plan }} balance/runs
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-${{ matrix.plan }}
+          path: |
+            balance/runs
+            balance.log
+          retention-days: 7
+
+  baseline-soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      # Reproduce the original pre-switch main baseline at its immutable ref.
+      - uses: actions/checkout@v4
+        with:
+          ref: e8b88be4ca94a2a9651688bdb55ae1832e0e5a61
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: git rev-parse HEAD > baseline-commit.txt
+      - run: npm run soak -- --difficulties easy,normal,hard --jobs 4 --json soak-main.json 2>&1 | tee soak-main.log
+      - name: Verify the complete baseline, including all old saves
+        run: |
+          python3 <<'PY'
+          import json
+          assert open('baseline-commit.txt').read().strip() == 'e8b88be4ca94a2a9651688bdb55ae1832e0e5a61'
+          r = json.load(open('soak-main.json'))
+          assert r['seeds'] == 20 and r['seasons'] == 5
+          fresh = [x for x in r['results'] if x.get('fromVersion') is None]
+          expected = {(s * 7919, mode, difficulty) for s in range(1, 21) for mode in ['idle', 'managed'] for difficulty in ['easy', 'normal', 'hard']}
+          assert {(x['seed'], x['mode'], x.get('difficulty', 'normal')) for x in fresh} == expected
+          assert len(fresh) == 120
+          assert sorted(x['fromVersion'] for x in r['results'] if x.get('fromVersion') is not None) == list(range(1, 21))
+          assert not any(x['problems'] for x in r['results'])
+          assert not any(s['forfeits'] for x in r['results'] for s in x['seasons'])
+          print('Complete 20-seed, five-season baseline: no problems or forfeits; saves v1–20 loaded.')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-soak-main
+          path: |
+            baseline-commit.txt
+            soak-main.json
+            soak-main.log
+          retention-days: 7
+
+  enabled-soak:
+    needs: baseline-soak
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run soak -- --difficulties easy,normal,hard --jobs 4 --json soak-enabled.json 2>&1 | tee soak-enabled.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-soak-enabled
+          path: |
+            soak-enabled.json
+            soak-enabled.log
+          retention-days: 7
+
+  soak-guards:
+    needs: [baseline-soak, enabled-soak]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: counters-soak-main
+          path: evidence/main
+      - uses: actions/download-artifact@v4
+        with:
+          name: counters-soak-enabled
+          path: evidence/enabled
+      - run: python3 scripts/check-counters-soak.py evidence/main/soak-main.json evidence/enabled/soak-enabled.json
+
+  phone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [667x375, 844x390]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run e2e:season -- --size ${{ matrix.size }} 2>&1 | tee phone.log
+        env:
+          CHROMIUM_PATH: /usr/bin/google-chrome
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: counters-phone-${{ matrix.size }}
+          path: |
+            e2e-output
+            !e2e-output/**/dist/**
+            phone.log
+          retention-days: 7

@@ -14,6 +14,17 @@ beforeEach(() => {
 });
 
 describe('createNewGame', () => {
+  it('stores an optional coach name without changing any other generated state', () => {
+    const unnamed = createNewGame('Test FC', 42);
+    const named = createNewGame('Test FC', 42, { coachName: 'Sam Hale' });
+    expect(named).toEqual({ ...unnamed, coachName: 'Sam Hale' });
+    expect(JSON.parse(JSON.stringify(named)).coachName).toBe('Sam Hale');
+    for (const state of [unnamed, createNewGame('Test FC', 42, { coachName: '' })]) {
+      expect(state).not.toHaveProperty('coachName');
+      expect(JSON.parse(JSON.stringify(state))).not.toHaveProperty('coachName');
+    }
+  });
+
   it('yields the spec starting state', () => {
     const s = createNewGame('Cavehole Crushers', 42);
     expect(s.clubName).toBe('Cavehole Crushers');
@@ -130,5 +141,19 @@ describe('resetForNewSeason', () => {
     resetForNewSeason();
     expect(getState().season).toBe(3);
     expect(getState().week).toBe(1);
+  });
+});
+
+
+describe('optional home metadata (#485)', () => {
+  it('preserves home metadata without consuming simulation randomness', () => {
+    const original = createNewGame('Town Club', 42);
+    const located = createNewGame('Town Club', 42, { home: { town: 'A Town', country: 'AU', lat: -30, lon: 150 }, groundName: 'A Town Oval' });
+    const { home, groundName, ...rest } = located;
+    expect(home).toEqual({ town: 'A Town', country: 'AU', lat: -30, lon: 150 });
+    expect(groundName).toBe('A Town Oval');
+    expect(rest).toEqual(original);
+    expect(original.home).toBeUndefined();
+    expect(original.groundName).toBeUndefined();
   });
 });

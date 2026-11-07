@@ -1,8 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { clubHomeView, nextMatchLine } from '../../../src/ui/screens/clubHome';
+vi.mock('../../../src/art/coachFace', () => ({ coachFaceDataUrl: () => 'data:image/png;base64,face' }));
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { clubHomeView, nextMatchLine, openClubHome } from '../../../src/ui/screens/clubHome';
 import { createNewGame, getState, setState, type GameState, type Objective } from '../../../src/core/state';
 import { initLeague } from '../../../src/systems/fixtures';
 import { ordinal, placeName } from '../../../src/ui/hud';
+import { financeSummary } from '../../../src/ui/screens/finance';
+import { coachDocument } from '../coachDom';
+import { closeScreen } from '../../../src/ui/dom';
+import { coachSays } from '../../../src/ui/coachSays';
+import type { StubNode } from '../stubDom';
 import { ECON, WEEKS_PER_SEASON } from '../../../src/config';
 
 // #350 P1: the Club home sheet, CLUB on a phone held upright.
@@ -32,6 +38,15 @@ describe('the Club home sheet (#350)', () => {
     expect(line.label).toContain(`You are ${place} on the ladder`);
   });
 
+  it('tags only the derby opponent in the next-fixture line and spoken label', () => {
+    const s = getState();
+    const { opp } = next(s);
+    const home = { town: opp.home!.town, lat: opp.home!.lat, lon: opp.home!.lon };
+    expect(nextMatchLine({ ...s, home })!.text).toContain(' · Derby');
+    expect(nextMatchLine({ ...s, home })!.label).toContain(', Derby,');
+    expect(nextMatchLine({ ...s, home: { town: 'Free text' } })!.text).not.toContain('Derby');
+  });
+
   it('no next match with the season done', () => {
     const s = getState();
     expect(nextMatchLine({ ...s, league: { ...s.league, fixtures: [] } })).toBeNull();
@@ -42,9 +57,48 @@ describe('the Club home sheet (#350)', () => {
     const v = clubHomeView({ ...getState(), week: 3, season: 2, money: 123_456 });
     expect(v.club).toBe('Test Club');
     expect(v.week).toBe(`Week 3 of ${WEEKS_PER_SEASON} · Season 2`);
-    expect(v.money).toBe('$123,456');
+    expect(v.money).toBe('$123k · covering costs');
     expect(v.moneyLevel).toBe('ok');
-    expect(v.moneyLabel).toBe('Money $123,456. Tap for Finance');
+    expect(v.moneyLabel).toBe('Money $123k · covering costs. Tap for Finance');
+  });
+
+  it.each([
+    [31.7, 'about 31 weeks of runway'],
+    [1.2, 'about 1 week of runway'],
+    [0, 'about 1 week of runway'],
+    [99, 'about 99 weeks of runway'],
+    [99.1, '99+ weeks of runway'],
+    [150, '99+ weeks of runway'],
+    [null, 'covering costs'],
+  ])('always shows the runway for %s weeks (#479)', (runway, words) => {
+    const v = clubHomeView({ ...getState(), money: 200_000 }, { runwayWeeks: () => runway });
+    expect(v.money).toBe(`$200k · ${words}`);
+    expect(v.moneyLabel).toBe(`Money $200k · ${words}. Tap for Finance`);
+  });
+
+  it('shows a new Normal game’s day-one runway from Finance (#479)', () => {
+    createNewGame('Test Club', 1, { difficulty: 'normal' });
+    setState({ league: initLeague(getState()) });
+    const s = getState();
+    const runway = financeSummary(s).runwayWeeks;
+    expect(runway).not.toBeNull();
+    expect(runway!).toBeGreaterThanOrEqual(2);
+    expect(runway!).toBeLessThanOrEqual(99);
+    const v = clubHomeView(s, { runwayWeeks: (state) => financeSummary(state).runwayWeeks });
+    expect(v.money).toBe(`$200k · about ${Math.floor(runway!)} weeks of runway`);
+  });
+
+  it('shows covering costs when Finance projects no cash burn (#479)', () => {
+    const s = { ...getState(), squad: [], facilities: [], reputation: 100 };
+    expect(financeSummary(s).runwayWeeks).toBeNull();
+    expect(clubHomeView(s, { runwayWeeks: (state) => financeSummary(state).runwayWeeks }).money)
+      .toBe('$200k · covering costs');
+  });
+
+  it.each([
+    [20, 'ok'], [19.9, 'low'], [8, 'low'], [7.9, 'short'], [null, 'ok'],
+  ])('keeps the colour threshold for %s weeks (#479)', (runway, level) => {
+    expect(clubHomeView(getState(), { runwayWeeks: () => runway }).moneyLevel).toBe(level);
   });
 
   it('the money worries as the dock’s does: the runway, then debt', () => {
@@ -70,5 +124,45 @@ describe('the Club home sheet (#350)', () => {
     const v = clubHomeView({ ...s, money: 12_000, objectives: [solvent] }, { runwayWeeks: () => 3 });
     expect(v.board).toMatchObject({ title: 'Board: $20k', detail: 'You have $12k', risk: 'off-track' });
     expect(clubHomeView({ ...s, objectives: [] }).board).toBeNull();
+  });
+});
+
+
+describe('Coach says row (#477)', () => {
+  afterEach(() => { closeScreen(); vi.unstubAllGlobals(); });
+  it('includes the pure suggestion, renders it first and opens its destination; refreshes and reopens', () => {
+    createNewGame('Test Club', 1);
+    coachDocument();
+    const onCoach = vi.fn();
+    const deps = { onCoach, onMoney: vi.fn(), onNextMatch: vi.fn(), onDecisions: vi.fn(), onBoard: vi.fn(), onGrounds: vi.fn() };
+    const v = clubHomeView(getState());
+    expect(v.coach).toEqual(coachSays(getState(), { decisions: 0, runwayWeeks: null }));
+    const screen = openClubHome(deps) as unknown as StubNode;
+    const row = () => screen.all().find((n) => n.className.includes('nrl-club-home-coach'))!;
+    expect(row().parentNode!.children[1]).toBe(row()); // first row after club identity
+    expect(row().textContent).toContain(`Coach saysMick Dorney${v.coach.text}`);
+    row().click();
+    expect(onCoach).toHaveBeenCalledWith(v.coach.screen);
+    const squad = getState().squad.map((p) => ({ ...p, injuredWeeks: 2 }));
+    setState({ squad, week: 2 });
+    expect(row().textContent).toContain("can't play. Fix the lineup.");
+    row().click();
+    expect(onCoach).toHaveBeenLastCalledWith('lineup');
+    closeScreen();
+    const reopened = openClubHome(deps) as unknown as StubNode;
+    expect(reopened.textContent).toContain("can't play. Fix the lineup.");
+  });
+});
+
+describe('the named home ground (#485)', () => {
+  it('appears for a home fixture only; older saves keep the original line', () => {
+    const s = createNewGame('Ground Club', 42);
+    s.league = initLeague(s);
+    const home = s.league.fixtures.find(f => f.homeId === 'player')!;
+    const away = s.league.fixtures.find(f => f.awayId === 'player')!;
+    const baseline = nextMatchLine({ ...s, week: home.round });
+    expect(nextMatchLine({ ...s, week: home.round, groundName: 'Valley Oval' })?.text).toBe(`${baseline?.text} · Valley Oval`);
+    expect(nextMatchLine({ ...s, week: home.round, groundName: 'Valley Oval' })?.label).toContain('home at Valley Oval');
+    expect(nextMatchLine({ ...s, week: away.round, groundName: 'Valley Oval' })).toEqual(nextMatchLine({ ...s, week: away.round }));
   });
 });

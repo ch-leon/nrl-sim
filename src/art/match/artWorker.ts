@@ -4,11 +4,13 @@
 // message paints the ground ahead (the same for every fixture), with no reply. It
 // imports the pure match art only: no Phaser, no game state, no DOM.
 import { fixtureArtBuffers, paintFixtureArt, type FixtureKits } from './fixtureArt';
-import { warmGround } from './stadium';
+import type { StadiumSigns } from '../../content/pack';
+import { warmGround, setStadiumSigns } from './stadium';
 
-type ArtRequest = { warm: number } | { offsetX: number; kits: FixtureKits };
+type ArtRequest = ({ warm: number } | { offsetX: number; kits: FixtureKits }) & { signs?: StadiumSigns };
 
 self.onmessage = (e: MessageEvent<ArtRequest>): void => {
+  if (e.data.signs) setStadiumSigns(e.data.signs);
   if ('warm' in e.data) {
     warmGround(e.data.warm);
     return;

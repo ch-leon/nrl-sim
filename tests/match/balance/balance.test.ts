@@ -3,7 +3,10 @@
 // expanded in order, the report's bands and luck test, and a measured cell
 // that is deterministic and actually feels its overrides.
 import { describe, it, expect } from 'vitest';
+import enabledPlan from '../../../balance/plans/counters-enabled.json';
 import { BASE, MOMENTUM, OPEN, contestOdds } from '../../../src/match/league/contest';
+import { COUNTERS, fitEdge, slideCounter } from '../../../src/match/league/counters';
+import { styleFit } from '../../../src/match/league/fit';
 import { FATIGUE } from '../../../src/match/league/fatigue';
 import { LIVE, LiveSim } from '../../../src/match/league/live';
 import { PRESET_TABLES, attackPlan, defencePlan } from '../../../src/match/league/presets';
@@ -18,9 +21,19 @@ const EVEN = { name: 'even', home: { rating: 60 }, away: { rating: 60 } };
 const plan = (over: Partial<Plan> = {}): Plan => ({ name: 'p', seeds: 2, minutes: 2, scenarios: [EVEN], ...over });
 
 describe('knobs by name', () => {
+  it('enables strategy counters by default and leaves flat Balanced / Slide neutral (#465)', () => {
+    for (const group of Object.values(COUNTERS)) expect(group.on).toBe(1);
+    // The paired control restores the legacy preset; enabled must restore the actual live default.
+    expect(enabledPlan.variants[0]!.tuning['presets.attack.kick-chase.base.pass'])
+      .toBe(attackPlan('kick-chase', 'midfield').pass);
+    const fit = styleFit(sideSheet('H', { rating: 60 }).roster!);
+    for (const value of Object.values(fit)) expect(value).toBe(1);
+    expect(fitEdge(fit.balanced) - fitEdge(fit.slide)).toBe(0);
+    expect(slideCounter('balanced', 'slide', fit.balanced, fit.slide)).toBe(0);
+  });
   it('lists every group and applies overrides with an exact way back', () => {
     const paths = listKnobs().map((k) => k.path);
-    for (const p of ['live.carrySpeed', 'contest.broken', 'fatigue.runCost', 'fatigue.contactCost.carrier', 'wrestle.gripBase', 'wrestle.gang.1', 'traits.hitman', 'edge.hothead', 'presets.defence.rush.lineSpeed', 'presets.attackDefault.earlyKick']) {
+    for (const p of ['live.carrySpeed', 'contest.broken', 'fatigue.runCost', 'fatigue.contactCost.carrier', 'wrestle.gripBase', 'wrestle.gang.1', 'traits.hitman', 'edge.hothead', 'presets.defence.rush.lineSpeed', 'presets.attackDefault.earlyKick', 'race.on', 'race.perPoint', 'race.cap', 'race.fendShare', 'race.wide', 'race.backsOnly', 'race.single', 'contest.stepSlope', 'counters.slide.expansiveSigned', 'counters.slide.expansiveByDefence', 'counters.compressed.expansiveRelative']) {
       expect(paths).toContain(p);
     }
     const before = JSON.stringify(PRESET_TABLES);
@@ -221,7 +234,7 @@ describe('measuring and reporting', () => {
     expect(tracked).toContain('Side win');
     expect(tracked).toContain('50.0% (10.0% drawn)');
     expect(tracked).toContain('both ways round');
-    // A whole percent would print 54.8% as 55%, on the wrong side of the preset band's top.
+    // Keep tenths so the revised 42–58% preset band can be assessed precisely.
     const edge = reportMarkdown({
       plan: plan(),
       meta: {},
@@ -260,8 +273,10 @@ describe('measuring and reporting', () => {
     // 14-10:369:df1ab5c448c16159, re-pinned for the deeper default kick-off (#397: the
     // receivers' 15–8 m line instead of their 24 m line; balance/plans/kickoff-depth.md),
     // and before that 8-16:346:3436c830c791688a and 14-14:385:97934f5b337f329e.
+    // Expansive was 8-10:377:e051c574b7fe72b5: strategy counters switched on, #465.
+    // Balanced / Slide retains its pin: flat fit is exactly 1 and its cell is zero.
     { attack: 'balanced' as const, expected: '10-26:350:34ab09d37c3de210' },
-    { attack: 'expansive' as const, expected: '8-10:377:e051c574b7fe72b5' },
+    { attack: 'expansive' as const, expected: '10-38:372:0e0dce9822247ec4' },
   ])('pins an even $attack / Slide match (seed 1)', async ({ attack, expected }) => {
     const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack } }), sideSheet('A', { rating: 60 }), 1);
     const parts: string[] = [];

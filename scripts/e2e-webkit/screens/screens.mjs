@@ -297,17 +297,26 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     st.setProperty('--nrl-safe-r', `${s.r}px`); st.setProperty('--nrl-safe-b', `${s.b}px`);
   }, safe);
   // The title (#350 T1, #347): a fresh install opens on the new club's setup, every
-  // field and Start on screen with no scrolling, clear of the notch.
+  // detail field reachable by scrolling its panel; difficulty and Start stay in view, clear of the notch.
   await step('title-setup', async () => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
+    await page.locator('[data-nrl-open-all]').check();
     await setInsets();
     await page.waitForTimeout(250);
-    return controlsProblems(page, ['[data-nrl-clubname]', '.nrl-title-swatch', '.nrl-title-pick', '[data-nrl-start]'], safe);
+    const problems = await controlsProblems(page, ['.nrl-title-pick', '[data-nrl-start]'], safe);
+    for (const control of await page.locator('.nrl-title-details input, .nrl-title-swatch').all()) {
+      await control.evaluate(e => { e.setAttribute('data-nrl-reach-probe', ''); e.scrollIntoView({ block: 'center', inline: 'nearest' }); });
+      problems.push(...await controlsProblems(page, ['[data-nrl-reach-probe]'], safe));
+      await control.evaluate(e => e.removeAttribute('data-nrl-reach-probe'));
+    }
+    await page.evaluate(() => { document.querySelector('.nrl-title-details').scrollTop = 0; });
+    return problems;
   });
   await step('hub', async (rec) => {
     await page.fill('[data-nrl-clubname]', 'Landscape FC');
     await tap('[data-nrl-start]');
+    await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-tutorial-skip');
     await tap('.nrl-tutorial-skip');
     await page.waitForSelector('.nrl-tutorial', { state: 'detached' });
@@ -445,6 +454,53 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       return check(rec, spec, spec.id);
     });
   }
+  // #467: every new readout at both requested text sizes. Images stay in CI artifacts.
+  const textSize = (size) => page.evaluate((size) => {
+    if (size === 'normal') document.documentElement.removeAttribute('data-text-size');
+    else document.documentElement.setAttribute('data-text-size', size);
+    document.documentElement.style.setProperty('--nrl-text-scale', size === 'large' ? '1.15' : '1');
+  }, size);
+  const readoutProblems = () => page.evaluate(() => {
+    const out = [];
+    for (const e of document.querySelectorAll('[data-plan-done], .nrl-mo-plan-go, [data-fit] > span, [data-matchup], [data-counters], [data-usual-fit], [data-working], [data-preview-line]')) {
+      const r = e.getBoundingClientRect();
+      if (r.width < 1) continue;
+      if (r.left < 0 || r.right > innerWidth + 1 || r.top < 0 || r.bottom > innerHeight + 1) out.push(`off screen: ${e.textContent}`);
+      for (let a = e.parentElement; a; a = a.parentElement) {
+        const cs = getComputedStyle(a), ar = a.getBoundingClientRect();
+        if (/(auto|scroll|hidden|clip)/.test(cs.overflowY) && (r.top < ar.top - 1 || r.bottom > ar.bottom + 1)) out.push(`ancestor clips: ${e.textContent}`);
+      }
+      if (e.scrollWidth > e.clientWidth + 1) out.push(`clipped: ${e.textContent}`);
+    }
+    return out;
+  });
+  for (const size of ['normal', 'large']) {
+    await textSize(size);
+    await step(`fit-lineup-${size}`, async () => {
+      await openNav(page, 'lineup');
+      await tap('[data-plan]');
+      await page.waitForSelector('.nrl-lineup-plan');
+      const out = await readoutProblems();
+      if (await page.locator('.nrl-lineup-plan [data-fit]').count() !== 8) out.push('missing fit buttons');
+      return out;
+    });
+    await tap('[data-plan-done]');
+    await step(`matchup-fixtures-${size}`, async () => {
+      await openNav(page, 'fixtures');
+      await tap('[data-next-row]');
+      await page.waitForSelector('[data-next-match]');
+      const text = await page.locator('[data-next-match]').innerText();
+      return /Matchup/i.test(text) && /Counters/i.test(text) ? await readoutProblems() : ['missing matchup or counters'];
+    });
+    await step(`matchup-rival-${size}`, async () => {
+      await tap('[data-next-opponent] button');
+      await page.waitForSelector('[data-matchup]');
+      return readoutProblems();
+    });
+    await closeAll();
+  }
+  await textSize('normal');
+
   // Popups: the player page, the kit designer, a rival's squad, a decision card.
   await step('popup-player', async (rec) => {
     await openNav(page, 'squad');
@@ -591,10 +647,25 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     // A try's offer, then the half-time card over it (the scene's own calls, as the playback makes them).
     await page.evaluate(() => {
       const sc = window.__nrlGame.scene.getScene('Match');
+      // Reach the real break through the playback runner, keeping its event recorder connected.
+      const pb = sc.playback;
+      pb.hold();
+      for (let i = 0; i < 24000 && pb.breakKind !== 'half-time'; i++) pb.runner.step();
+      pb.release();
+      if (pb.breakKind !== 'half-time') throw new Error('did not reach half-time');
+      sc.planCardHalf = pb.half; // mirror refreshPlan's once-per-half latch
       sc.overlay.offerReplay(() => {});
       sc.openPlanCard('Half-time', ['Landscape FC 4 – 0 Rivals', 'Legs 80% / 78%', 'Calls paid off – / –']);
     });
     if (!(await page.locator('.nrl-mo-plan').count())) return ['no plan card (no plan side in this match)'];
+    for (const size of ['normal', 'large']) {
+      await textSize(size);
+      const problems = await readoutProblems();
+      out.push(...problems);
+      if (await page.locator('.nrl-mo-plan [data-fit]').count() !== 8 || !(await page.locator('[data-working], [data-preview-line]').count())) out.push('missing half-time fit or numbers');
+      await page.screenshot({ path: join(OUT, `fit-half-time-${size}.png`) });
+    }
+    await textSize('normal');
     const at = await clock();
     await page.waitForTimeout(6000);
     if (!(await page.locator('.nrl-mo-plan').count())) out.push('the half-time card closed by itself');
@@ -767,6 +838,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
   await step('title-overwrite-confirm', async () => {
     await tap('[data-nrl-new-1]');
     await page.waitForSelector('[data-nrl-start]');
+    await page.locator('[data-nrl-open-all]').check();
     await tap('[data-nrl-start]');
     await page.waitForSelector('[data-nrl-confirm]');
     await page.waitForTimeout(200);

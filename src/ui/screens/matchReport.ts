@@ -318,7 +318,7 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: { rou
 
   // The ladder after the round: it moves once the week has finished.
   let offWeek: (() => void) | null = null;
-  if (mine && fixture.round <= SEASON_ROUNDS) {
+  if (mine && fixture.round > 0 && fixture.round <= SEASON_ROUNDS) {
     let before = 0;
     try {
       before = ladderPosition(getState(), PLAYER_ID);
@@ -410,14 +410,17 @@ export function openMatchReport(r: MatchReport, opts: ReportOpts = {}): HTMLElem
       ...r.changes.map((t) => el('p', { class: 'nrl-report-change', text: t })))] : []),
     // #368: on a loss, "Why did I lose?" folds under them, so the scorers stay above the fold.
     ...(r.reasons.length ? [whyLost(r.reasons, opts.onReason)] : []),
-    ...(r.potm ? [el('p', { class: 'nrl-report-potm' }, el('span', { class: 'nrl-rp-potm-label', text: 'Player of the match ' }), `${r.potm.who} · ${r.potm.line}`)] : []),
   );
   const back = button('Back to Club ▸', backToClub, { class: 'nrl-btn-primary nrl-rp-back' });
   back.setAttribute('data-back-to-club', '');
   const content = el(
     'div',
     { class: 'nrl-report' },
-    el('div', { class: 'nrl-rp-left' }, scroll, back),
+    // Changed match outcomes can add scorer/injury/reason rows (#465). Keep the
+    // Player of the Match beside the fixed exit while those details scroll.
+    el('div', { class: 'nrl-rp-left' }, scroll,
+      ...(r.potm ? [el('p', { class: 'nrl-report-potm' }, el('span', { class: 'nrl-rp-potm-label', text: 'Player of the match ' }), `${r.potm.who} · ${r.potm.line}`)] : []),
+      back),
     el('div', { class: 'nrl-rp-stats' }, statTable(r.rows, codes, colours)),
   );
   const backdrop = openModal(content, { class: 'nrl-report-modal', region: true });

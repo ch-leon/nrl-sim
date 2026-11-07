@@ -1,10 +1,11 @@
+import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/matchday.test.ts — player match tick: result toast timing (the
 // result comes at full time from the match played on screen, BAK-207),
 // SQUAD_MIN forfeit (GitHub #4), big-hit injuries applied to squad (GitHub #7),
 // the difficulty's edge on the rival (N12.2).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bus } from '../../src/core/events';
-import { createNewGame, getState, setState } from '../../src/core/state';
+import { getState, setState } from '../../src/core/state';
 import { advanceWeek, advanceWeeks, clearHeldWeek, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import {
@@ -390,11 +391,11 @@ describe('difficulty plays in the match: the rival’s edge after the spread (N1
       // The rival changes plan at the breaks on every difficulty. Only Hard's rival has an AI coach (N14.1).
       expect(k.live.breakRuleSides).toEqual([k.rival]);
       expect(k.live.aiCoach).toEqual(d === 'hard' ? [k.rival] : undefined);
-      // The sheet is the rival's squad through his coach's pick, in his style (N11), nothing scaled (scaleSheet is gone).
+      // The unscaled squad is unchanged; only its fixed-input habit plan varies (#469).
       const theirs = pick(k, [k.home, k.away], 'rival');
       const club = getState().league.clubs.find((c) => c.id === theirs.clubId)!;
       const fit = club.squad!.filter((p) => p.injuredWeeks <= 0);
-      expect(theirs).toEqual(withRivalStyle(teamSheetFromSquad(fit, club.id, club.name, club.colors, resolveLineup(autoPick(fit), fit)), club));
+      expect(theirs).toEqual(withRivalStyle(teamSheetFromSquad(fit, club.id, club.name, club.colors, resolveLineup(autoPick(fit), fit)), club, { difficulty: d, recentPlans: [], playerRoster: pick(k, [k.home, k.away], 'own').roster ?? [] }));
       const spread = spreadSheets(k.home, k.away);
       const played = edgeSheets(...spread, k.live.difficultyEdge);
       const before = men(pick(k, spread, 'rival'));
@@ -420,6 +421,7 @@ describe('difficulty plays in the match: the rival’s edge after the spread (N1
     const watched = runMatch(k.home, k.away, {
       seed: k.live.seed, weather: k.live.weather, injuryRate: k.live.injuryRate!, difficultyEdge: k.live.difficultyEdge!,
       ...(k.live.aiCoach?.length ? { aiCoach: k.live.aiCoach } : {}),
+      ...(k.live.aiRival ? { aiRival: k.live.aiRival } : {}),
       ...(k.live.breakRuleSides?.length ? { breakRuleSides: k.live.breakRuleSides } : {}),
     });
     const flat = runMatch(k.home, k.away, { seed: k.live.seed, weather: k.live.weather, injuryRate: k.live.injuryRate! });
@@ -441,7 +443,7 @@ describe('difficulty plays in the match: the rival’s edge after the spread (N1
     });
     const theirs = pick(k, [k.home, k.away], 'rival');
     expect(theirs.roster!.every((r) => r.id === undefined)).toBe(true);
-    expect(theirs).toEqual(teamSheetFromRival(getState().league.clubs.find((c) => c.id === theirs.clubId)!));
+    expect(theirs).toEqual(teamSheetFromRival(getState().league.clubs.find((c) => c.id === theirs.clubId)!, { difficulty: 'hard', recentPlans: [], playerRoster: pick(k, [k.home, k.away], 'own').roster ?? [] }));
     expect(k.live.difficultyEdge).toEqual({ side: k.rival, points: DIFFICULTY.hard.rivalEdge });
   });
 });

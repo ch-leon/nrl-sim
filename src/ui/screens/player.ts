@@ -128,7 +128,7 @@ export function playerOutlook(p: Player, ctx: PlayerContext, state: GameState): 
 }
 
 const STAT_LABELS: readonly [keyof PlayerStats, string][] = [
-  ['speed', 'Speed'], ['strength', 'Strength'], ['stamina', 'Stamina'], ['skill', 'Skill'], ['footyIQ', activePack().vocab.iqStat],
+  ['speed', 'Speed'], ['strength', 'Strength'], ['stamina', 'Stamina'], ['skill', 'Skill'], ['footyIQ', ''],
 ];
 
 /** Morale in a word: 70+ happy, 50+ content, 30+ unsettled, else unhappy. */
@@ -295,7 +295,7 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     overall: overallRating(p),
     where: ctx.kind === 'squad' ? `Your squad · ${lineupSlotText(state, p.id)}` : ctx.kind === 'freeAgent' ? (p.junior ? 'Academy prospect' : 'Free agent') : ctx.club.name,
     // Stats train in fractions; the page shows whole numbers.
-    stats: STAT_LABELS.map(([key, label]) => ({ label, value: Math.round(p.stats[key]), ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}) })),
+    stats: STAT_LABELS.map(([key, label]) => ({ label: key === 'footyIQ' ? activePack().vocab.iqStat : label, value: Math.round(p.stats[key]), ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}) })),
     trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
       .filter((t) => t.id in TRAITS)
