@@ -35,6 +35,9 @@ import type { MatchEvent, MatchResult, TeamSheet, WeatherKind } from '../../sim/
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset, type TeamTactics } from '../../match/league/presets';
 import { TACTIC_BLURB } from '../tacticsBlurbs';
 import { CALL_LABEL, callIsBench, callIsDefence, callIsKickoff, callIsPenalty, type CoachCall } from '../../match/league/calls';
+import { PLAYS_BY_ID, type PlayId } from '../../data/plays';
+import { PLAYS } from '../../match/league/plays';
+import { surnameOf } from '../../match/view/popups';
 import { TICKER_FIT_CHARS } from '../../match/view/commentary';
 import { lockedCallsLine, officeLevelName, officeLevelOf } from '../coachCallsText';
 import { teamTags } from '../teamTag';
@@ -525,6 +528,20 @@ export interface TrayRow {
 export const TRAY_MAX_ROWS = 5;
 export const TRAY_MAX_BUTTONS = 6;
 
+/** How many rows and buttons the calls part of the tray may take. */
+export interface TrayCap {
+  rows: number;
+  buttons: number;
+}
+export const TRAY_CAP: TrayCap = { rows: TRAY_MAX_ROWS, buttons: TRAY_MAX_BUTTONS };
+/**
+ * The calls' share of the tray while its Plays section shows (#326): three tiles
+ * (one line at three a line, two at two), so the calls, a line of plays and the
+ * footer fit the shortest phone (568×320) without the tray scrolling. The calls
+ * keep TRAY_PRIORITY's order; the rest are named in the footer ("+2 more").
+ */
+export const TRAY_CAP_WITH_PLAYS: TrayCap = { rows: 3, buttons: 3 };
+
 /**
  * Calls that share a row, side by side. The kick-off calls (#397) join as one more pair,
  * `['kickoff', <short>, <long>]`, which TRAY_PRIORITY and TRAY_ORDER already rank first: a
@@ -562,7 +579,7 @@ export function callForRole(call: CoachCall, attacking: boolean): boolean {
  * TRAY_ORDER. A pair keeps its other half greyed when that half says something about
  * this moment (the captain already chose it, the siren has gone). Pure: no dice.
  */
-export function trayRows(calls: readonly TrayButton[], attacking: boolean): TrayRow[] {
+export function trayRows(calls: readonly TrayButton[], attacking: boolean, cap: TrayCap = TRAY_CAP): TrayRow[] {
   const mine = calls.filter((c) => callForRole(c.call, attacking));
   const paired = new Set<CoachCall>(TRAY_PAIRS.flatMap(([, a, b]) => [a, b]));
   const rows: TrayRow[] = [];
@@ -579,7 +596,7 @@ export function trayRows(calls: readonly TrayButton[], attacking: boolean): Tray
   const shown: TrayRow[] = [];
   let buttons = 0;
   for (const r of [...rows].sort((p, q) => rank(p, TRAY_PRIORITY) - rank(q, TRAY_PRIORITY))) {
-    if (shown.length >= TRAY_MAX_ROWS || buttons + r.buttons.length > TRAY_MAX_BUTTONS) continue;
+    if (shown.length >= cap.rows || buttons + r.buttons.length > cap.buttons) continue;
     shown.push(r);
     buttons += r.buttons.length;
   }
@@ -600,7 +617,7 @@ export function trayHidden(calls: readonly TrayButton[], attacking: boolean, row
  * doesn't fit is `overflow`, for the footer. So a locked call never takes a usable
  * one's place, and only ones that fit the moment show.
  */
-export function trayWithLocked(rows: readonly TrayRow[], locked: readonly TrayButton[]): { rows: TrayRow[]; overflow: TrayButton[] } {
+export function trayWithLocked(rows: readonly TrayRow[], locked: readonly TrayButton[], cap: TrayCap = TRAY_CAP): { rows: TrayRow[]; overflow: TrayButton[] } {
   const extra: TrayRow[] = [];
   const paired = new Set<CoachCall>(TRAY_PAIRS.flatMap(([, a, b]) => [a, b]));
   for (const [id, a, b] of TRAY_PAIRS) {
@@ -618,7 +635,7 @@ export function trayWithLocked(rows: readonly TrayRow[], locked: readonly TrayBu
   const overflow: TrayButton[] = [];
   let buttons = rows.reduce((n, r) => n + r.buttons.length, 0);
   for (const r of extra) {
-    if (out.length >= TRAY_MAX_ROWS || buttons + r.buttons.length > TRAY_MAX_BUTTONS) {
+    if (out.length >= cap.rows || buttons + r.buttons.length > cap.buttons) {
       overflow.push(...r.buttons);
       continue;
     }
@@ -677,10 +694,118 @@ export function trayRowEls(rows: readonly TrayRow[], onCall: (call: CoachCall) =
  * The COACH button's badge (3m/3n): how many calls are on now; the call made this
  * set; or why none are ("THEIR BALL"). It is always there, so the row never shifts.
  */
-export function coachBadge(legal: number, attacking: boolean, made: CoachCall | null): { text: string; state: 'on' | 'off' | 'made' } {
+export function coachBadge(legal: number, attacking: boolean, made: CoachCall | null, plays: { on?: number; made?: PlayId | null } = {}): { text: string; state: 'on' | 'off' | 'made' } {
+  // A set play called (#326) reads like a made call: its short name, until the set's play is spent.
+  if (plays.made && PLAYS_BY_ID[plays.made]) return { text: PLAYS_BY_ID[plays.made].short, state: 'made' };
   if (made) return { text: CALL_LABEL[made], state: 'made' };
-  if (legal > 0) return { text: `${legal} call${legal === 1 ? '' : 's'}`, state: 'on' };
+  const on = plays.on ?? 0;
+  const callsText = `${legal} call${legal === 1 ? '' : 's'}`;
+  const playsText = `${on} play${on === 1 ? '' : 's'}`;
+  if (legal > 0 && on > 0) return { text: `${callsText} · ${playsText}`, state: 'on' };
+  if (on > 0) return { text: playsText, state: 'on' };
+  if (legal > 0) return { text: callsText, state: 'on' };
   return { text: attacking ? 'No calls' : 'Their ball', state: 'off' };
+}
+
+/**
+ * Put a coachBadge's text in the COACH badge. Calls and plays together ("2 calls · 1 play",
+ * #326) go in as two parts, so a narrow phone can stack them and the bottom row is no
+ * wider than with today's badge; anything else is the plain text it always was.
+ */
+export function renderCoachBadge(el: HTMLElement, text: string): void {
+  const parts = text.split(' · ');
+  if (parts.length !== 2) {
+    if (el.textContent !== text || el.children.length > 0) el.textContent = text;
+    el.removeAttribute('data-parts');
+    return;
+  }
+  if (el.textContent === text && el.hasAttribute('data-parts')) return;
+  const span = (cls: string, t: string): HTMLSpanElement => {
+    const sp = document.createElement('span');
+    sp.className = cls;
+    sp.textContent = t;
+    return sp;
+  };
+  el.replaceChildren(span('nrl-mo-badge-calls', parts[0]!), span('nrl-mo-badge-sep', ' · '), span('nrl-mo-badge-plays', parts[1]!));
+  el.setAttribute('data-parts', '');
+}
+
+// ── Set plays in the tray (#326, phase 3) ──────────────────────────────────────
+
+/**
+ * A set play's tile in the coach tray: the play, the sim's refusal (null when it
+ * can be called now), whether it is the one called and waiting for the next
+ * play-the-ball, and its worst man against the play's IQ needs (playFit's).
+ */
+export interface TrayPlay {
+  play: PlayId;
+  why: string | null;
+  pending: boolean;
+  worst: { name: string; iq: number; short: number };
+}
+
+/**
+ * The tray's Plays section (#326): the side's plays (its three, at most
+ * PLAYS.takeMax, in its order), only while it has the ball. Defending, or a club
+ * with no playbook, none: the section is not there at all. Pure: no dice.
+ */
+export function trayPlays(plays: readonly TrayPlay[], attacking: boolean): TrayPlay[] {
+  return attacking ? plays.slice(0, PLAYS.takeMax) : [];
+}
+
+/** A play's refusal in a few words on its tile (the sim's words are setPlayRefusal's and playWhen's). */
+const PLAY_CAPTION: Readonly<Record<string, string>> = {
+  'not your ball': 'with the ball',
+  'not in your three': 'not taken in',
+  'last tackle': 'last tackle',
+  'the kick’s away': 'kick’s away',
+  'at the breaks': 'wait for play',
+  'full time': 'full time',
+};
+
+/**
+ * A play tile's caption (#326): "next play" once it is called and waiting for the
+ * play-the-ball; its refusal ("not from here", "one play a set"); else its worst
+ * man against the IQ the play needs: "✓ IQ" when every need is met, "⚠ Jones 49" when not.
+ */
+export function playCaption(p: TrayPlay): string {
+  if (p.pending) return 'next play';
+  if (p.why !== null) return PLAY_CAPTION[p.why] ?? p.why;
+  return p.worst.short > 0 ? `⚠ ${surnameOf(p.worst.name)} ${Math.round(p.worst.iq)}` : '✓ IQ';
+}
+
+/** How many of the section's plays can be called now (the COACH badge's "· 1 play"). */
+export function trayPlaysOn(plays: readonly TrayPlay[]): number {
+  return plays.filter((p) => p.why === null && !p.pending).length;
+}
+
+/**
+ * The Plays section's tiles (#326): the calls' tile (.nrl-mo-tray-call, 44px),
+ * the play's short name on top and playCaption under it. A play that can be
+ * called makes it (`onPlay`); one that can't is greyed and says why.
+ */
+export function trayPlayEls(plays: readonly TrayPlay[], onPlay: (play: PlayId) => void): HTMLButtonElement[] {
+  return plays.map((p) => {
+    const play = PLAYS_BY_ID[p.play];
+    const b = button('', () => onPlay(p.play), { class: 'nrl-mo-tray-call nrl-mo-tray-play' });
+    const name = document.createElement('b');
+    name.textContent = play.short;
+    const what = document.createElement('span');
+    what.textContent = playCaption(p);
+    b.replaceChildren(name, what);
+    b.setAttribute('data-call', 'set-play');
+    b.setAttribute('data-play', p.play);
+    if (p.pending) b.setAttribute('data-pending', '');
+    const need = p.worst.short > 0 ? `${p.worst.name} has footy IQ ${Math.round(p.worst.iq)}, ${p.worst.short} short` : 'every man has the footy IQ it needs';
+    b.title = `${play.name}: ${p.pending ? 'called, at the next play-the-ball' : need}`;
+    b.disabled = p.why !== null || p.pending;
+    return b;
+  });
+}
+
+/** The tray's key for its Plays section: rebuilt only when a tile's text or state changes. */
+export function trayPlaysKey(plays: readonly TrayPlay[]): string {
+  return plays.map((p) => `${p.play}:${playCaption(p)}:${p.why === null && !p.pending ? 1 : 0}`).join(',');
 }
 
 /** "2/5" for a side's calls paid off of made, "–" when it made none. */
@@ -1683,6 +1808,9 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-call-result[data-paid] { color: var(--nrl-pos); }
 .nrl-mo-tray-open ~ .nrl-mo-call-result, .nrl-mo-call-result[hidden] { display: none; }
+/* With the commentary line up (log = line) the tag sat under it, unseen (#326 phase 3's webkit check found it):
+   it goes just above the line (the strip's 78px + its 40px + a gap). */
+.nrl-match-overlay[data-log="line"] ~ .nrl-mo-call-result { bottom: calc(124px + var(--nrl-safe-b)); }
 /* Key moments (#366): the speed a break, a try or the last minutes hold the match at pulses in the pill; the chosen one stays yellow. */
 .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { box-shadow: inset 0 0 0 2px var(--nrl-accent); animation: nrl-mo-slow 0.9s ease-in-out infinite alternate; }
 @keyframes nrl-mo-slow { from { color: var(--nrl-text); } to { color: var(--nrl-accent); } }
@@ -1790,6 +1918,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-coach-badge[data-state="on"] { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-coach-badge[data-state="made"] { color: var(--nrl-accent); }
+/* Calls and plays together (#326): one line, its spaces kept; stacked two lines on a narrow phone (below). */
+.nrl-mo-coach-badge[data-parts] { display: block; line-height: 36px; white-space: pre; }
 .nrl-mo-coach[aria-expanded="true"] { padding: 0 16px; background: var(--nrl-button); box-shadow: inset 0 0 0 2px var(--nrl-accent); }
 .nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { display: none; }
 /* The coach tray (3o): only the calls on now; the match keeps playing. #396: at most five rows
@@ -1832,6 +1962,16 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-tray-none { grid-column: 1 / -1; padding: 6px 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
 .nrl-mo-tray-foot { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 0.75rem; line-height: 1.3; color: var(--nrl-muted); }
 .nrl-mo-tray-foot:empty { display: none; }
+/* Set plays (#326): a section under the calls, only while his side has the ball and only for a
+   club that took plays in (otherwise it is not in the tray at all). At most PLAYS.takeMax (3)
+   tiles, three a line at every size, so it is one line of 44px tiles under a small label. */
+.nrl-mo-tray-plays { display: flex; flex-direction: column; gap: 2px; }
+.nrl-mo-tray-plays[hidden] { display: none; }
+.nrl-mo-tray-plays-label { font-family: var(--nrl-f-label); font-size: 0.6875rem; font-weight: 700; line-height: 1.2; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
+.nrl-mo-tray-plays-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.nrl-btn.nrl-mo-tray-call.nrl-mo-tray-play { padding: 0 8px; }
+/* Under the plays the footer keeps to one line, so the tray fits a 375-tall phone unscrolled. */
+.nrl-mo-tray-plays:not([hidden]) ~ .nrl-mo-tray-foot { flex-shrink: 0; -webkit-line-clamp: 1; }
 /* A short wide phone (956×330): three tiles a line in a wider tray, so six fit in two. */
 @media (max-height: 360px) and (min-width: 760px) {
   .nrl-mo-tray { width: min(540px, calc(100vw - 32px)); }
@@ -1915,6 +2055,9 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-controls .nrl-mo-speed:not([aria-pressed="true"]),
   .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-pill-div { display: none; }
   .nrl-mo-coach { padding: 0 6px 0 12px; gap: 8px; }
+  /* "2 calls · 1 play" (#326) as two short lines, no wider than today's longest badge, so the row keeps its width. */
+  .nrl-mo-coach-badge[data-parts] { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; line-height: 1.1; font-size: 0.75rem; white-space: nowrap; }
+  .nrl-mo-coach-badge[data-parts] .nrl-mo-badge-sep { display: none; }
   .nrl-mo-log-toggle { padding: 0 12px; }
 }
 /* Large and Larger text (#371) on a narrow phone: the row keeps to one line with the Plan chip up,
