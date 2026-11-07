@@ -42,7 +42,7 @@ premium game with a free demo and a one-off unlock
   ([issue](https://github.com/ch-leon/nrl-sim/issues/365)). The storage adapter,
   content packs and brand config are in use in today's game. Only the demo gate,
   paywall and login sit behind the commercial switch, which is off on the live build.
-- **Save format:** version 22 (`SAVE_VERSION` in `src/core/state.ts`).
+- **Save format:** version 23 (`SAVE_VERSION` in `src/core/state.ts`).
 - **Repo maintenance:** the live-sim and WebKit module split is merged
   ([PR #443](https://github.com/ch-leon/nrl-sim/pull/443)); the repo slim is also
   merged ([PR #447](https://github.com/ch-leon/nrl-sim/pull/447)).
@@ -63,10 +63,14 @@ premium game with a free demo and a one-off unlock
   ([#322](https://github.com/ch-leon/nrl-sim/issues/322), open). The Speed levers in
   [PR #514](https://github.com/ch-leon/nrl-sim/pull/514) are merged but all off, so no
   match changed.
-- **Set plays:** phase 1, set plays in the match engine, is merged to main
-  ([PR #515](https://github.com/ch-leon/nrl-sim/pull/515)) and **off by default**, so
-  matches without plays are unchanged. Club screens, rival plays and the balance pass
-  are later phases ([#326](https://github.com/ch-leon/nrl-sim/issues/326), open).
+- **Set plays:** phase 1, set plays in the match engine, is merged
+  ([PR #515](https://github.com/ch-leon/nrl-sim/pull/515)); matches without plays are
+  unchanged. Phase 2, the club screens, is merged too
+  ([PR #516](https://github.com/ch-leon/nrl-sim/pull/516)): hire an attack coach, buy
+  plays in the Office Playbook and take up to three into a match from Lineup. This took
+  the save to version 23. A side runs plays only if it took some in, and rivals take
+  none yet. The live tray and pop-ups, rival plays and the balance pass are still open
+  ([#326](https://github.com/ch-leon/nrl-sim/issues/326)).
 - **Labs shorter matches** ([#513](https://github.com/ch-leon/nrl-sim/issues/513)):
   planned and awaiting Leon's go.
 - **Launch plumbing:** decided and documented
