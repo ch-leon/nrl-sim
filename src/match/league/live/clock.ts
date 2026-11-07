@@ -9,9 +9,9 @@ import { refillSeconds, tankSeconds } from '../gas';
 import { NINES } from '../rules';
 import { BENCH, benchRecover, pickSwaps } from '../bench';
 import { other, type Player, type Phase } from './types';
-import { LiveCalls } from './calls';
+import { LiveSetPlays } from './setPlays';
 
-export abstract class LiveClock extends LiveCalls {
+export abstract class LiveClock extends LiveSetPlays {
   // ── Clock ─────────────────────────────────────────────────────────────────
   /** The clock runs while the ball is in play; at time up the siren goes and play carries on to the next dead ball. */
   protected runClock(): void {

@@ -7,6 +7,7 @@ import { POSITIONS } from '../../data/player';
 import type { RosterStats, WeatherKind } from '../../sim/events';
 import { DIFFICULTIES, type Difficulty } from '../../config';
 import { isCoachCall, type CoachCall } from '../league/calls';
+import { isPlayId, type PlayId } from '../../data/plays';
 import { isRotation, type Rotation } from '../league/bench';
 import { isLegs, type Legs } from '../league/fatigue';
 import { isAttackPreset, isDefencePreset, type AttackPreset, type TeamTactics } from '../league/presets';
@@ -57,6 +58,8 @@ export interface SideSpec {
   difficulty?: Difficulty;
   /** A `player` squad with its star swapped for a first-grader at his position (what the squad's shape is worth). */
   noStar?: boolean;
+  /** Set plays taken into the match (#326), in order, at most three (`plays.on` 0 ignores them). */
+  plays?: PlayId[];
   /** This side is the rival of a player on this difficulty: it plays with the difficulty's edge after the spread (`difficulty.<d>.rivalEdge`), as matchday.ts gives it (N12.2). */
   rivalOf?: Difficulty;
 }
@@ -200,6 +203,8 @@ export function checkPlan(p: Plan): string[] {
           else if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1.5) errs.push(`${s.name} ${side}: fit.${style} must be a number 0–1.5`);
         }
       }
+      for (const id of spec.plays ?? []) if (!isPlayId(id)) errs.push(`${s.name} ${side}: unknown play "${String(id)}"`);
+      if (spec.plays && spec.plays.length > 3) errs.push(`${s.name} ${side}: at most 3 plays`);
       if (spec.tactics?.attack && !isAttackPreset(spec.tactics.attack)) errs.push(`${s.name} ${side}: unknown attack preset "${spec.tactics.attack}"`);
       if (spec.tactics?.defence && !isDefencePreset(spec.tactics.defence)) errs.push(`${s.name} ${side}: unknown defence preset "${spec.tactics.defence}"`);
       if (spec.traits && !['none', 'gen', 'stars'].includes(spec.traits)) errs.push(`${s.name} ${side}: traits must be none / gen / stars`);

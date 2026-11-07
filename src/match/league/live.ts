@@ -72,7 +72,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
     // Coach calls due this tick (#73).
     while (this.callRead < this.callList.length && this.callList[this.callRead]!.tick <= this.tick) {
       const c = this.callList[this.callRead++]!;
-      if (c.tick === this.tick) this.call(c.side, c.call);
+      if (c.tick === this.tick) this.call(c.side, c.call, c.play);
     }
     // Plan changes due this tick (N11); a new plan comes in as the restart is set.
     while (this.planRead < this.planList.length && this.planList[this.planRead]!.tick <= this.tick) {
@@ -134,6 +134,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
     }
     this.watchLineBreak(h);
     this.expireCalls();
+    if (this.scripted || this.tucked >= 0) this.tidyPlays();
     if (this.attacking !== beforeSide || this.tackles < beforeTackles
       || !['play', 'tackle', 'ruck'].includes(this.phase.kind)) {
       this.pendingControl.home = this.pendingControl.away = null;

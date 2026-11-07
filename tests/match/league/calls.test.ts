@@ -6,8 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { LiveSim } from '../../../src/match/league/live';
 import { runMatch } from '../../../src/match/league/match';
 import { sideSheet } from '../../../src/match/balance/measure';
-import { CALLS, CallJudge, chipState, withAttackCall, type CallInput, type CoachCall } from '../../../src/match/league/calls';
-import { callsLine } from '../../../src/ui/screens/matchOverlay';
+import { CALLS, CALL_LABEL, CALL_RESULT, COACH_CALLS, CallJudge, callIsPlay, callIsSetPlay, chipState, isCoachCall, unlockedCalls, withAttackCall, type CallInput, type CoachCall } from '../../../src/match/league/calls';
+import { CALL_TILE, CALL_WHEN, callsLine } from '../../../src/ui/screens/matchOverlay';
 import { attackPlan } from '../../../src/match/league/presets';
 import type { SimEvent } from '../../../src/match/core/snapshot';
 import type { MatchLength } from '../../../src/match/league/rules';
@@ -183,4 +183,23 @@ describe('coach calls in the live sim', () => {
       expect(paid, call).toBeLessThan(made);
     }
   }, 120_000);
+});
+
+describe('the set play call (#326)', () => {
+  it('is in every record a call has: label, result, when and tile', () => {
+    expect(CALL_LABEL['set-play']).toBe('Set play');
+    expect(typeof CALL_RESULT['set-play']).toBe('function');
+    expect(CALL_WHEN['set-play']).toBeTruthy();
+    expect(CALL_TILE['set-play']).toBeTruthy();
+    expect(isCoachCall('set-play')).toBe(true);
+  });
+  it('is a play call of its own: not a chip, not unlocked by the Coach’s Office, and it leaves the plan alone', () => {
+    expect(COACH_CALLS).not.toContain('set-play');
+    expect(unlockedCalls(3)).not.toContain('set-play');
+    expect(callIsPlay('set-play')).toBe(true);
+    expect(callIsSetPlay('set-play')).toBe(true);
+    expect(callIsSetPlay('shift-left')).toBe(false);
+    const plan = attackPlan('balanced', 'midfield');
+    expect(withAttackCall(plan, 'set-play')).toEqual(plan);
+  });
 });

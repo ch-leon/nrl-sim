@@ -26,18 +26,24 @@ import { LivePenalties } from './penalties';
 
 export abstract class LiveContact extends LivePenalties {
   // ── Actions ───────────────────────────────────────────────────────────────
-  protected pass(from: Player, to: Player, spillExtra = 0): void {
+  /**
+   * A pass to `to`. `read` (#326, a set play's scripted pass only) scales the
+   * lane defender's read: 0 is a pass nobody reads, the cut-out plays' is
+   * `plays.cutOutRead`. Absent, every pass is read as it always was.
+   */
+  protected pass(from: Player, to: Player, spillExtra = 0, read?: number): void {
     this.offloadReceiver = null;
     const flightS = dist(from.body.pos, to.body.pos) / PASS_SPEED;
     const lead = this.leadPoint(from, to, flightS);
     this.spillExtra = spillExtra;
     this.interceptTrait = undefined;
     // A defender sitting in the lane may pick it off: the ball then flies to him.
-    const thief = this.laneDefender(from.body.pos, lead, from.side);
+    const thief = read === 0 ? null : this.laneDefender(from.body.pos, lead, from.side);
     const cutOut = dist(from.body.pos, lead) > 12;
     const it = thief ? interceptTraits(thief.traits) : null;
-    const read = cutOut && this.tactics[from.side].attack === 'expansive' ? this.slideEffect(from.side) : 0;
-    if (thief && it && this.rng.next() < interceptChance(thief.stats.footyIQ, cutOut, it.bonus + read)) {
+    const slideRead = cutOut && this.tactics[from.side].attack === 'expansive' ? this.slideEffect(from.side) : 0;
+    const chance = thief && it ? interceptChance(thief.stats.footyIQ, cutOut, it.bonus + slideRead) : 0;
+    if (thief && it && this.rng.next() < (read === undefined ? chance : chance * read)) {
       this.ball = passFlight(from.body.pos, { ...thief.body.pos }, this.tick, this.indexOf(thief));
       this.interceptTrait = announce(it.credit);
     } else {
@@ -52,6 +58,25 @@ export abstract class LiveContact extends LivePenalties {
     from.pose = 'pass';
     from.poseUntil = this.tick + LIVE.passPoseTicks;
     from.catchTick = this.tick;
+  }
+
+  /**
+   * A set play's botched pass picked off (#326): thrown toward `toward` and
+   * read, it flies to the defender in the lane. False, with nothing thrown,
+   * when nobody is in the lane (then it is a breakdown).
+   */
+  protected interceptThrow(from: Player, toward: Player): boolean {
+    const lead = this.leadPoint(from, toward, dist(from.body.pos, toward.body.pos) / PASS_SPEED);
+    const thief = this.laneDefender(from.body.pos, lead, from.side);
+    if (!thief) return false;
+    this.offloadReceiver = null;
+    this.spillExtra = 0;
+    this.interceptTrait = undefined;
+    this.ball = passFlight(from.body.pos, { ...thief.body.pos }, this.tick, this.indexOf(thief));
+    from.pose = 'pass';
+    from.poseUntil = this.tick + LIVE.passPoseTicks;
+    from.catchTick = this.tick;
+    return true;
   }
 
   /**
@@ -99,6 +124,9 @@ export abstract class LiveContact extends LivePenalties {
   }
 
   protected contest(c: Player, t: Player, committed: readonly Player[]): void {
+    // A botched set play's caller caught with it before his pass (#326): it has broken down, and he has tucked it.
+    const botched = this.scripted;
+    if (botched && botched.outcome !== 'ok' && botched.step === 1 && botched.men[0] === this.indexOf(c)) this.breakDown(c);
     const sit = this.situation(c, t, committed);
     const tr = contestTraits(c.traits, t.traits, sit, this.toLine(c) <= FINISHER_M);
     // The game plans weigh in: how much the attack wants the offload, how the line tackles.
@@ -117,6 +145,14 @@ export abstract class LiveContact extends LivePenalties {
     this.applyEdgeRace(c, t, sit.defenders, tr.mods);
     this.applySlideContact(c, tr.mods, sit.support);
     this.applyCompressedContact(c, t, committed, tr.mods, sit.support);
+    // A set play's last man (#326): the play's bonus on his first contact, once.
+    const sp = this.scripted;
+    if (sp && !sp.bonusUsed && sp.bonusFor === this.indexOf(c)) {
+      sp.bonusUsed = true;
+      if (sp.bonus.broken) tr.mods.broken = (tr.mods.broken ?? 0) + sp.bonus.broken;
+      if (sp.bonus.fend) tr.mods.fend = (tr.mods.fend ?? 0) + sp.bonus.fend;
+      if (sp.bonus.offload) tr.mods.offload = (tr.mods.offload ?? 0) + sp.bonus.offload;
+    }
     const outcome = resolveContest(c.stats, t.stats, this.rng.next(), sit, tr.mods);
     const credit = announce(tr.credit[outcome]);
     // Contact costs both men legs, whatever happens.

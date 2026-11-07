@@ -77,6 +77,11 @@ export abstract class LiveRestarts extends LivePlay {
         return;
       }
     }
+    // A set play (#326): the coach's waiting call or the half's own, launched here with its one roll in place of the dart's.
+    if (this.sheetPlays[this.attacking].length > 0 && this.launchPlay('ptb', h)) {
+      this.phase = { kind: 'play' };
+      return;
+    }
     let receiver: number | null = null;
     if (this.lastPlay) {
       const k = this.kicker(this.attacking);
@@ -306,6 +311,8 @@ export abstract class LiveRestarts extends LivePlay {
       p.decided = false;
       p.steppedOn = -1;
       this.phase = { kind: 'play' };
+      // A set play off the tap (#326).
+      if (this.sheetPlays[ph.side].length > 0) this.launchPlay('tap', p);
       return;
     }
     // Play-the-ball: the nearest defender stands at the mark as the tackler would.

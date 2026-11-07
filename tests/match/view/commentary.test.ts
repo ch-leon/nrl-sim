@@ -7,6 +7,8 @@ import { LiveSim } from '../../../src/match/league/live';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { CALL_LABEL, COACH_CALLS } from '../../../src/match/league/calls';
 import { PRESET_LABEL } from '../../../src/match/league/presets';
+import { PLAY_LIST } from '../../../src/data/plays';
+import { playShortTitle } from '../../../src/match/league/plays';
 import { FIRST_NAMES, SURNAMES } from '../../../src/data/names';
 import { LADDER_NAME_MAX } from '../../../src/ui/screens/fixtures';
 import type { Side, SimEvent } from '../../../src/match/core/snapshot';
@@ -60,6 +62,9 @@ const SAMPLES: SimEvent[] = [
   ...['conversion', 'penalty-goal', 'field-goal'].flatMap((k) => ['good', 'missed'].map((d) => ev(k, { detail: d }))), ev('drop-goal'),
   ...COACH_CALLS.flatMap((c) => [ev('coach-call', { detail: c }), nobody('call-paid', { detail: c, side: 'home' })]),
   ev('plan', { detail: 'kick-chase/compressed' }),
+  // Set plays (#326): a coach's call, the launch, the breakdown, and one paying off.
+  ev('coach-call', { detail: 'set-play:block-play' }), ev('set-play', { detail: 'block-play' }), ev('set-play', { detail: 'tap-rambo' }),
+  ev('play-breaks-down', { detail: 'cut-out-winger' }), nobody('call-paid', { detail: 'set-play', side: 'home' }),
   nobody('siren'),
   nobody('half-time', { side: 'home' }), nobody('golden-point', { side: 'home' }),
   nobody('full-time', { side: 'home' }), nobody('full-time', { side: 'home', detail: 'golden-point' }),
@@ -250,7 +255,8 @@ describe('the ticker at 844×390', () => {
   const plan = `${longest(presets)} / ${longest(presets)}`;
 
   it('holds every line, filled with the longest names', () => {
-    const fill = { player, team: club, other: club, leader: club, winner: club, hi: 48, lo: 44, margin: 4, call, plan, n: 'three', m: 'three' };
+    const play = longest(PLAY_LIST.map((p) => playShortTitle(p)));
+    const fill = { player, team: club, other: club, leader: club, winner: club, hi: 48, lo: 44, margin: 4, call, plan, play, n: 'three', m: 'three' };
     const over = Object.entries(LINES)
       .flatMap(([key, lines]) => lines.map((l) => [key, fillLine(l, fill)!] as const))
       .filter(([, l]) => l.length > TICKER_FIT_CHARS)

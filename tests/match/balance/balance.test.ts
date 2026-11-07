@@ -11,6 +11,7 @@ import { FATIGUE } from '../../../src/match/league/fatigue';
 import { LIVE, LiveSim } from '../../../src/match/league/live';
 import { PRESET_TABLES, attackPlan, defencePlan } from '../../../src/match/league/presets';
 import { WRESTLE } from '../../../src/match/league/wrestle';
+import { PLAYS } from '../../../src/match/league/plays';
 import { applyTuning, checkTuning, listKnobs } from '../../../src/match/league/tuning';
 import { cellsOf, checkPlan, expandVariants, type Plan } from '../../../src/match/balance/plan';
 import { measureCell, scenarioEdge, scenarioSides, sideSheet } from '../../../src/match/balance/measure';
@@ -33,18 +34,21 @@ describe('knobs by name', () => {
   });
   it('lists every group and applies overrides with an exact way back', () => {
     const paths = listKnobs().map((k) => k.path);
-    for (const p of ['live.carrySpeed', 'contest.broken', 'fatigue.runCost', 'fatigue.contactCost.carrier', 'wrestle.gripBase', 'wrestle.gang.1', 'traits.hitman', 'edge.hothead', 'presets.defence.rush.lineSpeed', 'presets.attackDefault.earlyKick', 'race.on', 'race.perPoint', 'race.cap', 'race.fendShare', 'race.wide', 'race.backsOnly', 'race.single', 'contest.stepSlope', 'counters.slide.expansiveSigned', 'counters.slide.expansiveByDefence', 'counters.compressed.expansiveRelative']) {
+    for (const p of ['live.carrySpeed', 'contest.broken', 'fatigue.runCost', 'fatigue.contactCost.carrier', 'wrestle.gripBase', 'wrestle.gang.1', 'traits.hitman', 'edge.hothead', 'presets.defence.rush.lineSpeed', 'presets.attackDefault.earlyKick', 'race.on', 'race.perPoint', 'race.cap', 'race.fendShare', 'race.wide', 'race.backsOnly', 'race.single', 'contest.stepSlope', 'counters.slide.expansiveSigned', 'counters.slide.expansiveByDefence', 'counters.compressed.expansiveRelative', 'plays.on', 'plays.failBase', 'plays.counterFail.against', 'plays.auto.cooldownSets', 'plays.aiPlays.hard']) {
       expect(paths).toContain(p);
     }
     const before = JSON.stringify(PRESET_TABLES);
-    const restore = applyTuning({ 'wrestle.gripBase': 2, 'fatigue.contactCost.carrier': 0.5, 'contest.broken': 0.3, 'live.carrySpeed': 0.9, 'wrestle.gang.1': 3, 'presets.defence.rush.lineSpeed': 9 });
+    const restore = applyTuning({ 'wrestle.gripBase': 2, 'fatigue.contactCost.carrier': 0.5, 'contest.broken': 0.3, 'live.carrySpeed': 0.9, 'wrestle.gang.1': 3, 'presets.defence.rush.lineSpeed': 9, 'plays.failBase': 0.3, 'plays.on': 0, 'plays.auto.perHalf': 9 });
     expect(WRESTLE.gripBase).toBe(2);
     expect(FATIGUE.contactCost.carrier).toBe(0.5);
     expect(BASE.broken).toBe(0.3);
     expect(LIVE.carrySpeed).toBe(0.9);
     expect(WRESTLE.gang[1]).toBe(3);
     expect(defencePlan('rush').lineSpeed).toBe(9);
+    expect([PLAYS.failBase, PLAYS.on, PLAYS.auto.perHalf]).toEqual([0.3, 0, 9]);
     restore();
+    // Set plays (#326): the group comes back as it was.
+    expect([PLAYS.failBase, PLAYS.on, PLAYS.auto.perHalf]).toEqual([0.12, 1, 4]);
     expect(WRESTLE.gripBase).toBe(1.3);
     expect(FATIGUE.contactCost.carrier).toBeCloseTo(0.006 * (9 / 7));
     expect(BASE.broken).toBe(0.12);
@@ -292,6 +296,29 @@ describe('measuring and reporting', () => {
     // pin so its intentional tuning changes have their own replay evidence.
     // Expansive was 18-18:341:c5d42c10eb6a4f46 before pass 0 -> -0.1.
     // See docs/status/2026-10-balance.md.
+    expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
+  });
+  it.each([
+    // Set plays (#326, phase 1): flat 60 v 60 seed 1, the home side taking the block play,
+    // the cut-out and the kick-pass, its half calling them (plays-on); and with Hard's AI
+    // coach on the home side, so its live play call is pinned too (plays-on-hard). Re-pin
+    // in the same commit whenever a play's numbers change, with the reason here. The two
+    // pins above are untouched by plays: a sheet without them takes no new branch or roll.
+    { name: 'plays-on', aiCoach: false, expected: '18-10:388:2aac62c880ffbcf3' },
+    { name: 'plays-on-hard', aiCoach: true, expected: '10-10:414:d2084e7d74b5c443' },
+  ])('pins $name: an even Balanced / Slide match with set plays (seed 1)', async ({ aiCoach, expected }) => {
+    const home = { ...sideSheet('H', { rating: 60 }), plays: ['block-play' as const, 'cut-out-winger' as const, 'kick-pass' as const] };
+    const sim = new LiveSim(home, sideSheet('A', { rating: 60 }), 1, aiCoach ? { aiCoach: ['home'] } : {});
+    const parts: string[] = [];
+    while (!sim.finished && sim.tick < 100_000) {
+      sim.step();
+      for (const e of sim.tickEvents) parts.push(`${e.tick}:${e.kind}:${e.side ?? ''}:${e.detail ?? ''}`);
+    }
+    const spec = 'node:crypto';
+    const { createHash } = await import(spec);
+    const hash = createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
+    expect(parts.some((p) => p.includes(':set-play:home:'))).toBe(true);
+    expect(parts.some((p) => p.includes(':coach-call:home:set-play:'))).toBe(aiCoach);
     expect(`${sim.points.home}-${sim.points.away}:${parts.length}:${hash}`).toBe(expected);
   });
 });

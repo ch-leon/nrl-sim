@@ -11,7 +11,7 @@ import { LiveSim } from '../league/live';
 import { LabController, labHash, parseLabHash, type LabParams } from './controller';
 import { LabPanel } from './panel';
 import { LabScene, type LabSceneData } from './scene';
-import { DEFAULT_AWAY, DEFAULT_HOME, LAB_CLUBS, labSheet } from './sheets';
+import { DEFAULT_AWAY, DEFAULT_HOME, LAB_CLUBS, labSheet, withPlays } from './sheets';
 import { DEFAULT_TACTICS, tacticsLabel } from '../league/presets';
 import { LEGS_ENERGY } from '../league/fatigue';
 
@@ -41,14 +41,14 @@ export function bootLab(): void {
     const away = labSheet(params.away, params.traits, params.tactics.away);
     const ctrl = new LabController(
       (h, a, seed, traits, tactics, legs, bench, weather, calls) =>
-        new LiveSim({ ...labSheet(h, traits, tactics.home), rotation: bench }, { ...labSheet(a, traits, tactics.away), rotation: bench }, seed, { energy: LEGS_ENERGY[legs], weather, calls, ...(params.ai ? { aiCoach: ['home', 'away'] as ('home' | 'away')[] } : {}), ...(params.final ? { goldenPoint: true } : {}) }),
+        new LiveSim(withPlays({ ...labSheet(h, traits, tactics.home), rotation: bench }, params.plays), withPlays({ ...labSheet(a, traits, tactics.away), rotation: bench }, params.plays), seed, { energy: LEGS_ENERGY[legs], weather, calls, ...(params.ai ? { aiCoach: ['home', 'away'] as ('home' | 'away')[] } : {}), ...(params.final ? { goldenPoint: true } : {}) }),
       params,
     );
     const data: LabSceneData = { home, away, controller: ctrl, weather: params.weather ?? 'clear' };
     panel?.destroy();
     const styles = `${home.name}: ${tacticsLabel(home.tactics ?? DEFAULT_TACTICS)} · ${away.name}: ${tacticsLabel(away.tactics ?? DEFAULT_TACTICS)}`;
     panel = new LabPanel(ctrl, LAB_CLUBS, { restart: start, notify }, styles);
-    history.replaceState(null, '', labHash({ seed: params.seed, home: params.home, away: params.away, tick: params.tick, traits: params.traits, tactics: params.tactics, legs: params.legs, bench: params.bench, weather: params.weather, calls: params.calls, ai: params.ai, final: params.final }));
+    history.replaceState(null, '', labHash({ seed: params.seed, home: params.home, away: params.away, tick: params.tick, traits: params.traits, tactics: params.tactics, legs: params.legs, bench: params.bench, weather: params.weather, calls: params.calls, ai: params.ai, final: params.final, plays: params.plays }));
     if (!game) {
       game = new Phaser.Game({
         type: Phaser.AUTO,

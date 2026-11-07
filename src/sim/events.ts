@@ -59,6 +59,12 @@ export interface TeamSheet {
   /** The goal-kicker and the captain (N11): roster ids. The live sim falls back to the slot-5 kicker and a neutral captain when absent. */
   kicker?: string;
   captain?: string;
+  /**
+   * The set plays taken into the match (#326), in order, at most three. The
+   * live sim's half calls them at the right moments and the coach may call
+   * one live; absent or empty, the match plays exactly as before.
+   */
+  plays?: import('../data/plays').PlayId[];
 }
 
 /** Attacking / territorial kick flavour (stored on MatchEvent.detail). */
