@@ -120,9 +120,10 @@ export function sideSheet(id: string, spec: SideSpec): TeamSheet {
   const tactics = { ...DEFAULT_TACTICS, ...(spec.tactics ?? {}) };
   const bench = spec.bench ?? 4;
   const rotation = spec.rotation ?? 'standard';
+  const plays = spec.plays?.length ? { plays: [...spec.plays] } : {};
   if (spec.club) {
     const s = labSheet(spec.club, spec.traits ?? 'gen', spec.tactics ?? {});
-    return { ...s, clubId: `${s.clubId}:${id}`, ...(s.roster ? { roster: s.roster.map((r) => positionEntry(r, spec)) } : {}), bench: (s.bench ?? []).slice(0, bench).map((r) => positionEntry(r, spec)), rotation };
+    return { ...s, clubId: `${s.clubId}:${id}`, ...(s.roster ? { roster: s.roster.map((r) => positionEntry(r, spec)) } : {}), bench: (s.bench ?? []).slice(0, bench).map((r) => positionEntry(r, spec)), rotation, ...plays };
   }
   const r = spec.rating ?? 60;
   const entry = (position: RosterEntry['position'], name: string, key: string): RosterEntry => {
@@ -132,7 +133,7 @@ export function sideSheet(id: string, spec: SideSpec): TeamSheet {
   };
   const roster = POSITIONS.map((position, i) => entry(position, `${id} ${position} ${i}`, `${id}:${i}`));
   const reserves = BENCH_POSITIONS.slice(0, bench).map((position, i) => entry(position, `${id} bench ${position} ${i}`, `${id}:bench:${i}`));
-  return { clubId: id, name: id, attack: r, defense: r, kicking: r, fitness: r, colors: ['#111', '#eee'], roster, bench: reserves, rotation, tactics };
+  return { clubId: id, name: id, attack: r, defense: r, kicking: r, fitness: r, colors: ['#111', '#eee'], roster, bench: reserves, rotation, tactics, ...plays };
 }
 
 /** Mean overall of a squad's best nine: the soak's rating for the player's club, and a rival's strength before rounding (systems/rivals.ts). */
@@ -190,6 +191,7 @@ export function squadSide(id: string, spec: SideSpec, seed: number, level: numbe
     bench: (sheet.bench ?? []).slice(0, spec.bench ?? 4).map((r, i) => positionEntry(traits(r, `${id}:bench:${i}`), spec)),
     ...(spec.rotation ? { rotation: spec.rotation } : {}),
     ...(spec.tactics ? { tactics: { ...DEFAULT_TACTICS, ...(sheet.tactics ?? {}), ...spec.tactics } } : {}),
+    ...(spec.plays?.length ? { plays: [...spec.plays] } : {}),
   };
   return { sheet, nine: bestNine(squad) };
 }

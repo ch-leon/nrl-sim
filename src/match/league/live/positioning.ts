@@ -13,6 +13,8 @@ import { GAS, canSprint, paceMult, runCostMult, stepGas } from '../gas';
 import { WRESTLE } from '../wrestle';
 import { postsFor } from '../goals';
 import { CALLS } from '../calls';
+import { PLAYS, roleSlot } from '../plays';
+import { PLAYS_BY_ID } from '../../../data/plays';
 import { WEATHER } from '../weather';
 import { ownLineX } from '../touch';
 import { LIVE } from './knobs';
@@ -42,7 +44,7 @@ export abstract class LivePositioning extends LiveContact {
    * Which side of the passer has the overlap: +1 / −1 when his side has more
    * players than the defence within LIVE.shiftM of him on that side, else 0.
    */
-  private overlapSide(passer: Player): 0 | 1 | -1 {
+  protected overlapSide(passer: Player): 0 | 1 | -1 {
     const count = (ps: readonly Player[], sign: number): number =>
       ps.filter((p) => p !== passer && !this.locked(p) && Math.sign(p.body.pos.y - passer.body.pos.y) === sign && Math.abs(p.body.pos.x - passer.body.pos.x) < LIVE.shiftM && Math.abs(p.body.pos.y - passer.body.pos.y) < LIVE.shiftM).length;
     const atk = this.side(passer.side);
@@ -406,6 +408,51 @@ export abstract class LivePositioning extends LiveContact {
         const depth = role.name === 'winger'
           ? (this.lastPlay ? LIVE.fullbackLastM : LIVE.fullbackDeepM) * coverDepth - LIVE.fullbackDeepM * rushDepth : 0;
         p.target = { x: clamp(this.lineX + this.dir * depth, -8, FIELD_LENGTH + 8), y };
+      }
+    }
+    if (this.scripted && ph.kind === 'play') this.scriptTargets();
+  }
+
+  /**
+   * A set play's lines (#326, plan §3.3), over the shape the side would take:
+   * the men still to take the ball run onto it at the play's angles, each off
+   * the man before him; the decoys run hard at a line `plays.decoyLeadM` ahead
+   * of the caller; a kick play's chaser is sent early for the corner.
+   */
+  private scriptTargets(): void {
+    const s = this.scripted!;
+    if (s.side !== this.attacking) return;
+    const play = PLAYS_BY_ID[s.id];
+    const h = this.holder();
+    const flight = this.ball.kind === 'flight' && this.ball.via === 'pass' ? this.ball : null;
+    const anchor = h && h.side === s.side ? h.body.pos : flight && flight.receiver !== null && this.players[flight.receiver]!.side === s.side ? flight.to : null;
+    if (!anchor) return;
+    const free = (p: Player): boolean => p !== h && this.onField(p) && !this.locked(p) && !(flight && flight.receiver === this.indexOf(p));
+    let from = anchor;
+    for (let k = s.step; k < s.men.length; k++) {
+      const p = this.players[s.men[k]!]!;
+      const to = clampToGround({ x: from.x - this.dir * 2.5, y: from.y + s.ySign * play.script[k]!.latM }, 1);
+      if (free(p)) {
+        p.target = to;
+        p.through = true;
+        p.wantsSprint = false;
+      }
+      from = to;
+    }
+    const caller = this.players[s.men[0]!]!;
+    for (const d of s.decoys) {
+      const p = this.players[d.idx]!;
+      if (!free(p) || s.men.includes(d.idx)) continue;
+      p.target = clampToGround({ x: caller.body.pos.x + this.dir * PLAYS.decoyLeadM, y: caller.body.pos.y + s.ySign * d.latM }, 1);
+      p.through = true;
+      p.wantsSprint = true;
+    }
+    if (play.kick) {
+      const w = this.at(s.side, roleSlot('wing', s.edge));
+      if (free(w) && !s.men.includes(this.indexOf(w))) {
+        const line = this.dir > 0 ? FIELD_LENGTH : 0;
+        w.target = { x: line - this.dir * 6, y: s.ySign < 0 ? 5 : FIELD_WIDTH - 5 };
+        w.through = true;
       }
     }
   }

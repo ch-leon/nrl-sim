@@ -24,8 +24,10 @@ import { weatherEffect, type WeatherEffect } from '../weather';
 import type { MatchInjury, WeatherKind } from '../../../sim/events';
 import { styleFit, type StyleFit } from '../fit';
 import { compressedCounter, fitEdge, rushCounter, slideCounter } from '../counters';
+import { NO_AUTO_USED, sheetPlays, type AutoUsed } from '../plays';
+import type { PlayId } from '../../../data/plays';
 import { LIVE } from './knobs';
-import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput } from './types';
+import { other, STAND_INS, captainOf, benchOf, statsOf, type Player, type BenchMan, type Phase, type PendingKick, type LiveOptions, type PlanInput, type ScriptedPlay } from './types';
 
 export abstract class LiveBase {
   tick = 0;
@@ -134,6 +136,27 @@ export abstract class LiveBase {
    * channel, not events, so the event stream and every recorded match stay as they are.
    */
   readonly verdicts: CallVerdict[] = [];
+  /**
+   * Set plays (#326): each side's three as the sim runs them (none when the
+   * sheet has none or `plays.on` is 0, and then nothing below is ever set, so
+   * the match plays exactly as before); a coach's call waiting for the next
+   * play-the-ball or tap; whether the side has had its play this set; the play
+   * being run; a play's kick in the air; a caller who tucked it when his play
+   * broke down; what the half remembers of his own calls; and the plays run.
+   */
+  protected readonly sheetPlays: Record<Side, PlayId[]>;
+  protected readonly pendingPlay: Record<Side, PlayId | null> = { home: null, away: null };
+  protected readonly playUsed: Record<Side, boolean> = { home: false, away: false };
+  protected scripted: ScriptedPlay | null = null;
+  protected playKick: { side: Side; edge: number; chasers: number[] } | null = null;
+  protected tucked = -1;
+  protected readonly autoUsed: Record<Side, AutoUsed> = { home: { ...NO_AUTO_USED, lastSet: {} }, away: { ...NO_AUTO_USED, lastSet: {} } };
+  /** Plays each side launched, and how many broke down or were intercepted (a view channel, like `verdicts`: not events). */
+  readonly playsRun: { launched: Record<Side, number>; brokeDown: Record<Side, number>; intercepted: Record<Side, number> } = {
+    launched: { home: 0, away: 0 },
+    brokeDown: { home: 0, away: 0 },
+    intercepted: { home: 0, away: 0 },
+  };
   /** Sets each side has had and how many it completed (§7 completion: a set not ended by its own error, a turnover or a penalty against it). */
   readonly sets: Record<Side, number> = { home: 0, away: 0 };
   readonly setsCompleted: Record<Side, number> = { home: 0, away: 0 };
@@ -224,6 +247,7 @@ export abstract class LiveBase {
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
     this.squadFit = { home: styleFit(home.roster ?? []), away: styleFit(away.roster ?? []) };
     this.tightFit = { home: this.squadFit.home.grind, away: this.squadFit.away.grind };
+    this.sheetPlays = { home: sheetPlays(home.plays), away: sheetPlays(away.plays) };
     // How much the rating gap between the sides counts (Phase 3): stats drawn toward the match average;
     // then the difficulty's edge to the player's rival (N12.2), which the spread would mostly cancel.
     [home, away] = edgeSheets(...spreadSheets(home, away), opts.difficultyEdge);
@@ -393,7 +417,9 @@ export abstract class LiveBase {
   }
   /** The attacking side's plan for the zone the carrier is in. */
   protected atkPlan(h: Player): AttackPlan {
-    return withAttackCall(attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h)), this.tightFit[this.attacking], ROLES[h.slot]!.name), this.playCall());
+    const plan = withAttackCall(attackPlan(this.tactics[this.attacking].attack, zoneOf(this.toLine(h)), this.tightFit[this.attacking], ROLES[h.slot]!.name), this.playCall());
+    // A set play that broke down (#326): its caller tucks it and takes the tackle — no step, no offload.
+    return this.tucked >= 0 && this.tucked === this.indexOf(h) ? { ...plan, step: 0, offload: 0 } : plan;
   }
   /** How the defending side's line is set. */
   protected defPlan(): DefencePlan {
@@ -496,7 +522,14 @@ export abstract class LiveBase {
   protected abstract goalAim(posts: Vec, dir: 1 | -1, good: boolean): Vec;
   protected abstract fieldGoalOn(h: Player): boolean;
   protected abstract resolveGoal(): void;
-  protected abstract pass(from: Player, to: Player, spillExtra?: number): void;
+  protected abstract pass(from: Player, to: Player, spillExtra?: number, read?: number): void;
+  protected abstract interceptThrow(from: Player, toward: Player): boolean;
+  protected abstract overlapSide(passer: Player): 0 | 1 | -1;
+  protected abstract setPlayRefusal(side: Side, play: PlayId | undefined): string | null;
+  protected abstract callSetPlay(side: Side, play: PlayId): void;
+  protected abstract aiCallPlay(side: Side): boolean;
+  protected abstract expirePlays(newSet: boolean): void;
+  protected abstract breakDown(h: Player): void;
   protected abstract contest(c: Player, t: Player, committed: readonly Player[]): void;
   protected abstract stepWrestle(ph: Extract<Phase, { kind: 'tackle' }>, w: WrestleState): boolean;
   protected abstract goForBonus(h: Player): boolean;

@@ -18,6 +18,7 @@
 import type { Side, SimEvent } from '../core/snapshot';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { CALL_LABEL, callIsPenalty, isCoachCall } from '../league/calls';
+import { playOfDetail, playShortTitle } from '../league/plays';
 import { MID_Y } from '../core/field';
 import { MAX_LAT_M } from '../league/tactics';
 import { ROLES } from '../league/roles';
@@ -169,6 +170,10 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   // The coach overrules the captain on a penalty (#396).
   'coach-call:penalty': ['{team} coach steps in: {call}.', 'From the {team} box: {call}.', 'The coach overrules: {call}.'],
   'call-paid:penalty': ['{call} pays off for {team}.', 'The {call} call comes off for {team}.', 'The call comes off: {call}.'],
+  // Set plays (#326): the coach's call, the launch (the half's own call or the coach's), the breakdown. The pop-ups and the rest come with the tray (phase 3).
+  'coach-call:play': ['{team} coach calls {play}.', 'From the {team} box: {play}.', 'A play from the box: {play}.'],
+  'set-play': ['{player} calls {play}.', '{team} go to {play}.', 'Here comes {play}.'],
+  'play-breaks-down': ['It breaks down: {player} tucks it.', 'Nobody there: {play} breaks down.', '{play} goes wrong for {team}.'],
   plan: ['{team} switch to {plan}.', 'New plan for {team}: {plan}.', '{team} go {plan}.'],
   // ── The whistles ──
   siren: ["There's the siren — play on till it's dead.", 'The siren goes. Play on until the ball is dead.', 'Siren! The ball has to go dead first.'],
@@ -244,6 +249,8 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
     case 'penalty-choice':
       return `penalty-choice:${d === 'goal' || d === 'touch' ? d : 'tap'}`;
     case 'coach-call':
+      if (d?.startsWith('set-play:')) return 'coach-call:play';
+      return isCoachCall(d) && callIsPenalty(d) ? `${e.kind}:penalty` : e.kind;
     case 'call-paid':
       return isCoachCall(d) && callIsPenalty(d) ? `${e.kind}:penalty` : e.kind;
     case 'try':
@@ -293,6 +300,8 @@ export interface LineFill {
   lo?: number;
   margin?: number;
   call?: string;
+  /** A set play (#326), "the block play". */
+  play?: string;
   plan?: string;
   n?: string;
   m?: string;
@@ -376,11 +385,13 @@ export class Commentator {
     if (!lines) return e.text;
     const side = e.side;
     const plan = e.kind === 'plan' ? planLabel(e.detail) : undefined;
+    const setPlay = e.kind === 'set-play' || e.kind === 'play-breaks-down' || e.kind === 'coach-call' ? playOfDetail(e.detail) : null;
     const f: LineFill = {
       ...(e.player ? { player: e.player } : {}),
       ...(side ? { team: this.words[side], other: this.words[side === 'home' ? 'away' : 'home'] } : {}),
       ...(isCoachCall(e.detail) ? { call: CALL_LABEL[e.detail].toLowerCase() } : {}),
       ...(plan ? { plan } : {}),
+      ...(setPlay ? { play: playShortTitle(setPlay) } : {}),
       ...(score ? this.scoreFill(score) : {}),
     };
     return this.say(key, lines, f, e.tick, ordinal, counter ? side : undefined) ?? e.text;

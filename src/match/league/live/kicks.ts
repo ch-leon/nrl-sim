@@ -74,6 +74,9 @@ export abstract class LiveKicks extends LiveClock {
     }
     if (b.kind === 'flight') {
       if (!landed(b, this.tick)) return;
+      // A set play's kick (#326) is settled where it comes down, whatever it does.
+      const playKick = b.via === 'kick' ? this.playKick : null;
+      if (playKick) this.playKick = null;
       // Bounced or rolled out of the field (2d).
       if (this.outPending) {
         this.resolveOut();
@@ -99,6 +102,7 @@ export abstract class LiveKicks extends LiveClock {
       }
       // A kick is anyone's: whoever is under it takes it, the nominated man on a tie.
       let r = b.via === 'kick' ? this.underKick(b.to, b.receiver) : b.receiver !== null ? this.players[b.receiver] : undefined;
+      if (playKick && r && r.side !== playKick.side) r = this.playKickEdge(playKick, b.to) ?? r;
       if (!r || (b.via !== 'roll' && dist(r.body.pos, b.to) > (b.via === 'kick' ? LIVE.kickCatchReach : LIVE.catchReach))) {
         // Nobody under it: it comes down and bounces on in the direction it was going.
         if (b.via === 'pass') this.emit('loose', r ? `${r.name} can't get to the pass — loose ball` : 'The pass goes to ground — loose ball', r);
@@ -203,6 +207,21 @@ export abstract class LiveKicks extends LiveClock {
         if (this.phase.kind !== 'play') this.phase = { kind: 'play' };
       }
     }
+  }
+
+  /**
+   * A set play's kick with a defender under it (#326): its chaser (the sent
+   * winger for a kick-pass; the kicker or the winger for a chip) within reach
+   * of where it comes down takes it this often (`plays.kickPassChase`,
+   * `plays.chipRegather`). One draw; null when no chaser is there or he misses.
+   */
+  private playKickEdge(k: { side: Side; edge: number; chasers: number[] }, at: Vec): Player | null {
+    const near = k.chasers
+      .map((i) => this.players[i]!)
+      .filter((p) => p.side === k.side && this.onField(p) && !this.locked(p) && dist(p.body.pos, at) <= LIVE.kickCatchReach)
+      .sort((p, q) => dist(p.body.pos, at) - dist(q.body.pos, at))[0];
+    if (!near) return null;
+    return this.rng.next() < k.edge ? near : null;
   }
 
   /** Who takes a kick coming down at `at`: the nearest free player within reach, the nominated man on a near-tie. */

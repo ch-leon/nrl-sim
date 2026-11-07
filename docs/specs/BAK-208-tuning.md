@@ -1624,3 +1624,42 @@ rule; all difficulties retain it as fallback. Rival-v-rival matches have no
 habit context. Watched, fast-forwarded and resumed matches carry identical
 serialisable rival context. SAVE_VERSION 22 adds only `recentPlans` (newest first,
 at most three played league kick-offs); v21 migrates to an empty history.
+
+## 37. Set plays (#326, phase 1)
+
+`match/league/plays.ts` (`PLAYS`, group `plays`); the catalogue and each play's
+own numbers (IQ needs, success mods, reach, intercept base, price) are data in
+`src/data/plays.ts`. The live sim runs a play only for a sheet that carries
+`plays`: a sheet without them takes no new branch and draws no new roll, so
+every existing fingerprint and acceptance share is unchanged. A play's one roll
+is drawn at its launch, in place of the dummy-half's dart roll (or, off a tap,
+as a new draw). Phase 5 adds the per-play table and the balance runs.
+
+| Knob | Default | Meaning |
+|---|---|---|
+| `plays.on` | 1 | 0 ignores every sheet's plays (a kill switch for the harness and the soak, not a game setting) |
+| `plays.failBase` | 0.12 | A play breaks down this often with every man's IQ need met |
+| `plays.failPerPoint` | 0.015 | Added per footy-IQ point short, summed over the play's roles |
+| `plays.failCap` | 0.65 | The fail odds never go above this |
+| `plays.interceptBase` | 0.05 | Of the botches, this share is an intercept (a play may set its own: the Rambo 0.08, the long ball 0.10) |
+| `plays.interceptPerPoint` | 0.005 | Added to the intercept share per IQ point short |
+| `plays.interceptCap` | 0.30 | The intercept share never goes above this |
+| `plays.styleFail` | −0.05 | On the fail odds when the side's attack preset is the play's style |
+| `plays.counterFail.against` / `.for` | +0.05 / −0.03 | On the fail odds when their defence reads the play's style (`COUNTER_MATRIX` −1) / leaves room for it (+1) |
+| `plays.bonusByFit` | 1 | 1 scales a play's success mods by the side's `planFit.attack` when it plays the play's style |
+| `plays.cutOutRead` | 0.5 | The cut-out plays' scripted pass is read by the lane defender at this share (the others' are not read) |
+| `plays.kickPassChase` | 0.1 | Kick-pass: the sent winger takes a cross-field kick a defender was under this often |
+| `plays.chipRegather` | 0.1 | Chip and chase: the kicker or the winger regathers a chip a defender was under this often |
+| `plays.shortSideM` | 20 | The short side is within this many metres of touch |
+| `plays.reachM` | 14 | How far a scripted pass may go (the cut-out 22 m and the long ball 26 m say further) |
+| `plays.decoyLeadM` | 2 | Decoys run at a line this far ahead of the caller |
+| `plays.scriptTicks` | 60 | A play left unfinished this long is over |
+| `plays.auto.cooldownSets` | 2 | The half does not call the same play again for this many sets |
+| `plays.auto.perHalf` | 4 | Plays a side runs a half at most, on its half's or its AI coach's call |
+| `plays.razzleRep` | 50 | Reputation the Razzle attack coach needs (phase 2) |
+| `plays.takeMax` | 3 | Plays taken into a match |
+| `plays.aiPlays.easy` / `.normal` / `.hard` | 0 / 1 / 3 | Plays a rival carries by difficulty (phase 4) |
+
+A botched play is mostly a wasted tackle: its caller tucks it (no step, no
+offload, no kick) and takes the tackle. The intercept band (fail × intercept)
+throws the pass to the lane defender; with nobody in the lane it is a breakdown.

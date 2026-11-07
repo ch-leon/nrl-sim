@@ -18,6 +18,8 @@ import { CALLS } from '../calls';
 import { bombPeak } from '../kickContest';
 import { TOUCH, inOwnInGoal } from '../touch';
 import { BIN } from '../sinbin';
+import { PLAYS } from '../plays';
+import { PLAYS_BY_ID } from '../../../data/plays';
 import { LIVE } from './knobs';
 import { other, type Player, type Phase, type PendingKick } from './types';
 import { LiveKicks } from './kicks';
@@ -84,6 +86,13 @@ export abstract class LivePlay extends LiveKicks {
       return;
     }
 
+    // A set play's man (#326): his scripted pass, kick or carry, or the play breaking down.
+    // 'carry': he runs with it (no field goal, kick or pass of his own); 'done': this tick is his play.
+    const script = this.scripted ? this.scriptedTurn(h, nearD) : 'fall';
+    if (script === 'done') return;
+    // A caller whose play broke down has tucked it: no kick or pass of his own either, till he is tackled.
+    const own = script === 'fall' && this.tucked !== this.indexOf(h);
+
     // Last tackle: the kicker makes one call for the play — run it when he's
     // on the line (or fancies it inside 40), else a kick for the zone — then
     // runs a few steps and puts boot to ball.
@@ -96,7 +105,7 @@ export abstract class LivePlay extends LiveKicks {
     const called = this.callState[this.attacking].attack;
     // Kicks in play are the slot-5 kicker's; a field goal is his or the named goal-kicker's (N11), whoever has the ball.
     const isKicker = h === this.kicker(h.side);
-    if ((isKicker || h === this.goalKicker(h.side)) && this.fieldGoalOn(h)) {
+    if (own && (isKicker || h === this.goalKicker(h.side)) && this.fieldGoalOn(h)) {
       if (this.fgCall === null) this.fgCall = called === 'field-goal' || this.rng.next() < GOALS.fieldGoalChance;
       if (this.fgCall && (this.tick - h.catchTick >= LIVE.kickRunTicks || nearD < LIVE.engageM)) {
         this.lock(h, 'kick', LIVE.kickLockTicks);
@@ -108,7 +117,7 @@ export abstract class LivePlay extends LiveKicks {
     const forLast = called === 'grubber' || called === 'forty-twenty';
     const early = this.tackles === SET_TACKLES - 2 && !forLast && (toLine <= LIVE.earlyKickM || zone === 'own20' || zone === 'ownHalf');
     const kickEarly = called === 'kick-early' && !this.lastPlay;
-    if ((this.lastPlay || early || kickEarly) && isKicker) {
+    if (own && (this.lastPlay || early || kickEarly) && isKicker) {
       // Grubber or 40/20 (#396) sets the last-tackle kick even when it comes after his own choice, till the kick is struck.
       if (this.lastPlay && forLast) this.kickCall = called === 'grubber' ? 'grubber' : 'long';
       else if (this.kickCall === null) {
@@ -127,7 +136,7 @@ export abstract class LivePlay extends LiveKicks {
     // Engaged: decide once — shift it to a better option out the back, or
     // take the line on. Re-deciding every tick would pass out of every contact.
     // A Playmaker passes more and can find a man beyond the normal width.
-    if (nearD < LIVE.engageM && !h.decided && this.tick - h.catchTick >= LIVE.passCooldown) {
+    if (own && nearD < LIVE.engageM && !h.decided && this.tick - h.catchTick >= LIVE.passCooldown) {
       h.decided = true;
       const maker = traitBoost(h.traits, 'playmaker');
       const reach = MAX_LAT_M + (maker > 0 ? LIVE.cutOutPerLevelM * maker : 0) + (plan.width > 0 ? 3 : 0);
@@ -163,7 +172,7 @@ export abstract class LivePlay extends LiveKicks {
         h.steppedOn = this.indexOf(nearest);
         const st = stepTraits(h.traits, nearest.traits, toLine <= FINISHER_M);
         const tries = plan.step >= 1 || this.rng.next() < plan.step;
-        if (tries && this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus + dplan.stepAgainst + (defenders.length < PLAYERS ? BIN.shortStep : 0))) {
+        if (tries && this.rng.next() < stepChance(h.stats, nearest.stats, sit, st.bonus + dplan.stepAgainst + (defenders.length < PLAYERS ? BIN.shortStep : 0) + this.playStepBonus(h))) {
           this.sidestep(h, nearest, announce(st.credit));
           return;
         }
@@ -181,6 +190,71 @@ export abstract class LivePlay extends LiveKicks {
 
   private steppedOn(h: Player): number {
     return h.steppedOn;
+  }
+
+  /**
+   * A set play's carrier (#326, plan §3.3). Only the man whose turn it is in
+   * the script: the caller, then each man after him. The launch's one roll
+   * is played out at the caller's moment (engaged, once, as any carrier
+   * decides): a breakdown and he tucks it (the wasted tackle); an intercept
+   * and the pass flies to the lane defender (none there: a breakdown). When
+   * it comes off, the pass goes to the next man with no roll of the passer's
+   * own (unread, or read at `plays.cutOutRead` for a cut-out), a kick play's
+   * kick is struck, and the last man takes the line on with the play's bonus.
+   * A next man out of reach, down or off: the play is off and he decides as
+   * usual ('fall').
+   */
+  private scriptedTurn(h: Player, nearD: number): 'fall' | 'carry' | 'done' {
+    const s = this.scripted!;
+    const i = this.indexOf(h);
+    const at = s.side === h.side ? s.men.indexOf(i) : -1;
+    if (at < 0 || at !== s.step - 1) return 'fall';
+    const play = PLAYS_BY_ID[s.id];
+    const last = s.step >= s.men.length;
+    if (s.outcome === 'ok' && last) {
+      if (play.kick) {
+        if (this.tick - h.catchTick < LIVE.kickRunTicks && nearD >= LIVE.engageM) return 'carry';
+        this.kickCall = play.kick;
+        const kick = this.planKick(h, play.kick);
+        this.pendingKick = kick;
+        this.lock(h, 'kick', LIVE.kickLockTicks);
+        const chaser = this.indexOf(this.at(s.side, s.edge === 'left' ? 1 : 2));
+        this.playKick = { side: s.side, edge: play.kick === 'chip' ? PLAYS.chipRegather : PLAYS.kickPassChase, chasers: play.kick === 'chip' ? [i, chaser] : kick.receiver !== null ? [kick.receiver] : [] };
+        s.step++;
+        return 'done';
+      }
+      if (s.bonusFor !== i) {
+        s.bonusFor = i;
+        h.decided = true;
+        this.burst(h);
+      }
+      return 'carry';
+    }
+    if (!(nearD < LIVE.engageM && !h.decided && this.tick - h.catchTick >= LIVE.passCooldown)) return 'carry';
+    h.decided = true;
+    if (s.outcome !== 'ok') {
+      const toward = this.playTarget(s);
+      if (s.outcome === 'intercept' && toward && this.interceptThrow(h, toward)) {
+        this.scripted = null;
+        this.playsRun.intercepted[s.side]++;
+        return 'done';
+      }
+      this.breakDown(h);
+      return 'carry';
+    }
+    const next = this.players[s.men[s.step]!]!;
+    if (!this.onField(next) || this.locked(next) || dist(next.body.pos, h.body.pos) > (play.reachM ?? PLAYS.reachM)) {
+      this.scripted = null;
+      h.decided = false;
+      return 'fall';
+    }
+    if (Math.abs(next.body.pos.y - h.body.pos.y) > MAX_LAT_M) {
+      this.emit('cut-out', `${h.name} throws the cut-out ball to ${next.name}`, h);
+      this.events[this.events.length - 1]!.toSlot = next.slot;
+    }
+    this.pass(h, next, 0, play.cutOut ? PLAYS.cutOutRead : 0);
+    s.step++;
+    return 'done';
   }
 
   /**

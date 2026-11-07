@@ -8,6 +8,7 @@
 import type { Side, SimEvent } from '../core/snapshot';
 import type { KickoffCall } from './kickoff';
 import type { AttackPlan, DefencePlan, DefencePreset } from './presets';
+import { PLAYS_BY_ID, type PlayId } from '../../data/plays';
 
 export type CoachCall =
   | 'hit-up' | 'shift-left' | 'shift-right' // attack, the next play
@@ -18,8 +19,14 @@ export type CoachCall =
   | 'gang-tackle' // defence, the next two tackles (#396)
   | 'take-two' | 'tap-go' // a penalty won (#396): the captain's choice overruled
   | 'fresh-legs' // the bench (#367): either way, once a half
-  | 'kickoff-short' | 'kickoff-long'; // the kick-off (#397): the kicking side, in the break before it
+  | 'kickoff-short' | 'kickoff-long' // the kick-off (#397): the kicking side, in the break before it
+  | 'set-play'; // a set play from the side's three (#326): its own channel, one a set
 
+/**
+ * The calls on the coach's chips and in the Coach calls guide. A set play
+ * (#326) is not among them: it is called from the side's own three, which the
+ * playbook unlocks (not the Coach's Office), and has its own section.
+ */
 export const COACH_CALLS: readonly CoachCall[] = [
   'hit-up', 'shift-left', 'shift-right', 'kick-early', 'run-it', 'bomb', 'field-goal', 'rush', 'hold', 'fresh-legs',
   'offload', 'gang-tackle', 'grubber', 'take-two', 'tap-go', 'forty-twenty',
@@ -27,7 +34,7 @@ export const COACH_CALLS: readonly CoachCall[] = [
 ];
 
 export function isCoachCall(v: unknown): v is CoachCall {
-  return COACH_CALLS.includes(v as CoachCall);
+  return COACH_CALLS.includes(v as CoachCall) || v === 'set-play';
 }
 
 /** A call made at a tick: a match is { seed, sheets, calls[] }. */
@@ -35,6 +42,8 @@ export interface CallInput {
   tick: number;
   side: 'home' | 'away';
   call: CoachCall;
+  /** The play, for a `set-play` call (#326). */
+  play?: PlayId;
 }
 
 /** The call knobs (tuning reference §20). Overridable by name in balance experiments (tuning.ts). */
@@ -145,9 +154,14 @@ export function callIsKickoff(c: CoachCall): c is KickoffCall {
   return c === 'kickoff-short' || c === 'kickoff-long';
 }
 
-/** Scope: a play (until the next tackle; Offload the next two) or the set. */
+/** Scope: a play (until the next tackle; Offload the next two) or the set. A set play (#326) is a play call. */
 export function callIsPlay(c: CoachCall): boolean {
-  return c === 'hit-up' || c === 'shift-left' || c === 'shift-right' || c === 'offload';
+  return c === 'hit-up' || c === 'shift-left' || c === 'shift-right' || c === 'offload' || c === 'set-play';
+}
+
+/** A set play (#326): one a set from the side's three, using up neither of the set's calls. */
+export function callIsSetPlay(c: CoachCall): boolean {
+  return c === 'set-play';
 }
 
 /** How many tackles a play call (#396: Offload) or a defence call (Gang tackle) lasts; 0 = the set. */
@@ -222,6 +236,7 @@ export const CALL_LABEL: Readonly<Record<CoachCall, string>> = {
   // "Short kick", not "Short kick-off": the commentary ticker's longest line must fit (shift right is as long).
   'kickoff-short': 'Short kick',
   'kickoff-long': 'Long kick',
+  'set-play': 'Set play',
 };
 
 /** How long a call's result shows by the chips (#366), in real ms. A new result replaces the one up. */
@@ -238,6 +253,13 @@ const playResult = (v: CallVerdict): string => {
   if (v.how === 'strip') return 'ball stripped';
   if (v.how === 'error' || v.how === 'drop' || v.how === 'loose') return 'lost the ball';
   return gain(v.metres) ?? 'no gain';
+};
+
+/** A set play (#326): its ground, a break, a try, the ball lost; or it broke down. */
+const setPlayResult = (v: CallVerdict): string => {
+  if (v.how === 'breakdown') return 'broke down';
+  if (v.how === 'lapsed') return 'not run';
+  return playResult(v);
 };
 
 /** A kick call (kick early, bomb): what came of the kick. */
@@ -308,11 +330,14 @@ export const CALL_RESULT: Readonly<Record<CoachCall, (v: CallVerdict) => string>
   'tap-go': (v) => joinResult('tap-go', v.how === 'penalty' ? 'won a penalty' : v.how === 'try' ? (v.paid ? 'try!' : 'try against') : v.how === 'intercept' || v.how === 'strip' || v.how === 'error' || v.how === 'drop' || v.how === 'loose' ? 'lost the ball' : gain(v.metres) ? `no try, +${v.metres}m` : 'no try'),
   'kickoff-short': (v) => joinResult('kickoff-short', v.how === 'lapsed' ? 'no kick-off' : v.paid ? 'regathered!' : 'they took it'),
   'kickoff-long': (v) => joinResult('kickoff-long', v.how === 'lapsed' ? 'no kick-off' : v.how === 'dead-on-full' ? 'dead on the full' : v.paid ? 'pinned them deep' : gain(v.metres) ?? 'no gain'),
+  // "Block play +9m", "Cut-out: line break!", "Block play: broke down", "Long ball: intercepted" (the play's short name).
+  'set-play': (v) => joinResult('set-play', setPlayResult(v), v.play),
 };
 
-/** "Shift left +18m" (a gain follows the name), "Bomb: regathered" (anything else after a colon). */
-function joinResult(c: CoachCall, what: string): string {
-  return what.startsWith('+') ? `${CALL_LABEL[c]} ${what}` : `${CALL_LABEL[c]}: ${what}`;
+/** "Shift left +18m" (a gain follows the name), "Bomb: regathered" (anything else after a colon). A set play is named for its play. */
+function joinResult(c: CoachCall, what: string, play?: PlayId): string {
+  const name = play && PLAYS_BY_ID[play] ? PLAYS_BY_ID[play].short : CALL_LABEL[c];
+  return what.startsWith('+') ? `${name} ${what}` : `${name}: ${what}`;
 }
 
 /** The tag's line for a verdict. */
@@ -338,6 +363,8 @@ export interface CallVerdict {
   how: CallHow;
   /** Fresh legs (#367): who came off and who went on, "Smith off, Jones on". */
   note?: string;
+  /** A set play (#326): which. */
+  play?: PlayId;
 }
 
 /** A call being judged: the side the ball was with when it was made, which way they attack, where the ball was, the furthest tackle since, and for a kick call whether it has gone. */
@@ -353,6 +380,7 @@ interface Watch {
   kicked: boolean;
   /** Set ends left for a kick that has gone to come good (a dead ball and the drop-out after it). */
   setsLeft: number;
+  play?: PlayId;
 }
 
 const TURNOVER_BY_DEFENCE = new Set(['intercept', 'strip']);
@@ -375,9 +403,15 @@ export class CallJudge {
   private open: Watch[] = [];
 
   /** A call is made by `side` while `atk` has the ball going `dir`, the ball at x. */
-  make(side: Side, call: CoachCall, atk: Side, dir: 1 | -1, x: number): void {
+  make(side: Side, call: CoachCall, atk: Side, dir: 1 | -1, x: number, play?: PlayId): void {
     this.made[side]++;
-    this.open.push({ side, call, atk, dir, fromX: x, bestM: 0, plays: 0, kicked: false, setsLeft: 2 });
+    this.open.push({ side, call, atk, dir, fromX: x, bestM: 0, plays: 0, kicked: false, setsLeft: 2, ...(play ? { play } : {}) });
+  }
+
+  /** A set play the coach called (#326) whose set ended before it could be run: made, not paid. */
+  playLapsed(side: Side, play: PlayId): CallVerdict[] {
+    this.made[side]++;
+    return [{ side, call: 'set-play', paid: false, metres: 0, how: 'lapsed', play }];
   }
 
   /** `side`'s kick in play was taken by the other side `gainM` metres on from where it was kicked (a grubber or 40/20 that did it has missed, #396). */
@@ -403,7 +437,7 @@ export class CallJudge {
   /** The end of a tick: its events, the ball's x (the tackle's spot when a play has ended), and whether a play (a tackle in the set) and the set have ended. */
   observe(events: readonly SimEvent[], x: number, playEnded: boolean, setEnded: boolean): CallVerdict[] {
     const out: CallVerdict[] = [];
-    for (const e of events) out.push(...this.settle((w) => this.onEvent(w, e), () => e.kind));
+    for (const e of events) out.push(...this.settle((w) => this.onEvent(w, e), () => (e.kind === 'play-breaks-down' ? 'breakdown' : e.kind)));
     if (playEnded) {
       for (const w of this.open) {
         w.bestM = Math.max(w.bestM, (x - w.fromX) * w.dir);
@@ -418,7 +452,7 @@ export class CallJudge {
   /** A tackle in the set: a play call's play is over (Offload's two, #396), and Gang tackle's two tackles are made. */
   private onPlayEnd(w: Watch): boolean | null {
     if (w.call === 'hit-up') return w.bestM >= CALLS.paid.hitUpM;
-    if (w.call === 'shift-left' || w.call === 'shift-right') return w.bestM >= CALLS.paid.shiftM;
+    if (w.call === 'shift-left' || w.call === 'shift-right' || w.call === 'set-play') return w.bestM >= CALLS.paid.shiftM;
     if (w.call === 'offload') return w.plays >= CALLS.offload.plays ? false : null;
     if (w.call === 'gang-tackle') return w.plays >= CALLS.gang.tackles ? w.bestM < CALLS.paid.gangM : null;
     return null;
@@ -444,6 +478,11 @@ export class CallJudge {
         return e.kind === 'penalty-goal' && !theirs ? e.detail === 'good' : null;
       case 'tap-go':
         if (e.kind === 'penalty' && theirs) return true;
+        return (theirs && TURNOVER_BY_DEFENCE.has(e.kind)) || (!theirs && TURNOVER_BY_ATTACK.has(e.kind)) ? false : null;
+      case 'set-play':
+        // A set play (#326) is paid off like a shift; its own breakdown is not.
+        if (e.kind === 'play-breaks-down' && !theirs) return false;
+        if (e.kind === 'line-break' && !theirs) return true;
         return (theirs && TURNOVER_BY_DEFENCE.has(e.kind)) || (!theirs && TURNOVER_BY_ATTACK.has(e.kind)) ? false : null;
       case 'hit-up':
       case 'shift-left':
@@ -497,7 +536,7 @@ export class CallJudge {
         return null;
       default:
         // A play call whose play ended with the set (tackled on the last), run it, a field goal not taken.
-        return w.call === 'hit-up' ? w.bestM >= CALLS.paid.hitUpM : w.call === 'shift-left' || w.call === 'shift-right' ? w.bestM >= CALLS.paid.shiftM : false;
+        return w.call === 'hit-up' ? w.bestM >= CALLS.paid.hitUpM : w.call === 'shift-left' || w.call === 'shift-right' || w.call === 'set-play' ? w.bestM >= CALLS.paid.shiftM : false;
     }
   }
 
@@ -508,14 +547,14 @@ export class CallJudge {
       const v = rule(w);
       if (v === null) return true;
       if (v) this.paid[w.side]++;
-      out.push({ side: w.side, call: w.call, paid: v, metres: Math.round(gainM ?? w.bestM), how: how(w), ...(note !== undefined ? { note } : {}) });
+      out.push({ side: w.side, call: w.call, paid: v, metres: Math.round(gainM ?? w.bestM), how: how(w), ...(note !== undefined ? { note } : {}), ...(w.play ? { play: w.play } : {}) });
       return false;
     });
     return out;
   }
 }
 
-/** The commentary line for a call that paid off. */
-export function paidOffText(team: string, c: CoachCall): string {
-  return `${CALL_LABEL[c]} pays off for ${team}`;
+/** The commentary line for a call that paid off (a set play by its play's name, #326). */
+export function paidOffText(team: string, c: CoachCall, play?: PlayId): string {
+  return `${play && PLAYS_BY_ID[play] ? PLAYS_BY_ID[play].name : CALL_LABEL[c]} pays off for ${team}`;
 }
