@@ -68,8 +68,9 @@ import { isLabHash } from './match/lab/controller';
 import { commercialEnabled } from './commercial/flags';
 import { initCommercial, recordFirstRun } from './commercial/demo';
 import { openPaywall } from './ui/screens/paywall';
-import posthog, { isPostHogConfigured } from './posthog';
-import { gameLog } from './posthogLogs';
+import { startAnalytics, track } from './analytics';
+import { dockTab } from './analytics/events';
+import { initGameAnalytics } from './analytics/gameEvents';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
@@ -153,18 +154,11 @@ async function boot(): Promise<void> {
     createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
-  const state = getState();
-  if (isPostHogConfigured) {
-    posthog.capture(freshGame ? 'career_started' : 'career_resumed', freshGame
-      ? { difficulty: state.settings.difficulty, open_all: choice.openAll === true }
-      : { season: state.season, week: state.week });
-  }
-  gameLog.info('career ready', {
-    career_type: freshGame ? 'new' : 'resumed',
-    difficulty: state.settings.difficulty,
-    season: state.season,
-    week: state.week,
-  });
+  // #450: anonymous analytics, from here on (never before the title is done). Off without
+  // a token and in dev, tests, the lab and Labs; the SDK comes in its own chunk once the
+  // page is idle, and any failure leaves the game as it was (src/analytics/index.ts).
+  initGameAnalytics(getState(), freshGame);
+  void startAnalytics();
   if (freshGame) {
     for (const text of expansionIntroLines(getState(), generateObjectives(getState())).slice(0, 2)) {
       bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
@@ -261,32 +255,12 @@ async function boot(): Promise<void> {
   // comes back with 'match:finished'. The scene's own Back-to-Club button
   // returns to Grounds at full-time.
   bus.on('match:started', ({ fixture, home, away, live }) => {
-    const state = getState();
-    if (isPostHogConfigured) {
-      posthog.capture('match_started', {
-        season: state.season,
-        round: fixture.round,
-        difficulty: state.settings.difficulty,
-        match_mode: 'live',
-      });
-    }
-    gameLog.info('match scene started', {
-      season: state.season,
-      round: fixture.round,
-      difficulty: state.settings.difficulty,
-      match_mode: 'live',
-    });
     // Screens stay usable alongside the HUD (Advance Week is reachable with one
     // open), so clear any screen/dialog before the match takes over the view.
     closeScreen();
     closeModal();
     g.scene.stop('Grounds');
     g.scene.start('Match', { home, away, fixture, live });
-  });
-
-  bus.on('season:ended', ({ season, ladderPosition, premiership }) => {
-    if (isPostHogConfigured) posthog.capture('season_completed', { season, ladder_position: ladderPosition, premiership });
-    gameLog.info('season completed', { season, ladder_position: ladderPosition, premiership });
   });
 
   initPlacementBar(); // build/move instructions + Cancel (#78)
@@ -297,7 +271,12 @@ async function boot(): Promise<void> {
   initAudio();
   const openSettings = initAudioUi();
   setMatchSettingsOpener(openSettings); // the pause sheet's Settings
-  const nav = createNav();
+  const nav = createNav({
+    onTabView: (id) => {
+      const tab = dockTab(id);
+      if (tab) track('tab_viewed', { tab });
+    },
+  });
   nav.registerScreen('squad', 'Squad', () => openSquadScreen(), { holds: ['lineup', 'recruit'] });
   nav.registerScreen('fixtures', 'League', () => openFixturesScreen(), { holds: ['ladder'] });
   nav.registerScreen('build', 'Build', () => openBuildScreen());

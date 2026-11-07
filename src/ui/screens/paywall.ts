@@ -23,7 +23,6 @@ import {
 } from '../../commercial/storeRules';
 import { PLACEHOLDER_PRICES, type PriceSource } from '../../commercial/prices';
 import { DEV_FAKE_LOGIN, logIn, loginProvider, type LoginProvider } from '../../commercial/login';
-import posthog, { isPostHogConfigured } from '../../posthog';
 
 // Plain words. No store's name and nothing about buying elsewhere outside the
 // web-only lines (buyWeb, webPrice, webNotOpen), which show only where the rules allow.
@@ -184,10 +183,8 @@ export function buildPaywall(opts: PaywallOptions, close: () => void): HTMLEleme
       if (rules.nativePurchase) {
         // The store supplies its own label for this button once it is wired.
         const buy = button(PAYWALL_TEXT.buy, status.act(async () => {
-          if (owns(await service.purchase(t.tier))) {
-            if (isPostHogConfigured) posthog.capture('full_game_purchased', { tier: t.tier, storefront });
-            unlocked(PAYWALL_TEXT.unlocked);
-          } else status.say(PAYWALL_TEXT.notBought);
+          if (owns(await service.purchase(t.tier))) unlocked(PAYWALL_TEXT.unlocked);
+          else status.say(PAYWALL_TEXT.notBought);
         }), { class: i === 0 ? 'nrl-btn-primary' : '' });
         buy.setAttribute('data-nrl-paywall-buy', t.tier);
         buy.setAttribute('aria-label', `${PAYWALL_TEXT.buy} ${t.name}`);
@@ -198,10 +195,8 @@ export function buildPaywall(opts: PaywallOptions, close: () => void): HTMLEleme
 
     const foot = el('div', { class: 'nrl-paywall-foot' });
     const restore = button(PAYWALL_TEXT.restore, status.act(async () => {
-      if (owns(await service.restore())) {
-        if (isPostHogConfigured) posthog.capture('purchases_restored', { storefront });
-        unlocked(PAYWALL_TEXT.restored);
-      } else status.say(PAYWALL_TEXT.nothingToRestore);
+      if (owns(await service.restore())) unlocked(PAYWALL_TEXT.restored);
+      else status.say(PAYWALL_TEXT.nothingToRestore);
     }));
     restore.setAttribute('data-nrl-paywall-restore', '');
     foot.append(restore);

@@ -17,12 +17,10 @@
 import { bus } from '../core/events';
 import { getState, setState, type GameState, type Lineup, type PlacedFacility, type Player } from '../core/state';
 import { earnMoney, spendMoney } from '../data/club';
-import { overallRating } from '../data/player';
 import { FACILITY_CATALOG } from '../data/facility';
 import { demolishFacility, validatePlacement } from '../world/placement';
 import { signPlayer, signingFee, type SignResult } from './freeagency';
 import { signingNote } from './lineup';
-import posthog, { isPostHogConfigured } from '../posthog';
 
 /** How long the Undo stays on offer. */
 export const UNDO_MS = 5000;
@@ -171,10 +169,7 @@ export function signWithUndo(playerId: string): SignResult {
   const signed = after.squad.find((p) => p.id === playerId);
   // "Signed Deakin Cronky: goes straight into the nine at second-row" (#416).
   const text = res.placed && signed ? `Signed ${signed.name}: ${signingNote(res.placed)}` : undefined;
-  if (res.ok && asWas && signed) {
-    offerSign(signed, asWas, index, fee, Date.now(), { ...(text ? { text } : {}), lineup: { before: s.lineup, after: after.lineup } });
-    if (isPostHogConfigured) posthog.capture('player_signed', { signing_fee: fee, player_overall: overallRating(signed) });
-  }
+  if (res.ok && asWas && signed) offerSign(signed, asWas, index, fee, Date.now(), { ...(text ? { text } : {}), lineup: { before: s.lineup, after: after.lineup } });
   return res;
 }
 

@@ -107,7 +107,9 @@ export default defineConfig(({ command }) => ({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,woff2}'],
         // UK is fetched only for UK careers, including on installed AU builds.
-        globIgnores: ['**/uk-*.js'],
+        // The analytics SDK (#450) only when the build has a token and the title is done;
+        // offline it simply stays off.
+        globIgnores: ['**/uk-*.js', '**/posthogClient-*.js'],
         maximumFileSizeToCacheInBytes: 6_000_000,
       },
       devOptions: { enabled: false },

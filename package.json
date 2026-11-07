@@ -15,7 +15,8 @@
     "soak": "vite-node scripts/soak.ts --",
     "e2e:season": "node scripts/e2e-season.mjs",
     "e2e:perf": "node scripts/e2e-perf.mjs",
-    "e2e:webkit": "node scripts/e2e-webkit.mjs"
+    "e2e:webkit": "node scripts/e2e-webkit.mjs",
+    "e2e:analytics": "node scripts/e2e-analytics.mjs"
   },
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.3.0",

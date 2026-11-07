@@ -16,7 +16,6 @@ import { ATTACK_COACHES, attackCoach } from '../../systems/staff';
 import { screenLockReason } from '../../systems/screenUnlocks';
 import { money, playFitLine, playFitShort, playStyleLabel, playWhenLine, todaysNine } from '../playbookText';
 import { openStaffScreen, STAFF_SCREEN_TITLE } from './board';
-import posthog, { isPostHogConfigured } from '../../posthog';
 
 /** The page's name, in the nav's Office sheet. */
 export const PLAYBOOK_TITLE = 'Playbook';
@@ -152,8 +151,6 @@ function tapBuy(id: PlayId): void {
     bus.emit('ui:notify', { text: why ?? 'Not enough money', kind: 'danger' });
     return;
   }
-  const play = PLAY_LIST.find((item) => item.id === id);
-  if (isPostHogConfigured && play) posthog.capture('play_purchased', { play_id: id, price: play.price });
   save(getState());
 }
 
