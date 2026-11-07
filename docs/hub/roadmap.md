@@ -38,7 +38,7 @@ live gameplay change; work still open below has not shipped.
   the plays catalogue and set plays in the match engine, merged to main in
   [PR #515](https://github.com/ch-leon/nrl-sim/pull/515) on 7 Nov. It is **off by
   default**: matches without plays are unchanged and the save version stays 22.
-  #326 stays open for the later phases: club screens, rival plays and the balance
+  The issue stays open for the later phases: club screens, rival plays and the balance
   pass.
 - **Strategy counters** ([tracker #470](https://github.com/ch-leon/nrl-sim/issues/470), closed):
   - Matchup reports, derived ratings and the Grind-to-Tight rebuild
