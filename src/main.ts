@@ -42,6 +42,7 @@ import { initMatchReport } from './ui/screens/matchReport';
 import { setMatchSettingsOpener } from './ui/screens/matchOverlay';
 import { openBuildScreen } from './ui/screens/build';
 import { COACH_CALLS_TITLE, coachCallsStatus, openCoachCallsScreen } from './ui/screens/coachCalls';
+import { PLAYBOOK_TITLE, openPlaybookScreen, playbookStatus } from './ui/screens/playbook';
 import { initPlacementBar } from './ui/placementBar';
 import { openKitDesigner, syncKitDesign } from './ui/screens/kit';
 import { openSquadScreen } from './ui/screens/squad';
@@ -289,6 +290,11 @@ async function boot(): Promise<void> {
   nav.registerScreen('calls', COACH_CALLS_TITLE, () => openCoachCallsScreen(), {
     more: true,
     status: () => ({ text: coachCallsStatus(coachsOfficeLevel(getState())) }),
+  });
+  // Set plays (#326): your attack coach's plays to buy and the three you take in, beside the calls.
+  nav.registerScreen('playbook', PLAYBOOK_TITLE, () => openPlaybookScreen(), {
+    more: true,
+    status: () => ({ text: playbookStatus(getState()) }),
   });
   nav.registerScreen('news', 'News', () => openInboxScreen(), {
     more: true,

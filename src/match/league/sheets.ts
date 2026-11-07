@@ -142,6 +142,8 @@ export function teamSheetFromSquad(
     ...(selection?.tactics ? { tactics: selection.tactics } : {}),
     // The goal-kicker and captain (N11): the coach's picks when they are in the nine, else the defaults.
     ...kickerAndCaptain(best, selection),
+    // The set plays the coach takes in (#326), in his order. None: the sheet is exactly as before.
+    ...(selection?.plays?.length && picked.length > 0 ? { plays: [...selection.plays] } : {}),
   };
 }
 

@@ -11,7 +11,7 @@ import { BOARD } from '../../config';
 import { objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board';
 import { financeSummary } from './finance';
 import { ladderPosition } from '../../systems/fixtures';
-import { STAFF, STAFF_ROLES, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
+import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, STAFF_ROLES, attackCoach, attackCoachRefusal, attackCoachWage, hireAttackCoach, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
 import { el, button, openModal, openScreen, closeScreen, ensureStyles } from '../dom';
 
 /** How an objective stands (3k): ON TRACK / AT RISK while the season runs, MET / FAILED once reviewed, PENDING before a ball is kicked. */
@@ -102,7 +102,46 @@ export function staffRows(state: GameState): HTMLElement[] {
     );
     rows.push(row);
   }
+  rows.push(attackCoachRow(state));
   return rows;
+}
+
+const money = (n: number): string => `$${n.toLocaleString('en-US')}`;
+
+/** The roles on the panel: the three, and the attack coach. */
+export const STAFF_ROW_COUNT = STAFF_ROLES.length + 1;
+
+/**
+ * The attack coach's row (#326, plan §2.2): one at a time, so the holder and
+ * Release, or the four specialities to hire, each with its wage (the Razzle
+ * coach needs reputation 50 and says so). Plays bought stay when he goes.
+ */
+export function attackCoachRow(state: GameState): HTMLElement {
+  const coach = attackCoach(state);
+  if (coach?.speciality) {
+    const def = ATTACK_COACHES[coach.speciality];
+    return el('div', { class: 'nrl-staff-row', attrs: { 'data-staff': 'attackCoach', 'data-speciality': coach.speciality } },
+      el('div', { class: 'nrl-staff-info' },
+        el('strong', { text: `${def.title}: ${coach.name} · ${money(coach.wage)}/wk` }),
+        el('span', { class: 'nrl-staff-blurb', text: `${def.blurb} Plays you buy stay if he goes.` })),
+      button('Release', () => { releaseStaff('attackCoach'); }, { class: 'nrl-btn-danger' }));
+  }
+  const hires = el('div', { class: 'nrl-staff-hires' }, ...ATTACK_SPECIALITIES.map((sp) => {
+    const def = ATTACK_COACHES[sp];
+    const why = attackCoachRefusal(state, sp);
+    const b = button('', () => { hireAttackCoach(sp); }, { class: 'nrl-btn-primary nrl-staff-hire' });
+    b.append(el('span', { class: 'nrl-staff-hire-name', text: `Hire ${def.short}` }),
+      el('small', { text: why ?? `${money(attackCoachWage(state, sp))}/wk` }));
+    b.setAttribute('data-hire-attack', sp);
+    b.title = why ? `${def.title}: ${why.toLowerCase()} (you have ${state.reputation})` : `${def.title} · ${money(attackCoachWage(state, sp))}/wk. ${def.blurb}`;
+    if (why) { b.disabled = true; b.setAttribute('data-locked', ''); }
+    return b;
+  }));
+  return el('div', { class: 'nrl-staff-row nrl-staff-row-attack', attrs: { 'data-staff': 'attackCoach' } },
+    el('div', { class: 'nrl-staff-info' },
+      el('strong', { text: 'Attack Coach · one at a time' }),
+      el('span', { class: 'nrl-staff-blurb', text: 'Opens a family of set plays to buy on the Playbook. Plays you buy stay if he goes.' })),
+    hires);
 }
 
 /** The Staff & Board screen's name, in the nav's Office sheet. */
@@ -121,7 +160,7 @@ export function openStaffScreen(): HTMLElement {
   const render = (): void => {
     const s = getState();
     left.replaceChildren(buildObjectivesSection(s));
-    label.textContent = `Staff · ${s.staff.length} of ${STAFF_ROLES.length} hired · wages paid with running costs`;
+    label.textContent = `Staff · ${s.staff.length} of ${STAFF_ROW_COUNT} hired · wages paid with running costs`;
     list.replaceChildren(...staffRows(s));
   };
   render();
@@ -210,6 +249,14 @@ export const BOARD_CSS = `
 .nrl-staff-blurb { font-size: 0.75rem; color: var(--nrl-muted); }
 .nrl-staff-row .nrl-btn { flex: 0 0 auto; min-height: 40px; border-radius: 8px; padding: 0 14px; }
 @media (pointer: coarse) { .nrl-staff-row .nrl-btn { min-height: 44px; } }
+/* The attack coach (#326): his four specialities under the row's words, two or four across. */
+.nrl-staff-row-attack { flex-wrap: wrap; }
+.nrl-staff-row-attack .nrl-staff-info { flex-basis: 100%; }
+.nrl-staff-hires { flex: 1 1 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 116px), 1fr)); gap: 6px; }
+.nrl-staff-row .nrl-btn.nrl-staff-hire { min-height: 44px; padding: 2px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; min-width: 0; }
+.nrl-staff-hire-name { font-size: 0.8125rem; white-space: nowrap; }
+.nrl-staff-hire small { font-size: 0.6875rem; font-weight: 500; opacity: 0.85; white-space: nowrap; }
+.nrl-staff-hire[data-locked] { opacity: 0.55; cursor: default; }
 @media (max-width: 700px) { .nrl-screen.nrl-staff { grid-template-columns: 230px minmax(0, 1fr); gap: 12px; } }
 
 /* The sacked card: centred, navy, like full time (3s). */

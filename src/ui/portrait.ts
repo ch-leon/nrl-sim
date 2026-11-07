@@ -253,6 +253,12 @@ export const PORTRAIT_CSS = `
   html:root .nrl-grid-body > .nrl-row { flex: 0 0 auto; }
   html:root .nrl-sq .nrl-screen-tools { max-width: none; flex: 1 1 100%; }
   html:root .nrl-sq .nrl-screen-tools [data-plan] { max-width: none; }
+  /* Lineup's three controls (Plan, Plays #326, Auto pick) wrap rather than scroll one off the screen. */
+  html:root .nrl-lineup .nrl-screen-tools { flex-wrap: wrap; overflow-x: visible; row-gap: 6px; }
+  html:root .nrl-sq .nrl-screen-tools [data-plays] { max-width: none; }
+  html:root .nrl-lineup-plays-full { display: inline; }
+  html:root .nrl-lineup-plays-short { display: none; }
+  html:root .nrl-lineup-auto-more { display: inline; }
   html:root .nrl-row-who { flex-wrap: wrap; row-gap: 2px; padding: 4px 0; overflow: visible; }
   html:root .nrl-row-name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }
   html:root .nrl-fit-bar { display: none; }

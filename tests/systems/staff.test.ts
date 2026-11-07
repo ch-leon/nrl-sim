@@ -6,6 +6,8 @@ import { bus } from '../../src/core/events';
 import { createNewGame, emptyFinance, getState, loadState, setState } from '../../src/core/state';
 import { migrateState } from '../../src/core/save';
 import { STAFF, STAFF_ROLES, WELFARE_CARDS, WELFARE_RENEWAL_CUT, hireStaff, releaseStaff, staffWage, staffWages } from '../../src/systems/staff';
+import { ATTACK_COACHES, ATTACK_SPECIALITIES, attackCoach, attackCoachRefusal, attackCoachWage, hireAttackCoach, staffTitle } from '../../src/systems/staff';
+import { PLAYS } from '../../src/match/league/plays';
 import { breakRuleSidesFor } from '../../src/systems/matchday';
 import { whenBehindLine } from '../../src/ui/tacticsBlurbs';
 import { applyEconomy, registerFinanceSystem, tickContracts, weeklyOverhead } from '../../src/systems/economy';
@@ -138,5 +140,65 @@ describe('old saves (N14.5)', () => {
     delete raw.staff;
     const res = migrateState(raw);
     expect(res.ok && res.state.staff).toEqual([]);
+  });
+});
+
+// The fourth role (#326, plan §2.2): one attack coach at a time, by speciality.
+describe('the attack coach (plan §2.2)', () => {
+  it('one at a time, of one speciality, kept on the card; released for nothing', () => {
+    const m = hireAttackCoach('direct')!;
+    expect(m).toMatchObject({ role: 'attackCoach', speciality: 'direct', hiredSeason: 1 });
+    expect(m.name).toMatch(/^\S+ \S+$/);
+    expect(staffTitle(m)).toBe('Attack Coach (direct play)');
+    expect(attackCoach(getState())).toEqual(m);
+    // A second, of any speciality, is refused while he is there.
+    for (const sp of ATTACK_SPECIALITIES) {
+      expect(attackCoachRefusal(getState(), sp)).toBe('You already have an attack coach');
+      expect(hireAttackCoach(sp)).toBeNull();
+    }
+    expect(getState().staff.filter((s) => s.role === 'attackCoach')).toHaveLength(1);
+    // He sits beside the other three roles, which still hire as before.
+    expect(hireStaff('analyst')).not.toBeNull();
+    const money = getState().money;
+    expect(releaseStaff('attackCoach')).toBe(true);
+    expect(attackCoach(getState())).toBeNull();
+    expect(getState().money).toBe(money);
+    expect(hireAttackCoach('width')!.speciality).toBe('width');
+  });
+
+  it('is paid 800 / 950 / 900 / 1,250 a week on Normal, times the difficulty’s wages, with the running costs', () => {
+    expect(ATTACK_SPECIALITIES.map((sp) => ATTACK_COACHES[sp].wage)).toEqual([800, 950, 900, 1250]);
+    for (const sp of ATTACK_SPECIALITIES) expect(attackCoachWage(getState(), sp)).toBe(ATTACK_COACHES[sp].wage);
+    for (const d of ['easy', 'hard'] as const) {
+      loadState({ ...getState(), settings: { ...getState().settings, difficulty: d } });
+      for (const sp of ATTACK_SPECIALITIES) expect(attackCoachWage(getState(), sp)).toBe(Math.round(ATTACK_COACHES[sp].wage * DIFFICULTY[d].wages));
+    }
+    loadState({ ...getState(), settings: { ...getState().settings, difficulty: 'hard' }, reputation: 60 });
+    const m = hireAttackCoach('razzle')!;
+    expect(m.wage).toBe(Math.round(1250 * DIFFICULTY.hard.wages));
+    expect(staffWages(getState())).toBe(m.wage);
+    const overhead = Math.round(ECON.OVERHEAD_WEEKLY * DIFFICULTY.hard.overhead);
+    expect(weeklyOverhead(getState())).toBe(overhead + m.wage);
+    setState({ finance: [emptyFinance(1)] });
+    const off = registerFinanceSystem();
+    applyEconomy(getState());
+    off();
+    expect(getState().finance[0]!.overhead).toBe(-(overhead + m.wage));
+  });
+
+  it('the Razzle coach needs reputation 50; the other three never ask', () => {
+    expect(PLAYS.razzleRep).toBe(50);
+    setState({ reputation: 49 });
+    expect(attackCoachRefusal(getState(), 'razzle')).toBe('Needs reputation 50');
+    expect(hireAttackCoach('razzle')).toBeNull();
+    for (const sp of ['direct', 'width', 'kicking'] as const) expect(attackCoachRefusal(getState(), sp)).toBeNull();
+    setState({ reputation: 50 });
+    expect(hireAttackCoach('razzle')!.speciality).toBe('razzle');
+  });
+
+  it('a hire draws a name from the seed: the same game hires the same man', () => {
+    const a = hireAttackCoach('kicking')!.name;
+    createNewGame('Staff FC', 3);
+    expect(hireAttackCoach('kicking')!.name).toBe(a);
   });
 });
