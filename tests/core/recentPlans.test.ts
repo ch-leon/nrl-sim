@@ -35,7 +35,7 @@ describe('saved recent league plans', () => {
     __setStorage({ getItem: k => map.get(k) ?? null, setItem: (k, v) => { map.set(k, v); }, removeItem: k => { map.delete(k); } });
     setActiveSlot(1);
     const loaded = load();
-    expect(SAVE_VERSION).toBe(22);
+    expect(SAVE_VERSION).toBe(23);
     expect(MIGRATIONS.filter(m => m.from === 21)).toHaveLength(1);
     expect(loaded?.recentPlans).toEqual([]);
     expect(JSON.parse(raw)).not.toHaveProperty('recentPlans');

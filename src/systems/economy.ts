@@ -392,7 +392,8 @@ export function classifyReason(reason: string): FinanceLine {
   if (reason.startsWith('event: ') || MODIFIER_LABELS.has(reason)) return 'events';
   if (/^(sign|sell):/.test(reason)) return 'transfers';
   if (/^(renew|release):/.test(reason)) return 'contracts';
-  if (/^(build|upgrade|move|demolish):/.test(reason)) return 'facilities';
+  // A set play bought from the Playbook (#326) is spent on the club like a build.
+  if (/^(build|upgrade|move|demolish|play):/.test(reason)) return 'facilities';
   return 'other';
 }
 

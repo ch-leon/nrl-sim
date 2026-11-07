@@ -17,6 +17,7 @@ import { openLineupScreen } from '../screens/lineup';
 import { openLadderScreen } from '../screens/fixtures';
 import { openBuildScreen } from '../screens/build';
 import { openCoachCallsScreen } from '../screens/coachCalls';
+import { openPlaybookScreen } from '../screens/playbook';
 import { openInboxScreen } from '../inbox';
 import { NINES_PAGE } from './nines';
 import { bonusZoneSvg } from './zonePicture';
@@ -38,6 +39,7 @@ export const GUIDE_SCREENS: Record<GuideScreen, { label: string; open: () => voi
   ladder: { label: 'Open Ladder', open: () => openLadderScreen() },
   build: { label: 'Open Build', open: () => openBuildScreen() },
   calls: { label: 'Open Coach calls', open: () => openCoachCallsScreen() },
+  playbook: { label: 'Open Playbook', open: () => openPlaybookScreen() },
 };
 
 /** Each picture's markup (a static SVG built from the page's facts). */

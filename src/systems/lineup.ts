@@ -95,7 +95,7 @@ export function autoPick(squad: readonly Player[], rotation: Rotation = DEFAULT_
     used.add(p.id);
   }
   const bench = fit.filter((p) => !used.has(p.id)).sort(byOverall).slice(0, BENCH.size).map((p) => p.id);
-  return { starters, bench, rotation, tactics: { ...tactics }, kicker: null, captain: null };
+  return { starters, bench, rotation, tactics: { ...tactics }, kicker: null, captain: null, plays: [] };
 }
 
 /** Why a slot had to be filled on the day. */
@@ -121,6 +121,8 @@ export interface Selection {
   /** The goal-kicker and captain he picked (N11, player ids); the sheet takes the default when null or not in the nine. */
   kicker?: string | null;
   captain?: string | null;
+  /** The set plays the side takes into the match (#326), already checked against the playbook (systems/playbook.ts validPlays); absent or empty = none. */
+  plays?: import('../data/plays').PlayId[];
 }
 
 export interface Resolved extends Selection {
@@ -204,7 +206,8 @@ export function resolveLineup(lineup: Lineup, squad: readonly Player[]): Resolve
     kicker === lineup.kicker && captain === lineup.captain;
   return {
     starters, bench, rotation, tactics, kicker, captain, fills,
-    lineup: same ? lineup : { starters: clean, bench: cleanBench, rotation, tactics, kicker, captain },
+    // The set plays (#326) ride along untouched: which of them the club owns is the playbook's to say (validPlays).
+    lineup: same ? lineup : { starters: clean, bench: cleanBench, rotation, tactics, kicker, captain, plays: lineup.plays ?? [] },
     changed: !same,
   };
 }

@@ -31,7 +31,9 @@ const NAV_SCREENS = [
   { id: 'news', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-news-item, .nrl-news-empty', card: '.nrl-event-card' },
   { id: 'build', box: '.nrl-screen-region', rows: '.nrl-build-list > *', primary: ['.nrl-build-list > :first-child'] },
   { id: 'finance', box: '.nrl-screen-region', rows: '.nrl-finance-row', card: '.nrl-finance-tile', primary: ['[data-finance-contracts]'] },
-  { id: 'staff', box: '.nrl-screen-region', rows: '.nrl-staff-row', primary: ['.nrl-staff-row .nrl-btn'] },
+  // The three one-button roles must show whole; the attack coach's taller row of four Hire
+  // buttons (#326) comes after them and is reached by scrolling the staff list.
+  { id: 'staff', box: '.nrl-screen-region', rows: '.nrl-staff-row:not([data-staff="attackCoach"])', primary: ['.nrl-staff-row .nrl-btn'] },
   { id: 'contracts', box: '.nrl-screen-region', rows: '.nrl-contracts-table tbody tr', primary: ['[data-back]'] },
   { id: 'history', box: '.nrl-screen-region', rows: '.nrl-history-body tr, .nrl-history-empty', card: '.nrl-history-body' },
   { id: 'help', box: '.nrl-screen-region .nrl-modal', rows: '.nrl-guide-body :is(p, li, h3)', prose: '.nrl-guide-body', primary: ['.nrl-guide-replay'] },

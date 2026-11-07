@@ -9,7 +9,8 @@ import { roundLabel } from '../../systems/matchday';
 // slot: a man out of position plays below his rating (systems/lineup.ts,
 // tuning reference §21), in amber. Auto pick rebuilds today's best side; PLAN
 // opens the attack, defence and bench presets in a bottom sheet over it, the
-// half-time sheet's look (3r, #342). Saved at once, so a side picked and then
+// half-time sheet's look (3r, #342); PLAYS opens the set plays taken into the
+// match in a sheet of its own (#326). Saved at once, so a side picked and then
 // the app closed is not lost. DOM UI kit only; the rules are pure and tested
 // in systems/lineup.ts. No Phaser.
 import { el, button, openScreen, openModal, closeModal, screenHead, segmented } from '../dom';
@@ -31,6 +32,11 @@ import {
 } from '../../systems/lineup';
 import { ensureScreenStyles } from './recruit';
 import { squadTabs } from './squad';
+import { PLAYS_BY_ID, type PlayId } from '../../data/plays';
+import { PLAYS } from '../../match/league/plays';
+import { ownedPlays, togglePlay, validPlays } from '../../systems/playbook';
+import { playFitLine, playFitShort, playWhenLine, playsButtonLabel, todaysNine } from '../playbookText';
+import { openPlaybookScreen } from './playbook';
 
 const STYLE_ID = 'nrl-lineup-styles';
 /** Tiles are a finger tall (#342) and 72 wide where the pitch has room (3e). */
@@ -222,7 +228,15 @@ const LINEUP_CSS = `
 .nrl-lineup-where[data-injured], .nrl-lineup-where[data-banned] { background: var(--nrl-out); }
 .nrl-lineup-where[data-free] { background: transparent; color: var(--nrl-muted); }
 .nrl-sq .nrl-screen-tools [data-plan] { max-width: 18rem; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 760px) { .nrl-sq .nrl-screen-tools [data-plan] { max-width: 9.5rem; } }
+.nrl-sq .nrl-screen-tools [data-plays] { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; }
+.nrl-lineup-plays-short { display: none; }
+@media (max-width: 1000px) {
+  .nrl-lineup-plays-full { display: none; }
+  .nrl-lineup-plays-short { display: inline; }
+  .nrl-sq.nrl-lineup .nrl-screen-tools { gap: 6px; }
+  .nrl-sq .nrl-screen-tools [data-plan] { max-width: 9.5rem; }
+}
+@media (max-width: 760px) { .nrl-sq .nrl-screen-tools [data-plan] { max-width: 8rem; } .nrl-lineup-auto-more { display: none; } }
 /* A big screen (1280×800): bigger tiles on a pitch that does not run to the floor. */
 @media (min-width: 1000px) and (min-height: 600px) {
   .nrl-lineup-field { flex: 0 1 auto; height: 100%; max-height: 420px; }
@@ -288,6 +302,22 @@ ${PLAN_FIT_CSS}
 @media (max-height: 340px) {
   .nrl-lineup-plan .nrl-seg { padding: 1px; }
 }
+/* The Plays sheet (#326): the plays owned as rows, a numbered tick for each taken, in the order taken. */
+.nrl-lineup-plays-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 6px; max-height: min(52vh, 320px); overflow-y: auto; overscroll-behavior: contain; }
+.nrl-lineup-play { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 10px; border: 0; border-radius: 10px; background: var(--nrl-button); color: var(--nrl-text); text-align: left; cursor: pointer; min-width: 0; font: inherit; }
+.nrl-lineup-play[aria-pressed="true"] { background: var(--nrl-me); }
+.nrl-lineup-play[data-full] { opacity: 0.55; }
+.nrl-lineup-play:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
+.nrl-lineup-play-tick { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--nrl-line); display: flex; align-items: center; justify-content: center; font-family: var(--nrl-f-num); font-size: 0.875rem; font-weight: 700; box-sizing: border-box; }
+.nrl-lineup-play[aria-pressed="true"] .nrl-lineup-play-tick { background: var(--nrl-accent); border-color: var(--nrl-accent); color: var(--nrl-navy); }
+.nrl-lineup-play-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.nrl-lineup-play-name { font-size: 0.875rem; font-weight: 600; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.nrl-lineup-play-fit { font-size: 0.6875rem; font-weight: 500; color: var(--nrl-pos); }
+.nrl-lineup-play-fit.nrl-lineup-play-short { color: var(--nrl-accent); }
+.nrl-lineup-play-when { font-size: 0.6875rem; color: var(--nrl-muted); overflow-wrap: anywhere; }
+.nrl-lineup-plays-empty { margin: 4px 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
+.nrl-lineup-plays-gap { flex: 1 1 auto; }
+.nrl-lineup-plays .nrl-lineup-plan-foot .nrl-btn { min-height: 44px; }
 @media (max-width: 760px) {
   .nrl-dialog-region .nrl-modal.nrl-lineup-plan-modal { padding: 8px 14px 12px; }
   .nrl-lineup-plan .nrl-seg > .nrl-btn { font-size: 0.9375rem; padding: 0 4px; }
@@ -370,6 +400,12 @@ export function openLineupScreen(): void {
   const planBtn = button('PLAN', () => {});
   planBtn.setAttribute('data-plan', '');
   planBtn.setAttribute('aria-haspopup', 'dialog');
+  // The set plays taken into the match (#326): their own sheet, beside the plan's (which is full at 440px).
+  const playsBtn = button('PLAYS', () => {});
+  playsBtn.setAttribute('data-plays', '');
+  playsBtn.setAttribute('aria-haspopup', 'dialog');
+  const playsSub = el('span', { class: 'nrl-lineup-plan-sub' });
+  const playsList = el('div', { class: 'nrl-lineup-plays-list', attrs: { 'data-plays-list': '' } });
 
   // An injury or a ban keeps the man out of the side: red (#339). A hint is neutral.
   const toast = (text: string, kind: 'info' | 'danger' = 'info'): void => bus.emit('ui:notify', { text, kind });
@@ -496,6 +532,7 @@ export function openLineupScreen(): void {
     }
     planBtn.textContent = `Plan: ${PRESET_LABEL[tactics.attack]} · ${PRESET_LABEL[tactics.defence]}`;
     planBtn.title = `Attack, defence and the bench (${ROTATION_LABEL[lineup.rotation]}): the coach’s plan for the match`;
+    renderPlays(s);
 
     const fit = s.squad.filter((p) => p.injuredWeeks <= 0 && (p.suspendedWeeks ?? 0) <= 0).length;
     const picked = lineup.starters.filter((id) => id !== null).length;
@@ -573,13 +610,56 @@ export function openLineupScreen(): void {
     }
   };
 
+  /** The Plays button and sheet (#326): the plays owned, ticked in the order taken, three at most. */
+  const renderPlays = (s: ReturnType<typeof getState>): void => {
+    const owned = ownedPlays(s);
+    const taken = validPlays(s.lineup.plays, owned);
+    // The names, or on a phone held sideways "Plays 1/3" so Plan, Plays and Auto pick all fit the header.
+    playsBtn.replaceChildren(
+      el('span', { class: 'nrl-lineup-plays-full', text: playsButtonLabel(taken) }),
+      el('span', { class: 'nrl-lineup-plays-short', text: `Plays ${taken.length}/${PLAYS.takeMax}` }));
+    playsBtn.title = `${playsButtonLabel(taken)}: the set plays you take into the match; your half calls them when they’re on`;
+    playsSub.textContent = owned.length === 0 ? 'None bought yet' : `${taken.length} of ${PLAYS.takeMax} · your half calls them in this order`;
+    if (owned.length === 0) {
+      playsList.replaceChildren(el('p', { class: 'nrl-lineup-plays-empty', text: 'Buy plays on the Playbook: hire an attack coach and he opens a family of them.' }));
+      return;
+    }
+    const nine = todaysNine(s);
+    playsList.replaceChildren(...owned.flatMap((id) => {
+      const play = PLAYS_BY_ID[id];
+      if (!play) return [];
+      const at = taken.indexOf(id);
+      const full = at < 0 && taken.length >= PLAYS.takeMax;
+      const short = playFitShort(play, nine);
+      const row = el('button', {
+        class: 'nrl-lineup-play',
+        attrs: { type: 'button', 'data-play': id, 'aria-pressed': String(at >= 0), title: full ? 'Three is the most' : playFitLine(play, nine) },
+        onClick: () => tapPlay(id),
+      },
+      el('span', { class: 'nrl-lineup-play-tick', attrs: { 'aria-hidden': 'true' }, text: at >= 0 ? String(at + 1) : '' }),
+      el('span', { class: 'nrl-lineup-play-text' },
+        el('span', { class: 'nrl-lineup-play-name' }, play.name, el('span', { class: `nrl-lineup-play-fit${short.ok ? '' : ' nrl-lineup-play-short'}`, text: short.text })),
+        el('span', { class: 'nrl-lineup-play-when', text: full ? 'Three is the most: leave one out first' : playWhenLine(play) })));
+      if (full) row.setAttribute('data-full', '');
+      return [row];
+    }));
+  };
+  const tapPlay = (id: PlayId): void => {
+    const s = getState();
+    const next = togglePlay(s.lineup, id, ownedPlays(s));
+    if (next === s.lineup) toast('Three is the most. Leave one out first.');
+    else setLineup(next);
+  };
+
   const autoBtn = button('AUTO PICK', () => {
     selected = null;
     const cur = getState().lineup;
-    setLineup({ ...autoPick(getState().squad, cur.rotation, validTactics(cur.tactics)), kicker: cur.kicker ?? null, captain: cur.captain ?? null });
+    setLineup({ ...autoPick(getState().squad, cur.rotation, validTactics(cur.tactics)), kicker: cur.kicker ?? null, captain: cur.captain ?? null, plays: cur.plays ?? [] });
   });
   autoBtn.title = 'Today’s best nine by slot and the next four';
   autoBtn.setAttribute('data-auto-pick', '');
+  // A narrow phone held sideways (667×375): "AUTO", so it stays on screen beside Plan and Plays (#326).
+  autoBtn.replaceChildren(el('span', { text: 'AUTO' }), el('span', { class: 'nrl-lineup-auto-more', text: ' PICK' }));
 
   // The plan sheet (N11, #342): over the screen so the field and the list keep their height.
   // The bench rotation is part of the plan: how hard the four are used.
@@ -596,7 +676,20 @@ export function openLineupScreen(): void {
   );
   planBtn.onclick = () => openModal(plan, { class: 'nrl-lineup-plan-modal', region: true });
 
-  const head = screenHead('', { lead: [squadTabs('lineup')], sub, controls: [planBtn, autoBtn] });
+  // The Plays sheet (#326): the plays owned, tap to take or leave out; a way to the Playbook.
+  const playsDone = button('Done', () => closeModal(), { class: 'nrl-btn-primary' });
+  playsDone.setAttribute('data-plays-done', '');
+  const toBook = button('Playbook ▸', () => { closeModal(); openPlaybookScreen(); });
+  toBook.setAttribute('data-plays-playbook', '');
+  const playsSheet = el('div', { class: 'nrl-lineup nrl-lineup-plan nrl-lineup-plays', attrs: { 'data-plays-sheet': '' } },
+    el('span', { class: 'nrl-lineup-plan-grab', attrs: { 'aria-hidden': 'true' } }),
+    el('div', { class: 'nrl-lineup-plan-head' }, el('span', { class: 'nrl-lineup-plan-title', text: 'Set plays' }), playsSub),
+    playsList,
+    el('div', { class: 'nrl-lineup-plan-foot' }, toBook, el('span', { class: 'nrl-lineup-plays-gap' }), playsDone),
+  );
+  playsBtn.onclick = () => openModal(playsSheet, { class: 'nrl-lineup-plan-modal nrl-lineup-plays-modal', region: true });
+
+  const head = screenHead('', { lead: [squadTabs('lineup')], sub, controls: [planBtn, playsBtn, autoBtn] });
   const body = el(
     'div',
     { class: 'nrl-lineup-body' },

@@ -22,7 +22,7 @@ const saves = import.meta.glob('../../fixtures/saves/*.json', { eager: true, imp
 
 describe('the setting (#366)', () => {
   it('is on when absent: every old save in the corpus migrates to the current version with no keyMoments and slows down', () => {
-    expect(SAVE_VERSION).toBe(22);
+    expect(SAVE_VERSION).toBe(23);
     const files = Object.keys(saves);
     expect(files.length).toBeGreaterThan(10);
     for (const f of files) {

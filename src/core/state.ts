@@ -96,11 +96,20 @@ export type WeatherKind = 'clear' | 'rain' | 'wind';
 
 /** Current save-format version. Bump when GameState changes and add a step to
  *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 22;
+export const SAVE_VERSION = 23;
 
-/** The three hires the facilities don't cover (N14.5). */
-export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare';
-export interface StaffMember { role: StaffRole; name: string; wage: number; hiredSeason: number }
+/** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
+export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
+/** The attack coach's speciality: the family of set plays he opens to buy (#326, plan §2.2). */
+export type AttackCoachSpeciality = import('../data/plays').PlayFamily;
+export interface StaffMember {
+  role: StaffRole;
+  name: string;
+  wage: number;
+  hiredSeason: number;
+  /** The attack coach's speciality (#326); absent on every other role. */
+  speciality?: AttackCoachSpeciality;
+}
 
 /** A squad training focus (N11): one stat trained harder, the rest a little less, or Balanced. */
 export type TrainingFocus = keyof PlayerStats | 'balanced';
@@ -121,6 +130,8 @@ export interface Lineup {
   /** The goal-kicker and the captain the coach picked (N11, player ids); null, or a man not in the nine, = the default (sheets.ts). */
   kicker: string | null;
   captain: string | null;
+  /** The set plays taken into the match (#326), in order, at most PLAYS.takeMax: the half calls them himself. Only plays the club owns are run (systems/playbook.ts validPlays). */
+  plays: import('../data/plays').PlayId[];
 }
 
 /**
@@ -298,6 +309,8 @@ export interface GameState {
   boardLoan: { owed: number };
   /** The club's hires (N14.5): at most one of each role, none at the start. */
   staff: StaffMember[];
+  /** The set plays bought (#326, systems/playbook.ts): kept when the attack coach who opened them leaves. */
+  playbook: { owned: import('../data/plays').PlayId[] };
   /** Player-of-the-match awards this season (#190), kept by the full-time card; absent until the first. */
   potmTally?: PotmTally;
   rngSeed: number; // advanced state of the seeded RNG
@@ -414,6 +427,7 @@ export function createNewGame(
     training: { focus: 'balanced' },
     boardLoan: { owed: 0 },
     staff: [],
+    playbook: { owned: [] },
     rngSeed: rng.state(),
   };
 

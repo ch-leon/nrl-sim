@@ -270,6 +270,15 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   },
   // v21 → v22: rivals learn only from league plans actually played (#469).
   { from: 21, to: 22, run: (old) => ({ ...old, recentPlans: [] }) },
+  // v22 → v23 (#326): set plays. An older save has bought none and takes none into a match.
+  {
+    from: 22,
+    to: 23,
+    run: (old) => {
+      const lineup = old.lineup as RawState | undefined;
+      return { ...old, playbook: { owned: [] }, ...(lineup && typeof lineup === 'object' ? { lineup: { ...lineup, plays: [] } } : {}) };
+    },
+  },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

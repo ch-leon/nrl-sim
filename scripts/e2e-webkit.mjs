@@ -41,7 +41,9 @@ import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 // Both Bali choices must fit, retain 44px targets and accept taps at these same
 // four sizes. Last, the ladder's form column after five rounds at every text size (#426,
 // see runLadderForm). Then the Coach calls page, from Office and from the Coach's Office's
-// Build tile (see runCoachCalls; --coach-calls-only runs just that). Exits 1 on any failure.
+// Build tile (see runCoachCalls; --coach-calls-only runs just that). Then set plays' club
+// screens upright and sideways (#326: Playbook, the attack coach on Staff & Board, the
+// Lineup's Plays sheet; see runPlaybook; --playbook-only runs just that). Exits 1 on any failure.
 //
 //   npm run e2e:webkit
 //   npm run e2e:webkit -- --size 956x330           (or E2E_SIZES="956x330 844x390")
@@ -80,6 +82,7 @@ import { runLargeTextTargets } from './e2e-webkit/text/largeTextTargets.mjs';
 import { runLadderForm } from './e2e-webkit/text/ladderForm.mjs';
 import { runLabsControls } from './e2e-webkit/match/labsControls.mjs';
 import { runCoachCalls } from './e2e-webkit/match/coachCalls.mjs';
+import { runPlaybook } from './e2e-webkit/screens/playbook.mjs';
 
 // ── Sections and CI shards ──────────────────────────────────────────────────────
 // Every run* phase above, in the order a full run takes them. A full run (no flag)
@@ -113,6 +116,7 @@ const SECTIONS = [
   ['runPortraitMenus', (b) => runPortraitMenus(b)],
   ['runCoachCalls', (b) => runCoachCalls(b, [[844, 390]])],
   ['runLabsControls', (b) => runLabsControls(b)],
+  ['runPlaybook', (b) => runPlaybook(b, [[390, 844], [844, 390]])],
 ];
 /**
  * The CI shards (ci.yml, job webkit-shard), balanced on section times from CI.
@@ -121,7 +125,7 @@ const SECTIONS = [
 const GROUPS = {
   match: ['runPlaytest', 'runPauseSettings', 'runTutorialWalk', 'runCoachCalls', 'runLabsControls'],
   text: ['runCounterText', 'runLargeTextTargets', 'runLadderForm'],
-  screens: ['runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays'],
+  screens: ['runContentPacks', 'runTrials', 'runExpansionIntro', 'runDerby', 'runOfficeUnlocks', 'runUnlocks', 'runRecruit', 'runScreens', 'runTownSetup', 'runFlow', 'runCoachName', 'runDifficulty', 'runCoachVoice', 'runCoachSays', 'runPlaybook'],
   portrait: ['runSize', 'runPortrait', 'runDockTextSize', 'runPortraitMenus'],
 };
 
@@ -149,19 +153,22 @@ const GROUPS = {
 const SCREENS_ONLY = argv.includes('--screens-only');
 const CONTROLS_ONLY = argv.includes('--controls-only');
 const CALLS_ONLY = argv.includes('--coach-calls-only');
+const PLAYBOOK_ONLY = argv.includes('--playbook-only');
 const GROUP = argv.includes('--group') ? argv[argv.indexOf('--group') + 1] : null;
 if (argv.includes('--group') && !GROUPS[GROUP]) {
   console.error(`bad --group "${GROUP ?? ''}": want one of ${Object.keys(GROUPS).join(', ')}`);
   process.exit(2);
 }
-if (GROUP && (SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY)) {
-  console.error('--group does not combine with --screens-only, --controls-only or --coach-calls-only');
+if (GROUP && (SCREENS_ONLY || CONTROLS_ONLY || CALLS_ONLY || PLAYBOOK_ONLY)) {
+  console.error('--group does not combine with --screens-only, --controls-only, --coach-calls-only or --playbook-only');
   process.exit(2);
 }
 /** [name, run] pairs this invocation plays, in the full run's order. */
 const plan = CALLS_ONLY
   ? [['runCoachCalls', (b) => runCoachCalls(b, [[390, 844], [844, 390]])]]
-  : CONTROLS_ONLY
+  : PLAYBOOK_ONLY
+    ? SECTIONS.filter(([n]) => n === 'runPlaybook')
+    : CONTROLS_ONLY
     ? SECTIONS.filter(([n]) => n === 'runLabsControls')
     : SCREENS_ONLY
       ? SECTIONS.filter(([n]) => ['runTutorialWalk', 'runScreens', 'runDockTextSize', 'runLargeTextTargets'].includes(n))
