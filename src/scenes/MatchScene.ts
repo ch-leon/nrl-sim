@@ -1017,6 +1017,7 @@ export class MatchScene extends Phaser.Scene {
   /** The badge and the tray follow the play (a few times a second): the calls the sim takes now. */
   private refreshCallChips(): void {
     if (!this.coachBtn || !(this.playback instanceof LivePlayback)) return;
+    this.placeCallResult();
     const pb = this.playback;
     const side = this.callSide;
     const attacking = pb.inPossession === side;
@@ -1142,8 +1143,23 @@ export class MatchScene extends Phaser.Scene {
     tag.toggleAttribute('data-paid', v.paid);
     // Not over the open tray: its rows are where the finger is.
     tag.hidden = this.trayOpen();
+    this.placeCallResult();
     if (this.callResultTimer) clearTimeout(this.callResultTimer);
     this.callResultTimer = setTimeout(() => this.clearCallResult(), CALL_RESULT_MS);
+  }
+
+  /**
+   * The tag sits over COACH; with the commentary line up (log = line) that is under the
+   * line, which hid it (#326 phase 3's webkit check found it). Then it goes just above the
+   * line, from where the line's top is now: a long line wraps and grows upward.
+   */
+  private placeCallResult(): void {
+    const tag = this.callResultEl;
+    if (!tag) return;
+    const strip = getRoot().querySelector<HTMLElement>('.nrl-mo-strip');
+    const r = strip && getComputedStyle(strip).display !== 'none' ? strip.getBoundingClientRect() : null;
+    const bottom = r && r.height > 0 ? `${Math.round(window.innerHeight - r.top + 6)}px` : '';
+    if (tag.style.bottom !== bottom) tag.style.bottom = bottom;
   }
 
   private clearCallResult(): void {

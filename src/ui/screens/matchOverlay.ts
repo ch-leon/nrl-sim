@@ -1808,9 +1808,6 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-call-result[data-paid] { color: var(--nrl-pos); }
 .nrl-mo-tray-open ~ .nrl-mo-call-result, .nrl-mo-call-result[hidden] { display: none; }
-/* With the commentary line up (log = line) the tag sat under it, unseen (#326 phase 3's webkit check found it):
-   it goes just above the line (the strip's 78px + its 40px + a gap). */
-.nrl-match-overlay[data-log="line"] ~ .nrl-mo-call-result { bottom: calc(124px + var(--nrl-safe-b)); }
 /* Key moments (#366): the speed a break, a try or the last minutes hold the match at pulses in the pill; the chosen one stays yellow. */
 .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { box-shadow: inset 0 0 0 2px var(--nrl-accent); animation: nrl-mo-slow 0.9s ease-in-out infinite alternate; }
 @keyframes nrl-mo-slow { from { color: var(--nrl-text); } to { color: var(--nrl-accent); } }

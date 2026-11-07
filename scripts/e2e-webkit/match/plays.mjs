@@ -234,8 +234,14 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
             // Its tag, once the play has been run (or lapsed, when the set ended first: try again).
             const text = await page.waitForFunction((short) => {
               const el = document.querySelector('.nrl-mo-call-result');
-              if (!el || !el.textContent.startsWith(short)) return null;
-              // Seen: shown, on screen, and not under the commentary line or COACH (it has no pointer events, so measure, don't hit-test).
+              return el && el.textContent.startsWith(short) ? el.textContent : null;
+            }, SHORT[play], { timeout: 60000 }).then((hdl) => hdl.jsonValue());
+            // Seen: shown, on screen, and not under the commentary line or COACH, measured once its slide-up
+            // (nrl-mo-up, 180ms) has settled. It has no pointer events, so measure rather than hit-test.
+            const seen = await page.evaluate(async () => {
+              const el = document.querySelector('.nrl-mo-call-result');
+              if (!el) return 'gone before it settled';
+              await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => {})));
               const r = el.getBoundingClientRect();
               const clash = (sel) => {
                 const o = document.querySelector(sel);
@@ -243,14 +249,12 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
                 const q = o.getBoundingClientRect();
                 return q.height > 0 && r.left < q.right && q.left < r.right && r.top < q.bottom && q.top < r.bottom;
               };
-              window.__tagSeen = getComputedStyle(el).display === 'none' || !(r.height > 0) ? 'hidden'
+              return getComputedStyle(el).display === 'none' || !(r.height > 0) ? 'hidden'
                 : r.top < 0 || r.bottom > innerHeight ? 'off screen'
                   : clash('.nrl-mo-strip') ? 'under the commentary line' : clash('.nrl-mo-bar [data-coach]') ? 'over COACH' : 'seen';
-              return el.textContent;
-            }, SHORT[play], { timeout: 60000 }).then((hdl) => hdl.jsonValue());
-            const seen = await page.evaluate(() => window.__tagSeen);
-            if (seen !== 'seen') problems.push(`the tag "${text}" is ${seen}`);
+            });
             await page.screenshot({ path: join(OUT, `result-${w}x${h}.png`) });
+            if (seen !== 'seen') problems.push(`the tag "${text}" is ${seen}`);
             if (!/: not run$/.test(text)) result = text;
             else await page.waitForFunction(() => !document.querySelector('.nrl-mo-call-result'), null, { timeout: 5000 }).catch(() => {});
           }
