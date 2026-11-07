@@ -229,7 +229,14 @@ const LINEUP_CSS = `
 .nrl-lineup-where[data-free] { background: transparent; color: var(--nrl-muted); }
 .nrl-sq .nrl-screen-tools [data-plan] { max-width: 18rem; overflow: hidden; text-overflow: ellipsis; }
 .nrl-sq .nrl-screen-tools [data-plays] { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 760px) { .nrl-sq .nrl-screen-tools [data-plan] { max-width: 9.5rem; } .nrl-sq .nrl-screen-tools [data-plays] { max-width: 8rem; } }
+.nrl-lineup-plays-short { display: none; }
+@media (max-width: 1000px) {
+  .nrl-lineup-plays-full { display: none; }
+  .nrl-lineup-plays-short { display: inline; }
+  .nrl-sq.nrl-lineup .nrl-screen-tools { gap: 6px; }
+  .nrl-sq .nrl-screen-tools [data-plan] { max-width: 9.5rem; }
+}
+@media (max-width: 760px) { .nrl-sq .nrl-screen-tools [data-plan] { max-width: 8rem; } .nrl-lineup-auto-more { display: none; } }
 /* A big screen (1280×800): bigger tiles on a pitch that does not run to the floor. */
 @media (min-width: 1000px) and (min-height: 600px) {
   .nrl-lineup-field { flex: 0 1 auto; height: 100%; max-height: 420px; }
@@ -607,8 +614,11 @@ export function openLineupScreen(): void {
   const renderPlays = (s: ReturnType<typeof getState>): void => {
     const owned = ownedPlays(s);
     const taken = validPlays(s.lineup.plays, owned);
-    playsBtn.textContent = playsButtonLabel(taken);
-    playsBtn.title = 'The set plays you take into the match: your half calls them when they’re on';
+    // The names, or on a phone held sideways "Plays 1/3" so Plan, Plays and Auto pick all fit the header.
+    playsBtn.replaceChildren(
+      el('span', { class: 'nrl-lineup-plays-full', text: playsButtonLabel(taken) }),
+      el('span', { class: 'nrl-lineup-plays-short', text: `Plays ${taken.length}/${PLAYS.takeMax}` }));
+    playsBtn.title = `${playsButtonLabel(taken)}: the set plays you take into the match; your half calls them when they’re on`;
     playsSub.textContent = owned.length === 0 ? 'None bought yet' : `${taken.length} of ${PLAYS.takeMax} · your half calls them in this order`;
     if (owned.length === 0) {
       playsList.replaceChildren(el('p', { class: 'nrl-lineup-plays-empty', text: 'Buy plays on the Playbook: hire an attack coach and he opens a family of them.' }));
@@ -648,6 +658,8 @@ export function openLineupScreen(): void {
   });
   autoBtn.title = 'Today’s best nine by slot and the next four';
   autoBtn.setAttribute('data-auto-pick', '');
+  // A narrow phone held sideways (667×375): "AUTO", so it stays on screen beside Plan and Plays (#326).
+  autoBtn.replaceChildren(el('span', { text: 'AUTO' }), el('span', { class: 'nrl-lineup-auto-more', text: ' PICK' }));
 
   // The plan sheet (N11, #342): over the screen so the field and the list keep their height.
   // The bench rotation is part of the plan: how hard the four are used.

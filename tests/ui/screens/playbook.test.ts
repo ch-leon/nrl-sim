@@ -167,7 +167,10 @@ describe('the Lineup’s Plays sheet (plan §4.2)', () => {
     buyPlay('kick-pass');
     openLineupScreen();
     const btn = q('[data-plays]')! as unknown as HTMLButtonElement & StubNode;
-    expect(btn.textContent).toBe('Plays: — · — · —');
+    const full = (): string => btn.querySelector('.nrl-lineup-plays-full')!.textContent;
+    const short = (): string => btn.querySelector('.nrl-lineup-plays-short')!.textContent;
+    expect(full()).toBe('Plays: — · — · —');
+    expect(short()).toBe('Plays 0/3');
     btn.onclick!.call(btn, {} as PointerEvent);
     const sheet = q('[data-plays-sheet]')!;
     expect(sheet).not.toBeNull();
@@ -180,7 +183,9 @@ describe('the Lineup’s Plays sheet (plan §4.2)', () => {
     tap(rows().find((r) => r.attrs['data-play'] === 'block-play')!);
     expect(getState().lineup.plays).toEqual(['kick-pass', 'block-play']);
     expect(rows().find((r) => r.attrs['data-play'] === 'kick-pass')!.attrs['aria-pressed']).toBe('true');
-    expect(btn.textContent).toBe('Plays: Kick-pass · Block play · —');
+    expect(full()).toBe('Plays: Kick-pass · Block play · —');
+    expect(short()).toBe('Plays 2/3');
+    expect(btn.title).toContain('Plays: Kick-pass · Block play · —: the set plays you take into the match');
     tap(rows().find((r) => r.attrs['data-play'] === 'inside-ball')!);
     // The fourth is greyed and refused.
     const fourth = rows().find((r) => r.attrs['data-play'] === 'short-side-raid')!;
