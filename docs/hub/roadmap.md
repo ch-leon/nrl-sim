@@ -3,7 +3,7 @@
 Last updated: 2026-11-07
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
-live gameplay change; open and draft PRs below have not shipped.
+live gameplay change; work still open below has not shipped.
 
 ## Now
 
@@ -13,10 +13,6 @@ live gameplay change; open and draft PRs below have not shipped.
   no match changed. Expansive is still about 41% of level-rating games (−8.4 against
   strength), well under the other attacks. The next pass looks at why a rushing line
   shuts out the wide game; it is not a Speed question.
-- **Set plays** ([issue #326](https://github.com/ch-leon/nrl-sim/issues/326)): phase 1,
-  the plays in the engine and off by default, is in draft
-  [PR #515](https://github.com/ch-leon/nrl-sim/pull/515). Not shipped. Club screens,
-  rival plays and the balance pass are later phases.
 - **Labs: shorter matches** ([issue #513](https://github.com/ch-leon/nrl-sim/issues/513)):
   about 4 minutes of watching at ×1, behind a Labs toggle that is off by default.
   Planned and awaiting Leon's go; no PR yet.
@@ -38,6 +34,12 @@ live gameplay change; open and draft PRs below have not shipped.
 
 ## Recently completed
 
+- **Set plays, phase 1** ([issue #326](https://github.com/ch-leon/nrl-sim/issues/326)):
+  the plays catalogue and set plays in the match engine, merged to main in
+  [PR #515](https://github.com/ch-leon/nrl-sim/pull/515) on 7 Nov. It is **off by
+  default**: matches without plays are unchanged and the save version stays 22.
+  #326 stays open for the later phases: club screens, rival plays and the balance
+  pass.
 - **Strategy counters** ([tracker #470](https://github.com/ch-leon/nrl-sim/issues/470), closed):
   - Matchup reports, derived ratings and the Grind-to-Tight rebuild
     ([PR #471](https://github.com/ch-leon/nrl-sim/pull/471),
@@ -93,7 +95,7 @@ Open backlog checked on 7 Nov 2026; these are not newly scheduled:
 - On-field scuffles ([issue #329](https://github.com/ch-leon/nrl-sim/issues/329))
 - Judiciary and a club lawyer ([issue #328](https://github.com/ch-leon/nrl-sim/issues/328))
 - Scrums ([issue #327](https://github.com/ch-leon/nrl-sim/issues/327))
-- Set plays, later phases ([issue #326](https://github.com/ch-leon/nrl-sim/issues/326); phase 1 is in Now)
+- Set plays, later phases: club screens, rival plays and the balance pass ([issue #326](https://github.com/ch-leon/nrl-sim/issues/326); phase 1 merged, off by default)
 - League progression from a lower league ([issue #323](https://github.com/ch-leon/nrl-sim/issues/323))
 - Expansive still under par ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322); in Now)
 - App store builds with Capacitor ([issue #89](https://github.com/ch-leon/nrl-sim/issues/89))

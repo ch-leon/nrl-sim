@@ -63,10 +63,12 @@ premium game with a free demo and a one-off unlock
   ([#322](https://github.com/ch-leon/nrl-sim/issues/322), open). The Speed levers in
   [PR #514](https://github.com/ch-leon/nrl-sim/pull/514) are merged but all off, so no
   match changed.
-- **In progress, not shipped:** set plays phase 1 in draft
-  [PR #515](https://github.com/ch-leon/nrl-sim/pull/515), off by default; Labs shorter
-  matches ([#513](https://github.com/ch-leon/nrl-sim/issues/513)), planned and
-  awaiting Leon's go.
+- **Set plays:** phase 1, set plays in the match engine, is merged to main
+  ([PR #515](https://github.com/ch-leon/nrl-sim/pull/515)) and **off by default**, so
+  matches without plays are unchanged. Club screens, rival plays and the balance pass
+  are later phases ([#326](https://github.com/ch-leon/nrl-sim/issues/326), open).
+- **Labs shorter matches** ([#513](https://github.com/ch-leon/nrl-sim/issues/513)):
+  planned and awaiting Leon's go.
 - **Launch plumbing:** decided and documented
   ([PR #457](https://github.com/ch-leon/nrl-sim/pull/457), merged), not live. Firebase
   hosting/push, PostHog, EmailOctopus, tester distribution and privacy work are tracked
