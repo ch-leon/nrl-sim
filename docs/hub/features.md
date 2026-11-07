@@ -63,7 +63,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- Call a set play from the match: with the ball, the COACH tray shows the plays you took in (three at most) under the calls, each with its weakest man's footy IQ; a tapped play runs at the next play-the-ball and the tag over COACH says what came of it. Clubs with no playbook see today's tray ([issue](https://github.com/ch-leon/nrl-sim/issues/326)).
+- Call a set play from the match: with the ball, the COACH tray shows the plays you took in (three at most) under the calls, each with its weakest man's footy IQ; a tapped play runs at the next play-the-ball and the tag over COACH says what came of it. Clubs with no playbook see today's tray ([PR](https://github.com/ch-leon/nrl-sim/pull/517)).
 
 - Normal and Hard rivals counter your last three league plans; Easy keeps its existing squad style. Player-match scouting shows the same habit-based plan as kick-off. Old saves start with no plan history ([PR](https://github.com/ch-leon/nrl-sim/pull/511)).
 
