@@ -11,6 +11,7 @@ import { BOARD, CONTRACTS, MORALE, SQUAD_MIN, difficultyMultipliers } from '../c
 import { REP_BASELINE, REP_MAX } from './league';
 import type { SignResult } from './freeagency';
 import { hasStaff, WELFARE_RENEWAL_CUT } from './staff';
+import posthog, { isPostHogConfigured } from '../posthog';
 
 /** Warning text when `weeks` is a warning threshold, else null. */
 export function warnForWeeks(name: string, weeks: number): string | null {
@@ -140,6 +141,7 @@ export function renewEarly(state: GameState, playerId: string): SignResult {
       : `Re-signed ${p.name} for ${CONTRACTS.NEW_CONTRACT_WEEKS} weeks`,
     kind: 'success',
   });
+  if (isPostHogConfigured) posthog.capture('player_contract_renewed', { renewal_fee: fee, weekly_wage: wage, used_board_loan: onLoan });
   return { ok: true };
 }
 
@@ -153,6 +155,7 @@ export function sellPlayer(state: GameState, playerId: string): SignResult {
   setState({ squad: state.squad.filter((x) => x.id !== playerId) });
   earnMoney(fee, `sell:${playerId}`);
   bus.emit('ui:notify', { text: `Sold ${p.name} for $${fee.toLocaleString()}`, kind: 'success' });
+  if (isPostHogConfigured) posthog.capture('player_sold', { transfer_fee: fee, player_overall: overallRating(p) });
   return { ok: true };
 }
 

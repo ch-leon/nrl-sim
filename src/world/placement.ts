@@ -27,6 +27,7 @@ import { onEntrancePath, onWalkway, type WalkGrid } from './path';
 import { GhostPreview, strokeFootprint } from './ghostPreview';
 import { ghostStyle } from './buildFeedback';
 import { offerBuild } from '../systems/undo';
+import posthog, { isPostHogConfigured } from '../posthog';
 
 export interface PlaceValidation {
   ok: boolean;
@@ -546,6 +547,7 @@ export class PlacementController {
         this.path.setBlocked(t.x, t.y, true);
       }
       offerBuild(placed, def.cost); // "built!" with a 5-second Undo (#370)
+      if (isPostHogConfigured) posthog.capture('facility_built', { facility_type: defId, cost: def.cost });
     }
     this.exit();
     return v;
@@ -558,7 +560,10 @@ export class PlacementController {
       bus.emit('ui:notify', { text: reasonText(r.reason ?? ''), kind: 'info' });
       return r;
     }
-    if (r.fee) bus.emit('ui:notify', { text: `${def.name} moved (−$${r.fee.toLocaleString('en-US')}).`, kind: 'success' });
+    if (r.fee) {
+      bus.emit('ui:notify', { text: `${def.name} moved (−$${r.fee.toLocaleString('en-US')}).`, kind: 'success' });
+      if (isPostHogConfigured) posthog.capture('facility_moved', { facility_type: this.moving!.defId, fee: r.fee });
+    }
     this.exit();
     return r;
   }
