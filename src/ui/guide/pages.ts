@@ -14,7 +14,9 @@ import { getState, type GameState } from '../../core/state';
 import { BOARD, DIFFICULTY, ECON, LEAGUE, PRIZE, SQUAD_MIN, SEASON_ROUNDS, FINALS_WEEKS, WEEKS_PER_SEASON, TRAINING_FOCUS, WILDCARDS } from '../../config';
 import { activePack } from '../../content';
 import { inlineIqStat } from '../../content/pack';
-import { STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
+import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, WELFARE_RENEWAL_CUT } from '../../systems/staff';
+import { playsOfFamily } from '../../data/plays';
+import { PLAYS } from '../../match/league/plays';
 import { LEVEL_MULT } from '../../data/facility';
 import { sponsorReturn } from '../../systems/economy';
 import { REP_BASELINE } from '../../systems/league';
@@ -61,6 +63,23 @@ export function coachsOfficeBullet(club: Pick<GameState, 'facilities'> | null = 
   return `Coach’s Office ($30,000): IQ and skill, and morale, and it unlocks coach calls (Office ▸ Coach calls lists them all). ${yours}${officeUnlockLine(level)}`;
 }
 
+/**
+ * The Tactics page's set plays (#326), worded from the catalogue and the
+ * staff table so they move with them: the four attack coaches and their
+ * wages, what each opens, the three taken in, and what IQ and style do.
+ */
+export function setPlaysBullets(): string[] {
+  const coaches = ATTACK_SPECIALITIES.map((sp) => `${ATTACK_COACHES[sp].short} (${dollars(ATTACK_COACHES[sp].wage)} a week on Normal)`).join(', ');
+  const families = ATTACK_SPECIALITIES.map((sp) => `${ATTACK_COACHES[sp].short}: ${playsOfFamily(sp).map((p) => p.name).join(', ')}`).join('. ');
+  return [
+    `Hire one attack coach at a time on Staff & Board: ${coaches}. The Razzle coach needs reputation ${PLAYS.razzleRep}. Each opens a family of plays to buy once on Office ▸ Playbook; plays you buy stay if he goes.`,
+    `${families}.`,
+    `Take up to ${PLAYS.takeMax} into a match with PLAYS on the Lineup screen. Your half calls them himself when one is on, in your order, from the play-the-ball or a tap restart, at most ${PLAYS.auto.perHalf} a half.`,
+    `Each play needs ${IQ_INLINE} from the men who run it; the Playbook shows who falls short. Short of it, a play breaks down more often: mostly a wasted tackle, now and then an intercept.`,
+    'A play of your own attack style breaks down less and pays off more when the squad fits the style; some defences read some plays (Slide reads the shifts).',
+  ];
+}
+
 /** A picture a section can show under its text (guide.ts draws it). */
 export type GuideFigure = 'bonus-zone';
 
@@ -74,7 +93,7 @@ export interface GuideSection {
 }
 
 /** A nav screen a page can link to (N14, #263): guide.ts opens it. */
-export type GuideScreen = 'finance' | 'squad' | 'lineup' | 'news' | 'ladder' | 'build' | 'calls';
+export type GuideScreen = 'finance' | 'squad' | 'lineup' | 'news' | 'ladder' | 'build' | 'calls' | 'playbook';
 
 export interface GuidePage {
   id: string;
@@ -218,6 +237,11 @@ export const CLUB_PAGES: readonly GuidePage[] = [
           'After a score, the Plan chip opens the same sheet until the kick-off. A change comes in at the kick-off; it never changes mid-set.',
           'Coach calls are the moment-to-moment layer on top: one call a set each way.',
         ],
+      },
+      {
+        heading: 'Set plays',
+        bullets: setPlaysBullets(),
+        link: 'playbook',
       },
       {
         heading: 'Kicker and captain',

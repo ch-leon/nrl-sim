@@ -30,6 +30,7 @@ import { getState, setState, type Fixture } from '../core/state';
 import { SKIP_ARM_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
 import { styleLine } from '../ui/tacticsBlurbs';
+import { halfTimePlaysLine } from '../ui/playbookText';
 import {
   LivePlayback,
   keyMomentsOn,
@@ -1198,6 +1199,8 @@ export class MatchScene extends Phaser.Scene {
       summary: this.planSummary(pb, side),
       // How the other side plays (the ladder shows it too, N11).
       tendency: `${shortName(other === 'home' ? this.home.name : this.away.name)} play ${styleLine(pb.planFor(other))}`,
+      // The plays taken in (#326), read-only: a change would re-shape a resumed match's sheet.
+      plays: halfTimePlaysLine((side === 'home' ? this.home : this.away).plays) ?? undefined,
       go: head === 'Half-time' ? 'Start 2nd half ▸' : head === 'Golden point' ? 'Golden point ▸' : 'Continue ▸',
       tactics: pb.planFor(side),
       roster: (side === 'home' ? this.home : this.away).roster,

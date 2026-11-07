@@ -13,6 +13,7 @@ import { NINES } from '../match/league/rules';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, SEASON_ROUNDS, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
 import { teamSheetFromSquad } from '../match/league/sheets';
+import { validPlays } from './playbook';
 import type { MatchInjury, MatchResult, TeamSheet } from '../sim/events';
 import { makeRng } from '../utils/rng';
 import { runMatch } from '../match/league/match';
@@ -136,12 +137,14 @@ function sheetFor(clubId: string): TeamSheet {
     const picked = resolveLineup(state.lineup ?? autoPick(state.squad), state.squad);
     if (picked.changed) setState({ lineup: picked.lineup });
     if (picked.fills.length > 0) bus.emit('ui:notify', { text: describeFills(picked.fills), kind: 'info', match: true });
+    // The set plays he takes in (#326): only ones the club owns, at most three, in his order.
+    const plays = validPlays(picked.lineup.plays, state.playbook?.owned);
     return teamSheetFromSquad(
       state.squad,
       PLAYER_ID,
       state.clubName,
       entry?.colors ?? DEFAULT_PLAYER_COLORS,
-      picked,
+      plays.length > 0 ? { ...picked, plays } : picked,
     );
   }
   const rival = state.league.clubs.find((c) => c.id === clubId);

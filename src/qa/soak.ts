@@ -8,7 +8,7 @@
 // tests/fixtures/saves, tests/qa/corpus.test.ts). Used by scripts/soak.ts (npm run
 // soak) and, at a smaller size, by tests/qa/soak.test.ts. Never imported by the
 // game. No Phaser.
-import { createNewGame, FINANCE_LINES, getState, loadState, setState, type FinanceLine, type Fixture, type GameState, type Player, type StaffRole } from '../core/state';
+import { createNewGame, FINANCE_LINES, getState, loadState, setState, type FinanceLine, type Fixture, type GameState, type Player } from '../core/state';
 import { advanceWeek, clearSeasonHooks, clearTickHooks, weekHeld, withFastForward } from '../core/time';
 import { bus, type Events } from '../core/events';
 import { migrateState, MIGRATIONS } from '../core/save';
@@ -16,7 +16,7 @@ import { EVENTS, GRID_H, GRID_W, ON_FIELD, SEASON_ROUNDS, SQUAD_CAP, WEEKS_PER_S
 import { finalsSeeds, initLeague, isFinalsRound, registerFixturesSystem } from '../systems/fixtures';
 import { registerUnlockSystem, isFacilityOpen } from '../systems/unlocks';
 import { isTrainingFocus, registerTrainingSystem, setTrainingFocus, weakestStat } from '../systems/training';
-import { hasStaff, hireStaff, staffWage } from '../systems/staff';
+import { hasStaff, hireStaff, staffWage, type HireRole } from '../systems/staff';
 import { classifyReason, homeGate, registerEconomySystem, registerFinanceSystem, weeklyIncome, weeklyOverhead, weeklyUpkeep, weeklyWages } from '../systems/economy';
 import { registerFreeAgencySystem, signPlayer, signingFee } from '../systems/freeagency';
 import { registerPlayerMatchSystem } from '../systems/matchday';
@@ -383,6 +383,14 @@ export function asOldSave(s: GameState, version: number): Record<string, unknown
   delete out.unlocks;
   delete out.preseason;
   raw.league.fixtures = raw.league.fixtures.filter((f) => f.round > 0);
+  // v23: set plays (#326). Stripped first so the lineup steps below rebuild it without them.
+  if (version < 23) {
+    delete out.playbook;
+    if (raw.lineup) {
+      const { plays: _plays, ...lineup } = raw.lineup;
+      raw.lineup = lineup as GameState['lineup'];
+    }
+  }
   if (version < 20) {
     const settings = out.settings;
     if (settings && typeof settings === 'object') {
@@ -477,7 +485,7 @@ export const MANAGED = {
  * Coach and the Analyst once their effects landed). Welfare stays last, and
  * his cut is unchanged.
  */
-export const MANAGED_STAFF: readonly StaffRole[] = ['assistantCoach', 'analyst', 'welfare'];
+export const MANAGED_STAFF: readonly HireRole[] = ['assistantCoach', 'analyst', 'welfare'];
 
 /** The club's next home fixture from this week, if any. */
 function nextHomeFixture(s: GameState): Fixture | undefined {

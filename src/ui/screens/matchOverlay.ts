@@ -733,6 +733,8 @@ export interface PlanCardOptions {
   lines?: string[];
   /** The other side's plan, on the right ("Larrikins play Direct · Rush"). */
   tendency?: string;
+  /** The set plays the side took in, read-only ("Plays: Block play · Cut-out", #326): the three can't change mid-match. */
+  plays?: string | undefined;
   /** The primary: "Start 2nd half ▸", "Golden point ▸"; "Continue ▸" by default. */
   go?: string;
   /** The plan the side will play from the restart. */
@@ -804,6 +806,7 @@ export function showPlanCard(o: PlanCardOptions): PlanCardHandle {
       ...(o.score ? [el('span', { class: 'nrl-mo-plan-score', text: o.score })] : []),
       ...(summary ? [el('span', { class: 'nrl-mo-plan-line', text: summary })] : []),
       ...(o.tendency ? [el('span', { class: 'nrl-mo-plan-tend', text: o.tendency })] : []),
+      ...(o.plays ? [el('span', { class: 'nrl-mo-plan-plays', attrs: { 'data-plan-plays': '' }, text: o.plays })] : []),
     ),
     ...(o.numbers ? [el('div', { class: 'nrl-mo-working', attrs: { 'data-working': '' }, text: `What’s working · half-time guide: ${o.numbers.map(n => `${n.label} ${n.count} ${n.arrow} (aim ${n.label === 'Errors' ? '≤' : '≥'}${n.target})`).join(' · ')}` })] : []),
     el('div', { class: 'nrl-mo-plan-rows' },
@@ -1995,6 +1998,7 @@ ${PLAN_FIT_CSS}
 .nrl-mo-plan-score { font-family: var(--nrl-f-num); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .nrl-mo-plan-line { font-size: 0.8125rem; color: var(--nrl-text-2); }
 .nrl-mo-plan-tend { margin-left: auto; font-size: 0.75rem; color: var(--nrl-muted); }
+.nrl-mo-plan-plays { flex-basis: 100%; font-size: 0.75rem; color: var(--nrl-text-2); }
 .nrl-mo-plan-top, .nrl-mo-plan-grab { flex: 0 0 auto; }
 /* On a short screen the rows scroll and the foot with the primary stays put (#341). */
 .nrl-mo-plan-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px 12px; }
