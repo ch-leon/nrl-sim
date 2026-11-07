@@ -1,6 +1,6 @@
 # Overview
 
-Last updated: 2026-11-01
+Last updated: 2026-11-07
 
 ## The pitch
 
@@ -32,23 +32,53 @@ premium game with a free demo and a one-off unlock
   ([PR](https://github.com/ch-leon/nrl-sim/pull/394)). Saves stay on the phone; no
   login or payments.
 
-## Where things stand (as of 1 Nov 2026)
+## Where things stand (as of 7 Nov 2026)
 
 - **UI cleanup:** done, in five chunks
   ([PR](https://github.com/ch-leon/nrl-sim/pull/353) to
   [PR](https://github.com/ch-leon/nrl-sim/pull/359)).
-- **Leon's 12 gameplay and UX tasks:** every checklist box is ticked; the issue is
-  still open (source: [issue #372](https://github.com/ch-leon/nrl-sim/issues/372)).
+- **Leon's 12 gameplay and UX tasks:** complete; the tracker is closed (source: [issue #372](https://github.com/ch-leon/nrl-sim/issues/372)).
 - **Commercial foundations:** built
   ([issue](https://github.com/ch-leon/nrl-sim/issues/365)). The storage adapter,
   content packs and brand config are in use in today's game. Only the demo gate,
   paywall and login sit behind the commercial switch, which is off on the live build.
-- **Save format:** version 21 (`SAVE_VERSION` in `src/core/state.ts`).
-- **In flight:** splitting `live.ts` and `e2e-webkit.mjs` into modules, no behaviour
-  change: open, awaiting Leon's thumbs up (source: [PR #443](https://github.com/ch-leon/nrl-sim/pull/443)).
-  The repo slim Leon approved has no PR yet (source: the open PR list). The
-  development process in AGENTS.md is merged (source: [PR #444](https://github.com/ch-leon/nrl-sim/pull/444)).
-  See [roadmap.md](roadmap.md).
+- **Save format:** version 23 (`SAVE_VERSION` in `src/core/state.ts`).
+- **Repo maintenance:** the live-sim and WebKit module split is merged
+  ([PR #443](https://github.com/ch-leon/nrl-sim/pull/443)); the repo slim is also
+  merged ([PR #447](https://github.com/ch-leon/nrl-sim/pull/447)).
+- **Strategy counters:** on in the live game
+  ([PR #506](https://github.com/ch-leon/nrl-sim/pull/506)), with plan fit, matchup
+  scouting, half-time readouts, counter commentary and rivals that counter your recent
+  plans by difficulty. The tracker is closed
+  ([#470](https://github.com/ch-leon/nrl-sim/issues/470)).
+- **New game experience:** phases 1 to 4 have shipped, including the curated offline
+  Australia and New Zealand town list
+  ([PR #496](https://github.com/ch-leon/nrl-sim/pull/496)), the nearest club as derby
+  rival ([PR #505](https://github.com/ch-leon/nrl-sim/pull/505)), expansion-club
+  framing ([PR #504](https://github.com/ch-leon/nrl-sim/pull/504)) and an English-style
+  league for UK home towns ([PR #509](https://github.com/ch-leon/nrl-sim/pull/509)).
+  The tracker stays open ([#489](https://github.com/ch-leon/nrl-sim/issues/489)); the
+  board grant is parked ([#483](https://github.com/ch-leon/nrl-sim/issues/483)).
+- **Match balance:** Expansive is still under par, at about 41% of level-rating games
+  ([#322](https://github.com/ch-leon/nrl-sim/issues/322), open). The Speed levers in
+  [PR #514](https://github.com/ch-leon/nrl-sim/pull/514) are merged but all off, so no
+  match changed.
+- **Set plays:** phase 1, set plays in the match engine, is merged
+  ([PR #515](https://github.com/ch-leon/nrl-sim/pull/515)); matches without plays are
+  unchanged. Phase 2, the club screens, is merged too
+  ([PR #516](https://github.com/ch-leon/nrl-sim/pull/516)): hire an attack coach, buy
+  plays in the Office Playbook and take up to three into a match from Lineup. This took
+  the save to version 23. A side runs plays only if it took some in, and rivals take
+  none yet. The live tray and pop-ups, rival plays and the balance pass are still open
+  ([#326](https://github.com/ch-leon/nrl-sim/issues/326)).
+- **Labs shorter matches** ([#513](https://github.com/ch-leon/nrl-sim/issues/513)):
+  planned and awaiting Leon's go.
+- **Launch plumbing:** decided and documented
+  ([PR #457](https://github.com/ch-leon/nrl-sim/pull/457), merged), not live. Firebase
+  hosting/push, PostHog, EmailOctopus, tester distribution and privacy work are tracked
+  in [#456](https://github.com/ch-leon/nrl-sim/issues/456), including Leon's setup
+  checklist. GitHub Pages remains the current play link; the repo goes private at
+  launch. See [roadmap.md](roadmap.md).
 
 ## How work moves
 
