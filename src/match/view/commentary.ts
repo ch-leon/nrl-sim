@@ -19,6 +19,7 @@ import type { Side, SimEvent } from '../core/snapshot';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { CALL_LABEL, callIsPenalty, isCoachCall } from '../league/calls';
 import { playOfDetail, playShortTitle } from '../league/plays';
+import type { Play } from '../../data/plays';
 import { MID_Y } from '../core/field';
 import { MAX_LAT_M } from '../league/tactics';
 import { ROLES } from '../league/roles';
@@ -174,6 +175,9 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   'coach-call:play': ['{team} coach calls {play}.', 'From the {team} box: {play}.', 'A play from the box: {play}.'],
   'set-play': ['{player} calls {play}.', '{team} go to {play}.', 'Here comes {play}.'],
   'play-breaks-down': ['It breaks down: {player} tucks it.', 'Nobody there: {play} breaks down.', '{play} goes wrong for {team}.'],
+  // Phase 3: the half's own call from the three (no word from the box), and a coach's play that pays off.
+  'set-play:half': ['{player} calls {play} himself.', 'Off the cuff: {play}.', '{player} sees it: {play}.'],
+  'call-paid:play': ['{play} comes off for {team}!', 'Straight off the whiteboard: {play} works.', 'Called from the box, and {play} pays off.'],
   plan: ['{team} switch to {plan}.', 'New plan for {team}: {plan}.', '{team} go {plan}.'],
   // ── The whistles ──
   siren: ["There's the siren — play on till it's dead.", 'The siren goes. Play on until the ball is dead.', 'Siren! The ball has to go dead first.'],
@@ -355,6 +359,13 @@ export class Commentator {
   private ordinal = 0;
   /** The last line index used for each moment, so the same line never comes twice running. */
   private readonly last = new Map<string, number>();
+  /**
+   * Set plays (#326): the play each side's coach has called and is still to run (a
+   * launch that isn't one is the half's own call), and the last he called (what a
+   * paid-off `set-play` call was: the sim's call-paid names the call, not the play).
+   */
+  private readonly calledPlay: Record<Side, Play | null> = { home: null, away: null };
+  private readonly lastCalledPlay: Record<Side, Play | null> = { home: null, away: null };
 
   constructor(
     private readonly seed: number,
@@ -375,7 +386,8 @@ export class Commentator {
       if (isAttackPreset(attack) && isDefencePreset(defence)) this.plans[e.side] = { attack, defence };
     }
     const counter = minute === undefined ? null : this.counter(e, minute, ballY);
-    const key = counter ?? lineKey(e, this.kickInAir, score);
+    const play = this.followPlays(e);
+    const key = counter ?? play.key ?? lineKey(e, this.kickInAir, score);
     if (KICKS.has(e.kind)) {
       this.kickInAir = true;
       this.kickTick = e.tick;
@@ -385,7 +397,7 @@ export class Commentator {
     if (!lines) return e.text;
     const side = e.side;
     const plan = e.kind === 'plan' ? planLabel(e.detail) : undefined;
-    const setPlay = e.kind === 'set-play' || e.kind === 'play-breaks-down' || e.kind === 'coach-call' ? playOfDetail(e.detail) : null;
+    const setPlay = e.kind === 'set-play' || e.kind === 'play-breaks-down' || e.kind === 'coach-call' ? playOfDetail(e.detail) : play.paid;
     const f: LineFill = {
       ...(e.player ? { player: e.player } : {}),
       ...(side ? { team: this.words[side], other: this.words[side === 'home' ? 'away' : 'home'] } : {}),
@@ -395,6 +407,33 @@ export class Commentator {
       ...(score ? this.scoreFill(score) : {}),
     };
     return this.say(key, lines, f, e.tick, ordinal, counter ? side : undefined) ?? e.text;
+  }
+
+  /**
+   * Set plays (#326): a coach's play call is remembered until it runs; a launch is
+   * the coach's when it is the play he called ('set-play'), else the half's own
+   * ('set-play:half'); a paid-off `set-play` call names the play he last called
+   * ('call-paid:play'). A new set forgets a call that never ran (the sim lets it lapse).
+   */
+  private followPlays(e: SimEvent): { key: string | null; paid: Play | null } {
+    const side = e.side;
+    if (e.kind === 'set-start') this.calledPlay.home = this.calledPlay.away = null;
+    if (!side) return { key: null, paid: null };
+    if (e.kind === 'coach-call' && e.detail?.startsWith('set-play:')) {
+      const p = playOfDetail(e.detail);
+      this.calledPlay[side] = p;
+      this.lastCalledPlay[side] = p;
+      return { key: null, paid: null };
+    }
+    if (e.kind === 'set-play') {
+      const p = playOfDetail(e.detail);
+      const coach = !!p && this.calledPlay[side] === p;
+      this.calledPlay[side] = null;
+      return { key: coach ? 'set-play' : 'set-play:half', paid: null };
+    }
+    // Not knowing the play (a stretch it never heard), the call's own pay-off line.
+    if (e.kind === 'call-paid' && e.detail === 'set-play' && this.lastCalledPlay[side]) return { key: 'call-paid:play', paid: this.lastCalledPlay[side] };
+    return { key: null, paid: null };
   }
 
   /** Read existing successful actions against the active plans; credit the acting side.

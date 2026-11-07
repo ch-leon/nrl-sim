@@ -2,6 +2,7 @@
 // sim event to the pop-up word over the player's head, its tone and whether it
 // is a big moment (slow-motion beat). popupLayer.ts draws them.
 import { CALL_LABEL, isCoachCall } from '../league/calls';
+import { playOfDetail } from '../league/plays';
 import type { SimEvent } from '../core/snapshot';
 
 export type PopupTone = 'attack' | 'defence' | 'neutral' | 'bad';
@@ -76,6 +77,10 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   // Sin bins (#71): over the man marched, and over him again when he is back.
   'sin-bin': { word: 'SIN BIN!', tone: 'bad', big: true },
   'sin-bin-return': { word: 'BACK ON', tone: 'neutral' },
+  // Set plays (#326): the play's short name over the man who calls it ("BLOCK PLAY!"), and a play
+  // that breaks down over the man who tucks it. Neither is a big moment: a play's line break or try is.
+  'set-play': { word: 'PLAY!', tone: 'attack' },
+  'play-breaks-down': { word: 'BROKE DOWN', tone: 'neutral' },
 };
 
 /** The captain's call on a penalty (2e). */
@@ -123,6 +128,8 @@ export function popupFor(e: SimEvent): Popup | null {
           ? 'BONUS TRY!'
           : e.kind === 'touch' && e.detail === 'bundled'
             ? 'INTO TOUCH!'
+            : e.kind === 'set-play' && playOfDetail(e.detail)
+              ? `${playOfDetail(e.detail)!.short.toUpperCase()}!`
             : e.kind === 'coach-call' && e.detail && isCoachCall(e.detail)
               ? `${CALL_LABEL[e.detail].toUpperCase()}!`
               : e.kind === 'error' && e.detail === 'contact'

@@ -112,7 +112,12 @@ export interface CoachCallsPage {
   groups: CallGroup[];
   /** One attack and one defence call a set, and which calls don't use it up. */
   limitLine: string;
+  /** Where set plays come from (#326): not the Coach's Office but the Playbook. */
+  playsLine: string;
 }
+
+/** The Coach calls page's footnote (#326): set plays are called from the tray like calls, but bought on the Playbook. */
+export const SET_PLAYS_FOOTNOTE = 'Set plays come from the Playbook';
 
 /** Tackle n of the set as the player counts it (the sim counts tackles done, from 0). */
 const tackle = (done: number): number => done + 1;
@@ -229,5 +234,6 @@ export function coachCallsPageData(level: number): CoachCallsPage {
     total: groups.reduce((n, g) => n + g.calls.length, 0),
     groups,
     limitLine: callLimitLine(),
+    playsLine: `${SET_PLAYS_FOOTNOTE}: your attack coach opens them to buy, and the ones you take into a match show under the calls in the tray while you have the ball.`,
   };
 }

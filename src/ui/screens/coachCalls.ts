@@ -42,7 +42,8 @@ export function coachCallsBody(d: CoachCallsPage): HTMLElement {
     el('div', { class: 'nrl-calls-summary', attrs: { 'data-calls-summary': '' } },
       el('p', { class: 'nrl-calls-next', text: d.nextLine }),
       el('p', { class: 'nrl-calls-limit', text: d.limitLine })),
-    el('div', { class: 'nrl-calls-groups' }, ...d.groups.map(groupEl)));
+    el('div', { class: 'nrl-calls-groups' }, ...d.groups.map(groupEl)),
+    el('p', { class: 'nrl-calls-foot', attrs: { 'data-calls-plays': '' }, text: d.playsLine }));
 }
 
 /** Open the Coach calls page for the club as it is now (it follows a build or an upgrade while open). */
@@ -83,6 +84,7 @@ export const COACH_CALLS_CSS = `
 .nrl-calls-summary p { margin: 0; font-size: 0.8125rem; line-height: 1.35; }
 .nrl-calls-next { color: var(--nrl-text); font-weight: 500; }
 .nrl-calls-limit { color: var(--nrl-text-2); }
+.nrl-calls-foot { margin: 0; font-size: 0.8125rem; color: var(--nrl-muted); }
 .nrl-calls-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 8px; align-items: start; }
 .nrl-calls-group { background: var(--nrl-raised); border-radius: 10px; padding: 8px 10px; min-width: 0; }
 .nrl-calls-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }

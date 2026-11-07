@@ -11,7 +11,7 @@ import { SET_TACKLES } from '../../../config';
 import { FIELD_WIDTH, MID_Y } from '../../core/field';
 import type { Side } from '../../core/snapshot';
 import { PLAYS_BY_ID, type PlayFrom, type PlayId } from '../../../data/plays';
-import { PLAYS, pickAutoPlay, playBonus, playFit, playOdds, playOutcome, playTitle, playWhen, roleSlot, type Edge, type PlayFacts } from '../plays';
+import { PLAYS, pickAutoPlay, playBonus, playFit, playOdds, playOutcome, playTitle, playWhen, roleSlot, type Edge, type PlayFacts, type PlayFit } from '../plays';
 import { ROLES } from '../roles';
 import { other, type Player, type ScriptedPlay } from './types';
 import { LiveCalls } from './calls';
@@ -20,6 +20,24 @@ export abstract class LiveSetPlays extends LiveCalls {
   /** A side's plays as the sim runs them (its sheet's, none when `plays.on` is 0). */
   playsOf(side: Side): readonly PlayId[] {
     return this.sheetPlays[side];
+  }
+
+  /** The play `side`'s coach has called and the sim is waiting to run (at the next play-the-ball or tap), or null (the tray's "next play", #326). */
+  pendingPlayOf(side: Side): PlayId | null {
+    return this.pendingPlay[side];
+  }
+
+  /**
+   * `side`'s men against `play`'s IQ needs (the tray's caption, #326): the nine on
+   * the field now, by slot, with their footy IQ after the spread. The edge the play
+   * would leave further short. A read: no roll, nothing changed.
+   */
+  playFitOf(side: Side, play: PlayId): PlayFit {
+    const nine = ROLES.map((_, slot) => {
+      const p = this.at(side, slot);
+      return { name: p.name, footyIQ: p.stats.footyIQ };
+    });
+    return playFit(PLAYS_BY_ID[play], nine);
   }
 
   /** Where the ball is, for a play from `from`: `ahead` 1 while the ball is still being carried (the play lands at the next play-the-ball). */

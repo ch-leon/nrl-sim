@@ -27,7 +27,8 @@ import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
-import { SKIP_ARM_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle } from '../ui/screens/matchOverlay';
+import { SKIP_ARM_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
+import { PLAYS_BY_ID, type PlayId } from '../data/plays';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
 import { styleLine } from '../ui/tacticsBlurbs';
 import { halfTimePlaysLine } from '../ui/playbookText';
@@ -347,6 +348,8 @@ export class MatchScene extends Phaser.Scene {
     // match's ticks passed the tick it was made on, and never offered a call (#431).
     this.madeCall = null;
     this.madeAt = 0;
+    this.madePlay = null;
+    this.madePlayAt = 0;
   }
 
   create(): void {
@@ -914,6 +917,13 @@ export class MatchScene extends Phaser.Scene {
   private madeCall: CoachCall | null = null;
   /** The tick the call was made on (it takes effect on the next). */
   private madeAt = 0;
+  /** The set play called this set (#326): the badge names it until the set's play is spent. */
+  private madePlay: PlayId | null = null;
+  private madePlayAt = 0;
+  /** The tray's Plays section (#326): only made for a side that took plays into the match, so a club with no playbook has today's tray. */
+  private trayPlaysEl: HTMLDivElement | null = null;
+  private trayPlaysList: HTMLDivElement | null = null;
+  private trayPlaysKeyNow = '';
   private chipsAt = 0;
   /** The side with the ball on screen when the chips last looked (#348). */
   private chipsBall: 'home' | 'away' | null = null;
@@ -953,6 +963,25 @@ export class MatchScene extends Phaser.Scene {
     tray.setAttribute('aria-label', 'Coach calls');
     tray.hidden = true;
     tray.append(head, list, foot);
+    // The Plays section (#326): under the calls, for a side with plays only.
+    this.trayPlaysEl = null;
+    this.trayPlaysList = null;
+    this.trayPlaysKeyNow = '';
+    if (this.playback instanceof LivePlayback && this.playback.playsOf(side).length > 0) {
+      const label = document.createElement('span');
+      label.className = 'nrl-mo-tray-plays-label';
+      label.textContent = 'Plays';
+      const plays = document.createElement('div');
+      plays.className = 'nrl-mo-tray-plays-list';
+      const section = document.createElement('div');
+      section.className = 'nrl-mo-tray-plays';
+      section.setAttribute('data-tray-plays', '');
+      section.hidden = true;
+      section.append(label, plays);
+      tray.insertBefore(section, foot);
+      this.trayPlaysEl = section;
+      this.trayPlaysList = plays;
+    }
     this.coachBtn = btn;
     this.coachLabel = label;
     this.coachBadgeEl = badge;
@@ -981,12 +1010,14 @@ export class MatchScene extends Phaser.Scene {
     if (this.coachLabel) this.coachLabel.textContent = open ? 'COACH ▾' : 'COACH';
     this.overlay?.setTrayOpen?.(open);
     this.trayKey = '';
+    this.trayPlaysKeyNow = '';
     if (open) this.refreshCallChips();
   }
 
   /** The badge and the tray follow the play (a few times a second): the calls the sim takes now. */
   private refreshCallChips(): void {
     if (!this.coachBtn || !(this.playback instanceof LivePlayback)) return;
+    this.placeCallResult();
     const pb = this.playback;
     const side = this.callSide;
     const attacking = pb.inPossession === side;
@@ -998,16 +1029,22 @@ export class MatchScene extends Phaser.Scene {
     const role = this.unlocked.filter((c) => callForRole(c, attacking));
     // The rows the tray shows (#396): at most five, so it never scrolls.
     const buttons = role.map((call) => ({ call, why: why.get(call) ?? null }));
-    const usable = trayRows(buttons, attacking);
-    const badge = coachBadge(trayCallsOn(usable), attacking, this.madeCall);
-    if (this.coachBadgeEl && this.coachBadgeEl.textContent !== badge.text) this.coachBadgeEl.textContent = badge.text;
+    // The set plays (#326): a tile each while his side has the ball, none for a club with no playbook.
+    // While they show, the calls keep to TRAY_CAP_WITH_PLAYS so the tray never scrolls.
+    const plays = this.trayPlaysEl ? trayPlays(this.playTiles(pb, side), attacking) : [];
+    const cap = plays.length > 0 ? TRAY_CAP_WITH_PLAYS : TRAY_CAP;
+    const usable = trayRows(buttons, attacking, cap);
+    if (this.madePlay && pb.pendingPlay(side) === null && pb.callRefusal(side, 'set-play', this.madePlay) !== 'one play a set' && pb.tick > this.madePlayAt + 1) this.madePlay = null;
+    const playLatest = this.madePlay !== null && (this.madeCall === null || this.madePlayAt >= this.madeAt);
+    const badge = coachBadge(trayCallsOn(usable), attacking, this.madeCall, { on: trayPlaysOn(plays), made: playLatest ? this.madePlay : null });
+    if (this.coachBadgeEl) renderCoachBadge(this.coachBadgeEl, badge.text);
     if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
     if (!this.trayOpen() || !this.trayList || !this.trayTitle || !this.trayFoot) return;
     // The locked calls (N9.6) that fit the moment: ones the sim would take now if his Coach's Office had them,
     // under the usable rows while there is room, the rest in the footer. The sim never sees them as calls.
     const locked = COACH_CALLS.filter((c) => !this.unlocked.includes(c) && callForRole(c, attacking) && pb.callRefusal(side, c) === null)
       .map((call) => ({ call, why: null, locked: unlockLevel(call) }));
-    const { rows, overflow } = trayWithLocked(usable, locked);
+    const { rows, overflow } = trayWithLocked(usable, locked, cap);
     // The kick-off pair (#397) is up: the break before his side's kick-off.
     const title = rows.some((r) => r.id === 'kickoff') ? 'Kick-off' : attacking ? 'Your ball' : 'Their ball';
     if (this.trayTitle.textContent !== title) this.trayTitle.textContent = title;
@@ -1015,13 +1052,21 @@ export class MatchScene extends Phaser.Scene {
     if (key !== this.trayKey) {
       this.trayKey = key;
       const els: HTMLElement[] = trayRowEls(rows, (call) => this.makeCall(call), (level) => this.noteLocked(level));
-      if (els.length === 0) {
+      if (els.length === 0 && plays.length === 0) {
         const none = document.createElement('div');
         none.className = 'nrl-mo-tray-none';
         none.textContent = 'Nothing to call right now.';
         els.push(none);
       }
       this.trayList.replaceChildren(...els);
+    }
+    if (this.trayPlaysEl && this.trayPlaysList) {
+      const pkey = trayPlaysKey(plays);
+      if (pkey !== this.trayPlaysKeyNow) {
+        this.trayPlaysKeyNow = pkey;
+        this.trayPlaysList.replaceChildren(...trayPlayEls(plays, (id) => this.makePlay(id)));
+      }
+      if (this.trayPlaysEl.hidden !== (plays.length === 0)) this.trayPlaysEl.hidden = plays.length === 0;
     }
     // A tap on a locked tile says what unlocks it, in the footer, for a moment.
     const foot = this.time.now < this.lockedNoteUntil
@@ -1057,6 +1102,28 @@ export class MatchScene extends Phaser.Scene {
     this.refreshCallChips();
   }
 
+  /** His plays as the tray shows them (#326): each with the sim's refusal, the one waiting for the play-the-ball, and its worst man's IQ. */
+  private playTiles(pb: LivePlayback, side: 'home' | 'away'): TrayPlay[] {
+    const pending = pb.pendingPlay(side);
+    return pb.playsOf(side).map((play) => {
+      const { worst } = pb.playFit(side, play);
+      return { play, why: pb.callRefusal(side, 'set-play', play), pending: play === pending, worst: { name: worst.name, iq: worst.iq, short: worst.short } };
+    });
+  }
+
+  /** A set play from the tray (#326): it waits for the next play-the-ball, the tray closes, the badge names it, the log says it. */
+  private makePlay(play: PlayId): void {
+    const pb = this.playback;
+    if (!(pb instanceof LivePlayback)) return;
+    if (pb.call(this.callSide, 'set-play', play) === null) {
+      this.madePlay = play;
+      this.madePlayAt = pb.tick;
+      this.overlay?.noteCall?.(PLAYS_BY_ID[play].short);
+      this.toggleTray(false);
+    }
+    this.refreshCallChips();
+  }
+
   // ── What each call did (#366): a tag over COACH for two seconds ──────────
   private callResultEl: HTMLDivElement | null = null;
   private callResultTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1076,8 +1143,23 @@ export class MatchScene extends Phaser.Scene {
     tag.toggleAttribute('data-paid', v.paid);
     // Not over the open tray: its rows are where the finger is.
     tag.hidden = this.trayOpen();
+    this.placeCallResult();
     if (this.callResultTimer) clearTimeout(this.callResultTimer);
     this.callResultTimer = setTimeout(() => this.clearCallResult(), CALL_RESULT_MS);
+  }
+
+  /**
+   * The tag sits over COACH; with the commentary line up (log = line) that is under the
+   * line, which hid it (#326 phase 3's webkit check found it). Then it goes just above the
+   * line, from where the line's top is now: a long line wraps and grows upward.
+   */
+  private placeCallResult(): void {
+    const tag = this.callResultEl;
+    if (!tag) return;
+    const strip = getRoot().querySelector<HTMLElement>('.nrl-mo-strip');
+    const r = strip && getComputedStyle(strip).display !== 'none' ? strip.getBoundingClientRect() : null;
+    const bottom = r && r.height > 0 ? `${Math.round(window.innerHeight - r.top + 6)}px` : '';
+    if (tag.style.bottom !== bottom) tag.style.bottom = bottom;
   }
 
   private clearCallResult(): void {

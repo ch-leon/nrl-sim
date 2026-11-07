@@ -23,6 +23,8 @@ import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { MatchRecorder, type RunMatchOptions } from '../league/match';
 import { callIsBench, callIsPenalty, type CallInput, type CallVerdict, type CoachCall } from '../league/calls';
+import type { PlayId } from '../../data/plays';
+import type { PlayFit } from '../league/plays';
 import type { DifficultyEdge } from '../league/spread';
 import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
@@ -430,14 +432,33 @@ export class LivePlayback {
     if (this.runner.finished) this.finish();
   }
 
-  /** Why `side`'s coach can't make `call` now, or null (#73). */
-  callRefusal(side: Side, call: CoachCall): string | null {
+  /** Why `side`'s coach can't make `call` now, or null (#73). A set play (#326) names the play. */
+  callRefusal(side: Side, call: CoachCall, play?: PlayId): string | null {
     if (this.finishEmitted || this.awaitingSkip) return 'full time';
+    // A set play tapped (#326), and the sim takes it on the next tick: one a set.
+    if (call === 'set-play' && this.queuedCall(side, 'set-play')) return 'one play a set';
+    if (call === 'set-play') return this.sim.callRefusal(side, call, play);
     // Fresh legs (#367) tapped, and the sim takes it on the next tick: not twice.
     if (callIsBench(call) && this.queuedCall(side, call)) return 'used this half';
     // A penalty call (#396) tapped: one a penalty, whichever.
     if (callIsPenalty(call) && (this.queuedCall(side, 'take-two') || this.queuedCall(side, 'tap-go'))) return 'one call a penalty';
     return this.sim.callRefusal(side, call);
+  }
+
+  /** `side`'s set plays (#326): its sheet's three as the sim runs them, none for a club with no playbook. */
+  playsOf(side: Side): readonly PlayId[] {
+    return this.sim.playsOf(side);
+  }
+
+  /** The play `side`'s coach has called that is still to run (#326): tapped this tick, or waiting in the sim for the play-the-ball. */
+  pendingPlay(side: Side): PlayId | null {
+    const queued = this.opts.calls.find((c) => c.tick > this.runner.tick && c.side === side && c.call === 'set-play');
+    return queued?.play ?? this.sim.pendingPlayOf(side);
+  }
+
+  /** `side`'s worst man against `play`'s footy IQ needs (#326, the tray's caption). */
+  playFit(side: Side, play: PlayId): PlayFit {
+    return this.sim.playFitOf(side, play);
   }
 
   /** Fresh legs (#367) called and its swap still to come: tapped this tick, or waiting in the sim. */
@@ -451,10 +472,10 @@ export class LivePlayback {
   }
 
   /** The coach makes a call: it takes effect on the next tick. Returns why not, or null. */
-  call(side: Side, call: CoachCall): string | null {
-    const why = this.callRefusal(side, call);
+  call(side: Side, call: CoachCall, play?: PlayId): string | null {
+    const why = this.callRefusal(side, call, play);
     if (why) return why;
-    this.opts.calls.push({ tick: this.runner.tick + 1, side, call });
+    this.opts.calls.push({ tick: this.runner.tick + 1, side, call, ...(call === 'set-play' && play ? { play } : {}) });
     this.persistProgress();
     return null;
   }
