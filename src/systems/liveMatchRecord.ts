@@ -11,7 +11,7 @@
 // that much. A few hundred bytes, kept next to the save slot; cleared at full time.
 import { type ControlInput, isControlInput } from '../match/league/controls';
 import { getActiveSlot } from '../core/save';
-import { browserStorage, type StorageLike } from '../core/storage/local';
+import { browserStorage, inCareerNamespace, type StorageLike } from '../core/storage/local';
 import { liveMatchKey } from '../core/storageKeys';
 import { TICK_S } from '../match/core/engine';
 import type { CallInput } from '../match/league/calls';
@@ -63,7 +63,8 @@ export const LIVE_MATCH_EXPORT_FIELD = 'nrlLiveMatch';
 export { liveMatchKey };
 
 function store(): StorageLike | null {
-  return browserStorage();
+  // A playtest career's record sits under its own prefix, beside its slot (#519).
+  return inCareerNamespace(browserStorage());
 }
 
 /** A record this game can resume: a bad or partial one is ignored, not spread. */

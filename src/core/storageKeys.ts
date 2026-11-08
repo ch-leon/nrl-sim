@@ -37,3 +37,14 @@ export function liveMatchKey(slot: number): string {
 
 /** Local experiments, never part of a career (Labs: match controls (Leon, 30 Oct)). */
 export const LABS_KEY = 'nrl-sim-labs';
+
+/**
+ * Developer settings' playtest career (#519). Its whole career (slots, meta, live
+ * match, device id) lives under this prefix, so a normal slot key never sees a
+ * test write: `nrl-sim-devtest:nrl-sim-save-slot-1` and so on.
+ */
+export const DEV_TEST_PREFIX = 'nrl-sim-devtest:';
+/** The normal career's keys, byte for byte, as they were when a playtest career was set up (#519). */
+export const DEV_TEST_BACKUP_KEY = 'nrl-sim-devtest-backup';
+/** A normal key found changed on the way back, kept here before the backup is put back (#519). */
+export const DEV_TEST_DISPLACED_KEY = 'nrl-sim-devtest-displaced';

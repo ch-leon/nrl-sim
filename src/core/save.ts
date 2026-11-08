@@ -26,7 +26,7 @@ import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
-import { browserStorage, LocalSaveStore, type StorageLike } from './storage/local';
+import { browserStorage, inCareerNamespace, LocalSaveStore, type StorageLike } from './storage/local';
 import { nextMeta } from './storage/meta';
 import type { SaveMeta, SlotListing } from './storage/types';
 
@@ -59,7 +59,8 @@ export function __setStorage(s: StorageLike | null): void {
  * persistence). One store per storage, so its queued meta and device id persist.
  */
 function getStore(): LocalSaveStore | null {
-  const storage = injectedStorage ?? browserStorage();
+  // A playtest career (#519) reads and writes only under its own prefix.
+  const storage = inCareerNamespace(injectedStorage ?? browserStorage());
   if (!storage) return null;
   if (activeStore?.storage !== storage) activeStore = new LocalSaveStore(storage, SLOT_COUNT);
   return activeStore;
@@ -457,13 +458,55 @@ export function getSlotMeta(slot: number): SaveMeta | null {
   return listSlotMeta().find((l) => l.slot === slot)?.meta ?? null;
 }
 
-/** Test hook: write any queued save meta now instead of after the current task. */
-export function __flushSaveMeta(): void {
+/**
+ * Write any queued save meta (and a new device id) now instead of after the current
+ * task. Developer settings' career switch (#519) does this before it copies or
+ * clears a career's keys, so no write queued before it lands after.
+ */
+export function flushSaveMeta(): void {
   getStore()?.flush();
+}
+
+/** Test hook: the same as flushSaveMeta. */
+export function __flushSaveMeta(): void {
+  flushSaveMeta();
 }
 
 /** The state save() last wrote to the active slot: any later one holds a change not saved yet. */
 let lastSaved: GameState | null = null;
+
+/**
+ * Set while the page switches careers (Developer settings, #519): save() writes
+ * nothing more on this page, so the reload's pagehide can't write one career's
+ * state into the other's keys. A new page starts unlocked.
+ */
+let savesLocked = false;
+
+/** Stop save() for the rest of this page (Developer settings' career switch, #519). */
+export function lockSaves(): void {
+  savesLocked = true;
+}
+
+/** Test hook: let save() write again. */
+export function __unlockSaves(): void {
+  savesLocked = false;
+}
+
+/**
+ * Save the game being played unless the active slot already holds exactly these
+ * bytes, so a career with nothing new to save is not written at all (#519: going
+ * to the playtest career leaves an unchanged career's keys untouched). False when
+ * a save was needed and did not land.
+ */
+export function saveIfChanged(state: GameState): boolean {
+  const store = getStore();
+  if (!store) return false;
+  try {
+    if (store.read(activeSlot) === JSON.stringify(state)) return true;
+  } catch { /* unreadable: try the write */ }
+  if (weekHeld() || slotImported || savesLocked) return false;
+  return writeSlot(activeSlot, state) ? (lastSaved = state, true) : false;
+}
 
 /**
  * Persist state to the active slot. Never throws: on QuotaExceededError or any
@@ -476,7 +519,7 @@ let lastSaved: GameState | null = null;
  * the active slot: the page is on its way to the title screen to load it.
  */
 export function save(state: GameState): void {
-  if (weekHeld() || slotImported) return;
+  if (weekHeld() || slotImported || savesLocked) return;
   getStore()?.migrateLegacy();
   if (writeSlot(activeSlot, state)) lastSaved = state;
 }

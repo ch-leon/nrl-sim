@@ -33,6 +33,47 @@ export function browserStorage(): StorageLike | null {
   }
 }
 
+// ── The career namespace (Developer settings' playtest career, #519) ─────────
+//
+// A playtest career keeps its whole career (slots, meta, the live-match record)
+// under a key prefix, so it can never write a normal slot. main.ts turns the
+// namespace on at boot, before anything reads a save; the save code and the
+// live-match record both reach storage through inCareerNamespace.
+
+let careerPrefix: string | null = null;
+const views = new WeakMap<StorageLike, Map<string, StorageLike>>();
+
+/** `base` with every key read and written under `prefix`. One view per (base, prefix), so a store over it keeps its identity. */
+export function prefixedStorage(base: StorageLike, prefix: string): StorageLike {
+  let byPrefix = views.get(base);
+  if (!byPrefix) views.set(base, byPrefix = new Map());
+  let view = byPrefix.get(prefix);
+  if (!view) {
+    view = {
+      getItem: (key) => base.getItem(prefix + key),
+      setItem: (key, value) => base.setItem(prefix + key, value),
+      removeItem: (key) => base.removeItem(prefix + key),
+    };
+    byPrefix.set(prefix, view);
+  }
+  return view;
+}
+
+/** Put every career key under `prefix` from now on (null: the normal keys). */
+export function setCareerNamespace(prefix: string | null): void {
+  careerPrefix = prefix;
+}
+
+/** The career prefix in use, or null for the normal keys. */
+export function careerNamespace(): string | null {
+  return careerPrefix;
+}
+
+/** `base` as the career code must see it: itself, or its view under the career prefix. */
+export function inCareerNamespace(base: StorageLike | null): StorageLike | null {
+  return base && careerPrefix ? prefixedStorage(base, careerPrefix) : base;
+}
+
 export class LocalSaveStore implements SyncSaveStore {
   private readonly pending = new Map<number, SaveMeta>();
   private flushQueued = false;

@@ -13,7 +13,7 @@ import { PLAY_LIST, playsOfFamily, type Play, type PlayId } from '../../data/pla
 import { PLAYS, type PlayMan } from '../../match/league/plays';
 import { buyPlay, buyRefusal, ownedPlays, togglePlay, validPlays } from '../../systems/playbook';
 import { ATTACK_COACHES, attackCoach } from '../../systems/staff';
-import { screenLockReason } from '../../systems/screenUnlocks';
+import { uiScreenLockReason } from '../../labs/screenOverride';
 import { money, playFitLine, playFitShort, playStyleLabel, playWhenLine, todaysNine } from '../playbookText';
 import { openStaffScreen, STAFF_SCREEN_TITLE } from './board';
 
@@ -81,7 +81,7 @@ function coachCard(state: GameState): HTMLElement {
       el('b', { text: `${def.title}: ${coach.name}` }),
       el('p', { text: `Opens ${playsOfFamily(coach.speciality).map((p) => p.name).join(', ')}. Plays you buy stay if he goes.` }));
   }
-  const locked = screenLockReason(state, 'staff');
+  const locked = uiScreenLockReason(state, 'staff');
   const go = button(STAFF_SCREEN_TITLE, () => { openStaffScreen(); }, { class: 'nrl-btn-primary' });
   go.setAttribute('data-playbook-staff', '');
   if (locked) { go.disabled = true; go.title = `${STAFF_SCREEN_TITLE}: ${locked.toLowerCase()}`; }
