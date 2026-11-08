@@ -837,8 +837,8 @@ export function initAudioUi(): () => void {
     ),
   );
 
-  // Labs: match controls (Leon, 30 Oct). Load the sheet only when opened.
-  const labs = button('Labs', () => { void import('../labs/panel').then((m) => m.openLabsPanel()); }, { class: 'nrl-audio-row nrl-labs-open' });
+  // Developer settings (was Labs: match controls, Leon, 30 Oct; #519). Load the sheet only when opened.
+  const labs = button('Developer settings', () => { void import('../labs/panel').then((m) => m.openLabsPanel()); }, { class: 'nrl-audio-row nrl-labs-open' });
   labs.style.minHeight = '44px';
   ensureAudioStyles();
   return () => {

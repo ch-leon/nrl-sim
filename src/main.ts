@@ -7,7 +7,7 @@ import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
-import { enableAutosave, getActiveSlot, getSlotSummaries, load, save } from './core/save';
+import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, load, save, setActiveSlot } from './core/save';
 import { showTitleFlow } from './ui/title';
 import { showExpansionIntro } from './ui/expansionIntro';
 import { expansionIntroLines } from './ui/expansionCopy';
@@ -21,7 +21,8 @@ import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
 import { initToasts } from './ui/toasts';
 import { initLeague, registerFixturesSystem } from './systems/fixtures';
-import { registerUnlockSystem, screenLockReason } from './systems/unlocks';
+import { registerUnlockSystem } from './systems/unlocks';
+import { uiScreenLockReason } from './labs/screenOverride';
 import { registerTrainingSystem } from './systems/training';
 import { registerEconomySystem, registerFinanceSystem } from './systems/economy';
 import { registerFreeAgencySystem } from './systems/freeagency';
@@ -68,6 +69,8 @@ import { isLabHash } from './match/lab/controller';
 import { commercialEnabled } from './commercial/flags';
 import { initCommercial, recordFirstRun } from './commercial/demo';
 import { openPaywall } from './ui/screens/paywall';
+import { announcePlaytest, applyPlaytestPreset, bootCareerNamespace, markPlaytestBuilt, PLAYTEST_CLUB, PLAYTEST_COACH, PLAYTEST_SEED, setMatchSceneProbe } from './labs/devCareer';
+import { syncDevMarker } from './labs/marker';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
@@ -130,10 +133,22 @@ async function boot(): Promise<void> {
   initFinanceLedger();
   initNewsInbox();
   warmMatchArt(); // the match ground painted in the art worker while the title is up (N10.5)
+  // Developer settings' playtest career (#519): its keys under their own prefix
+  // before any save is read, and straight into it, past the title.
+  const playtest = bootCareerNamespace();
+  syncDevMarker();
   // #362: the careers already here before the first commercial run keep the full game.
-  if (commercialEnabled()) recordFirstRun(getSlotSummaries());
-  const choice = await showTitleFlow(uiRoot);
-  let freshGame = choice.mode !== 'continue';
+  // A playtest career's slots are not those careers, so it records nothing.
+  if (commercialEnabled() && !playtest) recordFirstRun(getSlotSummaries());
+  if (playtest) {
+    setActiveSlot(1);
+    // Its save gone (site data cleared): build it again rather than start a stray new game.
+    if (!hasSave(1)) playtest.fresh = true;
+  }
+  const choice = playtest
+    ? (playtest.fresh ? { mode: 'new' as const, clubName: PLAYTEST_CLUB, coachName: PLAYTEST_COACH, seed: PLAYTEST_SEED, difficulty: 'normal' as const } : { mode: 'continue' as const })
+    : await showTitleFlow(uiRoot);
+  let freshGame = choice.mode !== 'continue' && !playtest;
   if (choice.mode === 'continue') {
     const saved = load();
     if (saved) { await preparePack(saved.pack ?? 'au'); loadState(saved); }
@@ -151,6 +166,14 @@ async function boot(): Promise<void> {
     createNewGame(choice.clubName ?? 'Cavehole Crushers', choice.seed, { difficulty: choice.difficulty, coachName: choice.coachName, openAll: choice.openAll, home: choice.home, groundName: choice.groundName });
   }
   if (getState().league.clubs.length === 0) initLeague(getState(), choice.colors);
+  if (playtest?.fresh) {
+    // The preset through the game's own routes; a reload from here resumes it, not a new one.
+    const problems = applyPlaytestPreset();
+    if (problems.length) console.warn('nrl-sim: playtest preset', problems);
+    save(getState());
+    markPlaytestBuilt();
+  }
+  if (playtest) announcePlaytest();
   if (freshGame) {
     for (const text of expansionIntroLines(getState(), generateObjectives(getState())).slice(0, 2)) {
       bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
@@ -192,6 +215,7 @@ async function boot(): Promise<void> {
 
   const g = new Phaser.Game(config);
   game = g;
+  setMatchSceneProbe(() => g.scene.isActive('Match')); // Developer settings waits for the match (#519)
   // `?e2e` exposes the game to the end-to-end playthrough (scripts/e2e-season.mjs),
   // which checks what the grounds actually draw and dumps the live state for the
   // save corpus (tests/fixtures/saves) before the first autosave. Nothing else reads these.
@@ -271,16 +295,16 @@ async function boot(): Promise<void> {
   nav.registerScreen('recruit', 'Recruit', () => openRecruitScreen(), { hidden: true });
   nav.registerScreen('finance', 'Finance', () => openFinanceScreen(), {
     more: true,
-    locked: () => screenLockReason(getState(), 'finance'),
+    locked: () => uiScreenLockReason(getState(), 'finance'),
     status: () => {
       const net = Math.round(financeSummary(getState()).netWeekly);
       return { text: `${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))} / week`, attn: net < 0 };
     },
   });
-  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { more: true, locked: () => screenLockReason(getState(), 'contracts') }); // also from Finance's VIEW ▸
+  nav.registerScreen('contracts', 'Contracts', () => openContractsScreen(), { more: true, locked: () => uiScreenLockReason(getState(), 'contracts') }); // also from Finance's VIEW ▸
   nav.registerScreen('staff', STAFF_SCREEN_TITLE, () => openStaffScreen(), {
     more: true,
-    locked: () => screenLockReason(getState(), 'staff'),
+    locked: () => uiScreenLockReason(getState(), 'staff'),
     status: () => {
       const p = getState().boardPatience;
       return { text: `Board patience ${p}/${BOARD.MAX_PATIENCE}`, attn: p <= 2 };
@@ -328,7 +352,7 @@ async function boot(): Promise<void> {
   nav.registerScreen('quit', 'Save & quit', () => {
     save(getState());
     location.reload();
-  }, { more: true, status: () => ({ text: `Slot ${getActiveSlot()}` }) });
+  }, { more: true, status: () => ({ text: playtest ? 'Playtest career' : `Slot ${getActiveSlot()}` }) });
   // News badge: unread messages plus event cards waiting for a choice (#75).
   const refreshNewsBadge = (): void => nav.setBadge('news', newsInbox.unreadCount + pendingDecisionCount(getState()));
   newsInbox.onChange(refreshNewsBadge);
