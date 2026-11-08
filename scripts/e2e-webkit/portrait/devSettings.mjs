@@ -9,8 +9,9 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav }
  *     Reset parts, 44px targets, and fits upright (390×844) and sideways (667×375, 568×320);
  *   - the screen override opens Staff & Board on the dock's Office with a DEV tag and
  *     writes no career key; off locks it again;
- *   - Set up playtest career reloads into a TEST CAREER with Block play bought and picked,
- *     the normal career's keys byte for byte as they were;
+ *   - Set up playtest career, with a change not saved yet, saves it with its meta into the backup
+ *     and reloads into a TEST CAREER with Block play bought and picked, every normal key equal
+ *     to its backup;
  *   - the first match, watched at ×1, calls Block play from the coach tray; ×2 works; the
  *     record is under the playtest prefix; mid-match, Return is refused with the reason;
  *   - after the match, Return reloads to the title with the normal keys byte for byte and
@@ -84,7 +85,7 @@ export async function runDevSettings(browser) {
     if (await page.locator('.nrl-tutorial-skip').count()) await page.locator('.nrl-tutorial-skip').tap();
     const clubName = await page.evaluate(() => window.__nrlState().clubName);
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide'))); // whatever is unsaved lands now, as a backgrounded tab would
-    const normal = await careerKeys();
+    let normal = await careerKeys();
     if (!normal['nrl-sim-save-slot-1']) throw new Error('no normal save in slot 1');
     await openPanel();
     if (await page.locator('[data-experiment="match-controls"]').isChecked()) throw new Error('Match controls is on by default');
@@ -131,7 +132,13 @@ export async function runDevSettings(browser) {
     if (await page.locator('.nrl-dev-marker').count()) throw new Error('the DEV tag stayed with everything off');
     step('screen override opens Staff & Board on screen only');
 
-    // 4. Set up the playtest career.
+    // 4. Set up the playtest career, with a change not saved yet: the setup saves it (as Save &
+    // quit would) and its meta, written after the current task, must be in the backup too.
+    const before = await page.evaluate(() => {
+      const s = window.__nrlState();
+      s.money += 1; // in memory only, as a between-weeks change sits until the next save
+      return { money: s.money, meta: JSON.parse(localStorage.getItem('nrl-sim-save-meta-1')) };
+    });
     await openPanel();
     await page.locator('[data-dev-action="enter"]').tap();
     await Promise.all([page.waitForEvent('load', { timeout: 30000 }), page.locator('[data-dev-confirm]').tap()]);
@@ -142,10 +149,19 @@ export async function runDevSettings(browser) {
       return { club: s.clubName, owned: s.playbook.owned, plays: s.lineup.plays, coach: s.staff.find((m) => m.role === 'attackCoach')?.speciality, speed: s.settings.playbackSpeed, dev: document.documentElement.dataset.nrlDev };
     });
     if (test.club !== 'Playtest XIII' || test.owned.join() !== 'block-play' || test.plays.join() !== 'block-play' || test.coach !== 'direct' || test.speed !== 1 || test.dev !== 'test-career') throw new Error(`playtest career is ${JSON.stringify(test)}`);
-    if (!same(await careerKeys(), normal)) throw new Error('setting up the playtest career changed a normal career key');
+    const backup = await page.evaluate(() => JSON.parse(localStorage.getItem('nrl-sim-devtest-backup')));
+    const backedUp = Object.fromEntries(Object.entries(backup).filter(([, v]) => v !== null).sort(([a], [b]) => a.localeCompare(b)));
+    if (!same(await careerKeys(), backedUp)) throw new Error('the normal career keys differ from their backup (a write landed after it)');
+    if (JSON.parse(backedUp['nrl-sim-save-slot-1']).money !== before.money) throw new Error('the unsaved change was not saved before the backup');
+    const meta = JSON.parse(backedUp['nrl-sim-save-meta-1'] ?? 'null');
+    if (!meta || !(meta.updatedAt > 0) || meta.revision !== (before.meta?.revision ?? 0) + 1 || meta.deviceId !== backedUp['nrl-sim-device-id']) {
+      throw new Error(`the backed-up meta is not the setup save's: ${JSON.stringify(meta)}`);
+    }
+    for (const [k, v] of Object.entries(normal)) if (!/^nrl-sim-save-(slot|meta)-1$/.test(k) && backedUp[k] !== v) throw new Error(`setup changed ${k}`);
+    normal = backedUp; // the career as set up: from here every normal key must stay exactly this
     if (await page.locator('[data-nrl-title]').count()) throw new Error('the playtest career stopped on the title');
     await page.screenshot({ path: join(OUT, 'playtest-club-390x844.png') });
-    step('playtest career set up; normal keys byte for byte');
+    step('playtest career set up from an unsaved change; the save and its meta in the backup, normal keys byte for byte');
 
     // 5. The real route: the first match at ×1, Block play called from the tray, ×2.
     await page.setViewportSize({ width: 844, height: 390 });
@@ -222,6 +238,8 @@ export async function runDevSettings(browser) {
     await Promise.all([page.waitForEvent('load', { timeout: 30000 }), page.locator('[data-dev-confirm]').tap()]);
     await page.locator('[data-nrl-title]').waitFor({ timeout: 30000 });
     if (!same(await careerKeys(), normal)) throw new Error('the normal career keys are not byte for byte after Return');
+    const slotMeta = await page.evaluate(() => JSON.parse(localStorage.getItem('nrl-sim-save-meta-1')));
+    if (slotMeta.updatedAt !== meta.updatedAt || slotMeta.checksum !== meta.checksum) throw new Error('slot 1 meta changed by the round trip');
     const left = await devKeys();
     if (left.length) throw new Error(`playtest keys left after Return: ${left}`);
     if (await page.locator('.nrl-dev-marker').count()) throw new Error('the TEST CAREER tag stayed after Return');

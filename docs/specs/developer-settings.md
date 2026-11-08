@@ -40,7 +40,9 @@ inside its frame upright (390×844) and sideways (667×375 and 568×320).
   1. The career being played is saved only if it has an unsaved change: the same
      save Save & quit makes (`saveIfChanged`). An unchanged career is not written
      at all.
-  2. Every normal career key is copied byte for byte into `nrl-sim-devtest-backup`.
+  2. Any save meta (and a first device id) still queued is written straight away
+     (`flushSaveMeta`), so nothing lands on a normal key after the copy. Every
+     normal career key is then copied byte for byte into `nrl-sim-devtest-backup`.
   3. This page stops saving (`lockSaves`), so the reload's `pagehide` can't write.
   4. The marker is set and the page reloads.
   If the backup or the marker doesn't land, nothing switches.
@@ -55,7 +57,8 @@ inside its frame upright (390×844) and sideways (667×375 and 568×320).
 - **Reload** stays in the playtest career with its progress. Only Return or Reset
   all switch careers. If its save is lost (site data cleared), it is built again.
 - **Return** (`returnToNormalCareer`):
-  1. This page stops saving.
+  1. This page stops saving, and the playtest's own queued meta is written before
+     its keys are cleared.
   2. Every normal key is checked against the backup. Any key that differs (for
      example, another tab wrote to it) is put back byte for byte, and what was
      found is kept under `nrl-sim-devtest-displaced`.

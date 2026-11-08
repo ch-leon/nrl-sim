@@ -5,7 +5,7 @@
 // Isolation: the playtest career lives under DEV_TEST_PREFIX (core/storage/local.ts
 // inCareerNamespace), so it never writes a normal slot. Setting one up saves the
 // career being played only if it has something unsaved (as Save & quit would),
-// copies every normal career key byte for byte into DEV_TEST_BACKUP_KEY, stops
+// writes that save's queued meta at once, copies every normal career key byte for byte into DEV_TEST_BACKUP_KEY, stops
 // this page saving, and reloads into the playtest career. The way back stops
 // saving, puts any normal key that differs from the backup back (keeping what it
 // found under DEV_TEST_DISPLACED_KEY), throws the playtest career away and
@@ -15,7 +15,7 @@
 // Neither runs while a match is live or can be resumed (transitionRefusal): the
 // match's sheet and record belong to the career that kicked it off.
 import { bus } from '../core/events';
-import { getActiveSlot, lockSaves, saveIfChanged, SLOT_COUNT } from '../core/save';
+import { flushSaveMeta, getActiveSlot, lockSaves, saveIfChanged, SLOT_COUNT } from '../core/save';
 import { getState, setState } from '../core/state';
 import { careerNamespace, setCareerNamespace, browserStorage, type StorageLike } from '../core/storage/local';
 import {
@@ -159,6 +159,9 @@ export function enterTestCareer(deps: SwitchDeps = pageDeps()): SwitchResult {
   if (!storage) return { ok: false, why: 'This browser is not keeping saves, so there is nowhere to put a playtest career.' };
   if (!saveIfChanged(getState())) return { ok: false, why: "Your career's latest change didn't save, so nothing was switched." };
   lockSaves();
+  // A save's meta (and a first device id) is written after the current task: write it
+  // now, so the backup holds it and nothing queued lands on a normal key after.
+  flushSaveMeta();
   if (!backupNormalCareer(storage)) {
     return { ok: false, why: 'There was no room to back up your career, so nothing was switched. Reload to carry on.' };
   }
@@ -180,6 +183,8 @@ export function returnToNormalCareer(deps: SwitchDeps = pageDeps()): SwitchResul
   const storage = deps.storage;
   if (!storage) return { ok: false, why: "This browser's storage can't be reached right now. Reload and try again." };
   lockSaves();
+  // The playtest's own queued meta lands now, under its prefix, before its keys are cleared.
+  flushSaveMeta();
   const res = restoreNormalCareer(storage);
   clearTestCareer(storage);
   setTestCareer(null);

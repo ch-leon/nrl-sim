@@ -458,9 +458,18 @@ export function getSlotMeta(slot: number): SaveMeta | null {
   return listSlotMeta().find((l) => l.slot === slot)?.meta ?? null;
 }
 
-/** Test hook: write any queued save meta now instead of after the current task. */
-export function __flushSaveMeta(): void {
+/**
+ * Write any queued save meta (and a new device id) now instead of after the current
+ * task. Developer settings' career switch (#519) does this before it copies or
+ * clears a career's keys, so no write queued before it lands after.
+ */
+export function flushSaveMeta(): void {
   getStore()?.flush();
+}
+
+/** Test hook: the same as flushSaveMeta. */
+export function __flushSaveMeta(): void {
+  flushSaveMeta();
 }
 
 /** The state save() last wrote to the active slot: any later one holds a change not saved yet. */

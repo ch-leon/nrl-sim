@@ -3,11 +3,12 @@
 // preset through the game's own routes, and the browser-local screen override.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  __setStorage, __unlockSaves, __flushSaveMeta, load, save, setActiveSlot, getActiveSlot,
+  __setStorage, __unlockSaves, __flushSaveMeta, getSlotMeta, load, save, setActiveSlot, getActiveSlot,
 } from '../../src/core/save';
 import { createNewGame, getState, setState, SAVE_VERSION } from '../../src/core/state';
 import { careerNamespace, setCareerNamespace, type StorageLike } from '../../src/core/storage/local';
-import { DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, LABS_KEY, liveMatchKey, slotKey } from '../../src/core/storageKeys';
+import { DEV_TEST_BACKUP_KEY, DEV_TEST_DISPLACED_KEY, DEV_TEST_PREFIX, DEVICE_ID_KEY, LABS_KEY, liveMatchKey, saveMetaKey, slotKey } from '../../src/core/storageKeys';
+import { checksumOf, parseMeta } from '../../src/core/storage/meta';
 import { clearLiveMatch, writeLiveMatch } from '../../src/systems/liveMatchRecord';
 import {
   __setLabs, developerSession, experimentOn, hintSeen, OPEN_SCREENS, overrideOn, readLabs, setExperiment, setOverride, testCareer,
@@ -130,6 +131,49 @@ describe('setting up the playtest career', () => {
     const backup = JSON.parse(storage.getItem(DEV_TEST_BACKUP_KEY)!) as Record<string, string>;
     expect(JSON.parse(backup[slotKey(2)]!).money).toBe(STARTING_MONEY + 1234);
     expect(storage.getItem(slotKey(2))).toBe(backup[slotKey(2)]);
+  });
+
+  it('with an unsaved change, backs up the save with its meta and a first device id, and nothing lands after', async () => {
+    // A save from before meta, on a browser with no device id yet: the setup's save makes both.
+    setActiveSlot(2);
+    createNewGame('Leon Real Club', 42);
+    storage.setItem(slotKey(2), JSON.stringify(getState()));
+    setState({ money: getState().money + 1 });
+    expect(enterTestCareer(deps()).ok).toBe(true);
+    await new Promise((r) => setTimeout(r, 0)); // every deferred write has had its turn
+    const backup = JSON.parse(storage.getItem(DEV_TEST_BACKUP_KEY)!) as Record<string, string | null>;
+    for (const key of careerKeys()) expect(storage.getItem(key), key).toBe(backup[key]);
+    expect(backup[DEVICE_ID_KEY]).not.toBeNull();
+    const meta = parseMeta(backup[saveMetaKey(2)]!);
+    expect(meta?.checksum).toBe(checksumOf(backup[slotKey(2)]!));
+    expect(meta?.updatedAt).toBeGreaterThan(0);
+    expect(meta?.deviceId).toBe(backup[DEVICE_ID_KEY]);
+  });
+
+  it('round trip with an unsaved change: Return leaves the save, its meta and the device id as set up, putting nothing back', async () => {
+    normalCareer();
+    setState({ money: getState().money + 5 });
+    expect(enterTestCareer(deps()).ok).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    const after = storage.dump(isNormal);
+    expect(JSON.parse(after[slotKey(2)]!).money).toBe(STARTING_MONEY + 5);
+    bootPlaytestPage();
+    save(getState()); // the playtest's own save, its meta queued under the prefix
+    const warn = vi.spyOn(console, 'warn');
+    expect(returnToNormalCareer(deps()).ok).toBe(true);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+    expect(storage.dump(isNormal)).toEqual(after);
+    expect(storage.getItem(DEV_TEST_DISPLACED_KEY)).toBeNull();
+    expect(Object.keys(storage.dump((k) => k.startsWith('nrl-sim-devtest')))).toEqual([]);
+    // The next page: slot 2's meta still describes its save, with its time known.
+    setCareerNamespace(null);
+    __unlockSaves();
+    const meta = getSlotMeta(2);
+    expect(meta?.checksum).toBe(checksumOf(storage.getItem(slotKey(2))!));
+    expect(meta?.updatedAt).toBeGreaterThan(0);
+    expect(meta?.deviceId).toBe(storage.getItem(DEVICE_ID_KEY));
   });
 
   it.each<[string, Partial<MatchProbe>]>([
