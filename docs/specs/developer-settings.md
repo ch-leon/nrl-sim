@@ -68,8 +68,13 @@ inside its frame upright (390×844) and sideways (667×375 and 568×320).
   demo gate applies to it as it does to any career.
 - The save format is unchanged (`SAVE_VERSION` 23).
 
-## Marker contract (for analytics, #518 and later)
+## Marker contract (analytics and anything else that must leave testing out)
 
+- The analytics merged in #518 already stays off on any browser where
+  `labsVisible()` is true (`src/analytics/index.ts`, reason `labs`). `labsVisible()`
+  is also true while a playtest career is on, even after the page is hidden, so
+  developer and playtest sessions send nothing. If that rule ever changes to
+  classify instead of drop, use the marker below.
 - `developerSession()` in `src/labs/flags.ts` returns `null` on a player's browser
   (the page has never been shown). Otherwise it returns `{ testCareer, overrides,
   experiments }`. Treat any non-null value as a developer session: either send

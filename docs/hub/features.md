@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-06
+Last updated: 2026-11-07
 
 What's in the game, with the PR that added each.
 
@@ -64,6 +64,8 @@ What's in the game, with the PR that added each.
 ## Recently added
 
 - Labs is now Developer settings (still `?labs=1`). It can open the Office screens early on this browser only. It can also set up a separate playtest career with a Direct attack coach hired and Block play bought and picked, so you can call it in the first match. Return to my career puts your own career back exactly as it was. Reset all turns everything off ([issue](https://github.com/ch-leon/nrl-sim/issues/519)).
+
+- Anonymous analytics, ready for the PostHog EU token: once the title screen is done, a build given the token sends a handful of anonymous events (career started, match result and difficulty, season finished, dock tab views; push, pop-up and email sign-up events wait for those features). No cookies or browser storage, no person profiles, no names or save data; off in dev, tests, the match lab and Labs, and the game plays the same when PostHog is unreachable. The Pages build has no token yet, so it sends nothing ([PR](https://github.com/ch-leon/nrl-sim/pull/518)).
 
 - Call a set play from the match: with the ball, the COACH tray shows the plays you took in (three at most) under the calls, each with its weakest man's footy IQ; a tapped play runs at the next play-the-ball and the tag over COACH says what came of it. Clubs with no playbook see today's tray ([PR](https://github.com/ch-leon/nrl-sim/pull/517)).
 

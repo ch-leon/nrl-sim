@@ -71,6 +71,9 @@ import { initCommercial, recordFirstRun } from './commercial/demo';
 import { openPaywall } from './ui/screens/paywall';
 import { announcePlaytest, applyPlaytestPreset, bootCareerNamespace, markPlaytestBuilt, PLAYTEST_CLUB, PLAYTEST_COACH, PLAYTEST_SEED, setMatchSceneProbe } from './labs/devCareer';
 import { syncDevMarker } from './labs/marker';
+import { startAnalytics, track } from './analytics';
+import { dockTab } from './analytics/events';
+import { initGameAnalytics } from './analytics/gameEvents';
 
 // Phaser rendering conventions per ARCHITECTURE.md §7.
 const config: Phaser.Types.Core.GameConfig = {
@@ -174,6 +177,11 @@ async function boot(): Promise<void> {
     markPlaytestBuilt();
   }
   if (playtest) announcePlaytest();
+  // #450: anonymous analytics, from here on (never before the title is done). Off without
+  // a token and in dev, tests, the lab and Labs; the SDK comes in its own chunk once the
+  // page is idle, and any failure leaves the game as it was (src/analytics/index.ts).
+  initGameAnalytics(getState(), freshGame);
+  void startAnalytics();
   if (freshGame) {
     for (const text of expansionIntroLines(getState(), generateObjectives(getState())).slice(0, 2)) {
       bus.emit('ui:notify', { text, kind: 'info', quiet: true, from: 'coach' });
@@ -287,7 +295,12 @@ async function boot(): Promise<void> {
   initAudio();
   const openSettings = initAudioUi();
   setMatchSettingsOpener(openSettings); // the pause sheet's Settings
-  const nav = createNav();
+  const nav = createNav({
+    onTabView: (id) => {
+      const tab = dockTab(id);
+      if (tab) track('tab_viewed', { tab });
+    },
+  });
   nav.registerScreen('squad', 'Squad', () => openSquadScreen(), { holds: ['lineup', 'recruit'] });
   nav.registerScreen('fixtures', 'League', () => openFixturesScreen(), { holds: ['ladder'] });
   nav.registerScreen('build', 'Build', () => openBuildScreen());

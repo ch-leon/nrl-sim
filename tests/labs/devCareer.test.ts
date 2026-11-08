@@ -326,3 +326,13 @@ describe('the developer marker', () => {
     expect(getActiveSlot()).toBe(1);
   });
 });
+
+describe('analytics stays off for developer sessions (#518 reads labsVisible)', () => {
+  it('counts a playtest career as Labs even with the page hidden', async () => {
+    const { labsVisible } = await import('../../src/labs/flags');
+    __setLabs({ visible: false, on: {}, hintsSeen: [] });
+    expect(labsVisible()).toBe(false);
+    __setLabs({ visible: false, on: {}, hintsSeen: [], testCareer: { preset: 'block-play', fresh: false, from: 1 } });
+    expect(labsVisible()).toBe(true);
+  });
+});
