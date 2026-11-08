@@ -75,6 +75,16 @@ export interface Nav {
   destroy(): void;
 }
 
+/** What the dock tells its owner. */
+export interface NavOptions {
+  /**
+   * A dock tab tapped and its view now up (#450's tab views): CLUB, a tab's screen,
+   * or Office's sheet, by id (HOME_ID, a tab's screen id, OFFICE_ID). Not a tap that
+   * closes it, not an Office tile, and not open() from elsewhere.
+   */
+  onTabView?: (id: string) => void;
+}
+
 /** The label Office's tab reads: "OFFICE ▴" while its sheet is up. */
 export const OFFICE_LABEL = 'Office';
 
@@ -204,7 +214,7 @@ export function tabText(label: string, open: boolean, home = false): string {
  * adds a tab that calls open() on a tap, or (placement.more) a tile in Office;
  * re-registering the same id replaces it in place (idempotent).
  */
-export function createNav(): Nav {
+export function createNav(opts: NavOptions = {}): Nav {
   ensureStyles();
   const parts = dock();
   const root = parts.tabs;
@@ -219,6 +229,7 @@ export function createNav(): Nav {
   const club = tabButton('Club', () => {
     setSheet(false);
     if (screenKey() !== HOME_ID) closeScreen();
+    opts.onTabView?.(HOME_ID);
   });
   club.setAttribute('data-screen', HOME_ID);
   club.setAttribute('data-nav-home', '');
@@ -236,6 +247,7 @@ export function createNav(): Nav {
     closeModal(); // a dialog left open (a decision) would sit over the tiles
     closeScreen();
     setSheet(true);
+    opts.onTabView?.(OFFICE_ID);
   });
   more.setAttribute('data-nav-more', '');
   more.setAttribute('data-screen', OFFICE_ID);
@@ -319,7 +331,10 @@ export function createNav(): Nav {
       btn.append(el('span', { class: 'nrl-office-name', text: label }), el('span', { class: 'nrl-office-status' }));
       btn.setAttribute('role', 'menuitem');
     } else {
-      btn = tabButton(label, () => pick(id));
+      btn = tabButton(label, () => {
+        pick(id);
+        if (registry.owner(screenKey()) === id) opts.onTabView?.(id);
+      });
     }
     btn.setAttribute('data-screen', id);
     if (placement.holds?.length) btn.setAttribute('data-nav-holds', placement.holds.join(' '));

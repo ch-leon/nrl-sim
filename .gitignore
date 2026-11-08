@@ -15,6 +15,7 @@ e2e-output/
 # Build env (VITE_* placeholders for the commercial work, #362): never committed.
 .env
 .env.*
+!.env.example
 
 # PR screenshots: attach to the PR or use the CI artifact, don't commit them.
 docs/screenshots/*
