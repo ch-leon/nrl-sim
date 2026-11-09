@@ -251,6 +251,11 @@ from the phone playthrough, `v<version>-<point>.json`, today v9–v19. Never edi
 when the version moves, add the new version's dumps. `tests/qa/corpus.test.ts` checks
 that every one migrates to `SAVE_VERSION`, passes the soak's invariants and plays on.
 
+Nested save validation and permitted repairs are documented in
+[save validation](specs/save-validation.md). Load/import validate before trusted
+installation; autosave uses exact-byte approvals and never runs nested validators
+in a tick. Repaired originals and replaced import destinations use #522 recovery.
+
 ### 4.1 Mutation ownership and operation effects
 
 UI owns a selected row/slot, a name or kit draft, an open modal, sorting and display

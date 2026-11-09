@@ -343,6 +343,22 @@ describe('showTitleFlow', () => {
     expect(root.children.length).toBe(0);
   });
 
+  it('shows the repair warning and recovery copy before continuing a repaired career', async () => {
+    const s = createNewGame('Missing selection', 525);
+    delete (s.lineup as unknown as Record<string, unknown>).captain;
+    const original = JSON.stringify(s, null, 2);
+    storage.map.set(slotKey(1), original);
+    const root = makeStubEl('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    const card = root.querySelector('[data-nrl-slot-1]')!;
+    expect(card.children.some(c => c.textContent.includes('Career lineup repaired'))).toBe(true);
+    expect(root.querySelector('[data-nrl-recovery-1-0]')).not.toBeNull();
+    expect(storage.map.get(slotKey(1))).toBe(original);
+    root.querySelector('[data-nrl-continue-1]')!.click();
+    expect(await choice).toEqual({ mode: 'continue' });
+    expect(load()!.lineup.captain).toBeNull();
+  });
+
   it('with a save: New game opens the setup step, and Start asks before replacing the season (#350 T2)', async () => {
     save(createNewGame('Existing', 1));
     const root = makeStubEl('div');

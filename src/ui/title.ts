@@ -354,7 +354,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
           if (!free) return showSlots('All slots are full — delete one before importing.');
           const res = installImportedSave(text, free.slot);
           if (!res.ok) return showSlots(res.message ? `Import failed: ${res.message}` : 'Import failed: could not write to storage.');
-          showSlots();
+          showSlots(res.repairs.length ? res.repairs[0]!.notification : undefined);
         });
       });
       foot.appendChild(importBtn);
