@@ -866,6 +866,8 @@ export function applyNamesFile(text: string): { ok: boolean; text: string } {
  * message means the write itself failed and already notified.
  */
 export function installImportedSave(text: string, slot: number): ImportResult {
+  // Record shape is validated here; absent/malformed engine identities remain
+  // eligible for matchday's week-start restart after the career is installed.
   const peeled = peelLiveMatchExport(text);
   if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
   const res = importSave(peeled.text);
