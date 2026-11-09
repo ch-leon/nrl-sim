@@ -7,15 +7,22 @@
 
 ## 1. Core principles
 
-1. **Simulation is pure TypeScript.** Nothing under `src/sim/`, `src/data/`,
-   `src/systems/`, `src/core/` or `src/match/{core,league}/` may import Phaser. All
-   game logic is headless and unit-testable with Vitest. Phaser scenes are *views*
-   that render state and emit intents.
-2. **Single serialisable state object.** All persistent game state lives in one
-   plain-JSON-serialisable `GameState` object (see §4). No class instances in state.
+1. **Keep simulation and domain calculations headless.** They must not depend on
+   DOM/Phaser or concrete remote-service SDKs. `src/match/{core,league}/` and pure
+   calculations such as `src/systems/lineup.ts` take data and return data. Existing
+   orchestration, browser I/O and view bridges are intentional seams or current
+   exceptions, not proof of complete separation (see §1.2). Scenes render state
+   and send intents through existing exported operations.
+2. **Single serialisable career state.** Persistent career data lives in the
+   plain-JSON-serialisable `GameState` (see §4); no class instances in state. Save
+   metadata, live-match recovery and entitlement caches have dedicated sidecars,
+   not a second career store. UI owns ephemeral selection, open sheets and display
+   state; persistent game-rule changes belong to existing system/core operations
+   (§4.1). Presentation preferences have a bounded exception (§4.2).
 3. **Typed event bus.** Systems communicate via a single typed `EventBus`
    (see §5). Scenes/UI subscribe; systems publish. No direct scene→system calls
-   other than through exported system functions.
+   other than through exported system functions. A returned system patch may be
+   applied by the caller under the explicit ownership contract in §4.1.
 4. **Generated pixel art.** No binary assets in the repo. All textures are
    painted pixel-by-pixel into a `PixelBuffer` (`src/art/pixel.ts`: palette
    sprite grids, hard-edged polygons, deterministic `noise2`/`bayer` dither) and
@@ -35,6 +42,73 @@
    (self-hosted, `src/ui/fonts.ts`), one yellow primary action a screen. The
    world's art stays pixel art (`image-rendering: pixelated`). Tokens and helpers
    in `src/ui/dom.ts`.
+
+### 1.1 Offline gameplay and remote integrations
+
+The game loop, week hooks and match execution must work from local state without
+waiting for remote services. `src/core/time.ts` runs synchronous ordered hooks;
+its hold/resume mechanism coordinates local live matches and worker jobs (§5),
+not login, analytics, flags, purchases or cloud availability. Do not put remote
+requests in a tick, simulation step or render update.
+
+Purchases, Restore, login and sync may await network at their UI/menu boundary.
+`src/ui/screens/paywall.ts` already awaits entitlement purchase/restore operations;
+it currently uses stub integration, not a shipped store SDK. A failed remote save
+must leave the local career playable. Sync uses the existing storage seam and
+conflict rules, outside active week/match execution (§4.3).
+
+**Cached entitlement policy is existing policy, not a new offline purchase rule.**
+`src/commercial/entitlements.ts` exposes synchronous `snapshot()` for gameplay.
+`EntitlementService` starts from an explicit provider initial answer, otherwise the
+persisted last-good cache, otherwise demo; failed provider calls keep the last
+answer, while a successful changed answer (including a refund) replaces it. The
+currently wired `LocalStubProvider` supplies its own synchronous initial answer.
+`src/commercial/demo.ts` uses the snapshot (or the existing slot-grandfathering
+rule), and `advanceWeek` checks the gate after the held-week guard, so an active
+match finishes. Preserve the current tier/platform, demo and grandfathering rules;
+this contract adds no grace period, purchase bypass or new entitlement grant.
+See [commercial entitlements](specs/commercial-entitlements.md#the-service) and
+its [decision switches](specs/commercial-entitlements.md#decision-leon-switches).
+
+Remote presentation flags may select copy, announcements or presentation variants.
+They must not alter match outcomes, RNG draws/order, tuning, save format/validation,
+storage ownership or purchase entitlements. The build-time `commercial` gate in
+`src/commercial/flags.ts` and ownership rules in `entitlements.ts` are not remote
+presentation flags. Launch integration [#456](https://github.com/ch-leon/nrl-sim/issues/456)
+and remote flags [#452](https://github.com/ch-leon/nrl-sim/issues/452) must follow
+these boundaries; neither is a prerequisite or implemented by this contract.
+
+### 1.2 Dependency seams and current exceptions
+
+- Domain calculations consume explicit data: `resolveLineup` in
+  `src/systems/lineup.ts`, `runMatch` in `src/match/league/match.ts`, and
+  `resolveSaveConflict` in `src/core/storage/conflict.ts` do not need a scene or SDK.
+  Keep concrete provider clients at integration boundaries; for example,
+  `src/commercial/revenuecat.ts` maps an injected `RcPurchasesClient` into the
+  entitlement model. It is a seam, not a wired RevenueCat SDK.
+- System orchestration is not necessarily pure: `src/systems/freeagency.ts` reads
+  and updates the store, emits events and registers week hooks. `src/core/time.ts`
+  intentionally consults the local commercial gate. Neither should acquire a
+  concrete service SDK or await a remote answer.
+- `src/core/save.ts` combines save/migration logic with browser download, file-picker
+  and page-lifecycle helpers. `src/commercial/entitlements.ts` accesses browser
+  storage and exposes a dev-only window hook. Do not describe all core/commercial
+  modules as DOM-free or all persistence as already routed through one adapter.
+- `src/world/placement.ts` mixes pure placement validation, money/state operations,
+  a scene registry and Phaser `PlacementController` glue. `src/systems/undo.ts`
+  imports its placement helpers, so that dependency is not fully separated.
+  Keep rules in the existing operations rather than copying them into screens.
+- `src/match/view/livePlayback.ts` currently drives `LiveSim`, records events and
+  publishes completion as well as drawing (§6.1). These are real orchestration
+  responsibilities in a view module; drawing itself is never result authority.
+
+Retain the current folders and exported operations. Do not introduce a parallel
+application/service framework or wrappers that only rename an existing API.
+The remaining screen mutation exceptions in §4.1 are work for
+[#526](https://github.com/ch-leon/nrl-sim/issues/526). Deferred overlay decomposition
+[#527](https://github.com/ch-leon/nrl-sim/issues/527) and the later Preact decision
+[#528](https://github.com/ch-leon/nrl-sim/issues/528) must preserve these contracts;
+this document does not start their implementation.
 
 ## 2. Directory layout
 
@@ -161,7 +235,8 @@ Store API: `getState()`, `setState(patch)` (publishes `state:changed`),
 League parity (N5, #140): a new game on Normal starts the player's best nine level
 with the rival mean (`LEAGUE.MEAN`, 55 in the AU pack), not above it.
 
-**Save versions.** `SAVE_VERSION` is **21**. Any change to `GameState`'s shape:
+**Save versions.** `SAVE_VERSION` is **23**. This documentation does not change it.
+Any change to `GameState`'s shape:
 
 1. Bump `SAVE_VERSION` in `state.ts` and update `GameState` and `createNewGame`.
 2. Append one step to `MIGRATIONS` in `src/core/save.ts`, `{ from: N, to: N+1, run }`:
@@ -174,6 +249,93 @@ The save corpus (`tests/fixtures/saves/`, rules in its `README.md`) holds real s
 from the phone playthrough, `v<version>-<point>.json`, today v9–v19. Never edit one;
 when the version moves, add the new version's dumps. `tests/qa/corpus.test.ts` checks
 that every one migrates to `SAVE_VERSION`, passes the soak's invariants and plays on.
+
+### 4.1 Mutation ownership and operation effects
+
+UI owns a selected row/slot, a name or kit draft, an open modal, sorting and display
+state. Confirming a persistent change must use the existing system/core operation
+that owns validation and game rules. A shared calculation alone does not make a
+screen the owner of the resulting gameplay mutation.
+
+Two existing contracts are valid: an operation commits to the store, or a pure
+operation returns a patch for the caller to apply. `setState` is a shallow merge
+and publishes `state:changed`; it does not validate rules, deep-merge nested objects,
+persist a save, book finance, or offer Undo. Applying a returned patch is permitted;
+rebuilding its rules or reapplying a committed operation's effects in UI is not.
+
+For each operation, keep its effect ownership explicit. Current examples:
+
+| Operation | State/rule owner | Persistence owner | Notifications, finance and Undo |
+|---|---|---|---|
+| Player rename | `renamePlayer` in `src/systems/rename.ts` validates and returns a patch or no change; the player page applies that patch with `setState` | `src/ui/screens/player.ts` calls `save(getState())` after a changed patch | Player page deliberately redraws without a toast; no money movement or Undo is part of rename |
+| Club rename | `renameClub` in `src/systems/rename.ts` returns the coordinated club/league patch; the kit screen applies it | `src/ui/screens/kit.ts` calls `saveGame(getState())` (its imported save alias) | Kit screen emits the success toast only for a changed patch; no finance effect or Undo |
+| Signing from Recruit/player page | Existing `signWithUndo` in `src/systems/undo.ts` calls `signPlayer` in `src/systems/freeagency.ts`; the latter checks funds/capacity, spends the fee and commits squad/pool/optional lineup changes | Neither operation directly saves; existing autosave owns persistence (§4.3) | `signPlayer` emits `player:signed` and money effects; `toast: false` suppresses its ordinary toast so `signWithUndo` offers one Undo toast. Undo restores eligible state and books a reversing money movement |
+
+`spendMoney`/`earnMoney` in `src/data/club.ts` emit `money:changed`;
+`registerFinanceSystem` in `src/systems/economy.ts`, installed once by `main.ts`,
+books that movement. A caller must not also deduct the fee, emit the same money
+event or update the finance ledger. `src/systems/undo.ts` owns eligibility, expiry
+and reversal for its supported operations; the toast only invokes it. Undo offers
+are in memory, expire after five seconds, and end on advance, match start or reload.
+Do not add Undo to an operation that has no such contract merely to match a screen.
+
+A changed patch must be applied once, with the operation's assigned save and
+notification path; a refused/no-change result must not charge, announce success or
+create an Undo offer. Preserve existing persistence timing, including held-week
+protection, rather than adding a second generic save/notification layer.
+
+**Current gaps, not approved patterns:** `src/ui/screens/lineup.ts` and
+`player.ts` write lineup changes directly; `playbook.ts` writes tactics/plays;
+`kit.ts` commits the kit draft directly (distinct from its system-owned rename);
+`build.ts` writes facility upgrades; `matchReport.ts` updates `potmTally`.
+These persistent mutations remain on main and are the later #526 cleanup scope.
+They do not permit new UI-owned gameplay rules. No mutation code is moved here.
+
+### 4.2 Persistent preferences
+
+Small presentation-only preferences may remain in their dedicated settings
+boundary. For example, `src/fx/audio.ts` owns audio controls and the settings sheet:
+volume/mute use `setState`, and the sheet's settings patch helper also calls `save`;
+`src/ui/textSize.ts` translates the saved text-size choice into presentation.
+These use the same save/held-week rules as other callers; they are persistent
+preferences, not ephemeral UI state.
+
+This exception is limited by meaning, not by the field name `settings`. Difficulty,
+lineup, training, match rules, money, ownership and save data are not presentation
+preferences. The existing settings sheet also exposes match-affecting choices
+such as live rivals; its current location does not authorise arbitrary gameplay
+patches through a settings helper. Keep rule changes with the existing system/core
+owner and its validation/effect contract. Preserve other settings fields when
+applying a presentation preference, because `setState` replaces nested objects.
+
+### 4.3 Local persistence and asynchronous storage
+
+`src/core/save.ts` owns serialisation, migration/validation and the synchronous
+`save`/`load` contract. `LocalSaveStore` in `src/core/storage/local.ts` writes the
+local payload synchronously; metadata is a sidecar coalesced in a microtask, not a
+promise that callers must await before the career is saved. `setState` alone is
+not a disk save. Existing `enableAutosave` wiring saves settled weeks, changes
+before the next week's hooks, and on page hide/visibility loss. Callers with an
+explicit immediate-save contract, such as rename above, retain it.
+
+`save` refuses a held week, an imported-over active slot and locked career writes;
+never bypass it to write a half-ticked state. Preserve the week-start save plus
+live-match sidecar contract (§5). Preserve normal/developer career namespace
+isolation (`setCareerNamespace` in `storage/local.ts`, selected by the existing
+Labs career flow), stable keys in `src/core/storageKeys.ts`, and existing save
+bytes/schema. Keys are historical identifiers, not branding or folder names.
+
+`SaveStore` in `src/core/storage/types.ts` allows `MaybePromise` results for future
+adapters, but current save callers require `SyncSaveStore`. That interface does
+not automatically make `save`, `load`, title flows or week hooks async. Remote or
+native storage requires an explicitly designed caller boundary; replacing the
+local store with a promise-returning adapter is not a transparent substitution.
+Keep local saves available without a remote service. `RemoteSaveStore` is currently
+an interface: future menu-driven sync must use conditional writes and the pure
+conflict resolver, preserving unknown/newer payloads rather than overwriting them.
+See [commercial saves](specs/commercial-saves.md#what-shipped) and its
+[conflict rules](specs/commercial-saves.md#conflict-rules--resolvesaveconflictlocal-remote).
+No storage migration or new adapter is introduced by this contract.
 
 ## 5. EventBus (src/core/events.ts)
 
@@ -289,6 +451,25 @@ export interface MatchResult {
   in a Worker, and the match art is painted ahead in another.
 - Callers' sheets are never mutated. The sim only reports injuries; matchday applies
   them at full time.
+
+### 6.1 Worker inputs and result authority
+
+Workers receive explicit serialisable (structured-cloneable) inputs, not a live
+store, DOM nodes, Phaser objects, callbacks or service clients.
+`MatchJob` in `src/systems/matchJobs.ts` carries `home`, `away` and `opts` (including
+seed); `src/systems/matchWorker.ts` runs `runMatch` and returns `MatchResult[]` in
+request order without reading `GameState`. Replay requests likewise supply sheets,
+options, seed and tick range. The existing worker failure/timeout path runs the
+same jobs locally; remote availability never decides whether a fixture can finish.
+
+The official result comes from simulation and its recorder, never pixels, frame
+rate, animation completion, DOM scores or a replay. Headless `runMatch` and live
+`LivePlayback` use `LiveSim`/`MatchRecorder`; live playback currently drives that
+sim and emits `match:finished` from the recorded result (or the headless Skip
+result). `src/systems/matchday.ts` owns applying the player result and resuming the
+held week. Draw layers and instant replays cannot overwrite the fixture or apply
+season/finance effects a second time. Coach calls and plan changes are explicit
+simulation inputs; cosmetic presentation choices must not consume its RNG.
 
 ## 7. Rendering conventions
 
