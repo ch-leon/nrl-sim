@@ -1,8 +1,10 @@
 // Save boundary only. Historical defaults belong to MIGRATIONS, never to ticks.
-import { SAVE_VERSION, type GameState, type Lineup, type Player, type PlayerStats, type PlacedFacility } from './state';
+import { FINANCE_LINES, SAVE_VERSION, type GameState, type Lineup, type Player, type PlayerStats, type PlacedFacility } from './state';
 import { POSITIONS } from '../data/player';
 import { FACILITY_CATALOG } from '../data/facility';
-import { isTraitId } from '../data/traits';
+import { TRAIT_IDS } from '../data/traits';
+import type { ActiveModifier, SeasonFinance } from './state';
+import type { ImmediateEffect } from '../data/events';
 import { isPlayId } from '../data/plays';
 import { BOARD, GRID_W, GRID_H } from '../config';
 import { BENCH, isRotation } from '../match/league/bench';
@@ -17,6 +19,7 @@ const range = (v: unknown, lo: number, hi = Infinity): v is number => finite(v) 
 const integer = (v: unknown, lo = 0, hi = Infinity): v is number => range(v, lo, hi) && Number.isInteger(v);
 const text = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
 const oneOf = (v: unknown, values: readonly unknown[]): boolean => values.includes(v);
+const knownTrait = (v: unknown): boolean => typeof v === 'string' && TRAIT_IDS.some(id => id === v);
 const stats = ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const;
 const unique = (xs: readonly unknown[]): boolean => new Set(xs).size === xs.length;
 function validHome(v: unknown): boolean {
@@ -41,13 +44,62 @@ export function isPlayer(v: unknown, version = SAVE_VERSION): v is Player {
   if (v.career !== undefined && !tally(v.career)) return false;
   if (v.seasonStats !== undefined && (!tally(v.seasonStats) || !record(v.seasonStats) || !integer(v.seasonStats.season, 1))) return false;
   if (!Array.isArray(v.traits)) return false;
-  if (version <= 5) return v.traits.every(t => typeof t === 'string' || (record(t) && isTraitId(String(t.id)) && integer(t.level, 1, 3)));
-  return v.traits.every(t => record(t) && typeof t.id === 'string' && isTraitId(t.id) && integer(t.level, 1, 3)) && unique(v.traits.map(t => (t as Record<string, unknown>).id));
+  if (version <= 5) return v.traits.every(t => typeof t === 'string' || (record(t) && knownTrait(t.id) && integer(t.level, 1, 3)));
+  return v.traits.every(t => record(t) && typeof t.id === 'string' && knownTrait(t.id) && integer(t.level, 1, 3)) && unique(v.traits.map(t => (t as Record<string, unknown>).id));
 }
 export function isPlacedFacility(v: unknown): v is PlacedFacility {
   if (!record(v) || !text(v.id) || typeof v.defId !== 'string' || !Object.prototype.hasOwnProperty.call(FACILITY_CATALOG, v.defId) || !integer(v.level, 1, 3)) return false;
   const def = FACILITY_CATALOG[v.defId as keyof typeof FACILITY_CATALOG];
   return integer(v.x, 0, GRID_W - def.footprint.w) && integer(v.y, 0, GRID_H - def.footprint.h);
+}
+
+/** Finance gained its books in v10 and the overhead line in v17. Missing
+ * historical overhead is defaulted by that migration; every other line must
+ * already exist. Deltas are signed amounts, not nonnegative balances. */
+export function isSeasonFinance(v: unknown, version = SAVE_VERSION): v is SeasonFinance {
+  if (!record(v) || !integer(v.season, 1)) return false;
+  return FINANCE_LINES.every(line => line === 'overhead' && version < 17 && v[line] === undefined
+    ? true : finite(v[line]));
+}
+
+/** ActiveModifier persists ImmediateEffect[], rather than nested chance or
+ * modifier declarations. Validate every discriminated payload before ticks can
+ * consume it. Missing/departed subjects are still legitimate frozen references. */
+export function isImmediateEffect(v: unknown): v is ImmediateEffect {
+  if (!record(v)) return false;
+  switch (v.kind) {
+    case 'money':
+    case 'reputation':
+    case 'squadMorale':
+    case 'playerMorale':
+    case 'boardPatience':
+      return finite(v.amount);
+    case 'playerWage':
+      return range(v.pct, -1); // a full wage cut is valid; a negative resulting wage is not
+    case 'playerTrait':
+      return knownTrait(v.trait);
+    case 'signSubject':
+    case 'closeGates':
+      return true;
+    case 'flag':
+      return text(v.id);
+    case 'suspend': {
+      const weeks = v.weeks;
+      const validWeeks = integer(weeks) || (Array.isArray(weeks) && weeks.length === 2
+        && integer(weeks[0]) && integer(weeks[1]) && weeks[0] <= weeks[1]);
+      return validWeeks && oneOf(v.source, ['event', 'trip', 'judiciary']);
+    }
+    default:
+      return false;
+  }
+}
+
+export function isActiveModifier(v: unknown): v is ActiveModifier {
+  return record(v) && text(v.id) && text(v.cardId) && text(v.label)
+    && oneOf(v.trigger, ['weekly', 'win', 'loss']) && integer(v.weeksLeft, 1)
+    && Array.isArray(v.effects) && v.effects.every(isImmediateEffect)
+    && (v.subjectId === undefined || text(v.subjectId))
+    && (v.subjectName === undefined || typeof v.subjectName === 'string');
 }
 
 /** Validate structures a migration reads before it can spread/map/dereference
@@ -110,8 +162,8 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if ((v.settings.playbackSpeed !== undefined && !oneOf(v.settings.playbackSpeed, [1, 2, 4, 8])) || (v.settings.textSize !== undefined && !oneOf(v.settings.textSize, ['normal', 'large', 'larger'])) || (v.settings.hintsSeen !== undefined && !strings(v.settings.hintsSeen))) return fail('settings preferences');
   if (!Array.isArray(v.history) || !v.history.every(record)) return fail('history');
   if (version >= 5 && (!range(v.boardPatience, 0, BOARD.MAX_PATIENCE) || !Array.isArray(v.objectives) || !v.objectives.every(record))) return fail('board');
-  if (version >= 7 && (!record(v.eventDeck) || !integer(v.eventDeck.rng, 0, 0xffffffff) || !Array.isArray(v.eventDeck.pending) || !v.eventDeck.pending.every(record) || !Array.isArray(v.eventDeck.modifiers) || !v.eventDeck.modifiers.every(record) || !record(v.eventDeck.cooldowns) || !integer(v.eventDeck.lastDrawn))) return fail('eventDeck');
-  if (version >= 10 && (!Array.isArray(v.finance) || !v.finance.every(e => record(e) && Object.entries(e).every(([k, n]) => k === 'season' ? integer(n, 1) : finite(n))))) return fail('finance');
+  if (version >= 7 && (!record(v.eventDeck) || !integer(v.eventDeck.rng, 0, 0xffffffff) || !Array.isArray(v.eventDeck.pending) || !v.eventDeck.pending.every(record) || !Array.isArray(v.eventDeck.modifiers) || !v.eventDeck.modifiers.every(isActiveModifier) || !record(v.eventDeck.cooldowns) || !integer(v.eventDeck.lastDrawn))) return fail('eventDeck');
+  if (version >= 10 && (!Array.isArray(v.finance) || !v.finance.every(e => isSeasonFinance(e, version)))) return fail('finance');
   if (version >= 21 && record(v.eventDeck) && !strings(v.eventDeck.flags)) return fail('eventDeck.flags');
   if (v.lineup !== undefined && !record(v.lineup)) return fail('lineup');
   if (version >= 16 && (!record(v.training) || !oneOf(v.training.focus, ['balanced', ...stats]))) return fail('training');

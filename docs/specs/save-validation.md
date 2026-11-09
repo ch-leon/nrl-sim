@@ -51,6 +51,17 @@ restricted to the generator's starting band. Contract weeks and bans are whole,
 nonnegative counts. Money and finance movements may be negative; non-finite
 values are refused. No economy, RNG, tuning or match code changes.
 
+Finance rows require their positive whole season and every ledger line, including
+signed finite amounts. Only saves before v17 may omit `overhead`; the existing
+v16→v17 migration supplies zero. A missing current ledger value is refused rather
+than invented. Active modifiers require their id, card id, label, trigger,
+positive whole weeks left, effect array, and correctly typed optional frozen
+subject fields. Each persisted `ImmediateEffect` payload is checked by kind,
+including numeric amounts, wage fractions, trait catalogue membership, flag ids,
+and suspension weeks/ranges/sources. Nested chance/modifier declarations are not
+persisted immediate effects. Trait membership uses the explicit catalogue IDs,
+so inherited object names such as `toString` cannot pass as traits.
+
 Facility definitions/unlock references must exist in the catalogue; instance IDs
 must be unique, levels 1–3, origins whole and footprints within the grid, without
 overlap or duplicate unique buildings. Unknown definitions cannot be guessed or

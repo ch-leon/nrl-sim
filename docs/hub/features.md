@@ -63,7 +63,7 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- Career loads and imports validate nested players, facilities and selections. Missing or duplicate selections use explicit deterministic repairs, with a warning and retained originals; invalid imports leave the existing career intact ([issue](https://github.com/ch-leon/nrl-sim/issues/525), [repair rules](../specs/save-validation.md)).
+- Career loads and imports validate nested players, facilities and selections. Missing or duplicate selections use explicit deterministic repairs, with a warning and retained originals; invalid imports leave the existing career intact ([PR](https://github.com/ch-leon/nrl-sim/pull/532), [repair rules](../specs/save-validation.md)).
 
 - Unreadable and newer-version careers stay visible in their slots, with Export original to recover the exact saved file. Automatic saves cannot replace them; Start over and Delete require confirmation. Older save originals are kept before an upgrade is written, with each recovery copy available to export on the title screen ([PR](https://github.com/ch-leon/nrl-sim/pull/530)).
 
