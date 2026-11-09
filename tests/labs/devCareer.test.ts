@@ -138,6 +138,7 @@ describe('setting up the playtest career', () => {
     setActiveSlot(2);
     createNewGame('Leon Real Club', 42);
     storage.setItem(slotKey(2), JSON.stringify(getState()));
+    expect(load()).not.toBeNull(); // normal boot validates and approves the occupied slot
     setState({ money: getState().money + 1 });
     expect(enterTestCareer(deps()).ok).toBe(true);
     await new Promise((r) => setTimeout(r, 0)); // every deferred write has had its turn
