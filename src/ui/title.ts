@@ -8,7 +8,7 @@
 // attribute.
 
 import {
-  deleteSlot, getSlotSummaries, installImportedSave, pickSaveFile, setActiveSlot, type SlotSummary,
+  deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, pickSaveFile, setActiveSlot, type SlotSummary,
 } from '../core/save';
 import { cleanName, NAME_MAX } from '../data/names';
 import type { GameState } from '../core/state';
@@ -294,9 +294,17 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       club.setAttribute(`data-nrl-slot-label-${s.slot}`, '');
       card.appendChild(club);
       card.appendChild(mk('div', 'nrl-title-when', s.status === 'ok' ? `Season ${s.season} · Week ${s.week}` : ''));
-      if (s.message && s.status === 'future') card.appendChild(mk('div', 'nrl-title-warn', s.message));
+      if (s.message) card.appendChild(mk('div', 'nrl-title-warn', s.message));
 
       const actions = mk('div', 'nrl-title-actions');
+      try {
+        const originals = exportRecoverySaves(s.slot);
+        for (let i = 0; i < originals.length; i++) {
+          const copies = mkButton(`Export recovery copy ${i + 1}`, `data-nrl-recovery-${s.slot}-${i}`, 'nrl-title-btn-small');
+          copies.addEventListener('click', () => downloadOriginalSave(s.slot, i));
+          actions.appendChild(copies);
+        }
+      } catch { /* unreadable storage is already described on the card */ }
       if (s.status === 'ok') {
         const cont = mkButton('Continue', `data-nrl-continue-${s.slot}`, 'nrl-title-btn-go');
         cont.addEventListener('click', () => finish(s.slot, { mode: 'continue' }));
@@ -308,6 +316,9 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         actions.appendChild(newBtn);
       }
       if (s.status !== 'empty') {
+        const recover = mkButton('Export original', `data-nrl-recover-${s.slot}`, 'nrl-title-btn-small');
+        recover.addEventListener('click', () => downloadOriginalSave(s.slot));
+        actions.appendChild(recover);
         // Two taps so a stray one never destroys a season.
         const del = mkButton('Delete', `data-nrl-delete-${s.slot}`, 'nrl-title-btn-small');
         let armed = false;
@@ -549,6 +560,7 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
 
       const go = mk('div', 'nrl-title-go');
       const begin = (): void => {
+        if (s.status !== 'empty') deleteSlot(s.slot);
         const name = input.value.trim() || DEFAULT_CLUB_NAME;
         const coach = cleanName(coachInput.value);
         const town = selected?.name ?? townInput.value.trim();

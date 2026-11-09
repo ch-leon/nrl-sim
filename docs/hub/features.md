@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Unreadable and newer-version careers stay visible in their slots, with Export original to recover the exact saved file. Automatic saves cannot replace them; Start over and Delete require confirmation. Older save originals are kept before an upgrade is written, with each recovery copy available to export on the title screen ([issue](https://github.com/ch-leon/nrl-sim/issues/522)).
+
 - Labs is now Developer settings (still `?labs=1`). It can open the Office screens early on this browser only. It can also set up a separate playtest career with a Direct attack coach hired and Block play bought and picked, so you can call it in the first match. Return to my career puts your own career back exactly as it was. Reset all turns everything off ([issue](https://github.com/ch-leon/nrl-sim/issues/519)).
 
 - Anonymous analytics, ready for the PostHog EU token: once the title screen is done, a build given the token sends a handful of anonymous events (career started, match result and difficulty, season finished, dock tab views; push, pop-up and email sign-up events wait for those features). No cookies or browser storage, no person profiles, no names or save data; off in dev, tests, the match lab and Labs, and the game plays the same when PostHog is unreachable. The Pages build has no token yet, so it sends nothing ([PR](https://github.com/ch-leon/nrl-sim/pull/518)).
