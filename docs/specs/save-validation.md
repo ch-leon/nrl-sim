@@ -52,7 +52,8 @@ nonnegative counts. Money and finance movements may be negative; non-finite
 values are refused. No economy, RNG, tuning or match code changes.
 
 Finance rows require their positive whole season and every ledger line, including
-signed finite amounts. Only saves before v17 may omit `overhead`; the existing
+signed finite amounts. Every present value, including extra ledger keys, must
+also be finite because totals consume all lines. Only saves before v17 may omit `overhead`; the existing
 v16→v17 migration supplies zero. A missing current ledger value is refused rather
 than invented. Active modifiers require their id, card id, label, trigger,
 positive whole weeks left, effect array, and correctly typed optional frozen

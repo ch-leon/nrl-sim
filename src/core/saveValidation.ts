@@ -57,7 +57,8 @@ export function isPlacedFacility(v: unknown): v is PlacedFacility {
  * historical overhead is defaulted by that migration; every other line must
  * already exist. Deltas are signed amounts, not nonnegative balances. */
 export function isSeasonFinance(v: unknown, version = SAVE_VERSION): v is SeasonFinance {
-  if (!record(v) || !integer(v.season, 1)) return false;
+  // Totals consume every present line, including extra keys preserved by the UI.
+  if (!record(v) || !integer(v.season, 1) || !Object.values(v).every(finite)) return false;
   return FINANCE_LINES.every(line => line === 'overhead' && version < 17 && v[line] === undefined
     ? true : finite(v[line]));
 }

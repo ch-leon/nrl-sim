@@ -63,6 +63,21 @@ describe('complete finance rows (checker P1)', () => {
     const s = { ...fresh(), version, finance: [{}] };
     refusesAtBoundaries(s);
   });
+  it.each(['bad', null, true, {}, []])('refuses a complete row with an extra nonnumeric value %j through load and import', extra => {
+    for (const version of [16, 23]) {
+      const s = { ...fresh(), version, finance: [{ ...emptyFinance(1), extra }] };
+      refusesAtBoundaries(s);
+    }
+  });
+  it('keeps finite signed extra ledger values unchanged', () => {
+    const s = fresh(); s.finance = [{ ...emptyFinance(1), extra: -25.5 } as GameState['finance'][number]];
+    const source = JSON.stringify(s);
+    bytes.set(slotKey(1), source);
+    const loaded = loadSlot();
+    expect(loaded).toMatchObject({ status: 'ok', outcome: 'valid' });
+    if (loaded.status === 'ok') expect(JSON.stringify(loaded.state)).toBe(source);
+    expect(installImportedSave(source, 2)).toMatchObject({ ok: true, outcome: 'valid' });
+  });
   it('accepts signed finite ledger amounts unchanged and books the next wage movement without NaN', () => {
     const s = fresh(); s.finance = [{ ...emptyFinance(1), wages: -500, other: -100.5, gate: 200 }];
     const source = JSON.stringify(s);
