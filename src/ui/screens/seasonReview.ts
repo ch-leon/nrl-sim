@@ -13,11 +13,9 @@
 import { EXPANSION_COPY } from '../expansionCopy';
 import { bus } from '../../core/events';
 import {
-  getState, setState, type Fixture, type GameState, type PotmTally, type RivalClub, type SeasonRecord, type SeasonReview,
+  getState, type GameState, type SeasonRecord, type SeasonReview,
 } from '../../core/state';
-import { registerSeasonHook } from '../../core/time';
-import { strengthChanges } from '../../systems/league';
-import { isFinalsRound, knockoutWinner } from '../../systems/fixtures';
+import { registerSeasonReview } from '../../systems/stats';
 import { BOARD, FINALS_WEEKS, SEASON_ROUNDS } from '../../config';
 import { backButton, button, closeScreen, el, openScreen, screenHead } from '../dom';
 import { whenNoMatch } from '../updatePrompt';
@@ -26,115 +24,8 @@ import { ensureHistoryStyles, fmtSeasonEndToast, fmtSeasonSummary, openHistorySc
 
 // ── Pure builders ───────────────────────────────────────────────────────────
 
-/** What the review needs from before the rollover's hooks run. */
-export interface RolloverSnapshot {
-  /** The season that is ending. */
-  season: number;
-  squad: { id: string; name: string; age: number }[];
-  rivals: RivalClub[];
-  reputation: number;
-  /** How the club's finals ended; the fixtures are gone by the time the review is built. */
-  finals?: SeasonReview['finals'];
-}
-
-/** `endedSeason`: the rollover has already moved the counter on when its hooks run, so the hook passes `season - 1`. */
-export function snapshotBeforeRollover(s: Pick<GameState, 'season' | 'squad' | 'league' | 'reputation' | 'clubId'>, endedSeason: number = s.season): RolloverSnapshot {
-  const finals = finalsRun(s.league.fixtures, s.clubId);
-  return {
-    season: endedSeason,
-    squad: s.squad.map((p) => ({ id: p.id, name: p.name, age: p.age })),
-    rivals: s.league.clubs.map((c) => ({ id: c.id, name: c.name, colors: c.colors, strength: c.strength })),
-    reputation: s.reputation,
-    ...(finals ? { finals } : {}),
-  };
-}
-
-/** The club's last played finals tie and whether it won, or undefined when it played none (#351 E2). */
-export function finalsRun(fixtures: readonly Fixture[], clubId: string): SeasonReview['finals'] {
-  let last: Fixture | undefined;
-  for (const f of fixtures) {
-    if (!isFinalsRound(f.round) || !f.result || (f.homeId !== clubId && f.awayId !== clubId)) continue;
-    if (!last || f.round > last.round) last = f;
-  }
-  return last ? { round: last.round, won: knockoutWinner(last) === clubId } : undefined;
-}
-
-/** How many movers the review names. */
-export const MOVERS_SHOWN = 3;
-
-/** The tally with one more award for `name` in `season` (a new season starts it over). */
-export function addPotm(tally: PotmTally | undefined, season: number, name: string): PotmTally {
-  const counts = tally && tally.season === season ? { ...tally.counts } : {};
-  counts[name] = (counts[name] ?? 0) + 1;
-  return { season, counts };
-}
-
-/** The season's awards: how many, and who took most (ties to the first name). */
-export function potmSummary(tally: PotmTally | undefined, season: number): SeasonReview['potm'] | undefined {
-  if (!tally || tally.season !== season) return undefined;
-  let total = 0;
-  let best: { name: string; count: number } | undefined;
-  for (const [name, count] of Object.entries(tally.counts)) {
-    total += count;
-    if (!best || count > best.count || (count === best.count && name < best.name)) best = { name, count };
-  }
-  return total > 0 ? { total, ...(best ? { best } : {}) } : undefined;
-}
-
-/**
- * The review of `before.season`, read off the state as the rollover's hooks
- * (ageing, youth, fixtures, the board review) have left it and before the
- * board sets the new season's objectives.
- */
-export function buildSeasonReview(before: RolloverSnapshot, after: GameState): SeasonReview {
-  const ended = before.season;
-  const review: SeasonReview = {};
-
-  if (before.finals) review.finals = before.finals;
-
-  const potm = potmSummary(after.potmTally, ended);
-  if (potm) review.potm = potm;
-
-  const reviewed = after.objectives.filter((o) => o.status !== 'pending');
-  if (reviewed.length > 0) {
-    const met = reviewed.filter((o) => o.status === 'met').length;
-    review.board = {
-      met,
-      missed: reviewed.length - met,
-      patience: after.boardPatience,
-      sacked: after.sacked?.season === ended,
-      objectives: reviewed.map((o) => ({ text: o.text, met: o.status === 'met' })),
-    };
-  }
-
-  const books = after.finance.find((f) => f.season === ended);
-  if (books) {
-    let moneyIn = 0;
-    let moneyOut = 0;
-    for (const [line, v] of Object.entries(books)) {
-      if (line === 'season' || typeof v !== 'number') continue;
-      if (v > 0) moneyIn += v;
-      else moneyOut -= v;
-    }
-    review.money = { in: Math.round(moneyIn), out: Math.round(moneyOut) };
-  }
-
-  const stillHere = new Set(after.squad.map((p) => p.id));
-  const retired = before.squad.filter((p) => !stillHere.has(p.id)).map((p) => ({ name: p.name, age: p.age + 1 }));
-  if (retired.length > 0) review.retired = retired;
-
-  const juniors = after.freeAgents.filter((p) => p.junior).length;
-  if (juniors > 0) review.juniors = juniors;
-
-  const movers = strengthChanges(before.rivals, after.league.clubs)
-    .filter((c) => c.clubId !== after.clubId)
-    .slice(0, MOVERS_SHOWN)
-    .map((c) => ({ name: c.name, from: c.from, to: c.to }));
-  if (movers.length > 0) review.movers = movers;
-
-  review.reputation = { from: before.reputation, to: after.reputation };
-  return review;
-}
+export type { RolloverSnapshot } from '../../systems/stats';
+export { addPotm, buildSeasonReview, finalsRun, MOVERS_SHOWN, potmSummary, snapshotBeforeRollover } from '../../systems/stats';
 
 /** "W12 L10 D2 · 480 for, 400 against" or '' for a record without one. */
 export function fmtRecord(e: SeasonRecord): string {
@@ -155,8 +46,6 @@ export function fmtMovers(movers: NonNullable<SeasonReview['movers']>): string {
 
 // ── Hooks and the modal ─────────────────────────────────────────────────────
 
-let snapshot: RolloverSnapshot | null = null;
-
 /**
  * Register the rollover hooks and the season:ended listener. Called once from
  * initSeasonEndFeedback (history.ts, which main.ts calls at boot). Headless
@@ -164,21 +53,7 @@ let snapshot: RolloverSnapshot | null = null;
  * listener's unsubscribe.
  */
 export function initSeasonReview(): () => void {
-  // Before ageing (5), youth (6), fixtures (10) and the board (10 / 20).
-  registerSeasonHook('season-review-before', 1, ({ season }) => {
-    snapshot = snapshotBeforeRollover(getState(), season - 1);
-  });
-  // After fixtures (10) and tenure (12), before the board's new objectives (20).
-  registerSeasonHook('season-review', 15, () => {
-    const s = getState();
-    const before = snapshot;
-    snapshot = null;
-    if (!before) return;
-    const i = s.history.findIndex((h) => h.season === before.season);
-    if (i < 0) return;
-    const review = buildSeasonReview(before, s);
-    setState({ history: s.history.map((h, k) => (k === i ? { ...h, review } : h)) });
-  });
+  registerSeasonReview();
   return bus.on('season:ended', ({ season, ladderPosition, premiership }) => {
     // The event carries enough for the toast on its own (a listener must not throw).
     let state: GameState | null = null;

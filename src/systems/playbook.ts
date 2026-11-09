@@ -7,6 +7,7 @@
 // plays he owns to take into a match (Lineup.plays, in order); the half calls
 // them himself at the right moments (match/league/plays.ts pickAutoPlay).
 // Pure rules here, plus the one write each for a purchase and a pick.
+import { commitLineup } from './lineup';
 import { bus } from '../core/events';
 import { getState, setState, type GameState, type Lineup } from '../core/state';
 import { spendMoney } from '../data/club';
@@ -80,4 +81,15 @@ export function togglePlay(lineup: Lineup, id: PlayId, owned: readonly PlayId[])
   if (cur.includes(id)) return { ...lineup, plays: cur.filter((p) => p !== id) };
   if (!owned.includes(id) || cur.length >= PLAYS.takeMax) return lineup;
   return { ...lineup, plays: [...cur, id] };
+}
+
+/** Coach's play pick: refusal feedback or one immediate lineup save, as on both screens. */
+export function takePlay(id: PlayId): void {
+  const s = getState();
+  const next = togglePlay(s.lineup, id, ownedPlays(s));
+  if (next === s.lineup) {
+    bus.emit('ui:notify', { text: 'Three is the most. Leave one out first.', kind: 'info' });
+    return;
+  }
+  commitLineup(next);
 }

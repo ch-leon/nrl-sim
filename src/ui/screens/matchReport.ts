@@ -11,19 +11,18 @@
 // changes folded into one line (#351 P0), and the stats column. A match finished
 // with no match screen up (the soak) opens the report on its own.
 import { bus } from '../../core/events';
-import { getState, setState } from '../../core/state';
+import { getState } from '../../core/state';
 import type { MatchEvent, MatchResult, TeamSheet } from '../../sim/events';
 import { SEASON_ROUNDS } from '../../config';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
 import { gateReceipts } from '../../systems/economy';
 import { roundLabel } from '../../systems/matchday';
-import { playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
+import { recordMatchAward, type PlayerOfMatch } from '../../systems/stats';
 import { lossReasons, type LossReason, type ReasonScreen } from '../../systems/lossReasons';
 import { el, button, mount, openModal, closeModal, getRoot } from '../dom';
 import { fmtMoney, ordinal } from '../hud';
 import { MATCH_ACTIVE_CLASS, injectOverlayStyles, matchColours, statTable, teamCodes } from './matchOverlay';
 import { fmtPotmShort } from './potm';
-import { addPotm } from './seasonReview';
 import { shortName, summaryLines } from '../../match/view/commentary';
 import { PRESET_LABEL, isAttackPreset, isDefencePreset } from '../../match/league/presets';
 
@@ -456,9 +455,7 @@ export function initMatchReport(opts: ReportOpts = {}): () => void {
   let kickOff: { fixture: { round: number; homeId: string }; home: TeamSheet; away: TeamSheet } | null = null;
   const offStarted = bus.on('match:started', ({ fixture, home, away }) => { kickOff = { fixture, home, away }; });
   const offFinished = bus.on('match:finished', ({ fixture, result }: { fixture: { round: number; homeId: string; awayId: string }; result: MatchResult }) => {
-    const p = playerOfTheMatch(result, fixture.homeId, fixture.awayId);
-    const s = getState();
-    if (p && p.teamId === PLAYER_ID) setState({ potmTally: addPotm(s.potmTally, s.season, p.name) });
+    const p = recordMatchAward(result, fixture.homeId, fixture.awayId);
     const sheets = kickOff && kickOff.fixture.round === fixture.round && kickOff.fixture.homeId === fixture.homeId ? kickOff : null;
     const reasons = sheets ? lossReasons(result, fixture, sheets, getState()) : [];
     const report = buildMatchReport(result, fixture, clubNames(), p, reasons);

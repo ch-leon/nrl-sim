@@ -76,3 +76,8 @@ export function registerUnlockSystem(): void {
     }
   });
 }
+
+/** The existing Settings opt-out from staged unlocks. No immediate save or notification. */
+export function openAllUnlocks(): void {
+  setState({ unlocks: undefined });
+}

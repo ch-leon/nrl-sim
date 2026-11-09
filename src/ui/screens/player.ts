@@ -31,7 +31,7 @@ import { backButton, button, closeModal, el, openModal } from '../dom';
 import { ensureScreenStyles, fitColour } from './recruit';
 import { fmtMoney } from './finance';
 import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
-import { LINEUP_SLOTS, resolveLineup, setCaptain, setKicker, statsAt } from '../../systems/lineup';
+import { LINEUP_SLOTS, commitLineup, resolveLineup, setCaptain, setKicker, statsAt } from '../../systems/lineup';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import { RETIREMENT_NOTE_AGE, careerStage, projectCareer, retirementRisk, type CareerPoint, type CareerStage } from '../../systems/potential';
 import { renamePlayer } from '../../systems/rename';
@@ -512,13 +512,6 @@ function statBars(stats: PlayerPageModel['stats'], focus: string | null): HTMLEl
   }));
 }
 
-/** Write the coach's lineup and keep it now, as the Lineup screen does. */
-function setLineup(next: GameState['lineup']): void {
-  if (next === getState().lineup) return;
-  setState({ lineup: next });
-  save(getState());
-}
-
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const CURVE_W = 132;
 const CURVE_H = 38;
@@ -684,8 +677,8 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       };
       side.append(
         el('h3', { text: 'Roles' }),
-        role('Goal-kicker', roles.kicker, 'kicker', () => setLineup(setKicker(getState().lineup, p.id))),
-        role('Captain', roles.captain, 'captain', () => setLineup(setCaptain(getState().lineup, p.id))),
+        role('Goal-kicker', roles.kicker, 'kicker', () => commitLineup(setKicker(getState().lineup, p.id))),
+        role('Captain', roles.captain, 'captain', () => commitLineup(setCaptain(getState().lineup, p.id))),
       );
       if (!roles.starter) notes.push({ text: 'Roles: starters only — pick him in the nine', attn: true });
     }
