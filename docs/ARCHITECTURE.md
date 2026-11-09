@@ -441,6 +441,27 @@ never the half-ticked week, and refuses when that save is missing or from anothe
 drops the record (`deleteSlot`, `main.ts`, `installImportedSave`), so the next game
 never resumes the old match.
 
+Live-match compatibility (#524) is separate from career `SAVE_VERSION` (still 23)
+and the build SHA. `systems/matchEngineIdentity.ts` owns the explicit revision:
+bump it whenever simulation code, RNG consumption/order, default tuning, rule
+interpretation, relevant sheet/input derivation, AI or result recording can change
+reconstruction. Visual-only changes do not bump it. The identity also fingerprints
+the selected content-pack id, actual `NINES` rules and configured field/set size;
+display words, colours and art are excluded. Keep this rule when changing match code.
+
+Only matching engine identity, half length, season/week, fixture teams/round and
+seed allow persisted calls, plans, controls and tick to resume. Missing, malformed
+or mismatched identities restart only that fixture at kick-off using the existing
+week-start path. The match toast explains once that an update may discard nearly
+the whole watched fixture; the two-second checkpoint bound applies only to
+compatible recovery. Save & exit uses the already-held week without rerunning
+training/wages; reload and imported exports reconstruct from the saved week start.
+Sidecars are replaced only after the fixture's sheets/options and held-week
+continuation exist. Export/import carries identity and accepts historical missing
+identities via that fallback, using the existing save preservation/validation path.
+All record reads/writes retain normal/developer namespace isolation. Invalid
+record inputs cannot cross the boundary; they are never replayed.
+
 **Multi-week advance** (`core/advance.ts`, the HUD's ×4 / to finals / to season end):
 one `advanceWeek()` per week under fast-forward, a frame between weeks so the page
 paints and **Stop** works; the stop rules (`core/advanceRules.ts`) run after each week.

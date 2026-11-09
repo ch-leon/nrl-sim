@@ -1,4 +1,3 @@
-import { currentRound } from './core/season';
 import Phaser from 'phaser';
 import { packForCountry, preparePack } from './content';
 import './ui/fonts';
@@ -20,7 +19,7 @@ import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
 import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
 import { initToasts } from './ui/toasts';
-import { initLeague, registerFixturesSystem } from './systems/fixtures';
+import { getCurrentFixture, initLeague, registerFixturesSystem } from './systems/fixtures';
 import { registerUnlockSystem } from './systems/unlocks';
 import { uiScreenLockReason } from './labs/screenOverride';
 import { registerTrainingSystem } from './systems/training';
@@ -408,7 +407,12 @@ async function boot(): Promise<void> {
   // week before it, so advancing again rebuilds the same match, which picks up
   // the record and plays on from where it was, calls and all.
   const pending = readLiveMatch();
-  if (pending && pending.season === getState().season && pending.week === getState().week && pending.round === currentRound(getState())) {
+  const fixture = getCurrentFixture(getState(), getState().clubId);
+  // Identity is deliberately checked by matchday after the week-start path can
+  // rebuild the fixture. Do not discard an incompatible sidecar during boot.
+  if (pending && fixture && !fixture.result && pending.season === getState().season
+    && pending.week === getState().week && pending.round === fixture.round
+    && pending.homeId === fixture.homeId && pending.awayId === fixture.awayId) {
     const resume = (): void => void setTimeout(() => advanceWeek(), 0);
     if (g.isBooted) resume();
     else g.events.once(Phaser.Core.Events.READY, resume);

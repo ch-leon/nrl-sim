@@ -341,7 +341,8 @@ export class LivePlayback {
     this.runner.onEvents = (events) => this.onSimEvents(events);
     this.runner.onStep = () => {
       this.recorder.clock(this.sim.matchSeconds);
-      // A kill with no pagehide loses at most one save interval (liveMatchRecord.ts).
+      // Compatible recovery loses at most one interval (liveMatchRecord.ts).
+      // An engine update may restart the whole fixture; matchday explains it.
       this.maybePersist();
       // The commentator watches the ball land: a kick picked up off the ground is a scoop, not a catch.
       this.commentator.ball(this.runner.cur.ball, this.runner.cur.tick);
