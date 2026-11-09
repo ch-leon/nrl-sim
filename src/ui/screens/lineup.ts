@@ -14,9 +14,8 @@ import { roundLabel } from '../../systems/matchday';
 // the app closed is not lost. DOM UI kit only; the rules are pure and tested
 // in systems/lineup.ts. No Phaser.
 import { el, button, openScreen, openModal, closeModal, screenHead, segmented } from '../dom';
-import { getState, setState, type Lineup, type Player, type Position } from '../../core/state';
+import { getState, type Player, type Position } from '../../core/state';
 import { bus } from '../../core/events';
-import { save } from '../../core/save';
 import { overallRating } from '../../data/player';
 import { BENCH, ROTATIONS, type Rotation } from '../../match/league/bench';
 import { ATTACK_PRESETS, DEFENCE_PRESETS, PRESET_LABEL, type AttackPreset, type DefencePreset } from '../../match/league/presets';
@@ -27,14 +26,14 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { playerRivalContext, rivalStyle } from '../../systems/rivalRound';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import {
-  LINEUP_SLOTS, POSITION_SHORT, autoPick, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
+  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
   resolveLineup, sameSpot, setCaptain, setKicker, setTactics, spotOf, statsAt, swapSpots, validTactics, type Spot,
 } from '../../systems/lineup';
 import { ensureScreenStyles } from './recruit';
 import { squadTabs } from './squad';
-import { PLAYS_BY_ID, type PlayId } from '../../data/plays';
+import { PLAYS_BY_ID } from '../../data/plays';
 import { PLAYS } from '../../match/league/plays';
-import { ownedPlays, togglePlay, validPlays } from '../../systems/playbook';
+import { ownedPlays, takePlay, validPlays } from '../../systems/playbook';
 import { playFitLine, playFitShort, playWhenLine, playsButtonLabel, todaysNine } from '../playbookText';
 import { openPlaybookScreen } from './playbook';
 
@@ -341,13 +340,6 @@ function onLineupClosed(): void {
   closeModal(); // the plan sheet, if it is open
 }
 
-/** Write the coach's lineup and keep it now (the game otherwise saves at the week's end). */
-function setLineup(next: Lineup): void {
-  if (next === getState().lineup) return;
-  setState({ lineup: next });
-  save(getState());
-}
-
 /**
  * Open the Lineup screen as a sheet above the dock (ui/dom.ts openScreen).
  * Re-renders on 'state:changed' (a tap, an injury, a signing); taps go through
@@ -373,11 +365,11 @@ export function openLineupScreen(): void {
   };
   const { btn: kBtn, holder: kHolder, state: kState } = kcSwitch('Kicker', () => {
     const id = chosen();
-    if (id) setLineup(setKicker(getState().lineup, id));
+    if (id) commitLineup(setKicker(getState().lineup, id));
   }, 'data-make-kicker');
   const { btn: cBtn, holder: cHolder, state: cState } = kcSwitch('Captain', () => {
     const id = chosen();
-    if (id) setLineup(setCaptain(getState().lineup, id));
+    if (id) commitLineup(setCaptain(getState().lineup, id));
   }, 'data-make-captain');
   const kcRow = el('div', { class: 'nrl-lineup-kc' }, kBtn, cBtn);
   kcRow.hidden = true;
@@ -385,13 +377,13 @@ export function openLineupScreen(): void {
 
   // The plan (N11): attack and defence presets and the bench rotation, as the half-time sheet has them (3r).
   const rotation = segmented<Rotation>(ROTATIONS.map((r) => ({ id: r, label: ROTATION_LABEL[r], title: ROTATION_TIP[r] })), null,
-    (r) => setLineup({ ...getState().lineup, rotation: r }), { class: 'nrl-lineup-rot', label: 'Bench' });
+    (r) => commitLineup(setRotation(getState().lineup, r)), { class: 'nrl-lineup-rot', label: 'Bench' });
   for (const [r, b] of rotation.buttons) b.setAttribute('data-rotation', r);
   const rotTip = el('span', { class: 'nrl-lineup-rot-tip' });
   const attack = segmented<AttackPreset>(ATTACK_PRESETS.map((p) => ({ id: p, label: PRESET_LABEL[p], title: TACTIC_BLURB[p] })), null,
-    (p) => setLineup(setTactics(getState().lineup, { attack: p })), { class: 'nrl-lineup-tac', label: 'Attack' });
+    (p) => commitLineup(setTactics(getState().lineup, { attack: p })), { class: 'nrl-lineup-tac', label: 'Attack' });
   const defence = segmented<DefencePreset>(DEFENCE_PRESETS.map((p) => ({ id: p, label: PRESET_LABEL[p], title: TACTIC_BLURB[p] })), null,
-    (p) => setLineup(setTactics(getState().lineup, { defence: p })), { class: 'nrl-lineup-tac', label: 'Defence' });
+    (p) => commitLineup(setTactics(getState().lineup, { defence: p })), { class: 'nrl-lineup-tac', label: 'Defence' });
   for (const seg of [attack, defence]) for (const [p, b] of seg.buttons as Map<string, HTMLButtonElement>) b.setAttribute('data-tactic', p);
   // Each side's pick explained in the foot (#351 L2), and what the next opponent plays in the head.
   const hint = el('p', { class: 'nrl-lineup-tac-hint' });
@@ -416,7 +408,7 @@ export function openLineupScreen(): void {
     else if (selected) {
       const next = swapSpots(getState().lineup, selected, spot);
       selected = null;
-      if (next !== getState().lineup) setLineup(next);
+      if (next !== getState().lineup) commitLineup(next);
       else render();
     } else selected = spot;
     render();
@@ -436,7 +428,7 @@ export function openLineupScreen(): void {
     if (selected) {
       const next = placeAt(lineup, selected, p.id);
       selected = null;
-      if (next !== lineup) setLineup(next);
+      if (next !== lineup) commitLineup(next);
       else render();
       return;
     }
@@ -496,7 +488,7 @@ export function openLineupScreen(): void {
     // A man who has left the club is replaced in the saved lineup as soon as the screen sees it.
     const today = resolveLineup(s.lineup, s.squad);
     if (today.changed) {
-      setLineup(today.lineup);
+      commitLineup(today.lineup);
       return; // state:changed renders again
     }
     const lineup = s.lineup;
@@ -634,7 +626,7 @@ export function openLineupScreen(): void {
       const row = el('button', {
         class: 'nrl-lineup-play',
         attrs: { type: 'button', 'data-play': id, 'aria-pressed': String(at >= 0), title: full ? 'Three is the most' : playFitLine(play, nine) },
-        onClick: () => tapPlay(id),
+        onClick: () => takePlay(id),
       },
       el('span', { class: 'nrl-lineup-play-tick', attrs: { 'aria-hidden': 'true' }, text: at >= 0 ? String(at + 1) : '' }),
       el('span', { class: 'nrl-lineup-play-text' },
@@ -644,17 +636,11 @@ export function openLineupScreen(): void {
       return [row];
     }));
   };
-  const tapPlay = (id: PlayId): void => {
-    const s = getState();
-    const next = togglePlay(s.lineup, id, ownedPlays(s));
-    if (next === s.lineup) toast('Three is the most. Leave one out first.');
-    else setLineup(next);
-  };
 
   const autoBtn = button('AUTO PICK', () => {
     selected = null;
     const cur = getState().lineup;
-    setLineup({ ...autoPick(getState().squad, cur.rotation, validTactics(cur.tactics)), kicker: cur.kicker ?? null, captain: cur.captain ?? null, plays: cur.plays ?? [] });
+    commitLineup(autoPickKeepingPlan(getState().squad, cur));
   });
   autoBtn.title = 'Today’s best nine by slot and the next four';
   autoBtn.setAttribute('data-auto-pick', '');

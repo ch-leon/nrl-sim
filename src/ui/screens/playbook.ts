@@ -6,12 +6,12 @@
 // systems/playbook.ts and systems/staff.ts; the words playbookText.ts. One
 // column that scrolls upright, two side by side when there's room.
 import { el, button, ensureStyles, openScreen, screenHead } from '../dom';
-import { getState, setState, type GameState } from '../../core/state';
+import { getState, type GameState } from '../../core/state';
 import { bus } from '../../core/events';
 import { save } from '../../core/save';
 import { PLAY_LIST, playsOfFamily, type Play, type PlayId } from '../../data/plays';
 import { PLAYS, type PlayMan } from '../../match/league/plays';
-import { buyPlay, buyRefusal, ownedPlays, togglePlay, validPlays } from '../../systems/playbook';
+import { buyPlay, buyRefusal, ownedPlays, takePlay, validPlays } from '../../systems/playbook';
 import { ATTACK_COACHES, attackCoach } from '../../systems/staff';
 import { uiScreenLockReason } from '../../labs/screenOverride';
 import { money, playFitLine, playFitShort, playStyleLabel, playWhenLine, todaysNine } from '../playbookText';
@@ -131,18 +131,6 @@ export function playbookBody(state: GameState, h: PlaybookHandlers): HTMLElement
       el('ul', { class: 'nrl-pb-list' }, ...otherLines)));
   }
   return body;
-}
-
-/** Take a play into the match or leave it out, and keep the lineup now (as the Lineup screen does). */
-function takePlay(id: PlayId): void {
-  const s = getState();
-  const next = togglePlay(s.lineup, id, ownedPlays(s));
-  if (next === s.lineup) {
-    bus.emit('ui:notify', { text: 'Three is the most. Leave one out first.', kind: 'info' });
-    return;
-  }
-  setState({ lineup: next });
-  save(getState());
 }
 
 function tapBuy(id: PlayId): void {

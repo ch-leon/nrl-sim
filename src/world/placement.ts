@@ -256,6 +256,20 @@ export function moveFacility(facilityId: string, x: number, y: number): MoveResu
   return { ok: true, fee };
 }
 
+/** Upgrade the current facility, charging/bookkeeping through spendMoney once. Autosave owns persistence. */
+export function upgradeFacility(facilityId: string): boolean {
+  const facility = getState().facilities.find((f) => f.id === facilityId);
+  if (!facility || facility.level >= 3) return false;
+  const def = FACILITY_CATALOG[facility.defId];
+  const nextLevel = (facility.level + 1) as 2 | 3;
+  const cost = upgradeCost(def, nextLevel);
+  if (!spendMoney(cost, `upgrade:${facility.defId}`)) return false;
+  const s = getState();
+  setState({ facilities: s.facilities.map((f) => f.id === facilityId ? { ...f, level: nextLevel } : f) });
+  bus.emit('ui:notify', { text: `${def.name} upgraded to L${nextLevel}!`, kind: 'success' });
+  return true;
+}
+
 /**
  * Demolish a facility: remove it and refund part of what it cost (ledger reason
  * `demolish:<defId>`). Returns the refund, or null if there is no such facility.

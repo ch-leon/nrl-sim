@@ -450,3 +450,8 @@ export function resetForNewSeason(): void {
   const current = getState();
   setState({ season: current.season + 1, week: 1, ...(current.preseason === undefined ? {} : { preseason: 1 as const }) });
 }
+
+/** Match choices exposed by Settings; keep other preferences and the existing immediate-save caller. */
+export function setMatchSettings(patch: Partial<Pick<GameState['settings'], 'coachCalls' | 'liveRivals'>>): void {
+  setState({ settings: { ...getState().settings, ...patch } });
+}

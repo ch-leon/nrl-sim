@@ -12,9 +12,10 @@
 //  - The context starts suspended; initAudio() registers a one-time, self-removing
 //    pointer/key listener that resume()s it on the first user gesture.
 
+import { openAllUnlocks } from '../systems/unlocks';
 import { labsVisible } from '../labs/flags';
 import { bus } from '../core/events';
-import { getState, setState, type GameState } from '../core/state';
+import { getState, setState, setMatchSettings, type GameState } from '../core/state';
 import { el, button, openModal, closeModal, screenKey, segmented } from '../ui/dom';
 import { TEXT_SIZES, textSizeOf } from '../ui/textSize';
 import { applyNamesFile, downloadNames, downloadSave, getActiveSlot, importIntoSlot, pickSaveFile, save } from '../core/save';
@@ -703,15 +704,15 @@ export function initAudioUi(): () => void {
       box, el('span', { class: 'nrl-settings-text' }, el('b', { text: name }), ...(hint ? [el('small', { text: hint })] : [])));
     return { row, sync: () => { box.checked = get(); } };
   };
-  const setSetting = (patch: Partial<GameState['settings']>): void => {
+  const setSetting = (patch: Partial<Pick<GameState['settings'], 'keyMoments' | 'weekSummary' | 'teamLetters' | 'textSize'>>): void => {
     setState({ settings: { ...getState().settings, ...patch } });
     save(getState());
   };
   const mute = toggle('Mute', '', () => getState().settings.muted, (on) => eng.setMuted(on));
   const coachCalls = toggle('Coach calls', 'Nudge your side during a match: hit-up, shift, kick early, rush…',
-    () => getState().settings.coachCalls !== false, (on) => setSetting({ coachCalls: on }), 'nrl-live-toggle');
+    () => getState().settings.coachCalls !== false, (on) => { setMatchSettings({ coachCalls: on }); save(getState()); }, 'nrl-live-toggle');
   const liveRivals = toggle('Rival matches played out', 'Real stats and injuries for every result. Match weeks take longer on a phone.',
-    () => getState().settings.liveRivals === true, (on) => setSetting({ liveRivals: on }), 'nrl-live-toggle nrl-rivals-toggle');
+    () => getState().settings.liveRivals === true, (on) => { setMatchSettings({ liveRivals: on }); save(getState()); }, 'nrl-live-toggle nrl-rivals-toggle');
   // #366: on when absent, so an old save slows down for big moments too.
   const keyMoments = toggle('Slow down for big moments', 'Line breaks, tries and the last two minutes',
     () => getState().settings.keyMoments !== false, (on) => setSetting({ keyMoments: on }), 'nrl-live-toggle nrl-moments-toggle');
@@ -809,7 +810,7 @@ export function initAudioUi(): () => void {
     openAllRow.append(button('Open everything now', () => {
       openAllRow.replaceChildren(
         el('span', { text: 'Open every facility and Office tile now?' }),
-        button('Confirm', () => { setState({ unlocks: undefined }); syncUnlocks(); }),
+        button('Confirm', () => { openAllUnlocks(); syncUnlocks(); }),
         button('Cancel', syncUnlocks),
       );
     }, { class: 'nrl-unlocks-open' }));

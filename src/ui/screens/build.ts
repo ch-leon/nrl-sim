@@ -26,8 +26,7 @@ import {
 } from '../../data/facility';
 import type { PlayerStats, PlacedFacility } from '../../core/state';
 import { isFacilityOpen, unlockReason } from '../../systems/unlocks';
-import { getState, setState } from '../../core/state';
-import { spendMoney } from '../../data/club';
+import { getState } from '../../core/state';
 import { ECON } from '../../config';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
@@ -39,7 +38,7 @@ import { coachsOfficeLevel } from '../../systems/matchday';
 import { officeUnlockLine } from '../coachCallsText';
 import { openCoachCallsScreen } from './coachCalls';
 import {
-  activeGroundsScene, demolishRefund, moveFee, type GroundsSceneLike,
+  activeGroundsScene, demolishRefund, moveFee, upgradeFacility, type GroundsSceneLike,
 } from '../../world/placement';
 
 /** Format a money value for display (local; mirrors hud.fmtMoney conventions). */
@@ -289,15 +288,7 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
     const upBtn = button(
       `Upgrade to L${nextLevel} · ${fmtMoney(cost)}`,
       () => {
-        // Re-check funds at click time (source of truth).
-        if (getState().money < cost) return;
-        if (!spendMoney(cost, `upgrade:${facility.defId}`)) return;
-        const s = getState();
-        const facilities = s.facilities.map((f) =>
-          f.id === facility.id ? { ...f, level: nextLevel } : f,
-        );
-        setState({ facilities }); // emits state:changed -> scene re-renders
-        bus.emit('ui:notify', { text: `${def.name} upgraded to L${nextLevel}!`, kind: 'success' });
+        if (!upgradeFacility(facility.id)) return;
         // Re-render the popup body against the new state.
         const updated = getState().facilities.find((f) => f.id === facility.id);
         if (updated) {

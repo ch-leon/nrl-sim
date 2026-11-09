@@ -21,7 +21,7 @@ import {
 import { PLAYER_ID } from '../../systems/fixtures';
 import { bus } from '../../core/events';
 import { button, closeScreen, el, openModal, segmented } from '../dom';
-import { renameClub } from '../../systems/rename';
+import { changeKit, renameClub } from '../../systems/rename';
 import { save as saveGame } from '../../core/save';
 import { nameField } from '../rename';
 
@@ -58,11 +58,7 @@ export function withAltJersey(d: KitDesign, jersey: string): KitDesign {
   return { ...d, alt: { ...d.alt, jersey, trim } };
 }
 
-/** Is every colour in the design readable (trims contrast with their jerseys)? */
-export function isValidDesign(d: KitDesign, primary: string): boolean {
-  return KIT_PATTERNS.includes(d.pattern) && KIT_PATTERNS.includes(d.alt.pattern)
-    && colorsContrast(primary, d.trim) && colorsContrast(d.alt.jersey, d.alt.trim);
-}
+export { isValidDesign } from '../../systems/rename';
 
 /** Put the player's design (if the flag is on) into the kit registry. Call on load and state change. */
 export function syncKitDesign(state: GameState): void {
@@ -163,8 +159,9 @@ export function openKitDesigner(): HTMLElement {
   };
 
   const save = button('Save kit', () => {
-    if (!isValidDesign(draft, primary)) return;
-    setState({ kit: draft });
+    const patch = changeKit(draft, primary);
+    if (!patch) return;
+    setState(patch);
     bus.emit('ui:notify', { text: 'New kit saved. It will be worn from the next match.', kind: 'success' });
     closeScreen();
   }, { class: 'nrl-kit-save nrl-btn-primary' });

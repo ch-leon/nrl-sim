@@ -104,8 +104,9 @@ these boundaries; neither is a prerequisite or implemented by this contract.
 
 Retain the current folders and exported operations. Do not introduce a parallel
 application/service framework or wrappers that only rename an existing API.
-The remaining screen mutation exceptions in §4.1 are work for
-[#526](https://github.com/ch-leon/nrl-sim/issues/526). Deferred overlay decomposition
+The state ownership inventory and intentional presentation/lifecycle exceptions
+from [#526](https://github.com/ch-leon/nrl-sim/issues/526) are recorded in §4.1.
+Deferred overlay decomposition
 [#527](https://github.com/ch-leon/nrl-sim/issues/527) and the later Preact decision
 [#528](https://github.com/ch-leon/nrl-sim/issues/528) must preserve these contracts;
 this document does not start their implementation.
@@ -284,12 +285,63 @@ notification path; a refused/no-change result must not charge, announce success 
 create an Undo offer. Preserve existing persistence timing, including held-week
 protection, rather than adding a second generic save/notification layer.
 
-**Current gaps, not approved patterns:** `src/ui/screens/lineup.ts` and
-`player.ts` write lineup changes directly; `playbook.ts` writes tactics/plays;
-`kit.ts` commits the kit draft directly (distinct from its system-owned rename);
-`build.ts` writes facility upgrades; `matchReport.ts` updates `potmTally`.
-These persistent mutations remain on main and are the later #526 cleanup scope.
-They do not permit new UI-owned gameplay rules. No mutation code is moved here.
+The remaining gameplay gaps inventoried for [#526](https://github.com/ch-leon/nrl-sim/issues/526)
+now use these existing owners. Pure calculations (`autoPick`, `resolveLineup`,
+`placeAt`, `swapSpots`, `setKicker`, `setCaptain`, `setTactics`, `togglePlay`,
+`addPotm` and the season-review builders) remain pure. Their existing exports are
+retained, including re-exports of moved builders from the season-review screen
+and `isValidDesign` from the kit screen.
+
+| Operation | State/rule owner | Persistence owner | Other effects |
+|---|---|---|---|
+| Coach lineup edits from Lineup/player, including render-time reconciliation | Pure rules in `systems/lineup.ts`; `setRotation` and `autoPickKeepingPlan` now own the formerly hand-built rotation/auto-pick rules. `commitLineup` commits a changed result once | `commitLineup` calls the existing guarded `save` immediately after the write; an identical result neither writes nor saves | No money, notification or new Undo; auto pick keeps the existing roles, tactics, rotation and plays |
+| Take/leave a set play, from either screen | `takePlay` in `systems/playbook.ts` uses pure `togglePlay` and `ownedPlays` | Successful picks use `commitLineup`; refused picks do not save | One existing info toast on refusal; no success toast, spending or Undo. Buying still uses `buyPlay` and the Playbook screen's one immediate save |
+| Confirm kit draft | Pure `changeKit` in the club identity/colours owner, `systems/rename.ts`, validates with the moved `isValidDesign` and returns the kit patch using the designer's displayed primary colour | Existing autosave; no new immediate save despite the button's wording | UI applies the returned patch once, emits the unchanged success toast and closes; draft/preview and registry sync remain presentation |
+| Upgrade facility | `upgradeFacility` in `world/placement.ts` reads the live facility, checks level/funds, uses `upgradeCost` and `spendMoney`, and writes the level | Existing autosave; no immediate save | One money event/finance booking and success toast. No upgrade Undo; an existing build Undo remains subject to its unchanged eligibility check |
+| Full-time award | `recordMatchAward` in `systems/stats.ts` computes the award and counts it for the player's club | Existing settled-week autosave | No new listener, toast or save. The report invokes it at its original listener position, before downstream result/rollover handling |
+| Season review | `registerSeasonReview` in `systems/stats.ts` owns pure builders and history write; the screen's existing init entry registers it | Existing rollover/autosave | Named hooks remain at orders 1 and 15. UI still owns the season-ended toast/modal and its unsubscribe |
+| Match-affecting settings | Narrow `setMatchSettings` core operation merges `coachCalls`/`liveRivals`, preserving other settings | Settings UI retains its one immediate guarded save per change | No new rules, notification, spending or Undo |
+| Settings opt-out from staged unlocks | `openAllUnlocks` in `systems/unlocks.ts` | Existing autosave | Same confirmation UI; no new notification or immediate save |
+
+#### UI/presentation mutation inventory (#526)
+
+This inventory was taken against `origin/main` **8de9cb3** before the cleanup;
+`file:line` entries below refer to that revision so moved/deleted sites remain
+reviewable. It covers `ui/`, scenes, match views, FX and the boot/developer
+lifecycle. Returned rename patches already met §4.1 and were retained. The
+settings sheet's two gameplay toggles and unlock opt-out were additional gaps;
+the six initially reviewed screens were not assumed exhaustive.
+
+| Original call site (`src/` prefix) | Classification | Result / intentional exception |
+|---|---|---|
+| `ui/screens/lineup.ts:347` | gameplay | Coach edits/reconciliation now commit through lineup; inline rotation (`388`) and auto-pick preservation (`657`) moved into pure lineup operations |
+| `ui/screens/player.ts:518` | gameplay | Roles now use lineup's shared commit/save owner |
+| `ui/screens/player.ts:617` | gameplay | Intentional application of `renamePlayer`'s returned patch; UI keeps the one immediate save and redraw, no toast |
+| `ui/screens/playbook.ts:144` | gameplay | Both play-pick screens use `takePlay`; pure ownership/limit checks retained |
+| `ui/screens/kit.ts:103` | gameplay | Intentional application of `renameClub`'s returned patch; UI keeps one save and changed-only toast |
+| `ui/screens/kit.ts:167` | persistent preference | Cosmetic career kit applies the validated club identity operation patch; no immediate save added |
+| `ui/screens/build.ts:299` | gameplay | Upgrade rule, spending and notification moved to placement owner |
+| `ui/screens/matchReport.ts:461` | gameplay | Award decision/tally moved to stats, called at same event position |
+| `ui/screens/seasonReview.ts:180` | gameplay | Review builders and rollover history write moved to stats |
+| `ui/screens/rivalSquad.ts:261` | gameplay | Intentional application of pure `renameClub` patch; same immediate save and changed-only toast |
+| `fx/audio.ts:414`, `:420` | persistent preference | Audio engine's volume/mute boundary; state write only, same autosave timing |
+| `fx/audio.ts:707` | gameplay / persistent preference | Gameplay toggles now use core operation; UI helper narrowed to key moments, weekly summary, team letters and text size; each retains immediate save |
+| `fx/audio.ts:812` | gameplay | Unlock opt-out moved to unlock system, preserving autosave timing |
+| `ui/tutorial.ts:265`, `:329`, `:665`; `ui/expansionIntro.ts:14` | persistent preference | Tutorial completion/seen hints/replay reset stay in their presentation boundary, preserving nested settings and existing autosave |
+| `scenes/MatchScene.ts:1217` | persistent preference | Playback speed only; state write and existing autosave, no sim speed/RNG change |
+| `main.ts:157`, `:163`, `:169`; `ui/title.ts:256` (lifecycle entry) | lifecycle | Existing load/new-career/slot flow, intentionally unchanged and outside this cleanup |
+| `labs/devCareer.ts:249`, `:255` | lifecycle | Developer preset's tutorial/playback preference and system-produced lineup result, intentionally unchanged under #519 and parallel save/lifecycle ownership |
+| `ui/screens/matchOverlay.ts:109`, `:154`, `:159` | ephemeral UI | Reducer/score/tackle updates affect copied or overlay-local `LiveState`, not `GameState`; retained for #527 |
+| `ui/screens/lineup.ts:333`, `:451`; `ui/screens/kit.ts:82`, `:89`; `ui/screens/playbook.ts:162`; `ui/screens/player.ts:577` | ephemeral UI | Local selected slot, roles, kit/name drafts, folded sections and rename mode; retained in UI |
+
+The direct-assignment and mutating-array audit found no additional direct nested
+career writes in these presentation paths: render models, copied sort/filter
+arrays, match-view popup/particle objects and in-memory finance summaries are
+presentation data. Match playback's existing engine/recorder/result authority is
+the separate §6.1 seam (#524), and the overlay's LiveSim calls remain in #527's
+owned file; neither is moved here. Lifecycle import/export and names-file calls
+continue through existing save APIs (§4.3), with no edits to save/title/boot or
+developer-career code. No new storage adapter, schema or save version is needed.
 
 ### 4.2 Persistent preferences
 
@@ -302,9 +354,9 @@ preferences, not ephemeral UI state.
 
 This exception is limited by meaning, not by the field name `settings`. Difficulty,
 lineup, training, match rules, money, ownership and save data are not presentation
-preferences. The existing settings sheet also exposes match-affecting choices
-such as live rivals; its current location does not authorise arbitrary gameplay
-patches through a settings helper. Keep rule changes with the existing system/core
+preferences. The settings sheet routes its match-affecting choices (coach calls and live
+rivals) through the narrow core operation in §4.1; its presentation patch helper
+accepts only presentation fields. Keep rule changes with the existing system/core
 owner and its validation/effect contract. Preserve other settings fields when
 applying a presentation preference, because `setState` replaces nested objects.
 
