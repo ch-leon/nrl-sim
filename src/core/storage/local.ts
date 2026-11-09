@@ -10,7 +10,7 @@
 // fails (storage full) can never undo or block the slot write before it. Reading a
 // slot's meta sees the queued one at once.
 
-import { CORRUPT_SAVE_KEY, DEVICE_ID_KEY, LEGACY_SAVE_KEY, liveMatchKey, saveMetaKey, slotKey } from '../storageKeys';
+import { CORRUPT_SAVE_KEY, DEVICE_ID_KEY, LEGACY_SAVE_KEY, liveMatchKey, recoveryKey, saveMetaKey, slotKey } from '../storageKeys';
 import { metaFor, newDeviceId, parseMeta } from './meta';
 import type { SaveMeta, SlotListing, SyncSaveStore } from './types';
 
@@ -92,9 +92,12 @@ export class LocalSaveStore implements SyncSaveStore {
 
   /** Throws when the payload was not stored (storage full or blocked); nothing else is touched then. */
   write(slot: number, payload: string, meta: SaveMeta): void {
+    const previous = slot === 1 ? this.storage.getItem(slotKey(1)) : null;
+    const legacy = slot === 1 ? this.storage.getItem(LEGACY_SAVE_KEY) : null;
     this.storage.setItem(slotKey(slot), payload);
-    // Slot 1 now holds current data; the stale legacy copy must not resurface.
-    if (slot === 1) {
+    // Only retire the legacy source we replaced. A different, shadowed career
+    // must survive ordinary autosaves of slot 1, including a future-version one.
+    if (slot === 1 && (previous === null || previous === legacy)) {
       try { this.storage.removeItem(LEGACY_SAVE_KEY); } catch { /* best effort */ }
     }
     this.pending.set(slot, meta);
@@ -185,9 +188,27 @@ export class LocalSaveStore implements SyncSaveStore {
     }
   }
 
-  /** Keep a corrupt payload for forensics. Throws if storage does. */
-  keepCorrupt(raw: string): void {
-    this.storage.setItem(CORRUPT_SAVE_KEY, raw);
+  /** Preserve exact originals without replacing an earlier recovery payload.
+   * Readback is mandatory before a caller may install a repaired save. */
+  keepCorrupt(raw: string, slot = 1): void {
+    const originals = this.recovery(slot);
+    if (!originals.includes(raw)) {
+      const payload = JSON.stringify([...originals, raw]);
+      this.storage.setItem(recoveryKey(slot), payload);
+      if (this.storage.getItem(recoveryKey(slot)) !== payload) throw new Error('Recovery readback failed');
+    }
+    // Retain the historical forensics key, but never replace a different career.
+    if (this.storage.getItem(CORRUPT_SAVE_KEY) === null) {
+      try { this.storage.setItem(CORRUPT_SAVE_KEY, raw); } catch { /* verified slot recovery exists */ }
+    }
+  }
+
+  recovery(slot: number): string[] {
+    const raw = this.storage.getItem(recoveryKey(slot));
+    if (raw === null) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every((v) => typeof v === 'string')) throw new Error('Unreadable recovery');
+    return parsed;
   }
 
   /** Drop the live-match record kept beside a slot. Never throws. */

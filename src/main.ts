@@ -7,7 +7,7 @@ import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
-import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, load, save, setActiveSlot } from './core/save';
+import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, save, setActiveSlot } from './core/save';
 import { showTitleFlow } from './ui/title';
 import { showExpansionIntro } from './ui/expansionIntro';
 import { expansionIntroLines } from './ui/expansionCopy';
@@ -148,12 +148,18 @@ async function boot(): Promise<void> {
     // Its save gone (site data cleared): build it again rather than start a stray new game.
     if (!hasSave(1)) playtest.fresh = true;
   }
-  const choice = playtest
+  let choice = playtest
     ? (playtest.fresh ? { mode: 'new' as const, clubName: PLAYTEST_CLUB, coachName: PLAYTEST_COACH, seed: PLAYTEST_SEED, difficulty: 'normal' as const } : { mode: 'continue' as const })
     : await showTitleFlow(uiRoot);
+  // Rejection is not an empty career: stay at recovery instead of installing defaults.
+  let loaded = loadSlot();
+  while ((choice.mode === 'continue' || playtest?.fresh) && loaded.status !== 'ok' && loaded.status !== 'empty') {
+    choice = await showTitleFlow(uiRoot);
+    loaded = loadSlot();
+  }
   let freshGame = choice.mode !== 'continue' && !playtest;
   if (choice.mode === 'continue') {
-    const saved = load();
+    const saved = loaded.status === 'ok' ? loaded.state : null;
     if (saved) { await preparePack(saved.pack ?? 'au'); loadState(saved); }
     else {
       freshGame = true;

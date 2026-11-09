@@ -69,14 +69,14 @@ describe('load absence & corruption', () => {
     expect(load()).toBeNull();
   });
 
-  it('unparseable JSON is corrupt: null, warns, preserves raw, drops SAVE_KEY', () => {
+  it('unparseable JSON is corrupt: null, warns, preserves raw and source slot', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     storage.map.set(slotKey(1), '{not valid json');
     const result = load();
     expect(result).toBeNull();
     expect(warn).toHaveBeenCalledWith('nrl-sim: corrupt save, ignoring');
     expect(storage.map.get(CORRUPT_KEY)).toBe('{not valid json');
-    expect(storage.map.has(slotKey(1))).toBe(false);
+    expect(storage.map.has(slotKey(1))).toBe(true);
   });
 
   it('non-numeric version is corrupt', () => {
@@ -879,12 +879,32 @@ describe('title flow slots', () => {
     expect(root.querySelector('[data-nrl-delete-1]')).toBeNull();
   });
 
+  it('a rejected slot stays visible with raw recovery and requires confirmation before Start over', async () => {
+    const raw = 'original rejected bytes';
+    storage.map.set(slotKey(1), raw);
+    const root = makeStubEl('div');
+    const result = showTitleFlow(root as unknown as HTMLElement);
+    expect(root.querySelector('[data-nrl-slot-label-1]')!.textContent).toBe('Unreadable save');
+    expect(root.querySelector('[data-nrl-recover-1]')).not.toBeNull();
+    expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
+    root.querySelector('[data-nrl-new-1]')!.click();
+    await vi.dynamicImportSettled();
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(storage.map.get(slotKey(1))).toBe(raw);
+    root.querySelector('[data-nrl-start-confirm]')!.click();
+    expect((await result).mode).toBe('new');
+    expect(hasSave(1)).toBe(false);
+    save(createNewGame('Deliberate replacement', 522));
+    expect(load()?.clubName).toBe('Deliberate replacement');
+  });
+
   it('a future-version slot offers Delete but not Continue or New', () => {
     storage.map.set(slotKey(1), JSON.stringify({ ...createNewGame('F', 1), version: 99 }));
     const root = makeStubEl('div');
     void showTitleFlow(root as unknown as HTMLElement);
     expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
     expect(root.querySelector('[data-nrl-new-1]')).toBeNull();
+    expect(root.querySelector('[data-nrl-recover-1]')).not.toBeNull();
     expect(root.querySelector('[data-nrl-delete-1]')).not.toBeNull();
   });
 });
