@@ -56,9 +56,20 @@ export async function runRecruit(browser) {
         check(await rows.count() === pool, 'full pool shown');
         check(await page.locator('[data-sort-menu]').isVisible(), 'sort shown in full view');
         const original = await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute('data-row-player')));
-        // Overall rounds the mean; read the actual displayed ratings for its stable ordering.
-        check(await rows.evaluateAll((rs) => rs.every((r, i) => i === 0 ||
-          Number(rs[i - 1].querySelector('.nrl-row-ovr').textContent) >= Number(r.querySelector('.nrl-row-ovr').textContent))), 'overall order');
+        // #537 puts stars beside a rounded label. Sort by the exact average of
+        // the four shown stats, independently of that presentation text.
+        check(await rows.evaluateAll((rs) => {
+          const overall = (p) => {
+            const keys = p.position === 'hooker' ? ['handling', 'footyIQ', 'stamina', 'strength']
+              : ['five-eighth', 'halfback'].includes(p.position) ? ['handling', 'kicking', 'footyIQ', 'speed']
+              : ['fullback', 'winger', 'centre'].includes(p.position) ? ['speed', 'handling', 'strength', 'footyIQ']
+              : ['strength', 'stamina', 'speed', 'footyIQ'];
+            return keys.reduce((sum, key) => sum + p.stats[key], 0) / 4;
+          };
+          const expected = [...window.__nrlState().freeAgents]
+            .sort((a, b) => overall(b) - overall(a)).map((p) => p.id);
+          return JSON.stringify(rs.map((r) => r.getAttribute('data-row-player'))) === JSON.stringify(expected);
+        }), 'overall order');
         await shot('show-all');
         for (const sort of ['fee', 'age', 'rating']) {
           await page.locator('[data-sort-menu]').tap();

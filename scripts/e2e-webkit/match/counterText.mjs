@@ -38,9 +38,18 @@ export async function runCounterText(browser) {
         // Normal reads recent habits (#469): this fixture needs Compressed v Tight.
         s.recentPlans = Array.from({ length: 3 }, () => ({ attack: 'grind', defence: 'slide' }));
         s.facilities.push({ id: 'counter-training', defId: 'trainingPaddock', level: 3, x: 10, y: 10 });
+        // Isolate the defender's Compressed counter: the rival's own Tight
+        // offloads against Slide otherwise spend its shared commentary window
+        // first, depending on the generated lineup and opening possession.
+        // These four edge defenders give Slide zero fit even after training;
+        // veteran training leaves their Speed below 19 and their IQ stays 1.
+        const edgeIds = new Set(s.lineup.starters.slice(0, 4));
         for (const p of s.squad) {
           p.stats = { speed: 80, strength: 80, stamina: 100, handling: 80, kicking: 80, footyIQ: 80 };
           p.traits = []; p.injuredWeeks = 0; p.suspendedWeeks = 0;
+          if (edgeIds.has(p.id)) {
+            p.age = 34; p.stats.speed = 1; p.stats.footyIQ = 1;
+          }
         }
         // Flat stronger stats keep fits predictable; the Tight habit selects Compressed.
         for (const c of s.league.clubs) {
