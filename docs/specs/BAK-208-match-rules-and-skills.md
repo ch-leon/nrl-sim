@@ -237,6 +237,8 @@ sim's defaults (`src/match/league/presets.ts`).
 | **Kick-chase** | +4% | ×0.6 | always | — | — | territory 35% from deep (bomb 40% of those); red zone 55% | bomb ×1.8, grubber ×1.3, long ×1.2 |
 | **All-out** | 0 (N13: was +15%; Phase 3 had cut +20% to +15%) | ×1.5 (1.2 own 20; N13: was ×1.6) | always | width 0.35, cut-out 3% (N13: was 0.45 / 12%) | edges +0.5 | red zone 15% (N13: was 30%) | chip ×1.6, cross ×1.3, grubber ×1.2, long ×0.6 |
 
+Offload rating weights Strength two-thirds and Handling one-third (#543); the existing Tight/All-out fit uses it to scale contact offload chances, with no new roll.
+
 The Tight offload rebuild (#460, enabled by #465 with `counters.tight.on = 1`) supplies the pack offloads above; backs and halves keep the legacy zone values (0 deep, ×½ attacking half, ×0.7 red zone). With the switch on, pack carriers use the starting sheet’s Tight fit for second-phase offloads; hit-ups and territory kicks stay unchanged. See tuning §30.
 
 Slide counters (#462) are on by default from #465 (`counters.slide.on = 1`). Both sides’ style fits scale drift and cut-out reads against Expansive, deep kick cover against Kick-chase, inside pack offloads against Tight and busts in the line’s recovery window after an All-out offload. Unequal starting fits strengthen all nonzero cells, with extra local responses for Expansive and Kick-chase. All-out extends the existing receiver recovery window by both style fits, with a further extension for an attack-fit advantage: neutral fits give 120 ticks and fit 1.5 v 0.5 gives 188. A pass, kick, turnover or stoppage still clears it. Balanced is neutral; the existing contest rolls decide outcomes. See tuning §32.

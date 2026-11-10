@@ -106,6 +106,24 @@ export function traitLabel(t: TraitInstance): string {
   return `${TRAITS[t.id].name} ${ROMAN[t.level]}`;
 }
 
+/**
+ * One existing trait to lead with: Offload King for the forward position group,
+ * otherwise the highest level, with catalogue order breaking ties. Traitless
+ * players have no headline. Pure derived copy: no mutation, saved field or dice.
+ */
+export function headlineTrait(position: Position, traits: readonly TraitInstance[]): TraitInstance | null {
+  if (position === 'prop' || position === 'second-row' || position === 'lock') {
+    const offloader = traits.find((t) => t.id === 'offloadKing');
+    if (offloader) return offloader;
+  }
+  let best: TraitInstance | null = null;
+  for (const t of traits) {
+    if (!isTraitId(t.id)) continue;
+    if (!best || t.level > best.level || (t.level === best.level && TRAIT_IDS.indexOf(t.id) < TRAIT_IDS.indexOf(best.id))) best = t;
+  }
+  return best;
+}
+
 /** The player-page line: the blurb, and "You will see it as …" when the trait has a move (N15.4). */
 export function traitTip(id: TraitId): string {
   const d = TRAITS[id];
