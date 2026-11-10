@@ -65,6 +65,10 @@ What's in the game, with the PR that added each.
 
 - Squad players earn XP from matches, moments and weekly training; levels auto-spend banked points by focus within fixed ceilings. Training buildings give a generic, capped XP boost with no adjacency effect, and the player page shows plain XP progress ([PR](https://github.com/ch-leon/nrl-sim/pull/568)).
 
+- Arriving juniors gain +2 potential ceiling points per shown stat per Academy level (up to +6 at level 3); existing players keep their ceilings ([PR](https://github.com/ch-leon/nrl-sim/pull/566)).
+
+- Offloads lean two-thirds on Strength and one-third on Handling; one existing trait is marked as the headline, with Offload King first for forwards ([PR](https://github.com/ch-leon/nrl-sim/pull/564)).
+
 - Every player has fixed potential ceilings on their four shown stats, with more headroom for younger players. A plain Potential star line replaces the career projection; existing format-24 careers backfill ceilings deterministically ([PR](https://github.com/ch-leon/nrl-sim/pull/565)).
 
 - Players show four stats for their position group; overall averages those four, with half-step rating stars beside it. Hidden off-role stats start low and stay fixed ([issue](https://github.com/ch-leon/nrl-sim/issues/537)).

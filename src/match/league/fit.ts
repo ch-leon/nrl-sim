@@ -13,7 +13,7 @@ export const FIT = {
   maxFit: 1.5,
   archetypeThreshold: 80,
   carry: { strength: 3, speed: 1, wreckingBall: 8 },
-  offload: { handling: 1, strength: 1, offloadKing: 8, razzleDazzle: 6 },
+  offload: { handling: 1, strength: 2, offloadKing: 8, razzleDazzle: 6 },
   ballPlay: { handling: 1, footyIQ: 1, playmaker: 8 },
   footwork: { speed: 1, handling: 1, dancingFeet: 8 },
   edgeD: { speed: 1, footyIQ: 1, lastLine: 8, poacher: 6 },

@@ -29,7 +29,7 @@ describe('pure squad fit', () => {
     const roster = squad();
     for (const p of roster) if (PACK.includes(p.position)) p.stats!.strength = 80;
     expect(topAttack(roster)).toBe('grind');
-    expect(styleFit(roster).grind).toBe(1.25);
+    expect(styleFit(roster).grind).toBeCloseTo(1 + (20 * (0.75 + 2 / 3) / 2) / 50);
   });
   it.each([1, 99])('clamps all eight fits for all-%i squads, with and without all traits', (base) => {
     for (const traits of [[], ['dancingFeet', 'wreckingBall', 'offloadKing', 'razzleDazzle', 'hitman', 'brickWall', 'lastLine', 'poacher', 'playmaker', 'jets', 'bigBoot']]) {
@@ -50,14 +50,14 @@ describe('pure squad fit', () => {
       expect(derivedRatings(player('winger', 60, [trait, trait]))).toEqual(derivedRatings(player('winger', 60, [trait])));
     }
   });
-  it('keeps offloads equally weighted between Handling and Strength, independent of Kicking', () => {
+  it('weights offloads two-thirds Strength and one-third Handling, independent of Kicking', () => {
     const p = player('prop');
     p.stats = { ...p.stats!, handling: 90, strength: 30, kicking: 1 };
-    expect(derivedRatings(p).offload).toBe(60);
+    expect(derivedRatings(p).offload).toBe(50);
     p.stats.kicking = 100;
-    expect(derivedRatings(p).offload).toBe(60);
+    expect(derivedRatings(p).offload).toBe(50);
     p.stats.handling = 30; p.stats.strength = 90;
-    expect(derivedRatings(p).offload).toBe(60);
+    expect(derivedRatings(p).offload).toBe(70);
   });
   it('reads the best kicker anywhere, Big Boot, and Hitman rush bonuses', () => {
     const roster = squad();
