@@ -10,7 +10,7 @@ import {
 } from '../../src/systems/rivals';
 import { STRENGTH_MIN, STRENGTH_MAX } from '../../src/systems/league';
 import { RIVAL_CLUBS } from '../../src/data/league';
-import { POSITIONS, overallRating, generatePlayer, withShownStats } from '../../src/data/player';
+import { POSITIONS, overallRating, generatePlayer, shownStats, withShownStats } from '../../src/data/player';
 import { getState, setState, type Player, type RivalClub } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { makeRng } from '../../src/utils/rng';
@@ -321,14 +321,15 @@ describe('weekly development and the league anchor (#143)', () => {
     const p = agent(makeRng(536), { age, stats: {
       speed: 50, strength: 50, stamina: 50, handling: 35, kicking: 70, footyIQ: 50,
     } });
+    const withHeadroom = { ...p, ceilings: Object.fromEntries(shownStats(p.position).map(key => [key, 100])) };
     const rng = makeRng(536);
     const draws = [0, .999, 0, 0, .999, .999, 0, .999, .999, 0];
     const next = vi.spyOn(rng, 'next').mockImplementation(() => draws.shift()!);
-    const first = developRivalPlayerWeek(p, rng);
+    const first = developRivalPlayerWeek(withHeadroom, rng);
     expect(next).toHaveBeenCalledTimes(5);
     expect(first.stats).toEqual(withShownStats(p.position, p.stats, { speed: 50 + delta, strength: 50, stamina: 50 + delta,
       handling: 35 + delta, kicking: 70 + delta, footyIQ: 50 }));
-    const second = developRivalPlayerWeek(p, rng);
+    const second = developRivalPlayerWeek(withHeadroom, rng);
     expect(next).toHaveBeenCalledTimes(10);
     expect(second.stats).toEqual(withShownStats(p.position, p.stats, { speed: 50, strength: 50 + delta, stamina: 50,
       handling: 35, kicking: 70, footyIQ: 50 + delta }));
@@ -369,6 +370,70 @@ describe('weekly development and the league anchor (#143)', () => {
     const battler = rivalPlayer(rng, 'c', 'prop', 35, 27);
     expect(overallRating(season(star, 1))).toBeLessThan(overallRating(star));
     expect(overallRating(season(battler, 1))).toBeGreaterThan(overallRating(battler));
+  });
+
+  it('rivals already have ceilings and the shared four-shown-stat overall at creation and rollover', () => {
+    const clubs = withRivalSquads(RIVAL_CLUBS, 542);
+    const rolled = rolloverRivals(clubs.map(c => ({ ...c, squad: c.squad!.slice(0, 12) })), makeRng(542));
+    expect(rolled.juniors).toBeGreaterThan(0);
+    for (const p of [...clubs, ...rolled.clubs].flatMap(c => c.squad!)) {
+      const keys = shownStats(p.position);
+      expect(Object.keys(p.ceilings).sort()).toEqual([...keys].sort());
+      expect(overallRating(p)).toBe(keys.reduce((n, k) => n + p.stats[k], 0) / 4);
+      for (const key of keys) expect(p.ceilings[key]).toBeGreaterThanOrEqual(p.stats[key]);
+    }
+  });
+
+  it('approaches and reaches fractional ceilings without exceeding them or growing hidden stats', () => {
+    for (const position of POSITIONS) {
+      const base = rivalPlayer(makeRng(542), 'c', position, 55, 19);
+      const p: Player = { ...base, ceilings: Object.fromEntries(shownStats(position).map((key, i) => [key, base.stats[key] + [0, .01, 1.5, 8][i]!])) };
+      const original = structuredClone(p);
+      const rng = makeRng(542);
+      const next = vi.spyOn(rng, 'next').mockReturnValue(0);
+      let after = p;
+      for (let w = 0; w < 3 * WEEKS_PER_SEASON; w++) {
+        const before = after;
+        after = developRivalPlayerWeek(after, rng);
+        for (const key of Object.keys(p.stats) as (keyof Player['stats'])[]) {
+          if (shownStats(position).includes(key)) {
+            expect(after.stats[key]).toBeGreaterThanOrEqual(before.stats[key]);
+            expect(after.stats[key]).toBeLessThanOrEqual(p.ceilings[key]!);
+          } else expect(after.stats[key]).toBe(p.stats[key]);
+        }
+      }
+      for (const key of shownStats(position)) expect(after.stats[key]).toBe(p.ceilings[key]);
+      expect(next).toHaveBeenCalledTimes(3 * WEEKS_PER_SEASON * 5);
+      expect(after.ceilings).toEqual(original.ceilings);
+      expect(p).toEqual(original);
+    }
+  });
+
+  it('preserves the five-draw order per player in the anchor even when ceilings block gains', () => {
+    const base = rivalPlayer(makeRng(542), 'c', 'halfback', 35, 27);
+    const stats = { speed: 35, strength: 35, stamina: 35, handling: 35, kicking: 35, footyIQ: 35 };
+    const first: Player = { ...base, stats, ceilings: { speed: 35, handling: 35.25, kicking: 35, footyIQ: 40 } };
+    const second: Player = { ...base, id: 'second', position: 'prop', stats,
+      ceilings: { strength: 35.01, stamina: 40, speed: 40, footyIQ: 35 } };
+    // No age/pull hits, then five anchor draws each, in the same stat/player order.
+    const draws = [...Array<number>(10).fill(.999), 0, .999, 0, 0, .999, .999, 0, .999, .999, 0];
+    const rng = makeRng(542);
+    const next = vi.spyOn(rng, 'next').mockImplementation(() => draws.shift()!);
+    const out = developRivalsWeek([{ ...club(35), squad: [first, second] }], rng)[0]!.squad!;
+    expect(next).toHaveBeenCalledTimes(20);
+    expect(draws).toEqual([]);
+    expect(out[0]!.stats).toEqual({ ...stats, handling: 35.25 });
+    expect(out[1]!.stats).toEqual({ ...stats, strength: 35.01 });
+    expect(out.map(p => p.ceilings)).toEqual([first.ceilings, second.ceilings]);
+  });
+
+  it('preserves the zero-adjustment skip without drawing dice', () => {
+    const p: Player = { ...rivalPlayer(makeRng(542), 'c', 'halfback', 55, 27),
+      stats: { speed: 55, strength: 55, stamina: 55, handling: 55, kicking: 55, footyIQ: 55 } };
+    const rng = makeRng(542);
+    expect(developRivalPlayerWeek(p, rng)).toBe(p);
+    developRivalsWeek([{ ...club(55), squad: [p] }], rng);
+    expect(rng.state()).toBe(542);
   });
 
   it('the anchor pulls a drifted league back toward the mean and leaves a centred one alone', () => {
