@@ -2,12 +2,13 @@
 // The DOM (openPlayerPage) is not rendered here: the vitest env is 'node'.
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  fmtTally, lineupSlotText, moraleReasons, moraleWord, playerActions, playerPageModel, positionLabel, riskWord,
+  fmtTally, lineupSlotText, moraleReasons, moraleWord, playerActions, playerPageModel, positionLabel, riskWord, type PlayerContext,
 } from '../../../src/ui/screens/player';
 import { createNewGame, getState, setState, type Player } from '../../../src/core/state';
 import { initLeague } from '../../../src/systems/fixtures';
 import { bus } from '../../../src/core/events';
 import { marketWage, overallRating, shownStats } from '../../../src/data/player';
+import { headlineTrait } from '../../../src/data/traits';
 import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN } from '../../../src/config';
 import { renewalFee, transferFee } from '../../../src/systems/contracts';
 import { RELEASE_PAYOUT_WEEKS, signingFee } from '../../../src/systems/freeagency';
@@ -53,6 +54,54 @@ describe('playerPageModel', () => {
     expect(m.season).toEqual({ games: 0, tries: 0, tackles: 0, lineBreaks: 0 });
     expect(m.career).toEqual(p.career);
     expect(m.actions.map((a) => a.id)).toEqual(['renew', 'sell', 'release']);
+  });
+
+  it('gives generated players with traits one headline and traitless players none (seed 543, PM ruling)', () => {
+    const s = createNewGame('Headline regression', 543);
+    initLeague(s);
+    const groups: { name: string; players: Player[]; ctx: PlayerContext }[] = [
+      { name: 'squad', players: s.squad, ctx: { kind: 'squad' } },
+      { name: 'free agents', players: s.freeAgents, ctx: { kind: 'freeAgent' } },
+      ...s.league.clubs.filter(c => c.id !== s.clubId).map(club => ({
+        name: club.name, players: club.squad ?? [], ctx: { kind: 'rival' as const, club },
+      })),
+    ];
+    const before = structuredClone(s);
+    const seed = s.rngSeed;
+    expect(s.squad).toHaveLength(20);
+    for (const { name, players, ctx } of groups) {
+      expect(players.length, name).toBeGreaterThan(0);
+      expect(players.some(p => p.traits.length > 0), name).toBe(true);
+      expect(players.some(p => p.traits.length === 0), name).toBe(true);
+      for (const p of players) {
+        const headline = headlineTrait(p.position, p.traits);
+        const m = playerPageModel(p, ctx, s);
+        const marked = m.traits.filter(t => t.tip.startsWith('Headline trait. '));
+        expect(marked, `${name}: ${p.name}`).toHaveLength(p.traits.length > 0 ? 1 : 0);
+        expect(m.traits).toHaveLength(p.traits.length);
+        if (p.traits.length > 0) expect(p.traits).toContain(headline);
+        else {
+          expect(headline).toBeNull();
+          expect(m.traits).toEqual([]);
+        }
+      }
+    }
+    expect(s).toEqual(before);
+    expect(s.rngSeed).toBe(seed);
+  });
+
+  it('marks exactly one headline in existing trait copy without dropping or mutating traits', () => {
+    const s = getState();
+    const p = { ...s.squad[0]!, position: 'prop' as const, traits: [
+      { id: 'hitman' as const, level: 3 as const }, { id: 'offloadKing' as const, level: 1 as const },
+    ] };
+    const before = structuredClone(p);
+    const seed = s.rngSeed;
+    const m = playerPageModel(p, { kind: 'squad' }, s);
+    expect(m.traits).toHaveLength(2);
+    expect(m.traits.filter(t => t.tip.startsWith('Headline trait. ')).map(t => t.label)).toEqual(['Offload King I']);
+    expect(p).toEqual(before);
+    expect(s.rngSeed).toBe(seed);
   });
 
   it('shows whole-number stats when training has left fractions', () => {
