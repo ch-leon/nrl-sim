@@ -24,7 +24,7 @@ export function fitRead(roster: readonly RosterEntry[], plan: Plan): { stars: st
       case 'kick-chase': return (s?.kicking ?? 60) + (p.traits?.some(t => t.id === 'bigBoot') ? 8 : 0);
       case 'rush': return ((s?.stamina ?? 60) + r.contactD) / 2;
       case 'all-out': return (r.offload + r.footwork + (s?.stamina ?? 60)) / 3;
-      default: return s ? Object.values(s).reduce((a, b) => a + b, 0) / 5 : 60;
+      default: return s ? Object.values(s).reduce((a, b) => a + b, 0) / 6 : 60;
     }
   };
   const best = roster.filter(p => !roles || roles.includes(p.position)).map(p => ({ p, n: rating(p) })).sort((a,b) => b.n - a.n)[0];

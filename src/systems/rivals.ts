@@ -385,10 +385,10 @@ export function developmentRate(age: number): number {
 }
 
 /** One week's chance of a ±1 step that averages `perSeason` over a season. */
-function stepStat(value: number, perSeason: number, rng: Rng): number {
+function stepStat(value: number, perSeason: number, roll: number): number {
   if (perSeason === 0) return value;
   const p = Math.min(1, Math.abs(perSeason) / WEEKS_PER_SEASON);
-  if (rng.next() >= p) return value;
+  if (roll >= p) return value;
   return clampStat(value + Math.sign(perSeason));
 }
 
@@ -396,14 +396,18 @@ function stepStat(value: number, perSeason: number, rng: Rng): number {
 function nudgeStats(p: Player, perSeason: number, rng: Rng): Player {
   if (perSeason === 0) return p;
   const s = p.stats;
+  const speed = stepStat(s.speed, perSeason, rng.next());
+  const strength = stepStat(s.strength, perSeason, rng.next());
+  const stamina = stepStat(s.stamina, perSeason, rng.next());
+  // Share the former Skill draw without shifting Footy IQ or the next player.
+  const handlingRoll = rng.next();
   return {
     ...p,
     stats: {
-      speed: stepStat(s.speed, perSeason, rng),
-      strength: stepStat(s.strength, perSeason, rng),
-      stamina: stepStat(s.stamina, perSeason, rng),
-      handling: stepStat(s.handling, perSeason, rng), kicking: stepStat(s.kicking, perSeason, rng),
-      footyIQ: stepStat(s.footyIQ, perSeason, rng),
+      speed, strength, stamina,
+      handling: stepStat(s.handling, perSeason, handlingRoll),
+      kicking: stepStat(s.kicking, perSeason, handlingRoll),
+      footyIQ: stepStat(s.footyIQ, perSeason, rng.next()),
     },
   };
 }

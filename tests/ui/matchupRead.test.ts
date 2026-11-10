@@ -42,6 +42,18 @@ function expectScoutingMatchesKickoff(rival: RivalClub) {
 }
 afterEach(() => vi.unstubAllGlobals());
 describe('strategy readouts #467', () => {
+  it('displays the six-stat mean for the Balanced contributor', () => {
+    const roster = nine(80);
+    expect(fitRead(roster, 'balanced').reason).toBe('Jones 80');
+    roster[0] = { ...roster[0]!, name: 'Kai Smith', stats: { ...roster[0]!.stats!, kicking: 20 } };
+    expect(fitRead([roster[0]!], 'balanced').reason).toBe('Smith 70');
+    expect(fitRead(roster, 'balanced').reason).toBe('Jones 80');
+    stubDocument();
+    const button = document.createElement('button');
+    renderPlanFit(button, nine(80), 'balanced');
+    expect(button.textContent).toBe('Balanced★★☆Jones 80');
+  });
+
   it('maps fit bands, clamped at zero and three stars', () => {
     expect([-1, 0, .49, .5, .99, 1, 1.49, 1.5, 2].map(fitStars)).toEqual([0,0,0,1,1,2,2,3,3]);
   });

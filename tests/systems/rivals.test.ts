@@ -1,6 +1,6 @@
 import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/rivals.test.ts — rival squads and rival free agency (GitHub #74).
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   generateRivalSquad, squadStrength, withRivalSquads, pickSigning, rivalSigningTick, healRivals,
   injureRivalPlayers, rolloverRivals, rivalPlayer, weakestPosition, developmentRate, registerRivalsSystem,
@@ -318,6 +318,24 @@ describe('rolloverRivals', () => {
 });
 
 describe('weekly development and the league anchor (#143)', () => {
+  it.each([[19, 1], [34, -1]])('keeps the five-draw order across players aged %i, sharing the former Skill draw', (age, delta) => {
+    const p = agent(makeRng(536), { age, stats: {
+      speed: 50, strength: 50, stamina: 50, handling: 35, kicking: 70, footyIQ: 50,
+    } });
+    const rng = makeRng(536);
+    const draws = [0, .999, 0, 0, .999, .999, 0, .999, .999, 0];
+    const next = vi.spyOn(rng, 'next').mockImplementation(() => draws.shift()!);
+    const first = developRivalPlayerWeek(p, rng);
+    expect(next).toHaveBeenCalledTimes(5);
+    expect(first.stats).toEqual({ speed: 50 + delta, strength: 50, stamina: 50 + delta,
+      handling: 35 + delta, kicking: 70 + delta, footyIQ: 50 });
+    const second = developRivalPlayerWeek(p, rng);
+    expect(next).toHaveBeenCalledTimes(10);
+    expect(second.stats).toEqual({ speed: 50, strength: 50 + delta, stamina: 50,
+      handling: 35, kicking: 70, footyIQ: 50 + delta });
+    expect(draws).toEqual([]);
+  });
+
   const season = (p: Player, seed: number): Player => {
     const rng = makeRng(seed);
     let out = p;
