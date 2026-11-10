@@ -6,7 +6,7 @@ import { drainRate } from '../../src/match/league/fatigue';
 import { knockOnChance } from '../../src/match/league/contest';
 import { STAR_BANDS } from '../../src/config';
 import { makeRng } from '../../src/utils/rng';
-import { trainPlayer, weeklyGain, TRAINING_FOCI } from '../../src/systems/training';
+import { trainWeek, TRAINING_FOCI } from '../../src/systems/training';
 import { developRivalPlayerWeek } from '../../src/systems/rivals';
 import { generateProspects } from '../../src/systems/youth';
 import { FACILITY_CATALOG } from '../../src/data/facility';
@@ -81,12 +81,10 @@ describe('position groups (#537)', () => {
     for (const age of [19, 25, 34]) {
       let p = generatePlayer(rng, { position, age });
       const initial = { ...p.stats };
-      expect(shownStats(position).some(k => weeklyGain(p, facilities)[k] > 0)).toBe(true);
+
       for (let week = 0; week < 52; week++) {
         for (const focus of TRAINING_FOCI) {
-          const gain = weeklyGain(p, facilities, focus);
-          for (const key of keys.filter(k => !shownStats(position).includes(k))) expect(gain[key]).toBe(0);
-          p = { ...p, stats: trainPlayer(p, facilities, focus) };
+          p = trainWeek(p, facilities, focus);
         }
         p = developRivalPlayerWeek(p, rng);
       }

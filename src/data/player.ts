@@ -168,6 +168,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
     position,
     stats,
     ceilings: createCeilings({ id, age, position, stats }),
+    xp: 0, level: 1, unspentPoints: 0,
     morale,
     injuryRisk,
     injuredWeeks: 0,

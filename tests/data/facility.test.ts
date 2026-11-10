@@ -7,7 +7,6 @@ import {
   levelMult,
   upgradeCost,
   facilityUpkeep,
-  effectiveTrains,
   type FacilityDefId,
 } from '../../src/data/facility';
 
@@ -34,19 +33,16 @@ describe('FACILITY_CATALOG', () => {
 
   it('has the exact spec numbers', () => {
     expect(FACILITY_CATALOG.trainingPaddock).toMatchObject({
-      cost: 8000, footprint: { w: 2, h: 2 }, trains: { speed: 1.5, stamina: 1.0 },
+      cost: 8000, footprint: { w: 2, h: 2 }, training: true,
     });
     expect(FACILITY_CATALOG.weightsRoom).toMatchObject({
-      cost: 15000, trains: { strength: 2.0 },
-      adjacency: { near: 'trainingPaddock', bonusMult: 1.25 },
+      cost: 15000, training: true,
     });
     expect(FACILITY_CATALOG.videoRoom).toMatchObject({
-      cost: 18000, trains: { footyIQ: 2.0 },
-      adjacency: { near: 'coachsOffice', bonusMult: 1.25 },
+      cost: 18000, training: true,
     });
     expect(FACILITY_CATALOG.physioCentre).toMatchObject({
-      cost: 22000, trains: { stamina: 1.5 }, special: 'injuryRecovery',
-      adjacency: { near: 'medicalBay', bonusMult: 1.25 },
+      cost: 22000, training: true, special: 'injuryRecovery',
     });
     expect(FACILITY_CATALOG.canteen).toMatchObject({ cost: 12000, special: 'morale' });
     expect(FACILITY_CATALOG.sponsorBoard).toMatchObject({
@@ -56,18 +52,17 @@ describe('FACILITY_CATALOG', () => {
       cost: 120000, footprint: { w: 3, h: 3 }, special: 'gate',
     });
     expect(FACILITY_CATALOG.academy).toMatchObject({
-      cost: 60000, footprint: { w: 3, h: 3 }, trains: { handling: 1.0, kicking: 1.0, footyIQ: 1.0 },
-      special: 'recruitQuality', adjacency: { near: 'coachsOffice', bonusMult: 1.25 },
+      cost: 60000, footprint: { w: 3, h: 3 }, training: true,
+      special: 'recruitQuality',
     });
     expect(FACILITY_CATALOG.coachsOffice).toMatchObject({
-      cost: 30000, trains: { footyIQ: 1.0, handling: 1.0 }, special: 'morale',
+      cost: 30000, training: true, special: 'morale',
     });
     expect(FACILITY_CATALOG.scoutOffice).toMatchObject({ cost: 25000, special: 'recruitQuality' });
     expect(FACILITY_CATALOG.medicalBay).toMatchObject({ cost: 35000, special: 'injuryRecovery' });
     expect(FACILITY_CATALOG.teamGym).toMatchObject({
       cost: 40000, footprint: { w: 3, h: 3 },
-      trains: { strength: 1.5, speed: 1.0, stamina: 1.5 },
-      adjacency: { near: 'weightsRoom', bonusMult: 1.2 },
+      training: true,
     });
   });
 
@@ -129,34 +124,11 @@ describe('upgradeCost', () => {
   });
 });
 
-describe('effectiveTrains', () => {
-  it('scales trains by level multiplier', () => {
-    const def = FACILITY_CATALOG.weightsRoom; // strength 2.0
-    expect(effectiveTrains(def, 1, false)).toEqual({ strength: 2.0 });
-    expect(effectiveTrains(def, 2, false)).toEqual({ strength: 3.2 });
-    expect(effectiveTrains(def, 3, false)).toEqual({ strength: 4.4 });
-  });
-
-  it('applies adjacency multiplier only when active', () => {
-    const def = FACILITY_CATALOG.weightsRoom; // strength 2.0, adj x1.25
-    expect(effectiveTrains(def, 1, true)).toEqual({ strength: 2.5 });
-    // level 2 x1.6 x1.25 = 4.0
-    expect(effectiveTrains(def, 2, true)).toEqual({ strength: 4.0 });
-  });
-
-  it('ignores adjacency for facilities without an adjacency rule', () => {
-    const def = FACILITY_CATALOG.trainingPaddock; // no adjacency
-    expect(effectiveTrains(def, 1, true)).toEqual(effectiveTrains(def, 1, false));
-  });
-
-  it('returns {} for facilities with no trains', () => {
-    expect(effectiveTrains(FACILITY_CATALOG.grandstand, 3, true)).toEqual({});
-    expect(effectiveTrains(FACILITY_CATALOG.canteen, 2, true)).toEqual({});
-  });
-
-  it('rounds each result to 1 decimal place', () => {
-    const def = FACILITY_CATALOG.trainingPaddock; // speed 1.5, stamina 1.0
-    // level 3 x2.2: speed 3.3, stamina 2.2
-    expect(effectiveTrains(def, 3, false)).toEqual({ speed: 3.3, stamina: 2.2 });
+describe('generic training buildings', () => {
+  it('has no per-stat gains or adjacency effects', () => {
+    for (const def of Object.values(FACILITY_CATALOG)) {
+      expect(def).not.toHaveProperty('trains');
+      expect(def).not.toHaveProperty('adjacency');
+    }
   });
 });

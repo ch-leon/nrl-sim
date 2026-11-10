@@ -82,7 +82,7 @@ describe('stored potential ceilings (#538)', () => {
   });
 
   it('preserves veteran decline from current stats without changing ceilings', () => {
-    const p = { ...generatePlayer(makeRng(53), { age: 33, position: 'prop' }), stats: flat(80), traits: [] };
+    const p = { ...generatePlayer(makeRng(53), { age: 33, position: 'prop' }), stats: flat(80), ceilings: { speed: 100, strength: 100, stamina: 100, footyIQ: 100 }, traits: [] };
     const ceilings = JSON.stringify(p.ceilings);
     let aged = p;
     for (let w = 0; w < WEEKS_PER_SEASON; w++) aged = { ...aged, stats: trainPlayer(aged, [], 'balanced') };

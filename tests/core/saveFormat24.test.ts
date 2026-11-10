@@ -82,3 +82,32 @@ describe('save format 24 (#536)', () => {
     }
   }
 });
+
+
+it('backfills pre-progression v24 players deterministically without changing RNG, ceilings or raw bytes', () => {
+  const s = createNewGame('XP backfill', 539); initLeague(s);
+  const current = getState();
+  const raw = JSON.stringify(current, (_key, value: unknown) => {
+    if (value && typeof value === 'object' && 'stats' in value && 'position' in value) {
+      const { xp: _xp, level: _level, unspentPoints: _points, ...old } = value as GameState['squad'][number];
+      return old;
+    }
+    return value;
+  });
+  const first = importSave(raw); const second = importSave(raw);
+  expect(first).toEqual(second);
+  expect(first.ok).toBe(true);
+  if (!first.ok) return;
+  expect(first.state.rngSeed).toBe(current.rngSeed);
+  const players = [...first.state.squad, ...first.state.freeAgents, ...first.state.league.clubs.flatMap(c => c.squad ?? [])];
+  for (const p of players) expect(p).toMatchObject({ xp: 0, level: 1, unspentPoints: 0 });
+  expect(first.state.squad.map(p => p.ceilings)).toEqual(current.squad.map(p => p.ceilings));
+  const progressed = { ...first.state, squad: first.state.squad.map(p => ({ ...p, xp: 45.5, level: 4, unspentPoints: 7 })) };
+  expect(importSave(exportSave(progressed))).toMatchObject({ ok: true, state: progressed });
+  expect(JSON.parse(raw).squad[0]).not.toHaveProperty('xp');
+});
+it.each([{ xp: -1 }, { xp: null }, { level: 0 }, { level: 1.5 }, { unspentPoints: -1 }, { unspentPoints: 0.5 }])('rejects malformed progression fields %j', fields => {
+  const s = createNewGame('XP validation', 539);
+  const raw = JSON.stringify({ ...s, squad: [{ ...s.squad[0]!, ...fields }, ...s.squad.slice(1)] });
+  expect(importSave(raw).ok).toBe(false);
+});

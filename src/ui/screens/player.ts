@@ -18,7 +18,7 @@ import { getState, setState, type GameState, type Player, type PlayerStats, type
 import { save } from '../../core/save';
 import { marketWage, overallRating, ratingText, shownStats } from '../../data/player';
 import { ROMAN, TRAITS, traitTip } from '../../data/traits';
-import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
+import { PROGRESSION, CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } from '../../systems/contracts';
 import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
 import { signWithUndo } from '../../systems/undo';
@@ -30,7 +30,7 @@ import { PORTRAIT_H, PORTRAIT_W, TRAINING_KIT, portraitDataUrl } from '../../art
 import { backButton, button, closeModal, el, openModal } from '../dom';
 import { ensureScreenStyles, fitColour } from './recruit';
 import { fmtMoney } from './finance';
-import { focusLabel, weeklyChange, weeklyGain } from '../../systems/training';
+import { focusLabel } from '../../systems/training';
 import { LINEUP_SLOTS, commitLineup, resolveLineup, setCaptain, setKicker, statsAt } from '../../systems/lineup';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import { potentialText } from '../../systems/potential';
@@ -93,6 +93,7 @@ export interface PlayerPageModel {
   season: StatTally | null;
   career: StatTally | null;
   potential: string;
+  xp: string;
   actions: PlayerAction[];
 }
 
@@ -251,12 +252,10 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     ? { text: `Asks ${fmtMoney(wage)}/wk on a ${CONTRACTS.NEW_CONTRACT_WEEKS}-week deal`, expiring: false }
     : { text: `${weeksText(p.contractWeeks)} left · ${fmtMoney(wage)}/wk`, expiring: p.contractWeeks <= MORALE.EXPIRING_WEEKS };
   const seasonsAtClub = p.joinedSeason !== undefined ? state.season - p.joinedSeason + 1 : null;
-  // A week's training under the squad's focus (N11): what each stat gains, for your own players.
+  // Keep the squad focus visible: it now controls level-point spending.
   const focus = state.training?.focus ?? 'balanced';
-  // Nothing trains without facilities: no gains to show. What shows is the week's change, a veteran's decline included.
-  const trains = squad && Object.values(weeklyGain(p, state.facilities, focus)).some((g) => g > 0);
-  const gain = trains ? weeklyChange(p, state.facilities, focus) : null;
   return {
+    xp: `Level ${p.level ?? 1} · XP ${Math.floor(p.xp ?? 0)}/${PROGRESSION.XP_PER_LEVEL}`,
     id: p.id,
     name: p.name,
     position: positionLabel(p.position),
@@ -267,7 +266,6 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     stats: shownStats(p.position).map((key) => ({
       label: key === 'footyIQ' ? activePack().vocab.iqStat : STAT_LABELS.find(([k]) => k === key)![1],
       value: Math.round(p.stats[key]),
-      ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}),
     })),
     trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
@@ -565,6 +563,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       el('h3', { text: m.trainingFocus ? `Stats · this week's training: ${m.trainingFocus}` : 'Stats' }),
       statBars(m.stats, m.trainingFocus),
       el('div', { class: 'nrl-player-line', attrs: { 'data-potential': '' }, text: m.potential }),
+      el('div', { class: 'nrl-player-line', attrs: { 'data-xp': '' }, text: m.xp }),
       el('h3', { text: 'Traits' }),
       ...(m.traits.length > 0
         ? m.traits.map((t) => el('div', { class: `nrl-player-trait${t.bad ? ' nrl-player-trait-bad' : ''}` }, el('b', { text: t.label }), t.tip))

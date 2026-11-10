@@ -48,24 +48,22 @@ export const STAT_MAX = 100;
  */
 export let LEAGUE = league.rating;
 
-// Training curve (GitHub #35). Each week's stat gain is multiplied by headroom:
-//   GAIN_RATE × (1 − stat / STAT_MAX) ^ HEADROOM_EXP
-// so gains are quick early and slow towards the ceiling, with no stored
-// potential. Tuned so a typical ~60-overall player on one Training Paddock gains
-// about 8–9 overall in season 1 and then slows sharply (projection test in
-// tests/systems/training.test.ts). Raise HEADROOM_EXP to flatten the top end;
-// raise GAIN_RATE to speed up every stat.
-export const TRAINING_CURVE = {
-  GAIN_RATE: 12,
-  HEADROOM_EXP: 2,
+// Rough starting progression values (#539). #547 owns tuning.
+export const PROGRESSION = {
+  WEEKLY_XP: 10,
+  STARTER_XP: 40,
+  BENCH_XP: 20,
+  TRY_XP: 10,
+  LINE_BREAK_XP: 5,
+  POTM_XP: 20,
+  XP_PER_LEVEL: 100,
+  POINTS_PER_LEVEL: 1,
+  FACILITY_XP_BONUS: 0.10,
+  FACILITY_XP_CAP: 0.50,
 } as const;
 
-// A squad training focus (N11): the focused stat's facility gains ×ON, the other four
-// ×OFF (1.3 + 4 × 0.85 = 4.7 of Balanced's 5: close to even in total). Balanced is ×1 each.
-export const TRAINING_FOCUS = {
-  ON: 1.3,
-  OFF: 0.85,
-} as const;
+// Legacy help-copy values; no longer used for stat growth. #546 owns help text.
+export const TRAINING_FOCUS = { ON: 1.3, OFF: 0.85 } as const;
 
 // Economy tuning (BAK-188, WU-10). Weekly income/expense loop constants read by
 // src/systems/economy.ts. See the ticket spec for formula derivations.

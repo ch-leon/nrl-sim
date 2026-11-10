@@ -76,3 +76,14 @@ describe('closed facility tiles (#481)', () => {
     expect(buildBlocker(FACILITY_CATALOG.teamGym, s)).toMatch(/^Need \$/);
   });
 });
+
+
+describe('generic facility XP copy (#539)', () => {
+  it('shows the same XP percentage and cap for every training building, scaled by level', () => {
+    for (const def of Object.values(FACILITY_CATALOG).filter(d => d.training)) {
+      expect(facilityBlurb(def)).toContain('+10% XP (total cap 50%)');
+      expect(facilityBlurb(def, { level: 3, reputation: 30 })).toContain('+22% XP (total cap 50%)');
+      expect(facilityBlurb(def)).not.toMatch(/Trains|adjacen/i);
+    }
+  });
+});

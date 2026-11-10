@@ -24,14 +24,13 @@ import {
   type FacilityDefId,
   type FacilityDef,
 } from '../../data/facility';
-import type { PlayerStats, PlacedFacility } from '../../core/state';
+import type { PlacedFacility } from '../../core/state';
 import { isFacilityOpen, unlockReason } from '../../systems/unlocks';
 import { getState } from '../../core/state';
-import { ECON } from '../../config';
+import { ECON, PROGRESSION } from '../../config';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
 import { demolishWithUndo } from '../../systems/undo';
-import { activePack } from '../../content';
 import { POOL_POINTS_PER_BIAS, SCOUT_BIAS_PER_LEVEL, SCOUT_FEE_DISCOUNT_PER_LEVEL } from '../../systems/freeagency';
 import { REP_BASELINE } from '../../systems/league';
 import { coachsOfficeLevel } from '../../systems/matchday';
@@ -54,14 +53,6 @@ function fmtShort(n: number): string {
   if (abs < 1000) return fmtMoney(n);
   return `${n < 0 ? '-' : ''}$${(abs / 1000).toFixed(1).replace(/\.0$/, '')}k`;
 }
-
-const STAT_LABEL: Record<keyof PlayerStats, string> = {
-  speed: 'Speed',
-  strength: 'Strength',
-  stamina: 'Stamina',
-  handling: 'Handling', kicking: 'Kicking',
-  get footyIQ() { return activePack().vocab.iqStat; },
-};
 
 /** The free-agent pool's lift a level, in overall points (freeagency.poolTarget). */
 const poolLift = (bias: number): number => Math.round(bias * POOL_POINTS_PER_BIAS * 10) / 10;
@@ -109,26 +100,23 @@ function sponsorCopy({ level, reputation }: BlurbContext): string {
 }
 
 /**
- * Human "what it trains / does" copy derived from a facility's trains + special.
+ * Human XP / special-effect copy derived from the facility definition.
  * `ctx` is the level described (the build menu's L1, a placed facility's own)
  * and the club's reputation; without it, L1 at the baseline reputation.
  */
 export function facilityBlurb(def: FacilityDef, ctx: BlurbContext = { level: 1, reputation: REP_BASELINE }): string {
-  const trains = (Object.entries(def.trains) as [keyof PlayerStats, number][])
-    .filter(([, v]) => v > 0)
-    .map(([stat, v]) => `+${v} ${STAT_LABEL[stat]}`);
   const parts: string[] = [];
-  if (trains.length > 0) parts.push('Trains ' + trains.join(', ') + ' / week');
+  if (def.training) parts.push(`+${Math.round(PROGRESSION.FACILITY_XP_BONUS * LEVEL_MULT[ctx.level - 1] * 100)}% XP (total cap ${PROGRESSION.FACILITY_XP_CAP * 100}%)`);
   if (def.special) parts.push(def.id === 'sponsorBoard' ? sponsorCopy(ctx) : def.id === 'coachsOffice' ? officeCopy(ctx) : SPECIAL_COPY[def.id]);
   return parts.length > 0 ? parts.join('. ') : 'A club facility.';
 }
 
-/** The Build menu's categories (3c): TRAINING is every facility that trains a stat, CLUB the rest. */
+/** The Build menu's categories (3c): TRAINING is every facility that boosts XP, CLUB the rest. */
 export type BuildCategory = 'all' | 'training' | 'club';
 
 /** Which category a facility is listed under (besides ALL). */
-export function facilityCategory(def: Pick<FacilityDef, 'trains'>): Exclude<BuildCategory, 'all'> {
-  return Object.values(def.trains).some((v) => (v ?? 0) > 0) ? 'training' : 'club';
+export function facilityCategory(def: Pick<FacilityDef, 'training'>): Exclude<BuildCategory, 'all'> {
+  return def.training ? 'training' : 'club';
 }
 
 /**

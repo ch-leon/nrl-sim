@@ -37,8 +37,8 @@ function tally(v: unknown): boolean {
 export function isPlayer(v: unknown, version = SAVE_VERSION): v is Player {
   if (!record(v) || !text(v.id) || !text(v.name) || !integer(v.age, 1) || !oneOf(v.position, POSITIONS) || !isPlayerStats(v.stats)) return false;
   // Missing means a pre-ceiling v24 career. Present ceilings must be complete.
-  // Do not compare to current stats: legacy training can still pass ceilings
-  // until XP/spending replaces growth in #539/#540. Never lift a stored ceiling.
+  // Do not reject legacy v24 training above a stored ceiling. The weekly
+  // progression tick clamps those stats; never lift the stored ceiling.
   if (v.ceilings !== undefined) {
     const ceilings = v.ceilings;
     if (!record(ceilings) || !Object.keys(ceilings).every(k => stats.includes(k as typeof stats[number]) && range(ceilings[k], 1, 100))
@@ -47,6 +47,9 @@ export function isPlayer(v: unknown, version = SAVE_VERSION): v is Player {
   // Injury recovery is fractional; contracts and ages are not. Debt is a career
   // balance, never a reason to clamp a player's wage or fabricate a contract.
   if (!range(v.morale, 1, 100) || !range(v.injuryRisk, 0, 100) || !range(v.injuredWeeks, 0) || !range(v.wage, 0) || !integer(v.contractWeeks)) return false;
+  if (v.xp !== undefined && !range(v.xp, 0)) return false;
+  if (v.level !== undefined && !integer(v.level, 1)) return false;
+  if (v.unspentPoints !== undefined && !integer(v.unspentPoints)) return false;
   if (v.suspendedWeeks !== undefined && !integer(v.suspendedWeeks)) return false;
   if (['junior', 'departed'].some(k => v[k] !== undefined && typeof v[k] !== 'boolean')) return false;
   if (v.joinedSeason !== undefined && !integer(v.joinedSeason, 1)) return false;
@@ -223,13 +226,13 @@ export function validateCurrent(v: Record<string, unknown>): ValidationResult {
       captain: lineup.captain,
     };
   }
-  // Compatible addition within format 24. Copy only missing-ceiling players;
+  // Compatible additions within format 24. Copy only players missing fields;
   // preserve existing ceilings, raw input, selections and all RNG state.
   let backfilled = false;
   const roster = (players: Player[]): Player[] => players.map(p => {
-    if (p.ceilings !== undefined) return p;
+    if (p.ceilings !== undefined && p.xp !== undefined && p.level !== undefined && p.unspentPoints !== undefined) return p;
     backfilled = true;
-    return { ...p, ceilings: createCeilings(p) };
+    return { ...p, ceilings: p.ceilings ?? createCeilings(p), xp: p.xp ?? 0, level: p.level ?? 1, unspentPoints: p.unspentPoints ?? 0 };
   });
   const squad = roster(state.squad);
   const freeAgents = roster(state.freeAgents);

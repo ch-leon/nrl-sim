@@ -45,7 +45,7 @@ export function coachSays(state: GameState, ctx: CoachContext): CoachSuggestion 
       return { text: `We're thin at ${position}. Have a look at the recruits.`, screen: 'recruit' };
     }
   }
-  const trainingBuilt = state.facilities.some((f) => Object.keys(FACILITY_CATALOG[f.defId].trains).length > 0);
+  const trainingBuilt = state.facilities.some((f) => FACILITY_CATALOG[f.defId].training);
   if (!trainingBuilt && state.money >= FACILITY_CATALOG.trainingPaddock.cost) {
     return { text: 'Get a Training Paddock down.', screen: 'build' };
   }

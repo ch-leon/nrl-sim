@@ -294,6 +294,14 @@ export async function runPortraitMenus(browser) {
             out.push(`${m.id}: did not open (${err.message.split('\n')[0]})`);
             continue;
           }
+          if (m.id === 'player') {
+            const xp = page.locator('[data-xp]');
+            const text = await xp.textContent();
+            if (!/^Level \d+ · XP \d+\/100$/.test(text ?? '')) out.push(`player: missing plain XP progress (${text})`);
+            await xp.scrollIntoViewIfNeeded();
+            const bounds = await xp.boundingBox();
+            if (!bounds || bounds.x < 0 || bounds.x + bounds.width > W || bounds.y < 0 || bounds.y + bounds.height > H) out.push('player: XP line is clipped');
+          }
           const found = [
             ...await portraitFitProblems(page, m.root ?? '.nrl-screen-region', safe),
             ...await portraitDockProblems(page, m.mark, safe),
