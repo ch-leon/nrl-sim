@@ -227,3 +227,12 @@ describe('plain Potential line (#538)', () => {
     }
   });
 });
+
+
+it('shows plain XP level and progress without per-stat weekly gains', () => {
+  const s = createNewGame('XP text', 539);
+  const p = { ...s.squad[0]!, xp: 42.75, level: 3, unspentPoints: 2 };
+  const m = playerPageModel(p, { kind: 'squad' }, s);
+  expect(m.xp).toBe('Level 3 · XP 42/100');
+  expect(m.stats.every(stat => stat.gain === undefined)).toBe(true);
+});

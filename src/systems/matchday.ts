@@ -3,6 +3,7 @@
 // (BAK-207): the week holds at kick-off, 'match:started' hands the Match scene
 // the seed, and the result — what the player watched and called — lands with
 // the rest of the week at 'match:finished'. Fast-forward plays it headless.
+import { applyMatchXp } from './training';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import type { RivalPlanContext } from '../match/league/ai';
 import { bus, type LiveMatchData } from '../core/events';
@@ -225,7 +226,8 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   setState({
     league: applied.league,
     ...(fixture.round > 0 ? { recentPlans: [{ ...(ownSheet.tactics ?? DEFAULT_TACTICS) }, ...getState().recentPlans].slice(0, 3) } : {}),
-    squad: applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
+    squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
+      ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus),
   });
 
   // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.

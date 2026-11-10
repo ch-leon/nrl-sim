@@ -2,8 +2,6 @@
 // See BAK-168 (this spec is authoritative for all numbers). Runtime placed
 // instances use PlacedFacility from ../core/state. No mutable state, no Phaser.
 
-import type { PlayerStats } from '../core/state';
-
 export type FacilityDefId =
   | 'trainingPaddock' | 'weightsRoom' | 'videoRoom' | 'physioCentre'
   | 'canteen' | 'sponsorBoard' | 'grandstand' | 'academy'
@@ -22,12 +20,10 @@ export interface FacilityDef {
    */
   upkeep: number;
   footprint: { w: number; h: number };
-  trains: Partial<PlayerStats>; // per-week stat gain at level 1 (pre-scaling)
+  training?: boolean; // generic XP bonus, configured in PROGRESSION
   special?: FacilitySpecial; // non-training effect (magnitude read by systems)
   /** Income/gate facilities earn from one copy only, so placement blocks a second (#38). */
   unique?: boolean;
-  adjacency?: { near: FacilityDefId; bonusMult: number }; // mult on this
-  //                                        facility's trains when adjacent
 }
 
 export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
@@ -37,7 +33,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 8000,
     upkeep: 80,
     footprint: { w: 2, h: 2 },
-    trains: { speed: 1.5, stamina: 1.0 },
+    training: true,
   },
   weightsRoom: {
     id: 'weightsRoom',
@@ -45,8 +41,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 15000,
     upkeep: 150,
     footprint: { w: 2, h: 2 },
-    trains: { strength: 2.0 },
-    adjacency: { near: 'trainingPaddock', bonusMult: 1.25 },
+    training: true,
   },
   videoRoom: {
     id: 'videoRoom',
@@ -54,8 +49,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 18000,
     upkeep: 180,
     footprint: { w: 2, h: 2 },
-    trains: { footyIQ: 2.0 },
-    adjacency: { near: 'coachsOffice', bonusMult: 1.25 },
+    training: true,
   },
   physioCentre: {
     id: 'physioCentre',
@@ -63,9 +57,8 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 22000,
     upkeep: 220,
     footprint: { w: 2, h: 2 },
-    trains: { stamina: 1.5 },
+    training: true,
     special: 'injuryRecovery',
-    adjacency: { near: 'medicalBay', bonusMult: 1.25 },
   },
   canteen: {
     id: 'canteen',
@@ -73,7 +66,6 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 12000,
     upkeep: 120,
     footprint: { w: 2, h: 2 },
-    trains: {},
     special: 'morale',
   },
   sponsorBoard: {
@@ -82,7 +74,6 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 10000,
     upkeep: 100,
     footprint: { w: 2, h: 1 },
-    trains: {},
     special: 'income',
     unique: true,
   },
@@ -92,7 +83,6 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 120000,
     upkeep: 1200,
     footprint: { w: 3, h: 3 },
-    trains: {},
     special: 'gate',
     unique: true,
   },
@@ -102,9 +92,8 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 60000,
     upkeep: 600,
     footprint: { w: 3, h: 3 },
-    trains: { handling: 1.0, kicking: 1.0, footyIQ: 1.0 },
+    training: true,
     special: 'recruitQuality',
-    adjacency: { near: 'coachsOffice', bonusMult: 1.25 },
   },
   coachsOffice: {
     id: 'coachsOffice',
@@ -112,7 +101,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 30000,
     upkeep: 300,
     footprint: { w: 2, h: 2 },
-    trains: { footyIQ: 1.0, handling: 1.0, kicking: 1.0 },
+    training: true,
     special: 'morale',
   },
   scoutOffice: {
@@ -121,7 +110,6 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 25000,
     upkeep: 250,
     footprint: { w: 2, h: 2 },
-    trains: {},
     special: 'recruitQuality',
   },
   medicalBay: {
@@ -130,7 +118,6 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 35000,
     upkeep: 350,
     footprint: { w: 2, h: 2 },
-    trains: {},
     special: 'injuryRecovery',
   },
   teamGym: {
@@ -139,8 +126,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 40000,
     upkeep: 400,
     footprint: { w: 3, h: 3 },
-    trains: { strength: 1.5, speed: 1.0, stamina: 1.5 },
-    adjacency: { near: 'weightsRoom', bonusMult: 1.2 },
+    training: true,
   },
 };
 
@@ -156,7 +142,7 @@ export const SPECIAL_MAGNITUDE: Record<FacilitySpecial, number> = {
   morale: 1, // +morale/week per level of Canteen/Coach's Office (systems/morale.ts)
 };
 
-/** Level scaling multiplier applied to `trains` (and special magnitude). */
+/** Level scaling multiplier applied to the XP bonus and special magnitude. */
 export const LEVEL_MULT: readonly [number, number, number] = [1, 1.6, 2.2];
 
 export function levelMult(level: 1 | 2 | 3): number {
@@ -174,33 +160,4 @@ export const UPKEEP_LEVEL_MULT: readonly [number, number, number] = [1, 1.5, 2];
 /** Weekly running cost of a facility at `level`: def.upkeep × UPKEEP_LEVEL_MULT. */
 export function facilityUpkeep(def: FacilityDef, level: 1 | 2 | 3): number {
   return Math.round(def.upkeep * UPKEEP_LEVEL_MULT[level - 1]);
-}
-
-/** Round to 1 decimal place, avoiding negative-zero and float drift. */
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
-}
-
-/**
- * Effective per-week trains for a placed facility at a level. Adjacency is
- * decided by the caller (training system); when active AND the def has an
- * adjacency rule, that facility's trains are additionally multiplied by the
- * adjacency bonus. Each result rounded to 1 dp. Facilities with no trains
- * return {}.
- */
-export function effectiveTrains(
-  def: FacilityDef,
-  level: 1 | 2 | 3,
-  adjacencyActive: boolean,
-): Partial<PlayerStats> {
-  const lm = levelMult(level);
-  const adjMult = adjacencyActive && def.adjacency ? def.adjacency.bonusMult : 1;
-  const out: Partial<PlayerStats> = {};
-  for (const [stat, base] of Object.entries(def.trains) as [
-    keyof PlayerStats,
-    number,
-  ][]) {
-    out[stat] = round1(base * lm * adjMult);
-  }
-  return out;
 }

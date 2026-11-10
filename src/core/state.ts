@@ -43,6 +43,10 @@ export interface Player {
   position: Position;
   stats: PlayerStats;
   readonly ceilings: PlayerCeilings;
+  /** XP towards the next level. Absent only on pre-progression format-24 players. */
+  xp?: number;
+  level?: number;
+  unspentPoints?: number;
   morale: number; // 1-100
   injuryRisk: number; // 1-100
   injuredWeeks: number; // 0 = fit
