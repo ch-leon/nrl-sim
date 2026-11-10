@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Every player has fixed potential ceilings on their four shown stats, with more headroom for younger players. A plain Potential star line replaces the career projection; existing format-24 careers backfill ceilings deterministically ([PR](https://github.com/ch-leon/nrl-sim/pull/565)).
+
 - Players show four stats for their position group; overall averages those four, with half-step rating stars beside it. Hidden off-role stats start low and stay fixed ([issue](https://github.com/ch-leon/nrl-sim/issues/537)).
 
 - Handling and Kicking replace Skill in matches, training and player stats. New careers use save format 24; older careers need a new start and their original files remain available for recovery ([issue](https://github.com/ch-leon/nrl-sim/issues/536)).
