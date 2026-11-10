@@ -301,3 +301,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261110-154344-543-offload-weighting | 543-offload-weighting | 4bdc770 | codex/543-offloads-headline-trait | [report](runs/20261110-154344-543-offload-weighting/report.md) |
 | 20261110-154452-543-offload-weighting | 543-offload-weighting | 4bdc770 (uncommitted changes) | codex/543-offloads-headline-trait | [report](runs/20261110-154452-543-offload-weighting/report.md) |
 | 20261110-163332-standard | standard | 12662ef | main | [report](runs/20261110-163332-standard/report.md) |
+| 20261110-173807-standard | standard | 489cea5 | main | [report](runs/20261110-173807-standard/report.md) |
