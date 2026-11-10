@@ -8,15 +8,16 @@
 //  - person_profiles 'never': no person records, and the game never calls
 //    identify(), alias(), group() or reset();
 //  - nothing captured on its own: no autocapture, page views or page leaves, dead
-//    clicks, heatmaps, web vitals, exceptions or console logs;
+//    clicks, heatmaps, web vitals or console logs; exceptions use guarded listeners;
 //  - session replay off (and inputs masked, should it ever be switched on);
 //  - no other calls: no feature flags or remote config (advanced_disable_flags), no
 //    scripts fetched from PostHog (surveys, recorder, toolbar, site apps).
-// before_send is the last gate: only events.ts's events, with only their own
+// before_send is the last gate: sanitized $exception plus events.ts's events, with only their own
 // properties, and the page address without its query or hash.
 
 import type { CaptureResult, PostHogConfig } from 'posthog-js/dist/module.slim';
 import type { AnalyticsSetup } from './config';
+import { sanitizeExceptionProperties } from './exceptions';
 import { isEventName, sanitize } from './events';
 
 /** SDK properties that say where a visit came from; dropped. */
@@ -24,7 +25,14 @@ const DROPPED = ['$referrer', '$referring_domain', '$initial_referrer', '$initia
 
 /** Only the agreed events, with only their own properties and the SDK's anonymous ones. */
 export function beforeSend(e: CaptureResult | null): CaptureResult | null {
-  if (!e || !isEventName(e.event)) return null;
+  if (!e) return null;
+  if (e.event === '$exception') {
+    try {
+      const properties = sanitizeExceptionProperties(e.properties ?? {});
+      return properties ? { uuid: e.uuid, event: '$exception', timestamp: e.timestamp, properties } as CaptureResult : null;
+    } catch { return null; }
+  }
+  if (!isEventName(e.event)) return null;
   const own = sanitize(e.event, e.properties ?? {});
   if (!own) return null;
   const props: Record<string, unknown> = {};
@@ -61,6 +69,8 @@ export function clientConfig(setup: AnalyticsSetup): Partial<PostHogConfig> {
     capture_dead_clicks: false,
     capture_heatmaps: false,
     capture_performance: false,
+    // #548: guarded window listeners queue errors before this chunk exists.
+    // captureException uses the official extension; no duplicate SDK listeners.
     capture_exceptions: false,
     disable_session_recording: true,
     session_recording: { maskAllInputs: true },

@@ -78,6 +78,22 @@ inside its frame upright (390×844) and sideways (667×375 and 568×320).
   is also true while a playtest career is on, even after the page is hidden, so
   developer and playtest sessions send nothing. If that rule ever changes to
   classify instead of drop, use the marker below.
+- JavaScript error tracking (#548) uses the same off-switches, including test
+  careers. DNT/GPC are also checked before SDK loading, because the SDK can
+  otherwise send in cookieless-always mode despite `respect_dnt: true`. Guarded window error/rejection listeners keep at most ten sanitized
+  exceptions in memory until post-title SDK startup (ten distinct errors/minute,
+  deduped across both listeners). A boot that never reaches startup cannot flush;
+  module-load failures before the listeners exist are also an intentional gap.
+  Only the official PostHog error-tracking extension joins the lazy slim chunk.
+  `capture_exceptions` stays false because these listeners own autocapture;
+  `captureException` sends through the extension, and `before_send` allows only
+  sanitized `$exception` alongside the existing curated events. No error messages,
+  arbitrary rejection values, causes, function names, source context or user URLs
+  survive. Stack frames keep only known production chunk names and line/column
+  numbers (maximum 20 frames); hosts, queries and hashes are discarded. Development
+  and unknown-script frames are dropped. This trades diagnostic detail for privacy;
+  the app build identifies the minified bundle. No replay, logs or native crash path.
+  Live ingestion still awaits the public project token from the accounts side.
 - `developerSession()` in `src/labs/flags.ts` returns `null` on a player's browser
   (the page has never been shown). Otherwise it returns `{ testCareer, overrides,
   experiments }`. Treat any non-null value as a developer session: either send
