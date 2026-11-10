@@ -135,11 +135,11 @@ describe('the Assistant Coach and the Analyst (N14)', () => {
 });
 
 describe('old saves (N14.5)', () => {
-  it('a v18 save has hired nobody', () => {
+  it('a v18 save requires a new career', () => {
     const raw = { ...JSON.parse(JSON.stringify(getState())), version: 18 } as Record<string, unknown>;
     delete raw.staff;
     const res = migrateState(raw);
-    expect(res.ok && res.state.staff).toEqual([]);
+    expect(res).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
   });
 });
 

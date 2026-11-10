@@ -82,7 +82,7 @@ export const LIVE = {
   driveBack: 2.5,
   /** A support runner this close can take an offload. */
   offloadM: 7,
-  /** Chance a catcher spills a kick: alone, and with a chaser inside PRESSURE_M (less by Skill). */
+  /** Chance a catcher spills a kick: alone, and with a chaser inside PRESSURE_M (less by Handling). */
   dropChance: 0.06,
   dropPressured: 0.18,
   /** Kick chasers this far from the landing point still run flat out at it. */
@@ -122,7 +122,7 @@ export const LIVE = {
   ruckAdvanceM: 3,
   /** Chance the dummy-half darts instead of passing. */
   dartChance: 0.08,
-  /** Engaged carrier's base chance to pass (+ Skill/300, + Playmaker, + preset). */
+  /** Engaged carrier's base chance to pass (+ Handling/300, + Playmaker, + preset). */
   passBase: 0.3,
 };
 

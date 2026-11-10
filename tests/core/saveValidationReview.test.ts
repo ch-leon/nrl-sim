@@ -95,14 +95,14 @@ describe('complete finance rows (checker P1)', () => {
       expect(FINANCE_LINES.every(line => Number.isFinite(getState().finance[0]![line]))).toBe(true);
     } finally { off(); }
   });
-  it.each([10, 16])('keeps the documented pre-v17 overhead default for v%i without changing source bytes', version => {
+  it.each([10, 16])('rejects the historical pre-v17 overhead format for v%i without changing source bytes', version => {
     const s = { ...fresh(), version, finance: [{ ...emptyFinance(1), wages: -500 }] };
     delete (s.finance[0] as unknown as Record<string, unknown>).overhead;
     const source = JSON.stringify(s);
     bytes.set(slotKey(1), source);
-    expect(loadSlot()).toMatchObject({ status: 'ok', state: { finance: [{ wages: -500, overhead: 0 }] } });
+    expect(loadSlot()).toMatchObject({ status: 'corrupt', message: expect.stringMatching(/start a new career/i) });
     expect(bytes.get(slotKey(1))).toBe(source);
-    expect(installImportedSave(source, 2)).toMatchObject({ ok: true, state: { finance: [{ wages: -500, overhead: 0 }] } });
+    expect(installImportedSave(source, 2)).toMatchObject({ ok: false });
     expect(JSON.stringify(s)).toBe(source);
   });
 });

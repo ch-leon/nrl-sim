@@ -61,7 +61,7 @@ export function statsAt(p: Pick<Player, 'stats' | 'position'>, slot: Position): 
   const f = positionFit(p.position, slot);
   if (f === 1) return { ...p.stats };
   const scale = (n: number): number => Math.max(1, Math.round(n * f));
-  return { speed: scale(p.stats.speed), strength: scale(p.stats.strength), stamina: scale(p.stats.stamina), skill: scale(p.stats.skill), footyIQ: scale(p.stats.footyIQ) };
+  return { speed: scale(p.stats.speed), strength: scale(p.stats.strength), stamina: scale(p.stats.stamina), handling: scale(p.stats.handling), kicking: scale(p.stats.kicking), footyIQ: scale(p.stats.footyIQ) };
 }
 
 /** Fit to play: not injured and not banned (#324). A missing ban field is 0. */

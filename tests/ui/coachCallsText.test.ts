@@ -115,8 +115,8 @@ describe('the next unlock, named', () => {
     expect(facilityBlurb(def)).toContain('Level 1 unlocks');
   });
 
-  it('the Guide\'s Grounds page: IQ, skill, morale and the calls, with the club\'s next level', () => {
-    expect(coachsOfficeBullet({ facilities: [] })).toContain('IQ and skill, and morale, and it unlocks coach calls');
+  it('the Guide\'s Grounds page: IQ, handling, morale and the calls, with the club\'s next level', () => {
+    expect(coachsOfficeBullet({ facilities: [] })).toContain('IQ, handling and kicking, and morale, and it unlocks coach calls');
     expect(coachsOfficeBullet({ facilities: [] })).toContain('Level 1 unlocks Shift, Rush, Offload and Gang tackle.');
     expect(coachsOfficeBullet({ facilities: office(2) })).toContain('Yours is level 2. Level 3 unlocks Bomb, Field goal and 40/20.');
     expect(coachsOfficeBullet({ facilities: office(3) })).toContain('All coach calls are unlocked.');

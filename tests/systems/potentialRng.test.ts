@@ -33,7 +33,10 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * pin with habit AI off, and compare UI-read/no-read streams with it on too.
  * The two match fingerprint pins remain unchanged.
  */
-const MAIN_SEED_AFTER_SEASON = 3040797444;
+// #536 splits the stat in rival growth as well as match inputs. The existing
+// per-stat step now rolls for Kicking too; career streams change without tuning.
+// Golden individual-match fingerprints remain unchanged.
+const MAIN_SEED_AFTER_SEASON = 1642145858;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly projection and dot reads preserve the season stream with habit AI=%i', (ai) => {

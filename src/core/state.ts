@@ -27,7 +27,7 @@ export type Trait = import('../data/traits').TraitId;
 
 export interface PlayerStats {
   speed: number; strength: number; stamina: number;
-  skill: number; footyIQ: number; // 1-100
+  handling: number; kicking: number; footyIQ: number; // 1-100
 }
 
 /** Event-derived individual tallies (GitHub #46). */
@@ -94,9 +94,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** Current save-format version. Bump when GameState changes and add a step to
- *  MIGRATIONS in save.ts (see the pattern comment there). */
-export const SAVE_VERSION = 23;
+/** Current save-format version. v24 is new careers only: no migration from v23
+ *  or earlier (Leon, 10 Nov 2026). Rejected originals stay in recovery. */
+export const SAVE_VERSION = 24;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';

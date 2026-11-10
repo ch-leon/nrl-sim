@@ -400,7 +400,7 @@ describe('difficulty plays in the match: the rival’s edge after the spread (N1
       const played = edgeSheets(...spread, k.live.difficultyEdge);
       const before = men(pick(k, spread, 'rival'));
       men(pick(k, played, 'rival')).forEach((e, i) => {
-        for (const stat of ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const) {
+        for (const stat of ['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'] as const) {
           expect(Math.sign(e.stats![stat] - before[i]!.stats![stat])).toBe(d === 'hard' ? 1 : -1);
         }
       });

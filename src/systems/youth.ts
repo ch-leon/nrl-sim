@@ -50,8 +50,9 @@ export function generateProspects(rng: Rng, level: number): Player[] {
     });
     const roll = (): number => Math.min(STAT_MAX, rng.int(lo, hi));
     const stats = {
-      speed: roll(), strength: roll(), stamina: roll(), skill: roll(), footyIQ: roll(),
+      speed: roll(), strength: roll(), stamina: roll(), handling: roll(), kicking: 0, footyIQ: roll(),
     };
+    stats.kicking = stats.handling;
     const overall = overallRating({ stats });
     let traits = withoutTrait(withoutTrait(base.traits, 'youngGun'), 'veteran');
     if (level >= 2) traits = withTrait(traits, 'youngGun');

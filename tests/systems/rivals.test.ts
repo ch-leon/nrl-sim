@@ -185,7 +185,7 @@ describe('need signings', () => {
     const base = c0();
     let squad: Player[] | null = null;
     for (let level = 30; level <= 99 && !squad; level++) {
-      const sq = base.map((p) => ({ ...p, stats: { speed: level, strength: level, stamina: level, skill: level, footyIQ: level } }));
+      const sq = base.map((p) => ({ ...p, stats: { speed: level, strength: level, stamina: level, handling: level, kicking: level, footyIQ: level } }));
       const room = RIVAL_WAGE_CAP - squadWages(sq);
       const freed = squadWages(sq.slice(0, 1));
       if (room >= squadWages([cheap]) && room + freed < squadWages([pricey])) squad = sq;

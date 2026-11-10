@@ -59,7 +59,7 @@ const STAT_LABEL: Record<keyof PlayerStats, string> = {
   speed: 'Speed',
   strength: 'Strength',
   stamina: 'Stamina',
-  skill: 'Skill',
+  handling: 'Handling', kicking: 'Kicking',
   get footyIQ() { return activePack().vocab.iqStat; },
 };
 

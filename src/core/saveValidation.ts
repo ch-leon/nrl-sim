@@ -20,7 +20,7 @@ const integer = (v: unknown, lo = 0, hi = Infinity): v is number => range(v, lo,
 const text = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
 const oneOf = (v: unknown, values: readonly unknown[]): boolean => values.includes(v);
 const knownTrait = (v: unknown): boolean => typeof v === 'string' && TRAIT_IDS.some(id => id === v);
-const stats = ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const;
+const stats = ['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'] as const;
 const unique = (xs: readonly unknown[]): boolean => new Set(xs).size === xs.length;
 function validHome(v: unknown): boolean {
   return record(v) && typeof v.town === 'string' && ['region', 'country'].every(k => v[k] === undefined || typeof v[k] === 'string') && (v.lat === undefined || range(v.lat, -90, 90)) && (v.lon === undefined || range(v.lon, -180, 180));
@@ -28,7 +28,7 @@ function validHome(v: unknown): boolean {
 const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every(text);
 
 export function isPlayerStats(v: unknown): v is PlayerStats {
-  return record(v) && stats.every(k => range(v[k], 1, 100));
+  return record(v) && !('skill' in v) && stats.every(k => range(v[k], 1, 100));
 }
 function tally(v: unknown): boolean {
   return record(v) && ['games', 'tries', 'tackles', 'lineBreaks'].every(k => integer(v[k])) && (v.sinBins === undefined || integer(v.sinBins));

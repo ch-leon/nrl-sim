@@ -20,7 +20,7 @@ import type { TraitId, TraitInstance } from '../../src/core/state';
 const T = (...ids: TraitId[]): TraitInstance[] => ids.map((id) => ({ id, level: 1 as const }));
 
 const flatStats = (v: number): PlayerStats => ({
-  speed: v, strength: v, stamina: v, skill: v, footyIQ: v,
+  speed: v, strength: v, stamina: v, handling: v, kicking: v, footyIQ: v,
 });
 
 // A test player with fully controlled fields (age/traits/stats/injury).
@@ -424,7 +424,7 @@ describe('projection — 3 seasons on one Training Paddock (GitHub #35)', () => 
   const OVERALL_CEILING = 80;
   // Mirrors overallRating's weights, unrounded, so small season gains compare exactly.
   const rawOverall = (s: PlayerStats): number =>
-    s.skill * 0.25 + s.footyIQ * 0.25 + s.speed * 0.2 + s.strength * 0.15 + s.stamina * 0.15;
+    s.handling * 0.25 + s.footyIQ * 0.25 + s.speed * 0.2 + s.strength * 0.15 + s.stamina * 0.15;
 
   it('season 1 gains 8–15 overall, then each season gains less than the last', () => {
     const p = mkPlayer({ id: 'proj', age: 22, stats: flatStats(60) });

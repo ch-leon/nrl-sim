@@ -218,7 +218,7 @@ export abstract class LiveContact extends LivePenalties {
       return;
     }
     // Ball lost in the tackle (2f): a knock-on, more on a big hit and in the rain.
-    if (this.rng.next() < lostInContactChance(outcome === 'big-hit', c.stats.skill, this.wx.handling)) {
+    if (this.rng.next() < lostInContactChance(outcome === 'big-hit', c.stats.handling, this.wx.handling)) {
       this.emit('error', `${c.name} loses the ball in the tackle — knock-on`, c);
       this.events[this.events.length - 1]!.detail = 'contact';
       this.lock(c, 'tackled', LIVE.contactTicks);

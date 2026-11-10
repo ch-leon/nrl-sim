@@ -23,7 +23,7 @@ function sheet(id: string): TeamSheet {
     roster: POSITIONS.map((position, i) => ({
       name: `${id} ${i}`,
       position,
-      stats: { speed: 60, strength: 60, stamina: 50, skill: 60, footyIQ: 60 },
+      stats: { speed: 60, strength: 60, stamina: 50, handling: 60, kicking: 60, footyIQ: 60 },
     })),
   };
 }

@@ -21,7 +21,7 @@ import type { WeatherKind } from '../../../sim/events';
 import type { PlayId, PlayMods } from '../../../data/plays';
 import type { Edge } from '../plays';
 
-interface Stats extends ContestStats {}
+interface Stats extends ContestStats { kicking: number }
 
 export interface Player {
   side: Side;
@@ -235,5 +235,5 @@ export function benchOf(sheet: TeamSheet): BenchMan[] {
 
 export function statsOf(entry: RosterEntry | undefined): Stats {
   const s = entry?.stats;
-  return s ? { strength: s.strength, speed: s.speed, skill: s.skill, footyIQ: s.footyIQ } : { ...AVERAGE };
+  return s ? { strength: s.strength, speed: s.speed, handling: s.handling, kicking: s.kicking, footyIQ: s.footyIQ } : { ...AVERAGE, kicking: 50 };
 }

@@ -14,7 +14,7 @@ import { openNextMatch } from '../../src/ui/screens/fixtures';
 import { openRivalSquad } from '../../src/ui/screens/rivalSquad';
 import { showPlanCard } from '../../src/ui/screens/matchOverlay';
 import type { RosterEntry, MatchEvent } from '../../src/sim/events';
-const nine = (n: number): RosterEntry[] => ['prop', 'winger', 'halfback'].map(position => ({ name: 'Kai Jones', position: position as RosterEntry['position'], stats: { speed:n, strength:n, skill:n, stamina:n, footyIQ:n } }));
+const nine = (n: number): RosterEntry[] => ['prop', 'winger', 'halfback'].map(position => ({ name: 'Kai Jones', position: position as RosterEntry['position'], stats: { speed:n, strength:n, handling:n, kicking:n, stamina:n, footyIQ:n } }));
 
 /** Assert the rendered fit and comparison use the same nine that will kick off. */
 function expectScoutingMatchesKickoff(rival: RivalClub) {
@@ -56,7 +56,7 @@ describe('strategy readouts #467', () => {
   });
   it('names the best available kicker even outside the halves', () => {
     const roster = nine(40);
-    roster[0] = { ...roster[0]!, name: 'Tui Jones', stats: { ...roster[0]!.stats!, skill: 90 } };
+    roster[0] = { ...roster[0]!, name: 'Tui Jones', stats: { ...roster[0]!.stats!, kicking: 90 } };
     roster[2] = { ...roster[2]!, name: 'Kai Smith' };
     expect(fitRead(roster, 'kick-chase').reason).toBe('Jones 90');
   });

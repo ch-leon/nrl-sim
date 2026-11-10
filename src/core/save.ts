@@ -79,6 +79,10 @@ function getStore(): LocalSaveStore | null {
 
 // ── Migration ────────────────────────────────────────────────────────────────
 //
+// v24 exception (Leon, 10 Nov 2026): new careers only. The boundary below
+// rejects every pre-v24 version before any of these historical steps can run.
+// There is deliberately no 23 → 24 migration.
+//
 // HOW TO ADD A STATE CHANGE (e.g. new GameState fields):
 //   1. Bump SAVE_VERSION in state.ts (N → N+1) and update GameState + createNewGame.
 //   2. Append ONE step to MIGRATIONS below: `{ from: N, to: N+1, run }` where `run`
@@ -331,6 +335,11 @@ function migrateChecked(raw: unknown): MigrateResult {
       outcome: 'unsupported', reason: 'future',
       message: `This save is from a newer version of ${BRAND.name} (save v${version}, this game supports v${SAVE_VERSION}). Update the game to load it.`,
     };
+  }
+  // Leon, 10 Nov 2026: v24 is new careers only. Reuse rejected-save recovery.
+  if (version <= 23) {
+    return { ok: false, outcome: 'unrecoverable', reason: 'corrupt',
+      message: `This save is from an older version of ${BRAND.name} (save v${version}). Please start a new career. Your original save has been kept.` };
   }
   const inputProblem = validateInput(cur, version);
   if (inputProblem) return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: inputProblem };

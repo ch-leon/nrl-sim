@@ -16,35 +16,48 @@ const PADDOCK_GYM: PlacedFacility[] = [
 
 function young(): Player {
   const p = createNewGame('Train FC', 5).squad[0]!;
-  return { ...p, age: 21, injuredWeeks: 0, traits: [], stats: { speed: 50, strength: 50, stamina: 50, skill: 50, footyIQ: 50 } };
+  return { ...p, age: 21, injuredWeeks: 0, traits: [], stats: { speed: 50, strength: 50, stamina: 50, handling: 50, kicking: 50, footyIQ: 50 } };
 }
 
 describe('the squad training focus (N11)', () => {
   it('the focused stat ×ON, the rest ×OFF; Balanced ×1; close to even in total', () => {
     expect(focusMult('balanced', 'speed')).toBe(1);
     expect(focusMult('speed', 'speed')).toBe(TRAINING_FOCUS.ON);
-    expect(focusMult('speed', 'skill')).toBe(TRAINING_FOCUS.OFF);
-    const total = TRAINING_FOCUS.ON + 4 * TRAINING_FOCUS.OFF;
-    expect(total).toBeGreaterThan(4.5);
-    expect(total).toBeLessThanOrEqual(5);
+    expect(focusMult('speed', 'handling')).toBe(TRAINING_FOCUS.OFF);
+    const total = TRAINING_FOCUS.ON + 5 * TRAINING_FOCUS.OFF;
+    expect(total).toBeGreaterThan(5.5);
+    expect(total).toBeLessThanOrEqual(6);
   });
 
   it('moves each stat’s gain by those factors; Balanced is the old training exactly', () => {
     const p = young();
     const bal = weeklyGain(p, PADDOCK_GYM, 'balanced');
     const str = weeklyGain(p, PADDOCK_GYM, 'strength');
-    for (const k of ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const) {
+    for (const k of ['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'] as const) {
       if (bal[k] === 0) continue;
       expect(str[k] / bal[k]).toBeCloseTo(k === 'strength' ? TRAINING_FOCUS.ON : TRAINING_FOCUS.OFF, 6);
     }
     expect(trainPlayer(p, PADDOCK_GYM)).toEqual(trainPlayer(p, PADDOCK_GYM, 'balanced'));
   });
 
+  it.each(['handling', 'kicking'] as const)('trains %s with the existing focus multipliers', focus => {
+    const p = young();
+    const facilities: PlacedFacility[] = [{ id: 'office', defId: 'coachsOffice', x: 0, y: 0, level: 1 }];
+    const other = focus === 'handling' ? 'kicking' : 'handling';
+    const balanced = weeklyGain(p, facilities, 'balanced');
+    const gains = weeklyGain(p, facilities, focus);
+    expect(balanced[focus]).toBeGreaterThan(0);
+    expect(gains[focus]).toBeCloseTo(balanced[focus] * TRAINING_FOCUS.ON, 9);
+    expect(gains[other]).toBeCloseTo(balanced[other] * TRAINING_FOCUS.OFF, 9);
+    setTrainingFocus(focus);
+    expect(getState().training.focus).toBe(focus);
+  });
+
   it('the weekly gain is what a week’s training adds (no veteran decline under 31)', () => {
     const p = young();
-    const g = weeklyGain(p, PADDOCK_GYM, 'skill');
-    const after = trainPlayer(p, PADDOCK_GYM, 'skill');
-    for (const k of ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const) expect(after[k] - p.stats[k]).toBeCloseTo(g[k], 9);
+    const g = weeklyGain(p, PADDOCK_GYM, 'handling');
+    const after = trainPlayer(p, PADDOCK_GYM, 'handling');
+    for (const k of ['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'] as const) expect(after[k] - p.stats[k]).toBeCloseTo(g[k], 9);
   });
 
   it('the player page’s weekly change is what the week does: a veteran’s decline and an injury included', () => {
@@ -53,7 +66,7 @@ describe('the squad training focus (N11)', () => {
     const gain = weeklyGain(vet, PADDOCK_GYM, 'speed');
     expect(ch.speed).toBeCloseTo(gain.speed - VETERAN_DECLINE, 9);
     expect(ch.stamina).toBeCloseTo(gain.stamina - VETERAN_DECLINE, 9);
-    expect(ch.skill).toBeCloseTo(gain.skill, 9);
+    expect(ch.handling).toBeCloseTo(gain.handling, 9);
     const hurt = { ...young(), injuredWeeks: 2 };
     const after = trainPlayer(hurt, PADDOCK_GYM, 'speed');
     expect(weeklyChange(hurt, PADDOCK_GYM, 'speed').speed).toBeCloseTo(after.speed - hurt.stats.speed, 9);
@@ -79,12 +92,11 @@ describe('the squad training focus (N11)', () => {
     expect(weakestStat(squad)).toBe('stamina');
   });
 
-  it('a v15 save loads training Balanced', () => {
+  it('a v15 save requires a new career', () => {
     const base = createNewGame('Train FC', 5);
     const { training: _t, ...old } = base;
     void _t;
     const res = migrateState({ ...old, version: 15 });
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(res.state.training).toEqual({ focus: 'balanced' });
+    expect(res).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
   });
 });

@@ -125,7 +125,7 @@ export abstract class LiveKicks extends LiveClock {
       if (contested) r = contested;
       const pressured = this.side(other(r.side)).some((d) => !this.locked(d) && dist(d.body.pos, r.body.pos) < LIVE.pressureM);
       const cover = !this.kickoffUp && r.side === this.attacking ? this.kickCover(other(r.side)) : 0;
-      if (b.via === 'kick' && !contested && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.skill - 50) / 300 : LIVE.dropChance) * this.wx.handling / (1 + cover)) {
+      if (b.via === 'kick' && !contested && this.rng.next() < (pressured ? LIVE.dropPressured - (r.stats.handling - 50) / 300 : LIVE.dropChance) * this.wx.handling / (1 + cover)) {
         this.spillKick(r, b.to, `${r.name} spills the kick under pressure!`);
         return;
       }
@@ -133,7 +133,7 @@ export abstract class LiveKicks extends LiveClock {
       const picked = this.interceptTrait;
       this.spillExtra = 0;
       this.interceptTrait = undefined;
-      if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.skill, pressured, false, spillExtra) * this.wx.handling) {
+      if (b.via === 'pass' && r.side === this.attacking && this.rng.next() < knockOnChance(r.stats.handling, pressured, false, spillExtra) * this.wx.handling) {
         // Spilled: the ball squirts forward and the defence takes over.
         this.emit('error', spillExtra > 0 ? `${r.name} can't hold the wild offload — knock-on` : `${r.name} spills it — knock-on`, r);
         this.lastTouch = r.side;
@@ -246,7 +246,7 @@ export abstract class LiveKicks extends LiveClock {
   /**
    * A bomb comes down with a chaser and a catcher under it (#99, BAK-208 §4.3):
    * whoever is a step nearer, it is the chaser's Speed against the catcher's
-   * Skill, the height of the kick, a Kick-chase side and the wet
+   * Handling, the height of the kick, a Kick-chase side and the wet
    * (kickContest.ts). One draw: won back (he taps it back to his side),
    * spilled, or caught under pressure (the catcher is returned). Null when only
    * one side is under it: the catch, or a regather, as for any kick.
@@ -263,7 +263,7 @@ export abstract class LiveKicks extends LiveClock {
     const mine = nominated && nominated.side === this.attacking && !this.locked(nominated) && this.onField(nominated) && dist(nominated.body.pos, b.to) <= KICK_CONTEST.bomb.contestM;
     const catcher = mine ? nominated : under(this.attacking);
     if (!chaser || !catcher) return null;
-    const odds = highBall(chaser.stats.speed, catcher.stats.skill, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling, this.kickCover(kicking), this.rushKickGap(kicking));
+    const odds = highBall(chaser.stats.speed, catcher.stats.handling, b.peak, this.tactics[kicking].attack === 'kick-chase', this.wx.handling, this.kickCover(kicking), this.rushKickGap(kicking));
     const u = this.rng.next();
     if (u < odds.won) {
       this.ball = { kind: 'held', by: this.indexOf(chaser) };
@@ -381,8 +381,8 @@ export abstract class LiveKicks extends LiveClock {
     // The kick-off call (#397) is the kicking side's own; its dice are drawn only when one is made.
     const kc = ph.from === undefined && this.kickoffCall?.side === ph.kicking ? this.kickoffCall.call : null;
     this.kickoffCall = null;
-    const land = ph.from === 'goal-line' ? null : kickoffLanding(kc, rd, r1, kicker.stats.skill);
-    const called = kc && land ? this.kickoffRoll(kc, ph.kicking, land.to, rd, r1, kicker.stats.skill) : null;
+    const land = ph.from === 'goal-line' ? null : kickoffLanding(kc, rd, r1, kicker.stats.kicking);
+    const called = kc && land ? this.kickoffRoll(kc, ph.kicking, land.to, rd, r1, kicker.stats.kicking) : null;
     const to = land
       ? called?.to ?? land.to
       : { x: ownLineX(kd) + kd * (TOUCH.dropOutM + (r1 - 0.5) * TOUCH.dropOutSpreadM), y: clamp(MID_Y + (this.rng.next() - 0.5) * 24, 8, FIELD_WIDTH - 8) };
@@ -401,22 +401,22 @@ export abstract class LiveKicks extends LiveClock {
   /**
    * A called kick-off (#397), as it leaves the boot: one more draw, and only for
    * a call. Short: regathered on the best chaser's Speed against the catcher's
-   * Skill, and the man who will take it goes under it. Long: dead on the full,
+   * Handling, and the man who will take it goes under it. Long: dead on the full,
    * or for the fullback deep.
    */
-  private kickoffRoll(call: KickoffCall, kicking: Side, to: Vec, rd: 1 | -1, r1: number, skill: number): { to: Vec; receiver: number } {
+  private kickoffRoll(call: KickoffCall, kicking: Side, to: Vec, rd: 1 | -1, r1: number, kickingStat: number): { to: Vec; receiver: number } {
     const receiving = other(kicking);
     const near = (ps: readonly Player[]): Player[] => ps.filter((p) => this.onField(p) && p !== this.kicker(kicking)).sort((a, b) => dist(a.body.pos, to) - dist(b.body.pos, to));
     if (call === 'kickoff-short') {
       const chaser = near(this.side(kicking)).slice(0, KICKOFF.short.chasers).sort((a, b) => b.stats.speed - a.stats.speed)[0] ?? this.kicker(kicking);
       const catcher = near(this.side(receiving))[0] ?? this.fullback(receiving);
-      const regather = this.rng.next() < regatherChance(chaser.stats.speed, catcher.stats.skill);
+      const regather = this.rng.next() < regatherChance(chaser.stats.speed, catcher.stats.handling);
       this.kickoffPlay = { side: kicking, call, outcome: regather ? 'regather' : 'taken' };
       return { to, receiver: this.indexOf(regather ? chaser : catcher) };
     }
     const dead = this.rng.next() < KICKOFF.long.deadOnFull;
     this.kickoffPlay = { side: kicking, call, outcome: dead ? 'dead' : 'taken' };
-    return { to: dead ? kickoffLanding(call, rd, r1, skill, true).to : to, receiver: this.indexOf(this.fullback(receiving)) };
+    return { to: dead ? kickoffLanding(call, rd, r1, kickingStat, true).to : to, receiver: this.indexOf(this.fullback(receiving)) };
   }
 
   /**

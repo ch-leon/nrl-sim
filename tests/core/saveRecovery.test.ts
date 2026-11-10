@@ -127,26 +127,19 @@ describe('rejected career preservation (#522)', () => {
     expect(bytes).toEqual(new Map([[LEGACY_SAVE_KEY, raw]]));
   });
 
-  it.each(['quota', 'readback'] as const)('preserves an older original before installing migrated state, refusing repair on backup %s failure', (failure) => {
-    const raw = JSON.stringify({ ...createNewGame('Old', 1), version: 22 }, null, 2);
+  it.each(['quota', 'readback'] as const)('refuses old saves even when recovery has a %s failure', failure => {
+    const raw = JSON.stringify({ ...createNewGame('Old', 1), version: 23 }, null, 2);
     bytes.set(slotKey(1), raw);
-    const result = loadSlot();
-    expect(result.status).toBe('ok');
-    if (result.status !== 'ok') throw new Error('expected migration');
-    const set = storage.setItem;
-    const get = storage.getItem;
-    storage.getItem = (key) => key === recoveryKey(1) && failure === 'readback' && bytes.has(key) ? null : get(key);
+    const set = storage.setItem; const get = storage.getItem;
+    storage.getItem = key => key === recoveryKey(1) && failure === 'readback' ? null : get(key);
     storage.setItem = (key, value) => {
       if (key === recoveryKey(1) && failure === 'quota') throw new Error('quota');
       set(key, value);
     };
-    expect(writeSlot(1, result.state)).toBe(false);
+    expect(loadSlot()).toMatchObject({ status: 'corrupt', message: expect.stringMatching(/start a new career/i) });
+    expect(load()).toBeNull();
+    expect(writeSlot(1, createNewGame('Defaults', 2))).toBe(false);
     expect(bytes.get(slotKey(1))).toBe(raw);
-    storage.setItem = set;
-    storage.getItem = get;
-    expect(writeSlot(1, result.state)).toBe(true);
-    expect(exportRecoverySaves(1)).toEqual([raw]);
-    expect(JSON.parse(bytes.get(slotKey(1))!).version).toBe(23);
   });
 
   it('isolates recovery data in the developer namespace and respects career switching locks', () => {

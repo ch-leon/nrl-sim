@@ -18,7 +18,7 @@ import { BOARD } from '../../src/config';
 
 beforeEach(() => bus.clear());
 
-const stats = (over: Partial<PlayerStats> = {}): PlayerStats => ({ speed: 50, strength: 50, stamina: 50, skill: 50, footyIQ: 50, ...over });
+const stats = (over: Partial<PlayerStats> = {}): PlayerStats => ({ speed: 50, strength: 50, stamina: 50, handling: 50, kicking: 50, footyIQ: 50, ...over });
 const lines = (over: Partial<Record<FinanceLine, number>> = {}): Record<FinanceLine, number> =>
   ({ ...(Object.fromEntries(FINANCE_LINES.map((l) => [l, 0])) as Record<FinanceLine, number>), ...over });
 const man = (id: string, over: Partial<WeekSnapshot['squad'][number]> = {}): WeekSnapshot['squad'][number] =>
@@ -36,13 +36,13 @@ describe('weekSummary: training (#368)', () => {
       squad: [
         man('a', { stats: stats({ speed: 51, strength: 50.3 }) }),
         man('b', { stats: stats({ footyIQ: 50.8 }) }),
-        man('c', { stats: stats({ skill: 52.25, stamina: 49.7 }) }), // a veteran's decline is not a gain
+        man('c', { stats: stats({ handling: 52.25, stamina: 49.7 }) }), // a veteran's decline is not a gain
       ],
     });
     const v = weekSummary(before, after);
     expect(v.title).toBe('Week 5');
     expect(v.weeks).toBe(1);
-    expect(v.gains).toEqual(['Player c +2.3 skill', 'Player a +1 speed', 'Player b +0.8 footy IQ']);
+    expect(v.gains).toEqual(['Player c +2.3 handling', 'Player a +1 speed', 'Player b +0.8 footy IQ']);
     expect(v.gains).toHaveLength(TOP_GAINS);
   });
 

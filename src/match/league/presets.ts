@@ -47,7 +47,7 @@ export function zoneOf(toLine: number): Zone {
 
 /** What the attack wants in a zone. Numbers are deltas / multipliers on the sim's defaults. */
 export interface AttackPlan {
-  /** Added to the chance of passing when engaged (default 0.3 + Skill/300). */
+  /** Added to the chance of passing when engaged (default 0.3 + Handling/300). */
   pass: number;
   /** Multiplier on the offload odds; 0 forbids them (support is ignored). */
   offload: number;
@@ -201,7 +201,7 @@ export const PACK: readonly string[] = ['hooker', 'prop', 'second-row', 'lock'];
 /** A man of the nine, as the style reads him (a team sheet's roster entry). */
 export interface StyleEntry {
   position: string;
-  stats?: { speed: number; strength: number; stamina: number; skill: number; footyIQ: number };
+  stats?: { speed: number; strength: number; stamina: number; handling: number; kicking: number; footyIQ: number };
   traits?: readonly { id: string }[];
 }
 
@@ -232,7 +232,7 @@ function styleOfNine(strength: number, nine: readonly StyleEntry[]): TeamTactics
     mean(nine.filter((e) => !units || units.includes(e.position)).map((e) => e.stats![k]));
   const backs = stat(BACKS, 'speed') - stat(null, 'speed');
   const pack = stat(PACK, 'strength') - stat(null, 'strength');
-  const fit = stat(null, 'stamina') - (stat(null, 'strength') + stat(null, 'speed') + stat(null, 'skill') + stat(null, 'footyIQ')) / 4;
+  const fit = stat(null, 'stamina') - (stat(null, 'strength') + stat(null, 'speed') + stat(null, 'handling') + stat(null, 'footyIQ')) / 4;
   const kicker = nine.some((e) => HALVES.includes(e.position) && (e.traits ?? []).some((t) => t.id === 'bigBoot' || t.id === 'playmaker'));
   const attack: AttackPreset =
     kicker ? 'kick-chase'

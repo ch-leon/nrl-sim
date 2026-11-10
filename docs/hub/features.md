@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Handling and Kicking replace Skill in matches, training and player stats. New careers use save format 24; older careers need a new start and their original files remain available for recovery ([issue](https://github.com/ch-leon/nrl-sim/issues/536)).
+
 - Live-match recovery resumes only with a matching engine identity and rules. Updates restart the affected fixture from kick-off with a one-time explanation, keeping the career and once-only week effects; exports and developer careers follow the same policy ([issue](https://github.com/ch-leon/nrl-sim/issues/524)).
 
 - Career loads and imports validate nested players, facilities and selections. Missing or duplicate selections use explicit deterministic repairs, with a warning and retained originals; invalid imports leave the existing career intact ([PR](https://github.com/ch-leon/nrl-sim/pull/532), [repair rules](../specs/save-validation.md)).

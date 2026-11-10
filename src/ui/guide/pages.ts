@@ -60,7 +60,7 @@ export function sponsorBullet(club: Pick<GameState, 'reputation' | 'facilities'>
 export function coachsOfficeBullet(club: Pick<GameState, 'facilities'> | null = clubNow()): string {
   const level = (club?.facilities ?? []).reduce((m, f) => (f.defId === 'coachsOffice' ? Math.max(m, f.level) : m), 0);
   const yours = level > 0 ? `Yours is level ${level}. ` : '';
-  return `Coach’s Office ($30,000): IQ and skill, and morale, and it unlocks coach calls (Office ▸ Coach calls lists them all). ${yours}${officeUnlockLine(level)}`;
+  return `Coach’s Office ($30,000): IQ, handling and kicking, and morale, and it unlocks coach calls (Office ▸ Coach calls lists them all). ${yours}${officeUnlockLine(level)}`;
 }
 
 /**
@@ -171,7 +171,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
     screen: 'squad',
     sections: [
       {
-        text: `Between 13 and 30 players (you need 13 fit to field a side). A player’s overall is skill and ${IQ_INLINE} (25% each), speed (20%), strength and stamina (15% each). Tap any player card for his page: stats, traits and tips, morale, contract, tallies and the actions that apply.`,
+        text: `Between 13 and 30 players (you need 13 fit to field a side). A player’s overall is handling and ${IQ_INLINE} (25% each), speed (20%), strength and stamina (15% each). Tap any player card for his page: stats, traits and tips, morale, contract, tallies and the actions that apply.`,
       },
       {
         heading: 'Training and age',
@@ -247,7 +247,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Kicker and captain',
         bullets: [
           'On the Lineup screen select a starter and tap Kicker or Captain (tap again for the default). K and C mark them on the field.',
-          'Your goal-kicker takes the conversions and penalty goals, and a field goal when he has the ball; his Skill (and Big Boot) is what goes over. Unpicked, or off the field, your best-kicking half takes them. Kicks in play stay with the halfback.',
+          'Your goal-kicker takes the conversions and penalty goals, and a field goal when he has the ball; his Kicking (and Big Boot) is what goes over. Unpicked, or off the field, your best-kicking half takes them. Kicks in play stay with the halfback.',
           `Your captain makes the penalty call: a smart one (${IQ}) takes the points on a slimmer chance; a Hothead taps and runs from further out.`,
           `Leave them unpicked and the best-kicking half kicks and the starter with the best ${IQ} captains.`,
         ],
@@ -335,7 +335,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
             coachsOfficeBullet(),
             'Physio Centre ($22,000): stamina, and injuries heal a week faster. Medical Bay ($35,000): injuries heal faster by its level.',
             `Canteen ($12,000): morale. Sponsor Board ($10,000, one only): ${dollars(ECON.SPONSOR_BASE)} a week plus ${dollars(ECON.SPONSOR_PER_REP)} a reputation point (up to ${dollars(ECON.SPONSOR_CAP)}), more at levels 2 and 3. Grandstand ($120,000, one only): seats 3,500, 5,000 or 6,500.`,
-            'Academy ($60,000): skill and IQ, more and better juniors each pre-season. Scout Office ($25,000): a better free-agent pool and signing fees 10% cheaper per level.',
+            'Academy ($60,000): handling, kicking and IQ, more and better juniors each pre-season. Scout Office ($25,000): a better free-agent pool and signing fees 10% cheaper per level.',
           ];
         },
       },

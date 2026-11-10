@@ -59,13 +59,13 @@ export function marketWage(p: Pick<Player, 'stats'>): number {
 }
 
 /**
- * Weighted mean of the 5 PlayerStats (skill .25, footyIQ .25, speed .2,
+ * Existing weighted mean (Handling replaces skill at .25, footyIQ .25, speed .2,
  * strength .15, stamina .15). Returns 1..100, rounded.
  */
 export function overallRating(p: Pick<Player, 'stats'>): number {
   const s = p.stats;
   const raw =
-    s.skill * 0.25 +
+    s.handling * 0.25 +
     s.footyIQ * 0.25 +
     s.speed * 0.2 +
     s.strength * 0.15 +
@@ -76,13 +76,15 @@ export function overallRating(p: Pick<Player, 'stats'>): number {
 function rollStats(rng: Rng, quality: Quality): PlayerStats {
   const [lo, hi] = QUALITY_BANDS[quality];
   const roll = (): number => clampStat(rng.int(lo, hi));
-  return {
+  const stats = {
     speed: roll(),
     strength: roll(),
     stamina: roll(),
-    skill: roll(),
+    handling: roll(), kicking: 0,
     footyIQ: roll(),
   };
+  // Seed both from the former skill roll; training can develop them separately.
+  return { ...stats, kicking: stats.handling };
 }
 
 /**
@@ -146,7 +148,8 @@ export function qualityFor(target: number): Quality {
 export function generatePlayerAround(rng: Rng, target: number, opts: Omit<GenPlayerOpts, 'quality'> = {}): Player {
   const base = generatePlayer(rng, { ...opts, quality: qualityFor(target) });
   const roll = (): number => clampStat(target + rng.int(-AROUND_SPREAD, AROUND_SPREAD));
-  const stats: PlayerStats = { speed: roll(), strength: roll(), stamina: roll(), skill: roll(), footyIQ: roll() };
+  const stats: PlayerStats = { speed: roll(), strength: roll(), stamina: roll(), handling: roll(), kicking: 0, footyIQ: roll() };
+  stats.kicking = stats.handling;
   return { ...base, stats, wage: marketWage({ stats }) };
 }
 

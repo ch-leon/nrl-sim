@@ -12,7 +12,8 @@ export interface RosterStats {
   speed: number;
   strength: number;
   stamina: number;
-  skill: number;
+  handling: number;
+  kicking: number;
   footyIQ: number;
 }
 

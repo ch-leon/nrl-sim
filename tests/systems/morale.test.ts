@@ -18,7 +18,7 @@ import { refreshFreeAgents } from '../../src/systems/freeagency';
 import { makeRng } from '../../src/utils/rng';
 
 function mkPlayer(over: Partial<Player> = {}): Player {
-  const stats = { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 };
+  const stats = { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 };
   const p: Player = {
     id: 'p1', name: 'T', age: 25, position: 'lock', stats, morale: 50, injuryRisk: 10,
     injuredWeeks: 0, traits: [], wage: 0, contractWeeks: 30, ...over,

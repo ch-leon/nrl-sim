@@ -15,7 +15,7 @@ describe('statsWindow', () => {
     expect(late).toMatchObject({ tackles: 0, breaks: 0, offloads: 0, errors: 1, kicks: 1, tries: 1 });
     expect(late.seconds).toBeCloseTo(45 / 20);
   });
-  it('counts the events a special skill shaped', () => {
+  it('counts the events a special handling shaped', () => {
     const h = [e(10, 'step', 'Dancing Feet II'), e(20, 'tackle', 'Wrecking Ball I'), e(30, 'tackle')];
     expect(statsWindow(h, 100, 1000).traits).toBe(2);
   });

@@ -25,7 +25,7 @@ function sheet(id: string, traits: (i: number) => TraitInstance[] | undefined = 
     colors: ['#111', '#eee'],
     roster: POSITIONS.map((position, i) => {
       const t = traits(i);
-      return { name: `${id} ${position} ${i}`, position, stats: { speed: base, strength: base, stamina: 50, skill: base, footyIQ: base }, ...(t ? { traits: t } : {}) };
+      return { name: `${id} ${position} ${i}`, position, stats: { speed: base, strength: base, stamina: 50, handling: base, kicking: base, footyIQ: base }, ...(t ? { traits: t } : {}) };
     }),
   };
 }

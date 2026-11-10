@@ -90,7 +90,7 @@ export function injuryMult(player: Player): number {
 }
 
 const STAT_KEYS: readonly (keyof PlayerStats)[] = [
-  'speed', 'strength', 'stamina', 'skill', 'footyIQ',
+  'speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ',
 ];
 
 const clamp = (n: number): number => Math.max(STAT_FLOOR, Math.min(STAT_MAX, n));
@@ -108,10 +108,10 @@ export function headroom(stat: number): number {
 // What the coach sets on the Squad screen, its labels, and the managed manager's
 // pick (the squad's weakest stat). The multipliers are config.ts TRAINING_FOCUS.
 
-export const TRAINING_FOCI: readonly TrainingFocus[] = ['balanced', 'speed', 'strength', 'stamina', 'skill', 'footyIQ'];
+export const TRAINING_FOCI: readonly TrainingFocus[] = ['balanced', 'speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'];
 
 const LABEL: Readonly<Record<TrainingFocus, string>> = {
-  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', skill: 'Skill', get footyIQ() { return activePack().vocab.iqStat; },
+  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', handling: 'Handling', kicking: 'Kicking', get footyIQ() { return activePack().vocab.iqStat; },
 };
 
 export function focusLabel(f: TrainingFocus): string {
@@ -173,7 +173,7 @@ export function trainPlayer(player: Player, facilities: PlacedFacility[], focus:
 export function weeklyGain(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
   // 1. Sum per-stat base contributions across all built facilities.
   const gains: Record<keyof PlayerStats, number> = {
-    speed: 0, strength: 0, stamina: 0, skill: 0, footyIQ: 0,
+    speed: 0, strength: 0, stamina: 0, handling: 0, kicking: 0, footyIQ: 0,
   };
   for (const pf of facilities) {
     const def = getDef(pf.defId);
@@ -190,7 +190,7 @@ export function weeklyGain(player: Player, facilities: PlacedFacility[], focus: 
   //    and each stat's headroom towards STAT_MAX.
   const scale = ageMod(player.age) * traitMult(player) * injuryMult(player) * TRAINING_CURVE.GAIN_RATE;
 
-  const out: PlayerStats = { speed: 0, strength: 0, stamina: 0, skill: 0, footyIQ: 0 };
+  const out: PlayerStats = { speed: 0, strength: 0, stamina: 0, handling: 0, kicking: 0, footyIQ: 0 };
   for (const stat of STAT_KEYS) out[stat] = gains[stat] * scale * focusMult(focus, stat) * headroom(player.stats[stat]);
   return out;
 }

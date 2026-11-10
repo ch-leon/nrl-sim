@@ -21,7 +21,7 @@ function nine(o: { backsSpeed?: number; packStrength?: number; stamina?: number;
       speed: BACKS.has(position) ? (o.backsSpeed ?? 60) : 60,
       strength: PACK.has(position) ? (o.packStrength ?? 60) : 60,
       stamina: o.stamina ?? 60,
-      skill: 60,
+      handling: 60, kicking: 60,
       footyIQ: 60,
     },
     ...(position === 'halfback' && o.halfTrait ? { traits: [{ id: o.halfTrait }] } : {}),

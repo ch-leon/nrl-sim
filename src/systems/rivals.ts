@@ -402,7 +402,7 @@ function nudgeStats(p: Player, perSeason: number, rng: Rng): Player {
       speed: stepStat(s.speed, perSeason, rng),
       strength: stepStat(s.strength, perSeason, rng),
       stamina: stepStat(s.stamina, perSeason, rng),
-      skill: stepStat(s.skill, perSeason, rng),
+      handling: stepStat(s.handling, perSeason, rng), kicking: stepStat(s.kicking, perSeason, rng),
       footyIQ: stepStat(s.footyIQ, perSeason, rng),
     },
   };
