@@ -17,7 +17,7 @@ import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
 import { SQUAD_CAP, SQUAD_MIN, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { fitSquadCount } from './matchday';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
-import { overallRating, generatePlayer, POSITIONS } from '../data/player';
+import { overallRating, withShownStats, generatePlayer, POSITIONS } from '../data/player';
 import type { Rng } from '../utils/rng';
 import { makeRng } from '../utils/rng';
 
@@ -49,11 +49,12 @@ export function generateProspects(rng: Rng, level: number): Player[] {
       quality: 'rookie',
     });
     const roll = (): number => Math.min(STAT_MAX, rng.int(lo, hi));
-    const stats = {
+    const rolled = {
       speed: roll(), strength: roll(), stamina: roll(), handling: roll(), kicking: 0, footyIQ: roll(),
     };
-    stats.kicking = stats.handling;
-    const overall = overallRating({ stats });
+    rolled.kicking = rolled.handling;
+    const stats = withShownStats(base.position, base.stats, rolled);
+    const overall = overallRating({ stats, position: base.position });
     let traits = withoutTrait(withoutTrait(base.traits, 'youngGun'), 'veteran');
     if (level >= 2) traits = withTrait(traits, 'youngGun');
     out.push({

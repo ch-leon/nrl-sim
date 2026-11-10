@@ -10,7 +10,7 @@ import {
 } from '../../src/systems/rivals';
 import { STRENGTH_MIN, STRENGTH_MAX } from '../../src/systems/league';
 import { RIVAL_CLUBS } from '../../src/data/league';
-import { POSITIONS, overallRating, generatePlayer } from '../../src/data/player';
+import { POSITIONS, overallRating, generatePlayer, withShownStats } from '../../src/data/player';
 import { getState, setState, type Player, type RivalClub } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { makeRng } from '../../src/utils/rng';
@@ -154,8 +154,7 @@ describe('need signings', () => {
     const banned = c.squad!.map((p) => (p.id === hookers[0]!.id ? { ...p, suspendedWeeks: 2 } : p));
     expect(rivalNeed(banned)?.position).toBe('hooker');
     // Two short, but every position still has two: a size need.
-    const spares = c.squad!.filter((p) => c.squad!.filter((q) => q.position === p.position).length > 2);
-    const short = c.squad!.filter((p) => !spares.slice(0, 2).some((x) => x.id === p.id));
+    const short = POSITIONS.flatMap(pos => c.squad!.filter(p => p.position === pos).slice(0, 2));
     expect(short.length).toBeLessThan(RIVAL_SQUAD_SIZE);
     expect(rivalNeed(short)?.kind).toBe('size');
   });
@@ -318,7 +317,7 @@ describe('rolloverRivals', () => {
 });
 
 describe('weekly development and the league anchor (#143)', () => {
-  it.each([[19, 1], [34, -1]])('keeps the five-draw order across players aged %i, sharing the former Skill draw', (age, delta) => {
+  it.each([[19, 1], [34, -1]])('keeps the five-draw order across players aged %i, freezing hidden stats', (age, delta) => {
     const p = agent(makeRng(536), { age, stats: {
       speed: 50, strength: 50, stamina: 50, handling: 35, kicking: 70, footyIQ: 50,
     } });
@@ -327,12 +326,12 @@ describe('weekly development and the league anchor (#143)', () => {
     const next = vi.spyOn(rng, 'next').mockImplementation(() => draws.shift()!);
     const first = developRivalPlayerWeek(p, rng);
     expect(next).toHaveBeenCalledTimes(5);
-    expect(first.stats).toEqual({ speed: 50 + delta, strength: 50, stamina: 50 + delta,
-      handling: 35 + delta, kicking: 70 + delta, footyIQ: 50 });
+    expect(first.stats).toEqual(withShownStats(p.position, p.stats, { speed: 50 + delta, strength: 50, stamina: 50 + delta,
+      handling: 35 + delta, kicking: 70 + delta, footyIQ: 50 }));
     const second = developRivalPlayerWeek(p, rng);
     expect(next).toHaveBeenCalledTimes(10);
-    expect(second.stats).toEqual({ speed: 50, strength: 50 + delta, stamina: 50,
-      handling: 35, kicking: 70, footyIQ: 50 + delta });
+    expect(second.stats).toEqual(withShownStats(p.position, p.stats, { speed: 50, strength: 50 + delta, stamina: 50,
+      handling: 35, kicking: 70, footyIQ: 50 + delta }));
     expect(draws).toEqual([]);
   });
 

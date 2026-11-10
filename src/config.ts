@@ -313,3 +313,19 @@ onPackChange(() => {
   LEAGUE = league.rating;
   WEEKS_PER_SEASON = SEASON_ROUNDS + FINALS_WEEKS;
 });
+
+/** Rough starting star bands for progression; tuning belongs to #547.
+ * One half-star per six overall points, with a minimum of ½ and maximum of 5.
+ */
+export const STAR_BANDS: readonly { minOverall: number; stars: number }[] = [
+  { minOverall: 0, stars: 0.5 },
+  { minOverall: 12, stars: 1 },
+  { minOverall: 18, stars: 1.5 },
+  { minOverall: 24, stars: 2 },
+  { minOverall: 30, stars: 2.5 },
+  { minOverall: 36, stars: 3 },
+  { minOverall: 42, stars: 3.5 },
+  { minOverall: 48, stars: 4 },
+  { minOverall: 54, stars: 4.5 },
+  { minOverall: 60, stars: 5 },
+];

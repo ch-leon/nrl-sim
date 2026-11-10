@@ -19,7 +19,7 @@ import { getState, setState, type GameState, type Player, type Position, type Ri
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
-import { generatePlayerAround, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
+import { generatePlayerAround, withShownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
@@ -368,7 +368,7 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       pool = pool.filter((p) => p.id !== target.id);
       const ovr = overallRating(target);
       signed.push({ clubId: club.id, playerId: target.id, overall: ovr, reason: need?.kind ?? 'upgrade' });
-      if (ovr >= notable) news.push(`${club.name} sign ${ovr}-rated ${target.position} ${target.name}.`);
+      if (ovr >= notable) news.push(`${club.name} sign ${Math.round(ovr)}-rated ${target.position} ${target.name}.`);
       club = withDerivedStrength({ ...club, squad: [...room.squad, { ...target, morale: 50, departed: false }] });
     }
     out[i] = club;
@@ -403,12 +403,12 @@ function nudgeStats(p: Player, perSeason: number, rng: Rng): Player {
   const handlingRoll = rng.next();
   return {
     ...p,
-    stats: {
+    stats: withShownStats(p.position, s, {
       speed, strength, stamina,
       handling: stepStat(s.handling, perSeason, handlingRoll),
       kicking: stepStat(s.kicking, perSeason, handlingRoll),
       footyIQ: stepStat(s.footyIQ, perSeason, rng.next()),
-    },
+    }),
   };
 }
 

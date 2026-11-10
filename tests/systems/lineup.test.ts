@@ -239,7 +239,7 @@ describe('the sheet the sim gets', () => {
     // Without a selection the sheet is the old top nine by overall, no fit applied, no rotation.
     const plain = teamSheetFromSquad(s, 'me', 'Me', ['#111', '#eee']);
     expect(plain.rotation).toBeUndefined();
-    expect(plain.roster!.map((r) => overallRating({ stats: r.stats! }))).toEqual([...s].sort((a, b) => overallRating(b) - overallRating(a)).slice(0, 9).map(overallRating));
+    expect(plain.roster!.map((r) => overallRating({ stats: r.stats!, position: r.position }))).toEqual([...s].sort((a, b) => overallRating(b) - overallRating(a)).slice(0, 9).map(overallRating));
   });
   it('the live sim puts the picked man in his slot, and the same lineup and seed give the same match', () => {
     const s = squad();

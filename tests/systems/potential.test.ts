@@ -71,9 +71,10 @@ describe('projectCareer', () => {
   });
 
   it('a 32-year-old declines once the paddock and weights can\'t keep up, and his peak is now', () => {
-    // (A level-2 video room still adds more handling and IQ than the decline takes: the rules, as they are.)
-    const { points, peak } = projectCareer(SQUAD[2]!, BUILT.slice(0, 2));
-    expect(peak).toEqual({ age: 32, rating: overallRating(SQUAD[2]!) });
+    // A high-stat veteran has little training headroom in his four shown stats.
+    const veteran = { ...SQUAD[2]!, stats: flat(90) };
+    const { points, peak } = projectCareer(veteran, BUILT.slice(0, 2));
+    expect(peak).toEqual({ age: 32, rating: overallRating(veteran) });
     expect(points[points.length - 1]!.rating).toBeLessThan(points[0]!.rating);
   });
 

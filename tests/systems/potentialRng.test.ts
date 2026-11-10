@@ -31,9 +31,11 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * Both UI-read and no-read runs still agree; no RNG call site was added.
  * #469 changes rival plans and therefore season outcomes. Keep this historical
  * pin with habit AI off, and compare UI-read/no-read streams with it on too.
- * The two match fingerprint pins remain unchanged.
+ * #537 changes creation draws, shown-stat growth and overall-based selection.
+ * Re-pin the new-career season stream; UI reads must still match the control.
+ * Flat-match fingerprint pins remain unchanged.
  */
-const MAIN_SEED_AFTER_SEASON = 3040797444;
+const MAIN_SEED_AFTER_SEASON = 1788836146;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly projection and dot reads preserve the season stream with habit AI=%i', (ai) => {
