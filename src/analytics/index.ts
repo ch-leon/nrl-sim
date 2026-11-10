@@ -20,6 +20,7 @@
 import { buildLabel } from '../ui/buildInfo';
 import { labsVisible } from '../labs/flags';
 import { analyticsSetup, type AnalyticsEnv, type AnalyticsPage, type AnalyticsSetup } from './config';
+import { sanitizeException, EXCEPTION_BURST_MAX, EXCEPTION_WINDOW_MS, type SafeException } from './exceptions';
 import { sanitize, type EventContext, type EventName, type EventProps } from './events';
 
 declare const __NRL_NATIVE__: boolean | undefined;
@@ -27,6 +28,7 @@ declare const __NRL_NATIVE__: boolean | undefined;
 /** What the SDK chunk hands back (posthogClient.ts). */
 export interface AnalyticsClient {
   capture(name: EventName, props: Record<string, string | boolean>): void;
+  captureException?(error: SafeException, props: EventContext & { exception_source: ExceptionSource }): void;
 }
 export type ClientLoader = () => Promise<{ createClient(setup: AnalyticsSetup): AnalyticsClient }>;
 
@@ -34,6 +36,13 @@ export const QUEUE_MAX = 50;
 export const TAB_REPEAT_MS = 1000;
 
 type Status = 'idle' | 'loading' | 'ready' | 'off';
+type ExceptionSource = 'error' | 'unhandledrejection';
+type QueuedException = { error: SafeException; props: EventContext & { exception_source: ExceptionSource } };
+let exceptions: QueuedException[] = [];
+const exceptionKeys = new Set<string>();
+let exceptionWindow = 0;
+let removeListeners: (() => void) | null = null;
+let exceptionAllowed: (() => boolean) | null = null;
 let status: Status = 'idle';
 let client: AnalyticsClient | null = null;
 let queue: { name: EventName; props: Record<string, string | boolean> }[] = [];
@@ -62,6 +71,12 @@ function stop(): void {
   status = 'off';
   client = null;
   queue = [];
+  exceptions = [];
+  exceptionKeys.clear();
+  const remove = removeListeners;
+  removeListeners = null;
+  exceptionAllowed = null;
+  try { remove?.(); } catch { /* Listener cleanup never stops the game. */ }
 }
 
 /**
@@ -117,7 +132,13 @@ function readPage(): AnalyticsPage {
   } catch {
     labs = true; // can't tell: treat it as Labs, off
   }
+  const privacyNavigator = typeof navigator === 'undefined' ? undefined : navigator as Navigator & { msDoNotTrack?: unknown; globalPrivacyControl?: boolean };
   return {
+    // The SDK's cookieless always mode can send despite respect_dnt. Enforce
+    // its browser privacy signals here too, before any SDK fetch/capture.
+    doNotTrack: [privacyNavigator?.doNotTrack, privacyNavigator?.msDoNotTrack,
+      (globalThis as { doNotTrack?: unknown }).doNotTrack, privacyNavigator?.globalPrivacyControl]
+      .some((v) => v === true || v === 1 || v === '1' || v === 'yes' || v === 'true'),
     hash: typeof location === 'undefined' ? '' : location.hash,
     search: typeof location === 'undefined' ? '' : location.search,
     labs,
@@ -129,6 +150,54 @@ function whenIdle(run: () => void): void {
   const w = globalThis as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
   if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(run, { timeout: 4000 });
   else setTimeout(run, 2000);
+}
+
+/** Tiny listeners only: no SDK/network before the existing post-title start. */
+export function installExceptionTracking(opts: Pick<StartOptions, 'env' | 'page'> = {}, target: Pick<Window, 'addEventListener' | 'removeEventListener'> | undefined = typeof window === 'undefined' ? undefined : window): void {
+  try {
+    if (removeListeners || status === 'off' || !target) return;
+    const allowed = (): boolean => !('off' in analyticsSetup(opts.env ?? (import.meta.env as AnalyticsEnv), opts.page ?? readPage()));
+    if (!allowed()) return;
+    exceptionAllowed = allowed;
+    const onError = (event: ErrorEvent): void => {
+      try { captureException(event.error, 'error', event); } catch { /* Fail-open. */ }
+    };
+    const onRejection = (event: PromiseRejectionEvent): void => {
+      try { captureException(event.reason, 'unhandledrejection'); } catch { /* Fail-open. */ }
+    };
+    removeListeners = () => {
+      target.removeEventListener('error', onError as EventListener);
+      target.removeEventListener('unhandledrejection', onRejection as EventListener);
+    };
+    target.addEventListener('error', onError as EventListener);
+    target.addEventListener('unhandledrejection', onRejection as EventListener);
+  } catch { stop(); }
+}
+
+function sendException(event: QueuedException): void {
+  try {
+    if (!exceptionAllowed?.()) { exceptions = []; return; }
+    client?.captureException?.(event.error, event.props);
+  } catch { stop(); }
+}
+
+function captureException(error: unknown, source: ExceptionSource, fallback?: ErrorEvent): void {
+  try {
+    if (status === 'off' || !exceptionAllowed?.()) return;
+    const now = Date.now();
+    if (now - exceptionWindow >= EXCEPTION_WINDOW_MS) {
+      exceptionWindow = now;
+      exceptionKeys.clear();
+    }
+    if (exceptionKeys.size >= EXCEPTION_BURST_MAX) return;
+    const clean = sanitizeException(error, fallback);
+    const key = JSON.stringify(clean);
+    if (exceptionKeys.has(key)) return;
+    exceptionKeys.add(key);
+    const event = { error: clean, props: { ...context(), exception_source: source } };
+    if (status === 'ready') sendException(event);
+    else if (exceptions.length < EXCEPTION_BURST_MAX) exceptions.push(event);
+  } catch { /* Analytics never stops the game. */ }
 }
 
 /**
@@ -143,6 +212,8 @@ export function startAnalytics(opts: StartOptions = {}): Promise<void> {
       stop();
       return Promise.resolve();
     }
+    installExceptionTracking(opts);
+    if (status !== 'idle') return Promise.resolve();
     status = 'loading';
     const load: ClientLoader = opts.load ?? (() => import('./posthogClient'));
     return new Promise<void>((resolve) => {
@@ -156,6 +227,12 @@ export function startAnalytics(opts: StartOptions = {}): Promise<void> {
             const waiting = queue;
             queue = [];
             for (const e of waiting) send(e.name, e.props);
+            const waitingExceptions = exceptions;
+            exceptions = [];
+            for (const e of waitingExceptions) {
+              if (status !== 'ready') break;
+              sendException(e);
+            }
           })
           .catch(() => stop())
           .finally(resolve);
@@ -169,6 +246,8 @@ export function startAnalytics(opts: StartOptions = {}): Promise<void> {
 
 /** Test hook: back to a fresh page. */
 export function __resetAnalytics(): void {
+  stop();
+  exceptionWindow = 0;
   status = 'idle';
   client = null;
   queue = [];
@@ -181,3 +260,6 @@ export function __resetAnalytics(): void {
 export function __analyticsStatus(): { status: Status; queued: number } {
   return { status, queued: queue.length };
 }
+
+// Installed on module evaluation; off sessions install nothing. Start still waits for the title.
+installExceptionTracking();
