@@ -1,6 +1,7 @@
 // Save boundary only. Historical defaults belong to MIGRATIONS, never to ticks.
 import { FINANCE_LINES, SAVE_VERSION, type GameState, type Lineup, type Player, type PlayerStats, type PlacedFacility } from './state';
-import { POSITIONS } from '../data/player';
+import { createCeilings } from '../systems/potential';
+import { POSITIONS, shownStats } from '../data/player';
 import { FACILITY_CATALOG } from '../data/facility';
 import { TRAIT_IDS } from '../data/traits';
 import type { ActiveModifier, SeasonFinance } from './state';
@@ -35,6 +36,14 @@ function tally(v: unknown): boolean {
 }
 export function isPlayer(v: unknown, version = SAVE_VERSION): v is Player {
   if (!record(v) || !text(v.id) || !text(v.name) || !integer(v.age, 1) || !oneOf(v.position, POSITIONS) || !isPlayerStats(v.stats)) return false;
+  // Missing means a pre-ceiling v24 career. Present ceilings must be complete.
+  // Do not compare to current stats: legacy training can still pass ceilings
+  // until XP/spending replaces growth in #539/#540. Never lift a stored ceiling.
+  if (v.ceilings !== undefined) {
+    const ceilings = v.ceilings;
+    if (!record(ceilings) || !Object.keys(ceilings).every(k => stats.includes(k as typeof stats[number]) && range(ceilings[k], 1, 100))
+      || !shownStats(v.position as Player['position']).every(k => range(ceilings[k], 1, 100))) return false;
+  }
   // Injury recovery is fractional; contracts and ages are not. Debt is a career
   // balance, never a reason to clamp a player's wage or fabricate a contract.
   if (!range(v.morale, 1, 100) || !range(v.injuryRisk, 0, 100) || !range(v.injuredWeeks, 0) || !range(v.wage, 0) || !integer(v.contractWeeks)) return false;
@@ -214,5 +223,17 @@ export function validateCurrent(v: Record<string, unknown>): ValidationResult {
       captain: lineup.captain,
     };
   }
-  return { ok: true, state: repairs.length ? { ...state, lineup } : state, repairs };
+  // Compatible addition within format 24. Copy only missing-ceiling players;
+  // preserve existing ceilings, raw input, selections and all RNG state.
+  let backfilled = false;
+  const roster = (players: Player[]): Player[] => players.map(p => {
+    if (p.ceilings !== undefined) return p;
+    backfilled = true;
+    return { ...p, ceilings: createCeilings(p) };
+  });
+  const squad = roster(state.squad);
+  const freeAgents = roster(state.freeAgents);
+  const clubs = state.league.clubs.map(c => c.squad ? { ...c, squad: roster(c.squad) } : c);
+  const compatible = backfilled ? { ...state, squad, freeAgents, league: { ...state.league, clubs } } : state;
+  return { ok: true, state: repairs.length ? { ...compatible, lineup } : compatible, repairs };
 }

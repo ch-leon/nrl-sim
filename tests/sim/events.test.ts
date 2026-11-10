@@ -128,6 +128,7 @@ describe('teamSheetFromSquad', () => {
 
   it('teamSheetFromSquad carries traits onto roster entries', () => {
     const mk = (i: number, traits: TraitInstance[]): Player => ({
+      ceilings: { speed: 100, strength: 100, stamina: 100, handling: 100, kicking: 100, footyIQ: 100 },
       id: `p${i}`, name: `P${i}`, age: 25, position: (['halfback', 'prop'] as const)[i % 2]!,
       stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 },
       morale: 60, injuryRisk: 20, injuredWeeks: 0, traits, wage: 1000, contractWeeks: 10,

@@ -28,7 +28,7 @@ What's in the game, with the PR that added each.
 ## Squad and recruitment
 
 - Free agents; stars cost a fee ([PR](https://github.com/ch-leon/nrl-sim/pull/147))
-- Player page, projected peak ([PR](https://github.com/ch-leon/nrl-sim/pull/378))
+- Player page ([PR](https://github.com/ch-leon/nrl-sim/pull/378))
 - Lineup: the nine and bench ([PR](https://github.com/ch-leon/nrl-sim/pull/186))
 - Staff (`src/systems/staff.ts`): Assistant Coach, Analyst, Welfare Manager
 

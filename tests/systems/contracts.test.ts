@@ -15,6 +15,7 @@ import { SQUAD_MIN } from '../../src/config';
 
 const mk = (id: string, over: Partial<Player> = {}): Player => ({
   id, name: id, age: 25, position: 'lock',
+  ceilings: { speed: 100, strength: 100, stamina: 100, handling: 100, kicking: 100, footyIQ: 100 },
   stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 },
   morale: 50, injuryRisk: 10, injuredWeeks: 0, traits: [], wage: 5000, contractWeeks: 20, ...over,
 });
