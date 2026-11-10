@@ -1,6 +1,6 @@
 import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 // tests/systems/rivals.test.ts — rival squads and rival free agency (GitHub #74).
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   generateRivalSquad, squadStrength, withRivalSquads, pickSigning, rivalSigningTick, healRivals,
   injureRivalPlayers, rolloverRivals, rivalPlayer, weakestPosition, developmentRate, registerRivalsSystem,
@@ -10,7 +10,7 @@ import {
 } from '../../src/systems/rivals';
 import { STRENGTH_MIN, STRENGTH_MAX } from '../../src/systems/league';
 import { RIVAL_CLUBS } from '../../src/data/league';
-import { POSITIONS, overallRating, generatePlayer, shownStats } from '../../src/data/player';
+import { POSITIONS, overallRating, generatePlayer, shownStats, withShownStats } from '../../src/data/player';
 import { getState, setState, type Player, type RivalClub } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { makeRng } from '../../src/utils/rng';
@@ -317,13 +317,60 @@ describe('rolloverRivals', () => {
 });
 
 describe('weekly development and the league anchor (#143)', () => {
-  const season = (p: Player, seed = 542): Player => {
+  it.each([[19, 1], [34, -1]])('keeps the five-draw order across players aged %i, freezing hidden stats', (age, delta) => {
+    const p = agent(makeRng(536), { age, stats: {
+      speed: 50, strength: 50, stamina: 50, handling: 35, kicking: 70, footyIQ: 50,
+    } });
+    const withHeadroom = { ...p, ceilings: Object.fromEntries(shownStats(p.position).map(key => [key, 100])) };
+    const rng = makeRng(536);
+    const draws = [0, .999, 0, 0, .999, .999, 0, .999, .999, 0];
+    const next = vi.spyOn(rng, 'next').mockImplementation(() => draws.shift()!);
+    const first = developRivalPlayerWeek(withHeadroom, rng);
+    expect(next).toHaveBeenCalledTimes(5);
+    expect(first.stats).toEqual(withShownStats(p.position, p.stats, { speed: 50 + delta, strength: 50, stamina: 50 + delta,
+      handling: 35 + delta, kicking: 70 + delta, footyIQ: 50 }));
+    const second = developRivalPlayerWeek(withHeadroom, rng);
+    expect(next).toHaveBeenCalledTimes(10);
+    expect(second.stats).toEqual(withShownStats(p.position, p.stats, { speed: 50, strength: 50 + delta, stamina: 50,
+      handling: 35, kicking: 70, footyIQ: 50 + delta }));
+    expect(draws).toEqual([]);
+  });
+
+  const season = (p: Player, seed: number): Player => {
     const rng = makeRng(seed);
     let out = p;
     for (let w = 0; w < WEEKS_PER_SEASON; w++) out = developRivalPlayerWeek(out, rng);
-    expect(rng.state()).toBe(seed); // all weekly development is draw-free
     return out;
   };
+
+  it('young players gain about the BY_AGE rate over a season and veterans fade, stats staying whole', () => {
+    const rng = makeRng(10);
+    const gain = (age: number): number => {
+      let total = 0;
+      for (let i = 0; i < 40; i++) {
+        const p = rivalPlayer(rng, 'c', 'lock', RIVAL_LEAGUE_MEAN, age); // at the mean, so no pull
+        const after = season(p, 100 + i);
+        for (const k of Object.keys(after.stats) as (keyof Player['stats'])[]) expect(Number.isInteger(after.stats[k])).toBe(true);
+        total += overallRating(after) - overallRating(p);
+      }
+      return total / 40;
+    };
+    expect(developmentRate(19)).toBe(4);
+    expect(developmentRate(34)).toBe(-4);
+    expect(gain(19)).toBeGreaterThan(2.5);
+    expect(gain(19)).toBeLessThan(5.5);
+    expect(gain(27)).toBeGreaterThan(-1);
+    expect(gain(27)).toBeLessThan(1);
+    expect(gain(34)).toBeLessThan(-2.5);
+  });
+
+  it('the pull brings a star down and a battler up over a season', () => {
+    const rng = makeRng(11);
+    const star = rivalPlayer(rng, 'c', 'prop', 80, 27);
+    const battler = rivalPlayer(rng, 'c', 'prop', 35, 27);
+    expect(overallRating(season(star, 1))).toBeLessThan(overallRating(star));
+    expect(overallRating(season(battler, 1))).toBeGreaterThan(overallRating(battler));
+  });
 
   it('rivals already have ceilings and the shared four-shown-stat overall at creation and rollover', () => {
     const clubs = withRivalSquads(RIVAL_CLUBS, 542);
@@ -342,10 +389,12 @@ describe('weekly development and the league anchor (#143)', () => {
       const base = rivalPlayer(makeRng(542), 'c', position, 55, 19);
       const p: Player = { ...base, ceilings: Object.fromEntries(shownStats(position).map((key, i) => [key, base.stats[key] + [0, .01, 1.5, 8][i]!])) };
       const original = structuredClone(p);
+      const rng = makeRng(542);
+      const next = vi.spyOn(rng, 'next').mockReturnValue(0);
       let after = p;
       for (let w = 0; w < 3 * WEEKS_PER_SEASON; w++) {
         const before = after;
-        after = developRivalPlayerWeek(after, makeRng(w));
+        after = developRivalPlayerWeek(after, rng);
         for (const key of Object.keys(p.stats) as (keyof Player['stats'])[]) {
           if (shownStats(position).includes(key)) {
             expect(after.stats[key]).toBeGreaterThanOrEqual(before.stats[key]);
@@ -354,38 +403,37 @@ describe('weekly development and the league anchor (#143)', () => {
         }
       }
       for (const key of shownStats(position)) expect(after.stats[key]).toBe(p.ceilings[key]);
+      expect(next).toHaveBeenCalledTimes(3 * WEEKS_PER_SEASON * 5);
       expect(after.ceilings).toEqual(original.ceilings);
       expect(p).toEqual(original);
     }
   });
 
-  it('younger players move faster, peak players hold, and veterans decline with fixed ceilings', () => {
-    const base = rivalPlayer(makeRng(542), 'c', 'halfback', 55, 19);
-    for (const age of [19, 23, 27, 31, 34]) {
-      const p = { ...base, age };
-      const after = season(p);
-      for (const key of shownStats(p.position)) expect(after.stats[key] - p.stats[key]).toBeCloseTo(developmentRate(age));
-      expect(after.ceilings).toBe(p.ceilings);
-    }
-    expect(developmentRate(19)).toBeGreaterThan(developmentRate(23));
-    expect(developmentRate(23)).toBeGreaterThan(developmentRate(27));
-    expect(developmentRate(27)).toBe(0);
-    expect(developmentRate(31)).toBeLessThan(0);
-    expect(developmentRate(34)).toBeLessThan(developmentRate(31));
-    const floor = { ...base, age: 34, stats: { speed: 1, strength: 1, stamina: 1, handling: 1, kicking: 1, footyIQ: 1 } };
-    expect(season(floor).stats).toEqual(floor.stats);
+  it('preserves the five-draw order per player in the anchor even when ceilings block gains', () => {
+    const base = rivalPlayer(makeRng(542), 'c', 'halfback', 35, 27);
+    const stats = { speed: 35, strength: 35, stamina: 35, handling: 35, kicking: 35, footyIQ: 35 };
+    const first: Player = { ...base, stats, ceilings: { speed: 35, handling: 35.25, kicking: 35, footyIQ: 40 } };
+    const second: Player = { ...base, id: 'second', position: 'prop', stats,
+      ceilings: { strength: 35.01, stamina: 40, speed: 40, footyIQ: 35 } };
+    // No age/pull hits, then five anchor draws each, in the same stat/player order.
+    const draws = [...Array<number>(10).fill(.999), 0, .999, 0, 0, .999, .999, 0, .999, .999, 0];
+    const rng = makeRng(542);
+    const next = vi.spyOn(rng, 'next').mockImplementation(() => draws.shift()!);
+    const out = developRivalsWeek([{ ...club(35), squad: [first, second] }], rng)[0]!.squad!;
+    expect(next).toHaveBeenCalledTimes(20);
+    expect(draws).toEqual([]);
+    expect(out[0]!.stats).toEqual({ ...stats, handling: 35.25 });
+    expect(out[1]!.stats).toEqual({ ...stats, strength: 35.01 });
+    expect(out.map(p => p.ceilings)).toEqual([first.ceilings, second.ceilings]);
   });
 
-  it('the anchor is draw-free and cannot grow shown stats above ceilings', () => {
+  it('preserves the zero-adjustment skip without drawing dice', () => {
+    const p: Player = { ...rivalPlayer(makeRng(542), 'c', 'halfback', 55, 27),
+      stats: { speed: 55, strength: 55, stamina: 55, handling: 55, kicking: 55, footyIQ: 55 } };
     const rng = makeRng(542);
-    const base = rivalPlayer(rng, 'c', 'halfback', 35, 27);
-    const p: Player = { ...base, ceilings: Object.fromEntries(shownStats(base.position).map(key => [key, base.stats[key] + .01])) };
-    const seed = rng.state();
-    const clubs: RivalClub[] = [{ ...club(35), squad: [p] }];
-    let out = clubs;
-    for (let w = 0; w < WEEKS_PER_SEASON; w++) out = developRivalsWeek(out, rng);
-    expect(rng.state()).toBe(seed);
-    for (const key of shownStats(p.position)) expect(out[0]!.squad![0]!.stats[key]).toBe(p.ceilings[key]);
+    expect(developRivalPlayerWeek(p, rng)).toBe(p);
+    developRivalsWeek([{ ...club(55), squad: [p] }], rng);
+    expect(rng.state()).toBe(542);
   });
 
   it('the anchor pulls a drifted league back toward the mean and leaves a centred one alone', () => {
