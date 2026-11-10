@@ -19,7 +19,7 @@ import { getState, setState, type GameState, type Player, type Position, type Ri
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
-import { generatePlayerAround, withShownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
+import { generatePlayerAround, withShownStats, shownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
@@ -401,15 +401,18 @@ function nudgeStats(p: Player, perSeason: number, rng: Rng): Player {
   const stamina = stepStat(s.stamina, perSeason, rng.next());
   // Share the former Skill draw without shifting Footy IQ or the next player.
   const handlingRoll = rng.next();
-  return {
-    ...p,
-    stats: withShownStats(p.position, s, {
-      speed, strength, stamina,
-      handling: stepStat(s.handling, perSeason, handlingRoll),
-      kicking: stepStat(s.kicking, perSeason, handlingRoll),
-      footyIQ: stepStat(s.footyIQ, perSeason, rng.next()),
-    }),
-  };
+  const stats = withShownStats(p.position, s, {
+    speed, strength, stamina,
+    handling: stepStat(s.handling, perSeason, handlingRoll),
+    kicking: stepStat(s.kicking, perSeason, handlingRoll),
+    footyIQ: stepStat(s.footyIQ, perSeason, rng.next()),
+  });
+  // Cap only upward steps after all five original draws, including hidden stats'
+  // draws. Full ceilings must not shift the next player or the anchor's stream.
+  for (const key of shownStats(p.position)) {
+    if (stats[key] > s[key]) stats[key] = Math.max(s[key], Math.min(stats[key], p.ceilings[key]!));
+  }
+  return { ...p, stats };
 }
 
 /** A week of development for one rival player: by age, plus the pull toward the league mean. */
