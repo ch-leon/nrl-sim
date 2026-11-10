@@ -5,7 +5,6 @@ import { describe, it, expect } from 'vitest';
 import { seasonBooks, fmtNetClosing } from '../../../src/ui/screens/finance';
 import { fmtBooksHeading } from '../../../src/ui/screens/history';
 import { emptyFinance, FINANCE_LINES, type GameState, type SeasonFinance } from '../../../src/core/state';
-import { migrateState } from '../../../src/core/save';
 import { financeNet } from '../../../src/systems/economy';
 import { STARTING_MONEY, difficultyMultipliers } from '../../../src/config';
 
@@ -49,7 +48,7 @@ describe("a season's books (N14)", () => {
   });
 });
 
-describe('the corpus: every v12+ save opens every season it has, and the books add up to the balance', () => {
+describe('historical corpus ledger data: season books add up to the balance', () => {
   const saves = import.meta.glob('../../fixtures/saves/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
   const modern = Object.keys(saves).filter((f) => Number(/\/v(\d+)-/.exec(f)?.[1]) >= 12);
 
@@ -59,10 +58,8 @@ describe('the corpus: every v12+ save opens every season it has, and the books a
 
   for (const file of modern) {
     it(file.slice(file.lastIndexOf('/') + 1), () => {
-      const res = migrateState(saves[file]);
-      expect(res.ok).toBe(true);
-      if (!res.ok) return;
-      const s = res.state;
+      // Read frozen ledger data without loading the historical career.
+      const s = saves[file] as GameState;
       for (const h of s.history) expect(seasonBooks(s, h.season), `season ${h.season}`).not.toBeNull();
       // Every movement booked: the starting balance plus every season's net is today's balance.
       const start = Math.round(STARTING_MONEY * difficultyMultipliers(s.settings.difficulty).startingMoney);

@@ -17,8 +17,8 @@ import type { MatchResult } from '../../../src/sim/events';
 
 describe('the high ball (pure)', () => {
   it('the kick-off regather is the same contest: chaserWins on the Short knobs', () => {
-    for (const [speed, skill] of [[60, 60], [90, 30], [30, 90], [75, 50]] as const) {
-      expect(regatherChance(speed, skill)).toBe(chaserWins(KICKOFF.short, speed, skill));
+    for (const [speed, handling] of [[60, 60], [90, 30], [30, 90], [75, 50]] as const) {
+      expect(regatherChance(speed, handling)).toBe(chaserWins(KICKOFF.short, speed, handling));
     }
     expect(regatherChance(60, 60)).toBe(KICKOFF.short.base);
   });
@@ -36,8 +36,8 @@ describe('the high ball (pure)', () => {
     }
     let lastSpill = 2;
     let lastWon = 2;
-    for (let skill = 20; skill <= 99; skill += 5) {
-      const { won, spill } = highBall(60, skill, 20, false);
+    for (let handling = 20; handling <= 99; handling += 5) {
+      const { won, spill } = highBall(60, handling, 20, false);
       expect(won).toBeLessThanOrEqual(lastWon);
       expect(won + spill).toBeLessThanOrEqual(lastSpill + lastWon);
       lastWon = won;

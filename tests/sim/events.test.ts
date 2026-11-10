@@ -35,11 +35,11 @@ describe('mkEvent', () => {
 describe('teamSheetFromSquad', () => {
   it('excludes injured players', () => {
     const fitPlayers = Array.from({ length: ON_FIELD }, () =>
-      player({ injuredWeeks: 0, stats: { speed: 40, strength: 40, stamina: 40, skill: 40, footyIQ: 40 }, morale: 50 }),
+      player({ injuredWeeks: 0, stats: { speed: 40, strength: 40, stamina: 40, handling: 40, kicking: 40, footyIQ: 40 }, morale: 50 }),
     );
     // Add injured superstars that would inflate stats if wrongly included.
     const injured = Array.from({ length: 4 }, () =>
-      player({ injuredWeeks: 3, stats: { speed: 99, strength: 99, stamina: 99, skill: 99, footyIQ: 99 }, morale: 50 }),
+      player({ injuredWeeks: 3, stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 }, morale: 50 }),
     );
     const sheet = teamSheetFromSquad([...fitPlayers, ...injured], 'player', 'Sharks', COLORS);
     // All fit players are 40-rated → aggregates should be ~40, nowhere near 99.
@@ -53,7 +53,7 @@ describe('teamSheetFromSquad', () => {
         id: `id-${i}`,
         injuryRisk: 10 + i,
         injuredWeeks: 0,
-        stats: { speed: 50, strength: 50, stamina: 50, skill: 50, footyIQ: 50 },
+        stats: { speed: 50, strength: 50, stamina: 50, handling: 50, kicking: 50, footyIQ: 50 },
         morale: 50,
       }),
     );
@@ -67,10 +67,10 @@ describe('teamSheetFromSquad', () => {
 
   it('uses the best ON_FIELD by overall rating', () => {
     const strong = Array.from({ length: ON_FIELD }, () =>
-      player({ injuredWeeks: 0, stats: { speed: 80, strength: 80, stamina: 80, skill: 80, footyIQ: 80 }, morale: 50 }),
+      player({ injuredWeeks: 0, stats: { speed: 80, strength: 80, stamina: 80, handling: 80, kicking: 80, footyIQ: 80 }, morale: 50 }),
     );
     const weak = Array.from({ length: 10 }, () =>
-      player({ injuredWeeks: 0, stats: { speed: 20, strength: 20, stamina: 20, skill: 20, footyIQ: 20 }, morale: 50 }),
+      player({ injuredWeeks: 0, stats: { speed: 20, strength: 20, stamina: 20, handling: 20, kicking: 20, footyIQ: 20 }, morale: 50 }),
     );
     const sheet = teamSheetFromSquad([...weak, ...strong], 'player', 'Sharks', COLORS);
     expect(sheet.roster).toHaveLength(ON_FIELD);
@@ -81,10 +81,10 @@ describe('teamSheetFromSquad', () => {
 
   it('applies the morale modifier (±10% at morale 0/100)', () => {
     const highMorale = Array.from({ length: ON_FIELD }, () =>
-      player({ injuredWeeks: 0, stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 }, morale: 100 }),
+      player({ injuredWeeks: 0, stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 }, morale: 100 }),
     );
     const lowMorale = Array.from({ length: ON_FIELD }, () =>
-      player({ injuredWeeks: 0, stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 }, morale: 0 }),
+      player({ injuredWeeks: 0, stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 }, morale: 0 }),
     );
     const hi = teamSheetFromSquad(highMorale, 'player', 'A', COLORS);
     const lo = teamSheetFromSquad(lowMorale, 'player', 'B', COLORS);
@@ -95,7 +95,7 @@ describe('teamSheetFromSquad', () => {
 
   it('clamps aggregates to 1..STAT_MAX', () => {
     const maxed = Array.from({ length: ON_FIELD }, () =>
-      player({ injuredWeeks: 0, stats: { speed: 100, strength: 100, stamina: 100, skill: 100, footyIQ: 100 }, morale: 100 }),
+      player({ injuredWeeks: 0, stats: { speed: 100, strength: 100, stamina: 100, handling: 100, kicking: 100, footyIQ: 100 }, morale: 100 }),
     );
     const sheet = teamSheetFromSquad(maxed, 'player', 'A', COLORS);
     expect(sheet.attack).toBe(STAT_MAX);
@@ -103,11 +103,11 @@ describe('teamSheetFromSquad', () => {
     expect(sheet.kicking).toBeLessThanOrEqual(STAT_MAX);
   });
 
-  it('derives kicking from halfback/five-eighth skill when present', () => {
+  it('derives kicking from halfback/five-eighth Kicking when present', () => {
     const forwards = Array.from({ length: ON_FIELD - 1 }, () =>
-      player({ position: 'prop', injuredWeeks: 0, stats: { speed: 50, strength: 50, stamina: 50, skill: 30, footyIQ: 50 }, morale: 50 }),
+      player({ position: 'prop', injuredWeeks: 0, stats: { speed: 50, strength: 50, stamina: 50, handling: 30, kicking: 30, footyIQ: 50 }, morale: 50 }),
     );
-    const half = player({ position: 'halfback', injuredWeeks: 0, stats: { speed: 50, strength: 50, stamina: 50, skill: 90, footyIQ: 50 }, morale: 50 });
+    const half = player({ position: 'halfback', injuredWeeks: 0, stats: { speed: 50, strength: 50, stamina: 50, handling: 10, kicking: 90, footyIQ: 50 }, morale: 50 });
     const sheet = teamSheetFromSquad([...forwards, half], 'player', 'A', COLORS);
     expect(sheet.kicking).toBe(90);
   });
@@ -119,7 +119,7 @@ describe('teamSheetFromSquad', () => {
 
   it('uses all fit players when fewer than ON_FIELD', () => {
     const five = Array.from({ length: 5 }, () =>
-      player({ injuredWeeks: 0, stats: { speed: 70, strength: 70, stamina: 70, skill: 70, footyIQ: 70 }, morale: 50 }),
+      player({ injuredWeeks: 0, stats: { speed: 70, strength: 70, stamina: 70, handling: 70, kicking: 70, footyIQ: 70 }, morale: 50 }),
     );
     const sheet = teamSheetFromSquad(five, 'player', 'A', COLORS);
     expect(sheet.roster).toHaveLength(5);
@@ -129,7 +129,7 @@ describe('teamSheetFromSquad', () => {
   it('teamSheetFromSquad carries traits onto roster entries', () => {
     const mk = (i: number, traits: TraitInstance[]): Player => ({
       id: `p${i}`, name: `P${i}`, age: 25, position: (['halfback', 'prop'] as const)[i % 2]!,
-      stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 },
+      stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 },
       morale: 60, injuryRisk: 20, injuredWeeks: 0, traits, wage: 1000, contractWeeks: 10,
     });
     const squad = [mk(0, [{ id: 'finisher', level: 1 }, { id: 'hitman', level: 1 }]), mk(1, [])];

@@ -31,7 +31,7 @@ describe('focused boundary validators', () => {
     expect(isPlayer(s.squad[0])).toBe(true);
     expect(isPlayerStats(s.squad[0]!.stats)).toBe(true);
   });
-  it.each([null, [], {}, { speed: 1 }, ...[NaN, Infinity, -Infinity, 0, 101, '50'].map(speed => ({ speed, strength: 50, stamina: 50, skill: 50, footyIQ: 50 }))])('refuses malformed stats %j', stats => {
+  it.each([null, [], {}, { speed: 1 }, ...[NaN, Infinity, -Infinity, 0, 101, '50'].map(speed => ({ speed, strength: 50, stamina: 50, handling: 50, kicking: 50, footyIQ: 50 }))])('refuses malformed stats %j', stats => {
     expect(isPlayerStats(stats)).toBe(false);
     expect(isPlayer({ ...fresh().squad[0], stats })).toBe(false);
   });
@@ -131,11 +131,12 @@ describe('explicit repairs and outcomes', () => {
     expect(bytes.get(slotKey(1))).toBe(raw);
     expect(installImportedSave(raw, 2).ok).toBe(false); expect(bytes.has(slotKey(2))).toBe(false);
   });
-  it('catches a migration exception in the public pure boundary', () => {
+  it('rejects old input before any historical migration runs', () => {
     const step = MIGRATIONS[0]!;
-    vi.spyOn(step, 'run').mockImplementation(() => { throw new Error('migration failed'); });
+    const run = vi.spyOn(step, 'run').mockImplementation(() => { throw new Error('migration failed'); });
     const raw = { ...fresh(), version: 1 }; const original = JSON.stringify(raw);
-    expect(migrateState(raw)).toMatchObject({ ok: false, outcome: 'unrecoverable', message: 'Save could not be migrated.' });
+    expect(migrateState(raw)).toMatchObject({ ok: false, outcome: 'unrecoverable', message: expect.stringMatching(/start a new career/i) });
+    expect(run).not.toHaveBeenCalled();
     expect(JSON.stringify(raw)).toBe(original);
   });
 });
@@ -165,10 +166,10 @@ describe('preservation gates', () => {
     expect(installImportedSave(incoming, 1)).toMatchObject({ ok: true, outcome: 'repaired' });
     expect(exportRecoverySaves(1)).toEqual([incoming, destination]);
   });
-  it('preserves migrated incoming source bytes before installation too', () => {
+  it('rejects historical imports without installing or writing recovery', () => {
     const incoming = JSON.stringify({ ...fresh(), version: 22 }, null, 2);
-    expect(installImportedSave(incoming, 1).ok).toBe(true);
-    expect(exportRecoverySaves(1)).toContain(incoming);
+    expect(installImportedSave(incoming, 1).ok).toBe(false);
+    expect(bytes.size).toBe(0);
   });
   it('invalid imports leave the existing destination and live match byte-for-byte intact', () => {
     const destination = JSON.stringify(fresh()); bytes.set(slotKey(1), destination); bytes.set(liveMatchKey(1), 'live');

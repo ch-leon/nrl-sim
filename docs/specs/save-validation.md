@@ -1,11 +1,15 @@
 # Nested career validation (#525)
 
 The synchronous save boundary in `core/save.ts` uses the hand-written validators
-in `core/saveValidation.ts`. It validates historical inputs before migrations read
-them, catches migration exceptions, and validates the migrated current shape.
-Load and import use the same boundary. SAVE_VERSION stays 23: no persisted shape
-changed. Main was re-read at c790414 (including #530 and #529); no filed/in-flight
-stats/facilities schema rework or v24 dependency was found.
+in `core/saveValidation.ts`. It checks save-version compatibility before
+validating the current nested shape.
+Load and import use the same boundary. Save format 24 is new careers only
+(Leon, 10 Nov 2026, 5:17pm AEST; #536). Versions 23 and earlier are refused
+before nested validation or migration, with a friendly “start a new career”
+message. No 23→24 migration exists. The existing rejected-save path retains
+source bytes and live-match records, offers original export/recovery, and blocks
+autosave replacement in both normal and developer namespaces. Future-version
+handling and storage keys are unchanged.
 
 ## Outcomes
 
@@ -45,7 +49,9 @@ free-agent pool and every present rival roster. IDs are unique across those
 rosters. Current rivals must have a roster; the player club's league entry need
 not have one. Empty/short squads remain possible (forfeit rules still own them).
 Player identity, wages, contracts and rosters are never inferred from ratings.
-Stats and morale are 1–100; fractional training stats and injury recovery are
+Stats are speed, strength, stamina, handling, kicking and footyIQ. A current
+player carrying `skill` or missing either new stat is refused. Stats and morale
+are 1–100; fractional training stats and injury recovery are
 valid, injury risk includes zero, ages include academy players and are not
 restricted to the generator's starting band. Contract weeks and bans are whole,
 nonnegative counts. Money and finance movements may be negative; non-finite
@@ -81,15 +87,10 @@ This is why validation does not reject or rewrite every missing reference.
 
 ## Historical rules and persistence
 
-Existing `MIGRATIONS` retain their version-specific schema rules: v3 difficulty;
-v4 initial tallies/history; v5 board; v6 legacy trait name mapping/deduplication
-and unknown-name removal; v7 event deck; v8 seeded rival creation; v10 initial
-books; v11 auto lineup; v14 tactics; v15 leadership; v16 training; v17 overhead;
-v18 board loan; v19 staff; v21 bans/flags; v22 recent plans; v23 playbook/plays.
-These are documented schema transitions, not new current-shape repair rules.
-Current malformed traits, money, contracts or missing rival rosters cannot use
-an old migration to manufacture replacements. Exact old bytes are retained before
-writing an upgrade, including an incoming import file and its match envelope.
+Historical `MIGRATIONS` remain as records of earlier schema transitions through
+v23. They are not run for v24 loads or imports; all pre-v24 careers are refused
+without changing their data. Current malformed traits, money, contracts or
+missing rival rosters cannot use an old migration to manufacture replacements.
 
 Validation runs only at load/list/import boundaries. Saves written by the trusted
 runtime approve their own exact bytes; subsequent autosaves check those bytes

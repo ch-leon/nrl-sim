@@ -5,7 +5,7 @@ import { applyTuning, listKnobs } from '../../../src/match/league/tuning';
 
 const positions = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'];
 const player = (position = 'winger', base = 60, traits: string[] = []): StyleEntry => ({
-  position, stats: { speed: base, strength: base, stamina: base, skill: base, footyIQ: base }, traits: traits.map((id) => ({ id })),
+  position, stats: { speed: base, strength: base, stamina: base, handling: base, kicking: base, footyIQ: base }, traits: traits.map((id) => ({ id })),
 });
 const squad = (base = 60, traits: string[] = []): StyleEntry[] => positions.map((p) => player(p, base, traits));
 const topAttack = (roster: StyleEntry[]): string => {
@@ -50,9 +50,18 @@ describe('pure squad fit', () => {
       expect(derivedRatings(player('winger', 60, [trait, trait]))).toEqual(derivedRatings(player('winger', 60, [trait])));
     }
   });
+  it('keeps offloads equally weighted between Handling and Strength, independent of Kicking', () => {
+    const p = player('prop');
+    p.stats = { ...p.stats!, handling: 90, strength: 30, kicking: 1 };
+    expect(derivedRatings(p).offload).toBe(60);
+    p.stats.kicking = 100;
+    expect(derivedRatings(p).offload).toBe(60);
+    p.stats.handling = 30; p.stats.strength = 90;
+    expect(derivedRatings(p).offload).toBe(60);
+  });
   it('reads the best kicker anywhere, Big Boot, and Hitman rush bonuses', () => {
     const roster = squad();
-    roster[0]!.stats!.skill = 80;
+    roster[0]!.stats!.kicking = 80;
     expect(styleFit(roster)['kick-chase']).toBe(1.2);
     roster[0]!.traits = [{ id: 'bigBoot' }];
     expect(styleFit(roster)['kick-chase']).toBe(1.28);

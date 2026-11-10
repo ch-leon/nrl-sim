@@ -127,7 +127,7 @@ export function sideSheet(id: string, spec: SideSpec): TeamSheet {
   }
   const r = spec.rating ?? 60;
   const entry = (position: RosterEntry['position'], name: string, key: string): RosterEntry => {
-    const e: RosterEntry = { name, position, stats: { speed: r, strength: r, stamina: r, skill: r, footyIQ: r, ...(spec.stats ?? {}) } };
+    const e: RosterEntry = { name, position, stats: { speed: r, strength: r, stamina: r, handling: r, kicking: r, footyIQ: r, ...(spec.stats ?? {}) } };
     if (spec.traits === 'stars') e.traits = starTraits(position, key);
     return positionEntry(e, spec);
   };

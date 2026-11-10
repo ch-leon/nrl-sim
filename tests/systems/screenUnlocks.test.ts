@@ -2,11 +2,9 @@ import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
 import { registerScreenUnlockSystem as registerUnlockSystem } from '../../src/systems/screenUnlocks';
 import { SCREEN_UNLOCK_LADDER as UNLOCK_LADDER } from '../../src/systems/screenUnlocks';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
 import { getState, loadState, setState } from '../../src/core/state';
 import { advanceWeek, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
 import { bus, type Events } from '../../src/core/events';
-import { migrateState } from '../../src/core/save';
 import { isScreenOpen, screensDue, screenLockReason } from '../../src/systems/unlocks';
 import { initNewsInbox, NewsInbox } from '../../src/ui/inbox';
 
@@ -63,11 +61,7 @@ describe('season-one Office schedule (#482)', () => {
     loadState({ ...skipped, unlocks: { facilities: [] } });
     expect(isScreenOpen(getState(), 'finance')).toBe(true);
     expect(isScreenOpen(getState(), 'news')).toBe(true);
-    for (const file of readdirSync('tests/fixtures/saves').filter((f) => f.endsWith('.json'))) {
-      const result = migrateState(JSON.parse(readFileSync(`tests/fixtures/saves/${file}`, 'utf8')));
-      expect(result.ok, file).toBe(true);
-      if (result.ok) for (const row of UNLOCK_LADDER) expect(isScreenOpen(result.state, row.id), file).toBe(true);
-    }
+
   });
 });
 

@@ -8,7 +8,7 @@ import { agePlayer } from '../../src/systems/aging';
 import { overallRating } from '../../src/data/player';
 import { WEEKS_PER_SEASON } from '../../src/config';
 
-const flat = (v: number): PlayerStats => ({ speed: v, strength: v, stamina: v, skill: v, footyIQ: v });
+const flat = (v: number): PlayerStats => ({ speed: v, strength: v, stamina: v, handling: v, kicking: v, footyIQ: v });
 
 const mk = (id: string, age: number, stats: PlayerStats, traits: TraitId[] = []): Player => ({
   id, name: id, age, position: 'lock', stats, morale: 60, injuryRisk: 10, injuredWeeks: 0,
@@ -24,9 +24,9 @@ const BUILT: PlacedFacility[] = [
 
 /** A fixed squad: a teenager (young gun), a hurt prime-age man, a veteran. */
 const SQUAD: Player[] = [
-  mk('kid', 19, { speed: 62, strength: 48, stamina: 55, skill: 58, footyIQ: 50 }, ['youngGun']),
+  mk('kid', 19, { speed: 62, strength: 48, stamina: 55, handling: 58, kicking: 58, footyIQ: 50 }, ['youngGun']),
   { ...mk('mid', 26, flat(66), ['workhorse']), injuredWeeks: 4 },
-  mk('vet', 32, { speed: 78, strength: 80, stamina: 76, skill: 82, footyIQ: 84 }, ['veteran']),
+  mk('vet', 32, { speed: 78, strength: 80, stamina: 76, handling: 82, kicking: 82, footyIQ: 84 }, ['veteran']),
 ];
 
 /** The same rules stepped by hand: trainPlayer each week (fit), agePlayer at each rollover. */
@@ -71,7 +71,7 @@ describe('projectCareer', () => {
   });
 
   it('a 32-year-old declines once the paddock and weights can\'t keep up, and his peak is now', () => {
-    // (A level-2 video room still adds more skill and IQ than the decline takes: the rules, as they are.)
+    // (A level-2 video room still adds more handling and IQ than the decline takes: the rules, as they are.)
     const { points, peak } = projectCareer(SQUAD[2]!, BUILT.slice(0, 2));
     expect(peak).toEqual({ age: 32, rating: overallRating(SQUAD[2]!) });
     expect(points[points.length - 1]!.rating).toBeLessThan(points[0]!.rating);
@@ -97,10 +97,10 @@ describe('projectCareer', () => {
   it('is pure: the player and the facilities are untouched, and it says the same twice', () => {
     const p = structuredClone(SQUAD[1]!);
     const f = structuredClone(BUILT);
-    const a = projectCareer(p, f, 'skill', undefined, 5);
+    const a = projectCareer(p, f, 'handling', undefined, 5);
     expect(p).toEqual(SQUAD[1]);
     expect(f).toEqual(BUILT);
-    expect(projectCareer(p, f, 'skill', undefined, 5)).toEqual(a);
+    expect(projectCareer(p, f, 'handling', undefined, 5)).toEqual(a);
   });
 
   it('a man at or past the last age is just today', () => {

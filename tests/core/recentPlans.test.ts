@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createLegacyGame } from '../helpers/legacyGame';
 import { bus, type LiveMatchData } from '../../src/core/events';
-import { getState, loadState, setState, SAVE_VERSION } from '../../src/core/state';
-import { __setStorage, load, MIGRATIONS, slotKey, setActiveSlot } from '../../src/core/save';
+import { getState, loadState, setState } from '../../src/core/state';
+import { __setStorage, load, slotKey, setActiveSlot } from '../../src/core/save';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
@@ -28,23 +28,15 @@ function kickOff(): Started {
 function rival(m: Started): TeamTactics | undefined { return (m.home.clubId === PLAYER_ID ? m.away : m.home).tactics; }
 
 describe('saved recent league plans', () => {
-  it('loads a real v21 save with [] and plays a complete match', () => {
+  it('refuses a v21 save without filling plan history or changing its bytes', () => {
     const { recentPlans: _, ...old } = getState();
     const raw = JSON.stringify({ ...old, version: 21 });
     const map = new Map([[slotKey(1), raw]]);
     __setStorage({ getItem: k => map.get(k) ?? null, setItem: (k, v) => { map.set(k, v); }, removeItem: k => { map.delete(k); } });
     setActiveSlot(1);
-    const loaded = load();
-    expect(SAVE_VERSION).toBe(23);
-    expect(MIGRATIONS.filter(m => m.from === 21)).toHaveLength(1);
-    expect(loaded?.recentPlans).toEqual([]);
+    expect(load()).toBeNull();
+    expect(map.get(slotKey(1))).toBe(raw);
     expect(JSON.parse(raw)).not.toHaveProperty('recentPlans');
-    loadState(loaded!);
-    const m = kickOff();
-    const result = runMatch(m.home, m.away, { ...m.live });
-    bus.emit('match:finished', { fixture: m.fixture, result });
-    expect(getState().league.fixtures.find(f => f.round === m.fixture.round && f.homeId === m.fixture.homeId)?.result).toBeDefined();
-    expect(getState().recentPlans).toEqual([(m.home.clubId === PLAYER_ID ? m.home : m.away).tactics]);
   });
   it.each(['normal', 'hard'] as const)('%s reads history but never the upcoming lineup tactics', difficulty => {
     const original = structuredClone(getState());

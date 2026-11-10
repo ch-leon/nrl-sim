@@ -25,7 +25,7 @@ function sheet(id: string, base = 60): TeamSheet {
     roster: POSITIONS.map((position, i) => ({
       name: `${id} ${position} ${i}`,
       position,
-      stats: { speed: base + i, strength: base - i, stamina: 50, skill: base, footyIQ: base },
+      stats: { speed: base + i, strength: base - i, stamina: 50, handling: base, kicking: base, footyIQ: base },
     })),
   };
 }
@@ -106,7 +106,7 @@ describe('contest', () => {
   });
   it('a step: 10% one-on-one at even stats, more for footwork and from the side, never against two', () => {
     expect(stepChance(AVERAGE, AVERAGE, OPEN)).toBeCloseTo(0.1);
-    expect(stepChance({ ...AVERAGE, speed: 90, skill: 90 }, AVERAGE, OPEN)).toBeCloseTo(0.3);
+    expect(stepChance({ ...AVERAGE, speed: 90, handling: 90 }, AVERAGE, OPEN)).toBeCloseTo(0.3);
     expect(stepChance(AVERAGE, { ...AVERAGE, strength: 80, footyIQ: 80 }, OPEN)).toBeLessThan(0.1);
     expect(stepChance(AVERAGE, AVERAGE, { ...OPEN, angle: 'side' })).toBeCloseTo(0.15);
     expect(stepChance(AVERAGE, AVERAGE, { ...OPEN, angle: 'behind' })).toBeCloseTo(0.05);

@@ -200,8 +200,8 @@ describe('the pool follows the league (N12)', () => {
   it('leaves Academy prospects and departed players exactly as they were', () => {
     createNewGame('Test Club', 6);
     const [a, b] = getState().freeAgents;
-    const junior: Player = { ...a!, id: 'jr', junior: true, stats: { speed: 41, strength: 42, stamina: 43, skill: 44, footyIQ: 45 } };
-    const departed: Player = { ...b!, id: 'gone', departed: true, stats: { speed: 71, strength: 72, stamina: 73, skill: 74, footyIQ: 75 } };
+    const junior: Player = { ...a!, id: 'jr', junior: true, stats: { speed: 41, strength: 42, stamina: 43, handling: 44, kicking: 44, footyIQ: 45 } };
+    const departed: Player = { ...b!, id: 'gone', departed: true, stats: { speed: 71, strength: 72, stamina: 73, handling: 74, kicking: 74, footyIQ: 75 } };
     setState({ ...club(100, [{ defId: 'scoutOffice', level: 3 }, { defId: 'academy', level: 3 }]), freeAgents: [junior, departed] });
     const pool = refreshFreeAgents(getState(), makeRng(9)).freeAgents;
     expect(pool.slice(0, 2)).toEqual([junior, departed]);
@@ -213,7 +213,7 @@ describe('the pool follows the league (N12)', () => {
 describe('signingFee (#146)', () => {
   const at = (overall: number, over: Partial<Player> = {}): Player => ({
     ...getState().freeAgents[0]!, id: `fa${overall}`, age: 25,
-    stats: { speed: overall, strength: overall, stamina: overall, skill: overall, footyIQ: overall }, ...over,
+    stats: { speed: overall, strength: overall, stamina: overall, handling: overall, kicking: overall, footyIQ: overall }, ...over,
   });
 
   it('is a transfer-style fee that grows with overall and falls with age', () => {
@@ -270,7 +270,7 @@ describe('signPlayer', () => {
   });
 
   it('leaves the lineup alone unless the coach\'s tap asks (#416: the soak and the rivals never place him)', () => {
-    const agent = { ...firstAgent(), injuredWeeks: 0, stats: { speed: 99, strength: 99, stamina: 99, skill: 99, footyIQ: 99 } };
+    const agent = { ...firstAgent(), injuredWeeks: 0, stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 } };
     setState({ freeAgents: [agent, ...getState().freeAgents.slice(1)] });
     const lineup = getState().lineup;
     const plain = signPlayer(getState(), agent.id);
@@ -279,7 +279,7 @@ describe('signPlayer', () => {
   });
 
   it('with intoLineup a man who out-rates a starter goes into the nine before player:signed (#416)', () => {
-    const agent = { ...firstAgent(), injuredWeeks: 0, stats: { speed: 99, strength: 99, stamina: 99, skill: 99, footyIQ: 99 } };
+    const agent = { ...firstAgent(), injuredWeeks: 0, stats: { speed: 99, strength: 99, stamina: 99, handling: 99, kicking: 99, footyIQ: 99 } };
     setState({ freeAgents: [agent, ...getState().freeAgents.slice(1)] });
     let inNine = false;
     bus.on('player:signed', () => { inNine = getState().lineup.starters.includes(agent.id); });

@@ -5,8 +5,6 @@
 // setting are never rewritten, a speed tap ends the moment, Skip ignores it.
 import { describe, it, expect, vi } from 'vitest';
 import { KEY_MOMENT_LATE_MIN, KeyMoments, LivePlayback, keyMomentsOn, type LivePlaybackScene } from '../../../src/match/view/livePlayback';
-import { migrateState } from '../../../src/core/save';
-import { SAVE_VERSION } from '../../../src/core/state';
 import { NINES } from '../../../src/match/league/rules';
 import { sideSheet } from '../../../src/match/balance/measure';
 import { createNewGame, getState, setState } from '../../../src/core/state';
@@ -17,20 +15,10 @@ import type Phaser from 'phaser';
 const H = NINES.halfMinutes;
 const early = { half: 1, seconds: 60 };
 
-// The tsconfig has no Node types: the saves are read with Vite's JSON import.
-const saves = import.meta.glob('../../fixtures/saves/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
-
 describe('the setting (#366)', () => {
-  it('is on when absent: every old save in the corpus migrates to the current version with no keyMoments and slows down', () => {
-    expect(SAVE_VERSION).toBe(23);
-    const files = Object.keys(saves);
-    expect(files.length).toBeGreaterThan(10);
-    for (const f of files) {
-      const r = migrateState(structuredClone(saves[f]));
-      if (!r.ok) throw new Error(`${f}: ${r.message}`);
-      expect(r.state.settings.keyMoments, f).toBeUndefined();
-      expect(keyMomentsOn(r.state.settings), f).toBe(true);
-    }
+  it('defaults on for a current career and respects an explicit choice', () => {
+    const s = createNewGame('Moments', 366);
+    expect(keyMomentsOn(s.settings)).toBe(true);
     expect(keyMomentsOn({ keyMoments: false })).toBe(false);
     expect(keyMomentsOn({ keyMoments: true })).toBe(true);
   });

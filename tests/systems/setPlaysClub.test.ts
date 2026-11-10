@@ -13,7 +13,7 @@ import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks } from '..
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 import { readLiveMatch } from '../../src/systems/liveMatchRecord';
-import { hireAttackCoach, hireStaff, releaseStaff } from '../../src/systems/staff';
+import { hireAttackCoach, releaseStaff } from '../../src/systems/staff';
 import { buyPlay, ownedPlays, togglePlay } from '../../src/systems/playbook';
 import { asOldSave } from '../../src/qa/soak';
 import { MatchRecorder, runMatch } from '../../src/match/league/match';
@@ -190,7 +190,7 @@ describe('save v23 (plan §2.3, §8)', () => {
   beforeEach(() => newClub());
 
   it('one migration step, v22 → v23, fills an empty playbook and an empty three', () => {
-    expect(SAVE_VERSION).toBe(23);
+    expect(SAVE_VERSION).toBe(24);
     expect(MIGRATIONS.filter((m) => m.from === 22 && m.to === 23)).toHaveLength(1);
     const step = MIGRATIONS.find((m) => m.from === 22)!;
     const raw = { version: 22, lineup: { starters: [], bench: [] }, staff: [] };
@@ -199,24 +199,12 @@ describe('save v23 (plan §2.3, §8)', () => {
     expect(raw).toEqual({ version: 22, lineup: { starters: [], bench: [] }, staff: [] }); // never mutates
   });
 
-  it('a v22 export loads with no attack coach, an empty playbook and no plays taken, and plays a match without them', () => {
-    hireStaff('welfare');
-    const v22 = asOldSave(getState(), 22);
-    expect(v22).not.toHaveProperty('playbook');
-    expect(v22.lineup as object).not.toHaveProperty('plays');
-    expect(v22.staff).toEqual(getState().staff);
-    const res = importSave(JSON.stringify({ ...v22, version: 22 }));
-    expect(res.ok).toBe(true);
-    if (!res.ok) return;
-    expect(res.state.version).toBe(SAVE_VERSION);
-    expect(res.state.playbook).toEqual({ owned: [] });
-    expect(res.state.lineup.plays).toEqual([]);
-    expect(res.state.staff.map((s) => s.role)).toEqual(['welfare']);
-    expect(res.state.staff.some((s) => s.role === 'attackCoach')).toBe(false);
-    setState(res.state);
-    const m = kickOff();
-    expect(mine(m)).not.toHaveProperty('plays');
-  }, 30_000);
+  it('a v22 export requires a new career without installing plays', () => {
+    const old = JSON.stringify(asOldSave(getState(), 22));
+    const before = getState();
+    expect(importSave(old)).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
+    expect(getState()).toBe(before);
+  });
 
   it('asOldSave strips the playbook and the three below 23 and keeps both at 23', () => {
     hireAttackCoach('direct');
@@ -230,11 +218,7 @@ describe('save v23 (plan §2.3, §8)', () => {
       expect(old, `v${v}`).not.toHaveProperty('playbook');
       if (old.lineup) expect(old.lineup as object, `v${v}`).not.toHaveProperty('plays');
       const back = migrateState(old);
-      expect(back.ok, `v${v}`).toBe(true);
-      if (back.ok) {
-        expect(back.state.playbook).toEqual({ owned: [] });
-        expect(back.state.lineup.plays).toEqual([]);
-      }
+      expect(back).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
     }
   });
 });

@@ -66,7 +66,7 @@ describe('Recruit screen', () => {
   });
   it('marks only the one reach fee in warning colour and explains the saving estimate', () => {
     const pool = getState().freeAgents.slice(0, 5).map((p, i) => ({ ...p, junior: true, wage: i === 0 ? 300 : 20,
-      stats: { speed: i === 0 ? 90 : 40, strength: 40, stamina: 40, skill: 40, footyIQ: 40 } }));
+      stats: { speed: i === 0 ? 90 : 40, strength: 40, stamina: 40, handling: 40, kicking: 40, footyIQ: 40 } }));
     setState({ money: 1000, freeAgents: pool }); openRecruitScreen();
     const reach = rows().find((r) => r.attrs['data-row-player'] === pool[0]!.id)!;
     expect(reach.children[4]!.style.color).toBe('var(--nrl-alert)');

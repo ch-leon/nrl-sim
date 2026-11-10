@@ -24,7 +24,7 @@ function mkPlayer(over: Partial<Player> = {}): Player {
     name: over.name ?? 'Test Player',
     age: 25,
     position: 'lock',
-    stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 },
+    stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 },
     morale: 60,
     injuryRisk: 10,
     injuredWeeks: 0,
@@ -338,7 +338,7 @@ describe('tickContracts', () => {
     // overall 60, neutral morale, a new club at the baseline reputation → the market wage, $1,050.
     const p = mkPlayer({
       id: 'renew', wage: 4000, morale: 50, contractWeeks: 1,
-      stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 }, // overall 60
+      stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 }, // overall 60
     });
     setup({ money: 1_000_000, reputation: 30, season: 1, squad: [p] });
     tickContracts(getState());
@@ -353,7 +353,7 @@ describe('tickContracts', () => {
     // overall 100 → $5,650 on the curve; reputation 100 in season 3 → ×1.25 × (1 + 2 × the season inflation).
     const elite = mkPlayer({
       id: 'elite', wage: 10000, morale: 50, contractWeeks: 1,
-      stats: { speed: 100, strength: 100, stamina: 100, skill: 100, footyIQ: 100 },
+      stats: { speed: 100, strength: 100, stamina: 100, handling: 100, kicking: 100, footyIQ: 100 },
     });
     setup({ money: 10_000_000, reputation: 100, season: 3, squad: [elite] });
     tickContracts(getState());

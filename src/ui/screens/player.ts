@@ -128,7 +128,7 @@ export function playerOutlook(p: Player, ctx: PlayerContext, state: GameState): 
 }
 
 const STAT_LABELS: readonly [keyof PlayerStats, string][] = [
-  ['speed', 'Speed'], ['strength', 'Strength'], ['stamina', 'Stamina'], ['skill', 'Skill'], ['footyIQ', ''],
+  ['speed', 'Speed'], ['strength', 'Strength'], ['stamina', 'Stamina'], ['handling', 'Handling'], ['kicking', 'Kicking'], ['footyIQ', ''],
 ];
 
 /** Morale in a word: 70+ happy, 50+ content, 30+ unsettled, else unhappy. */

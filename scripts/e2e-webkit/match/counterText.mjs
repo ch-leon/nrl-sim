@@ -39,14 +39,14 @@ export async function runCounterText(browser) {
         s.recentPlans = Array.from({ length: 3 }, () => ({ attack: 'grind', defence: 'slide' }));
         s.facilities.push({ id: 'counter-training', defId: 'trainingPaddock', level: 3, x: 10, y: 10 });
         for (const p of s.squad) {
-          p.stats = { speed: 80, strength: 80, stamina: 100, skill: 80, footyIQ: 80 };
+          p.stats = { speed: 80, strength: 80, stamina: 100, handling: 80, kicking: 80, footyIQ: 80 };
           p.traits = []; p.injuredWeeks = 0; p.suspendedWeeks = 0;
         }
         // Flat stronger stats keep fits predictable; the Tight habit selects Compressed.
         for (const c of s.league.clubs) {
           c.strength = 90;
           for (const p of c.squad ?? []) {
-            p.stats = { speed: 95, strength: 95, stamina: 100, skill: 95, footyIQ: 95 };
+            p.stats = { speed: 95, strength: 95, stamina: 100, handling: 95, kicking: 95, footyIQ: 95 };
             p.traits = [];
           }
         }

@@ -347,7 +347,7 @@ export abstract class LiveRestarts extends LivePlay {
       if (ph.readyAt === 0 && dist(k.body.pos, ph.spot) < 1) ph.readyAt = this.tick;
       const ready = ph.readyAt > 0 && this.tick >= ph.readyAt + GOALS.conversionTicks;
       if (!ready && this.tick < ph.t0 + GOALS.conversionMaxTicks) return;
-      ph.good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.skill, this.goalAcc(k));
+      ph.good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.kicking, this.goalAcc(k));
       this.lock(k, 'kick', LIVE.kickLockTicks);
       this.ball = kickFlight(k.body.pos, this.goalAim(posts, this.dirOf(ph.side), ph.good), this.tick, null, 7);
       return;

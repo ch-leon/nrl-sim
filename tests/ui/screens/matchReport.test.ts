@@ -17,7 +17,7 @@ const sheet = (id: string, name: string): TeamSheet => ({
   kicking: 60,
   fitness: 60,
   colors: ['#111', '#eee'],
-  roster: POSITIONS.map((position, i) => ({ name: `${name} ${i}`, position, stats: { speed: 60, strength: 60, stamina: 50, skill: 60, footyIQ: 60 } })),
+  roster: POSITIONS.map((position, i) => ({ name: `${name} ${i}`, position, stats: { speed: 60, strength: 60, stamina: 50, handling: 60, kicking: 60, footyIQ: 60 } })),
 });
 const names = { player: 'Live Test FC', 'rival-gulls': 'Gulls' };
 const fixture = { round: 3, homeId: 'player', awayId: 'rival-gulls' };

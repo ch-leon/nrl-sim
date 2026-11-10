@@ -19,7 +19,7 @@ const game = () => createNewGame('Kick FC', 21);
 
 function man(id: string, position: Player['position'], stats: Partial<Player['stats']>): Player {
   const p = game().squad[0]!;
-  return { ...p, id, name: id, position, stats: { speed: 50, strength: 50, stamina: 50, skill: 50, footyIQ: 50, ...stats } };
+  return { ...p, id, name: id, position, stats: { speed: 50, strength: 50, stamina: 50, handling: 50, kicking: 50, footyIQ: 50, ...stats } };
 }
 
 /** A flat sheet whose nine carry ids, so it can name a kicker and a captain. */
@@ -29,21 +29,21 @@ function named(id: string, over: (i: number) => Partial<NonNullable<TeamSheet['r
 }
 
 describe('the goal-kicker and the captain (N11)', () => {
-  it('defaults: the half with the best Skill kicks, the best Footy IQ captains; the coach’s picks win when in the nine', () => {
+  it('defaults: the half with the best Kicking kicks, the best Footy IQ captains; the coach’s picks win when in the nine', () => {
     const nine = [
-      man('fb', 'fullback', { skill: 90, footyIQ: 40 }),
-      man('fe', 'five-eighth', { skill: 70 }),
-      man('hb', 'halfback', { skill: 75 }),
+      man('fb', 'fullback', { handling: 20, kicking: 90, footyIQ: 40 }),
+      man('fe', 'five-eighth', { kicking: 70 }),
+      man('hb', 'halfback', { kicking: 75 }),
       man('pr', 'prop', { footyIQ: 85 }),
     ];
     expect(kickerAndCaptain(nine)).toEqual({ kicker: 'hb', captain: 'pr' });
     expect(kickerAndCaptain(nine, { kicker: 'fb', captain: 'fe' })).toEqual({ kicker: 'fb', captain: 'fe' });
     expect(kickerAndCaptain(nine, { kicker: 'gone', captain: null })).toEqual({ kicker: 'hb', captain: 'pr' });
-    // No half in the nine: the best Skill anywhere.
+    // No half in the nine: the best Kicking anywhere.
     expect(kickerAndCaptain(nine.filter((p) => p.position !== 'five-eighth' && p.position !== 'halfback')).kicker).toBe('fb');
   });
 
-  it('the lineup keeps the picks (tap again for the default); the sheet carries them; old saves get the defaults', () => {
+  it('the lineup keeps the picks (tap again for the default); the sheet carries them; old saves require a new career', () => {
     const s = game();
     const lineup = autoPick(s.squad);
     expect(lineup.kicker).toBeNull();
@@ -61,8 +61,7 @@ describe('the goal-kicker and the captain (N11)', () => {
     void _k;
     void _c;
     const res = migrateState({ ...s, version: 14, lineup: v14Lineup as never });
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(res.state.lineup).toMatchObject({ kicker: null, captain: null });
+    expect(res).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
   });
 
   it('a sheet naming the slot-5 kicker and a neutral captain plays exactly as one naming neither', () => {
@@ -73,15 +72,15 @@ describe('the goal-kicker and the captain (N11)', () => {
     expect(runMatch(neutral, away, { seed: 3 })).toEqual(runMatch(plain, away, { seed: 3 }));
   }, 60_000);
 
-  it('the named kicker takes the goal kicks while he is on, and his Skill moves the conversion rate (40 seeds)', () => {
+  it('the named kicker takes the goal kicks while he is on, and his Kicking moves the conversion rate (40 seeds)', () => {
     const away = sideSheet('A', { rating: 60 });
-    // The fullback (slot 0) kicks; his Skill is the only thing that differs.
-    const withKicker = (skill: number): TeamSheet => {
-      const s = named('H', (i) => (i === 0 ? { stats: { speed: 60, strength: 60, stamina: 60, skill, footyIQ: 60 } } : {}));
+    // The fullback (slot 0) kicks; his Kicking is the only thing that differs.
+    const withKicker = (kicking: number): TeamSheet => {
+      const s = named('H', (i) => (i === 0 ? { stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking, footyIQ: 60 } } : {}));
       return { ...s, kicker: s.roster![0]!.id! };
     };
-    const rate = (skill: number): { made: number; tried: number; byKicker: number } => {
-      const sheet = withKicker(skill);
+    const rate = (kicking: number): { made: number; tried: number; byKicker: number } => {
+      const sheet = withKicker(kicking);
       let made = 0;
       let tried = 0;
       let byKicker = 0;

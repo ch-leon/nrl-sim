@@ -10,7 +10,7 @@ const plan = (home: SideSpec): Plan => ({ name: 'counters', seeds: 2, scenarios:
 describe('position stat overrides', () => {
   const overrides: SideSpec = {
     stats: { speed: 55, strength: 56 },
-    positionStats: { backs: { speed: 80 }, halves: { skill: 85 }, pack: { strength: 80 }, prop: { strength: 90 } },
+    positionStats: { backs: { speed: 80 }, halves: { handling: 85 }, pack: { strength: 80 }, prop: { strength: 90 } },
   };
   it('applies groups and exact positions after flat stats to starters and bench on every sheet kind', () => {
     const builders = [
@@ -27,7 +27,7 @@ describe('position stat overrides', () => {
       for (const [i, r] of [...sheet.roster!, ...sheet.bench!].entries()) {
         expect(r.stats!.speed).toBe((POSITION_GROUPS.backs as readonly string[]).includes(r.position) ? 80 : before[i]!.stats!.speed);
         expect(r.stats!.strength).toBe(r.position === 'prop' ? 90 : (POSITION_GROUPS.pack as readonly string[]).includes(r.position) ? 80 : before[i]!.stats!.strength);
-        expect(r.stats!.skill).toBe((POSITION_GROUPS.halves as readonly string[]).includes(r.position) ? 85 : before[i]!.stats!.skill);
+        expect(r.stats!.handling).toBe((POSITION_GROUPS.halves as readonly string[]).includes(r.position) ? 85 : before[i]!.stats!.handling);
       }
     }
   });
@@ -39,9 +39,9 @@ describe('position stat overrides', () => {
     }
   });
   it('validates every position and rejects bad positions, stats and values', () => {
-    expect(checkPlan(plan({ positionStats: Object.fromEntries(POSITIONS.map((p) => [p, { skill: 75 }])) }))).toEqual([]);
-    for (const positionStats of [{ wing: { speed: 80 } }, { backs: { handling: 80 } }, { pack: { strength: 101 } },
-      { halves: { skill: Number.NaN } }, { backs: { speed: '80' } }, { pack: null }, []]) {
+    expect(checkPlan(plan({ positionStats: Object.fromEntries(POSITIONS.map((p) => [p, { handling: 75 }])) }))).toEqual([]);
+    for (const positionStats of [{ wing: { speed: 80 } }, { backs: { skill: 80 } }, { pack: { strength: 101 } },
+      { halves: { handling: Number.NaN } }, { backs: { speed: '80' } }, { pack: null }, []]) {
       expect(checkPlan(plan({ positionStats: positionStats as never })).length).toBeGreaterThan(0);
     }
     expect(checkPlan({ ...plan({}), report: 'unknown' as never })).toContain('report must be matrix');

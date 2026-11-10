@@ -49,8 +49,8 @@ describe('the kick-off depth (#397)', () => {
   it('with the deeper default off, the kick-off is today’s: the receivers’ 24 m line, 16 m high, one draw across', () => {
     for (const j of [0, 0.3, 0.5, 0.99]) {
       for (const rd of [1, -1] as const) {
-        for (const skill of [20, 60, 99]) {
-          const land = kickoffLanding(null, rd, j, skill, false, false);
+        for (const handling of [20, 60, 99]) {
+          const land = kickoffLanding(null, rd, j, handling, false, false);
           expect(land.to).toEqual(kickoffTarget(rd, j));
           expect(land.peak).toBe(16);
         }
@@ -66,11 +66,11 @@ describe('the kick-off depth (#397)', () => {
     expect(kickoffLineM(null, 90, true)).toBe(8);
     expect(kickoffLineM(null, 99, true)).toBe(8);
     expect(kickoffLineM(null, 60, true)).toBeCloseTo(11.5);
-    for (let skill = 0; skill <= 100; skill += 5) {
-      const from = FIELD_LENGTH / 2 - kickoffLineM(null, skill, true);
+    for (let handling = 0; handling <= 100; handling += 5) {
+      const from = FIELD_LENGTH / 2 - kickoffLineM(null, handling, true);
       expect(from).toBeGreaterThanOrEqual(35);
       expect(from).toBeLessThanOrEqual(42);
-      expect(kickoffLineM(null, skill + 5, true)).toBeLessThanOrEqual(kickoffLineM(null, skill, true));
+      expect(kickoffLineM(null, handling + 5, true)).toBeLessThanOrEqual(kickoffLineM(null, handling, true));
     }
     expect(kickoffLanding(null, 1, 0.5, 60, false, true).peak).toBeGreaterThan(16);
   });
@@ -134,7 +134,7 @@ describe('the Short kick-off (#397)', () => {
       let won = 0;
       for (let seed = 1; seed <= 200; seed++) {
         // Both sides quick and sure-handed or slow and fumbling: whichever kicks off, its chase meets the other's hands.
-        const spec: SideSpec = { rating: 60, stats: fast ? { speed: 90, skill: 30 } : { speed: 30, skill: 90 } };
+        const spec: SideSpec = { rating: 60, stats: fast ? { speed: 90, handling: 30 } : { speed: 30, handling: 90 } };
         if (firstKickoff(seed, 'kickoff-short', spec, spec).verdict!.paid) won++;
       }
       return won / 200;

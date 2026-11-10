@@ -214,19 +214,20 @@ export interface NineShape {
   packStrength: number;
   speed: number;
   strength: number;
-  skill: number;
+  handling: number;
+  kicking: number;
   footyIQ: number;
   stamina: number;
   age: number;
 }
 
-const SHAPE_KEYS: readonly (keyof NineShape)[] = ['backsSpeed', 'packStrength', 'speed', 'strength', 'skill', 'footyIQ', 'stamina', 'age'];
+const SHAPE_KEYS: readonly (keyof NineShape)[] = ['backsSpeed', 'packStrength', 'speed', 'strength', 'handling', 'kicking', 'footyIQ', 'stamina', 'age'];
 
 /** A nine's shape from its roster entries; ages by id from the squad (0 when none match). Pure. */
 export function nineShape(roster: readonly (StyleEntry & { id?: string })[], ages: ReadonlyMap<string, number> = new Map()): NineShape {
   const men = roster.filter((e) => e.stats);
   const avg = (xs: readonly number[]): number => xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : 0;
-  const stat = (k: 'speed' | 'strength' | 'skill' | 'footyIQ' | 'stamina', roles?: readonly string[]): number =>
+  const stat = (k: 'speed' | 'strength' | 'handling' | 'kicking' | 'footyIQ' | 'stamina', roles?: readonly string[]): number =>
     avg(men.filter((e) => !roles || roles.includes(e.position)).map((e) => e.stats![k]));
   const speed = stat('speed');
   const strength = stat('strength');
@@ -236,7 +237,7 @@ export function nineShape(roster: readonly (StyleEntry & { id?: string })[], age
     const age = e.id !== undefined ? ages.get(e.id) : undefined;
     return age === undefined ? [] : [age];
   });
-  return { backsSpeed: backs, packStrength: pack, speed, strength, skill: stat('skill'), footyIQ: stat('footyIQ'), stamina: stat('stamina'), age: avg(known) };
+  return { backsSpeed: backs, packStrength: pack, speed, strength, handling: stat('handling'), kicking: stat('kicking'), footyIQ: stat('footyIQ'), stamina: stat('stamina'), age: avg(known) };
 }
 
 export interface SoakResult {

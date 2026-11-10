@@ -49,9 +49,9 @@ describe('the difficulty’s edge after the spread (N12.2, pure)', () => {
     const [h, a] = edgeSheets(mine, rival, { side: 'away', points: 3 });
     expect(h).toBe(mine);
     a.roster!.forEach((e, i) => {
-      for (const k of ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const) expect(e.stats![k]).toBe(rival.roster![i]!.stats![k] + 3);
+      for (const k of ['speed', 'strength', 'stamina', 'handling', 'footyIQ'] as const) expect(e.stats![k]).toBe(rival.roster![i]!.stats![k] + 3);
     });
-    a.bench!.forEach((e, i) => expect(e.stats!.skill).toBe(rival.bench![i]!.stats!.skill + 3)); // the bench too
+    a.bench!.forEach((e, i) => expect(e.stats!.handling).toBe(rival.bench![i]!.stats!.handling + 3)); // the bench too
     const [easyHome] = edgeSheets(rival, mine, { side: 'home', points: -2.5 });
     expect(easyHome.roster![4]!.stats!.footyIQ).toBe(rival.roster![4]!.stats!.footyIQ - 2.5);
   });
@@ -67,7 +67,7 @@ describe('the difficulty’s edge after the spread (N12.2, pure)', () => {
     const [, low] = edgeSheets(mine, sideSheet('A', { rating: 3 }), { side: 'away', points: -5 });
     expect(top.roster![0]!.stats!.speed).toBe(100);
     expect(top.bench![0]!.stats!.stamina).toBe(100);
-    expect(low.roster![0]!.stats!.skill).toBe(1);
+    expect(low.roster![0]!.stats!.handling).toBe(1);
   });
   it('no edge, or none on Normal, plays the sheets exactly as they were', () => {
     const [h, a] = edgeSheets(mine, rival, undefined);

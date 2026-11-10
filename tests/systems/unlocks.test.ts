@@ -6,7 +6,6 @@ import { bus, type Events } from '../../src/core/events';
 import { FACILITY_CATALOG, type FacilityDefId } from '../../src/data/facility';
 import { DIFFICULTIES, SEASON_ROUNDS, BOARD } from '../../src/config';
 import { isFacilityOpen, registerUnlockSystem, unlockReason, unlocksDue } from '../../src/systems/unlocks';
-import { migrateState } from '../../src/core/save';
 import { generateObjectives } from '../../src/systems/board';
 import { NewsInbox, initNewsInbox } from '../../src/ui/inbox';
 
@@ -113,15 +112,7 @@ describe('facility unlock ladder (#481)', () => {
     expect(getState()).not.toHaveProperty('unlocks');
     expect(open()).toHaveLength(12);
     expect(unlocksDue(getState())).toEqual([]);
-    const saves = import.meta.glob('../fixtures/saves/*.json', { eager: true, import: 'default' });
-    expect(Object.keys(saves).length).toBeGreaterThan(0);
-    for (const raw of Object.values(saves)) {
-      const result = migrateState(raw);
-      expect(result.ok).toBe(true);
-      if (!result.ok) continue;
-      expect(result.state).not.toHaveProperty('unlocks');
-      expect(all.every((id) => isFacilityOpen(result.state, id))).toBe(true);
-    }
+
   });
 
   it('keeps the season-one build objective reachable with the facilities open by round 8', () => {

@@ -10,7 +10,6 @@ import {
   playedBeforeNines,
   PRE_NINES_NOTE,
 } from '../../../src/ui/screens/history';
-import { migrateState } from '../../../src/core/save';
 import { bus } from '../../../src/core/events';
 
 describe('fmtSeasonSummary', () => {
@@ -104,10 +103,9 @@ describe('the pre-Nines note', () => {
   for (const file of withHistory) {
     const version = Number(/\/v(\d+)-/.exec(file)?.[1]);
     it(`${file.slice(file.lastIndexOf('/') + 1)}: ${version < 12 ? 'noted' : 'no note'}`, () => {
-      const res = migrateState(saves[file]);
-      expect(res.ok).toBe(true);
-      if (!res.ok) return;
-      for (const h of res.state.history) expect(fmtRulesNote(h), `season ${h.season}`).toBe(version < 12 ? PRE_NINES_NOTE : '');
+      // Presentation data only: opening these historical careers is refused in corpus.test.ts.
+      const history = (saves[file] as { history: SeasonRecord[] }).history;
+      for (const h of history) expect(fmtRulesNote(h), `season ${h.season}`).toBe(version < 12 ? PRE_NINES_NOTE : '');
     });
   }
 });

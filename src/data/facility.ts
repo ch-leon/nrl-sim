@@ -102,7 +102,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 60000,
     upkeep: 600,
     footprint: { w: 3, h: 3 },
-    trains: { skill: 1.0, footyIQ: 1.0 },
+    trains: { handling: 1.0, kicking: 1.0, footyIQ: 1.0 },
     special: 'recruitQuality',
     adjacency: { near: 'coachsOffice', bonusMult: 1.25 },
   },
@@ -112,7 +112,7 @@ export const FACILITY_CATALOG: Record<FacilityDefId, FacilityDef> = {
     cost: 30000,
     upkeep: 300,
     footprint: { w: 2, h: 2 },
-    trains: { footyIQ: 1.0, skill: 1.0 },
+    trains: { footyIQ: 1.0, handling: 1.0, kicking: 1.0 },
     special: 'morale',
   },
   scoutOffice: {

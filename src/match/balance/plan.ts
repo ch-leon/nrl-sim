@@ -191,7 +191,7 @@ export function checkPlan(p: Plan): string[] {
           if (![...POSITIONS, ...Object.keys(POSITION_GROUPS)].includes(position)) errs.push(`${s.name} ${side}: unknown position "${position}"`);
           if (!stats || typeof stats !== 'object' || Array.isArray(stats)) errs.push(`${s.name} ${side}: ${position} stats must be an object`);
           else for (const [key, value] of Object.entries(stats)) {
-            if (!['speed', 'strength', 'stamina', 'skill', 'footyIQ'].includes(key)) errs.push(`${s.name} ${side}: unknown stat "${key}"`);
+            if (!['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'].includes(key)) errs.push(`${s.name} ${side}: unknown stat "${key}"`);
             else if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 100) errs.push(`${s.name} ${side}: ${position}.${key} must be a number 1–100`);
           }
         }

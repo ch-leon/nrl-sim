@@ -11,12 +11,12 @@ import type { Vec } from '../core/vec';
 export const GOALS = {
   /** Half the gap between the uprights, metres (posts 5.5 m apart). */
   halfPosts: 2.75,
-  /** Sideways error of a kick, degrees (1 standard deviation) for a Skill 60 kicker before distance. */
+  /** Sideways error of a kick, degrees (1 standard deviation) for a Kicking 60 kicker before distance. */
   errorDeg: 5,
   /** The error grows by this share per metre to the posts. */
   errorPerM: 1 / 40,
-  /** Each Skill point above 60 narrows the error this much (and below 60 widens it). */
-  errorPerSkill: 0.012,
+  /** Each Kicking point above 60 narrows the error this much (and below 60 widens it). */
+  errorPerKicking: 0.012,
   /** A conversion is taken from at least this far out and at most this far. */
   minBackM: 10,
   maxBackM: 35,
@@ -94,12 +94,12 @@ function erf(x: number): number {
 
 /**
  * Chance a kick from `from` goes between the posts: its sideways error is
- * normal with a spread set by distance, the kicker's Skill and Big Boot's
+ * normal with a spread set by distance, the kicker's Kicking and Big Boot's
  * accuracy multiplier (`acc` < 1 is truer).
  */
-export function goalChance(from: Vec, posts: Vec, skill: number, acc = 1): number {
+export function goalChance(from: Vec, posts: Vec, kicking: number, acc = 1): number {
   const metres = Math.hypot(posts.x - from.x, posts.y - from.y);
-  const spread = Math.max(0.5, GOALS.errorDeg * (1 + metres * GOALS.errorPerM) * (1 - (skill - 60) * GOALS.errorPerSkill) * acc);
+  const spread = Math.max(0.5, GOALS.errorDeg * (1 + metres * GOALS.errorPerM) * (1 - (kicking - 60) * GOALS.errorPerKicking) * acc);
   const half = postsAngleDeg(from, posts) / 2;
   return Math.max(0, Math.min(1, erf(half / (spread * Math.SQRT2))));
 }

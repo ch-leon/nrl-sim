@@ -1,12 +1,6 @@
-// tests/qa/corpus.test.ts — the save corpus: real saves dumped by the phone
-// playthrough (scripts/e2e-season.mjs writes e2e-output/saves/) and committed as
-// tests/fixtures/saves/v<version>-<point>.json. Every one must keep loading as the
-// game moves on: it migrates to SAVE_VERSION, passes the soak's invariant checks,
-// and plays on headless through every system: a whole season for the oldest and the
-// newest version's saves, past the rollover for one version in between's mid-season save,
-// SHORT_WEEKS for the rest (each version adds four saves, and a season each was the
-// slowest file in CI's 10-minute check job). One file per save version at each point,
-// never edited after it lands (tests/fixtures/saves/README.md).
+// Immutable historical saves now verify the new-career refusal policy (#536).
+// Supported current-format fixtures validate and play on through the systems;
+// they are added alongside old files, never substituted for historical bytes.
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
 import { coachAddress } from '../../src/ui/coachName';
@@ -44,13 +38,20 @@ describe('save corpus', () => {
         expect(raw.version).toBeLessThanOrEqual(SAVE_VERSION);
       });
 
-      it('migrates to SAVE_VERSION and passes checkState', () => {
+      if ((raw.version ?? 0) < 24) {
+        it('requires a new career without changing the historical fixture', () => {
+          const before = JSON.stringify(raw);
+          expect(migrateState(raw)).toMatchObject({ ok: false, message: expect.stringMatching(/older version.*start a new career/i) });
+          expect(JSON.stringify(raw)).toBe(before);
+        });
+        return;
+      }
+
+      it('loads v24 and passes checkState', () => {
         const res = migrateState(raw);
         expect(res.ok, res.ok ? '' : res.message).toBe(true);
         if (!res.ok) return;
         expect(res.state.version).toBe(SAVE_VERSION);
-        expect(res.state).not.toHaveProperty('coachName');
-        expect(res.state).not.toHaveProperty('unlocks');
         expect(coachAddress(res.state)).toBe('Coach');
         expect(checkState(res.state)).toEqual([]);
       });

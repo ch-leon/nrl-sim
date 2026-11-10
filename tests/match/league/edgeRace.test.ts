@@ -61,7 +61,7 @@ describe('the edge race (#322)', () => {
   });
   it('names the step slope without changing the step', () => {
     expect(BASE.stepSlope).toBe(200);
-    const atk = { strength: 50, speed: 80, skill: 70, footyIQ: 50 }, def = { strength: 50, speed: 50, skill: 50, footyIQ: 50 };
+    const atk = { strength: 50, speed: 80, handling: 70, kicking: 70, footyIQ: 50 }, def = { strength: 50, speed: 50, handling: 50, kicking: 50, footyIQ: 50 };
     expect(stepChance(atk, def, OPEN)).toBeCloseTo(0.1 + 25 / 200);
     tuned({ 'contest.stepSlope': 100 }, () => expect(stepChance(atk, def, OPEN)).toBeCloseTo(0.1 + 25 / 100));
   });

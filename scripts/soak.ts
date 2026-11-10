@@ -1,11 +1,11 @@
 // scripts/soak.ts — headless multi-season soak of the club/league systems.
 //
-//   npm run soak                         5 seasons × 20 seeds, idle + managed + idle Hard, plus old saves
+//   npm run soak                         5 seasons × 20 seeds, idle + managed + idle Hard
 //   npm run soak -- --shard 1/7 --jobs 4   one partition of the same complete case set
 //   npm run soak -- --seasons 3 --seeds 5
 //   npm run soak -- --difficulties easy,normal,hard   idle + managed on each difficulty (#148)
 //   npm run soak -- --managed-only --difficulties easy,normal,hard   managed career guardrails
-//   npm run soak -- --pack uk               UK careers (old saves remain AU)
+//   npm run soak -- --pack uk               UK careers
 //   npm run soak -- --json out.json      also write every run's samples to a file
 //   npm run soak -- --jobs 4             split the runs over 4 processes (same results, in order)
 //   npm run soak -- --live-rivals        rival rounds on the live sim too (N9.2's setting; several times slower),
@@ -36,7 +36,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { PERSONAS, personaById } from '../src/qa/personas';
 import { compareBaseline, makeBaseline, personaReport, summarisePersonas, type PersonaBaseline } from '../src/qa/personas/report';
-import { attackVsDefence, fieldedTable, levelWinRates, shapeTable, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
+import { attackVsDefence, fieldedTable, levelWinRates, shapeTable, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 import { applyTuning } from '../src/match/league/tuning';
 import { shardCases } from '../src/qa/shard';
@@ -106,8 +106,8 @@ for (let seed = 1; seed <= seeds; seed++) {
     if (!args.includes('--managed-only')) specs.push({ seed: seed * 7919, seasons, mode: 'idle', difficulty: 'hard', ...live, pack });
   }
 }
-// Old saves have no pack id and remain AU. UK runs contain only UK careers.
-if (!personaConfigs && pack === 'au') for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
+// Format 24 is new careers only. Historical refusal/preservation is covered
+// by the save corpus and boundary tests; old saves cannot be soak inputs.
 const selectedSpecs = shardCases(specs, shard);
 if (shard) console.log(`Soak case shard ${shard}: ${selectedSpecs.length} of ${specs.length} unchanged cases.`);
 
@@ -280,10 +280,10 @@ if (liveRivals) {
     }
   }
   console.log(`\nThe fielded nine's shape by attack (#322): bSpd = backs' Speed − the nine's, pStr = pack Strength − the nine's, then the nine's mean of each stat and its mean age.`);
-  console.log(`${pad('attack', 11)} ${pad('sides', 6)} ${['bSpd', 'pStr', 'spd', 'str', 'skl', 'iq', 'sta', 'age'].map((h) => pad(h, 6)).join(' ')}`);
+  console.log(`${pad('attack', 11)} ${pad('sides', 6)} ${['bSpd', 'pStr', 'spd', 'str', 'hnd', 'kick', 'iq', 'sta', 'age'].map((h) => pad(h, 6)).join(' ')}`);
   for (const row of shapeTable(games, 'attack')) {
     const sh = row.shape;
-    console.log([pad(row.style, 11), pad(row.sides, 6), ...[sh.backsSpeed, sh.packStrength, sh.speed, sh.strength, sh.skill, sh.footyIQ, sh.stamina, sh.age].map((n) => pad(n.toFixed(1), 6))].join(' '));
+    console.log([pad(row.style, 11), pad(row.sides, 6), ...[sh.backsSpeed, sh.packStrength, sh.speed, sh.strength, sh.handling, sh.kicking, sh.footyIQ, sh.stamina, sh.age].map((n) => pad(n.toFixed(1), 6))].join(' '));
   }
   console.log(`\nExpansive by the defence it faced (#322): against strength (score − expect, se) and at a level rating (clubs within ${STYLE_GAP_BAND} points).`);
   console.log(`${pad('defence', 11)} ${pad('sides', 6)} ${pad('score', 6)} ${pad('expect', 6)} ${pad('diff', 6)} ${pad('se', 5)} ${pad('level', 6)} ${pad('score', 6)}`);

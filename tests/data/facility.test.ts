@@ -56,11 +56,11 @@ describe('FACILITY_CATALOG', () => {
       cost: 120000, footprint: { w: 3, h: 3 }, special: 'gate',
     });
     expect(FACILITY_CATALOG.academy).toMatchObject({
-      cost: 60000, footprint: { w: 3, h: 3 }, trains: { skill: 1.0, footyIQ: 1.0 },
+      cost: 60000, footprint: { w: 3, h: 3 }, trains: { handling: 1.0, kicking: 1.0, footyIQ: 1.0 },
       special: 'recruitQuality', adjacency: { near: 'coachsOffice', bonusMult: 1.25 },
     });
     expect(FACILITY_CATALOG.coachsOffice).toMatchObject({
-      cost: 30000, trains: { footyIQ: 1.0, skill: 1.0 }, special: 'morale',
+      cost: 30000, trains: { footyIQ: 1.0, handling: 1.0 }, special: 'morale',
     });
     expect(FACILITY_CATALOG.scoutOffice).toMatchObject({ cost: 25000, special: 'recruitQuality' });
     expect(FACILITY_CATALOG.medicalBay).toMatchObject({ cost: 35000, special: 'injuryRecovery' });

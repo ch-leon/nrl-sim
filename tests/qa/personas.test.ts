@@ -76,8 +76,8 @@ describe('AI personas (#534)', () => {
       expect(r.career).toBeUndefined();
       expect(getState().version).toBe(SAVE_VERSION);
     }
-    // This build starts from v23; the source file is outside the allowed edit set.
-    expect(SAVE_VERSION).toBe(23);
+    // Handling/Kicking careers use format 24, including persona runs.
+    expect(SAVE_VERSION).toBe(24);
   }, 20_000);
 
   it('UK persona smoke is deterministic with the prepared UK pack', async () => {

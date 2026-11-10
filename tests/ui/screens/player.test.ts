@@ -40,7 +40,7 @@ describe('playerPageModel', () => {
     const m = playerPageModel(p, { kind: 'squad' }, s);
     expect(m.where).toMatch(/^Your squad · (Starting \S+|On the bench|Not picked)$/); // the lineup slot (N14)
     expect(m.overall).toBe(overallRating(p));
-    expect(m.stats.map((x) => x.label)).toEqual(['Speed', 'Strength', 'Stamina', 'Skill', 'Footy IQ']);
+    expect(m.stats.map((x) => x.label)).toEqual(['Speed', 'Strength', 'Stamina', 'Handling', 'Kicking', 'Footy IQ']);
     expect(m.traits).toHaveLength(p.traits.length);
     for (const t of m.traits) {
       expect(t.label).toMatch(/ (I|II|III)$/);
@@ -57,8 +57,8 @@ describe('playerPageModel', () => {
 
   it('shows whole-number stats when training has left fractions', () => {
     const s = getState();
-    const p = { ...s.squad[0]!, stats: { speed: 78.6487606885, strength: 54.428, stamina: 55, skill: 60.5, footyIQ: 41.49 } };
-    expect(playerPageModel(p, { kind: 'squad' }, s).stats.map((x) => x.value)).toEqual([79, 54, 55, 61, 41]);
+    const p = { ...s.squad[0]!, stats: { speed: 78.6487606885, strength: 54.428, stamina: 55, handling: 60.5, kicking: 60.5, footyIQ: 41.49 } };
+    expect(playerPageModel(p, { kind: 'squad' }, s).stats.map((x) => x.value)).toEqual([79, 54, 55, 61, 61, 41]);
   });
 
   it('prices the squad actions the way the Contracts screen does and guards them', () => {
@@ -175,7 +175,7 @@ describe('the player page outlook (#369)', () => {
     { id: 'f2', defId: 'weightsRoom', x: 10, y: 0, level: 1 },
     { id: 'f3', defId: 'videoRoom', x: 0, y: 10, level: 1 },
   ];
-  const flat = (v: number) => ({ speed: v, strength: v, stamina: v, skill: v, footyIQ: v });
+  const flat = (v: number) => ({ speed: v, strength: v, stamina: v, handling: v, kicking: v, footyIQ: v });
 
   beforeEach(() => {
     bus.clear();

@@ -131,11 +131,10 @@ describe('overlapping (#395)', () => {
   });
 });
 
-describe('old saves (#395)', () => {
-  const saves = import.meta.glob('../fixtures/saves/*.json', { eager: true, import: 'default' }) as Record<string, unknown>;
+describe('saved facility placements (#395)', () => {
 
   it('a save with a facility on the entrance path still loads, keeps it there, and gets footpaths', () => {
-    const raw = structuredClone(saves['../fixtures/saves/v19-mid-season.json']) as { facilities: PlacedFacility[] };
+    const raw = createNewGame('Path', 395);
     raw.facilities = [
       { id: 'onpath', defId: 'trainingPaddock', level: 1, x: MID - 1, y: 5 }, // covers the entrance column
       { id: 'canteen', defId: 'canteen', level: 1, x: 3, y: 3 },
@@ -154,12 +153,10 @@ describe('old saves (#395)', () => {
     expect(validateMove(getState(), f, 2, 12).ok).toBe(true);
   });
 
-  it('every fixture save still yields deterministic footpaths', () => {
-    for (const raw of Object.values(saves)) {
-      const res = migrateState(structuredClone(raw));
-      expect(res.ok).toBe(true);
-      if (!res.ok) continue;
-      expect(autoPaths(res.state.facilities)).toEqual(autoPaths(res.state.facilities));
-    }
+  it('a current saved career yields deterministic footpaths', () => {
+    const s = createNewGame('Paths', 395);
+    const res = migrateState(s);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(autoPaths(res.state.facilities)).toEqual(autoPaths(s.facilities));
   });
 });

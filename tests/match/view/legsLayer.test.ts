@@ -15,7 +15,7 @@ const sheet = (id: string): TeamSheet => ({
   kicking: 60,
   fitness: 60,
   colors: ['#111', '#eee'],
-  roster: POSITIONS.map((position, i) => ({ name: `${id} ${position} ${i}`, position, stats: { speed: 60, strength: 60, stamina: 50, skill: 60, footyIQ: 60 } })),
+  roster: POSITIONS.map((position, i) => ({ name: `${id} ${position} ${i}`, position, stats: { speed: 60, strength: 60, stamina: 50, handling: 60, kicking: 60, footyIQ: 60 } })),
 });
 const P = (side: 'home' | 'away', slot: number, extra: Partial<PlayerSnap> = {}): PlayerSnap => ({ side, slot, x: 50, y: 30, pose: 'run', headX: 1, speed: 7, ...extra });
 const snap = (players: PlayerSnap[]): Snapshot => ({ tick: 1, players, ball: { x: 0, y: 30, lift: 1, holder: null }, label: '', events: [] });

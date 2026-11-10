@@ -352,7 +352,7 @@ describe('rival player cards (#74)', () => {
     const s = fresh(21);
     // Make one rival's best player clearly better than anyone at the club.
     const rival = s.league.clubs.find((c) => c.id === 'rival-reapers')!;
-    const star = { ...rival.squad![0]!, stats: { speed: 95, strength: 95, stamina: 95, skill: 95, footyIQ: 95 }, injuredWeeks: 0 };
+    const star = { ...rival.squad![0]!, stats: { speed: 95, strength: 95, stamina: 95, handling: 95, kicking: 95, footyIQ: 95 }, injuredWeeks: 0 };
     const clubs = s.league.clubs.map((c) => (c.id === rival.id ? { ...c, squad: [star, ...c.squad!.slice(1)] } : c));
     return { s: { ...s, money: 500_000, league: { ...s.league, clubs } }, star, rivalId: rival.id };
   };
