@@ -55,6 +55,20 @@ describe('playerPageModel', () => {
     expect(m.actions.map((a) => a.id)).toEqual(['renew', 'sell', 'release']);
   });
 
+  it('marks exactly one headline in existing trait copy without dropping or mutating traits', () => {
+    const s = getState();
+    const p = { ...s.squad[0]!, position: 'prop' as const, traits: [
+      { id: 'hitman' as const, level: 3 as const }, { id: 'offloadKing' as const, level: 1 as const },
+    ] };
+    const before = structuredClone(p);
+    const seed = s.rngSeed;
+    const m = playerPageModel(p, { kind: 'squad' }, s);
+    expect(m.traits).toHaveLength(2);
+    expect(m.traits.filter(t => t.tip.startsWith('Headline trait. ')).map(t => t.label)).toEqual(['Offload King I']);
+    expect(p).toEqual(before);
+    expect(s.rngSeed).toBe(seed);
+  });
+
   it('shows whole-number stats when training has left fractions', () => {
     const s = getState();
     const p = { ...s.squad[0]!, stats: { speed: 78.6487606885, strength: 54.428, stamina: 55, handling: 60.5, kicking: 60.5, footyIQ: 41.49 } };

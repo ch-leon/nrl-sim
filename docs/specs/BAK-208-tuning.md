@@ -1368,7 +1368,7 @@ All paths below appear under `fit` in `npm run balance -- --list`.
 | `fit.leagueAverage` / `fit.pointsPerFit` / `fit.maxFit` | 60 / 50 / 1.5 | Fit = 1 + (style rating − 60)/50, clamped to 0–1.5. Missing stats or role groups use 60. |
 | `fit.archetypeThreshold` | 80 | Below this top derived rating, no UI label. Ties use Carry, Offload, Ball-play, Footwork, Edge D, Contact D order. |
 | `fit.carry.strength` / `fit.carry.speed` / `fit.carry.wreckingBall` | 3 / 1 / 8 | Weighted mean of Strength and Speed, plus Wrecking Ball. |
-| `fit.offload.skill` / `fit.offload.strength` / `fit.offload.offloadKing` / `fit.offload.razzleDazzle` | 1 / 1 / 8 / 6 | Weighted mean of Skill and Strength, plus each named trait. |
+| `fit.offload.handling` / `fit.offload.strength` / `fit.offload.offloadKing` / `fit.offload.razzleDazzle` | 1 / 2 / 8 / 6 | Weighted mean: one-third Handling, two-thirds Strength (#543), plus each named trait. Feeds Tight/All-out fit and their contact offload odds; no extra roll. |
 | `fit.ballPlay.skill` / `fit.ballPlay.footyIQ` / `fit.ballPlay.playmaker` | 1 / 1 / 8 | Weighted mean of Skill and IQ, plus Playmaker. |
 | `fit.footwork.speed` / `fit.footwork.skill` / `fit.footwork.dancingFeet` | 1 / 1 / 8 | Weighted mean of Speed and Skill, plus Dancing Feet. |
 | `fit.edgeD.speed` / `fit.edgeD.footyIQ` / `fit.edgeD.lastLine` / `fit.edgeD.poacher` | 1 / 1 / 8 / 6 | Weighted mean of Speed and IQ, plus each named trait. |
