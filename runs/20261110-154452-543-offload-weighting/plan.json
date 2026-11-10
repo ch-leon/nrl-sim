@@ -1,0 +1,84 @@
+{
+  "name": "543-offload-weighting",
+  "description": "Compare 1:1 and 2:1 Strength/Handling Offload weights on identical seeds; neutral, generated careers and position-specific strong packs. No other tuning.",
+  "seeds": 100,
+  "report": "matrix",
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "track": "home",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "generated player v rival",
+      "track": "home",
+      "home": {
+        "squad": "player",
+        "rating": 60
+      },
+      "away": {
+        "squad": "rival",
+        "rating": 60
+      }
+    },
+    {
+      "name": "strong forwards Tight",
+      "track": "home",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "prop": {
+            "strength": 80,
+            "handling": 30
+          },
+          "second-row": {
+            "strength": 80,
+            "handling": 30
+          },
+          "lock": {
+            "strength": 80,
+            "handling": 30
+          }
+        },
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "handling forwards Tight",
+      "track": "home",
+      "home": {
+        "rating": 60,
+        "positionStats": {
+          "prop": {
+            "strength": 30,
+            "handling": 80
+          },
+          "second-row": {
+            "strength": 30,
+            "handling": 80
+          },
+          "lock": {
+            "strength": 30,
+            "handling": 80
+          }
+        },
+        "tactics": {
+          "attack": "grind"
+        }
+      },
+      "away": {
+        "rating": 60
+      }
+    }
+  ]
+}

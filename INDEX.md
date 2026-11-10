@@ -298,3 +298,5 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261109-194451-standard | standard | abb51c8 | main | [report](runs/20261109-194451-standard/report.md) |
 | 20261110-121739-standard | standard | 629662a | main | [report](runs/20261110-121739-standard/report.md) |
 | 20261110-153705-standard | standard | 4bdc770 | main | [report](runs/20261110-153705-standard/report.md) |
+| 20261110-154344-543-offload-weighting | 543-offload-weighting | 4bdc770 | codex/543-offloads-headline-trait | [report](runs/20261110-154344-543-offload-weighting/report.md) |
+| 20261110-154452-543-offload-weighting | 543-offload-weighting | 4bdc770 (uncommitted changes) | codex/543-offloads-headline-trait | [report](runs/20261110-154452-543-offload-weighting/report.md) |
