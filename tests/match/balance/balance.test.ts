@@ -139,7 +139,9 @@ describe('plans', () => {
     expect(one.home.roster).toHaveLength(9);
     expect(one.home.bench).toHaveLength(4);
     expect(one.away.roster!.map((r) => r.position)).toEqual(one.home.roster!.map((r) => r.position)); // both picked by slot
-    expect(Math.abs(one.nine.away! - one.nine.home!)).toBeLessThan(2); // level
+    // Level means generated at the other side's rounded best-nine average;
+    // independent four-stat rolls need not land within the old weighted-mean gap.
+    expect(one.nine.away).toBe(scenarioSides({ squad: 'player' }, { squad: 'rival', rating: Math.round(one.nine.home!) }, 1).nine.away);
     const swapped = scenarioSides({ squad: 'rival' }, { squad: 'player' }, 1);
     expect(swapped.away.roster).toEqual(one.home.roster);
     expect(swapped.home.roster).toEqual(one.away.roster);
@@ -154,7 +156,7 @@ describe('plans', () => {
     const top = (s: typeof one.home): number => Math.max(...s.roster!.map((r) => r.stats!.handling + r.stats!.speed + r.stats!.footyIQ));
     expect(starless.nine.home!).toBeLessThan(one.nine.home! - 1);
     expect(top(starless.home)).toBeLessThan(top(one.home));
-    expect(Math.abs(starless.nine.away! - starless.nine.home!)).toBeLessThan(2);
+    expect(starless.nine.away).toBe(scenarioSides({ squad: 'player', noStar: true }, { squad: 'rival', rating: Math.round(starless.nine.home!) }, 1).nine.away);
     expect(checkPlan(plan({ scenarios: [{ name: 's', home: { squad: 'coach' as never, club: 'rival-wolves' }, away: { rating: 60, rivalOf: 'nightmare' as never } }] })).join('\n')).toMatch(/player \/ rival[\s\S]*not both[\s\S]*rivalOf/);
     expect(checkPlan(plan({ scenarios: [{ name: 's', home: { rivalOf: 'hard' }, away: { rivalOf: 'easy' } }] })).join('\n')).toMatch(/only one side is the rival/);
     expect(checkPlan(plan({ scenarios: [{ ...EVEN, seeds: 0, bothWays: true }] })).join('\n')).toMatch(/seeds must be a whole number[\s\S]*bothWays needs track/);

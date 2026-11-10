@@ -154,7 +154,7 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     rows.push(el('tr', { attrs: { 'data-contract': p.id } },
       who,
       el('td', { text: p.position }),
-      el('td', { class: 'nrl-num', text: String(overallRating(p)) }),
+      el('td', { class: 'nrl-num', text: String(Math.round(overallRating(p))) }),
       el('td', { class: `nrl-num${weeks <= EXPIRY_WINDOW_WEEKS ? ' nrl-contract-soon' : ''}`, text: `${weeks} wk${weeks === 1 ? '' : 's'}` }),
       el('td', { class: 'nrl-num', text: fmtMoney(Math.round(p.wage * wageMult)) }),
       el('td', {}, el('div', { class: 'nrl-contract-actions' }, renew, release, sell)),

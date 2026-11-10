@@ -11,6 +11,7 @@ import { FACILITY_CATALOG, levelMult, type FacilityDef, type FacilityDefId } fro
 import { STAT_MAX, TRAINING_CURVE, TRAINING_FOCUS } from '../config';
 import { activePack } from '../content';
 import { registerTickHook, TICK_ORDER } from '../core/time';
+import { shownStats } from '../data/player';
 import { hasTrait, traitBoost } from '../data/traits';
 
 /** Stats floor. Stats are clamped to [STAT_FLOOR, STAT_MAX] after each tick. */
@@ -154,8 +155,9 @@ export function trainPlayer(player: Player, facilities: PlacedFacility[], focus:
 
   // 3. Veteran decline: age>=31 subtract flat 0.3 from speed & stamina, post-gain.
   if (player.age >= 31) {
-    next.speed -= VETERAN_DECLINE;
-    next.stamina -= VETERAN_DECLINE;
+    for (const stat of shownStats(player.position)) {
+      if (stat === 'speed' || stat === 'stamina') next[stat] -= VETERAN_DECLINE;
+    }
   }
 
   // 4. Clamp every stat to [STAT_FLOOR, STAT_MAX]; stays fractional.
@@ -191,7 +193,7 @@ export function weeklyGain(player: Player, facilities: PlacedFacility[], focus: 
   const scale = ageMod(player.age) * traitMult(player) * injuryMult(player) * TRAINING_CURVE.GAIN_RATE;
 
   const out: PlayerStats = { speed: 0, strength: 0, stamina: 0, handling: 0, kicking: 0, footyIQ: 0 };
-  for (const stat of STAT_KEYS) out[stat] = gains[stat] * scale * focusMult(focus, stat) * headroom(player.stats[stat]);
+  for (const stat of shownStats(player.position)) out[stat] = gains[stat] * scale * focusMult(focus, stat) * headroom(player.stats[stat]);
   return out;
 }
 

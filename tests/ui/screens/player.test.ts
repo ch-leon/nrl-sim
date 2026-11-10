@@ -7,7 +7,7 @@ import {
 import { createNewGame, getState, setState, type Player } from '../../../src/core/state';
 import { initLeague } from '../../../src/systems/fixtures';
 import { bus } from '../../../src/core/events';
-import { marketWage, overallRating } from '../../../src/data/player';
+import { marketWage, overallRating, shownStats } from '../../../src/data/player';
 import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN } from '../../../src/config';
 import { renewalFee, transferFee } from '../../../src/systems/contracts';
 import { RELEASE_PAYOUT_WEEKS, signingFee } from '../../../src/systems/freeagency';
@@ -40,7 +40,7 @@ describe('playerPageModel', () => {
     const m = playerPageModel(p, { kind: 'squad' }, s);
     expect(m.where).toMatch(/^Your squad · (Starting \S+|On the bench|Not picked)$/); // the lineup slot (N14)
     expect(m.overall).toBe(overallRating(p));
-    expect(m.stats.map((x) => x.label)).toEqual(['Speed', 'Strength', 'Stamina', 'Handling', 'Kicking', 'Footy IQ']);
+    expect(m.stats.map((x) => x.label)).toEqual(shownStats(p.position).map(k => ({ speed: 'Speed', strength: 'Strength', stamina: 'Stamina', handling: 'Handling', kicking: 'Kicking', footyIQ: 'Footy IQ' })[k]));
     expect(m.traits).toHaveLength(p.traits.length);
     for (const t of m.traits) {
       expect(t.label).toMatch(/ (I|II|III)$/);
@@ -58,12 +58,13 @@ describe('playerPageModel', () => {
   it('shows whole-number stats when training has left fractions', () => {
     const s = getState();
     const p = { ...s.squad[0]!, stats: { speed: 78.6487606885, strength: 54.428, stamina: 55, handling: 60.5, kicking: 60.5, footyIQ: 41.49 } };
-    expect(playerPageModel(p, { kind: 'squad' }, s).stats.map((x) => x.value)).toEqual([79, 54, 55, 61, 61, 41]);
+    expect(playerPageModel(p, { kind: 'squad' }, s).stats.map((x) => x.value)).toEqual(shownStats(p.position).map(k => Math.round(p.stats[k])));
   });
 
   it('prices the squad actions the way the Contracts screen does and guards them', () => {
     const s = getState();
     const p = s.squad[0]!;
+    p.contractWeeks = 10; // Exercise renewal pricing independently of generated contract length.
     const [renew, sell, release] = playerActions(p, { kind: 'squad' }, s);
     expect(renew!.label).toContain(renewalFee(s, p).toLocaleString('en-US'));
     expect(renew!.enabled).toBe(true);

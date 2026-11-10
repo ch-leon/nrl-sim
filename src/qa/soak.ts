@@ -881,7 +881,7 @@ function rivalStylesNow(s: GameState): RivalStylesNow {
   for (const c of s.league.clubs) {
     if (c.id === s.clubId) continue;
     const sheet = rivalSheet(c);
-    const nine = (sheet.roster ?? []).filter((e) => e.stats).map((e) => overallRating({ stats: e.stats! }));
+    const nine = (sheet.roster ?? []).filter((e) => e.stats).map((e) => overallRating({ stats: e.stats!, position: e.position }));
     clubs.set(c.id, {
       tactics: sheet.tactics ?? { attack: 'balanced', defence: 'slide' },
       strength: c.strength,

@@ -41,7 +41,7 @@ describe('the squad training focus (N11)', () => {
   });
 
   it.each(['handling', 'kicking'] as const)('trains %s with the existing focus multipliers', focus => {
-    const p = young();
+    const p = { ...young(), position: 'halfback' as const };
     const facilities: PlacedFacility[] = [{ id: 'office', defId: 'coachsOffice', x: 0, y: 0, level: 1 }];
     const other = focus === 'handling' ? 'kicking' : 'handling';
     const balanced = weeklyGain(p, facilities, 'balanced');

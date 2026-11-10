@@ -16,7 +16,7 @@
 import { bus } from '../../core/events';
 import { getState, setState, type GameState, type Player, type PlayerStats, type RivalClub, type StatTally } from '../../core/state';
 import { save } from '../../core/save';
-import { marketWage, overallRating } from '../../data/player';
+import { marketWage, overallRating, ratingText, shownStats } from '../../data/player';
 import { ROMAN, TRAITS, traitTip } from '../../data/traits';
 import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } from '../../systems/contracts';
@@ -121,7 +121,7 @@ export function playerOutlook(p: Player, ctx: PlayerContext, state: GameState): 
   return {
     points,
     peak,
-    peakText: `Projected peak: ${peak.rating} ${when}${where}`,
+    peakText: `Projected peak: ${Math.round(peak.rating)} ${when}${where}`,
     stage: careerStage(p.age, { peak }), // the word follows the curve (#419)
     retirement: p.age >= RETIREMENT_NOTE_AGE ? `Retirement risk: ${Math.round(retirementRisk(p.age) * 100)}% at the season's end` : null,
   };
@@ -295,7 +295,11 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     overall: overallRating(p),
     where: ctx.kind === 'squad' ? `Your squad · ${lineupSlotText(state, p.id)}` : ctx.kind === 'freeAgent' ? (p.junior ? 'Academy prospect' : 'Free agent') : ctx.club.name,
     // Stats train in fractions; the page shows whole numbers.
-    stats: STAT_LABELS.map(([key, label]) => ({ label: key === 'footyIQ' ? activePack().vocab.iqStat : label, value: Math.round(p.stats[key]), ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}) })),
+    stats: shownStats(p.position).map((key) => ({
+      label: key === 'footyIQ' ? activePack().vocab.iqStat : STAT_LABELS.find(([k]) => k === key)![1],
+      value: Math.round(p.stats[key]),
+      ...(gain ? { gain: Math.round(gain[key] * 10) / 10 } : {}),
+    })),
     trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
       .filter((t) => t.id in TRAITS)
@@ -541,7 +545,7 @@ function careerCurve(o: PlayerOutlook): SVGSVGElement {
   svg.setAttribute('viewBox', `0 0 ${CURVE_W} ${CURVE_H}`);
   svg.setAttribute('class', 'nrl-player-curve');
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', `Projected rating by age: ${o.points.map((q) => `${q.rating} at ${q.age}`).join(', ')}`);
+  svg.setAttribute('aria-label', `Projected rating by age: ${o.points.map((q) => `${Math.round(q.rating)} at ${q.age}`).join(', ')}`);
   const xy = curveXY(o.points);
   const add = (tag: string, attrs: Record<string, string | number>): void => {
     const n = document.createElementNS(SVG_NS, tag);
@@ -627,7 +631,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
     );
     if (!rename) card.append(
       el('div', { class: 'nrl-player-tiles' },
-        el('div', { class: 'nrl-player-tile', attrs: { title: 'Overall rating' } }, el('b', { text: String(m.overall) }), el('span', { text: 'overall' })),
+        el('div', { class: 'nrl-player-tile', attrs: { title: 'Overall rating' } }, el('b', { text: ratingText(m.overall) }), el('span', { text: 'overall' })),
         el('div', { class: 'nrl-player-tile', attrs: { title: `Fitness: 100 less his injury risk (${p.injuryRisk}); 0 while injured` } }, fit, el('span', { text: 'fitness' }))),
       el('div', { class: `nrl-player-deal${m.contract.expiring ? ' nrl-player-expiring' : ''}`, text: ctx.kind === 'freeAgent' ? m.contract.text : `Contract: ${m.contract.text}` }),
       ...(m.tenure ? [el('div', { class: 'nrl-player-deal', text: m.tenure })] : []),

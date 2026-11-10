@@ -13,7 +13,7 @@ import { STAT_MAX, WEEKS_PER_SEASON } from '../../src/config';
 import {
   clearTickHooks, advanceWeek, TICK_ORDER,
 } from '../../src/core/time';
-import { generatePlayer } from '../../src/data/player';
+import { generatePlayer, overallRating } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
 import type { TraitId, TraitInstance } from '../../src/core/state';
 
@@ -419,12 +419,10 @@ describe('headroom — gains shrink as a stat rises (GitHub #35)', () => {
 // ageMod 1.0 (ages 22–27) and the seasons are directly comparable.
 describe('projection — 3 seasons on one Training Paddock (GitHub #35)', () => {
   // Stated ceiling: 3-season overall stays under this. Note that a Paddock trains
-  // only speed & stamina (35% of overall weight), so it cannot add more than +14
+  // only speed & stamina (half of a lock’s overall), so it cannot add more than +20
   // from a 60 start regardless of the curve.
   const OVERALL_CEILING = 80;
-  // Mirrors overallRating's weights, unrounded, so small season gains compare exactly.
-  const rawOverall = (s: PlayerStats): number =>
-    s.handling * 0.25 + s.footyIQ * 0.25 + s.speed * 0.2 + s.strength * 0.15 + s.stamina * 0.15;
+  const rawOverall = (stats: PlayerStats): number => overallRating({ position: 'lock', stats });
 
   it('season 1 gains 8–15 overall, then each season gains less than the last', () => {
     const p = mkPlayer({ id: 'proj', age: 22, stats: flatStats(60) });

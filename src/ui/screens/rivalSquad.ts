@@ -8,7 +8,7 @@ import { resolveLineup, validTactics } from '../../systems/lineup';
 // for the club's name and its two kit colours. The rows and the colour options
 // come from pure view-models that are unit-tested without the DOM. No Phaser.
 import type { RivalClub } from '../../core/state';
-import { overallRating } from '../../data/player';
+import { overallRating, ratingText } from '../../data/player';
 import { traitLabel } from '../../data/traits';
 import { button, el, ensureStyles, openModal, screenKey } from '../dom';
 import { openFixturesScreen, openLadderScreen } from './fixtures';
@@ -204,7 +204,7 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
         name,
         el('td', { class: 'nrl-row-pos', text: posShort(r.position), attrs: { title: positionLabel(r.position) } }),
         el('td', { class: 'nrl-num', text: String(r.age) }),
-        el('td', { class: 'nrl-num', text: String(r.overall) }),
+        el('td', { class: 'nrl-num', text: ratingText(r.overall) }),
         el('td', { class: 'nrl-rival-traits', text: r.traits }),
       );
       body.append(tr);

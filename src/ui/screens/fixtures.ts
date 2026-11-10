@@ -471,7 +471,7 @@ function nextMatchCard(state: GameState): HTMLElement {
     }
   }
   if (p.bestThree.length > 0) {
-    line('Their best', p.bestThree.map((b) => `${b.name} (${b.position} ${b.overall})`).join(' · '));
+    line('Their best', p.bestThree.map((b) => `${b.name} (${b.position} ${Math.round(b.overall)})`).join(' · '));
   }
   line('Head to head', fmtHeadToHead(p.headToHead));
   if (p.weather) line('Conditions', fmtWeather(p.weather));

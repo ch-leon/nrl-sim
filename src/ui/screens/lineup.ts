@@ -459,7 +459,7 @@ export function openLineupScreen(): void {
           type: 'button',
           'data-spot': spot.kind === 'starter' ? `s${spot.slot}` : `b${spot.index}`,
           title: p
-            ? `${p.name} · ${positionLabel(p.position)} · OVR ${overallRating(p)}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ${rating} (×${fit})` : ''}${injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`
+            ? `${p.name} · ${positionLabel(p.position)} · OVR ${Math.round(overallRating(p))}${slotPos && fit < 1 ? ` · at ${positionLabel(slotPos)} ${rating} (×${fit})` : ''}${injured ? ` · injured, out ${p.injuredWeeks}w` : banned ? ` · suspended, banned ${p.suspendedWeeks}w` : ''}`
             : spot.kind === 'starter'
               ? `${positionLabel(slotPos!)}: nobody picked`
               : 'Bench seat: nobody picked',
@@ -576,9 +576,9 @@ export function openLineupScreen(): void {
       else if (banned) whereEl.setAttribute('data-banned', '');
       else if (where?.kind === 'bench') whereEl.setAttribute('data-bench', '');
       else if (!where) whereEl.setAttribute('data-free', '');
-      const effText = slotPos ? `${effectiveRating(p, slotPos)}` : `${overallRating(p)}`;
+      const effText = slotPos ? `${effectiveRating(p, slotPos)}` : `${Math.round(overallRating(p))}`;
       const eff = el('span', { class: `nrl-lineup-row-eff ${slotPos ? fitClass(positionFit(p.position, slotPos)) : ''}`.trim(), text: effText });
-      eff.title = slotPos ? `Rating at ${positionLabel(slotPos)} (overall ${overallRating(p)})` : 'Overall rating';
+      eff.title = slotPos ? `Rating at ${positionLabel(slotPos)} (overall ${Math.round(overallRating(p))})` : 'Overall rating';
       const row = el(
         'button',
         {
