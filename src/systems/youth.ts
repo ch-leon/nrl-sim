@@ -18,7 +18,7 @@ import { registerSeasonHook, registerTickHook, TICK_ORDER } from '../core/time';
 import { SQUAD_CAP, SQUAD_MIN, STAT_MAX, WEEKS_PER_SEASON } from '../config';
 import { fitSquadCount } from './matchday';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
-import { overallRating, withShownStats, generatePlayer, POSITIONS } from '../data/player';
+import { overallRating, shownStats, withShownStats, generatePlayer, POSITIONS } from '../data/player';
 import type { Rng } from '../utils/rng';
 import { makeRng } from '../utils/rng';
 
@@ -27,6 +27,10 @@ export const JUNIOR_MAX_AGE = 19;
 /** Prospects start well below the ceiling so the training curve has room. */
 const BASE_BAND = [26, 42] as const;
 const BAND_PER_LEVEL = [4, 5] as const;
+/** Arrival-only headroom: +2 per shown stat per Academy level (+6 at L3),
+ * on top of the existing starting-stat bands. No extra RNG draws; saved
+ * ceilings stay fixed when the Academy is upgraded or demolished. */
+const CEILING_BONUS_PER_LEVEL = 2;
 
 /** Prospects per intake: 3 with no Academy, 4 at L1-2, 5 at L3. */
 export function juniorCount(academyLevel: number): number {
@@ -55,13 +59,17 @@ export function generateProspects(rng: Rng, level: number): Player[] {
     };
     rolled.kicking = rolled.handling;
     const stats = withShownStats(base.position, base.stats, rolled);
+    const ceilings = { ...createCeilings({ ...base, stats }) };
+    for (const key of shownStats(base.position)) {
+      ceilings[key] = Math.min(STAT_MAX, ceilings[key]! + CEILING_BONUS_PER_LEVEL * level);
+    }
     const overall = overallRating({ stats, position: base.position });
     let traits = withoutTrait(withoutTrait(base.traits, 'youngGun'), 'veteran');
     if (level >= 2) traits = withTrait(traits, 'youngGun');
     out.push({
       ...base,
       stats,
-      ceilings: createCeilings({ ...base, stats }),
+      ceilings,
       traits,
       junior: true,
       wage: Math.round(overall * 8 + 60), // cheap contract
