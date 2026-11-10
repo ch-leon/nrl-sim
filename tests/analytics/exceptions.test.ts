@@ -161,7 +161,7 @@ describe('JavaScript error tracking (#548)', () => {
   });
 
   it('sanitizes $exception at before_send, keeping only type, bounded stack, build, platform and cookieless metadata', () => {
-    const raw = sdkEvent({ ...CONTEXT, token: PROD.VITE_POSTHOG_KEY, exception_source: 'unhandledrejection',
+    const raw = sdkEvent({ ...CONTEXT, token: PROD.VITE_POSTHOG_KEY, $lib: 'web', $lib_version: '1.447.3', exception_source: 'unhandledrejection',
       $exception_list: [{ type: 'TypeError', value: error().message, stacktrace: { frames: [
         { filename: 'https://game.test/assets/index-AbCd1234.js?email=me@example.com#private', lineno: 1, colno: 2, function: 'CoachLeon', vars: { save: 'blob' } },
         { filename: 'https://game.test/players/Deakin.js', lineno: 2, colno: 3 },
@@ -170,9 +170,9 @@ describe('JavaScript error tracking (#548)', () => {
       $set: { email: 'me@example.com' }, distinct_id: 'private', player: 'Deakin', save: 'blob',
     });
     const result = beforeSend(raw);
-    expect(result?.properties).toEqual({ ...CONTEXT, token: PROD.VITE_POSTHOG_KEY,
+    expect(result?.properties).toEqual({ ...CONTEXT, token: PROD.VITE_POSTHOG_KEY, $lib: 'web', $lib_version: '1.447.3',
       $exception_level: 'error', $exception_list: [{ type: 'TypeError', value: EXCEPTION_MESSAGE,
-        mechanism: { type: 'onunhandledrejection', handled: false }, stacktrace: { type: 'raw', frames: [{ filename: 'app:///assets/index.js', lineno: 1, colno: 2 }] } }],
+        mechanism: { type: 'onunhandledrejection', handled: false }, stacktrace: { type: 'raw', frames: [{ filename: 'app:///assets/index.js', lineno: 1, colno: 2, platform: 'web:javascript' }] } }],
       distinct_id: '$posthog_cookieless', $process_person_profile: false, $cookieless_mode: true,
     });
     expect(JSON.stringify(result)).not.toMatch(/Coach|Deakin|Cavehole|@|[?#]|private|blob/);

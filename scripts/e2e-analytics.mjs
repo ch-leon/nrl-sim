@@ -162,6 +162,7 @@ async function main() {
         const p = e.properties ?? {};
         if (!p.app_build || p.platform !== 'web') fail('exception missing build/platform');
         if (!p.$exception_list?.[0]?.stacktrace?.frames?.length) fail('exception missing stack frames');
+        if (p.$lib !== 'web' || p.$exception_list?.[0]?.stacktrace?.frames?.some((f) => f.platform !== 'web:javascript')) fail('exception missing SDK/platform metadata');
         if (p.$exception_list?.[0]?.mechanism?.handled !== false) fail('exception not marked unhandled');
         if (/Coach|Leon|@|[?#]|private|blob/.test(JSON.stringify(p))) fail('exception contains private data');
       }

@@ -60,12 +60,12 @@ export function sanitizeExceptionProperties(props: Record<string, unknown>): Rec
   if (!context || !Array.isArray(props.$exception_list) || !props.$exception_list.length) return null;
   const original = props.$exception_list[0];
   if (!original || typeof original !== 'object') return null;
-  const frames: ExceptionFrame[] = [];
+  const frames: (ExceptionFrame & { platform: 'web:javascript' })[] = [];
   if (Array.isArray(original.stacktrace?.frames)) {
     for (const f of original.stacktrace.frames.slice(0, EXCEPTION_MAX_FRAMES)) {
       if (!f || typeof f !== 'object') continue;
       const clean = frame(f.filename, f.lineno, f.colno);
-      if (clean) frames.push(clean);
+      if (clean) frames.push({ ...clean, platform: 'web:javascript' });
     }
   }
   const mechanism = props.exception_source === 'unhandledrejection' ? 'onunhandledrejection' : 'onerror';
@@ -74,7 +74,9 @@ export function sanitizeExceptionProperties(props: Record<string, unknown>): Rec
     $exception_level: 'error',
     $exception_list: [{ type: errorType(original.type), value: EXCEPTION_MESSAGE,
       mechanism: { type: mechanism, handled: false }, stacktrace: { type: 'raw', frames } }],
-    // Only the SDK's required cookieless metadata; no arbitrary $-prefixed data.
+    // Only known SDK metadata; no arbitrary $-prefixed data or browser URLs.
+    $lib: 'web',
+    ...(typeof props.$lib_version === 'string' && /^\d{1,4}\.\d{1,4}\.\d{1,4}$/.test(props.$lib_version) ? { $lib_version: props.$lib_version } : {}),
     ...(typeof props.token === 'string' && /^phc_[A-Za-z0-9_-]{16,}$/.test(props.token) ? { token: props.token } : {}),
     distinct_id: '$posthog_cookieless',
     $process_person_profile: false,
