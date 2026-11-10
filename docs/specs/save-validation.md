@@ -15,7 +15,7 @@ handling and storage keys are unchanged.
 
 | Outcome | Handling |
 | --- | --- |
-| `valid` | `migrateState`/`importSave` return unchanged current state with no repairs. `loadSlot` approves exact source bytes for subsequent synchronous writes. |
+| `valid` | `migrateState`/`importSave` return current state with no repairs (with compatible ceiling defaults where absent). `loadSlot` approves exact source bytes for subsequent synchronous writes. |
 | `repaired` | The same boundary returns a new state and structured `SaveRepair[]`. `loadSlot` verifies retention of its original before returning trusted state; `writeSlot` retains it before replacement. `installImportedSave` retains the complete incoming file and any existing destination before installation. |
 | `unrecoverable` | Migration/validation returns a structured failure. Slot bytes and its live-match record remain in place; existing #522 recovery exports bypass validation. Invalid imported files remain untouched and cannot replace the destination. `load()` also uses #522's recovery-copy path. |
 | `unsupported` | Future versions are refused before inspecting nested fields. Original slot/import bytes remain untouched; the title offers original export and the update explanation. |
@@ -99,3 +99,21 @@ approval is refused until it is reopened at the boundary. Approvals are scoped
 to the namespaced store and reset with injected storage; #519 keys, isolation,
 save locks and content preparation stay intact. No asynchronous storage adapter
 or additional simulation hook is introduced.
+
+## Format-24 potential compatibility (#538)
+
+Format stays 24. A player with no `ceilings` field is a supported pre-change
+format-24 player, in the squad, free-agent pool (including juniors) or a rival
+roster. Validation copies that player and fills only the four shown stat keys.
+It uses the saved age/current stats as the creation snapshot: ages <=21 get
+18–30 points of headroom, 22–27 get 10–20, 28–30 get 4–12, and 31+ get 0–4.
+Each gap is the band's minimum plus unsigned FNV-1a(`id:stat`) modulo the
+inclusive band width. Each ceiling is current stat + gap, capped at 100.
+Fractional saved stats are preserved. No career or match RNG is consumed.
+
+This is a compatible default, not a lineup repair: it has no repair warning,
+does not mutate the source, and leaves version, RNG seed, selections and current
+stats unchanged. Ordinary saving persists the defaults. Present ceilings must
+contain all four shown keys, with finite numbers in 1–100; malformed present
+fields are rejected. Existing ceilings are never recalculated, including after
+ageing or if legacy training/rival growth exceeds them before #539/#542 land.

@@ -33,12 +33,16 @@ export interface PlayerStats {
 /** Event-derived individual tallies (GitHub #46). */
 export interface StatTally { games: number; tries: number; tackles: number; lineBreaks: number; sinBins?: number }
 
+/** Only the four shown stats have ceilings. Written once at creation/load. */
+export type PlayerCeilings = Readonly<Partial<PlayerStats>>;
+
 export interface Player {
   id: string; // seeded deterministic id (no crypto)
   name: string;
   age: number; // 17-36
   position: Position;
   stats: PlayerStats;
+  readonly ceilings: PlayerCeilings;
   morale: number; // 1-100
   injuryRisk: number; // 1-100
   injuredWeeks: number; // 0 = fit

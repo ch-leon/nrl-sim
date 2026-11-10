@@ -12,7 +12,7 @@ import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, 
  *     Contracts, History) the line beside the title is clear of the controls and a tap
  *     on it lands on it; the controls stay inside the header (they scroll);
  *   - #415, #420: on the player page no line is cut short, each column fits or scrolls,
- *     the outlook's curve keeps its height and can be scrolled into view, ◂ back and the
+ *     the potential line can be scrolled into view, ◂ back and the
  *     deals are tappable; after a renewal the greyed Renew carries no price;
  *   - #422: every pitch and bench tile on Lineup is tapped over a 44px band (a tap 21px
  *     above, below and either side of its middle still lands on it), with no page scroll;
@@ -212,19 +212,23 @@ export async function runLargeTextTargets(browser) {
         await page.waitForTimeout(250);
         const out = await page.evaluate(() => {
           const out = [];
-          for (const d of document.querySelectorAll('.nrl-player-why > div, .nrl-player-line, .nrl-player-trait, .nrl-player-deal, .nrl-player-outlook-text > *')) {
+          for (const d of document.querySelectorAll('.nrl-player-why > div, .nrl-player-line, .nrl-player-trait, .nrl-player-deal')) {
             if (d.scrollWidth > d.clientWidth + 1) out.push(`"${d.textContent.slice(0, 30)}" cut short (${d.scrollWidth}>${d.clientWidth})`);
           }
           for (const c of document.querySelectorAll('.nrl-player > *')) {
             const oy = getComputedStyle(c).overflowY;
             if (c.scrollHeight > c.clientHeight + 1 && oy !== 'auto' && oy !== 'scroll') out.push(`${c.className}: ${c.scrollHeight - c.clientHeight}px cut off, no scroll`);
           }
-          const curve = document.querySelector('.nrl-player-curve');
-          curve.scrollIntoView({ block: 'nearest' });
-          const cr = curve.getBoundingClientRect();
-          const col = document.querySelector('.nrl-player-about').getBoundingClientRect();
-          if (cr.height < 30) out.push(`the outlook's curve is ${Math.round(cr.height)}px tall`);
-          if (cr.top < col.top - 1 || cr.bottom > col.bottom + 1) out.push('the outlook cannot be scrolled into view');
+          const potential = document.querySelector('[data-potential]');
+          if (!potential || !/^Potential: ★*(?:½)?$/.test(potential.textContent)) {
+            out.push('missing plain Potential star line');
+          } else {
+            potential.scrollIntoView({ block: 'nearest' });
+            const cr = potential.getBoundingClientRect();
+            const col = document.querySelector('.nrl-player-about').getBoundingClientRect();
+            if (cr.height < 10 || cr.top < col.top - 1 || cr.bottom > col.bottom + 1) out.push('potential cannot be scrolled into view');
+          }
+          if (document.querySelector('.nrl-player-curve') || document.body.textContent.includes('Projected peak:')) out.push('old projection remains');
           return out;
         });
         out.push(...await targetProblems(page, '[data-player-page] :is(.nrl-back, [data-player-action])', safe, false));

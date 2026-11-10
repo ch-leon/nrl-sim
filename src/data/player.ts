@@ -5,6 +5,7 @@
 import type { Player, Position, PlayerStats } from '../core/state';
 import type { Rng } from '../utils/rng';
 import { WEEKS_PER_SEASON, STAT_MAX, STAR_BANDS } from '../config';
+import { createCeilings } from '../systems/potential';
 import { randomName } from './names';
 import { rollTraits, withTrait } from './traits';
 
@@ -166,6 +167,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
     age,
     position,
     stats,
+    ceilings: createCeilings({ id, age, position, stats }),
     morale,
     injuryRisk,
     injuredWeeks: 0,
@@ -196,7 +198,7 @@ export function generatePlayerAround(rng: Rng, target: number, opts: Omit<GenPla
   const stats: PlayerStats = { speed: roll(), strength: roll(), stamina: roll(), handling: roll(), kicking: 0, footyIQ: roll() };
   stats.kicking = stats.handling;
   const finalStats = withShownStats(base.position, base.stats, stats);
-  return { ...base, stats: finalStats, wage: marketWage({ stats: finalStats, position: base.position }) };
+  return { ...base, stats: finalStats, ceilings: createCeilings({ ...base, stats: finalStats }), wage: marketWage({ stats: finalStats, position: base.position }) };
 }
 
 /**
