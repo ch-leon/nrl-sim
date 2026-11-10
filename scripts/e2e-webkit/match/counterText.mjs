@@ -50,6 +50,9 @@ export async function runCounterText(browser) {
           if (edgeIds.has(p.id)) {
             p.age = 34; p.stats.speed = 1; p.stats.footyIQ = 1;
           }
+          // These are synthetic players: their ceilings must match the authored
+          // stats, otherwise the XP tick clamps them back to creation quality.
+          p.ceilings = Object.fromEntries(Object.keys(p.ceilings).map(stat => [stat, p.stats[stat]]));
         }
         // Flat stronger stats keep fits predictable; the Tight habit selects Compressed.
         for (const c of s.league.clubs) {
@@ -57,6 +60,7 @@ export async function runCounterText(browser) {
           for (const p of c.squad ?? []) {
             p.stats = { speed: 95, strength: 95, stamina: 100, handling: 95, kicking: 95, footyIQ: 95 };
             p.traits = [];
+            p.ceilings = Object.fromEntries(Object.keys(p.ceilings).map(stat => [stat, p.stats[stat]]));
           }
         }
       }, textSize);
@@ -70,6 +74,13 @@ export async function runCounterText(browser) {
         if (await ask.count()) await ask.first().tap();
       }
       await page.waitForSelector('.nrl-mo-controls', { timeout: 30000 });
+      rec.fixture = await page.evaluate(() => ({
+        strength: Math.min(...window.__nrlState().squad.map(p => p.stats.strength)),
+        stamina: Math.min(...window.__nrlState().squad.map(p => p.stats.stamina)),
+      }));
+      if (rec.fixture.strength !== 80 || rec.fixture.stamina < 99.7) {
+        throw new Error(`Counter fixture stats changed before kick-off: ${JSON.stringify(rec.fixture)}`);
+      }
       // Hold on a real counter line so the screenshot and geometry inspect the
       // text actually produced by the view, at the selected text size.
       await page.evaluate(() => {
