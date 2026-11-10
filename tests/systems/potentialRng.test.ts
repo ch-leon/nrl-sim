@@ -33,7 +33,11 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * Re-pin the new-career season stream; UI reads must still match the control.
  * Flat-match fingerprint pins remain unchanged.
  */
-const MAIN_SEED_AFTER_SEASON = 1788836146;
+// #542: draw-free ceiling-limited rival growth changes match inputs and outcomes,
+// hence the season's existing draws. Verified against origin/main 12662ef's
+// 1788836146; weekly rival development now consumes zero draws and rollover is
+// unchanged. UI-read/no-read seasons must still agree in both AI modes.
+const MAIN_SEED_AFTER_SEASON = 4145195222;
 
 describe('the rng stream (#369)', () => {
   it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {
