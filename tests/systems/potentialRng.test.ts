@@ -1,7 +1,5 @@
 import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
-// tests/systems/potentialRng.test.ts — #369 adds no dice: a season through every
-// system leaves the same rngSeed as main did before it, with the player page's
-// projection and the Squad dot worked out every week as if they were on screen.
+// Stored ceilings and weekly player-page reads preserve the season RNG stream.
 import { describe, it, expect } from 'vitest';
 import { getState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
@@ -38,7 +36,7 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
 const MAIN_SEED_AFTER_SEASON = 1788836146;
 
 describe('the rng stream (#369)', () => {
-  it.each([0, 1])('weekly projection and dot reads preserve the season stream with habit AI=%i', (ai) => {
+  it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {
     const restore = applyTuning({ 'counters.ai.on': ai });
     try {
       const season = (readPages: boolean) => {

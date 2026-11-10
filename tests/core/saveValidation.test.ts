@@ -1,3 +1,4 @@
+import { shownStats } from '../../src/data/player';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNewGame, getState, SAVE_VERSION, type GameState } from '../../src/core/state';
 import { isPlayer, isPlayerStats, isPlacedFacility, REPAIR_NOTICE } from '../../src/core/saveValidation';
@@ -249,4 +250,55 @@ it('does not install a repaired import when retaining its occupied destination f
   expect(installImportedSave(incoming, 1)).toMatchObject({ ok: false });
   expect(exportRecoverySaves(1)).toContain(incoming);
   expect(bytes.get(slotKey(1))).toBe(destination); expect(bytes.get(liveMatchKey(1))).toBe('existing live');
+});
+
+describe('format-24 ceiling compatibility (#538)', () => {
+  it('backfills every pre-change v24 roster deterministically without mutation or RNG draws', () => {
+    fresh(); initLeague(getState());
+    const source = JSON.parse(JSON.stringify(getState()));
+    const rosters = [source.squad, source.freeAgents, ...source.league.clubs.map((c: { squad?: unknown[] }) => c.squad ?? [])];
+    for (const roster of rosters) for (const p of roster) delete p.ceilings;
+    source.squad[0].stats.speed = 99.75;
+    const original = JSON.stringify(source);
+    const first = migrateState(source);
+    const second = importSave(original);
+    expect(first.ok).toBe(true); expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+    expect(first.state).toEqual(second.state);
+    expect(first.state.version).toBe(24);
+    expect(first.state.rngSeed).toBe(source.rngSeed);
+    expect(first.state.lineup).toEqual(source.lineup);
+    expect(JSON.stringify(source)).toBe(original);
+    const players = [...first.state.squad, ...first.state.freeAgents, ...first.state.league.clubs.flatMap(c => c.squad ?? [])];
+    for (const p of players) for (const key of shownStats(p.position)) expect(p.ceilings[key]).toBeGreaterThanOrEqual(p.stats[key]);
+    expect(migrateState(first.state)).toMatchObject({ ok: true, state: first.state });
+    bytes.set(slotKey(1), original);
+    const loaded = loadSlot();
+    expect(loaded.status).toBe('ok');
+    if (loaded.status === 'ok') expect(loaded.state).toEqual(first.state);
+  });
+
+  it('preserves stored ceilings even when legacy training has passed them', () => {
+    const s = fresh();
+    const p = s.squad[0]!;
+    const key = shownStats(p.position)[0]!;
+    p.stats[key] = 100;
+    const result = migrateState(s);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.state.squad[0]!.ceilings).toEqual(p.ceilings);
+  });
+
+  it.each([null, {}, { speed: 101 }, { speed: '50' }, { speed: 0 }, { speed: 50, madeUp: 50 }])('rejects malformed present ceilings %j', ceilings => {
+    const s = fresh();
+    s.squad[0] = { ...s.squad[0]!, ceilings } as typeof s.squad[number];
+    expect(migrateState(s).ok).toBe(false);
+  });
+});
+
+it.each([0, 101, -1, NaN, Infinity, '50', null])('rejects invalid individual ceiling %j in a complete ceiling record', value => {
+  const s = fresh();
+  const p = s.squad[0]!;
+  const key = shownStats(p.position)[0]!;
+  s.squad[0] = { ...p, ceilings: { ...p.ceilings, [key]: value } } as typeof p;
+  expect(migrateState(s).ok).toBe(false);
 });

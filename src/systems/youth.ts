@@ -9,6 +9,7 @@
 // Academy's level (no Academy: the lowest band) and signed at the junior wage for
 // the rest of the season. It adds dice only in a week it calls someone up, so
 // every other week plays as before.
+import { createCeilings } from './potential';
 import { bus } from '../core/events';
 import { getState, setState } from '../core/state';
 import type { Player } from '../core/state';
@@ -60,6 +61,7 @@ export function generateProspects(rng: Rng, level: number): Player[] {
     out.push({
       ...base,
       stats,
+      ceilings: createCeilings({ ...base, stats }),
       traits,
       junior: true,
       wage: Math.round(overall * 8 + 60), // cheap contract

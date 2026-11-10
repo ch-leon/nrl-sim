@@ -1,91 +1,36 @@
-// src/systems/potential.ts — a player's projected career (GitHub #369).
-//
-// There is no potential stat. What the player page shows is a projection: the
-// weekly training rules (training.ts trainPlayer: the facilities' gains scaled
-// by age, traits, the squad focus and headroom, then the veteran decline) run
-// forward week by week with no dice and no injuries, ageing a year at each
-// season's rollover the way time.ts and aging.ts do. So it moves when a
-// facility is built, and it is no promise. Pure: reads its arguments, writes
-// nothing, rolls nothing.
+// Stored shown-stat ceilings (#538). Pure: creation and v24 backfill use the
+// same rule without consuming the career or match RNG stream.
+import type { Player, PlayerCeilings } from '../core/state';
+import { STAT_MAX } from '../config';
+import { shownStats, starsForOverall } from '../data/player';
 
-import type { PlacedFacility, Player, TrainingFocus } from '../core/state';
-import { overallRating } from '../data/player';
-import { RETIRE_SOFT_AGE, WEEKS_PER_SEASON } from '../config';
-import { ageMod, trainPlayer } from './training';
-import { agePlayer, retirementChance } from './aging';
-
-/** The curve runs to this age. */
-export const PROJECTION_LAST_AGE = 34;
+type CeilingSource = Pick<Player, 'id' | 'age' | 'position' | 'stats'>;
 
 /**
- * Rating points short of the best that still count as the peak. Once the big
- * gains are in, the 28–30 band's ×0.6 and the rounding creep a point on over
- * years of plateau; a peak at 30 would read as "still improving", so the peak
- * is when he gets there, not the last point he adds.
+ * Initial headroom bands: <=21: 18–30, 22–27: 10–20, 28–30: 4–12,
+ * 31+: 0–4. Each stat's variation is a stable FNV-1a hash of id + stat.
+ * Clamp at STAT_MAX; never round a fractional current stat down.
+ * For pre-ceiling v24 saves, use the saved age/stats as the creation snapshot.
+ * Call only at creation or when the entire ceilings field is absent at load.
  */
-export const PEAK_TOLERANCE = 1;
-
-export interface CareerPoint {
-  age: number;
-  rating: number;
-}
-
-export interface CareerProjection {
-  /** The overall rating today, then on each birthday (a season's rollover) to PROJECTION_LAST_AGE. */
-  points: CareerPoint[];
-  /** Where the curve tops out: the first point within PEAK_TOLERANCE of the best. */
-  peak: CareerPoint;
-}
-
-/**
- * Run a player's training forward `seasonsAhead` seasons (to PROJECTION_LAST_AGE
- * by default) against `facilities` and `focus`, from `week` of the current season.
- * Each week is trainPlayer's week with the player fit; each rollover ages him a
- * year and re-derives the age traits (agePlayer). Retirement isn't rolled.
- */
-export function projectCareer(
-  player: Player,
-  facilities: PlacedFacility[],
-  focus: TrainingFocus = 'balanced',
-  seasonsAhead = Math.max(0, PROJECTION_LAST_AGE - player.age),
-  week = 1,
-): CareerProjection {
-  let p: Player = { ...player, injuredWeeks: 0 };
-  const points: CareerPoint[] = [{ age: p.age, rating: overallRating(p) }];
-  // This season's weeks still to train (week is the one about to be played), then whole seasons.
-  let weeks = Math.max(0, WEEKS_PER_SEASON - week + 1);
-  for (let s = 0; s < seasonsAhead; s++) {
-    for (let w = 0; w < weeks; w++) p = { ...p, stats: trainPlayer(p, facilities, focus) };
-    p = agePlayer(p);
-    points.push({ age: p.age, rating: overallRating(p) });
-    weeks = WEEKS_PER_SEASON;
+export function createCeilings(p: CeilingSource): PlayerCeilings {
+  const [lo, hi]: readonly [number, number] = p.age <= 21 ? [18, 30] : p.age <= 27 ? [10, 20] : p.age <= 30 ? [4, 12] : [0, 4];
+  const ceilings: Partial<Player['stats']> = {};
+  for (const key of shownStats(p.position)) {
+    let hash = 2166136261;
+    for (const ch of `${p.id}:${key}`) hash = Math.imul(hash ^ ch.charCodeAt(0), 16777619) >>> 0;
+    ceilings[key] = Math.min(STAT_MAX, p.stats[key] + lo + hash % (hi - lo + 1));
   }
-  const best = Math.max(...points.map((x) => x.rating));
-  const peak = points.find((x) => x.rating >= best - PEAK_TOLERANCE)!;
-  return { points, peak };
+  return ceilings;
 }
 
-export type CareerStage = 'Developing' | 'Prime' | 'Declining' | 'Still improving';
-
-/**
- * Where an age sits on the curve, from training.ts ageMod's bands: Developing
- * while he trains at ×1.5 (21 and under), Prime while he still gains at ×1 or
- * ×0.6 (22–30), Declining from the veteran decline at ×0.25 (31+). Given his
- * projection, a veteran whose curve still tops out later than today (good
- * facilities outrun the decline) is Still improving, so the word agrees with
- * the line the page draws (#419).
- */
-export function careerStage(age: number, projection?: Pick<CareerProjection, 'peak'>): CareerStage {
-  const m = ageMod(age);
-  if (m > 1) return 'Developing';
-  if (m >= ageMod(30)) return 'Prime';
-  return projection && projection.peak.age > age ? 'Still improving' : 'Declining';
+/** Reuse #537's bands on the unrounded average of the four ceilings. */
+export function potentialStars(p: Pick<Player, 'position' | 'ceilings'>): number {
+  return starsForOverall(shownStats(p.position).reduce((sum, key) => sum + p.ceilings[key]!, 0) / 4);
 }
 
-/** The page shows the retirement risk from this age: one birthday short of RETIRE_SOFT_AGE. */
-export const RETIREMENT_NOTE_AGE = RETIRE_SOFT_AGE - 1;
-
-/** The chance he retires at the coming rollover (aging.ts rolls it once he is a year older). */
-export function retirementRisk(age: number): number {
-  return retirementChance(age + 1);
+/** Plain stars, with the same half-star character as #537. */
+export function potentialText(p: Pick<Player, 'position' | 'ceilings'>): string {
+  const stars = potentialStars(p);
+  return `Potential: ${'★'.repeat(Math.floor(stars))}${Number.isInteger(stars) ? '' : '½'}`;
 }

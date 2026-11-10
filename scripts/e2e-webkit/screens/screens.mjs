@@ -512,6 +512,25 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
     return check(rec, { box: '.nrl-player-modal', rows: '.nrl-player-stats .nrl-statrow', card: '.nrl-player-stats', exit: '.nrl-player-modal [data-back]',
       primary: ['[data-player-action="renew"]', '[data-player-action="sell"]', '[data-player-action="release"]'] }, null);
   });
+  // #538: the temporary Potential line also fits phone portrait, without a redesign.
+  await step('popup-player-potential-390x844', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(250);
+    return page.evaluate(() => {
+      const line = document.querySelector('[data-potential]');
+      if (!line || !/^Potential: ★*(?:½)?$/.test(line.textContent)) return ['missing plain Potential star line'];
+      line.scrollIntoView({ block: 'nearest' });
+      const r = line.getBoundingClientRect();
+      const col = document.querySelector('.nrl-player-about').getBoundingClientRect();
+      const out = [];
+      if (r.left < 0 || r.right > 390 || r.height < 10 || r.top < 0 || r.bottom > 844
+        || r.top < col.top - 1 || r.bottom > col.bottom + 1 || line.scrollWidth > line.clientWidth + 1) out.push('Potential line clipped at 390x844');
+      if (document.querySelector('.nrl-player-curve') || document.body.textContent.includes('Projected peak:')) out.push('old projection remains');
+      return out;
+    });
+  });
+  await page.setViewportSize({ width: W, height: H });
+  await page.waitForTimeout(250);
   // The kit designer: Office's Kit & colours tile (it was a button on Squad).
   await step('popup-kit', async (rec) => {
     await page.locator('.nrl-player-modal [data-back]').tap().catch(() => {});

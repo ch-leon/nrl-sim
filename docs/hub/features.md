@@ -28,7 +28,7 @@ What's in the game, with the PR that added each.
 ## Squad and recruitment
 
 - Free agents; stars cost a fee ([PR](https://github.com/ch-leon/nrl-sim/pull/147))
-- Player page, projected peak ([PR](https://github.com/ch-leon/nrl-sim/pull/378))
+- Player page ([PR](https://github.com/ch-leon/nrl-sim/pull/378))
 - Lineup: the nine and bench ([PR](https://github.com/ch-leon/nrl-sim/pull/186))
 - Staff (`src/systems/staff.ts`): Assistant Coach, Analyst, Welfare Manager
 
@@ -62,6 +62,8 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- Every player has fixed potential ceilings on their four shown stats, with more headroom for younger players. A plain Potential star line replaces the career projection; existing format-24 careers backfill ceilings deterministically ([PR](https://github.com/ch-leon/nrl-sim/pull/565)).
 
 - Players show four stats for their position group; overall averages those four, with half-step rating stars beside it. Hidden off-role stats start low and stay fixed ([issue](https://github.com/ch-leon/nrl-sim/issues/537)).
 

@@ -30,6 +30,7 @@ function mkPlayer(over: Partial<Player> = {}): Player {
     name: 'Test Player',
     age: 25,
     position: 'lock',
+    ceilings: { speed: 100, strength: 100, stamina: 100, handling: 100, kicking: 100, footyIQ: 100 },
     stats: flatStats(50),
     morale: 60,
     injuryRisk: 10,
