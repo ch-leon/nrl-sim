@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   LEVEL_MULT, POOL_IDS, TRAITS, TRAIT_COUNT_ODDS, TRAIT_IDS, fromLegacy, hasTrait, rollTraitCount, rollTraits,
-  traitBoost, traitLabel, traitLevel, withTrait, withoutTrait,
+  headlineTrait, traitBoost, traitLabel, traitLevel, withTrait, withoutTrait,
 } from '../../src/data/traits';
 import { makeRng } from '../../src/utils/rng';
 
@@ -108,5 +108,39 @@ describe('fromLegacy', () => {
       { id: 'injuryProne', level: 1 },
     ]);
     expect(fromLegacy([])).toEqual([]);
+  });
+});
+
+
+describe('headlineTrait (#543)', () => {
+  const traits = [{ id: 'hitman', level: 3 }, { id: 'offloadKing', level: 1 }, { id: 'wreckingBall', level: 3 }] as const;
+  it.each(['prop', 'second-row', 'lock'] as const)('prioritises Offload King for %s even at a lower level', (position) => {
+    expect(headlineTrait(position, traits)).toBe(traits[1]);
+  });
+  it('picks exactly one existing trait by level then catalogue order, independent of array order', () => {
+    for (const position of ['fullback', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker'] as const) {
+      expect(headlineTrait(position, traits)).toBe(traits[2]);
+      expect(headlineTrait(position, [...traits].reverse())).toBe(traits[2]);
+    }
+    for (const id of TRAIT_IDS) {
+      const only = [{ id, level: 1 as const }];
+      expect(headlineTrait('prop', only)).toBe(only[0]);
+    }
+    expect(headlineTrait('prop', [])).toBeNull();
+  });
+  it('is deterministic and preserves traits and generation RNG order', () => {
+    const control = makeRng(543), viewed = makeRng(543);
+    for (let i = 0; i < 100; i++) {
+      const expected = rollTraits(control, 'prop', 'star');
+      const actual = rollTraits(viewed, 'prop', 'star');
+      const before = structuredClone(actual);
+      const seed = viewed.state();
+      const first = headlineTrait('prop', actual);
+      expect(headlineTrait('prop', actual)).toBe(first);
+      expect(actual).toEqual(before);
+      expect(actual).toEqual(expected);
+      expect(viewed.state()).toBe(seed);
+      expect(viewed.next()).toBe(control.next());
+    }
   });
 });

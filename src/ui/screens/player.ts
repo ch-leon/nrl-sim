@@ -17,7 +17,7 @@ import { bus } from '../../core/events';
 import { getState, setState, type GameState, type Player, type PlayerStats, type RivalClub, type StatTally } from '../../core/state';
 import { save } from '../../core/save';
 import { marketWage, overallRating, ratingText, shownStats } from '../../data/player';
-import { ROMAN, TRAITS, traitTip } from '../../data/traits';
+import { ROMAN, TRAITS, headlineTrait, traitTip } from '../../data/traits';
 import { CONTRACTS, MORALE, SQUAD_CAP, SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { renewalFee, renewalWeeklyCost, renewEarly, sellPlayer, transferFee } from '../../systems/contracts';
 import { RELEASE_PAYOUT_WEEKS, releasePlayer, signingFee, signingFeeBasis } from '../../systems/freeagency';
@@ -246,6 +246,7 @@ function rolesOf(r: ReturnType<typeof sideRoles>, id: string): { starter: boolea
 /** Everything the page shows, from the player, where he is and the game state. */
 export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState): PlayerPageModel {
   const squad = ctx.kind === 'squad';
+  const headline = headlineTrait(p.position, p.traits);
   const wage = paidWage(p, state);
   const contract = ctx.kind === 'freeAgent'
     ? { text: `Asks ${fmtMoney(wage)}/wk on a ${CONTRACTS.NEW_CONTRACT_WEEKS}-week deal`, expiring: false }
@@ -272,7 +273,7 @@ export function playerPageModel(p: Player, ctx: PlayerContext, state: GameState)
     trainingFocus: squad ? focusLabel(focus) : null,
     traits: p.traits
       .filter((t) => t.id in TRAITS)
-      .map((t) => ({ label: `${TRAITS[t.id].name} ${ROMAN[t.level]}`, tip: traitTip(t.id), bad: TRAITS[t.id].bad ?? false })),
+      .map((t) => ({ label: `${TRAITS[t.id].name} ${ROMAN[t.level]}`, tip: `${t === headline ? 'Headline trait. ' : ''}${traitTip(t.id)}`, bad: TRAITS[t.id].bad ?? false })),
     morale: { value: p.morale, word: moraleWord(p.morale), reasons: squad ? moraleReasons(p) : [] },
     fitness: p.injuredWeeks > 0 ? `Out ${weeksText(p.injuredWeeks)}` : (p.suspendedWeeks ?? 0) > 0 ? `Banned ${weeksText(p.suspendedWeeks ?? 0)}` : 'Fit',
     injured: p.injuredWeeks > 0 || (p.suspendedWeeks ?? 0) > 0,
