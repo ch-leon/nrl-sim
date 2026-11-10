@@ -31,9 +31,11 @@
 // Advance Week, and in Node (no Worker) each round's seven matches play in place.
 import { preparePack } from '../src/content';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { PERSONAS, personaById } from '../src/qa/personas';
+import { compareBaseline, makeBaseline, personaReport, summarisePersonas, type PersonaBaseline } from '../src/qa/personas/report';
 import { attackVsDefence, fieldedTable, levelWinRates, shapeTable, offTheLevelMean, runSoak, styleTable, summariseSeasons, tallyNet, LEVEL_OFF_MEAN, OLD_VERSIONS, STYLE_GAP_BAND, type FinanceLine, type SoakOptions, type SoakResult } from '../src/qa/soak';
 import { DIFFICULTIES, type Difficulty } from '../src/config';
 import { applyTuning } from '../src/match/league/tuning';
@@ -50,6 +52,12 @@ const str = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : undefined;
 };
+const personaIds = str('personas');
+if (args.includes('--personas') && !personaIds) throw new Error('--personas requires all or comma-separated ids');
+const personaConfigs = personaIds ? (personaIds === 'all' ? PERSONAS : personaIds.split(',').map(personaById)) : undefined;
+for (const name of ['seasons', 'seeds', 'weeks', 'jobs']) {
+  if (args.includes(`--${name}`) && (!Number.isInteger(opt(name, 0)) || opt(name, 0) < 1)) throw new Error(`--${name} must be a positive integer`);
+}
 const pack = str('pack') ?? 'au';
 if (pack !== 'au' && pack !== 'uk') throw new Error('--pack must be au or uk');
 await preparePack(pack);
@@ -57,7 +65,9 @@ const jsonOut = str('json');
 const shard = str('shard');
 if (args.includes('--shard') && !shard) throw new Error('--shard requires i/n');
 // Without --difficulties: idle and managed on Normal plus idle on Hard (the original soak).
-const difficulties = str('difficulties')?.split(',').filter((d): d is Difficulty => DIFFICULTIES.includes(d as Difficulty));
+const difficultyNames = str('difficulties')?.split(',');
+if (difficultyNames?.some(d => !DIFFICULTIES.includes(d as Difficulty))) throw new Error('--difficulties must contain easy,normal,hard');
+const difficulties = difficultyNames as Difficulty[] | undefined;
 const liveRivals = args.includes('--live-rivals');
 // Match knobs by name (#322): set in this process and passed to every --jobs child, so a
 // candidate value can be soaked before its default moves. Never on in the game.
@@ -83,7 +93,11 @@ if (childIn) {
 const live = liveRivals ? { liveRivals: true } : {};
 const specs: SoakOptions[] = [];
 for (let seed = 1; seed <= seeds; seed++) {
-  if (difficulties) {
+  if (personaConfigs) {
+    for (const config of personaConfigs) for (const difficulty of difficulties ?? config.difficulties) {
+      specs.push({ seed: seed * 7919, seasons, mode: 'persona', persona: config.id, difficulty, pack, ...live, ...(str('weeks') ? { weeks: opt('weeks', 1) } : {}) });
+    }
+  } else if (difficulties) {
     for (const difficulty of difficulties) {
       for (const mode of modes) specs.push({ seed: seed * 7919, seasons, mode, difficulty, ...live, pack });
     }
@@ -93,7 +107,7 @@ for (let seed = 1; seed <= seeds; seed++) {
   }
 }
 // Old saves have no pack id and remain AU. UK runs contain only UK careers.
-if (pack === 'au') for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
+if (!personaConfigs && pack === 'au') for (const v of OLD_VERSIONS) specs.push({ seed: 4242 + v, seasons: 2, mode: 'managed', fromVersion: v });
 const selectedSpecs = shardCases(specs, shard);
 if (shard) console.log(`Soak case shard ${shard}: ${selectedSpecs.length} of ${specs.length} unchanged cases.`);
 
@@ -121,6 +135,27 @@ async function runInJobs(all: SoakOptions[], jobs: number): Promise<SoakResult[]
 
 const jobs = Math.max(1, Math.min(opt('jobs', 1), selectedSpecs.length));
 const results: SoakResult[] = jobs > 1 ? await runInJobs(selectedSpecs, jobs) : selectedSpecs.map((o) => runSoak(o));
+
+if (personaConfigs) {
+  const baselinePath = str('baseline') ?? 'src/qa/personas/baseline.json';
+  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')) as PersonaBaseline;
+  const comparison = compareBaseline(results, baseline);
+  const report = personaReport(results, comparison);
+  const machinePath = jsonOut ?? 'work/personas.json';
+  const reportPath = str('report') ?? machinePath.replace(/\.json$/, '') + '.md';
+  if (machinePath === reportPath) throw new Error('--json and --report must be different files');
+  for (const path of [machinePath, reportPath]) mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(machinePath, JSON.stringify({ schema: 1, seasons, seeds, pack, ...(shard ? { shard } : {}), results, perRun: results.map(r => ({ seed: r.seed, summary: summarisePersonas([r])[0] })), summary: summarisePersonas(results), comparison }, null, 2));
+  writeFileSync(reportPath, report);
+  const baselineOut = str('write-baseline');
+  if (baselineOut) {
+    mkdirSync(dirname(baselineOut), { recursive: true });
+    writeFileSync(baselineOut, JSON.stringify(makeBaseline(results, `Measured with #534 persona harness; ${seasons} seasons, ${seeds} seeds, ${pack}; weeks=${str('weeks') ?? 'whole seasons'}.`), null, 2));
+  }
+  console.log(report);
+  console.log(`\nWrote ${machinePath} and ${reportPath}`);
+  process.exit(results.some(r => r.problems.length) ? 1 : 0);
+}
 
 const pad = (s: string | number, n: number): string => String(s).padStart(n);
 const signed = (n: number, digits = 1): string => `${n >= 0 ? '+' : ''}${n.toFixed(digits)}`;

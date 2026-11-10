@@ -16,7 +16,9 @@
     "e2e:season": "node scripts/e2e-season.mjs",
     "e2e:perf": "node scripts/e2e-perf.mjs",
     "e2e:webkit": "node scripts/e2e-webkit.mjs",
-    "e2e:analytics": "node scripts/e2e-analytics.mjs"
+    "e2e:analytics": "node scripts/e2e-analytics.mjs",
+    "soak:personas": "vite-node scripts/soak.ts -- --personas all --difficulties easy,normal,hard",
+    "soak:personas:smoke": "vitest run tests/qa/personas.test.ts"
   },
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.3.0",

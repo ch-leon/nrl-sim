@@ -36,9 +36,12 @@ import { overallRating } from '../data/player';
 import { cardById } from '../data/events';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDefId } from '../data/facility';
 import { addFacility, spendMoney } from '../data/club';
+import { personaById, type PersonaConfig } from './personas';
+import { createPersonaManager } from './personas/policy';
+import { observeCareer, careerRoundTrip, emptyCareerMetrics, type CareerMetrics, type SaveHealth } from './personas/metrics';
 
-/** How the headless manager plays: hands-off, or a simple sensible manager. */
-export type SoakMode = 'idle' | 'managed';
+/** Existing reference managers, or a config-driven persona policy. */
+export type SoakMode = 'idle' | 'managed' | 'persona';
 
 export interface SoakOptions {
   seed: number;
@@ -52,6 +55,8 @@ export interface SoakOptions {
    */
   weeks?: number;
   mode: SoakMode;
+  /** Persona id (or a supplied config for policy experiments). Required in persona mode. */
+  persona?: string | PersonaConfig;
   /** Start from a save of this version (built from the fresh game) instead of v-current. */
   fromVersion?: number;
   /**
@@ -238,6 +243,10 @@ export interface SoakResult {
   pack?: 'au' | 'uk';
   seed: number;
   mode: SoakMode;
+  persona?: PersonaConfig;
+  career?: CareerMetrics;
+  /** Loaded input is not comparable with a fresh-career baseline. */
+  fromSave?: boolean;
   difficulty?: Difficulty;
   fromVersion?: number;
   /** Rival rounds were played on the live sim (--live-rivals, N12.1). */
@@ -655,23 +664,38 @@ export const FORFEITED = / forfeited \(\d+–\d+\)\.$/;
 /** Play `seasons` seasons from a new game (or an old save built from it) and check as we go. */
 export function runSoak(opts: SoakOptions): SoakResult {
   const t0 = Date.now();
+  const config = opts.mode === 'persona' ? (typeof opts.persona === 'string' ? personaById(opts.persona) : opts.persona) : undefined;
+  if (opts.mode === 'persona' && !config) throw new Error('persona mode requires a persona config or id');
   bus.clear();
   const problems: string[] = [];
+  let initialLoad: SaveHealth | undefined;
+  const failedLoad = (message: string): SoakResult => {
+    const career = emptyCareerMetrics();
+    career.saves.push({ season: 0, ok: false, repairs: [], changed: false, message });
+    return { seed: opts.seed, mode: opts.mode, ...(config ? { persona: config, career, pack: opts.pack ?? 'au', difficulty: opts.difficulty ?? 'normal', fromSave: opts.fromSave !== undefined } : {}),
+      ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}),
+      start: { bestNine: 0, rivalMean: 0, rivalRange: [0, 0] }, seasons: [], problems: [message], ms: Date.now() - t0 };
+  };
   if (opts.fromSave !== undefined) {
     const res = migrateState(opts.fromSave);
-    if (!res.ok) return { seed: opts.seed, mode: opts.mode, start: { bestNine: 0, rivalMean: 0, rivalRange: [0, 0] }, seasons: [], problems: [`save failed to migrate: ${res.message}`], ms: 0 };
+    if (!res.ok) return failedLoad(`save failed to migrate: ${res.message}`);
+    initialLoad = { season: res.state.season, ok: true, repairs: res.repairs, changed: res.outcome === 'repaired' };
     loadState(res.state);
   } else {
     createNewGame(`Soak ${opts.seed}`, opts.seed, { difficulty: opts.difficulty, ...(opts.pack === 'uk' ? { home: { town: 'Ashcombe', country: 'GB' } } : {}) });
     initLeague(getState());
     if (opts.fromVersion !== undefined) {
       const res = migrateState(asOldSave(getState(), opts.fromVersion));
-      if (!res.ok) return { seed: opts.seed, mode: opts.mode, fromVersion: opts.fromVersion, start: gapSample(getState()), seasons: [], problems: [`v${opts.fromVersion} save failed to migrate: ${res.message}`], ms: 0 };
+      if (!res.ok) return failedLoad(`v${opts.fromVersion} save failed to migrate: ${res.message}`);
+      initialLoad = { season: res.state.season, ok: true, repairs: res.repairs, changed: true };
       loadState(res.state);
     }
   }
   if (opts.liveRivals) setState({ settings: { ...getState().settings, liveRivals: true } });
   registerAllSystems();
+  const observer = config ? observeCareer(s => bestNineMean(s.squad)) : undefined;
+  if (observer && initialLoad) observer.metrics.saves.push(initialLoad);
+  const manager = config ? createPersonaManager(config, opts.seed, { buildFirstFree, weeklyNet }) : undefined;
   const seasons: SeasonSample[] = [];
   let minMoney = getState().money;
   // The season's P&L (#161): every money movement, by line, checked against the
@@ -704,7 +728,15 @@ export function runSoak(opts: SoakOptions): SoakResult {
     const s = getState();
     if (problems.length < 20) problems.push(`S${s.season}W${s.week}: ${msg}`);
   };
-  for (const p of checkState(getState())) note(p);
+  const check = (s: GameState): void => {
+    const failures = checkState(s);
+    if (observer) {
+      observer.metrics.stability.invariantFailures += failures.length;
+      observer.metrics.stability.nonFinite += nonFinitePaths(s).length;
+    }
+    for (const p of failures) note(p);
+  };
+  check(getState());
 
   // Fast-forward plays every match headless; --live-rivals weeks are Advance Week (advanceWeekAsTapped).
   // --live-rivals: the rival-v-rival games and the styles they were played with (#249).
@@ -715,32 +747,44 @@ export function runSoak(opts: SoakOptions): SoakResult {
     ? onRivalPlanChanges((n) => { planChanges.set(`${n.round}:${n.homeId}`, n.switches); })
     : null;
   let styleFrom = 0;
-  const play = opts.liveRivals ? (fn: () => void): void => fn() : withFastForward;
-  const playWeek = opts.liveRivals ? advanceWeekAsTapped : advanceWeek;
+  const tapped = opts.liveRivals || !!config;
+  const play = tapped ? (fn: () => void): void => fn() : withFastForward;
+  const playWeek = tapped ? advanceWeekAsTapped : advanceWeek;
   try {
   play(() => {
     for (let i = 0; i < (opts.weeks ?? opts.seasons * (WEEKS_PER_SEASON + (getState().preseason === undefined ? 0 : 2))); i++) {
-      if (getState().sacked) break;
-      if (opts.mode === 'managed') {
-        const w = manage();
-        signed = { count: signed.count + w.count, fees: signed.fees + w.fees, overall: signed.overall + w.overall };
-      }
+      if (getState().sacked || (config && opts.weeks === undefined && seasons.length >= opts.seasons)) break;
+
       const before = getState().season;
       const styles = opts.liveRivals ? rivalStylesNow(getState()) : null;
+      let ticking = false;
       try {
+        if (opts.mode === 'managed' || manager) {
+          const w = manager ? manager.weekly() : manage();
+          signed = { count: signed.count + w.count, fees: signed.fees + w.fees, overall: signed.overall + w.overall };
+        }
+        manager?.prepareMatch();
+        observer?.beforeWeek();
+        ticking = true;
         playWeek();
       } catch (err) {
-        note(`tick threw: ${(err as Error).message}`);
+        if (observer) {
+          observer.metrics.stability.crashes++;
+          if (ticking) observer.metrics.stability.thrownTicks++;
+        }
+        note(`${ticking ? 'tick' : 'decision'} threw: ${(err as Error).message}`);
         break;
       }
       if (weekHeld()) {
+        if (observer) observer.metrics.stability.invariantFailures++;
         note('week still held after the match');
         break;
       }
       const s = getState();
       if (styles && s.season === before) styleGames.push(...newStyleGames(styles, s, planChanges));
       minMoney = Math.min(minMoney, s.money);
-      for (const p of checkState(s)) note(p);
+      check(s);
+      observer?.afterWeek();
       if (s.season === before && s.week === SEASON_ROUNDS + 1) {
         gap = gapSample(s);
         const near = recordAgainst(s, nearestRivals(s));
@@ -751,6 +795,12 @@ export function runSoak(opts: SoakOptions): SoakResult {
         const back = migrateState(JSON.parse(text));
         if (!back.ok) note(`save does not reload: ${back.message}`);
         else if (JSON.stringify(back.state) !== text) note('save changes on reload');
+        if (observer) {
+          const health = careerRoundTrip(s, before);
+          observer.metrics.saves.push(health);
+          if (!health.ok) note(`persona save does not reload: ${health.message}`);
+          check(getState());
+        }
         const strengths = s.league.clubs.filter((c) => c.id !== s.clubId).map((c) => c.strength);
         // The season's record was pushed onto history by the rollover (fixtures season hook).
         const rec = s.history.find((h) => h.season === before);
@@ -808,10 +858,12 @@ export function runSoak(opts: SoakOptions): SoakResult {
     const last = seasons[seasons.length - 1]!.saveBytes;
     if (last > first * 1.5) note(`save grew ${Math.round((last / first) * 100)}% over ${seasons.length} seasons (${first} → ${last} bytes)`);
   }
+  observer?.finish();
   setState({});
-  return { seed: opts.seed, mode: opts.mode, ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.pack ? { pack: opts.pack } : {}), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
+  return { ...(config && observer ? { persona: config, career: observer.metrics, fromSave: opts.fromSave !== undefined } : {}), seed: opts.seed, mode: opts.mode, ...(config ? { difficulty: getState().settings.difficulty, pack: getState().pack === 'uk' ? 'uk' as const : 'au' as const } : { ...(opts.difficulty ? { difficulty: opts.difficulty } : {}), ...(opts.pack ? { pack: opts.pack } : {}) }), ...(opts.fromVersion !== undefined ? { fromVersion: opts.fromVersion } : {}), ...(opts.liveRivals ? { liveRivals: true, styleGames } : {}), start, seasons, problems, ms: Date.now() - t0 };
   } finally {
     stopPlanChanges?.();
+    observer?.dispose();
   }
 }
 
