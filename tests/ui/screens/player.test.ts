@@ -193,7 +193,7 @@ describe('the player page outlook (#369)', () => {
     expect(m.outlook.points[1]!.rating).toBeGreaterThan(m.outlook.points[0]!.rating);
     expect(m.outlook.peak.age).toBeGreaterThanOrEqual(22);
     expect(m.outlook.peak.age).toBeLessThanOrEqual(26);
-    expect(m.outlook.peakText).toBe(`Projected peak: ${m.outlook.peak.rating} at ${m.outlook.peak.age}`);
+    expect(m.outlook.peakText).toBe(`Projected peak: ${Math.round(m.outlook.peak.rating)} at ${m.outlook.peak.age}`);
     expect(m.outlook.retirement).toBeNull();
     // A free agent or a rival's man is projected at your club, and says so.
     expect(playerOutlook(kid, { kind: 'freeAgent' }, s).peakText).toBe(`${m.outlook.peakText} (at your club)`);
@@ -206,7 +206,7 @@ describe('the player page outlook (#369)', () => {
     const vet = { ...s.squad[0]!, age: 32, traits: [], stats: flat(80) };
     const m = playerPageModel(vet, { kind: 'squad' }, s);
     expect(m.outlook.stage).toBe('Declining');
-    expect(m.outlook.peakText).toBe(`Projected peak: ${overallRating(vet)} now`);
+    expect(m.outlook.peakText).toBe(`Projected peak: ${Math.round(overallRating(vet))} now`);
     expect(m.outlook.points[m.outlook.points.length - 1]!.rating).toBeLessThan(overallRating(vet));
     expect(m.outlook.retirement).toBeNull();
     expect(playerOutlook({ ...vet, age: 33 }, { kind: 'squad' }, s).retirement).toBe("Retirement risk: 20% at the season's end");
@@ -217,7 +217,7 @@ describe('the player page outlook (#369)', () => {
     const kid = { ...s.squad[0]!, age: 19, traits: [], stats: flat(55) };
     const none = playerOutlook(kid, { kind: 'squad' }, { ...s, facilities: [] });
     const built = playerOutlook(kid, { kind: 'squad' }, { ...s, facilities: BUILT });
-    expect(none.peakText).toBe(`Projected peak: ${overallRating(kid)} now`);
+    expect(none.peakText).toBe(`Projected peak: ${Math.round(overallRating(kid))} now`);
     expect(built.peak.rating).toBeGreaterThan(none.peak.rating);
     const late = { ...s, facilities: BUILT, week: 20 };
     expect(playerOutlook(kid, { kind: 'squad' }, late).points)
