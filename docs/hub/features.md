@@ -63,6 +63,8 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Arriving juniors gain +2 potential ceiling points per shown stat per Academy level (up to +6 at level 3); existing players keep their ceilings ([PR](https://github.com/ch-leon/nrl-sim/pull/566)).
+
 - Offloads lean two-thirds on Strength and one-third on Handling; one existing trait is marked as the headline, with Offload King first for forwards ([PR](https://github.com/ch-leon/nrl-sim/pull/564)).
 
 - Every player has fixed potential ceilings on their four shown stats, with more headroom for younger players. A plain Potential star line replaces the career projection; existing format-24 careers backfill ceilings deterministically ([PR](https://github.com/ch-leon/nrl-sim/pull/565)).
