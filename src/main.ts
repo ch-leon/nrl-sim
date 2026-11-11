@@ -100,6 +100,12 @@ let portraitBlocked = false;
 let portrait: PortraitMenus | null = null;
 
 async function boot(): Promise<void> {
+  // Isolated visual rehearsal: boot before any career reads or autosave hooks.
+  if (location.hash === '#artlab') {
+    const { bootArtLab } = await import('./labs/art/boot');
+    bootArtLab();
+    return;
+  }
   // BAK-207: `/#lab` opens the live match sim lab instead of the club game.
   // Its own chunk (#400): a player's first load never fetches it.
   if (isLabHash(location.hash)) {

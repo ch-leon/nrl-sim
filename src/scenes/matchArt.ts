@@ -12,7 +12,8 @@ import { toTexture } from '../art/pixel';
 import type { PixelBuffer } from '../art/pixel';
 import type { Kit } from '../art/match/kit';
 import { ANIM_ORDER, PLAYER_ANIMS, frameName, type PlayerAnim } from '../art/match/players';
-import { drawBall, drawCrossbar, drawShadow, drawUpright } from '../art/match/props';
+import { drawCrossbar, drawShadow, drawUpright } from '../art/match/props';
+import { ballPixels } from '../art/prototype/player';
 import type { AtlasPixels, LayerChunk, TexturePiece } from '../art/match/fixtureArt';
 
 let registrySerial = 0;
@@ -100,7 +101,7 @@ export class MatchArtRegistry {
   /** Ball, shadows and goalpost pieces. */
   props(prefix: string, home: Kit): { ball: string; shadow: string; ballShadow: string; upright: string; crossbar: string } {
     return {
-      ball: this.texture(`${prefix}-ball`, drawBall()),
+      ball: this.texture(`${prefix}-ball`, ballPixels()),
       shadow: this.texture(`${prefix}-shadow`, drawShadow(12, 5, 0.28)),
       ballShadow: this.texture(`${prefix}-ball-shadow`, drawShadow(8, 4, 0.3)),
       upright: this.texture(`${prefix}-upright`, drawUpright(home)),

@@ -1,7 +1,7 @@
 import { TICK_S } from '../../core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, IN_GOAL, MID_Y, clampToGround, inGoal } from '../../core/field';
 import { PASS_SPEED, passFlight } from '../../core/ball';
-import type { Side } from '../../core/snapshot';
+import type { ContactSnap, Side } from '../../core/snapshot';
 import { add, clamp, dist, dot, scale, sub, type Vec } from '../../core/vec';
 import { BASE, RACE, compressedContact, edgeRace, interceptChance, resolveContest, type ContestMods } from '../contest';
 import { PLAYERS, ROLES } from '../roles';
@@ -25,6 +25,26 @@ import { other, type Player, type Phase } from './types';
 import { LivePenalties } from './penalties';
 
 export abstract class LiveContact extends LivePenalties {
+  /** Presentation history only; never consulted by match decisions. */
+  protected visualContact: ContactSnap | null = null;
+  /** Render metadata only: no rolls, movement or changes to the contest. */
+  protected contactInfo(carrier: Player, defenders: readonly Player[], startedTick = this.tick): ContactSnap {
+    const ref = (p: Player) => ({ side: p.side, slot: p.slot, who: p.key });
+    const prior = this.visualContact?.startedTick === startedTick && this.visualContact.carrier.who === carrier.key ? this.visualContact : null;
+    return { ...prior, startedTick, carrier: ref(carrier), defenders: defenders.map(ref),
+      joinedTicks: defenders.map((p, i) => {
+        const index = prior?.defenders.findIndex(d => d.side === p.side && d.slot === p.slot && d.who === p.key) ?? -1;
+        return index >= 0 ? prior!.joinedTicks![index]! : i === 0 ? startedTick : this.tick;
+      }) };
+  }
+
+  private tagContact(carrier: Player, defenders: readonly Player[], startedTick = this.tick): void {
+    const event = this.events[this.events.length - 1]!;
+    const info = this.contactInfo(carrier, defenders, startedTick);
+    const supported = ['tackle', 'big-hit', 'break-tackle', 'strip'].includes(event.kind);
+    this.visualContact = supported ? { ...info, outcome: event.kind as NonNullable<ContactSnap['outcome']>, resolvedTick: this.tick } : null;
+    event.contact = this.visualContact ?? info;
+  }
   // ── Actions ───────────────────────────────────────────────────────────────
   /**
    * A pass to `to`. `read` (#326, a set play's scripted pass only) scales the
@@ -124,6 +144,7 @@ export abstract class LiveContact extends LivePenalties {
   }
 
   protected contest(c: Player, t: Player, committed: readonly Player[]): void {
+    this.visualContact = null;
     // A botched set play's caller caught with it before his pass (#326): it has broken down, and he has tucked it.
     const botched = this.scripted;
     if (botched && botched.outcome !== 'ok' && botched.step === 1 && botched.men[0] === this.indexOf(c)) this.breakDown(c);
@@ -163,6 +184,7 @@ export abstract class LiveContact extends LivePenalties {
       case 'strip': {
         // One-on-one, he rips it free: the tackler is the new carrier.
         this.emit('strip', `${t.name} strips the ball from ${c.name}!`, t, credit);
+        this.tagContact(c, [t]);
         this.lock(c, 'tackled', 14);
         this.lock(t, 'tackle', 6);
         this.ball = { kind: 'held', by: this.indexOf(t) };
@@ -174,12 +196,14 @@ export abstract class LiveContact extends LivePenalties {
       }
       case 'broken':
         this.emit('break-tackle', `${c.name} busts through ${t.name}`, c, credit);
+        this.tagContact(c, [t]);
         this.lock(t, 'down', 16, add(t.body.pos, scale(back, -1.2)));
         t.cooldownUntil = this.tick + LIVE.beatenCooldown;
         this.burst(c);
         return;
       case 'fend':
         this.emit('fend', `${c.name} palms off ${t.name}`, c, credit);
+        this.tagContact(c, [t]);
         c.pose = 'fend';
         c.poseUntil = this.tick + 6;
         this.lock(t, 'tackled', 14, add(t.body.pos, scale(back, -1.5)));
@@ -191,6 +215,7 @@ export abstract class LiveContact extends LivePenalties {
         const r = pickReceiver(c.body.pos, this.dir, cands) ?? cands.find((k) => !k.busy)?.idx ?? null;
         if (r !== null) {
           this.emit('offload', `${c.name} gets the offload away to ${this.players[r]!.name}`, c, credit);
+          this.tagContact(c, [t]);
           // A Razzle Dazzle offload is the miracle ball — and the one that gets spilled; so is one the coach called for (#396).
           this.pass(c, this.players[r]!, (tr.credit.offload?.id === 'razzleDazzle' ? EDGE_COST.razzleDazzle : 0) + (this.playCall() === 'offload' ? CALLS.offload.spill : 0)
             + this.rushOffloadSpill(c.side));
@@ -220,6 +245,7 @@ export abstract class LiveContact extends LivePenalties {
     // Ball lost in the tackle (2f): a knock-on, more on a big hit and in the rain.
     if (this.rng.next() < lostInContactChance(outcome === 'big-hit', c.stats.handling, this.wx.handling)) {
       this.emit('error', `${c.name} loses the ball in the tackle — knock-on`, c);
+      this.tagContact(c, [t]);
       this.events[this.events.length - 1]!.detail = 'contact';
       this.lock(c, 'tackled', LIVE.contactTicks);
       this.lock(t, 'tackle', LIVE.contactTicks);
@@ -241,6 +267,7 @@ export abstract class LiveContact extends LivePenalties {
     const nearTouch = Math.min(c.body.pos.y, FIELD_WIDTH - c.body.pos.y) < TOUCH.bundleNearM;
     if (nearTouch && this.rng.next() < (outcome === 'big-hit' ? TOUCH.bundleBigHit : TOUCH.bundle)) {
       this.emit('touch', `${t.name} bundles ${c.name} into touch`, t);
+      this.tagContact(c, [t]);
       this.events[this.events.length - 1]!.detail = 'bundled';
       this.lock(c, 'tackled', LIVE.contactTicks);
       this.lock(t, 'tackle', LIVE.contactTicks);
@@ -252,6 +279,7 @@ export abstract class LiveContact extends LivePenalties {
     if (outcome === 'big-hit') {
       // Smashed backwards at contact: no wrestle, he is down.
       this.emit('big-hit', `${t.name} smashes ${c.name} backwards!`, t, credit);
+      this.tagContact(c, [t]);
       const drive = scale(back, LIVE.driveBack);
       this.lock(c, 'tackled', LIVE.contactTicks, add(c.body.pos, drive));
       this.lock(t, 'tackle', LIVE.contactTicks, add(t.body.pos, drive));
@@ -263,6 +291,7 @@ export abstract class LiveContact extends LivePenalties {
     const wreck = wb > 0 && this.rng.next() < LIVE.wreckDriveChance * wb ? wb : 0;
     const fight = fightOf({ ...c.stats, stamina: c.stamina }, c.energy, this.rng.next()) * (1 + WRESTLE.wreckFight * wreck);
     const wrestle: WrestleState = { men: [this.indexOf(t)], fight, fight0: fight, grip: gripOf(t.stats, t.energy, true), t0: this.tick, metres: 0 };
+    this.visualContact = this.contactInfo(c, [t]);
     this.hold(c, 'tackled');
     this.hold(t, 'tackle');
     this.phase = { kind: 'tackle', t0: this.tick, carrier: this.indexOf(c), tackler: this.indexOf(t), big: false, wrestle, wreck };
@@ -364,6 +393,7 @@ export abstract class LiveContact extends LivePenalties {
       this.tire(d, FATIGUE.contactCost.tackler);
     }
     const men = w.men.map((i) => this.players[i]!);
+    this.visualContact = this.contactInfo(c, men, ph.t0);
     const dt = TICK_S;
     const end = wrestleTick(w, men.map((d) => holdOf(d.stats, d.energy)), dt, (this.tick - w.t0) * dt);
     this.tire(c, FATIGUE.wrestleCost.carrierPerMan * men.length * dt);
@@ -383,6 +413,7 @@ export abstract class LiveContact extends LivePenalties {
     if (end === 'free') {
       // The defenders' grip went before his fight: he is through.
       this.emit('break-tackle', `${c.name} fights out of the tackle!`, c);
+      this.tagContact(c, men, ph.t0);
       this.events[this.events.length - 1]!.detail = 'wrestle';
       for (const d of men) {
         this.lock(d, 'down', 16, add(d.body.pos, { x: -this.dir * 0.8, y: 0 }));
@@ -404,6 +435,7 @@ export abstract class LiveContact extends LivePenalties {
     const help = men.length > 1 ? ` (${men.length} men)` : '';
     const after = w.metres >= 1 ? ` after ${w.metres.toFixed(1)} m` : '';
     this.emit('tackle', ph.wreck > 0 ? `${t.name} hangs on as ${c.name} drives through the tackle${after}` : `${t.name} wraps up ${c.name}${after}${help}`, t, ph.wreck > 0 ? announce(c.traits.find((x) => x.id === 'wreckingBall')) : undefined);
+    this.tagContact(c, men, ph.t0);
     return true;
   }
 

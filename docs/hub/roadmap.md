@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-07
+Last updated: 2026-11-11
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **Match-art phone play-test** ([release PR and verification](https://github.com/ch-leon/nrl-sim/pull/584)): play a full match in landscape at ×1 and your usual speed; check player recognition, possession and tacklers releasing into play-the-ball. The PR records the deployed build and required review/CI/QA evidence. Feedback informs the separate animation follow-up below.
 
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
@@ -18,6 +20,8 @@ live gameplay change; work still open below has not shipped.
   Planned and awaiting Leon's go; no PR yet.
 
 ## Next
+
+- **Match animation follow-up, after the playable build and phone feedback:** item 3 is transition polish (catch → run, tackle recovery → play-the-ball, dummy-half → pass). Item 4 is big moments (kicks, aerial catches, tries and celebrations). Keep these separate from the current release task. Portraits, grounds characters and an appearance editor remain later work.
 
 - **Launch plumbing (decided 2 Nov 2026):** hosting, push, analytics, pop-ups, flags, email and privacy. Tracking: [issue #456](https://github.com/ch-leon/nrl-sim/issues/456), which has Leon's setup checklist. Decisions are in [marketing.md](marketing.md#engagement-and-launch-plumbing) ([PR #457](https://github.com/ch-leon/nrl-sim/pull/457), merged 6 Nov). Implementation is still open.
   - Buildable now: the pop-up itself, with a test message ([issue #451](https://github.com/ch-leon/nrl-sim/issues/451)).
@@ -33,6 +37,8 @@ live gameplay change; work still open below has not shipped.
     Until then the live build stays on GitHub Pages.
 
 ## Recently completed
+
+- **[Approved match player art and contact animations](../specs/match-art-prototype.md)** ([PR #584](https://github.com/ch-leon/nrl-sim/pull/584)): integrated into career matches and `/#lab`, including the corrected tackle-leg reach and lowered stance. `/#artlab` retains comparisons. The [original handover](../handoffs/match-art-playable-build.md) records the recovered source and historical checks; the release PR is the verification record. Transition polish and big moments remain separate work after phone feedback.
 
 - **Set plays, phases 1 and 2** ([issue #326](https://github.com/ch-leon/nrl-sim/issues/326)):
   - Phase 1: the plays catalogue and set plays in the match engine, merged in
