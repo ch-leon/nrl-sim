@@ -44,7 +44,7 @@ describe('format-24 player contract and current saves (#536)', () => {
   it('round-trips a current career and export with distinct Handling and Kicking', () => {
     const s = createNewGame('Round-trip', 536); initLeague(s); const state = getState();
     state.squad[0]!.stats.handling = 31.5; state.squad[0]!.stats.kicking = 87.25;
-    expect(SAVE_VERSION).toBe(25); save(state);
+    expect(SAVE_VERSION).toBe(26); save(state);
     expect(JSON.parse(bytes.get(slotKey(1))!).version).toBe(SAVE_VERSION);
     expect(load()).toEqual(state);
     expect(importSave(exportSave(state))).toMatchObject({ ok: true, state });

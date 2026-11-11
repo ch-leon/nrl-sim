@@ -77,7 +77,7 @@ describe('stable competition identities and snapshots', () => {
     save(s); expect(loadSlot()).toMatchObject({ status: 'ok', state: before });
     expect(importSave(exportSave(s))).toMatchObject({ ok: true, state: before });
     expect(s.league.fixtures).toEqual(before.league.fixtures);
-    expect(s.week).toBe(1); expect(s.preseason).toBe(1); expect(s.version).toBe(25);
+    expect(s.week).toBe(1); expect(s.preseason).toBe(1); expect(s.version).toBe(SAVE_VERSION);
     const copy = importSave(exportSave(s));
     if (!copy.ok) throw new Error(copy.message);
     expect(copy.state.competitions!.instances[0]!.definition.slotCount).toBe(28);
@@ -278,7 +278,7 @@ describe('v24 compatibility, import safety and namespace isolation', () => {
     expect(step?.to).toBe(25); expect(step?.run(source)).toEqual(source);
     expect(MIGRATIONS.some(m => m.from === 23)).toBe(false);
     const result = importSave(original);
-    expect(result).toMatchObject({ ok: true, state: { ...source, version: 25 } });
+    expect(result).toMatchObject({ ok: true, state: { ...source, version: SAVE_VERSION } });
     if (!result.ok) throw new Error(result.message);
     expect(result.state).not.toHaveProperty('competitions');
     expect(JSON.stringify(source)).toBe(original);

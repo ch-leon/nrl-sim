@@ -1,6 +1,7 @@
 // Competition metadata only (#570). The existing match/time systems remain
 // authoritative until the calendar and result-lifecycle work wires this in.
 import type { MatchRules } from '../content/pack';
+import { validateCompetitionCalendar, type CompetitionCalendar } from './competitionCalendar';
 
 export type CompetitionFormat =
   | { kind: 'league'; finalsSize: number }
@@ -85,6 +86,7 @@ export interface CompetitionInstance {
 export interface CompetitionCareerState {
   schemaVersion: 1;
   instances: CompetitionInstance[];
+  calendar?: CompetitionCalendar;
 }
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -214,7 +216,7 @@ function validResult(v: unknown, f: CompetitionFixture, stage: CompetitionStageD
 
 /** Boundary proof from saved sporting facts. Split whole tied cohorts rather
  * than using a non-transitive pairwise head-to-head sort comparator. */
-function standingsOrder(clubs: readonly string[], fixtures: readonly CompetitionFixture[], policy: CompetitionStandingsPolicy, frozen: readonly string[]): string[] {
+export function standingsOrder(clubs: readonly string[], fixtures: readonly CompetitionFixture[], policy: CompetitionStandingsPolicy, frozen: readonly string[]): string[] {
   const rows = new Map(clubs.map(id => [id, { points: 0, difference: 0, scored: 0 }]));
   const points = (score: number, against: number): number => score > against ? policy.win : score < against ? policy.loss : policy.draw;
   for (const f of fixtures) {
@@ -248,7 +250,7 @@ function standingsOrder(clubs: readonly string[], fixtures: readonly Competition
   return cohorts.flat();
 }
 
-function completedCompetition(instance: CompetitionInstance): string | null {
+export function completedCompetition(instance: CompetitionInstance): string | null {
   const { definition: def, fixtures, entrantIds, winnerId } = instance;
   const played = fixtures.filter(f => f.status === 'completed');
   if (played.length === 0 || fixtures.some(f => f.status !== 'completed' && f.status !== 'cancelled')) return 'competition completion';
@@ -308,8 +310,8 @@ function completedCompetition(instance: CompetitionInstance): string | null {
 }
 
 /** Returns the first invalid field; callers retain the entire rejected input. */
-export function validateCompetitions(v: unknown, context: { pack: string; season: number; clubIds: readonly string[] }): string | null {
-  if (!record(v) || !keys(v, ['schemaVersion', 'instances']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
+export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[] }): string | null {
+  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
   const clubIds = new Set(context.clubIds);
   const instanceIds = new Set<string>();
   const fixtureIds = new Set<string>();
@@ -383,5 +385,5 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
       if (completion) return completion;
     }
   }
-  return null;
+  return v.calendar === undefined ? null : validateCompetitionCalendar(v.calendar, v.instances as CompetitionInstance[], context.season, context.week);
 }

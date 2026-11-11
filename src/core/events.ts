@@ -70,6 +70,8 @@ export interface Events {
   'match:started': { fixture: Fixture; home: TeamSheet; away: TeamSheet; live: LiveMatchData };
   'match:event': MatchEvent; // re-emitted during playback pacing
   'match:finished': { fixture: Fixture; result: MatchResult };
+  /** Structural fixture accepted once; report subscribers are presentation-only. */
+  'match:committed': { fixture: Fixture; result: MatchResult };
   /** Save & exit left a live match parked: the week stays held and the club's Advance Week resumes it. */
   'match:parked': { tick: number };
   'board:sacked': { season: number; reason: string };

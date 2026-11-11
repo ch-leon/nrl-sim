@@ -325,6 +325,6 @@ describe('UK careers (#488)', () => {
       expect(config.SEASON_ROUNDS).toBe(24);
       expect(cardById('baliTrip')?.title).toBe(AU_PACK.events.trip.title);
     }
-    expect(SAVE_VERSION).toBe(25);
+    expect(SAVE_VERSION).toBe(26);
   });
 });

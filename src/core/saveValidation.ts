@@ -129,7 +129,7 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
     : Array.isArray(value) ? value.every(finiteTree) : record(value) ? Object.values(value).every(finiteTree) : true;
   if (!finiteTree(v)) return fail('non-finite number');
   if (v.pack !== undefined && !oneOf(v.pack, ['au', 'uk'])) return fail('pack');
-  if (v.clubId !== 'player' || !text(v.clubName) || !finite(v.money) || !integer(v.season, 1) || !integer(v.week, 1, v.pack === 'uk' ? 25 : 27) || !range(v.reputation, 1, 100) || !integer(v.rngSeed, 0, 0xffffffff)) return fail('career fields');
+  if (v.clubId !== 'player' || !text(v.clubName) || !finite(v.money) || !integer(v.season, 1) || !integer(v.week, 1) || !range(v.reputation, 1, 100) || !integer(v.rngSeed, 0, 0xffffffff)) return fail('career fields');
   if (v.preseason !== undefined && !oneOf(v.preseason, [0, 1, 2])) return fail('preseason');
   for (const key of ['coachName', 'groundName']) if (v[key] !== undefined && typeof v[key] !== 'string') return fail(key);
   if (v.weather !== undefined && !oneOf(v.weather, ['clear', 'rain', 'wind'])) return fail('weather');
@@ -164,9 +164,11 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');
-    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, clubIds: [...clubs] });
+    if (record(v.competitions) && v.competitions.calendar !== undefined && version < 26) return fail('competition calendar version');
+    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs] });
     if (problem) return fail(problem);
   }
+  if ((!record(v.competitions) || v.competitions.calendar === undefined) && !integer(v.week, 1, v.pack === 'uk' ? 25 : 27)) return fail('career fields');
   for (const f of v.league.fixtures) {
     if (!record(f) || !integer(f.round, -1, v.pack === 'uk' ? 25 : 27) || !text(f.homeId) || !text(f.awayId) || !clubs.has(f.homeId) || !clubs.has(f.awayId) || f.homeId === f.awayId || (f.result !== undefined && (!record(f.result) || !integer(f.result.homeScore) || !integer(f.result.awayScore)))) return fail('fixture');
   }

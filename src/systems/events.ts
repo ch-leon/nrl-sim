@@ -25,6 +25,8 @@ import { reviewSuspension, withSuspension } from './suspension';
 import { makeRng, type Rng } from '../utils/rng';
 import { clampMorale } from './morale';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
+import { elapsedInterval } from '../core/season';
+import { hasStructuralCalendar } from './competitionCalendar';
 
 /** Tick order: after morale (55) so a card's morale change isn't drifted the same week, before free agency (60). */
 export const EVENTS_TICK_ORDER = 58;
@@ -538,7 +540,16 @@ function tickSuspensions(state: GameState): GameState {
 }
 
 export function eventsTick(state: GameState): EventsTick {
-  const now = absWeek(state.season, state.week);
+  if (hasStructuralCalendar(state)) {
+    // Time still expires old cards/modifiers; prototype events never apply effects.
+    const now = elapsedInterval(state);
+    const next = tickSuspensions(state);
+    return { state: { ...next, eventDeck: { ...next.eventDeck,
+      pending: next.eventDeck.pending.filter(event => event.expiresAt > now),
+      modifiers: next.eventDeck.modifiers.filter(modifier => modifier.weeksLeft > 1).map(modifier => ({ ...modifier, weeksLeft: modifier.weeksLeft - 1 })),
+    } }, money: [], news: [], drawn: null };
+  }
+  const now = elapsedInterval(state);
   const mods = tickModifiers(tickSuspensions(state), now);
   let s = mods.state;
   const money = [...mods.money];
@@ -585,7 +596,8 @@ function commit(a: Applied): void {
 /** The player picked choice `index` on a pending card. Returns false if it no longer exists. */
 export function chooseEvent(eventId: string, index: number): boolean {
   const s = getState();
-  const r = resolveEvent(s, eventId, index, absWeek(s.season, s.week));
+  if (hasStructuralCalendar(s)) return false;
+  const r = resolveEvent(s, eventId, index, elapsedInterval(s));
   if (!r) return false;
   commit(r);
   return true;
@@ -597,8 +609,8 @@ export function chooseEvent(eventId: string, index: number): boolean {
  * takes its default before that match.
  */
 export function applySeasonEvents(state: GameState): GameState {
-  if (state.sacked) return state;
-  const now = absWeek(state.season, state.week);
+  if (state.sacked || hasStructuralCalendar(state)) return state;
+  const now = elapsedInterval(state);
   const pending = [...state.eventDeck.pending];
   const cooldowns = { ...state.eventDeck.cooldowns };
   let added = false;
@@ -648,7 +660,7 @@ export function plantPending(cardId: string): boolean {
   const card = cardById(cardId);
   if (!card) return false;
   const s = getState();
-  const now = absWeek(s.season, s.week);
+  const now = elapsedInterval(s);
   const ev: PendingEvent = {
     id: `${cardId}-show`,
     cardId,
@@ -683,8 +695,8 @@ export function plantPending(cardId: string): boolean {
 export function registerEventsSystem(): void {
   registerTickHook('events-rollover', TICK_ORDER.match - 5, () => {
     const s = getState();
-    if (s.sacked) return;
-    const due = resolveDueRollovers(s, absWeek(s.season, s.week));
+    if (s.sacked || hasStructuralCalendar(s)) return;
+    const due = resolveDueRollovers(s, elapsedInterval(s));
     if (due.state !== s) commit(due);
   });
   registerTickHook('events', EVENTS_TICK_ORDER, () => {
@@ -694,6 +706,7 @@ export function registerEventsSystem(): void {
   });
   registerSeasonHook('events-season', 25, () => {
     const s = getState();
+    if (hasStructuralCalendar(s)) return;
     const next = applySeasonEvents(s);
     if (next === s) return;
     setState({ eventDeck: next.eventDeck });

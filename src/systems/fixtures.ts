@@ -33,6 +33,7 @@ import { RIVAL_CLUBS } from '../data/league';
 import { bus } from '../core/events';
 import { strengthChanges, applySeasonReputation } from './league';
 import { rolloverRivals, withRivalSquads } from './rivals';
+import { currentCalendarFixtures, finaliseCalendarFixture, fixtureBridge, hasStructuralCalendar, resolveCalendarForfeits, sameFixtureIdentity } from './competitionCalendar';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -197,6 +198,8 @@ export function stampFixtureResult(
   fixture: Fixture,
   result: { homeScore: number; awayScore: number },
 ): GameState {
+  if (hasStructuralCalendar(state)) return finaliseCalendarFixture(state, fixture, result);
+  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return state;
   const fixtures = state.league.fixtures.map((f) =>
     f.round === fixture.round && f.homeId === fixture.homeId && f.awayId === fixture.awayId
       ? { ...f, result }
@@ -219,6 +222,8 @@ export function applyResult(
   fixture: Fixture,
   result: { homeScore: number; awayScore: number },
 ): GameState {
+  if (hasStructuralCalendar(state)) return finaliseCalendarFixture(state, fixture, result);
+  if (state.league.fixtures.some(f => sameFixtureIdentity(f, fixture) && f.result)) return state;
   if (fixture.round <= 0 || isFinalsRound(fixture.round)) {
     return stampFixtureResult(state, fixture, result);
   }
@@ -281,6 +286,10 @@ export function ladderPosition(state: GameState, clubId: string): number {
  * to the round number for weeks 1..WEEKS_PER_SEASON (regular season + finals).
  */
 export function getCurrentFixture(state: GameState, clubId: string): Fixture | undefined {
+  if (hasStructuralCalendar(state)) {
+    const context = currentCalendarFixtures(state).find(({ fixture }) => fixture.homeId === clubId || fixture.awayId === clubId);
+    return context ? fixtureBridge(context) : undefined;
+  }
   const round = currentRound(state);
   if (round < -1 || round > WEEKS_PER_SEASON) return undefined;
   return state.league.fixtures.find(
@@ -332,6 +341,18 @@ export function cheapSimScore(
  * Already-played fixtures are skipped. Returns a NEW GameState. Deterministic.
  */
 export function simulateRivalRound(state: GameState, rng: Rng): GameState {
+  if (hasStructuralCalendar(state)) {
+    let next = resolveCalendarForfeits(state);
+    for (const context of currentCalendarFixtures(next)) {
+      const f = fixtureBridge(context);
+      if (f.homeId === PLAYER_ID || f.awayId === PLAYER_ID) continue;
+      const home = state.league.clubs.find(c => c.id === f.homeId);
+      const away = state.league.clubs.find(c => c.id === f.awayId);
+      if (!home || !away) continue;
+      next = applyResult(next, f, cheapSimScore(home, away, rng));
+    }
+    return next;
+  }
   const round = currentRound(state);
   if (round < -1 || round > WEEKS_PER_SEASON) return state;
   const byId = new Map(state.league.clubs.map((c) => [c.id, c] as const));
@@ -614,6 +635,7 @@ export function registerFixturesSystem(): void {
 
   // (a2) Generate this week's finals bracket ties before rivals/player match.
   registerTickHook('fixtures-finals', TICK_ORDER.match - 2, (ctx: TickContext) => {
+    if (hasStructuralCalendar(getState())) return;
     if (!isFinalsRound(ctx.week)) return;
     const s = getState();
     if (s.league.clubs.length === 0) return;
@@ -626,8 +648,12 @@ export function registerFixturesSystem(): void {
   // week plays them on the live sim — off the main thread where it can, holding
   // the week until they're in — and fast-forward keeps the cheap sim.
   registerTickHook('fixtures-rivals', TICK_ORDER.match, (ctx: TickContext) => {
-    const s = getState();
-    if (currentRound(s) < -1 || ctx.week > WEEKS_PER_SEASON) return;
+    let s = getState();
+    if (hasStructuralCalendar(s)) {
+      const legal = resolveCalendarForfeits(s);
+      if (legal !== s) { setState({ league: legal.league, competitions: legal.competitions! }); s = getState(); }
+    }
+    if (!hasStructuralCalendar(s) && (currentRound(s) < -1 || ctx.week > WEEKS_PER_SEASON)) return;
     if (s.league.clubs.length === 0) return; // league not initialised yet
     const rng = makeRng(s.rngSeed);
     if (s.settings.liveRivals === true && !ctx.fastForward) {
@@ -637,7 +663,7 @@ export function registerFixturesSystem(): void {
         // A result missing from the worker's answer is played here, so no fixture is left unplayed.
         const all = jobs.map((job, i) => results[i] ?? playRivalJob(job));
         const next = applyRivalResults(getState(), jobs, all, applyResult);
-        setState({ league: next.league });
+        setState({ league: next.league, ...(next.competitions ? { competitions: next.competitions } : {}) });
       };
       if (ctx.hold && canUseWorker() && jobs.length > 0) {
         ctx.hold();
@@ -660,12 +686,13 @@ export function registerFixturesSystem(): void {
       return;
     }
     const next = simulateRivalRound(s, rng);
-    setState({ league: next.league, rngSeed: rng.state() });
+    setState({ league: next.league, rngSeed: rng.state(), ...(next.competitions ? { competitions: next.competitions } : {}) });
   }, { trials: true });
 
   // (c) Ladder refresh — defensive re-sort after the round's results land.
   registerTickHook('fixtures-ladder', TICK_ORDER.ladder, () => {
     const s = getState();
+    if (hasStructuralCalendar(s)) return;
     if (s.league.ladder.length === 0) return;
     setState({ league: { ...s.league, ladder: sortLadder(s.league.ladder) } });
   });
@@ -676,6 +703,7 @@ export function registerFixturesSystem(): void {
   // home final for gate receipts. 'fixtures-finals' above stays as a fallback
   // for saves made before this hook existed.
   registerTickHook('fixtures-finals-next', TICK_ORDER.ladder + 1, (ctx: TickContext) => {
+    if (hasStructuralCalendar(getState())) return;
     const nextWeek = ctx.week + 1;
     if (!isFinalsRound(nextWeek)) return;
     const s = getState();
@@ -687,6 +715,7 @@ export function registerFixturesSystem(): void {
   // Season rollover: record finals outcome, then regenerate the season.
   registerSeasonHook('fixtures-season', 10, () => {
     const s = getState();
+    if (hasStructuralCalendar(s)) return; // #574 owns structural movement/next-season setup.
 
     // If the league is missing (fresh game / defensive), initialise from scratch.
     if (s.league.clubs.length === 0) {

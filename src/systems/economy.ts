@@ -19,6 +19,7 @@ import { FACILITY_CATALOG, facilityUpkeep, levelMult } from '../data/facility';
 import { closedGatesFlag, EVENT_CARDS } from '../data/events';
 import { currentRound, inTrials } from '../core/season';
 import { registerTickHook, TICK_ORDER } from '../core/time';
+import { hasStructuralCalendar } from './competitionCalendar';
 import { staffWages } from './staff';
 import { BOARD_LOAN, BOARD_LOAN_REPAID, renewalWage, takeBoardLoan, warnForWeeks, notifyContractWarning } from './contracts';
 
@@ -331,6 +332,7 @@ export function handleBankruptcy(_state: GameState): GameState {
  * money:changed per net movement (via earnMoney; deductions credit a negative delta).
  */
 export function applyEconomy(state: GameState): GameState {
+  if (hasStructuralCalendar(state)) return state; // Annual finance is not enabled by the structural prototype.
   // Compute wages from the entry snapshot; subsequent reads use getState() as the
   // store is mutated between steps.
   const wages = weeklyWages(state);

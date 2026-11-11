@@ -8,6 +8,7 @@ import { coachAddress } from '../ui/coachName';
 import { getState, setState, type GameState, type Objective } from '../core/state';
 import { bus } from '../core/events';
 import { registerSeasonHook } from '../core/time';
+import { hasStructuralCalendar } from './competitionCalendar';
 import { earnMoney } from '../data/club';
 import { makeRng } from '../utils/rng';
 import { BOARD, PRIZE, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers, scaledMoney } from '../config';
@@ -153,6 +154,7 @@ export function sackedSummary(state: GameState): {
  */
 export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
   const s = getState();
+  if (hasStructuralCalendar(s)) return { objectives: s.objectives, met: 0, missed: 0, patience: s.boardPatience, reputation: s.reputation, grant: 0, sacked: false };
   const prize = scaledMoney(finalsPrize(outcome), difficultyMultipliers(s.settings.difficulty).prize);
   if (prize > 0) {
     earnMoney(prize, 'finals prize money');
@@ -191,6 +193,7 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
 /** Replace this season's objectives with freshly generated ones when missing/stale. */
 export function ensureObjectives(): void {
   const s = getState();
+  if (hasStructuralCalendar(s)) return;
   if (s.sacked || s.objectives.length > 0 || s.league.clubs.length === 0) return;
   setState({ objectives: generateObjectives(s) });
 }
@@ -316,7 +319,7 @@ export function worstObjective(state: GameState, runwayWeeks: number | null = nu
 export function registerBoardSystem(): void {
   const announceObjectives = (quiet = false): void => {
     const s = getState();
-    if (s.sacked) return;
+    if (s.sacked || hasStructuralCalendar(s)) return;
     const objectives = generateObjectives(s);
     setState({ objectives });
     bus.emit('ui:notify', {

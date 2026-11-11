@@ -35,3 +35,10 @@ playtest evidence: AU after-tutorial, UK after-tutorial, and dormant AU competit
 metadata. The metadata snapshot includes rules/prizes, explicit identity and a
 scheduled test tie; the existing gameplay path intentionally ignores it until the
 later calendar issue activates competition careers. Historical files stay intact.
+
+Format 26 (#571) adds an explicit isolated developer calendar. The three v26
+fixtures are generated from source with seed 571 using the same AU, UK and
+dormant-metadata cases as v25. They exercise supported legacy careers through
+the new migration; structural active/held/rollover saves have focused source
+regressions in `tests/systems/competitionCalendar.test.ts`. These are not phone
+playtest evidence, and no production competition entry is activated.
