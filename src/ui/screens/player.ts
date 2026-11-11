@@ -641,11 +641,15 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       side.append(actions);
     }
 
+    // A redraw (a job switched, Sell armed, Rename) builds the columns again: each keeps its place (#614).
+    // Upright the sheet scrolls, not the columns, and it holds its own place.
+    const tops = Array.from(content.children, (col) => col.scrollTop);
     // A rival's man has no jobs or deals here: two columns, the note under his card.
     if (ctx.kind === 'rival') {
       card.append(...side.childNodes);
       content.replaceChildren(card, about);
     } else content.replaceChildren(card, about, side);
+    Array.from(content.children).forEach((col, i) => { if (tops[i]) col.scrollTop = tops[i]; });
   };
 
   const off = bus.on('state:changed', () => {

@@ -77,16 +77,17 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - Rows: min-height 30, top border #1f2b55, 13px.
 - **Fitness**: a 72×5 bar on #1f2b55, followed by the %. Bar colour: ≥85 #3fbf6a, ≥65 #e8a33a, otherwise #d9534f.
 - **Injury/knock note**: inline after the name, 11px #f0a39b.
+- **Traits**: chips after the name and its note, two at most; the rest are a "+n" chip whose tip names them. The name keeps its width: a chip the cell has no room for joins the "+n" (#614). Recruit's rows the same.
 - Tapping a row opens 3f.
 
 ### 3e Lineup
-- **Header**: segmented control (LINEUP selected) · "9/9 picked · rated 74 · 22/24 fit" · PLAN: BALANCED · RUSH (opens the 3r sheet) · AUTO PICK.
+- **Header**: segmented control (LINEUP selected) · "9/9 picked · rated 74 · 22/24 fit" · PLAN: BALANCED · RUSH (opens the 3r sheet) · AUTO PICK, which toasts what it did: "Auto pick: 3 changes." or "Already your best side." (#614).
 - **Left column**: a BENCH strip (4 tiles), then a mini-pitch in 3 rows (forwards / spine + edges / fullback).
   - Slot tile: 72×44, radius 6, bg #1b264a. Shows slot + rating on line 1 and surname on line 2.
   - Rating colour: amber #e8a33a = out of position; red bg #5a2430 = injured.
   - Selected slot: 2px #f4d03f ring.
   - Role badges (C = captain, K = kicker): 11px #f4d03f, top-right of the tile.
-- **Right column (270px)**: "FOR 2ND ROW: TAP A PLAYER" and a candidate list re-sorted for the selected slot.
+- **Right column (270px)**: "FOR 2ND ROW: TAP A PLAYER" and a candidate list re-sorted for the selected slot, back at its top each time another slot is picked (#614).
   - Rows are 40 tall and show name, meta, rating, and a "where" chip: current slot, B1–B4 (#3a6ea5), or OUT (#b03a2e).
   - Unavailable rows are at .55 opacity.
 
@@ -95,6 +96,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - **Left**: ◂ SQUAD back button, 64px portrait slot, name, position · age · number, overall and fitness tiles, contract line.
   - **Middle**: stats rows (label · 6px bar · value · weekly gain in #6fd896).
   - **Right**: role toggles (GOAL-KICKER / CAPTAIN, ON in #f4d03f), primary RENEW · $38,000, and SELL in #f0a39b.
+- Each column scrolls on its own and keeps its place when the page is drawn again (a role switched, Sell armed, Rename; #614).
 
 ### 3g Recruit
 - **Header**: segmented control (RECRUIT selected) and the line "Free agents · window open 3 more weeks · cap room $190k".

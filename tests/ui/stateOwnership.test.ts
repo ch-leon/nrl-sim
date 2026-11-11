@@ -32,11 +32,14 @@ beforeEach(() => {
 afterEach(() => { closeModal(); closeScreen(); bus.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('screens call their owners without reapplying effects', () => {
-  it('the Lineup auto pick saves once and a player-page role saves once, with no toast or Undo', () => {
+  it('the Lineup auto pick saves once and says what it did; a player-page role saves once, with no toast or Undo', () => {
     const notify = vi.fn(); bus.on('ui:notify', notify);
     openLineupScreen(); vi.mocked(saves.save).mockClear();
     tap('[data-auto-pick]');
     expect(saves.save).toHaveBeenCalledTimes(1);
+    // #614: the screen's own line, once, so a tap on a side already the best is not a dead one. No Undo.
+    expect(notify.mock.calls).toEqual([[{ text: 'Already your best side.', kind: 'info' }]]);
+    notify.mockClear();
     closeScreen();
     const id = getState().lineup.starters[0]!;
     const player = getState().squad.find((p) => p.id === id)!;

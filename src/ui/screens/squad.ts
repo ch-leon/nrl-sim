@@ -15,7 +15,7 @@ import { overallRating, ratingText } from '../../data/player';
 import { MORALE, TRAINING_FOCUS } from '../../config';
 import { TRAINING_FOCI, focusLabel, setTrainingFocus } from '../../systems/training';
 import {
-  ensureScreenStyles, fitnessCell, gridHead, openRecruitScreen, popMenu, posShort, tableRow, traitChips, whoCell, type PopItem,
+  ensureScreenStyles, fitChips, fitnessCell, gridHead, openRecruitScreen, popMenu, posShort, tableRow, traitChips, whoCell, type PopItem,
 } from './recruit';
 import { openLineupScreen } from './lineup';
 import { fitnessPct, moraleWord, openPlayerPage, positionLabel, squadNumbers } from './player';
@@ -159,7 +159,12 @@ export function openSquadScreen(): void {
         el('span', { class: `nrl-sq-wide ${unhappy ? 'nrl-row-bad' : 'nrl-row-dim'}`, text: moraleWord(p.morale), attrs: { title: `Morale ${p.morale}` } }),
       ], () => openPlayerPage(p, { kind: 'squad' })));
     }
+    fitChips(list);
+    fitted = list.clientWidth;
   };
+  // The phone turned or the window moved: the chips fold again for the room the cells have now (#614).
+  let fitted = 0;
+  const turned = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (list.clientWidth !== fitted) render(); }) : null;
 
   const head = screenHead('', { lead: [squadTabs('squad')], sub, controls: [training.button, sort.button] });
   const screen = el('div', { class: 'nrl-screen nrl-sq nrl-squad' }, head,
@@ -167,5 +172,7 @@ export function openSquadScreen(): void {
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onSquadClosed, 'squad');
   render();
-  unsub = bus.on('state:changed', render);
+  const off = bus.on('state:changed', render);
+  turned?.observe(list);
+  unsub = () => { off(); turned?.disconnect(); };
 }

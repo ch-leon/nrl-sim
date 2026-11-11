@@ -88,9 +88,12 @@ const SCREEN_CSS = `
 .nrl-card-open:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 /* Tappable rows are a finger tall on a touch screen. */
 @media (pointer: coarse) { .nrl-row.nrl-card-open { min-height: 44px; } }
-/* The name, then a knock or a ban in red, then the traits as chips; the name gives way first. */
+/* The name, then a knock or a ban in red, then the traits as chips. The name keeps its width (#614: the
+   list is where players are told apart); the chips give way, folding into "+n" (traitChips, fitChips). */
 .nrl-row-who { display: flex; align-items: center; gap: 6px; overflow: hidden; padding-right: 6px; }
-.nrl-row-name { flex: 0 1 auto; min-width: 3em; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.nrl-row-name { flex: 0 0 auto; max-width: 100%; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+/* A name too long for its dot, its note and the "+n" beside it gives them the room. */
+.nrl-row-who[data-tight] > .nrl-row-name { flex-shrink: 1; min-width: 3em; }
 .nrl-row-note { flex: 0 0 auto; font-size: 0.6875rem; color: var(--nrl-neg); }
 .nrl-row-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); }
 .nrl-chip {
@@ -166,14 +169,87 @@ export function traitBadge(t: TraitInstance): { label: string; tip: string; bad:
   return { label: traitLabel(t), tip: `${traitLabel(t)}: ${def.blurb}`, bad: def.bad ?? false };
 }
 
-/** A player's traits as chips; a tap on one says what it does (see {@link tableRow}). */
+/** The most trait chips a row shows (#614); the rest fold into a "+n" chip. */
+export const CHIPS_SHOWN = 2;
+
+/** A row's traits in two: the first `room` to show as chips, and the rest for the "+n" chip (#614). Pure. */
+export function foldTraits<T>(traits: readonly T[], room: number = CHIPS_SHOWN): { shown: T[]; folded: T[] } {
+  const n = Math.max(0, Math.min(room, traits.length));
+  return { shown: traits.slice(0, n), folded: traits.slice(n) };
+}
+
+/**
+ * The "+n" chip (#614): "+2", and the folded traits by name for its tip, its toast and a screen
+ * reader ("2 more traits: …"; with no chip showing beside it, "4 traits: …"). Pure.
+ */
+export function moreTraits(folded: readonly string[], shown: number): { label: string; tip: string } {
+  const n = folded.length;
+  return { label: `+${n}`, tip: `${n} ${shown > 0 ? 'more ' : ''}trait${n === 1 ? '' : 's'}: ${folded.join(', ')}` };
+}
+
+/** Show the first `room` of a row's trait chips and fold the rest into `more`, red when one folded has a downside. */
+function foldChips(chips: readonly HTMLElement[], more: HTMLElement, room: number): void {
+  const { shown, folded } = foldTraits(chips, room);
+  for (const c of shown) c.hidden = false;
+  for (const c of folded) c.hidden = true;
+  const { label, tip } = moreTraits(folded.map((c) => c.textContent ?? ''), shown.length);
+  more.hidden = folded.length === 0;
+  more.textContent = label;
+  more.setAttribute('title', tip);
+  more.setAttribute('aria-label', tip);
+  more.classList.toggle('nrl-chip-bad', folded.some((c) => c.classList.contains('nrl-chip-bad')));
+}
+
+/**
+ * A player's traits as chips; a tap on one says what it does (see {@link tableRow}).
+ * {@link CHIPS_SHOWN} show; the rest are folded into the "+n" chip after them (#614),
+ * so four traits do not squeeze the name out of its cell.
+ */
 export function traitChips(p: Player): HTMLElement[] {
-  return p.traits.filter((t) => t.id in TRAITS).map((t) => {
+  const chips = p.traits.filter((t) => t.id in TRAITS).map((t) => {
     const b = traitBadge(t);
     // Not a button: Chrome on Android snaps a tap near a button onto it, so a tap on
     // the name would read out the trait. The row's click handler tells them apart.
     return el('span', { class: `nrl-chip${b.bad ? ' nrl-chip-bad' : ''}`, text: b.label, attrs: { title: b.tip, 'data-trait': t.id } });
   });
+  if (chips.length === 0) return chips;
+  const more = el('span', { class: 'nrl-chip', attrs: { 'data-trait-more': '' } });
+  foldChips(chips, more, CHIPS_SHOWN);
+  return [...chips, more];
+}
+
+/**
+ * Fold the chips a row has no room for (#614). The name keeps its width, so beside a long name
+ * or at a larger text size fewer than {@link CHIPS_SHOWN} fit: the last one showing joins the
+ * "+n" rather than be cut off at the cell's edge (Squad) or wrap onto the next row (Recruit,
+ * whose cell wraps). Every row is read, then the tight ones are written, so a pass costs one
+ * layout; a row needs a pass for each chip it gives up. Call it once the rows are on the page.
+ */
+export function fitChips(list: HTMLElement): void {
+  const cells = Array.from(list.querySelectorAll<HTMLElement>('.nrl-row-who'));
+  if (cells.length === 0 || typeof cells[0]!.getBoundingClientRect !== 'function') return; // no layout (the tests' DOM)
+  const pad = parseFloat(getComputedStyle(cells[0]!).paddingRight) || 0;
+  // Tight: what it shows runs past the cell's edge, or out of the foot of its row.
+  const tight = (who: HTMLElement): boolean => {
+    const right = who.getBoundingClientRect().right - pad + 0.5;
+    const foot = who.parentElement!.getBoundingClientRect().bottom + 0.5;
+    return Array.from(who.children).some((c) => {
+      const r = c.getBoundingClientRect();
+      return r.width > 0 && (r.right > right || r.bottom > foot);
+    });
+  };
+  for (let pass = 0; pass <= CHIPS_SHOWN; pass++) {
+    const over = cells.filter(tight);
+    if (over.length === 0) return;
+    for (const who of over) {
+      const chips = Array.from(who.querySelectorAll<HTMLElement>('[data-trait]'));
+      const more = who.querySelector<HTMLElement>('[data-trait-more]');
+      const showing = chips.filter((c) => !c.hidden).length;
+      if (more && showing > 0) foldChips(chips, more, showing - 1);
+      // Nothing left to fold: the name gives its dot, its note and the "+n" the room (the stylesheet).
+      else who.setAttribute('data-tight', '');
+    }
+  }
 }
 
 /** Fitness colour (Broadcast Quiet): 85+ green, 65+ amber, else red. */
@@ -206,8 +282,9 @@ export function gridHead(cols: readonly (string | [string, string])[]): HTMLElem
 
 /**
  * One player in a table row: the cells the screen passes in. Tapping the row
- * opens his page (N7, #185); a tap on a trait chip says what the trait does,
- * in the toast lane, instead. The name cell carries .nrl-row-name.
+ * opens his page (N7, #185); a tap on a trait chip says what the trait does
+ * (the "+n" chip: which traits it stands for), in the toast lane, instead. The
+ * name cell carries .nrl-row-name.
  */
 export function tableRow(p: Player, cells: Node[], onOpen: () => void): HTMLElement {
   const row = el('div', {
@@ -215,7 +292,7 @@ export function tableRow(p: Player, cells: Node[], onOpen: () => void): HTMLElem
     attrs: { 'data-row-player': p.id, 'data-player-open': p.id, role: 'button', tabindex: '0', 'aria-label': `${p.name}: player page` },
   }, ...cells);
   row.addEventListener('click', (e) => {
-    const trait = e.target instanceof Element ? e.target.closest('[data-trait]') : null;
+    const trait = e.target instanceof Element ? e.target.closest('[data-trait], [data-trait-more]') : null;
     if (trait) bus.emit('ui:notify', { text: trait.getAttribute('title') ?? '', kind: 'info' });
     else onOpen();
   });
@@ -429,6 +506,7 @@ export function openRecruitScreen(): void {
       ], () => openPlayerPage(agent, { kind: 'freeAgent' })));
     }
     list.append(more);
+    fitChips(list);
   };
 
   const head = screenHead('', { lead: [squadTabs('recruit')], sub, controls: [sort.button] });

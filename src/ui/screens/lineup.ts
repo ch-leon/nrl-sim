@@ -26,7 +26,7 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { playerRivalContext, rivalStyle } from '../../systems/rivalRound';
 import { kickerAndCaptain } from '../../match/league/sheets';
 import {
-  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, lineupAverage, occupant, placeAt, positionFit,
+  LINEUP_SLOTS, POSITION_SHORT, autoPickKeepingPlan, commitLineup, setRotation, describeFills, effectiveRating, lineupAverage, lineupChanges, occupant, placeAt, positionFit,
   resolveLineup, sameSpot, setCaptain, setKicker, setTactics, spotOf, statsAt, swapSpots, validTactics, type Spot,
 } from '../../systems/lineup';
 import { ensureScreenStyles } from './recruit';
@@ -328,6 +328,11 @@ const fitClass = (f: number): string => (f >= 1 ? '' : f >= 0.9 ? 'nrl-lineup-fi
 /** Human label for a position (title-cased, hyphens kept). */
 const positionLabel = (pos: string): string => pos.replace(/(^|-)([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 
+/** What AUTO PICK says it did (#614), by the spots it changed: a tap on a side already the best is not a dead one. */
+export function autoPickNote(changes: number): string {
+  return changes === 0 ? 'Already your best side.' : `Auto pick: ${changes} change${changes === 1 ? '' : 's'}.`;
+}
+
 let unsub: (() => void) | null = null;
 let selected: Spot | null = null;
 
@@ -441,6 +446,8 @@ export function openLineupScreen(): void {
 
   // Who kicks and who captains today (N11): the coach's picks, or the defaults.
   let roles: { kicker?: string; captain?: string } = {};
+  // The spot the list was last sorted for (#614).
+  let listFor: Spot | null = null;
   const tile = (p: Player | null, spot: Spot, slotPos: Position | null): HTMLElement => {
     const label = spot.kind === 'starter' ? POSITION_SHORT[slotPos!] : `B${spot.index + 1}`;
     const injured = p !== null && p.injuredWeeks > 0;
@@ -601,6 +608,10 @@ export function openLineupScreen(): void {
       if (occupantId === p.id) row.setAttribute('data-selected', '');
       list.append(row);
     }
+    // Another spot picked (or none now) sorts the list afresh: back to its top, where the best man for
+    // the spot is (#614). The same spot drawn again (a kicker, an injury) leaves the list where it was.
+    if (selected ? !sameSpot(selected, listFor) : listFor !== null) list.scrollTop = 0;
+    listFor = selected;
   };
 
   /** The Plays button and sheet (#326): the plays owned, ticked in the order taken, three at most. */
@@ -641,7 +652,9 @@ export function openLineupScreen(): void {
   const autoBtn = button('AUTO PICK', () => {
     selected = null;
     const cur = getState().lineup;
-    commitLineup(autoPickKeepingPlan(getState().squad, cur));
+    const best = autoPickKeepingPlan(getState().squad, cur);
+    commitLineup(best);
+    toast(autoPickNote(lineupChanges(cur, best)));
   });
   autoBtn.title = 'Today’s best nine by slot and the next four';
   autoBtn.setAttribute('data-auto-pick', '');
