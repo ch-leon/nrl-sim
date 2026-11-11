@@ -145,6 +145,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   1. **COACH**: 56 tall, radius 14, #0e1630.
      - Badge: "3 CALLS" (yellow) when calls are available.
      - "THEIR BALL" (#1b264a / #9aa6c7) when they aren't. **The button never disappears**, so the row never shifts.
+     - The badge is one width (room for its longest text, "TAKE THE TWO"), its text centred, and it keeps that room while the tray is open, so LOG beside it never moves (#608). Calls and plays together ("2 CALLS · 1 PLAY") are two short lines.
   2. **LOG toggle**: 56 tall, a 28×16 switch + "LOG". On = #f4d03f track, knob right. Off = #26325c, knob left.
   3. Spacer.
   4. **Speed pill**: radius 28. Contents: ❚❚, 1× / 2× / 4× / 8× (selected = yellow pill), a divider, SKIP ▸▸.
@@ -205,6 +206,8 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - **Persist** the mode across matches (prototype key `nrlsim.logMode`; save `full` as `line`).
   - Key-moment banners still show when the log is hidden.
 - **Coach**: the badge count = calls legal at this tackle. Tap to open the tray; tap a call to apply it, close the tray and log it with its outcome.
+  - The call goes in at the tap. Its tile lights (yellow, navy text) and the tray closes about 140ms later (#608).
+  - The tray's tiles follow the play. When they change while it is open they dip (opacity 0.6 → 1, 150ms) and a tap in the next 300ms makes no call: it was aimed at the tile that was there before (#608).
 - **Sheets**: tapping the active tab or the dimmed area closes the sheet. Only one sheet is open at a time.
 - **Speed**: the selected speed persists for the match. SKIP goes to the next break (half-time / full time).
 - **Disabled items** always render, with the reason in place of the action.

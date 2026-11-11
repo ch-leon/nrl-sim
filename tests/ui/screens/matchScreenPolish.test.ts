@@ -14,6 +14,8 @@ import {
   SKIP_LABEL,
   SKIP_REPEAT_MS,
   TICKER_MIN_PX,
+  TRAY_CALLED_MS,
+  TRAY_SETTLE_MS,
   fittedTickerPx,
   bannerText,
   callCaption,
@@ -29,6 +31,7 @@ import {
   statSplit,
   teamCode,
   teamCodes,
+  trayTap,
 } from '../../../src/ui/screens/matchOverlay';
 import { REPORT_CSS } from '../../../src/ui/screens/matchReport';
 import { CSS } from '../../../src/ui/dom';
@@ -150,6 +153,65 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
     expect(SKIP_ARMED_SAY).toMatch(/again.*full time/i);
     expect(tap).toContain("btn.setAttribute('aria-label', SKIP_ARMED_SAY)");
     expect(tap).toContain('say.textContent = SKIP_ARMED_SAY');
+  });
+  it('#608: a tap under 300ms after the open tray’s tiles changed makes no call; a later one does', () => {
+    expect(TRAY_SETTLE_MS).toBe(300);
+    // Nothing has changed since it opened: the tiles are the ones he is looking at.
+    expect(trayTap(null)).toBe('call');
+    expect(trayTap(0)).toBe('wait');
+    expect(trayTap(TRAY_SETTLE_MS - 1)).toBe('wait');
+    expect(trayTap(TRAY_SETTLE_MS)).toBe('call');
+    expect(trayTap(5000)).toBe('call');
+    // A call and a set play both ask it before the sim hears anything, and a change dips the tiles.
+    const scene = readFileSync('src/scenes/MatchScene.ts', 'utf8');
+    for (const [from, to] of [['private makeCall', 'private playTiles'], ['private makePlay', '// ── What each call did']] as const) {
+      const tap = scene.slice(scene.indexOf(from), scene.indexOf(to));
+      expect(tap.indexOf('this.trayTapWaits()'), from).toBeGreaterThan(0);
+      expect(tap.indexOf('this.trayTapWaits()'), from).toBeLessThan(tap.indexOf('pb.call('));
+    }
+    expect(scene.slice(scene.indexOf('private trayTapWaits'), scene.indexOf('private shutTrayCalled'))).toContain('trayTap(');
+    const changed = scene.slice(scene.indexOf('private trayChanged'), scene.indexOf('private trayTapWaits'));
+    expect(changed).toContain('this.trayChangedAt = performance.now()');
+    expect(changed).toContain("setAttribute('data-changed', '')");
+    expect(rule(OVERLAY_CSS, '.nrl-mo-tray[data-changed] .nrl-mo-tray-list, .nrl-mo-tray[data-changed] .nrl-mo-tray-plays')).toContain('animation: nrl-mo-tray-changed var(--nrl-dur-fast) var(--nrl-ease-out)');
+    expect(OVERLAY_CSS).toContain('@keyframes nrl-mo-tray-changed { from { opacity: 0.6; } }');
+  });
+  it('#608: a call goes in at the tap; its tile is lit and the tray shuts a moment later', () => {
+    expect(TRAY_CALLED_MS).toBeGreaterThanOrEqual(100);
+    expect(TRAY_CALLED_MS).toBeLessThanOrEqual(200);
+    const scene = readFileSync('src/scenes/MatchScene.ts', 'utf8');
+    const shut = scene.slice(scene.indexOf('private shutTrayCalled'), scene.indexOf('/** The badge and the tray follow the play'));
+    expect(shut).toContain("setAttribute('data-called', '')");
+    // COACH is shut for a screen reader at the tap; only the tray's going waits.
+    expect(shut).toContain("this.coachBtn.setAttribute('aria-expanded', 'false')");
+    expect(shut).toMatch(/setTimeout\(\(\) => \{\s*this\.trayShut = null;\s*this\.toggleTray\(false\);\s*\}, TRAY_CALLED_MS\)/);
+    // The scene is kept between matches (#408): a shut still to come is dropped when the next match's COACH is made.
+    const mount = scene.slice(scene.indexOf('private mountCoach'), scene.indexOf('private trayOpen'));
+    expect(mount).toContain('this.trayShut = null;');
+    expect(mount).toContain('this.trayChangedAt = null;');
+    const call = scene.slice(scene.indexOf('private makeCall'), scene.indexOf('private playTiles'));
+    expect(call.indexOf('pb.call(')).toBeLessThan(call.indexOf('this.shutTrayCalled('));
+    expect(call).not.toContain('this.toggleTray(false)');
+    // The badge's "on" colours, with no fade: the tile is lit for the whole of the moment.
+    const lit = rule(OVERLAY_CSS, '.nrl-btn.nrl-mo-tray-call[data-called], .nrl-btn.nrl-mo-tray-call[data-called]:hover');
+    expect(lit).toContain('background: var(--nrl-accent)');
+    expect(lit).toContain('color: var(--nrl-on-accent)');
+    expect(lit).toContain('transition-property: transform');
+  });
+  it('#608: the COACH badge is one width, and keeps its room while the tray is open', () => {
+    const badge = rule(OVERLAY_CSS, '.nrl-mo-coach-badge');
+    expect(badge).toContain('box-sizing: border-box');
+    expect(badge).toContain('width: 6.8em');
+    expect(badge).toContain('text-align: center');
+    expect(badge).toContain('text-overflow: ellipsis');
+    // Calls and plays together stack at every width, their size set on the lines so the badge's own em holds.
+    expect(rule(OVERLAY_CSS, '.nrl-mo-coach-badge[data-parts]')).toContain('flex-direction: column');
+    expect(rule(OVERLAY_CSS, '.nrl-mo-coach-badge[data-parts]')).not.toContain('font-size');
+    expect(rule(OVERLAY_CSS, '.nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge')).toContain('visibility: hidden');
+    // Open, nothing about COACH's box changes: no padding of its own, no badge taken out, one word for a label.
+    expect(OVERLAY_CSS).not.toMatch(/\.nrl-mo-coach\[aria-expanded="true"\][^{]*\{[^}]*(padding|display: none)/);
+    expect(rule(OVERLAY_CSS, '.nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-label::after')).toContain('position: absolute');
+    expect(readFileSync('src/scenes/MatchScene.ts', 'utf8')).not.toContain('COACH ▾');
   });
   it('the log: one line, nothing, or the full log on the right', () => {
     expect(rule(OVERLAY_CSS, '.nrl-mo-strip')).toContain('width: min(560px');

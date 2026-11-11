@@ -944,8 +944,9 @@ async function play() {
     // long enough for a locator click: call at ×1, opening the tray and tapping its first row
     // inside the page, then go back to ×8.
     await press(page.locator('.nrl-mo-controls [data-speed="1"]'));
-    // A call that lands names itself on the badge at once (MatchScene.makeCall) and closes the
-    // tray; one refused (the play moved on) rebuilds the rows: read it in the same task.
+    // A call that lands names itself on the badge at once (MatchScene.makeCall), lights its tile
+    // and shuts the tray a moment later (#608); one refused (the play moved on) rebuilds the rows,
+    // and a tap inside 300ms of the rows changing makes no call: read it in the same task.
     let call = null;
     let empty = 0;
     const refused = [];
@@ -957,9 +958,13 @@ async function play() {
         if (!b) return null;
         b.click();
         const badge = document.querySelector('.nrl-mo-coach-badge');
-        return { call: b.getAttribute('data-call'), made: badge?.getAttribute('data-state') === 'made', badge: badge?.textContent?.trim() ?? '', tray: !document.querySelector('.nrl-mo-calls')?.hidden };
+        return { call: b.getAttribute('data-call'), made: badge?.getAttribute('data-state') === 'made', badge: badge?.textContent?.trim() ?? '', lit: b.hasAttribute('data-called') };
       });
-      if (got?.made) { call = got; break; }
+      if (got?.made) {
+        // The tray shuts TRAY_CALLED_MS after the tap.
+        call = { ...got, tray: !(await page.waitForSelector('.nrl-mo-calls[hidden]', { state: 'attached', timeout: 3000 }).then(() => true, () => false)) };
+        break;
+      }
       if (got) refused.push(got.call); else empty++;
       await wait(250);
     }
@@ -969,6 +974,7 @@ async function play() {
       if (coach?.getAttribute('aria-expanded') === 'true') coach.click();
     });
     if (!call) throw new Error(refused.length ? `no call landed (${refused.slice(-3).join(', ')} refused)` : 'the tray offered no call for 10 s');
+    if (!call.lit) throw new Error(`${call.call} was made but its tile was not lit`);
     if (call.tray) throw new Error(`the tray stayed open after ${call.call} was made`);
     rec.notes.push(`called ${call.call}; badge reads "${call.badge}"${refused.length ? ` (${refused.length} refused first)` : ''}${empty ? `; ${empty} looks at an empty tray` : ''}`);
     await press(page.locator('.nrl-mo-controls [data-speed="8"]'));

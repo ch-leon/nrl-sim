@@ -182,8 +182,9 @@ export async function runDevSettings(browser) {
         const b = document.querySelector('[data-tray-plays]:not([hidden]) [data-play="block-play"]');
         if (!b) return document.querySelector('.nrl-mo-tray-title')?.textContent !== 'Your ball' ? 'lost' : null;
         if (b.disabled) return document.querySelector('.nrl-mo-tray-title')?.textContent !== 'Your ball' ? 'lost' : null;
+        // A tap inside 300ms of the tiles changing makes no call (#608): tap until the tile lights.
         b.click();
-        return 'called';
+        return b.hasAttribute('data-called') ? 'called' : null;
       }, null, { timeout: 120000 }).then((hdl) => hdl.jsonValue()) === 'called';
     }
     if (!called) throw new Error('Block play never came on to call');

@@ -709,8 +709,8 @@ export function coachBadge(legal: number, attacking: boolean, made: CoachCall | 
 
 /**
  * Put a coachBadge's text in the COACH badge. Calls and plays together ("2 calls · 1 play",
- * #326) go in as two parts, so a narrow phone can stack them and the bottom row is no
- * wider than with today's badge; anything else is the plain text it always was.
+ * #326) go in as two parts, stacked as two short lines so they fit the badge's one
+ * width (#608); anything else is the plain text it always was.
  */
 export function renderCoachBadge(el: HTMLElement, text: string): void {
   const parts = text.split(' · ');
@@ -828,6 +828,16 @@ export const SKIP_ARMED_SAY = 'Tap again to skip to full time';
 export function skipTap(armedFor: number | null): 'arm' | 'wait' | 'skip' {
   if (armedFor === null) return 'arm';
   return armedFor < SKIP_REPEAT_MS ? 'wait' : 'skip';
+}
+
+/** A tap this soon after the open tray's rows changed was aimed at the tile that was there before (#608). */
+export const TRAY_SETTLE_MS = 300;
+/** How long the tile just called stays lit before the tray shuts (#608). */
+export const TRAY_CALLED_MS = 140;
+
+/** What a tap on a tray tile does. `changedFor` is how long ago the open tray's rows last changed (ms), null when they have not since it opened. */
+export function trayTap(changedFor: number | null): 'call' | 'wait' {
+  return changedFor !== null && changedFor < TRAY_SETTLE_MS ? 'wait' : 'call';
 }
 
 /** Smallest the ticker's line is drawn, px, when a long name would otherwise run over (#433). */
@@ -1992,18 +2002,27 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-switch > i { width: 12px; height: 12px; border-radius: 6px; background: #fff; transition: transform var(--nrl-dur-fast) var(--nrl-ease-in-out); }
 .nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch { background: var(--nrl-accent); }
 .nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch > i { transform: translateX(12px); }
-/* COACH (MatchScene): its badge says how many calls are on, or why none ("THEIR BALL"). */
+/* COACH (MatchScene): its badge says how many calls are on, or why none ("THEIR BALL"). The badge is one
+   width, its text centred (#608): room for the longest it shows ("TAKE THE TWO"), so COACH keeps its width
+   and LOG beside it stays put as the text changes. Anything longer would end in an ellipsis. */
 .nrl-mo-coach { gap: 10px; padding: 0 8px 0 16px; font-size: 1.1875rem; }
+.nrl-mo-coach-label { position: relative; }
 .nrl-mo-coach-badge {
-  height: 36px; display: flex; align-items: center; padding: 0 10px; border-radius: 8px; font-size: 0.9375rem; text-transform: uppercase;
+  box-sizing: border-box; width: 6.8em; height: 36px; padding: 0 6px; border-radius: 8px; font-size: 0.9375rem; line-height: 36px; text-align: center; text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis;
   background: var(--nrl-raised); color: var(--nrl-muted);
 }
 .nrl-mo-coach-badge[data-state="on"] { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-coach-badge[data-state="made"] { color: var(--nrl-accent); }
-/* Calls and plays together (#326): one line, its spaces kept; stacked two lines on a narrow phone (below). */
-.nrl-mo-coach-badge[data-parts] { display: block; line-height: 36px; white-space: pre; }
-.nrl-mo-coach[aria-expanded="true"] { padding: 0 16px; background: var(--nrl-button); box-shadow: inset 0 0 0 2px var(--nrl-accent); }
-.nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { display: none; }
+/* Calls and plays together ("2 calls · 1 play", #326): two short lines, so they fit the badge's one width (#608). */
+.nrl-mo-coach-badge[data-parts] { display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1.1; }
+.nrl-mo-coach-badge[data-parts] > span { font-size: 0.8em; }
+.nrl-mo-coach-badge[data-parts] .nrl-mo-badge-sep { display: none; }
+/* Open (3o): the ring, and ▾ after COACH. The badge keeps its room unseen and ▾ sits in it, on the same
+   padding, so the button is the width it was shut (#608). */
+.nrl-mo-coach[aria-expanded="true"] { background: var(--nrl-button); box-shadow: inset 0 0 0 2px var(--nrl-accent); }
+.nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-badge { visibility: hidden; }
+.nrl-mo-coach[aria-expanded="true"] .nrl-mo-coach-label::after { content: '▾'; position: absolute; left: 100%; margin-left: 0.3em; }
 /* The coach tray (3o): only the calls on now; the match keeps playing. #396: at most five rows
    (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls. */
 .nrl-mo-tray {
@@ -2013,6 +2032,9 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   pointer-events: auto; animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-tray[hidden] { display: none; }
+/* Its rows changed while it was open (#608): they dip and come back, so the change reads before a tap lands. */
+.nrl-mo-tray[data-changed] .nrl-mo-tray-list, .nrl-mo-tray[data-changed] .nrl-mo-tray-plays { animation: nrl-mo-tray-changed var(--nrl-dur-fast) var(--nrl-ease-out); }
+@keyframes nrl-mo-tray-changed { from { opacity: 0.6; } }
 /* The tray and the full log side by side: the log gives way on a narrow phone (667px) rather than sit under the tray. */
 .nrl-mo-tray-open .nrl-mo-full { width: min(330px, calc(100vw - 32px - 360px - 8px - var(--nrl-safe-l) - var(--nrl-safe-r))); }
 .nrl-mo-tray-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row dense; gap: 6px; }
@@ -2030,6 +2052,9 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   font-family: var(--nrl-f-body); font-size: 0.75rem; font-weight: 400; line-height: 1.2; color: var(--nrl-text-2);
 }
+/* The call just made (#608): the badge's "on" colours, at once, for the moment before the tray shuts. */
+.nrl-btn.nrl-mo-tray-call[data-called], .nrl-btn.nrl-mo-tray-call[data-called]:hover { background: var(--nrl-accent); color: var(--nrl-on-accent); transition-property: transform; }
+.nrl-mo-tray-call[data-called] span { color: var(--nrl-on-accent); }
 /* A locked call (the Coach's Office hasn't unlocked it): greyed, outlined rather than filled, its level as a
    small tag. aria-disabled, not disabled, so a tap can say what unlocks it; it never makes the call. */
 .nrl-btn.nrl-mo-tray-call.nrl-mo-tray-locked { background: transparent; box-shadow: inset 0 0 0 1px var(--nrl-line); color: var(--nrl-muted); cursor: default; }
@@ -2137,9 +2162,6 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-controls .nrl-mo-speed:not([aria-pressed="true"]),
   .nrl-mo-bar:has(.nrl-mo-planchip:not([hidden])) .nrl-mo-pill-div { display: none; }
   .nrl-mo-coach { padding: 0 6px 0 12px; gap: 8px; }
-  /* "2 calls · 1 play" (#326) as two short lines, no wider than today's longest badge, so the row keeps its width. */
-  .nrl-mo-coach-badge[data-parts] { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; line-height: 1.1; font-size: 0.75rem; white-space: nowrap; }
-  .nrl-mo-coach-badge[data-parts] .nrl-mo-badge-sep { display: none; }
   .nrl-mo-log-toggle { padding: 0 12px; }
 }
 /* Large and Larger text (#371) on a narrow phone: the row keeps to one line with the Plan chip up,
@@ -2147,8 +2169,6 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 @media (max-width: 720px) {
   html[data-text-size] .nrl-mo-bar, html[data-text-size] .nrl-mo-slot { gap: 6px; }
   html[data-text-size] .nrl-mo-coach { padding: 0 4px 0 10px; gap: 6px; }
-  html[data-text-size] .nrl-mo-coach[aria-expanded="true"] { padding: 0 10px; }
-  html[data-text-size] .nrl-mo-coach-badge { padding: 0 6px; }
   html[data-text-size] .nrl-mo-log-toggle { padding: 0 8px; gap: 6px; }
   html[data-text-size] .nrl-btn.nrl-mo-planchip { padding: 0 10px; }
   html[data-text-size] .nrl-mo-controls { padding: 0 4px; }
