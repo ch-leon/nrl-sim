@@ -12,7 +12,7 @@ import { objectiveLine, objectiveRisk, sackedSummary } from '../../systems/board
 import { financeSummary } from './finance';
 import { ladderPosition } from '../../systems/fixtures';
 import { ATTACK_COACHES, ATTACK_SPECIALITIES, STAFF, STAFF_ROLES, attackCoach, attackCoachRefusal, attackCoachWage, hireAttackCoach, hireStaff, releaseStaff, staffWage } from '../../systems/staff';
-import { el, button, openModal, openScreen, closeScreen, ensureStyles } from '../dom';
+import { el, button, openModal, openScreen, closeScreen, ensureStyles, guardDoubleTap } from '../dom';
 
 /** How an objective stands (3k): ON TRACK / AT RISK while the season runs, MET / FAILED once reviewed, PENDING before a ball is kicked. */
 export type ObjectiveStatus = 'on-track' | 'at-risk' | 'pending' | 'met' | 'failed' | 'off-track';
@@ -157,6 +157,8 @@ export function openStaffScreen(): HTMLElement {
   const left = el('div', { class: 'nrl-staff-board' });
   const label = el('div', { class: 'nrl-label nrl-staff-label' });
   const list = el('div', { class: 'nrl-staff-list' });
+  // Hire and Release share a spot: the second tap of a double tap must not undo the first (#598).
+  guardDoubleTap(list);
   const render = (): void => {
     const s = getState();
     left.replaceChildren(buildObjectivesSection(s));

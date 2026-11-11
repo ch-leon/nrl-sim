@@ -4,7 +4,7 @@
 // exports the pieces the squad screens share: their stylesheet, the trait
 // chips, the fitness bar and the ▾ menu button.
 
-import { el, button, ensureStyles, openScreen, screenHead } from '../dom';
+import { el, button, ensureStyles, guardDoubleTap, openScreen, screenHead } from '../dom';
 import { getState, type Player, type TraitInstance } from '../../core/state';
 import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
@@ -340,6 +340,8 @@ export function openRecruitScreen(): void {
 
   let showAll = false;
   const list = el('div', { class: 'nrl-grid-body nrl-screen-body' });
+  // A signing redraws the rows: the next man's SIGN is then under the finger (#598).
+  guardDoubleTap(list);
   const more = el('div');
   const sub = el('div', { class: 'nrl-screen-sub' });
   const sort = popMenu<RecruitSort>({

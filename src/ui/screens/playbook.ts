@@ -5,7 +5,7 @@
 // then the other coaches' plays, folded away. The rules are
 // systems/playbook.ts and systems/staff.ts; the words playbookText.ts. One
 // column that scrolls upright, two side by side when there's room.
-import { el, button, ensureStyles, openScreen, screenHead } from '../dom';
+import { el, button, ensureStyles, guardDoubleTap, openScreen, screenHead } from '../dom';
 import { getState, type GameState } from '../../core/state';
 import { bus } from '../../core/events';
 import { save } from '../../core/save';
@@ -147,6 +147,8 @@ export function openPlaybookScreen(): HTMLElement {
   ensurePlaybookStyles();
   const sub = el('span', { class: 'nrl-screen-sub' });
   const body = el('div', { class: 'nrl-pb-scroll' });
+  // A purchase redraws the lists: the next play's Buy, or the new play's Take, is then under the finger (#598).
+  guardDoubleTap(body);
   let open = false;
   const render = (): void => {
     const s = getState();

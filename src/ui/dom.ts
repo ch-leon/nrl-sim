@@ -337,6 +337,45 @@ export function trackChromeInset(node: HTMLElement, cssVar: string): () => void 
   };
 }
 
+/** The double-tap guard's reach (#598): a repeat inside 400ms and 32px of the last tap it let through. */
+export const DOUBLE_TAP = { ms: 400, px: 32 } as const;
+
+/**
+ * Double-tap guard (#598), opt-in: put it on the node whose content a tap redraws
+ * (Recruit's list, Staff's list, the facility card, the Playbook's body). A tap
+ * that signs or hires redraws the list, a different action then sits under the
+ * finger, and the second tap of a double tap fired it: SIGN signed the next
+ * player, HIRE turned into RELEASE. So a click is dropped when it lands within
+ * DOUBLE_TAP of the last click let through AND `container`'s content has
+ * changed since that click: nodes added, removed or re-labelled, whether the
+ * tapped button was replaced or rewritten in place (a MutationObserver, read at
+ * the click with takeRecords; without one, the tapped node having left the
+ * document). A repeat on content that held still goes through. So does a tap
+ * somewhere else, a tap later (a second signing half a second on), and a
+ * keyboard or scripted click (detail 0: no finger). A dropped click does not
+ * restart the window. Not global: decision cards are answered in one spot, one
+ * after another.
+ */
+export function guardDoubleTap(container: HTMLElement): void {
+  let last: { t: number; x: number; y: number; target: EventTarget | null } | null = null;
+  let changed = false;
+  const seen = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => { changed = true; });
+  seen?.observe(container, { childList: true, characterData: true, subtree: true });
+  container.addEventListener('click', (e) => {
+    if (e.detail === 0) return;
+    if (seen && seen.takeRecords().length > 0) changed = true;
+    const redrawn = changed || (last?.target as Node | null | undefined)?.isConnected === false;
+    if (last && redrawn && e.timeStamp - last.t < DOUBLE_TAP.ms
+      && Math.hypot(e.clientX - last.x, e.clientY - last.y) <= DOUBLE_TAP.px) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    last = { t: e.timeStamp, x: e.clientX, y: e.clientY, target: e.target };
+    changed = false;
+  }, true);
+}
+
 /** Currently open modal overlay, if any (guards against stacking). */
 let openModalEl: HTMLElement | null = null;
 

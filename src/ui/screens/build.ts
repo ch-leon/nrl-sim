@@ -14,7 +14,7 @@
 // how much more is needed), Move (placement mode with that facility's ghost, for
 // a fee) and Demolish (two taps, part refund) — GitHub #78.
 
-import { el, button, openModal, closeModal, closeScreen, openScreen, screenHead, segmented, ensureStyles } from '../dom';
+import { el, button, openModal, closeModal, closeScreen, openScreen, screenHead, segmented, ensureStyles, guardDoubleTap } from '../dom';
 import {
   FACILITY_CATALOG,
   LEVEL_MULT,
@@ -219,6 +219,8 @@ export function openFacilityPopup(facility: PlacedFacility): void {
 
   const card = el('div', { class: 'nrl-facility-popup', attrs: { 'data-facility-popup': facility.id } });
   card.append(renderFacilityBody(facility, def));
+  // An upgrade redraws the card with the next level's Upgrade in the same spot, and has no Undo (#598).
+  guardDoubleTap(card);
   openModal(card, { class: 'nrl-facility-modal' }).classList.add('nrl-facility-backdrop');
 }
 
