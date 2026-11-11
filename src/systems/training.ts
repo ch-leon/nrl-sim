@@ -1,17 +1,20 @@
-// src/systems/training.ts — weekly training stat gains + injury recovery tick.
+// src/systems/training.ts — XP, level points, focus spending and injury recovery.
 // See BAK-180 (WU-10). Pure TypeScript, no Phaser. All maths deterministic and
 // unit-tested; stats stay fractional in state (UI rounds for display).
 //
-// Pipeline (ARCHITECTURE §5): training gains = order 10, injuries tick = order 20.
+// Pipeline (ARCHITECTURE §5): weekly XP = order 10, injuries tick = order 20.
 // applyTraining runs strictly before applyInjuries so an injured player trains at
 // ×0.3 THIS week and recovers AFTER.
 
 import { getState, setState, type GameState, type Player, type PlacedFacility, type PlayerStats, type TrainingFocus } from '../core/state';
 import { FACILITY_CATALOG, levelMult, type FacilityDef, type FacilityDefId } from '../data/facility';
-import { STAT_MAX, TRAINING_CURVE, TRAINING_FOCUS } from '../config';
+import { STAT_MAX, PROGRESSION } from '../config';
 import { activePack } from '../content';
 import { registerTickHook, TICK_ORDER } from '../core/time';
+import { shownStats } from '../data/player';
 import { hasTrait, traitBoost } from '../data/traits';
+import { foldEvents, playerOfTheMatch } from './stats';
+import type { MatchResult, TeamSheet } from '../sim/events';
 
 /** Stats floor. Stats are clamped to [STAT_FLOOR, STAT_MAX] after each tick. */
 export const STAT_FLOOR = 1;
@@ -29,7 +32,7 @@ function getDef(defId: FacilityDefId): FacilityDef {
 export { levelMult };
 
 /**
- * Age-based development modifier applied to all training gains.
+ * Age-based development modifier applied to all XP awards.
  *  age<=21 → 1.5 ; 22-27 → 1.0 ; 28-30 → 0.6 ; 31+ → 0.25
  */
 export function ageMod(age: number): number {
@@ -39,37 +42,11 @@ export function ageMod(age: number): number {
   return 0.25;
 }
 
-/**
- * True when facilities `a` and `b` footprints are orthogonally adjacent
- * (touching along a N/E/S/W edge — not merely diagonally). Uses each def's
- * footprint (w,h) with (x,y) as the top-left grid origin.
- */
-function footprintsAdjacent(a: PlacedFacility, b: PlacedFacility): boolean {
-  const fa = getDef(a.defId).footprint;
-  const fb = getDef(b.defId).footprint;
-  const aL = a.x, aR = a.x + fa.w, aT = a.y, aB = a.y + fa.h;
-  const bL = b.x, bR = b.x + fb.w, bT = b.y, bB = b.y + fb.h;
-
-  // Horizontal edge contact: one's right edge meets the other's left edge, and
-  // their vertical spans overlap (strictly, so corner-only touching = diagonal).
-  const horizTouch = (aR === bL || bR === aL) && aT < bB && bT < aB;
-  // Vertical edge contact: bottom meets top, horizontal spans overlap.
-  const vertTouch = (aB === bT || bB === aT) && aL < bR && bL < aR;
-
-  return horizTouch || vertTouch;
-}
-
-/**
- * Count of facilities orthogonally adjacent to `f` (footprints touching N/E/S/W).
- * Adjacency multiplier = 1 + 0.1 × adjacentCount, capped at 1.4.
- */
-export function adjacencyMult(f: PlacedFacility, all: PlacedFacility[]): number {
-  let count = 0;
-  for (const other of all) {
-    if (other === f || other.id === f.id) continue;
-    if (footprintsAdjacent(f, other)) count += 1;
-  }
-  return Math.min(1.4, 1 + 0.1 * count);
+/** Generic additive facility XP rate; position and adjacency never enter it. */
+export function facilityXpMultiplier(facilities: readonly PlacedFacility[]): number {
+  const bonus = facilities.reduce((sum, f) => sum +
+    (getDef(f.defId).training ? PROGRESSION.FACILITY_XP_BONUS * levelMult(f.level) : 0), 0);
+  return 1 + Math.min(PROGRESSION.FACILITY_XP_CAP, bonus);
 }
 
 /**
@@ -89,29 +66,16 @@ export function injuryMult(player: Player): number {
   return player.injuredWeeks > 0 ? 0.3 : 1.0;
 }
 
-const STAT_KEYS: readonly (keyof PlayerStats)[] = [
-  'speed', 'strength', 'stamina', 'skill', 'footyIQ',
-];
-
 const clamp = (n: number): number => Math.max(STAT_FLOOR, Math.min(STAT_MAX, n));
-
-/**
- * Headroom factor for one stat: (1 − stat/STAT_MAX)^HEADROOM_EXP, floored at 0.
- * Multiplies that week's gain so a stat gains less the closer it is to the
- * ceiling (GitHub #35). Evaluated on the pre-tick stat value.
- */
-export function headroom(stat: number): number {
-  return Math.max(0, 1 - stat / STAT_MAX) ** TRAINING_CURVE.HEADROOM_EXP;
-}
 
 // ── The squad's training focus (N11) ─────────────────────────────────────────
 // What the coach sets on the Squad screen, its labels, and the managed manager's
-// pick (the squad's weakest stat). The multipliers are config.ts TRAINING_FOCUS.
+// pick (the squad's weakest stat). Focus controls point spending, never XP.
 
-export const TRAINING_FOCI: readonly TrainingFocus[] = ['balanced', 'speed', 'strength', 'stamina', 'skill', 'footyIQ'];
+export const TRAINING_FOCI: readonly TrainingFocus[] = ['balanced', 'speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'];
 
 const LABEL: Readonly<Record<TrainingFocus, string>> = {
-  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', skill: 'Skill', get footyIQ() { return activePack().vocab.iqStat; },
+  balanced: 'Balanced', speed: 'Speed', strength: 'Strength', stamina: 'Stamina', handling: 'Handling', kicking: 'Kicking', get footyIQ() { return activePack().vocab.iqStat; },
 };
 
 export function focusLabel(f: TrainingFocus): string {
@@ -136,84 +100,67 @@ export function weakestStat(squad: readonly Player[]): keyof PlayerStats {
   return keys.reduce((a, b) => (mean(b) < mean(a) ? b : a));
 }
 
-/** A stat's share of the week under a squad focus (N11): ×ON for the focus, ×OFF for the rest, ×1 under Balanced. */
-export function focusMult(focus: TrainingFocus, stat: keyof PlayerStats): number {
-  if (focus === 'balanced') return 1;
-  return stat === focus ? TRAINING_FOCUS.ON : TRAINING_FOCUS.OFF;
+/** Award XP and bank level points, without spending or changing stats. No RNG. */
+export function awardXp(player: Player, baseXp: number, facilities: readonly PlacedFacility[] = []): Player {
+  let xp = (player.xp ?? 0) + Math.max(0, baseXp) * ageMod(player.age) * traitMult(player) * facilityXpMultiplier(facilities);
+  const levels = Math.floor(xp / PROGRESSION.XP_PER_LEVEL);
+  xp -= levels * PROGRESSION.XP_PER_LEVEL;
+  return { ...player, xp, level: (player.level ?? 1) + levels,
+    unspentPoints: (player.unspentPoints ?? 0) + levels * PROGRESSION.POINTS_PER_LEVEL };
 }
 
-/**
- * Compute one week of training for a single player against the given facilities.
- * Pure — returns a new PlayerStats; does not mutate. Exported for unit testing
- * of the exact per-player maths.
- */
-export function trainPlayer(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
-  const gain = weeklyGain(player, facilities, focus);
-  const next: PlayerStats = { ...player.stats };
-  for (const stat of STAT_KEYS) next[stat] += gain[stat];
-
-  // 3. Veteran decline: age>=31 subtract flat 0.3 from speed & stamina, post-gain.
-  if (player.age >= 31) {
-    next.speed -= VETERAN_DECLINE;
-    next.stamina -= VETERAN_DECLINE;
+/** Reusable #540 “spend by focus” rule. Ties follow shown-stat order. */
+export function spendByFocus(player: Player, focus: TrainingFocus = 'balanced'): Player {
+  const stats = { ...player.stats };
+  let points = player.unspentPoints ?? 0;
+  const keys = shownStats(player.position);
+  const room = (key: keyof PlayerStats): number => Math.max(0, (player.ceilings[key] ?? stats[key]) - stats[key]);
+  while (points > 0) {
+    const target = focus !== 'balanced' && keys.includes(focus) && room(focus) > 0
+      ? focus : keys.reduce((a, b) => room(b) > room(a) ? b : a);
+    if (room(target) <= 0) break;
+    stats[target] = Math.min(player.ceilings[target]!, stats[target] + 1);
+    points--;
   }
+  return { ...player, stats, unspentPoints: points };
+}
 
-  // 4. Clamp every stat to [STAT_FLOOR, STAT_MAX]; stays fractional.
-  for (const stat of STAT_KEYS) {
-    next[stat] = clamp(next[stat]);
+/** Existing veteran decline only; hidden stats remain fixed. No passive growth. */
+export function trainPlayer(player: Player, _facilities: PlacedFacility[] = [], _focus: TrainingFocus = 'balanced'): PlayerStats {
+  const next = { ...player.stats };
+  for (const key of shownStats(player.position)) {
+    next[key] = Math.min(player.ceilings[key] ?? STAT_MAX, clamp(next[key]));
+    if (player.age >= 31 && (key === 'speed' || key === 'stamina')) next[key] = clamp(next[key] - VETERAN_DECLINE);
   }
   return next;
 }
 
-/**
- * What a player gains in a week of training (before the veteran decline and the
- * clamp): the facilities' gains, scaled by his age, traits and fitness, the squad
- * focus (N11) and each stat's headroom. Pure; the player page's "+0.8 a week".
- */
-export function weeklyGain(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
-  // 1. Sum per-stat base contributions across all built facilities.
-  const gains: Record<keyof PlayerStats, number> = {
-    speed: 0, strength: 0, stamina: 0, skill: 0, footyIQ: 0,
-  };
-  for (const pf of facilities) {
-    const def = getDef(pf.defId);
-    const lm = levelMult(pf.level);
-    const adj = adjacencyMult(pf, facilities);
-    for (const stat of STAT_KEYS) {
-      const base = def.trains[stat];
-      if (base === undefined) continue;
-      gains[stat] += base * lm * adj;
-    }
-  }
-
-  // 2. Scale summed gains by age × trait × injury modifiers, the tuning rate,
-  //    and each stat's headroom towards STAT_MAX.
-  const scale = ageMod(player.age) * traitMult(player) * injuryMult(player) * TRAINING_CURVE.GAIN_RATE;
-
-  const out: PlayerStats = { speed: 0, strength: 0, stamina: 0, skill: 0, footyIQ: 0 };
-  for (const stat of STAT_KEYS) out[stat] = gains[stat] * scale * focusMult(focus, stat) * headroom(player.stats[stat]);
-  return out;
+/** A small weekly XP trickle even without buildings; injury still slows training. */
+export function trainWeek(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): Player {
+  const declined = { ...player, stats: trainPlayer(player) };
+  return spendByFocus(awardXp(declined, PROGRESSION.WEEKLY_XP * injuryMult(player), facilities), focus);
 }
 
-/**
- * What a week's training does to each stat (N11, the player page's "+0.8/wk"):
- * the gain, less the veteran decline, inside the clamp. Pure.
- */
-export function weeklyChange(player: Player, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): PlayerStats {
-  const after = trainPlayer(player, facilities, focus);
-  const out = { ...after };
-  for (const stat of STAT_KEYS) out[stat] = after[stat] - player.stats[stat];
-  return out;
+/** Match XP uses the sheets and recorded moments, never the simulation RNG. */
+export function applyMatchXp(squad: readonly Player[], own: TeamSheet, result: MatchResult,
+  homeId: string, awayId: string, facilities: PlacedFacility[], focus: TrainingFocus = 'balanced'): Player[] {
+  const starters = new Set((own.roster ?? []).map(p => p.id));
+  const bench = new Set((own.bench ?? []).map(p => p.id));
+  const moments = foldEvents(result.events, own.clubId);
+  const potm = playerOfTheMatch(result, homeId, awayId);
+  return squad.map(p => {
+    if (!starters.has(p.id) && !bench.has(p.id)) return p;
+    const tally = moments.get(p.name);
+    const xp = (starters.has(p.id) ? PROGRESSION.STARTER_XP : PROGRESSION.BENCH_XP)
+      + (tally?.tries ?? 0) * PROGRESSION.TRY_XP + (tally?.lineBreaks ?? 0) * PROGRESSION.LINE_BREAK_XP
+      + (potm && potm.teamId === own.clubId && potm.name === p.name ? PROGRESSION.POTM_XP : 0);
+    return spendByFocus(awardXp(p, xp, facilities), focus);
+  });
 }
 
-/**
- * Tick hook order 10: apply one week of training to every squad player.
- * Mutates & returns state (via setState so state:changed fires).
- */
+/** Weekly hook (10), before injury recovery (20). */
 export function applyTraining(state: GameState): GameState {
-  const facilities = state.facilities;
-  const focus = state.training?.focus ?? 'balanced';
-  const squad = state.squad.map((p) => ({ ...p, stats: trainPlayer(p, facilities, focus) }));
+  const squad = state.squad.map(p => trainWeek(p, state.facilities, state.training?.focus ?? 'balanced'));
   setState({ squad });
   return getState();
 }

@@ -1,303 +1,113 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  ageMod, traitMult, injuryMult, adjacencyMult, levelMult, headroom,
-  trainPlayer, applyTraining, applyInjuries, registerTrainingSystem,
-  STAT_FLOOR, VETERAN_DECLINE,
-} from '../../src/systems/training';
-import {
-  createNewGame, getState, loadState,
-  type Player, type PlacedFacility, type PlayerStats,
-} from '../../src/core/state';
-import { bus } from '../../src/core/events';
-import { STAT_MAX, WEEKS_PER_SEASON } from '../../src/config';
-import {
-  clearTickHooks, advanceWeek, TICK_ORDER,
-} from '../../src/core/time';
-import { generatePlayer } from '../../src/data/player';
-import { makeRng } from '../../src/utils/rng';
-import type { TraitId, TraitInstance } from '../../src/core/state';
-
-const T = (...ids: TraitId[]): TraitInstance[] => ids.map((id) => ({ id, level: 1 as const }));
-
-const flatStats = (v: number): PlayerStats => ({
-  speed: v, strength: v, stamina: v, skill: v, footyIQ: v,
-});
-
-// A test player with fully controlled fields (age/traits/stats/injury).
+import { applyInjuries, applyTraining, ageMod, traitMult, awardXp, spendByFocus, trainPlayer, trainWeek, facilityXpMultiplier, applyMatchXp } from '../../src/systems/training';
+import { createNewGame, getState, loadState, type Player, type PlacedFacility } from '../../src/core/state';
+import { PROGRESSION } from '../../src/config';
+import { shownStats, POSITIONS } from '../../src/data/player';
+import { teamSheetFromSquad } from '../../src/match/league/sheets';
+import type { MatchResult } from '../../src/sim/events';
+const pf = (over: Partial<PlacedFacility> & Pick<PlacedFacility, 'defId'>): PlacedFacility => ({ id: 'f', x: 0, y: 0, level: 1, ...over });
 function mkPlayer(over: Partial<Player> = {}): Player {
-  const base: Player = {
-    id: over.id ?? 'p_test',
-    name: 'Test Player',
-    age: 25,
-    position: 'lock',
-    stats: flatStats(50),
-    morale: 60,
-    injuryRisk: 10,
-    injuredWeeks: 0,
-    traits: [],
-    wage: 5000,
-    contractWeeks: 20,
-  };
-  return { ...base, ...over };
+  const p = getState().squad[0]!;
+  return { ...p, id: 'p', name: 'Test Player', age: 25, position: 'lock', traits: [], injuredWeeks: 0,
+    stats: { speed: 50, strength: 50, stamina: 50, handling: 20, kicking: 20, footyIQ: 50 },
+    ceilings: { speed: 52, strength: 55, stamina: 53, footyIQ: 54 }, xp: 0, level: 1, unspentPoints: 0, ...over };
 }
-
-const pf = (over: Partial<PlacedFacility> & Pick<PlacedFacility, 'defId'>): PlacedFacility => ({
-  id: over.id ?? `f_${over.defId}_${over.x ?? 0}_${over.y ?? 0}`,
-  defId: over.defId,
-  level: over.level ?? 1,
-  x: over.x ?? 0,
-  y: over.y ?? 0,
-});
-
-beforeEach(() => {
-  bus.clear();
-  clearTickHooks();
-  createNewGame('Test Club', 1);
-});
-
-describe('levelMult (re-exported from facility.ts)', () => {
-  it('matches BAK-168 [1, 1.6, 2.2]', () => {
-    expect(levelMult(1)).toBe(1);
-    expect(levelMult(2)).toBe(1.6);
-    expect(levelMult(3)).toBe(2.2);
+beforeEach(() => { createNewGame('XP', 539); });
+describe('XP progression', () => {
+  it('no growth without XP, regardless of buildings or focus', () => {
+    const p = mkPlayer();
+    expect(trainPlayer(p, [pf({ defId: 'teamGym', level: 3 })], 'strength')).toEqual(p.stats);
+    expect(awardXp(p, 0).stats).toEqual(p.stats);
+    expect(spendByFocus(p).stats).toEqual(p.stats);
   });
-});
-
-describe('ageMod', () => {
-  it('returns 1.5 / 1.0 / 0.6 / 0.25 for ages 21 / 25 / 29 / 33', () => {
-    expect(ageMod(21)).toBe(1.5);
-    expect(ageMod(25)).toBe(1.0);
-    expect(ageMod(29)).toBe(0.6);
-    expect(ageMod(33)).toBe(0.25);
-  });
-  it('boundary ages', () => {
-    expect(ageMod(17)).toBe(1.5);
-    expect(ageMod(22)).toBe(1.0);
-    expect(ageMod(27)).toBe(1.0);
-    expect(ageMod(28)).toBe(0.6);
-    expect(ageMod(30)).toBe(0.6);
-    expect(ageMod(31)).toBe(0.25);
-  });
-});
-
-describe('traitMult', () => {
-  it('workhorse ×1.2', () => {
-    expect(traitMult(mkPlayer({ traits: T('workhorse') }))).toBeCloseTo(1.2, 10);
-  });
-  it('youngGun ×1.3', () => {
-    expect(traitMult(mkPlayer({ traits: T('youngGun') }))).toBeCloseTo(1.3, 10);
-  });
-  it('workhorse + youngGun stack to ×1.56', () => {
-    expect(traitMult(mkPlayer({ traits: T('workhorse', 'youngGun') }))).toBeCloseTo(1.56, 10);
-  });
-  it('irrelevant traits ×1.0', () => {
-    expect(traitMult(mkPlayer({ traits: T('finisher', 'veteran', 'hitman') }))).toBe(1);
-  });
-});
-
-describe('injuryMult', () => {
-  it('injured ×0.3, fit ×1.0', () => {
-    expect(injuryMult(mkPlayer({ injuredWeeks: 2 }))).toBe(0.3);
-    expect(injuryMult(mkPlayer({ injuredWeeks: 0 }))).toBe(1);
-  });
-});
-
-describe('adjacencyMult', () => {
-  it('lone facility → 1.0', () => {
-    const a = pf({ defId: 'weightsRoom', x: 0, y: 0 }); // 2x2
-    expect(adjacencyMult(a, [a])).toBe(1);
-  });
-
-  it('two orthogonally adjacent facilities → 1.1 each', () => {
-    // weightsRoom 2x2 at (0,0) occupies x[0,2) y[0,2). Place another 2x2 at (2,0)
-    // so their vertical edges touch (right edge 2 == left edge 2), spans overlap.
-    const a = pf({ defId: 'weightsRoom', x: 0, y: 0 });
-    const b = pf({ defId: 'trainingPaddock', x: 2, y: 0 });
-    const all = [a, b];
-    expect(adjacencyMult(a, all)).toBeCloseTo(1.1, 10);
-    expect(adjacencyMult(b, all)).toBeCloseTo(1.1, 10);
-  });
-
-  it('moving a facility breaks or creates the bonus (#78)', async () => {
-    const { moveFacility } = await import('../../src/world/placement');
-    const { setState } = await import('../../src/core/state');
-    createNewGame('Move FC', 3);
-    setState({
-      money: 100_000,
-      facilities: [pf({ id: 'a', defId: 'weightsRoom', x: 0, y: 0 }), pf({ id: 'b', defId: 'trainingPaddock', x: 2, y: 0 })],
-    });
-    const mult = () => adjacencyMult(getState().facilities[0]!, getState().facilities);
-    expect(mult()).toBeCloseTo(1.1, 10);
-    expect(moveFacility('b', 8, 8).ok).toBe(true); // breaks it
-    expect(mult()).toBe(1);
-    expect(moveFacility('b', 0, 2).ok).toBe(true); // creates it again, below
-    expect(mult()).toBeCloseTo(1.1, 10);
-    expect(getState().facilities[1]!.level).toBe(1);
-  });
-
-  it('diagonal (corner-only) touch is NOT adjacent', () => {
-    // 2x2 at (0,0) and 2x2 at (2,2) share only the corner point (2,2).
-    const a = pf({ defId: 'weightsRoom', x: 0, y: 0 });
-    const b = pf({ defId: 'trainingPaddock', x: 2, y: 2 });
-    expect(adjacencyMult(a, [a, b])).toBe(1);
-  });
-
-  it('non-touching facilities → 1.0', () => {
-    const a = pf({ defId: 'weightsRoom', x: 0, y: 0 });
-    const b = pf({ defId: 'trainingPaddock', x: 5, y: 5 });
-    expect(adjacencyMult(a, [a, b])).toBe(1);
-  });
-
-  it('caps at 1.4 with 5+ neighbours', () => {
-    // Central 1-wide-ish facility surrounded on many sides. Use sponsorBoard (2x1)
-    // centre at (2,2); ring several 2x2 around it so >4 touch.
-    const c = pf({ defId: 'sponsorBoard', x: 2, y: 2 }); // occupies x[2,4) y[2,3)
-    const neighbours = [
-      pf({ id: 'n1', defId: 'weightsRoom', x: 0, y: 2 }),   // left edge x2 meets... x[0,2)y[2,4) right=2==c.left
-      pf({ id: 'n2', defId: 'trainingPaddock', x: 4, y: 2 }), // right x[4,6)y[2,4) left=4==c.right
-      pf({ id: 'n3', defId: 'weightsRoom', x: 2, y: 0 }),   // top x[2,4)y[0,2) bottom=2==c.top
-      pf({ id: 'n4', defId: 'trainingPaddock', x: 2, y: 3 }), // below x[2,4)y[3,5) top=3==c.bottom
-      pf({ id: 'n5', defId: 'weightsRoom', x: 0, y: 0 }),   // extra to push count
-      pf({ id: 'n6', defId: 'trainingPaddock', x: 4, y: 0 }),
-    ];
-    const all = [c, ...neighbours];
-    // At minimum n1..n4 touch (count 4 → 1.4). Cap guarantees ≤1.4 regardless.
-    expect(adjacencyMult(c, all)).toBe(1.4);
-  });
-});
-
-describe('trainPlayer — exact deterministic maths', () => {
-  it('no facilities → no change for a prime-age fit player', () => {
-    const p = mkPlayer({ age: 25, stats: flatStats(50) });
-    expect(trainPlayer(p, [])).toEqual(flatStats(50));
-  });
-
-  it('single L1 weightsRoom trains strength by base×ageMod×rate×headroom', () => {
-    // weightsRoom trains { strength: 2.0 }. L1 mult=1, lone adj=1, age25 mod=1,
-    // GAIN_RATE 12, headroom(50) = (1 − 0.5)^2 = 0.25 → 2.0 × 12 × 0.25 = 6.0.
-    const p = mkPlayer({ age: 25, stats: flatStats(50) });
-    const facs = [pf({ defId: 'weightsRoom' })];
-    const out = trainPlayer(p, facs);
-    expect(out.strength).toBeCloseTo(56.0, 10);
-    // other stats untouched
-    expect(out.speed).toBe(50);
-  });
-
-  it('level scaling: L2 weightsRoom → base×1.6', () => {
-    const p = mkPlayer({ age: 25, stats: flatStats(50) });
-    const out = trainPlayer(p, [pf({ defId: 'weightsRoom', level: 2 })]);
-    // 2.0 × 1.6 × 12 × 0.25 = 9.6
-    expect(out.strength).toBeCloseTo(59.6, 10);
-  });
-
-  it('age curve: youth ×1.5 vs veteran ×0.25 (before veteran decline)', () => {
-    const youth = mkPlayer({ age: 20, stats: flatStats(50) });
-    const facs = [pf({ defId: 'weightsRoom' })];
-    // 2.0 × 1.5 × 12 × 0.25 = +9.0
-    expect(trainPlayer(youth, facs).strength).toBeCloseTo(59.0, 10);
-  });
-
-  it('adjacency raises gain: two adjacent facilities beat two apart', () => {
-    const p = mkPlayer({ age: 25, stats: flatStats(50) });
-    // Two weightsRooms (strength 2.0 each) adjacent vs far apart.
-    const adjacent = [
-      pf({ id: 'a', defId: 'weightsRoom', x: 0, y: 0 }),
-      pf({ id: 'b', defId: 'weightsRoom', x: 2, y: 0 }),
-    ];
-    const apart = [
-      pf({ id: 'a', defId: 'weightsRoom', x: 0, y: 0 }),
-      pf({ id: 'b', defId: 'weightsRoom', x: 10, y: 10 }),
-    ];
-    const gAdj = trainPlayer(p, adjacent).strength;
-    const gApart = trainPlayer(p, apart).strength;
-    expect(gAdj).toBeGreaterThan(gApart);
-    // exact (×12 rate, ×0.25 headroom at 50): adjacent each 2.0×1.1 = 2.2 → sum
-    // 4.4 → +13.2 → 63.2 ; apart 2.0+2.0=4.0 → +12.0 → 62.0
-    expect(gAdj).toBeCloseTo(63.2, 10);
-    expect(gApart).toBeCloseTo(62.0, 10);
-  });
-
-  it('trait stacking: workhorse+youngGun scales gains ×1.56', () => {
-    const p = mkPlayer({ age: 25, traits: T('workhorse', 'youngGun'), stats: flatStats(50) });
-    const out = trainPlayer(p, [pf({ defId: 'weightsRoom' })]);
-    // 2.0 × 1.56 × 12 × 0.25 = 9.36
-    expect(out.strength).toBeCloseTo(59.36, 10);
-  });
-
-  it('injured player trains at ×0.3', () => {
-    const p = mkPlayer({ age: 25, injuredWeeks: 3, stats: flatStats(50) });
-    const out = trainPlayer(p, [pf({ defId: 'weightsRoom' })]);
-    // 2.0 × 0.3 × 12 × 0.25 = 1.8
-    expect(out.strength).toBeCloseTo(51.8, 10);
-  });
-
-  it('veteran (31+) declines speed & stamina by 0.3/wk net of gains, no facilities', () => {
-    const vet = mkPlayer({ age: 33, stats: flatStats(50) });
-    const out = trainPlayer(vet, []);
-    expect(out.speed).toBeCloseTo(50 - VETERAN_DECLINE, 10);
-    expect(out.stamina).toBeCloseTo(50 - VETERAN_DECLINE, 10);
-    expect(out.strength).toBe(50); // not declined
-  });
-
-  it('veteran: gains from facilities can be net negative after decline', () => {
-    // trainingPaddock trains speed 1.5. Vet age33 mod 0.25 → speed gain 0.375,
-    // then −0.3 decline → net +0.075.
-    const vet = mkPlayer({ age: 33, stats: flatStats(50) });
-    const out = trainPlayer(vet, [pf({ defId: 'trainingPaddock' })]);
-    // gain 1.5 × ageMod 0.25 × rate 12 × headroom(50) 0.25 = 1.125
-    expect(out.speed).toBeCloseTo(50 + 1.5 * 0.25 * 12 * headroom(50) - VETERAN_DECLINE, 10);
-  });
-
-  it('at STAT_MAX (100) the gain is zero and the stat stays at the ceiling', () => {
-    const p = mkPlayer({ age: 20, stats: flatStats(STAT_MAX) });
-    const out = trainPlayer(p, [pf({ defId: 'weightsRoom', level: 3 })]);
-    expect(out.strength).toBe(STAT_MAX);
-  });
-
-  it('a near-max stat cannot overshoot STAT_MAX', () => {
-    const p = mkPlayer({ age: 20, stats: flatStats(99.9) });
-    const out = trainPlayer(p, [pf({ defId: 'weightsRoom', level: 3 })]);
-    expect(out.strength).toBeLessThanOrEqual(STAT_MAX);
-  });
-
-  it('clamps to STAT_FLOOR (1) — veteran with low speed cannot go below 1', () => {
-    const vet = mkPlayer({ age: 35, stats: { ...flatStats(50), speed: 1, stamina: 1 } });
-    const out = trainPlayer(vet, []);
-    expect(out.speed).toBe(STAT_FLOOR);
-    expect(out.stamina).toBe(STAT_FLOOR);
-  });
-});
-
-describe('applyTraining over N weeks — exact accumulation', () => {
-  it('accumulates fractional gains and stays within [1,100]', () => {
-    const p = mkPlayer({ id: 'acc', age: 25, stats: flatStats(50) });
-    loadState({ ...getState(), squad: [p], facilities: [pf({ defId: 'weightsRoom' })] });
-
-    for (let i = 0; i < 10; i++) applyTraining(getState());
-
-    const out = getState().squad[0];
-    // Headroom shrinks each week, so 10 weeks gain less than 10 × the week-1 gain
-    // (+6.0 at stat 50 → 56) and the stat is still climbing (≈78 by hand-stepping).
-    expect(out.stats.strength).toBeGreaterThan(70);
-    expect(out.stats.strength).toBeLessThan(80);
-    // all stats within range
-    for (const v of Object.values(out.stats)) {
-      expect(v).toBeGreaterThanOrEqual(1);
-      expect(v).toBeLessThanOrEqual(100);
+  it('age and Workhorse / Young Gun modify every XP award', () => {
+    for (const [age, mult] of [[21, 1.5], [25, 1], [29, 0.6], [33, 0.25]]) {
+      const p = mkPlayer({ age, traits: [{ id: 'workhorse', level: 2 }, { id: 'youngGun', level: 1 }] });
+      expect(ageMod(age)).toBe(mult);
+      expect(traitMult(p)).toBeCloseTo(1.32 * 1.3);
+      expect(awardXp(p, 10).xp).toBeCloseTo(10 * mult * 1.32 * 1.3);
     }
   });
-
-  it('many weeks never breaches bounds even with strong facility on a youth', () => {
-    const p = mkPlayer({ id: 'acc', age: 20, stats: flatStats(50) });
-    loadState({ ...getState(), squad: [p], facilities: [pf({ defId: 'teamGym', level: 3 })] });
-    for (let i = 0; i < 60; i++) applyTraining(getState());
-    for (const v of Object.values(getState().squad[0].stats)) {
-      expect(v).toBeGreaterThanOrEqual(1);
-      expect(v).toBeLessThanOrEqual(100);
-    }
+  it('level-up banks points, carries XP and does not spend or change stats', () => {
+    const p = mkPlayer({ xp: 90, unspentPoints: 3 });
+    const q = awardXp(p, 220);
+    expect(q).toMatchObject({ xp: 10, level: 4, unspentPoints: 6, stats: p.stats });
+    expect(p.xp).toBe(90);
+  });
+  it('weekly trickle works without facilities and injuries slow it before recovery', () => {
+    const p = mkPlayer();
+    expect(trainWeek(p, []).xp).toBe(PROGRESSION.WEEKLY_XP);
+    loadState({ ...getState(), squad: [{ ...p, injuredWeeks: 1 }] });
+    applyTraining(getState()); applyInjuries(getState());
+    expect(getState().squad[0]).toMatchObject({ xp: PROGRESSION.WEEKLY_XP * 0.3, injuredWeeks: 0 });
+  });
+  it('training buildings give the same generic capped XP boost; adjacency has no effect', () => {
+    const buildings = ['trainingPaddock', 'weightsRoom', 'videoRoom', 'physioCentre', 'academy', 'coachsOffice', 'teamGym'] as const;
+    for (const defId of buildings) expect(facilityXpMultiplier([pf({ defId })])).toBe(1.1);
+    const all = buildings.map((defId, i) => pf({ id: String(i), defId, level: 3, x: i * 2 }));
+    expect(facilityXpMultiplier(all)).toBe(1 + PROGRESSION.FACILITY_XP_CAP);
+    expect(facilityXpMultiplier([pf({ defId: 'medicalBay' })])).toBe(1);
+    expect(trainWeek(mkPlayer(), all)).toEqual(trainWeek(mkPlayer(), all.map((f, i) => ({ ...f, x: i * 20 }))));
+    expect(trainWeek(mkPlayer(), all).ceilings).toEqual(mkPlayer().ceilings);
+  });
+  it('match level points auto-spend through focus without changing the season seed', () => {
+    const squad = getState().squad.map(p => ({ ...p, age: 25, traits: [], xp: 90, level: 1, unspentPoints: 0 }));
+    const own = teamSheetFromSquad(squad, 'player', 'XP', ['#000000', '#ffffff']);
+    const result = { homeScore: 0, awayScore: 0, events: [] } as unknown as MatchResult;
+    const seed = getState().rngSeed;
+    const after = applyMatchXp(squad, own, result, 'player', 'rival', [], 'balanced');
+    const starter = after.find(p => p.id === own.roster![0]!.id)!;
+    const before = squad.find(p => p.id === starter.id)!;
+    expect(starter).toMatchObject({ level: 2, unspentPoints: 0 });
+    expect(shownStats(starter.position).reduce((sum, key) => sum + starter.stats[key] - before.stats[key], 0)).toBe(1);
+    expect(getState().rngSeed).toBe(seed);
+  });
+  it('playing and moments award starters more than bench, and reserves nothing', () => {
+    const squad = getState().squad.map(p => ({ ...p, age: 25, traits: [], xp: 0, level: 1, unspentPoints: 0 }));
+    const own = teamSheetFromSquad(squad, 'player', 'XP', ['#000000', '#ffffff']);
+    const result = { homeScore: 6, awayScore: 0, events: [] } as unknown as MatchResult;
+    let after = applyMatchXp(squad, own, result, 'player', 'rival', []);
+    expect(after.find(p => p.id === own.roster![0]!.id)?.xp).toBe(PROGRESSION.STARTER_XP);
+    expect(after.find(p => p.id === own.bench![0]!.id)?.xp).toBe(PROGRESSION.BENCH_XP);
+    expect(after.filter(p => ![...own.roster!, ...own.bench!].some(r => r.id === p.id)).every(p => p.xp === 0)).toBe(true);
+    const scorer = squad.find(p => p.id === own.roster![0]!.id)!;
+    result.events = [{ t: 1, kind: 'try', teamId: 'player', player: scorer.name }, { t: 2, kind: 'break', teamId: 'player', player: scorer.name }];
+    after = applyMatchXp(squad, own, result, 'player', 'rival', []);
+    expect(after.find(p => p.id === scorer.id)?.xp).toBe(PROGRESSION.STARTER_XP + PROGRESSION.TRY_XP + PROGRESSION.LINE_BREAK_XP + PROGRESSION.POTM_XP);
   });
 });
-
+describe('spendByFocus', () => {
+  it('spends on an eligible focus before the stat with most room', () => {
+    const p = mkPlayer({ unspentPoints: 1 });
+    expect(spendByFocus(p, 'speed')).toMatchObject({ unspentPoints: 0, stats: { ...p.stats, speed: 51 } });
+  });
+  it.each(['balanced', 'handling', 'kicking', 'speed'] as const)('%s falls back to most room when Balanced, off-group or at ceiling', focus => {
+    const p = mkPlayer({ unspentPoints: 1 }); p.stats.speed = 52;
+    expect(spendByFocus(p, focus).stats.strength).toBe(51);
+  });
+  it('rechecks room for every point, honours fractional ceilings and retains surplus', () => {
+    const p = mkPlayer({ unspentPoints: 100, ceilings: { speed: 50.5, strength: 51, stamina: 51, footyIQ: 51 } });
+    const q = spendByFocus(p, 'speed');
+    expect(q.stats.speed).toBe(50.5);
+    expect(q.unspentPoints).toBe(96);
+    expect(q.ceilings).toEqual(p.ceilings);
+    expect(q.stats.handling).toBe(p.stats.handling);
+  });
+  it.each(POSITIONS)('%s never passes ceilings or grows hidden stats through many weeks', position => {
+    let p: Player = { ...getState().squad[0]!, position, age: 20, traits: [] };
+    p = { ...p, ceilings: Object.fromEntries(shownStats(position).map(k => [k, p.stats[k] + 1.5])) };
+    const initial = { ...p.stats };
+    for (let i = 0; i < 300; i++) p = trainWeek(p, [pf({ defId: 'teamGym', level: 3 })]);
+    for (const k of Object.keys(p.stats) as (keyof Player['stats'])[]) {
+      if (shownStats(position).includes(k)) expect(p.stats[k]).toBeLessThanOrEqual(p.ceilings[k]!);
+      else expect(p.stats[k]).toBe(initial[k]);
+    }
+  });
+  it('veteran decline remains on shown speed/stamina only', () => {
+    const p = mkPlayer({ age: 33 });
+    expect(trainPlayer(p)).toEqual({ ...p.stats, speed: 49.7, stamina: 49.7 });
+  });
+});
 describe('applyInjuries', () => {
   it('base recovery of 1/wk with no medical facilities', () => {
     const p = mkPlayer({ id: 'inj', injuredWeeks: 3 });
@@ -346,125 +156,5 @@ describe('applyInjuries', () => {
     loadState({ ...getState(), squad: [p], facilities: [] });
     applyInjuries(getState());
     expect(getState().squad[0].injuredWeeks).toBe(0);
-  });
-});
-
-describe('pipeline ordering: training (10) before injuries (20)', () => {
-  it('injured player trains at ×0.3 THIS week then recovers AFTER', () => {
-    const p = mkPlayer({ id: 'ord', age: 25, injuredWeeks: 1, stats: flatStats(50) });
-    loadState({ ...getState(), squad: [p], facilities: [pf({ defId: 'weightsRoom' })] });
-
-    // simulate the pipeline order manually
-    applyTraining(getState()); // injured → ×0.3
-    applyInjuries(getState());  // then recover
-
-    const out = getState().squad[0];
-    expect(out.stats.strength).toBeCloseTo(51.8, 10); // 2.0×0.3×12×0.25
-    expect(out.injuredWeeks).toBe(0);
-  });
-});
-
-describe('registerTrainingSystem — hook installation', () => {
-  it('installs hooks at TICK_ORDER.training(10) and injuries(20) and runs on advanceWeek', () => {
-    const p = mkPlayer({ id: 'hook', age: 25, injuredWeeks: 2, stats: flatStats(50) });
-    loadState({ ...getState(), squad: [p], facilities: [pf({ defId: 'weightsRoom' })] });
-
-    registerTrainingSystem();
-    expect(TICK_ORDER.training).toBe(10);
-    expect(TICK_ORDER.injuries).toBe(20);
-
-    advanceWeek();
-
-    const out = getState().squad[0];
-    // trained injured (×0.3): +1.8, then injuredWeeks 2 → 1
-    expect(out.stats.strength).toBeCloseTo(51.8, 10);
-    expect(out.injuredWeeks).toBe(1);
-  });
-
-  it('re-registering does not double-apply (name-keyed registry)', () => {
-    const p = mkPlayer({ id: 'once', age: 25, stats: flatStats(50) });
-    loadState({ ...getState(), squad: [p], facilities: [pf({ defId: 'weightsRoom' })] });
-    registerTrainingSystem();
-    registerTrainingSystem();
-    advanceWeek();
-    // single week's gain (+6.0 at stat 50 → 56), not doubled
-    expect(getState().squad[0].stats.strength).toBeCloseTo(56.0, 10);
-  });
-});
-
-describe('headroom — gains shrink as a stat rises (GitHub #35)', () => {
-  const gainAt = (v: number, over: Partial<Player> = {}): number =>
-    trainPlayer(mkPlayer({ age: 25, stats: flatStats(v), ...over }), [pf({ defId: 'weightsRoom' })]).strength - v;
-
-  it('headroom is 1 at zero and 0 at the ceiling', () => {
-    expect(headroom(0)).toBe(1);
-    expect(headroom(STAT_MAX)).toBe(0);
-  });
-
-  it('weekly gain falls monotonically as the stat rises', () => {
-    expect(gainAt(40)).toBeGreaterThan(gainAt(70));
-    expect(gainAt(70)).toBeGreaterThan(gainAt(90));
-    expect(gainAt(90)).toBeGreaterThan(0);
-  });
-
-  it('workhorse ×1.2 and youngGun ×1.3 still give a bonus at the same stat', () => {
-    const plain = gainAt(70);
-    expect(gainAt(70, { traits: T('workhorse') })).toBeCloseTo(plain * 1.2, 10);
-    expect(gainAt(70, { traits: T('youngGun') })).toBeCloseTo(plain * 1.3, 10);
-  });
-});
-
-// Representative average-band player (flat 60 overall) on one Training Paddock,
-// simulated weekly for 3 seasons. Ageing is not applied, so every season uses
-// ageMod 1.0 (ages 22–27) and the seasons are directly comparable.
-describe('projection — 3 seasons on one Training Paddock (GitHub #35)', () => {
-  // Stated ceiling: 3-season overall stays under this. Note that a Paddock trains
-  // only speed & stamina (35% of overall weight), so it cannot add more than +14
-  // from a 60 start regardless of the curve.
-  const OVERALL_CEILING = 80;
-  // Mirrors overallRating's weights, unrounded, so small season gains compare exactly.
-  const rawOverall = (s: PlayerStats): number =>
-    s.skill * 0.25 + s.footyIQ * 0.25 + s.speed * 0.2 + s.strength * 0.15 + s.stamina * 0.15;
-
-  it('season 1 gains 8–15 overall, then each season gains less than the last', () => {
-    const p = mkPlayer({ id: 'proj', age: 22, stats: flatStats(60) });
-    loadState({ ...getState(), squad: [p], facilities: [pf({ defId: 'trainingPaddock' })] });
-
-    const seasonGains: number[] = [];
-    let prev = rawOverall(getState().squad[0].stats);
-    for (let season = 0; season < 3; season++) {
-      for (let w = 0; w < WEEKS_PER_SEASON; w++) applyTraining(getState());
-      const now = rawOverall(getState().squad[0].stats);
-      seasonGains.push(now - prev);
-      prev = now;
-    }
-
-    expect(seasonGains[0]).toBeGreaterThanOrEqual(8);
-    expect(seasonGains[0]).toBeLessThanOrEqual(15);
-    expect(seasonGains[1]).toBeLessThan(seasonGains[0]);
-    expect(seasonGains[2]).toBeLessThan(seasonGains[1]);
-    expect(prev).toBeLessThan(OVERALL_CEILING);
-  });
-
-  it('is deterministic: two identical runs produce identical stats', () => {
-    const run = (): PlayerStats => {
-      loadState({
-        ...getState(),
-        squad: [mkPlayer({ id: 'det', age: 22, stats: flatStats(60) })],
-        facilities: [pf({ defId: 'trainingPaddock' })],
-      });
-      for (let w = 0; w < 3 * WEEKS_PER_SEASON; w++) applyTraining(getState());
-      return getState().squad[0].stats;
-    };
-    expect(run()).toEqual(run());
-  });
-});
-
-describe('determinism with generated players', () => {
-  it('identical seeds → identical trained stats', () => {
-    const facs = [pf({ defId: 'teamGym', level: 2 })];
-    const p1 = generatePlayer(makeRng(42));
-    const p2 = generatePlayer(makeRng(42));
-    expect(trainPlayer(p1, facs)).toEqual(trainPlayer(p2, facs));
   });
 });

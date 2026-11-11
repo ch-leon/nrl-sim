@@ -96,7 +96,9 @@ async function open(browser, { blockHost = false, blockChunk = false } = {}) {
   });
   const page = await ctx.newPage();
   page.setDefaultTimeout(15000);
-  page.on('pageerror', (e) => seen.errors.push(`pageerror: ${e.message}`));
+  page.on('pageerror', (e) => {
+    if (!e.message.includes('analytics-548-probe')) seen.errors.push(`pageerror: ${e.message}`);
+  });
   return { ctx, page, seen };
 }
 
@@ -127,6 +129,16 @@ async function main() {
       const { ctx, page, seen } = await open(browser);
       await page.goto(ROOT);
       await page.waitForSelector('[data-nrl-start]');
+      // Genuine uncaught error and rejected promise on the title: queue only.
+      await page.evaluate(() => {
+        const url = document.querySelector('script[type=module]').src;
+        const error = new TypeError('analytics-548-probe Coach Leon me@example.com phc_private');
+        error.stack = `TypeError: private\n    at privateName (${url}?coach=Leon#private:123:10)`;
+        setTimeout(() => { throw error; }, 0);
+        const rejection = new RangeError('analytics-548-probe save blob');
+        rejection.stack = `RangeError: private\n    at privateName (${url}?email=me@example.com#private:123:11)`;
+        void Promise.reject(rejection);
+      });
       await wait(4000); // longer than the idle wait: nothing may start on the title
       if (seen.posthog.length) fail(`requests to PostHog on the title: ${seen.posthog.join(', ')}`); else ok('no request to PostHog on the title');
       if (seen.chunk) fail('the SDK chunk was fetched on the title'); else ok('SDK chunk not fetched on the title');
@@ -141,8 +153,19 @@ async function main() {
       for (const want of ['career_started', 'tab_viewed']) {
         if (names.includes(want)) ok(`${want} sent to ${EU}`); else fail(`${want} not sent (saw: ${names.join(', ') || 'nothing'})`);
       }
-      const extra = names.filter((n) => !['career_started', 'tab_viewed'].includes(n));
-      if (extra.length) fail(`events that are not on the list: ${extra.join(', ')}`); else ok('no other events (no $pageview, $exception, $autocapture…)');
+      const extra = names.filter((n) => !['career_started', 'tab_viewed', '$exception'].includes(n));
+      if (extra.length) fail(`events that are not on the list: ${extra.join(', ')}`); else ok('no events beyond curated events and $exception');
+      const exceptions = seen.events.filter((e) => e.event === '$exception');
+      if (exceptions.length !== 2) fail(`expected 2 queued exceptions, saw ${exceptions.length}`);
+      else ok('uncaught error and unhandled rejection queued on title, sent after start');
+      for (const e of exceptions) {
+        const p = e.properties ?? {};
+        if (!p.app_build || p.platform !== 'web') fail('exception missing build/platform');
+        if (!p.$exception_list?.[0]?.stacktrace?.frames?.length) fail('exception missing stack frames');
+        if (p.$lib !== 'web' || p.$exception_list?.[0]?.stacktrace?.frames?.some((f) => f.platform !== 'web:javascript')) fail('exception missing SDK/platform metadata');
+        if (p.$exception_list?.[0]?.mechanism?.handled !== false) fail('exception not marked unhandled');
+        if (/Coach|Leon|@|[?#]|private|blob/.test(JSON.stringify(p))) fail('exception contains private data');
+      }
       for (const e of seen.events) {
         const p = e.properties ?? {};
         const own = Object.keys(p).filter((k) => !k.startsWith('$') && k !== 'token' && k !== 'distinct_id');
@@ -161,6 +184,20 @@ async function main() {
       const after = await phStorage(page);
       if (after.length) fail(`PostHog storage after sending: ${after}`); else ok('no PostHog cookie, localStorage or sessionStorage key after sending');
       if (seen.errors.length) fail(seen.errors.join('; '));
+      await ctx.close();
+    }
+
+    console.log('DNT. no events, including errors');
+    {
+      const { ctx, page, seen } = await open(browser);
+      await ctx.addInitScript(() => Object.defineProperty(Navigator.prototype, 'doNotTrack', { get: () => '1' }));
+      await page.goto(ROOT);
+      await page.waitForSelector('[data-nrl-start]');
+      await newCareer(page);
+      await page.evaluate(() => { void Promise.reject(new Error('analytics-548-probe DNT')); });
+      await wait(5000);
+      if (seen.posthog.length) fail('DNT sent requests'); else ok('DNT sends no curated events or exceptions');
+      if ((await phStorage(page)).length) fail('DNT left PostHog storage');
       await ctx.close();
     }
 

@@ -58,12 +58,17 @@ describe('player matchday result toast', () => {
     expect(c.toasts.filter((t) => t.startsWith('Round'))).toHaveLength(0);
 
     const { fixture, sim } = c.started[0]!;
+    const xpBefore = getState().squad.map(p => p.xp);
+    expect(xpBefore.every(xp => xp === 0)).toBe(true);
     bus.emit('match:finished', { fixture, result: sim });
     expect(c.toasts.filter((t) => t.startsWith('Round'))).toHaveLength(1);
 
+    const xpAfter = getState().squad.map(p => ({ xp: p.xp, level: p.level, points: p.unspentPoints }));
+    expect(xpAfter.some(p => p.xp !== 0 || p.level !== 1)).toBe(true);
     // Only once, even if match:finished is echoed again.
     bus.emit('match:finished', { fixture, result: sim });
     expect(c.toasts.filter((t) => t.startsWith('Round'))).toHaveLength(1);
+    expect(getState().squad.map(p => ({ xp: p.xp, level: p.level, points: p.unspentPoints }))).toEqual(xpAfter);
     c.stop();
   });
 
@@ -71,6 +76,7 @@ describe('player matchday result toast', () => {
     const c = collect();
     advanceWeeks(1);
     expect(c.started).toHaveLength(0);
+    expect(getState().squad.some(p => (p.xp ?? 0) > 0 || (p.level ?? 1) > 1)).toBe(true);
     expect(c.toasts.filter((t) => t.startsWith('Round'))).toHaveLength(1);
     c.stop();
   });
@@ -400,7 +406,7 @@ describe('difficulty plays in the match: the rival’s edge after the spread (N1
       const played = edgeSheets(...spread, k.live.difficultyEdge);
       const before = men(pick(k, spread, 'rival'));
       men(pick(k, played, 'rival')).forEach((e, i) => {
-        for (const stat of ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const) {
+        for (const stat of ['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'] as const) {
           expect(Math.sign(e.stats![stat] - before[i]!.stats![stat])).toBe(d === 'hard' ? 1 : -1);
         }
       });

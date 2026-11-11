@@ -17,7 +17,7 @@ export const WEATHER = {
   windKick: 1.12,
   windJitter: 0.15,
   windGoalSpread: 1.4,
-  /** Ball lost in contact (a knock-on in the tackle): a held tackle, a big hit; less for a high-Skill carrier (per point over 50). */
+  /** Ball lost in contact (a knock-on in the tackle): a held tackle, a big hit; less for a high-Handling carrier (per point over 50). */
   lostHeld: 0.006,
   lostBigHit: 0.03,
   lostSkill: 0.0001,
@@ -50,10 +50,10 @@ export function weatherEffect(w: WeatherKind | undefined): WeatherEffect {
   return { handling: 1, kickDistance: 1, goalSpread: 1, jitter: 0 };
 }
 
-/** Chance the carrier loses the ball in the tackle: a big hit more than a held tackle, a high-Skill carrier less, rain more. */
-export function lostInContactChance(bigHit: boolean, skill: number, handling: number): number {
+/** Chance the carrier loses the ball in the tackle: a big hit more than a held tackle, a high-Handling carrier less, rain more. */
+export function lostInContactChance(bigHit: boolean, handling: number, weatherHandling: number): number {
   const base = bigHit ? WEATHER.lostBigHit : WEATHER.lostHeld;
-  return Math.max(0, (base - (skill - 50) * WEATHER.lostSkill) * handling);
+  return Math.max(0, (base - (handling - 50) * WEATHER.lostSkill) * weatherHandling);
 }
 
 /** Chance a big hit injures the carrier (the old engine's roll, scaled): his injury risk, Injury Prone, the difficulty's rate. */

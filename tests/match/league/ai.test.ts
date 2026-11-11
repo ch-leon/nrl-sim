@@ -13,7 +13,7 @@ describe('rival plans from three past kick-offs', () => {
   it('Easy preserves main’s All-out / Slide for a flat-60 nine at strength 70', () => {
     const club = { id: 'flat-contender', strength: 70 };
     const nine: StyleEntry[] = STANDARD_POSITIONS.map(position => ({ position,
-      stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 } }));
+      stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 } }));
     const legacy = rivalTactics(club, nine);
     expect(legacy).toEqual({ attack: 'all-out', defence: 'slide' });
     for (const recentPlans of [[], [wide, wide, wide], [tight, tight, tight]]) {
@@ -22,7 +22,7 @@ describe('rival plans from three past kick-offs', () => {
   });
   it('Easy matches the legacy selector across squad styles, strengths and histories', () => {
     const flat: StyleEntry[] = STANDARD_POSITIONS.map(position => ({ position,
-      stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 } }));
+      stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 } }));
     const nines = [undefined, [], flat,
       flat.map(p => ({ ...p, stats: { ...p.stats!, strength: ['hooker', 'prop', 'second-row'].includes(p.position) ? 85 : 60 } })),
       flat.map(p => ({ ...p, stats: { ...p.stats!, speed: ['fullback', 'winger', 'centre'].includes(p.position) ? 85 : 60 } })),

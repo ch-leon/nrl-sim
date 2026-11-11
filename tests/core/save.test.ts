@@ -6,10 +6,9 @@ import {
   type StorageLike,
 } from '../../src/core/save';
 import { showTitleFlow, type TitleChoice } from '../../src/ui/title';
-import { createNewGame, getState, SAVE_VERSION, type GameState, type SeasonFinance, emptyFinance } from '../../src/core/state';
+import { createNewGame, getState, SAVE_VERSION, type GameState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { DEFAULT_PLAYER_COLORS, isValidColorPair } from '../../src/config';
-import { autoPick } from '../../src/systems/lineup';
 
 // Setup data loads asynchronously; save-slot tests use a synthetic catalogue.
 vi.mock('../../src/data/towns.json', () => ({ default: [
@@ -69,14 +68,14 @@ describe('load absence & corruption', () => {
     expect(load()).toBeNull();
   });
 
-  it('unparseable JSON is corrupt: null, warns, preserves raw, drops SAVE_KEY', () => {
+  it('unparseable JSON is corrupt: null, warns, preserves raw and source slot', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     storage.map.set(slotKey(1), '{not valid json');
     const result = load();
     expect(result).toBeNull();
     expect(warn).toHaveBeenCalledWith('nrl-sim: corrupt save, ignoring');
     expect(storage.map.get(CORRUPT_KEY)).toBe('{not valid json');
-    expect(storage.map.has(slotKey(1))).toBe(false);
+    expect(storage.map.has(slotKey(1))).toBe(true);
   });
 
   it('non-numeric version is corrupt', () => {
@@ -343,6 +342,22 @@ describe('showTitleFlow', () => {
     expect(root.children.length).toBe(0);
   });
 
+  it('shows the repair warning and recovery copy before continuing a repaired career', async () => {
+    const s = createNewGame('Missing selection', 525);
+    delete (s.lineup as unknown as Record<string, unknown>).captain;
+    const original = JSON.stringify(s, null, 2);
+    storage.map.set(slotKey(1), original);
+    const root = makeStubEl('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    const card = root.querySelector('[data-nrl-slot-1]')!;
+    expect(card.children.some(c => c.textContent.includes('Career lineup repaired'))).toBe(true);
+    expect(root.querySelector('[data-nrl-recovery-1-0]')).not.toBeNull();
+    expect(storage.map.get(slotKey(1))).toBe(original);
+    root.querySelector('[data-nrl-continue-1]')!.click();
+    expect(await choice).toEqual({ mode: 'continue' });
+    expect(load()!.lineup.captain).toBeNull();
+  });
+
   it('with a save: New game opens the setup step, and Start asks before replacing the season (#350 T2)', async () => {
     save(createNewGame('Existing', 1));
     const root = makeStubEl('div');
@@ -404,287 +419,22 @@ describe('showTitleFlow', () => {
 // ── Migration, future versions, export/import, slots ─────────────────────────
 
 describe('migrateState', () => {
-  const v1 = (): Record<string, unknown> => ({ ...createNewGame('Old', 7), version: 1 });
-
-  it('a v1 save loads unchanged apart from the version stamp and default difficulty', () => {
-    const old = v1();
-    const res = migrateState(old);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state).toMatchObject({
-        clubName: 'Old',
-        version: SAVE_VERSION,
-        settings: { ...(old.settings as object), difficulty: 'normal' },
-      });
-    }
+  it.each(Array.from({ length: 23 }, (_, i) => i + 1))('rejects v%i without migration or mutation', version => {
+    const raw = { ...createNewGame('Old', 7), version };
+    const before = JSON.stringify(raw);
+    const result = migrateState(raw);
+    expect(result).toMatchObject({ ok: false, outcome: 'unrecoverable', message: expect.stringMatching(/older version.*start a new career/i) });
+    expect(JSON.stringify(raw)).toBe(before);
   });
-
-  it('a v2 save (no settings.difficulty) loads as Normal and keeps its other settings', () => {
-    const { difficulty: _drop, ...settings } = createNewGame('V2', 3).settings;
-    const old = { ...createNewGame('V2', 3), version: 2, settings: { ...settings, volume: 0.3 } };
-    const res = migrateState(old);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.settings.difficulty).toBe('normal');
-      expect(res.state.settings.volume).toBe(0.3);
-      expect(res.state.version).toBe(SAVE_VERSION);
-    }
-    expect('difficulty' in old.settings).toBe(false);
+  it('has no migration from 23 to 24', () => {
+    expect(SAVE_VERSION).toBe(24);
+    expect(MIGRATIONS.some(m => m.from === 23)).toBe(false);
   });
-
-  it('a v4 save gains default board patience and objectives for the current season', () => {
-    const { boardPatience: _b, objectives: _o, ...base } = createNewGame('V4', 5);
-    const old = { ...base, version: 4, season: 3 };
-    const res = migrateState(old);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.boardPatience).toBe(5);
-      expect(res.state.objectives.map((o) => o.kind)).toEqual(['finals', 'solvent']);
-      expect(res.state.objectives.every((o) => o.status === 'pending' && o.id.startsWith('s3-'))).toBe(true);
-    }
-    expect(old).not.toHaveProperty('boardPatience');
-  });
-
-  it('a v3 save gains empty tallies, join season and extended history', () => {
-    const base = createNewGame('V3', 5);
-    const old = {
-      ...base, version: 3, season: 4,
-      squad: base.squad.map(({ career: _c, joinedSeason: _j, ...p }) => p),
-      freeAgents: [],
-      history: [{ season: 3, ladderPosition: 2, premiership: false }],
-    };
-    const res = migrateState(old);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      for (const p of res.state.squad) {
-        expect(p.career).toEqual({ games: 0, tries: 0, tackles: 0, lineBreaks: 0 });
-        expect(p.joinedSeason).toBe(4);
-      }
-      expect(res.state.history[0]).toEqual({
-        season: 3, ladderPosition: 2, premiership: false,
-        wins: 0, losses: 0, draws: 0, pointsFor: 0, pointsAgainst: 0,
-      });
-    }
-    expect(old.squad[0]).not.toHaveProperty('career');
-  });
-
-  it('a v5 save turns string traits into levelled instances (hardMan → hitman, junk dropped)', () => {
-    const base = createNewGame('V5', 5);
-    const old = {
-      ...base, version: 5,
-      squad: base.squad.map((p, i) => ({ ...p, traits: i === 0 ? ['finisher', 'hardMan', 'bogus'] : i === 1 ? [] : ['veteran'] })),
-      freeAgents: base.freeAgents.map((p) => ({ ...p, traits: ['playmaker', 'playmaker'] })),
-    };
-    const res = migrateState(old);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.squad[0]!.traits).toEqual([{ id: 'finisher', level: 1 }, { id: 'hitman', level: 1 }]);
-      expect(res.state.squad[1]!.traits).toEqual([]);
-      expect(res.state.squad[2]!.traits).toEqual([{ id: 'veteran', level: 1 }]);
-      expect(res.state.freeAgents[0]!.traits).toEqual([{ id: 'playmaker', level: 1 }]);
-    }
-    expect(old.squad[0]!.traits).toEqual(['finisher', 'hardMan', 'bogus']);
-  });
-
-  it('a v6 save gains an empty events deck seeded from its rngSeed (#75)', () => {
-    const base = createNewGame('V6', 6);
-    const { eventDeck: _drop, ...rest } = base;
-    const old = { ...rest, version: 6 };
-    const res = migrateState(old);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.eventDeck).toEqual({
-        rng: (base.rngSeed ^ 0x9e3779b9) >>> 0, pending: [], cooldowns: {}, lastDrawn: 0, modifiers: [], flags: [],
-      });
-    }
-    expect('eventDeck' in old).toBe(false);
-  });
-
-  it('keeps pending events, modifiers and cooldowns through a save round-trip (#75)', () => {
-    const base = createNewGame('Deck', 9);
-    const eventDeck = {
-      rng: 123, lastDrawn: 5, cooldowns: { fanDay: 21 },
-      pending: [{ id: 'fanDay-s1w5', cardId: 'fanDay', season: 1, week: 5, expiresAt: 7 }],
-      modifiers: [{ id: 'm', cardId: 'merchDeal', label: 'Merch royalties', trigger: 'weekly' as const, weeksLeft: 3, effects: [{ kind: 'money' as const, amount: 1500 }] }],
-      flags: [],
-    };
-    save({ ...base, eventDeck });
-    expect(load()?.eventDeck).toEqual(eventDeck);
-  });
-
-  it('a v7 save gains rival squads matching each rival\'s strength (#74)', async () => {
-    const { initLeague } = await import('../../src/systems/fixtures');
-    const { squadStrength } = await import('../../src/systems/rivals');
-    createNewGame('V7', 7);
-    const base = getState();
-    initLeague(base);
-    const withLeague = getState();
-    const old = {
-      ...withLeague, version: 7,
-      league: { ...withLeague.league, clubs: withLeague.league.clubs.map(({ squad: _s, ...c }) => c) },
-    };
-    const res = migrateState(old);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      const [player, ...rivals] = res.state.league.clubs;
-      expect(player!.squad).toBeUndefined();
-      rivals.forEach((c, i) => {
-        expect(c.squad!.length).toBeGreaterThanOrEqual(18);
-        expect(c.strength).toBe(squadStrength(c.squad!));
-        expect(Math.abs(c.strength - old.league.clubs[i + 1]!.strength)).toBeLessThanOrEqual(2);
-      });
-      // Same save, same squads.
-      const again = migrateState(old);
-      expect(again.ok && again.state.league.clubs).toEqual(res.state.league.clubs);
-    }
-    expect(old.league.clubs.every((c) => !('squad' in c))).toBe(true);
-  });
-
-  it('a v8 save loads with no kit design, keeping its current look (#79)', () => {
-    const base = createNewGame('V8', 8);
-    const { kit: _k, ...rest } = base;
-    const res = migrateState({ ...rest, version: 8 });
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.kit).toBeUndefined();
-    }
-    const designed = { ...base, kit: { pattern: 'stripes' as const, trim: '#ffffff', alt: { jersey: '#ffffff', trim: '#1a1a2e', pattern: 'v' as const } } };
-    save(designed);
-    expect(load()?.kit).toEqual(designed.kit);
-  });
-
-  it('a v9 save gains empty books for the season it is in (#172)', () => {
-    const base = createNewGame('V9', 9);
-    const { finance: _f, ...rest } = base;
-    const res = migrateState({ ...rest, version: 9, season: 3 });
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.finance).toEqual([emptyFinance(3)]);
-    }
-    // A current save keeps its books as they are.
-    const booked = { ...base, finance: [{ ...emptyFinance(1), gate: 24_000, wages: -18_000 }] };
-    save(booked);
-    expect(load()?.finance).toEqual(booked.finance);
-  });
-
-  it('a v10 save gains today’s auto-picked lineup (#69)', () => {
-    const base = createNewGame('V10', 10);
-    const { lineup: _l, ...rest } = base;
-    const res = migrateState({ ...rest, version: 10 });
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.lineup).toEqual(autoPick(base.squad));
-      expect(res.state.lineup.starters.every((id) => id !== null)).toBe(true);
-    }
-    // A current save keeps the coach's picks as they are.
-    const picked = { ...base, lineup: { ...base.lineup, rotation: 'heavy' as const, starters: [...base.lineup.starters].reverse() } };
-    save(picked);
-    expect(load()?.lineup).toEqual(picked.lineup);
-  });
-
-  it('a v12 save loads with rival matches on the cheap sim (N9.2), and the setting saves', () => {
-    const base = createNewGame('V12', 12);
-    const res = migrateState({ ...base, version: 12 });
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.settings.liveRivals).toBeUndefined();
-    }
-    const on = { ...base, settings: { ...base.settings, liveRivals: true } };
-    save(on);
-    expect(load()?.settings.liveRivals).toBe(true);
-  });
-
-  it('a v11 save loads with no season reviews and no award tally yet (#190)', () => {
-    const base = createNewGame('V11', 11);
-    const played = {
-      ...base,
-      version: 11,
-      history: [{ season: 1, ladderPosition: 4, premiership: false, wins: 14, losses: 9, draws: 1, pointsFor: 480, pointsAgainst: 400 }],
-    };
-    const res = migrateState(played);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.history[0]).toEqual(played.history[0]);
-      expect(res.state.history[0]?.review).toBeUndefined();
-      expect(res.state.potmTally).toBeUndefined();
-    }
-    // A current save keeps its review and tally as they are.
-    const reviewed = {
-      ...base,
-      history: [{ season: 1, ladderPosition: 2, premiership: true, review: { juniors: 3, reputation: { from: 30, to: 49 } } }],
-      potmTally: { season: 2, counts: { 'Zeke Leilua': 2 } },
-    };
-    save(reviewed);
-    expect(load()?.history[0]?.review).toEqual(reviewed.history[0]!.review);
-    expect(load()?.potmTally).toEqual(reviewed.potmTally);
-  });
-
-  it('a v16 save gets a Running costs line of 0 on every season it has booked (N12.3)', () => {
-    const base = createNewGame('V16', 16);
-    const strip = ({ overhead: _o, ...lines }: SeasonFinance): Omit<SeasonFinance, 'overhead'> => lines;
-    const books = [
-      { ...emptyFinance(1), wages: -480_000, gate: 330_000, upkeep: -2_000 },
-      { ...emptyFinance(2), wages: -410_000, gate: 390_000, prize: 15_000 },
-      { ...emptyFinance(3), wages: -18_000 },
-    ];
-    const old = { ...base, version: 16, season: 3, finance: books.map(strip) };
-    expect(old.finance.every((e) => !('overhead' in e))).toBe(true);
-    const res = migrateState(old);
-    expect(res.ok).toBe(true);
-    if (res.ok) {
-      expect(res.state.version).toBe(SAVE_VERSION);
-      expect(res.state.finance).toEqual(books.map((e) => ({ ...e, overhead: 0 })));
-    }
-    // A v14 save (before N11's kicker, captain and training focus) gets the same books on the way up.
-    const v14 = migrateState({ ...old, version: 14 });
-    expect(v14.ok && v14.state.finance).toEqual(books.map((e) => ({ ...e, overhead: 0 })));
-    expect(old.finance.every((e) => !('overhead' in e))).toBe(true); // the input is untouched
-    // A current save keeps its running costs as they are.
-    const booked = { ...base, finance: [{ ...emptyFinance(1), wages: -18_000, overhead: -4_500 }] };
-    save(booked);
-    expect(load()?.finance).toEqual(booked.finance);
-  });
-
-  it('does not mutate its input', () => {
-    const old = v1();
-    const copy = JSON.parse(JSON.stringify(old));
-    migrateState(old);
-    expect(old).toEqual(copy);
-  });
-
-  it('steps are contiguous and end at SAVE_VERSION', () => {
-    MIGRATIONS.forEach((m, i) => {
-      expect(m.to).toBe(m.from + 1);
-      if (i > 0) expect(m.from).toBe(MIGRATIONS[i - 1].to);
-    });
-    expect(MIGRATIONS[MIGRATIONS.length - 1].to).toBe(SAVE_VERSION);
-  });
-
   it('refuses a future version with a clear message', () => {
-    const res = migrateState({ ...createNewGame('F', 1), version: SAVE_VERSION + 1 });
-    expect(res.ok).toBe(false);
-    if (!res.ok) {
-      expect(res.reason).toBe('future');
-      expect(res.message).toMatch(/newer version/i);
-    }
+    expect(migrateState({ version: SAVE_VERSION + 1 })).toMatchObject({ ok: false, reason: 'future', message: expect.stringMatching(/newer version/i) });
   });
-
-  it('rejects structurally invalid saves as corrupt', () => {
-    for (const bad of [null, 42, [], { version: 1 }, { ...v1(), squad: 'x' }]) {
-      const res = migrateState(bad);
-      expect(res.ok).toBe(false);
-      if (!res.ok) expect(res.reason).toBe('corrupt');
-    }
+  it.each([null, 42, [], {}, { version: '23' }])('rejects malformed input %j', raw => {
+    expect(migrateState(raw)).toMatchObject({ ok: false, reason: 'corrupt' });
   });
 });
 
@@ -704,7 +454,7 @@ describe('load: legacy and future saves', () => {
 
   it('the legacy single save appears in slot 1, then the legacy key is removed', () => {
     const s = createNewGame('Legacy', 3);
-    const raw = JSON.stringify({ ...s, version: 1 });
+    const raw = JSON.stringify(s);
     storage.map.set(SAVE_KEY, raw);
     const sums = getSlotSummaries();
     expect(sums[0]).toMatchObject({ slot: 1, status: 'ok', clubName: 'Legacy' });
@@ -717,7 +467,7 @@ describe('load: legacy and future saves', () => {
 
   it('keeps the legacy key when the slot write fails, and still shows it in slot 1', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const raw = JSON.stringify({ ...createNewGame('Keep', 3), version: 1 });
+    const raw = JSON.stringify(createNewGame('Keep', 3));
     storage.map.set(SAVE_KEY, raw);
     const failing: StorageLike = {
       getItem: (k) => storage.getItem(k),
@@ -786,9 +536,9 @@ describe('export / import', () => {
     expect(storage.map.has(slotKey(2))).toBe(false);
   });
 
-  it('importIntoSlot writes a migrated state to the slot', () => {
+  it('importIntoSlot writes a current state to the slot', () => {
     const s = createNewGame('Imp', 5);
-    const out = importIntoSlot(JSON.stringify({ ...s, version: 1 }), 2);
+    const out = importIntoSlot(JSON.stringify(s), 2);
     expect(out).toEqual(s);
     setActiveSlot(2);
     expect(load()).toEqual(s);
@@ -879,12 +629,32 @@ describe('title flow slots', () => {
     expect(root.querySelector('[data-nrl-delete-1]')).toBeNull();
   });
 
+  it('a rejected slot stays visible with raw recovery and requires confirmation before Start over', async () => {
+    const raw = 'original rejected bytes';
+    storage.map.set(slotKey(1), raw);
+    const root = makeStubEl('div');
+    const result = showTitleFlow(root as unknown as HTMLElement);
+    expect(root.querySelector('[data-nrl-slot-label-1]')!.textContent).toBe('Unreadable save');
+    expect(root.querySelector('[data-nrl-recover-1]')).not.toBeNull();
+    expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
+    root.querySelector('[data-nrl-new-1]')!.click();
+    await vi.dynamicImportSettled();
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(storage.map.get(slotKey(1))).toBe(raw);
+    root.querySelector('[data-nrl-start-confirm]')!.click();
+    expect((await result).mode).toBe('new');
+    expect(hasSave(1)).toBe(false);
+    save(createNewGame('Deliberate replacement', 522));
+    expect(load()?.clubName).toBe('Deliberate replacement');
+  });
+
   it('a future-version slot offers Delete but not Continue or New', () => {
     storage.map.set(slotKey(1), JSON.stringify({ ...createNewGame('F', 1), version: 99 }));
     const root = makeStubEl('div');
     void showTitleFlow(root as unknown as HTMLElement);
     expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
     expect(root.querySelector('[data-nrl-new-1]')).toBeNull();
+    expect(root.querySelector('[data-nrl-recover-1]')).not.toBeNull();
     expect(root.querySelector('[data-nrl-delete-1]')).not.toBeNull();
   });
 });

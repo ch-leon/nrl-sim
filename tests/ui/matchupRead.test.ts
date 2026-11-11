@@ -14,7 +14,7 @@ import { openNextMatch } from '../../src/ui/screens/fixtures';
 import { openRivalSquad } from '../../src/ui/screens/rivalSquad';
 import { showPlanCard } from '../../src/ui/screens/matchOverlay';
 import type { RosterEntry, MatchEvent } from '../../src/sim/events';
-const nine = (n: number): RosterEntry[] => ['prop', 'winger', 'halfback'].map(position => ({ name: 'Kai Jones', position: position as RosterEntry['position'], stats: { speed:n, strength:n, skill:n, stamina:n, footyIQ:n } }));
+const nine = (n: number): RosterEntry[] => ['prop', 'winger', 'halfback'].map(position => ({ name: 'Kai Jones', position: position as RosterEntry['position'], stats: { speed:n, strength:n, handling:n, kicking:n, stamina:n, footyIQ:n } }));
 
 /** Assert the rendered fit and comparison use the same nine that will kick off. */
 function expectScoutingMatchesKickoff(rival: RivalClub) {
@@ -42,6 +42,18 @@ function expectScoutingMatchesKickoff(rival: RivalClub) {
 }
 afterEach(() => vi.unstubAllGlobals());
 describe('strategy readouts #467', () => {
+  it('displays the six-stat mean for the Balanced contributor', () => {
+    const roster = nine(80);
+    expect(fitRead(roster, 'balanced').reason).toBe('Jones 80');
+    roster[0] = { ...roster[0]!, name: 'Kai Smith', stats: { ...roster[0]!.stats!, kicking: 20 } };
+    expect(fitRead([roster[0]!], 'balanced').reason).toBe('Smith 70');
+    expect(fitRead(roster, 'balanced').reason).toBe('Jones 80');
+    stubDocument();
+    const button = document.createElement('button');
+    renderPlanFit(button, nine(80), 'balanced');
+    expect(button.textContent).toBe('Balanced★★☆Jones 80');
+  });
+
   it('maps fit bands, clamped at zero and three stars', () => {
     expect([-1, 0, .49, .5, .99, 1, 1.49, 1.5, 2].map(fitStars)).toEqual([0,0,0,1,1,2,2,3,3]);
   });
@@ -56,7 +68,7 @@ describe('strategy readouts #467', () => {
   });
   it('names the best available kicker even outside the halves', () => {
     const roster = nine(40);
-    roster[0] = { ...roster[0]!, name: 'Tui Jones', stats: { ...roster[0]!.stats!, skill: 90 } };
+    roster[0] = { ...roster[0]!, name: 'Tui Jones', stats: { ...roster[0]!.stats!, kicking: 90 } };
     roster[2] = { ...roster[2]!, name: 'Kai Smith' };
     expect(fitRead(roster, 'kick-chase').reason).toBe('Jones 90');
   });

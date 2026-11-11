@@ -22,7 +22,7 @@ function sheet(id: string, base = 60): TeamSheet {
     kicking: base,
     fitness: base,
     colors: ['#111', '#eee'],
-    roster: POSITIONS.map((position, i) => ({ name: `${id} ${position} ${i}`, position, stats: { speed: base, strength: base, stamina: 50, skill: base, footyIQ: base } })),
+    roster: POSITIONS.map((position, i) => ({ name: `${id} ${position} ${i}`, position, stats: { speed: base, strength: base, stamina: 50, handling: base, kicking: base, footyIQ: base } })),
   };
 }
 function events(seeds: number, seconds: number): { es: SimEvent[]; snaps: Snapshot[] } {

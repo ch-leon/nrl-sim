@@ -114,7 +114,7 @@ export function teamSheetFromSquad(
   // The next best fit players make the interchange bench (the live sim rotates them on).
   const bench = selection && picked.length > 0 ? selection.bench : ranked.slice(ON_FIELD, ON_FIELD + BENCH.size);
 
-  const attackRaw = mean(best.map((p) => (p.stats.speed + p.stats.skill + p.stats.footyIQ) / 3));
+  const attackRaw = mean(best.map((p) => (p.stats.speed + p.stats.handling + p.stats.footyIQ) / 3));
   const defenseRaw = mean(best.map((p) => (p.stats.strength + p.stats.stamina) / 2));
   const fitness = clampStat(Math.round(mean(best.map((p) => p.stats.stamina))));
 
@@ -122,7 +122,7 @@ export function teamSheetFromSquad(
     (p) => p.position === 'halfback' || p.position === 'five-eighth',
   );
   const kickerPool = kickers.length > 0 ? kickers : best;
-  const kicking = clampStat(Math.round(Math.max(...kickerPool.map((p) => p.stats.skill))));
+  const kicking = clampStat(Math.round(Math.max(...kickerPool.map((p) => p.stats.kicking))));
 
   const meanMorale = mean(best.map((p) => p.morale));
   const moraleMod = 1 + ((meanMorale - 50) / 50) * 0.1;
@@ -154,7 +154,7 @@ export function withRivalStyle(sheet: TeamSheet, club: { id: string; strength: n
 
 /**
  * Who kicks the goals and who captains the side (N11): the coach's picks when
- * they are in the nine, else the defaults — the half with the best Skill (any
+ * they are in the nine, else the defaults — the half with the best Kicking (any
  * man if there is no half), and the starter with the best Footy IQ. Ties go to
  * the better player, then the earlier slot.
  */
@@ -165,7 +165,7 @@ export function kickerAndCaptain(nine: readonly Player[], selection?: Pick<Selec
     pool.reduce((a, b) => (stat(b) > stat(a) || (stat(b) === stat(a) && overallRating(b) > overallRating(a)) ? b : a));
   const halves = nine.filter((p) => p.position === 'halfback' || p.position === 'five-eighth');
   return {
-    kicker: inNine(selection?.kicker) ?? best(halves.length > 0 ? halves : nine, (p) => p.stats.skill).id,
+    kicker: inNine(selection?.kicker) ?? best(halves.length > 0 ? halves : nine, (p) => p.stats.kicking).id,
     captain: inNine(selection?.captain) ?? best(nine, (p) => p.stats.footyIQ).id,
   };
 }
@@ -188,9 +188,10 @@ export function teamSheetFromRival(club: RivalClub, context?: RivalPlanContext):
       speed: clampStat(attack + rng.int(-8, 8)),
       strength: clampStat(defense + rng.int(-8, 8)),
       stamina: clampStat(fitness + rng.int(-8, 8)),
-      skill: clampStat(kicking + rng.int(-8, 8)),
+      handling: clampStat(kicking + rng.int(-8, 8)), kicking: 0,
       footyIQ: clampStat(attack + rng.int(-8, 8)),
     };
+    stats.kicking = stats.handling;
     // Rivals carry traits too, so their stars are memorable (BAK-208 §3).
     const traits = rollTraits(rng, p.position, quality);
     return { ...p, stats, ...(traits.length > 0 ? { traits } : {}) };
@@ -202,9 +203,10 @@ export function teamSheetFromRival(club: RivalClub, context?: RivalPlanContext):
       speed: clampStat(attack + brng.int(-8, 8) - 3),
       strength: clampStat(defense + brng.int(-8, 8) - 3),
       stamina: clampStat(fitness + brng.int(-8, 8) - 3),
-      skill: clampStat(kicking + brng.int(-8, 8) - 3),
+      handling: clampStat(kicking + brng.int(-8, 8) - 3), kicking: 0,
       footyIQ: clampStat(attack + brng.int(-8, 8) - 3),
     };
+    stats.kicking = stats.handling;
     const traits = rollTraits(brng, p.position, quality);
     return { ...p, stats, ...(traits.length > 0 ? { traits } : {}) };
   });

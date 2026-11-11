@@ -258,7 +258,7 @@ export function drawEvent(state: GameState, now: number, rng: Rng): PendingEvent
     ev.rivalId = pick.club.id;
     ev.fee = pick.fee;
     ev.vars = {
-      rival: pick.club.name, ovr: String(overallRating(pick.player)), position: pick.player.position,
+      rival: pick.club.name, ovr: String(Math.round(overallRating(pick.player))), position: pick.player.position,
       fee: `$${pick.fee.toLocaleString('en-US')}`,
     };
   } else if (card.subject) {
@@ -664,7 +664,7 @@ export function plantPending(cardId: string): boolean {
     ev.rivalId = pick.club.id;
     ev.fee = pick.fee;
     ev.vars = {
-      rival: pick.club.name, ovr: String(overallRating(pick.player)), position: pick.player.position,
+      rival: pick.club.name, ovr: String(Math.round(overallRating(pick.player))), position: pick.player.position,
       fee: `$${pick.fee.toLocaleString('en-US')}`,
     };
   } else if (card.subject) {

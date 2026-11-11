@@ -38,7 +38,7 @@ export abstract class LivePenalties extends LiveRestarts {
     const kicker = this.goalKicker(award);
     const halfS = (this.golden ? NINES.goldenPointMinutes : this.length.halfMinutes) * 60;
     const halfLeftS = Math.max(0, halfS - this.clockTicks * TICK_S);
-    const shot = goalChance(mark, postsFor(dir, FIELD_LENGTH, MID_Y), kicker.stats.skill, this.goalAcc(kicker));
+    const shot = goalChance(mark, postsFor(dir, FIELD_LENGTH, MID_Y), kicker.stats.kicking, this.goalAcc(kicker));
     const choice = choosePenalty({
       shotChance: shot,
       toLine: this.toLineFor(award, mark),
@@ -198,7 +198,7 @@ export abstract class LivePenalties extends LiveRestarts {
       return;
     }
     const posts = postsFor(dir, FIELD_LENGTH, MID_Y);
-    const good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.skill, this.goalAcc(k));
+    const good = this.rng.next() < goalChance(k.body.pos, posts, k.stats.kicking, this.goalAcc(k));
     this.ball = kickFlight(k.body.pos, this.goalAim(posts, dir, good), this.tick, null, 8);
     this.goalUp = { side: k.side, kicker: g.kicker, good };
     this.emit('drop-goal', `${k.name} drops for the field goal…`, k);

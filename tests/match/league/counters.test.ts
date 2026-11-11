@@ -11,7 +11,7 @@ function sheet(strength: number): TeamSheet {
   return { clubId: 'test', name: 'Test', colors: ['#111', '#eee'], attack: 60, defense: 60, kicking: 60, fitness: 60,
     tactics: { attack: 'grind', defence: 'slide' },
     roster: positions.map((position) => ({ name: position, position, stats: {
-      speed: 60, strength: PACK.includes(position) ? strength : 60, stamina: 60, skill: 60, footyIQ: 60,
+      speed: 60, strength: PACK.includes(position) ? strength : 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60,
     } })),
   };
 }

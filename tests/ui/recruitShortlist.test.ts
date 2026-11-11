@@ -8,7 +8,7 @@ import { recruitAffordable, recruitShortlist } from '../../src/ui/recruitShortli
 function player(id: string, position: Position, rating = 60, wage = 100): Player {
   return { ...getState().squad[0]!, id, name: id, position, age: 25, wage, junior: false,
     injuredWeeks: 0, suspendedWeeks: 0, traits: [],
-    stats: { speed: rating, strength: rating, stamina: rating, skill: rating, footyIQ: rating } };
+    stats: { speed: rating, strength: rating, stamina: rating, handling: rating, kicking: rating, footyIQ: rating } };
 }
 function state(agents: Player[]): GameState {
   const squad = LINEUP_SLOTS.map((pos, i) => player(`s${i}`, pos, 50));

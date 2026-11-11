@@ -7,6 +7,7 @@
 // the state and returns the patch for setState, or null when nothing changes.
 // No DOM, no Phaser.
 
+import { KIT_PATTERNS, type KitDesign } from '../art/match/kit';
 import type { GameState, Player, RivalClub } from '../core/state';
 import { cleanName } from '../data/names';
 import { colorsContrast } from '../config';
@@ -96,4 +97,15 @@ export function renameClub(state: GameState, id: string, raw: string, colors?: [
   if (!state.league.clubs.some((c) => c.id === id)) return { ok: false, why: 'That club is not in the league' };
   if (colors && !validClubColors(colors)) return { ok: false, why: 'Pick two colours that read apart' };
   return { ok: true, patch: renameClubsPatch(state, new Map([[id, { name: check.name, ...(colors ? { colors } : {}) }]])) };
+}
+
+/** Whether the designer's colours and patterns can be worn. Pure; shared with its preview. */
+export function isValidDesign(d: KitDesign, primary: string): boolean {
+  return KIT_PATTERNS.includes(d.pattern) && KIT_PATTERNS.includes(d.alt.pattern)
+    && colorsContrast(primary, d.trim) && colorsContrast(d.alt.jersey, d.alt.trim);
+}
+
+/** Kit edit alongside the club's name/colours. Use the designer's displayed primary colour. */
+export function changeKit(design: KitDesign, primary: string): Pick<GameState, 'kit'> | null {
+  return isValidDesign(design, primary) ? { kit: design } : null;
 }

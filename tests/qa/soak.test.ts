@@ -10,7 +10,7 @@ import {
 } from '../../src/qa/soak';
 import { STARTING_MONEY } from '../../src/config';
 import { SEASON_ROUNDS, SQUAD_CAP } from '../../src/config';
-import { getState, setState, SAVE_VERSION, type Fixture, type GameState } from '../../src/core/state';
+import { getState, setState, type Fixture, type GameState } from '../../src/core/state';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
 import { migrateState } from '../../src/core/save';
 import { advanceWeek, weekHeld, withFastForward } from '../../src/core/time';
@@ -27,50 +27,13 @@ describe('soak checks', () => {
     expect(duplicatePlayers(dupe)).toEqual([s.squad[0]!.id]);
   });
 
-  it('every old save version migrates', () => {
-    createNewGame('Old', 9);
-    initLeague(getState());
-    for (const v of OLD_VERSIONS) {
-      const res = migrateState(asOldSave(getState(), v));
-      expect(res.ok, `v${v}`).toBe(true);
-      if (res.ok) {
-        expect(checkState(res.state), `v${v}`).toEqual([]);
-        expect(res.state).not.toHaveProperty('unlocks');
-      }
-    }
-    // Each version's old save lacks what its migration adds, so the step really runs: v18's board
-    // loan, v19's staff, and v20's playback speed (left absent, so an old save plays at ×4).
-    const owing = { ...getState(), boardLoan: { owed: 12_000 } };
-    expect(asOldSave(owing, 17)).not.toHaveProperty('boardLoan');
-    expect(asOldSave(owing, 18)).toHaveProperty('boardLoan', { owed: 12_000 });
-    const back = migrateState(asOldSave(owing, 17));
-    expect(back.ok && back.state.boardLoan).toEqual({ owed: 0 });
-    const welfare = { role: 'welfare' as const, name: 'Pat Doyle', wage: 1_500, hiredSeason: 1 };
-    const staffed = { ...getState(), staff: [welfare] };
-    expect(asOldSave(staffed, 18)).not.toHaveProperty('staff');
-    expect(asOldSave(staffed, 19)).toHaveProperty('staff', [welfare]);
-    const unstaffed = migrateState(asOldSave(staffed, 18));
-    expect(unstaffed.ok && unstaffed.state.staff).toEqual([]);
-    const sped = { ...getState(), settings: { ...getState().settings, playbackSpeed: 8 as const } };
-    const oldSpeed = asOldSave(sped, 19).settings as { playbackSpeed?: number };
-    expect(oldSpeed.playbackSpeed).toBeUndefined();
-    const kept = migrateState(asOldSave(sped, 19));
-    expect(kept.ok && kept.state.settings.playbackSpeed).toBeUndefined();
-    // A v21 fixture must lack the new habit history (#469).
-    expect(asOldSave(getState(), 21)).not.toHaveProperty('recentPlans');
-    // v20 has no bans and no event-chain flags; v21 fills both (#324).
-    const v20 = asOldSave(getState(), 20);
-    const deck = v20.eventDeck as { flags?: string[] };
-    expect(deck.flags).toBeUndefined();
-    expect((v20.squad as { suspendedWeeks?: number }[])[0]).not.toHaveProperty('suspendedWeeks');
-    const v21 = migrateState(v20);
-    expect(v21.ok).toBe(true);
-    if (v21.ok) {
-      expect(v21.state.version).toBe(SAVE_VERSION);
-      expect(v21.state.recentPlans).toEqual([]);
-      expect(v21.state.eventDeck.flags).toEqual([]);
-      expect(v21.state.squad.every((p) => p.suspendedWeeks === 0)).toBe(true);
-      expect(v21.state.freeAgents.every((p) => p.suspendedWeeks === 0)).toBe(true);
+  it('every old save version requires a new career', () => {
+    createNewGame('Old', 9); initLeague(getState());
+    for (const version of [...OLD_VERSIONS, 23]) {
+      const raw = asOldSave(getState(), version);
+      const original = JSON.stringify(raw);
+      expect(migrateState(raw)).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
+      expect(JSON.stringify(raw)).toBe(original);
     }
   });
 });
@@ -183,10 +146,11 @@ describe('soak', () => {
     expect(bestNineMean([])).toBe(0);
   });
 
-  it('plays on from a v1 save and a v7 save', () => {
+  it('refuses to play on from a v1 save or a v7 save', () => {
     for (const v of [1, 7]) {
       const r = runSoak({ seed: 202, seasons: 1, mode: 'managed', fromVersion: v });
-      expect(r.problems, `v${v}`).toEqual([]);
+      expect(r.problems, `v${v}`).toEqual([expect.stringMatching(/start a new career/i)]);
+      expect(r.seasons).toEqual([]);
     }
   }, 180_000);
 });
@@ -426,7 +390,7 @@ describe('rival styles over a season (#249, N11)', () => {
   });
 
   it('the nine shape (#322): backs Speed and pack Strength margins, stat means and age by id', () => {
-    const stats = (speed: number, strength: number) => ({ speed, strength, stamina: 60, skill: 50, footyIQ: 70 });
+    const stats = (speed: number, strength: number) => ({ speed, strength, stamina: 60, handling: 50, kicking: 50, footyIQ: 70 });
     const nine = [
       { id: 'a', position: 'winger', stats: stats(80, 50) },
       { id: 'b', position: 'centre', stats: stats(70, 60) },
@@ -438,12 +402,12 @@ describe('rival styles over a season (#249, N11)', () => {
     expect(shape.strength).toBe(60);
     expect(shape.backsSpeed).toBe(10);
     expect(shape.packStrength).toBe(20);
-    expect(shape).toMatchObject({ skill: 50, footyIQ: 70, stamina: 60, age: 27 });
+    expect(shape).toMatchObject({ handling: 50, kicking: 50, footyIQ: 70, stamina: 60, age: 27 });
     expect(nineShape([]).age).toBe(0);
   });
 
   it('the shape table and Expansive split by the defence it faced (#322)', () => {
-    const flat: NineShape = { backsSpeed: 0, packStrength: 0, speed: 60, strength: 60, skill: 60, footyIQ: 60, stamina: 60, age: 26 };
+    const flat: NineShape = { backsSpeed: 0, packStrength: 0, speed: 60, strength: 60, handling: 60, kicking: 60, footyIQ: 60, stamina: 60, age: 26 };
     const fast: NineShape = { ...flat, backsSpeed: 8, speed: 64 };
     const vs = (defence: 'slide' | 'rush', homeScore: number, gap = 0): StyleGame => ({
       home: { attack: 'expansive', defence: 'slide' }, away: { attack: 'balanced', defence },

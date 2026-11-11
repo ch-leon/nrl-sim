@@ -164,9 +164,9 @@ function theNine(us: TeamSheet, state: ClubState): Scored {
     : { score: 0, screen: 'lineup', text: '', cta: '' };
 }
 
-/** Training facility levels built: every level of a facility that trains a stat. */
+/** Training facility levels built: every level of a facility that boosts XP. */
 export function trainingLevels(state: Pick<GameState, 'facilities'>): number {
-  return state.facilities.reduce((n, f) => n + (Object.keys(FACILITY_CATALOG[f.defId]?.trains ?? {}).length > 0 ? f.level : 0), 0);
+  return state.facilities.reduce((n, f) => n + (FACILITY_CATALOG[f.defId]?.training ? f.level : 0), 0);
 }
 
 function behindTheLeague(state: ClubState): Scored {

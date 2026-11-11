@@ -180,11 +180,10 @@ describe('export file name and import', () => {
     expect(exportFilename(s).startsWith(`${BRAND.exportSlug}-`)).toBe(true);
   });
 
-  it('an old-style export file (old name, an older save version) still imports: import reads content', () => {
+  it('an older save requires a new career; current exports still round-trip', () => {
     // A save from an older version, shaped the old way, as a player has it on their phone.
     const res = importSave(OLD_SAVE);
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(res.state.version).toBe(SAVE_VERSION);
+    expect(res).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
     // Today's export round-trips too.
     const s = createNewGame('Crushers', 1);
     expect(importSave(exportSave(s)).ok).toBe(true);

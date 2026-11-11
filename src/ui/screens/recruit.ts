@@ -8,7 +8,7 @@ import { el, button, ensureStyles, openScreen, screenHead } from '../dom';
 import { getState, type Player, type TraitInstance } from '../../core/state';
 import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
-import { overallRating } from '../../data/player';
+import { overallRating, ratingText } from '../../data/player';
 import {
   signingFee, signingFeeBasis, weeksToPoolRefresh, FREE_AGENT_POOL_SIZE,
 } from '../../systems/freeagency';
@@ -422,7 +422,7 @@ export function openRecruitScreen(): void {
         who,
         el('span', { class: 'nrl-row-pos', text: posShort(agent.position), attrs: { title: positionLabel(agent.position) } }),
         el('span', { class: 'nrl-num', text: String(agent.age) }),
-        el('span', { class: 'nrl-num nrl-row-ovr', text: String(ovr), attrs: { title: 'Overall rating' } }),
+        el('span', { class: 'nrl-num nrl-row-ovr', text: ratingText(ovr), attrs: { title: 'Overall rating' } }),
         feeCell,
         el('span', { class: 'nrl-num nrl-row-dim', text: money(agent.wage), attrs: { title: 'Weekly wage' } }),
         action,

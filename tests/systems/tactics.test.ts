@@ -65,9 +65,9 @@ describe('team tactics (N11.1)', () => {
     expect(runMatch(withDefault, away, { seed: 4 })).toEqual(runMatch(withoutTactics, away, { seed: 4 }));
   }, 60_000);
 
-  it('an old save keeps the grind id and displays Tight without a save change (#466)', () => {
+  it('a current save keeps the grind id and displays Tight without a save change (#466)', () => {
     const base = game();
-    const raw = JSON.parse(JSON.stringify({ ...base, version: 19,
+    const raw = JSON.parse(JSON.stringify({ ...base, version: SAVE_VERSION,
       lineup: setTactics(base.lineup, { attack: 'grind', defence: 'compressed' }),
     }));
     const res = migrateState(raw);
@@ -80,12 +80,11 @@ describe('team tactics (N11.1)', () => {
     expect(PRESET_LABEL[res.state.lineup.tactics.attack]).toBe('Tight');
   });
 
-  it('a v13 save loads with Balanced / Slide on its lineup', () => {
+  it('a v13 save requires a new career', () => {
     const base = game();
     const { tactics: _t, ...oldLineup } = base.lineup;
     void _t;
     const res = migrateState({ ...base, version: 13, lineup: oldLineup as never });
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(res.state.lineup.tactics).toEqual(DEFAULT_TACTICS);
+    expect(res).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
   });
 });

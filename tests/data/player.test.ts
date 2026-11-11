@@ -9,27 +9,31 @@ import type { Player } from '../../src/core/state';
 const QUALITIES: Quality[] = ['rookie', 'average', 'star'];
 
 describe('overallRating', () => {
-  it('computes the weighted mean for known stats', () => {
-    // all 80 -> weighted mean is 80
+  it('computes the four-stat average for known stats', () => {
+    // all 80 -> four-stat average is 80
     const r = overallRating({
-      stats: { speed: 80, strength: 80, stamina: 80, skill: 80, footyIQ: 80 },
+      position: 'halfback',
+      stats: { speed: 80, strength: 80, stamina: 80, handling: 80, kicking: 80, footyIQ: 80 },
     });
     expect(r).toBe(80);
   });
 
-  it('weights skill & footyIQ higher than strength/stamina', () => {
+  it('uses the halves stats rather than hidden strength/stamina', () => {
     const highSkill = overallRating({
-      stats: { speed: 50, strength: 50, stamina: 50, skill: 100, footyIQ: 100 },
+      position: 'halfback',
+      stats: { speed: 50, strength: 50, stamina: 50, handling: 100, kicking: 100, footyIQ: 100 },
     });
     const highStrength = overallRating({
-      stats: { speed: 50, strength: 100, stamina: 100, skill: 50, footyIQ: 50 },
+      position: 'halfback',
+      stats: { speed: 50, strength: 100, stamina: 100, handling: 50, kicking: 50, footyIQ: 50 },
     });
     expect(highSkill).toBeGreaterThan(highStrength);
   });
 
   it('returns a value within 1..100', () => {
     const r = overallRating({
-      stats: { speed: 1, strength: 1, stamina: 1, skill: 1, footyIQ: 1 },
+      position: 'halfback',
+      stats: { speed: 1, strength: 1, stamina: 1, handling: 1, kicking: 1, footyIQ: 1 },
     });
     expect(r).toBeGreaterThanOrEqual(1);
     expect(r).toBeLessThanOrEqual(100);

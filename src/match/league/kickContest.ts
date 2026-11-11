@@ -2,10 +2,10 @@
 // E #99): who wins a high ball, who wins the race to a grubber in the in-goal,
 // and when a loose ball is a scramble. The short kick-off's regather (#397,
 // kickoff.ts) is the same contest as a bomb's: the chaser's Speed against the
-// catcher's Skill. Pure: live.ts draws the dice and plays it out.
+// catcher's Handling. Pure: live.ts draws the dice and plays it out.
 import { clamp } from '../core/vec';
 
-/** A chaser's odds under a kick: `base`, plus `perPoint` for each point of his Speed over the catcher's Skill, kept to `min`–`max`. */
+/** A chaser's odds under a kick: `base`, plus `perPoint` for each point of his Speed over the catcher's Handling, kept to `min`–`max`. */
 export interface ChaseOdds {
   base: number;
   perPoint: number;
@@ -18,9 +18,9 @@ export const KICK_CONTEST = {
   bomb: {
     /** A bomb is contested when a chaser and a catcher are both this close to where it comes down as it lands. */
     contestM: 3,
-    /** The chaser wins it back (taps it back to his side) this often, by his Speed over the catcher's Skill. */
+    /** The chaser wins it back (taps it back to his side) this often, by his Speed over the catcher's Handling. */
     won: { base: 0.11, perPoint: 0.002, min: 0.05, max: 0.25 } as ChaseOdds,
-    /** Not beaten to it, the catcher spills it this often, by the chaser's Speed over his Skill; rain multiplies it (weather.rainHandling). */
+    /** Not beaten to it, the catcher spills it this often, by the chaser's Speed over his Handling; rain multiplies it (weather.rainHandling). */
     spill: { base: 0.16, perPoint: 0.002, min: 0.08, max: 0.32 } as ChaseOdds,
     /** A bomb's peak, metres, and how much each level of Big Boot adds to it (hang time: the chase gets there). */
     peak: 20,
@@ -44,7 +44,7 @@ export const KICK_CONTEST = {
   },
 };
 
-/** The chance the chaser wins a contest under a kick: his Speed against the catcher's Skill, plus `extra`, kept to the odds' range. */
+/** The chance the chaser wins a contest under a kick: his Speed against the catcher's Handling, plus `extra`, kept to the odds' range. */
 export function chaserWins(o: ChaseOdds, chaserSpeed: number, catcherSkill: number, extra = 0): number {
   return clamp(o.base + (chaserSpeed - catcherSkill) * o.perPoint + extra, o.min, o.max);
 }
@@ -61,7 +61,7 @@ export interface HighBall {
 }
 
 /**
- * A contested bomb: the chaser's Speed against the catcher's Skill, the kick's
+ * A contested bomb: the chaser's Speed against the catcher's Handling, the kick's
  * height (Big Boot puts it higher), a Kick-chase side, and the wet (`handling`,
  * 1 dry, more in rain) which makes the catcher spill more. The two always
  * leave clean catches at normal strengths. Slide's fit-scaled `cover` reduces

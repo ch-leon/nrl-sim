@@ -24,7 +24,7 @@ function squad(first = 65, depth = 55): Player[] {
   for (const target of [first, depth]) {
     for (const position of POSITIONS) {
       const p = generatePlayerAround(rng, target, { position });
-      out.push({ ...p, id: `${position}-${target}`, injuredWeeks: 0, stats: { speed: target, strength: target, stamina: target, skill: target, footyIQ: target } });
+      out.push({ ...p, id: `${position}-${target}`, injuredWeeks: 0, stats: { speed: target, strength: target, stamina: target, handling: target, kicking: target, footyIQ: target } });
     }
   }
   return out;
@@ -51,7 +51,7 @@ describe('positional fit (pure)', () => {
     expect(effectiveRating(p, 'winger')).toBe(Math.round(overallRating(p) * FIT.related));
     expect(effectiveRating(p, 'prop')).toBe(Math.round(overallRating(p) * FIT.unrelated));
     const at = statsAt(p, 'prop');
-    for (const k of ['speed', 'strength', 'stamina', 'skill', 'footyIQ'] as const) expect(at[k]).toBe(Math.max(1, Math.round(p.stats[k] * FIT.unrelated)));
+    for (const k of ['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'] as const) expect(at[k]).toBe(Math.max(1, Math.round(p.stats[k] * FIT.unrelated)));
     expect(statsAt(p, 'fullback')).toEqual(p.stats);
   });
 });
@@ -79,7 +79,7 @@ describe('auto pick', () => {
     expect(l.bench[0]).toBe('lock-65');
   });
   it('a natural halfback keeps his slot ahead of a better centre moved there; the better man plays his own spot', () => {
-    const s = squad(60, 50).map((p) => (p.id === 'centre-60' ? { ...p, stats: { speed: 85, strength: 85, stamina: 85, skill: 85, footyIQ: 85 } } : p));
+    const s = squad(60, 50).map((p) => (p.id === 'centre-60' ? { ...p, stats: { speed: 85, strength: 85, stamina: 85, handling: 85, kicking: 85, footyIQ: 85 } } : p));
     const l = autoPick(s);
     expect(l.starters[3]).toBe('centre-60');
     expect(l.starters[5]).toBe('halfback-60');
@@ -232,14 +232,14 @@ describe('the sheet the sim gets', () => {
     expect(sheet.roster!.map((r) => r.position)).toEqual([...LINEUP_SLOTS]);
     const prop = s.find((p) => p.id === 'prop-55')!;
     expect(sheet.roster![5]!.stats).toEqual(statsAt(prop, 'halfback'));
-    expect(sheet.roster![5]!.stats!.skill).toBeLessThan(prop.stats.skill);
+    expect(sheet.roster![5]!.stats!.handling).toBeLessThan(prop.stats.handling);
     expect(sheet.roster![0]!.stats).toEqual(s.find((p) => p.id === 'fullback-65')!.stats);
     expect(sheet.bench!.map((b) => b.id)).toEqual(l.bench);
     expect(sheet.rotation).toBe('heavy');
     // Without a selection the sheet is the old top nine by overall, no fit applied, no rotation.
     const plain = teamSheetFromSquad(s, 'me', 'Me', ['#111', '#eee']);
     expect(plain.rotation).toBeUndefined();
-    expect(plain.roster!.map((r) => overallRating({ stats: r.stats! }))).toEqual([...s].sort((a, b) => overallRating(b) - overallRating(a)).slice(0, 9).map(overallRating));
+    expect(plain.roster!.map((r) => overallRating({ stats: r.stats!, position: r.position }))).toEqual([...s].sort((a, b) => overallRating(b) - overallRating(a)).slice(0, 9).map(overallRating));
   });
   it('the live sim puts the picked man in his slot, and the same lineup and seed give the same match', () => {
     const s = squad();
@@ -261,7 +261,7 @@ describe('a new signing (#416)', () => {
   const sq = squad();
   const picked = (): Lineup => ({ ...autoPick(sq), captain: 'second-row-65', kicker: 'halfback-65' });
   const recruit = (position: Position, rating: number, id = `new-${position}`): Player =>
-    ({ ...sq.find((p) => p.position === position)!, id, injuredWeeks: 0, stats: { speed: rating, strength: rating, stamina: rating, skill: rating, footyIQ: rating } });
+    ({ ...sq.find((p) => p.position === position)!, id, injuredWeeks: 0, stats: { speed: rating, strength: rating, stamina: rating, handling: rating, kicking: rating, footyIQ: rating } });
 
   it('a man who out-rates the starter in his own slot goes straight in; the starter goes to the bench', () => {
     const l = picked();

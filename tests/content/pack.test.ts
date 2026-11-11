@@ -312,7 +312,7 @@ describe('UK careers (#488)', () => {
     expect(cardById('baliTrip')?.cooldown).toBe(25);
   });
 
-  it('an old save without pack loads as AU even after a UK career, without migration or a version bump', () => {
+  it('a current save without pack loads as AU even after a UK career', () => {
     const old = createNewGame('Test Club', 71);
     delete old.pack;
     createNewGame('Test Club', 71, { home: { town: 'Test Town', country: 'GB' } });
@@ -325,6 +325,6 @@ describe('UK careers (#488)', () => {
       expect(config.SEASON_ROUNDS).toBe(24);
       expect(cardById('baliTrip')?.title).toBe(AU_PACK.events.trip.title);
     }
-    expect(SAVE_VERSION).toBe(23);
+    expect(SAVE_VERSION).toBe(24);
   });
 });

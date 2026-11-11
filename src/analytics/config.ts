@@ -31,6 +31,8 @@ export interface AnalyticsPage {
   labs: boolean;
   /** navigator.webdriver: a browser driven by Playwright and the like. */
   automated: boolean;
+  /** Browser DNT/GPC opt-out, enforced before SDK load as well as by respect_dnt. */
+  doNotTrack?: boolean;
 }
 
 export interface AnalyticsSetup {
@@ -39,7 +41,7 @@ export interface AnalyticsSetup {
 }
 
 /** Why analytics is off, for the tests and a dev's console. */
-export type AnalyticsOff = 'no-token' | 'not-public-token' | 'dev' | 'test' | 'lab' | 'labs' | 'e2e' | 'automated';
+export type AnalyticsOff = 'no-token' | 'not-public-token' | 'dev' | 'test' | 'lab' | 'labs' | 'e2e' | 'automated' | 'dnt';
 
 /** A PostHog public project token: `phc_` and URL-safe characters only. */
 const PUBLIC_TOKEN = /^phc_[A-Za-z0-9_-]{16,}$/;
@@ -55,5 +57,6 @@ export function analyticsSetup(env: AnalyticsEnv, page: AnalyticsPage): Analytic
   if (page.labs || new URLSearchParams(page.search).get('labs') === '1') return { off: 'labs' };
   if (new URLSearchParams(page.search).has('e2e')) return { off: 'e2e' };
   if (page.automated) return { off: 'automated' };
+  if (page.doNotTrack) return { off: 'dnt' };
   return { token, host: POSTHOG_EU_HOST };
 }

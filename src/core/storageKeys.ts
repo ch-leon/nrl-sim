@@ -48,3 +48,8 @@ export const DEV_TEST_PREFIX = 'nrl-sim-devtest:';
 export const DEV_TEST_BACKUP_KEY = 'nrl-sim-devtest-backup';
 /** A normal key found changed on the way back, kept here before the backup is put back (#519). */
 export const DEV_TEST_DISPLACED_KEY = 'nrl-sim-devtest-displaced';
+
+/** Original payloads preserved before migration/repair, scoped to a slot and career. */
+export function recoveryKey(slot: number): string {
+  return `nrl-sim-save-recovery-${slot}`;
+}

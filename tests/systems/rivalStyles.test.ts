@@ -21,7 +21,7 @@ function nine(o: { backsSpeed?: number; packStrength?: number; stamina?: number;
       speed: BACKS.has(position) ? (o.backsSpeed ?? 60) : 60,
       strength: PACK.has(position) ? (o.packStrength ?? 60) : 60,
       stamina: o.stamina ?? 60,
-      skill: 60,
+      handling: 60, kicking: 60,
       footyIQ: 60,
     },
     ...(position === 'halfback' && o.halfTrait ? { traits: [{ id: o.halfTrait }] } : {}),
@@ -59,7 +59,7 @@ describe('rival styles from their squads (N11)', () => {
     }
   });
 
-  it('styles vary across a league', () => {
+  it('attacks vary across a league; low hidden stamina leaves generated defences on Slide or Rush', () => {
     const attacks = new Set<string>();
     const defences = new Set<string>();
     for (const seed of [1, 2, 3]) {
@@ -70,7 +70,7 @@ describe('rival styles from their squads (N11)', () => {
       }
     }
     expect(attacks.size).toBeGreaterThanOrEqual(4);
-    expect(defences.size).toBe(3);
+    expect([...defences].sort()).toEqual(['rush', 'slide']);
   });
 
   it('omitting player context preserves legacy rival-v-rival styles, squad-built or strength-built', () => {

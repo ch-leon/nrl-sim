@@ -4,7 +4,8 @@
 
 import type { Player, Position, PlayerStats } from '../core/state';
 import type { Rng } from '../utils/rng';
-import { WEEKS_PER_SEASON, STAT_MAX } from '../config';
+import { WEEKS_PER_SEASON, STAT_MAX, STAR_BANDS } from '../config';
+import { createCeilings } from '../systems/potential';
 import { randomName } from './names';
 import { rollTraits, withTrait } from './traits';
 
@@ -13,6 +14,36 @@ export const POSITIONS: readonly Position[] = [
   'fullback', 'winger', 'centre', 'five-eighth', 'halfback',
   'hooker', 'prop', 'second-row', 'lock',
 ];
+
+export type PositionGroup = 'outside-backs' | 'halves' | 'hooker' | 'forwards';
+
+export const POSITION_GROUPS: Readonly<Record<Position, PositionGroup>> = {
+  fullback: 'outside-backs', winger: 'outside-backs', centre: 'outside-backs',
+  'five-eighth': 'halves', halfback: 'halves', hooker: 'hooker',
+  prop: 'forwards', 'second-row': 'forwards', lock: 'forwards',
+};
+
+const SHOWN_STATS: Readonly<Record<PositionGroup, readonly (keyof PlayerStats)[]>> = {
+  'outside-backs': ['speed', 'handling', 'strength', 'footyIQ'],
+  halves: ['handling', 'kicking', 'footyIQ', 'speed'],
+  hooker: ['handling', 'footyIQ', 'stamina', 'strength'],
+  forwards: ['strength', 'stamina', 'speed', 'footyIQ'],
+};
+
+/** Order is also the order of the four bars on the player page. */
+export function shownStats(position: Position): readonly (keyof PlayerStats)[] {
+  return SHOWN_STATS[POSITION_GROUPS[position]];
+}
+
+/** Off-role stats remain usable in matches, but start low regardless of quality. */
+export const HIDDEN_STAT_BAND = [10, 25] as const;
+
+/** Preserve the created off-role values when a generator replaces shown stats. */
+export function withShownStats(position: Position, created: PlayerStats, rolled: PlayerStats): PlayerStats {
+  const stats = { ...created };
+  for (const key of shownStats(position)) stats[key] = rolled[key];
+  return stats;
+}
 
 export type Quality = 'rookie' | 'average' | 'star';
 
@@ -54,35 +85,52 @@ export function wageForOverall(overall: number): number {
  * what rivals' salary cap counts and what a renewal asks (#146: the one copy;
  * contracts.ts and rivals.ts re-export it).
  */
-export function marketWage(p: Pick<Player, 'stats'>): number {
+export function marketWage(p: Pick<Player, 'stats' | 'position'>): number {
   return wageForOverall(overallRating(p));
 }
 
-/**
- * Weighted mean of the 5 PlayerStats (skill .25, footyIQ .25, speed .2,
- * strength .15, stamina .15). Returns 1..100, rounded.
- */
-export function overallRating(p: Pick<Player, 'stats'>): number {
-  const s = p.stats;
-  const raw =
-    s.skill * 0.25 +
-    s.footyIQ * 0.25 +
-    s.speed * 0.2 +
-    s.strength * 0.15 +
-    s.stamina * 0.15;
-  return clampStat(Math.round(raw));
+/** Plain average of the four shown stats; round only when displaying a number. */
+export function overallRating(p: Pick<Player, 'stats' | 'position'>): number {
+  return shownStats(p.position).reduce((sum, key) => sum + p.stats[key], 0) / 4;
 }
 
-function rollStats(rng: Rng, quality: Quality): PlayerStats {
+/** Half-star steps, clamped to the first and last configured bands. */
+export function starsForOverall(overall: number): number {
+  let stars = STAR_BANDS[0]!.stars;
+  for (const band of STAR_BANDS) {
+    if (overall < band.minOverall) break;
+    stars = band.stars;
+  }
+  return stars;
+}
+
+export function playerStars(p: Pick<Player, 'stats' | 'position'>): number {
+  return starsForOverall(overallRating(p));
+}
+
+/** Compact plain text fits the existing rating cells, including phone portrait. */
+export function ratingText(overall: number): string {
+  const stars = starsForOverall(overall);
+  const label = Number.isInteger(stars) ? String(stars) : `${Math.floor(stars) || ''}½`;
+  return `${label}★ ${Math.round(overall)}`;
+}
+
+function rollStats(rng: Rng, quality: Quality, position: Position): PlayerStats {
   const [lo, hi] = QUALITY_BANDS[quality];
   const roll = (): number => clampStat(rng.int(lo, hi));
-  return {
+  const stats = {
     speed: roll(),
     strength: roll(),
     stamina: roll(),
-    skill: roll(),
+    handling: roll(), kicking: 0,
     footyIQ: roll(),
   };
+  stats.kicking = stats.handling;
+  const shown = shownStats(position);
+  for (const key of Object.keys(stats) as (keyof PlayerStats)[]) {
+    if (!shown.includes(key)) stats[key] = rng.int(...HIDDEN_STAT_BAND);
+  }
+  return stats;
 }
 
 /**
@@ -94,8 +142,8 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
   const age = opts.age ?? rng.int(17, 36);
   const position = opts.position ?? rng.pick(POSITIONS);
   const name = randomName(rng);
-  const stats = rollStats(rng, quality);
-  const overall = overallRating({ stats });
+  const stats = rollStats(rng, quality, position);
+  const overall = overallRating({ stats, position });
 
   // Deterministic id (no crypto). state() BEFORE int() so it reflects the
   // RNG's position at the moment of id construction.
@@ -103,7 +151,7 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
 
   const morale = rng.int(55, 85);
   const injuryRisk = rng.int(5, 40);
-  const wage = marketWage({ stats });
+  const wage = marketWage({ stats, position });
   const contractWeeks = rng.int(1, 3) * WEEKS_PER_SEASON;
 
   // Special skills: rare, levelled, weighted to the position (BAK-208 §3).
@@ -119,6 +167,8 @@ export function generatePlayer(rng: Rng, opts: GenPlayerOpts = {}): Player {
     age,
     position,
     stats,
+    ceilings: createCeilings({ id, age, position, stats }),
+    xp: 0, level: 1, unspentPoints: 0,
     morale,
     injuryRisk,
     injuredWeeks: 0,
@@ -146,8 +196,10 @@ export function qualityFor(target: number): Quality {
 export function generatePlayerAround(rng: Rng, target: number, opts: Omit<GenPlayerOpts, 'quality'> = {}): Player {
   const base = generatePlayer(rng, { ...opts, quality: qualityFor(target) });
   const roll = (): number => clampStat(target + rng.int(-AROUND_SPREAD, AROUND_SPREAD));
-  const stats: PlayerStats = { speed: roll(), strength: roll(), stamina: roll(), skill: roll(), footyIQ: roll() };
-  return { ...base, stats, wage: marketWage({ stats }) };
+  const stats: PlayerStats = { speed: roll(), strength: roll(), stamina: roll(), handling: roll(), kicking: 0, footyIQ: roll() };
+  stats.kicking = stats.handling;
+  const finalStats = withShownStats(base.position, base.stats, stats);
+  return { ...base, stats: finalStats, ceilings: createCeilings({ ...base, stats: finalStats }), wage: marketWage({ stats: finalStats, position: base.position }) };
 }
 
 /**

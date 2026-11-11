@@ -14,6 +14,7 @@ import { currentRound } from './season';
 // comes from src/core/storageKeys.ts, frozen whatever the game is called.
 
 import type { GameState } from './state';
+import { validateInput, validateCurrent, REPAIR_NOTICE, type SaveRepair } from './saveValidation';
 import { emptyFinance, getState, SAVE_VERSION, setState } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
 import { withRivalSquads } from '../systems/rivals';
@@ -22,7 +23,7 @@ import { DEFAULT_TACTICS } from '../match/league/presets';
 import { bus } from './events';
 import { registerTickHook, TICK_ORDER, unregisterTickHook, weekHeld } from './time';
 import { clearLiveMatch, LIVE_MATCH_EXPORT_FIELD, peelLiveMatchExport, readLiveMatch, writeLiveMatch } from '../systems/liveMatchRecord';
-import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY } from './storageKeys';
+import { CORRUPT_SAVE_KEY, LEGACY_SAVE_KEY, slotKey } from './storageKeys';
 import { BRAND } from '../brand';
 import { cleanName } from '../data/names';
 import { allPlayers, renameClubsPatch, renamePlayersPatch, validClubColors, type ClubEdit } from '../systems/rename';
@@ -46,10 +47,20 @@ export const SLOT_COUNT = 3;
 
 let injectedStorage: StorageLike | null = null;
 let activeStore: LocalSaveStore | null = null;
+// Boundary approvals are scoped to the actual namespaced store and exact bytes.
+// Autosave never validates nested input during a tick. An externally changed
+// occupied slot must be reopened through load/import before it can be written.
+let approvedOriginals = new WeakMap<LocalSaveStore, Map<number, { raw: string; preserve: boolean }>>();
+function approveOriginal(store: LocalSaveStore, slot: number, raw: string, preserve: boolean): void {
+  let slots = approvedOriginals.get(store);
+  if (!slots) approvedOriginals.set(store, slots = new Map());
+  slots.set(slot, { raw, preserve });
+}
 
 /** Test hook: inject a fake storage (pass null to clear and fall back to real). */
 export function __setStorage(s: StorageLike | null): void {
   injectedStorage = s;
+  approvedOriginals = new WeakMap();
   slotImported = false; // a fresh storage is a fresh page
 }
 
@@ -67,6 +78,10 @@ function getStore(): LocalSaveStore | null {
 }
 
 // ── Migration ────────────────────────────────────────────────────────────────
+//
+// v24 exception (Leon, 10 Nov 2026): new careers only. The boundary below
+// rejects every pre-v24 version before any of these historical steps can run.
+// There is deliberately no 23 → 24 migration.
 //
 // HOW TO ADD A STATE CHANGE (e.g. new GameState fields):
 //   1. Bump SAVE_VERSION in state.ts (N → N+1) and update GameState + createNewGame.
@@ -291,13 +306,8 @@ function migrateTraits(traits: unknown): TraitInstance[] {
 }
 
 export type MigrateResult =
-  | { ok: true; state: GameState }
-  | { ok: false; reason: 'corrupt' | 'future'; message: string };
-
-/** The required top-level keys every valid save must carry (BAK-174 spec). */
-const REQUIRED_KEYS = [
-  'clubId', 'clubName', 'money', 'week', 'season', 'squad', 'facilities', 'league',
-] as const;
+  | { ok: true; outcome: 'valid' | 'repaired'; state: GameState; repairs: SaveRepair[] }
+  | { ok: false; outcome: 'unrecoverable' | 'unsupported'; reason: 'corrupt' | 'future'; message: string };
 
 /**
  * Upgrade a parsed save to the current version, one step at a time, then
@@ -305,46 +315,46 @@ const REQUIRED_KEYS = [
  * Future-version saves are refused with a clear message (reason 'future').
  */
 export function migrateState(raw: unknown): MigrateResult {
+  try { return migrateChecked(raw); }
+  catch { return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'Save could not be migrated.' }; }
+}
+
+function migrateChecked(raw: unknown): MigrateResult {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { ok: false, reason: 'corrupt', message: 'Not a valid save file.' };
+    return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'Not a valid save file.' };
   }
   let cur = raw as RawState;
   const declared = cur.version;
   if (typeof declared !== 'number' || !Number.isInteger(declared) || declared < 1) {
-    return { ok: false, reason: 'corrupt', message: 'Save has no valid version.' };
+    return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'Save has no valid version.' };
   }
   let version: number = declared;
   if (version > SAVE_VERSION) {
     return {
       ok: false,
-      reason: 'future',
+      outcome: 'unsupported', reason: 'future',
       message: `This save is from a newer version of ${BRAND.name} (save v${version}, this game supports v${SAVE_VERSION}). Update the game to load it.`,
     };
   }
+  // Leon, 10 Nov 2026: v24 is new careers only. Reuse rejected-save recovery.
+  if (version <= 23) {
+    return { ok: false, outcome: 'unrecoverable', reason: 'corrupt',
+      message: `This save is from an older version of ${BRAND.name} (save v${version}). Please start a new career. Your original save has been kept.` };
+  }
+  const inputProblem = validateInput(cur, version);
+  if (inputProblem) return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: inputProblem };
   while (version < SAVE_VERSION) {
     const step = MIGRATIONS.find((m) => m.from === version);
     if (!step) {
-      return { ok: false, reason: 'corrupt', message: `No migration from save v${version}.` };
+      return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: `No migration from save v${version}.` };
     }
     cur = { ...step.run(cur), version: step.to };
     version = step.to;
   }
-  if (!isValidShape(cur)) {
-    return { ok: false, reason: 'corrupt', message: 'Save is missing required data.' };
-  }
-  return { ok: true, state: cur as unknown as GameState };
-}
-
-/** Structural validation: all required keys present with squad/facilities arrays
- *  and league an object. */
-function isValidShape(obj: RawState): boolean {
-  for (const key of REQUIRED_KEYS) {
-    if (!(key in obj)) return false;
-  }
-  if (!Array.isArray(obj.squad)) return false;
-  if (!Array.isArray(obj.facilities)) return false;
-  if (obj.league === null || typeof obj.league !== 'object') return false;
-  return true;
+  const checked = validateCurrent(cur);
+  return checked.ok
+    ? { ...checked, outcome: checked.repairs.length ? 'repaired' : 'valid' }
+    : { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: checked.message };
 }
 
 /** Parse + migrate JSON text (shared by load and import). Never throws. */
@@ -353,9 +363,10 @@ function parseSave(text: string): MigrateResult {
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { ok: false, reason: 'corrupt', message: 'File is not valid JSON.' };
+    return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'File is not valid JSON.' };
   }
-  return migrateState(parsed);
+  try { return migrateState(parsed); }
+  catch { return { ok: false, outcome: 'unrecoverable', reason: 'corrupt', message: 'Save could not be migrated.' }; }
 }
 
 // ── Slots ────────────────────────────────────────────────────────────────────
@@ -390,26 +401,26 @@ export interface SlotSummary {
   message?: string;
 }
 
-/** Describe every slot for the title screen. Read-only (never marks corrupt). */
+/** Describe slots without replacing their source; repaired originals are retained. */
 export function getSlotSummaries(): SlotSummary[] {
   const store = getStore();
   const out: SlotSummary[] = [];
-  store?.migrateLegacy();
+  if (loadSlot(1).status === 'ok') store?.migrateLegacy();
   for (let slot = 1; slot <= SLOT_COUNT; slot++) {
-    const raw = store ? store.read(slot) : null;
-    if (raw === null) {
+    const result = loadSlot(slot);
+    if (result.status === 'empty') {
       out.push({ slot, status: 'empty' });
       continue;
     }
-    const res = parseSave(raw);
-    if (res.ok) {
-      out.push({
-        slot, status: 'ok',
-        clubName: String(res.state.clubName), season: res.state.season, week: res.state.week,
-      });
-    } else {
-      out.push({ slot, status: res.reason, message: res.message });
+    if (result.status !== 'ok') {
+      out.push({ slot, status: result.status, message: result.message });
+      continue;
     }
+    out.push({
+      slot, status: 'ok',
+      clubName: String(result.state.clubName), season: result.state.season, week: result.state.week,
+      ...(result.repairs.length ? { message: REPAIR_NOTICE } : {}),
+    });
   }
   return out;
 }
@@ -418,6 +429,7 @@ export function getSlotSummaries(): SlotSummary[] {
 
 /** Write `state` to `slot`. Returns false (after warning + ui:notify) on failure. */
 export function writeSlot(slot: number, state: GameState): boolean {
+  if (savesLocked) return false;
   const store = getStore();
   if (!store) {
     console.warn('nrl-sim: no storage available, save skipped');
@@ -425,9 +437,20 @@ export function writeSlot(slot: number, state: GameState): boolean {
     return false;
   }
   try {
+    const original = store.read(slot);
+    if (original !== null) {
+      const approved = approvedOriginals.get(store)?.get(slot);
+      if (approved?.raw !== original) {
+        bus.emit('ui:notify', { text: 'Save refused: the slot changed. Reopen the career before saving.', kind: 'danger' });
+        return false;
+      }
+      // An upgraded/repaired state must never replace its only original bytes.
+      if (approved.preserve) store.keepCorrupt(original, slot);
+    }
     const payload = JSON.stringify(state);
     const facts = { saveVersion: state.version, club: String(state.clubName), season: state.season, week: state.week };
     store.write(slot, payload, nextMeta(store.storedMeta(slot), payload, facts, store.deviceId(), Date.now()));
+    approveOriginal(store, slot, payload, false);
   } catch (err) {
     console.warn('nrl-sim: save failed', err);
     bus.emit('ui:notify', { text: 'Save failed: storage full', kind: 'danger' });
@@ -445,7 +468,7 @@ export function listSlotMeta(): SlotListing[] {
   const store = getStore();
   if (!store) return [];
   try {
-    store.migrateLegacy();
+    if (loadSlot(1).status === 'ok') store.migrateLegacy();
     return store.list();
   } catch (err) {
     console.warn('nrl-sim: could not list saves', err);
@@ -520,47 +543,94 @@ export function saveIfChanged(state: GameState): boolean {
  */
 export function save(state: GameState): void {
   if (weekHeld() || slotImported || savesLocked) return;
-  getStore()?.migrateLegacy();
   if (writeSlot(activeSlot, state)) lastSaved = state;
 }
 
-/**
- * Load the active slot: parse → migrateState → validate. Returns the GameState,
- * or null when absent/unusable. Never throws.
- *  - corrupt (unparseable, bad version, missing keys): warn, copy raw payload to
- *    CORRUPT_KEY for forensics, remove the slot, return null.
- *  - from a newer game version: notify with a clear message, leave the save
- *    untouched, return null.
- */
-export function load(): GameState | null {
+export type LoadResult =
+  | { status: 'empty' }
+  | { status: 'ok'; outcome: 'valid' | 'repaired'; state: GameState; repairs: SaveRepair[] }
+  | { status: 'corrupt' | 'future'; outcome: 'unrecoverable' | 'unsupported'; message: string };
+
+/** Read without changing the source, including legacy and future-version bytes. */
+export function loadSlot(slot = activeSlot): LoadResult {
   const store = getStore();
-  if (!store) return null;
-  store.migrateLegacy();
-
-  const raw = store.read(activeSlot);
-  if (raw === null) return null;
-
-  const res = parseSave(raw);
-  if (res.ok) return res.state;
-  if (res.reason === 'future') {
-    console.warn(`nrl-sim: ${res.message}`);
-    bus.emit('ui:notify', { text: res.message, kind: 'danger' });
-    return null;
+  if (!store) return { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage unavailable. Your career may still be on this device.' };
+  try {
+    const raw = store.read(slot);
+    if (raw === null) return { status: 'empty' };
+    const res = parseSave(raw);
+    if (!res.ok) return { status: res.reason, outcome: res.outcome, message: res.message };
+    // A repaired state must not reach trusted memory until its exact source is
+    // retained and verified by #522's preservation path. Persisting comes later.
+    if (res.repairs.length) {
+      try { store.keepCorrupt(raw, slot); }
+      catch { return { status: 'corrupt', outcome: 'unrecoverable', message: 'Could not preserve the original. The repaired career was not loaded.' }; }
+    }
+    approveOriginal(store, slot, raw, res.repairs.length > 0 || JSON.parse(raw).version !== SAVE_VERSION);
+    return { status: 'ok', outcome: res.outcome, state: res.state, repairs: res.repairs };
+  } catch {
+    return { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage could not be read. Your career has been kept.' };
   }
-  return markCorrupt(store, raw);
 }
 
-/** Shared corrupt path: preserve raw under CORRUPT_KEY, drop the slot, warn. */
-function markCorrupt(store: LocalSaveStore, raw: string): null {
-  console.warn('nrl-sim: corrupt save, ignoring');
-  try {
-    store.keepCorrupt(raw);
-  } catch (err) {
-    // Preserving forensics is best-effort; never let it block recovery.
-    console.warn('nrl-sim: could not preserve corrupt save', err);
+/** Compatibility wrapper. Rejected careers stay in place and cannot be autosaved over. */
+export function load(): GameState | null {
+  const result = loadSlot();
+  if (result.status === 'ok') {
+    if (result.repairs.length) bus.emit('ui:notify', { text: REPAIR_NOTICE, kind: 'info' });
+    return result.state;
   }
-  store.remove(activeSlot);
+  if (result.status !== 'empty') {
+    console.warn('nrl-sim: corrupt save, ignoring');
+    bus.emit('ui:notify', { text: result.message, kind: 'danger' });
+    if (result.status === 'corrupt') {
+      try {
+        const store = getStore();
+        const raw = store?.read(activeSlot);
+        if (store && raw !== null && raw !== undefined) store.keepCorrupt(raw, activeSlot);
+      } catch { /* source remains untouched, including when backup fails */ }
+    }
+  }
   return null;
+}
+
+/** Raw recovery bypasses parsing, migration and validation entirely. */
+export function exportOriginalSave(slot: number): string | null {
+  return getStore()?.read(slot) ?? null;
+}
+
+/** Earlier originals retained when an older save was upgraded. Never migrates. */
+export function exportRecoverySaves(slot: number): string[] {
+  const store = getStore();
+  if (!store) return [];
+  const originals = store.recovery(slot);
+  if (slot === 1) {
+    // Older builds kept one shared forensic copy. Also expose a different legacy
+    // career shadowed by slot 1, without moving or rewriting either source.
+    const legacy = store.storage.getItem(LEGACY_SAVE_KEY);
+    const own = store.storage.getItem(slotKey(1));
+    for (const raw of [store.storage.getItem(CORRUPT_SAVE_KEY), own !== null && own !== legacy ? legacy : null]) {
+      if (raw !== null && !originals.includes(raw)) originals.push(raw);
+    }
+  }
+  return originals;
+}
+
+export function downloadOriginalSave(slot: number, recoveryIndex?: number): void {
+  try {
+    const raw = recoveryIndex === undefined ? exportOriginalSave(slot) : exportRecoverySaves(slot)[recoveryIndex] ?? null;
+    if (raw === null || typeof document === 'undefined') return;
+    const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `career-slot-${slot}-${recoveryIndex === undefined ? 'original' : `recovery-${recoveryIndex + 1}`}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch {
+    bus.emit('ui:notify', { text: 'Could not read the original save. It has been kept; try again when storage is available.', kind: 'danger' });
+  }
 }
 
 /** Delete a slot (leaves CORRUPT_KEY intact) and the live-match record beside it. */
@@ -585,8 +655,10 @@ export function clearSave(): void {
 export function hasSave(slot: number = activeSlot): boolean {
   const store = getStore();
   if (!store) return false;
-  store.migrateLegacy();
-  return store.read(slot) !== null;
+  try {
+    if (loadSlot(1).status === 'ok') store.migrateLegacy();
+    return store.read(slot) !== null;
+  } catch { return true; } // unreadable is occupied, never a fresh developer career
 }
 
 // ── Export / import ──────────────────────────────────────────────────────────
@@ -619,14 +691,11 @@ export function exportSave(state: GameState): string {
   return JSON.stringify(payload, null, 2);
 }
 
-export type ImportResult =
-  | { ok: true; state: GameState }
-  | { ok: false; message: string };
+export type ImportResult = MigrateResult | { ok: false; message: string };
 
 /** Validate + migrate imported text. Never throws, never touches storage. */
-export function importSave(text: string): ImportResult {
-  const res = parseSave(text);
-  return res.ok ? res : { ok: false, message: res.message };
+export function importSave(text: string): MigrateResult {
+  return parseSave(text);
 }
 
 // ── Names file (#398) ───────────────────────────────────────────────────────
@@ -806,10 +875,26 @@ export function applyNamesFile(text: string): { ok: boolean; text: string } {
  * message means the write itself failed and already notified.
  */
 export function installImportedSave(text: string, slot: number): ImportResult {
+  // Record shape is validated here; absent/malformed engine identities remain
+  // eligible for matchday's week-start restart after the career is installed.
   const peeled = peelLiveMatchExport(text);
   if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
   const res = importSave(peeled.text);
   if (!res.ok) return res;
+  const destinationStatus = loadSlot(slot);
+  if (destinationStatus.status !== 'empty' && destinationStatus.status !== 'ok') return { ok: false, message: 'Destination needs recovery before replacement.' };
+  // Repaired/historical imports retain both the exact incoming file (including
+  // its match envelope) and the occupied destination before any installation.
+  if (res.repairs.length || JSON.parse(peeled.text).version !== SAVE_VERSION) {
+    try {
+      const store = getStore();
+      if (!store || savesLocked) throw new Error('Storage unavailable');
+      const destination = store.read(slot);
+      if (destination !== null && !parseSave(destination).ok) return { ok: false, message: 'Destination needs recovery before replacement.' };
+      store.keepCorrupt(text, slot);
+      if (destination !== null) store.keepCorrupt(destination, slot);
+    } catch { return { ok: false, message: 'Could not preserve originals. Import was not installed.' }; }
+  }
   if (!writeSlot(slot, res.state)) return { ok: false, message: '' };
   if (peeled.live) {
     if (!writeLiveMatch(peeled.live, slot)) clearLiveMatch(slot);
@@ -833,7 +918,7 @@ export function importIntoSlot(text: string, slot: number): GameState | null {
   // The import now owns the active slot: this page's game must not save over it on
   // the way to the title screen (Settings → Import save reloads; #295's checker).
   if (slot === activeSlot) slotImported = true;
-  bus.emit('ui:notify', { text: `Save imported into slot ${slot}`, kind: 'success' });
+  bus.emit('ui:notify', { text: res.repairs.length ? REPAIR_NOTICE : `Save imported into slot ${slot}`, kind: 'success' });
   return res.state;
 }
 

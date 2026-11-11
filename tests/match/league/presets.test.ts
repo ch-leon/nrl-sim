@@ -20,7 +20,7 @@ function sheet(id: string, attack: AttackPreset = 'balanced', defence: DefencePr
     kicking: base,
     fitness: base,
     colors: ['#111', '#eee'],
-    roster: POSITIONS.map((position, i) => ({ name: `${id} ${position} ${i}`, position, stats: { speed: base, strength: base, stamina: 50, skill: base, footyIQ: base } })),
+    roster: POSITIONS.map((position, i) => ({ name: `${id} ${position} ${i}`, position, stats: { speed: base, strength: base, stamina: 50, handling: base, kicking: base, footyIQ: base } })),
     tactics: { attack, defence },
   };
 }

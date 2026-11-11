@@ -150,7 +150,7 @@ export abstract class LivePlay extends LiveKicks {
           .sort((a, b) => Math.abs(b.pos.y - h.body.pos.y) - Math.abs(a.pos.y - h.body.pos.y))[0];
         if (widest && Math.abs(widest.pos.y - h.body.pos.y) > MAX_LAT_M) receiver = widest.idx;
       }
-      if (receiver !== null && this.rng.next() < LIVE.passBase + h.stats.skill / 300 + TRAIT_PTS.playmakerPass * maker + plan.pass) {
+      if (receiver !== null && this.rng.next() < LIVE.passBase + h.stats.handling / 300 + TRAIT_PTS.playmakerPass * maker + plan.pass) {
         const to = this.players[receiver]!;
         if (Math.abs(to.body.pos.y - h.body.pos.y) > MAX_LAT_M) {
           this.emit('cut-out', `${h.name} throws the cut-out ball to ${to.name}`, h, announce(h.traits.find((t) => t.id === 'playmaker')));

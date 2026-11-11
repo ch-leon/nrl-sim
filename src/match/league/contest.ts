@@ -13,11 +13,11 @@ export type ContestOutcome = 'held' | 'big-hit' | 'broken' | 'fend' | 'offload' 
 export interface ContestStats {
   strength: number;
   speed: number;
-  skill: number;
+  handling: number;
   footyIQ: number;
 }
 
-export const AVERAGE: ContestStats = { strength: 50, speed: 50, skill: 50, footyIQ: 50 };
+export const AVERAGE: ContestStats = { strength: 50, speed: 50, handling: 50, footyIQ: 50 };
 
 /** How the tackler arrives relative to the carrier's running line. */
 export type Angle = 'square' | 'side' | 'behind';
@@ -41,7 +41,7 @@ export const OPEN: Situation = { defenders: 1, angle: 'square', speedDiff: 0, la
 
 /** The carrier's edge in the contact from stats alone, 0..1 (0.5 = even). */
 export function carrierEdge(atk: ContestStats, def: ContestStats): number {
-  const a = atk.strength * 0.5 + atk.speed * 0.3 + atk.skill * 0.2;
+  const a = atk.strength * 0.5 + atk.speed * 0.3 + atk.handling * 0.2;
   const d = def.strength * 0.6 + def.footyIQ * 0.2 + def.speed * 0.2;
   return 1 / (1 + Math.exp(-(a - d) / 22));
 }
@@ -167,7 +167,7 @@ export function resolveContest(atk: ContestStats, def: ContestStats, roll: numbe
 // ── The step (pre-contact, one-on-one) ───────────────────────────────────────
 
 /** Footwork and defence are derived stats (§2). */
-export const footwork = (s: ContestStats): number => (s.speed + s.skill) / 2;
+export const footwork = (s: ContestStats): number => (s.speed + s.handling) / 2;
 export const defence = (s: ContestStats): number => (s.strength + s.footyIQ) / 2;
 
 /**

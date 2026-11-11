@@ -58,7 +58,7 @@ describe('Rush counters', () => {
     expect(rushBroken(0.11, 'rush', 80, 1)).toBeGreaterThan(rushBroken(0.11, 'rush', 45, 1));
     expect(rushBroken(0.11, 'rush', 60, 1.5)).toBeLessThan(rushBroken(0.11, 'rush', 60, 0.5));
     expect(rushBroken(0, 'slide', 90, 0.5)).toBe(0);
-    const stats = { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 };
+    const stats = { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 };
     expect(derivedRatings({ position: 'prop', stats, traits: [{ id: 'wreckingBall' }] }).carry).toBeGreaterThan(60);
     expect(styleFit([{ position: 'prop', stats, traits: [{ id: 'hitman' }] }]).rush).toBeGreaterThan(1);
   }));

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { generateProspects, juniorCount, registerYouthSystem } from '../../src/systems/youth';
 import { registerAgingSystem } from '../../src/systems/aging';
 import { freeAgencyTick, signPlayer } from '../../src/systems/freeagency';
-import { trainPlayer } from '../../src/systems/training';
+import { trainWeek } from '../../src/systems/training';
 import { overallRating } from '../../src/data/player';
 import { makeRng } from '../../src/utils/rng';
 import { createNewGame, getState, setState } from '../../src/core/state';
@@ -41,14 +41,14 @@ describe('generateProspects', () => {
     expect(avgOverall(2)).toBeGreaterThan(avgOverall(1));
     expect(avgOverall(3)).toBeGreaterThan(avgOverall(2));
   });
-  it('develop under the training curve (>= 8 overall in a season at L0)', () => {
+  it('develop only through XP level points during weekly training', () => {
     const facilities = [{ id: 'f1', defId: 'trainingPaddock' as const, level: 1 as const, x: 0, y: 0 },
       { id: 'f2', defId: 'videoRoom' as const, level: 1 as const, x: 2, y: 0 },
       { id: 'f3', defId: 'weightsRoom' as const, level: 1 as const, x: 0, y: 2 }];
     for (const p of generateProspects(makeRng(3), 0)) {
       let q = p;
-      for (let w = 0; w < WEEKS_PER_SEASON; w++) q = { ...q, stats: trainPlayer(q, facilities) };
-      expect(overallRating(q) - overallRating(p)).toBeGreaterThanOrEqual(8);
+      for (let w = 0; w < WEEKS_PER_SEASON; w++) q = trainWeek(q, facilities);
+      expect(overallRating(q) - overallRating(p)).toBeGreaterThan(0);
     }
   });
 });

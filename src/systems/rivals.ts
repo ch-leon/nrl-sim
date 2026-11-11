@@ -19,7 +19,7 @@ import { getState, setState, type GameState, type Player, type Position, type Ri
 import { bus } from '../core/events';
 import { registerTickHook } from '../core/time';
 import { LEAGUE, ON_FIELD, SEASON_ROUNDS, STAT_MAX, WEEKS_PER_SEASON } from '../config';
-import { generatePlayerAround, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
+import { generatePlayerAround, withShownStats, shownStats, marketWage, overallRating, POSITIONS, wageForOverall } from '../data/player';
 import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
@@ -368,7 +368,7 @@ export function rivalSigningTick(clubs: readonly RivalClub[], freeAgents: readon
       pool = pool.filter((p) => p.id !== target.id);
       const ovr = overallRating(target);
       signed.push({ clubId: club.id, playerId: target.id, overall: ovr, reason: need?.kind ?? 'upgrade' });
-      if (ovr >= notable) news.push(`${club.name} sign ${ovr}-rated ${target.position} ${target.name}.`);
+      if (ovr >= notable) news.push(`${club.name} sign ${Math.round(ovr)}-rated ${target.position} ${target.name}.`);
       club = withDerivedStrength({ ...club, squad: [...room.squad, { ...target, morale: 50, departed: false }] });
     }
     out[i] = club;
@@ -385,10 +385,10 @@ export function developmentRate(age: number): number {
 }
 
 /** One week's chance of a ±1 step that averages `perSeason` over a season. */
-function stepStat(value: number, perSeason: number, rng: Rng): number {
+function stepStat(value: number, perSeason: number, roll: number): number {
   if (perSeason === 0) return value;
   const p = Math.min(1, Math.abs(perSeason) / WEEKS_PER_SEASON);
-  if (rng.next() >= p) return value;
+  if (roll >= p) return value;
   return clampStat(value + Math.sign(perSeason));
 }
 
@@ -396,16 +396,23 @@ function stepStat(value: number, perSeason: number, rng: Rng): number {
 function nudgeStats(p: Player, perSeason: number, rng: Rng): Player {
   if (perSeason === 0) return p;
   const s = p.stats;
-  return {
-    ...p,
-    stats: {
-      speed: stepStat(s.speed, perSeason, rng),
-      strength: stepStat(s.strength, perSeason, rng),
-      stamina: stepStat(s.stamina, perSeason, rng),
-      skill: stepStat(s.skill, perSeason, rng),
-      footyIQ: stepStat(s.footyIQ, perSeason, rng),
-    },
-  };
+  const speed = stepStat(s.speed, perSeason, rng.next());
+  const strength = stepStat(s.strength, perSeason, rng.next());
+  const stamina = stepStat(s.stamina, perSeason, rng.next());
+  // Share the former Skill draw without shifting Footy IQ or the next player.
+  const handlingRoll = rng.next();
+  const stats = withShownStats(p.position, s, {
+    speed, strength, stamina,
+    handling: stepStat(s.handling, perSeason, handlingRoll),
+    kicking: stepStat(s.kicking, perSeason, handlingRoll),
+    footyIQ: stepStat(s.footyIQ, perSeason, rng.next()),
+  });
+  // Cap only upward steps after all five original draws, including hidden stats'
+  // draws. Full ceilings must not shift the next player or the anchor's stream.
+  for (const key of shownStats(p.position)) {
+    if (stats[key] > s[key]) stats[key] = Math.max(s[key], Math.min(stats[key], p.ceilings[key]!));
+  }
+  return { ...p, stats };
 }
 
 /** A week of development for one rival player: by age, plus the pull toward the league mean. */

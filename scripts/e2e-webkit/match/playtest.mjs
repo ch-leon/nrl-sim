@@ -57,7 +57,7 @@ export async function runPlaytest(browser, W = 667, H = 375) {
       for (const club of window.__nrlState().league.clubs) for (const p of club.squad ?? []) {
         p.traits = [];
         p.stats = { speed: 60, strength: ['hooker', 'prop', 'second-row', 'lock'].includes(p.position) ? 90 : 60,
-          stamina: 60, skill: 60, footyIQ: 60 };
+          stamina: 60, handling: 60, kicking: 60, footyIQ: 60 };
       }
     });
   });

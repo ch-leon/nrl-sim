@@ -18,7 +18,7 @@ export const KICKOFF = {
   /** The old kick-off (deepDefault 0): onto the receivers' this-metre line, `peak` metres high. */
   today: { lineM: 24, peak: 16 },
   /**
-   * The deeper default: onto the receivers' `worstM` line with a kicking skill
+   * The deeper default: onto the receivers' `worstM` line with a Kicking stat
    * of `skillLo` or less, their `bestM` line at `skillHi` or more (straight
    * between), a little more hang to match.
    */
@@ -26,7 +26,7 @@ export const KICKOFF = {
   /**
    * Short kick-off: high, `pastHalfwayM` past halfway (the 10 m rule) for the
    * chase. Regathered `base` of the time, plus `perPoint` for each point of the
-   * best chaser's Speed over the catcher's Skill, kept to `min`–`max`. The best
+   * best chaser's Speed over the catcher's Handling, kept to `min`–`max`. The best
    * chaser is the quickest of the `chasers` kicking men nearest the spot.
    */
   short: { pastHalfwayM: 12, peak: 20, base: 0.25, perPoint: 0.005, min: 0.15, max: 0.4, chasers: 3 },
@@ -42,13 +42,13 @@ export const KICKOFF = {
 
 export type KickoffCall = 'kickoff-short' | 'kickoff-long';
 
-/** Where the kick-off comes down on the receivers' side of halfway, in metres from their own try line, by the kicker's Skill. */
-export function kickoffLineM(call: KickoffCall | null, skill: number, deep = KICKOFF.deepDefault > 0): number {
+/** Where the kick-off comes down on the receivers' side of halfway, in metres from their own try line, by the kicker's Kicking. */
+export function kickoffLineM(call: KickoffCall | null, kicking: number, deep = KICKOFF.deepDefault > 0): number {
   if (call === 'kickoff-short') return 50 - KICKOFF.short.pastHalfwayM;
   const k = call === 'kickoff-long' ? KICKOFF.long : deep ? KICKOFF.deep : null;
   if (!k) return KICKOFF.today.lineM;
   const s = KICKOFF.deep;
-  const t = clamp((skill - s.skillLo) / (s.skillHi - s.skillLo), 0, 1);
+  const t = clamp((kicking - s.skillLo) / (s.skillHi - s.skillLo), 0, 1);
   return k.worstM + (k.bestM - k.worstM) * t;
 }
 
@@ -64,12 +64,12 @@ export function kickoffPeak(call: KickoffCall | null, deep = KICKOFF.deepDefault
  * today's kick to the letter (the same one draw, `jitter01`, across the field).
  * `dead`: a Long that goes dead on the full, past the dead-ball line.
  */
-export function kickoffLanding(call: KickoffCall | null, receivingDir: 1 | -1, jitter01: number, skill: number, dead = false, deep = KICKOFF.deepDefault > 0): { to: Vec; peak: number } {
-  const line = dead ? -(IN_GOAL + KICKOFF.long.deadPastM) : kickoffLineM(call, skill, deep);
+export function kickoffLanding(call: KickoffCall | null, receivingDir: 1 | -1, jitter01: number, kicking: number, dead = false, deep = KICKOFF.deepDefault > 0): { to: Vec; peak: number } {
+  const line = dead ? -(IN_GOAL + KICKOFF.long.deadPastM) : kickoffLineM(call, kicking, deep);
   return { to: kickoffTarget(receivingDir, jitter01, line), peak: kickoffPeak(call, deep) };
 }
 
-/** A short kick-off's chance of being regathered: the best chaser's Speed against the catcher's Skill (the bomb's contest, kickContest.ts, #99). */
+/** A short kick-off's chance of being regathered: the best chaser's Speed against the catcher's Handling (the bomb's contest, kickContest.ts, #99). */
 export function regatherChance(chaserSpeed: number, catcherSkill: number): number {
   return chaserWins(KICKOFF.short, chaserSpeed, catcherSkill);
 }

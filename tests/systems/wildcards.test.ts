@@ -6,7 +6,7 @@ import {
 } from '../../src/systems/events';
 import { cardById, EVENT_CARDS } from '../../src/data/events';
 import { initLeague } from '../../src/systems/fixtures';
-import { createNewGame, SAVE_VERSION, getState, resetForNewSeason, setState, type GameState, type Player } from '../../src/core/state';
+import { createNewGame, getState, resetForNewSeason, setState, type GameState, type Player } from '../../src/core/state';
 import { bus } from '../../src/core/events';
 import { clearSeasonHooks, clearTickHooks } from '../../src/core/time';
 import { makeRng, type Rng } from '../../src/utils/rng';
@@ -172,7 +172,7 @@ describe('wildcard odds', () => {
     };
     const calm: Player = {
       ...s.squad[1]!, id: 'calm', name: 'Calm Hand', morale: 80, junior: false,
-      injuredWeeks: 0, suspendedWeeks: 0, traits: [], stats: { ...s.squad[1]!.stats, skill: 99, footyIQ: 99 },
+      injuredWeeks: 0, suspendedWeeks: 0, traits: [], stats: { ...s.squad[1]!.stats, handling: 99, kicking: 99, footyIQ: 99 },
     };
     expect(incidentWeight(hot)).toBe(9);
     expect(incidentWeight(calm)).toBe(1);
@@ -390,17 +390,10 @@ describe('saves', () => {
     __setStorage(null);
   });
 
-  it('a v20 save gains zero bans and an empty flag list', () => {
-    const s = fresh();
-    const raw = asOldSave(s, 20);
-    expect((raw.eventDeck as { flags?: unknown }).flags).toBeUndefined();
-    expect((raw.squad as { suspendedWeeks?: number }[])[0]).not.toHaveProperty('suspendedWeeks');
-    const res = migrateState(raw);
-    expect(res.ok).toBe(true);
-    if (!res.ok) return;
-    expect(res.state.version).toBe(SAVE_VERSION);
-    expect(res.state.eventDeck.flags).toEqual([]);
-    expect(res.state.squad.every((p) => p.suspendedWeeks === 0)).toBe(true);
+  it('a v20 save requires a new career without filling bans or flags', () => {
+    const raw = asOldSave(fresh(), 20); const before = JSON.stringify(raw);
+    expect(migrateState(raw)).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
+    expect(JSON.stringify(raw)).toBe(before);
   });
 
   it('keeps a pending trip and a banned player through a save round-trip', () => {

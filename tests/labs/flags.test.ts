@@ -27,7 +27,7 @@ describe('browser-local Labs', () => {
   it('never adds Labs to a save payload', () => {
     __setLabs({ visible: true, on: { 'match-controls': true }, hintsSeen: ['match-controls'] });
     const state = createNewGame('Labs', 1);
-    expect(SAVE_VERSION).toBe(23);
+    expect(SAVE_VERSION).toBe(24);
     expect(JSON.stringify(state)).not.toContain('match-controls');
     expect(JSON.stringify(state)).not.toContain('nrl-sim-labs');
     expect(exportSave(state)).not.toContain('nrl-sim-labs');

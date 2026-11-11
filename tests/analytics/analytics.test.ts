@@ -113,10 +113,11 @@ describe('the SDK setup (clientConfig.ts)', () => {
       disable_persistence: true,
       save_referrer: false,
       save_campaign_params: false,
+      respect_dnt: true,
     });
   });
 
-  it('captures nothing on its own: no autocapture, page views, replay, exceptions or remote scripts', () => {
+  it('uses guarded exception listeners; no SDK autocapture, page views, replay or remote scripts', () => {
     expect(cfg).toMatchObject({
       autocapture: false,
       rageclick: false,
@@ -140,10 +141,14 @@ describe('the SDK setup (clientConfig.ts)', () => {
     ({ uuid: 'u', event, properties, timestamp: new Date() } as unknown as CaptureResult);
 
   it('before_send drops every event not on the list', () => {
-    for (const name of ['$pageview', '$pageleave', '$autocapture', '$exception', '$identify', '$snapshot', '$web_vitals', 'survey shown', 'player_sold']) {
+    for (const name of ['$pageview', '$pageleave', '$autocapture', '$identify', '$snapshot', '$web_vitals', 'survey shown', 'player_sold']) {
       expect(beforeSend(sdkEvent(name, { ...CONTEXT }))).toBeNull();
     }
     expect(beforeSend(null)).toBeNull();
+  });
+
+  it('before_send refuses malformed exceptions', () => {
+    expect(beforeSend(sdkEvent('$exception', { ...CONTEXT }))).toBeNull();
   });
 
   it('before_send keeps the agreed properties and the SDK\'s own, drops the rest, and strips the address', () => {
@@ -352,7 +357,7 @@ describe('the SDK stays out of the first load (static guard)', () => {
   });
 
   it('nothing imports posthogClient.ts except index.ts, lazily', () => {
-    const refs = src.filter(([p, code]) => p !== 'src/analytics/posthogClient.ts' && /posthogClient/.test(code.replace(/\/\/.*$/gm, '')));
+    const refs = src.filter(([p, code]) => p !== 'src/analytics/posthogClient.ts' && /(?:from\s*|import\(\s*)['"]\.\/posthogClient['"]/.test(code));
     expect(refs.map(([p]) => p)).toEqual(['src/analytics/index.ts']);
     const idx = refs[0]![1];
     expect(idx).toMatch(/import\('\.\/posthogClient'\)/);

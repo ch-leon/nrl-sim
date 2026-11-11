@@ -178,7 +178,7 @@ describe('out-schemed (#468)', () => {
   it('does not fire below threshold, including zero fit', () => {
     const s = club(), { us, them } = countered(s);
     const roster = (rating: number) => ours(s).roster!.map(p => ({ ...p,
-      stats: { speed: rating, strength: rating, stamina: rating, skill: rating, footyIQ: rating } }));
+      stats: { speed: rating, strength: rating, stamina: rating, handling: rating, kicking: rating, footyIQ: rating } }));
     expect(hasReason(why(s, ended(), { ...us, roster: roster(59) }, them))).toBe(false);
     expect(hasReason(why(s, ended(), { ...us, roster: roster(0) }, them))).toBe(false);
   });

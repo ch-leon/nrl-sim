@@ -15,7 +15,8 @@ import { SQUAD_MIN } from '../../src/config';
 
 const mk = (id: string, over: Partial<Player> = {}): Player => ({
   id, name: id, age: 25, position: 'lock',
-  stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 },
+  ceilings: { speed: 100, strength: 100, stamina: 100, handling: 100, kicking: 100, footyIQ: 100 },
+  stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 },
   morale: 50, injuryRisk: 10, injuredWeeks: 0, traits: [], wage: 5000, contractWeeks: 20, ...over,
 });
 
@@ -213,11 +214,11 @@ describe('the board loan at the rollover and in old saves (N14.3)', () => {
     expect(getState().finance.find((f) => f.season === 1)!.boardGrant).toBe(0);
   });
 
-  it('a v17 save owes the board nothing', () => {
+  it('a v17 save requires a new career', () => {
     const raw = structuredClone(v17MidSeason) as Record<string, unknown>;
     expect(raw.version).toBe(17);
     expect(raw.boardLoan).toBeUndefined();
     const res = migrateState(raw);
-    expect(res.ok && res.state.boardLoan).toEqual({ owed: 0 });
+    expect(res).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
   });
 });

@@ -1,4 +1,3 @@
-import { currentRound } from './core/season';
 import Phaser from 'phaser';
 import { packForCountry, preparePack } from './content';
 import './ui/fonts';
@@ -7,7 +6,7 @@ import { GroundsScene } from './scenes/GroundsScene';
 import { MatchScene } from './scenes/MatchScene';
 import { bus, type Events } from './core/events';
 import { createNewGame, getState, loadState, type GameState } from './core/state';
-import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, load, save, setActiveSlot } from './core/save';
+import { enableAutosave, getActiveSlot, getSlotSummaries, hasSave, loadSlot, save, setActiveSlot } from './core/save';
 import { showTitleFlow } from './ui/title';
 import { showExpansionIntro } from './ui/expansionIntro';
 import { expansionIntroLines } from './ui/expansionCopy';
@@ -20,7 +19,7 @@ import { initMatchArtAhead, warmMatchArt } from './scenes/matchArtAhead';
 import { createNav } from './ui/nav';
 import { closeModal, closeScreen } from './ui/dom';
 import { initToasts } from './ui/toasts';
-import { initLeague, registerFixturesSystem } from './systems/fixtures';
+import { getCurrentFixture, initLeague, registerFixturesSystem } from './systems/fixtures';
 import { registerUnlockSystem } from './systems/unlocks';
 import { uiScreenLockReason } from './labs/screenOverride';
 import { registerTrainingSystem } from './systems/training';
@@ -154,12 +153,18 @@ async function boot(): Promise<void> {
     // Its save gone (site data cleared): build it again rather than start a stray new game.
     if (!hasSave(1)) playtest.fresh = true;
   }
-  const choice = playtest
+  let choice = playtest
     ? (playtest.fresh ? { mode: 'new' as const, clubName: PLAYTEST_CLUB, coachName: PLAYTEST_COACH, seed: PLAYTEST_SEED, difficulty: 'normal' as const } : { mode: 'continue' as const })
     : await showTitleFlow(uiRoot);
+  // Rejection is not an empty career: stay at recovery instead of installing defaults.
+  let loaded = loadSlot();
+  while ((choice.mode === 'continue' || playtest?.fresh) && loaded.status !== 'ok' && loaded.status !== 'empty') {
+    choice = await showTitleFlow(uiRoot);
+    loaded = loadSlot();
+  }
   let freshGame = choice.mode !== 'continue' && !playtest;
   if (choice.mode === 'continue') {
-    const saved = load();
+    const saved = loaded.status === 'ok' ? loaded.state : null;
     if (saved) { await preparePack(saved.pack ?? 'au'); loadState(saved); }
     else {
       freshGame = true;
@@ -408,7 +413,12 @@ async function boot(): Promise<void> {
   // week before it, so advancing again rebuilds the same match, which picks up
   // the record and plays on from where it was, calls and all.
   const pending = readLiveMatch();
-  if (pending && pending.season === getState().season && pending.week === getState().week && pending.round === currentRound(getState())) {
+  const fixture = getCurrentFixture(getState(), getState().clubId);
+  // Identity is deliberately checked by matchday after the week-start path can
+  // rebuild the fixture. Do not discard an incompatible sidecar during boot.
+  if (pending && fixture && !fixture.result && pending.season === getState().season
+    && pending.week === getState().week && pending.round === fixture.round
+    && pending.homeId === fixture.homeId && pending.awayId === fixture.awayId) {
     const resume = (): void => void setTimeout(() => advanceWeek(), 0);
     if (g.isBooted) resume();
     else g.events.once(Phaser.Core.Events.READY, resume);

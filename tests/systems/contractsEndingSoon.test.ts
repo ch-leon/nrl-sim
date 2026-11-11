@@ -8,7 +8,8 @@ import { EXPIRY_WINDOW_WEEKS } from '../../src/ui/screens/finance';
 
 const mk = (id: string, contractWeeks: number, over: Partial<Player> = {}): Player => ({
   id, name: id, age: 25, position: 'lock',
-  stats: { speed: 60, strength: 60, stamina: 60, skill: 60, footyIQ: 60 },
+  ceilings: { speed: 100, strength: 100, stamina: 100, handling: 100, kicking: 100, footyIQ: 100 },
+  stats: { speed: 60, strength: 60, stamina: 60, handling: 60, kicking: 60, footyIQ: 60 },
   morale: 50, injuryRisk: 10, injuredWeeks: 0, traits: [], wage: 5000, contractWeeks, ...over,
 });
 

@@ -1,7 +1,5 @@
 import { createLegacyGame as createNewGame } from '../helpers/legacyGame';
-// tests/systems/potentialRng.test.ts — #369 adds no dice: a season through every
-// system leaves the same rngSeed as main did before it, with the player page's
-// projection and the Squad dot worked out every week as if they were on screen.
+// Stored ceilings and weekly player-page reads preserve the season RNG stream.
 import { describe, it, expect } from 'vitest';
 import { getState } from '../../src/core/state';
 import { bus } from '../../src/core/events';
@@ -31,12 +29,17 @@ import { contractsEndingSoon } from '../../src/systems/contracts';
  * Both UI-read and no-read runs still agree; no RNG call site was added.
  * #469 changes rival plans and therefore season outcomes. Keep this historical
  * pin with habit AI off, and compare UI-read/no-read streams with it on too.
- * The two match fingerprint pins remain unchanged.
+ * #537 changes creation draws, shown-stat growth and overall-based selection.
+ * Re-pin the new-career season stream; UI reads must still match the control.
+ * Flat-match fingerprint pins remain unchanged.
  */
-const MAIN_SEED_AFTER_SEASON = 3040797444;
+// #539: XP replaces passive facility growth, changing selection and later match outcomes.
+// No RNG draw was added; UI-read and no-read runs still finish on the same stream.
+// Previous pin: 1788836146.
+const MAIN_SEED_AFTER_SEASON = 1597012555;
 
 describe('the rng stream (#369)', () => {
-  it.each([0, 1])('weekly projection and dot reads preserve the season stream with habit AI=%i', (ai) => {
+  it.each([0, 1])('weekly potential and dot reads preserve the season stream with habit AI=%i', (ai) => {
     const restore = applyTuning({ 'counters.ai.on': ai });
     try {
       const season = (readPages: boolean) => {

@@ -3,12 +3,14 @@
 // (BAK-207): the week holds at kick-off, 'match:started' hands the Match scene
 // the seed, and the result — what the player watched and called — lands with
 // the rest of the week at 'match:finished'. Fast-forward plays it headless.
+import { applyMatchXp } from './training';
 import { DEFAULT_TACTICS } from '../match/league/presets';
 import type { RivalPlanContext } from '../match/league/ai';
 import { bus, type LiveMatchData } from '../core/events';
 import { getState, setState, type Fixture, type GameState, type RivalClub } from '../core/state';
 import { registerTickHook, resumeWeek, weekHeld, TICK_ORDER } from '../core/time';
 import { clearLiveMatch, liveMatchSameRules, readLiveMatch, writeLiveMatch, type LiveMatchRecord } from './liveMatchRecord';
+import { matchEngineIdentity } from './matchEngineIdentity';
 import { NINES } from '../match/league/rules';
 import { DEFAULT_PLAYER_COLORS, FORFEIT_SCORE, SQUAD_MIN, SEASON_ROUNDS, difficultyMultipliers } from '../config';
 import { applyResult, getCurrentFixture, isFinalsRound, PLAYER_ID } from './fixtures';
@@ -50,6 +52,8 @@ interface ParkedMatch {
   home: TeamSheet;
   away: TeamSheet;
   live: LiveMatchData;
+  record: LiveMatchRecord;
+  restartExplained: boolean;
 }
 let parked: ParkedMatch | null = null;
 
@@ -62,14 +66,18 @@ export function playerMatchPending(): boolean {
   return parked !== null && weekHeld();
 }
 
-/** Said once when a mid-match save from the old halves cannot be carried on. */
-export const MATCH_RESTARTED_TEXT = 'This match restarted under the new rules.';
+/** Said once per incompatible fixture, through the existing match toast lane. */
+export const MATCH_RESTARTED_TEXT = 'An update requires this match to restart from kick-off. Your career is safe. Progress in this fixture, including coach calls and plan changes, has been reset; this can lose nearly the whole watched match.';
+
+function explainRestart(): void {
+  bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info', match: true, ms: 16000 });
+}
 
 /**
  * Back at the club with the match still on: start the Match scene again from
  * the record. The week stays held (one hold, from kick-off), so the result
  * still lands once, at full time. Returns false when there is nothing to resume.
- * A record from the old halves starts again at the kick-off.
+ * An incompatible record starts again at kick-off.
  */
 export function resumePlayerMatch(): boolean {
   if (!parked || !weekHeld()) return false;
@@ -77,16 +85,22 @@ export function resumePlayerMatch(): boolean {
   const live = parked.live;
   // Prefer the stored record (a kill, or a write newer than this page). A missing
   // or other match's record keeps the calls and tick already on the parked match.
-  if (rec && rec.seed === live.seed) {
-    if (rec.tick > 0 && !liveMatchSameRules(rec)) {
+  if (rec && rec.season === parked.record.season && rec.week === parked.record.week
+    && rec.round === parked.fixture.round && rec.homeId === parked.fixture.homeId
+    && rec.awayId === parked.fixture.awayId && rec.seed === live.seed) {
+    if (!liveMatchSameRules(rec)) {
       live.calls = [];
       live.plans = [];
       delete live.controls;
       delete live.resumeAt;
-      const restarted = { ...rec, calls: [], plans: [], tick: 0, halfMinutes: NINES.halfMinutes };
+      const restarted = { ...rec, calls: [], plans: [], tick: 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
       delete restarted.controls;
+      // The held week and its sheets/options already exist; no week hook reruns.
+      Object.assign(parked.record, restarted);
+      delete parked.record.controls;
       writeLiveMatch(restarted);
-      bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info', match: true });
+      if (!parked.restartExplained) explainRestart();
+      parked.restartExplained = true;
     } else {
       live.calls = [...rec.calls];
       live.plans = rec.plans ? [...rec.plans] : [];
@@ -212,7 +226,8 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   setState({
     league: applied.league,
     ...(fixture.round > 0 ? { recentPlans: [{ ...(ownSheet.tactics ?? DEFAULT_TACTICS) }, ...getState().recentPlans].slice(0, 3) } : {}),
-    squad: applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
+    squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
+      ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus),
   });
 
   // GitHub #7: engine emits injuries; matchday owns squad mutation + notify.
@@ -300,20 +315,17 @@ export function registerPlayerMatchSystem(): void {
     };
     // A live match the app was closed in the middle of (#73): this is the same match.
     const prior = readLiveMatch();
-    const sameMatch =
-      prior && prior.season === state.season && prior.week === state.week && prior.round === fixture.round && prior.homeId === fixture.homeId && prior.seed === seed ? prior : null;
-    // A v19 mid-match save has no half length. Re-simming that tick under 7:00
-    // rules is a different match, so it starts again from the kick-off.
-    const stale = sameMatch && sameMatch.tick > 0 && !liveMatchSameRules(sameMatch);
-    if (stale) bus.emit('ui:notify', { text: MATCH_RESTARTED_TEXT, kind: 'info', match: true });
-    const resumed = stale ? null : sameMatch;
+    const sameFixture =
+      prior && prior.season === state.season && prior.week === state.week && prior.round === fixture.round && prior.homeId === fixture.homeId && prior.awayId === fixture.awayId ? prior : null;
+    // Never replay incompatible inputs, even a call queued at tick zero.
+    const stale = !!sameFixture && (!liveMatchSameRules(sameFixture) || sameFixture.seed !== seed);
+    const resumed = stale ? null : sameFixture;
     // The match on screen is the match (BAK-207; coach calls #73). The week
     // holds here; the result and the rest of the week come at full time, from
     // what the player watched (and called).
     if (!ctx.fastForward && ctx.hold) {
       ctx.hold();
-      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes };
-      writeLiveMatch(record);
+      const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
         if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
         off();
@@ -353,7 +365,10 @@ export function registerPlayerMatchSystem(): void {
         if (wrote && tick > 0) live.resumeAt = tick;
         return wrote;
       };
-      parked = { fixture, home, away, live };
+      parked = { fixture, home, away, live, record, restartExplained: stale };
+      writeLiveMatch(record);
+      // Replacing the sidecar is safe only after construction and the hold above.
+      if (stale) explainRestart();
       bus.emit('match:started', { fixture, home, away, live });
       return;
     }

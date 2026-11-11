@@ -6,8 +6,10 @@
 // saved lineup is the coach's intent; `resolveLineup` turns it into the side
 // that actually runs out on the day, filling a slot whose man is injured or has
 // left the club. Pure: the lineup screen, matchday and the save migration
-// call these. No Phaser, no state access, no dice.
-import type { Lineup, Player, PlayerStats, Position } from '../core/state';
+// call these. Calculations stay pure; commitLineup owns the coach edits'
+// store write and immediate save. No Phaser, no dice.
+import { getState, setState, type Lineup, type Player, type PlayerStats, type Position } from '../core/state';
+import { save } from '../core/save';
 import { overallRating } from '../data/player';
 import { BENCH, DEFAULT_ROTATION, isRotation, type Rotation } from '../match/league/bench';
 import { DEFAULT_TACTICS, isAttackPreset, isDefencePreset, type TeamTactics } from '../match/league/presets';
@@ -59,7 +61,7 @@ export function statsAt(p: Pick<Player, 'stats' | 'position'>, slot: Position): 
   const f = positionFit(p.position, slot);
   if (f === 1) return { ...p.stats };
   const scale = (n: number): number => Math.max(1, Math.round(n * f));
-  return { speed: scale(p.stats.speed), strength: scale(p.stats.strength), stamina: scale(p.stats.stamina), skill: scale(p.stats.skill), footyIQ: scale(p.stats.footyIQ) };
+  return { speed: scale(p.stats.speed), strength: scale(p.stats.strength), stamina: scale(p.stats.stamina), handling: scale(p.stats.handling), kicking: scale(p.stats.kicking), footyIQ: scale(p.stats.footyIQ) };
 }
 
 /** Fit to play: not injured and not banned (#324). A missing ban field is 0. */
@@ -396,4 +398,23 @@ export function signingNote(placed: Pick<SigningPlacement, 'where' | 'slot'>): s
   if (placed.where === 'nine' && placed.slot !== undefined) return `goes straight into the nine at ${LINEUP_SLOTS[placed.slot]}`;
   if (placed.where === 'bench') return 'starts on the bench';
   return 'is outside the thirteen for now: pick him in Lineup';
+}
+
+/** Keep a coach edit once, immediately; unchanged pure results do not save. No toast or Undo. */
+export function commitLineup(next: Lineup): boolean {
+  if (next === getState().lineup) return false;
+  setState({ lineup: next });
+  save(getState());
+  return true;
+}
+
+/** Change bench rotation while keeping the rest of the coach's plan. */
+export function setRotation(lineup: Lineup, rotation: Rotation): Lineup {
+  return { ...lineup, rotation };
+}
+
+/** Auto pick changes the thirteen while retaining the coach's roles and plays. */
+export function autoPickKeepingPlan(squad: readonly Player[], lineup: Lineup): Lineup {
+  return { ...autoPick(squad, lineup.rotation, validTactics(lineup.tactics)),
+    kicker: lineup.kicker ?? null, captain: lineup.captain ?? null, plays: lineup.plays ?? [] };
 }

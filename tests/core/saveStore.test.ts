@@ -161,6 +161,7 @@ describe('save meta (sidecar, not inside the save)', () => {
     expect(id).toMatch(/^[0-9a-f]{32}$/);
     __setStorage(null);
     __setStorage(storage); // a reload: same storage, fresh page
+    expect(load()).not.toBeNull(); // boot approves the occupied slot before autosave
     save(createNewGame('Device', 6));
     await settle();
     expect(storage.map.get(DEVICE_ID_KEY)).toBe(id);

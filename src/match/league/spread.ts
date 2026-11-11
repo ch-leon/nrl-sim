@@ -22,7 +22,7 @@ export const RATING = {
   spread: 0.2,
 };
 
-const KEYS: readonly (keyof RosterStats)[] = ['speed', 'strength', 'stamina', 'skill', 'footyIQ'];
+const KEYS: readonly (keyof RosterStats)[] = ['speed', 'strength', 'stamina', 'handling', 'kicking', 'footyIQ'];
 
 /** Each side's stats on the match: the starters' average, per stat (entries without stats left out). */
 function sideMean(sheet: TeamSheet): Record<keyof RosterStats, number> | null {

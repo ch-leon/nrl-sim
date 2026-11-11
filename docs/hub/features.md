@@ -28,7 +28,7 @@ What's in the game, with the PR that added each.
 ## Squad and recruitment
 
 - Free agents; stars cost a fee ([PR](https://github.com/ch-leon/nrl-sim/pull/147))
-- Player page, projected peak ([PR](https://github.com/ch-leon/nrl-sim/pull/378))
+- Player page ([PR](https://github.com/ch-leon/nrl-sim/pull/378))
 - Lineup: the nine and bench ([PR](https://github.com/ch-leon/nrl-sim/pull/186))
 - Staff (`src/systems/staff.ts`): Assistant Coach, Analyst, Welfare Manager
 
@@ -66,6 +66,26 @@ What's in the game, with the PR that added each.
 - The contact-study preview opens with Current and Prototype visible together, sharing playback and scenario controls; phone layouts stack the comparison panels. Updated tackles use close torso contact, short bent arms, impact compression and firmer landings. Tackle legs now keep their standing reach: boots slide in with the hips and knees fold through the landing instead of stretching between fixed feet and moving bodies.
 
 - [Match character art and contact animations](../specs/match-art-prototype.md), approved by Leon and locally integrated pending release: larger heads and stable identities in career matches and the match lab; running catches, close body contact, short bent arms and sim-driven group tackles, breaks and steals. Join/result timing survives replay and faster playback. `/#artlab` retains the earlier-art comparison and eleven-head workbench. Existing hair/colour assignments and save formats are preserved. The [Astra release handover](../handoffs/match-art-playable-build.md) takes this baseline to a playable build before further animation work.
+
+- Squad players earn XP from matches, moments and weekly training; levels auto-spend banked points by focus within fixed ceilings. Training buildings give a generic, capped XP boost with no adjacency effect, and the player page shows plain XP progress ([PR](https://github.com/ch-leon/nrl-sim/pull/568)).
+
+- Rival players grow their shown stats toward fixed ceilings by age, veterans still decline, and the league anchor keeps average strength steady ([PR](https://github.com/ch-leon/nrl-sim/pull/567)).
+
+- Arriving juniors gain +2 potential ceiling points per shown stat per Academy level (up to +6 at level 3); existing players keep their ceilings ([PR](https://github.com/ch-leon/nrl-sim/pull/566)).
+
+- Offloads lean two-thirds on Strength and one-third on Handling; one existing trait is marked as the headline, with Offload King first for forwards ([PR](https://github.com/ch-leon/nrl-sim/pull/564)).
+
+- Every player has fixed potential ceilings on their four shown stats, with more headroom for younger players. A plain Potential star line replaces the career projection; existing format-24 careers backfill ceilings deterministically ([PR](https://github.com/ch-leon/nrl-sim/pull/565)).
+
+- Players show four stats for their position group; overall averages those four, with half-step rating stars beside it. Hidden off-role stats start low and stay fixed ([issue](https://github.com/ch-leon/nrl-sim/issues/537)).
+
+- Handling and Kicking replace Skill in matches, training and player stats. New careers use save format 24; older careers need a new start and their original files remain available for recovery ([issue](https://github.com/ch-leon/nrl-sim/issues/536)).
+
+- Live-match recovery resumes only with a matching engine identity and rules. Updates restart the affected fixture from kick-off with a one-time explanation, keeping the career and once-only week effects; exports and developer careers follow the same policy ([issue](https://github.com/ch-leon/nrl-sim/issues/524)).
+
+- Career loads and imports validate nested players, facilities and selections. Missing or duplicate selections use explicit deterministic repairs, with a warning and retained originals; invalid imports leave the existing career intact ([PR](https://github.com/ch-leon/nrl-sim/pull/532), [repair rules](../specs/save-validation.md)).
+
+- Unreadable and newer-version careers stay visible in their slots, with Export original to recover the exact saved file. Automatic saves cannot replace them; Start over and Delete require confirmation. Older save originals are kept before an upgrade is written, with each recovery copy available to export on the title screen ([PR](https://github.com/ch-leon/nrl-sim/pull/530)).
 
 - Labs is now Developer settings (still `?labs=1`). It can open the Office screens early on this browser only. It can also set up a separate playtest career with a Direct attack coach hired and Block play bought and picked, so you can call it in the first match. Return to my career puts your own career back exactly as it was. Reset all turns everything off ([issue](https://github.com/ch-leon/nrl-sim/issues/519)).
 

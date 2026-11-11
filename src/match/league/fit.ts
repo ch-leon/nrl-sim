@@ -13,9 +13,9 @@ export const FIT = {
   maxFit: 1.5,
   archetypeThreshold: 80,
   carry: { strength: 3, speed: 1, wreckingBall: 8 },
-  offload: { skill: 1, strength: 1, offloadKing: 8, razzleDazzle: 6 },
-  ballPlay: { skill: 1, footyIQ: 1, playmaker: 8 },
-  footwork: { speed: 1, skill: 1, dancingFeet: 8 },
+  offload: { handling: 1, strength: 2, offloadKing: 8, razzleDazzle: 6 },
+  ballPlay: { handling: 1, footyIQ: 1, playmaker: 8 },
+  footwork: { speed: 1, handling: 1, dancingFeet: 8 },
   edgeD: { speed: 1, footyIQ: 1, lastLine: 8, poacher: 6 },
   contactD: { strength: 1, footyIQ: 1, brickWall: 8, hitman: 6 },
   tight: { carry: 1, offload: 1 },
@@ -45,13 +45,13 @@ const weighted = (...parts: readonly [number, number][]): number => {
 /** Missing stats use the neutral league baseline, as do absent role groups. */
 export function derivedRatings(player: StyleEntry): DerivedRatings {
   const s = player.stats ?? { speed: FIT.leagueAverage, strength: FIT.leagueAverage,
-    stamina: FIT.leagueAverage, skill: FIT.leagueAverage, footyIQ: FIT.leagueAverage };
+    stamina: FIT.leagueAverage, handling: FIT.leagueAverage, kicking: FIT.leagueAverage, footyIQ: FIT.leagueAverage };
   const bonus = (id: string, amount: number): number => has(player, id) ? amount : 0;
   return {
     carry: weighted([s.strength, FIT.carry.strength], [s.speed, FIT.carry.speed]) + bonus('wreckingBall', FIT.carry.wreckingBall),
-    offload: weighted([s.skill, FIT.offload.skill], [s.strength, FIT.offload.strength]) + bonus('offloadKing', FIT.offload.offloadKing) + bonus('razzleDazzle', FIT.offload.razzleDazzle),
-    ballPlay: weighted([s.skill, FIT.ballPlay.skill], [s.footyIQ, FIT.ballPlay.footyIQ]) + bonus('playmaker', FIT.ballPlay.playmaker),
-    footwork: weighted([s.speed, FIT.footwork.speed], [s.skill, FIT.footwork.skill]) + bonus('dancingFeet', FIT.footwork.dancingFeet),
+    offload: weighted([s.handling, FIT.offload.handling], [s.strength, FIT.offload.strength]) + bonus('offloadKing', FIT.offload.offloadKing) + bonus('razzleDazzle', FIT.offload.razzleDazzle),
+    ballPlay: weighted([s.handling, FIT.ballPlay.handling], [s.footyIQ, FIT.ballPlay.footyIQ]) + bonus('playmaker', FIT.ballPlay.playmaker),
+    footwork: weighted([s.speed, FIT.footwork.speed], [s.handling, FIT.footwork.handling]) + bonus('dancingFeet', FIT.footwork.dancingFeet),
     edgeD: weighted([s.speed, FIT.edgeD.speed], [s.footyIQ, FIT.edgeD.footyIQ]) + bonus('lastLine', FIT.edgeD.lastLine) + bonus('poacher', FIT.edgeD.poacher),
     contactD: weighted([s.strength, FIT.contactD.strength], [s.footyIQ, FIT.contactD.footyIQ]) + bonus('brickWall', FIT.contactD.brickWall) + bonus('hitman', FIT.contactD.hitman),
   };
@@ -69,7 +69,7 @@ export function styleFit(roster: readonly StyleEntry[]): StyleFit {
   const scale = (n: number): number => Math.max(0, Math.min(FIT.maxFit, 1 + (n - FIT.leagueAverage) / FIT.pointsPerFit));
   // The best available kicker supplies the kick; backs supply the chase.
   const kicker = players.length ? Math.max(...players.map(({ entry }) =>
-    (entry.stats?.skill ?? FIT.leagueAverage) + (has(entry, 'bigBoot') ? FIT.kickChase.bigBoot : 0))) : FIT.leagueAverage;
+    (entry.stats?.kicking ?? FIT.leagueAverage) + (has(entry, 'bigBoot') ? FIT.kickChase.bigBoot : 0))) : FIT.leagueAverage;
   const rushContact = mean(players.map(({ entry, ratings }) => ratings.contactD + (has(entry, 'hitman') ? FIT.rush.hitman : 0)));
   return {
     grind: scale(weighted([rating('carry', PACK), FIT.tight.carry], [rating('offload', PACK), FIT.tight.offload])),
