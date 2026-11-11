@@ -15,6 +15,7 @@
 import { bus } from './events';
 import { getState, type GameState } from './state';
 import { advanceWeek, weekHeld, withFastForward } from './time';
+import { structuralAdvanceProblem } from '../systems/competitionCalendar';
 import { getCurrentFixture, PLAYER_ID } from '../systems/fixtures';
 import { fitSquadCount, playerMatchPending } from '../systems/matchday';
 import { overallRating } from '../data/player';
@@ -78,6 +79,8 @@ function newCards(before: GameState, after: GameState): string[] {
  * by default). A second call while one is running does nothing.
  */
 export async function advanceUntil(target: AdvanceTarget, frame: () => Promise<void> = nextFrame): Promise<AdvanceRun> {
+  const blocked = structuralAdvanceProblem(getState());
+  if (blocked) return { weeksPlayed: 0, stop: { kind: 'stopped', text: blocked } };
   if (getState().sacked) return { weeksPlayed: 0, stop: { kind: 'target', text: 'The board has sacked you.' } };
   if (running) return { weeksPlayed: 0, stop: { kind: 'busy', text: 'An advance is already running.' } };
   // A week already held (Save & exit, or the rival round) must not be waited on here:
@@ -138,6 +141,8 @@ async function runUntil(target: AdvanceTarget, frame: () => Promise<void>): Prom
         if (stopAsked) return { weeksPlayed, stop: { kind: 'stopped', text: STOPPED_BY_YOU } };
       }
       const before = getState();
+      const unavailable = structuralAdvanceProblem(before);
+      if (unavailable) return { weeksPlayed, stop: { kind: 'stopped', text: unavailable } };
       // The demo ends here: stop before the week, not inside it (#362).
       if (demoBlocked(before)) return { weeksPlayed, stop: { kind: 'demo', text: DEMO_ENDED_TEXT } };
 

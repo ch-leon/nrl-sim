@@ -190,7 +190,7 @@ describe('save v23 (plan §2.3, §8)', () => {
   beforeEach(() => newClub());
 
   it('one migration step, v22 → v23, fills an empty playbook and an empty three', () => {
-    expect(SAVE_VERSION).toBe(25);
+    expect(SAVE_VERSION).toBe(26);
     expect(MIGRATIONS.filter((m) => m.from === 22 && m.to === 23)).toHaveLength(1);
     const step = MIGRATIONS.find((m) => m.from === 22)!;
     const raw = { version: 22, lineup: { starters: [], bench: [] }, staff: [] };

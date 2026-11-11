@@ -17,7 +17,9 @@ import { SEASON_ROUNDS } from '../../config';
 import { PLAYER_ID, ladderPosition } from '../../systems/fixtures';
 import { gateReceipts } from '../../systems/economy';
 import { roundLabel } from '../../systems/matchday';
-import { recordMatchAward, type PlayerOfMatch } from '../../systems/stats';
+import { recordMatchAward, playerOfTheMatch, type PlayerOfMatch } from '../../systems/stats';
+import { hasStructuralCalendar, sameFixtureIdentity } from '../../systems/competitionCalendar';
+import type { Fixture } from '../../core/state';
 import { lossReasons, type LossReason, type ReasonScreen } from '../../systems/lossReasons';
 import { el, button, mount, openModal, closeModal, getRoot } from '../dom';
 import { fmtMoney, ordinal } from '../hud';
@@ -452,19 +454,22 @@ export function clubNames(): Record<string, string> {
  */
 export function initMatchReport(opts: ReportOpts = {}): () => void {
   // The sheets from kick-off feed "Why did I lose?" (#368).
-  let kickOff: { fixture: { round: number; homeId: string }; home: TeamSheet; away: TeamSheet } | null = null;
+  let kickOff: { fixture: Fixture; home: TeamSheet; away: TeamSheet } | null = null;
   const offStarted = bus.on('match:started', ({ fixture, home, away }) => { kickOff = { fixture, home, away }; });
-  const offFinished = bus.on('match:finished', ({ fixture, result }: { fixture: { round: number; homeId: string; awayId: string }; result: MatchResult }) => {
-    const p = recordMatchAward(result, fixture.homeId, fixture.awayId);
-    const sheets = kickOff && kickOff.fixture.round === fixture.round && kickOff.fixture.homeId === fixture.homeId ? kickOff : null;
+  const reportFinished = ({ fixture, result }: { fixture: Fixture; result: MatchResult }, structural: boolean): void => {
+    const p = structural ? playerOfTheMatch(result, fixture.homeId, fixture.awayId) : recordMatchAward(result, fixture.homeId, fixture.awayId);
+    const sheets = kickOff && sameFixtureIdentity(kickOff.fixture, fixture) ? kickOff : null;
     const reasons = sheets ? lossReasons(result, fixture, sheets, getState()) : [];
     const report = buildMatchReport(result, fixture, clubNames(), p, reasons);
     if (typeof document !== 'undefined' && document.body?.classList.contains(MATCH_ACTIVE_CLASS)) showFullTime(report, result, fixture, opts);
     else openMatchReport(report, opts);
-  });
+  };
+  const offFinished = bus.on('match:finished', value => { if (!hasStructuralCalendar(getState())) reportFinished(value, false); });
+  const offCommitted = bus.on('match:committed', value => reportFinished(value, true));
   return () => {
     offStarted();
     offFinished();
+    offCommitted();
   };
 }
 

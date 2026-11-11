@@ -1,4 +1,7 @@
 import { currentRound } from './season';
+import { careerNamespace } from './storage/local';
+import { DEV_TEST_PREFIX } from './storageKeys';
+import { fixtureBridge, hasStructuralCalendar, recoverUnfinishableCompetitions, sameFixtureIdentity, structuralPolicyProblem } from '../systems/competitionCalendar';
 // src/core/save.ts — persistence, migration, slots + title flow
 // (BAK-174, WU-4; migration/export/import/slots: GitHub #34; storage seam: #360).
 //
@@ -13,7 +16,7 @@ import { currentRound } from './season';
 // localStorage, or over a Map-backed fake a Node-env unit test injects. Every key
 // comes from src/core/storageKeys.ts, frozen whatever the game is called.
 
-import type { GameState } from './state';
+import type { Fixture, GameState } from './state';
 import { validateInput, validateCurrent, REPAIR_NOTICE, type SaveRepair } from './saveValidation';
 import { emptyFinance, getState, SAVE_VERSION, setState } from './state';
 import { fromLegacy, isTraitId, type TraitInstance } from '../data/traits';
@@ -298,6 +301,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // v24 → v25 (#570): optional competition metadata. Existing careers retain
   // their league, people, RNG and absent metadata; no pyramid is constructed.
   { from: 24, to: 25, run: (old) => ({ ...old }) },
+  // v26 adds explicit developer-only calendar activation; supported careers stay dormant.
+  { from: 25, to: 26, run: (old) => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */
@@ -563,6 +568,11 @@ export function loadSlot(slot = activeSlot): LoadResult {
     if (raw === null) return { status: 'empty' };
     const res = parseSave(raw);
     if (!res.ok) return { status: res.reason, outcome: res.outcome, message: res.message };
+    if (hasStructuralCalendar(res.state) && (careerNamespace() !== DEV_TEST_PREFIX || structuralPolicyProblem(res.state)))
+      return { status: 'corrupt', outcome: 'unrecoverable', message: structuralPolicyProblem(res.state) ?? 'Competition prototypes require the isolated developer career.' };
+    // An offered, qualified or entered competition can never finish on this calendar.
+    // Close it here so a save that would freeze the week loads ready to advance.
+    const state = recoverUnfinishableCompetitions(res.state);
     // A repaired state must not reach trusted memory until its exact source is
     // retained and verified by #522's preservation path. Persisting comes later.
     if (res.repairs.length) {
@@ -570,7 +580,7 @@ export function loadSlot(slot = activeSlot): LoadResult {
       catch { return { status: 'corrupt', outcome: 'unrecoverable', message: 'Could not preserve the original. The repaired career was not loaded.' }; }
     }
     approveOriginal(store, slot, raw, res.repairs.length > 0 || JSON.parse(raw).version !== SAVE_VERSION);
-    return { status: 'ok', outcome: res.outcome, state: res.state, repairs: res.repairs };
+    return { status: 'ok', outcome: res.outcome, state, repairs: res.repairs };
   } catch {
     return { status: 'corrupt', outcome: 'unrecoverable', message: 'Storage could not be read. Your career has been kept.' };
   }
@@ -676,6 +686,17 @@ function heldWeekSnapshot(): GameState | null {
   if (!weekHeld() || !lastSaved) return null;
   const now = getState();
   if (lastSaved.season !== now.season || lastSaved.week !== now.week || currentRound(lastSaved) !== currentRound(now)) return null;
+  if (hasStructuralCalendar(now)) {
+    if (!hasStructuralCalendar(lastSaved)) return null;
+    // The player's game can be complete while the grouped rival hold is pending.
+    // Compare slot identity independently of played status, never half-ticked state.
+    const identities = (s: GameState): Fixture[] => s.competitions!.instances.filter(i => i.season === s.season)
+      .flatMap(instance => instance.fixtures.filter(f => f.slot === s.week && (f.homeId === s.clubId || f.awayId === s.clubId))
+        .map(fixture => fixtureBridge({ instance, fixture })));
+    const before = identities(lastSaved);
+    const current = identities(now);
+    if (before.length !== current.length || before.some((f, index) => !sameFixtureIdentity(f, current[index]!))) return null;
+  }
   return lastSaved;
 }
 
@@ -884,6 +905,13 @@ export function installImportedSave(text: string, slot: number): ImportResult {
   if (peeled.bad) return { ok: false, message: 'the match in this file could not be read.' };
   const res = importSave(peeled.text);
   if (!res.ok) return res;
+  if (hasStructuralCalendar(res.state) && careerNamespace() !== DEV_TEST_PREFIX) return { ok: false, message: 'Competition prototypes can only be imported into the isolated developer career.' };
+  if (hasStructuralCalendar(res.state)) {
+    const policy = structuralPolicyProblem(res.state);
+    if (policy) return { ok: false, message: policy };
+  }
+  const recovered = recoverUnfinishableCompetitions(res.state);
+  const installed = recovered === res.state ? res : { ...res, state: recovered };
   const destinationStatus = loadSlot(slot);
   if (destinationStatus.status !== 'empty' && destinationStatus.status !== 'ok') return { ok: false, message: 'Destination needs recovery before replacement.' };
   // Repaired/historical imports retain both the exact incoming file (including
@@ -898,13 +926,13 @@ export function installImportedSave(text: string, slot: number): ImportResult {
       if (destination !== null) store.keepCorrupt(destination, slot);
     } catch { return { ok: false, message: 'Could not preserve originals. Import was not installed.' }; }
   }
-  if (!writeSlot(slot, res.state)) return { ok: false, message: '' };
+  if (!writeSlot(slot, installed.state)) return { ok: false, message: '' };
   if (peeled.live) {
     if (!writeLiveMatch(peeled.live, slot)) clearLiveMatch(slot);
   } else {
     clearLiveMatch(slot);
   }
-  return res;
+  return installed;
 }
 
 /**

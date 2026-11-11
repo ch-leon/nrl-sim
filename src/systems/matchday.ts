@@ -23,10 +23,11 @@ import { rivalEdge } from '../match/league/spread';
 import { canUseWorker, playMatchesInWorker } from './matchJobs';
 import { aiCoachSides, unlockedCalls } from '../match/league/calls';
 import { hasStaff } from './staff';
-import { applyMatchStats } from './stats';
+import { applyMatchStats, recordMatchAward } from './stats';
 import { injureRivalPlayers } from './rivals';
 import { playerRivalContext, rivalSheet } from './rivalRound';
 import { autoPick, describeFills, resolveLineup } from './lineup';
+import { calendarFixtureContext, calendarKnockout, finaliseCalendarFixture, hasStructuralCalendar, sameFixtureIdentity } from './competitionCalendar';
 
 /**
  * Who changes plan at the breaks. The rival always. The player's side too when
@@ -87,7 +88,8 @@ export function resumePlayerMatch(): boolean {
   // or other match's record keeps the calls and tick already on the parked match.
   if (rec && rec.season === parked.record.season && rec.week === parked.record.week
     && rec.round === parked.fixture.round && rec.homeId === parked.fixture.homeId
-    && rec.awayId === parked.fixture.awayId && rec.seed === live.seed) {
+    && rec.awayId === parked.fixture.awayId && rec.seed === live.seed
+    && rec.competitionId === parked.record.competitionId && rec.fixtureId === parked.record.fixtureId && rec.slot === parked.record.slot) {
     if (!liveMatchSameRules(rec)) {
       live.calls = [];
       live.plans = [];
@@ -215,17 +217,23 @@ export function roundLabel(round: number): string {
  * Apply the player's match result: ladder, player stats, injuries (ours and the
  * rival's). Returns the toast to show when the player sees the final score.
  */
-function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, sim: MatchResult): () => void {
+function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, sim: MatchResult, presentation = false): () => void {
   // Finals draws still stamp as-is; knockoutWinner favours home (higher seed).
   const ownSheet = fixture.homeId === PLAYER_ID ? home : away;
   const playedIds = (ownSheet.roster ?? []).flatMap((r) => (r.id ? [r.id] : []));
-  const applied = applyResult(getState(), fixture, {
+  const before = getState();
+  const structural = hasStructuralCalendar(before);
+  const knockout = structural ? calendarKnockout(before, fixture) : isFinalsRound(fixture.round);
+  const context = structural ? calendarFixtureContext(before, fixture) : undefined;
+  const applied = applyResult(before, fixture, {
     homeScore: sim.homeScore,
     awayScore: sim.awayScore,
   });
+  if (applied === before) return () => {};
   setState({
     league: applied.league,
-    ...(fixture.round > 0 ? { recentPlans: [{ ...(ownSheet.tactics ?? DEFAULT_TACTICS) }, ...getState().recentPlans].slice(0, 3) } : {}),
+    ...(applied.competitions ? { competitions: applied.competitions } : {}),
+    ...((structural ? context?.instance.definition.stages.find(s => s.id === fixture.stageId)?.kind === 'league' : fixture.round > 0) ? { recentPlans: [{ ...(ownSheet.tactics ?? DEFAULT_TACTICS) }, ...getState().recentPlans].slice(0, 3) } : {}),
     squad: applyMatchXp(applyMatchStats(getState().squad, sim.events, PLAYER_ID, playedIds, getState().season),
       ownSheet, sim, fixture.homeId, fixture.awayId, getState().facilities, getState().training.focus),
   });
@@ -238,6 +246,10 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
     const lg = getState().league;
     setState({ league: { ...lg, clubs: injureRivalPlayers(lg.clubs, rivalHurt) } });
   }
+  if (structural) {
+    recordMatchAward(sim, fixture.homeId, fixture.awayId);
+    if (presentation) bus.emit('match:committed', { fixture, result: sim });
+  }
 
   const playerHome = fixture.homeId === PLAYER_ID;
   const [us, them] = playerHome
@@ -248,12 +260,13 @@ function applyPlayerResult(fixture: Fixture, home: TeamSheet, away: TeamSheet, s
   // which way it went rather than leaving the player guessing.
   const verdict = us > them ? 'WIN' : us < them ? 'LOSS' : 'DRAW';
   const goldenPoint = sim.events.some((e) => e.kind === 'full-time' && e.detail === 'golden-point');
-  const seedingNote = us === them && isFinalsRound(fixture.round)
-    ? (playerHome ? ' — through on seeding' : ' — out on seeding')
+  const decidedWinner = structural ? applied.competitions!.instances.find(i => i.id === fixture.competitionId)!.fixtures.find(f => f.id === fixture.id)!.result!.winnerId : undefined;
+  const seedingNote = us === them && knockout
+    ? (structural ? (decidedWinner === PLAYER_ID ? ' — through on the published tie draw' : ' — out on the published tie draw') : playerHome ? ' — through on seeding' : ' — out on seeding')
     : goldenPoint ? ' in golden point' : '';
   return (): void => {
     bus.emit('ui:notify', {
-      text: `${roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
+      text: `${context ? `${context.instance.definition.name}, ${context.fixture.round}` : roundLabel(fixture.round)}: ${verdict} ${us}–${them}${seedingNote}`,
       // A loss is news, not a problem (#339): red is kept for injuries, debt and errors.
       kind: us > them ? 'success' : 'info',
     });
@@ -273,8 +286,8 @@ export function registerPlayerMatchSystem(): void {
     const fit = fitSquadCount(state.squad);
     if (fit < SQUAD_MIN) {
       const result = forfeitResult(fixture);
-      const applied = applyResult(getState(), fixture, result);
-      setState({ league: applied.league });
+      const applied = hasStructuralCalendar(state) ? finaliseCalendarFixture(getState(), fixture, result, true) : applyResult(getState(), fixture, result);
+      setState({ league: applied.league, ...(applied.competitions ? { competitions: applied.competitions } : {}) });
       bus.emit('ui:notify', {
         text:
           fit === 0
@@ -283,6 +296,19 @@ export function registerPlayerMatchSystem(): void {
         kind: 'danger',
       });
       return;
+    }
+
+    if (hasStructuralCalendar(state)) {
+      const context = calendarFixtureContext(state, fixture)!;
+      const rivalId = fixture.homeId === PLAYER_ID ? fixture.awayId : fixture.homeId;
+      const rival = state.league.clubs.find(c => c.id === rivalId)!;
+      if (fitSquadCount(rival.squad ?? []) < context.instance.definition.lineup.minSquad) {
+        const score = forfeitResult(fixture, rivalId);
+        const next = finaliseCalendarFixture(state, fixture, score, true);
+        setState({ competitions: next.competitions!, league: next.league });
+        bus.emit('ui:notify', { text: `${rival.name} cannot field a legal squad. The fixture is a walkover; no match XP or income is awarded.`, kind: 'info' });
+        return;
+      }
     }
 
     const rng = makeRng(state.rngSeed);
@@ -311,12 +337,13 @@ export function registerPlayerMatchSystem(): void {
       aiRival: { side: rivalSide, difficulty: state.settings.difficulty },
       breakRuleSides: breakRuleSidesFor(state, rivalSide, !!ctx.fastForward),
       // A drawn final goes to golden point (N9.4).
-      ...(isFinalsRound(fixture.round) ? { goldenPoint: true } : {}),
+      ...((hasStructuralCalendar(state) ? calendarKnockout(state, fixture) : isFinalsRound(fixture.round)) ? { goldenPoint: true } : {}),
     };
     // A live match the app was closed in the middle of (#73): this is the same match.
     const prior = readLiveMatch();
     const sameFixture =
-      prior && prior.season === state.season && prior.week === state.week && prior.round === fixture.round && prior.homeId === fixture.homeId && prior.awayId === fixture.awayId ? prior : null;
+      prior && prior.season === state.season && prior.week === state.week && prior.round === fixture.round && prior.homeId === fixture.homeId && prior.awayId === fixture.awayId
+        && prior.competitionId === fixture.competitionId && prior.fixtureId === fixture.id && prior.slot === fixture.slot ? prior : null;
     // Never replay incompatible inputs, even a call queued at tick zero.
     const stale = !!sameFixture && (!liveMatchSameRules(sameFixture) || sameFixture.seed !== seed);
     const resumed = stale ? null : sameFixture;
@@ -326,12 +353,13 @@ export function registerPlayerMatchSystem(): void {
     if (!ctx.fastForward && ctx.hold) {
       ctx.hold();
       const record: LiveMatchRecord = { season: state.season, week: state.week, round: fixture.round, homeId: fixture.homeId, awayId: fixture.awayId, seed, calls: resumed ? [...resumed.calls] : [], ...(resumed?.controls?.length ? { controls: [...resumed.controls] } : {}), plans: resumed?.plans ? [...resumed.plans] : [], tick: resumed?.tick ?? 0, halfMinutes: NINES.halfMinutes, engineId: matchEngineIdentity() };
+      if (fixture.id) { record.fixtureId = fixture.id; record.competitionId = fixture.competitionId!; record.slot = fixture.slot!; }
       const off = bus.on('match:finished', ({ fixture: done, result }) => {
-        if (done.round !== fixture.round || done.homeId !== fixture.homeId) return;
+        if (!sameFixtureIdentity(done, fixture) || getState().season !== state.season || getState().week !== state.week) return;
         off();
         parked = null;
         clearLiveMatch();
-        applyPlayerResult(fixture, home, away, result)();
+        applyPlayerResult(fixture, home, away, result, true)();
         resumeWeek();
       });
       const live: LiveMatchData = {

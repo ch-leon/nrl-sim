@@ -77,7 +77,7 @@ describe('AI personas (#534)', () => {
       expect(getState().version).toBe(SAVE_VERSION);
     }
     // Persona runs use the current save envelope and Handling/Kicking players.
-    expect(SAVE_VERSION).toBe(25);
+    expect(SAVE_VERSION).toBe(26);
   }, 20_000);
 
   it('UK persona smoke is deterministic with the prepared UK pack', async () => {

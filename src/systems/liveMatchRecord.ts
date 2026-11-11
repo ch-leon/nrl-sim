@@ -36,6 +36,9 @@ export function liveMatchSaveDue(tick: number, lastSavedTick: number, every = LI
 }
 
 export interface LiveMatchRecord {
+  competitionId?: string;
+  fixtureId?: string;
+  slot?: number;
   season: number;
   week: number;
   round: number;
@@ -92,6 +95,9 @@ function isPlan(x: unknown): boolean {
 export function isLiveMatchRecord(x: unknown): x is LiveMatchRecord {
   if (!object(x)) return false;
   const r = x as Partial<LiveMatchRecord>;
+  const identity = [r.competitionId, r.fixtureId, r.slot];
+  if (identity.some(v => v !== undefined) && !(typeof r.competitionId === 'string' && r.competitionId.length > 0
+    && typeof r.fixtureId === 'string' && r.fixtureId.length > 0 && tick(r.slot) && r.slot >= 1 && r.slot === r.week)) return false;
   return Number.isSafeInteger(r.season) && r.season! >= 1 && tick(r.week) && r.week >= 1
     && Number.isSafeInteger(r.round) && typeof r.homeId === 'string' && r.homeId.length > 0
     && typeof r.awayId === 'string' && r.awayId.length > 0

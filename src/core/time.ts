@@ -14,6 +14,7 @@ import { bus } from './events';
 import { WEEKS_PER_SEASON } from '../config';
 import { inTrials } from './season';
 import { demoStops } from '../commercial/demo';
+import { hasStructuralCalendar, settleStructuralCalendar, structuralAdvanceProblem, structuralSeasonResolved } from '../systems/competitionCalendar';
 
 // ── Public hook contracts ──────────────────────────────────────────────────
 
@@ -37,7 +38,7 @@ export interface TickContext {
 }
 
 /** A season-rollover hook. Runs only at rollover, after counters are bumped. */
-export type SeasonHook = (ctx: { season: number }) => void;
+export type SeasonHook = (ctx: { season: number; completedSeason?: Readonly<import('./state').GameState> }) => void;
 
 /**
  * Fixed order constants for the §5 pipeline. Ascending `order` = execution
@@ -158,6 +159,10 @@ function sortedEntries<T extends { order: number; seq: number }>(m: Map<string, 
 export function advanceWeek(): void {
   if (getState().sacked) return; // game over (#47): the save stays, time stops
   if (held) return; // a held week finishes first (resumeWeek)
+  if (hasStructuralCalendar(getState())) {
+    // A paused setup or unsupported loaded policy cannot consume training or money.
+    if (structuralAdvanceProblem(getState())) return;
+  }
   if (demoStops()) return; // the demo's last week is played (#362; never with the commercial flag off)
   const { week, season } = getState();
   let holding = 0;
@@ -205,6 +210,20 @@ export function clearHeldWeek(): void {
 
 function finishWeek(week: number): void {
   const s = getState();
+  if (hasStructuralCalendar(s)) {
+    // A result that never landed, or a competition that can never finish, is closed
+    // and logged. The interval still ends, so a later advance is not held forever.
+    const settled = settleStructuralCalendar(s, week);
+    if (settled !== s) setState(settled);
+    const now = getState();
+    const calendar = now.competitions!.calendar!;
+    setState({ competitions: { ...now.competitions!, calendar: { ...calendar, elapsedIntervals: calendar.elapsedIntervals + 1 } } });
+    if (week >= calendar.slots.length || structuralSeasonResolved(getState())) rollSeasonOver();
+    else setState({ week: week + 1 });
+    const post = getState();
+    bus.emit('week:advanced', { week: post.week, season: post.season });
+    return;
+  }
   if (inTrials(s)) {
     setState({ preseason: s.preseason === 1 ? 2 : 0 });
     bus.emit('week:advanced', { week: s.week, season: s.season });
@@ -231,11 +250,21 @@ function finishWeek(week: number): void {
  *   position / premiership (defaults 0 / false until WU-7 populates the league).
  */
 function rollSeasonOver(): void {
+  const structural = hasStructuralCalendar(getState());
+  // Detached/frozen sporting state is available to #574's existing season hook.
+  const completed = structural ? JSON.parse(JSON.stringify(getState())) as import('./state').GameState : undefined;
+  if (completed) {
+    const freeze = (value: unknown): void => {
+      if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); }
+    };
+    freeze(completed);
+  }
   resetForNewSeason();
+  if (structural) setState({ competitions: { ...getState().competitions!, calendar: { ...getState().competitions!.calendar!, status: 'awaiting-next-season' } } });
   const { season } = getState(); // new season
 
   for (const entry of sortedEntries(seasonHooks)) {
-    entry.fn({ season });
+    entry.fn({ season, ...(completed ? { completedSeason: completed } : {}) });
   }
 
   const endedSeason = season - 1;

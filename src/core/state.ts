@@ -76,6 +76,11 @@ export interface LadderRow {
 }
 
 export interface Fixture {
+  /** Present only on the structural competition bridge; legacy fixtures stay byte-compatible. */
+  id?: string;
+  competitionId?: string;
+  stageId?: string;
+  slot?: number;
   round: number; // 1..SEASON_ROUNDS (+ finals rounds)
   homeId: string; awayId: string;
   result?: { homeScore: number; awayScore: number };
@@ -103,9 +108,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** v25 adds optional competition metadata. v24 careers keep their existing
- *  format; pre-v24 player data still requires a new career. */
-export const SAVE_VERSION = 25;
+/** v25 adds optional competition metadata. v26 adds the developer-only calendar.
+ *  Supported careers stay dormant. Pre-v24 player data still requires a new career. */
+export const SAVE_VERSION = 26;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';

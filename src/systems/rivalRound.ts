@@ -18,9 +18,11 @@ import type { StyleEntry, TeamTactics } from '../match/league/presets';
 import { autoPick, isFieldable, resolveLineup } from './lineup';
 import { applyMatchStats } from './stats';
 import { injureRivalPlayers } from './rivals';
+import { calendarFixtureContext, calendarKnockout, currentCalendarFixtures, fixtureBridge, hasStructuralCalendar, sameFixtureIdentity } from './competitionCalendar';
 
 /** One rival fixture to play: the sheets, the seed and the day's weather. */
 export interface RivalJob {
+  fixture?: GameState['league']['fixtures'][number];
   round: number;
   homeId: string;
   awayId: string;
@@ -71,18 +73,25 @@ export function rivalJobs(state: GameState, rng: Rng, playerId: string): RivalJo
   const round = currentRound(state);
   const byId = new Map(state.league.clubs.map((c) => [c.id, c] as const));
   const jobs: RivalJob[] = [];
-  for (const f of state.league.fixtures) {
-    if (f.round !== round || f.result || f.homeId === playerId || f.awayId === playerId) continue;
+  const structural = hasStructuralCalendar(state);
+  const fixtures = structural ? currentCalendarFixtures(state).map(fixtureBridge) : state.league.fixtures;
+  for (const f of fixtures) {
+    if ((!structural && f.round !== round) || f.result || f.homeId === playerId || f.awayId === playerId) continue;
     const home = byId.get(f.homeId);
     const away = byId.get(f.awayId);
     if (!home || !away) continue;
+    if (structural) {
+      const minimum = calendarFixtureContext(state, f)!.instance.definition.lineup.minSquad;
+      // Let the cheap path record a forfeit; never manufacture a replacement sheet.
+      if ([home, away].some(c => (c.squad ?? []).filter(isFieldable).length < minimum)) continue;
+    }
     jobs.push({
-      round, homeId: f.homeId, awayId: f.awayId, home: rivalSheet(home), away: rivalSheet(away),
+      round: f.round, ...(structural ? { fixture: f } : {}), homeId: f.homeId, awayId: f.awayId, home: rivalSheet(home), away: rivalSheet(away),
       seed: rng.int(1, 2 ** 31), weather: state.weather ?? 'clear',
       // Both sides change plan at the breaks. Hard gives both an AI coach; Normal and Easy do not (N14.1).
       aiCoach: aiCoachSides(['home', 'away'], state.settings.difficulty === 'hard'),
       breakRuleSides: ['home', 'away'],
-      goldenPoint: round > SEASON_ROUNDS,
+      goldenPoint: structural ? calendarKnockout(state, f) : round > SEASON_ROUNDS,
     });
   }
   return jobs;
@@ -137,10 +146,14 @@ export function applyRivalResults(
   jobs.forEach((job, i) => {
     const r = results[i];
     if (!r) return;
-    const f = next.league.fixtures.find((x) => x.round === job.round && x.homeId === job.homeId && x.awayId === job.awayId);
+    const f = hasStructuralCalendar(next)
+      ? currentCalendarFixtures(next).map(fixtureBridge).find(x => job.fixture && sameFixtureIdentity(x, job.fixture))
+      : next.league.fixtures.find((x) => x.round === job.round && x.homeId === job.homeId && x.awayId === job.awayId);
     if (!f || f.result) return;
     notePlanChanges(job, r);
-    next = applyResult(next, f, { homeScore: r.homeScore, awayScore: r.awayScore });
+    const applied = applyResult(next, f, { homeScore: r.homeScore, awayScore: r.awayScore });
+    if (applied === next) return;
+    next = applied;
     let clubs = injureRivalPlayers(next.league.clubs, r.injuries.filter((x) => x.playerId));
     clubs = clubs.map((c) => {
       const sheet = c.id === job.homeId ? job.home : c.id === job.awayId ? job.away : null;
