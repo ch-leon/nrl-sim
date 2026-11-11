@@ -11,6 +11,7 @@
 // data and checks: no Phaser, no store, no runtime imports (config.ts imports
 // the active pack, so a runtime import of config here would be a cycle).
 import type { RivalClub } from '../core/state';
+import { validateCompetitionDefinition, type CompetitionDefinition } from '../data/competition';
 
 /** The league's shape: config.ts re-exports each of these under its old name. */
 export interface LeagueShape {
@@ -109,6 +110,8 @@ export interface ContentPack {
   id: string;
   league: LeagueShape;
   rules: MatchRules;
+  /** Optional catalogue; merely defining competitions does not activate them. */
+  competitions?: readonly CompetitionDefinition[];
   /** The rival clubs a new game starts with (data/league.ts RIVAL_CLUBS). ids are `rival-` kebab-case and stable. */
   clubs: readonly RivalClub[];
   /** Name pools for generated players (data/names.ts). */
@@ -149,6 +152,14 @@ export function validatePack(pack: ContentPack): string[] {
   if (league.squadMin < league.onField) problems.push(`squadMin ${league.squadMin} cannot field ${league.onField}`);
   if (league.squadCap < league.squadMin) problems.push(`squadCap ${league.squadCap} is below squadMin ${league.squadMin}`);
   if (!(pack.rules.halfMinutes > 0)) problems.push(`rules.halfMinutes must be positive (${pack.rules.halfMinutes})`);
+  const competitionIds = new Set<string>();
+  for (const definition of pack.competitions ?? []) {
+    const problem = validateCompetitionDefinition(definition);
+    if (problem) problems.push(`competition: ${problem}`);
+    if (definition.pack !== pack.id) problems.push(`competition "${definition.id}" belongs to another pack`);
+    if (competitionIds.has(definition.id)) problems.push(`competition id "${definition.id}" is used twice`);
+    competitionIds.add(definition.id);
+  }
 
   if (pack.clubs.length === 0) problems.push('pack has no clubs');
   const ids = new Set<string>();

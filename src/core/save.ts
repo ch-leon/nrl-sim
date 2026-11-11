@@ -295,6 +295,9 @@ export const MIGRATIONS: readonly MigrationStep[] = [
       return { ...old, playbook: { owned: [] }, ...(lineup && typeof lineup === 'object' ? { lineup: { ...lineup, plays: [] } } : {}) };
     },
   },
+  // v24 → v25 (#570): optional competition metadata. Existing careers retain
+  // their league, people, RNG and absent metadata; no pyramid is constructed.
+  { from: 24, to: 25, run: (old) => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

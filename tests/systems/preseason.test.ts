@@ -31,7 +31,7 @@ it('preserves optional phase on save/reload and leaves a v21 legacy season uncha
   if (back.ok) loadState(back.state);
   advanceWeeks(27);
   expect(getState().version).toBe(SAVE_VERSION);
-  expect(SAVE_VERSION).toBe(24);
+  expect(SAVE_VERSION).toBe(25);
   expect(getState().season).toBe(2);
   expect(getState()).not.toHaveProperty('preseason');
   expect(getState().league.fixtures.every((f) => f.round > 0)).toBe(true);

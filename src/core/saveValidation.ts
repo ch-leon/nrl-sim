@@ -11,6 +11,7 @@ import { BOARD, GRID_W, GRID_H } from '../config';
 import { BENCH, isRotation } from '../match/league/bench';
 import { isAttackPreset, isDefencePreset } from '../match/league/presets';
 import { LINEUP_SLOTS, resolveLineup } from '../systems/lineup';
+import { validateCompetitions } from '../data/competition';
 
 export interface SaveRepair { field: string; problem: string; repair: string; rationale: string; notification: string }
 export const REPAIR_NOTICE = 'Career lineup repaired. The original save has been kept in recovery.';
@@ -161,6 +162,11 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
     if ((c.squad !== undefined || (version >= 8 && c.id !== 'player')) && !roster(c.squad)) return fail('rival squad');
   }
   if (clubs.size && !clubs.has('player')) return fail('player club reference');
+  if (v.competitions !== undefined) {
+    if (version < 25) return fail('competition metadata version');
+    const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, clubIds: [...clubs] });
+    if (problem) return fail(problem);
+  }
   for (const f of v.league.fixtures) {
     if (!record(f) || !integer(f.round, -1, v.pack === 'uk' ? 25 : 27) || !text(f.homeId) || !text(f.awayId) || !clubs.has(f.homeId) || !clubs.has(f.awayId) || f.homeId === f.awayId || (f.result !== undefined && (!record(f.result) || !integer(f.result.homeScore) || !integer(f.result.awayScore)))) return fail('fixture');
   }
