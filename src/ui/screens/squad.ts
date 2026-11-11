@@ -164,7 +164,7 @@ export function openSquadScreen(): void {
 
   const head = screenHead('', { lead: [squadTabs('squad')], sub, controls: [training.button, sort.button] });
   const screen = el('div', { class: 'nrl-screen nrl-sq nrl-squad' }, head,
-    gridHead(['#', 'Player', 'Pos', 'Ovr', 'Fitness', 'To', ['Wage', 'nrl-sq-wide'], ['Morale', 'nrl-sq-wide']]), list);
+    gridHead(['#', 'Player', 'Pos', ['Ovr', 'nrl-col-ovr'], 'Fitness', 'To', ['Wage', 'nrl-sq-wide'], ['Morale', 'nrl-sq-wide']]), list);
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onSquadClosed, 'squad');
   render();

@@ -262,6 +262,8 @@ export const PORTRAIT_CSS = `
   html:root .nrl-row-who { flex-wrap: wrap; row-gap: 2px; padding: 4px 0; overflow: visible; }
   html:root .nrl-row-name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }
   html:root .nrl-fit-bar { display: none; }
+  /* Upright the rating is one of a line of values under the name: it starts its column like the rest (#600). */
+  html:root :is(.nrl-col-ovr, .nrl-row-ovr) { text-align: left; padding-right: 0; }
   html:root .nrl-grid-head { height: auto; row-gap: 2px; padding-bottom: 2px; letter-spacing: 0.04em; }
   html:root .nrl-squad .nrl-grid-head, html:root .nrl-squad .nrl-row {
     grid-template-columns: 2em repeat(4, minmax(0, 1fr));

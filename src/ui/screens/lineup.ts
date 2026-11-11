@@ -446,7 +446,8 @@ export function openLineupScreen(): void {
     const injured = p !== null && p.injuredWeeks > 0;
     const banned = p !== null && (p.suspendedWeeks ?? 0) > 0;
     const fit = p && slotPos ? positionFit(p.position, slotPos) : 1;
-    const rating = p ? (slotPos ? effectiveRating(p, slotPos) : overallRating(p)) : null;
+    // A bench seat has no slot: his overall, in whole numbers like the list beside it (#600).
+    const rating = p ? (slotPos ? effectiveRating(p, slotPos) : Math.round(overallRating(p))) : null;
     const top = el('span', { class: 'nrl-lineup-tile-top' }, `${label} `);
     if (injured) top.append(el('span', { class: 'nrl-lineup-tile-out', text: 'OUT' }));
     else if (banned) top.append(el('span', { class: 'nrl-lineup-tile-out', text: 'BAN' }));

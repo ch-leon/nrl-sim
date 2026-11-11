@@ -71,7 +71,8 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
 
 ### 3d Squad list
 - **Header**: segmented SQUAD / LINEUP / RECRUIT, then "24 players · cap $1.21M / $1.40M", then a SORT ▾ button on the right.
-- **Table columns**: `32px 1fr 52px 44px 130px 64px`, i.e. # · PLAYER · POS · OVR · FITNESS · TO.
+- **Table columns**: `32px 1fr 52px 3.875rem 130px 64px`, i.e. # · PLAYER · POS · OVR · FITNESS · TO.
+  - OVR ("4½★ 56") is right-aligned with 0.625rem after it, in Recruit's table too; its track is rem so it grows with the text size (#600).
   - Column headers: Barlow 13/600, .08em, #9aa6c7.
   - Rows: min-height 30, top border #1f2b55, 13px.
 - **Fitness**: a 72×5 bar on #1f2b55, followed by the %. Bar colour: ≥85 #3fbf6a, ≥65 #e8a33a, otherwise #d9534f.
@@ -97,7 +98,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
 
 ### 3g Recruit
 - **Header**: segmented control (RECRUIT selected) and the line "Free agents · window open 3 more weeks · cap room $190k".
-- **Columns**: `1fr 52 40 44 84 84 96`, i.e. PLAYER · POS · AGE · OVR · FEE · WAGE · action. Rows are 44 tall.
+- **Columns**: `1fr 52 40 3.875rem 84 84 96`, i.e. PLAYER · POS · AGE · OVR · FEE · WAGE · action. Rows are 44 tall.
 - **Action button**: SIGN (yellow) or "NEED $18k" (#1b264a / #9aa6c7) when unaffordable.
 
 ### 3h League

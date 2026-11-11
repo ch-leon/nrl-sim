@@ -19,6 +19,7 @@ import { openPlayerPage, positionLabel } from './player';
 import { squadTabs } from './squad';
 import { recruitShortlist } from '../recruitShortlist';
 import { weeklyIncome } from '../../systems/economy';
+import { fmtMoney } from '../hud';
 
 // ── Shared screen styling ───────────────────────────────────────────────────
 // Injected once alongside the base kit CSS (which holds the sheet, the
@@ -110,6 +111,8 @@ const SCREEN_CSS = `
 .nrl-row-pos { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 600; }
 .nrl-row .nrl-num { font-weight: 500; }
 .nrl-row .nrl-row-ovr { font-weight: 600; }
+/* #600: the rating ("4½★ 56") ends on one line down its column, a clear gap before the next; so does its head. */
+.nrl-grid-head > .nrl-col-ovr, .nrl-row > .nrl-row-ovr { text-align: right; padding-right: 0.625rem; }
 .nrl-row-dim { color: var(--nrl-text-2); font-size: 0.75rem; }
 .nrl-row-attn { color: var(--nrl-accent); }
 .nrl-row-bad { color: var(--nrl-neg); }
@@ -118,16 +121,18 @@ const SCREEN_CSS = `
 .nrl-fit-bar { flex: 0 0 auto; width: 72px; height: 5px; border-radius: 3px; background: var(--nrl-button); overflow: hidden; }
 .nrl-fit-bar > span { display: block; height: 100%; }
 .nrl-fit-pct { font-family: var(--nrl-f-num); font-size: 0.75rem; }
-/* 3d Squad: # · PLAYER · POS · OVR · FITNESS · TO, then wage and morale where the sheet has room. */
-.nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 52px 44px 130px 64px 84px 84px; }
+/* 3d Squad: # · PLAYER · POS · OVR · FITNESS · TO, then wage and morale where the sheet has room.
+   OVR is rem, not px (#600): "4½★ 56" is 47px at Normal and grows with Settings › Text size. The track is
+   3.25rem for the text (room for a wider ★ from a fallback font) and the gap after it; the name gives up the room. */
+.nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 52px 3.875rem 130px 64px 84px 84px; }
 @media (max-width: 760px) {
-  .nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 44px 40px 118px 56px; }
+  .nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 44px 3.875rem 118px 56px; }
   .nrl-squad .nrl-sq-wide { display: none; }
 }
 .nrl-squad-no { color: var(--nrl-muted); }
 /* 3g Recruit: PLAYER · POS · AGE · OVR · FEE · WAGE · action, rows 44 tall. */
-.nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 52px 40px 44px 84px 84px 96px; }
-@media (max-width: 760px) { .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 40px 34px 38px 80px 72px 92px; } }
+.nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 52px 40px 3.875rem 84px 84px 96px; }
+@media (max-width: 760px) { .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 40px 34px 3.875rem 80px 72px 92px; } }
 .nrl-recruit .nrl-row { min-height: 44px; }
 /* Written in caps already, so a sum keeps its small k ("NEED $18k"). */
 .nrl-row .nrl-row-action { min-height: 36px; min-width: 0; width: 100%; padding: 0 6px; border-radius: 8px; font-size: 0.875rem; text-transform: none; }
@@ -369,8 +374,10 @@ export function openRecruitScreen(): void {
     // R2 (#349): when the pool changes, in Advance Weeks.
     const n = weeksToPoolRefresh(s.week);
     const when = n === 1 ? 'after this week' : `in ${n} weeks`;
-    sub.textContent = `Free agents · new players ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${money(s.money)}`;
-    sub.title = `A pool of ${FREE_AGENT_POOL_SIZE}; new players arrive ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${money(s.money)}.`;
+    // The bank as the dock writes it (#600): in debt it is "-$84,448", the sign before the dollar.
+    const bank = fmtMoney(s.money);
+    sub.textContent = `Free agents · new players ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${bank}`;
+    sub.title = `A pool of ${FREE_AGENT_POOL_SIZE}; new players arrive ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${bank}.`;
     if (s.freeAgents.length === 0) {
       list.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. New players arrive when the pool refreshes.' }));
       return;
@@ -435,7 +442,7 @@ export function openRecruitScreen(): void {
 
   const head = screenHead('', { lead: [squadTabs('recruit')], sub, controls: [sort.button] });
   const screen = el('div', { class: 'nrl-screen nrl-sq nrl-recruit' }, head,
-    gridHead(['Player', 'Pos', 'Age', 'Ovr', 'Fee', 'Wage', '']), list);
+    gridHead(['Player', 'Pos', 'Age', ['Ovr', 'nrl-col-ovr'], 'Fee', 'Wage', '']), list);
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onRecruitClosed, 'recruit');
   render();
