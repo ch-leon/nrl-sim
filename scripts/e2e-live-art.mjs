@@ -19,6 +19,10 @@ try {
     r.onEvents=null;
     while(r.tick<10000 && !r.finished) {
       r.step(); const s=r.cur, c=s.contact;
+      const holder=s.players.find(p=>p.side===s.ball.holder?.side && p.slot===s.ball.holder?.slot);
+      if(holder && holder.caughtTick===s.tick && ['run','idle'].includes(holder.pose)) found.catch ??= s.tick;
+      if(holder?.pose==='dummyHalf') found.pickup ??= s.tick;
+      if(s.players.some(p=>p.pose==='pass')) found.pass ??= s.tick;
       if(c) {
         if(c.defenders.length>=2 && !c.outcome && s.tick>=Math.max(...c.joinedTicks)+3) found.group ??= s.tick;
         if(c.defenders.length===3 && s.tick>=Math.max(...c.joinedTicks)+3) found.three ??= s.tick;
@@ -27,12 +31,12 @@ try {
         if(s.players.some(p=>p.side===c.carrier.side && p.slot===c.carrier.slot && p.pose==='ptb')) found.ptb ??= s.tick;
       }
       if(!s.ball.holder) found.flight ??= s.tick;
-      if(['group','three','tackle','big-hit','break-tackle','strip','ground','ptb','flight'].every(k=>found[k]!==undefined)) break;
+      if(['group','three','tackle','big-hit','break-tackle','strip','ground','ptb','flight','catch','pickup','pass'].every(k=>found[k]!==undefined)) break;
     }
     return found;
   });
   console.log('Actual moments',moments);
-  for(const required of ['group','tackle','ground','ptb','flight']) assert.ok(moments[required]!==undefined,required);
+  for(const required of ['group','tackle','ground','ptb','flight','catch','pickup','pass']) assert.ok(moments[required]!==undefined,required);
   const inspect=()=>page.evaluate(()=>{
     const {ctrl,game}=window.__lab, s=game.scene.getScene('Lab'), r=ctrl.runner;
     const state=s.view.contactState;
@@ -41,6 +45,7 @@ try {
       expected:state?[state.contact.carrier,...state.contact.defenders].map(p=>p.who).sort():[],
       ball:s.ball.sprite.visible, held:!!r.cur.ball.holder,
       textures:game.textures.getTextureKeys().length,cache:s.playerFrames.size,
+      actors:Object.values(s.players).flat().map(a=>[a.who,a.sprite.texture.getSourceImage().toDataURL()]),
       player:s.players.home[0].sprite.texture.getSourceImage().toDataURL(),
       group:s.contact.sprite.texture.getSourceImage().toDataURL()};
   });
@@ -66,6 +71,14 @@ try {
   const replay=await inspect();
   assert.equal(first.player,replay.player);assert.equal(first.group,replay.group);
   assert.equal(first.textures,replay.textures,'seek does not allocate textures');
+  for(const name of ['catch','ptb','pickup','pass']) {
+    await seek(moments[name]+1); const original=await inspect();
+    await page.waitForTimeout(100); assert.deepEqual((await inspect()).actors,original.actors,`${name}: pause freezes handling`);
+    await seek(moments[name]+40); await seek(moments[name]+1);
+    const repeated=await inspect();
+    assert.deepEqual(repeated.actors,original.actors,`${name}: seek reproduces every player`);
+    assert.equal(repeated.ball,!repeated.held,`${name}: ownership controls the only ball`);
+  }
   await page.setViewportSize({width:844,height:390});
   await seek(moments.group);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
