@@ -1,11 +1,13 @@
 // Independent regional identities; UK is a locale, not a rank above AU (#573).
 import { UK_PACK } from '../uk';
 import type { RegionalCareerProfile } from '../../data/divisions';
+import { INITIAL_CALENDAR, INITIAL_FINALS_SLOTS, INITIAL_REGULAR_SLOTS, INITIAL_TRIAL_SLOTS } from './calendar';
 
 // The same provisional generation bands as AU, with independently authored
 // clubs and membership. These values are not measured balance or annual caps.
 export const UK_CAREER_PROFILE: RegionalCareerProfile = {
   id: 'uk-career-3x8', version: 1, pack: 'uk', slotCount: 25,
+  calendarSlots: INITIAL_CALENDAR, trialSlots: INITIAL_TRIAL_SLOTS,
   startingDivisionId: 'uk-local', startingSquad: { firstGrade: 41, depthGap: 8, heroes: 1, size: 20 },
   clubs: [
     ...UK_PACK.clubs.map(c => ({ id: c.id, name: c.name, colors: [...c.colors] as [string, string], ...(c.home ? { home: { ...c.home } } : {}) })),
@@ -23,7 +25,7 @@ export const UK_CAREER_PROFILE: RegionalCareerProfile = {
     { id: 'rival-uk-runners', name: 'Yewbridge Runners', colors: ['#424f76', '#c3d99b'] },
   ],
   divisions: [
-    { id: 'uk-local', name: 'Local League', rank: 0, regularRounds: 14, finalsSize: 4, ratingMean: 44, entrants: [
+    { id: 'uk-local', name: 'Local League', rank: 0, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 44, entrants: [
       { clubId: 'player', strength: 44 },
       { clubId: 'rival-uk-buntings', strength: 38 },
       { clubId: 'rival-uk-10', strength: 40 },
@@ -33,7 +35,7 @@ export const UK_CAREER_PROFILE: RegionalCareerProfile = {
       { clubId: 'rival-uk-8', strength: 48 },
       { clubId: 'rival-uk-coppers', strength: 50 },
     ] },
-    { id: 'uk-championship', name: 'Championship', rank: 1, regularRounds: 14, finalsSize: 4, ratingMean: 54, entrants: [
+    { id: 'uk-championship', name: 'Championship', rank: 1, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 54, entrants: [
       { clubId: 'rival-uk-flint', strength: 47 },
       { clubId: 'rival-uk-7', strength: 49 },
       { clubId: 'rival-uk-whistlers', strength: 51 },
@@ -43,7 +45,7 @@ export const UK_CAREER_PROFILE: RegionalCareerProfile = {
       { clubId: 'rival-uk-rattles', strength: 59 },
       { clubId: 'rival-uk-4', strength: 61 },
     ] },
-    { id: 'uk-premier', name: 'Premier League', rank: 2, regularRounds: 14, finalsSize: 4, ratingMean: 64, entrants: [
+    { id: 'uk-premier', name: 'Premier League', rank: 2, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 64, entrants: [
       { clubId: 'rival-uk-kilns', strength: 57 },
       { clubId: 'rival-uk-3', strength: 59 },
       { clubId: 'rival-uk-bells', strength: 61 },

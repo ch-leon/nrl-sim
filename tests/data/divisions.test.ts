@@ -164,8 +164,10 @@ describe('dormant regional world construction', () => {
     selectPack('au');
     const clubs = AU_CAREER_PROFILE.clubs.slice(0, 5);
     const profile: RegionalCareerProfile = {
-      ...AU_CAREER_PROFILE, id: 'six-club-prototype', slotCount: 12, startingDivisionId: 'small-local', clubs,
-      divisions: [{ id: 'small-local', name: 'Small Local', rank: 0, regularRounds: 10, finalsSize: 4, ratingMean: 44,
+      ...AU_CAREER_PROFILE, id: 'six-club-prototype', slotCount: 14, trialSlots: [1, 2],
+      calendarSlots: Array.from({ length: 14 }, (_, i) => ({ id: i + 1, kind: i < 2 ? 'preseason' : 'competition' })), startingDivisionId: 'small-local', clubs,
+      divisions: [{ id: 'small-local', name: 'Small Local', rank: 0, regularRounds: 10,
+        regularSlots: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12], finalsSlots: [13, 14], finalsSize: 4, ratingMean: 44,
         entrants: [{ clubId: 'player', strength: 44 }, ...clubs.map((c, n) => ({ clubId: c.id, strength: 40 + n }))] }],
     };
     const world = createDivisionWorld(profile, AU_PACK, 6, player);

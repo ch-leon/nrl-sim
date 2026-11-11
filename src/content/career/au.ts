@@ -2,12 +2,14 @@
 // supported single-league AU pack and its existing clubs are unchanged.
 import { AU_PACK } from '../au';
 import type { RegionalCareerProfile } from '../../data/divisions';
+import { INITIAL_CALENDAR, INITIAL_FINALS_SLOTS, INITIAL_REGULAR_SLOTS, INITIAL_TRIAL_SLOTS } from './calendar';
 
 // Version-one hypotheses: 44/54/64 tier centres overlap at their edges; the
 // player's 41 target leaves room for original young recruits to reach the top.
 // Stars/XP still belong to the progression tuning pass, annual caps to finance.
 export const AU_CAREER_PROFILE: RegionalCareerProfile = {
   id: 'au-career-3x8', version: 1, pack: 'au', slotCount: 25,
+  calendarSlots: INITIAL_CALENDAR, trialSlots: INITIAL_TRIAL_SLOTS,
   startingDivisionId: 'au-local', startingSquad: { firstGrade: 41, depthGap: 8, heroes: 1, size: 20 },
   clubs: [
     ...AU_PACK.clubs.map(c => ({ id: c.id, name: c.name, colors: [...c.colors] as [string, string], ...(c.home ? { home: { ...c.home } } : {}) })),
@@ -21,7 +23,7 @@ export const AU_CAREER_PROFILE: RegionalCareerProfile = {
     { id: 'rival-au-miners', name: 'Mount Isa Miners', colors: ['#703b2c', '#b9cbd0'] },
   ],
   divisions: [
-    { id: 'au-local', name: 'Local League', rank: 0, regularRounds: 14, finalsSize: 4, ratingMean: 44, entrants: [
+    { id: 'au-local', name: 'Local League', rank: 0, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 44, entrants: [
       { clubId: 'player', strength: 44 },
       { clubId: 'rival-au-bellbirds', strength: 38 },
       { clubId: 'rival-larrikins', strength: 40 },
@@ -31,7 +33,7 @@ export const AU_CAREER_PROFILE: RegionalCareerProfile = {
       { clubId: 'rival-au-saltbush', strength: 48 },
       { clubId: 'rival-diggers', strength: 50 },
     ] },
-    { id: 'au-championship', name: 'Championship', rank: 1, regularRounds: 14, finalsSize: 4, ratingMean: 54, entrants: [
+    { id: 'au-championship', name: 'Championship', rank: 1, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 54, entrants: [
       { clubId: 'rival-au-fireflies', strength: 47 },
       { clubId: 'rival-gulls', strength: 49 },
       { clubId: 'rival-mariners', strength: 51 },
@@ -41,7 +43,7 @@ export const AU_CAREER_PROFILE: RegionalCareerProfile = {
       { clubId: 'rival-brumbies', strength: 59 },
       { clubId: 'rival-drovers', strength: 61 },
     ] },
-    { id: 'au-premier', name: 'Premier League', rank: 2, regularRounds: 14, finalsSize: 4, ratingMean: 64, entrants: [
+    { id: 'au-premier', name: 'Premier League', rank: 2, regularRounds: 14, regularSlots: INITIAL_REGULAR_SLOTS, finalsSlots: INITIAL_FINALS_SLOTS, finalsSize: 4, ratingMean: 64, entrants: [
       { clubId: 'rival-au-sandpipers', strength: 57 },
       { clubId: 'rival-crocs', strength: 59 },
       { clubId: 'rival-cyclones', strength: 61 },

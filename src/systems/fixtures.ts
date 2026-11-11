@@ -34,6 +34,7 @@ import { bus } from '../core/events';
 import { strengthChanges, applySeasonReputation } from './league';
 import { rolloverRivals, withRivalSquads } from './rivals';
 import { currentCalendarFixtures, finaliseCalendarFixture, fixtureBridge, hasStructuralCalendar, resolveCalendarForfeits, sameFixtureIdentity } from './competitionCalendar';
+import { prepareDivisionFinals } from './divisionCareer';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -635,7 +636,11 @@ export function registerFixturesSystem(): void {
 
   // (a2) Generate this week's finals bracket ties before rivals/player match.
   registerTickHook('fixtures-finals', TICK_ORDER.match - 2, (ctx: TickContext) => {
-    if (hasStructuralCalendar(getState())) return;
+    if (hasStructuralCalendar(getState())) {
+      const next = prepareDivisionFinals(getState());
+      if (next !== getState()) setState({ competitions: next.competitions! });
+      return;
+    }
     if (!isFinalsRound(ctx.week)) return;
     const s = getState();
     if (s.league.clubs.length === 0) return;
@@ -703,7 +708,11 @@ export function registerFixturesSystem(): void {
   // home final for gate receipts. 'fixtures-finals' above stays as a fallback
   // for saves made before this hook existed.
   registerTickHook('fixtures-finals-next', TICK_ORDER.ladder + 1, (ctx: TickContext) => {
-    if (hasStructuralCalendar(getState())) return;
+    if (hasStructuralCalendar(getState())) {
+      const next = prepareDivisionFinals(getState());
+      if (next !== getState()) setState({ competitions: next.competitions! });
+      return;
+    }
     const nextWeek = ctx.week + 1;
     if (!isFinalsRound(nextWeek)) return;
     const s = getState();

@@ -8,6 +8,9 @@ import { generatePlayer, generatePlayerAround, POSITIONS } from './player';
 import { createCompetitionInstance, competitionFixtureId, type CompetitionDefinition, type CompetitionInstance } from './competition';
 import { generateRivalSquad, hashString, rivalSquadSeed, squadStrength } from '../systems/rivals';
 import { makeRng } from '../utils/rng';
+import type { DivisionMetadata } from './competitionDivisions';
+import type { CompetitionCalendarSlot } from './competitionCalendar';
+export type { DivisionMetadata } from './competitionDivisions';
 
 export type CareerClubIdentity = Omit<RivalClub, 'squad' | 'strength'>;
 export interface DivisionProfile {
@@ -15,6 +18,8 @@ export interface DivisionProfile {
   name: string;
   rank: number;
   regularRounds: number;
+  regularSlots: readonly number[];
+  finalsSlots: readonly number[];
   finalsSize: number;
   /** Initial generation target, not a budget or a measured balance result. */
   ratingMean: number;
@@ -25,18 +30,12 @@ export interface RegionalCareerProfile {
   version: number;
   pack: string;
   slotCount: number;
+  calendarSlots: readonly CompetitionCalendarSlot[];
+  trialSlots: readonly [number, number];
   startingDivisionId: string;
   startingSquad: { firstGrade: number; depthGap: number; heroes: number; size: number };
   clubs: readonly CareerClubIdentity[];
   divisions: readonly DivisionProfile[];
-}
-/** Membership belongs to the referenced instance, never another copied squad. */
-export interface DivisionMetadata {
-  id: string;
-  name: string;
-  rank: number;
-  ratingMean: number;
-  instanceId: string;
 }
 export interface DivisionWorld {
   profile: { id: string; version: number; pack: string; startingDivisionId: string };
@@ -57,6 +56,9 @@ const powerOfTwo = (n: number): boolean => n >= 2 && Number.isInteger(Math.log2(
 export function validateRegionalCareerProfile(profile: RegionalCareerProfile, pack: ContentPack): string[] {
   const problems: string[] = [];
   if (!present(profile.id) || !integer(profile.version, 1) || profile.pack !== pack.id || !integer(profile.slotCount, 1)) problems.push('career profile identity');
+  if (profile.calendarSlots.length !== profile.slotCount || profile.calendarSlots.some((s, i) => s.id !== i + 1 || !['preseason', 'competition', 'rest'].includes(s.kind))) problems.push('career calendar');
+  if (profile.trialSlots.length !== 2 || !profile.trialSlots.every((slot, index) => integer(slot, 1, profile.slotCount)
+    && (index === 0 || slot > profile.trialSlots[index - 1]!) && profile.calendarSlots[slot - 1]?.kind === 'preseason')) problems.push('career trial dates');
   const clubIds = new Set<string>();
   for (const club of profile.clubs) {
     if (!present(club.id) || club.id === 'player' || clubIds.has(club.id) || !present(club.name)
@@ -75,6 +77,10 @@ export function validateRegionalCareerProfile(profile: RegionalCareerProfile, pa
     if (division.finalsSize !== 0 && (!powerOfTwo(division.finalsSize) || division.finalsSize > count)) problems.push('division finals');
     const finalsRounds = division.finalsSize ? Math.log2(division.finalsSize) : 0;
     if (division.regularRounds + finalsRounds > profile.slotCount) problems.push('division calendar capacity');
+    const dates = [...division.regularSlots, ...division.finalsSlots];
+    if (division.regularSlots.length !== division.regularRounds || division.finalsSlots.length !== finalsRounds
+      || !dates.every((slot, i) => integer(slot, 1, profile.slotCount) && (i === 0 || slot > dates[i - 1]!)
+        && profile.calendarSlots[slot - 1]?.kind === 'competition' && !profile.trialSlots.includes(slot))) problems.push('division stage dates');
     for (const entrant of division.entrants) {
       if ((entrant.clubId !== 'player' && !clubIds.has(entrant.clubId)) || assigned.has(entrant.clubId) || !rating(entrant.strength)) problems.push('division entrant ownership');
       assigned.add(entrant.clubId);
@@ -120,8 +126,8 @@ function divisionDefinition(profile: RegionalCareerProfile, division: DivisionPr
     format: { kind: 'league', finalsSize: division.finalsSize },
     minEntrants: division.entrants.length, maxEntrants: division.entrants.length, slotCount: profile.slotCount,
     stages: [
-      { id: 'regular', name: 'League', kind: 'league', rounds: division.regularRounds },
-      ...(division.finalsSize ? [{ id: 'finals', name: 'Finals', kind: 'knockout' as const, rounds: Math.log2(division.finalsSize) }] : []),
+      { id: 'regular', name: 'League', kind: 'league', rounds: division.regularRounds, slotIds: [...division.regularSlots] },
+      ...(division.finalsSize ? [{ id: 'finals', name: 'Finals', kind: 'knockout' as const, rounds: Math.log2(division.finalsSize), slotIds: [...division.finalsSlots] }] : []),
     ],
     matchRules: { ...pack.rules },
     lineup: { onField: pack.league.onField, benchSize: 4, minSquad: pack.league.squadMin, maxSquad: pack.league.squadCap },
