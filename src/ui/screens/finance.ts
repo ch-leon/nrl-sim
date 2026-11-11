@@ -668,10 +668,13 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 /* Contracts (under Finance): one row a player, soonest to end first. */
 .nrl-screen.nrl-contracts { display: flex; flex-direction: column; }
 .nrl-contracts-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; container-type: inline-size; }
-.nrl-table.nrl-contracts-table { min-width: 660px; }
 .nrl-contracts-table td { height: 44px; }
 .nrl-contracts-table td.nrl-num { font-weight: 500; }
+/* The name column takes what the others leave, at every width (#612: "…on a board loan" or a
+   24-letter name pushed SELL off an 844px sheet). A long line ends in "…"; the cell's title has it whole. */
+.nrl-contracts-table td.nrl-contract-info { max-width: 0; width: 100%; }
 .nrl-contract-who { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.nrl-contract-name, .nrl-contract-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nrl-contract-name { font-weight: 600; }
 .nrl-contract-meta, .nrl-contract-pos { font-size: 0.6875rem; color: var(--nrl-muted); }
 .nrl-contract-pos { display: none; }
@@ -679,16 +682,12 @@ button.nrl-finance-contracts:focus-visible { outline: 2px solid var(--nrl-accent
 .nrl-contract-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .nrl-contract-actions .nrl-btn { min-height: 36px; padding: 0 10px; font-size: 0.875rem; border-radius: 8px; text-transform: none; }
 @media (pointer: coarse) { .nrl-contract-actions .nrl-btn { min-height: 44px; } }
-.nrl-contract-actions .nrl-btn.nrl-contract-armed, .nrl-contract-actions .nrl-btn.nrl-contract-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 .nrl-contract-gone td { color: var(--nrl-muted); }
-/* A narrow sheet (667px, or 844px between a notch's insets): the table fits without a sideways
-   scroll; who he is goes to the name's tooltip, and the name column takes what the others leave,
-   a long name ending in "…". On the sheet's own width, not the screen's, and in rem (760px at
-   Normal) so a larger Text size (#371) takes the narrow table sooner (#350: SELL ran off the sheet). */
+/* A narrow sheet (667px, or 844px between a notch's insets): who he is goes to the name's
+   tooltip, and the cells and buttons close up. On the sheet's own width, not the screen's, and
+   in rem (760px at Normal) so a larger Text size (#371) takes the narrow table sooner (#350:
+   SELL ran off the sheet). */
 @container (max-width: 47.5rem) {
-  .nrl-table.nrl-contracts-table { min-width: 0; }
-  .nrl-contracts-table td.nrl-contract-info { max-width: 0; width: 100%; }
-  .nrl-contract-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nrl-contract-meta { display: none; }
   .nrl-contracts-table th, .nrl-contracts-table td { padding: 0 4px; }
   .nrl-contract-actions { gap: 4px; }

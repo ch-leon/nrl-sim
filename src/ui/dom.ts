@@ -376,6 +376,27 @@ export function guardDoubleTap(container: HTMLElement): void {
   }, true);
 }
 
+/** A two-tap Sell or Release waiting for its second tap (#612): the class its button wears, and how long it waits. */
+export const ARMED_CLASS = 'nrl-btn-armed';
+export const ARMED_MS = 4000;
+
+/**
+ * Start an armed button's wait (#612; Contracts and the player page). `disarm` runs
+ * once: after ARMED_MS, or on a pointerdown anywhere but the armed button, which
+ * is found by ARMED_CLASS so a re-render may swap the node. `disarm` puts the
+ * button back in place rather than re-rendering: the tap that disarmed it still
+ * lands on what it was aimed at. The returned function calls the wait off (the
+ * second tap, or the screen closing).
+ */
+export function armGuard(disarm: () => void): () => void {
+  const drop = (): void => { clearTimeout(timer); document.removeEventListener('pointerdown', onDown, true); };
+  const fire = (): void => { drop(); disarm(); };
+  const onDown = (e: Event): void => { if (!(e.target as Element | null)?.closest?.(`.${ARMED_CLASS}`)) fire(); };
+  const timer = setTimeout(fire, ARMED_MS);
+  document.addEventListener('pointerdown', onDown, true);
+  return drop;
+}
+
 /** Currently open modal overlay, if any (guards against stacking). */
 let openModalEl: HTMLElement | null = null;
 
@@ -569,6 +590,8 @@ export const CSS = `
 .nrl-btn.nrl-btn-primary:hover:not(:disabled) { background: #f7da5e; }
 .nrl-btn.nrl-btn-danger { background: var(--nrl-button); color: var(--nrl-neg); }
 .nrl-btn.nrl-btn-danger:hover:not(:disabled) { background: #283669; }
+/* Armed (#612): a two-tap Sell or Release asking again is solid red, on every screen that asks. */
+.nrl-btn.nrl-btn-armed, .nrl-btn.nrl-btn-armed:hover:not(:disabled) { background: var(--nrl-neg); color: var(--nrl-on-accent); }
 /* Disabled stays visible and says why (the reason is the label or the title). */
 .nrl-btn:disabled { cursor: default; opacity: 0.55; }
 .nrl-btn.nrl-btn-primary:disabled { background: var(--nrl-raised); color: var(--nrl-muted); opacity: 1; }
