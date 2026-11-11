@@ -15,6 +15,7 @@ import { nextFixture } from '../systems/league';
 import { RISK_WORD, ladderStanding, worstObjective, type ObjectiveRisk } from '../systems/board';
 import { ECON, WEEKS_PER_SEASON } from '../config';
 import { el, button, mount, ensureStyles, dock, activeScreen, onScreenChange } from './dom';
+import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
 
 /** Options for {@link createHud}. */
 export interface HudOpts {
@@ -400,6 +401,23 @@ export function createHud(opts: HudOpts = {}): Hud {
 
   let lastMoney: number | null = null;
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
+  // The balance from before the flash now showing (#599). A week's ledger lines
+  // land as a burst (costs, then income): the colour is the burst's net, not its last line's.
+  let flashFrom: number | null = null;
+
+  /** Colour the balance for a move from `from` to `to`; one that nets to nothing shows no flash. */
+  function flashMoney(from: number, to: number): void {
+    moneyEl.classList.remove('nrl-flash-up', 'nrl-flash-down');
+    if (flashTimer) clearTimeout(flashTimer);
+    flashFrom = null;
+    if (to === from) return;
+    flashFrom = from;
+    moneyEl.classList.add(to > from ? 'nrl-flash-up' : 'nrl-flash-down');
+    flashTimer = setTimeout(() => {
+      moneyEl.classList.remove('nrl-flash-up', 'nrl-flash-down');
+      flashFrom = null;
+    }, FLASH_MS);
+  }
 
   function renderMoney(balance: number): void {
     const tile = moneyTile(balance);
@@ -414,15 +432,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     statusBox.setAttribute('aria-label', label);
     statusBox.title = label;
 
-    if (lastMoney !== null && balance !== lastMoney) {
-      const up = balance > lastMoney;
-      moneyEl.classList.remove('nrl-flash-up', 'nrl-flash-down');
-      moneyEl.classList.add(up ? 'nrl-flash-up' : 'nrl-flash-down');
-      if (flashTimer) clearTimeout(flashTimer);
-      flashTimer = setTimeout(() => {
-        moneyEl.classList.remove('nrl-flash-up', 'nrl-flash-down');
-      }, FLASH_MS);
-    }
+    if (lastMoney !== null && balance !== lastMoney) flashMoney(flashFrom ?? lastMoney, balance);
     lastMoney = balance;
   }
 
@@ -500,6 +510,23 @@ export function createHud(opts: HudOpts = {}): Hud {
   const offFinished = bus.on('match:finished', () => queueMicrotask(() => render(getState())));
   const offScreen = onScreenChange(() => renderChip(getState()));
 
+  // #599: a played week's flash starts at the tap and the match hides the dock
+  // about 250ms later, so it is shown again when the dock is next on screen: Back
+  // to Club, or Save & exit. Full time is too early (the dock is still hidden) and
+  // nothing on the bus says the club is back; the body class does (as matchReport.ts).
+  let matchFrom: number | null = null;
+  let matchOn = false;
+  const offStarted = bus.on('match:started', () => { matchFrom = flashFrom ?? lastMoney; });
+  const matchWatch = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => {
+    const on = document.body.classList.contains(MATCH_ACTIVE_CLASS);
+    if (on === matchOn) return;
+    matchOn = on;
+    if (on || matchFrom === null || lastMoney === null) return;
+    flashMoney(matchFrom, lastMoney);
+    matchFrom = null;
+  });
+  matchWatch?.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
   return {
     el: root,
     destroy() {
@@ -508,6 +535,8 @@ export function createHud(opts: HudOpts = {}): Hud {
       offParked();
       offFinished();
       offScreen();
+      offStarted();
+      matchWatch?.disconnect();
       setMenuOpen(false);
       if (flashTimer) clearTimeout(flashTimer);
       parts.status.replaceChildren();

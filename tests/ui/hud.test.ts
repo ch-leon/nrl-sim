@@ -9,9 +9,9 @@ import { bus } from '../../src/core/events';
 import { CSS } from '../../src/ui/dom';
 import { ECON } from '../../src/config';
 
-// DOM tests (createHud rendering / flash / bus wiring) are skipped: jsdom is not
-// installed and the vitest environment is 'node' (see vite.config.ts). The
-// money formatter is extracted as a pure function so it is covered here.
+// jsdom is not installed and the vitest environment is 'node' (see vite.config.ts),
+// so the money formatter is extracted as a pure function and covered here. The
+// createHud tests at the foot of the file (routes, the flash) mount it on the stub DOM.
 describe('fmtMoney', () => {
   it('formats positive balances with thousands separators and a $ prefix', () => {
     expect(fmtMoney(0)).toBe('$0');
@@ -301,5 +301,114 @@ describe('essential routes bypass Office locks (#482)', () => {
     tickContracts(getState());
     expect(action).toBeDefined(); action!(); expect(contracts).toHaveBeenCalledOnce();
     hud.destroy(); nav.destroy();
+  });
+});
+
+import { earnMoney } from '../../src/data/club';
+import { MATCH_ACTIVE_CLASS } from '../../src/ui/screens/matchOverlay';
+
+describe('the balance flashes the way the week went (#599)', () => {
+  // The body class is how the HUD knows the match view has gone; the stub DOM has no observers.
+  let bodyClassChanged: () => void;
+  beforeEach(() => {
+    stubDocument();
+    bodyClassChanged = () => {};
+    vi.stubGlobal('MutationObserver', class {
+      constructor(fn: () => void) { bodyClassChanged = fn; }
+      observe(): void {}
+      disconnect(): void {}
+    });
+    vi.useFakeTimers();
+    bus.clear();
+    createNewGame('Flash', 2);
+    setState({ money: 200_000 });
+  });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  const body = (): StubNode => document.body as unknown as StubNode;
+  const flash = (): string => {
+    const money = body().querySelector('[data-hud="money"]')!;
+    return ['nrl-flash-up', 'nrl-flash-down'].filter((c) => money.classList.contains(c)).join(' ');
+  };
+  /** A week's ledger lines, as the economy posts them: one money:changed each. */
+  const week = (...lines: number[]): void => lines.forEach((amount, i) => earnMoney(amount, `line-${i}`));
+  const matchView = (on: boolean): void => { body().classList.toggle(MATCH_ACTIVE_CLASS, on); bodyClassChanged(); };
+
+  it('a week that loses money flashes the loss colour though its last line is income', () => {
+    const hud = createHud();
+    week(-17_323, -1_500, 1_200, 5_593); // $200,000 to $187,970
+    expect(getState().money).toBe(187_970);
+    expect(flash()).toBe('nrl-flash-down');
+    vi.advanceTimersByTime(450);
+    expect(flash()).toBe('');
+    hud.destroy();
+  });
+
+  it('a week that makes money flashes the gain colour though its last line is a cost', () => {
+    const hud = createHud();
+    week(25_200, 1_200, -17_323, -1_500);
+    expect(flash()).toBe('nrl-flash-up');
+    // The next week is coloured on its own once this flash has run out.
+    vi.advanceTimersByTime(450);
+    week(-17_323, 1_200);
+    expect(flash()).toBe('nrl-flash-down');
+    hud.destroy();
+  });
+
+  it('lines that land while a flash is showing count against the balance it started from', () => {
+    const hud = createHud();
+    week(-17_323);
+    vi.advanceTimersByTime(200);
+    week(6_300);
+    expect(flash()).toBe('nrl-flash-down');
+    hud.destroy();
+  });
+
+  it('a burst that ends on the balance it started from shows no flash', () => {
+    const hud = createHud();
+    week(-17_323, -1_500, 18_823);
+    expect(getState().money).toBe(200_000);
+    expect(flash()).toBe('');
+    hud.destroy();
+  });
+
+  it('a played week flashes again when the club is back: the match hid the dock on the first one', () => {
+    const hud = createHud();
+    week(-17_323, -1_500, 1_200, 6_300);
+    bus.emit('match:started', {} as never);
+    matchView(true);
+    vi.advanceTimersByTime(450);
+    // Full time: the dock is still hidden behind the full-time card.
+    bus.emit('match:finished', {} as never);
+    vi.advanceTimersByTime(2_000);
+    expect(flash()).toBe('');
+    matchView(false);
+    expect(flash()).toBe('nrl-flash-down');
+    vi.advanceTimersByTime(450);
+    expect(flash()).toBe('');
+    // Only once: another change of the body class shows nothing more.
+    matchView(true);
+    matchView(false);
+    expect(flash()).toBe('');
+    hud.destroy();
+  });
+
+  it('a played week that made money comes back in the gain colour, and one that broke even shows nothing', () => {
+    const hud = createHud();
+    week(-17_323, -1_500, 1_200, 25_200);
+    bus.emit('match:started', {} as never);
+    matchView(true);
+    vi.advanceTimersByTime(450);
+    matchView(false);
+    expect(flash()).toBe('nrl-flash-up');
+    vi.advanceTimersByTime(450);
+
+    week(-1_500, 1_500);
+    bus.emit('match:started', {} as never);
+    matchView(true);
+    vi.advanceTimersByTime(450);
+    matchView(false);
+    expect(flash()).toBe('');
+    hud.destroy();
   });
 });
