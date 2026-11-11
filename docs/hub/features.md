@@ -63,6 +63,13 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- An isolated developer competition calendar separates slots from competition
+  rounds, guards watch/skip/worker results and honours against duplicate delivery,
+  preserves held-match recovery, and tracks elapsed intervals. It pauses for
+  next-season setup through the existing hook registry. Default and dormant
+  careers retain their current flow; normal competition entry and finance remain
+  separate work ([PR](https://github.com/ch-leon/nrl-sim/pull/587)).
+
 - Save format 25 stores optional, versioned competition rule/prize snapshots and
   stable fixture identities with strict import validation. Supported v24 careers
   upgrade without changing their people or league format, retaining their original
