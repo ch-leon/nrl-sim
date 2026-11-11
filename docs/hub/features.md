@@ -63,6 +63,13 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Save format 25 stores optional, versioned competition rule/prize snapshots and
+  stable fixture identities with strict import validation. Supported v24 careers
+  upgrade without changing their people or league format, retaining their original
+  save; the pre-v24 restart/export policy stays in place. This is dormant metadata
+  for subsequent calendar work, not an enabled multi-competition career
+  ([PR](https://github.com/ch-leon/nrl-sim/pull/586)).
+
 - [Match big moments](../specs/match-big-moments.md) ([release issue #588](https://github.com/ch-leon/nrl-sim/issues/588)): distinct punt/grubber/drop-kick motion at the actual release, high-take landings with grounded shadows, and scored tries that flow through grounding, recovery and individual reactions. The new snapshot fields describe presentation only; the original seeded match behavior is preserved.
 
 - [Match transition polish](../specs/match-animation-transitions.md) ([release issue #588](https://github.com/ch-leon/nrl-sim/issues/588)): catches keep their running stride while tucking the ball; tackled carriers rise into the play-the-ball; dummy-half pickup and pass follow the real ball timing. The approved short limbs and sim outcomes are preserved.

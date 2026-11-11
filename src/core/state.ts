@@ -3,6 +3,7 @@
 // instances in state (must JSON round-trip).
 
 import type { TeamTactics } from '../match/league/presets';
+import type { CompetitionCareerState } from '../data/competition';
 import { bus } from './events';
 import { packForCountry, selectPack } from '../content';
 import { makeRng } from '../utils/rng';
@@ -102,9 +103,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** Current save-format version. v24 is new careers only: no migration from v23
- *  or earlier (Leon, 10 Nov 2026). Rejected originals stay in recovery. */
-export const SAVE_VERSION = 24;
+/** v25 adds optional competition metadata. v24 careers keep their existing
+ *  format; pre-v24 player data still requires a new career. */
+export const SAVE_VERSION = 25;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */
 export type StaffRole = 'assistantCoach' | 'analyst' | 'welfare' | 'attackCoach';
@@ -279,6 +280,8 @@ export interface GameState {
   unlocks?: { facilities: FacilityDefId[]; screens?: string[] | undefined } | undefined;
   freeAgents: Player[];
   league: LeagueState;
+  /** Dormant, opt-in competition metadata (#570); absent keeps the legacy path. */
+  competitions?: CompetitionCareerState;
   weather?: WeatherKind; // set for current round by fixtures system
   /**
    * coachCalls: the call chips during your matches (#73); on when absent.

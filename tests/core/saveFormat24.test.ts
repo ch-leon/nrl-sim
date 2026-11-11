@@ -29,7 +29,7 @@ function historical(version: number): string {
   }, 2)}\n`;
 }
 
-describe('save format 24 (#536)', () => {
+describe('format-24 player contract and current saves (#536)', () => {
   it('generates only Handling and Kicking for squad, rivals, free agents and juniors', () => {
     createNewGame('Generation', 536); initLeague(getState()); const s = getState(); const rng = makeRng(536);
     const players = [...s.squad, ...s.freeAgents, ...s.league.clubs.flatMap(c => c.squad ?? []),
@@ -41,11 +41,11 @@ describe('save format 24 (#536)', () => {
       }
     }
   });
-  it('round-trips a v24 career and export with distinct Handling and Kicking', () => {
+  it('round-trips a current career and export with distinct Handling and Kicking', () => {
     const s = createNewGame('Round-trip', 536); initLeague(s); const state = getState();
     state.squad[0]!.stats.handling = 31.5; state.squad[0]!.stats.kicking = 87.25;
-    expect(SAVE_VERSION).toBe(24); save(state);
-    expect(JSON.parse(bytes.get(slotKey(1))!).version).toBe(24);
+    expect(SAVE_VERSION).toBe(25); save(state);
+    expect(JSON.parse(bytes.get(slotKey(1))!).version).toBe(SAVE_VERSION);
     expect(load()).toEqual(state);
     expect(importSave(exportSave(state))).toMatchObject({ ok: true, state });
   });
@@ -87,7 +87,7 @@ describe('save format 24 (#536)', () => {
 it('backfills pre-progression v24 players deterministically without changing RNG, ceilings or raw bytes', () => {
   const s = createNewGame('XP backfill', 539); initLeague(s);
   const current = getState();
-  const raw = JSON.stringify(current, (_key, value: unknown) => {
+  const raw = JSON.stringify({ ...current, version: 24 }, (_key, value: unknown) => {
     if (value && typeof value === 'object' && 'stats' in value && 'position' in value) {
       const { xp: _xp, level: _level, unspentPoints: _points, ...old } = value as GameState['squad'][number];
       return old;

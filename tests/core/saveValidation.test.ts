@@ -256,6 +256,7 @@ describe('format-24 ceiling compatibility (#538)', () => {
   it('backfills every pre-change v24 roster deterministically without mutation or RNG draws', () => {
     fresh(); initLeague(getState());
     const source = JSON.parse(JSON.stringify(getState()));
+    source.version = 24;
     const rosters = [source.squad, source.freeAgents, ...source.league.clubs.map((c: { squad?: unknown[] }) => c.squad ?? [])];
     for (const roster of rosters) for (const p of roster) delete p.ceilings;
     source.squad[0].stats.speed = 99.75;
@@ -265,7 +266,7 @@ describe('format-24 ceiling compatibility (#538)', () => {
     expect(first.ok).toBe(true); expect(second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
     expect(first.state).toEqual(second.state);
-    expect(first.state.version).toBe(24);
+    expect(first.state.version).toBe(SAVE_VERSION);
     expect(first.state.rngSeed).toBe(source.rngSeed);
     expect(first.state.lineup).toEqual(source.lineup);
     expect(JSON.stringify(source)).toBe(original);

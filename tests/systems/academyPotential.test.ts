@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createNewGame, getState, setState, type PlacedFacility } from '../../src/core/state';
+import { createNewGame, getState, setState, SAVE_VERSION, type PlacedFacility } from '../../src/core/state';
 import { advanceWeeks, clearSeasonHooks, clearTickHooks } from '../../src/core/time';
 import { importSave } from '../../src/core/save';
 import { bus } from '../../src/core/events';
@@ -94,10 +94,10 @@ describe('Academy arrival potential (#545)', () => {
     state.freeAgents = generateProspects(makeRng(545), 1).map(p => ({ ...p, ceilings: createCeilings(p) }));
     const original = JSON.stringify(state.freeAgents);
     for (const level of levels) {
-      const result = importSave(JSON.stringify({ ...state, facilities: level ? [facility('academy', level as 1 | 2 | 3)] : [] }));
+      const result = importSave(JSON.stringify({ ...state, version: 24, facilities: level ? [facility('academy', level as 1 | 2 | 3)] : [] }));
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error(result.message);
-      expect(result.state.version).toBe(24);
+      expect(result.state.version).toBe(SAVE_VERSION);
       expect(result.state.rngSeed).toBe(state.rngSeed);
       expect(JSON.stringify(result.state.freeAgents)).toBe(original);
     }

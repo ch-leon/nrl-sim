@@ -2,7 +2,8 @@
 // Supported current-format fixtures validate and play on through the systems;
 // they are added alongside old files, never substituted for historical bytes.
 /// <reference types="vite/client" />
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect } from 'vitest';
+import { preparePack } from '../../src/content';
 import { coachAddress } from '../../src/ui/coachName';
 import { SAVE_VERSION } from '../../src/core/state';
 import { WEEKS_PER_SEASON } from '../../src/config';
@@ -22,6 +23,7 @@ const SHORT_WEEKS = 4;
 /** One version in between whose mid-season save plays on past the season's end, so a migrated save still crosses a rollover. */
 const middle = [...new Set(versions)].filter((v) => !FULL.has(v)).sort((a, b) => a - b);
 const CROSS = middle[Math.floor(middle.length / 2)];
+beforeAll(async () => { await preparePack('uk'); });
 
 describe('save corpus', () => {
   it('has at least one save', () => {
@@ -47,7 +49,7 @@ describe('save corpus', () => {
         return;
       }
 
-      it('loads v24 and passes checkState', () => {
+      it('loads supported saves and passes checkState', () => {
         const res = migrateState(raw);
         expect(res.ok, res.ok ? '' : res.message).toBe(true);
         if (!res.ok) return;

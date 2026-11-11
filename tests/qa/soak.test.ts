@@ -27,9 +27,9 @@ describe('soak checks', () => {
     expect(duplicatePlayers(dupe)).toEqual([s.squad[0]!.id]);
   });
 
-  it('every old save version requires a new career', () => {
+  it('every pre-v24 save version requires a new career', () => {
     createNewGame('Old', 9); initLeague(getState());
-    for (const version of [...OLD_VERSIONS, 23]) {
+    for (const version of [...OLD_VERSIONS.filter(v => v < 24), 23]) {
       const raw = asOldSave(getState(), version);
       const original = JSON.stringify(raw);
       expect(migrateState(raw)).toMatchObject({ ok: false, message: expect.stringMatching(/start a new career/i) });
