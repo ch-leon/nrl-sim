@@ -137,6 +137,8 @@ const fixture = vi.hoisted(() => [
 ]);
 vi.mock('../../src/data/towns.json', () => ({ default: fixture }));
 
+/** The field the keyboard is on, as the stand-in DOM knows it. */
+let focused: StubNode | null = null;
 class InputNode extends StubNode {
   events: Record<string, (() => void)[]> = {};
   override addEventListener(event: string, fn: () => void): void {
@@ -147,6 +149,15 @@ class InputNode extends StubNode {
     this.value = value;
     for (const fn of this.events.input ?? []) fn();
   }
+  /** The keyboard's return key: true when the field took it (no line break, no form submit). */
+  pressEnter(composing = false): boolean {
+    let taken = false;
+    const e = { key: 'Enter', isComposing: composing, preventDefault: () => { taken = true; } };
+    for (const fn of this.events.keydown ?? []) (fn as unknown as (e: object) => void)(e);
+    return taken;
+  }
+  override focus(): void { focused = this; }
+  blur(): void { if (focused === this) focused = null; }
 }
 const settleTowns = async (): Promise<void> => { await vi.dynamicImportSettled(); };
 beforeEach(() => {
@@ -298,5 +309,50 @@ describe('Start while the town list loads (#613)', () => {
     expect(TITLE_CSS).toContain(rule);
     // Later in the sheet than the yellow rule of equal weight (.nrl-title-btn-go:hover), so it wins.
     expect(TITLE_CSS.indexOf(rule)).toBeGreaterThan(TITLE_CSS.indexOf('.nrl-title-btn-go, .nrl-title-btn-go:hover {'));
+  });
+});
+
+describe('the phone keyboard on the name fields (#609)', () => {
+  const FIELDS = ['[data-nrl-town]', '[data-nrl-clubname]', '[data-nrl-coachname]', '[data-nrl-groundname]'];
+  const setup = (): InputNode[] => {
+    focused = null;
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    return FIELDS.map((sel) => root.querySelector(sel)! as InputNode);
+  };
+
+  it('starts each word with a capital, corrects nothing, and words the return key: next, then done', () => {
+    const boxes = setup();
+    boxes.forEach((box, i) => {
+      expect(box.type).toBe('text');
+      expect(box.getAttribute('autocapitalize')).toBe('words');
+      expect(box.getAttribute('autocorrect')).toBe('off');
+      expect(box.getAttribute('spellcheck')).toBe('false');
+      expect(box.getAttribute('enterkeyhint')).toBe(i === boxes.length - 1 ? 'done' : 'next');
+    });
+  });
+
+  it('the return key does what it says: on to the next name, and off the last one', () => {
+    const boxes = setup();
+    boxes.forEach((box, i) => {
+      box.focus();
+      expect(box.pressEnter()).toBe(true);
+      expect(focused).toBe(boxes[i + 1] ?? null);
+    });
+  });
+
+  it('leaves the return key to a keyboard that is still composing a word', () => {
+    const [town] = setup();
+    town!.focus();
+    expect(town!.pressEnter(true)).toBe(false);
+    expect(focused).toBe(town);
+  });
+
+  it('keeps a drag past the end of the details list in the list', () => {
+    const i = TITLE_CSS.indexOf('.nrl-title-details {');
+    expect(i).toBeGreaterThanOrEqual(0);
+    const details = TITLE_CSS.slice(i, TITLE_CSS.indexOf('}', i));
+    expect(details).toContain('overflow-y: auto');
+    expect(details).toContain('overscroll-behavior: contain');
   });
 });

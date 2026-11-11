@@ -663,6 +663,11 @@ export const CSS = `
   box-sizing: border-box;
 }
 #ui-root input, #ui-root select, #ui-root textarea { font: inherit; }
+/* A field you type in is never under 16px (#609): below that iOS Safari zooms the page into it on
+   focus and leaves it zoomed. The rule above out-ranks a field's own font-size, so the floor goes
+   here; rem, so it still follows Settings › Text size. The match lab's panel is a dense desk tool
+   and keeps its small fields. */
+#ui-root :is(input:is([type="text"], [type="search"], [type="number"]), input:not([type]), textarea, select):not(.nrl-lab *) { font-size: max(1rem, 16px); }
 /* Every number in Plex Mono: money, scores, ratings, the clock. */
 .nrl-num { font-family: var(--nrl-f-num); font-weight: 600; font-variant-numeric: tabular-nums; }
 /* A raised tile inside a sheet. */
@@ -1007,6 +1012,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   max-height: calc(100vh - var(--nrl-nav-h, 0px) - 20px - var(--nrl-safe-t, 0px));
   max-height: calc(100dvh - var(--nrl-nav-h, 0px) - 20px - var(--nrl-safe-t, 0px));
   overflow-y: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 10px 12px;
   background: var(--nrl-sheet);
@@ -1119,6 +1125,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   max-height: 85vh;
   max-height: 85dvh; /* #206: Safari's toolbars */
   overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   font-size: 0.875rem;
 }

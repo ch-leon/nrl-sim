@@ -302,7 +302,7 @@ ${PLAN_FIT_CSS}
   .nrl-lineup-plan .nrl-seg { padding: 1px; }
 }
 /* The Plays sheet (#326): the plays owned as rows, a numbered tick for each taken, in the order taken. */
-.nrl-lineup-plays-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 6px; max-height: min(52vh, 320px); overflow-y: auto; overscroll-behavior: contain; }
+.nrl-lineup-plays-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 6px; max-height: min(52vh, 320px); max-height: min(52dvh, 320px); overflow-y: auto; overscroll-behavior: contain; }
 .nrl-lineup-play { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 10px; border: 0; border-radius: 10px; background: var(--nrl-button); color: var(--nrl-text); text-align: left; cursor: pointer; min-width: 0; font: inherit; }
 .nrl-lineup-play[aria-pressed="true"] { background: var(--nrl-me); }
 .nrl-lineup-play[data-full] { opacity: 0.55; }

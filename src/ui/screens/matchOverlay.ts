@@ -1907,10 +1907,12 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 @keyframes nrl-mo-slow { from { color: var(--nrl-text); } to { color: var(--nrl-accent); } }
 /* The pulse never ends, so reduced motion stops it; the entrances keep their fade and lose their travel (dom.ts, #597). */
 @media (prefers-reduced-motion: reduce) { .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { animation: none; } }
-/* The stats, opened from the score bug: the report's stat column (3t). Asked for, so over the banner. */
+/* The stats, opened from the score bug: the report's stat column (3t). Asked for, so over the banner.
+   dvh follows Safari's toolbars, so the last rows stay above COACH and LOG; the vh line is the fallback (#609). */
 .nrl-mo-statsheet {
   position: fixed; top: calc(var(--nrl-mo-board, 60px) + 6px); left: calc(16px + var(--nrl-safe-l)); z-index: 19;
-  width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - var(--nrl-mo-board, 60px) - 94px); overflow-y: auto; box-sizing: border-box;
+  width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - var(--nrl-mo-board, 60px) - 94px);
+  max-height: calc(100dvh - var(--nrl-mo-board, 60px) - 94px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
   padding: 8px 12px 10px; border-radius: 14px; background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); pointer-events: auto;
 }
 .nrl-mo-statsheet[hidden] { display: none; }
@@ -2027,7 +2029,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
    (six buttons), as tiles two a line (three on a short wide phone), so it never scrolls. */
 .nrl-mo-tray {
   position: fixed; left: calc(16px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 21;
-  width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px));
+  max-height: calc(100dvh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 14px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-tray);
   pointer-events: auto; animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
@@ -2246,7 +2249,7 @@ ${PLAN_FIT_CSS}
 .nrl-mo-plan-plays { flex-basis: 100%; font-size: 0.75rem; color: var(--nrl-text-2); }
 .nrl-mo-plan-top, .nrl-mo-plan-grab { flex: 0 0 auto; }
 /* On a short screen the rows scroll and the foot with the primary stays put (#341). */
-.nrl-mo-plan-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px 12px; }
+.nrl-mo-plan-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 8px 12px; }
 .nrl-mo-plan-label { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-mo-plan .nrl-seg { display: flex; gap: 4px; padding: 4px; overflow: visible; }
 .nrl-mo-plan .nrl-seg > .nrl-btn { flex: 1 1 0; min-width: 0; height: 40px; min-height: 40px; padding: 0 6px; font-size: 1.0625rem; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
@@ -2257,7 +2260,7 @@ ${PLAN_FIT_CSS}
 .nrl-btn.nrl-mo-plan-go { flex: 0 0 auto; height: 48px; padding: 0 24px; font-size: 1.1875rem; }
 .nrl-mo-sheet { align-items: center; justify-content: center; }
 .nrl-mo-sheet-card {
-  position: relative; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
+  position: relative; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 18px; border-radius: 18px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal);
   animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }

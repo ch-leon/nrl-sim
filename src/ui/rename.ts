@@ -29,6 +29,9 @@ const RENAME_CSS = `
 .nrl-rename-why { min-height: 1.2em; font-size: 0.6875rem; line-height: 1.2; color: var(--nrl-muted); }
 .nrl-rename-why.nrl-attn { color: var(--nrl-neg); }
 .nrl-rename .nrl-btn { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 8px; }
+/* Beside the box (Kit) the button keeps its word (#609): the box asks for more of the row as its
+   text grows, and at Larger text on a 667px phone that left RENAME as RENAM. */
+.nrl-rename-row > .nrl-rename-input ~ .nrl-btn { min-width: min-content; }
 /* The Rename button beside a sheet's ◂ back: small, never wider than its word. */
 .nrl-btn.nrl-rename-open { flex: 0 0 auto; min-height: 44px; padding: 0 12px; font-size: 0.875rem; }
 `;

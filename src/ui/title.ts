@@ -117,8 +117,9 @@ export const TITLE_CSS = `
 .nrl-title-kit img { width: 84px; height: 90px; image-rendering: pixelated; }
 .nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0;
   max-height: calc(100dvh - 110px - var(--nrl-safe-t, env(safe-area-inset-top, 0px)) - var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
-/* Details scroll on short phones; difficulty guidance and Start stay in view. */
-.nrl-title-details { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; padding: 3px; }
+/* Details scroll on short phones; difficulty guidance and Start stay in view. A drag past the
+   list's end stays in the list (#609): chained to the screen, it slid BACK and the heading off the top. */
+.nrl-title-details { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 3px; }
 .nrl-title-details > *, .nrl-title-form > :not(.nrl-title-details) { flex-shrink: 0; }
 .nrl-title-names { display: flex; flex-direction: column; gap: 8px; }
 .nrl-title-veteran { grid-area: veteran; display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.8125rem; cursor: pointer; }
@@ -488,6 +489,21 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       ground.setAttribute('aria-label', 'Ground name');
       ground.setAttribute('maxlength', '120');
       details.appendChild(field('Ground name', ground));
+      // The phone keyboard (#609): names start with a capital and are not "corrected", and the
+      // return key says what it does: on to the next name, then done (the keyboard goes away).
+      const nameInputs = [townInput, input, coachInput, ground];
+      nameInputs.forEach((box, i) => {
+        const next = nameInputs[i + 1];
+        box.setAttribute('autocapitalize', 'words');
+        box.setAttribute('autocorrect', 'off');
+        box.setAttribute('spellcheck', 'false');
+        box.setAttribute('enterkeyhint', next ? 'next' : 'done');
+        box.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' || e.isComposing) return;
+          e.preventDefault();
+          if (next) next.focus(); else box.blur();
+        });
+      });
       const applyTown = (): void => {
         const value = townInput.value.trim();
         selected = towns.find(t => townLabel(t) === value)
