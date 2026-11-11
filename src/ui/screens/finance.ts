@@ -15,6 +15,7 @@ import {
   classifyReason, stampMovement, type StandProjection,
 } from '../../systems/economy';
 import { ECON, SEASON_ROUNDS, WEEKS_PER_SEASON } from '../../config';
+import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 import { openHistoryScreen } from './history';
 import { openContractsScreen } from './contracts';
 import { el, button, openScreen, closeScreen, segmented, ensureStyles } from '../dom';
@@ -343,20 +344,16 @@ export function fmtNetClosing(b: Pick<SeasonBooks, 'net' | 'closing'>): string {
 
 // ── Formatting ─────────────────────────────────────────────────────────────────
 
-/** Whole dollars with thousands separators: 1234 → "$1,234", -50 → "-$50". */
-export function fmtMoney(n: number): string {
-  const r = Math.round(n);
-  const sign = r < 0 ? '-' : '';
-  const digits = Math.abs(r).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${sign}$${digits}`;
-}
+// Whole dollars, "$1,234" and "-$50": the shared formatter (#615), re-exported for
+// the screens that take it from here.
+export { fmtMoney };
 
-/** Compact for narrow tables: 12345 → "$12.3k". Under 1000 it is whole dollars. */
+/**
+ * Compact for narrow tables: 12345 → "$12.3k", 1600000 → "$1.6m" (#615). Under
+ * 1000 it is whole dollars. The ".0" stays so a column lines up ("$25.0k").
+ */
 export function fmtMoneyCompact(n: number): string {
-  const sign = n < 0 ? '-' : '';
-  const abs = Math.abs(n);
-  if (abs < 1000) return fmtMoney(n);
-  return `${sign}$${(abs / 1000).toFixed(1)}k`;
+  return fmtMoneyShort(n, { places: 1, keepZero: true });
 }
 
 /** The next home crowd against the seats: "1,450 of 2,000 seats" or "Sold out · 2,000 seats" (#169). */
@@ -371,10 +368,9 @@ export function fmtCrowd(c: { attendance: number; capacity: number; soldOut: boo
  * one game's demand, which form and the opponent move.
  */
 export function fmtStand(p: StandProjection): { label: string; value: string } {
-  const gain = p.gain >= 1000 ? `$${Math.round(p.gain / 1000)}k` : fmtMoney(p.gain);
   return {
     label: `${p.level > 1 ? 'A bigger stand' : 'A stand'} would seat ${p.capacity.toLocaleString('en-US')}`,
-    value: `about +${gain} a game`,
+    value: `about +${fmtMoneyShort(p.gain)} a game`,
   };
 }
 

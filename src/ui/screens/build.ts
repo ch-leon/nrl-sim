@@ -28,6 +28,7 @@ import type { PlacedFacility } from '../../core/state';
 import { isFacilityOpen, unlockReason } from '../../systems/unlocks';
 import { getState } from '../../core/state';
 import { ECON, PROGRESSION } from '../../config';
+import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
 import { demolishWithUndo } from '../../systems/undo';
@@ -39,20 +40,6 @@ import { openCoachCallsScreen } from './coachCalls';
 import {
   activeGroundsScene, demolishRefund, moveFee, upgradeFacility, type GroundsSceneLike,
 } from '../../world/placement';
-
-/** Format a money value for display (local; mirrors hud.fmtMoney conventions). */
-function fmtMoney(n: number): string {
-  const abs = Math.abs(Math.round(n));
-  const s = '$' + abs.toLocaleString('en-US');
-  return n < 0 ? '-' + s : s;
-}
-
-/** Short money for a button: $900, $9k, $9.6k. */
-function fmtShort(n: number): string {
-  const abs = Math.abs(Math.round(n));
-  if (abs < 1000) return fmtMoney(n);
-  return `${n < 0 ? '-' : ''}$${(abs / 1000).toFixed(1).replace(/\.0$/, '')}k`;
-}
 
 /** The free-agent pool's lift a level, in overall points (freeagency.poolTarget). */
 const poolLift = (bias: number): number => Math.round(bias * POOL_POINTS_PER_BIAS * 10) / 10;
@@ -309,7 +296,7 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
 
   // One tap: the toast's 5-second Undo puts it back (#370; it replaced the "Really demolish?" tap).
   // Written in caps here, so the money keeps its small k (3b: "DEMOLISH +$9k").
-  const demoBtn = button(`DEMOLISH +${fmtShort(refund)}`, () => {
+  const demoBtn = button(`DEMOLISH +${fmtMoneyShort(refund, { places: 1 })}`, () => {
     demolishWithUndo(facility.id);
     closeModal();
   }, { class: 'nrl-btn-danger nrl-facility-demolish' });

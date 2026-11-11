@@ -16,6 +16,7 @@ import {
   contractRows, renewalFee, renewalWeeklyCost, renewEarly, renewsOnLoan, sellPlayer, transferFee,
 } from '../../systems/contracts';
 import { SQUAD_MIN, difficultyMultipliers } from '../../config';
+import { fmtMoneyShort } from '../../utils/money';
 import { ARMED_CLASS, armGuard, el, button, openScreen, screenHead, backButton } from '../dom';
 import { EXPIRY_WINDOW_WEEKS, ensureFinanceStyles, fmtMoney, openFinanceScreen } from './finance';
 
@@ -30,12 +31,8 @@ function act(result: { ok: boolean; reason?: string }): void {
   if (!result.ok) bus.emit('ui:notify', { text: REASONS[result.reason ?? ''] ?? 'Not possible.', kind: 'info' });
 }
 
-/** Short money for a button: $900, $12k, $12.5k (the labels are written in caps so the k stays small). */
-function fmtShort(n: number): string {
-  const abs = Math.abs(Math.round(n));
-  if (abs < 1000) return fmtMoney(n);
-  return `${n < 0 ? '-' : ''}$${(abs / 1000).toFixed(1).replace(/\.0$/, '')}k`;
-}
+/** Short money for a button: $900, $12k, $12.5k, $2m (the labels are written in caps so the k stays small). */
+const fmtShort = (n: number): string => fmtMoneyShort(n, { places: 1 });
 
 /**
  * The action waiting for its second tap (N14, #263): the player page's two-tap

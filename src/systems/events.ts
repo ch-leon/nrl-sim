@@ -23,6 +23,7 @@ import { hasStaff, WELFARE_CARDS } from './staff';
 import { isFieldable } from './lineup';
 import { reviewSuspension, withSuspension } from './suspension';
 import { makeRng, type Rng } from '../utils/rng';
+import { fmtMoney } from '../utils/money';
 import { clampMorale } from './morale';
 import { getCurrentFixture, PLAYER_ID } from './fixtures';
 import { elapsedInterval } from '../core/season';
@@ -49,7 +50,7 @@ export function fillText(
 }
 
 const signed = (n: number): string => (n >= 0 ? `+${n}` : `${n}`);
-const dollars = (n: number): string => `${n < 0 ? '−' : '+'}$${Math.abs(n).toLocaleString('en-US')}`;
+const dollars = (n: number): string => `${n < 0 ? '−' : '+'}${fmtMoney(Math.abs(n))}`;
 
 /** A risky chance after the Welfare Manager, who halves it (#324, #325). */
 export function effectiveChance(p: number, risk: boolean | undefined, welfare: boolean): number {
@@ -261,7 +262,7 @@ export function drawEvent(state: GameState, now: number, rng: Rng): PendingEvent
     ev.fee = pick.fee;
     ev.vars = {
       rival: pick.club.name, ovr: String(Math.round(overallRating(pick.player))), position: pick.player.position,
-      fee: `$${pick.fee.toLocaleString('en-US')}`,
+      fee: fmtMoney(pick.fee),
     };
   } else if (card.subject) {
     const who = rng.pick(subjectCandidates(state, card.subject));
@@ -463,7 +464,7 @@ export function resolveEvent(state: GameState, eventId: string, index: number, n
     return applied;
   }
   const text = fillText(choice.outcome, ctx);
-  const fee = ev.fee && choice.effects.some((e) => e.kind === 'signSubject') ? ` (−$${ev.fee.toLocaleString('en-US')})` : '';
+  const fee = ev.fee && choice.effects.some((e) => e.kind === 'signSubject') ? ` (−${fmtMoney(ev.fee)})` : '';
   applied.news.unshift({
     text: `${auto ? 'No answer, so: ' : ''}${text}${fee || outcomeTail(choice.effects, applied.rolls)}`,
     kind: 'info',
@@ -677,7 +678,7 @@ export function plantPending(cardId: string): boolean {
     ev.fee = pick.fee;
     ev.vars = {
       rival: pick.club.name, ovr: String(Math.round(overallRating(pick.player))), position: pick.player.position,
-      fee: `$${pick.fee.toLocaleString('en-US')}`,
+      fee: fmtMoney(pick.fee),
     };
   } else if (card.subject) {
     const who = subjectCandidates(s, card.subject)[0];

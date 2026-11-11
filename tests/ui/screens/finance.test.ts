@@ -328,6 +328,8 @@ describe('fmtMoney / fmtMoneyCompact / fmtRunway', () => {
     expect(fmtMoneyCompact(12345)).toBe('$12.3k');
     expect(fmtMoneyCompact(-2500)).toBe('-$2.5k');
     expect(fmtMoneyCompact(999)).toBe('$999');
+    // A million and over steps to "m", not "$1600.0k" (#615); the ".0" stays for the column.
+    expect([1_600_000, 2_000_000, 999_950, -1_250_000].map(fmtMoneyCompact)).toEqual(['$1.6m', '$2.0m', '$1.0m', '-$1.3m']);
   });
 
   it('labels runway', () => {

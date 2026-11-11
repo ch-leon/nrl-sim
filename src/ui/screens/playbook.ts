@@ -13,8 +13,9 @@ import { PLAY_LIST, playsOfFamily, type Play, type PlayId } from '../../data/pla
 import { PLAYS, type PlayMan } from '../../match/league/plays';
 import { buyPlay, buyRefusal, ownedPlays, takePlay, validPlays } from '../../systems/playbook';
 import { ATTACK_COACHES, attackCoach } from '../../systems/staff';
+import { fmtMoney } from '../../utils/money';
 import { uiScreenLockReason } from '../../labs/screenOverride';
-import { money, playFitLine, playFitShort, playStyleLabel, playWhenLine, todaysNine } from '../playbookText';
+import { playFitLine, playFitShort, playStyleLabel, playWhenLine, todaysNine } from '../playbookText';
 import { openStaffScreen, STAFF_SCREEN_TITLE } from './board';
 
 /** The page's name, in the nav's Office sheet. */
@@ -33,7 +34,7 @@ function playTop(play: Play, price: boolean): HTMLElement {
   return el('div', { class: 'nrl-pb-top' },
     el('b', { class: 'nrl-pb-name', text: play.name }),
     el('span', { class: 'nrl-pb-style', text: playStyleLabel(play) }),
-    ...(price ? [el('span', { class: 'nrl-pb-price nrl-num', text: money(play.price) })] : []));
+    ...(price ? [el('span', { class: 'nrl-pb-price nrl-num', text: fmtMoney(play.price) })] : []));
 }
 
 function playWords(play: Play, nine: readonly PlayMan[]): HTMLElement[] {
@@ -64,7 +65,7 @@ function ownedRow(play: Play, nine: readonly PlayMan[], taken: readonly PlayId[]
 /** A play the club's coach opens: its price and Buy. A refusal (the money) is said when tapped. */
 function buyRow(play: Play, nine: readonly PlayMan[], state: GameState, onBuy: (id: PlayId) => void): HTMLElement {
   const why = buyRefusal(state, play.id);
-  const buy = button(`Buy · ${money(play.price)}`, () => onBuy(play.id), { class: why ? 'nrl-pb-buy' : 'nrl-btn-primary nrl-pb-buy' });
+  const buy = button(`Buy · ${fmtMoney(play.price)}`, () => onBuy(play.id), { class: why ? 'nrl-pb-buy' : 'nrl-btn-primary nrl-pb-buy' });
   buy.setAttribute('data-play-buy', play.id);
   if (why) { buy.setAttribute('data-refused', ''); buy.title = why; }
   return el('li', { class: 'nrl-pb-play', attrs: { 'data-play': play.id, 'data-to-buy': '' } },
@@ -122,7 +123,7 @@ export function playbookBody(state: GameState, h: PlaybookHandlers): HTMLElement
   }
   const otherLines = others.map((p) =>
     el('li', { class: 'nrl-pb-other', attrs: { 'data-play': p.id, 'data-other': p.family } },
-      el('b', { text: p.name }), ` · ${playStyleLabel(p)} · ${money(p.price)}`,
+      el('b', { text: p.name }), ` · ${playStyleLabel(p)} · ${fmtMoney(p.price)}`,
       el('span', { class: 'nrl-pb-note', text: `Hire the ${ATTACK_COACHES[p.family].title.replace(/^Attack Coach \((.*)\)$/, '$1')} coach to buy` })));
   const body = el('div', { class: 'nrl-pb-body', attrs: { 'data-playbook-body': '' } }, coachCard(state), cols);
   if (otherLines.length > 0) {
@@ -154,7 +155,7 @@ export function openPlaybookScreen(): HTMLElement {
     const s = getState();
     // Keep the folded list as the coach left it across a re-render.
     open = body.querySelector<HTMLDetailsElement>('[data-playbook-others]')?.open ?? open;
-    sub.textContent = `${playbookStatus(s)} · ${money(s.money)} in the bank`;
+    sub.textContent = `${playbookStatus(s)} · ${fmtMoney(s.money)} in the bank`;
     body.replaceChildren(playbookBody(s, { onTake: takePlay, onBuy: tapBuy }));
     const det = body.querySelector<HTMLDetailsElement>('[data-playbook-others]');
     if (det) det.open = open;

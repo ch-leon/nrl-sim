@@ -19,7 +19,7 @@ import { openPlayerPage, positionLabel } from './player';
 import { squadTabs } from './squad';
 import { recruitShortlist } from '../recruitShortlist';
 import { weeklyIncome } from '../../systems/economy';
-import { fmtMoney } from '../hud';
+import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 
 // ── Shared screen styling ───────────────────────────────────────────────────
 // Injected once alongside the base kit CSS (which holds the sheet, the
@@ -159,15 +159,6 @@ const SCREEN_CSS = `
 `;
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
-
-const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
-
-/** "$18k", "$1.2M": a short sum for a button label. */
-export function shortMoney(n: number): string {
-  if (n >= 1_000_000) return `$${(Math.ceil(n / 100_000) / 10).toFixed(1).replace(/\.0$/, '')}M`;
-  if (n >= 1_000) return `$${Math.ceil(n / 1_000)}k`;
-  return `$${Math.ceil(n)}`;
-}
 
 /** Badge label + tooltip for a levelled trait (BAK-208 §3): its full name (#349 S3). Traits with a downside render in a warning tint. */
 export function traitBadge(t: TraitInstance): { label: string; tip: string; bad: boolean } {
@@ -393,7 +384,7 @@ export function openRecruitScreen(): void {
       const reach = !fullView && agent.id === shortlist.reachId;
       const short = fee - s.money;
       // The signing fee: a transfer-style fee by rating and age (#146).
-      const action = button(full ? 'SQUAD FULL' : short > 0 ? `NEED ${shortMoney(short)}` : 'SIGN', () => {
+      const action = button(full ? 'SQUAD FULL' : short > 0 ? `NEED ${fmtMoneyShort(short, { roundUp: true })}` : 'SIGN', () => {
         const res = signWithUndo(agent.id); // "Signed …" with a 5-second Undo (#370)
         if (!res.ok) bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'info' });
       }, { class: `nrl-row-action${full || short > 0 ? '' : ' nrl-btn-primary'}` });
@@ -402,8 +393,8 @@ export function openRecruitScreen(): void {
       action.title = full
         ? `Squad full (${SQUAD_CAP}): release or sell a player first`
         : short > 0
-          ? `The ${money(fee)} fee is ${money(short)} more than the bank`
-          : `Signing fee ${money(fee)} (${signingFeeBasis(s, agent)}), then ${money(agent.wage)}/wk`;
+          ? `The ${fmtMoney(fee)} fee is ${fmtMoney(short)} more than the bank`
+          : `Signing fee ${fmtMoney(fee)} (${signingFeeBasis(s, agent)}), then ${fmtMoney(agent.wage)}/wk`;
       const chips = traitChips(agent);
       if (agent.junior) chips.unshift(el('span', { class: 'nrl-chip nrl-chip-academy', text: 'Academy', attrs: { title: 'Academy prospect: a 4×wage fee' } }));
       if (agent.id === shortlist.pickId) chips.unshift(el('span', {
@@ -418,14 +409,14 @@ export function openRecruitScreen(): void {
       if (reach) {
         const income = weeklyIncome(s);
         const gap = fee + 8 * agent.wage * difficultyMultipliers(s.settings.difficulty).wages - s.money;
-        const reason = income > 0 ? `Fee ${money(fee)}: about ${Math.ceil(gap / income)} weeks away`
-            : `Fee ${money(fee)}: more weekly income needed`;
+        const reason = income > 0 ? `Fee ${fmtMoney(fee)}: about ${Math.ceil(gap / income)} weeks away`
+            : `Fee ${fmtMoney(fee)}: more weekly income needed`;
         const note = el('span', { text: reason, attrs: { title: 'Saving the fee plus eight weeks of wages, estimated from weekly income before expenses; gates and spending can change it.' } });
         note.style.color = 'var(--nrl-alert)';
         note.style.flexBasis = '100%';
         who.append(note);
       }
-      const feeCell = el('span', { class: 'nrl-num', text: money(fee), attrs: { title: `Signing fee (${signingFeeBasis(s, agent)})` } });
+      const feeCell = el('span', { class: 'nrl-num', text: fmtMoney(fee), attrs: { title: `Signing fee (${signingFeeBasis(s, agent)})` } });
       if (reach) feeCell.style.color = 'var(--nrl-alert)';
       list.appendChild(tableRow(agent, [
         who,
@@ -433,7 +424,7 @@ export function openRecruitScreen(): void {
         el('span', { class: 'nrl-num', text: String(agent.age) }),
         el('span', { class: 'nrl-num nrl-row-ovr', text: ratingText(ovr), attrs: { title: 'Overall rating' } }),
         feeCell,
-        el('span', { class: 'nrl-num nrl-row-dim', text: money(agent.wage), attrs: { title: 'Weekly wage' } }),
+        el('span', { class: 'nrl-num nrl-row-dim', text: fmtMoney(agent.wage), attrs: { title: 'Weekly wage' } }),
         action,
       ], () => openPlayerPage(agent, { kind: 'freeAgent' })));
     }

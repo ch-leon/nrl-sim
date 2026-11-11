@@ -163,7 +163,7 @@ src/
                            #   screens/ (squad, lineup, recruit, contracts, finance, …)
   fx/                      # audio, particles, atmosphere, PWA
   qa/soak.ts               # headless multi-season soak (npm run soak)
-  utils/                   # rng, hash, …
+  utils/                   # rng, hash, money (fmtMoney, fmtMoneyShort), …
   vendor/phaser-slim.js    # the Phaser the production build ships (#400)
 scripts/
   e2e-season.mjs           # Chromium playthrough of a season (dumps the save corpus)

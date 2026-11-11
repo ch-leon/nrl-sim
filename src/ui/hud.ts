@@ -14,6 +14,7 @@ import { playerMatchPending, resumePlayerMatch } from '../systems/matchday';
 import { nextFixture } from '../systems/league';
 import { RISK_WORD, ladderStanding, worstObjective, type ObjectiveRisk } from '../systems/board';
 import { ECON, WEEKS_PER_SEASON } from '../config';
+import { fmtMoney, fmtMoneyShort } from '../utils/money';
 import { el, button, mount, ensureStyles, dock, activeScreen, onScreenChange } from './dom';
 import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
 
@@ -50,16 +51,9 @@ export interface Hud {
   destroy(): void;
 }
 
-/**
- * Format a money balance as `$1,234` (thousands-separated). Negative balances
- * render as `-$1,234`. Pure — extracted for unit testing without the DOM.
- */
-export function fmtMoney(n: number): string {
-  const rounded = Math.round(n);
-  const abs = Math.abs(rounded);
-  const grouped = abs.toLocaleString('en-US');
-  return rounded < 0 ? `-$${grouped}` : `$${grouped}`;
-}
+// The money formatters live in utils/money.ts, where systems/ can reach them too
+// (#615). Re-exported for the screens that take them from the dock.
+export { fmtMoney, fmtMoneyShort };
 
 /** The money tile below $0 (N12.5): its red class, and the tag beside the number. */
 export const IN_DEBT_CLASS = 'nrl-money-negative';
@@ -129,13 +123,6 @@ export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { opponent
   const detail = `${home ? 'Home' : 'Away'}${place ? ` · ${place}` : ''}`;
   const label = `Next match: ${opp.name}, ${home ? 'home' : 'away'}${place ? `. You are ${place} on the ladder` : ''}`;
   return { opponent: `v ${placeName(opp.name)}`, detail, label };
-}
-
-/** "$32k", "-$4k", "$1.2m": money short enough for the board chip's second line. */
-export function fmtMoneyShort(n: number): string {
-  const abs = Math.abs(Math.round(n));
-  const body = abs >= 1_000_000 ? `${(abs / 1_000_000).toFixed(1).replace(/\.0$/, '')}m` : abs >= 1000 ? `${Math.round(abs / 1000)}k` : String(abs);
-  return `${n < 0 && abs > 0 ? '-' : ''}$${body}`;
 }
 
 /** The board chip's short form (#368): "top 8", "rival", "cash", "build". */
