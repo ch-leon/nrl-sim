@@ -13,6 +13,7 @@ import { runExpansionIntro } from './e2e-webkit/screens/expansionIntro.mjs';
 //   - the same with every font in the bubble boosted 2.17× (what Safari's boost did
 //     on Leon's phone, issue #206; WebKit on Linux never boosts by itself): the copy
 //     scrolls inside the bubble and Skip / Next stay reachable;
+//   - the Guide reopened on its last page: that page's tab whole in the tab track (#611);
 //   - the Guide boosted the same way: the page scrolls, Replay and the dock's CLUB
 //     (a sheet's way out) reachable, and Replay brings the tutorial back with Skip
 //     and Next on screen;

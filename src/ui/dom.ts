@@ -306,9 +306,69 @@ export function segmented<T extends string>(
   const set = (id: T | null): void => {
     current = id;
     for (const [k, b] of buttons) b.setAttribute('aria-pressed', String(k === id));
+    revealSeg(track);
   };
   set(selected);
+  watchSeg(track);
   return { el: track, buttons, set };
+}
+
+/** The fade on a track's cut side, and how far clear of it the selection is brought, in px (the CSS below says 24px too). */
+const SEG_PEEK = 24;
+
+/**
+ * Where a track that scrolls sideways should scroll to so the selected button
+ * (`left` and `width`, in the track's content) is wholly on show with SEG_PEEK of
+ * its neighbour beside it, or null when it already is (#611). Pure.
+ */
+export function segScrollLeft(view: { scrollLeft: number; room: number; full: number }, left: number, width: number): number | null {
+  const from = Math.max(0, left - SEG_PEEK);
+  const to = Math.min(view.full, left + width + SEG_PEEK);
+  if (from >= view.scrollLeft - 1 && to <= view.scrollLeft + view.room + 1) return null;
+  return from < view.scrollLeft ? from : Math.max(0, Math.min(left, to - view.room));
+}
+
+/** The side(s) a scrolled track is cut on, for its edge fade; null when it all fits (#611). Pure. */
+export function segCut(view: { scrollLeft: number; room: number; full: number }): 'start' | 'end' | 'both' | null {
+  const start = view.scrollLeft > 1;
+  const end = view.scrollLeft + view.room < view.full - 1;
+  return start && end ? 'both' : start ? 'start' : end ? 'end' : null;
+}
+
+/** Mark the track's cut sides (data-cut) and, with `behavior`, bring its selected button into it. */
+function syncSeg(track: HTMLElement, behavior?: ScrollBehavior): void {
+  if (!track.clientWidth) return; // not on the page (or not shown) yet
+  const view = { scrollLeft: track.scrollLeft, room: track.clientWidth, full: track.scrollWidth };
+  const b = behavior ? track.querySelector<HTMLElement>('[aria-pressed="true"]') : null;
+  // On the track itself, never scrollIntoView: that scrolls the sheet and the page too.
+  const left = b ? segScrollLeft(view, b.offsetLeft - (b.offsetParent === track ? 0 : track.offsetLeft), b.offsetWidth) : null;
+  if (left !== null && behavior) track.scrollTo({ left, behavior });
+  const cut = segCut({ ...view, scrollLeft: track.scrollLeft });
+  if (cut === track.getAttribute('data-cut')) return;
+  if (cut) track.setAttribute('data-cut', cut);
+  else track.removeAttribute('data-cut');
+}
+
+/** Bring a `.nrl-seg` track's selected button into it (#611): a glide, or at once under reduced motion. */
+export function revealSeg(track: HTMLElement): void {
+  syncSeg(track, typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+}
+
+let segWatch: ResizeObserver | null = null;
+/**
+ * Keep a `.nrl-seg` track's cut sides faded as it scrolls and resizes, and its
+ * selection in view when it lands on the page (set() runs before that) or changes
+ * size (#611). One observer for every track: it is handed the track that changed
+ * and keeps none, and a track stays watched off the page, as Settings builds its
+ * popup once and mounts it again each time.
+ */
+export function watchSeg(track: HTMLElement): void {
+  if (typeof ResizeObserver === 'undefined') return;
+  track.addEventListener('scroll', () => syncSeg(track), { passive: true });
+  segWatch ??= new ResizeObserver((entries) => {
+    for (const e of entries) syncSeg(e.target as HTMLElement, 'auto');
+  });
+  segWatch.observe(track);
 }
 
 /** A "◂ SQUAD" button back to the screen this one was opened from. */
@@ -671,6 +731,11 @@ export const CSS = `
   scrollbar-width: none;
 }
 .nrl-seg::-webkit-scrollbar { display: none; }
+/* A track too long for its room scrolls; the cut side fades, so the row reads as going on (#611, watchSeg). */
+.nrl-seg[data-cut] { -webkit-mask-image: var(--nrl-seg-cut); mask-image: var(--nrl-seg-cut); }
+.nrl-seg[data-cut="end"] { --nrl-seg-cut: linear-gradient(to left, transparent, #000 24px); }
+.nrl-seg[data-cut="start"] { --nrl-seg-cut: linear-gradient(to right, transparent, #000 24px); }
+.nrl-seg[data-cut="both"] { --nrl-seg-cut: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
 .nrl-seg > .nrl-btn {
   flex: 0 0 auto;
   min-height: 38px;
@@ -1610,5 +1675,6 @@ body:has(.nrl-placebar:not([hidden])) .nrl-decisions-chip { visibility: hidden; 
 .nrl-guide-figure { border-radius: 10px; overflow: hidden; background: var(--nrl-panel); padding: 6px; }
 .nrl-guide-foot { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .nrl-guide-build { font-family: var(--nrl-f-num); font-size: 0.6875rem; color: var(--nrl-muted); white-space: nowrap; }
-@media (max-width: 760px) { .nrl-guide-build { display: none; } }
+/* Up to 900px the build label's room goes to the tabs: all eight fit at 844 (#611). */
+@media (max-width: 900px) { .nrl-guide-build { display: none; } }
 `;

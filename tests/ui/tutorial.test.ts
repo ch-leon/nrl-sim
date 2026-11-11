@@ -21,6 +21,7 @@ import {
   TUTORIAL_END_TEXT,
   overlapArea,
   pickDock,
+  onSheetIn,
   type Box,
   type TutorialStep,
 } from '../../src/ui/tutorial';
@@ -329,4 +330,71 @@ it('bubbles and first-visit hints contain the shared coach block (#476)', async 
     expect(root.textContent).toContain(HINTS.lineup);
     expect(root.textContent).toContain(COACH_NAME);
   } finally { endTutorial(); off(); vi.unstubAllGlobals(); }
+});
+
+// #611: the ring is measured as the step's sheet mounts, 12px low while the sheet rises;
+// it is measured again the moment the sheet lands.
+describe('onSheetIn: the anchor is measured again when its sheet has risen (#611)', () => {
+  /** A sheet that records its listeners; `fire` sends it an event as the browser would. */
+  const fakeSheet = () => {
+    const on = new Map<string, Set<(e: Event) => void>>();
+    const sheet = {
+      addEventListener: (ev: string, fn: (e: Event) => void) => { (on.get(ev) ?? on.set(ev, new Set()).get(ev)!).add(fn); },
+      removeEventListener: (ev: string, fn: (e: Event) => void) => { on.get(ev)?.delete(fn); },
+    };
+    const fire = (ev: string, target: unknown = sheet): void => { for (const fn of [...(on.get(ev) ?? [])]) fn({ target } as Event); };
+    const listening = (): number => [...on.values()].reduce((n, fns) => n + fns.size, 0);
+    return { sheet, fire, listening };
+  };
+  const anchorIn = (sheet: unknown, asked: string[] = []) => ({ closest: ((sel: string) => { asked.push(sel); return sheet; }) as HTMLElement['closest'] });
+
+  it('calls once when the sheet\'s entrance ends, and stops listening', () => {
+    const { sheet, fire, listening } = fakeSheet();
+    const asked: string[] = [];
+    let calls = 0;
+    onSheetIn(anchorIn(sheet, asked), () => { calls++; });
+    expect(asked).toEqual(['.nrl-screen-region, .nrl-nav-sheet']);
+    expect(calls).toBe(0);
+    fire('animationend');
+    fire('animationend');
+    expect(calls).toBe(1);
+    expect(listening()).toBe(0);
+  });
+
+  it('is not set off by an animation ending inside the sheet', () => {
+    const { sheet, fire } = fakeSheet();
+    let calls = 0;
+    onSheetIn(anchorIn(sheet), () => { calls++; });
+    fire('animationend', { a: 'row' });
+    expect(calls).toBe(0);
+    fire('animationend');
+    expect(calls).toBe(1);
+  });
+
+  it('measures again when the entrance is cut short too', () => {
+    const { sheet, fire, listening } = fakeSheet();
+    let calls = 0;
+    onSheetIn(anchorIn(sheet), () => { calls++; });
+    fire('animationcancel');
+    expect(calls).toBe(1);
+    expect(listening()).toBe(0);
+  });
+
+  it('never calls for a sheet that came in without an entrance (a swap), and its teardown lets go', () => {
+    const { sheet, fire, listening } = fakeSheet();
+    let calls = 0;
+    const off = onSheetIn(anchorIn(sheet), () => { calls++; });
+    expect(listening()).toBe(2);
+    off();
+    expect(listening()).toBe(0);
+    fire('animationend');
+    expect(calls).toBe(0);
+  });
+
+  it('does nothing for an anchor outside a sheet (PLAY WEEK, a dock tab)', () => {
+    let calls = 0;
+    const off = onSheetIn(anchorIn(null), () => { calls++; });
+    off();
+    expect(calls).toBe(0);
+  });
 });
