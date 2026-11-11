@@ -11,6 +11,7 @@ import { createCompetitionInstance, competitionFixtureId, validateCompetitions, 
 import { activateStructuralCalendar, competitionLadder, hasStructuralCalendar, structuralRuntimeAllowed } from './competitionCalendar';
 import { hashString } from './rivals';
 import { makeRng } from '../utils/rng';
+import { structuralOpenCup } from './openCupCareer';
 
 export function currentDivision(state: Pick<GameState, 'clubId' | 'competitions'>, clubId: string = state.clubId): ReturnType<typeof divisionForClub> {
   const competitions = state.competitions;
@@ -48,7 +49,8 @@ function trialInstances(world: ReturnType<typeof createDivisionWorld>, profile: 
 
 /** Construct and install only into a genuinely fresh isolated developer career.
  * Ordinary careers, imports and paid competition offers cannot call around this gate. */
-export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, seed: number, colors: [string, string] = DEFAULT_PLAYER_COLORS): GameState {
+export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, seed: number, colors: [string, string] = DEFAULT_PLAYER_COLORS,
+  options: { enterOpenCup?: boolean } = {}): GameState {
   const state = getState();
   if (!structuralRuntimeAllowed()) throw new Error('Competition prototypes require the isolated developer career.');
   if (weekHeld() || state.season !== 1 || state.week !== 1 || state.preseason !== 1 || state.history.length
@@ -59,6 +61,8 @@ export function setupStructuralDivisionCareer(profile: RegionalCareerProfile, se
     fixtures: i.fixtures.map(f => ({ ...f, status: 'scheduled' as const, slot: i.definition.stages[0]!.slotIds![f.round - 1]! })) }));
   const local = leagues.find(i => i.entrantIds.includes(state.clubId))!;
   const instances = [...leagues, ...trialInstances(world, profile, seed)];
+  const cup = structuralOpenCup(profile, activePack(), seed, world.clubs.map(c => c.id), state.clubId, options.enterOpenCup);
+  if (cup) instances.push(cup);
   const next = activateStructuralCalendar({ ...state, rngSeed: (seed ^ hashString(`${profile.id}:calendar`)) >>> 0,
     squad: world.squad, freeAgents: [], lineup: autoPick(world.squad), objectives: [],
     league: { clubs: world.clubs, fixtures: [], ladder: competitionLadder(local) },

@@ -7,13 +7,40 @@ import { FORFEIT_SCORE, ON_FIELD, SQUAD_CAP, SQUAD_MIN } from '../config';
 import { BENCH } from '../match/league/bench';
 import { standingsOrder, completedCompetition, validateCompetitions, type CompetitionFixture, type CompetitionInstance, type CompetitionResult, type CompetitionStatus } from '../data/competition';
 import type { CompetitionCalendarSlot } from '../data/competitionCalendar';
+import { isOpenCupInstance, openCupProblem } from './openCup';
 
 export const hasStructuralCalendar = (state: Pick<GameState, 'competitions'>): boolean => state.competitions?.calendar?.mode === 'structural';
 export const structuralRuntimeAllowed = (): boolean => careerNamespace() === DEV_TEST_PREFIX;
 
+function openCupScheduleProblem(state: GameState, instance: CompetitionInstance): string | null {
+  const calendar = state.competitions?.calendar;
+  if (!calendar || instance.season !== calendar.season) return null;
+  const dates = instance.definition.stages[0]!.slotIds!;
+  if (dates.some(id => calendar.slots[id - 1]?.kind !== 'competition')) return 'The Open Cup snapshot has an unavailable calendar date.';
+  for (const other of state.competitions!.instances) {
+    if (other.id === instance.id || other.season !== instance.season || other.status === 'declined' || other.status === 'withdrawn'
+      || !other.entrantIds.some(id => instance.entrantIds.includes(id))) continue;
+    if (other.definition.stages.some(stage => stage.slotIds?.some(id => dates.includes(id)))) return 'The Open Cup snapshot overlaps another competition date.';
+  }
+  if (calendar.status === 'active' && instance.season === state.season && (instance.status === 'scheduled' || instance.status === 'active')) {
+    const lastRound = Math.max(...instance.fixtures.map(f => f.round));
+    const current = instance.fixtures.filter(f => f.round === lastRound);
+    if (lastRound < dates.length && current.every(f => f.status === 'completed') && dates[lastRound]! < state.week)
+      return 'The Open Cup snapshot has missed its next round.';
+  }
+  return null;
+}
+
 /** Loaded active snapshots must pass the same support gate as fresh activation. */
 export function structuralPolicyProblem(state: GameState): string | null {
   for (const instance of state.competitions?.instances ?? []) {
+    if (isOpenCupInstance(instance)) {
+      const problem = openCupProblem(instance);
+      if (problem) return problem;
+      if (instance.status === 'entered' || instance.status === 'offered' || instance.status === 'qualified') return 'The Open Cup entry has not been drawn.';
+      const schedule = openCupScheduleProblem(state, instance);
+      if (schedule) return schedule;
+    }
     if (instance.season !== state.season || !['entered', 'scheduled', 'active'].includes(instance.status)) continue;
     const definition = instance.definition;
     if (definition.eligibility.kind !== 'open') return 'This competition eligibility policy is not enabled yet.';
@@ -43,6 +70,7 @@ export function activateStructuralCalendar(state: GameState, slots: readonly Com
     calendar: { mode: 'structural', status: 'active', season: state.season, elapsedIntervals: 0, slots: slots.map(s => ({ ...s })) } } };
   const problem = validateCompetitions(next.competitions, { pack: next.pack ?? 'au', season: next.season, week: next.week, clubIds: next.league.clubs.map(c => c.id) });
   if (problem) throw new Error(`Invalid structural calendar: ${problem}`);
+  const scheduled = structuralPolicyProblem(next); if (scheduled) throw new Error(scheduled);
   return next;
 }
 
@@ -188,7 +216,8 @@ function applyInstances(state: GameState, instances: CompetitionInstance[]): Gam
 /**
  * Close competitions an active calendar can never play. Offered and qualified
  * never enter; entered fixtures are not on this calendar. A normal scheduled
- * league is left alone.
+ * league is left alone. A drawn Open Cup is scheduled or active, so this does
+ * not close one that is still progressing.
  */
 export function recoverUnfinishableCompetitions(state: GameState): GameState {
   if (!hasStructuralCalendar(state) || state.competitions!.calendar!.status !== 'active') return state;
@@ -248,6 +277,8 @@ function withdrawUnresolved(state: GameState): GameState {
  * After the interval's hooks: a result that never landed becomes a forfeit, or
  * the fixture is cancelled when the commit itself fails. Competitions that can
  * never finish are closed. The caller then advances; this does not hold the week.
+ * Open Cup rounds are drawn by the fixture hooks before this runs, so a round
+ * that is still to be played is not a leftover forfeit.
  */
 export function settleStructuralCalendar(state: GameState, week: number): GameState {
   let next = recoverUnfinishableCompetitions(state);

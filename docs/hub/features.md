@@ -63,6 +63,14 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- The isolated developer regional career includes an optional cross-division
+  Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,
+  a neutral final and a finite seeded tie decider. Existing match/result hooks
+  draw each later round before the week settles, so a cup that is still going is
+  not forfeited or withdrawn. They expose stable sporting outcomes for later
+  settlement; there are no prototype prize payments or normal event offers
+  ([issue](https://github.com/ch-leon/nrl-sim/issues/575)).
+
 - Isolated developer competition careers can construct AU or UK regional worlds
   from authored division counts, schedules and finals dates, with persistent
   squads, one club registry, division ladders and per-tier rival development.
