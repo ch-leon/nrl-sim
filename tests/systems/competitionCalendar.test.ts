@@ -5,8 +5,8 @@ import { clearHeldWeek, clearSeasonHooks, clearTickHooks, advanceWeek, advanceWe
 import { setCareerNamespace } from '../../src/core/storage/local';
 import { DEV_TEST_PREFIX, liveMatchKey, slotKey } from '../../src/core/storageKeys';
 import { elapsedInterval } from '../../src/core/season';
-import { advanceUntil } from '../../src/core/advance';
-import { activateStructuralCalendar, finaliseCalendarFixture, fixtureBridge, currentCalendarFixtures, hasStructuralCalendar } from '../../src/systems/competitionCalendar';
+import { advanceInProgress, advanceUntil, type AdvanceRun } from '../../src/core/advance';
+import { activateStructuralCalendar, __blockCalendarResults, finaliseCalendarFixture, fixtureBridge, currentCalendarFixtures, hasStructuralCalendar } from '../../src/systems/competitionCalendar';
 import { createCompetitionInstance, competitionFixtureId, type CompetitionDefinition } from '../../src/data/competition';
 import { cupDefinition } from '../fixtures/competition';
 import { initLeague, registerFixturesSystem, applyResult } from '../../src/systems/fixtures';
@@ -73,7 +73,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', storage); starts = [];
   bus.on('match:started', value => starts.push(value));
 });
-afterEach(() => { clearHeldWeek(); bus.clear(); clearTickHooks(); clearSeasonHooks(); setCareerNamespace(null); __setStorage(null); vi.unstubAllGlobals(); });
+afterEach(() => { __blockCalendarResults(false); clearHeldWeek(); bus.clear(); clearTickHooks(); clearSeasonHooks(); setCareerNamespace(null); __setStorage(null); vi.unstubAllGlobals(); });
 
 describe('structural calendar activation and boundaries', () => {
   it('requires the actual isolated developer namespace, not imported metadata', () => {
@@ -300,5 +300,118 @@ describe('recovery and rollover boundaries', () => {
     }
     expect(getState().season).toBe(2); expect(getState().competitions!.calendar!.elapsedIntervals).toBe(2);
     expect(getState().competitions!.instances[0]!.fixtures[2]!.status).toBe('cancelled');
+  });
+});
+
+function offeredCupCareer(): GameState {
+  const state = prototype();
+  const instances = state.competitions!.instances.map(instance => instance.definition.id === 'test-cup'
+    ? { ...instance, status: 'offered' as const, stageId: null, fixtures: [] }
+    : instance);
+  const next = { ...state, competitions: { ...state.competitions!, instances } };
+  setState(next);
+  return next;
+}
+
+/** A background result that arrives, then fails inside the result commit. */
+function workerThatFinishes(): void {
+  class WorkerMock {
+    onmessage: ((event: { data: unknown[] }) => void) | null = null;
+    onerror: (() => void) | null = null;
+    postMessage(): void {
+      queueMicrotask(() => this.onmessage?.({ data: [{ homeScore: 8, awayScore: 4, events: [], injuries: [] }] }));
+    }
+    terminate(): void {}
+  }
+  vi.stubGlobal('window', {});
+  vi.stubGlobal('Worker', WorkerMock);
+}
+
+function within(run: Promise<AdvanceRun>, ms = 1500): Promise<AdvanceRun> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<AdvanceRun>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('advance frozen')), ms);
+  });
+  return Promise.race([run, timeout]).finally(() => { if (timer) clearTimeout(timer); });
+}
+
+function recovered(errors: { mock: { calls: unknown[][] } }): boolean {
+  return errors.mock.calls.some(args => String(args[0]).includes('structural calendar recovered'));
+}
+
+/** Completes the current slot's fixture without the live match, so stop-early rules stay quiet. */
+function syntheticResults(): void {
+  registerTickHook('synthetic-result', 40, () => {
+    const ref = currentCalendarFixtures(getState())[0];
+    if (ref) setState(finaliseCalendarFixture(getState(), fixtureBridge(ref), { homeScore: 10, awayScore: 0 }));
+  });
+}
+
+describe('structural calendar freeze recovery', () => {
+  it('an unfinishable competition does not freeze the calendar', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      activate(offeredCupCareer());
+      syntheticResults();
+      const run = await within(advanceUntil({ kind: 'weeks', weeks: 5 }, async () => {}));
+      expect(weekHeld()).toBe(false);
+      expect(advanceInProgress()).toBe(false);
+      expect(run.weeksPlayed).toBe(3);
+      expect(run.stop.kind).not.toBe('busy');
+      expect(getState().season).toBe(2);
+      expect(getState().competitions!.instances.find(i => i.definition.id === 'test-cup')!.status).toBe('declined');
+      expect(recovered(errors)).toBe(true);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('a failed background result does not freeze the calendar, including after reload', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      __blockCalendarResults(true);
+      workerThatFinishes();
+      activate();
+      systems();
+      save(getState());
+      const run = await within(advanceUntil({ kind: 'weeks', weeks: 1 }, async () => {}));
+      expect(weekHeld()).toBe(false);
+      expect(advanceInProgress()).toBe(false);
+      expect(run.weeksPlayed).toBe(1);
+      expect(getState().week).toBe(2);
+      expect(getState().competitions!.instances[0]!.fixtures[0]!.status).not.toBe('scheduled');
+      expect(recovered(errors)).toBe(true);
+      setState(load()!);
+      expect(getState().week).toBe(1);
+      expect(getState().competitions!.instances[0]!.fixtures[0]!.status).toBe('scheduled');
+      const again = await within(advanceUntil({ kind: 'weeks', weeks: 1 }, async () => {}));
+      expect(again.weeksPlayed).toBe(1);
+      expect(weekHeld()).toBe(false);
+      expect(advanceInProgress()).toBe(false);
+      expect(getState().week).toBe(2);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('a save already stuck on an unfinishable competition recovers on load', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      activate(offeredCupCareer());
+      save(getState());
+      const loaded = load();
+      expect(loaded?.competitions!.instances.find(i => i.definition.id === 'test-cup')!.status).toBe('declined');
+      expect(recovered(errors)).toBe(true);
+      setState(loaded!);
+      syntheticResults();
+      const run = await within(advanceUntil({ kind: 'weeks', weeks: 5 }, async () => {}));
+      expect(weekHeld()).toBe(false);
+      expect(advanceInProgress()).toBe(false);
+      expect(run.weeksPlayed).toBe(3);
+      expect(getState().season).toBe(2);
+      expect(getState().competitions!.instances.find(i => i.definition.id === 'league')!.status).toBe('completed');
+    } finally {
+      errors.mockRestore();
+    }
   });
 });

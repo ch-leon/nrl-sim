@@ -145,6 +145,7 @@ export abstract class LiveKicks extends LiveClock {
       }
       this.ball = { kind: 'held', by: this.indexOf(r) };
       r.catchTick = this.tick;
+      if (b.via === 'kick' && b.bounces === 0) r.aerialCatchTick = this.tick;
       r.decided = false;
       r.steppedOn = -1;
       if (b.via === 'pass' && r.side !== this.attacking) {
@@ -268,6 +269,7 @@ export abstract class LiveKicks extends LiveClock {
     if (u < odds.won) {
       this.ball = { kind: 'held', by: this.indexOf(chaser) };
       chaser.catchTick = this.tick;
+      chaser.aerialCatchTick = this.tick;
       chaser.decided = false;
       chaser.steppedOn = -1;
       this.lock(chaser, 'catch', 3);
@@ -439,6 +441,7 @@ export abstract class LiveKicks extends LiveClock {
       const r = this.players[receiver]!;
       this.ball = { kind: 'held', by: receiver };
       r.catchTick = this.tick;
+      r.aerialCatchTick = this.tick;
       r.decided = false;
       r.steppedOn = -1;
       this.lock(r, 'catch', 3);

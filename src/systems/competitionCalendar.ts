@@ -5,7 +5,7 @@ import { DEV_TEST_PREFIX } from '../core/storageKeys';
 import { NINES } from '../match/league/rules';
 import { FORFEIT_SCORE, ON_FIELD, SQUAD_CAP, SQUAD_MIN } from '../config';
 import { BENCH } from '../match/league/bench';
-import { standingsOrder, completedCompetition, validateCompetitions, type CompetitionFixture, type CompetitionInstance, type CompetitionResult } from '../data/competition';
+import { standingsOrder, completedCompetition, validateCompetitions, type CompetitionFixture, type CompetitionInstance, type CompetitionResult, type CompetitionStatus } from '../data/competition';
 import type { CompetitionCalendarSlot } from '../data/competitionCalendar';
 
 export const hasStructuralCalendar = (state: Pick<GameState, 'competitions'>): boolean => state.competitions?.calendar?.mode === 'structural';
@@ -105,8 +105,15 @@ function progressInstance(instance: CompetitionInstance): CompetitionInstance {
   return completedCompetition(candidate) === null ? candidate : { ...next, status: 'active' };
 }
 
+/** Test hook: result commits throw, the way an invalid transition fails in the background. */
+let blockCalendarResults = false;
+export function __blockCalendarResults(block: boolean): void {
+  blockCalendarResults = block;
+}
+
 /** The sole structural result commit. Duplicate/stale/cancelled deliveries are no-ops. */
 export function finaliseCalendarFixture(state: GameState, bridge: Fixture, score: { homeScore: number; awayScore: number }, forfeit = false): GameState {
+  if (blockCalendarResults) throw new Error('Invalid result transition: result commit failed');
   if (!hasStructuralCalendar(state) || structuralAdvanceProblem(state) || ![score.homeScore, score.awayScore].every(n => Number.isSafeInteger(n) && n >= 0)) return state;
   const context = calendarFixtureContext(state, bridge);
   if (!context) return state;
@@ -139,6 +146,125 @@ export function structuralSeasonResolved(state: GameState): boolean {
   const calendar = state.competitions?.calendar;
   return !!calendar && state.competitions!.instances.filter(i => i.season === calendar.season)
     .every(i => i.status === 'completed' || i.status === 'declined' || i.status === 'withdrawn');
+}
+
+const TERMINAL: ReadonlySet<CompetitionStatus> = new Set(['completed', 'declined', 'withdrawn']);
+
+function recoveryLog(detail: string): void {
+  console.error(`structural calendar recovered: ${detail}`);
+}
+
+function cancelFixture(fixture: CompetitionFixture): CompetitionFixture {
+  if (fixture.status === 'completed' || fixture.status === 'cancelled') return fixture;
+  const { result: _result, ...rest } = fixture;
+  return { ...rest, status: 'cancelled' };
+}
+
+function withoutWinner(instance: CompetitionInstance): CompetitionInstance {
+  const { winnerId: _winner, ...rest } = instance;
+  return rest;
+}
+
+function declineInstance(instance: CompetitionInstance): CompetitionInstance {
+  return { ...withoutWinner(instance), status: 'declined', stageId: null, fixtures: [] };
+}
+
+function withdrawInstance(instance: CompetitionInstance): CompetitionInstance {
+  return { ...withoutWinner(instance), status: 'withdrawn', fixtures: instance.fixtures.map(cancelFixture) };
+}
+
+function applyInstances(state: GameState, instances: CompetitionInstance[]): GameState | null {
+  const competitions = { ...state.competitions!, instances };
+  const problem = validateCompetitions(competitions, {
+    pack: state.pack ?? 'au', season: state.season, week: state.week, clubIds: state.league.clubs.map(c => c.id),
+  });
+  if (problem) {
+    recoveryLog(`left unchanged (${problem})`);
+    return null;
+  }
+  return { ...state, competitions };
+}
+
+/**
+ * Close competitions an active calendar can never play. Offered and qualified
+ * never enter; entered fixtures are not on this calendar. A normal scheduled
+ * league is left alone.
+ */
+export function recoverUnfinishableCompetitions(state: GameState): GameState {
+  if (!hasStructuralCalendar(state) || state.competitions!.calendar!.status !== 'active') return state;
+  const season = state.competitions!.calendar!.season;
+  let changed = false;
+  const instances = state.competitions!.instances.map(instance => {
+    if (instance.season !== season || TERMINAL.has(instance.status)) return instance;
+    if (instance.status === 'offered' || instance.status === 'qualified') {
+      changed = true;
+      recoveryLog(`declined ${instance.id} (${instance.status})`);
+      return declineInstance(instance);
+    }
+    if (instance.status === 'entered') {
+      changed = true;
+      recoveryLog(`withdrew ${instance.id} (entered)`);
+      return withdrawInstance(instance);
+    }
+    return instance;
+  });
+  if (!changed) return state;
+  return applyInstances(state, instances) ?? state;
+}
+
+function forfeitScore(instance: CompetitionInstance, fixture: CompetitionFixture): { homeScore: number; awayScore: number } {
+  const homeWins = instance.tieOrder.indexOf(fixture.homeId) <= instance.tieOrder.indexOf(fixture.awayId);
+  return homeWins ? { homeScore: FORFEIT_SCORE, awayScore: 0 } : { homeScore: 0, awayScore: FORFEIT_SCORE };
+}
+
+function abandonFixture(state: GameState, instanceId: string, fixtureId: string, err: unknown): GameState {
+  const message = err instanceof Error ? err.message : 'result failed';
+  recoveryLog(`abandoned ${instanceId} ${fixtureId} (${message})`);
+  const cancelled = state.competitions!.instances.map(instance => instance.id !== instanceId ? instance : {
+    ...instance,
+    fixtures: instance.fixtures.map(fixture => fixture.id === fixtureId ? cancelFixture(fixture) : fixture),
+  });
+  const updated = applyInstances(state, cancelled);
+  if (updated) return updated;
+  recoveryLog(`withdrew ${instanceId} after ${fixtureId} could not be cancelled`);
+  const closed = state.competitions!.instances.map(instance => instance.id === instanceId ? withdrawInstance(instance) : instance);
+  return applyInstances(state, closed) ?? state;
+}
+
+function withdrawUnresolved(state: GameState): GameState {
+  const season = state.competitions!.calendar!.season;
+  let changed = false;
+  const instances = state.competitions!.instances.map(instance => {
+    if (instance.season !== season || TERMINAL.has(instance.status)) return instance;
+    changed = true;
+    recoveryLog(`withdrew ${instance.id} (${instance.status}) at the end of the calendar`);
+    return withdrawInstance(instance);
+  });
+  if (!changed) return state;
+  return applyInstances(state, instances) ?? state;
+}
+
+/**
+ * After the interval's hooks: a result that never landed becomes a forfeit, or
+ * the fixture is cancelled when the commit itself fails. Competitions that can
+ * never finish are closed. The caller then advances; this does not hold the week.
+ */
+export function settleStructuralCalendar(state: GameState, week: number): GameState {
+  let next = recoverUnfinishableCompetitions(state);
+  for (const ref of currentCalendarFixtures(next)) {
+    const live = currentCalendarFixtures(next).find(item => item.instance.id === ref.instance.id && item.fixture.id === ref.fixture.id);
+    if (!live) continue;
+    try {
+      const settled = finaliseCalendarFixture(next, fixtureBridge(live), forfeitScore(live.instance, live.fixture), true);
+      if (settled === next) throw new Error('fixture result was not accepted');
+      recoveryLog(`forfeited ${live.instance.id} ${live.fixture.id}`);
+      next = settled;
+    } catch (err) {
+      next = abandonFixture(next, live.instance.id, live.fixture.id, err);
+    }
+  }
+  if (week >= next.competitions!.calendar!.slots.length && !structuralSeasonResolved(next)) next = withdrawUnresolved(next);
+  return next;
 }
 
 /** Missing actual rival players produce a walkover, never a generated substitute sheet. */

@@ -143,26 +143,42 @@ export class LiveSim extends LivePositioning implements MatchSim {
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
   snapshot(): Snapshot {
-    const players: PlayerSnap[] = this.players.map((p) => ({
-      side: p.side,
-      slot: p.slot,
-      x: p.body.pos.x,
-      y: p.body.pos.y,
-      pose: p.pose,
-      headX: p.body.heading.x,
-      headY: p.body.heading.y,
-      speed: speedOf(p.body),
-      // As things stand after the tick: the tick he runs dry he is blown, not sprinting.
-      ...(p.sprinting && !p.gas.blown ? { sprint: true } : {}),
-      ...(p.gas.blown ? { blown: true } : {}),
-      gas: p.gas.gas,
-      legs: p.energy,
-      who: p.key,
-      poseUntil: p.poseUntil,
-      caughtTick: p.catchTick,
-      ...(p.binUntilS >= 0 ? { binned: true } : {}),
-    }));
-    const b = this.ball;
+    const b = this.ball; const ph = this.phase;
+    const scorer = ph.kind === 'try' ? this.players[ph.scorer] : undefined;
+    const players: PlayerSnap[] = this.players.map((p) => {
+      const pending = this.pendingKick && this.players[this.pendingKick.kicker] === p ? this.pendingKick : null;
+      const goal = this.pendingGoal && this.players[this.pendingGoal.kicker] === p ? this.pendingGoal : null;
+      const startedTick = p.lockUntil - LIVE.kickLockTicks;
+      const kick: PlayerSnap['kick'] = p.pose === 'kick' && this.tick < p.poseUntil ? {
+        startedTick, untilTick: p.lockUntil,
+        strikeTick: pending?.at ?? goal?.at ?? (b.kind === 'flight' && b.via === 'kick' ? b.t0 : startedTick + LIVE.kickContactTicks),
+        kind: pending?.kind === 'grubber' || (!pending && b.kind === 'flight' && b.bounces > 0) ? 'grubber'
+          : goal || this.goalUp || ph.kind === 'conversion' ? 'drop' : 'punt',
+      } : undefined;
+      return {
+        side: p.side,
+        slot: p.slot,
+        x: p.body.pos.x,
+        y: p.body.pos.y,
+        pose: p.pose,
+        headX: p.body.heading.x,
+        headY: p.body.heading.y,
+        speed: speedOf(p.body),
+        // As things stand after the tick: the tick he runs dry he is blown, not sprinting.
+        ...(p.sprinting && !p.gas.blown ? { sprint: true } : {}),
+        ...(p.gas.blown ? { blown: true } : {}),
+        gas: p.gas.gas,
+        legs: p.energy,
+        who: p.key,
+        poseUntil: p.poseUntil,
+        caughtTick: p.catchTick,
+        ...(kick ? { kick } : {}),
+        ...(p.aerialCatchTick !== undefined && p.aerialCatchTick === p.catchTick ? { aerialCatchTick: p.aerialCatchTick } : {}),
+        ...(ph.kind === 'try' && scorer === p ? { tryTick: ph.t0 } : {}),
+        ...(ph.kind === 'try' && scorer?.side === p.side ? { celebrationTick: ph.t0 } : {}),
+        ...(p.binUntilS >= 0 ? { binned: true } : {}),
+      };
+    });
     let ball: Snapshot['ball'];
     if (b.kind === 'held') {
       const h = this.players[b.by]!;
@@ -187,7 +203,6 @@ export class LiveSim extends LivePositioning implements MatchSim {
       clock: { half: this.half, seconds: this.clockTicks * TICK_S, minute: Math.floor(this.matchSeconds / 60), siren: this.siren, finished: this.finished },
       score: { ...this.points },
     };
-    const ph = this.phase;
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
     const contact = this.visualContact;
     if (contact) {
