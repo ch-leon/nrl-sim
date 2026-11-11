@@ -68,6 +68,8 @@ export interface Player {
   sprinting: boolean;
   /** Tick he last gained the ball. */
   catchTick: number;
+  /** Last successful airborne kick reception, for the renderer only. */
+  aerialCatchTick?: number;
   /** Already chose pass-or-carry for this possession (decided once, at engagement). */
   decided: boolean;
   /** Defender index this carrier has already tried to step this possession. */

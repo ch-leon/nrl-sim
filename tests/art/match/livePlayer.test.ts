@@ -24,4 +24,28 @@ describe('live match artwork', () => {
     expect(cache.get('home', picture).data).toEqual(before.data);
     cache.clear(); expect(cache.size).toBe(0);
   });
+  it('ends the catch and pass on the continuing carry and running pixels', () => {
+    const look = appearanceFor('same-player');
+    for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (const gait of [-1, 0, 1, 2, 3, 4, 5]) {
+      const a = { ...look, build };
+      expect(drawLivePlayer(a, kit, 'catch', 5, facing, true, gait).data)
+        .toEqual(drawLivePlayer(a, kit, 'carry', 0, facing, true, gait).data);
+      expect(drawLivePlayer(a, kit, 'pass', 5, facing, false, gait).data)
+        .toEqual(drawLivePlayer(a, kit, 'run', 0, facing, false, gait).data);
+      for (let f = 0; f < 6; f++) for (const action of ['catch', 'pass'] as const) {
+        const pixels = drawLivePlayer(a, kit, action, f, facing, action === 'catch', gait);
+        const bounds = opaqueBounds(pixels)!;
+        expect(bounds.x0).toBeGreaterThan(0); expect(bounds.y0).toBeGreaterThan(0);
+        expect(bounds.x1).toBeLessThan(pixels.w - 1); expect(bounds.y1).toBeLessThan(pixels.h - 1);
+      }
+    }
+  });
+  it('caches hand progress and gait separately', () => {
+    const cache = new PlayerFrameCache({ home: kit, away: kit });
+    const picture = { who: 'captain', action: 'catch' as const, frame: 1, strideFrame: 0, facing: 'front' as const, left: false, possession: true };
+    const first = cache.get('home', picture);
+    const step = cache.get('home', { ...picture, strideFrame: 2 });
+    expect(step.data).not.toEqual(first.data);
+    expect(cache.get('home', picture)).toBe(first);
+  });
 });
