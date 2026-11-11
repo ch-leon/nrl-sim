@@ -816,6 +816,19 @@ export function callsLine(made: Readonly<Record<'home' | 'away', number>>, paid:
 
 /** How long SKIP in the speed pill stays armed for its second tap (it has no undo, #348 M3). */
 export const SKIP_ARM_MS = 3000;
+/** A tap this soon after the one that armed SKIP is the same stab at the screen, not an answer (#601). */
+export const SKIP_REPEAT_MS = 300;
+/** SKIP's words. Armed it keeps the width it had, so its word is no longer than this one (#601). */
+export const SKIP_LABEL = 'Skip ▸▸';
+export const SKIP_ARMED_LABEL = 'Sure?';
+/** The armed button in full, for a screen reader. */
+export const SKIP_ARMED_SAY = 'Tap again to skip to full time';
+
+/** What a tap on SKIP does. `armedFor` is how long it has been armed (ms), null when it is not. */
+export function skipTap(armedFor: number | null): 'arm' | 'wait' | 'skip' {
+  if (armedFor === null) return 'arm';
+  return armedFor < SKIP_REPEAT_MS ? 'wait' : 'skip';
+}
 
 /** Smallest the ticker's line is drawn, px, when a long name would otherwise run over (#433). */
 export const TICKER_MIN_PX = 11;

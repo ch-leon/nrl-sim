@@ -27,7 +27,7 @@ import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
 import type { TeamSheet, MatchEvent, WeatherKind } from '../sim/events';
 import { getState, setState, type Fixture } from '../core/state';
-import { SKIP_ARM_MS, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
+import { SKIP_ARMED_LABEL, SKIP_ARMED_SAY, SKIP_ARM_MS, SKIP_LABEL, callForRole, callsLockedHint, callsUnlockLine, coachBadge, cssHex, lockedNote, matchSettingsOpener, mountMatchOverlay, renderCoachBadge, showMatchSheet, showPlanCard, skipTap, trayCallsOn, trayHidden, trayPlayEls, trayPlays, trayPlaysKey, trayPlaysOn, TRAY_CAP, TRAY_CAP_WITH_PLAYS, trayRowEls, trayRows, trayWithLocked, type MatchOverlayHandle, type PlanCardHandle, type TrayPlay } from '../ui/screens/matchOverlay';
 import { PLAYS_BY_ID, type PlayId } from '../data/plays';
 import { setFullTimeExit, shortName } from '../ui/screens/matchReport';
 import { styleLine } from '../ui/tacticsBlurbs';
@@ -745,37 +745,53 @@ export class MatchScene extends Phaser.Scene {
     divider.className = 'nrl-mo-pill-div';
     // SKIP has no undo and sits a finger's width from 8× (#348 M3): the first tap
     // arms it, the second goes. The live sim can only skip to full time (no break in between).
-    const skip = button('Skip ▸▸', () => this.tapSkip(skip), { class: 'nrl-mo-skip' });
+    const skip = button(SKIP_LABEL, () => this.tapSkip(skip, armedSay), { class: 'nrl-mo-skip' });
     skip.setAttribute('data-skip-pill', '');
     skip.title = 'Skip to full time';
-    pill.append(divider, skip);
+    // Armed is said aloud as well (#601): the word on the button is short, and the rest is colour.
+    const armedSay = document.createElement('span');
+    armedSay.className = 'nrl-mo-sr';
+    armedSay.setAttribute('role', 'status');
+    pill.append(divider, skip, armedSay);
     this.controlsEl = pill;
     const slot = this.overlay?.slot?.('speed');
     if (slot) slot.append(pill);
     else mount(pill);
   }
 
-  /** SKIP's first tap arms it ("Full time?") for a few seconds; the second skips. */
+  /** SKIP's first tap arms it ("Sure?") for a few seconds; the second skips. */
   private skipArm: ReturnType<typeof setTimeout> | null = null;
+  private skipArmedAt = 0;
 
-  private tapSkip(btn: HTMLButtonElement): void {
-    if (!this.skipArm) {
-      btn.textContent = 'Full time? ▸▸';
+  private tapSkip(btn: HTMLButtonElement, say: HTMLElement): void {
+    const tap = skipTap(this.skipArm ? performance.now() - this.skipArmedAt : null);
+    if (tap === 'wait') return;
+    if (tap === 'arm') {
+      // Armed, the pill keeps its shape (#601): "Full time? ▸▸" was 48px wider, which slid
+      // 8× under the finger that had just missed it, so its next tap skipped the match.
+      btn.style.width = `${btn.getBoundingClientRect().width}px`;
+      btn.textContent = SKIP_ARMED_LABEL;
+      btn.setAttribute('aria-label', SKIP_ARMED_SAY);
       btn.setAttribute('data-armed', '');
-      this.skipArm = setTimeout(() => this.disarmSkip(btn), SKIP_ARM_MS);
+      say.textContent = SKIP_ARMED_SAY;
+      this.skipArmedAt = performance.now();
+      this.skipArm = setTimeout(() => this.disarmSkip(btn, say), SKIP_ARM_MS);
       return;
     }
-    this.disarmSkip(btn);
+    this.disarmSkip(btn, say);
     this.toggleTray(false);
     this.playback?.skip();
   }
 
-  private disarmSkip(btn?: HTMLButtonElement): void {
+  private disarmSkip(btn?: HTMLButtonElement, say?: HTMLElement): void {
     if (this.skipArm) clearTimeout(this.skipArm);
     this.skipArm = null;
     if (!btn) return;
-    btn.textContent = 'Skip ▸▸';
+    btn.textContent = SKIP_LABEL;
+    btn.style.width = '';
+    btn.removeAttribute('aria-label');
     btn.removeAttribute('data-armed');
+    if (say) say.textContent = '';
   }
 
   /** The sheet over the field (the pause menu): the match holds while it is up. */

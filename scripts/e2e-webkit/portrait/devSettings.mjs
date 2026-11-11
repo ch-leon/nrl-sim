@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, SHEET_EXIT, openNav, skipFromPill } from '../common.mjs';
 
 /**
  * Developer settings (#519), the real route on an iPhone, upright first:
@@ -222,9 +222,7 @@ export async function runDevSettings(browser) {
     step('Return and Reset all refused mid-match');
 
     // Finish the match.
-    await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
-    await page.locator('[data-skip-pill][data-armed]').waitFor();
-    await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
+    await skipFromPill(page);
     await page.locator('.nrl-mo-ft [data-back-to-club]').waitFor({ timeout: 120000 });
     await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate((n) => n.click());
     await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');

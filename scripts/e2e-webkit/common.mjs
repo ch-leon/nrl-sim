@@ -163,6 +163,24 @@ export async function openNav(page, id) {
 
 export const NO_INSETS = { l: 0, t: 0, r: 0, b: 0 };
 
+/**
+ * SKIP in the speed pill, to full time. The first tap arms it; a second inside 300ms of
+ * that is ignored (SKIP_REPEAT_MS, #601), so the second waits that out. On a slow runner
+ * it can land after the arm has run out (SKIP_ARM_MS) and only arm it again: still armed
+ * after the tap means it has not gone, so tap once more.
+ */
+export async function skipFromPill(page) {
+  const skip = page.locator('.nrl-mo-controls [data-skip-pill]');
+  const armed = page.locator('[data-skip-pill][data-armed]');
+  await skip.tap();
+  await armed.waitFor();
+  for (let i = 0; i < 3; i++) {
+    await page.waitForTimeout(400);
+    await skip.tap();
+    if (!(await armed.count())) return;
+  }
+}
+
 /** Play a real match through the phone controls, then wait for its held week. */
 export async function playPhoneWeek(page, onResult = async () => {}) {
   const before = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason}`; });
@@ -171,9 +189,7 @@ export async function playPhoneWeek(page, onResult = async () => {}) {
   await page.waitForFunction(() => document.querySelector('[data-ask-proceed]') || document.querySelector('.nrl-mo-controls'));
   if (await page.locator('[data-ask-proceed]').isVisible()) await page.locator('[data-ask-proceed]').tap();
   await page.locator('.nrl-mo-controls [data-skip-pill]').waitFor({ timeout: 60000 });
-  await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
-  await page.locator('[data-skip-pill][data-armed]').waitFor();
-  await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
+  await skipFromPill(page);
   await page.locator('.nrl-mo-ft [data-back-to-club]').waitFor({ timeout: 120000 });
   await onResult();
   await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate(n => n.click());

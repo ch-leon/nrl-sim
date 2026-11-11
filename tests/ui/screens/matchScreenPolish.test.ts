@@ -8,7 +8,11 @@ import {
   CARD_SELECTOR,
   LOG_MODE_KEY,
   OVERLAY_CSS,
+  SKIP_ARMED_LABEL,
+  SKIP_ARMED_SAY,
   SKIP_ARM_MS,
+  SKIP_LABEL,
+  SKIP_REPEAT_MS,
   TICKER_MIN_PX,
   fittedTickerPx,
   bannerText,
@@ -21,6 +25,7 @@ import {
   replayCountdown,
   saveLogMode,
   scoreBanner,
+  skipTap,
   statSplit,
   teamCode,
   teamCodes,
@@ -123,6 +128,28 @@ describe('match screen readability (#348, Broadcast Quiet 3m)', () => {
     expect(SKIP_ARM_MS).toBeLessThanOrEqual(5000);
     expect(scene).toContain("'data-save-exit': ''");
     expect(scene).toContain("'data-skip': ''");
+  });
+  it('#601: a second tap under 300ms after the one that armed SKIP does nothing; a later one skips', () => {
+    expect(SKIP_REPEAT_MS).toBe(300);
+    expect(skipTap(null)).toBe('arm');
+    expect(skipTap(0)).toBe('wait');
+    expect(skipTap(SKIP_REPEAT_MS - 1)).toBe('wait');
+    expect(skipTap(SKIP_REPEAT_MS)).toBe('skip');
+    expect(skipTap(SKIP_ARM_MS - 1)).toBe('skip');
+  });
+  it('#601: arming SKIP moves nothing in the pill: its width is held before its word changes', () => {
+    const scene = readFileSync('src/scenes/MatchScene.ts', 'utf8');
+    const tap = scene.slice(scene.indexOf('private tapSkip'), scene.indexOf('private disarmSkip'));
+    expect(tap).toContain('skipTap(');
+    expect(tap.indexOf('btn.style.width = ')).toBeGreaterThan(0);
+    expect(tap.indexOf('btn.style.width = ')).toBeLessThan(tap.indexOf('btn.textContent = SKIP_ARMED_LABEL'));
+    // The armed word fits inside the held width, and is not the idle one in another colour.
+    expect(SKIP_ARMED_LABEL.length).toBeLessThan(SKIP_LABEL.length);
+    expect(SKIP_ARMED_LABEL).not.toContain('Skip');
+    // Said in full for a screen reader, on the button and in the pill's status line.
+    expect(SKIP_ARMED_SAY).toMatch(/again.*full time/i);
+    expect(tap).toContain("btn.setAttribute('aria-label', SKIP_ARMED_SAY)");
+    expect(tap).toContain('say.textContent = SKIP_ARMED_SAY');
   });
   it('the log: one line, nothing, or the full log on the right', () => {
     expect(rule(OVERLAY_CSS, '.nrl-mo-strip')).toContain('width: min(560px');

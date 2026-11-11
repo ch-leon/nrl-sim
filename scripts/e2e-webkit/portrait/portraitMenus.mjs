@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, openNav } from '../common.mjs';
+import { closeWeekSummary, OUT_ROOT, BASE, IPHONE_UA, log, reachProblems, openNav, skipFromPill } from '../common.mjs';
 
 // ── Portrait menus (#350 P1) ─────────────────────────────────────────────────
 /**
@@ -397,8 +397,7 @@ export async function runPortraitMenus(browser) {
         return out;
       });
       await step('report-upright', async (rec) => {
-        await press('[data-skip-pill]');
-        await press('[data-skip-pill]');
+        await skipFromPill(page);
         await page.waitForSelector('[data-back-to-club]', { timeout: 30000 });
         await turn(W, H);
         await page.waitForTimeout(400);
