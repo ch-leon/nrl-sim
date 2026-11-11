@@ -9,7 +9,7 @@ const clubs = (n = 24): string[] => Array.from({ length: n }, (_, i) => i === 0 
 const definition = (): CompetitionDefinition => ({
   id: 'open-cup', version: 1, pack: 'au', name: 'Open Cup', format: { kind: 'knockout' },
   minEntrants: 2, maxEntrants: 24, slotCount: 25,
-  stages: [{ id: 'cup', name: 'Open Cup', kind: 'knockout', rounds: 5 }],
+  stages: [{ id: 'cup', name: 'Open Cup', kind: 'knockout', rounds: 5, slotIds: [...OPEN_CUP_SLOTS] }],
   matchRules: { ...AU_PACK.rules }, lineup: { onField: 9, benchSize: 4, minSquad: 13, maxSquad: 30 },
   eligibility: { kind: 'open' }, venues: { rounds: 'drawn-home', final: 'neutral' }, drawnKnockout: 'seeded-draw',
   rewards: [{ id: 'title', stageId: 'cup', round: 5, kind: 'honour', title: 'Open Cup champion' }],

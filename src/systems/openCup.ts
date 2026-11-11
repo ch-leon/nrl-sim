@@ -8,7 +8,7 @@ import {
 import { cyrb53 } from '../utils/hash';
 import { makeRng } from '../utils/rng';
 
-/** Version-one Open Cup dates; reduced fields leave the early dates unused. */
+/** Original prototype dates; runtime scheduling reads the saved stage.slotIds. */
 export const OPEN_CUP_SLOTS = Object.freeze([7, 10, 13, 16, 19]);
 
 export interface OpenCupEntry {
@@ -50,7 +50,7 @@ function assertDefinition(definition: CompetitionDefinition): void {
   const problem = validateCompetitionDefinition(definition);
   if (problem) throw new Error(`Invalid Open Cup definition: ${problem}`);
   if (definition.format.kind !== 'knockout' || definition.stages.length !== 1 || definition.minEntrants !== 2
-    || definition.stages[0]!.rounds > OPEN_CUP_SLOTS.length || definition.slotCount < OPEN_CUP_SLOTS[OPEN_CUP_SLOTS.length - 1]!
+    || !definition.stages[0]!.slotIds
     || definition.eligibility.kind !== 'open' || definition.venues.rounds !== 'drawn-home'
     || definition.venues.final !== 'neutral' || definition.drawnKnockout !== 'seeded-draw') {
     throw new Error('Unsupported Open Cup rules');
@@ -90,7 +90,7 @@ function layout(instance: CompetitionInstance): { field: Array<string | null>; o
 
 function roundFixtures(instance: CompetitionInstance, field: readonly (string | null)[], round: number): CompetitionFixture[] {
   const stage = instance.definition.stages[0]!;
-  const slot = OPEN_CUP_SLOTS[OPEN_CUP_SLOTS.length - stage.rounds + round - 1]!;
+  const slot = stage.slotIds![round - 1]!;
   const firstOrdinal = 2 ** (stage.rounds - round) - 1;
   const fixtures: CompetitionFixture[] = [];
   for (let pair = 0; pair < field.length / 2; pair++) {
@@ -110,7 +110,7 @@ export function drawOpenCup(entry: OpenCupEntry): OpenCupDraw {
   const { definition, season, seed, clubIds, currentSlot, ordinal = 0, playerId = 'player', enterPlayer = true, existingInstances = [] } = entry;
   assertDefinition(definition);
   if (!integer(seed, 0, 0xffffffff) || !integer(season, 1) || !integer(ordinal)
-    || !integer(currentSlot) || currentSlot >= OPEN_CUP_SLOTS[0]!) throw new Error('Open Cup entry is closed or invalid');
+    || !integer(currentSlot) || currentSlot >= definition.stages[0]!.slotIds![0]!) throw new Error('Open Cup entry is closed or invalid');
   if (existingInstances.some(i => i.definition.id === definition.id && i.season === season)) throw new Error('The annual Open Cup draw is already recorded');
   if (!clubIds.every(id => typeof id === 'string' && id.trim().length > 0) || new Set(clubIds).size !== clubIds.length) throw new Error('Invalid Open Cup entrants');
   const candidates = clubIds.filter(id => enterPlayer || id !== playerId).slice().sort();
@@ -142,6 +142,10 @@ export function openCupByes(instance: CompetitionInstance): string[] {
   return instance.entrantIds.length < 2 ? [] : layout(instance).byes;
 }
 
+/** Only our named cup uses this persisted draw algorithm; other knockout formats
+ * retain their own definition and future progression owners. */
+export const isOpenCupInstance = (instance: CompetitionInstance): boolean => instance.definition.id === 'open-cup' || instance.definition.id.endsWith(':open-cup');
+
 /** Apply only after the match's bounded golden point. This never changes scores or state. */
 export function openCupResult(instance: CompetitionInstance, fixtureId: string,
   score: { homeScore: number; awayScore: number }, forfeit = false): CompetitionResult {
@@ -169,11 +173,9 @@ function outcome(instance: CompetitionInstance, fixture: CompetitionFixture, kin
   };
 }
 
-/** Consumes finalised scores. A next round (or completed status) is its consumption receipt. */
-export function advanceOpenCup(instance: CompetitionInstance): OpenCupAdvance {
+function inspectDraw(instance: CompetitionInstance): { round: number; winners: Array<string | null>; actual: CompetitionFixture[]; unresolved: boolean } | null {
   assertInstance(instance);
-  if (instance.status === 'declined' || instance.status === 'withdrawn' || instance.status === 'completed') return { instance, outcomes: [] };
-  if (instance.status !== 'scheduled' && instance.status !== 'active') throw new Error('The Open Cup has not been drawn');
+  if (['offered', 'qualified', 'entered', 'declined'].includes(instance.status) && instance.fixtures.length === 0) return null;
   if (instance.fixtures.length === 0) throw new Error('Open Cup fixtures are missing');
   const draw = layout(instance);
   let field: Array<string | null> = draw.field;
@@ -185,7 +187,8 @@ export function advanceOpenCup(instance: CompetitionInstance): OpenCupAdvance {
     for (const want of expected) {
       const found = actual.find(f => f.id === want.id);
       if (!found || found.homeId !== want.homeId || found.awayId !== want.awayId || found.slot !== want.slot
-        || found.stageId !== want.stageId || found.neutral !== want.neutral || found.status === 'cancelled') throw new Error('Open Cup draw no longer matches its saved field');
+        || found.stageId !== want.stageId || found.neutral !== want.neutral
+        || (found.status === 'cancelled' && instance.status !== 'withdrawn')) throw new Error('Open Cup draw no longer matches its saved field');
     }
     const winners: Array<string | null> = [];
     let unresolved = false;
@@ -198,19 +201,48 @@ export function advanceOpenCup(instance: CompetitionInstance): OpenCupAdvance {
     }
     if (unresolved) {
       if (round !== lastRound) throw new Error('Open Cup advanced before its previous round finished');
-      const status = instance.fixtures.some(f => f.status === 'completed') ? 'active' as const : 'scheduled' as const;
-      return { instance: instance.status === status ? instance : { ...instance, status }, outcomes: [] };
+      return { round, winners, actual, unresolved };
     }
     field = winners;
-    if (round !== lastRound) continue;
-    const outcomes = actual.map(f => outcome(instance, f, 'round-win'));
-    const finalRound = instance.definition.stages[0]!.rounds;
-    const next: CompetitionInstance = round === finalRound
-      ? { ...instance, status: 'completed', winnerId: field[0]!, fixtures: [...instance.fixtures] }
-      : { ...instance, status: 'active', fixtures: [...instance.fixtures, ...roundFixtures(instance, field, round + 1)] };
-    if (round === finalRound) outcomes.push(outcome(instance, actual[0]!, 'title'));
-    assertInstance(next);
-    return { instance: next, outcomes };
+    if (round === lastRound) return { round, winners, actual, unresolved: false };
   }
   throw new Error('Invalid Open Cup round');
+}
+
+/** Early import/runtime policy gate: never discover a redrawn bracket midseason. */
+export function openCupProblem(instance: CompetitionInstance): string | null {
+  try { inspectDraw(instance); return null; }
+  catch (error) { return error instanceof Error ? error.message : 'Invalid Open Cup draw'; }
+}
+
+/** Immutable sporting facts are the durable input to #576's separate settlement
+ * receipts. Re-reading them cannot pay cash, grant XP or invent another title. */
+export function openCupSportingOutcomes(instance: CompetitionInstance): OpenCupOutcome[] {
+  inspectDraw(instance);
+  const outcomes = instance.fixtures.filter(f => f.status === 'completed').map(f => outcome(instance, f, 'round-win'));
+  if (instance.status === 'completed') {
+    const final = instance.fixtures.find(f => f.round === instance.definition.stages[0]!.rounds)!;
+    outcomes.push(outcome(instance, final, 'title'));
+  }
+  return outcomes;
+}
+
+/** Consumes finalised scores. A next round (or completed status) is its consumption receipt. */
+export function advanceOpenCup(instance: CompetitionInstance): OpenCupAdvance {
+  const progress = inspectDraw(instance);
+  if (instance.status === 'declined' || instance.status === 'withdrawn' || instance.status === 'completed') return { instance, outcomes: [] };
+  if (!progress || (instance.status !== 'scheduled' && instance.status !== 'active')) throw new Error('The Open Cup has not been drawn');
+  if (progress.unresolved) {
+    const status = instance.fixtures.some(f => f.status === 'completed') ? 'active' as const : 'scheduled' as const;
+    return { instance: instance.status === status ? instance : { ...instance, status }, outcomes: [] };
+  }
+  const { round, winners, actual } = progress;
+  const outcomes = actual.map(f => outcome(instance, f, 'round-win'));
+  const finalRound = instance.definition.stages[0]!.rounds;
+  const next: CompetitionInstance = round === finalRound
+    ? { ...instance, status: 'completed', winnerId: winners[0]!, fixtures: [...instance.fixtures] }
+    : { ...instance, status: 'active', fixtures: [...instance.fixtures, ...roundFixtures(instance, winners, round + 1)] };
+  if (round === finalRound) outcomes.push(outcome(instance, actual[0]!, 'title'));
+  assertInstance(next);
+  return { instance: next, outcomes };
 }
