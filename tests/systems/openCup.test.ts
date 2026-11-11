@@ -174,6 +174,16 @@ describe('stored bracket advancement', () => {
 });
 
 describe('finite score and advancement policy', () => {
+  it('rejects new results after withdrawal while preserving already-final sporting facts', () => {
+    const next = finishRound(draw()).instance;
+    const withdrawn = { ...next, status: 'withdrawn' as const }; const before = clone(withdrawn);
+    const pending = withdrawn.fixtures.find(f => f.status === 'scheduled')!;
+    const played = withdrawn.fixtures.find(f => f.status === 'completed')!;
+    expect(() => openCupResult(withdrawn, pending.id, { homeScore: 1, awayScore: 0 })).toThrow(/no longer active/);
+    expect(openCupResult(withdrawn, played.id, played.result!)).toEqual(played.result);
+    expect(advanceOpenCup(withdrawn)).toEqual({ instance: withdrawn, outcomes: [] });
+    expect(withdrawn).toEqual(before);
+  });
   it('settles all tied games by the saved order while preserving the exact scores', () => {
     const first = draw(); const fixture = first.fixtures[0]!;
     const before = clone(first); const result = openCupResult(first, fixture.id, { homeScore: 12, awayScore: 12 });

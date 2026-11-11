@@ -152,6 +152,7 @@ export function openCupResult(instance: CompetitionInstance, fixtureId: string,
     if (fixture.result.homeScore !== score.homeScore || fixture.result.awayScore !== score.awayScore) throw new Error('Open Cup result is already final');
     return { ...fixture.result };
   }
+  if (instance.status !== 'scheduled' && instance.status !== 'active') throw new Error('The Open Cup is no longer active');
   if (score.homeScore === score.awayScore) {
     if (forfeit) throw new Error('An Open Cup forfeit needs a winner');
     const winnerId = instance.tieOrder.indexOf(fixture.homeId) < instance.tieOrder.indexOf(fixture.awayId) ? fixture.homeId : fixture.awayId;
