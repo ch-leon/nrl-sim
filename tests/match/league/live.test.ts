@@ -10,6 +10,7 @@ import { TICK_S, replayTo } from '../../../src/match/core/engine';
 import { SET_TACKLES } from '../../../src/config';
 import type { TeamSheet } from '../../../src/sim/events';
 import type { Snapshot } from '../../../src/match/core/snapshot';
+import { advanceContactAnimation, type ContactAnimation } from '../../../src/match/view/contactAnimation';
 
 const POSITIONS = ['fullback', 'winger', 'winger', 'centre', 'five-eighth', 'halfback', 'hooker', 'prop', 'second-row'] as const;
 
@@ -31,6 +32,43 @@ function sheet(id: string, base = 60): TeamSheet {
 }
 
 const factory = (seed: number): LiveSim => new LiveSim(sheet('H'), sheet('A'), seed);
+
+describe('contact render metadata', () => {
+  it('names the actual wrestlers and outcome actors without snapshot reads changing the match', () => {
+    const sim = factory(7); const control = factory(7);
+    let animation: ContactAnimation | null = null;
+    let contacts = 0; let groups = 0; let outcomes = 0;
+    for (let i = 0; i < 2400; i++) {
+      sim.step(); control.step();
+      const snap = sim.snapshot();
+      animation = advanceContactAnimation(animation, snap);
+      // Repeated render reads must not consume RNG or affect the next step.
+      sim.snapshot(); sim.snapshot();
+      expect(snap).toEqual(control.snapshot());
+      if (snap.contact) {
+        // A seek, resume or skipped display frame can draw straight from this tick.
+        expect(advanceContactAnimation(null, snap)).toEqual(animation);
+        contacts++;
+        const refs = [snap.contact.carrier, ...snap.contact.defenders];
+        expect(snap.contact.joinedTicks).toHaveLength(snap.contact.defenders.length);
+        expect(snap.contact.joinedTicks!.every(t => t >= snap.contact!.startedTick && t <= snap.tick)).toBe(true);
+        expect(new Set(refs.map(p => `${p.side}/${p.slot}`)).size).toBe(refs.length);
+        for (const ref of refs) expect(snap.players.some(p => p.side === ref.side && p.slot === ref.slot && p.who === ref.who)).toBe(true);
+        if (snap.wrestle) expect(snap.contact.defenders).toHaveLength(snap.wrestle.men);
+        if (snap.contact.defenders.length > 1) groups++;
+      }
+      for (const event of snap.events.filter(e => ['tackle', 'big-hit', 'break-tackle', 'strip'].includes(e.kind))) {
+        expect(event.contact).toBeDefined(); outcomes++;
+        const c = event.contact!;
+        expect(c.defenders.length).toBeGreaterThan(0); expect(c.defenders.length).toBeLessThanOrEqual(3);
+        const credited = event.kind === 'break-tackle' ? c.carrier : c.defenders[0]!;
+        expect(credited).toMatchObject({ side: event.side, slot: event.slot });
+        if (event.kind === 'strip') { expect(c.defenders).toHaveLength(1); expect(snap.ball.holder).toMatchObject({ side: credited.side, slot: credited.slot }); }
+      }
+    }
+    expect(contacts).toBeGreaterThan(0); expect(groups).toBeGreaterThan(0); expect(outcomes).toBeGreaterThan(0);
+  });
+});
 
 function run(sim: LiveSim, seconds: number, onTick?: (s: Snapshot) => void): Snapshot {
   const n = Math.round(seconds / TICK_S);

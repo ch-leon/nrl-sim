@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-07
+Last updated: 2026-11-11
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **[Match player art and animations](../specs/match-art-prototype.md):** Leon approved the characters, close tackles and leg correction. They are integrated locally into career matches and `/#lab`; 3,039 tests and desktop/mobile-size Chromium checks passed. Next is the playable build: different-tool review, remaining Safari/CI/QA checks, release and Leon's full phone play-test. The [Astra handover](../handoffs/match-art-playable-build.md) includes source recovery and release instructions. `/#artlab` retains comparisons.
 
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
@@ -18,6 +20,8 @@ live gameplay change; work still open below has not shipped.
   Planned and awaiting Leon's go; no PR yet.
 
 ## Next
+
+- **Match animation follow-up, after the playable build and phone feedback:** item 3 is transition polish (catch → run, tackle recovery → play-the-ball, dummy-half → pass). Item 4 is big moments (kicks, aerial catches, tries and celebrations). Keep these separate from the current release task. Portraits, grounds characters and an appearance editor remain later work.
 
 - **Launch plumbing (decided 2 Nov 2026):** hosting, push, analytics, pop-ups, flags, email and privacy. Tracking: [issue #456](https://github.com/ch-leon/nrl-sim/issues/456), which has Leon's setup checklist. Decisions are in [marketing.md](marketing.md#engagement-and-launch-plumbing) ([PR #457](https://github.com/ch-leon/nrl-sim/pull/457), merged 6 Nov). Implementation is still open.
   - Buildable now: the pop-up itself, with a test message ([issue #451](https://github.com/ch-leon/nrl-sim/issues/451)).

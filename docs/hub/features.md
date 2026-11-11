@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-07
+Last updated: 2026-11-11
 
 What's in the game, with the PR that added each.
 
@@ -62,6 +62,10 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- The contact-study preview opens with Current and Prototype visible together, sharing playback and scenario controls; phone layouts stack the comparison panels. Updated tackles use close torso contact, short bent arms, impact compression and firmer landings. Tackle legs now keep their standing reach: boots slide in with the hips and knees fold through the landing instead of stretching between fixed feet and moving bodies.
+
+- [Match character art and contact animations](../specs/match-art-prototype.md), approved by Leon and locally integrated pending release: larger heads and stable identities in career matches and the match lab; running catches, close body contact, short bent arms and sim-driven group tackles, breaks and steals. Join/result timing survives replay and faster playback. `/#artlab` retains the earlier-art comparison and eleven-head workbench. Existing hair/colour assignments and save formats are preserved. The [Astra release handover](../handoffs/match-art-playable-build.md) takes this baseline to a playable build before further animation work.
 
 - Labs is now Developer settings (still `?labs=1`). It can open the Office screens early on this browser only. It can also set up a separate playtest career with a Direct attack coach hired and Block play bought and picked, so you can call it in the first match. Return to my career puts your own career back exactly as it was. Reset all turns everything off ([issue](https://github.com/ch-leon/nrl-sim/issues/519)).
 

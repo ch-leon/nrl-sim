@@ -4,6 +4,20 @@
 // outcome. `pose` is a sprite animation name owned by the sport layer.
 export type Side = 'home' | 'away';
 
+/** Exact contact participants, in arrival order. Nearby defenders are not joiners. */
+export interface ContactPlayer { side: Side; slot: number; who: string }
+export interface ContactSnap {
+  startedTick: number;
+  carrier: ContactPlayer;
+  defenders: ContactPlayer[];
+  /** Self-contained timing so seeking and fast playback do not lose a join or result. */
+  joinedTicks?: number[];
+  outcome?: 'tackle' | 'big-hit' | 'break-tackle' | 'strip';
+  resolvedTick?: number;
+  phaseTick?: number;
+  releaseTick?: number;
+}
+
 export interface PlayerSnap {
   side: Side;
   slot: number;
@@ -14,10 +28,13 @@ export interface PlayerSnap {
   pose: string;
   /** Unit heading x component: faces screen-left or -right from this. */
   headX: number;
+  headY?: number;
   /** Ground speed m/s (drives run-cycle rate). */
   speed: number;
   /** Who is in this slot (squad id or name), when the sim can swap players: the look he wears. */
   who?: string;
+  poseUntil?: number;
+  caughtTick?: number;
   /** Sprint and gas (BAK-208 §8.2): going flat out this tick, ran his gas dry, gas left 0..1. */
   sprint?: boolean;
   blown?: boolean;
@@ -53,6 +70,8 @@ export interface SimEvent {
   detail?: string;
   /** The receiver's slot, when a cut-out names the man it was thrown to (N15.4). The view draws the line; the sim does not read it. */
   toSlot?: number;
+  /** Read-only animation context for this contact outcome. */
+  contact?: ContactSnap;
 }
 
 export interface Snapshot {
@@ -65,6 +84,8 @@ export interface Snapshot {
   events: SimEvent[];
   /** A wrestle in progress (BAK-208 §8.1): the carrier, the fight left in him (1 → 0) and how many men are on him. */
   wrestle?: WrestleSnap;
+  /** Participants in the current contact, including their persistent appearances. */
+  contact?: ContactSnap;
   /** The match clock, when the sim keeps one. */
   clock?: ClockSnap;
   /** Points, when the sim keeps score. */

@@ -4,8 +4,8 @@ import { halfTimeNumbers } from '../ui/matchupRead';
 //
 // Presentation only. Builds a generated pixel-art stadium (src/art/match/*):
 // a mown field with full markings, H goalposts, hoardings, a grandstand, a hill
-// and near terraces full of bobbing spectators in both teams' colours; 26
-// palette-swapped animated players with ground shadows; and a ball.
+// and near terraces full of bobbing spectators in both teams' colours; persistent
+// player characters, shared contact poses and ground shadows; and a ball.
 // LivePlayback (src/match/view/livePlayback.ts) plays the match on the live sim
 // (BAK-207) and drives the players; this scene only provides sprites through the
 // structural PlaybackActor/PlaybackBall interfaces and keeps the camera on the
@@ -37,7 +37,6 @@ import {
   keyMomentsOn,
   playbackSpeedOf,
   PLAYBACK_SPEEDS,
-  type PlaybackActor,
   type PlaybackBall,
   type PlaybackSpeed,
 } from '../match/view/livePlayback';
@@ -51,10 +50,9 @@ import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
 import { attachMatchFx } from '../fx/particles';
 import { attachMatchAtmosphere } from '../fx/atmosphere';
-import { RING_STYLES, resolveKits, type RingStyle } from '../art/match/kitClash';
+import { RING_STYLES, resolveKits } from '../art/match/kitClash';
 import { drawRing } from '../match/view/rings';
 import { teamLetters, teamLettersOn, teamTags } from '../ui/teamTag';
-import { BASE_Y, CENTER_X, FRAME_H, FRAME_W, lookForPlayer, lookForSlot, type PlayerAnim } from '../art/match/players';
 import {
   CROSSBAR_Z,
   POST_GX,
@@ -76,7 +74,9 @@ import {
   type CrowdMood,
 } from '../art/match/crowd';
 import { isoProject } from '../art/match/iso3d';
-import { MatchArtRegistry, playerAnimKey } from './matchArt';
+import { MatchArtRegistry } from './matchArt';
+import { MatchActor, MatchContactLayer, PlayerFrameCache } from './matchPlayers';
+export { MatchActor } from './matchPlayers';
 import { fixtureArtFor, takeFixtureArt } from './matchArtAhead';
 import {
   NAME_TAG_MS,
@@ -117,11 +117,11 @@ const DEPTH_FG = 50_000;
 const DEPTH_TAG = 73_000;
 const DEPTH_CROWD_FRONT = 60_000;
 
-/** Default match zoom (#17): a player stands ~36px tall at 1280×800. Eases
+/** Default match zoom (#17): keeps an integer pixel scale. Eases
  *  tighter/wider per beat (see world/readability). */
 const MATCH_ZOOM = ZOOM_DEFAULT;
 /** Name tag sits this many world px above a player's feet (just over his head). */
-const TAG_LIFT = 26;
+const TAG_LIFT = 39;
 /** How long a tap on a locked call's tile shows what unlocks it, in the tray's footer (ms). */
 const LOCKED_NOTE_MS = 2000;
 /** Ghost balls trailing a kicked ball. */
@@ -140,7 +140,6 @@ const TRAIL_MIN_LIFT = 30;
 /** Crowd animation tick (real ms). */
 const CROWD_TICK_MS = 220;
 /** Width (world px) of the team ring under every player (#340); the carrier's ring is 22. */
-const TEAM_RING_W = 15;
 const CARRIER_RING_W = 22;
 
 export interface MatchSceneData {
@@ -151,54 +150,6 @@ export interface MatchSceneData {
   weather?: WeatherKind;
   /** The match (BAK-207, coach calls #73): played on the live sim as the player watches; the result comes at full time. Absent in the match lab, which drives the sprites itself. */
   live?: LiveMatchData;
-}
-
-/** A player sprite + ground shadow + team ring, driven through PlaybackActor. */
-export class MatchActor implements PlaybackActor {
-  readonly sprite: Phaser.GameObjects.Sprite;
-  private readonly shadow: Phaser.GameObjects.Image;
-  /** The side's ring at his feet (#340): which team he is on, whatever the kits; solid or dashed by side (#371). */
-  private readonly ring: Phaser.GameObjects.Graphics;
-  private readonly atlas: string;
-  private look: number;
-  private current = '';
-  /** Whose look this is (live sim: a slot's player changes at an interchange). */
-  private wearing: string | null = null;
-
-  constructor(scene: Phaser.Scene, atlas: string, look: number, shadowKey: string, ringColor: number, ringStyle: RingStyle) {
-    this.atlas = atlas;
-    this.look = look;
-    this.shadow = scene.add.image(0, 0, shadowKey).setDepth(DEPTH_SHADOW);
-    this.ring = scene.add.graphics().setDepth(DEPTH_SHADOW + 0.5);
-    // #371: away's dashed ring is open (a faint fill), home's filled, so the two differ in shape twice over.
-    drawRing(this.ring, 0, 0, TEAM_RING_W, TEAM_RING_W / 2, ringStyle, { color: ringColor, width: 1.5, alpha: 0.9, fillAlpha: ringStyle === 'solid' ? 0.28 : 0.1 });
-    this.sprite = scene.add.sprite(0, 0, atlas, `${look}-idle-0`);
-    this.sprite.setOrigin((CENTER_X + 0.5) / FRAME_W, (BASE_Y + 1) / FRAME_H);
-  }
-
-  place(x: number, y: number, depth: number): void {
-    this.sprite.setPosition(x, y).setDepth(depth);
-    this.shadow.setPosition(x, y);
-    this.ring.setPosition(x, y);
-  }
-
-  /** Wear a player's own look (#21) by squad id or name; the next play() switches the sprite to it. */
-  wear(who: string): void {
-    if (who === this.wearing) return;
-    this.wearing = who;
-    this.look = lookForPlayer(who);
-    this.current = '';
-  }
-
-  play(anim: PlayerAnim, faceLeft: boolean, timeScale: number): void {
-    const key = playerAnimKey(this.atlas, this.look, anim);
-    if (key !== this.current) {
-      this.current = key;
-      this.sprite.play(key);
-    }
-    this.sprite.setFlipX(faceLeft);
-    this.sprite.anims.timeScale = timeScale;
-  }
 }
 
 /** The ball sprite + its ground shadow (shown while in the air) + flight trail. */
@@ -244,6 +195,11 @@ export class MatchBall implements PlaybackBall {
       g.setPosition(p.x, p.y).setDepth(depth - 0.01).setAlpha(0.5 - i * 0.09).setScale(1 - i * 0.12).setVisible(true);
     });
   }
+  setRendered(visible: boolean): void {
+    this.sprite.setVisible(visible);
+    if (!visible) { this.shadow.setVisible(false); for (const trail of this.trail) trail.setVisible(false); }
+  }
+
 }
 
 /**
@@ -257,6 +213,8 @@ export class MatchScene extends Phaser.Scene {
   // ── Public surface consumed by playback (structural PlaybackScene) ─────────
   public readonly players: { home: MatchActor[]; away: MatchActor[] } = { home: [], away: [] };
   public ball!: MatchBall;
+  public contact?: MatchContactLayer;
+  private playerFrames: PlayerFrameCache | null = null;
   /** Readability hooks driven by playback (#17): name tags + carrier ring. */
   public readonly focus = {
     tag: (t: NameTag): void => this.showTag(t),
@@ -407,18 +365,15 @@ export class MatchScene extends Phaser.Scene {
     this.spawnCrowd(this.art.crowd('match-crowd', art.crowd));
 
     // Players + ball.
-    const homeAtlas = this.art.players(`pl-${this.home.clubId}`, art.home);
-    const awayAtlas = this.art.players(`pl-${this.away.clubId}${kits.awayStrip === 'home' ? '' : `-${kits.awayStrip}`}`, art.away);
+    // Keep ownership of any legacy atlases uploaded ahead; the live actors use
+    // small reusable textures and a bounded cache of approved character frames.
+    this.art.adopt([art.home, art.away]);
+    this.playerFrames = new PlayerFrameCache({ home: kits.home, away: kits.away });
+    this.contact = new MatchContactLayer(this, this.art, { home: kits.home, away: kits.away });
     for (let i = 0; i < ON_FIELD; i++) {
-      // #21: each slot wears its player's own look (stable across matches);
-      // a slot with no named player falls back to the slot cycle. The live view
-      // re-dresses a slot when an interchange puts someone new in it.
-      const h = this.home.roster?.[i];
-      const a = this.away.roster?.[i];
-      const homeLook = h ? lookForPlayer(h.id ?? h.name) : lookForSlot(i);
-      const awayLook = a ? lookForPlayer(a.id ?? a.name) : lookForSlot(i + 5);
-      this.players.home.push(new MatchActor(this, homeAtlas, homeLook, props.shadow, kits.rings.home, kits.ringStyles.home));
-      this.players.away.push(new MatchActor(this, awayAtlas, awayLook, props.shadow, kits.rings.away, kits.ringStyles.away));
+      const h = this.home.roster?.[i]; const a = this.away.roster?.[i];
+      this.players.home.push(new MatchActor(this, this.art, this.playerFrames, 'home', i, h?.id ?? h?.name ?? `home/${i}`, props.shadow, kits.rings.home, kits.ringStyles.home));
+      this.players.away.push(new MatchActor(this, this.art, this.playerFrames, 'away', i, a?.id ?? a?.name ?? `away/${i}`, props.shadow, kits.rings.away, kits.ringStyles.away));
     }
     this.ball = new MatchBall(this, props.ball, props.ballShadow);
     this.markerColors = { home: kits.rings.home, away: kits.rings.away };
@@ -1424,6 +1379,9 @@ export class MatchScene extends Phaser.Scene {
     }
     // Game objects are destroyed by the scene; free the per-fixture textures
     // and animations once they are no longer displayed.
+    this.playerFrames?.clear();
+    this.playerFrames = null;
+    delete this.contact;
     this.crowdBobs = [];
     this.players.home = [];
     this.players.away = [];

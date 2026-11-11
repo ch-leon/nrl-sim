@@ -5,6 +5,7 @@ import { LIFT_PX_PER_M, LiveView, type ActorView, type BallView } from '../../..
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
 import { FIELD_WIDTH } from '../../../src/match/core/field';
 import type { Snapshot, PlayerSnap } from '../../../src/match/core/snapshot';
+import { caseSnapshot } from '../../../src/labs/art/contactCases';
 
 interface FakeActor extends ActorView {
   x: number;
@@ -58,6 +59,33 @@ function snap(tick: number, players: PlayerSnap[], ball: Snapshot['ball']): Snap
 }
 
 describe('LiveView', () => {
+  it('draws the real participants together, restores them after contact and paints only one ball', () => {
+    const groups: unknown[] = []; const hidden = new Set<string>(); const balls: boolean[] = [];
+    const s = { ...surface(), contact: { paint: (...args: unknown[]) => { groups.push(args[1]); } } };
+    for (const side of ['home', 'away'] as const) s.players[side].forEach((actor, slot) => {
+      actor.paint = () => {};
+      actor.setSpriteVisible = visible => { if (visible) hidden.delete(`${side}/${slot}`); else hidden.add(`${side}/${slot}`); };
+    });
+    s.ball.setRendered = visible => balls.push(visible);
+    const view = new LiveView(s);
+    let previous = caseSnapshot('three', 0);
+    for (let tick = 1; tick <= 30; tick++) { const next = caseSnapshot('three', tick); view.draw(previous, next, 1); previous = next; }
+    expect([...hidden].sort()).toEqual(['away/1', 'away/5', 'away/7', 'home/4']);
+    expect(groups[groups.length - 1]).not.toBeNull(); expect(balls[balls.length - 1]).toBe(false);
+    for (let tick = 31; tick <= 58; tick++) { const next = caseSnapshot('three', tick); view.draw(previous, next, 1); previous = next; }
+    expect(hidden.size).toBe(0); expect(groups[groups.length - 1]).toBeNull();
+    const loose = { ...previous, tick: previous.tick + 1, ball: { ...previous.ball, holder: null } };
+    view.draw(previous, loose, 1); expect(balls[balls.length - 1]).toBe(true);
+  });
+
+  it('does not interpolate an interchanged player from the previous occupant’s position', () => {
+    const s = surface(); const view = new LiveView(s);
+    const ball = { x: 0, y: 0, lift: 0, holder: null };
+    const old = snap(1, [player({ who: 'old', x: 5 })], ball);
+    const fresh = snap(2, [player({ who: 'new', x: 80 })], ball);
+    view.draw(old, fresh, .1);
+    expect(s.players.home[0]!.x).toBe(Math.round(fieldToWorldPoint(80, 50, fieldOffsetX()).x));
+  });
   it('places players at the interpolated field point and the ball in the holder’s hand', () => {
     const s = surface();
     const view = new LiveView(s);

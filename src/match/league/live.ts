@@ -150,6 +150,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
       y: p.body.pos.y,
       pose: p.pose,
       headX: p.body.heading.x,
+      headY: p.body.heading.y,
       speed: speedOf(p.body),
       // As things stand after the tick: the tick he runs dry he is blown, not sprinting.
       ...(p.sprinting && !p.gas.blown ? { sprint: true } : {}),
@@ -157,6 +158,8 @@ export class LiveSim extends LivePositioning implements MatchSim {
       gas: p.gas.gas,
       legs: p.energy,
       who: p.key,
+      poseUntil: p.poseUntil,
+      caughtTick: p.catchTick,
       ...(p.binUntilS >= 0 ? { binned: true } : {}),
     }));
     const b = this.ball;
@@ -186,6 +189,16 @@ export class LiveSim extends LivePositioning implements MatchSim {
     };
     const ph = this.phase;
     const w = ph.kind === 'tackle' ? ph.wrestle : null;
+    const contact = this.visualContact;
+    if (contact) {
+      const c = this.players.find(p => p.key === contact.carrier.who && p.side === contact.carrier.side && p.slot === contact.carrier.slot);
+      const holding = ((ph.kind === 'tackle' && ph.t0 === contact.startedTick) || (ph.kind === 'ruck' && ph.stage !== 'dh' && ph.contactStartedTick === contact.startedTick)) && this.players[ph.carrier] === c;
+      const escaping = ph.kind === 'play' && (contact.outcome === 'strip' || contact.outcome === 'break-tackle') && this.tick - contact.resolvedTick! <= 20;
+      if (holding || escaping) snap.contact = { ...contact,
+        phaseTick: ph.kind === 'ruck' || ph.kind === 'tackle' ? ph.t0 : contact.resolvedTick ?? contact.startedTick,
+        ...(ph.kind === 'ruck' && ph.stage !== 'dh' ? { releaseTick: ph.stage === 'down' ? ph.t0 + ph.down : ph.t0 } : {}),
+      };
+    }
     if (w && ph.kind === 'tackle') {
       const c = this.players[ph.carrier]!;
       snap.wrestle = { side: c.side, slot: c.slot, fight: w.fight0 > 0 ? w.fight / w.fight0 : 0, men: w.men.length };
