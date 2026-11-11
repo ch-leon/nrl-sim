@@ -1,8 +1,10 @@
 # Match player art and live integration
 
-The approved character art and close-contact poses now render in career matches
-and `/#lab` on this working branch. This is local integration, awaiting independent
-review, CI and play-test before release. `/#artlab` preserves the isolated studies,
+The approved character art and close-contact poses render in career matches
+and `/#lab`. [Release PR #584](https://github.com/ch-leon/nrl-sim/pull/584) records
+the independent review, final-candidate checks and verified deployment. The
+validation notes below retain the original local handoff evidence.
+`/#artlab` preserves the isolated studies,
 loaded before career setup or storage, including the previous-art comparison.
 
 Leon approved the baseline including the leg correction on 11 November 2026 and

@@ -7,7 +7,7 @@ live gameplay change; work still open below has not shipped.
 
 ## Now
 
-- **[Match player art and animations](../specs/match-art-prototype.md):** Leon approved the characters, close tackles and leg correction. They are integrated locally into career matches and `/#lab`; 3,039 tests and desktop/mobile-size Chromium checks passed. Next is the playable build: different-tool review, remaining Safari/CI/QA checks, release and Leon's full phone play-test. The [Astra handover](../handoffs/match-art-playable-build.md) includes source recovery and release instructions. `/#artlab` retains comparisons.
+- **Match-art phone play-test** ([release PR and verification](https://github.com/ch-leon/nrl-sim/pull/584)): play a full match in landscape at ×1 and your usual speed; check player recognition, possession and tacklers releasing into play-the-ball. The PR records the deployed build and required review/CI/QA evidence. Feedback informs the separate animation follow-up below.
 
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
@@ -37,6 +37,8 @@ live gameplay change; work still open below has not shipped.
     Until then the live build stays on GitHub Pages.
 
 ## Recently completed
+
+- **[Approved match player art and contact animations](../specs/match-art-prototype.md)** ([PR #584](https://github.com/ch-leon/nrl-sim/pull/584)): integrated into career matches and `/#lab`, including the corrected tackle-leg reach and lowered stance. `/#artlab` retains comparisons. The [original handover](../handoffs/match-art-playable-build.md) records the recovered source and historical checks; the release PR is the verification record. Transition polish and big moments remain separate work after phone feedback.
 
 - **Set plays, phases 1 and 2** ([issue #326](https://github.com/ch-leon/nrl-sim/issues/326)):
   - Phase 1: the plays catalogue and set plays in the match engine, merged in
