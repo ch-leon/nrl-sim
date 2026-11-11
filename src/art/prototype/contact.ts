@@ -5,6 +5,9 @@ import { drawHead, type Facing } from './head';
 import { ballPixels, CENTRE, FOOT, drawPrototypePlayer, type Appearance } from './player';
 import { add, blend, blendBody, body, contactPainter, flip, type Body, type Point } from './tackle';
 import { contactPlayerKey, type ContactAnimation } from '../../match/view/contactAnimation';
+import { fitLegs, bentContactArm, type ContactArm } from '../match/limbs';
+export { contactLeg, bentContactArm } from '../match/limbs';
+import { ruckPoseAt, drawRuckPlayer } from '../match/ruck';
 import type { ContactPlayer } from '../../match/core/snapshot';
 
 export const CONTACT_W = 176;
@@ -25,50 +28,6 @@ const FAR = body([46, 67], [54, 59], [47, 42], [42, 71], [40, 75], [51, 71], [53
 const HIGH_DOWN = body([96, 74], [81, 70], [74, 53], [96, 78], [104, 79], [108, 77], [116, 79]);
 const LOW_DOWN = body([111, 77], [93, 76], [86, 59], [119, 79], [125, 80], [110, 80], [118, 81]);
 const FAR_DOWN = body([46, 70], [53, 66], [46, 49], [40, 75], [36, 78], [51, 74], [54, 78]);
-
-export interface ContactArm { shoulder: Point; elbow: Point; hand: Point }
-/** Contact uses the standing sprite's leg reach, even while the hips turn or fall. */
-const LEG_SEGMENT = 5;
-const LEG_REACH = 9.5;
-
-export function contactLeg(hip: Point, kneeHint: Point, plantedFoot: Point): { knee: Point; foot: Point } {
-  const dy = Math.max(-LEG_REACH, Math.min(LEG_REACH, plantedFoot[1] - hip[1]));
-  const stride = Math.sqrt(LEG_REACH * LEG_REACH - dy * dy);
-  // Keep the sole on its ground plane. Step/slide inward when the hip moves out
-  // of reach; pinning the old boot position would pull the thigh into a long line.
-  const dx = Math.max(-stride, Math.min(stride, plantedFoot[0] - hip[0]));
-  const foot = add(hip, dx, dy);
-  const distance = Math.hypot(dx, dy);
-  const normal: Point = distance > .001 ? [-dy / distance, dx / distance] : [1, 0];
-  const middle = blend(hip, foot, .5);
-  const bendLimit = Math.sqrt(LEG_SEGMENT * LEG_SEGMENT - distance * distance / 4);
-  const hint = (kneeHint[0] - middle[0]) * normal[0] + (kneeHint[1] - middle[1]) * normal[1];
-  // A projected bend can shorten in a fall. Following the hint continuously
-  // avoids flipping the knee between two fixed-length solutions mid-tackle.
-  let bend = Math.max(-bendLimit, Math.min(bendLimit, hint));
-  if (normal[1] > .001) bend = Math.min(bend, Math.max(0, (foot[1] - middle[1]) / normal[1]));
-  if (normal[1] < -.001) bend = Math.max(bend, Math.min(0, (foot[1] - middle[1]) / normal[1]));
-  return { knee: add(middle, normal[0] * bend, normal[1] * bend), foot };
-}
-
-function fitLegs(pose: Body): Body {
-  const near = contactLeg(add(pose.hip, 2, 0), pose.knee, pose.foot);
-  const far = contactLeg(add(pose.hip, -2, 0), pose.farKnee, pose.farFoot);
-  return { ...pose, knee: near.knee, foot: near.foot, farKnee: far.knee, farFoot: far.foot };
-}
-
-/** Two short, bent segments. An approaching/releasing arm cannot stretch to its target. */
-export function bentContactArm(shoulder: Point, target: Point, bend = 1): ContactArm {
-  const dx = target[0] - shoulder[0]; const dy = target[1] - shoulder[1];
-  const distance = Math.max(.001, Math.hypot(dx, dy));
-  const reach = Math.min(9, distance); const ux = dx / distance; const uy = dy / distance;
-  const hand = add(shoulder, ux * reach, uy * reach);
-  const height = Math.sqrt(25 - reach * reach / 4);
-  // Positive bend places the visible elbow below the shoulder-to-hand line.
-  const sign = ux > 0 ? -bend : bend;
-  const elbow = add(blend(shoulder, hand, .5), uy * height * sign, -ux * height * sign);
-  return { shoulder, elbow, hand };
-}
 
 export interface ContactBody {
   player: ContactPlayer; pose: Body; tilt: number; left: boolean;
@@ -103,9 +62,13 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
   if (escaped) c = shift(blendBody(BRACE, CARRIER, ease(after / .2)), 34 * ease((after - .1) / .8));
   if (stolen) c = shift(BRACE, -4 * ease(after / .18));
   if (state.variant === 1 && completed) c = { ...c, shoulder: add(c.shoulder, -2 * fall, 0), head: add(c.head, -2 * fall, 0), knee: add(c.knee, -2 * fall, -fall) };
-  if (ptb) c = CARRIER;
+  const recovery = completed ? ease((after - .55) / .45) : 0;
+  const ready = ruckPoseAt('ptb', 0);
+  const recoveryTarget = shift(ready.pose, CONTACT_X - CENTRE, CONTACT_FOOT - FOOT);
+  c = blendBody(c, recoveryTarget, recovery);
+  if (ptb) c = recoveryTarget;
   c = fitLegs(c);
-  const carrier: ContactBody = { player: state.contact.carrier, pose: c, tilt: (low ? 65 : -75) * fall * (state.variant === 1 ? .8 : 1), left: false,
+  const carrier: ContactBody = { player: state.contact.carrier, pose: c, tilt: (low ? 65 : -75) * fall * (state.variant === 1 ? .8 : 1) * (1 - recovery), left: false,
     arms: [], grip: 0, role: 'carrier', running: run };
   const defenders = state.joined.map(({ player, tick }, index): ContactBody => {
     const role = index === 2 ? 'far' : index === 1 || low ? 'low' : 'upper';
@@ -149,11 +112,11 @@ export function contactPoseAt(state: ContactAnimation): ContactPose {
       left: !stolen || !running, arms, grip, role, running };
   });
   const owner = stolen ? defenders[0]!.player : carrier.player;
-  const ball = stolen ? blend(add(c.shoulder, 5, 4), add(defenders[0]!.pose.shoulder, 4, 4), ease(after / .18)) : add(c.shoulder, 3, 4);
+  const ball = stolen ? blend(add(c.shoulder, 5, 4), add(defenders[0]!.pose.shoulder, 4, 4), ease(after / .18)) : blend(add(c.shoulder, 3, 4), add(ready.ball, CONTACT_X - CENTRE, CONTACT_FOOT - FOOT), recovery);
   return { carrier, defenders, ball, owner, ptb, impact: state.kind === 'dominant' && after < .15 ? 1 - after / .15 : 0 };
 }
 
-function tiltedHead(look: Appearance, kit: Kit, facing: Facing, left: boolean, angle: number): PixelBuffer {
+export function tiltedHead(look: Appearance, kit: Kit, facing: Facing, left: boolean, angle: number): PixelBuffer {
   const head = left ? flip(drawHead(look, kit, facing)) : drawHead(look, kit, facing);
   const out = new PixelBuffer(28, 28);
   const radians = angle * Math.PI / 180; const co = Math.cos(radians); const si = Math.sin(radians);
@@ -176,7 +139,7 @@ export function drawContact(state: ContactAnimation, lookFor: (p: ContactPlayer)
       const pixels = drawPrototypePlayer(look, kit, 'carry', Math.floor(state.tick * .6) % 6, facing, contactPlayerKey(actor.player) === ownerKey);
       out.blit(actor.left ? flip(pixels) : pixels, Math.round(p.hip[0] - CENTRE), Math.round(p.foot[1] - FOOT));
     } else if (actor.role === 'carrier' && pose.ptb) {
-      out.blit(drawPrototypePlayer(look, kit, 'ptb', Math.min(5, Math.floor((state.tick - state.phaseTick) / 3)), facing, true), CONTACT_X - CENTRE, CONTACT_FOOT - FOOT);
+      out.blit(drawRuckPlayer(look, kit, 'ptb', Math.min(5, Math.floor((state.tick - state.phaseTick) / 2)), facing, true), CONTACT_X - CENTRE, CONTACT_FOOT - FOOT);
     } else {
       brush.legs(p, look, kit);
       const neck = add(p.head, 8, 16); const length = Math.max(1, Math.hypot(neck[0] - p.shoulder[0], neck[1] - p.shoulder[1]));

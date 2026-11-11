@@ -46,7 +46,7 @@ export function ballPixels(): PixelBuffer {
 const BALL = ballPixels();
 
 /** Frames are sampled on a six-step cycle; directions are painted, never skewed. */
-export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, frame: number, facing: Facing = 'front', possession = false): PixelBuffer {
+export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number): PixelBuffer {
   const b = new PixelBuffer(WIDTH, HEIGHT);
   const f = ((Math.floor(frame) % 6) + 6) % 6;
   const stocky = a.build === 'stocky';
@@ -75,10 +75,11 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     return b;
   }
 
-  const running = action === 'run' || action === 'carry' || action === 'catch';
-  const stride = running ? [3, 1, -3, -3, -1, 3][f]! : 0;
+  const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'catch' || (action === 'pass' && strideFrame !== undefined));
+  const gait = strideFrame === undefined || strideFrame < 0 ? f : strideFrame % 6;
+  const stride = running ? [3, 1, -3, -3, -1, 3][gait]! : 0;
   const crouch = action === 'brace' || action === 'wrap' ? 3 : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0;
-  const bob = running ? [0, 1, -1, 0, 1, -1][f]! : 0;
+  const bob = running ? [0, 1, -1, 0, 1, -1][gait]! : 0;
   const lean = action === 'brace' || action === 'wrap' ? 3 : running ? 1 : action === 'ptb' ? 2 : 0;
   const hipY = 27 + crouch + bob;
   const shoulderY = 20 + crouch + bob;
@@ -123,12 +124,19 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
   const shY = shoulderY + 2;
   let handX = shX + (running ? -stride : 1);
   let handY = shY + 6;
-  if (action === 'carry' || action === 'brace') {
+  if (action === 'carry' || action === 'brace' || (action === 'catch' && strideFrame !== undefined && f === 5)) {
     handX = shX + 2; handY = shY + 4;
     if (possession) heldBall(shX - 1, shY + 2);
     line(shX, shY, shX - 1, shY + 6, a.skin);
     line(shX - 1, shY + 6, handX + 2, handY + 1, a.skin, 2);
-  } else if (action === 'pass' || action === 'catch') {
+  } else if (strideFrame !== undefined && (action === 'catch' || (action === 'pass' && f < 5))) {
+    const reach = action === 'catch' ? [7, 6, 4, 3, 2, 2][f]! : [5, 7, 6, 4, 2, 1][f]!;
+    handX = shX + reach; handY = shY + (action === 'catch' ? [2, 2, 3, 4, 4, 4][f]! : [2, 1, 2, 4, 5, 6][f]!);
+    line(shX - 3, shY + 1, handX - 2, handY + 2, skinDark, 2);
+    if (possession) heldBall(handX - 3, handY - 2);
+    line(shX, shY, shX + 2, shY + 4, a.skin, 2);
+    line(shX + 2, shY + 4, handX, handY, a.skin, 2);
+  } else if (strideFrame === undefined && (action === 'pass' || action === 'catch')) {
     const extended = action === 'catch' || f >= 3;
     handX = shX + (extended ? 7 : 1); handY = shY + 2;
     line(shX - 3, shY + 1, handX, handY + 2, skinDark, 2);

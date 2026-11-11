@@ -66,8 +66,9 @@ What's in the game, with the PR that added each.
 - The isolated developer regional career includes an optional cross-division
   Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,
   a neutral final and a finite seeded tie decider. Existing match/result hooks
-  advance the bracket and expose stable sporting outcomes for later settlement;
-  there are no prototype prize payments or normal event offers
+  draw each later round before the week settles, so a cup that is still going is
+  not forfeited or withdrawn. They expose stable sporting outcomes for later
+  settlement; there are no prototype prize payments or normal event offers
   ([issue](https://github.com/ch-leon/nrl-sim/issues/575)).
 
 - Isolated developer competition careers can construct AU or UK regional worlds
@@ -80,10 +81,13 @@ What's in the game, with the PR that added each.
 
 - An isolated developer competition calendar separates slots from competition
   rounds, guards watch/skip/worker results and honours against duplicate delivery,
-  preserves held-match recovery, and tracks elapsed intervals. It pauses for
-  next-season setup through the existing hook registry. Default and dormant
-  careers retain their current flow; normal competition entry and finance remain
-  separate work ([PR](https://github.com/ch-leon/nrl-sim/pull/587)).
+  preserves held-match recovery, and tracks elapsed intervals. A competition that
+  can never finish, or a background result that fails to land, is closed and
+  logged so the week still advances; loading a save already in that state
+  applies the same closure. It pauses for next-season setup through the existing
+  hook registry. Default and dormant careers retain their current flow; normal
+  competition entry and finance remain separate work
+  ([PR](https://github.com/ch-leon/nrl-sim/pull/587)).
 
 - Save format 25 stores optional, versioned competition rule/prize snapshots and
   stable fixture identities with strict import validation. Supported v24 careers
@@ -91,6 +95,10 @@ What's in the game, with the PR that added each.
   save; the pre-v24 restart/export policy stays in place. This is dormant metadata
   for subsequent calendar work, not an enabled multi-competition career
   ([PR](https://github.com/ch-leon/nrl-sim/pull/586)).
+
+- [Match big moments](../specs/match-big-moments.md) ([release issue #588](https://github.com/ch-leon/nrl-sim/issues/588)): distinct punt/grubber/drop-kick motion at the actual release, high-take landings with grounded shadows, and scored tries that flow through grounding, recovery and individual reactions. The new snapshot fields describe presentation only; the original seeded match behavior is preserved.
+
+- [Match transition polish](../specs/match-animation-transitions.md) ([release issue #588](https://github.com/ch-leon/nrl-sim/issues/588)): catches keep their running stride while tucking the ball; tackled carriers rise into the play-the-ball; dummy-half pickup and pass follow the real ball timing. The approved short limbs and sim outcomes are preserved.
 
 - The contact-study preview opens with Current and Prototype visible together, sharing playback and scenario controls; phone layouts stack the comparison panels. Updated tackles use close torso contact, short bent arms, impact compression and firmer landings. Tackle legs now keep their standing reach: boots slide in with the hips and knees fold through the landing instead of stretching between fixed feet and moving bodies.
 

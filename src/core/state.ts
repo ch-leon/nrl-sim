@@ -108,8 +108,9 @@ export interface LeagueState {
 // TODO(WU-6): reconcile WeatherKind ownership with src/sim/weather.ts
 export type WeatherKind = 'clear' | 'rain' | 'wind';
 
-/** v27 adds optional regional division metadata to the structural calendar.
- *  v24+ careers retain their format; pre-v24 player data requires a new career. */
+/** v25 adds optional competition metadata. v26 adds the developer-only calendar.
+ *  v27 adds optional regional division metadata. Supported careers stay dormant.
+ *  Pre-v24 player data still requires a new career. */
 export const SAVE_VERSION = 27;
 
 /** The hires the facilities don't cover (N14.5), and the attack coach who opens set plays to buy (#326). */

@@ -14,7 +14,7 @@ import { bus } from './events';
 import { WEEKS_PER_SEASON } from '../config';
 import { inTrials } from './season';
 import { demoStops } from '../commercial/demo';
-import { currentCalendarFixtures, hasStructuralCalendar, structuralAdvanceProblem, structuralSeasonResolved } from '../systems/competitionCalendar';
+import { hasStructuralCalendar, settleStructuralCalendar, structuralAdvanceProblem, structuralSeasonResolved } from '../systems/competitionCalendar';
 
 // ── Public hook contracts ──────────────────────────────────────────────────
 
@@ -211,14 +211,13 @@ export function clearHeldWeek(): void {
 function finishWeek(week: number): void {
   const s = getState();
   if (hasStructuralCalendar(s)) {
-    const calendar = s.competitions!.calendar!;
-    if (currentCalendarFixtures(s).length || (week >= calendar.slots.length && !structuralSeasonResolved(s))) {
-      // A failed worker/missing stage cannot rerun the already-applied interval hooks.
-      held = { ctx: { week, season: s.season, fastForward: fastForwardFlag }, rest: [], pending: 1 };
-      bus.emit('ui:notify', { text: 'The prototype is waiting for this competition result or stage. Your interval has not been repeated.', kind: 'info' });
-      return;
-    }
-    setState({ competitions: { ...s.competitions!, calendar: { ...calendar, elapsedIntervals: calendar.elapsedIntervals + 1 } } });
+    // A result that never landed, or a competition that can never finish, is closed
+    // and logged. The interval still ends, so a later advance is not held forever.
+    const settled = settleStructuralCalendar(s, week);
+    if (settled !== s) setState(settled);
+    const now = getState();
+    const calendar = now.competitions!.calendar!;
+    setState({ competitions: { ...now.competitions!, calendar: { ...calendar, elapsedIntervals: calendar.elapsedIntervals + 1 } } });
     if (week >= calendar.slots.length || structuralSeasonResolved(getState())) rollSeasonOver();
     else setState({ week: week + 1 });
     const post = getState();
