@@ -24,6 +24,7 @@ import { makeRng, type Rng } from '../utils/rng';
 import { ageAndRetirePlayers } from './aging';
 import { STRENGTH_MAX, STRENGTH_MIN } from './league';
 import { poolTarget } from './freeagency';
+import { hasStructuralCalendar } from './competitionCalendar';
 
 // ── Tuning ───────────────────────────────────────────────────────────────────
 
@@ -385,27 +386,27 @@ export function developmentRate(age: number): number {
 }
 
 /** One week's chance of a ±1 step that averages `perSeason` over a season. */
-function stepStat(value: number, perSeason: number, roll: number): number {
+function stepStat(value: number, perSeason: number, roll: number, intervals = WEEKS_PER_SEASON): number {
   if (perSeason === 0) return value;
-  const p = Math.min(1, Math.abs(perSeason) / WEEKS_PER_SEASON);
+  const p = Math.min(1, Math.abs(perSeason) / intervals);
   if (roll >= p) return value;
   return clampStat(value + Math.sign(perSeason));
 }
 
 /** Nudge every stat of `p` by a chance of ±1 that averages `perSeason` over a season. */
-function nudgeStats(p: Player, perSeason: number, rng: Rng): Player {
+function nudgeStats(p: Player, perSeason: number, rng: Rng, intervals = WEEKS_PER_SEASON): Player {
   if (perSeason === 0) return p;
   const s = p.stats;
-  const speed = stepStat(s.speed, perSeason, rng.next());
-  const strength = stepStat(s.strength, perSeason, rng.next());
-  const stamina = stepStat(s.stamina, perSeason, rng.next());
+  const speed = stepStat(s.speed, perSeason, rng.next(), intervals);
+  const strength = stepStat(s.strength, perSeason, rng.next(), intervals);
+  const stamina = stepStat(s.stamina, perSeason, rng.next(), intervals);
   // Share the former Skill draw without shifting Footy IQ or the next player.
   const handlingRoll = rng.next();
   const stats = withShownStats(p.position, s, {
     speed, strength, stamina,
-    handling: stepStat(s.handling, perSeason, handlingRoll),
-    kicking: stepStat(s.kicking, perSeason, handlingRoll),
-    footyIQ: stepStat(s.footyIQ, perSeason, rng.next()),
+    handling: stepStat(s.handling, perSeason, handlingRoll, intervals),
+    kicking: stepStat(s.kicking, perSeason, handlingRoll, intervals),
+    footyIQ: stepStat(s.footyIQ, perSeason, rng.next(), intervals),
   });
   // Cap only upward steps after all five original draws, including hidden stats'
   // draws. Full ceilings must not shift the next player or the anchor's stream.
@@ -416,9 +417,9 @@ function nudgeStats(p: Player, perSeason: number, rng: Rng): Player {
 }
 
 /** A week of development for one rival player: by age, plus the pull toward the league mean. */
-export function developRivalPlayerWeek(p: Player, rng: Rng): Player {
-  const perSeason = developmentRate(p.age) + (RIVAL_LEAGUE_MEAN - overallRating(p)) * RIVAL_DEVELOPMENT_PULL;
-  return nudgeStats(p, perSeason, rng);
+export function developRivalPlayerWeek(p: Player, rng: Rng, target = RIVAL_LEAGUE_MEAN, intervals = WEEKS_PER_SEASON): Player {
+  const perSeason = developmentRate(p.age) + (target - overallRating(p)) * RIVAL_DEVELOPMENT_PULL;
+  return nudgeStats(p, perSeason, rng, intervals);
 }
 
 /** Mean strength of the rivals (the player's entry and squadless clubs excluded). */
@@ -433,11 +434,11 @@ export function rivalMeanStrength(clubs: readonly RivalClub[], playerId = 'playe
  * mean of `mean`: zero inside the deadband, otherwise toward LEAGUE.MEAN at
  * ANCHOR_RATE × the gap a week (capped), expressed per season for nudgeStats.
  */
-export function anchorPerSeason(mean: number): number {
-  const gap = mean - RIVAL_LEAGUE_MEAN;
+export function anchorPerSeason(mean: number, target = RIVAL_LEAGUE_MEAN, intervals = WEEKS_PER_SEASON): number {
+  const gap = mean - target;
   if (Math.abs(gap) <= RIVAL_DEVELOPMENT.ANCHOR_DEADBAND) return 0;
   const weekly = Math.min(RIVAL_DEVELOPMENT.ANCHOR_MAX, Math.abs(gap) * RIVAL_DEVELOPMENT.ANCHOR_RATE);
-  return -Math.sign(gap) * weekly * WEEKS_PER_SEASON;
+  return -Math.sign(gap) * weekly * intervals;
 }
 
 /**
@@ -446,17 +447,30 @@ export function anchorPerSeason(mean: number): number {
  * toward LEAGUE.MEAN if the rival mean has drifted. Strengths are re-derived.
  * `rng` is the rivals' own development stream (rivalDevelopSeed), never rngSeed.
  */
-export function developRivalsWeek(clubs: readonly RivalClub[], rng: Rng, playerId = 'player'): RivalClub[] {
+export function developRivalsWeek(clubs: readonly RivalClub[], rng: Rng, playerId = 'player', target = RIVAL_LEAGUE_MEAN, intervals = WEEKS_PER_SEASON): RivalClub[] {
   const developed = clubs.map((club) => {
     if (club.id === playerId || !club.squad) return club;
-    return withDerivedStrength({ ...club, squad: club.squad.map((p) => developRivalPlayerWeek(p, rng)) });
+    return withDerivedStrength({ ...club, squad: club.squad.map((p) => developRivalPlayerWeek(p, rng, target, intervals)) });
   });
-  const anchor = anchorPerSeason(rivalMeanStrength(developed, playerId));
+  const anchor = anchorPerSeason(rivalMeanStrength(developed, playerId), target, intervals);
   if (anchor === 0) return developed;
   return developed.map((club) => {
     if (club.id === playerId || !club.squad) return club;
-    return withDerivedStrength({ ...club, squad: club.squad.map((p) => nudgeStats(p, anchor, rng)) });
+    return withDerivedStrength({ ...club, squad: club.squad.map((p) => nudgeStats(p, anchor, rng, intervals)) });
   });
+}
+
+/** Each saved division keeps its own anchor; club/ceiling identity never changes. */
+export function developDivisionRivals(state: GameState, clubs: readonly RivalClub[], rng: Rng): RivalClub[] {
+  const competitions = state.competitions;
+  if (!competitions?.world || !competitions.calendar) return developRivalsWeek(clubs, rng);
+  const updated = new Map<string, RivalClub>();
+  for (const division of competitions.world.divisions) {
+    const instance = competitions.instances.find(i => i.id === division.instanceId)!;
+    const ids = new Set(instance.entrantIds);
+    for (const club of developRivalsWeek(clubs.filter(c => ids.has(c.id)), rng, state.clubId, division.ratingMean, competitions.calendar.slots.length)) updated.set(club.id, club);
+  }
+  return clubs.map(c => updated.get(c.id) ?? c);
 }
 
 /** Rival injuries heal a week. Returns the same array when nothing changed. */
@@ -535,6 +549,12 @@ export function registerRivalsSystem(): void {
     const s = getState();
     if (s.league.clubs.length === 0) return;
     const healed = healRivals(s.league.clubs);
+    if (hasStructuralCalendar(s)) {
+      // The revised salary cap/transfer market is not active in this playtest.
+      const clubs = developDivisionRivals(s, healed, makeRng(rivalDevelopSeed(s)));
+      setState({ league: { ...s.league, clubs } });
+      return;
+    }
     const perClub = s.week > SEASON_ROUNDS ? RIVAL_SIGNINGS_OFFSEASON : RIVAL_SIGNINGS_PER_WEEK;
     const r = rivalSigningTick(healed, s.freeAgents, makeRng(rivalWeekSeed(s)), {
       perClub, start: s.week, notable: Math.round(poolTarget(s)) + RIVAL_NOTABLE_ABOVE_TARGET,

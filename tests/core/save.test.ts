@@ -427,7 +427,6 @@ describe('migrateState', () => {
     expect(JSON.stringify(raw)).toBe(before);
   });
   it('has no migration from 23 to 24', () => {
-    expect(SAVE_VERSION).toBe(26);
     expect(MIGRATIONS.some(m => m.from === 23)).toBe(false);
   });
   it('refuses a future version with a clear message', () => {

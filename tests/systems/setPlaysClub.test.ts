@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createLegacyGame } from '../helpers/legacyGame';
 import { bus, type LiveMatchData } from '../../src/core/events';
-import { getState, setState, SAVE_VERSION, type Fixture } from '../../src/core/state';
+import { getState, setState, type Fixture } from '../../src/core/state';
 import { importSave, migrateState, MIGRATIONS } from '../../src/core/save';
 import { advanceWeek, clearHeldWeek, clearSeasonHooks, clearTickHooks } from '../../src/core/time';
 import { initLeague, PLAYER_ID } from '../../src/systems/fixtures';
@@ -190,7 +190,6 @@ describe('save v23 (plan §2.3, §8)', () => {
   beforeEach(() => newClub());
 
   it('one migration step, v22 → v23, fills an empty playbook and an empty three', () => {
-    expect(SAVE_VERSION).toBe(26);
     expect(MIGRATIONS.filter((m) => m.from === 22 && m.to === 23)).toHaveLength(1);
     const step = MIGRATIONS.find((m) => m.from === 22)!;
     const raw = { version: 22, lineup: { starters: [], bench: [] }, staff: [] };

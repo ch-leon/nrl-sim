@@ -15,6 +15,7 @@ import { LEAGUE, SQUAD_CAP, SQUAD_MIN, WEEKS_PER_SEASON } from '../config';
 import { transferFee } from './contracts';
 import { REP_BASELINE } from './league';
 import { placeSigning, type SigningPlacement } from './lineup';
+import { hasStructuralCalendar } from './competitionCalendar';
 
 // ── Tuning constants (spec §Key interfaces) ─────────────────────────────────
 
@@ -207,6 +208,7 @@ export function releasePlayer(state: GameState, playerId: string): SignResult {
  * the passed rng — the registered hook supplies an rng seeded from state.rngSeed.
  */
 export function freeAgencyTick(state: GameState, rng: Rng): GameState {
+  if (hasStructuralCalendar(state)) return state; // The revised market/finance contract is not active yet.
   if (state.week % REFRESH_EVERY_WEEKS !== 0) return state;
   return refreshFreeAgents(state, rng);
 }

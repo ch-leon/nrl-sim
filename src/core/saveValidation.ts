@@ -165,6 +165,7 @@ export function validateInput(v: Record<string, unknown>, version: number): stri
   if (v.competitions !== undefined) {
     if (version < 25) return fail('competition metadata version');
     if (record(v.competitions) && v.competitions.calendar !== undefined && version < 26) return fail('competition calendar version');
+    if (record(v.competitions) && v.competitions.world !== undefined && version < 27) return fail('division world version');
     const problem = validateCompetitions(v.competitions, { pack: v.pack === 'uk' ? 'uk' : 'au', season: v.season as number, week: v.week as number, clubIds: [...clubs] });
     if (problem) return fail(problem);
   }

@@ -303,6 +303,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   { from: 24, to: 25, run: (old) => ({ ...old }) },
   // v26 adds explicit developer-only calendar activation; supported careers stay dormant.
   { from: 25, to: 26, run: (old) => ({ ...old }) },
+  // v27 records optional regional world membership; existing careers retain it absent.
+  { from: 26, to: 27, run: (old) => ({ ...old }) },
 ];
 
 /** Old string traits → instances; instances already in the new shape pass through. */

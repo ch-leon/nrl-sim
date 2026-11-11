@@ -2,6 +2,7 @@
 // authoritative until the calendar and result-lifecycle work wires this in.
 import type { MatchRules } from '../content/pack';
 import { validateCompetitionCalendar, type CompetitionCalendar } from './competitionCalendar';
+import { validateCompetitionWorld, type CompetitionWorldMetadata } from './competitionDivisions';
 
 export type CompetitionFormat =
   | { kind: 'league'; finalsSize: number }
@@ -15,6 +16,8 @@ export interface CompetitionStageDefinition {
   name: string;
   kind: CompetitionStageKind;
   rounds: number;
+  /** Optional snapshotted dates: one ascending calendar slot per stage round. */
+  slotIds?: number[];
 }
 export type CompetitionRewardPolicy = { id: string; stageId: string; round: number } & (
   | { kind: 'cash'; matchBaseMultiplier: number }
@@ -87,6 +90,7 @@ export interface CompetitionCareerState {
   schemaVersion: 1;
   instances: CompetitionInstance[];
   calendar?: CompetitionCalendar;
+  world?: CompetitionWorldMetadata;
 }
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -155,10 +159,17 @@ export function validateCompetitionDefinition(v: unknown): string | null {
     || !text(v.id) || !integer(v.version, 1) || !text(v.pack) || !text(v.name) || !format(v.format)
     || !integer(v.minEntrants, 2) || !integer(v.maxEntrants, v.minEntrants) || !integer(v.slotCount, 1)) return 'definition fields';
   if (!Array.isArray(v.stages) || v.stages.length === 0 || !v.stages.every(s => record(s)
-    && keys(s, ['id', 'name', 'kind', 'rounds']) && text(s.id) && text(s.name)
-    && STAGE_KINDS.includes(s.kind as CompetitionStageKind) && integer(s.rounds, 1, v.slotCount as number))
+    && keys(s, ['id', 'name', 'kind', 'rounds', 'slotIds']) && text(s.id) && text(s.name)
+    && STAGE_KINDS.includes(s.kind as CompetitionStageKind) && integer(s.rounds, 1, v.slotCount as number)
+    && (s.slotIds === undefined || (Array.isArray(s.slotIds) && s.slotIds.length === s.rounds
+      && s.slotIds.every((slot, index) => integer(slot, 1, v.slotCount as number) && (index === 0 || slot > (s.slotIds as number[])[index - 1]!)))))
     || !unique(v.stages.map(s => (s as CompetitionStageDefinition).id))) return 'definition stages';
   const stages = v.stages as CompetitionStageDefinition[];
+  let previousSlot = 0;
+  for (const stage of stages) if (stage.slotIds) {
+    if (stage.slotIds[0]! <= previousSlot) return 'definition stage dates';
+    previousSlot = stage.slotIds[stage.slotIds.length - 1]!;
+  }
   if (stages.reduce((n, s) => n + s.rounds, 0) > v.slotCount) return 'definition calendar capacity';
   const f = v.format;
   const allowed = f.kind === 'league' || f.kind === 'group' ? [f.kind, 'knockout'] : [f.kind];
@@ -311,7 +322,7 @@ export function completedCompetition(instance: CompetitionInstance): string | nu
 
 /** Returns the first invalid field; callers retain the entire rejected input. */
 export function validateCompetitions(v: unknown, context: { pack: string; season: number; week?: number; clubIds: readonly string[] }): string | null {
-  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
+  if (!record(v) || !keys(v, ['schemaVersion', 'instances', 'calendar', 'world']) || v.schemaVersion !== 1 || !Array.isArray(v.instances)) return 'competitions';
   const clubIds = new Set(context.clubIds);
   const instanceIds = new Set<string>();
   const fixtureIds = new Set<string>();
@@ -346,6 +357,7 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
       const f = value as unknown as CompetitionFixture;
       const stage = def.stages.find(s => s.id === f.stageId);
       if (!stage || f.round > stage.rounds || (f.slot !== undefined && !integer(f.slot, 1, def.slotCount))) return 'competition fixture stage/slot';
+      if (f.slot !== undefined && stage.slotIds && f.slot !== stage.slotIds[f.round - 1]) return 'competition fixture date';
       if ((f.status === 'scheduled' || f.status === 'completed') && f.slot === undefined) return 'competition fixture missing slot';
       const isFinal = stage.kind === 'knockout' && stage === def.stages[def.stages.length - 1] && f.round === stage.rounds;
       if (f.neutral !== (def.venues.rounds === 'neutral' || (isFinal && def.venues.final === 'neutral'))) return 'competition fixture venue';
@@ -385,5 +397,14 @@ export function validateCompetitions(v: unknown, context: { pack: string; season
       if (completion) return completion;
     }
   }
-  return v.calendar === undefined ? null : validateCompetitionCalendar(v.calendar, v.instances as CompetitionInstance[], context.season, context.week);
+  if (v.calendar !== undefined) {
+    const calendar = validateCompetitionCalendar(v.calendar, v.instances as CompetitionInstance[], context.season, context.week);
+    if (calendar) return calendar;
+  }
+  if (v.world !== undefined) {
+    if (!record(v.calendar) || v.calendar.mode !== 'structural') return 'division world calendar';
+    const world = validateCompetitionWorld(v.world, v.instances as CompetitionInstance[], { ...context, season: v.calendar.season as number, slots: (v.calendar as unknown as CompetitionCalendar).slots });
+    if (world) return world;
+  }
+  return null;
 }

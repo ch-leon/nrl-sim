@@ -63,6 +63,14 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Isolated developer competition careers can construct AU or UK regional worlds
+  from authored division counts, schedules and finals dates, with persistent
+  squads, one club registry, division ladders and per-tier rival development.
+  Format 27 validates saved membership and retains supported originals. The
+  prototype has three divisions of eight; alternate sizes and finals series use
+  the same runtime. Normal entry, finance and promotion remain downstream
+  ([issue](https://github.com/ch-leon/nrl-sim/issues/573)).
+
 - An isolated developer competition calendar separates slots from competition
   rounds, guards watch/skip/worker results and honours against duplicate delivery,
   preserves held-match recovery, and tracks elapsed intervals. A competition that

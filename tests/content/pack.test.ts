@@ -319,12 +319,12 @@ describe('UK careers (#488)', () => {
     const migrated = migrateState(JSON.parse(JSON.stringify(old)));
     expect(migrated.ok).toBe(true);
     if (migrated.ok) {
+      expect(migrated.state.version).toBe(SAVE_VERSION);
       expect(migrated.state.pack).toBeUndefined();
       loadState(migrated.state);
       expect(activePack()).toBe(AU_PACK);
       expect(config.SEASON_ROUNDS).toBe(24);
       expect(cardById('baliTrip')?.title).toBe(AU_PACK.events.trip.title);
     }
-    expect(SAVE_VERSION).toBe(26);
   });
 });
