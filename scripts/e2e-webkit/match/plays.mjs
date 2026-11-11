@@ -237,7 +237,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
               return el && el.textContent.startsWith(short) ? el.textContent : null;
             }, SHORT[play], { timeout: 60000 }).then((hdl) => hdl.jsonValue());
             // Seen: shown, on screen, and not under the commentary line or COACH, measured once its slide-up
-            // (nrl-mo-up, 180ms) has settled. It has no pointer events, so measure rather than hit-test.
+            // (nrl-sheet-up, 180ms) has settled. It has no pointer events, so measure rather than hit-test.
             const seen = await page.evaluate(async () => {
               const el = document.querySelector('.nrl-mo-call-result');
               if (!el) return 'gone before it settled';

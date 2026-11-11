@@ -512,7 +512,19 @@ export const CSS = `
   --nrl-f-label: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
   --nrl-f-body: 'IBM Plex Sans', system-ui, sans-serif;
   --nrl-f-num: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  /* Motion (#597): every entrance and transition in src/ui takes its time, curve and travel from these. */
+  --nrl-dur-press: 120ms;
+  --nrl-dur-fast: 150ms;
+  --nrl-dur-sheet: 180ms;
+  --nrl-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --nrl-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --nrl-rise: 12px;
+  --nrl-pop: 0.97;
+  --nrl-press: 0.97;
 }
+/* The one reduced-motion rule (#597): travel and scale go, the fade stays. A keyframe that
+   moves does it by --nrl-rise (calc() for up, left and part-way), so it needs no rule of its own. */
+@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; --nrl-press: 1; } }
 .nrl-panel, .nrl-btn, .nrl-modal, .nrl-modal-backdrop, .nrl-dock, .nrl-screen {
   font-family: var(--nrl-f-body);
   box-sizing: border-box;
@@ -548,7 +560,7 @@ export const CSS = `
   min-width: 44px;
   line-height: 1.1;
   white-space: nowrap;
-  transition: background 0.12s ease, transform 0.08s ease;
+  transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out);
 }
 .nrl-btn:hover:not(:disabled) { background: #283669; }
 .nrl-btn:active:not(:disabled) { transform: translateY(1px); }
@@ -652,7 +664,7 @@ export const CSS = `
 }
 button.nrl-dock-statusbox { cursor: pointer; }
 button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; border-radius: 8px; }
-.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 0.9375rem; font-weight: 600; line-height: 1.2; white-space: nowrap; transition: color 0.15s ease; }
+.nrl-dock-money { font-family: var(--nrl-f-num); font-size: 0.9375rem; font-weight: 600; line-height: 1.2; white-space: nowrap; transition: color var(--nrl-dur-fast) ease; }
 .nrl-dock-week { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.06em; color: var(--nrl-muted); white-space: nowrap; }
 /* #351 H2: under 20 weeks of runway the money goes amber, under 8 red; N12.5 in debt is red with its tag. */
 .nrl-dock-money.nrl-money-low { color: var(--nrl-fit-ok); }
@@ -856,7 +868,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   border-radius: 16px;
   box-shadow: var(--nrl-shadow-tray);
   z-index: 56;
-  animation: nrl-sheet-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-nav-sheet > .nrl-btn {
   min-height: 64px;
@@ -894,8 +906,8 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 .nrl-nav-sheet > .nrl-btn.nrl-office-locked { cursor: default; opacity: 0.55; }
 .nrl-office-locked .nrl-office-status { white-space: normal; }
 @media (max-width: 560px) { .nrl-nav-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(12px); } }
-@media (prefers-reduced-motion: reduce) { .nrl-nav-sheet, .nrl-screen-region { animation: none !important; } }
+/* The rise every sheet, popup and match card comes in on (the match and report stylesheets use it too). */
+@keyframes nrl-sheet-up { from { opacity: 0; transform: translateY(var(--nrl-rise)); } }
 
 /* ── Hub chips: the club home's only things on the grounds (3a) ──────────
    The decisions waiting, and (#368) the board objective most at risk under it. */
@@ -983,7 +995,7 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   margin: 0 auto;
   z-index: 50;
   box-sizing: border-box;
-  animation: nrl-sheet-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-screen-backdrop { background: transparent; padding: 0; display: flex; align-items: stretch; justify-content: stretch; }
 .nrl-screen-backdrop .nrl-modal {
@@ -1210,9 +1222,8 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
 .nrl-toast-success { background: #1d5a33; color: #fff; border-left-color: var(--nrl-accent); }
 .nrl-toast-danger { background: #7a2a24; color: #fff; border-left-color: var(--nrl-alert); }
 .nrl-toast-danger .nrl-toast-text::before { content: '! '; font-weight: 700; }
-.nrl-toast-in { animation: nrl-toast-in 150ms ease-out; }
-@keyframes nrl-toast-in { from { opacity: 0; transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) { .nrl-toast-in { animation: none; } }
+.nrl-toast-in { animation: nrl-toast-in var(--nrl-dur-fast) var(--nrl-ease-out); }
+@keyframes nrl-toast-in { from { opacity: 0; transform: translateY(calc(var(--nrl-rise) / -3)); } }
 
 /* ── Update bar (N7, #181): a new build is waiting; never during a match ── */
 .nrl-update-toast {

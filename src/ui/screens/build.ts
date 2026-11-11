@@ -359,7 +359,7 @@ export const BUILD_CSS = `
   border-radius: 10px;
   padding: 8px 10px;
   box-sizing: border-box;
-  transition: background 0.12s ease;
+  transition: background-color var(--nrl-dur-press) ease;
 }
 .nrl-build-row:hover:not(.nrl-build-row-disabled) { background: #22305c; }
 .nrl-build-row:active:not(.nrl-build-row-disabled) { transform: translateY(1px); }
@@ -400,7 +400,7 @@ export const BUILD_CSS = `
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: nrl-sheet-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-facility-popup { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-facility-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }

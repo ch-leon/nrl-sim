@@ -1766,6 +1766,7 @@ export const MATCH_FINAL_CLASS = 'nrl-match-final';
 /** Inject the match stylesheet once (the report and the full-time card share its stat rows). */
 export function injectOverlayStyles(): void {
   if (typeof document === 'undefined') return;
+  ensureStyles(); // the shared kit holds the motion tokens and nrl-sheet-up the cards here rise on (#597)
   if (document.getElementById(OVERLAY_STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = OVERLAY_STYLE_ID;
@@ -1817,14 +1818,15 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   max-width: calc(100vw - 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 8px 12px; border-radius: 10px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-chip);
   font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nrl-text-2);
-  animation: nrl-mo-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-call-result[data-paid] { color: var(--nrl-pos); }
 .nrl-mo-tray-open ~ .nrl-mo-call-result, .nrl-mo-call-result[hidden] { display: none; }
 /* Key moments (#366): the speed a break, a try or the last minutes hold the match at pulses in the pill; the chosen one stays yellow. */
 .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { box-shadow: inset 0 0 0 2px var(--nrl-accent); animation: nrl-mo-slow 0.9s ease-in-out infinite alternate; }
 @keyframes nrl-mo-slow { from { color: var(--nrl-text); } to { color: var(--nrl-accent); } }
-@media (prefers-reduced-motion: reduce) { .nrl-mo-call-result, .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { animation: none; } }
+/* The pulse never ends, so reduced motion stops it; the entrances keep their fade and lose their travel (dom.ts, #597). */
+@media (prefers-reduced-motion: reduce) { .nrl-mo-controls .nrl-btn.nrl-mo-speed[data-slow] { animation: none; } }
 /* The stats, opened from the score bug: the report's stat column (3t). Asked for, so over the banner. */
 .nrl-mo-statsheet {
   position: fixed; top: calc(var(--nrl-mo-board, 60px) + 6px); left: calc(16px + var(--nrl-safe-l)); z-index: 19;
@@ -1875,7 +1877,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   position: fixed; top: calc(12px + var(--nrl-safe-t)); right: calc(12px + var(--nrl-safe-r)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 18;
   width: min(330px, calc(100vw - 24px)); box-sizing: border-box; padding: 10px 12px; border-radius: 14px;
   background: var(--nrl-sheet); box-shadow: var(--nrl-shadow-tray); display: flex; flex-direction: column; gap: 6px; pointer-events: auto;
-  animation: nrl-mo-in-right 180ms ease-out;
+  animation: nrl-mo-in-right var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-full-under .nrl-mo-full { top: calc(var(--nrl-mo-board, 60px) + 6px); }
 .nrl-match-overlay:not([data-log="full"]) .nrl-mo-full,
@@ -1916,8 +1918,8 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-log-toggle:focus-visible, .nrl-mo-coach:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-mo-log-toggle { gap: 8px; padding: 0 14px; font-size: 1rem; }
 .nrl-mo-log-toggle[aria-pressed="false"] { color: var(--nrl-text-2); }
-.nrl-mo-switch { width: 28px; height: 16px; border-radius: 8px; background: var(--nrl-line); display: flex; align-items: center; padding: 0 2px; box-sizing: border-box; transition: background 0.15s ease; }
-.nrl-mo-switch > i { width: 12px; height: 12px; border-radius: 6px; background: #fff; transition: transform 0.15s ease; }
+.nrl-mo-switch { width: 28px; height: 16px; border-radius: 8px; background: var(--nrl-line); display: flex; align-items: center; padding: 0 2px; box-sizing: border-box; transition: background-color var(--nrl-dur-fast) ease; }
+.nrl-mo-switch > i { width: 12px; height: 12px; border-radius: 6px; background: #fff; transition: transform var(--nrl-dur-fast) var(--nrl-ease-in-out); }
 .nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch { background: var(--nrl-accent); }
 .nrl-mo-log-toggle[aria-pressed="true"] .nrl-mo-switch > i { transform: translateX(12px); }
 /* COACH (MatchScene): its badge says how many calls are on, or why none ("THEIR BALL"). */
@@ -1938,7 +1940,7 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
   position: fixed; left: calc(16px + var(--nrl-safe-l)); bottom: calc(80px + var(--nrl-safe-b)); z-index: 21;
   width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 88px - var(--nrl-mo-board, 60px)); overflow-y: auto; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 14px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-tray);
-  pointer-events: auto; animation: nrl-mo-up 180ms ease-out;
+  pointer-events: auto; animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-tray[hidden] { display: none; }
 /* The tray and the full log side by side: the log gives way on a narrow phone (667px) rather than sit under the tray. */
@@ -2105,13 +2107,13 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 .nrl-mo-banner-who { font-family: var(--nrl-f-label); font-size: 1.25rem; font-weight: 700; line-height: 1; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-mo-banner-sub { font-family: var(--nrl-f-label); font-size: 0.875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nrl-mo-banner-extra { color: var(--nrl-accent); }
-.nrl-mo-banner-in { animation: nrl-mo-in-left 150ms ease-out both; }
-/* Points: the scoring side's box flashes. */
+.nrl-mo-banner-in { animation: nrl-mo-in-left var(--nrl-dur-fast) var(--nrl-ease-out) both; }
+/* Points: the scoring side's box flashes. Colour only, nothing moves, so it plays under reduced motion too (#597). */
 .nrl-mo-scored { animation: nrl-mo-scored 1.2s ease-out; }
 @keyframes nrl-mo-scored { 0%, 35% { background: var(--nrl-accent); color: var(--nrl-on-accent); } 100% { background: var(--nrl-raised); } }
-@keyframes nrl-mo-in-left { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
-@keyframes nrl-mo-in-right { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
-@keyframes nrl-mo-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+/* Sideways by the shared travel (#597); the tray, the cards and the sheets rise on dom.ts's nrl-sheet-up. */
+@keyframes nrl-mo-in-left { from { opacity: 0; transform: translateX(calc(var(--nrl-rise) * -1)); } to { opacity: 1; transform: none; } }
+@keyframes nrl-mo-in-right { from { opacity: 0; transform: translateX(var(--nrl-rise)); } to { opacity: 1; transform: none; } }
 /* Replay (N15.5, #348 M5): a small chip under the banner, its seconds left beside it. Never
    centred with a transform: the pressed nudge (.nrl-btn:active) would replace it. */
 .nrl-mo-replay, .nrl-mo-replay-tag {
@@ -2143,7 +2145,7 @@ ${PLAN_FIT_CSS}
   width: 100%; max-width: 1180px; min-height: min(296px, 100%); max-height: 100%; overflow: hidden; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 10px;
   padding: 10px calc(24px + var(--nrl-safe-r)) calc(16px + var(--nrl-safe-b)) calc(24px + var(--nrl-safe-l));
-  border-radius: 22px 22px 0 0; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal); animation: nrl-mo-up 180ms ease-out;
+  border-radius: 22px 22px 0 0; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-plan-grab { flex: 0 0 auto; align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--nrl-line); }
 .nrl-mo-plan-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
@@ -2167,7 +2169,7 @@ ${PLAN_FIT_CSS}
 .nrl-mo-sheet-card {
   position: relative; width: min(340px, calc(100vw - 32px)); max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
   display: flex; flex-direction: column; gap: 6px; padding: 16px 18px 18px; border-radius: 18px; background: var(--nrl-navy); box-shadow: var(--nrl-shadow-modal);
-  animation: nrl-mo-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-mo-sheet-head { padding-right: 44px; font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nrl-accent); }
 .nrl-btn.nrl-mo-sheet-x { position: absolute; top: 10px; right: 10px; width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 8px; font-family: var(--nrl-f-body); font-size: 0.9375rem; }
@@ -2180,8 +2182,5 @@ ${PLAN_FIT_CSS}
   .nrl-mo-sheet-card { width: min(460px, calc(100vw - 32px)); }
   .nrl-mo-sheet-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .nrl-mo-sheet-actions .nrl-btn:first-child { grid-column: 1 / -1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .nrl-mo-banner-in, .nrl-mo-scored, .nrl-mo-full, .nrl-mo-tray, .nrl-mo-plan-sheet, .nrl-mo-sheet-card { animation: none; }
 }
 `;

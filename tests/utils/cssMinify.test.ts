@@ -23,6 +23,18 @@ describe('minifyCss', () => {
     expect(minifyCss(".x::before { content: '! ;  {a}'; }")).toBe(".x::before{content:'! ;  {a}'}");
     expect(minifyCss('.x { top: calc(var(--a, 0px) + 0.3rem); }')).toBe('.x{top:calc(var(--a,0px) + 0.3rem)}');
   });
+  it('leaves the motion tokens whole (#597): var() and calc() in a keyframe, a cubic-bezier, a token under a media query', () => {
+    expect(minifyCss('@keyframes up { from { opacity: 0; transform: translateY(calc(var(--nrl-rise) / -3)); } }'))
+      .toBe('@keyframes up{from{opacity:0;transform:translateY(calc(var(--nrl-rise) / -3))}}');
+    expect(minifyCss('@keyframes left { from { transform: translateX(calc(var(--nrl-rise) * -1)); } to { transform: none; } }'))
+      .toBe('@keyframes left{from{transform:translateX(calc(var(--nrl-rise) * -1))}to{transform:none}}');
+    expect(minifyCss(':root {\n  --nrl-ease-out: cubic-bezier(0.23, 1, 0.32, 1);\n  --nrl-rise: 12px;\n}'))
+      .toBe(':root{--nrl-ease-out:cubic-bezier(0.23,1,0.32,1);--nrl-rise:12px}');
+    expect(minifyCss('.a { animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out); }'))
+      .toBe('.a{animation:nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out)}');
+    expect(minifyCss('@media (prefers-reduced-motion: reduce) { :root { --nrl-rise: 0px; --nrl-pop: 1; } }'))
+      .toBe('@media (prefers-reduced-motion:reduce){:root{--nrl-rise:0px;--nrl-pop:1}}');
+  });
   it('keeps media queries and !important readable to a browser', () => {
     expect(minifyCss('@media (max-height: 500px) and (min-width: 600px) {\n  .a { b: c !important; }\n}'))
       .toBe('@media (max-height:500px) and (min-width:600px){.a{b:c !important}}');

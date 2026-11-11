@@ -736,7 +736,7 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       const trayAt = Date.now();
       const traying = await clock();
       if (!(await runs(traying).then(() => true).catch(() => false))) out.push('the match stopped under the coach tray');
-      // Measure the tray settled (#390): mid slide-in (nrl-mo-up, 180ms) WebKit reports its 44px rows as 43.99998px.
+      // Measure the tray settled (#390): mid slide-in (nrl-sheet-up, 180ms) WebKit reports its 44px rows as 43.99998px.
       await page.evaluate(() => Promise.all(document.querySelector('.nrl-mo-calls').getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))));
       const tray = await page.evaluate(() => {
         const t = document.querySelector('.nrl-mo-calls');

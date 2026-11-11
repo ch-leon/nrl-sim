@@ -495,7 +495,7 @@ export const REPORT_CSS = `
 .nrl-ft-card {
   width: min(540px, 100%); max-height: 100%; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
   padding: 20px 24px; border-radius: 18px; background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-modal);
-  font-family: var(--nrl-f-body); animation: nrl-mo-up 180ms ease-out;
+  font-family: var(--nrl-f-body); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-ft-head, .nrl-rp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .nrl-ft-title { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
