@@ -99,6 +99,8 @@ export async function runPortrait(browser) {
   await step('portrait-boot', async (rec) => {
     await page.goto(BASE);
     await page.waitForSelector('[data-nrl-start]');
+    // press() is a DOM click, which a disabled Start ("Loading towns…", #613) ignores: wait for the town list.
+    await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
     await press('[data-nrl-start]');
     await page.locator('[data-expansion-work]').tap();
     await page.waitForSelector('.nrl-dock');

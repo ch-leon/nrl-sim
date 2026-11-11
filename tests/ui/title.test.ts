@@ -204,3 +204,99 @@ describe('offline town setup (#485)', () => {
     expect((await choice).home).toEqual({ town: 'A New Place' });
   });
 });
+
+describe('one yellow button on the slots screen (#613)', () => {
+  /** The hooks of every button in the primary yellow. */
+  const yellow = (root: StubNode): string[] =>
+    root.querySelectorAll('.nrl-title-btn-go').map((b) => Object.keys(b.attrs).find((k) => k.startsWith('data-nrl-'))!);
+  /** Write a career to `slot` as if at `at` (ms): SaveMeta.updatedAt is what orders the saves. */
+  const saveAt = (slot: number, at: number): void => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(at);
+    writeSlot(slot, createNewGame(`Club ${slot}`, slot));
+    now.mockRestore();
+  };
+  const slotsScreen = (): StubNode => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    return root;
+  };
+
+  it('with no saves it is slot 1\'s New game', () => {
+    const root = slotsScreen();
+    root.querySelector('[data-nrl-back]')!.click(); // a fresh install opens on the setup
+    expect(yellow(root)).toEqual(['data-nrl-new-1']);
+    // The other slots keep their full-width row in the secondary fill.
+    expect(root.querySelector('[data-nrl-new-2]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
+    expect(root.querySelector('[data-nrl-new-3]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
+    expect(TITLE_CSS).toContain('.nrl-title-btn-row { flex-basis: 100%; }');
+  });
+
+  it.each([1, 2, 3])('with one save, in slot %s, it is that Continue and no New game', (slot) => {
+    saveAt(slot, 1000);
+    expect(yellow(slotsScreen())).toEqual([`data-nrl-continue-${slot}`]);
+  });
+
+  it('with several saves it is Continue on the one written last', () => {
+    saveAt(1, 2000);
+    saveAt(3, 1000);
+    const two = slotsScreen();
+    expect(yellow(two)).toEqual(['data-nrl-continue-1']);
+    expect(two.querySelector('[data-nrl-continue-3]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
+    saveAt(2, 3000);
+    expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-2']);
+    saveAt(3, 4000);
+    expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-3']);
+  });
+
+  it('saves with no time kept (from before meta) fall to the first filled slot', () => {
+    for (const slot of [2, 3]) localStorage.setItem(`nrl-sim-save-slot-${slot}`, JSON.stringify(createNewGame(`Club ${slot}`, slot)));
+    expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-2']);
+  });
+
+  it('with only an unreadable save it is New game on the first empty slot, never the one that replaces it', () => {
+    localStorage.setItem('nrl-sim-save-slot-1', '{not a save');
+    const root = slotsScreen();
+    expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
+    expect(yellow(root)).toEqual(['data-nrl-new-2']);
+  });
+});
+
+describe('Start while the town list loads (#613)', () => {
+  it('is disabled and says why, then reads Start and starts', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    const start = root.querySelector('[data-nrl-start]')!;
+    expect(start.disabled).toBe(true);
+    expect(start.textContent).toBe('Loading towns…');
+    await settleTowns();
+    expect(start.disabled).toBe(false);
+    expect(start.textContent).toBe('Start');
+    start.click();
+    expect((await choice).mode).toBe('new');
+  });
+
+  it('a town list that fails to load still leaves Start ready', async () => {
+    const towns = fixture.splice(0); // an empty catalogue is refused, like a chunk that never arrived
+    try {
+      const root = new StubNode('div');
+      const choice = showTitleFlow(root as unknown as HTMLElement);
+      await settleTowns();
+      const start = root.querySelector('[data-nrl-start]')!;
+      expect(root.querySelector('[data-nrl-town-status]')!.textContent).toBe('Town list unavailable. Type your own town to start.');
+      expect(start.disabled).toBe(false);
+      expect(start.textContent).toBe('Start');
+      (root.querySelector('[data-nrl-town]')! as InputNode).enter('A New Place');
+      start.click();
+      expect((await choice).home).toEqual({ town: 'A New Place' });
+    } finally {
+      fixture.push(...towns);
+    }
+  });
+
+  it('a disabled title button takes the raised fill, muted text and no pointer, over the yellow', () => {
+    const rule = '.nrl-title-btn:disabled, .nrl-title-btn:disabled:hover { background: #1b264a; color: #9aa6c7; cursor: default;';
+    expect(TITLE_CSS).toContain(rule);
+    // Later in the sheet than the yellow rule of equal weight (.nrl-title-btn-go:hover), so it wins.
+    expect(TITLE_CSS.indexOf(rule)).toBeGreaterThan(TITLE_CSS.indexOf('.nrl-title-btn-go, .nrl-title-btn-go:hover {'));
+  });
+});

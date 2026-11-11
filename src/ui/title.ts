@@ -8,7 +8,7 @@
 // attribute.
 
 import {
-  deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, pickSaveFile, setActiveSlot, type SlotSummary,
+  deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, listSlotMeta, pickSaveFile, setActiveSlot, type SlotSummary,
 } from '../core/save';
 import { cleanName, NAME_MAX } from '../data/names';
 import type { GameState } from '../core/state';
@@ -91,6 +91,11 @@ export const TITLE_CSS = `
 .nrl-title-btn:hover { background: #283669; }
 .nrl-title-btn:focus-visible { outline: 2px solid #f4d03f; outline-offset: 2px; }
 .nrl-title-btn-go, .nrl-title-btn-go:hover { background: #f4d03f; color: #0e1630; flex-basis: 100%; }
+/* A slot's own Continue or New game when another slot holds the screen's one yellow (#613). */
+.nrl-title-btn-row { flex-basis: 100%; }
+/* Disabled stays visible and its label says why (#613). Two lines fit the narrow Start column. */
+.nrl-title-btn:disabled, .nrl-title-btn:disabled:hover { background: #1b264a; color: #9aa6c7; cursor: default;
+  white-space: normal; line-height: 1; }
 .nrl-title-btn-small { font-size: 0.875rem; padding: 0 8px; }
 .nrl-title-btn[data-nrl-delete-1], .nrl-title-btn[data-nrl-delete-2], .nrl-title-btn[data-nrl-delete-3] { color: #f0a39b; }
 .nrl-title-btn[data-armed] { background: #5a2430; color: #fff; }
@@ -281,7 +286,8 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       resolve(choice);
     };
 
-    const slotCard = (s: SlotSummary): HTMLElement => {
+    const slotCard = (s: SlotSummary, isPrimary: boolean): HTMLElement => {
+      const lead = isPrimary ? 'nrl-title-btn-go' : 'nrl-title-btn-row';
       const card = mk('div', 'nrl-title-card');
       card.setAttribute(`data-nrl-slot-${s.slot}`, '');
       if (s.status === 'empty') card.setAttribute('data-empty', '');
@@ -306,12 +312,12 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         }
       } catch { /* unreadable storage is already described on the card */ }
       if (s.status === 'ok') {
-        const cont = mkButton('Continue', `data-nrl-continue-${s.slot}`, 'nrl-title-btn-go');
+        const cont = mkButton('Continue', `data-nrl-continue-${s.slot}`, lead);
         cont.addEventListener('click', () => finish(s.slot, { mode: 'continue' }));
         actions.appendChild(cont);
       }
       if (s.status !== 'future') {
-        const newBtn = mkButton('New game', `data-nrl-new-${s.slot}`, s.status === 'empty' ? 'nrl-title-btn-go' : 'nrl-title-btn-small');
+        const newBtn = mkButton('New game', `data-nrl-new-${s.slot}`, s.status === 'empty' ? lead : 'nrl-title-btn-small');
         newBtn.addEventListener('click', () => showSetup(s));
         actions.appendChild(newBtn);
       }
@@ -338,11 +344,24 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       return card;
     };
 
+    // One yellow button on the slots screen (#613): Continue on the save written last
+    // (SaveMeta.updatedAt; a tie, or saves from before meta, go to the lower slot). With
+    // nothing to continue, New game on the first empty slot.
+    const primarySlot = (summaries: SlotSummary[]): number | undefined => {
+      const meta = listSlotMeta();
+      const when = (slot: number): number => meta.find((m) => m.slot === slot)?.meta?.updatedAt ?? 0;
+      const saved = summaries.filter((s) => s.status === 'ok');
+      if (saved.length) return saved.reduce((a, b) => (when(b.slot) > when(a.slot) ? b : a)).slot;
+      return summaries.find((s) => s.status === 'empty')?.slot;
+    };
+
     const showSlots = (notice?: string): void => {
       main.replaceChildren();
       for (const e of titleHeading()) main.appendChild(e);
       const slots = mk('div', 'nrl-title-slots');
-      for (const s of getSlotSummaries()) slots.appendChild(slotCard(s));
+      const summaries = getSlotSummaries();
+      const primary = primarySlot(summaries);
+      for (const s of summaries) slots.appendChild(slotCard(s, s.slot === primary));
       main.appendChild(slots);
 
       const foot = mk('div', 'nrl-title-foot');
@@ -570,8 +589,10 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         finish(s.slot, { mode: 'new', seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
           home, groundName: ground.value.trim() || groundForTown(town || name, selected?.id ?? town) });
       };
-      const start = mkButton('Start', 'data-nrl-start', 'nrl-title-btn-go');
+      // Start waits for the town list, and says so while it does (#613).
+      const start = mkButton('Loading towns…', 'data-nrl-start', 'nrl-title-btn-go');
       start.disabled = true;
+      const ready = (): void => { start.textContent = 'Start'; start.disabled = false; };
       start.addEventListener('click', () => {
         if (start.disabled) return;
         if (s.status === 'empty') return begin();
@@ -604,10 +625,10 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         applyTown();
         if (editedClub !== undefined) input.value = editedClub;
         if (editedGround !== undefined) ground.value = editedGround;
-        start.disabled = false;
+        ready();
       }).catch(() => {
         townNote.textContent = 'Town list unavailable. Type your own town to start.';
-        start.disabled = false;
+        ready();
       });
     };
 
