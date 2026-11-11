@@ -86,6 +86,25 @@ describe('regional cup entry and existing calendar hooks', () => {
     advanceWeeks(6); expect(getState().season).toBe(2); expect(intervals).toBe(25);
     expect(getState().competitions!.instances.every(i => i.status === 'completed')).toBe(true);
   });
+  it('completes a normally progressing Open Cup with no recovery forfeits or withdrawals', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      setup();
+      fixtureHooks(true);
+      advanceWeeks(25);
+      const finished = cup();
+      expect(getState().season).toBe(2);
+      expect(finished.status).toBe('completed');
+      expect(finished.winnerId).toEqual(expect.any(String));
+      expect(finished.fixtures).toHaveLength(23);
+      expect(finished.fixtures.every(f => f.status === 'completed' && f.result?.decider !== 'forfeit')).toBe(true);
+      expect(getState().competitions!.instances.some(i => isOpenCupInstance(i) && (i.status === 'withdrawn' || i.status === 'declined'))).toBe(false);
+      const recovery = errors.mock.calls.map(args => args.map(String).join(' ')).filter(line => line.includes('structural calendar recovered'));
+      expect(recovery).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
+  });
   it('uses alternate profile dates and a four-club cup instead of hard-coded prototype slots', () => {
     const regularSlots = [3, 5, 6, 8, 9, 10]; const finalsSlots = [11, 12];
     const identities = AU_CAREER_PROFILE.clubs.slice(0, 3);

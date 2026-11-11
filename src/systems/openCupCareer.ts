@@ -35,8 +35,10 @@ export function structuralOpenCup(profile: RegionalCareerProfile, pack: ContentP
   return drawOpenCup({ definition, season: 1, seed, clubIds, playerId, enterPlayer: enterPlayer ?? true, currentSlot: 1 }).instance;
 }
 
-/** Existing match hooks have already committed the sporting results. Append only
- * known opponents; finalisation, statistics and reward settlement are not replayed. */
+/** Draw the next known round from results the match hooks have already committed.
+ * Both fixture hooks call this before finishWeek settles the structural calendar,
+ * so a cup that is still progressing is drawn instead of forfeited or withdrawn.
+ * Finalisation, statistics and reward settlement are not replayed. */
 export function prepareOpenCup(state: GameState): GameState {
   const competitions = state.competitions;
   if (!competitions || competitions.calendar?.mode !== 'structural' || competitions.calendar.status !== 'active') return state;
