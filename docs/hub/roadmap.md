@@ -16,7 +16,9 @@ live gameplay change; work still open below has not shipped.
   #536–#539 and #545 have merged, clearing structural state/calendar/division
   work. Annual-cap finance #555–#562 and progression tuning #547 remain open;
   paid rewards, transfers and release balance retain those prerequisites.
-  No new competition career is enabled by the contract alone.
+  The state/calendar foundation and isolated AU/UK regional setup are implemented
+  on review branches; the Open Cup is being connected to that match flow. Normal
+  competition entry and promotion remain gated on their recorded dependencies.
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
   [PR #514](https://github.com/ch-leon/nrl-sim/pull/514), with every lever **off**, so
