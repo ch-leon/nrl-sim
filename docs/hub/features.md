@@ -63,6 +63,13 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Save format 25 stores optional, versioned competition rule/prize snapshots and
+  stable fixture identities with strict import validation. Supported v24 careers
+  upgrade without changing their people or league format, retaining their original
+  save; the pre-v24 restart/export policy stays in place. This is dormant metadata
+  for subsequent calendar work, not an enabled multi-competition career
+  ([PR](https://github.com/ch-leon/nrl-sim/pull/586)).
+
 - The contact-study preview opens with Current and Prototype visible together, sharing playback and scenario controls; phone layouts stack the comparison panels. Updated tackles use close torso contact, short bent arms, impact compression and firmer landings. Tackle legs now keep their standing reach: boots slide in with the hips and knees fold through the landing instead of stretching between fixed feet and moving bodies.
 
 - [Match character art and contact animations](../specs/match-art-prototype.md) ([release PR and verification](https://github.com/ch-leon/nrl-sim/pull/584)): larger heads and stable identities in career matches and the match lab; running catches, close body contact, short bent arms and sim-driven group tackles, breaks and steals. Join/result timing survives replay and faster playback. The approved tackle-leg correction keeps the lowered stance, bounded legs and boots moving with the hips. `/#artlab` retains the earlier-art comparison and eleven-head workbench. Existing hair/colour assignments and current save formats are preserved. The [original handover](../handoffs/match-art-playable-build.md) retains pre-release provenance; the release PR records the tested candidate, independent review and deployed build.
