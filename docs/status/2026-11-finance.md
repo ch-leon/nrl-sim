@@ -12,7 +12,7 @@ D1–D5, the current-source impact map, exact implementation coefficients, state
 transaction/rollover ownership and measurable targets. Finance runtime and UI
 remain with #557–#562; this slice changes no live career's money or contracts.
 
-FINANCE_PR_LINK publishes headless quotes with meaningful money/cap/eligibility
+[PR #595](https://github.com/ch-leon/nrl-sim/pull/595) publishes headless quotes with meaningful money/cap/eligibility
 checks and the [static inventory](2026-11-finance-inventory.json). Across 20 seeds,
 both packs and three difficulties, 120 worlds yielded 2,880 club market bills.
 Every starting player roster fits Local's proposed cap in this sample. The AU
