@@ -9,6 +9,14 @@ live gameplay change; work still open below has not shipped.
 
 - **Match-art phone play-test** ([release PR and verification](https://github.com/ch-leon/nrl-sim/pull/584)): play a full match in landscape at ×1 and your usual speed; check player recognition, possession and tacklers releasing into play-the-ball. The PR records the deployed build and required review/CI/QA evidence. Feedback informs the separate animation follow-up below.
 
+- **Career competitions: execution started** ([tracker #323](https://github.com/ch-leon/nrl-sim/issues/323)).
+  [#569](https://github.com/ch-leon/nrl-sim/issues/569) publishes the
+  [technical contract](../specs/career-competitions.md) against current main;
+  [delivery status](../status/2026-11-career.md) records evidence and dependencies.
+  #536–#539 and #545 have merged, clearing structural state/calendar/division
+  work. Annual-cap finance #555–#562 and progression tuning #547 remain open;
+  paid rewards, transfers and release balance retain those prerequisites.
+  No new competition career is enabled by the contract alone.
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in
   [PR #514](https://github.com/ch-leon/nrl-sim/pull/514), with every lever **off**, so
@@ -130,7 +138,22 @@ turning these into new work:
 
 ## Ideas being discussed (not decided)
 
-Source: Leon. None of these is an issue yet.
+Source: Leon. These are design discussions, not scheduled work.
+
+**Career progression, tournaments and prizes (11 Nov 2026). Execution started.**
+The [Notion specification](https://app.notion.com/p/4150870d4c44810c880ae3395086e9d0)
+is filed in NRL Sim HQ → Specs & Decisions, linked to NRL Sim and **In review**.
+[Tracker #323](https://github.com/ch-leon/nrl-sim/issues/323) links 14 scoped issues;
+[#569](https://github.com/ch-leon/nrl-sim/issues/569) publishes the versioned
+[execution contract](../specs/career-competitions.md) and prototype inputs. First deliver the league climb, persistent
+players and Open Cup; Sponsor Shield and Rising Stars follow, then a later
+Champions Series. The further-event catalogue stays open. Counts, prizes and cap
+percentages are explicit working defaults. Reuse finance
+[#555](https://github.com/ch-leon/nrl-sim/issues/555) (annual salary cap, separate
+cash) and player progression [#535](https://github.com/ch-leon/nrl-sim/issues/535),
+rather than duplicating their mechanisms or save policy. The
+[original concept](../plans/2026-11-career-competitions.md) is retained as history
+and points to the current spec.
 
 **Recruitment talks (Leon's idea, 31 Oct 2026, not decided). Open.** Longer talks
 for stars and key re-signings, and a Scout staff role. Open: how talks work, who
