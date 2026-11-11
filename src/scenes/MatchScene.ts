@@ -860,6 +860,8 @@ export class MatchScene extends Phaser.Scene {
       back();
       return;
     }
+    // It takes the pause sheet's place over the dimmed field: a swap, with no dialog's entrance (#606).
+    dialog.setAttribute('data-swap', '');
     const watch = new MutationObserver(() => {
       if (dialog.isConnected) return;
       watch.disconnect();

@@ -350,6 +350,8 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: { rou
   const report = button('Report', () => {
     wrap.hidden = true;
     const box = openMatchReport(r, opts);
+    // It takes this card's place over the same dim: a swap, with no dialog's entrance (#606).
+    box.setAttribute('data-swap', '');
     // The report closes (its dimmed edge) back onto this card.
     const watch = new MutationObserver(() => {
       if (box.isConnected) return;

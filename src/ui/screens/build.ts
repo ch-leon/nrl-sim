@@ -208,7 +208,8 @@ export function openFacilityPopup(facility: PlacedFacility): void {
   card.append(renderFacilityBody(facility, def));
   // An upgrade redraws the card with the next level's Upgrade in the same spot, and has no Undo (#598).
   guardDoubleTap(card);
-  openModal(card, { class: 'nrl-facility-modal' }).classList.add('nrl-facility-backdrop');
+  // cut: the card rises by itself (nrl-sheet-up below), so it takes no dialog's entrance as well (#606).
+  openModal(card, { class: 'nrl-facility-modal', cut: true }).classList.add('nrl-facility-backdrop');
 }
 
 /**

@@ -399,6 +399,12 @@ export function armGuard(disarm: () => void): () => void {
 
 /** Currently open modal overlay, if any (guards against stacking). */
 let openModalEl: HTMLElement | null = null;
+/**
+ * Whether a dialog has closed since the last frame was drawn (#606). One opened now takes its
+ * place before the dim is seen to go (◂ back from a rival's player closes his page, then opens
+ * the squad again), so it is a swap as much as one opened over an open dialog.
+ */
+let closedThisFrame = false;
 
 /**
  * Open a centred modal containing `content`. Clicking the dimmed backdrop closes
@@ -417,10 +423,15 @@ let openModalEl: HTMLElement | null = null;
  * its content scrolls, so a header row never scrolls away. A dialog (or a
  * sheet) gets a ✕ in its corner with `closeButton: true`. `key` is a screen's nav destination (see
  * openScreen).
+ *
+ * A dialog comes in (#606): its dim fades and its card grows from --nrl-pop. One that takes
+ * another dialog's place is marked `data-swap` and cuts in, so the dim does not blink. `cut: true`
+ * leaves the entrance out for good: the player page (a drill-in from a list) and the facility
+ * popup (it rises by itself).
  */
 export function openModal(
   content: HTMLElement,
-  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean; key?: string } = {},
+  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean; key?: string; cut?: boolean } = {},
 ): HTMLElement {
   ensureStyles();
   const framed = opts.screen === true || opts.region === true;
@@ -451,12 +462,15 @@ export function openModal(
     return openScreen(backdrop, undefined, opts.key);
   }
 
+  const swap = dialogOpen() || closedThisFrame;
   closeModal();
   const backdrop = el(
     'div',
     { class: opts.region ? 'nrl-modal-backdrop nrl-dialog-region' : 'nrl-modal-backdrop', onClick: () => closeModal() },
     box,
   );
+  if (swap) backdrop.setAttribute('data-swap', '');
+  if (opts.cut) backdrop.setAttribute('data-cut', '');
   openModalEl = backdrop;
   getRoot().appendChild(backdrop);
   return backdrop;
@@ -470,6 +484,10 @@ export function dialogOpen(): boolean {
 /** Close the currently open (dialog) modal, if any. Screens use closeScreen(). */
 export function closeModal(): void {
   if (openModalEl) {
+    if (openModalEl.isConnected && typeof requestAnimationFrame === 'function') {
+      closedThisFrame = true;
+      requestAnimationFrame(() => { closedThisFrame = false; });
+    }
     openModalEl.remove();
     openModalEl = null;
   }
@@ -806,6 +824,10 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   background: var(--nrl-navy);
   border-radius: 12px;
   box-shadow: var(--nrl-shadow-tray);
+  /* #606: out of the ▾ under its bottom right corner. It is shown by taking [hidden] off, which
+     starts the entrance again each time; closing is a cut. */
+  transform-origin: bottom right;
+  animation: nrl-fade-in var(--nrl-dur-fast) var(--nrl-ease-out), nrl-pop-in var(--nrl-dur-fast) var(--nrl-ease-out);
 }
 .nrl-hud-menu[hidden] { display: none; }
 .nrl-hud-menu-item { width: 100%; text-align: left; }
@@ -867,6 +889,7 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   inset: 0;
   background: rgba(5, 9, 22, 0.35);
   z-index: 54;
+  animation: nrl-fade-in var(--nrl-dur-sheet) var(--nrl-ease-out); /* #606: in with its sheet */
 }
 .nrl-office-dim[hidden], .nrl-nav-sheet[hidden] { display: none; }
 .nrl-nav-sheet {
@@ -1000,6 +1023,15 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   box-sizing: border-box;
   font-size: 0.875rem;
 }
+/* A dialog comes in (#606): its dim fades and its card, which fades with the dim it sits in, grows
+   from --nrl-pop about its centre. --nrl-dur-fast, not a sheet's time: the week summary is up after
+   every PLAY WEEK. Not a sheet (it rises, .nrl-screen-region below), not a dialog that takes
+   another's place ([data-swap]: the dim must not blink) and not one opened with cut (the player
+   page, the facility popup). There is no exit: closing is a cut. */
+.nrl-modal-backdrop:not(.nrl-screen-backdrop):not([data-swap]):not([data-cut]) { animation: nrl-fade-in var(--nrl-dur-fast) var(--nrl-ease-out); }
+.nrl-modal-backdrop:not(.nrl-screen-backdrop):not([data-swap]):not([data-cut]) > .nrl-modal { animation: nrl-pop-in var(--nrl-dur-fast) var(--nrl-ease-out); }
+@keyframes nrl-fade-in { from { opacity: 0; } }
+@keyframes nrl-pop-in { from { transform: scale(var(--nrl-pop)); } }
 .nrl-modal h2 { font-family: var(--nrl-f-label); font-size: 1.375rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; line-height: 1.15; }
 .nrl-modal h3 { font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 

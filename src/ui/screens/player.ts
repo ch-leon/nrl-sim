@@ -654,7 +654,8 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   });
   render();
   // A full sheet in the band above the dock (#203); ◂ back is the one close (#349 A5).
-  const backdrop = openModal(content, { class: 'nrl-player-modal', region: true });
+  // A drill-in from a list: it cuts in, with no dialog's entrance (#606).
+  const backdrop = openModal(content, { class: 'nrl-player-modal', region: true, cut: true });
   // The backdrop's own listener has closed the dialog; tell whoever opened it.
   backdrop.addEventListener('click', () => { if (!closed) { closed = true; off(); opts.onClose?.(); } });
   return backdrop;

@@ -185,6 +185,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     const w0 = await week();
     await menuPick('To season end');
     await page.waitForSelector('[data-advance-ask]');
+    await page.waitForTimeout(250); // the dialog's entrance (#606): its buttons are measured at full size
     const q = (await page.locator('[data-ask-question]').textContent().catch(() => '')) ?? '';
     rec.notes.push(`"${q}"`);
     const out = /^Play \d+ weeks\? It stops for decisions\.$/.test(q) ? [] : [`the ask says "${q}", not how long the run is`];

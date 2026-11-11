@@ -141,7 +141,7 @@ export async function runPortrait(browser) {
         await page.waitForSelector(review);
         await page.locator(review).tap();
         await page.waitForSelector('.nrl-decisions-modal .nrl-event-card');
-        await page.waitForTimeout(100);
+        await page.waitForTimeout(250); // past the card's entrance (#606): the choices are measured at full size
         const found = await reachProblems(page, '.nrl-decisions-modal', ['[data-event-choice="0"]', '[data-event-choice="1"]', '.nrl-decisions-modal .nrl-screen-x']);
         found.push(...await page.evaluate(() => {
           const box = document.querySelector('.nrl-decisions-modal').getBoundingClientRect();
