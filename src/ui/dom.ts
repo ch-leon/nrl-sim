@@ -150,6 +150,35 @@ const screenListeners = new Set<(key: string | null) => void>();
 
 /** Attribute naming which nav destination an open screen belongs to (the nav marks that tab). */
 export const SCREEN_KEY_ATTR = 'data-screen-key';
+/**
+ * On a sheet that took another's place (#605). It has no entrance: the rise starts from
+ * nothing, so between two sheets the grounds showed through for its first frames.
+ */
+export const SCREEN_SWAP_ATTR = 'data-swap';
+
+// The turn a sheet last came down in (#605). A sheet opened in that same turn takes its
+// place: nothing was drawn between the two. For a screen that closes before it opens the
+// next (History's ◂ back), and for Club home upright, which opens a tick after the sheet
+// over it closes.
+let sheetLeftAt: number | null = null;
+
+/**
+ * The document timeline's clock: it holds still through a turn of the event loop (a tap's
+ * handlers and the microtasks after them) and moves on with the frames, so two equal reads
+ * have no frame between them. Null where there is none (the unit tests).
+ */
+function turnClock(): number | null {
+  const t = document.timeline?.currentTime;
+  return typeof t === 'number' ? t : null;
+}
+
+/**
+ * A sheet has just come down, or Office's tiles (nav.ts): a sheet that opens in the same
+ * turn is a swap, with no entrance (#605).
+ */
+export function sheetLeaving(): void {
+  sheetLeftAt = turnClock();
+}
 
 function emitScreenChange(): void {
   const key = screenKey();
@@ -162,15 +191,20 @@ function emitScreenChange(): void {
  * runs when the screen is closed by any route (its own Close button calling
  * closeScreen(), another screen opening, or a match starting). `key` is the nav
  * destination it belongs to ('squad', 'finance', …), so the nav can mark it open
- * (#344). Returns `node`.
+ * (#344). A sheet opened on the bare grounds rises in; one that takes another's
+ * place, or Office's, is there at once (#605). Returns `node`.
  */
 export function openScreen(node: HTMLElement, onClose?: () => void, key?: string): HTMLElement {
   ensureStyles();
   closeModal();
   node.classList.add('nrl-screen-region');
   if (key) node.setAttribute(SCREEN_KEY_ATTR, key);
+  // Read before the slot closes the sheet that is up; a sheet opened on the bare grounds keeps its rise.
+  const turn = turnClock();
+  node.toggleAttribute(SCREEN_SWAP_ATTR, screenSlot.active !== null || (turn !== null && turn === sheetLeftAt));
   screenSlot.open(node, () => {
     node.remove();
+    sheetLeaving();
     onClose?.();
     if (screenSlot.active === null) emitScreenChange();
   });
@@ -1052,6 +1086,9 @@ body.nrl-match-active .nrl-hub-chips { display: none; }
   box-sizing: border-box;
   animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
+/* #605: a sheet taking another's place is there at once. Rising from nothing, it let the
+   grounds flash through on every tab and segment switch. */
+.nrl-screen-region[data-swap] { animation: none; }
 .nrl-screen-backdrop { background: transparent; padding: 0; display: flex; align-items: stretch; justify-content: stretch; }
 .nrl-screen-backdrop .nrl-modal {
   width: 100%;

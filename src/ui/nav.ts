@@ -25,6 +25,7 @@ import {
   screenKey,
   setScreenKey,
   onScreenChange,
+  sheetLeaving,
 } from './dom';
 
 /** A tile's status line in Office: "+$3,240 / week", "3 unread" (attn: yellow). */
@@ -274,6 +275,8 @@ export function createNav(opts: NavOptions = {}): Nav {
 
   function setSheet(open: boolean): void {
     if (open) paintTiles();
+    // A tile's sheet takes the tiles' place, with no entrance (#605).
+    else if (!sheet.hidden) sheetLeaving();
     sheet.hidden = !open;
     dim.hidden = !open;
     more.setAttribute('aria-expanded', String(open));

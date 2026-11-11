@@ -456,6 +456,47 @@ export async function runScreens(browser, { w: W, h: H, safe }) {
       return check(rec, spec, spec.id);
     });
   }
+  // #605: a sheet that takes another's place has no entrance (the rise starts from nothing, so
+  // the grounds flashed through between the two): a dock tab, Squad's segments, an Office tile,
+  // Finance's VIEW ▸ and its ◂ back. One opened on the bare grounds rises, and again after a close.
+  await step('sheet-swap', async (rec) => {
+    const grounds = async () => {
+      await tap(SHEET_EXIT);
+      await page.waitForSelector('.nrl-screen-region', { state: 'detached' });
+      await page.waitForTimeout(250);
+    };
+    /** Tap `sel` and read the sheet in the same turn, before a frame is drawn: its key, and whether it rises. */
+    const open = (sel) => page.evaluate((sel) => {
+      document.querySelector(sel)?.click();
+      const s = document.querySelector('.nrl-screen-region');
+      return s ? { key: s.getAttribute('data-screen-key'), rises: getComputedStyle(s).animationName !== 'none' } : null;
+    }, sel);
+    const dockTab = (id) => `.nrl-nav > .nrl-btn[data-screen="${id}"]`;
+    const out = [];
+    const want = async (what, sel, key, rises) => {
+      const got = await open(sel);
+      await page.waitForTimeout(250);
+      if (got?.key !== key) out.push(`${what}: ${got?.key ?? 'no'} sheet, not ${key}`);
+      else if (got.rises !== rises) out.push(`${what}: the sheet ${got.rises ? 'rises in from nothing' : 'has no entrance'}`);
+      else rec.notes.push(`${what} ${rises ? 'rises' : 'swaps'}`);
+    };
+    await grounds();
+    await want('grounds → SQUAD', dockTab('squad'), 'squad', true);
+    await want('SQUAD → LEAGUE', dockTab('fixtures'), 'fixtures', false);
+    await want('LEAGUE → SQUAD', dockTab('squad'), 'squad', false);
+    await want('Squad → Lineup', '.nrl-sq-tabs [data-seg="lineup"]', 'lineup', false);
+    await want('Lineup → Recruit', '.nrl-sq-tabs [data-seg="recruit"]', 'recruit', false);
+    await tap('.nrl-nav [data-nav-more]');
+    await page.waitForSelector('.nrl-nav-sheet:not([hidden])');
+    await page.waitForTimeout(250);
+    await want('Office → Finance', '.nrl-nav-sheet [data-screen="finance"]', 'finance', false);
+    await want('Finance → Contracts', '[data-finance-contracts]', 'contracts', false);
+    await want('Contracts ◂ Finance', '.nrl-screen-region [data-back]', 'finance', false);
+    await grounds();
+    await want('grounds → LEAGUE', dockTab('fixtures'), 'fixtures', true);
+    await grounds();
+    return out;
+  });
   // #467: every new readout at both requested text sizes. Images stay in CI artifacts.
   const textSize = (size) => page.evaluate((size) => {
     if (size === 'normal') document.documentElement.removeAttribute('data-text-size');

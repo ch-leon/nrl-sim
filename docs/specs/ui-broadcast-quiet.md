@@ -208,7 +208,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
 - **Sheets**: tapping the active tab or the dimmed area closes the sheet. Only one sheet is open at a time.
 - **Speed**: the selected speed persists for the match. SKIP goes to the next break (half-time / full time).
 - **Disabled items** always render, with the reason in place of the action.
-- **Transitions** (suggested): sheets slide up 180ms ease-out; banners fade/slide in 150ms and out after 3s. In code these are the motion tokens under Design tokens.
+- **Transitions** (suggested): sheets slide up 180ms ease-out; banners fade/slide in 150ms and out after 3s. In code these are the motion tokens under Design tokens. A sheet that takes another's place (a tab or segment switch, ◂ back, an Office tile) has no entrance (#605): it is there at once, so the grounds never show between the two. Only a sheet opened on the bare grounds slides up.
 
 ## Design tokens
 In code the colours are `src/ui/tokens.ts` (`COLOR_TOKENS`); `src/ui/dom.ts` writes them out as the `--nrl-*` properties, and the brand (`src/brand.ts`, #363) points at them.
