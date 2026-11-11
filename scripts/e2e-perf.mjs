@@ -45,6 +45,7 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { bundleSize, reportBundle } from './bundle-size.mjs';
+import { weeksAdvanced } from './e2e-week-count.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name, dflt) => (argv.includes(`--${name}`) ? argv[argv.indexOf(`--${name}`) + 1] : dflt);
@@ -287,7 +288,7 @@ async function advance(index, { probe = false } = {}) {
   // A sheet has no ✕ (Broadcast Quiet): CLUB in the dock closes the League sheet the probe opened.
   if (probe) await page.evaluate(() => document.querySelector('.nrl-nav [data-nav-home]')?.click());
   const after = await state();
-  const weeks = (after.season - before.season) * 27 + (after.week - before.week);
+  const weeks = weeksAdvanced(before, after);
   if (weeks > 0) summaryDue = true;
   return { ms, weeks, ...(tapMs !== undefined ? { tapMs, label } : {}) };
 }

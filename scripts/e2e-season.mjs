@@ -1,4 +1,3 @@
-import { playTrials } from './e2e-webkit/common.mjs';
 // scripts/e2e-season.mjs — end-to-end playthrough of a full season on a phone
 // (QA pass). Builds the game and serves it with `vite preview`, then in
 // Chromium at 844×390 (touch) or 1280×800 (a desktop window, mouse):
@@ -320,14 +319,14 @@ async function leaveMatch() {
  * (a squad short of 13), or nothing at all (a bye or a week out of the finals).
  */
 async function weekAsTapped(rec) {
-  const at = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}`; });
+  const at = await page.evaluate(() => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason ?? 0}`; });
   await tapAdvanceWeek();
   // The round's own toast ("… Round 9 forfeited (0–24)."), not the stop's "… would be forfeited."
   const what = await page.waitForFunction((a) => {
     if (document.querySelector('.nrl-mo-controls')) return 'match';
     if ([...document.querySelectorAll('.nrl-toast')].some((t) => /forfeited \(\d+/.test(t.textContent ?? ''))) return 'forfeit';
     const s = window.__nrlState();
-    return `${s.season}:${s.week}` !== a ? 'week' : null;
+    return `${s.season}:${s.week}:${s.preseason ?? 0}` !== a ? 'week' : null;
   }, at, { timeout: 15000 }).then((h) => h.jsonValue())
     .catch(() => { throw new Error(`Advance Week did nothing within 15 s at ${at.replace(/(\d+):(\d+)/, 'S$1 W$2')}`); });
   if (what === 'match') {
@@ -336,8 +335,20 @@ async function weekAsTapped(rec) {
     await leaveMatch();
   }
   // The week ends once the rival round is in (as long as held-week allows); wait for it.
-  await page.waitForFunction((a) => { const s = window.__nrlState(); return `${s.season}:${s.week}` !== a; }, at, { timeout: 60000 }).catch(() => {});
+  await page.waitForFunction((a) => { const s = window.__nrlState(); return `${s.season}:${s.week}:${s.preseason ?? 0}` !== a; }, at, { timeout: 60000 });
   rec.notes.push(what === 'forfeit' ? 'the round forfeited' : what === 'match' ? 'a match, skipped' : 'no match that week');
+}
+
+/** Use this playthrough's touch/mouse controls, and wait for both real trial ticks. */
+async function playTrialWeeks(rec) {
+  const inTrials = () => page.evaluate(() => [1, 2].includes(window.__nrlState().preseason));
+  for (let i = 0; i < 2 && await inTrials(); i++) {
+    await closeAny();
+    await goHome();
+    await answerCards(rec);
+    await weekAsTapped(rec);
+  }
+  if (await inTrials()) throw new Error('trial phase remained after two completed weeks');
 }
 
 /**
@@ -458,9 +469,9 @@ async function play() {
     if (!(await skip.count())) return 'no tutorial shown';
   });
   await step('tutorial-skipped', async (rec) => { await tap('.nrl-tutorial-skip'); await dumpSave('after-tutorial', rec); });
-  await step('pre-season-trials', async () => {
+  await step('pre-season-trials', async (rec) => {
     await page.evaluate(() => sessionStorage.setItem('nrlE2eCloseSummary', '1'));
-    await playTrials(page);
+    await playTrialWeeks(rec);
     await wait(500);
     await page.evaluate(() => sessionStorage.removeItem('nrlE2eCloseSummary'));
   });
@@ -1220,18 +1231,15 @@ async function play() {
     rec.notes.push('season 1 review reopened from History, and back to History from its header');
   });
   await step('season-2-week-2', async (rec) => {
+    // Rollover starts two trials at W1. The following held-week probe needs a
+    // league round with rival fixtures, so complete those trials through the UI.
+    await playTrialWeeks(rec);
     await closeAny();
     await goHome();
     await answerCards(rec);
-    await tapAdvanceWeek();
-    await wait(1500);
-    // A match week opens the match scene; skip it.
-    if (await page.locator('.nrl-mo-controls').count()) {
-      await skipMatch();
-      await page.waitForSelector(BACK_TO_CLUB, { timeout: 15000 });
-      await leaveMatch();
-    }
+    await weekAsTapped(rec);
     const s = await save();
+    if (s.season !== 2 || s.week !== 2 || s.preseason) throw new Error(`expected S2 round 2 after trials, got S${s.season} W${s.week} trial ${s.preseason}`);
     rec.notes.push(`S${s.season} W${s.week}`);
     await facilitiesDrawn(rec);
     await dumpSave('season-2', rec);
