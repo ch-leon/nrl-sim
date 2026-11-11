@@ -1082,6 +1082,28 @@ export class TackleChip {
   }
 }
 
+/** The part of an element a held text writes. */
+export type HeldTextEl = Pick<HTMLElement, 'textContent'>;
+
+/**
+ * Words on the page that are written only when they change (#602), as the tackle
+ * chip's are: the clock, the half label, the scores, the Replay chip's seconds.
+ * The live clock is set every frame, and writing the same words again still costs
+ * a style pass, a layout and a paint. It starts from what its element says and
+ * must be that element's only writer; a new overlay builds new ones.
+ */
+export class HeldText {
+  private text: string;
+
+  constructor(private readonly el: HeldTextEl) {
+    this.text = el.textContent ?? '';
+  }
+
+  set(text: string): void {
+    if (text !== this.text) this.el.textContent = this.text = text;
+  }
+}
+
 export interface MatchOverlayHandle {
   /** Remove the overlay and unsubscribe all bus handlers. Idempotent. */
   destroy(): void;
@@ -1246,8 +1268,32 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       ...(anyCalls ? [pair('Calls paid off', `${calls.paid.home}/${calls.made.home}`, `${calls.paid.away}/${calls.made.away}`)] : []),
     ];
   };
+  // An event rewrites only the values and bars that changed (#602), so the rows on the page
+  // stay the same elements. The table is built again only when its rows change (Calls paid off joins).
+  let statsShown: { rows: StatRow[]; cells: { home: HTMLElement; away: HTMLElement; bar: HTMLElement }[] } | null = null;
   const renderStats = (): void => {
-    statsBody.replaceChildren(statTable(statRows(), codes, worn));
+    const rows = statRows();
+    const shown = statsShown;
+    if (!shown || shown.rows.length !== rows.length || rows.some((r, i) => r.label !== shown.rows[i]!.label)) {
+      const table = statTable(rows, codes, worn);
+      const cells = [...table.querySelectorAll<HTMLElement>('.nrl-mo-statrow')].map((row) => ({
+        home: row.querySelector<HTMLElement>('.nrl-mo-stat-h')!,
+        away: row.querySelector<HTMLElement>('.nrl-mo-stat-a')!,
+        bar: row.querySelector<HTMLElement>('.nrl-mo-stat-bar')!.children[0] as HTMLElement,
+      }));
+      statsBody.replaceChildren(table);
+      statsShown = { rows, cells };
+      return;
+    }
+    rows.forEach((r, i) => {
+      const was = shown.rows[i]!;
+      const cell = shown.cells[i]!;
+      if (r.home !== was.home) cell.home.textContent = r.home;
+      if (r.away !== was.away) cell.away.textContent = r.away;
+      const split = statSplit(r.home, r.away);
+      if (split !== statSplit(was.home, was.away)) cell.bar.style.width = `${split}%`;
+    });
+    shown.rows = rows;
   };
   board.addEventListener('click', () => {
     statsOpen = !statsOpen;
@@ -1270,8 +1316,24 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   strip.addEventListener('click', () => setMode('full'));
   // A long typed name wraps (the CSS) and, on a narrow window, draws smaller until the
   // whole line is inside the strip (#433). The size resets when the line or the width changes.
+  // Measuring forces a layout mid-frame (#602): none while the line is not showing (the log
+  // off or full, the stats or the tray in its place, full time), and one a frame at most:
+  // the first ask measures at once, any more that frame wait for the next.
   let fitKey = '';
+  let fitFrame = 0;
+  let fitAgain = false;
   const fitStrip = (): void => {
+    if (mode !== 'line' || statsOpen || finalClock !== null || root.classList.contains('nrl-mo-tray-open')) return;
+    if (fitFrame) {
+      fitAgain = true;
+      return;
+    }
+    fitFrame = requestAnimationFrame(() => {
+      fitFrame = 0;
+      if (!fitAgain) return;
+      fitAgain = false;
+      fitStrip();
+    });
     if (stripText.clientHeight < 1) return;
     const key = `${stripText.textContent}\0${strip.clientWidth}\0${document.documentElement.getAttribute('data-text-size') ?? ''}`;
     if (key === fitKey) return;
@@ -1378,7 +1440,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
   // Under the open coach tray it hides and waits too, for a while (#348, stepReplayOffer).
   let replayTimer: ReturnType<typeof setInterval> | null = null;
   let replayBtn: HTMLButtonElement | null = null;
-  let replayCount: HTMLElement | null = null;
+  let replayCount: HeldText | null = null;
   let replayOffer: ReplayOffer = newReplayOffer();
   let replayAt = 0;
   let replayTag: HTMLElement | null = null;
@@ -1401,22 +1463,28 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       return;
     }
     replayBtn.hidden = !step.show;
-    if (replayCount) replayCount.textContent = String(replayCountdown(step.leftMs));
+    replayCount?.set(String(replayCountdown(step.leftMs)));
   };
   const cardWatch = new MutationObserver(tickReplay);
   cardWatch.observe(getRoot(), { childList: true });
   document.body?.classList.add(MATCH_ACTIVE_CLASS);
 
+  // The score bug's words, each written only when it changes (#602): the clock is set every frame, the score every event.
+  const clockText = new HeldText(clockEl);
+  const halfText = new HeldText(halfEl);
+  const homePts = new HeldText(homeCell.pts);
+  const awayPts = new HeldText(awayCell.pts);
+  const scoreText = new HeldText(scoreEl);
   const showScore = (h: number, a: number): void => {
-    homeCell.pts.textContent = String(h);
-    awayCell.pts.textContent = String(a);
-    scoreEl.textContent = `${h} – ${a}`;
+    homePts.set(String(h));
+    awayPts.set(String(a));
+    scoreText.set(`${h} – ${a}`);
   };
   const render = (): void => {
     showScore(state.homeScore, state.awayScore);
     if (!liveClock) {
-      clockEl.textContent = formatClock(state.minute, 2 * halfMinutes);
-      halfEl.textContent = state.half === 1 ? '1H' : '2H';
+      clockText.set(formatClock(state.minute, 2 * halfMinutes));
+      halfText.set(state.half === 1 ? '1H' : '2H');
     }
     if (statsOpen) renderStats();
   };
@@ -1571,6 +1639,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       document.documentElement.style.removeProperty(BOARD_VAR);
       if (boardFrame) cancelAnimationFrame(boardFrame);
       boardObserver?.disconnect();
+      if (fitFrame) cancelAnimationFrame(fitFrame);
       fitObserver.disconnect();
       stripObserver?.disconnect();
       cardWatch.disconnect();
@@ -1612,14 +1681,14 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       // Full time keeps the clock and the label it had at the whistle, except while a replay
       // shows an earlier half. (After a Skip the paused sim still reports where it stopped.)
       if (finalClock !== null && !root.classList.contains('nrl-mo-replaying')) {
-        clockEl.textContent = finalClock;
+        clockText.set(finalClock);
         tackle.fullTime();
-        halfEl.textContent = 'FT';
+        halfText.set('FT');
         return;
       }
       // Golden point (N9.4): its own clock from 00:00.
-      clockEl.textContent = formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes);
-      halfEl.textContent = half === 1 ? '1H' : half === 2 ? '2H' : 'GP';
+      clockText.set(formatClockSeconds(matchSeconds, half === 'gp' ? 60 : 2 * halfMinutes));
+      halfText.set(half === 1 ? '1H' : half === 2 ? '2H' : 'GP');
     },
     offerReplay(onTap: () => void): void {
       clearReplayOffer();
@@ -1629,8 +1698,9 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
         clearReplayOffer();
         onTap();
       }, { class: 'nrl-mo-replay' });
-      replayCount = el('span', { class: 'nrl-mo-replay-count', attrs: { 'aria-hidden': 'true' } });
-      replayBtn.append(replayCount);
+      const count = el('span', { class: 'nrl-mo-replay-count', attrs: { 'aria-hidden': 'true' } });
+      replayCount = new HeldText(count);
+      replayBtn.append(count);
       replayBtn.setAttribute('aria-label', 'Replay try');
       root.append(replayBtn);
       replayOffer = newReplayOffer();
@@ -1688,7 +1758,7 @@ export function mountMatchOverlay(opts: MatchOverlayOptions): MatchOverlayHandle
       hideBanner();
     }
     tackle.fullTime();
-    halfEl.textContent = 'FT';
+    halfText.set('FT');
     finalClock = clockEl.textContent ?? '';
     root.classList.add('nrl-mo-final');
     document.body?.classList.add(MATCH_FINAL_CLASS);
