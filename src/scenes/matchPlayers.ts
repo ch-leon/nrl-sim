@@ -18,10 +18,10 @@ export class PlayerFrameCache {
   private frames = new Map<string, PixelBuffer>();
   constructor(private readonly kits: Record<Side, Kit>) {}
   get(side: Side, p: PlayerPicture): PixelBuffer {
-    const key = `${side}/${p.who}/${p.action}/${p.frame}/${p.facing}/${p.possession}`;
+    const key = `${side}/${p.who}/${p.action}/${p.frame}/${p.strideFrame ?? "legacy"}/${p.facing}/${p.possession}`;
     const hit = this.frames.get(key);
     if (hit) { this.frames.delete(key); this.frames.set(key, hit); return hit; }
-    const pixels = drawLivePlayer(appearanceFor(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession);
+    const pixels = drawLivePlayer(appearanceFor(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession, p.strideFrame);
     if (this.frames.size >= 512) this.frames.delete(this.frames.keys().next().value!);
     this.frames.set(key, pixels); return pixels;
   }
@@ -51,6 +51,7 @@ export class MatchActor {
   private readonly ring: Phaser.GameObjects.Graphics;
   private readonly texture: PaintedTexture;
   private previousPixels: PixelBuffer | null = null;
+  private lift = 0;
   private who: string;
   constructor(scene: Phaser.Scene, art: MatchArtRegistry, private readonly cache: PlayerFrameCache, private readonly side: Side, slot: number, who: string, shadowKey: string, ringColor: number, ringStyle: RingStyle) {
     this.who = who;
@@ -62,11 +63,13 @@ export class MatchActor {
     this.paint({ who, action: 'idle', frame: 0, facing: 'front', left: false, possession: false });
   }
   place(x: number, y: number, depth: number): void {
-    this.sprite.setPosition(x, y).setDepth(depth); this.shadow.setPosition(x, y); this.ring.setPosition(x, y);
+    this.sprite.setPosition(x, y - this.lift).setDepth(depth); this.shadow.setPosition(x, y); this.ring.setPosition(x, y);
   }
   wear(who: string): void { this.who = who; }
   paint(picture: PlayerPicture): void {
     this.who = picture.who;
+    this.lift = picture.lift ?? 0;
+    this.sprite.setY(this.shadow.y - this.lift);
     const pixels = this.cache.get(this.side, picture);
     if (pixels !== this.previousPixels) { this.texture.paint(pixels); this.previousPixels = pixels; }
     // Mirroring a non-centred frame must preserve its feet origin.

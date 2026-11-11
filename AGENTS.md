@@ -22,7 +22,9 @@ short version of its **Cloud environment** section.
    never in a commit (`CLAUDE.md`, **Screenshots**).
 5. **Play-test.** Leon gets the live build link (https://ch-leon.github.io/nrl-sim/)
    and one line on what to try. Bugs he finds are batched into one fix-up PR.
-6. **Merge** after CI is green and Leon gives a thumbs up. Post one short update,
+6. **Merge.** The PM bot merges PRs that are green and checker-approved
+   ("CHECKER VERDICT: APPROVE" from an independent checker) without waiting for
+   Leon, and tells Leon only if a merge breaks something. Post one short update,
    and stay quiet when nothing changed.
 
 Update docs/hub/features.md Recently added (and roadmap.md if relevant) in every PR that changes the game.

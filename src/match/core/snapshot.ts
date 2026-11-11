@@ -35,6 +35,11 @@ export interface PlayerSnap {
   who?: string;
   poseUntil?: number;
   caughtTick?: number;
+  /** Presentation facts only; deadlines and outcomes still belong to the sim. */
+  kick?: { startedTick: number; strikeTick: number; untilTick: number; kind: 'punt' | 'grubber' | 'drop' };
+  aerialCatchTick?: number;
+  tryTick?: number;
+  celebrationTick?: number;
   /** Sprint and gas (BAK-208 §8.2): going flat out this tick, ran his gas dry, gas left 0..1. */
   sprint?: boolean;
   blown?: boolean;
