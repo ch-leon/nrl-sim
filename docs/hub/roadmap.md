@@ -18,8 +18,10 @@ live gameplay change; work still open below has not shipped.
   #536–#539 and #545 have merged, clearing structural state/calendar/division
   work. Annual-cap finance #555–#562 and progression tuning #547 remain open;
   paid rewards, transfers and release balance retain those prerequisites.
-  The state/calendar foundation and isolated AU/UK regional setup are implemented
-  on review branches; the Open Cup now runs through that match flow. Normal
+  The state/calendar foundation, isolated AU/UK regional setup and Open Cup are
+  merged through [PR #591](https://github.com/ch-leon/nrl-sim/pull/591). The finance
+  model is approved for initial testing: [contract](../specs/finance-prototype.md),
+  executable quotes and opening inventory (FINANCE_PR_LINK). Normal
   competition entry and promotion remain gated on their recorded dependencies.
 - **Expansive attack still under par** ([issue #322](https://github.com/ch-leon/nrl-sim/issues/322), open).
   The Speed diagnostic and four Speed levers merged in

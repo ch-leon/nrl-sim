@@ -63,6 +63,11 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- The finance testing model now has headless salary, fee, income and cap quotes,
+  a versioned contract and a reproducible opening-roster inventory. This prepares
+  the fresh-career economy; cash/cap transactions and player-facing finance are
+  subsequent work (FINANCE_PR_LINK).
+
 - The isolated developer regional career includes an optional cross-division
   Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,
   a neutral final and a finite seeded tie decider. Existing match/result hooks
