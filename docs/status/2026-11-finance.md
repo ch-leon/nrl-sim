@@ -25,5 +25,7 @@ unplayed/trial exclusions, bounded cap composition, salary/fee/release quotes,
 ordinary resale margin and bounded opening offers. No matches or multi-season
 balance were run by the inventory; no live finance playtest is claimed.
 
-Required TypeScript/full unit/build, PR CI/WebKit/QA and review in a different
-tool remain separate evidence. No merge or final numerical balance is claimed.
+TypeScript, the production build and all 3,771 tests across 277 files passed.
+The later documentation commits do not change those pricing functions. PR CI/
+WebKit, separate QA and review in a different tool remain gates. No merge or
+final numerical balance is claimed.

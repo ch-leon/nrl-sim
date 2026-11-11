@@ -195,14 +195,19 @@ plus normal purchased/earned allowances. Display protected excess separately.
 
 Maintain the current 13-player registration minimum and pack squad cap (currently
 30), not a newly assumed limit. If unavoidable retirement/expiry leaves fewer
-than 13 while protected contracts remain, permit only enough low-grade one-season
-Academy/emergency deals to reach 13, priced normally and disclosed separately.
-Emergency ceiling: no higher than the current pack's ordinary starting depth
-target. No exceptional potential, no free top-class replacement, no over-cap
-voluntary sale/release that deliberately creates an emergency slot. Injury/bans
-still use normal match eligibility/forfeit rules. On departure/expiry of all
-protected deals the temporary exception ends; never convert it to a permanent
-earned cap prize. #574 owns applying movement from the frozen completed season.
+than 13, permit only enough low-grade one-season Academy/emergency deals to
+reach 13. Waive their signing fee so a cash-empty club can resume playing; their
+normal annual salary still counts, with temporary cap protection only where
+required by surviving protected deals. These scholarships create no cash refund
+or resale proceeds; a later ordinary renewal ends the scholarship restriction.
+Display the exception. Emergency ceiling: no higher than the current pack's
+ordinary starting depth target, with ordinary depth-level potential. No free
+top-class replacement and no voluntary sale/release that deliberately creates
+an emergency slot. Injury/bans still use normal match eligibility/forfeit rules.
+On departure/expiry of all protected deals the temporary cap exception ends;
+never convert it to a permanent earned prize. #574 owns applying movement from
+the frozen completed season. This also supplies a bounded recovery path after
+unaffordable expiries without allowing infinite player/fee generation.
 
 ## 6. Fresh saves, state ownership and rollover
 
