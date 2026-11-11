@@ -2,7 +2,8 @@
 // rendering (openFixturesScreen/openLadderScreen) is skipped: jsdom is not
 // installed and the vitest env is 'node' (see vite.config.ts), matching the
 // hud.ts / nav.ts convention. The formatting/projection helpers are pure and
-// covered here.
+// covered here. The open sheet drawing itself again as the week moves on (#603)
+// is in leagueLive.test.ts, on the stand-in DOM.
 import { describe, it, expect } from 'vitest';
 import {
   fmtFixtureLine,

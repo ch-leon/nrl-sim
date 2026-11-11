@@ -7,7 +7,8 @@ import { resolveLineup, validTactics } from '../../systems/lineup';
 // dashed line under the last finals place, a rival's name opens its squad), the
 // club's fixtures on the right (results, NEXT, the weeks to come) with a toggle
 // to every game of every round. The NEXT row opens the next-match preview
-// (N7, #183) as a dialog over the sheet.
+// (N7, #183) as a dialog over the sheet. The dock stays usable with the sheet
+// up, so it draws itself again when the week moves on under it (#603).
 //
 // Pure formatting helpers (fmtFixtureLine, ladderView, myFixtureRows, …) are
 // exported so they can be unit-tested without a DOM (the vitest env is 'node',
@@ -18,6 +19,7 @@ import { resolveLineup, validTactics } from '../../systems/lineup';
 
 import { el, button, openModal, openScreen, ensureStyles } from '../dom';
 import { getState, type GameState, type Fixture, type LadderRow, type RivalClub, type WeatherKind } from '../../core/state';
+import { bus } from '../../core/events';
 import { currentRound } from '../../core/season';
 import { PLAYER_ID } from '../../systems/fixtures';
 import { formGuide, matchStage, nextFixture, nextMatchPreview, type ClubResult, type FormResult, type PreviewSide } from '../../systems/league';
@@ -227,16 +229,45 @@ export function openLadderScreen(): HTMLElement {
   return openLeagueScreen('ladder');
 }
 
-/** The ladder and the fixtures, side by side (3h; they used to be two tabs). */
+/**
+ * The ladder and the fixtures, side by side (3h; they used to be two tabs). Both
+ * are drawn again when the state changes under the open sheet (#603): a week
+ * advanced from the dock, a rival renamed in the squad sheet over this one.
+ */
 function openLeagueScreen(key: 'fixtures' | 'ladder'): HTMLElement {
   ensureLeagueStyles();
-  const state = getState();
-  const ladder = buildLadder(state);
-  const fixtures = buildFixtures(state);
-  const sheet = el('div', { class: 'nrl-screen nrl-league' }, ladder.el, fixtures.el);
-  const opened = openScreen(sheet, undefined, key);
+  const sheet = el('div', { class: 'nrl-screen nrl-league' });
+  let cols: LeagueColumn[] = [];
+  const draw = (): void => {
+    const state = getState();
+    cols = [buildLadder(state), buildFixtures(state)];
+    sheet.replaceChildren(...cols.map((c) => c.el));
+  };
+  // Each column goes back where it was, and the preview over the sheet is of the match now coming.
+  const redraw = (): void => {
+    const were = cols.map((c) => c.where());
+    const top = sheet.scrollTop; // upright, the sheet scrolls as one (portrait.ts)
+    draw();
+    sheet.scrollTop = top;
+    cols.forEach((c, i) => c.resume(were[i]));
+    if (nextCard?.isConnected) nextMatchCard(getState(), nextCard);
+  };
+  // At most once a frame: a long advance emits a change a week, and more inside one.
+  let frame: number | null = null;
+  const soon = (): void => {
+    // A match starting closes the sheet and the week's change comes after: nothing to draw.
+    if (!sheet.isConnected) return;
+    if (typeof requestAnimationFrame !== 'function') { redraw(); return; }
+    frame ??= requestAnimationFrame(() => { frame = null; redraw(); });
+  };
+  draw();
+  const off = bus.on('state:changed', soon);
+  const opened = openScreen(sheet, () => {
+    off();
+    if (frame !== null) cancelAnimationFrame(frame);
+  }, key);
   // Once laid out: the club's row and the next match in view.
-  const settle = (): void => { ladder.reveal(); fixtures.reveal(); };
+  const settle = (): void => { for (const c of cols) c.reveal(); };
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(settle);
   else settle();
   return opened;
@@ -247,6 +278,44 @@ function centreIn(box: HTMLElement, row: HTMLElement | null): void {
   if (!row || box.scrollHeight <= box.clientHeight) return;
   const top = row.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
   box.scrollTop = Math.max(0, top - (box.clientHeight - row.offsetHeight) / 2);
+}
+
+/** Where a column's scroll box sits, and whether the player put it there. */
+interface ScrollSpot { top: number; left: number; byHand: boolean }
+
+/** One column of the sheet, and its scroll box through a redraw (#603). */
+interface LeagueColumn {
+  el: HTMLElement;
+  /** Bring the column's row (the club's, the coming match) into view. */
+  reveal(): void;
+  /** Where its box sits now, read before the column is drawn again. */
+  where(): ScrollSpot;
+  /** Put this column, just drawn, where the one before it was. */
+  resume(at: ScrollSpot): void;
+}
+
+/**
+ * A column's scroll through a redraw (#603). reveal() notes where it left the
+ * box: a box still there has not been scrolled by hand, so the column drawn in
+ * its place follows its row again (the club moves on the ladder, NEXT moves down
+ * a round); one the player scrolled goes back to where he put it.
+ */
+function columnScroll(box: HTMLElement | null, show: () => void): Omit<LeagueColumn, 'el'> {
+  let rest = 0;
+  // Put back where the player had it: his until the column is revealed again, even at the very top.
+  let held = false;
+  const reveal = (): void => { show(); rest = box?.scrollTop ?? 0; held = false; };
+  return {
+    reveal,
+    where: () => ({ top: box?.scrollTop ?? 0, left: box?.scrollLeft ?? 0, byHand: held || Math.abs((box?.scrollTop ?? 0) - rest) > 1 }),
+    resume: (at) => {
+      if (!box) return;
+      box.scrollLeft = at.left;
+      if (!at.byHand) { reveal(); return; }
+      box.scrollTop = at.top;
+      held = true;
+    },
+  };
 }
 
 // ── The ladder ─────────────────────────────────────────────────────────────────
@@ -265,11 +334,11 @@ function formCells(form: readonly FormResult[]): HTMLElement {
  * starred; a dashed line falls under the last finals place; a rival's row
  * opens its squad (#74).
  */
-function buildLadder(state: GameState): { el: HTMLElement; reveal: () => void } {
+function buildLadder(state: GameState): LeagueColumn {
   const col = el('div', { class: 'nrl-league-col nrl-league-ladder' });
   if (state.league.ladder.length === 0) {
     col.append(el('div', { class: 'nrl-label nrl-league-label', text: 'Ladder' }), el('p', { class: 'nrl-league-empty', text: 'No ladder yet — season not started.' }));
-    return { el: col, reveal: () => {} };
+    return { el: col, ...columnScroll(null, () => {}) };
   }
   const names = clubLabels(state.league.clubs);
   const full = clubNameMap(state.league.clubs);
@@ -318,7 +387,7 @@ function buildLadder(state: GameState): { el: HTMLElement; reveal: () => void } 
   table.append(tbody);
   const scroll = el('div', { class: 'nrl-ladder-scroll' }, table);
   col.append(scroll, el('div', { class: 'nrl-league-foot', text: `Top ${cut} make the finals · tap a club for its squad` }));
-  return { el: col, reveal: () => centreIn(scroll, mine) };
+  return { el: col, ...columnScroll(scroll, () => centreIn(scroll, mine)) };
 }
 
 // ── The fixtures ───────────────────────────────────────────────────────────────
@@ -343,17 +412,17 @@ export function fmtMyFixture(f: Fixture, names: Record<string, string>, playerId
  * row opens the next-match preview), or every game of every round. Scrolled so
  * the coming round is in view.
  */
-function buildFixtures(state: GameState): { el: HTMLElement; reveal: () => void } {
+function buildFixtures(state: GameState): LeagueColumn {
   const col = el('div', { class: 'nrl-league-col nrl-league-fixtures' });
   const label = el('span', { class: 'nrl-label nrl-league-label' });
   const list = el('div', { class: 'nrl-fixtures-list' });
   if (state.league.fixtures.length === 0) {
     label.textContent = 'Your fixtures';
     col.append(el('div', { class: 'nrl-fixtures-head' }, label), el('p', { class: 'nrl-league-empty', text: 'No fixtures yet — season not started.' }));
-    return { el: col, reveal: () => {} };
+    return { el: col, ...columnScroll(null, () => {}) };
   }
   const names = clubLabels(state.league.clubs);
-  const toggle = button('', () => { fixturesView = fixturesView === 'mine' ? 'all' : 'mine'; render(); reveal(); }, { class: 'nrl-fixtures-toggle' });
+  const toggle = button('', () => { fixturesView = fixturesView === 'mine' ? 'all' : 'mine'; render(); scroll.reveal(); }, { class: 'nrl-fixtures-toggle' });
   let current: HTMLElement | null = null;
 
   const render = (): void => {
@@ -396,15 +465,18 @@ function buildFixtures(state: GameState): { el: HTMLElement; reveal: () => void 
       }
     }
   };
-  const reveal = (): void => {
+  const scroll = columnScroll(list, () => {
     if (!current) return;
     if (fixturesView === 'all') list.scrollTop = Math.max(0, current.offsetTop - list.offsetTop);
     else centreIn(list, current);
-  };
+  });
   render();
   col.append(el('div', { class: 'nrl-fixtures-head' }, label, toggle), list);
-  return { el: col, reveal };
+  return { el: col, ...scroll };
 }
+
+/** The preview last opened: the League sheet under it fills it again when the week moves on (#603). */
+let nextCard: HTMLElement | null = null;
 
 /**
  * The next-match preview (N7, #183), opened from the NEXT row as a dialog over
@@ -416,11 +488,13 @@ function buildFixtures(state: GameState): { el: HTMLElement; reveal: () => void 
  */
 export function openNextMatch(state: GameState = getState()): HTMLElement {
   ensureLeagueStyles();
-  return openModal(nextMatchCard(state), { class: 'nrl-next-modal', region: true, closeButton: true });
+  nextCard = nextMatchCard(state);
+  return openModal(nextCard, { class: 'nrl-next-modal', region: true, closeButton: true });
 }
 
-function nextMatchCard(state: GameState): HTMLElement {
-  const card = el('div', { class: 'nrl-next-match', attrs: { 'data-next-match': '' } });
+/** The preview's card, or `card` filled again from `state`. */
+function nextMatchCard(state: GameState, card: HTMLElement = el('div', { class: 'nrl-next-match', attrs: { 'data-next-match': '' } })): HTMLElement {
+  card.replaceChildren();
   const forecast = forecastFor(state);
   const p = nextMatchPreview(state, forecast ? { weather: forecast } : {});
   if (!p) {

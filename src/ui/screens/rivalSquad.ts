@@ -10,8 +10,7 @@ import { resolveLineup, validTactics } from '../../systems/lineup';
 import type { RivalClub } from '../../core/state';
 import { overallRating, ratingText } from '../../data/player';
 import { traitLabel } from '../../data/traits';
-import { button, el, ensureStyles, openModal, screenKey } from '../dom';
-import { openFixturesScreen, openLadderScreen } from './fixtures';
+import { button, el, ensureStyles, openModal } from '../dom';
 import { playerRivalContext, rivalSheet, rivalStyle } from '../../systems/rivalRound';
 import { hasStaff } from '../../systems/staff';
 import { getState, setState } from '../../core/state';
@@ -258,15 +257,9 @@ export function openRivalSquad(opened: RivalClub): HTMLElement {
           if (!res.ok) return res.why;
           draft = null;
           if (res.patch) {
+            // The League sheet under this one draws itself again on the change, where it was scrolled to (#603).
             setState(res.patch);
             save(getState());
-            // The League sheet under this one is drawn once: draw it again with the new name, then this sheet over it.
-            const key = screenKey();
-            if (key === 'fixtures' || key === 'ladder') {
-              (key === 'ladder' ? openLadderScreen : openFixturesScreen)();
-              openRivalSquad(live());
-              return null;
-            }
           }
           render();
           return null;
