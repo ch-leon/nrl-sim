@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { drawRingPixels, RING_SCALE } from '../../../src/match/view/ringTexture';
 import { RING_EDGE } from '../../../src/match/view/rings';
+import { drawRingPixelsReference } from './ringTextureReference';
 
 const paint = { color: 0xc03030, width: 1.5, alpha: 0.9, fillAlpha: 0.28 };
 const alphaAt = (b: ReturnType<typeof drawRingPixels>, x: number, y: number): number => b.data[(y * b.w + x) * 4 + 3]!;
@@ -57,4 +58,21 @@ describe('drawRingPixels', () => {
     expect(edge).toBeGreaterThan(20);
     expect(side).toBeGreaterThan(20);
   });
+});
+
+describe('drawRingPixels against the slow reference (#646)', () => {
+  const sizes: [number, number][] = [[15, 7.5], [12, 6], [20, 9.5], [8, 8]];
+  for (const style of ['solid', 'dashed'] as const) {
+    for (const [w, h] of sizes) {
+      it(`${style} ${w}x${h} is pixel-identical`, () => {
+        const p = { color: 0x2a9d5c, width: 1.5, alpha: 0.9, fillAlpha: style === 'solid' ? 0.28 : 0.1 };
+        for (const scale of [RING_SCALE, 2]) {
+          const a = drawRingPixels(style, w, h, p, scale);
+          const b = drawRingPixelsReference(style, w, h, p, scale);
+          expect([a.w, a.h]).toEqual([b.w, b.h]);
+          expect(Buffer.from(a.data).equals(Buffer.from(b.data))).toBe(true);
+        }
+      });
+    }
+  }
 });

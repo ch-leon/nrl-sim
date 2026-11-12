@@ -184,10 +184,11 @@ export function planChangeLines(
 
 /** Two letters for the Player of the Match badge: "Brayden Naden" → BN. */
 export function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
+  // By code point, letters and digits only (#616): "🦊 Fox" read "�F" when it took UTF-16 units.
+  const words = name.trim().split(/\s+/).map((w) => w.match(/\p{L}|\p{N}/gu) ?? []).filter((w) => w.length > 0);
   if (words.length === 0) return '?';
-  const first = words[0]![0] ?? '';
-  const last = words.length > 1 ? words[words.length - 1]![0] ?? '' : words[0]![1] ?? '';
+  const first = words[0]![0]!;
+  const last = words.length > 1 ? words[words.length - 1]![0]! : words[0]![1] ?? '';
   return `${first}${last}`.toUpperCase();
 }
 
@@ -395,6 +396,8 @@ export function showFullTime(r: MatchReport, result: MatchResult, fixture: { rou
   const report = button('Report', () => {
     wrap.hidden = true;
     const box = openMatchReport(r, opts);
+    // It takes this card's place over the same dim: a swap, with no dialog's entrance (#606).
+    box.setAttribute('data-swap', '');
     // The report closes (its dimmed edge) back onto this card.
     const watch = new MutationObserver(() => {
       if (box.isConnected) return;
@@ -540,7 +543,7 @@ export const REPORT_CSS = `
 .nrl-ft-card {
   width: min(540px, 100%); max-height: 100%; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
   padding: 20px 24px; border-radius: 18px; background: var(--nrl-navy); color: var(--nrl-text); box-shadow: var(--nrl-shadow-modal);
-  font-family: var(--nrl-f-body); animation: nrl-mo-up 180ms ease-out;
+  font-family: var(--nrl-f-body); animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-ft-head, .nrl-rp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .nrl-ft-title { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-accent); }
@@ -570,9 +573,9 @@ export const REPORT_CSS = `
 .nrl-ft-stat-v { font-family: var(--nrl-f-num); font-weight: 600; font-variant-numeric: tabular-nums; }
 .nrl-ft-stat-v:first-child { text-align: right; }
 .nrl-ft-stat-l { text-align: center; font-family: var(--nrl-f-label); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
-.nrl-ft-potm { animation: nrl-ft-slide 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 700ms backwards; }
-@keyframes nrl-ft-slide { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .nrl-ft-potm { animation: none; } }
+/* The Player of the Match comes in a beat after the card, on the motion tokens (#597): reduced motion keeps the fade and drops the travel. */
+.nrl-ft-potm { animation: nrl-ft-slide var(--nrl-dur-sheet) var(--nrl-ease-out) calc(var(--nrl-dur-sheet) * 3) backwards; }
+@keyframes nrl-ft-slide { from { opacity: 0; transform: translateX(var(--nrl-rise)); } to { opacity: 1; transform: none; } }
 /* The actions stay in reach when a short screen makes the card scroll (956×330: the stat rows took Back to Club off the bottom). */
 .nrl-ft-actions { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; background: var(--nrl-navy); }
 .nrl-ft-actions .nrl-btn { height: 48px; font-size: 1.125rem; padding: 0 16px; }
@@ -626,7 +629,7 @@ export const REPORT_CSS = `
 .nrl-report-potm { margin: 0; font-size: 0.8125rem; color: var(--nrl-text-2); }
 .nrl-rp-potm-label { font-family: var(--nrl-f-label); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nrl-muted); }
 .nrl-btn.nrl-rp-back { flex: 0 0 auto; width: 100%; height: 48px; font-size: 1.1875rem; }
-.nrl-rp-stats { min-height: 0; overflow-y: auto; }
+.nrl-rp-stats { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 /* Eight rows (Scrambles won and Calls paid off, #99) fit unscrolled at 956×330. */
 @media (max-height: 340px) { .nrl-rp-stats .nrl-mo-statrow { height: 31px; } }
 @media (max-width: 720px) { .nrl-report { grid-template-columns: minmax(0, 1fr) 280px; gap: 14px; } }

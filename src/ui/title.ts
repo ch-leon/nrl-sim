@@ -8,11 +8,11 @@
 // attribute.
 
 import {
-  deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, pickSaveFile, setActiveSlot, type SlotSummary,
+  deleteSlot, downloadOriginalSave, exportRecoverySaves, getSlotSummaries, installImportedSave, listSlotMeta, pickSaveFile, setActiveSlot, type SlotSummary,
 } from '../core/save';
-import { cleanName, NAME_MAX } from '../data/names';
+import { cleanName, GROUND_MAX, NAME_MAX } from '../data/names';
 import type { GameState } from '../core/state';
-import { colorsForTown, foldTown, groundForTown, townColorsAllowed, townHash, type Town } from '../data/townSetup';
+import { colorsForTown, defaultClubName, foldTown, groundForTown, townColorsAllowed, townHash, type Town } from '../data/townSetup';
 import { buildLabel } from './buildInfo';
 import {
   DEFAULT_DIFFICULTY, DEFAULT_PLAYER_COLORS, DIFFICULTIES, PLAYER_PRIMARY_COLORS,
@@ -26,6 +26,7 @@ import { BRAND, type Brand } from '../brand';
 import { COLOR_TOKENS } from './tokens';
 import { commercialEnabled } from '../commercial/flags';
 import { openLoginDialog, openPaywall } from './screens/paywall';
+import { listenForPress, MOTION_CSS } from './dom';
 
 export interface TitleChoice {
   mode: 'continue' | 'new';
@@ -61,6 +62,7 @@ export const DIFFICULTY_BLURB: Record<Difficulty, string> = {
 // insets come through the frame's --nrl-safe-* (dom.ts) where they are set, env()
 // before the frame's stylesheet is in.
 export const TITLE_CSS = `
+${MOTION_CSS}
 .nrl-title { position: absolute; inset: 0; pointer-events: auto; overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; align-items: center; box-sizing: border-box;
   padding: calc(12px + var(--nrl-safe-t, env(safe-area-inset-top, 0px))) calc(12px + var(--nrl-safe-r, env(safe-area-inset-right, 0px)))
@@ -68,6 +70,9 @@ export const TITLE_CSS = `
   background: radial-gradient(ellipse at 50% 120%, #1b3a2a 0%, #0e1630 60%) #0e1630; color: #fff;
   font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.875rem; }
 .nrl-title * { box-sizing: border-box; }
+/* Controls, as in the game's sheet (#604): no browser tap box, no long-press selection or callout, no double-tap zoom. */
+.nrl-title, .nrl-title * { -webkit-tap-highlight-color: transparent; }
+.nrl-title :is(button, label) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .nrl-title-main { margin: auto 0; width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: 14px; }
 .nrl-title h1 { margin: 0; text-align: center; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-style: italic;
   font-weight: 700; font-size: 3rem; letter-spacing: 0.06em; line-height: 1; }
@@ -87,13 +92,23 @@ export const TITLE_CSS = `
 .nrl-title-actions { margin-top: auto; padding-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
 .nrl-title-btn { min-height: 44px; padding: 0 14px; font-family: 'Barlow Condensed', sans-serif; font-size: 1rem; font-weight: 700;
   letter-spacing: 0.04em; text-transform: uppercase; color: #fff; cursor: pointer;
-  background: #1f2b55; border: 0; border-radius: 10px; flex: 1 1 0; white-space: nowrap; }
-.nrl-title-btn:hover { background: #283669; }
+  background: #1f2b55; border: 0; border-radius: 10px; flex: 1 1 0; white-space: nowrap;
+  transition: background-color var(--nrl-dur-press) ease; }
+/* Hover for a mouse only; a press takes the same fill and shrinks a little (#604), and snaps back. */
+@media (hover: hover) and (pointer: fine) { .nrl-title-btn:hover { background: #283669; } }
+.nrl-title-btn:active:not(:disabled) { background: #283669; transform: scale(var(--nrl-press));
+  transition: background-color var(--nrl-dur-press) ease, transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-title-btn:focus-visible { outline: 2px solid #f4d03f; outline-offset: 2px; }
 .nrl-title-btn-go, .nrl-title-btn-go:hover { background: #f4d03f; color: #0e1630; flex-basis: 100%; }
+.nrl-title-btn-go:active:not(:disabled) { background: #f7da5e; }
+/* A slot's own Continue or New game when another slot holds the screen's one yellow (#613). */
+.nrl-title-btn-row { flex-basis: 100%; }
+/* Disabled stays visible and its label says why (#613). Two lines fit the narrow Start column. */
+.nrl-title-btn:disabled, .nrl-title-btn:disabled:hover { background: #1b264a; color: #9aa6c7; cursor: default;
+  white-space: normal; line-height: 1; }
 .nrl-title-btn-small { font-size: 0.875rem; padding: 0 8px; }
 .nrl-title-btn[data-nrl-delete-1], .nrl-title-btn[data-nrl-delete-2], .nrl-title-btn[data-nrl-delete-3] { color: #f0a39b; }
-.nrl-title-btn[data-armed] { background: #5a2430; color: #fff; }
+.nrl-title-btn[data-armed], .nrl-title-btn[data-armed]:active:not(:disabled) { background: #5a2430; color: #fff; }
 .nrl-title-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .nrl-title-foot .nrl-title-btn { flex: 0 0 auto; }
 .nrl-title-notice { color: #f0a39b; font-size: 0.8125rem; max-width: 360px; text-align: center; }
@@ -112,8 +127,9 @@ export const TITLE_CSS = `
 .nrl-title-kit img { width: 84px; height: 90px; image-rendering: pixelated; }
 .nrl-title-form { grid-area: form; display: flex; flex-direction: column; gap: 8px; min-width: 0;
   max-height: calc(100dvh - 110px - var(--nrl-safe-t, env(safe-area-inset-top, 0px)) - var(--nrl-safe-b, env(safe-area-inset-bottom, 0px))); }
-/* Details scroll on short phones; difficulty guidance and Start stay in view. */
-.nrl-title-details { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; padding: 3px; }
+/* Details scroll on short phones; difficulty guidance and Start stay in view. A drag past the
+   list's end stays in the list (#609): chained to the screen, it slid BACK and the heading off the top. */
+.nrl-title-details { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 3px; }
 .nrl-title-details > *, .nrl-title-form > :not(.nrl-title-details) { flex-shrink: 0; }
 .nrl-title-names { display: flex; flex-direction: column; gap: 8px; }
 .nrl-title-veteran { grid-area: veteran; display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.8125rem; cursor: pointer; }
@@ -129,13 +145,20 @@ export const TITLE_CSS = `
 .nrl-title-swatch { width: 32px; height: 32px; padding: 0; border: 2px solid rgba(255, 255, 255, 0.15); border-radius: 8px; cursor: pointer; }
 .nrl-title-swatch[aria-pressed="true"] { border-color: #0e1630; box-shadow: 0 0 0 2px #f4d03f; }
 .nrl-title-swatch:disabled { opacity: 0.25; cursor: default; }
+.nrl-title-swatch:active:not(:disabled) { transform: scale(var(--nrl-press)); transition: transform var(--nrl-dur-press) var(--nrl-ease-out); }
 .nrl-title-pick { background: #1b264a; }
 .nrl-title-difficulty-copy { margin: 0; font-size: 0.8125rem; line-height: 1.3; color: #c9d1ea; }
 .nrl-title-difficulty-hint { color: #f4d03f; }
-.nrl-title-pick[aria-pressed="true"], .nrl-title-pick[aria-pressed="true"]:hover { background: #f4d03f; color: #0e1630; }
+.nrl-title-pick[aria-pressed="true"], .nrl-title-pick[aria-pressed="true"]:hover, .nrl-title-pick[aria-pressed="true"]:active:not(:disabled) { background: #f4d03f; color: #0e1630; }
 .nrl-title-input { min-height: 44px; padding: 0 12px; font: inherit; font-size: 1rem; flex: 1; min-width: 0; color: #fff;
   background: #1b264a; border: 2px solid #26325c; border-radius: 10px; }
 .nrl-title-input:focus { outline: none; border-color: #f4d03f; }
+/* A name box and, while the name won't do, why (#616): the rename field's rule and words. */
+.nrl-title-entry { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nrl-title-entry > .nrl-title-input { flex: 0 0 auto; }
+.nrl-title-input[aria-invalid="true"] { border-color: #f0a39b; }
+.nrl-title-why { font-size: 0.6875rem; line-height: 1.2; color: #f0a39b; }
+.nrl-title-why:empty { display: none; }
 @media (pointer: coarse) { .nrl-title-swatch { width: 44px; height: 44px; } }
 @media (max-height: 500px) and (min-width: 521px) {
   /* Keep the coarse-pointer swatches on one row at 667px, leaving room for both guidance lines. */
@@ -258,6 +281,7 @@ function jerseyUrl(colors: [string, string]): string {
  */
 export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
   return new Promise<TitleChoice>((resolve) => {
+    listenForPress();
     const overlay = mk('div', 'nrl-title');
     overlay.setAttribute('data-nrl-title', '');
     const style = document.createElement('style');
@@ -281,7 +305,8 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       resolve(choice);
     };
 
-    const slotCard = (s: SlotSummary): HTMLElement => {
+    const slotCard = (s: SlotSummary, isPrimary: boolean): HTMLElement => {
+      const lead = isPrimary ? 'nrl-title-btn-go' : 'nrl-title-btn-row';
       const card = mk('div', 'nrl-title-card');
       card.setAttribute(`data-nrl-slot-${s.slot}`, '');
       if (s.status === 'empty') card.setAttribute('data-empty', '');
@@ -306,12 +331,12 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         }
       } catch { /* unreadable storage is already described on the card */ }
       if (s.status === 'ok') {
-        const cont = mkButton('Continue', `data-nrl-continue-${s.slot}`, 'nrl-title-btn-go');
+        const cont = mkButton('Continue', `data-nrl-continue-${s.slot}`, lead);
         cont.addEventListener('click', () => finish(s.slot, { mode: 'continue' }));
         actions.appendChild(cont);
       }
       if (s.status !== 'future') {
-        const newBtn = mkButton('New game', `data-nrl-new-${s.slot}`, s.status === 'empty' ? 'nrl-title-btn-go' : 'nrl-title-btn-small');
+        const newBtn = mkButton('New game', `data-nrl-new-${s.slot}`, s.status === 'empty' ? lead : 'nrl-title-btn-small');
         newBtn.addEventListener('click', () => showSetup(s));
         actions.appendChild(newBtn);
       }
@@ -338,11 +363,24 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       return card;
     };
 
+    // One yellow button on the slots screen (#613): Continue on the save written last
+    // (SaveMeta.updatedAt; a tie, or saves from before meta, go to the lower slot). With
+    // nothing to continue, New game on the first empty slot.
+    const primarySlot = (summaries: SlotSummary[]): number | undefined => {
+      const meta = listSlotMeta();
+      const when = (slot: number): number => meta.find((m) => m.slot === slot)?.meta?.updatedAt ?? 0;
+      const saved = summaries.filter((s) => s.status === 'ok');
+      if (saved.length) return saved.reduce((a, b) => (when(b.slot) > when(a.slot) ? b : a)).slot;
+      return summaries.find((s) => s.status === 'empty')?.slot;
+    };
+
     const showSlots = (notice?: string): void => {
       main.replaceChildren();
       for (const e of titleHeading()) main.appendChild(e);
       const slots = mk('div', 'nrl-title-slots');
-      for (const s of getSlotSummaries()) slots.appendChild(slotCard(s));
+      const summaries = getSlotSummaries();
+      const primary = primarySlot(summaries);
+      for (const s of summaries) slots.appendChild(slotCard(s, s.slot === primary));
       main.appendChild(slots);
 
       const foot = mk('div', 'nrl-title-foot');
@@ -415,6 +453,30 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         row.appendChild(control);
         return row;
       };
+      // The club, coach and ground names take the rename rule (#616): a name that won't do
+      // says why under its box and holds Start, never cut short. Empty is fine (a default, or no coach).
+      const checks: (() => boolean)[] = [];
+      const reasons: HTMLElement[] = [];
+      const named = (box: HTMLInputElement, max: number, hook: string): HTMLElement => {
+        box.setAttribute('maxlength', String(max * 2)); // room past the limit, so the reason shows
+        const why = mk('div', 'nrl-title-why');
+        why.setAttribute('aria-live', 'polite');
+        why.setAttribute(hook, '');
+        const check = (): boolean => {
+          const c = box.value.trim() ? cleanName(box.value, max) : null;
+          const bad = c !== null && !c.ok;
+          box.setAttribute('aria-invalid', String(bad));
+          why.textContent = c && !c.ok ? c.why : '';
+          return !bad;
+        };
+        box.addEventListener('input', () => { check(); });
+        checks.push(check);
+        reasons.push(why);
+        const entry = mk('div', 'nrl-title-entry');
+        entry.appendChild(box);
+        entry.appendChild(why);
+        return entry;
+      };
 
       const townInput = mk('input', 'nrl-title-input');
       townInput.type = 'text';
@@ -449,17 +511,15 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       input.value = DEFAULT_CLUB_NAME;
       input.setAttribute('data-nrl-clubname', '');
       input.setAttribute('aria-label', 'Club name');
-      input.setAttribute('maxlength', '120');
       const names = mk('div', 'nrl-title-names');
-      names.appendChild(field('Club name', input));
+      names.appendChild(field('Club name', named(input, NAME_MAX, 'data-nrl-clubname-why')));
 
       const coachInput = mk('input', 'nrl-title-input');
       coachInput.type = 'text';
       coachInput.setAttribute('data-nrl-coachname', '');
       coachInput.setAttribute('aria-label', 'Your name');
       coachInput.setAttribute('placeholder', 'Coach');
-      coachInput.setAttribute('maxlength', String(NAME_MAX));
-      names.appendChild(field('Your name', coachInput));
+      names.appendChild(field('Your name', named(coachInput, NAME_MAX, 'data-nrl-coachname-why')));
       details.appendChild(names);
 
       const ground = mk('input', 'nrl-title-input');
@@ -467,16 +527,31 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       ground.type = 'text';
       ground.setAttribute('data-nrl-groundname', '');
       ground.setAttribute('aria-label', 'Ground name');
-      ground.setAttribute('maxlength', '120');
-      details.appendChild(field('Ground name', ground));
+      details.appendChild(field('Ground name', named(ground, GROUND_MAX, 'data-nrl-groundname-why')));
+      // The phone keyboard (#609): names start with a capital and are not "corrected", and the
+      // return key says what it does: on to the next name, then done (the keyboard goes away).
+      const nameInputs = [townInput, input, coachInput, ground];
+      nameInputs.forEach((box, i) => {
+        const next = nameInputs[i + 1];
+        box.setAttribute('autocapitalize', 'words');
+        box.setAttribute('autocorrect', 'off');
+        box.setAttribute('spellcheck', 'false');
+        box.setAttribute('enterkeyhint', next ? 'next' : 'done');
+        box.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' || e.isComposing) return;
+          e.preventDefault();
+          if (next) next.focus(); else box.blur();
+        });
+      });
       const applyTown = (): void => {
         const value = townInput.value.trim();
         selected = towns.find(t => townLabel(t) === value)
           ?? towns.find(t => foldTown(t.name) === foldTown(value));
         const name = selected?.name ?? value;
         const nickname = selected?.nickname ?? ['Wombats', 'Kestrels', 'Otters', 'Ironworkers'][townHash(name) % 4];
-        input.value = name ? `${name} ${nickname}` : DEFAULT_CLUB_NAME;
+        input.value = name ? defaultClubName(name, nickname) : DEFAULT_CLUB_NAME;
         ground.value = name ? groundForTown(name, selected?.id ?? name) : '';
+        for (const check of checks) check();
         if (!townColorsAllowed(name, selected?.country, primary, secondary)) {
           [primary, secondary] = colorsForTown(name, selected?.country);
         }
@@ -559,21 +634,36 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
       refresh();
 
       const go = mk('div', 'nrl-title-go');
+      /** Every name passes (each says why when not); focus the first that doesn't. */
+      const namesOk = (): boolean => {
+        const bad = [0, 1, 2].filter((i) => !checks[i]!());
+        if (bad.length) {
+          [input, coachInput, ground][bad[0]!]!.focus();
+          // On a short phone the details scroll: bring the reason into view, not only the box.
+          reasons[bad[0]!]!.scrollIntoView?.({ block: 'nearest' });
+        }
+        return bad.length === 0;
+      };
       const begin = (): void => {
+        if (!namesOk()) return;
         if (s.status !== 'empty') deleteSlot(s.slot);
-        const name = input.value.trim() || DEFAULT_CLUB_NAME;
+        const club = cleanName(input.value);
+        const name = club.ok ? club.name : DEFAULT_CLUB_NAME;
         const coach = cleanName(coachInput.value);
         const town = selected?.name ?? townInput.value.trim();
+        const groundName = cleanName(ground.value, GROUND_MAX);
         const home = selected
           ? { town, region: selected.region, country: selected.country, lat: selected.lat, lon: selected.lon }
           : { town };
         finish(s.slot, { mode: 'new', seed, clubName: name, ...(coach.ok ? { coachName: coach.name } : {}), difficulty, ...(veteran.checked ? { openAll: true } : {}), colors: [primary, secondary],
-          home, groundName: ground.value.trim() || groundForTown(town || name, selected?.id ?? town) });
+          home, groundName: groundName.ok ? groundName.name : groundForTown(town || name, selected?.id ?? town) });
       };
-      const start = mkButton('Start', 'data-nrl-start', 'nrl-title-btn-go');
+      // Start waits for the town list, and says so while it does (#613).
+      const start = mkButton('Loading towns…', 'data-nrl-start', 'nrl-title-btn-go');
       start.disabled = true;
+      const ready = (): void => { start.textContent = 'Start'; start.disabled = false; };
       start.addEventListener('click', () => {
-        if (start.disabled) return;
+        if (start.disabled || !namesOk()) return;
         if (s.status === 'empty') return begin();
         // A season (or an unreadable save) is in this slot: say what Start replaces first.
         go.replaceChildren();
@@ -604,10 +694,11 @@ export function showTitleFlow(root: HTMLElement): Promise<TitleChoice> {
         applyTown();
         if (editedClub !== undefined) input.value = editedClub;
         if (editedGround !== undefined) ground.value = editedGround;
-        start.disabled = false;
+        for (const check of checks) check();
+        ready();
       }).catch(() => {
         townNote.textContent = 'Town list unavailable. Type your own town to start.';
-        start.disabled = false;
+        ready();
       });
     };
 

@@ -23,6 +23,7 @@ import { bus } from '../core/events';
 import { spendMoney, addFacility, earnMoney } from '../data/club';
 import { FACILITY_CATALOG, upgradeCost, type FacilityDef, type FacilityDefId } from '../data/facility';
 import { GROUNDS } from '../config';
+import { fmtMoney } from '../utils/money';
 import { onEntrancePath, onWalkway, type WalkGrid } from './path';
 import { GhostPreview, strokeFootprint } from './ghostPreview';
 import { ghostStyle } from './buildFeedback';
@@ -572,7 +573,7 @@ export class PlacementController {
       bus.emit('ui:notify', { text: reasonText(r.reason ?? ''), kind: 'info' });
       return r;
     }
-    if (r.fee) bus.emit('ui:notify', { text: `${def.name} moved (−$${r.fee.toLocaleString('en-US')}).`, kind: 'success' });
+    if (r.fee) bus.emit('ui:notify', { text: `${def.name} moved (−${fmtMoney(r.fee)}).`, kind: 'success' });
     this.exit();
     return r;
   }

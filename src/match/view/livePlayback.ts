@@ -875,7 +875,8 @@ export class LivePlayback {
       // A line break the view calls half (#638) reads and plays as a plain line; the recorded events below are the sim's own.
       const e = shownBreak(sim, cur);
       if (e.side !== undefined && e.slot !== undefined && e.kind !== 'call-paid' && e.kind !== 'coach-call') this.lastActor[e.side] = e.slot;
-      if (e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick }); // the whoosh and the crowd (audio)
+      // The whoosh and the crowd (audio); a skipped or resumed stretch is not heard.
+      if (!this.skipping && e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick });
       // A kick struck or brought down (N15.3); a skipped or resumed stretch shows none.
       if (this.skipping) {
         this.kicks.clear();
@@ -912,7 +913,8 @@ export class LivePlayback {
     }
     // The contract's events, recorded for the result and sent to the overlay and FX.
     for (const ev of this.recorder.add(events, cur)) bus.emit('match:event', ev);
-    for (const e of events) if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick }); // the whistle (audio); the contract has no penalty event
+    // The whistle (audio; the contract has no penalty event). Not through a skipped or resumed stretch.
+    if (!this.skipping) for (const e of events) if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
   }
 
   /** One replay per try: the button stays up for eight seconds, including after the siren. */

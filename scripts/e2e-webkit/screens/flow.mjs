@@ -185,6 +185,7 @@ export async function runFlow(browser, { w: W, h: H, text }) {
     const w0 = await week();
     await menuPick('To season end');
     await page.waitForSelector('[data-advance-ask]');
+    await page.waitForTimeout(250); // the dialog's entrance (#606): its buttons are measured at full size
     const q = (await page.locator('[data-ask-question]').textContent().catch(() => '')) ?? '';
     rec.notes.push(`"${q}"`);
     const out = /^Play \d+ weeks\? It stops for decisions\.$/.test(q) ? [] : [`the ask says "${q}", not how long the run is`];
@@ -336,8 +337,8 @@ export async function runFlow(browser, { w: W, h: H, text }) {
       const sell = `[data-contract="${next.id}"] .nrl-contract-actions .nrl-btn:last-child`;
       await tap(sell);
       await page.waitForTimeout(200);
-      if (!(await page.locator('.nrl-contract-armed').count())) out.push('SELL did not arm');
-      out.push(...await flowReach(page, ['.nrl-contract-armed']));
+      if (!(await page.locator('.nrl-contracts .nrl-btn-armed').count())) out.push('SELL did not arm');
+      out.push(...await flowReach(page, ['.nrl-contracts .nrl-btn-armed']));
       const armedWide = await page.evaluate(() => { const e = document.querySelector('.nrl-contracts-scroll'); return e.scrollWidth - e.clientWidth; });
       if (armedWide > 1) out.push(`with SELL armed the table is ${armedWide}px wider than the sheet`);
       await shot('f3-armed');

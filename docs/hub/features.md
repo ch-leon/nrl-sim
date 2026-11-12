@@ -49,6 +49,7 @@ What's in the game, with the PR that added each.
 - Upright menus, 5-tab bar ([PR](https://github.com/ch-leon/nrl-sim/pull/436))
 - Three-tap onboarding, Undo ([PR](https://github.com/ch-leon/nrl-sim/pull/380))
 - Text size, non-colour cues ([PR](https://github.com/ch-leon/nrl-sim/pull/385))
+- Touch polish: press feedback, motion tokens, mis-tap guards, scroll cues ([PR](https://github.com/ch-leon/nrl-sim/pull/617))
 
 ## Labs
 
@@ -89,6 +90,17 @@ What's in the game, with the PR that added each.
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 
 - Kick catches and loose-ball pickups carry explicit commentary detail, so a kick scooped up on its first grounded tick is called a pickup ([PR](https://github.com/ch-leon/nrl-sim/pull/620)).
+
+- A touch and motion polish pass over the menus and the match screen. Controls
+  show a press under the finger and hover fills no longer stick after a tap; a
+  sheet that replaces a sheet opens without replaying its entrance; dialogs and
+  the ▾ menu ease in; motion runs on shared tokens and reduced motion keeps the
+  fades without the travel. A double tap no longer signs two players or upgrades
+  twice, arming SKIP no longer moves the speed pill, and the coach tray ignores
+  taps for a moment after its tiles move. The bank flashes the week's net
+  direction, money reads one way on every screen, the League sheet follows the
+  week, long lists show there is more below, and the dock's tabs hold their
+  place ([issue](https://github.com/ch-leon/nrl-sim/issues/596)).
 
 - The isolated developer regional career includes an optional cross-division
   Open Cup, with a saved deterministic draw, implicit byes, profile-based dates,

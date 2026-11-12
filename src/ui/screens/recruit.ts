@@ -4,7 +4,7 @@
 // exports the pieces the squad screens share: their stylesheet, the trait
 // chips, the fitness bar and the ▾ menu button.
 
-import { el, button, ensureStyles, openScreen, screenHead } from '../dom';
+import { el, button, ensureStyles, guardDoubleTap, hintScroll, openScreen, screenHead } from '../dom';
 import { getState, type Player, type TraitInstance } from '../../core/state';
 import { TRAITS, traitLabel } from '../../data/traits';
 import { bus } from '../../core/events';
@@ -19,6 +19,7 @@ import { openPlayerPage, positionLabel } from './player';
 import { squadTabs } from './squad';
 import { recruitShortlist } from '../recruitShortlist';
 import { weeklyIncome } from '../../systems/economy';
+import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 
 // ── Shared screen styling ───────────────────────────────────────────────────
 // Injected once alongside the base kit CSS (which holds the sheet, the
@@ -83,13 +84,17 @@ const SCREEN_CSS = `
   .nrl-grid-head { height: 20px; }
 }
 .nrl-row.nrl-card-open { cursor: pointer; }
-.nrl-row.nrl-card-open:hover { background: rgba(255, 255, 255, 0.04); }
+@media (hover: hover) and (pointer: fine) { .nrl-row.nrl-card-open:hover { background: rgba(255, 255, 255, 0.04); } }
+.nrl-row.nrl-card-open:active { background: rgba(255, 255, 255, 0.04); }
 .nrl-card-open:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: -2px; }
 /* Tappable rows are a finger tall on a touch screen. */
 @media (pointer: coarse) { .nrl-row.nrl-card-open { min-height: 44px; } }
-/* The name, then a knock or a ban in red, then the traits as chips; the name gives way first. */
+/* The name, then a knock or a ban in red, then the traits as chips. The name keeps its width (#614: the
+   list is where players are told apart); the chips give way, folding into "+n" (traitChips, fitChips). */
 .nrl-row-who { display: flex; align-items: center; gap: 6px; overflow: hidden; padding-right: 6px; }
-.nrl-row-name { flex: 0 1 auto; min-width: 3em; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.nrl-row-name { flex: 0 0 auto; max-width: 100%; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+/* A name too long for its dot, its note and the "+n" beside it gives them the room. */
+.nrl-row-who[data-tight] > .nrl-row-name { flex-shrink: 1; min-width: 3em; }
 .nrl-row-note { flex: 0 0 auto; font-size: 0.6875rem; color: var(--nrl-neg); }
 .nrl-row-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); }
 .nrl-chip {
@@ -110,6 +115,8 @@ const SCREEN_CSS = `
 .nrl-row-pos { font-family: var(--nrl-f-label); font-size: 0.9375rem; font-weight: 600; }
 .nrl-row .nrl-num { font-weight: 500; }
 .nrl-row .nrl-row-ovr { font-weight: 600; }
+/* #600: the rating ("4½★ 56") ends on one line down its column, a clear gap before the next; so does its head. */
+.nrl-grid-head > .nrl-col-ovr, .nrl-row > .nrl-row-ovr { text-align: right; padding-right: 0.625rem; }
 .nrl-row-dim { color: var(--nrl-text-2); font-size: 0.75rem; }
 .nrl-row-attn { color: var(--nrl-accent); }
 .nrl-row-bad { color: var(--nrl-neg); }
@@ -118,16 +125,18 @@ const SCREEN_CSS = `
 .nrl-fit-bar { flex: 0 0 auto; width: 72px; height: 5px; border-radius: 3px; background: var(--nrl-button); overflow: hidden; }
 .nrl-fit-bar > span { display: block; height: 100%; }
 .nrl-fit-pct { font-family: var(--nrl-f-num); font-size: 0.75rem; }
-/* 3d Squad: # · PLAYER · POS · OVR · FITNESS · TO, then wage and morale where the sheet has room. */
-.nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 52px 44px 130px 64px 84px 84px; }
+/* 3d Squad: # · PLAYER · POS · OVR · FITNESS · TO, then wage and morale where the sheet has room.
+   OVR is rem, not px (#600): "4½★ 56" is 47px at Normal and grows with Settings › Text size. The track is
+   3.25rem for the text (room for a wider ★ from a fallback font) and the gap after it; the name gives up the room. */
+.nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 52px 3.875rem 130px 64px 84px 84px; }
 @media (max-width: 760px) {
-  .nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 44px 40px 118px 56px; }
+  .nrl-squad .nrl-grid-head, .nrl-squad .nrl-row { grid-template-columns: 32px minmax(0, 1fr) 44px 3.875rem 118px 56px; }
   .nrl-squad .nrl-sq-wide { display: none; }
 }
 .nrl-squad-no { color: var(--nrl-muted); }
 /* 3g Recruit: PLAYER · POS · AGE · OVR · FEE · WAGE · action, rows 44 tall. */
-.nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 52px 40px 44px 84px 84px 96px; }
-@media (max-width: 760px) { .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 40px 34px 38px 80px 72px 92px; } }
+.nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 52px 40px 3.875rem 84px 84px 96px; }
+@media (max-width: 760px) { .nrl-recruit .nrl-grid-head, .nrl-recruit .nrl-row { grid-template-columns: minmax(0, 1fr) 40px 34px 3.875rem 80px 72px 92px; } }
 .nrl-recruit .nrl-row { min-height: 44px; }
 /* Written in caps already, so a sum keeps its small k ("NEED $18k"). */
 .nrl-row .nrl-row-action { min-height: 36px; min-width: 0; width: 100%; padding: 0 6px; border-radius: 8px; font-size: 0.875rem; text-transform: none; }
@@ -155,29 +164,93 @@ const SCREEN_CSS = `
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
 
-const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
-
-/** "$18k", "$1.2M": a short sum for a button label. */
-export function shortMoney(n: number): string {
-  if (n >= 1_000_000) return `$${(Math.ceil(n / 100_000) / 10).toFixed(1).replace(/\.0$/, '')}M`;
-  if (n >= 1_000) return `$${Math.ceil(n / 1_000)}k`;
-  return `$${Math.ceil(n)}`;
-}
-
 /** Badge label + tooltip for a levelled trait (BAK-208 §3): its full name (#349 S3). Traits with a downside render in a warning tint. */
 export function traitBadge(t: TraitInstance): { label: string; tip: string; bad: boolean } {
   const def = TRAITS[t.id];
   return { label: traitLabel(t), tip: `${traitLabel(t)}: ${def.blurb}`, bad: def.bad ?? false };
 }
 
-/** A player's traits as chips; a tap on one says what it does (see {@link tableRow}). */
+/** The most trait chips a row shows (#614); the rest fold into a "+n" chip. */
+export const CHIPS_SHOWN = 2;
+
+/** A row's traits in two: the first `room` to show as chips, and the rest for the "+n" chip (#614). Pure. */
+export function foldTraits<T>(traits: readonly T[], room: number = CHIPS_SHOWN): { shown: T[]; folded: T[] } {
+  const n = Math.max(0, Math.min(room, traits.length));
+  return { shown: traits.slice(0, n), folded: traits.slice(n) };
+}
+
+/**
+ * The "+n" chip (#614): "+2", and the folded traits by name for its tip, its toast and a screen
+ * reader ("2 more traits: …"; with no chip showing beside it, "4 traits: …"). Pure.
+ */
+export function moreTraits(folded: readonly string[], shown: number): { label: string; tip: string } {
+  const n = folded.length;
+  return { label: `+${n}`, tip: `${n} ${shown > 0 ? 'more ' : ''}trait${n === 1 ? '' : 's'}: ${folded.join(', ')}` };
+}
+
+/** Show the first `room` of a row's trait chips and fold the rest into `more`, red when one folded has a downside. */
+function foldChips(chips: readonly HTMLElement[], more: HTMLElement, room: number): void {
+  const { shown, folded } = foldTraits(chips, room);
+  for (const c of shown) c.hidden = false;
+  for (const c of folded) c.hidden = true;
+  const { label, tip } = moreTraits(folded.map((c) => c.textContent ?? ''), shown.length);
+  more.hidden = folded.length === 0;
+  more.textContent = label;
+  more.setAttribute('title', tip);
+  more.setAttribute('aria-label', tip);
+  more.classList.toggle('nrl-chip-bad', folded.some((c) => c.classList.contains('nrl-chip-bad')));
+}
+
+/**
+ * A player's traits as chips; a tap on one says what it does (see {@link tableRow}).
+ * {@link CHIPS_SHOWN} show; the rest are folded into the "+n" chip after them (#614),
+ * so four traits do not squeeze the name out of its cell.
+ */
 export function traitChips(p: Player): HTMLElement[] {
-  return p.traits.filter((t) => t.id in TRAITS).map((t) => {
+  const chips = p.traits.filter((t) => t.id in TRAITS).map((t) => {
     const b = traitBadge(t);
     // Not a button: Chrome on Android snaps a tap near a button onto it, so a tap on
     // the name would read out the trait. The row's click handler tells them apart.
     return el('span', { class: `nrl-chip${b.bad ? ' nrl-chip-bad' : ''}`, text: b.label, attrs: { title: b.tip, 'data-trait': t.id } });
   });
+  if (chips.length === 0) return chips;
+  const more = el('span', { class: 'nrl-chip', attrs: { 'data-trait-more': '' } });
+  foldChips(chips, more, CHIPS_SHOWN);
+  return [...chips, more];
+}
+
+/**
+ * Fold the chips a row has no room for (#614). The name keeps its width, so beside a long name
+ * or at a larger text size fewer than {@link CHIPS_SHOWN} fit: the last one showing joins the
+ * "+n" rather than be cut off at the cell's edge (Squad) or wrap onto the next row (Recruit,
+ * whose cell wraps). Every row is read, then the tight ones are written, so a pass costs one
+ * layout; a row needs a pass for each chip it gives up. Call it once the rows are on the page.
+ */
+export function fitChips(list: HTMLElement): void {
+  const cells = Array.from(list.querySelectorAll<HTMLElement>('.nrl-row-who'));
+  if (cells.length === 0 || typeof cells[0]!.getBoundingClientRect !== 'function') return; // no layout (the tests' DOM)
+  const pad = parseFloat(getComputedStyle(cells[0]!).paddingRight) || 0;
+  // Tight: what it shows runs past the cell's edge, or out of the foot of its row.
+  const tight = (who: HTMLElement): boolean => {
+    const right = who.getBoundingClientRect().right - pad + 0.5;
+    const foot = who.parentElement!.getBoundingClientRect().bottom + 0.5;
+    return Array.from(who.children).some((c) => {
+      const r = c.getBoundingClientRect();
+      return r.width > 0 && (r.right > right || r.bottom > foot);
+    });
+  };
+  for (let pass = 0; pass <= CHIPS_SHOWN; pass++) {
+    const over = cells.filter(tight);
+    if (over.length === 0) return;
+    for (const who of over) {
+      const chips = Array.from(who.querySelectorAll<HTMLElement>('[data-trait]'));
+      const more = who.querySelector<HTMLElement>('[data-trait-more]');
+      const showing = chips.filter((c) => !c.hidden).length;
+      if (more && showing > 0) foldChips(chips, more, showing - 1);
+      // Nothing left to fold: the name gives its dot, its note and the "+n" the room (the stylesheet).
+      else who.setAttribute('data-tight', '');
+    }
+  }
 }
 
 /** Fitness colour (Broadcast Quiet): 85+ green, 65+ amber, else red. */
@@ -210,8 +283,9 @@ export function gridHead(cols: readonly (string | [string, string])[]): HTMLElem
 
 /**
  * One player in a table row: the cells the screen passes in. Tapping the row
- * opens his page (N7, #185); a tap on a trait chip says what the trait does,
- * in the toast lane, instead. The name cell carries .nrl-row-name.
+ * opens his page (N7, #185); a tap on a trait chip says what the trait does
+ * (the "+n" chip: which traits it stands for), in the toast lane, instead. The
+ * name cell carries .nrl-row-name.
  */
 export function tableRow(p: Player, cells: Node[], onOpen: () => void): HTMLElement {
   const row = el('div', {
@@ -219,7 +293,7 @@ export function tableRow(p: Player, cells: Node[], onOpen: () => void): HTMLElem
     attrs: { 'data-row-player': p.id, 'data-player-open': p.id, role: 'button', tabindex: '0', 'aria-label': `${p.name}: player page` },
   }, ...cells);
   row.addEventListener('click', (e) => {
-    const trait = e.target instanceof Element ? e.target.closest('[data-trait]') : null;
+    const trait = e.target instanceof Element ? e.target.closest('[data-trait], [data-trait-more]') : null;
     if (trait) bus.emit('ui:notify', { text: trait.getAttribute('title') ?? '', kind: 'info' });
     else onOpen();
   });
@@ -340,6 +414,9 @@ export function openRecruitScreen(): void {
 
   let showAll = false;
   const list = el('div', { class: 'nrl-grid-body nrl-screen-body' });
+  // A signing redraws the rows: the next man's SIGN is then under the finger (#598).
+  guardDoubleTap(list);
+  hintScroll(list); // the pool runs past the sheet's foot (#610)
   const more = el('div');
   const sub = el('div', { class: 'nrl-screen-sub' });
   const sort = popMenu<RecruitSort>({
@@ -367,8 +444,10 @@ export function openRecruitScreen(): void {
     // R2 (#349): when the pool changes, in Advance Weeks.
     const n = weeksToPoolRefresh(s.week);
     const when = n === 1 ? 'after this week' : `in ${n} weeks`;
-    sub.textContent = `Free agents · new players ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${money(s.money)}`;
-    sub.title = `A pool of ${FREE_AGENT_POOL_SIZE}; new players arrive ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${money(s.money)}.`;
+    // The bank as the dock writes it (#600): in debt it is "-$84,448", the sign before the dollar.
+    const bank = fmtMoney(s.money);
+    sub.textContent = `Free agents · new players ${when} · squad ${s.squad.length}/${SQUAD_CAP} · bank ${bank}`;
+    sub.title = `A pool of ${FREE_AGENT_POOL_SIZE}; new players arrive ${when}. Squad ${s.squad.length} of ${SQUAD_CAP}. Bank ${bank}.`;
     if (s.freeAgents.length === 0) {
       list.appendChild(el('div', { class: 'nrl-screen-empty', text: 'No free agents available. New players arrive when the pool refreshes.' }));
       return;
@@ -384,7 +463,7 @@ export function openRecruitScreen(): void {
       const reach = !fullView && agent.id === shortlist.reachId;
       const short = fee - s.money;
       // The signing fee: a transfer-style fee by rating and age (#146).
-      const action = button(full ? 'SQUAD FULL' : short > 0 ? `NEED ${shortMoney(short)}` : 'SIGN', () => {
+      const action = button(full ? 'SQUAD FULL' : short > 0 ? `NEED ${fmtMoneyShort(short, { roundUp: true })}` : 'SIGN', () => {
         const res = signWithUndo(agent.id); // "Signed …" with a 5-second Undo (#370)
         if (!res.ok) bus.emit('ui:notify', { text: signFailureText(res.reason), kind: 'info' });
       }, { class: `nrl-row-action${full || short > 0 ? '' : ' nrl-btn-primary'}` });
@@ -393,8 +472,8 @@ export function openRecruitScreen(): void {
       action.title = full
         ? `Squad full (${SQUAD_CAP}): release or sell a player first`
         : short > 0
-          ? `The ${money(fee)} fee is ${money(short)} more than the bank`
-          : `Signing fee ${money(fee)} (${signingFeeBasis(s, agent)}), then ${money(agent.wage)}/wk`;
+          ? `The ${fmtMoney(fee)} fee is ${fmtMoney(short)} more than the bank`
+          : `Signing fee ${fmtMoney(fee)} (${signingFeeBasis(s, agent)}), then ${fmtMoney(agent.wage)}/wk`;
       const chips = traitChips(agent);
       if (agent.junior) chips.unshift(el('span', { class: 'nrl-chip nrl-chip-academy', text: 'Academy', attrs: { title: 'Academy prospect: a 4×wage fee' } }));
       if (agent.id === shortlist.pickId) chips.unshift(el('span', {
@@ -409,14 +488,14 @@ export function openRecruitScreen(): void {
       if (reach) {
         const income = weeklyIncome(s);
         const gap = fee + 8 * agent.wage * difficultyMultipliers(s.settings.difficulty).wages - s.money;
-        const reason = income > 0 ? `Fee ${money(fee)}: about ${Math.ceil(gap / income)} weeks away`
-            : `Fee ${money(fee)}: more weekly income needed`;
+        const reason = income > 0 ? `Fee ${fmtMoney(fee)}: about ${Math.ceil(gap / income)} weeks away`
+            : `Fee ${fmtMoney(fee)}: more weekly income needed`;
         const note = el('span', { text: reason, attrs: { title: 'Saving the fee plus eight weeks of wages, estimated from weekly income before expenses; gates and spending can change it.' } });
         note.style.color = 'var(--nrl-alert)';
         note.style.flexBasis = '100%';
         who.append(note);
       }
-      const feeCell = el('span', { class: 'nrl-num', text: money(fee), attrs: { title: `Signing fee (${signingFeeBasis(s, agent)})` } });
+      const feeCell = el('span', { class: 'nrl-num', text: fmtMoney(fee), attrs: { title: `Signing fee (${signingFeeBasis(s, agent)})` } });
       if (reach) feeCell.style.color = 'var(--nrl-alert)';
       list.appendChild(tableRow(agent, [
         who,
@@ -424,20 +503,28 @@ export function openRecruitScreen(): void {
         el('span', { class: 'nrl-num', text: String(agent.age) }),
         el('span', { class: 'nrl-num nrl-row-ovr', text: ratingText(ovr), attrs: { title: 'Overall rating' } }),
         feeCell,
-        el('span', { class: 'nrl-num nrl-row-dim', text: money(agent.wage), attrs: { title: 'Weekly wage' } }),
+        el('span', { class: 'nrl-num nrl-row-dim', text: fmtMoney(agent.wage), attrs: { title: 'Weekly wage' } }),
         action,
       ], () => openPlayerPage(agent, { kind: 'freeAgent' })));
     }
     list.append(more);
+    fitChips(list);
+    fitted = list.clientWidth;
   };
+  // The phone turned or the window moved: the chips fold again for the room the cells have now (#617; as Squad, #614).
+  // The width is read after fitChips, so a redraw that settles at a new width does not wake it again.
+  let fitted = 0;
+  const turned = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (list.clientWidth !== fitted) render(); }) : null;
 
   const head = screenHead('', { lead: [squadTabs('recruit')], sub, controls: [sort.button] });
   const screen = el('div', { class: 'nrl-screen nrl-sq nrl-recruit' }, head,
-    gridHead(['Player', 'Pos', 'Age', 'Ovr', 'Fee', 'Wage', '']), list);
+    gridHead(['Player', 'Pos', 'Age', ['Ovr', 'nrl-col-ovr'], 'Fee', 'Wage', '']), list);
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onRecruitClosed, 'recruit');
   render();
-  unsub = bus.on('state:changed', render);
+  const off = bus.on('state:changed', render);
+  turned?.observe(list);
+  unsub = () => { off(); turned?.disconnect(); };
 }
 
 /** Map a signPlayer failure reason to player-facing copy. */

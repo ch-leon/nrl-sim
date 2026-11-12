@@ -14,7 +14,7 @@
 // how much more is needed), Move (placement mode with that facility's ghost, for
 // a fee) and Demolish (two taps, part refund) — GitHub #78.
 
-import { el, button, openModal, closeModal, closeScreen, openScreen, screenHead, segmented, ensureStyles } from '../dom';
+import { el, button, openModal, closeModal, closeScreen, openScreen, screenHead, segmented, ensureStyles, guardDoubleTap } from '../dom';
 import {
   FACILITY_CATALOG,
   LEVEL_MULT,
@@ -28,6 +28,7 @@ import type { PlacedFacility } from '../../core/state';
 import { isFacilityOpen, unlockReason } from '../../systems/unlocks';
 import { getState } from '../../core/state';
 import { ECON, PROGRESSION } from '../../config';
+import { fmtMoney, fmtMoneyShort } from '../../utils/money';
 import { bus } from '../../core/events';
 import { sponsorReturn } from '../../systems/economy';
 import { demolishWithUndo } from '../../systems/undo';
@@ -39,20 +40,6 @@ import { openCoachCallsScreen } from './coachCalls';
 import {
   activeGroundsScene, demolishRefund, moveFee, upgradeFacility, type GroundsSceneLike,
 } from '../../world/placement';
-
-/** Format a money value for display (local; mirrors hud.fmtMoney conventions). */
-function fmtMoney(n: number): string {
-  const abs = Math.abs(Math.round(n));
-  const s = '$' + abs.toLocaleString('en-US');
-  return n < 0 ? '-' + s : s;
-}
-
-/** Short money for a button: $900, $9k, $9.6k. */
-function fmtShort(n: number): string {
-  const abs = Math.abs(Math.round(n));
-  if (abs < 1000) return fmtMoney(n);
-  return `${n < 0 ? '-' : ''}$${(abs / 1000).toFixed(1).replace(/\.0$/, '')}k`;
-}
 
 /** The free-agent pool's lift a level, in overall points (freeagency.poolTarget). */
 const poolLift = (bias: number): number => Math.round(bias * POOL_POINTS_PER_BIAS * 10) / 10;
@@ -219,7 +206,10 @@ export function openFacilityPopup(facility: PlacedFacility): void {
 
   const card = el('div', { class: 'nrl-facility-popup', attrs: { 'data-facility-popup': facility.id } });
   card.append(renderFacilityBody(facility, def));
-  openModal(card, { class: 'nrl-facility-modal' }).classList.add('nrl-facility-backdrop');
+  // An upgrade redraws the card with the next level's Upgrade in the same spot, and has no Undo (#598).
+  guardDoubleTap(card);
+  // cut: the card rises by itself (nrl-sheet-up below), so it takes no dialog's entrance as well (#606).
+  openModal(card, { class: 'nrl-facility-modal', cut: true }).classList.add('nrl-facility-backdrop');
 }
 
 /**
@@ -307,7 +297,7 @@ function renderFacilityBody(facility: PlacedFacility, def: FacilityDef): HTMLEle
 
   // One tap: the toast's 5-second Undo puts it back (#370; it replaced the "Really demolish?" tap).
   // Written in caps here, so the money keeps its small k (3b: "DEMOLISH +$9k").
-  const demoBtn = button(`DEMOLISH +${fmtShort(refund)}`, () => {
+  const demoBtn = button(`DEMOLISH +${fmtMoneyShort(refund, { places: 1 })}`, () => {
     demolishWithUndo(facility.id);
     closeModal();
   }, { class: 'nrl-btn-danger nrl-facility-demolish' });
@@ -357,10 +347,10 @@ export const BUILD_CSS = `
   border-radius: 10px;
   padding: 8px 10px;
   box-sizing: border-box;
-  transition: background 0.12s ease;
+  transition: background-color var(--nrl-dur-press) ease;
 }
-.nrl-build-row:hover:not(.nrl-build-row-disabled) { background: #22305c; }
-.nrl-build-row:active:not(.nrl-build-row-disabled) { transform: translateY(1px); }
+@media (hover: hover) and (pointer: fine) { .nrl-build-row:hover:not(.nrl-build-row-disabled) { background: #22305c; } }
+.nrl-build-row:active:not(.nrl-build-row-disabled) { background: #22305c; }
 .nrl-build-row:focus-visible { outline: 2px solid var(--nrl-accent); outline-offset: 2px; }
 .nrl-build-row-disabled { cursor: default; opacity: 0.55; }
 .nrl-build-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
@@ -398,7 +388,7 @@ export const BUILD_CSS = `
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: nrl-sheet-up 180ms ease-out;
+  animation: nrl-sheet-up var(--nrl-dur-sheet) var(--nrl-ease-out);
 }
 .nrl-facility-popup { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .nrl-facility-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }

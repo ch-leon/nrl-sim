@@ -14,7 +14,9 @@ import { playerMatchPending, resumePlayerMatch } from '../systems/matchday';
 import { nextFixture } from '../systems/league';
 import { RISK_WORD, ladderStanding, worstObjective, type ObjectiveRisk } from '../systems/board';
 import { ECON, WEEKS_PER_SEASON } from '../config';
+import { fmtMoney, fmtMoneyShort } from '../utils/money';
 import { el, button, mount, ensureStyles, dock, activeScreen, onScreenChange } from './dom';
+import { MATCH_ACTIVE_CLASS } from './screens/matchOverlay';
 
 /** Options for {@link createHud}. */
 export interface HudOpts {
@@ -49,16 +51,9 @@ export interface Hud {
   destroy(): void;
 }
 
-/**
- * Format a money balance as `$1,234` (thousands-separated). Negative balances
- * render as `-$1,234`. Pure — extracted for unit testing without the DOM.
- */
-export function fmtMoney(n: number): string {
-  const rounded = Math.round(n);
-  const abs = Math.abs(rounded);
-  const grouped = abs.toLocaleString('en-US');
-  return rounded < 0 ? `-$${grouped}` : `$${grouped}`;
-}
+// The money formatters live in utils/money.ts, where systems/ can reach them too
+// (#615). Re-exported for the screens that take them from the dock.
+export { fmtMoney, fmtMoneyShort };
 
 /** The money tile below $0 (N12.5): its red class, and the tag beside the number. */
 export const IN_DEBT_CLASS = 'nrl-money-negative';
@@ -128,13 +123,6 @@ export function nextMatchChip(s: Pick<GameState, 'league' | 'week'>): { opponent
   const detail = `${home ? 'Home' : 'Away'}${place ? ` · ${place}` : ''}`;
   const label = `Next match: ${opp.name}, ${home ? 'home' : 'away'}${place ? `. You are ${place} on the ladder` : ''}`;
   return { opponent: `v ${placeName(opp.name)}`, detail, label };
-}
-
-/** "$32k", "-$4k", "$1.2m": money short enough for the board chip's second line. */
-export function fmtMoneyShort(n: number): string {
-  const abs = Math.abs(Math.round(n));
-  const body = abs >= 1_000_000 ? `${(abs / 1_000_000).toFixed(1).replace(/\.0$/, '')}m` : abs >= 1000 ? `${Math.round(abs / 1000)}k` : String(abs);
-  return `${n < 0 && abs > 0 ? '-' : ''}$${body}`;
 }
 
 /** The board chip's short form (#368): "top 8", "rival", "cash", "build". */
@@ -400,6 +388,23 @@ export function createHud(opts: HudOpts = {}): Hud {
 
   let lastMoney: number | null = null;
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
+  // The balance from before the flash now showing (#599). A week's ledger lines
+  // land as a burst (costs, then income): the colour is the burst's net, not its last line's.
+  let flashFrom: number | null = null;
+
+  /** Colour the balance for a move from `from` to `to`; one that nets to nothing shows no flash. */
+  function flashMoney(from: number, to: number): void {
+    moneyEl.classList.remove('nrl-flash-up', 'nrl-flash-down');
+    if (flashTimer) clearTimeout(flashTimer);
+    flashFrom = null;
+    if (to === from) return;
+    flashFrom = from;
+    moneyEl.classList.add(to > from ? 'nrl-flash-up' : 'nrl-flash-down');
+    flashTimer = setTimeout(() => {
+      moneyEl.classList.remove('nrl-flash-up', 'nrl-flash-down');
+      flashFrom = null;
+    }, FLASH_MS);
+  }
 
   function renderMoney(balance: number): void {
     const tile = moneyTile(balance);
@@ -414,15 +419,7 @@ export function createHud(opts: HudOpts = {}): Hud {
     statusBox.setAttribute('aria-label', label);
     statusBox.title = label;
 
-    if (lastMoney !== null && balance !== lastMoney) {
-      const up = balance > lastMoney;
-      moneyEl.classList.remove('nrl-flash-up', 'nrl-flash-down');
-      moneyEl.classList.add(up ? 'nrl-flash-up' : 'nrl-flash-down');
-      if (flashTimer) clearTimeout(flashTimer);
-      flashTimer = setTimeout(() => {
-        moneyEl.classList.remove('nrl-flash-up', 'nrl-flash-down');
-      }, FLASH_MS);
-    }
+    if (lastMoney !== null && balance !== lastMoney) flashMoney(flashFrom ?? lastMoney, balance);
     lastMoney = balance;
   }
 
@@ -500,6 +497,23 @@ export function createHud(opts: HudOpts = {}): Hud {
   const offFinished = bus.on('match:finished', () => queueMicrotask(() => render(getState())));
   const offScreen = onScreenChange(() => renderChip(getState()));
 
+  // #599: a played week's flash starts at the tap and the match hides the dock
+  // about 250ms later, so it is shown again when the dock is next on screen: Back
+  // to Club, or Save & exit. Full time is too early (the dock is still hidden) and
+  // nothing on the bus says the club is back; the body class does (as matchReport.ts).
+  let matchFrom: number | null = null;
+  let matchOn = false;
+  const offStarted = bus.on('match:started', () => { matchFrom = flashFrom ?? lastMoney; });
+  const matchWatch = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => {
+    const on = document.body.classList.contains(MATCH_ACTIVE_CLASS);
+    if (on === matchOn) return;
+    matchOn = on;
+    if (on || matchFrom === null || lastMoney === null) return;
+    flashMoney(matchFrom, lastMoney);
+    matchFrom = null;
+  });
+  matchWatch?.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
   return {
     el: root,
     destroy() {
@@ -508,6 +522,8 @@ export function createHud(opts: HudOpts = {}): Hud {
       offParked();
       offFinished();
       offScreen();
+      offStarted();
+      matchWatch?.disconnect();
       setMenuOpen(false);
       if (flashTimer) clearTimeout(flashTimer);
       parts.status.replaceChildren();

@@ -5,6 +5,7 @@ import { bus } from '../../src/core/events';
 import { overallRating } from '../../src/data/player';
 import { signingFee } from '../../src/systems/freeagency';
 import { commitUndo, currentOffer, undoNow } from '../../src/systems/undo';
+import { fmtMoney } from '../../src/ui/hud';
 import { recruitShortlist } from '../../src/ui/recruitShortlist';
 import { openRecruitScreen } from '../../src/ui/screens/recruit';
 
@@ -73,6 +74,15 @@ describe('Recruit screen', () => {
     expect(reach.textContent).toMatch(/Fee \$1,200: about \d+ weeks away/);
     expect(screen().querySelectorAll('[data-coach-pick]')).toHaveLength(1);
     expect(rows().filter((r) => r.children[4]!.style.color === 'var(--nrl-alert)')).toHaveLength(1);
+  });
+  it('writes a bank in debt the way the dock does: the minus before the dollar (#600)', () => {
+    setState({ money: -84448 }); openRecruitScreen();
+    const sub = screen().querySelector('.nrl-screen-sub')!;
+    expect(sub.textContent).toMatch(/ · bank -\$84,448$/);
+    expect(sub.textContent).toContain(`bank ${fmtMoney(getState().money)}`);
+    expect((sub as unknown as { title: string }).title).toContain('Bank -$84,448.');
+    setState({ money: 84448 });
+    expect(sub.textContent).toMatch(/ · bank \$84,448$/);
   });
   it('skips shortlisting below five and keeps the full view after a signing', () => {
     setState({ freeAgents: getState().freeAgents.slice(0, 4) }); openRecruitScreen();

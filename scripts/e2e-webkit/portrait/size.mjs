@@ -84,6 +84,26 @@ export async function runSize(browser, W, H) {
     await page.waitForSelector('[data-guide]');
     return reachProblems(page, ...GUIDE);
   });
+  // #611: the Guide reopens on the page it was left on, and the eight tabs can outrun their
+  // track (they do at 956 beside the build label): that page's tab must be whole in the track.
+  await step('guide-reopens-on-its-tab', async () => {
+    await tap('[data-guide-tab="nines"]');
+    await tap('.nrl-nav [data-nav-home]');
+    await page.waitForSelector('[data-guide]', { state: 'detached' });
+    await openNav(page, 'help');
+    await page.waitForSelector('[data-guide-page="nines"]');
+    await page.waitForTimeout(300);
+    const out = await page.evaluate(() => {
+      const track = document.querySelector('.nrl-guide-tabs').getBoundingClientRect();
+      const on = document.querySelector('.nrl-guide-tab[aria-pressed="true"]').getBoundingClientRect();
+      return on.left >= track.left - 1 && on.right <= track.right + 1 ? []
+        : [`the open page's tab is cut by its track (${Math.round(on.left)}–${Math.round(on.right)} in ${Math.round(track.left)}–${Math.round(track.right)})`];
+    });
+    // Back to the first page for the steps below; its tab glides back into the track.
+    await tap('[data-guide-tab="week"]');
+    await page.waitForTimeout(700);
+    return out;
+  });
   await step('guide-boosted', async () => {
     await boostFonts(page, '.nrl-guide-modal', BOOST);
     const out = await reachProblems(page, ...GUIDE);

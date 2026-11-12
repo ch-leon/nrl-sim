@@ -32,9 +32,12 @@ screen had (traits, training focus, the next-match preview, …) in the new look
   - Tabs: CLUB · SQUAD · LEAGUE · BUILD · OFFICE. Each is 44 tall, padding 0 12, Barlow Condensed 16/600, letter-spacing .06em, #c9d1ea. Active tab: bg #1f2b55, radius 10, colour #f4d03f, weight 700. An alert is an 8px #e0574a dot after the label.
   - Right: **PLAY WEEK ▸**. Height 50, radius 12, bg #f4d03f, text #0e1630, Barlow Condensed 19/700, letter-spacing .04em. Sub-line "v Darwin · away" in Plex Sans 12/500. Optional ▾ split (40 wide, left border `rgba(14,22,48,.25)`) for multi-week advance.
   - The dock **never moves or changes layout** between screens.
+    - ▴ keeps its room on every tab but CLUB and shows on the open one only, so a tab opening moves no other tab (#607). For that room a phone's tabs give padding back at Normal text: `0 8` from 761 to 900px wide, `0 6` from 621 to 760px. At Large and Larger text, and in a dock of 620px or less, ▴ takes room on the open tab only.
+    - In debt the bank is red with a minus sign. The "IN DEBT" tag beside it shows from 961px wide; narrower it is hidden from sight (not from screen readers), so the tabs keep their room.
 - **Menu sheets**: the content of every tab opens as a navy sheet **above the dock**.
   - Position: `top 12, left 12, right 12, bottom 88`; radius 16; bg `rgba(14,22,48,.97)`; padding 10 14; `overflow:hidden`.
   - Long lists scroll **inside** the sheet (`flex:1; min-height:0; overflow-y:auto`); the header row stays fixed.
+  - A list with more below fades out at its foot (#610, `hintScroll` in `src/ui/dom.ts`): the last 44px, or 24px where the lines are close (Finance's lines, the weekly summary), and never more than 30% of the box. No fade at the end of the list or when it all fits. A phone draws no scrollbar until a finger moves, so a list ending on a whole row looked complete. Squad, Lineup's players, Recruit, the ladder, Finance's THIS WEEK and the weekly summary's columns have it.
 - **Sub-navigation inside a sheet**: segmented control. Track #1b264a, radius 10, padding 3, gap 4. Items 36–38 tall, padding 0 12–14, Barlow Condensed 15–16. Selected item: bg #f4d03f, text #0e1630, 700, radius 8.
 - **One yellow primary action per screen.** Secondary buttons: bg #1f2b55, white text. Destructive: bg #1f2b55, text #f0a39b.
 - **Disabled stays visible and says why** (e.g. "Need $18k more" in #f4d03f; the tile at 55% opacity). Don't silently grey things out or hide them.
@@ -71,21 +74,23 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
 
 ### 3d Squad list
 - **Header**: segmented SQUAD / LINEUP / RECRUIT, then "24 players · cap $1.21M / $1.40M", then a SORT ▾ button on the right.
-- **Table columns**: `32px 1fr 52px 44px 130px 64px`, i.e. # · PLAYER · POS · OVR · FITNESS · TO.
+- **Table columns**: `32px 1fr 52px 3.875rem 130px 64px`, i.e. # · PLAYER · POS · OVR · FITNESS · TO.
+  - OVR ("4½★ 56") is right-aligned with 0.625rem after it, in Recruit's table too; its track is rem so it grows with the text size (#600).
   - Column headers: Barlow 13/600, .08em, #9aa6c7.
   - Rows: min-height 30, top border #1f2b55, 13px.
 - **Fitness**: a 72×5 bar on #1f2b55, followed by the %. Bar colour: ≥85 #3fbf6a, ≥65 #e8a33a, otherwise #d9534f.
 - **Injury/knock note**: inline after the name, 11px #f0a39b.
+- **Traits**: chips after the name and its note, two at most; the rest are a "+n" chip whose tip names them. The name keeps its width: a chip the cell has no room for joins the "+n" (#614). Recruit's rows the same.
 - Tapping a row opens 3f.
 
 ### 3e Lineup
-- **Header**: segmented control (LINEUP selected) · "9/9 picked · rated 74 · 22/24 fit" · PLAN: BALANCED · RUSH (opens the 3r sheet) · AUTO PICK.
+- **Header**: segmented control (LINEUP selected) · "9/9 picked · rated 74 · 22/24 fit" · PLAN: BALANCED · RUSH (opens the 3r sheet) · AUTO PICK, which toasts what it did: "Auto pick: 3 changes." or "Already your best side." (#614).
 - **Left column**: a BENCH strip (4 tiles), then a mini-pitch in 3 rows (forwards / spine + edges / fullback).
   - Slot tile: 72×44, radius 6, bg #1b264a. Shows slot + rating on line 1 and surname on line 2.
   - Rating colour: amber #e8a33a = out of position; red bg #5a2430 = injured.
   - Selected slot: 2px #f4d03f ring.
   - Role badges (C = captain, K = kicker): 11px #f4d03f, top-right of the tile.
-- **Right column (270px)**: "FOR 2ND ROW: TAP A PLAYER" and a candidate list re-sorted for the selected slot.
+- **Right column (270px)**: "FOR 2ND ROW: TAP A PLAYER" and a candidate list re-sorted for the selected slot, back at its top each time another slot is picked (#614).
   - Rows are 40 tall and show name, meta, rating, and a "where" chip: current slot, B1–B4 (#3a6ea5), or OUT (#b03a2e).
   - Unavailable rows are at .55 opacity.
 
@@ -94,10 +99,11 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - **Left**: ◂ SQUAD back button, 64px portrait slot, name, position · age · number, overall and fitness tiles, contract line.
   - **Middle**: stats rows (label · 6px bar · value · weekly gain in #6fd896).
   - **Right**: role toggles (GOAL-KICKER / CAPTAIN, ON in #f4d03f), primary RENEW · $38,000, and SELL in #f0a39b.
+- Each column scrolls on its own and keeps its place when the page is drawn again (a role switched, Sell armed, Rename; #614).
 
 ### 3g Recruit
 - **Header**: segmented control (RECRUIT selected) and the line "Free agents · window open 3 more weeks · cap room $190k".
-- **Columns**: `1fr 52 40 44 84 84 96`, i.e. PLAYER · POS · AGE · OVR · FEE · WAGE · action. Rows are 44 tall.
+- **Columns**: `1fr 52 40 3.875rem 84 84 96`, i.e. PLAYER · POS · AGE · OVR · FEE · WAGE · action. Rows are 44 tall.
 - **Action button**: SIGN (yellow) or "NEED $18k" (#1b264a / #9aa6c7) when unaffordable.
 
 ### 3h League
@@ -122,7 +128,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - NET WEEKLY (AVG), large Mono, in #6fd896 or #f0a39b.
   - NEXT HOME GATE.
   - A contracts-expiring alert with VIEW ▸.
-- **Right column**: segmented THIS WEEK / SEASON P&L / LEDGER, then line items (28 tall, Mono values, +green / −red) and a Net total row with a 2px #26325c top border.
+- **Right column**: segmented THIS WEEK / SEASON P&L / LEDGER, then line items (28 tall; 23 on a phone under 400px high and 20 under 340px, so all seven fit without scrolling, #610; Mono values, +green / −red) and a Net total row with a 2px #26325c top border.
 
 ### 3k Staff & Board
 - **Left (280)**: BOARD · SEASON 1, a patience bar (3/5), and objective rows with status (ON TRACK #6fd896 / AT RISK #f4d03f).
@@ -145,6 +151,7 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   1. **COACH**: 56 tall, radius 14, #0e1630.
      - Badge: "3 CALLS" (yellow) when calls are available.
      - "THEIR BALL" (#1b264a / #9aa6c7) when they aren't. **The button never disappears**, so the row never shifts.
+     - The badge is one width (room for its longest text, "TAKE THE TWO"), its text centred, and it keeps that room while the tray is open, so LOG beside it never moves (#608). Calls and plays together ("2 CALLS · 1 PLAY") are two short lines.
   2. **LOG toggle**: 56 tall, a 28×16 switch + "LOG". On = #f4d03f track, knob right. Off = #26325c, knob left.
   3. Spacer.
   4. **Speed pill**: radius 28. Contents: ❚❚, 1× / 2× / 4× / 8× (selected = yellow pill), a divider, SKIP ▸▸.
@@ -188,8 +195,8 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
 - **Effect chips**: ladder move, gate, injuries (injuries in #f0a39b).
 - **Score count-up (#640)**: the score counts up from 0–0 over 0.8s (ease-out) and ends on the exact result.
 - **Stat rows (#640)**: three on the card, possession, line breaks and tries, the player's side first, label between.
-- **Player of the match**: a row with a 44px initials badge; it slides in from the right (0.42s, after 0.7s).
-- Under `prefers-reduced-motion` the score is final at once and the row does not slide. Back to Club takes the first tap throughout (#203); the card is 341px tall, inside 844x390 and 667x375.
+- **Player of the match**: a row with a 44px initials badge; it comes in a beat after the card, sliding `--nrl-rise` from the right over `--nrl-dur-sheet` (the motion tokens, #597).
+- Under `prefers-reduced-motion` the score is final at once and the row fades in without travelling. Under 360px tall (956x330) the three stats share one line and the card is 280px. Back to Club takes the first tap throughout (#203); the card is 341px tall, inside 844x390 and 667x375.
 - **Buttons**: REPORT (secondary) and **BACK TO CLUB ▸** (primary).
 
 ### 3t Match report
@@ -209,10 +216,12 @@ Each screen's mock is `docs/screenshots/broadcast-quiet/<id>_<name>.png` (render
   - **Persist** the mode across matches (prototype key `nrlsim.logMode`; save `full` as `line`).
   - Key-moment banners still show when the log is hidden.
 - **Coach**: the badge count = calls legal at this tackle. Tap to open the tray; tap a call to apply it, close the tray and log it with its outcome.
+  - The call goes in at the tap. Its tile lights (yellow, navy text) and the tray closes about 140ms later (#608).
+  - The tray's tiles follow the play. When they change while it is open they dip (opacity 0.6 → 1, 150ms) and a tap in the next 300ms makes no call: it was aimed at the tile that was there before (#608).
 - **Sheets**: tapping the active tab or the dimmed area closes the sheet. Only one sheet is open at a time.
 - **Speed**: the selected speed persists for the match. SKIP goes to the next break (half-time / full time).
 - **Disabled items** always render, with the reason in place of the action.
-- **Transitions** (suggested): sheets slide up 180ms ease-out; banners fade/slide in 150ms and out after 3s.
+- **Transitions** (suggested): sheets slide up 180ms ease-out; banners fade/slide in 150ms and out after 3s. In code these are the motion tokens under Design tokens. A sheet that takes another's place (a tab or segment switch, ◂ back, an Office tile) has no entrance (#605): it is there at once, so the grounds never show between the two. Only a sheet opened on the bare grounds slides up.
 
 ## Design tokens
 In code the colours are `src/ui/tokens.ts` (`COLOR_TOKENS`); `src/ui/dom.ts` writes them out as the `--nrl-*` properties, and the brand (`src/brand.ts`, #363) points at them.
@@ -226,6 +235,8 @@ In code the colours are `src/ui/tokens.ts` (`COLOR_TOKENS`); `src/ui/dom.ts` wri
 - **Shadows**: `0 4px 14px rgba(0,0,0,.35)` for floating chips/HUD · `0 6px 20px rgba(0,0,0,.4)` for trays/popovers · `0 12px 40px rgba(0,0,0,.4)` for modals
 - **Radii**: 6 tile · 8 button/strip · 10 button/tile · 12 chip/primary · 14 tray/match buttons · 16 sheet/dock · 18 modal · 22 bottom sheet · 28 pill
 - **Spacing**: 4 / 6 / 8 / 10 / 12 / 16 / 24. Screen insets are 12 (sheets/dock) and 16 (match HUD).
+- **Motion** (#597, `:root` in `src/ui/dom.ts`): `--nrl-dur-press` 120ms · `--nrl-dur-fast` 150ms (toasts, banners, the LOG switch, a dialog's fade and scale-in, the ▾ menu) · `--nrl-dur-sheet` 180ms (sheets, popups, match cards) · `--nrl-ease-out` `cubic-bezier(0.23, 1, 0.32, 1)` for anything coming in · `--nrl-ease-in-out` `cubic-bezier(0.77, 0, 0.175, 1)` for something moving on screen · `--nrl-rise` 12px of travel · `--nrl-pop` and `--nrl-press` 0.97 for scale. Colour changes keep the `ease` keyword. Under `prefers-reduced-motion: reduce` one rule sets the travel to 0 and the scales to 1, so entrances still fade and nothing moves; a keyframe that moves must take its distance from `--nrl-rise`.
+- **Press and hover** (#604): hover fills are for a mouse only (`@media (hover: hover) and (pointer: fine)`). A touch gets the same fill on `:active`, and a button or small tile shrinks to `--nrl-press` (the yellow PLAY WEEK group as a whole); full-width rows take only the fill. A press eases in over `--nrl-dur-press` and snaps back on release. A selected chip stays yellow and a disabled button shows nothing. No browser tap highlight; a control's label is not selectable and does not double-tap zoom.
 - **Type**:
   - **Barlow Condensed** (500/600/700, 700 italic for TRY) for labels, buttons, headings, tabs. Usually caps with letter-spacing .04–.08em.
   - **IBM Plex Sans** (400/500/600) for body, 12–15px.

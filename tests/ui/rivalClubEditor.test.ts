@@ -66,3 +66,45 @@ describe('the rival club editor (#398)', () => {
     expect(focusQueued).toHaveBeenCalledTimes(1);
   });
 });
+
+// #616: a name in the save from before the 24-character rule is not a fault on open.
+describe('the name field on a name longer than the rule', () => {
+  const LONG = 'Sydney Central Business District Wombats';
+  type Field = { box: StubNode; why: StubNode; save: StubNode; type: (v: string) => void };
+  const open = (value: string, kept?: string): Field => {
+    const field = nameField({ value, ...(kept !== undefined ? { kept } : {}), label: 'Club name', attr: 'data-name', focus: false, onSave: () => null }) as unknown as StubNode;
+    const box = field.querySelector('[data-name]')!;
+    const why = field.querySelector('.nrl-rename-why')!;
+    const save = field.querySelector('.nrl-rename-save')!;
+    const type = (v: string): void => {
+      box.value = v;
+      for (const fn of (box as unknown as { listeners: Record<string, (() => void)[]> }).listeners.input ?? []) fn();
+    };
+    return { box, why, save, type };
+  };
+
+  it('opens without the red reason, with nothing to save', () => {
+    const f = open(LONG);
+    expect(f.why.classList.contains('nrl-attn')).toBe(false);
+    expect(f.why.textContent).toBe('24 characters at most');
+    expect(f.box.getAttribute('aria-invalid')).toBe('false');
+    expect(f.save.disabled).toBe(true);
+  });
+
+  it('a new name over 24 is still refused; a valid one can be saved', () => {
+    const f = open(LONG);
+    f.type(`${LONG}X`);
+    expect(f.why.textContent).toBe('At most 24 characters');
+    expect(f.why.classList.contains('nrl-attn')).toBe(true);
+    expect(f.save.disabled).toBe(true);
+    f.type('Sydney Wombats');
+    expect(f.save.disabled).toBe(false);
+    expect(f.why.classList.contains('nrl-attn')).toBe(false);
+  });
+
+  it('a long draft carried across a redraw is still a fault: only the kept name is let off', () => {
+    const f = open('W'.repeat(25), LONG);
+    expect(f.why.textContent).toBe('At most 24 characters');
+    expect(f.save.disabled).toBe(true);
+  });
+});
