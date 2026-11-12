@@ -13,6 +13,7 @@ import { applyResult, initLeague, PLAYER_ID, registerFixturesSystem, simulateRiv
 import { registerPlayerMatchSystem } from '../../src/systems/matchday';
 import { applyRivalResults, onRivalPlanChanges, playRivalJob, playRivalJobsInWorker, rivalJobs } from '../../src/systems/rivalRound';
 import { makeRng } from '../../src/utils/rng';
+import { NINES } from '../../src/match/league/rules';
 import type { MatchResult, TeamSheet } from '../../src/sim/events';
 
 /** The state just before the rival round runs (a hook of the same order registered first). */
@@ -75,13 +76,15 @@ describe('rival rounds on the live sim (N9.2)', () => {
     expect(jobs.every((j) => j.goldenPoint === false)).toBe(true);
   });
 
-  it('the scores sit on the cheap sim’s scale: about 30 a match', () => {
+  it('the scoring rate sits on the cheap sim’s scale: about 30 per fourteen minutes', () => {
     newGame(true);
     advanceWeek();
     const fs = rivalFixtures(getState().week);
     const pts = fs.reduce((a, f) => a + f.result!.homeScore + f.result!.awayScore, 0) / fs.length;
-    expect(pts).toBeGreaterThan(12);
-    expect(pts).toBeLessThan(55);
+    // Preserve the historical scoring-rate band while the real default match is five minutes.
+    const ptsPer14Minutes = pts * 7 / NINES.halfMinutes;
+    expect(ptsPer14Minutes).toBeGreaterThan(12);
+    expect(ptsPer14Minutes).toBeLessThan(55);
     resumeWeek();
   }, 60_000);
 

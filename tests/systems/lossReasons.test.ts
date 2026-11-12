@@ -216,7 +216,8 @@ describe('out-schemed (#468)', () => {
     const them = sideSheet(rivalId(s), { rating: 60, tactics: { attack: 'balanced', defence: 'compressed' } });
     let losses = 0;
     for (const seed of [1, 2, 3, 4, 5, 6]) {
-      const r = runMatch(us, them, { seed });
+      // Historical full-length trajectories supply real countered losses without choosing new seeds.
+      const r = runMatch(us, them, { seed, length: { halves: 2, halfMinutes: 7 } });
       const lost = r.awayScore > r.homeScore;
       expect(hasReason(why(s, r, us, them))).toBe(lost);
       if (lost) losses++;
@@ -225,7 +226,7 @@ describe('out-schemed (#468)', () => {
     const flatUs = { ...us, tactics: { attack: 'balanced', defence: 'slide' } as const };
     const flatThem = { ...them, tactics: { attack: 'balanced', defence: 'slide' } as const };
     // Seed 1 keeps this negative control a real loss after completed retreats (#625).
-    const flat = runMatch(flatUs, flatThem, { seed: 1 });
+    const flat = runMatch(flatUs, flatThem, { seed: 1, length: { halves: 2, halfMinutes: 7 } });
     expect(flat.awayScore).toBeGreaterThan(flat.homeScore);
     expect(hasReason(why(s, flat, flatUs, flatThem))).toBe(false);
   });

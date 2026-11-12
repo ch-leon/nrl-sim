@@ -67,11 +67,12 @@ describe('sheets carry a bench', () => {
 describe('interchanges in the live sim', () => {
   interface Game {
     events: { e: SimEvent; snap: Snapshot }[];
-    /** Home's average legs over the last five minutes of the clock. */
+    /** Home's average legs over the final minute of the fourteen-minute fixture. */
     lateLegs: number;
   }
   function play(home: TeamSheet, away: TeamSheet, seed: number): Game {
-    const sim = new LiveSim(home, away, seed);
+    // The endurance comparison samples minute 13 onward in the historical fourteen-minute fixture.
+    const sim = new LiveSim(home, away, seed, { length: { halves: 2, halfMinutes: 7 } });
     const events: Game['events'] = [];
     let sum = 0;
     let n = 0;

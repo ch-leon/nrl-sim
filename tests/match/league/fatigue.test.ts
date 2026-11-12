@@ -179,12 +179,13 @@ describe('legs and the wrestle in the live sim', () => {
     // The fit bonus has its own integration coverage in fit-bonus.test.ts.
     const restore = applyTuning({ 'rating.spread': 1, 'counters.fit.on': 0 });
     try {
+      // Explicit historical seven-minute halves leave ten minutes of physical play to sample.
       // Four seeds: two left the mean within a few hundredths of the line whenever the seeds reshuffle.
       // Seeds 5–8 since the kick contests (#99) reshuffled every match: seeds 1–4 now leave the
       // Stamina-40 side at 0.83, 0.75, 0.84 and 0.79 (0.80; 0.76 before), seeds 5–8 at 0.75. On all
       // eight the Stamina-80 side is at least 0.11 ahead.
       for (let s = 5; s <= 8; s++) {
-        const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s);
+        const sim = new LiveSim(sheet('H', { stamina: 40 }), sheet('A', { stamina: 80 }), s, { length: { halves: 2, halfMinutes: 7 } });
         play(sim, 600);
         home += sim.energyOf('home') / 4;
         away += sim.energyOf('away') / 4;

@@ -27,6 +27,9 @@ import type { Player } from '../../../src/match/league/live/types';
 
 const flat = (plays?: PlayId[], over: Parameters<typeof sideSheet>[1] = {}): TeamSheet => ({ ...sideSheet('H', { rating: 60, ...over }), ...(plays ? { plays } : {}) });
 const A = sideSheet('A', { rating: 60 });
+// Historical script trajectories need enough play for the pinned launches and refusal states.
+// Keep their original seven-minute halves explicit; default-clock coverage lives in match.test.ts.
+const SCRIPT_LENGTH = { halves: 2 as const, halfMinutes: 7 };
 
 /** The pin's method (balance.test.ts): every event as tick:kind:side:detail. */
 function stream(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}): string[] {
@@ -44,7 +47,7 @@ class PlaySim extends LiveSim {
   force: number | null = null;
   private forcing = false;
   constructor(home: TeamSheet, away: TeamSheet, seed: number, opts: LiveOptions = {}) {
-    super(home, away, seed, opts);
+    super(home, away, seed, { length: SCRIPT_LENGTH, ...opts });
     const real = this.rng;
     (this as unknown as { rng: typeof real }).rng = { ...real, next: () => (this.forcing ? ((this.forcing = false), this.force!) : real.next()) };
   }

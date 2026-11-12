@@ -32,7 +32,7 @@ describe('AU pack', () => {
 
   it("holds today's Nines rules, in the order the harness lists them", () => {
     expect(Object.entries(AU_PACK.rules)).toEqual([
-      ['halfMinutes', 7],
+      ['halfMinutes', 2.5],
       ['tryPoints', 4],
       ['bonusTryPoints', 5],
       ['conversionPoints', 2],

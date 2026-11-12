@@ -337,8 +337,9 @@ describe('kicks in real matches', () => {
     const done: Kick[] = [];
     const aimed = new Map<Kick, { x: number; y: number }>();
     // Kick-chase supplies bombs as well as long kicks and ground landings after #625.
+    // Retain the historical fourteen-minute exposure for rare wide framing and kick types.
     for (const seed of [31, 32, 33]) {
-      const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack: 'kick-chase' } }), sideSheet('A', { rating: 60, tactics: { attack: 'kick-chase' } }), seed);
+      const sim = new LiveSim(sideSheet('H', { rating: 60, tactics: { attack: 'kick-chase' } }), sideSheet('A', { rating: 60, tactics: { attack: 'kick-chase' } }), seed, { length: { halves: 2, halfMinutes: 7 } });
       const w = new KickWatch();
       let open: Kick | null = null;
       while (!sim.finished && sim.tick < 100_000) {
