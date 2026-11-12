@@ -7,7 +7,7 @@ describe('unmerged match preview', () => {
     expect(resolveMatchPreview(undefined)).toBeNull();
     expect(resolveMatchPreview('')).toBeNull();
     const p = { x: 31.123456789, y: 34 };
-    expect(toFieldPt(p).fx).toBe(p.x);
+    expect(toFieldPt(p, 100).fx).toBe(p.x);
   });
   for (const length of [100, 80, 60] as const) {
     it(`selects a labelled ${length}m, 2:30-half build and maps physical metres round-trip`, () => {

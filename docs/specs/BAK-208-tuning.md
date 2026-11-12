@@ -1696,14 +1696,15 @@ build. These experiments do not change the production defaults.
 | Field length | 100 / 80 / 60m | Try line to try line; width stays 68m and in-goals stay 10m. |
 | Half length | 2.5 clock minutes | Viewing target is 2–2.5 actual minutes at ×1 per half; measured separately. |
 | Field projection | 0.24 longitudinal tiles/metre, width 18 tiles | Keep players/metre sizes and 10m markings consistent; normal legacy in-goal art stays unchanged. |
-| Kick-off receiving anchor | 28m from own line | Same physical anchor as today’s 100m formation; kicker and short kick use actual halfway. |
+| Kick-off receiving anchor | min(28m, halfway −10m −6m) from own line | Keep the existing 6m nudge and role depths, with every receiver at least 10m on its side of halfway; the 100m formation is unchanged. |
 | 40/20 availability | On only when field length >60m | Disable in the 60m prototype where own-40 and opposing-20 meet. Called and automatic kicks agree. Ordinary kicks remain unchanged. |
 | Neutral fixture | Rating 60 in every stat, seed 1, four reserves, no traits | Identical starting teams in each bundle; balanced attack/slide defence and standard rotation. |
 
 The preview lab uses career smart pace and key-moment caps at the selected ×1,
 and records viewed milliseconds per half, excluding pause and half-time. It drops
 the lab’s additional slow-motion beat so it does not add a second pacing layer.
-Changing speed/stepping/seeking invalidates comparison timing; Restart resets it.
+Changing speed/stepping/seeking or hiding the tab invalidates comparison timing;
+hiding also pauses. Restart clears queued coach calls and resets the timer.
 Normal lab playback is unchanged. Fatigue, sprint gas, substitutions and ordinary
 kick distances have not been compressed with the match: these are play-test
 limitations to compare rather than hidden balance tuning. PWA registration and

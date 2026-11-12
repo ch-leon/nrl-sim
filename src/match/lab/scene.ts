@@ -74,8 +74,16 @@ export class LabScene extends MatchScene {
     this.legsLayer = new LegsLayer(this, DEPTH_POPUP - 2, FATIGUE);
     const r = this.controller.runner;
     r.onEvents = (events) => this.onSimEvents(events);
+    const onVisibility = (): void => {
+      if (MATCH_PREVIEW && document.hidden && r.playing) {
+        this.controller.watchClock?.invalidate();
+        r.pause();
+      }
+    };
+    if (MATCH_PREVIEW) document.addEventListener('visibilitychange', onVisibility);
     this.view.draw(r.prev, r.cur, 0, 1);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener('visibilitychange', onVisibility);
       r.onEvents = null;
       this.popups?.destroy();
       this.popups = null;

@@ -212,7 +212,8 @@ export abstract class LivePositioning extends LiveContact {
         if (p.side === kicking) {
           p.target = p === this.kicker(kicking) ? { x: MID_X - rd * 1, y: MID_Y } : { x: MID_X - rd * (3 + role.def * 0.15), y: role.lane };
         } else {
-          p.target = formationTarget(role, { x: rd > 0 ? 28 : FIELD_LENGTH - 28, y: MID_Y }, rd, true);
+          const ownM = Math.min(28, MID_X - 10 - 6); // allow the 6m nudge while staying 10m off halfway
+          p.target = formationTarget(role, { x: rd > 0 ? ownM : FIELD_LENGTH - ownM, y: MID_Y }, rd, true);
           p.target = { x: p.target.x + rd * 6, y: p.target.y }; // deep but not on the line
         }
         p.through = false;

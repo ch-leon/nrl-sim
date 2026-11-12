@@ -221,7 +221,7 @@ export class LabPanel {
     if (MATCH_PREVIEW) {
       this.root.setAttribute('data-preview', '');
       for (const advanced of [step, whistle, this.scrub, this.stats, ...this.speedBtns.filter(b => b.textContent !== speedLabel(1))]) advanced.classList.add('nrl-lab-more');
-      const restart = button('Restart', () => { ctrl.seek(0); this.sync(); }, { class: 'nrl-lab-mini' });
+      const restart = button('Restart', () => { ctrl.restart(); this.sync(); }, { class: 'nrl-lab-mini' });
       this.playBtn.parentElement?.insertBefore(restart, this.playBtn.nextSibling);
       this.playBtn.setAttribute('aria-label', 'Play or pause match');
     }

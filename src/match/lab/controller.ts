@@ -195,6 +195,11 @@ export class LabController {
     this.params.seed = seed;
     this.runner.reseed(seed);
   }
+  /** A pristine comparison on the same seed, without previously queued coach calls. */
+  restart(): void {
+    this.calls.length = 0;
+    this.reseed(this.seed);
+  }
   update(realMs: number): void {
     this.runner.update(realMs);
   }
