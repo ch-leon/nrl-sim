@@ -86,3 +86,14 @@ reads `getState().settings`. Toggling either calls the store `setState` so save 
 ## Out of scope
 - Real recorded audio assets, positional/spatial audio, per-SFX volume mixing UI.
 - Phaser's sound manager (we use raw WebAudio, not Phaser sound).
+
+## Match audio changes (tracker #626)
+
+### Tries for and against (#634)
+`match:event` `try` is no longer one sound for every side. The engine learns who is coached from
+`match:started`: if either sheet's `clubId` equals `GameState.clubId` it is a coached match
+(`coaching` true, cleared on `match:finished` / `match:parked`). A try whose `teamId` is the coached
+club plays `try` + `cheer`; the other side's try plays `groan` (low falling sawtooth + dull noise) and no
+jingle. With no `match:started` (the match lab) nobody is coached and both sides' tries get the fanfare and cheer;
+the lab emits no start event, so "home is ours" there would need one (not added: it would wake the overlay and tutorial).
+Pure mapping: `sfxForTry(ours)`.

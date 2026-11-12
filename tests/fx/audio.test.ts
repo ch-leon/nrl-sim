@@ -7,6 +7,7 @@ import {
   buildLoop,
   scheduleWindow,
   sfxForMatchEventKind,
+  sfxForTry,
   SFX_PRESETS,
   AudioEngine,
   type MusicLoop,
@@ -58,9 +59,9 @@ describe('noteFreq', () => {
 });
 
 describe('SFX_PRESETS', () => {
-  it('exposes exactly the six spec presets', () => {
+  it('exposes the six spec presets and the groan', () => {
     expect(Object.keys(SFX_PRESETS).sort()).toEqual(
-      ['build', 'cheer', 'click', 'coin', 'tackle', 'try'].sort(),
+      ['build', 'cheer', 'click', 'coin', 'groan', 'tackle', 'try'].sort(),
     );
   });
   it('click is a 660Hz square, 40ms', () => {
@@ -99,6 +100,13 @@ describe('sfxForMatchEventKind', () => {
     expect(sfxForMatchEventKind('tackle')).toBe('tackle');
     expect(sfxForMatchEventKind('kickoff')).toBeNull();
     expect(sfxForMatchEventKind('penalty')).toBeNull();
+  });
+});
+
+describe('sfxForTry (#634)', () => {
+  it('our try is the fanfare and the cheer; a try against a groan with no jingle', () => {
+    expect(sfxForTry(true)).toEqual(['try', 'cheer']);
+    expect(sfxForTry(false)).toEqual(['groan']);
   });
 });
 
@@ -321,6 +329,30 @@ describe('AudioEngine (fake context)', () => {
 
     bus.emit('ui:notify', { text: 'hi', kind: 'info' });
     expect(spy).toHaveBeenCalledWith('click');
+  });
+
+  it('a try plays the fanfare for the coached club and a groan against it (#634)', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const spy = vi.spyOn(engine, 'playSfx');
+    const sheet = (clubId: string) => ({ clubId }) as never;
+    bus.emit('match:started', { fixture: { round: 1, homeId: 'r1', awayId: 'player' }, home: sheet('r1'), away: sheet('player') } as never);
+    spy.mockClear();
+    bus.emit('match:event', { t: 5, kind: 'try', teamId: 'player' });
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(['try', 'cheer']);
+    spy.mockClear();
+    fake.currentTime += 1;
+    bus.emit('match:event', { t: 9, kind: 'try', teamId: 'r1' });
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(['groan']);
+  });
+
+  it('the lab, where nobody is coached, cheers both sides', async () => {
+    await engine.resume();
+    engine.subscribeBus();
+    const spy = vi.spyOn(engine, 'playSfx');
+    bus.emit('match:event', { t: 5, kind: 'try', teamId: 'r1' });
+    bus.emit('match:event', { t: 9, kind: 'try', teamId: 'r2' });
+    expect(spy.mock.calls.map((c) => c[0])).toEqual(['try', 'cheer', 'try', 'cheer']);
   });
 
   it('a burst of match events in one moment starts each SFX once (a skipped match, QA finding 16)', async () => {

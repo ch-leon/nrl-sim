@@ -25,7 +25,7 @@ import { canInstall, promptInstall } from './pwa';
 
 // ── Public sfx names (BAK-200) ─────────────────────────────────────────────
 
-export type SfxName = 'click' | 'coin' | 'build' | 'cheer' | 'tackle' | 'try';
+export type SfxName = 'click' | 'coin' | 'build' | 'cheer' | 'tackle' | 'try' | 'groan';
 
 export type MusicTrack = 'grounds' | 'match';
 
@@ -129,6 +129,11 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
       { type: 'square', freq: 1046.5, start: 0.27, duration: 0.12, gain: 0.3, attack: 0.003 }, // C6
     ],
     noises: [],
+  },
+  // A try against (#634): a low falling sawtooth sigh under a dull noise murmur, no jingle.
+  groan: {
+    tones: [{ type: 'sawtooth', freq: 170, freqEnd: 90, start: 0, duration: 0.7, gain: 0.16, attack: 0.08 }],
+    noises: [{ filter: 'lowpass', freqStart: 500, freqEnd: 220, Q: 0.7, start: 0, duration: 0.8, gain: 0.3, attack: 0.15 }],
   },
 };
 
@@ -266,6 +271,15 @@ export function sfxForMatchEventKind(kind: string): SfxName | null {
   return null;
 }
 
+/**
+ * What a try sounds like (#634): the coached side's keeps the fanfare and the cheer, a try against is
+ * a groan with no jingle. `ours` is false only for the other side's try in a match the player coaches;
+ * the lab (nobody coached) cheers both.
+ */
+export function sfxForTry(ours: boolean): SfxName[] {
+  return ours ? ['try', 'cheer'] : ['groan'];
+}
+
 // ── Music loop definitions (precomputed note arrays) ───────────────────────
 
 // ~120 BPM → 0.5s per beat for the ambient theme; the match theme is faster.
@@ -380,6 +394,8 @@ export class AudioEngine {
   private disposed = false;
   /** When each SFX last started (audio time), for SFX_GAP. */
   private sfxStarted = new Map<SfxName, number>();
+  /** True while a match the player coaches is on (match:started names the player's club): a try for anyone else is a try against. */
+  private coaching = false;
 
   /** `ctx` injectable for tests. If omitted, one is created when available. */
   constructor(ctx?: AudioContext) {
@@ -493,6 +509,11 @@ export class AudioEngine {
     }
   }
 
+  /** Is this club's try one for the crowd to cheer? The coached club's, or anyone's when nobody is coached (the lab). */
+  private cheersFor(teamId: string): boolean {
+    return !this.coaching || teamId === getState().clubId;
+  }
+
   /** Wire bus subscriptions (called by initAudio). Records unsubscribers. */
   subscribeBus(): void {
     this.unsubs.push(bus.on('facility:placed', () => this.playSfx('build')));
@@ -503,14 +524,30 @@ export class AudioEngine {
     );
     this.unsubs.push(
       bus.on('match:event', (ev) => {
+        if (ev.kind === 'try') {
+          for (const sfx of sfxForTry(this.cheersFor(ev.teamId))) this.playSfx(sfx);
+          return;
+        }
         const sfx = sfxForMatchEventKind(ev.kind);
         if (sfx) this.playSfx(sfx);
-        if (ev.kind === 'try') this.playSfx('cheer');
       }),
     );
     this.unsubs.push(bus.on('ui:notify', () => this.playSfx('click')));
-    this.unsubs.push(bus.on('match:started', () => this.playMusic('match')));
-    this.unsubs.push(bus.on('match:finished', () => this.playMusic('grounds')));
+    this.unsubs.push(
+      bus.on('match:started', ({ home, away }) => {
+        // The coached club is GameState.clubId; its sheet (and so its events' teamId) carries that id.
+        const mine = getState().clubId;
+        this.coaching = home?.clubId === mine || away?.clubId === mine;
+        this.playMusic('match');
+      }),
+    );
+    this.unsubs.push(
+      bus.on('match:finished', () => {
+        this.coaching = false;
+        this.playMusic('grounds');
+      }),
+    );
+    this.unsubs.push(bus.on('match:parked', () => { this.coaching = false; }));
   }
 
   // ── internals ──────────────────────────────────────────────────────────
