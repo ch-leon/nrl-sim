@@ -6,14 +6,15 @@ import { drawPrototypePlayer, type Appearance, type Action, type Facing } from '
 import { drawRuckPlayer } from './ruck';
 import { MOMENT_ACTIONS, drawMomentPlayer, type MomentAction } from './moments';
 
-export type LivePlayerAction = PlayerAnim | 'carry' | MomentAction;
+/** `ready`: a defender set for the play-the-ball (#665). */
+export type LivePlayerAction = PlayerAnim | 'carry' | 'ready' | MomentAction;
 const BASIC: Partial<Record<LivePlayerAction, Action>> = {
   idle: 'idle', run: 'run', carry: 'carry', pass: 'pass', catch: 'catch',
   tackle: 'wrap', tackled: 'brace', down: 'ground', dive: 'ground', ptb: 'ptb', fend: 'fend',
 };
 
 export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number): PixelBuffer {
-  if (action === 'ptb' || action === 'dummyHalf') return drawRuckPlayer(look, kit, action, frame, facing, possession);
+  if (action === 'ptb' || action === 'dummyHalf' || action === 'ready') return drawRuckPlayer(look, kit, action, frame, facing, possession);
   if (MOMENT_ACTIONS.includes(action as MomentAction)) return drawMomentPlayer(look, kit, action as MomentAction, frame, facing, possession, strideFrame);
   let basic = BASIC[action];
   if (possession && (basic === 'wrap' || basic === 'idle')) basic = 'carry';

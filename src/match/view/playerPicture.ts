@@ -1,4 +1,4 @@
-import type { PlayerSnap, Snapshot } from '../core/snapshot';
+import type { PlayerSnap, Side, Snapshot } from '../core/snapshot';
 import type { Facing } from '../../art/prototype/player';
 import { PLAYER_ANIMS, type PlayerAnim } from '../../art/match/players';
 import { LIVE } from '../league/live/knobs';
@@ -36,8 +36,30 @@ export function strideFor(p: PlayerSnap, previous: PlayerSnap, tick: number): nu
   return (p.speed + previous.speed) / 2 < JOG_SPEED ? beat + 6 : beat;
 }
 
+/** What the whole tick says about one player's picture: read once per snapshot by `pictureContext`. */
+export interface PictureContext {
+  /** A play-the-ball in progress (#665): the side defending it, where the ball is, and whether it is coming out. */
+  ruck?: { side: Side; x: number; y: number; rising: boolean };
+}
+/** Markers stand 1.8 and 3.6 m in front of the mark (LIVE.markerStandM, markerGapM); the line is further back. */
+const MARKER_M = 5;
+/** The dummy half's last ticks before the pass: the line comes up out of its crouch. */
+const RISE_TICKS = 3;
+/** Ticks per bounce frame in the ready stance (on the toes, about two and a half bounces a second). */
+const READY_TICKS = 4;
+
+export function pictureContext(s: Snapshot): PictureContext {
+  const ctx: PictureContext = {};
+  const r = s.players.find(p => p.pose === 'ptb' || p.pose === 'dummyHalf');
+  if (r) {
+    const picked = r.pose === 'dummyHalf' && s.ball.holder?.side === r.side && s.ball.holder.slot === r.slot;
+    ctx.ruck = { side: r.side === 'home' ? 'away' : 'home', x: s.ball.x, y: s.ball.y, rising: picked && (r.poseUntil ?? 0) - s.tick <= RISE_TICKS };
+  }
+  return ctx;
+}
+
 /** Sampled from simulation time, so pause, replay and playback speed share a frame. */
-export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number, holder: Snapshot['ball']['holder'], screenDir: number): PlayerPicture {
+export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number, holder: Snapshot['ball']['holder'], screenDir: number, ctx: PictureContext = {}): PlayerPicture {
   const possession = holder?.side === p.side && holder.slot === p.slot;
   let action: LivePlayerAction = p.pose in PLAYER_ANIMS ? p.pose as PlayerAnim : 'idle';
   if ((action === 'run' || action === 'idle') && possession) {
@@ -51,6 +73,12 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   // Run and carry pixels follow the stride alone; idle breathes over two frames. Fewer distinct frames to cache.
   if (action === 'run' || action === 'carry') frame = Math.max(0, stride) % 6;
   if (action === 'idle') frame = Math.floor((tick + p.slot * 5) / BREATH_TICKS) % 2;
+  // The defensive line sets for the play-the-ball: standing men only, not the markers over the ball.
+  const ruck = ctx.ruck;
+  if (ruck && action === 'idle' && p.side === ruck.side && stride === -1 && !p.binned && Math.hypot(p.x - ruck.x, p.y - ruck.y) > MARKER_M) {
+    action = 'ready';
+    frame = ruck.rising ? 2 : Math.floor((tick + p.slot * 2) / READY_TICKS) % 2;
+  }
   const clampFrame = (n: number) => Math.max(0, Math.min(5, Math.floor(n)));
   const catchAge = tick - (p.caughtTick ?? tick);
   if (action === 'catch') frame = clampFrame(catchAge * 5 / 3);

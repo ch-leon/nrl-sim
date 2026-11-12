@@ -7,7 +7,7 @@ import { FRAME_CACHE_SIZE, PlayerFrameCache } from '../../../src/scenes/matchPla
 const kit = buildKit(0xccbb22, 0x213344, 'v');
 describe('live match artwork', () => {
   it('supports every live-sim pose with the approved heads and bounded frames', () => {
-    for (const action of [...ANIM_ORDER, 'carry'] as const) for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (let frame = 0; frame < 6; frame++) {
+    for (const action of [...ANIM_ORDER, 'carry', 'ready'] as const) for (const facing of ['front', 'back'] as const) for (const build of ['lean', 'athletic', 'stocky'] as const) for (let frame = 0; frame < 6; frame++) {
       const p = drawLivePlayer({ ...appearanceFor('same-player'), build }, kit, action, frame, facing, true);
       const bounds = opaqueBounds(p)!;
       expect(bounds.x0).toBeGreaterThan(0); expect(bounds.y0).toBeGreaterThan(0);

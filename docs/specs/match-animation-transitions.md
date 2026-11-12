@@ -39,6 +39,18 @@ The sim remains the authority for movement, participants, timing and possession.
 - The existing 512-frame CPU cache now includes the independent stride frame.
   Scene textures are still reused rather than allocated for each pose.
 
+### Body language (#626 wave 3)
+
+- **The line gets ready (#665).** While a carrier is in `ptb` or the dummy half
+  is over the ball, every opponent standing still (`idle`, feet planted) more
+  than 5 m from the ball drops into `ready` (`ruck.ts`): the brace crouch on wide
+  feet, palms open in front, bouncing a pixel on the toes every four ticks
+  (frames 0–1, phased by slot). In the dummy half's last three ticks with the
+  ball the line rises (frame 2); once the pass is away they are idle again. The
+  5 m keeps the markers (1.8 and 3.6 m in front of the mark) as they were; the
+  attack, runners and the sin-binned are unaffected. `pictureContext` reads the
+  ruck once per snapshot, so the frame is a pure function of the tick.
+
 No engine, save, appearance assignment, rules, odds, fatigue or RNG changes.
 The earlier ordinary-player art study keeps its old frame API; `/#lab` and career
 matches are the authority for reviewing these new transitions. The contact study

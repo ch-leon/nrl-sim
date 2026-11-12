@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ruckPoseAt } from '../../../src/art/match/ruck';
+import { readyPoseAt, ruckPoseAt } from '../../../src/art/match/ruck';
 import { CONTACT_CASES, contactCaseAt } from '../../../src/labs/art/contactCases';
 import { CONTACT_X, CONTACT_FOOT, contactPoseAt } from '../../../src/art/prototype/contact';
 import { CENTRE, PAINT_FOOT } from '../../../src/art/prototype/player';
@@ -19,6 +19,20 @@ describe('ruck transitions', () => {
         expect(knee[1]).toBeLessThanOrEqual(foot[1]);
       }
     }
+  });
+  it('sets the line in a crouch that bounces a pixel and rises as the ball comes out (#665)', () => {
+    const [low, high, up] = [0, 1, 2].map(readyPoseAt);
+    for (const { pose: p } of [low!, high!, up!]) for (const [offset, knee, foot] of [[2, p.knee, p.foot], [-2, p.farKnee, p.farFoot]] as const) {
+      const hip = add(p.hip, offset, 0);
+      expect(distance(hip, knee)).toBeLessThanOrEqual(5.001);
+      expect(distance(knee, foot)).toBeLessThanOrEqual(5.001);
+      expect(foot[1]).toBe(35);
+    }
+    expect(high!.pose.head[1]).toBe(low!.pose.head[1] - 1);
+    expect(up!.pose.head[1]).toBeLessThan(high!.pose.head[1]);
+    // Wider than the idle stance, with the hands out in front of the hips.
+    expect(low!.pose.foot[0] - low!.pose.farFoot[0]).toBeGreaterThan(9);
+    expect(low!.near[0]).toBeGreaterThan(low!.pose.shoulder[0] + 4);
   });
   it('recovers into the same body and ball anchors as the play-the-ball, including quick rucks', () => {
     const ready = ruckPoseAt('ptb', 0);

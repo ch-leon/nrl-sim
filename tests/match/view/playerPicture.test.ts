@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { JOG_SPEED, STRIDE_METRES, playerPicture } from '../../../src/match/view/playerPicture';
-import type { PlayerSnap } from '../../../src/match/core/snapshot';
+import { JOG_SPEED, STRIDE_METRES, pictureContext, playerPicture } from '../../../src/match/view/playerPicture';
+import type { PlayerSnap, Snapshot } from '../../../src/match/core/snapshot';
 import { LIVE } from '../../../src/match/league/live/knobs';
 import { FACING_BAND, screenFacing, screenHeading } from '../../../src/match/view/screenFacing';
 import { fieldToWorldPoint } from '../../../src/scenes/matchField';
@@ -128,5 +128,31 @@ describe('live player presentation', () => {
     expect(new Set(frames.map(f => f.frame))).toEqual(new Set([0, 1]));
     expect(frames.every(f => f.action === 'idle')).toBe(true);
     expect(playerPicture(still, still, 17, null, 1)).toEqual(frames[17]);
+  });
+  it('sets the defensive line for the play-the-ball, not the markers or the attack (#665)', () => {
+    const ptb: PlayerSnap = { ...p, side: 'away', slot: 4, x: 50, y: 30, pose: 'ptb', speed: 0, poseUntil: 110 };
+    const line: PlayerSnap = { ...p, slot: 2, x: 60, y: 22, pose: 'idle', speed: 0 };
+    const marker: PlayerSnap = { ...p, slot: 7, x: 51.8, y: 30, pose: 'idle', speed: 0 };
+    const mate: PlayerSnap = { ...p, side: 'away', slot: 1, x: 44, y: 20, pose: 'idle', speed: 0 };
+    const snap = (players: PlayerSnap[], tick: number, holder: Snapshot['ball']['holder']): Snapshot => ({ tick, players, ball: { x: 50, y: 30, lift: 0, holder }, label: '', events: [] });
+    const s = snap([ptb, line, marker, mate], 100, { side: 'away', slot: 4 });
+    const ctx = pictureContext(s);
+    const at = (q: PlayerSnap, tick = 100) => playerPicture(q, q, tick, s.ball.holder, 1, ctx);
+    expect(at(line).action).toBe('ready');
+    expect(at(marker).action).toBe('idle');
+    expect(at(mate).action).toBe('idle');
+    expect(at({ ...line, speed: 3, pose: 'run' }).action).toBe('run');
+    expect(at({ ...line, binned: true }).action).toBe('idle');
+    // A two-frame bounce from the tick, the same on every replay.
+    const bounce = Array.from({ length: 16 }, (_, t) => at(line, 100 + t).frame);
+    expect(new Set(bounce)).toEqual(new Set([0, 1]));
+    expect(at(line, 103)).toEqual(at(line, 103));
+    // The dummy half has it and is about to pass: the line rises; once he has, it is idle again.
+    const dh: PlayerSnap = { ...ptb, pose: 'dummyHalf', caughtTick: 120, poseUntil: 128 };
+    const lifting = snap([dh, line], 126, { side: 'away', slot: 4 });
+    expect(playerPicture(line, line, 126, lifting.ball.holder, 1, pictureContext(lifting))).toMatchObject({ action: 'ready', frame: 2 });
+    const waiting = snap([dh, line], 118, null);
+    expect(playerPicture(line, line, 118, null, 1, pictureContext(waiting)).frame).toBeLessThan(2);
+    expect(pictureContext(snap([{ ...dh, pose: 'run' }, line], 129, null)).ruck).toBeUndefined();
   });
 });

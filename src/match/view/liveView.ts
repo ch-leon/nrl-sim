@@ -6,7 +6,7 @@
 import { toFieldPt } from '../core/field';
 import type { PlayerSnap, Snapshot, Side } from '../core/snapshot';
 import type { PlayerAnim } from '../../art/match/players';
-import { playerPicture, type PlayerPicture } from './playerPicture';
+import { pictureContext, playerPicture, type PlayerPicture } from './playerPicture';
 import { screenFacing } from './screenFacing';
 import { advanceContactAnimation, type ContactAnimation } from './contactAnimation';
 import { contactLayout, type ContactLayout, type ContactPoint } from './contactLayout';
@@ -83,6 +83,7 @@ export class LiveView {
     const a = Math.max(0, Math.min(1, alpha));
     const points: ContactPoint[] = [];
     let placed = 0;
+    const ctx = pictureContext(cur);
     for (let i = 0; i < cur.players.length; i++) {
       const c = cur.players[i]!;
       let p = this.before(prev, c);
@@ -103,7 +104,7 @@ export class LiveView {
       points.push({ player: { side: c.side, slot: c.slot, who: c.who ?? `${c.side}/${c.slot}` }, ...w });
       const faceLeft = screenFacing(c, p, this.screenDir).left;
       const cadence = c.pose === 'run' ? Math.max(0.45, Math.min(1.7, c.speed / CADENCE_SPEED)) : 1;
-      if (actor.paint) actor.paint(playerPicture(c, p, cur.tick, cur.ball.holder, this.screenDir));
+      if (actor.paint) actor.paint(playerPicture(c, p, cur.tick, cur.ball.holder, this.screenDir, ctx));
       else actor.play(c.pose as PlayerAnim, faceLeft, timeScale * cadence);
     }
     let layout: ContactLayout | null = null;
