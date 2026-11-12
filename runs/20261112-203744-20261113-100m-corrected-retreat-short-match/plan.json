@@ -1,0 +1,40 @@
+{
+  "name": "20261113 100m corrected retreat short match",
+  "description": "Physical 100m field, 2.5 clock-minute halves, corrected retreat. Compile flag NRL_MATCH_PREVIEW_LENGTH=100. Compare actual tries/points/draws and fatigue with unchanged kicking and fatigue rules; neutral squads match playable comparison. Counts are per compiled 5-minute match.",
+  "seeds": 40,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "strong 70 v 60",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "stamina 30 v 80",
+      "home": {
+        "rating": 60,
+        "stats": {
+          "stamina": 30
+        }
+      },
+      "away": {
+        "rating": 60,
+        "stats": {
+          "stamina": 80
+        }
+      }
+    }
+  ]
+}

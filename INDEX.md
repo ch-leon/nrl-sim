@@ -311,3 +311,8 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261112-050734-standard | standard | 16677c8 | main | [report](runs/20261112-050734-standard/report.md) |
 | 20261112-051113-standard | standard | 85dcd19 | main | [report](runs/20261112-051113-standard/report.md) |
 | 20261112-054502-short-halves-initial-check | short halves initial check | 85dcd195 | codex/short-match-study | [report](runs/20261112-054502-short-halves-initial-check/report.md) |
+| 20261112-203438-standard | standard | 85dcd195 | codex/short-match-study | [report](runs/20261112-203438-standard/report.md) |
+| 20261112-203726-standard | standard | 1e3f7efd | codex/retreat-fix | [report](runs/20261112-203726-standard/report.md) |
+| 20261112-203744-20261113-100m-corrected-retreat-short-match | 20261113 100m corrected retreat short match | 52030527 | codex/short-match-preview | [report](runs/20261112-203744-20261113-100m-corrected-retreat-short-match/report.md) |
+| 20261112-203746-20261113-80m-corrected-retreat-short-match | 20261113 80m corrected retreat short match | 52030527 | codex/short-match-preview | [report](runs/20261112-203746-20261113-80m-corrected-retreat-short-match/report.md) |
+| 20261112-203748-20261113-60m-corrected-retreat-short-match | 20261113 60m corrected retreat short match | 52030527 | codex/short-match-preview | [report](runs/20261112-203748-20261113-60m-corrected-retreat-short-match/report.md) |
