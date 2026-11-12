@@ -49,8 +49,14 @@ and big-moment animation work follow that release and phone play-test.
   man his place on the match's team sheet: starters by slot, the bench after them.
   Ruck, kick and celebration poses keep the plain back.
   Simulation-tick frame selection keeps pauses and replays consistent. The CPU
-  frame cache is capped at 512; each fixture owns one texture per player and one
-  contact texture, all freed at scene shutdown.
+  frame cache is capped at 768 (7 KB a frame, 5.4 MB; #646: a whole match draws about
+  3,600 distinct frames, and a lookup misses one time in twenty at 768, one in nine at
+  512); each fixture owns one texture per player and one contact texture, all freed at
+  scene shutdown. A miss is a 0.1 ms repaint; the cost that scales with players is the
+  upload of a changed pose (about seven a tick), so a frame is looked up and uploaded
+  only when an actor's picture changes. The team rings are painted once per side as
+  pixels (`ringTexture.ts`, 4 texels per art pixel, hard-edged) and drawn as Images
+  sharing one texture, not as 36 Graphics redrawn every frame.
 - Facing follows the heading as it moves on screen, not the field axes (#629):
   `screenFacing` projects the sim heading through `fieldToGrid` and `gridToScreen`;
   up the screen shows the back, down it the face, and a leftward heading flips the

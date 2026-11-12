@@ -37,4 +37,4 @@ export function drawRing(g: Phaser.GameObjects.Graphics, x: number, y: number, w
 }
 
 /** The dark edge under a dashed ring's dashes. */
-const RING_EDGE = 0x10101c;
+export const RING_EDGE = 0x10101c;

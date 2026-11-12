@@ -3,7 +3,7 @@ import { PixelBuffer } from '../art/pixel';
 import type { Kit } from '../art/match/kit';
 import type { PlayerAnim } from '../art/match/players';
 import type { RingStyle } from '../art/match/kitClash';
-import { drawRing } from '../match/view/rings';
+import { drawRingPixels, RING_SCALE } from '../match/view/ringTexture';
 import { appearanceFor, WIDTH, HEIGHT, CENTRE, FOOT, type Appearance } from '../art/prototype/player';
 import { drawLivePlayer } from '../art/match/livePlayer';
 import { CONTACT_W, CONTACT_H, CONTACT_X, CONTACT_FOOT, drawContact } from '../art/prototype/contact';
@@ -57,6 +57,19 @@ export class PlayerFrameCache {
   stats(): FrameCacheStats { return { ...this.counts }; }
 }
 
+/** A side's ring, painted once per scene and shared by its eighteen actors (one texture, one batch). */
+const ringKeys = new WeakMap<MatchArtRegistry, Map<string, string>>();
+function ringTexture(art: MatchArtRegistry, color: number, style: RingStyle): string {
+  const keys = ringKeys.get(art) ?? new Map<string, string>(); ringKeys.set(art, keys);
+  const id = `${style}-${color.toString(16)}`;
+  let key = keys.get(id);
+  if (!key) {
+    key = art.texture(`live-ring-${id}`, drawRingPixels(style, 15, 7.5, { color, width: 1.5, alpha: .9, fillAlpha: style === 'solid' ? .28 : .1 }));
+    keys.set(id, key);
+  }
+  return key;
+}
+
 /** One small reusable GPU texture per actor, not a texture for every appearance/frame. */
 class PaintedTexture {
   readonly key: string;
@@ -81,7 +94,7 @@ function samePicture(a: PlayerPicture, b: PlayerPicture): boolean {
 export class MatchActor {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly shadow: Phaser.GameObjects.Image;
-  private readonly ring: Phaser.GameObjects.Graphics;
+  private readonly ring: Phaser.GameObjects.Image;
   private readonly texture: PaintedTexture;
   private previousPixels: PixelBuffer | null = null;
   /** The picture behind `previousPixels`: asked again, the cache and the texture are left alone. */
@@ -93,8 +106,7 @@ export class MatchActor {
     this.texture = new PaintedTexture(scene, art, `live-player-${side}-${slot}`, WIDTH, HEIGHT);
     this.sprite = scene.add.sprite(0, 0, this.texture.key).setOrigin(CENTRE / WIDTH, FOOT / HEIGHT);
     this.shadow = scene.add.image(0, 0, shadowKey).setDepth(-80_000);
-    this.ring = scene.add.graphics().setDepth(-79_999.5);
-    drawRing(this.ring, 0, 0, 15, 7.5, ringStyle, { color: ringColor, width: 1.5, alpha: .9, fillAlpha: ringStyle === 'solid' ? .28 : .1 });
+    this.ring = scene.add.image(0, 0, ringTexture(art, ringColor, ringStyle)).setScale(1 / RING_SCALE).setDepth(-79_999.5);
     this.paint({ who, action: 'idle', frame: 0, facing: 'front', left: false, possession: false });
   }
   place(x: number, y: number, depth: number): void {

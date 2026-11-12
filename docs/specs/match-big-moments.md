@@ -56,7 +56,7 @@ An old tag cannot affect a later pass or pickup because it must match the curren
 retain ordinary pose sampling.
 
 No movement, rules, contest probabilities, timing knobs, match RNG, saves or
-appearance assignments change. The frame cache remains bounded at 512 CPU
+appearance assignments change. The frame cache remains bounded (768 since #646) CPU
 frames, with one reusable GPU texture per actor. Pause and seek sample from the
 snapshot alone; no wall-clock animation state is accumulated.
 
