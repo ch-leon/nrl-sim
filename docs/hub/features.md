@@ -71,6 +71,14 @@ What's in the game, with the PR that added each.
   - Match sound: a crowd that rises near the try line and on a break, the whistle, the siren, a boot on the ball, a heavier big hit, and a groan when you concede. Not yet listened to by a person.
   - The balance report has a watchability table: lead changes, late margins, how tries are scored and what sides do on the last tackle.
 
+- Match watchability, wave 2 ([PR](https://github.com/ch-leon/nrl-sim/pull/676), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
+  - Commentary remembers the match: a second try, a hat-trick, the lead changing hands, two tries in a row, a close margin late, a long scoreless spell. A try, a clean break, a sin bin or a penalty stays on the strip for 1.2 s; routine lines no longer push it off.
+  - Forwards are drawn bigger than outside backs, heights vary, and all eleven head styles turn up. Players wear a number (their place on the team sheet) and real sleeve cuffs. A fending carrier keeps striding. Players in existing saves may change look once.
+  - The camera leaves room ahead of the ball carrier, picks its zoom back up 3 s after a pinch, and no longer streaks at the start of a half. The ball spins and its shadow follows its height; players cast a shadow that matches the stadium light.
+  - A coach call paying off shows `COACH'S CALL!` over the player and sounds; the COACH badge pulses when a held call suits the moment; the match holds at ×1 while the tray is open.
+  - Full time counts the score up and shows possession, line breaks and tries on the card. Golden point announces itself, and a final or a derby is tagged in the score bug.
+  - The match draws with less work each frame: the player frame cache holds 768 frames and the team rings are painted once.
+
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 
 - Kick catches and loose-ball pickups carry explicit commentary detail, so a kick scooped up on its first grounded tick is called a pickup ([PR](https://github.com/ch-leon/nrl-sim/pull/620)).
