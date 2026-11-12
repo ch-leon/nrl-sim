@@ -79,6 +79,13 @@ What's in the game, with the PR that added each.
   - Full time counts the score up and shows possession, line breaks and tries on the card. Golden point announces itself, and a final or a derby is tagged in the score bug.
   - The match draws with less work each frame: the player frame cache holds 768 frames and the team rings are painted once.
 
+- Match watchability, wave 3 ([PR](https://github.com/ch-leon/nrl-sim/pull/676), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
+  - A referee trails the ruck and signals tries and penalties; corner flags, benches with the interchange players seated, and a sin bin with a yellow card over the man in it.
+  - The crowd is drawn at the players' scale and fills the near terraces. It groans at a try against and a missed kick, looks up at a bomb, rises at kick-off and full time, waves flags on a home try and runs a Mexican wave.
+  - A scoreboard on the grandstand roof shows the score and flashes after one; floodlights come on bank by bank at dusk and night kick-offs.
+  - Body language: the defensive line gets ready at the play-the-ball; tired players run hunched and stand hands-on-knees; hands on head after a knock-on or a missed goal; team-mates gather round a try scorer; long hair and shorts hems move with the stride.
+  - Ten more traits show when they fire (Offload King, Jets, Last Line, Pickpocket, Poacher, Brick Wall, Hothead, Razzle Dazzle, Gambler, Workhorse), and each player page says what to look for.
+
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 
 - Kick catches and loose-ball pickups carry explicit commentary detail, so a kick scooped up on its first grounded tick is called a pickup ([PR](https://github.com/ch-leon/nrl-sim/pull/620)).
