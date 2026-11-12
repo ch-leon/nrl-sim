@@ -13,9 +13,12 @@
 // CSS zooms multiplied by it, and the DOM's CSS px become canvas px times it.
 import Phaser from 'phaser';
 import { backingSize, densityFor, screenDensity, setScreenDensity } from './viewport';
+import { CSS_PIXELS, overrideOn } from '../labs/flags';
 
+/** The screen's ratio, or 1 under the developer override that keeps the old CSS-pixel canvas (labs/flags CSS_PIXELS). */
 function deviceRatio(): number {
-  return typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  if (typeof window === 'undefined' || overrideOn(CSS_PIXELS)) return 1;
+  return window.devicePixelRatio || 1;
 }
 
 /** The game's scale config: the window's size at the screen's density, shown at CSS size. */
