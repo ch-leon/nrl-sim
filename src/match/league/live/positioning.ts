@@ -72,8 +72,10 @@ export abstract class LivePositioning extends LiveContact {
     const ph = this.phase;
     if (ph.kind !== 'tackle' && ph.kind !== 'ruck') return [];
     const t = this.players[ph.tackler]!;
-    if (t.side === this.attacking) return [];
     if (ph.kind === 'ruck' && this.retreat) return [...this.retreat.markers].filter(([p, key]) => this.onField(p) && p.key === key).map(([p]) => p);
+    if (ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh') {
+      return [...this.side(this.attacking)].sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark)).slice(0, 2);
+    }
     const second = this.side(t.side)
       .filter((d) => d !== t && d !== this.fullback(t.side))
       .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[0];
@@ -275,12 +277,17 @@ export abstract class LivePositioning extends LiveContact {
       pool.sort((a, b) => dist(a.body.pos, lead.body.pos) - dist(b.body.pos, lead.body.pos));
       supports.push(...pool.slice(0, 2));
     }
+    const handoverMarkers = ph.kind === 'ruck' && ph.handover && ph.stage !== 'dh' ? this.currentMarkers() : [];
     const spots = supportSpots(anchor, this.dir);
     const broken = this.lineBroken();
     for (const p of attackers) {
       const role = ROLES[p.slot]!;
       p.through = false;
-      if (chasers.has(p) && looseAt) {
+      if (this.targetRetreat(p)) continue;
+      if (handoverMarkers.includes(p)) {
+        const k = handoverMarkers.indexOf(p);
+        p.target = clampToGround({ x: this.mark.x - this.dir * (LIVE.markerStandM + k * LIVE.markerGapM), y: this.mark.y }, 0.5);
+      } else if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
         p.wantsSprint = true;
       } else if (kickUp && kickChasers.has(p)) {
@@ -369,12 +376,8 @@ export abstract class LivePositioning extends LiveContact {
     for (const p of defenders) {
       const role = ROLES[p.slot]!;
       p.through = false;
-      const retreat = this.retreatLine(p);
-      if (retreat !== null) {
-        // Aim just beyond the line: arrive steering stops short of its target.
-        p.target = { x: retreat + this.dir * BODY_RADIUS, y: p.body.pos.y };
-        p.wantsSprint = false;
-      } else if (chasers.has(p) && looseAt) {
+      if (this.targetRetreat(p)) continue;
+      if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
         p.wantsSprint = true;
       } else if (kickUp && kickChasers.has(p)) {
@@ -465,6 +468,22 @@ export abstract class LivePositioning extends LiveContact {
     }
   }
 
+  /** A short defender can use his normal available gas to get back promptly. */
+  private targetRetreat(p: Player): boolean {
+    if (!this.onField(p)) return false;
+    const pending = this.retreatLine(p);
+    const r = this.retreat;
+    const hold = r && p.side === r.side && r.markers.get(p) !== p.key
+      && this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
+    if (pending === null && !hold) return false;
+    // Arrive steering stops short, so aim a body radius beyond the legal line.
+    p.target = { x: (pending ?? r!.line) + r!.dir * BODY_RADIUS, y: p.body.pos.y };
+    p.through = false;
+    // Once back, hold the line until the handover heel without burning gas.
+    p.wantsSprint = pending !== null;
+    return true;
+  }
+
   // ── Physics ───────────────────────────────────────────────────────────────
   protected move(): void {
     const dt = TICK_S;
@@ -490,13 +509,8 @@ export abstract class LivePositioning extends LiveContact {
         continue;
       }
       p.slide = null;
-      const retreat = this.retreatLine(p);
-      if (retreat !== null) {
-        // Rucks can begin between targeting decisions: retire immediately.
-        p.target = { x: retreat + this.dir * BODY_RADIUS, y: p.body.pos.y };
-        p.through = false;
-        p.wantsSprint = false;
-      }
+      // Rucks can begin between targeting decisions: retire immediately.
+      this.targetRetreat(p);
       // Cruise unless he wants to go and has the gas; blown, less than cruise (§8.2).
       p.sprinting = p.wantsSprint && canSprint(p.gas);
       let max = p.body.maxSpeed * paceMult(p.gas, p.sprinting);

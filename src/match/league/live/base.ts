@@ -59,7 +59,10 @@ export abstract class LiveBase {
   /** The defensive line's x. */
   protected lineX = 60;
   /** The last ruck's fixed legal line; reaching it once releases each non-marker. */
-  protected retreat: { side: Side; dir: 1 | -1; line: number; eligible: Map<Player, string>; markers: Map<Player, string> } | null = null;
+  protected retreat: {
+    side: Side; dir: 1 | -1; line: number;
+    eligible: Map<Player, string>; markers: Map<Player, string>;
+  } | null = null;
 
   protected pendingKick: PendingKick | null = null;
   /** Who kicked the ball now in the air (he leads the chase). */
@@ -393,17 +396,24 @@ export abstract class LiveBase {
 
   protected startRetreat(): void {
     this.retreat = null;
-    const side = other(this.attacking);
+    const handover = this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
+    const side = handover ? this.attacking : other(this.attacking);
+    const dir = this.dirOf(other(side));
     const markers = this.currentMarkers().filter(p => p.side === side && this.onField(p));
-    this.lineX = Math.max(0, Math.min(FIELD_LENGTH, this.mark.x + this.dir * LIVE.onsideM));
-    this.retreat = { side, dir: this.dir, line: this.lineX, eligible: new Map(), markers: new Map(markers.map(p => [p, p.key])) };
+    const line = Math.max(0, Math.min(FIELD_LENGTH, this.mark.x + dir * LIVE.onsideM));
+    this.retreat = { side, dir, line, eligible: new Map(), markers: new Map(markers.map(p => [p, p.key])) };
     this.observeRetreat();
   }
 
-  /** Null means free to defend; otherwise he still owes this fixed retreat line. */
+  /**
+   * Null means free to defend; otherwise he still owes this fixed retreat line.
+   * Also records an observed crossing before a decision; move observes every tick.
+   */
   protected retreatLine(p: Player): number | null {
     const r = this.retreat;
-    if (!r || r.side !== p.side || r.side === this.attacking || r.dir !== this.dir) return null;
+    const handover = this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
+    if (!r || r.side !== p.side || r.side !== (handover ? this.attacking : other(this.attacking))
+      || r.dir !== (handover ? -this.dir : this.dir)) return null;
     if (!this.onField(p)) return null;
     if (r.markers.get(p) === p.key || r.eligible.get(p) === p.key) return null;
     if ((p.body.pos.x - r.line) * r.dir >= 0) {
@@ -418,6 +428,7 @@ export abstract class LiveBase {
     if (!this.retreat) return;
     for (const p of this.side(this.retreat.side)) this.retreatLine(p);
   }
+
   private idx(side: Side, slot: number): number {
     return (side === 'home' ? 0 : PLAYERS) + slot;
   }

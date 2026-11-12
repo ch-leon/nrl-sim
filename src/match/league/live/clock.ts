@@ -37,6 +37,7 @@ export abstract class LiveClock extends LiveSetPlays {
   /** The ball is dead after the siren: half-time, or full time. */
   protected endHalf(): void {
     this.retreat = null;
+    this.expirePlays(true);
     const score = `${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`;
     this.pendingKick = null;
     this.outPending = null;
@@ -61,6 +62,7 @@ export abstract class LiveClock extends LiveSetPlays {
   /** Golden point is won: full time on the spot. */
   protected endGoldenPoint(winner: Side): void {
     this.retreat = null;
+    this.expirePlays(true);
     this.pendingKick = null;
     this.outPending = null;
     this.penaltyKickUp = null;

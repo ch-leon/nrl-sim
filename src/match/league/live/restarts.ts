@@ -35,7 +35,7 @@ export abstract class LiveRestarts extends LivePlay {
         this.dir = this.dirOf(this.attacking);
         this.tackles = 0;
         this.lastPlay = false;
-        this.startRetreat();
+        this.lineX = this.mark.x + this.dir * LIVE.onsideM;
       }
       // Offside as the ball is played (2e): more likely in a defence that rushes up.
       const defSide = other(this.attacking);
@@ -121,6 +121,7 @@ export abstract class LiveRestarts extends LivePlay {
     const posts = postsFor(this.dirOf(side), FIELD_LENGTH, MID_Y);
     const spot = clampToGround(conversionSpot(scorer.body.pos.y, posts, this.dirOf(side)), 1);
     this.ball = { kind: 'held', by: this.indexOf(kicker) };
+    this.retreat = null;
     this.attacking = side;
     this.dir = this.dirOf(side);
     this.phase = { kind: 'conversion', t0: this.tick, side, kicker: this.indexOf(kicker), spot, readyAt: 0, good: null };
