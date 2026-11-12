@@ -15,16 +15,40 @@ export const RING_SCALE = 4;
 type Seg = readonly [x0: number, y0: number, x1: number, y1: number];
 
 /**
- * How far (px, py) is from the segment's line, and how far past either end along it. Every
- * piece is stroked with flat ends, as the line is: a round joint would also round off the
- * end of a dash and, on the thick dark edge, close the gaps between the dashes. Facets of
- * 4 degrees or less leave no visible wedge at a bend.
+ * A stroked piece of the outline with what the per-texel test needs worked out once: its
+ * direction and length, and the box a texel must be in to be covered by it. Every piece is
+ * stroked with flat ends, as the line is: a round joint would also round off the end of a
+ * dash and, on the thick dark edge, close the gaps between the dashes. Facets of 4 degrees
+ * or less leave no visible wedge at a bend.
  */
-function segReach(px: number, py: number, s: Seg): { dist: number; past: number } {
+interface Piece { x0: number; y0: number; dx: number; dy: number; len: number; lo_x: number; hi_x: number; lo_y: number; hi_y: number }
+
+function pieceFor(s: Seg, reach: number): Piece {
   const dx = s[2] - s[0]; const dy = s[3] - s[1];
-  const len = Math.hypot(dx, dy) || 1;
-  const along = ((px - s[0]) * dx + (py - s[1]) * dy) / len;
-  return { dist: Math.abs((px - s[0]) * dy - (py - s[1]) * dx) / len, past: Math.max(0, -along, along - len) };
+  // A texel is covered only within `reach` (the half line width) of the line and half a texel past an end:
+  // so only inside the piece's own box grown by that. The extra texel is slack for rounding.
+  const m = reach + 1.5;
+  return {
+    x0: s[0], y0: s[1], dx, dy, len: Math.hypot(dx, dy) || 1,
+    lo_x: Math.min(s[0], s[2]) - m, hi_x: Math.max(s[0], s[2]) + m, lo_y: Math.min(s[1], s[3]) - m, hi_y: Math.max(s[1], s[3]) + m,
+  };
+}
+
+/**
+ * Whether any piece covers the texel's centre (px, py) by half or more: within `reach` of
+ * the line across it and no more than half a texel past an end along it. The same sums as
+ * stroking each piece and taking the best cover, without a result object a texel.
+ */
+function covered(px: number, py: number, pieces: readonly Piece[], reach: number): boolean {
+  for (const s of pieces) {
+    if (px < s.lo_x || px > s.hi_x || py < s.lo_y || py > s.hi_y) continue;
+    const along = ((px - s.x0) * s.dx + (py - s.y0) * s.dy) / s.len;
+    const past = Math.max(0, -along, along - s.len);
+    const dist = Math.abs((px - s.x0) * s.dy - (py - s.y0) * s.dx) / s.len;
+    // cover = min(clamp(0.5 + reach - dist), clamp(1 - past)) and the pixel wants cover >= 0.5.
+    if (0.5 + reach - dist >= 0.5 && 1 - past >= 0.5) return true;
+  }
+  return false;
 }
 
 /** A `w` × `h` (art px) ring as RGBA, centred in a buffer padded for its line; even-sized so the centre falls between texels. */
@@ -40,9 +64,13 @@ export function drawRingPixels(style: RingStyle, w: number, h: number, p: RingPa
   for (const arc of ringOutline(style, w * scale, h * scale, 96)) {
     for (let i = 1; i < arc.length; i++) segs.push([cx + arc[i - 1]!.x, cy + arc[i - 1]!.y, cx + arc[i]!.x, cy + arc[i]!.y]);
   }
-  const layers: { width: number; color: number; alpha: number }[] = style === 'solid'
+  const strokes: { width: number; color: number; alpha: number }[] = style === 'solid'
     ? [{ width: p.width, color: p.color, alpha: p.alpha }]
     : [{ width: p.width + 1.5, color: RING_EDGE, alpha: 0.85 * p.alpha }, { width: p.width * 1.2, color: p.color, alpha: p.alpha }];
+  const layers = strokes.map((l) => {
+    const reach = (l.width * scale) / 2;
+    return { ...l, reach, pieces: segs.map((s) => pieceFor(s, reach)) };
+  });
   for (let y = 0; y < bh; y++) {
     for (let x = 0; x < bw; x++) {
       const px = x + 0.5; const py = y + 0.5;
@@ -60,16 +88,7 @@ export function drawRingPixels(style: RingStyle, w: number, h: number, p: RingPa
         const d = (u * u + v * v - 1) / (2 * grad);
         over(p.color, d <= 0 ? p.fillAlpha : 0); // hard-edged, like the pixel art around it
       }
-      const reach = segs.map((s) => segReach(px, py, s));
-      for (const l of layers) {
-        let cover = 0;
-        for (const r of reach) {
-          const side = Math.max(0, Math.min(1, 0.5 + (l.width * scale) / 2 - r.dist)); // across the line
-          const end = Math.max(0, Math.min(1, 1 - r.past)); // along it: past an end (half a texel of overlap hides the seams)
-          cover = Math.max(cover, Math.min(side, end));
-        }
-        over(l.color, cover >= 0.5 ? l.alpha : 0);
-      }
+      for (const l of layers) over(l.color, covered(px, py, l.pieces, l.reach) ? l.alpha : 0);
       if (al <= 0) continue;
       const i = (y * bw + x) * 4;
       out.data[i] = Math.round(r / al); out.data[i + 1] = Math.round(g / al); out.data[i + 2] = Math.round(bl / al); out.data[i + 3] = Math.round(al * 255);
