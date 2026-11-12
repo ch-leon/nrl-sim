@@ -24,7 +24,7 @@ function watch(home: TeamSheet, away: TeamSheet, seed: number, speed: number): M
   let pace = 1;
   let frames = 0;
   while (!r.finished) {
-    pace = blendPace(pace, playbackPace((r.current as LiveSim).phaseKind), FRAME_MS);
+    pace = blendPace(pace, playbackPace((r.current as LiveSim).phaseKind, speed), FRAME_MS);
     r.setSpeed(speed * pace);
     r.update(FRAME_MS);
     if (++frames > 500_000) throw new Error(`seed ${seed} at ×${speed} did not finish`);

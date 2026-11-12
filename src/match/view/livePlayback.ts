@@ -61,18 +61,25 @@ export interface PlaybackBall {
   place(x: number, y: number, lift: number, depth: number): void;
 }
 
-/** A live match starts at ×4 when the player has not picked a speed (§5.1 decision 1, then the 7:00 halves). */
-export const LIVE_DEFAULT_SPEED: PlaybackSpeed = 4;
+/** A live match starts at ×2 when the player has not picked a speed (§5.1 decision 1; ×4 until Leon moved it on 12 Nov 2026, #628). */
+export const LIVE_DEFAULT_SPEED: PlaybackSpeed = 2;
 
 /**
  * Dead time on screen plays at twice the chosen speed. Open play stays at the
- * chosen speed. A ruck includes the play-the-ball. A set piece is a tap restart,
+ * chosen speed, and so does contact (#628): the tackle is what the player came
+ * to see. A ruck includes the play-the-ball. A set piece is a tap restart,
  * a penalty the kick being lined up, a goal the field-goal celebration.
  */
-const FAST_PHASES: ReadonlySet<string> = new Set(['ruck', 'tackle', 'restart', 'set-piece', 'conversion', 'try', 'penalty', 'goal']);
+const FAST_PHASES: ReadonlySet<string> = new Set(['ruck', 'restart', 'set-piece', 'conversion', 'try', 'penalty', 'goal']);
 
-/** 2 during dead time, 1 while the ball is in play (and through the half-time break, which the card holds). */
-export function playbackPace(phase: string): 1 | 2 {
+/**
+ * 2 during dead time, 1 while the ball is in play or in contact (and through the
+ * half-time break, which the card holds). The ruck is capped at ×2 real speed
+ * (#628): doubled at ×1, left at the chosen speed at ×2. ×4 and ×8 keep the
+ * doubling, as they always did, so they are no slower than before.
+ */
+export function playbackPace(phase: string, speed: number = 1): 1 | 2 {
+  if (phase === 'ruck' && speed === 2) return 1;
   return FAST_PHASES.has(phase) ? 2 : 1;
 }
 
@@ -180,7 +187,7 @@ export function keyMomentsOn(settings: { keyMoments?: boolean }): boolean {
   return settings.keyMoments !== false;
 }
 
-/** The speed buttons remember. Anything else (an old save, a bad value) is ×4. */
+/** The speed buttons remember. Anything else (an old save, a bad value) is ×2. */
 export function playbackSpeedOf(raw: unknown): PlaybackSpeed {
   return raw === 1 || raw === 2 || raw === 4 || raw === 8 ? raw : LIVE_DEFAULT_SPEED;
 }
@@ -605,7 +612,7 @@ export class LivePlayback {
   /** A key moment is slowing the match to this speed now (the speed row shows it, #366), or null. */
   get slowedTo(): number | null {
     const cap = this.keyCap();
-    return cap !== null && cap < this.speed * playbackPace(this.sim.phaseKind) ? cap : null;
+    return cap !== null && cap < this.speed * playbackPace(this.sim.phaseKind, this.speed) ? cap : null;
   }
 
   /** The key moment's cap, when the setting is on and the match is playing on screen. */
@@ -616,7 +623,7 @@ export class LivePlayback {
 
   /** Ease the runner between the chosen speed and twice that, from the phase on screen, and down to a key moment's cap (#366). */
   private applyPace(deltaMs: number): void {
-    this.pace = blendPace(this.pace, playbackPace(this.sim.phaseKind), deltaMs);
+    this.pace = blendPace(this.pace, playbackPace(this.sim.phaseKind, this.speed), deltaMs);
     const free = this.speed * this.pace;
     const cap = this.keyCap();
     if (cap !== null || this.keySpeed !== null) {

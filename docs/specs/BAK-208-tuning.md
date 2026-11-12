@@ -1066,9 +1066,9 @@ The screen around that card (2026-10-25; none of these change the sim):
 | Knob | File | Value | Effect |
 |---|---|---|---|
 | Half-time card | `src/ui/screens/matchOverlay.ts` | waits for Continue | No timer (#341). It sits above every match control and the toasts (z 65, under a dialog), Continue is pinned to its foot so it stays on screen at 667×375, and the Replay try chip hides under it. Was `HALF_TIME_CARD_MS` 4500 ms; before that 8 s, only at ×4 and above. |
-| `playbackPace` | `src/match/view/livePlayback.ts` | ×2 on ruck, tackle, restart, set-piece, conversion, try, penalty, goal | Dead time plays at twice the chosen speed. Open play, half-time and full time stay at the chosen speed. The ruck includes the play-the-ball; a set piece is a tap restart. |
+| `playbackPace` | `src/match/view/livePlayback.ts` | ×2 on ruck, restart, set-piece, conversion, try, penalty, goal | Dead time plays at twice the chosen speed. Open play, contact (the tackle, #628), half-time and full time stay at the chosen speed. The ruck includes the play-the-ball and is capped at ×2 real speed: doubled at ×1, not doubled at ×2; ×4 and ×8 keep the doubling. A set piece is a tap restart. |
 | `PACE_BLEND_MS` | `livePlayback.ts` | 400 ms | The pace eases between ×1 and ×2 (exponential). A 16 ms frame barely moves, so a phase change does not lurch. |
-| `LIVE_DEFAULT_SPEED` / `settings.playbackSpeed` | `livePlayback.ts` / `state.ts` | ×4 / saved 1, 2, 4 or 8 | The buttons remember the last speed (save v20). An old save, or any other value, plays at ×4. |
+| `LIVE_DEFAULT_SPEED` / `settings.playbackSpeed` | `livePlayback.ts` / `state.ts` | ×2 / saved 1, 2, 4 or 8 | The buttons remember the last speed (save v20). An old save, or any other value, plays at ×2 (was ×4 until 12 Nov 2026, #628). |
 
 What each preset does when the player picks it (even 60 v 60, the preset side at home
 against Balanced / Slide, 40 whole matches a row, `20261020-062508-presets-whole-match-n11`;
