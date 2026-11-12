@@ -167,6 +167,7 @@ export abstract class LiveKicks extends LiveClock {
         this.endKick(r.side, r.body.pos);
         if (this.groundInGoal(r)) return;
         this.emit('set-start', `${r.name} takes the kick — ${this.names[this.attacking]} ball`, r);
+        this.events[this.events.length - 1]!.detail = 'caught';
       }
       return;
     }
@@ -204,7 +205,10 @@ export abstract class LiveKicks extends LiveClock {
           this.events[this.events.length - 1]!.detail = 'scramble';
         }
         if (this.groundInGoal(best, raced)) return;
-        if (!scramble) this.emit('set-start', `${best.name} scoops it up — ${this.names[this.attacking]} ball`, best);
+        if (!scramble) {
+          this.emit('set-start', `${best.name} scoops it up — ${this.names[this.attacking]} ball`, best);
+          this.events[this.events.length - 1]!.detail = 'gathered';
+        }
         if (this.phase.kind !== 'play') this.phase = { kind: 'play' };
       }
     }
