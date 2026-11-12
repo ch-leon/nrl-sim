@@ -310,3 +310,4 @@ Every balance run, newest last. Each folder has the plan, the raw results and `r
 | 20261111-065221-standard | standard | fe95edc | main | [report](runs/20261111-065221-standard/report.md) |
 | 20261112-050734-standard | standard | 16677c8 | main | [report](runs/20261112-050734-standard/report.md) |
 | 20261112-051113-standard | standard | 85dcd19 | main | [report](runs/20261112-051113-standard/report.md) |
+| 20261112-054502-short-halves-initial-check | short halves initial check | 85dcd195 | codex/short-match-study | [report](runs/20261112-054502-short-halves-initial-check/report.md) |

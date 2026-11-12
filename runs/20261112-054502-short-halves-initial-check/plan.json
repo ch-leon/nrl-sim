@@ -1,0 +1,51 @@
+{
+  "name": "short halves initial check",
+  "description": "How do two 2.0- or 2.5-minute halves change actual full-match tries, points and contacts versus current two 7-minute halves, on the unchanged 100m field? This is the duration-only control before any field-length or defensive-retreat change. The harness normalises count columns to 14 minutes; multiply those means/SEs by result.minutes/14 to recover actual match totals.",
+  "seeds": 40,
+  "scenarios": [
+    {
+      "name": "even 60 v 60",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60
+      }
+    },
+    {
+      "name": "slide v rush",
+      "home": {
+        "rating": 60
+      },
+      "away": {
+        "rating": 60,
+        "tactics": {
+          "defence": "rush"
+        }
+      }
+    },
+    {
+      "name": "70 v 50",
+      "home": {
+        "rating": 70
+      },
+      "away": {
+        "rating": 50
+      }
+    }
+  ],
+  "variants": [
+    {
+      "name": "two 2.5-minute halves",
+      "tuning": {
+        "rules.halfMinutes": 2.5
+      }
+    },
+    {
+      "name": "two 2-minute halves",
+      "tuning": {
+        "rules.halfMinutes": 2
+      }
+    }
+  ]
+}
