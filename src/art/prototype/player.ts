@@ -45,7 +45,26 @@ export function ballPixels(): PixelBuffer {
 
 const BALL = ballPixels();
 
-/** Frames are sampled on a six-step cycle; directions are painted, never skewed. */
+/**
+ * The run cycle (#630): six beats, two steps. Each leg goes contact, support,
+ * push-off, trail (heel kicked up), knee lift, reach; the far leg runs half a
+ * cycle behind, so beats 2 and 5 are flight with both boots off the turf.
+ * [knee dx, knee drop below the hip, boot dx, boot lift off the turf]
+ */
+const RUN_LEG: readonly (readonly [number, number, number, number])[] = [
+  [2, 3, 4, 0], [1, 3, 0, 0], [-1, 3, -4, 2], [-2, 2, -5, 4], [6, 1, 4, 4], [4, 2, 5, 2],
+];
+/** Below sprint pace (strideFrame 6–11): shorter steps and no flight. */
+const JOG_LEG: readonly (readonly [number, number, number, number])[] = [
+  [1, 3, 2, 0], [0, 3, 0, 0], [-1, 3, -2, 0], [-1, 3, -3, 2], [3, 2, 2, 2], [2, 3, 3, 1],
+];
+/** Hips and shoulders: low over the support leg, high in flight. */
+const RUN_BOB = [0, 1, -1, 0, 1, -1];
+const JOG_BOB = [0, 1, 0, 0, 1, 0];
+/** Arm swing, -2 (back) … 2 (forward), for the far arm; the near arm swings opposite. Arms oppose their own legs. */
+const ARM_SWING = [2, 1, -1, -2, -1, 1];
+
+/** Frames are sampled on a six-step cycle; directions are painted, never skewed. Idle breathes over frames 0–1. */
 export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number): PixelBuffer {
   const b = new PixelBuffer(WIDTH, HEIGHT);
   const f = ((Math.floor(frame) % 6) + 6) % 6;
@@ -77,21 +96,50 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
 
   const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'catch' || (action === 'pass' && strideFrame !== undefined));
   const gait = strideFrame === undefined || strideFrame < 0 ? f : strideFrame % 6;
-  const stride = running ? [3, 1, -3, -3, -1, 3][gait]! : 0;
+  const jog = running && strideFrame !== undefined && strideFrame >= 6;
+  const legs = jog ? JOG_LEG : RUN_LEG;
+  // Arms pump with the legs except while the hands are busy catching or passing.
+  const swing = running && (action === 'run' || action === 'carry' || (strideFrame !== undefined && f === 5)) ? ARM_SWING[gait]! * (jog ? .5 : 1) : 0;
   const crouch = action === 'brace' || action === 'wrap' ? 3 : action === 'ptb' ? [6, 6, 3, 1, 0, 0][f]! : 0;
-  const bob = running ? [0, 1, -1, 0, 1, -1][gait]! : 0;
+  const bob = running ? (jog ? JOG_BOB : RUN_BOB)[gait]! : 0;
+  // Idle breathing: the chest rises a pixel on the in-breath; hips and boots stay put.
+  const breath = action === 'idle' && f % 2 === 1 ? 1 : 0;
   const lean = action === 'brace' || action === 'wrap' ? 3 : running ? 1 : action === 'ptb' ? 2 : 0;
   const hipY = 27 + crouch + bob;
-  const shoulderY = 20 + crouch + bob;
+  const shoulderY = 20 + crouch + bob - breath;
   const left = CENTRE - Math.floor(bodyW / 2) + lean;
+  /** One running leg from its hip: thigh, sock to the boot, boot (toe forward). */
+  const runLeg = (hipX: number, top: number, beat: number, thigh: number, boot: number, band: number | null) => {
+    const [kx, ky, fx, lift] = legs[beat]!;
+    const kneeY = top + ky + 1;
+    const footY = 34 - lift;
+    line(hipX, top, hipX + kx, kneeY, thigh);
+    line(hipX + kx, kneeY, hipX + fx, footY, kit.sock);
+    if (band !== null) b.fillRect(hipX + kx, kneeY, thick, 1, band);
+    b.fillRect(hipX + fx, footY, 5, 2, boot);
+  };
 
   // Far limbs first; subdued shading separates them in crowded contact.
-  line(18, hipY, 18 - stride, 30 + bob, skinDark);
-  line(18 - stride, 30 + bob, 18 - stride * 2, 34 - Math.abs(stride), kit.sock);
-  b.fillRect(17 - stride * 2, 34 - Math.abs(stride), 5, 2, shade(a.boots, .7));
-  line(left + 2, shoulderY + 1, left - 1, shoulderY + 6, skinDark);
+  if (running) {
+    runLeg(18, hipY, (gait + 3) % 6, skinDark, shade(a.boots, .7), null);
+  } else {
+    line(18, hipY, 18, 30 + bob, skinDark);
+    line(18, 30 + bob, 18, 34, kit.sock);
+    b.fillRect(17, 34, 5, 2, shade(a.boots, .7));
+  }
+  if (swing > 0) {
+    // Swung forward: the forearm comes up past the chest.
+    line(left + 2, shoulderY + 1, left + 3, shoulderY + 5, skinDark, 2);
+    line(left + 3, shoulderY + 5, left + bodyW + (swing > 1 ? 1 : -1), shoulderY + (swing > 1 ? 3 : 5), skinDark, 2);
+  } else if (swing < 0) {
+    // Swung back: elbow behind the hip, hand trailing.
+    line(left + 2, shoulderY + 1, left - (swing < -1 ? 2 : 1), shoulderY + 4, skinDark, 2);
+    line(left - (swing < -1 ? 2 : 1), shoulderY + 4, left - (swing < -1 ? 4 : 2), shoulderY + (swing < -1 ? 6 : 7), skinDark, 2);
+  } else {
+    line(left + 2, shoulderY + 1, left - 1, shoulderY + 6, skinDark);
+  }
 
-  b.fillRect(left, shoulderY, bodyW, 7, kit.jersey);
+  b.fillRect(left, shoulderY, bodyW, 7 + breath, kit.jersey);
   b.fillRect(left, shoulderY, 2, 6, kit.jerseyShade);
   b.fillRect(left + 2, shoulderY, bodyW - 3, 1, kit.jerseyLight);
   b.fillRect(left + bodyW - 2, shoulderY + 1, 2, 6, kit.jerseyShade);
@@ -106,11 +154,14 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
   b.fillRect(left + 1, hipY, bodyW - 1, 3, kit.shorts);
   b.fillRect(left + 1, hipY + 2, bodyW - 1, 1, kit.shortsShade);
   const nearX = left + bodyW - 4;
-  const heel = action === 'ptb' && f >= 4 ? -5 : stride;
-  line(nearX, hipY + 2, nearX + heel, 31 + bob, a.skin);
-  line(nearX + heel, 31 + bob, nearX + heel, 34, kit.sock);
-  b.fillRect(nearX + heel, 31 + bob, thick, 1, kit.trim);
-  b.fillRect(nearX + heel, 34, 5, 2, a.boots);
+  if (running) runLeg(nearX, hipY + 2, gait, a.skin, a.boots, kit.trim);
+  else {
+    const heel = action === 'ptb' && f >= 4 ? -5 : 0;
+    line(nearX, hipY + 2, nearX + heel, 31 + bob, a.skin);
+    line(nearX + heel, 31 + bob, nearX + heel, 34, kit.sock);
+    b.fillRect(nearX + heel, 31 + bob, thick, 1, kit.trim);
+    b.fillRect(nearX + heel, 34, 5, 2, a.boots);
+  }
 
   b.fillRect(CENTRE + lean, shoulderY - 2, 3, 3, skinDark);
   b.fillRect(CENTRE + lean - 1, shoulderY, 5, 1, kit.trim);
@@ -122,7 +173,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
 
   const shX = left + bodyW - 2;
   const shY = shoulderY + 2;
-  let handX = shX + (running ? -stride : 1);
+  let handX = shX + 1;
   let handY = shY + 6;
   if (action === 'carry' || action === 'brace' || (action === 'catch' && strideFrame !== undefined && f === 5)) {
     handX = shX + 2; handY = shY + 4;
@@ -147,6 +198,14 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     line(shX - 4, shY + 1, handX - 1, handY + 4, skinDark, 2);
     line(shX, shY, handX - 2, shY - 1, a.skin);
     line(handX - 2, shY - 1, handX, handY, a.skin, 2);
+  } else if (swing !== 0) {
+    // Pumping: bent at the elbow, forward as the far leg reaches, back as the near leg does.
+    const s = -swing;
+    const elbow = s > 0 ? [shX + 1, shY + 4] : [shX - (s < -1 ? 3 : 1), shY + 4];
+    handX = s > 1 ? shX + 4 : s > 0 ? shX + 3 : s < -1 ? shX - 4 : shX - 2;
+    handY = s > 1 ? shY + 2 : s > 0 ? shY + 4 : s < -1 ? shY + 6 : shY + 7;
+    line(shX, shY, elbow[0]!, elbow[1]!, a.skin);
+    line(elbow[0]!, elbow[1]!, handX, handY, a.skin, 2);
   } else {
     if (action === 'ptb') { handX = shX + 2; handY = shY + (f < 3 ? 7 : 5); }
     line(shX, shY, handX - 1, handY - 2, a.skin);

@@ -44,6 +44,8 @@ export interface Player {
   /** Already announced as cooked, COOKED! (until he recovers some). */
   gassed: boolean;
   body: Body;
+  /** Metres run under his own steering since kick-off: presentation only (#630), the view's stride; nothing in the sim reads it. */
+  odometer: number;
   pose: string;
   /** Hold `pose` until then (overrides run/idle). */
   poseUntil: number;

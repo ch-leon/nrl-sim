@@ -29,8 +29,10 @@ export interface PlayerSnap {
   /** Unit heading x component: faces screen-left or -right from this. */
   headX: number;
   headY?: number;
-  /** Ground speed m/s (drives run-cycle rate). */
+  /** Ground speed m/s. */
   speed: number;
+  /** Metres run so far (#630): the view takes the stride from it, so feet advance with distance. Presentation only; the sim never reads it back. */
+  odometer?: number;
   /** Who is in this slot (squad id or name), when the sim can swap players: the look he wears. */
   who?: string;
   poseUntil?: number;

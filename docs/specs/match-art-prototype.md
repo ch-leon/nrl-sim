@@ -38,6 +38,21 @@ and big-moment animation work follow that release and phone play-test.
   sprite. The player picture, the contact layer and the held ball's hand all use it.
   Within 0.2 of an axis (`FACING_BAND`, about 12°) the previous snapshot's heading
   decides, so a run along a boundary holds its view; no view state is stored.
+- The run cycle follows ground covered, not time (#630). `LiveSim` keeps an odometer
+  (metres each player has run under his own steering) and puts it on `PlayerSnap`;
+  only the view reads it. `strideFor` takes one six-frame cycle per `STRIDE_METRES`
+  (4 m, two steps), so a jog and a sprint plant their feet over the same ground and
+  9 m/s shows about two-thirds of a frame a tick. Below `JOG_SPEED` (3 m/s, averaged
+  with the previous tick) the stride ramps in with shorter jogging frames
+  (`strideFrame` 6–11, no flight); under 0.6 m/s the feet plant.
+- Each leg goes contact, support, push-off, trail, knee lift and reach, the far leg
+  half a cycle behind, so beats 2 and 5 are flight with both boots off the turf.
+  The far arm pumps against the near leg and the near arm against the far leg; a
+  carry keeps the ball tucked while the far arm swings. Standing players breathe
+  over two frames (the chest rises a pixel). Proportions, palette and the 44×40
+  frame are unchanged. Run and carry pictures key on the stride alone and idle on
+  its two breaths, so the busiest five seconds of seed 11 request 465 distinct
+  frames, inside the 512-frame cache (407 before the jogging frames).
 
 Contest odds, RNG, movement, fatigue and strip rules are unchanged. Portraits and
 grounds characters remain a later art pass. The larger head catalogue stays

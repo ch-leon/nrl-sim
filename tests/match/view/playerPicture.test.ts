@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { playerPicture } from '../../../src/match/view/playerPicture';
+import { JOG_SPEED, STRIDE_METRES, playerPicture } from '../../../src/match/view/playerPicture';
 import type { PlayerSnap } from '../../../src/match/core/snapshot';
 import { LIVE } from '../../../src/match/league/live/knobs';
 import { FACING_BAND, screenFacing, screenHeading } from '../../../src/match/view/screenFacing';
@@ -98,5 +98,35 @@ describe('live player presentation', () => {
     }
     // Straight along the boundary itself: the same view every tick.
     expect(new Set(views(Array.from({ length: 8 }, () => .01))).size).toBe(1);
+  });
+  it('advances the feet one full cycle per fixed distance at any pace', () => {
+    const at = (speed: number, odometer: number, tick: number) => {
+      const snap = { ...p, speed, odometer };
+      return playerPicture(snap, snap, tick, null, 1).strideFrame!;
+    };
+    // The same ground covered at 3 m/s and at 9 m/s (three times as many ticks at 3): the same frames.
+    for (let tick = 0; tick < 60; tick++) {
+      const metres = tick * 9 * .05;
+      expect(at(9, metres, tick)).toBe(at(JOG_SPEED, metres, tick * 3));
+      expect(at(9, metres + STRIDE_METRES, tick)).toBe(at(9, metres, tick));
+    }
+    // A sprint shows every frame of the cycle, never skipping one between ticks (no wagon-wheel).
+    const sprint = Array.from({ length: 40 }, (_, t) => at(9, t * 9 * .05, t));
+    expect(new Set(sprint).size).toBe(6);
+    sprint.forEach((f, t) => { if (t > 0) expect((f - sprint[t - 1]! + 6) % 6).toBeLessThanOrEqual(1); });
+    // Below sprint pace the stride ramps in with the shorter jogging frames; standing plants the feet.
+    expect(at(2, 1, 0)).toBeGreaterThanOrEqual(6);
+    expect(at(.4, 1, 0)).toBe(-1);
+    // The picture's frame matches the gait, so run and carry add no cache entries beyond the stride.
+    const snap = { ...p, odometer: 2.5 };
+    const pic = playerPicture(snap, snap, 140, null, 1);
+    expect(pic.frame).toBe(pic.strideFrame! % 6);
+  });
+  it('breathes when standing still, the same on every replay', () => {
+    const still = { ...p, pose: 'idle', speed: 0, odometer: 10 };
+    const frames = Array.from({ length: 60 }, (_, t) => playerPicture(still, still, t, null, 1));
+    expect(new Set(frames.map(f => f.frame))).toEqual(new Set([0, 1]));
+    expect(frames.every(f => f.action === 'idle')).toBe(true);
+    expect(playerPicture(still, still, 17, null, 1)).toEqual(frames[17]);
   });
 });

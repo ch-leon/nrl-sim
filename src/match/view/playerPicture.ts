@@ -15,6 +15,27 @@ export interface PlayerPicture {
   who: string; action: LivePlayerAction; frame: number; facing: Facing; left: boolean; possession: boolean;
 }
 
+/** Metres run per full stride cycle (two steps, six frames): about a sprinter's, so 9 m/s shows two-thirds of a frame a tick. */
+export const STRIDE_METRES = 4;
+/** Below this ground speed (m/s) the stride ramps in: shorter jogging steps (strideFrame 6–11) instead of the sprint. */
+export const JOG_SPEED = 3;
+/** Ticks per breath (in or out) for a player standing still. */
+const BREATH_TICKS = 14;
+
+/**
+ * The stride frame for a moving player, from metres run rather than time (#630), so feet
+ * advance one cycle per STRIDE_METRES at any pace. Old recordings without an odometer
+ * keep the time-based cycle. -1 plants the feet.
+ */
+export function strideFor(p: PlayerSnap, previous: PlayerSnap, tick: number): number {
+  if (p.speed <= .6) return -1;
+  // Slots start out of step so a line of players does not run in lockstep.
+  const beat = p.odometer === undefined ? Math.floor(tick * .6 + p.slot) % 6
+    : Math.floor((p.odometer / STRIDE_METRES + p.slot * .37) * 6) % 6;
+  // Averaged with the previous tick so a pace hovering at JOG_SPEED does not flicker between gaits.
+  return (p.speed + previous.speed) / 2 < JOG_SPEED ? beat + 6 : beat;
+}
+
 /** Sampled from simulation time, so pause, replay and playback speed share a frame. */
 export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number, holder: Snapshot['ball']['holder'], screenDir: number): PlayerPicture {
   const possession = holder?.side === p.side && holder.slot === p.slot;
@@ -25,7 +46,11 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   if (action === 'tackle' && possession) action = 'carry'; // the tackler has just stripped it
   const remaining = (p.poseUntil ?? 0) - tick;
   const looping = ['run', 'carry', 'idle', 'celebrate', 'fistPump', 'chestBump'].includes(action);
+  const stride = strideFor(p, previous, tick);
   let frame = looping ? Math.floor(tick * (p.speed > .1 ? .6 : .15) + p.slot) % 6 : Math.max(0, Math.min(5, Math.floor(6 - remaining * .6)));
+  // Run and carry pixels follow the stride alone; idle breathes over two frames. Fewer distinct frames to cache.
+  if (action === 'run' || action === 'carry') frame = Math.max(0, stride) % 6;
+  if (action === 'idle') frame = Math.floor((tick + p.slot * 5) / BREATH_TICKS) % 2;
   const clampFrame = (n: number) => Math.max(0, Math.min(5, Math.floor(n)));
   const catchAge = tick - (p.caughtTick ?? tick);
   if (action === 'catch') frame = clampFrame(catchAge * 5 / 3);
@@ -58,6 +83,6 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
   }
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
   const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch'].includes(action)
-    ? p.speed > .6 ? Math.floor(tick * .6 + p.slot) % 6 : -1 : undefined;
+    ? stride : undefined;
   return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...screenFacing(p, previous, screenDir), possession };
 }

@@ -164,6 +164,7 @@ export class LiveSim extends LivePositioning implements MatchSim {
         headX: p.body.heading.x,
         headY: p.body.heading.y,
         speed: speedOf(p.body),
+        odometer: p.odometer,
         // As things stand after the tick: the tick he runs dry he is blown, not sprinting.
         ...(p.sprinting && !p.gas.blown ? { sprint: true } : {}),
         ...(p.gas.blown ? { blown: true } : {}),

@@ -357,6 +357,7 @@ export abstract class LiveBase {
         drain: drainRate(stamina, traits),
         gassed: false,
         body: makeBody({ x: 50, y: MID_Y }, maxSpeedFor(stats.speed), { x: this.dirOf(side), y: 0 }),
+        odometer: 0,
         pose: 'idle',
         poseUntil: 0,
         lockUntil: 0,
