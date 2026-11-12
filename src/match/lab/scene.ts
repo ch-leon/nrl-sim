@@ -105,6 +105,11 @@ export class LabScene extends MatchScene {
     }
   }
 
+  /** The lab's own clock: its runner's speed. */
+  protected override playSpeed(): number {
+    return this.controller.runner.speed;
+  }
+
   override update(time: number, delta: number): void {
     const r = this.controller.runner;
     r.update(delta);

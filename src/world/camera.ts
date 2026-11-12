@@ -190,6 +190,11 @@ export class CameraController {
     this.panHeld = held;
   }
 
+  /** True while a one-finger drag is moving the view (a scene that follows something holds still for it). */
+  isPanning(): boolean {
+    return this.pointerDown && this.dragging && !this.panHeld;
+  }
+
   /** True if the just-ended interaction exceeded the drag threshold. */
   wasDragging(): boolean {
     return this.dragging;

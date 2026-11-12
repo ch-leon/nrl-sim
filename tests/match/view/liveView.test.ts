@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { LIFT_PX_PER_M, LiveView, type ActorView, type BallView } from '../../../src/match/view/liveView';
 import { fieldOffsetX, fieldToWorldPoint } from '../../../src/scenes/matchField';
-import { FIELD_WIDTH } from '../../../src/match/core/field';
+import { FIELD_WIDTH, toFieldPt } from '../../../src/match/core/field';
 import type { Snapshot, PlayerSnap } from '../../../src/match/core/snapshot';
 import { caseSnapshot } from '../../../src/labs/art/contactCases';
 
@@ -121,9 +121,9 @@ describe('LiveView', () => {
     const s = surface();
     const view = new LiveView(s);
     const prev = snap(0, [], { x: 50, y: 34, lift: 0, holder: null });
-    const cur = snap(1, [], { x: 60, y: 34, lift: 4, holder: null });
+    const cur = snap(1, [], { x: 52, y: 34, lift: 4, holder: null });
     view.draw(prev, cur, 0.25, 2);
-    const w = fieldToWorldPoint(52.5, 50, fieldOffsetX());
+    const w = fieldToWorldPoint(50.5, 50, fieldOffsetX());
     expect(s.ball.x).toBe(Math.round(w.x));
     expect(s.ball.lift).toBe(LIFT_PX_PER_M);
     expect(s.ball.depth).toBe(Math.round(w.y) + 2);
@@ -156,14 +156,65 @@ describe('LiveView', () => {
     s.ball.place = (_x, _y, _l, _d, m) => void motions.push(m);
     const view = new LiveView(s);
     const prev = snap(7, [], { x: 50, y: 34, lift: 0, holder: null });
-    const cur = snap(8, [], { x: 60, y: 34, lift: 2, holder: null });
+    const cur = snap(8, [], { x: 52, y: 34, lift: 2, holder: null });
     view.draw(prev, cur, 0.5);
     const m = motions[0] as { dx: number; dy: number; t: number };
     expect(m.t).toBeCloseTo(7.5);
     const a = fieldToWorldPoint(50, 50, fieldOffsetX());
-    const b = fieldToWorldPoint(60, 50, fieldOffsetX());
+    const b = fieldToWorldPoint(52, 50, fieldOffsetX());
     expect(m.dx).toBeCloseTo(b.x - a.x);
     expect(m.dy).toBeCloseTo(b.y - a.y - 2 * LIFT_PX_PER_M);
+  });
+
+  it('snaps bodies and the ball placed in one tick, and cuts the camera only for a restart', () => {
+    const s = surface();
+    let cuts = 0;
+    (s as { cut?: () => void }).cut = () => void cuts++;
+    const view = new LiveView(s);
+    const ball = { x: 50, y: 34, lift: 0, holder: null };
+    const bodies = (x: number): PlayerSnap[] => Array.from({ length: 9 }, (_, slot) => player({ slot, x, y: 10 + slot * 4 }));
+    const world = (x: number, y: number) => {
+      const f = toFieldPt({ x, y });
+      return fieldToWorldPoint(f.fx, f.fy, fieldOffsetX());
+    };
+    // A restart: nine men 40 m away from where they were last tick. Halfway through the tick they are already there.
+    view.draw(snap(1, bodies(10), ball), snap(2, bodies(50), ball), 0.5);
+    expect(s.players.home[0]!.x).toBe(Math.round(world(50, 10).x));
+    expect(cuts).toBe(1);
+    // One man sent off to the touchline is placed too, but the camera stays on the play.
+    const before = bodies(50);
+    const after = bodies(50);
+    after[3] = player({ slot: 3, x: 50, y: 98 });
+    view.draw(snap(3, before, ball), snap(4, after, ball), 0.25);
+    expect(s.players.home[3]!.y).toBe(Math.round(world(50, 98).y));
+    expect(cuts).toBe(1);
+    // The ball put on a mark snaps; a run does not.
+    const places: number[] = [];
+    s.ball.place = (x) => void places.push(x);
+    view.draw(snap(5, [], { ...ball, x: 20 }), snap(6, [], { ...ball, x: 60 }), 0.25);
+    expect(places[0]).toBe(Math.round(fieldToWorldPoint(60, 50, fieldOffsetX()).x));
+    view.draw(snap(6, [], { ...ball, x: 60 }), snap(7, [], { ...ball, x: 61 }), 0.5);
+    expect(places[1]).toBe(Math.round(fieldToWorldPoint(60.5, 50, fieldOffsetX()).x));
+  });
+
+  it('a substitute fades in over a few ticks, and nobody else does', () => {
+    const s = surface();
+    const alphas: number[] = [];
+    s.players.home[0]!.fade = (a) => void alphas.push(a);
+    const view = new LiveView(s);
+    const ball = { x: 50, y: 34, lift: 0, holder: null };
+    const man = (who: string) => snap(0, [player({ who })], ball);
+    const at = (tick: number, who: string): Snapshot => ({ ...man(who), tick });
+    view.draw(at(1, 'old'), at(2, 'old'), 0.5);
+    expect(alphas).toEqual([]);
+    view.draw(at(2, 'old'), at(3, 'new'), 0);
+    view.draw(at(3, 'new'), at(4, 'new'), 0.5);
+    view.draw(at(5, 'new'), at(6, 'new'), 1);
+    view.draw(at(7, 'new'), at(8, 'new'), 0.5);
+    expect(alphas[0]).toBe(0);
+    expect(alphas[1]).toBeGreaterThan(0.2);
+    expect(alphas[1]!).toBeLessThan(1);
+    expect(alphas[alphas.length - 1]).toBe(1);
   });
 
   it('run cadence scales with ground speed and playback speed, within bounds', () => {

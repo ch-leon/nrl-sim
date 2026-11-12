@@ -79,6 +79,8 @@ export class MatchActor {
     this.paint({ who: this.who, action: anim, frame: 0, facing: 'front', left: faceLeft, possession: false });
   }
   setSpriteVisible(visible: boolean): void { this.sprite.setVisible(visible); }
+  /** A substitute fades in: his shadow and ring with him. */
+  fade(alpha: number): void { this.sprite.setAlpha(alpha); this.shadow.setAlpha(alpha); this.ring.setAlpha(alpha); }
 }
 
 export class MatchContactLayer {

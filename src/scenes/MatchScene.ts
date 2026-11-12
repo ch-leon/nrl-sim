@@ -41,7 +41,7 @@ import {
   type PlaybackBall,
   type PlaybackSpeed,
 } from '../match/view/livePlayback';
-import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, cameraFrame, type Frame } from '../match/view/kickLayer';
+import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, FRAME_MARGIN, cameraFrame, type Frame } from '../match/view/kickLayer';
 import { NINES } from '../match/league/rules';
 import { ON_FIELD, SET_TACKLES } from '../config';
 import type { LiveMatchData } from '../core/events';
@@ -131,6 +131,19 @@ const CLOSEUP_LIMIT_MS = 4000;
 const TAG_LIFT = 39;
 /** How long a tap on a locked call's tile shows what unlocks it, in the tray's footer (ms). */
 const LOCKED_NOTE_MS = 2000;
+/** Lead room (#633): the camera runs this far ahead of a sprinting carrier, as a share of the visible width and of the clear band's height. */
+const LEAD_X = 0.2;
+const LEAD_Y = 0.25;
+/** The carrier's travel is smoothed over this long (real ms) and the lead eases to it at this rate (per s), so a change of direction swings the view, never flips it. */
+const LEAD_VELOCITY_MS = 280;
+const LEAD_RATE_PER_S = 2;
+/** The lead builds from a jog (world px a tick) to a sprint (3.9 px a tick is 9 m/s). */
+const LEAD_FROM = 0.6;
+const LEAD_FULL = 3;
+/** Playback speeds the follow keeps pace with: a carrier covers the same screen in the same sim time at ×4, so the ease quickens with the speed up to this. */
+const FOLLOW_SPEED_MAX = 4;
+/** Automatic zoom (close-ups, kick framing) returns this long after the player's last wheel or pinch (ms). */
+const REARM_MS = 3000;
 /** A flying ball's shadow is half its size this many px of height up. */
 const BALL_SHADOW_REACH = 90;
 /** The ball's wobble about its heading (radians) and its rate (radians per tick): a spiral kick's precession. */
@@ -169,6 +182,9 @@ export class MatchBall implements PlaybackBall {
   /** Ground position — what the camera follows. */
   gx = 0;
   gy = 0;
+  /** How far the ball moved on screen over the last tick (world px): the carrier's travel, for the camera's lead room. */
+  vx = 0;
+  vy = 0;
 
   /** Half the ball's height: it turns about its middle, so it sits that far above its (bottom) rest point. */
   private readonly half: number;
@@ -190,6 +206,8 @@ export class MatchBall implements PlaybackBall {
     const sy = y - lift + 2;
     this.sprite.setPosition(x, sy - this.half).setDepth(depth);
     this.turn(motion);
+    this.vx = motion?.dx ?? 0;
+    this.vy = motion?.dy ?? 0;
     // The shadow lies on the ground along the light, shrinking and paling as the ball climbs:
     // a bomb's closes on its landing spot as it falls.
     const near = 1 / (1 + lift / BALL_SHADOW_REACH);
@@ -294,6 +312,16 @@ export class MatchScene extends Phaser.Scene {
   /** Until this loop time the camera eases back from a kick's framing at the quick rate; whether it is doing so this frame. */
   private kickBackUntil = 0;
   private kickBack = false;
+  /** Lead room (#633): the carrier's smoothed travel (world px a tick), and the lead the camera gives it (world px). */
+  private leadV = { x: 0, y: 0 };
+  private lead = { x: 0, y: 0 };
+  /** The ball is in a carrier's hands this frame (the ring is on him). */
+  private carried = false;
+  /** Bodies were placed this tick (a half's restart): the camera goes straight to the ball. */
+  private cutPending = false;
+  /** The zoom the player left the camera at and when they last changed it (scene ms): automatic zoom returns REARM_MS later. */
+  private handZoom = 0;
+  private handZoomAt = 0;
 
   // ── WU-12 playback + overlay ──────────────────────────────────────────────
   private controlsLayer: ControlsLayer | null = null;
@@ -576,16 +604,66 @@ export class MatchScene extends Phaser.Scene {
     if (!this.ball) return;
     const cam = this.cameras.main;
     const kf = this.kickFrame;
-    const tx = (kf ? kf.cx : this.ball.gx) - cam.width / 2;
-    const ty = (kf ? kf.cy : this.ball.gy) - cam.height / 2;
+    const kicking = kf !== null || this.kickBack;
+    this.updateLead(delta * Math.min(FOLLOW_SPEED_MAX, Math.max(1, this.playSpeed())), kicking);
+    // The follow centres the ball (and the room ahead of him) on the band the overlay leaves
+    // clear, between the score bug and the bottom bar, the way a kick's framing does.
+    const shiftY = ((FRAME_MARGIN.top - FRAME_MARGIN.bottom) / 2) * screenDensity();
+    const tx = (kf ? kf.cx : this.ball.gx + this.lead.x) - cam.width / 2;
+    const ty = (kf ? kf.cy : this.ball.gy + this.lead.y - shiftY / cam.zoom) - cam.height / 2;
     // Frame-rate independent; the speed cap scales with ×2/×4 playback. Going out to a
     // kick and back the ease alone sets the pace, so the return takes under a second at ×1 too.
-    const kicking = kf !== null || this.kickBack;
-    const maxPx = kicking ? KICK_PAN_MAX_PX_PER_MS : PAN_MAX_PX_PER_MS * (this.playback?.getSpeed() ?? 1);
-    const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : PAN_RATE_PER_S;
-    cam.setScroll(panTowards(cam.scrollX, tx, delta, rate, maxPx), panTowards(cam.scrollY, ty, delta, rate, maxPx));
+    const speed = this.playSpeed();
+    const maxPx = kicking ? KICK_PAN_MAX_PX_PER_MS : PAN_MAX_PX_PER_MS * speed;
+    const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : PAN_RATE_PER_S * Math.min(FOLLOW_SPEED_MAX, Math.max(1, speed));
+    if (this.cutPending) {
+      // The sides were placed for a restart: no streak across the pitch, the camera is there.
+      this.cutPending = false;
+      cam.setScroll(tx, ty);
+    } else if (!this.camController?.isPanning()) {
+      // A finger dragging the view holds it; the follow comes back when it lets go.
+      cam.setScroll(panTowards(cam.scrollX, tx, delta, rate, maxPx), panTowards(cam.scrollY, ty, delta, rate, maxPx));
+    }
     // A live match's pop-ups and bars sit over the sprites where the camera now has them.
     if (this.playback instanceof LivePlayback) this.playback.late(delta);
+  }
+
+  /** How fast the match is playing (1, 2, 4…): the follow keeps pace with it. */
+  protected playSpeed(): number {
+    return this.playback?.getSpeed() ?? 1;
+  }
+
+  /** The sides were put on their spots in one tick: the camera goes with them (LiveView calls this). */
+  cut(): void {
+    this.cutPending = true;
+  }
+
+  /**
+   * Lead room: aim a little ahead of the carrier, the way he is running, so the space he runs
+   * into gets more of the screen than the space behind him. His travel is smoothed and the
+   * lead eases to it, and it is clamped to a share of the view, so it never loses him and
+   * never flips when he turns. No lead while the ball is loose or a kick has the camera.
+   */
+  private updateLead(delta: number, kicking: boolean): void { // delta in sim-time ms (real ms times the playback speed, to ×4)
+    const cam = this.cameras.main;
+    if (this.cutPending) {
+      this.leadV = { x: 0, y: 0 };
+      this.lead = { x: 0, y: 0 };
+    }
+    const run = this.carried && !kicking;
+    const k = 1 - Math.exp(-delta / LEAD_VELOCITY_MS);
+    this.leadV.x += ((run ? this.ball.vx : 0) - this.leadV.x) * k;
+    this.leadV.y += ((run ? this.ball.vy : 0) - this.leadV.y) * k;
+    const sp = Math.hypot(this.leadV.x, this.leadV.y);
+    const m = Math.max(0, Math.min(1, (sp - LEAD_FROM) / (LEAD_FULL - LEAD_FROM)));
+    const d = screenDensity();
+    const viewW = cam.width / cam.zoom;
+    const bandH = Math.max(0, cam.height - (FRAME_MARGIN.top + FRAME_MARGIN.bottom) * d) / cam.zoom;
+    const wantX = sp > 1e-6 ? (this.leadV.x / sp) * m * LEAD_X * viewW : 0;
+    const wantY = sp > 1e-6 ? (this.leadV.y / sp) * m * LEAD_Y * bandH : 0;
+    const r = 1 - Math.exp((-LEAD_RATE_PER_S * delta) / 1000);
+    this.lead.x += (wantX - this.lead.x) * r;
+    this.lead.y += (wantY - this.lead.y) * r;
   }
 
   // ── Readability (#17): name tag, carrier ring, situational zoom ───────────
@@ -598,6 +676,7 @@ export class MatchScene extends Phaser.Scene {
   }
 
   private moveMarker(t: { side: TeamSide; x: number; y: number } | null): void {
+    this.carried = t !== null;
     if (!this.marker) return;
     if (!t) {
       this.marker.setVisible(false);
@@ -659,12 +738,21 @@ export class MatchScene extends Phaser.Scene {
     if (this.autoZoom !== null) {
       if (Math.abs(cam.zoom - this.autoZoom) > 0.01) {
         this.autoZoom = null;
+        this.handZoom = cam.zoom;
+        this.handZoomAt = this.time.now;
       } else {
         const kf = this.kickFrame;
         if (kf || this.kickBack) cam.setZoom(easeZoom(cam.zoom, kf ? kf.zoom : this.zoomTarget, delta, kf ? KICK_OUT_PER_S : KICK_BACK_PER_S));
         else cam.setZoom(stepZoom(cam.zoom, this.zoomTarget, delta));
         this.autoZoom = cam.zoom;
       }
+    } else if (Math.abs(cam.zoom - this.handZoom) > 0.01) {
+      // Still zooming by hand (a wheel turn, a pinch): the clock starts again.
+      this.handZoom = cam.zoom;
+      this.handZoomAt = this.time.now;
+    } else if (this.time.now - this.handZoomAt >= REARM_MS) {
+      // Left alone for a few seconds: close-ups and kick framing work again, and the zoom eases back to the beat's.
+      this.autoZoom = cam.zoom;
     }
   }
 
