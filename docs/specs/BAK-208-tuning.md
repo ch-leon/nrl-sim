@@ -50,6 +50,7 @@ result. Keep it in step with the code: when a constant changes, change the row.
 | `live.contactTicks` / `live.downTicks` / `live.ptbTicks` / `live.rollTicks` / `live.dhHoldTicks` | `live/knobs.ts` | 9 / 10 / 11 / 4 / 6 | Tackle → down → play-the-ball → heel → dummy-half pause. Sum ≈ 2 s per ruck. `live.contactTicks` / `live.downTicks` now apply to a big hit only; a held tackle is the wrestle and its length sets "down" (§11). |
 | `live.onsideM` | `live/knobs.ts` | 10 | The defensive line stands 10 m off the ruck. |
 | `live.markerReleaseTicks` | `live/knobs.ts` | 14 | Markers hold at the ruck this long after the heel (× defence preset `markerHold`). Dropped marker tackles from ~50% to ~25%. |
+| `live.markerStandM` / `live.markerGapM` | `live/knobs.ts` | 1.8 / 1.8 m | First marker stands this far toward the defending goal line from the mark; second stands this much farther behind him. Both stay on the mark's lateral coordinate. Each default gap is one body diameter, avoiding separation pushing a settled ruck sideways. See BAK-208 §5.2 and `tests/match/league/markers.test.ts`. |
 | `live.busyAfterPtb` | `live/knobs.ts` | 24 | The tackled man isn't a pass option this long. |
 | `live.passCooldown` | `live/knobs.ts` | 12 | No new pass this soon after a catch. |
 | `live.restartTicks` / `live.restartMaxTicks` | `live/knobs.ts` | 40 / 280 | Kick-off waits for everyone to be set, within these bounds. |

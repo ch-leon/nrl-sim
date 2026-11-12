@@ -229,6 +229,7 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
       return `kick:${d && LINES[`kick:${d}`] ? d : 'long'}`;
     case 'set-start':
       if (d === 'scramble') return 'set-start:scramble';
+      if (d === 'caught' || d === 'gathered') return `set-start:${d}`;
       return kickInAir ? 'set-start:caught' : 'set-start:gathered';
     case 'regather':
     case 'drop':

@@ -64,6 +64,10 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
+- Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
+
+- Kick catches and loose-ball pickups carry explicit commentary detail, so a kick scooped up on its first grounded tick is called a pickup ([PR](https://github.com/ch-leon/nrl-sim/pull/620)).
+
 - A touch and motion polish pass over the menus and the match screen. Controls
   show a press under the finger and hover fills no longer stick after a tap; a
   sheet that replaces a sheet opens without replaying its entrance; dialogs and
