@@ -263,3 +263,21 @@ grey footer. The unlocks stay exactly as they are; what changed is display only:
 
 Nothing the sim does changed: same calls, levels, gating and AI coaches, and both balance
 fingerprints are unchanged.
+
+## 13. Seeing a call land (#639)
+
+Presentation only; a call is still made by the player and nothing here makes or changes one.
+
+- **A call that pays off** (the player's own side only, on screen, not in a skipped stretch):
+  a pop-up over the man who made it count, **COACH'S CALL!** over the result wording the tag
+  already uses (`callPaidPopup`, `src/match/view/popups.ts`; the man is the side's latest named
+  event, `LivePlayback.lastActor`), and a short rising tone (`callPaid` in `SFX_PRESETS`, played
+  from the `match:call-paid` bus event). The 2-second tag on the COACH button stays.
+- **The badge pulses once** as a moment arrives that a held call suits (`callMoment`,
+  `calls.ts`): a penalty won (Take the two / Tap and go can be made), a restart (a kick-off
+  call can be made), or the last tackle with a last-tackle call on (Run it, Bomb, Field goal,
+  Grubber, 40/20). Never at another time, never while the tray is open or a call is made, and
+  not again until the moment has passed. Reduced motion: no animation.
+- **The open tray caps playback at ×1** (`LivePlayback.setCallsOpen`, through `keyCap`: eased
+  down and back like a key moment, whatever the Key moments setting). The chosen speed is never
+  rewritten and returns when the tray closes.

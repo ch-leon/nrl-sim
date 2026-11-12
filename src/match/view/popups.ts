@@ -100,6 +100,15 @@ const KICK_WORDS: Readonly<Record<string, string>> = {
   'cross-field': 'CROSS-FIELD!',
 };
 
+/**
+ * A coach's call that paid off (#639), over the man who made it count: the call's own result
+ * ("SHIFT LEFT +18M") under COACH'S CALL!. It stays up as long as a big moment but takes no
+ * impact tier (it is shown directly, not through impactTier): the moment it settles on has had its own.
+ */
+export function callPaidPopup(result: string): Popup {
+  return { word: "COACH'S CALL!", sub: result.toUpperCase(), tone: 'attack', big: false, ms: POPUP_BIG_MS };
+}
+
 export function surnameOf(name: string | undefined): string {
   if (!name) return '';
   const parts = name.trim().split(/\s+/);

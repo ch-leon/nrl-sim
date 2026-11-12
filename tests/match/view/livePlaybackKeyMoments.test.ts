@@ -165,6 +165,20 @@ describe('LivePlayback key moments (#366)', () => {
     }
   });
 
+  it('an open coach tray holds the match at ×1 whatever the setting, and the chosen speed returns when it closes (#639)', () => {
+    const pb = playback(false, 8, 5);
+    frames(pb, () => sim(pb).matchSeconds > 30);
+    pb.setCallsOpen(true);
+    frames(pb, () => pb.runSpeed < 1.05, 400);
+    expect(pb.runSpeed).toBeLessThan(1.05);
+    expect(pb.slowedTo).toBe(1);
+    expect(pb.getSpeed()).toBe(8);
+    pb.setCallsOpen(false);
+    frames(pb, () => pb.runSpeed > 7.9, 400);
+    expect(pb.runSpeed).toBeGreaterThan(7.9);
+    expect(pb.slowedTo).toBeNull();
+  });
+
   it('is ignored on Skip: the match runs to full time with no moment held', () => {
     const pb = playback(true, 8, 5);
     frames(pb, () => sim(pb).matchSeconds > 60);

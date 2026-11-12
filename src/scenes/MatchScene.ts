@@ -42,9 +42,9 @@ import {
 } from '../match/view/livePlayback';
 import { KICK_BACK_PER_S, KICK_OUT_PER_S, KICK_PAN_MAX_PX_PER_MS, KICK_RETURN_MS, cameraFrame, type Frame } from '../match/view/kickLayer';
 import { NINES } from '../match/league/rules';
-import { ON_FIELD } from '../config';
+import { ON_FIELD, SET_TACKLES } from '../config';
 import type { LiveMatchData } from '../core/events';
-import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callIsKickoff, callIsPenalty, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
+import { CALL_LABEL, CALL_RESULT_MS, COACH_CALLS, callIsBench, callMoment, callIsKickoff, callIsPenalty, callResultText, unlockLevel, type CallVerdict, type CoachCall } from '../match/league/calls';
 import { runMatch } from '../match/league/match';
 import { canUseWorker, playMatchesInWorker } from '../systems/matchJobs';
 
@@ -482,6 +482,7 @@ export class MatchScene extends Phaser.Scene {
         speed: this.rememberedSpeed(),
         keyMoments: () => this.keyMomentsOn(),
         onCallResult: (v) => this.showCallResult(v),
+        ...(live.coachSide ? { coachSide: live.coachSide } : {}),
       });
       this.mountPlaybackControls(this.playback.getSpeed());
       // Labs: match controls (Leon, 30 Oct). Snapshot the switch for this match.
@@ -962,6 +963,22 @@ export class MatchScene extends Phaser.Scene {
     this.refreshCallChips();
   }
 
+  /** The moment the badge last pulsed for (#639): it pulses once as a penalty, a restart or the last tackle arrives, not again until it has passed. */
+  private pulsedFor: string | null = null;
+
+  private pulseCoach(moment: string | null): void {
+    if (moment === null || this.madeCall !== null || this.trayOpen()) {
+      if (moment === null) this.pulsedFor = null;
+      return;
+    }
+    const badge = this.coachBadgeEl;
+    if (!badge || moment === this.pulsedFor) return;
+    this.pulsedFor = moment;
+    badge.removeAttribute('data-pulse');
+    void badge.offsetWidth;
+    badge.setAttribute('data-pulse', moment);
+  }
+
   private trayOpen(): boolean {
     return !!this.callsEl && !this.callsEl.hidden;
   }
@@ -975,6 +992,8 @@ export class MatchScene extends Phaser.Scene {
     this.coachBtn.setAttribute('aria-expanded', String(open));
     if (this.coachLabel) this.coachLabel.textContent = open ? 'COACH ▾' : 'COACH';
     this.overlay?.setTrayOpen?.(open);
+    // The match plays at ×1 at most while a call is chosen (#639).
+    if (this.playback instanceof LivePlayback) this.playback.setCallsOpen(open);
     this.trayKey = '';
     this.trayPlaysKeyNow = '';
     if (open) this.refreshCallChips();
@@ -1005,6 +1024,7 @@ export class MatchScene extends Phaser.Scene {
     const badge = coachBadge(trayCallsOn(usable), attacking, this.madeCall, { on: trayPlaysOn(plays), made: playLatest ? this.madePlay : null });
     if (this.coachBadgeEl) renderCoachBadge(this.coachBadgeEl, badge.text);
     if (this.coachBadgeEl) this.coachBadgeEl.dataset.state = badge.state;
+    this.pulseCoach(callMoment(buttons.filter((b) => b.why === null).map((b) => b.call), attacking, pb.controlTackle >= SET_TACKLES - 1));
     if (!this.trayOpen() || !this.trayList || !this.trayTitle || !this.trayFoot) return;
     // The locked calls (N9.6) that fit the moment: ones the sim would take now if his Coach's Office had them,
     // under the usable rows while there is room, the rest in the footer. The sim never sees them as calls.

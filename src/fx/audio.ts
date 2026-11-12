@@ -31,7 +31,9 @@ export type SfxName =
   | 'click' | 'coin' | 'build' | 'cheer' | 'tackle' | 'try' | 'groan'
   // The match (#635): the referee, the boot, the posts, a break, a big hit and the full-time stings.
   | 'whistle' | 'whistleLong' | 'siren' | 'boot' | 'goal' | 'miss' | 'whoosh' | 'tackleBig'
-  | 'stingWin' | 'stingDraw' | 'stingLoss';
+  | 'stingWin' | 'stingDraw' | 'stingLoss'
+  // A coach's call paid off (#639).
+  | 'callPaid';
 
 export type MusicTrack = 'grounds' | 'match';
 
@@ -219,6 +221,15 @@ export const SFX_PRESETS: Record<SfxName, SfxPreset> = {
       { type: 'triangle', freq: 293.66, start: 0.3, duration: 0.3, gain: 0.28, attack: 0.01 },
       { type: 'triangle', freq: 261.63, start: 0.6, duration: 0.3, gain: 0.28, attack: 0.01 },
       { type: 'triangle', freq: 196, start: 0.9, duration: 0.9, gain: 0.28, attack: 0.01 },
+    ],
+    noises: [],
+  },
+  // A coach's call paid off (#639): three sine notes rising (A5, D6, F#6), light and short.
+  callPaid: {
+    tones: [
+      { type: 'sine', freq: 880, start: 0, duration: 0.08, gain: 0.25, attack: 0.004 },
+      { type: 'sine', freq: 1174.7, start: 0.07, duration: 0.08, gain: 0.25, attack: 0.004 },
+      { type: 'sine', freq: 1480, start: 0.14, duration: 0.16, gain: 0.25, attack: 0.004 },
     ],
     noises: [],
   },
@@ -921,6 +932,7 @@ export class AudioEngine {
     this.unsubs.push(bus.on('match:event', (ev) => this.onMatchEvent(ev)));
     this.unsubs.push(bus.on('match:penalty', () => this.onPenalty()));
     this.unsubs.push(bus.on('match:clean-break', () => this.onCleanBreak()));
+    this.unsubs.push(bus.on('match:call-paid', () => this.playSfx('callPaid')));
     this.unsubs.push(bus.on('ui:notify', () => this.playSfx('click')));
     this.unsubs.push(
       bus.on('match:started', ({ home, away }) => {

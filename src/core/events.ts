@@ -69,6 +69,8 @@ export interface Events {
   // live sim on this seed and the result comes with 'match:finished'.
   'match:started': { fixture: Fixture; home: TeamSheet; away: TeamSheet; live: LiveMatchData };
   'match:event': MatchEvent; // re-emitted during playback pacing
+  /** One of the player's own calls paid off, on screen (not in a skipped stretch): the rising tone (#639). */
+  'match:call-paid': { call: string };
   'match:finished': { fixture: Fixture; result: MatchResult };
   /** Structural fixture accepted once; report subscribers are presentation-only. */
   'match:committed': { fixture: Fixture; result: MatchResult };

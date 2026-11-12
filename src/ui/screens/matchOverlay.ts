@@ -1915,6 +1915,10 @@ body.nrl-match-active .nrl-dock-wrap { display: none; }
 }
 .nrl-mo-coach-badge[data-state="on"] { background: var(--nrl-accent); color: var(--nrl-on-accent); }
 .nrl-mo-coach-badge[data-state="made"] { color: var(--nrl-accent); }
+/* A moment a held call suits (#639): the badge swells once. */
+.nrl-mo-coach-badge[data-pulse] { animation: nrl-mo-coach-pulse 900ms ease-out 1; }
+@keyframes nrl-mo-coach-pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 var(--nrl-accent); } 35% { transform: scale(1.18); box-shadow: 0 0 0 8px transparent; } 100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .nrl-mo-coach-badge[data-pulse] { animation: none; } }
 /* Calls and plays together (#326): one line, its spaces kept; stacked two lines on a narrow phone (below). */
 .nrl-mo-coach-badge[data-parts] { display: block; line-height: 36px; white-space: pre; }
 .nrl-mo-coach[aria-expanded="true"] { padding: 0 16px; background: var(--nrl-button); box-shadow: inset 0 0 0 2px var(--nrl-accent); }

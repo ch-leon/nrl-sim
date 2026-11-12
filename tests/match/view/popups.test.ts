@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BONUS_SUB,
+  callPaidPopup,
   POPUP_BIG_MS,
   POPUP_EDGE,
   POPUP_LINE_H,
@@ -110,5 +111,11 @@ describe('popupFor', () => {
   it('big moments last longer', () => {
     expect(POPUP_BIG_MS).toBeGreaterThan(POPUP_MS);
     for (const tone of ['attack', 'defence', 'neutral', 'bad'] as const) expect(TONE_COLOR[tone]).toMatch(/^#[0-9a-f]{6}$/);
+  });
+});
+
+describe('callPaidPopup (#639)', () => {
+  it('says COACH\'S CALL! over the result, as long as a big moment and with no slow-motion beat', () => {
+    expect(callPaidPopup('Shift left +18m')).toMatchObject({ word: "COACH'S CALL!", sub: 'SHIFT LEFT +18M', tone: 'attack', big: false, ms: POPUP_BIG_MS });
   });
 });

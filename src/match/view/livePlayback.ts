@@ -22,7 +22,7 @@ import { replayRange, Runner, TICK_MS, type SimFactory } from '../core/engine';
 import type { Side, SimEvent, Snapshot } from '../core/snapshot';
 import { LiveSim, type LiveOptions, type PlanInput } from '../league/live';
 import { MatchRecorder, type RunMatchOptions } from '../league/match';
-import { callIsBench, callIsPenalty, type CallInput, type CallVerdict, type CoachCall } from '../league/calls';
+import { callIsBench, callIsPenalty, callResultText, type CallInput, type CallVerdict, type CoachCall } from '../league/calls';
 import type { PlayId } from '../../data/plays';
 import type { PlayFit } from '../league/plays';
 import type { DifficultyEdge } from '../league/spread';
@@ -30,7 +30,7 @@ import type { TeamTactics } from '../league/presets';
 import { NINES } from '../league/rules';
 import { LiveView, type ViewSurface } from './liveView';
 import { PopupLayer } from './popupLayer';
-import { popupFor } from './popups';
+import { callPaidPopup, popupFor } from './popups';
 import { impactTier, playImpact } from './impact';
 import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
@@ -254,6 +254,8 @@ export interface LivePlaybackOptions {
   plans?: PlanInput[];
   controls?: ControlInput[];
   controlsSide?: Side;
+  /** The side the player coaches (#639): its calls paying off are shouted over the field and sounded. */
+  coachSide?: Side;
   /** The rival's AI coach (N9.6). */
   aiCoach?: ('home' | 'away')[];
   /** Sides whose plan changes at the breaks (N13.5). The watched match, a resume and a Skip all use it. */
@@ -626,9 +628,17 @@ export class LivePlayback {
     return cap !== null && cap < this.speed * playbackPace(this.sim.phaseKind, this.speed) ? cap : null;
   }
 
-  /** The key moment's cap, when the setting is on and the match is playing on screen. */
+  /** The coach's tray is open (#639): the match plays at ×1 at most while a call is chosen, then back to the chosen speed. */
+  private callsOpen = false;
+  setCallsOpen(open: boolean): void {
+    this.callsOpen = open;
+  }
+
+  /** The key moment's cap (or the open tray's), when the match is playing on screen. */
   private keyCap(): number | null {
-    if (this.skipping || this.awaitingSkip || this.finishEmitted || !this.opts.keyMoments?.()) return null;
+    if (this.skipping || this.awaitingSkip || this.finishEmitted) return null;
+    if (this.callsOpen) return KEY_MOMENT_SPEED;
+    if (!this.opts.keyMoments?.()) return null;
     return this.keyMoments.cap(this.runner.cur.clock, NINES.halfMinutes);
   }
 
@@ -655,8 +665,20 @@ export class LivePlayback {
       this.verdictsSeen = vs.length;
       return;
     }
-    while (this.verdictsSeen < vs.length) this.opts.onCallResult?.(vs[this.verdictsSeen++]!);
+    while (this.verdictsSeen < vs.length) {
+      const v = vs[this.verdictsSeen++]!;
+      this.opts.onCallResult?.(v);
+      // The player's own call paying off: a pop-up over the man who made it count, and the rising tone (#639).
+      if (v.paid && v.side === this.opts.coachSide) {
+        const who = this.lastActor[v.side];
+        if (who !== undefined) this.popups.show(callPaidPopup(callResultText(v)), v.side, who);
+        bus.emit('match:call-paid', { call: v.call });
+      }
+    }
   }
+
+  /** The slot each side's latest named event was about: who a call that pays off is shouted over (#639). */
+  private readonly lastActor: Partial<Record<Side, number>> = {};
 
   /**
    * Play the rest of the match at once: every event still reaches the overlay (the
@@ -850,6 +872,7 @@ export class LivePlayback {
     for (const sim of events) {
       // A line break the view calls half (#638) reads and plays as a plain line; the recorded events below are the sim's own.
       const e = shownBreak(sim, cur);
+      if (e.side !== undefined && e.slot !== undefined && e.kind !== 'call-paid' && e.kind !== 'coach-call') this.lastActor[e.side] = e.slot;
       if (e.kind === 'line-break' && e.detail !== HALF_BREAK) bus.emit('match:clean-break', { tick: e.tick }); // the whoosh and the crowd (audio)
       // A kick struck or brought down (N15.3); a skipped or resumed stretch shows none.
       if (this.skipping) {

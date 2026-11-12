@@ -71,8 +71,14 @@ describe('SFX_PRESETS', () => {
     expect(Object.keys(SFX_PRESETS).sort()).toEqual(
       ['build', 'cheer', 'click', 'coin', 'groan', 'tackle', 'try',
         'whistle', 'whistleLong', 'siren', 'boot', 'goal', 'miss', 'whoosh', 'tackleBig',
-        'stingWin', 'stingDraw', 'stingLoss'].sort(),
+        'stingWin', 'stingDraw', 'stingLoss', 'callPaid'].sort(),
     );
+  });
+  it('callPaid rises note to note (#639)', () => {
+    const f = SFX_PRESETS.callPaid.tones.map((t) => t.freq);
+    expect(f.length).toBe(3);
+    expect(f[0]).toBeLessThan(f[1]!);
+    expect(f[1]).toBeLessThan(f[2]!);
   });
   it('a big hit is louder and lower than an ordinary tackle', () => {
     const t = SFX_PRESETS.tackle.tones[0];
