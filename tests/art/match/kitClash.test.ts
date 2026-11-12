@@ -46,6 +46,11 @@ describe('kit coverage', () => {
     }
   });
 
+  it('is read off the approved player: a pattern puts its trim colour on the jersey', () => {
+    expect(roleCoverage('hoops').get('trim') ?? 0).toBeGreaterThan(roleCoverage('plain').get('trim') ?? 0);
+    expect(roleCoverage('stripes').get('trim') ?? 0).toBeGreaterThan(roleCoverage('plain').get('trim') ?? 0);
+  });
+
   it('merges roles that share a colour', () => {
     const k = kitFromColors(['#3e2723', '#ffb300'], 'rival-drovers');
     const cov = kitCoverage(k);

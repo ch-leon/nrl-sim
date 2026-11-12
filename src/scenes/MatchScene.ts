@@ -365,9 +365,7 @@ export class MatchScene extends Phaser.Scene {
     this.spawnCrowd(this.art.crowd('match-crowd', art.crowd));
 
     // Players + ball.
-    // Keep ownership of any legacy atlases uploaded ahead; the live actors use
-    // small reusable textures and a bounded cache of approved character frames.
-    this.art.adopt([art.home, art.away]);
+    // The live actors use small reusable textures and a bounded cache of approved character frames.
     this.playerFrames = new PlayerFrameCache({ home: kits.home, away: kits.away });
     this.contact = new MatchContactLayer(this, this.art, { home: kits.home, away: kits.away });
     for (let i = 0; i < ON_FIELD; i++) {

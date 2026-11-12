@@ -1,9 +1,10 @@
 // src/art/match/kitClash.ts — can the two sides be told apart on the pitch (#340)?
 //
 // A kit is judged on the pixels a player sprite actually wears, not on its two
-// club colours: the standing and running frames are painted once per pattern with
-// a probe kit (one marker colour per kit role) to learn how much of the sprite
-// each role covers, and a real kit's coverage is those weights on its colours.
+// club colours: the approved match player (art/prototype/player.ts, the one the
+// watcher sees) is painted once per pattern with a probe kit (one marker colour
+// per kit role) to learn how much of the sprite each role covers, and a real
+// kit's coverage is those weights on its colours.
 // Two kits clash when a large part of either sprite has no near colour on the
 // other (CIE Lab ΔE, weighted by coverage). Darwin (brown jersey, gold shorts and
 // trim) against a gold jersey with navy shorts is the case the jersey-only check
@@ -14,9 +15,9 @@
 // marks under its players, drawn solid for home and dashed for away (#371) so the
 // sides differ in shape as well as colour. Pure and Phaser-free
 // (tests/art/match/kitClash.test.ts).
-import { shade } from '../pixel';
 import { buildKit, kitFromColors, type Kit, type KitPattern } from './kit';
-import { LOOKS, drawPlayerFrame, type PlayerAnim } from './players';
+import { LOOKS } from './players';
+import { drawPrototypePlayer, type Action, type Appearance, type Build } from '../prototype/player';
 
 /** Contrast (coverage-weighted ΔE, see kitContrast) below which two kits clash. */
 export const KIT_CLASH_MIN = 30;
@@ -27,8 +28,10 @@ type Role = 'jersey' | 'jerseyLight' | 'jerseyShade' | 'trim' | 'trimShade' | 's
 const ROLES: readonly Role[] = ['jersey', 'jerseyLight', 'jerseyShade', 'trim', 'trimShade', 'shorts', 'shortsShade', 'sock', 'sockHoop'];
 /** Marker colours, one per role, that no look (skin, hair, boots, outline) uses. */
 const PROBE: readonly number[] = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0x800000, 0x008000, 0x000080];
-/** The frames a kit is judged on: standing, and two strides of the run. */
-const FRAMES: readonly [PlayerAnim, number][] = [['idle', 0], ['run', 0], ['run', 1]];
+/** The frames a kit is judged on: standing, and two strides of the run (opposite ends of the gait). */
+const FRAMES: readonly [Action, number][] = [['idle', 0], ['run', 0], ['run', 3]];
+/** All three builds count: a stocky prop shows more jersey than a lean winger. */
+const BUILDS: readonly Build[] = ['lean', 'athletic', 'stocky'];
 
 const weightsByPattern = new Map<KitPattern, ReadonlyMap<Role, number>>();
 
@@ -38,24 +41,24 @@ export function roleCoverage(pattern: KitPattern): ReadonlyMap<Role, number> {
   if (known) return known;
   const probe = Object.fromEntries(ROLES.map((r, i) => [r, PROBE[i]!])) as Record<Role, number>;
   const kit: Kit = { ...probe, pattern };
-  // Far limbs are drawn darker (players.ts darken): count them for their role too.
   const byColor = new Map<number, Role>();
-  ROLES.forEach((r) => {
-    byColor.set(probe[r], r);
-    byColor.set(shade(probe[r], 0.78), r);
-  });
+  ROLES.forEach((r) => byColor.set(probe[r], r));
   const counts = new Map<Role, number>();
   let total = 0;
-  for (const [anim, frame] of FRAMES) {
-    const buf = drawPlayerFrame(kit, LOOKS[0]!, anim, frame);
-    for (let y = 0; y < buf.h; y++) {
-      for (let x = 0; x < buf.w; x++) {
-        const px = buf.get(x, y);
-        if (px.alpha === 0) continue;
-        const role = byColor.get(px.color);
-        if (!role) continue;
-        counts.set(role, (counts.get(role) ?? 0) + 1);
-        total++;
+  const first = LOOKS[0]!;
+  for (const build of BUILDS) {
+    const look: Appearance = { skin: first.skin, hair: first.hair, head: first.style, beard: first.beard, build, tape: false, boots: 0x293449 };
+    for (const [action, frame] of FRAMES) {
+      const buf = drawPrototypePlayer(look, kit, action, frame);
+      for (let y = 0; y < buf.h; y++) {
+        for (let x = 0; x < buf.w; x++) {
+          const px = buf.get(x, y);
+          if (px.alpha === 0) continue;
+          const role = byColor.get(px.color);
+          if (!role) continue;
+          counts.set(role, (counts.get(role) ?? 0) + 1);
+          total++;
+        }
       }
     }
   }

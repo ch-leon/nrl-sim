@@ -1,9 +1,9 @@
 // src/scenes/matchArt.ts — thin Phaser registration for the generated match art.
 //
 // The art itself is pure (src/art/match/*); this module is the only place that
-// uploads those PixelBuffers as textures, registers atlas frames and player
-// animations, and creates the static stadium layers. Every key it creates (or
-// adopts, uploaded ahead by matchArtAhead.ts) is recorded so MatchScene can free them on shutdown — the stadium layers are a
+// uploads those PixelBuffers as textures, registers atlas frames, and creates the
+// static stadium layers. Every key it creates (or adopts, uploaded ahead by
+// matchArtAhead.ts) is recorded so MatchScene can free them on shutdown — the stadium layers are a
 // few megapixels and are rebuilt per fixture (team colours differ). Keys carry a
 // per-registry serial so a quick restart of the scene can never have its fresh
 // textures removed by the previous instance's deferred cleanup.
@@ -11,7 +11,6 @@ import Phaser from 'phaser';
 import { toTexture } from '../art/pixel';
 import type { PixelBuffer } from '../art/pixel';
 import type { Kit } from '../art/match/kit';
-import { ANIM_ORDER, PLAYER_ANIMS, frameName, type PlayerAnim } from '../art/match/players';
 import { drawCrossbar, drawShadow, drawUpright } from '../art/match/props';
 import { ballPixels } from '../art/prototype/player';
 import type { AtlasPixels, LayerChunk, TexturePiece } from '../art/match/fixtureArt';
@@ -21,7 +20,6 @@ let registrySerial = 0;
 export class MatchArtRegistry {
   private readonly scene: Phaser.Scene;
   private readonly textureKeys: string[] = [];
-  private readonly animKeys: string[] = [];
   private readonly serial: number;
 
   constructor(scene: Phaser.Scene) {
@@ -71,28 +69,6 @@ export class MatchArtRegistry {
     return chunks.map((c) => this.scene.add.image(c.x, c.y, this.own(c.name, c)).setOrigin(0, 0).setDepth(depth));
   }
 
-  /** Player atlas (painted for a kit, fixtureArt.ts) + one Phaser animation per look × anim. */
-  players(atlasKey: string, atlas: AtlasPixels): string {
-    const { frames } = atlas;
-    const key = this.frames(this.own(atlasKey, atlas), frames);
-    const looks = new Set(frames.map((f) => Number(f.name.split('-')[0])));
-    for (const look of looks) {
-      for (const anim of ANIM_ORDER) {
-        const spec = PLAYER_ANIMS[anim];
-        const animKey = playerAnimKey(key, look, anim);
-        if (this.scene.anims.exists(animKey)) this.scene.anims.remove(animKey);
-        this.scene.anims.create({
-          key: animKey,
-          frames: Array.from({ length: spec.frames }, (_, f) => ({ key, frame: frameName(look, anim, f) })),
-          frameRate: spec.frameRate,
-          repeat: spec.repeat,
-        });
-        this.animKeys.push(animKey);
-      }
-    }
-    return key;
-  }
-
   /** Crowd spectator atlas for a fixture's colours (painted in fixtureArt.ts). */
   crowd(key: string, atlas: AtlasPixels): string {
     return this.frames(this.own(key, atlas), atlas.frames);
@@ -111,14 +87,7 @@ export class MatchArtRegistry {
 
   /** Remove every texture and animation this registry created. */
   destroy(): void {
-    for (const k of this.animKeys) if (this.scene.anims.exists(k)) this.scene.anims.remove(k);
     for (const k of this.textureKeys) if (this.scene.textures.exists(k)) this.scene.textures.remove(k);
-    this.animKeys.length = 0;
     this.textureKeys.length = 0;
   }
-}
-
-/** Animation key for a player atlas look + anim. */
-export function playerAnimKey(atlasKey: string, look: number, anim: PlayerAnim): string {
-  return `${atlasKey}-${look}-${anim}`;
 }

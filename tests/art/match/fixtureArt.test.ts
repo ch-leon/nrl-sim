@@ -4,7 +4,6 @@ import { describe, it, expect } from 'vitest';
 import { setKitDesign } from '../../../src/art/match/kit';
 import { resolveKits } from '../../../src/art/match/kitClash';
 import { clearGroundCache, paintBackground, paintForeground, warmGround } from '../../../src/art/match/stadium';
-import { buildPlayerAtlas } from '../../../src/art/match/players';
 import { buildCrowdAtlas, crowdShirts } from '../../../src/art/match/crowd';
 import { chunkLayer, fixtureArtBuffers, fixtureArtKey, LAYER_CHUNK, paintFixtureArt, reviveFixtureArt, type LayerChunk } from '../../../src/art/match/fixtureArt';
 import { PixelBuffer } from '../../../src/art/pixel';
@@ -43,8 +42,6 @@ describe('fixture art (N10.5)', () => {
     sameChunks(art.bg, chunkLayer('match-bg', paintBackground(offsetX, kits.home, kits.away)));
     sameChunks(art.fg, chunkLayer('match-fg', paintForeground(offsetX, kits.home, kits.away)));
     sameAtlas(art.crowd, buildCrowdAtlas(crowdShirts(kits.home, kits.away)));
-    sameAtlas(art.home, buildPlayerAtlas(kits.home));
-    sameAtlas(art.away, buildPlayerAtlas(kits.away));
   });
 
   it("survives a Worker's transfer: cloned with its buffers moved, then revived", () => {
@@ -55,7 +52,7 @@ describe('fixture art (N10.5)', () => {
     expect(back.bg[0]!.buf).toBeInstanceOf(PixelBuffer);
     sameChunks(back.bg, art.bg);
     sameChunks(back.fg, art.fg);
-    sameAtlas(back.home, art.home);
+    sameAtlas(back.crowd, art.crowd);
     expect(back.key).toBe(art.key);
   });
 
