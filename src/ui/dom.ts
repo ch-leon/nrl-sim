@@ -473,6 +473,13 @@ export function guardDoubleTap(container: HTMLElement): void {
 /** A two-tap Sell or Release waiting for its second tap (#612): the class its button wears, and how long it waits. */
 export const ARMED_CLASS = 'nrl-btn-armed';
 export const ARMED_MS = 4000;
+/** A tap this soon after the one that armed the button is the same stab at the screen, not an answer (#617; as SKIP, #601). */
+export const ARMED_REPEAT_MS = 300;
+
+/** Whether a tap on an armed button confirms. `armedForMs` is how long it has been armed. */
+export function armedTap(armedForMs: number): boolean {
+  return armedForMs >= ARMED_REPEAT_MS;
+}
 
 /**
  * Start an armed button's wait (#612; Contracts and the player page). `disarm` runs
@@ -535,6 +542,8 @@ export function hintScroll(box: HTMLElement): () => void {
 
 /** Currently open modal overlay, if any (guards against stacking). */
 let openModalEl: HTMLElement | null = null;
+/** The open dialog's `onRemove` (#617): runs when closeModal takes it down, by any route. */
+let openModalRemoved: (() => void) | null = null;
 /**
  * Whether a dialog has closed since the last frame was drawn (#606). One opened now takes its
  * place before the dim is seen to go (◂ back from a rival's player closes his page, then opens
@@ -546,6 +555,9 @@ let closedThisFrame = false;
  * Open a centred modal containing `content`. Clicking the dimmed backdrop closes
  * it. Returns the backdrop element. Only one modal is open at a time — opening a
  * second closes the first.
+ *
+ * `onRemove` runs when closeModal takes the dialog down, whoever called it: a dock tab or
+ * another dialog opening close it without telling the page (#617).
  *
  * With `screen: true` the modal is a nav *screen* instead of a dialog: it is
  * confined to the screen region (HUD and nav stay visible and usable), it
@@ -567,7 +579,7 @@ let closedThisFrame = false;
  */
 export function openModal(
   content: HTMLElement,
-  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean; key?: string; cut?: boolean } = {},
+  opts: { class?: string; screen?: boolean; closeButton?: boolean; region?: boolean; key?: string; cut?: boolean; onRemove?: () => void } = {},
 ): HTMLElement {
   ensureStyles();
   const framed = opts.screen === true || opts.region === true;
@@ -608,6 +620,7 @@ export function openModal(
   if (swap) backdrop.setAttribute('data-swap', '');
   if (opts.cut) backdrop.setAttribute('data-cut', '');
   openModalEl = backdrop;
+  openModalRemoved = opts.onRemove ?? null;
   getRoot().appendChild(backdrop);
   return backdrop;
 }
@@ -626,6 +639,9 @@ export function closeModal(): void {
     }
     openModalEl.remove();
     openModalEl = null;
+    const removed = openModalRemoved;
+    openModalRemoved = null;
+    removed?.();
   }
 }
 

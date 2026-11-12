@@ -27,7 +27,7 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PORTRAIT_H, PORTRAIT_W, TRAINING_KIT, portraitDataUrl } from '../../art/portrait';
-import { ARMED_CLASS, armGuard, backButton, button, closeModal, el, openModal } from '../dom';
+import { ARMED_CLASS, armGuard, armedTap, backButton, button, closeModal, el, openModal } from '../dom';
 import { ensureScreenStyles, fitColour } from './recruit';
 import { fmtMoney } from './finance';
 import { focusLabel } from '../../systems/training';
@@ -492,8 +492,11 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   // it back in place, with no re-render under that tap.
   let stopWait: (() => void) | null = null;
   let atRest: (() => void) | null = null;
+  // When it was armed: a second tap inside ARMED_REPEAT_MS is the first one again (#617).
+  let armedAt = 0;
   const arm = (id: PlayerActionId | null): void => {
     armed = id;
+    armedAt = performance.now();
     stopWait?.();
     stopWait = id ? armGuard(() => { armed = null; stopWait = null; atRest?.(); }) : null;
   };
@@ -629,6 +632,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
         const ask = armed === a.id ? a.confirm : undefined;
         const btn = button(ask ?? a.label, () => {
           if (a.confirm && armed !== a.id) { arm(a.id); render(); return; }
+          if (a.confirm && !armedTap(performance.now() - armedAt)) return;
           arm(null);
           const res = runAction(a.id, p.id);
           if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
@@ -660,7 +664,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   render();
   // A full sheet in the band above the dock (#203); ◂ back is the one close (#349 A5).
   // A drill-in from a list: it cuts in, with no dialog's entrance (#606).
-  const backdrop = openModal(content, { class: 'nrl-player-modal', region: true, cut: true });
+  const backdrop = openModal(content, { class: 'nrl-player-modal', region: true, cut: true, onRemove: () => stopWait?.() });
   // The backdrop's own listener has closed the dialog; tell whoever opened it.
   backdrop.addEventListener('click', () => { if (!closed) { closed = true; off(); opts.onClose?.(); } });
   return backdrop;

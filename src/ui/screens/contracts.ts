@@ -17,7 +17,7 @@ import {
 } from '../../systems/contracts';
 import { SQUAD_MIN, difficultyMultipliers } from '../../config';
 import { fmtMoneyShort } from '../../utils/money';
-import { ARMED_CLASS, armGuard, el, button, openScreen, screenHead, backButton } from '../dom';
+import { ARMED_CLASS, armGuard, armedTap, el, button, openScreen, screenHead, backButton } from '../dom';
 import { EXPIRY_WINDOW_WEEKS, ensureFinanceStyles, fmtMoney, openFinanceScreen } from './finance';
 
 const REASONS: Record<string, string> = {
@@ -42,6 +42,8 @@ const fmtShort = (n: number): string => fmtMoneyShort(n, { places: 1 });
 let armed: string | null = null;
 /** Calls off the armed button's wait (dom.ts armGuard), and puts that button back as it was. */
 let stopWait: (() => void) | null = null;
+/** When the armed button was armed, so a quick double tap does not take both steps (#617). */
+let armedAt = 0;
 let atRest: (() => void) | null = null;
 
 /**
@@ -51,6 +53,7 @@ let atRest: (() => void) | null = null;
  */
 function arm(key: string | null): void {
   armed = key;
+  armedAt = performance.now();
   stopWait?.();
   stopWait = key ? armGuard(() => { armed = null; stopWait = null; atRest?.(); }) : null;
 }
@@ -143,6 +146,7 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     const sellLabel = `SELL +${fmtShort(transferFee(p))}`;
     const release = button(releaseArmed ? 'REALLY RELEASE?' : releaseLabel, () => {
       const g = guardTap(armed, `release:${p.id}`);
+      if (g.run && !armedTap(performance.now() - armedAt)) return; // the tap that armed it, twice
       arm(g.armed);
       if (g.run) {
         const res = releasePlayer(getState(), p.id);
@@ -154,6 +158,7 @@ function render(sub: HTMLElement, tbody: HTMLElement): void {
     release.title = `Two taps: pays out ${fmtMoney(RELEASE_PAYOUT_WEEKS * p.wage)}`;
     const sell = button(sellArmed ? 'REALLY SELL?' : sellLabel, () => {
       const g = guardTap(armed, `sell:${p.id}`);
+      if (g.run && !armedTap(performance.now() - armedAt)) return; // the tap that armed it, twice
       arm(g.armed);
       if (g.run) {
         const fee = transferFee(p);

@@ -4,7 +4,7 @@
 // under the finger. The four screens are checked in the browser; this pins the
 // rule on a stand-in container (vitest env is 'node': no DOM, no MutationObserver).
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DOUBLE_TAP, guardDoubleTap } from '../../src/ui/dom';
+import { ARMED_REPEAT_MS, DOUBLE_TAP, armedTap, guardDoubleTap } from '../../src/ui/dom';
 
 type Tap = { t: number; x?: number; y?: number; target?: { isConnected: boolean }; detail?: number };
 
@@ -102,5 +102,17 @@ describe('guardDoubleTap (#598)', () => {
     expect(g.tap({ t: 1010, x: 0, y: 0, detail: 0, target: gone() })).toBe(true);
     expect(g.tap({ t: 1020, x: 0, y: 0, detail: 0, target: gone() })).toBe(true);
     expect(g.tap({ t: 1100, target: gone() })).toBe(false); // still the repeat of the tap at 1000
+  });
+});
+
+// #617: the second tap of a quick double tap on an armed Sell or Release is the first again.
+describe('armedTap (#617)', () => {
+  it('confirms only once ARMED_REPEAT_MS has passed since the tap that armed it', () => {
+    expect(ARMED_REPEAT_MS).toBe(300);
+    expect(armedTap(0)).toBe(false);
+    expect(armedTap(150)).toBe(false);
+    expect(armedTap(299)).toBe(false);
+    expect(armedTap(300)).toBe(true);
+    expect(armedTap(3999)).toBe(true);
   });
 });

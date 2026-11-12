@@ -78,11 +78,11 @@ describe('the Money page stays true to the economy', () => {
     expect(text).toContain(`The board pays ${dollars(BOARD.GRANT_PER_MET)} for every objective met`);
     expect(text).toContain(`Easy pays ${Math.round(DIFFICULTY.easy.prize * 100)}% of that and Hard ${Math.round(DIFFICULTY.hard.prize * 100)}%`);
     expect(text).toContain(`Easy ${Math.round(DIFFICULTY.easy.prize * 100)}%, Hard ${Math.round(DIFFICULTY.hard.prize * 100)}%`);
-    expect(text).toContain(`below −${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player`);
+    expect(text).toContain(`below -${dollars(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player`);
     expect(text).toContain(`the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time`);
     const all = CLUB_PAGES.flatMap((p) => p.sections.map((s) => `${s.text ?? ''} ${s.bullets?.join(' ') ?? ''}`)).join(' ');
     expect(all).toContain(`Each one met pays ${dollars(BOARD.GRANT_PER_MET)} and ${BOARD.REP_PER_MET} reputation.`);
-    expect(all).toContain(`the week the balance passes the −${dollars(-ECON.FORCED_SALE_FLOOR)} floor`);
+    expect(all).toContain(`the week the balance passes the -${dollars(-ECON.FORCED_SALE_FLOOR)} floor`);
   });
 });
 

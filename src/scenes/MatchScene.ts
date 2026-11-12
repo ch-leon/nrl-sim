@@ -1097,18 +1097,23 @@ export class MatchScene extends Phaser.Scene {
     if (this.trayFoot.textContent !== foot) this.trayFoot.textContent = foot;
     // The Plays section coming or going, or the footer taking another line, moves every tile: the tray sits on its bottom edge.
     const height = this.callsEl.offsetHeight;
-    if (!opened && (changed || height !== this.trayHeight)) this.trayChanged();
+    // The note the finger just asked for is not the tiles moving under it (#617): the next tap is aimed at the tray as it now stands.
+    if (!opened && (changed || (height !== this.trayHeight && !this.noteAsked))) this.trayChanged();
     this.trayHeight = height;
   }
 
   /** The note a tap on a locked tile shows in the footer ("Unlocks with Coach's Office 2"), and until when. */
   private lockedNoteText = '';
   private lockedNoteUntil = 0;
+  /** Set while a tap's own note redraws the tray, so its footer line does not count as a move (#617). */
+  private noteAsked = false;
 
   private noteLocked(level: number): void {
     this.lockedNoteText = lockedNote(level);
     this.lockedNoteUntil = this.time.now + LOCKED_NOTE_MS;
+    this.noteAsked = true;
     this.refreshCallChips();
+    this.noteAsked = false;
   }
 
   /** A call from the tray: in on the next tick, its tile lit and the tray shut a moment later, the log says it (and later whether it paid off). */

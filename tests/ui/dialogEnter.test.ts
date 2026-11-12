@@ -113,3 +113,30 @@ describe('the entrance rules (#606)', () => {
     expect(CSS).toContain('.nrl-office-dim[hidden], .nrl-nav-sheet[hidden] { display: none; }');
   });
 });
+
+// #617: a page that holds something open (the player page's armed Sell) is told when any route closes it.
+describe('openModal onRemove (#617)', () => {
+  beforeEach(() => { stubDocument(); vi.stubGlobal('requestAnimationFrame', () => 0); });
+  afterEach(() => { closeModal(); vi.unstubAllGlobals(); });
+
+  it('runs once when closeModal takes the dialog down, and when another dialog opens over it', () => {
+    const gone = vi.fn();
+    dialog({ region: true, onRemove: gone });
+    expect(gone).not.toHaveBeenCalled();
+    closeModal();
+    closeModal();
+    expect(gone).toHaveBeenCalledTimes(1);
+    const swapped = vi.fn();
+    dialog({ onRemove: swapped });
+    dialog();
+    expect(swapped).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not carried to the next dialog', () => {
+    const gone = vi.fn();
+    dialog({ onRemove: gone });
+    dialog();
+    closeModal();
+    expect(gone).toHaveBeenCalledTimes(1);
+  });
+});

@@ -118,7 +118,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
         heading: 'Advancing further',
         bullets: [
           'The ▾ beside Play Week runs ×4 weeks, to the finals or to the season’s end.',
-          `A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the club goes into the red, a forced sale, and the week the balance passes the −${fmtMoney(-ECON.FORCED_SALE_FLOOR)} floor (not every week in the red).`,
+          `A long advance stops early when something needs you: fewer than 13 fit (the Academy would call up juniors to make the side), an injury, a contract about to run out, a decision card in News, or money: the week the club goes into the red, a forced sale, and the week the balance passes the ${fmtMoney(ECON.FORCED_SALE_FLOOR)} floor (not every week in the red).`,
         ],
       },
       {
@@ -160,7 +160,7 @@ export const CLUB_PAGES: readonly GuidePage[] = [
       },
       {
         heading: 'The Finance screen',
-        text: `This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, and the ledger (the board’s objectives and patience are on Staff & Board, in Office). Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below −${fmtMoney(-ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player each week (never below 13), and the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time. The balance at the left of the dock turns amber when the money would last fewer than ${RUNWAY_LOW_WEEKS} weeks at this week’s spending and red under ${RUNWAY_SHORT_WEEKS}; tap it to open this screen.`,
+        text: `This season’s books by line, the weekly run-rate and how many weeks of runway it leaves, and the ledger (the board’s objectives and patience are on Staff & Board, in Office). Below $0 the board warns, the balance turns red with “in debt” and this screen counts the weeks to the fire sale at the current burn; below ${fmtMoney(ECON.FORCED_SALE_FLOOR)} it sells your highest-paid player each week (never below 13), and the squad’s morale drops by ${ECON.FORCED_SALE_MORALE_HIT} each time. The balance at the left of the dock turns amber when the money would last fewer than ${RUNWAY_LOW_WEEKS} weeks at this week’s spending and red under ${RUNWAY_SHORT_WEEKS}; tap it to open this screen.`,
       },
     ],
   },

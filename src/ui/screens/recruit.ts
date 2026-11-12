@@ -509,7 +509,12 @@ export function openRecruitScreen(): void {
     }
     list.append(more);
     fitChips(list);
+    fitted = list.clientWidth;
   };
+  // The phone turned or the window moved: the chips fold again for the room the cells have now (#617; as Squad, #614).
+  // The width is read after fitChips, so a redraw that settles at a new width does not wake it again.
+  let fitted = 0;
+  const turned = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (list.clientWidth !== fitted) render(); }) : null;
 
   const head = screenHead('', { lead: [squadTabs('recruit')], sub, controls: [sort.button] });
   const screen = el('div', { class: 'nrl-screen nrl-sq nrl-recruit' }, head,
@@ -517,7 +522,9 @@ export function openRecruitScreen(): void {
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onRecruitClosed, 'recruit');
   render();
-  unsub = bus.on('state:changed', render);
+  const off = bus.on('state:changed', render);
+  turned?.observe(list);
+  unsub = () => { off(); turned?.disconnect(); };
 }
 
 /** Map a signPlayer failure reason to player-facing copy. */

@@ -110,7 +110,7 @@ describe('Sell and Release disarm (#612)', () => {
 
   beforeEach(() => {
     bus.clear(); stubDocument(); createNewGame('Test Club', 1);
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance'] }); // armedTap reads performance.now
     downs = [];
     Object.assign(document, {
       addEventListener: (ev: string, fn: (e: unknown) => void, capture?: boolean) => { expect([ev, capture]).toEqual(['pointerdown', true]); downs.push(fn); },
@@ -134,6 +134,31 @@ describe('Sell and Release disarm (#612)', () => {
     sell(0).click();
     expect(getState().squad.some((p) => p.id === id)).toBe(false);
     expect(downs).toHaveLength(0);
+  });
+
+  it('a second tap at 150ms is the first one again and does not sell; at 400ms it does (#617)', () => {
+    const id = rows()[0]!.attrs['data-contract']!;
+    sell(0).click();
+    vi.advanceTimersByTime(150);
+    sell(0).click();
+    expect(sell(0).textContent).toBe('REALLY SELL?');
+    expect(sell(0).classList.contains(ARMED_CLASS)).toBe(true);
+    expect(getState().squad.some((p) => p.id === id)).toBe(true);
+    vi.advanceTimersByTime(250); // 400ms in, and the 4s wait is still the one that began at the first tap
+    sell(0).click();
+    expect(getState().squad.some((p) => p.id === id)).toBe(false);
+  });
+
+  it('the same for Release: 150ms is ignored, 300ms goes through (#617)', () => {
+    const id = rows()[1]!.attrs['data-contract']!;
+    release(1).click();
+    vi.advanceTimersByTime(150);
+    release(1).click();
+    expect(release(1).textContent).toBe('REALLY RELEASE?');
+    expect(getState().squad.some((p) => p.id === id)).toBe(true);
+    vi.advanceTimersByTime(150);
+    release(1).click();
+    expect(getState().squad.some((p) => p.id === id)).toBe(false);
   });
 
   it('four seconds on it is back as it was, in place: no row is rebuilt, and the next tap only arms again', () => {
