@@ -34,12 +34,13 @@ and preview save/state separate from the production game.
 
 ## Implementation and verification
 
-- [ ] Add failing retreat regressions (known seed1 case, both directions, release,
+- [x] Add failing retreat regressions (known seed1 case, both directions, release,
   markers, goal-line exception, restart/possession and unavailable players).
   Implement eligibility plus movement in `live/base.ts`, `live/contact.ts`,
   `live/positioning.ts`, `live/play.ts`/`restarts.ts` as needed. Run targeted tests.
-- [ ] Run full checks on the corrected 100m baseline, re-record trajectory-dependent
-  fixtures without removing assertions, and measure via the existing balance
+- [ ] Run full checks on the corrected 100m baseline, refresh trajectory-dependent
+  fixtures while retaining behavioral coverage; isolate restoration/fatigue checks
+  from changed whole-match trajectories, and measure via the existing balance
   harness. Independent Claude review lists problems without editing. Draft PR625.
 - [ ] In a stacked preview branch, implement validated preview config, metre-space
   field geometry/projection and midpoint/kick fixes. Add regression coverage for
