@@ -21,7 +21,7 @@ import { experimentOn } from '../labs/flags';
 import { ControlsLayer } from '../match/view/controlsLayer';
 import Phaser from 'phaser';
 import { CameraController } from '../world/camera';
-import { zoomForViewport } from '../world/viewport';
+import { cssZoom, screenDensity } from '../world/viewport';
 import { bus } from '../core/events';
 import { button, getRoot, mount } from '../ui/dom';
 import { MATCH_NOT_SAVED_TEXT, MATCH_SAVED_TEXT, SKIPPING_EXIT_TEXT } from '../ui/hud';
@@ -82,6 +82,8 @@ import {
   NAME_TAG_MS,
   ZOOM_DEFAULT,
   easeZoom,
+  stepZoom,
+  zoomForBeat,
   zoomForEvent,
   type NameTag,
   type TeamSide,
@@ -117,9 +119,11 @@ const DEPTH_FG = 50_000;
 const DEPTH_TAG = 73_000;
 const DEPTH_CROWD_FRONT = 60_000;
 
-/** Default match zoom (#17): keeps an integer pixel scale. Eases
- *  tighter/wider per beat (see world/readability). */
+/** Default match zoom (#17), as authored; viewZoom turns a beat's zoom into a whole
+ *  number of canvas px per art px for the screen (see world/readability). */
 const MATCH_ZOOM = ZOOM_DEFAULT;
+/** A close-up is let go by its playback (closeUpDone, the lab's CLOSEUP_MS); past this it goes anyway. */
+const CLOSEUP_LIMIT_MS = 4000;
 /** Name tag sits this many world px above a player's feet (just over his head). */
 const TAG_LIFT = 39;
 /** How long a tap on a locked call's tile shows what unlocks it, in the tray's footer (ms). */
@@ -263,6 +267,8 @@ export class MatchScene extends Phaser.Scene {
   protected zoomTarget = MATCH_ZOOM;
   /** Authored (desktop) zoom for the current beat; zoomTarget is this scaled for the viewport. */
   protected beatZoom = MATCH_ZOOM;
+  /** Until this scene time a big moment's close-up holds against the beats after it (#627); 0 when none is up. */
+  private closeUpUntil = 0;
   private onResize = (): void => {
     this.zoomTarget = this.viewZoom(this.beatZoom);
     if (this.autoZoom !== null) this.autoZoom = this.cameras.main.zoom;
@@ -329,7 +335,8 @@ export class MatchScene extends Phaser.Scene {
     const beat = this.add
       .text(this.cameras.main.width / 2, this.cameras.main.height / 2, KICK_OFF_TEXT, { fontFamily: MATCH_LABEL_FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', resolution: 2 })
       .setOrigin(0.5)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setScale(1 / cssZoom(this.cameras.main)); // 22 CSS px on any screen (#627)
     const token = ++this.buildToken;
     // Shutdown bumps the token (teardown). Not isActive(): inside create() the scene
     // is still CREATING, so it reads false and the match would never build.
@@ -423,7 +430,12 @@ export class MatchScene extends Phaser.Scene {
     // the live playback, which plays the match and emits its events as they happen.
     this.startPlayback();
     this.offZoom = bus.on('match:event', (ev) => {
-      this.beatZoom = zoomForEvent(ev.kind);
+      const beat = zoomForEvent(ev.kind);
+      // The close-up holds until the moment ends (#627): the tackle and play-the-ball
+      // that follow a big hit within a tick do not pull it straight back out.
+      if (beat <= ZOOM_DEFAULT && this.time.now < this.closeUpUntil) return;
+      this.closeUpUntil = beat > ZOOM_DEFAULT ? this.time.now + CLOSEUP_LIMIT_MS : 0;
+      this.beatZoom = beat;
       this.zoomTarget = this.viewZoom(this.beatZoom);
     });
     // #18: rotating / resizing re-derives the zoom for the new viewport; the
@@ -466,10 +478,7 @@ export class MatchScene extends Phaser.Scene {
         ...(canUseWorker()
           ? { skipElsewhere: (job) => playMatchesInWorker([job], SKIP_WORKER_TIMEOUT_MS, 'skip').then(([r]) => r ?? runMatch(job.home, job.away, job.opts)) }
           : {}),
-        closeUpDone: () => {
-          this.beatZoom = ZOOM_DEFAULT;
-          this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
-        },
+        closeUpDone: () => this.endCloseUp(),
         speed: this.rememberedSpeed(),
         keyMoments: () => this.keyMomentsOn(),
         onCallResult: (v) => this.showCallResult(v),
@@ -512,7 +521,9 @@ export class MatchScene extends Phaser.Scene {
     // while it is up, then comes back to the ball within a second of the catch or the bounce.
     const cam0 = this.cameras.main;
     // A try's replay (N15.5) frames the ball wide, ahead of a kick's own framing.
-    const replayFrame = this.playback?.replayFraming() ?? null;
+    const replay = this.playback?.replayFraming() ?? null;
+    // The replay's zoom is a CSS one (REPLAY_ZOOM); the camera's is canvas px per art px.
+    const replayFrame = replay && { ...replay, zoom: Math.max(1, Math.round(replay.zoom * screenDensity())) };
     const kick = this.playback?.kickFraming({ width: cam0.width, height: cam0.height }, this.zoomTarget) ?? null;
     // A pinch or a wheel has the camera: a kick does not pan it off the ball (note 10).
     this.kickFrame = cameraFrame(replayFrame, kick, this.autoZoom === null);
@@ -598,14 +609,14 @@ export class MatchScene extends Phaser.Scene {
       // The name tag takes the letter's place over its man while it shows.
       const show = actor.sprite.visible && actor !== this.tagActor;
       text.setVisible(show);
-      if (show) text.setScale(1 / cam.zoom).setPosition(actor.sprite.x, actor.sprite.y - TAG_LIFT);
+      if (show) text.setScale(1 / cssZoom(cam)).setPosition(actor.sprite.x, actor.sprite.y - TAG_LIFT);
     }
     if (this.tagText) {
       const a = this.tagActor;
       if (a && this.time.now < this.tagUntil) {
         // Pinned above the sprite's head, counter-scaled so it stays screen-sized.
         this.tagText
-          .setScale(1 / cam.zoom)
+          .setScale(1 / cssZoom(cam))
           .setPosition(a.sprite.x, a.sprite.y - TAG_LIFT)
           .setVisible(true);
       } else {
@@ -613,14 +624,16 @@ export class MatchScene extends Phaser.Scene {
         this.tagActor = null;
       }
     }
-    // Ease toward this beat's zoom, or a kick's (N15.3), unless the player has taken over (wheel/pinch).
+    // Toward this beat's zoom, or a kick's (N15.3), unless the player has taken over (wheel/pinch).
+    // A kick eases out and back; a beat (a close-up and back) steps there in a few frames (#627).
+    if (this.time.now >= this.closeUpUntil && this.closeUpUntil) this.endCloseUp();
     if (this.autoZoom !== null) {
       if (Math.abs(cam.zoom - this.autoZoom) > 0.01) {
         this.autoZoom = null;
       } else {
         const kf = this.kickFrame;
-        const rate = kf ? KICK_OUT_PER_S : this.kickBack ? KICK_BACK_PER_S : undefined;
-        cam.setZoom(easeZoom(cam.zoom, kf ? kf.zoom : this.zoomTarget, delta, rate));
+        if (kf || this.kickBack) cam.setZoom(easeZoom(cam.zoom, kf ? kf.zoom : this.zoomTarget, delta, kf ? KICK_OUT_PER_S : KICK_BACK_PER_S));
+        else cam.setZoom(stepZoom(cam.zoom, this.zoomTarget, delta));
         this.autoZoom = cam.zoom;
       }
     }
@@ -1326,8 +1339,17 @@ export class MatchScene extends Phaser.Scene {
     this.scene.start('Grounds');
   }
 
+  /** A beat's authored zoom as the camera's: whole canvas px per art px for this viewport and screen (#627). */
   protected viewZoom(base: number): number {
-    return zoomForViewport(base, { width: this.cameras.main.width, height: this.cameras.main.height });
+    const d = screenDensity();
+    return zoomForBeat(base, { width: this.cameras.main.width / d, height: this.cameras.main.height / d }, d);
+  }
+
+  /** A big moment's close-up is over: back to the default zoom. */
+  protected endCloseUp(): void {
+    this.closeUpUntil = 0;
+    this.beatZoom = ZOOM_DEFAULT;
+    this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
   }
 
   /** The app is going to the background: a live match records where it is (#73). */

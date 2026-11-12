@@ -7,7 +7,7 @@ import Phaser from 'phaser';
 import { MatchScene } from '../../scenes/MatchScene';
 import { bus } from '../../core/events';
 import type { TeamSheet, WeatherKind } from '../../sim/events';
-import { ZOOM_DEFAULT } from '../../world/readability';
+import { cssZoom } from '../../world/viewport';
 import type { Side, SimEvent } from '../core/snapshot';
 import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
@@ -112,8 +112,7 @@ export class LabScene extends MatchScene {
     // The close-up MatchScene picked for a big moment eases back out after a beat.
     if (this.closeupUntil && time > this.closeupUntil) {
       this.closeupUntil = 0;
-      this.beatZoom = ZOOM_DEFAULT;
-      this.zoomTarget = this.viewZoom(ZOOM_DEFAULT);
+      this.endCloseUp();
     }
     super.update(time, delta); // camera follows the ball the view just placed
     const feet = (side: Side, slot: number): { x: number; y: number } | null => {
@@ -121,16 +120,18 @@ export class LabScene extends MatchScene {
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;
     };
     const cam = this.cameras.main;
+    // The layers are screen-sized in CSS px: they take the camera's zoom in CSS terms (#627).
+    const zoom = cssZoom(cam);
     const v = cam.worldView;
     const view: PopupView = { left: v.x, top: v.y, width: v.width, height: v.height };
-    this.popups?.update(delta, cam.zoom, feet, view);
-    this.contest?.update(delta, cam.zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet);
+    this.popups?.update(delta, zoom, feet, view);
+    this.contest?.update(delta, zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet);
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
-    this.wrestleBar?.update(r.cur.wrestle, this.cameras.main.zoom, (w) => feet(w.side, w.slot));
+    this.wrestleBar?.update(r.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
     // Legs (§8): a bar under everyone, green → amber once tired → red once spent.
-    this.legsLayer?.update(r.cur, this.cameras.main.zoom, feet);
+    this.legsLayer?.update(r.cur, zoom, feet);
     // Sprint and gas (§8.2): streaks behind anyone flat out, gas bars on the carrier and his chasers.
-    this.sprintLayer?.update(r.cur, this.cameras.main.zoom, (side, slot) => {
+    this.sprintLayer?.update(r.cur, zoom, (side, slot) => {
       const a = this.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y, faceLeft: a.sprite.flipX } : null;
     });

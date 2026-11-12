@@ -111,6 +111,23 @@ describe('kickFrame: the framing that holds the kicker and where the ball comes 
     for (let w = 0; w < 1200; w += 37) for (const view of [PHONE, DESKTOP]) expect(Number.isInteger(kickFrame([{ x: 0, y: 0 }, { x: w, y: w / 3 }], view, 2).zoom)).toBe(true);
   });
 
+  it('on a dense screen works in canvas px, steps by one device px and keeps the margins in CSS px (#627)', () => {
+    // An 844×390 phone at 2×: a 1688×780 canvas, default zoom 3 (×1.5 CSS), floor 2 (×1).
+    const view = { width: PHONE.width * 2, height: PHONE.height * 2 };
+    const fits = kickFrame([{ x: 100, y: 100 }, { x: 160, y: 120 }], view, 3, 2);
+    expect(fits.zoom).toBe(3);
+    // The band's middle sits where it does at 1×, in CSS px: canvas px / 2.
+    const mid = onScreen({ x: 130, y: 110 }, fits, view);
+    expect(mid.x / 2).toBeCloseTo((FRAME_MARGIN.left + PHONE.width - FRAME_MARGIN.right) / 2);
+    expect(mid.y / 2).toBeCloseTo((FRAME_MARGIN.top + PHONE.height - FRAME_MARGIN.bottom) / 2);
+    // The clear width is 1688 less 2 × 200 px of margins, 1288: 400 px across fits at 3 (1200), 500 does not.
+    expect(kickFrame([{ x: 0, y: 0 }, { x: 400, y: 0 }], view, 3, 2).zoom).toBe(3);
+    expect(kickFrame([{ x: 0, y: 0 }, { x: 500, y: 0 }], view, 3, 2).zoom).toBe(2);
+    // Never wider than ×1 in CSS terms, as at 1×.
+    expect(kickFrame([{ x: 0, y: 0 }, { x: 5000, y: 5000 }], view, 3, 2).zoom).toBe(2);
+    expect(kickFrame([{ x: 0, y: 0 }, { x: 5000, y: 5000 }], { width: PHONE.width * 3, height: PHONE.height * 3 }, 4, 3).zoom).toBe(3);
+  });
+
   it('when they cannot all fit, holds the landing first, then the kicker, then the top of the flight as far as it goes', () => {
     // A bomb on a phone: 300 px from its top to the kicker, 194 px of clear band at zoom 1.
     const landing = { x: 0, y: 0 };

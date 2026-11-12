@@ -490,7 +490,8 @@ async function play() {
     menu: !!document.querySelector('.nrl-screen-region'),
     home: !!document.querySelector('[data-club-home]'),
     running: window.__nrlGame?.loop.running,
-    game: `${window.__nrlGame?.scale.gameSize.width}x${window.__nrlGame?.scale.gameSize.height}`,
+    // In CSS px: the canvas renders at the screen's density, scale.zoom is 1 / it (#627).
+    game: `${Math.round(window.__nrlGame?.scale.gameSize.width * window.__nrlGame?.scale.zoom)}x${Math.round(window.__nrlGame?.scale.gameSize.height * window.__nrlGame?.scale.zoom)}`,
     viewport: `${innerWidth}x${innerHeight}`,
   }));
   let sleptUpright = false;

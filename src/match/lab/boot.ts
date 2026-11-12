@@ -5,6 +5,7 @@
 import Phaser from 'phaser';
 import { bus } from '../../core/events';
 import { initLandscapeGuard, sleepLoopIfPortrait } from '../../ui/orientation';
+import { densityScaleConfig, trackDensity } from '../../world/density';
 import { ensureStyles, getRoot } from '../../ui/dom';
 import { initToasts } from '../../ui/toasts';
 import { LiveSim } from '../league/live';
@@ -56,9 +57,10 @@ export function bootLab(): void {
         backgroundColor: '#1a1a2e',
         pixelArt: true,
         roundPixels: true,
-        scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
+        scale: densityScaleConfig(), // #627: at the screen's pixel density, like the club game
         scene: [],
       });
+      trackDensity(game);
       // Same as the club boot: a lab link opened upright must pause once the
       // loop has started, not on `ready` (that sleep is a no-op, #315).
       sleepLoopIfPortrait(game, () => blocked);

@@ -45,6 +45,7 @@ import { replayFrame, replayFrom, REPLAY_WORKER_MS } from './replay';
 import { toFieldPt } from '../core/field';
 import { canUseWorker, playReplayInWorker } from '../../systems/matchJobs';
 import { liveMatchSaveDue } from '../../systems/liveMatchRecord';
+import { cssZoom } from '../../world/viewport';
 
 export type PlaybackSpeed = 1 | 2 | 4 | 8;
 
@@ -779,7 +780,8 @@ export class LivePlayback {
   /** Pop-ups, the wrestle bar and sprint streaks, once the camera has moved this frame. */
   late(deltaMs: number): void {
     const cam = this.scene.cameras.main;
-    const zoom = cam.zoom;
+    // Screen-sized layers take the zoom in CSS terms; the canvas renders at the screen's density (#627).
+    const zoom = cssZoom(cam);
     const feet = (side: Side, slot: number): { x: number; y: number } | null => {
       const a = this.scene.players[side][slot];
       return a ? { x: a.sprite.x, y: a.sprite.y } : null;

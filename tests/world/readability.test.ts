@@ -9,6 +9,8 @@ import {
   ZOOM_WIDE,
   carrierMarkerTarget,
   easeZoom,
+  stepZoom,
+  ZOOM_STEP_MS,
   nameTagFor,
   surname,
   truncateTicker,
@@ -80,6 +82,23 @@ describe('situational zoom', () => {
     expect(ZOOM_WIDE).toBeLessThanOrEqual(ZOOM_DEFAULT);
     // Whole-number zooms only: fractional zooms make moving pixel art shimmer.
     for (const z of [ZOOM_DEFAULT, ZOOM_CLOSE, ZOOM_WIDE]) expect(Number.isInteger(z)).toBe(true);
+  });
+  it('steps a beat\'s zoom a whole step in ZOOM_STEP_MS and lands exactly (#627)', () => {
+    // A 60 fps close-up from 3 to 4: a few frames, then exactly 4, not a slow crawl through 3.9x.
+    let z = 3;
+    let frames = 0;
+    while (z !== 4 && frames < 100) {
+      z = stepZoom(z, 4, 1000 / 60);
+      frames++;
+    }
+    expect(z).toBe(4);
+    expect(frames).toBe(Math.ceil(ZOOM_STEP_MS / (1000 / 60)));
+    expect(frames).toBeLessThanOrEqual(6);
+    // And back out, the same way; frame-rate independent.
+    expect(stepZoom(4, 3, ZOOM_STEP_MS / 2)).toBeCloseTo(3.5);
+    expect(stepZoom(4, 3, ZOOM_STEP_MS)).toBe(3);
+    expect(stepZoom(3, 3, 16)).toBe(3);
+    expect(stepZoom(3, 4, -5)).toBe(3);
   });
   it('eases toward the target independent of frame rate and then snaps', () => {
     let a = ZOOM_DEFAULT;

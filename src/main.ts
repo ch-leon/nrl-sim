@@ -58,6 +58,7 @@ import { initAudio, initAudioUi, soundStatus } from './fx/audio';
 import { textSizeSync } from './ui/textSize';
 import { initPwa } from './fx/pwa';
 import { initLandscapeGuard, sleepLoopIfPortrait } from './ui/orientation';
+import { densityScaleConfig, trackDensity } from './world/density';
 import { ensurePortraitStyles, initPortraitMenus, type PortraitMenus } from './ui/portrait';
 import { openClubHome } from './ui/screens/clubHome';
 import { initFirstVisitHints, setTutorialScreens, startTutorial, whenTutorialDone, STEPS as TUTORIAL_STEPS } from './ui/tutorial';
@@ -81,13 +82,10 @@ const config: Phaser.Types.Core.GameConfig = {
   backgroundColor: '#1a1a2e',
   pixelArt: true,
   roundPixels: true,
-  scale: {
-    // #18: the canvas fills the viewport (no letterboxing); scenes re-clamp
-    // their cameras on the 'resize' event.
-    mode: Phaser.Scale.RESIZE,
-    width: '100%',
-    height: '100%',
-  },
+  // #18: the canvas fills the viewport (no letterboxing); scenes re-clamp
+  // their cameras on the 'resize' event. #627: at the screen's pixel density
+  // (world/density.ts), so zooms are whole device px, not whole CSS px.
+  scale: densityScaleConfig(),
   scene: [BootScene, GroundsScene, MatchScene],
 };
 
@@ -234,6 +232,7 @@ async function boot(): Promise<void> {
 
   const g = new Phaser.Game(config);
   game = g;
+  trackDensity(g);
   setMatchSceneProbe(() => g.scene.isActive('Match')); // Developer settings waits for the match (#519)
   // `?e2e` exposes the game to the end-to-end playthrough (scripts/e2e-season.mjs),
   // which checks what the grounds actually draw and dumps the live state for the

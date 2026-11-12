@@ -45,7 +45,8 @@ export async function runPortrait(browser) {
       card: !!card && getComputedStyle(card).display !== 'none',
       started: !!g?.loop.started,
       running: g ? g.loop.running : null,
-      game: g ? `${g.scale.gameSize.width}x${g.scale.gameSize.height}` : '',
+      // In CSS px: the canvas renders at the screen's density, scale.zoom is 1 / it (#627).
+      game: g ? `${Math.round(g.scale.gameSize.width * g.scale.zoom)}x${Math.round(g.scale.gameSize.height * g.scale.zoom)}` : '',
       canvas: box ? `${Math.round(box.width)}x${Math.round(box.height)}` : '',
       viewport: `${innerWidth}x${innerHeight}`,
       clock: document.querySelector('.nrl-mo-clock')?.textContent?.trim() ?? '',
@@ -84,7 +85,7 @@ export async function runPortrait(browser) {
     if (card && getComputedStyle(card).display !== 'none') return false;
     const canvas = document.querySelector('#game-root canvas')?.getBoundingClientRect();
     if (!canvas) return false;
-    const size = `${g.scale.gameSize.width}x${g.scale.gameSize.height}`;
+    const size = `${Math.round(g.scale.gameSize.width * g.scale.zoom)}x${Math.round(g.scale.gameSize.height * g.scale.zoom)}`;
     const fills = size === `${innerWidth}x${innerHeight}`
       && Math.abs(canvas.width - innerWidth) <= 1
       && Math.abs(canvas.height - innerHeight) <= 1;
