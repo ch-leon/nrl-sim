@@ -1,7 +1,7 @@
 // Real new-game setup and watched/skip result, with screenshots in the CI artifact only.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { playTrials, BASE, OUT_ROOT, openNav, closeWeekSummary, log } from '../common.mjs';
+import { playTrials, BASE, OUT_ROOT, openNav, closeWeekSummary, log, skipFromPill } from '../common.mjs';
 
 export async function runDerby(browser) {
   const out = join(OUT_ROOT, 'webkit', 'derby');
@@ -56,9 +56,7 @@ export async function runDerby(browser) {
       const proceed = page.locator('[data-ask-proceed]');
       if (await proceed.isVisible()) await proceed.tap();
       await page.waitForSelector('.nrl-mo-controls', { timeout: 60000 });
-      await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
-      await page.waitForSelector('[data-skip-pill][data-armed]');
-      await page.locator('.nrl-mo-controls [data-skip-pill]').tap();
+      await skipFromPill(page);
       await page.waitForSelector('.nrl-mo-ft [data-back-to-club]', { timeout: 120000 });
       await page.locator('.nrl-mo-ft [data-back-to-club]').evaluate(n => n.click());
       await page.waitForSelector('body:not(.nrl-match-active) .nrl-dock');

@@ -339,6 +339,8 @@ async function run() {
   });
   await timed('Start → grounds (textures painted, HUD up)', async () => {
     await page.fill('[data-nrl-clubname]', 'Budget FC');
+    // Start is disabled ("Loading towns…") until the town list is in (#613); a DOM click before that does nothing.
+    await page.waitForFunction(() => !document.querySelector('[data-nrl-start]')?.disabled);
     await clickTimed('[data-nrl-start]');
     await page.locator('[data-expansion-work]').tap();
     await page.waitForFunction(() => document.querySelector('.nrl-dock') && window.__nrlGame?.scene.isActive('Grounds'));

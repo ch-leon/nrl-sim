@@ -3,7 +3,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { stubLocalStorage } from '../commercial/memStorage';
 import { StubNode, stubDocument } from './stubDom';
-import { DIFFICULTY_BLURB, TITLE_CSS, showTitleFlow } from '../../src/ui/title';
+import { DIFFICULTY_BLURB, TITLE_CSS, showTitleFlow, type TitleChoice } from '../../src/ui/title';
+import { GROUND_MAX, NAME_MAX } from '../../src/data/names';
 import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY } from '../../src/config';
 import { deleteSlot, writeSlot } from '../../src/core/save';
 import { createNewGame } from '../../src/core/state';
@@ -91,11 +92,8 @@ describe('optional coach name at setup (#475)', () => {
     ['', undefined],
     ['   ', undefined],
     ['  Sam   Hale  ', 'Sam Hale'],
-    ['Sam\u0000Hale', undefined],
-    ['Sam\u0085Hale', undefined],
-    ['S', undefined],
-    ['S'.repeat(25), undefined],
-  ])('starts with %j cleaned to %j without blocking Start', async (raw, expected) => {
+    ['S'.repeat(24), 'S'.repeat(24)],
+  ])('starts with %j cleaned to %j', async (raw, expected) => {
     const root = new StubNode('div');
     const result = showTitleFlow(root as unknown as HTMLElement);
     const name = root.querySelector('[data-nrl-coachname]')!;
@@ -110,6 +108,79 @@ describe('optional coach name at setup (#475)', () => {
     expect(choice.mode).toBe('new');
     expect(choice.coachName).toBe(expected);
     if (expected === undefined) expect(choice).not.toHaveProperty('coachName');
+  });
+});
+
+describe('one name limit at setup (#616)', () => {
+  beforeEach(() => { stubLocalStorage(); stubDocument(); });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Type into a name box, tap Start, and say whether the career started. */
+  const tryStart = async (field: string, raw: string): Promise<{ root: StubNode; started: boolean; choice: Promise<TitleChoice> }> => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    let started = false;
+    void choice.then(() => { started = true; });
+    await vi.dynamicImportSettled();
+    root.querySelector(`[data-nrl-${field}]`)!.value = raw;
+    root.querySelector('[data-nrl-start]')!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    return { root, started, choice };
+  };
+
+  it('gives each name box room past the limit, so the reason shows instead of a silent cut', () => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    expect(root.querySelector('[data-nrl-clubname]')!.getAttribute('maxlength')).toBe(String(NAME_MAX * 2));
+    expect(root.querySelector('[data-nrl-coachname]')!.getAttribute('maxlength')).toBe(String(NAME_MAX * 2));
+    expect(root.querySelector('[data-nrl-groundname]')!.getAttribute('maxlength')).toBe(String(GROUND_MAX * 2));
+  });
+
+  it.each([
+    ['clubname', 'W'.repeat(25), 'At most 24 characters'],
+    ['clubname', 'W', 'At least 2 characters'],
+    ['clubname', 'Bad\u0000Name', 'Letters, numbers and punctuation only'],
+    ['coachname', "Sione Taumalolo-Fa'asavalu", 'At most 24 characters'],
+    ['coachname', 'S', 'At least 2 characters'],
+    ['coachname', 'Sam\u0085Hale', 'Letters, numbers and punctuation only'],
+    ['groundname', 'G'.repeat(49), 'At most 48 characters'],
+  ])('%s %j holds Start and says why', async (field, raw, why) => {
+    const { root, started } = await tryStart(field, raw);
+    expect(started).toBe(false);
+    expect(root.querySelector(`[data-nrl-${field}]`)!.getAttribute('aria-invalid')).toBe('true');
+    expect(root.querySelector(`[data-nrl-${field}-why]`)!.textContent).toBe(why);
+    expect(root.querySelector(`[data-nrl-${field}]`)!.value).toBe(raw); // never cut
+  });
+
+  it('24 exactly starts, stored as typed (cleaned)', async () => {
+    const { started, choice } = await tryStart('clubname', `  ${'W'.repeat(12)}   ${'W'.repeat(11)} `);
+    expect(started).toBe(true);
+    expect((await choice).clubName).toBe(`${'W'.repeat(12)} ${'W'.repeat(11)}`);
+  });
+
+  it('a name fixed after a refused Start clears its reason and starts', async () => {
+    const { root, started, choice } = await tryStart('clubname', 'W'.repeat(25));
+    expect(started).toBe(false);
+    const box = root.querySelector('[data-nrl-clubname]')!;
+    const why = root.querySelector('[data-nrl-clubname-why]')!;
+    expect(why.textContent).toBe('At most 24 characters');
+    box.value = 'W'.repeat(24);
+    root.querySelector('[data-nrl-start]')!.click();
+    expect(why.textContent).toBe('');
+    expect(box.getAttribute('aria-invalid')).toBe('false');
+    expect((await choice).clubName).toBe('W'.repeat(24));
+  });
+
+  it('an empty club or ground name starts on the default', async () => {
+    const { started, choice } = await tryStart('clubname', '   ');
+    expect(started).toBe(true);
+    expect((await choice).clubName).toBe('Cavehole Crushers');
+  });
+
+  it('pins the reason line: the rename field\'s colour for a fault, gone while the name will do', () => {
+    expect(TITLE_CSS).toContain('.nrl-title-why:empty { display: none; }');
+    expect(TITLE_CSS).toContain('.nrl-title-input[aria-invalid="true"]');
   });
 });
 
@@ -137,6 +208,8 @@ const fixture = vi.hoisted(() => [
 ]);
 vi.mock('../../src/data/towns.json', () => ({ default: fixture }));
 
+/** The field the keyboard is on, as the stand-in DOM knows it. */
+let focused: StubNode | null = null;
 class InputNode extends StubNode {
   events: Record<string, (() => void)[]> = {};
   override addEventListener(event: string, fn: () => void): void {
@@ -147,6 +220,15 @@ class InputNode extends StubNode {
     this.value = value;
     for (const fn of this.events.input ?? []) fn();
   }
+  /** The keyboard's return key: true when the field took it (no line break, no form submit). */
+  pressEnter(composing = false): boolean {
+    let taken = false;
+    const e = { key: 'Enter', isComposing: composing, preventDefault: () => { taken = true; } };
+    for (const fn of this.events.keydown ?? []) (fn as unknown as (e: object) => void)(e);
+    return taken;
+  }
+  override focus(): void { focused = this; }
+  blur(): void { if (focused === this) focused = null; }
 }
 const settleTowns = async (): Promise<void> => { await vi.dynamicImportSettled(); };
 beforeEach(() => {
@@ -194,6 +276,17 @@ describe('offline town setup (#485)', () => {
     root.querySelector('[data-nrl-start]')!.click();
     expect(await choice).toMatchObject({ clubName: 'My Club', groundName: 'My Ground', home: { town: 'Sample Bay', country: 'NZ', lat: -40, lon: 175 } });
   });
+  it('a long town\'s default club name keeps inside the name limit, and starts (#616)', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    await settleTowns();
+    (root.querySelector('[data-nrl-town]')! as InputNode).enter('Sydney Central Business District');
+    const club = root.querySelector('[data-nrl-clubname]')!.value;
+    expect(club).toMatch(/^Sydney (Wombats|Kestrels|Otters|Ironworkers)$/);
+    expect(root.querySelector('[data-nrl-clubname]')!.getAttribute('aria-invalid')).toBe('false');
+    root.querySelector('[data-nrl-start]')!.click();
+    expect((await choice).clubName).toBe(club);
+  });
   it('typing an unlisted town starts without stale coordinates, region or country', async () => {
     const root = new StubNode('div');
     const choice = showTitleFlow(root as unknown as HTMLElement);
@@ -202,5 +295,146 @@ describe('offline town setup (#485)', () => {
     expect(root.querySelector('[data-nrl-clubname]')!.value).toContain('A New Place');
     root.querySelector('[data-nrl-start]')!.click();
     expect((await choice).home).toEqual({ town: 'A New Place' });
+  });
+});
+
+describe('one yellow button on the slots screen (#613)', () => {
+  /** The hooks of every button in the primary yellow. */
+  const yellow = (root: StubNode): string[] =>
+    root.querySelectorAll('.nrl-title-btn-go').map((b) => Object.keys(b.attrs).find((k) => k.startsWith('data-nrl-'))!);
+  /** Write a career to `slot` as if at `at` (ms): SaveMeta.updatedAt is what orders the saves. */
+  const saveAt = (slot: number, at: number): void => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(at);
+    writeSlot(slot, createNewGame(`Club ${slot}`, slot));
+    now.mockRestore();
+  };
+  const slotsScreen = (): StubNode => {
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    return root;
+  };
+
+  it('with no saves it is slot 1\'s New game', () => {
+    const root = slotsScreen();
+    root.querySelector('[data-nrl-back]')!.click(); // a fresh install opens on the setup
+    expect(yellow(root)).toEqual(['data-nrl-new-1']);
+    // The other slots keep their full-width row in the secondary fill.
+    expect(root.querySelector('[data-nrl-new-2]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
+    expect(root.querySelector('[data-nrl-new-3]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
+    expect(TITLE_CSS).toContain('.nrl-title-btn-row { flex-basis: 100%; }');
+  });
+
+  it.each([1, 2, 3])('with one save, in slot %s, it is that Continue and no New game', (slot) => {
+    saveAt(slot, 1000);
+    expect(yellow(slotsScreen())).toEqual([`data-nrl-continue-${slot}`]);
+  });
+
+  it('with several saves it is Continue on the one written last', () => {
+    saveAt(1, 2000);
+    saveAt(3, 1000);
+    const two = slotsScreen();
+    expect(yellow(two)).toEqual(['data-nrl-continue-1']);
+    expect(two.querySelector('[data-nrl-continue-3]')!.className).toBe('nrl-title-btn nrl-title-btn-row');
+    saveAt(2, 3000);
+    expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-2']);
+    saveAt(3, 4000);
+    expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-3']);
+  });
+
+  it('saves with no time kept (from before meta) fall to the first filled slot', () => {
+    for (const slot of [2, 3]) localStorage.setItem(`nrl-sim-save-slot-${slot}`, JSON.stringify(createNewGame(`Club ${slot}`, slot)));
+    expect(yellow(slotsScreen())).toEqual(['data-nrl-continue-2']);
+  });
+
+  it('with only an unreadable save it is New game on the first empty slot, never the one that replaces it', () => {
+    localStorage.setItem('nrl-sim-save-slot-1', '{not a save');
+    const root = slotsScreen();
+    expect(root.querySelector('[data-nrl-continue-1]')).toBeNull();
+    expect(yellow(root)).toEqual(['data-nrl-new-2']);
+  });
+});
+
+describe('Start while the town list loads (#613)', () => {
+  it('is disabled and says why, then reads Start and starts', async () => {
+    const root = new StubNode('div');
+    const choice = showTitleFlow(root as unknown as HTMLElement);
+    const start = root.querySelector('[data-nrl-start]')!;
+    expect(start.disabled).toBe(true);
+    expect(start.textContent).toBe('Loading towns…');
+    await settleTowns();
+    expect(start.disabled).toBe(false);
+    expect(start.textContent).toBe('Start');
+    start.click();
+    expect((await choice).mode).toBe('new');
+  });
+
+  it('a town list that fails to load still leaves Start ready', async () => {
+    const towns = fixture.splice(0); // an empty catalogue is refused, like a chunk that never arrived
+    try {
+      const root = new StubNode('div');
+      const choice = showTitleFlow(root as unknown as HTMLElement);
+      await settleTowns();
+      const start = root.querySelector('[data-nrl-start]')!;
+      expect(root.querySelector('[data-nrl-town-status]')!.textContent).toBe('Town list unavailable. Type your own town to start.');
+      expect(start.disabled).toBe(false);
+      expect(start.textContent).toBe('Start');
+      (root.querySelector('[data-nrl-town]')! as InputNode).enter('A New Place');
+      start.click();
+      expect((await choice).home).toEqual({ town: 'A New Place' });
+    } finally {
+      fixture.push(...towns);
+    }
+  });
+
+  it('a disabled title button takes the raised fill, muted text and no pointer, over the yellow', () => {
+    const rule = '.nrl-title-btn:disabled, .nrl-title-btn:disabled:hover { background: #1b264a; color: #9aa6c7; cursor: default;';
+    expect(TITLE_CSS).toContain(rule);
+    // Later in the sheet than the yellow rule of equal weight (.nrl-title-btn-go:hover), so it wins.
+    expect(TITLE_CSS.indexOf(rule)).toBeGreaterThan(TITLE_CSS.indexOf('.nrl-title-btn-go, .nrl-title-btn-go:hover {'));
+  });
+});
+
+describe('the phone keyboard on the name fields (#609)', () => {
+  const FIELDS = ['[data-nrl-town]', '[data-nrl-clubname]', '[data-nrl-coachname]', '[data-nrl-groundname]'];
+  const setup = (): InputNode[] => {
+    focused = null;
+    const root = new StubNode('div');
+    void showTitleFlow(root as unknown as HTMLElement);
+    return FIELDS.map((sel) => root.querySelector(sel)! as InputNode);
+  };
+
+  it('starts each word with a capital, corrects nothing, and words the return key: next, then done', () => {
+    const boxes = setup();
+    boxes.forEach((box, i) => {
+      expect(box.type).toBe('text');
+      expect(box.getAttribute('autocapitalize')).toBe('words');
+      expect(box.getAttribute('autocorrect')).toBe('off');
+      expect(box.getAttribute('spellcheck')).toBe('false');
+      expect(box.getAttribute('enterkeyhint')).toBe(i === boxes.length - 1 ? 'done' : 'next');
+    });
+  });
+
+  it('the return key does what it says: on to the next name, and off the last one', () => {
+    const boxes = setup();
+    boxes.forEach((box, i) => {
+      box.focus();
+      expect(box.pressEnter()).toBe(true);
+      expect(focused).toBe(boxes[i + 1] ?? null);
+    });
+  });
+
+  it('leaves the return key to a keyboard that is still composing a word', () => {
+    const [town] = setup();
+    town!.focus();
+    expect(town!.pressEnter(true)).toBe(false);
+    expect(focused).toBe(town);
+  });
+
+  it('keeps a drag past the end of the details list in the list', () => {
+    const i = TITLE_CSS.indexOf('.nrl-title-details {');
+    expect(i).toBeGreaterThanOrEqual(0);
+    const details = TITLE_CSS.slice(i, TITLE_CSS.indexOf('}', i));
+    expect(details).toContain('overflow-y: auto');
+    expect(details).toContain('overscroll-behavior: contain');
   });
 });

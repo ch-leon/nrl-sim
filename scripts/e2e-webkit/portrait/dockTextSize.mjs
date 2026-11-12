@@ -211,6 +211,11 @@ export async function runDockTextSize(browser) {
         // Coach calls (#350 X3) on screen and tappable with Settings open: two taps from Office's tab.
         // At Normal that must hold; at Large and Larger, and at 568×320 (its Settings is taller than the
         // screen), the popup may scroll to it, which is noted.
+        // Where it must hold, measure Settings as it opens, from the top. Picking Large above pushes the
+        // text-size row below the fold in the narrow windows, the tap on the segment then scrolls the popup to
+        // it, and how far depends on the engine and on when the larger text lands: Coach calls sat 4px off the
+        // top in one WebKit run and on screen in the rest.
+        if (size === 'normal' && !settingsScroll) await page.evaluate(() => { const sc = document.querySelector('.nrl-settings-modal .nrl-modal-scroll'); if (sc) sc.scrollTop = 0; });
         const reach = await reachProblems(page, '.nrl-settings-modal', ['.nrl-switch[aria-label="Coach calls"]']);
         const out = size === 'normal' && !settingsScroll ? reach : [];
         rec.notes.push(reach.length ? `Coach calls: ${reach.join('; ')}` : 'Coach calls on screen, two taps from OFFICE');

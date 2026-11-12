@@ -49,7 +49,7 @@ export function bonusZoneSvg(): string {
     `<text x="${x}" y="${y}" font-family="'Courier New', monospace" font-weight="bold" font-size="${size}" text-anchor="${anchor}" dominant-baseline="middle" fill="${fill}">${s}</text>`;
   const post = (x: number): string => `<circle cx="${x}" cy="${g.tryLineY}" r="3" fill="${LINE}" stroke="${INK}" stroke-width="1"/>`;
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.width} ${g.height}" width="${g.width}" height="${g.height}" style="max-width:100%;max-height:32vh;height:auto;display:block" role="img" aria-label="The bonus zone: the in-goal between the posts. A try grounded in it is ${NINES_FACTS.bonusTryPoints} points, anywhere else over the line ${NINES_FACTS.tryPoints}.">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.width} ${g.height}" width="${g.width}" height="${g.height}" style="max-width:100%;max-height:32vh;max-height:32dvh;height:auto;display:block" role="img" aria-label="The bonus zone: the in-goal between the posts. A try grounded in it is ${NINES_FACTS.bonusTryPoints} points, anywhere else over the line ${NINES_FACTS.tryPoints}.">`,
     `<rect x="${left}" y="${g.deadBallY}" width="${right - left}" height="${g.tryLineY - g.deadBallY}" fill="${IN_GOAL}"/>`,
     `<rect x="${left}" y="${g.tryLineY}" width="${right - left}" height="${fieldBottom - g.tryLineY}" fill="${GRASS}"/>`,
     `<rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" fill="${ZONE}"/>`,

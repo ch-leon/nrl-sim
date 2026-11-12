@@ -163,7 +163,7 @@ src/
                            #   screens/ (squad, lineup, recruit, contracts, finance, …)
   fx/                      # audio, particles, atmosphere, PWA
   qa/soak.ts               # headless multi-season soak (npm run soak)
-  utils/                   # rng, hash, …
+  utils/                   # rng, hash, money (fmtMoney, fmtMoneyShort), …
   vendor/phaser-slim.js    # the Phaser the production build ships (#400)
 scripts/
   e2e-season.mjs           # Chromium playthrough of a season (dumps the save corpus)
@@ -551,7 +551,7 @@ simulation inputs; cosmetic presentation choices must not consume its RNG.
 
 ## 7. Rendering conventions
 
-- Phaser config (`main.ts`): `pixelArt: true`, `roundPixels: true`, background `#1a1a2e`.
+- Phaser config (`main.ts`): `pixelArt: true`, `roundPixels: true`, background `#0e1630` (`BRAND.colors.app`).
 - Iso projection (`src/world/iso.ts`): `screenX = (gx - gy) * TILE_W/2`,
   `screenY = (gx + gy) * TILE_H/2`; depth = `screenY` (+1 for objects on tile).
 - Grounds textures (BootScene → `registerGroundsArt`, `src/art/grounds/`): tiles

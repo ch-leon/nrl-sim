@@ -18,6 +18,7 @@ import { bus } from '../core/events';
 import { getState, setState, type GameState, type Lineup, type PlacedFacility, type Player } from '../core/state';
 import { earnMoney, spendMoney } from '../data/club';
 import { FACILITY_CATALOG } from '../data/facility';
+import { fmtMoney } from '../utils/money';
 import { demolishFacility, validatePlacement } from '../world/placement';
 import { signPlayer, signingFee, type SignResult } from './freeagency';
 import { signingNote } from './lineup';
@@ -40,8 +41,6 @@ export interface UndoOffer {
 }
 
 let open: UndoOffer | null = null;
-
-const fmt = (n: number): string => `$${n.toLocaleString('en-US')}`;
 
 /** The open offer, or null once it has expired, been taken or been committed. */
 export function currentOffer(now = Date.now()): UndoOffer | null {
@@ -145,7 +144,7 @@ export function offerDemolish(f: PlacedFacility, index: number, refund: number, 
   const def = FACILITY_CATALOG[f.defId];
   offerUndo({
     kind: 'demolish',
-    text: `${def.name} demolished, +${fmt(refund)}`,
+    text: `${def.name} demolished, +${fmtMoney(refund)}`,
     expiresAt: now + UNDO_MS,
     canRevert: (s) => !s.facilities.some((x) => x.id === f.id) && s.money >= refund && validatePlacement(s, f.defId, f.x, f.y, { cost: 0 }).ok,
     revert: () => {

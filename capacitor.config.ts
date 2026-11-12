@@ -15,6 +15,10 @@ const config: CapacitorConfig = {
   appId: 'au.supercooked.nrlsim.test', // DECISION (Leon): placeholder app id for the test APK
   appName: 'NRL Sim (Test)', // DECISION (Leon): placeholder app name for the test APK
   webDir: 'dist',
+  // The WebView's colour until the first paint: the page's navy (BRAND.colors.app), not
+  // white (#622). A literal because the Capacitor CLI loads this file without the app's
+  // TypeScript; tests/brand.test.ts pins it to the brand.
+  backgroundColor: '#0e1630',
   plugins: {
     SystemBars: {
       // Full screen: no status bar or nav bar (a swipe from the edge shows them for a moment).

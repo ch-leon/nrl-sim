@@ -191,7 +191,7 @@ export const PORTRAIT_CSS = `
   }
   html:root .nrl-dock-status { grid-area: status; min-width: 0; }
   html:root .nrl-dock-statusbox { padding: 0 0 0 4px; min-width: 0; }
-  html:root .nrl-dock-divider, html:root .nrl-dock-spacer, html:root .nrl-dock-advance-sub, html:root .nrl-dock-week-total, html:root .nrl-nav-caret { display: none; }
+  html:root .nrl-dock-divider, html:root .nrl-dock-spacer, html:root .nrl-dock-advance-sub, html:root .nrl-dock-week-total, html:root .nrl-nav-caret, html:root .nrl-nav-room { display: none; }
   html:root .nrl-dock-money { font-size: 0.875rem; }
   /* PLAY WEEK takes what the money leaves; short of room (320 wide at Larger, a decision's count, a
      run's "WEEK 12 OF 27…" beside Stop) its words go to two lines inside the button, never under the money. */
@@ -262,6 +262,8 @@ export const PORTRAIT_CSS = `
   html:root .nrl-row-who { flex-wrap: wrap; row-gap: 2px; padding: 4px 0; overflow: visible; }
   html:root .nrl-row-name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }
   html:root .nrl-fit-bar { display: none; }
+  /* Upright the rating is one of a line of values under the name: it starts its column like the rest (#600). */
+  html:root :is(.nrl-col-ovr, .nrl-row-ovr) { text-align: left; padding-right: 0; }
   html:root .nrl-grid-head { height: auto; row-gap: 2px; padding-bottom: 2px; letter-spacing: 0.04em; }
   html:root .nrl-squad .nrl-grid-head, html:root .nrl-squad .nrl-row {
     grid-template-columns: 2em repeat(4, minmax(0, 1fr));

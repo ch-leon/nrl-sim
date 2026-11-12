@@ -7,7 +7,7 @@
 // focus. A row opens the player's page, where Renew, Sell and Release live
 // (#336). DOM UI kit only; no Phaser.
 
-import { el, openScreen, screenHead, segmented } from '../dom';
+import { el, hintScroll, openScreen, screenHead, segmented } from '../dom';
 import { getState, type Player, type Position, type TrainingFocus } from '../../core/state';
 import { bus } from '../../core/events';
 import { save } from '../../core/save';
@@ -15,13 +15,12 @@ import { overallRating, ratingText } from '../../data/player';
 import { MORALE, TRAINING_FOCUS } from '../../config';
 import { TRAINING_FOCI, focusLabel, setTrainingFocus } from '../../systems/training';
 import {
-  ensureScreenStyles, fitnessCell, gridHead, openRecruitScreen, popMenu, posShort, tableRow, traitChips, whoCell, type PopItem,
+  ensureScreenStyles, fitChips, fitnessCell, gridHead, openRecruitScreen, popMenu, posShort, tableRow, traitChips, whoCell, type PopItem,
 } from './recruit';
 import { openLineupScreen } from './lineup';
 import { fitnessPct, moraleWord, openPlayerPage, positionLabel, squadNumbers } from './player';
 import { contractsEndingSoon, endsInTag } from '../../systems/contracts';
-
-const money = (n: number): string => `$${Math.round(n).toLocaleString('en-AU')}`;
+import { fmtMoney } from '../../utils/money';
 
 // ── Squad's segments ────────────────────────────────────────────────────────
 
@@ -101,6 +100,7 @@ export function openSquadScreen(): void {
   ensureScreenStyles();
 
   const list = el('div', { class: 'nrl-grid-body' });
+  hintScroll(list); // four whole rows of twenty looked like the squad (#610)
   const sub = el('div', { class: 'nrl-screen-sub' });
 
   const sort = popMenu<SortKey>({
@@ -135,7 +135,7 @@ export function openSquadScreen(): void {
     training.refresh();
     training.button.title = focusLine(focusNow());
     const wageBill = s.squad.reduce((sum, p) => sum + p.wage, 0);
-    sub.textContent = `${s.squad.length} players · wages ${money(wageBill)}/wk`;
+    sub.textContent = `${s.squad.length} players · wages ${fmtMoney(wageBill)}/wk`;
 
     if (s.squad.length === 0) {
       list.appendChild(el('div', { class: 'nrl-screen-empty', text: 'Your squad is empty.' }));
@@ -156,17 +156,24 @@ export function openSquadScreen(): void {
         el('span', { class: 'nrl-num nrl-row-ovr', text: ratingText(overallRating(p)), attrs: { title: 'Overall rating' } }),
         fitnessCell(fit, p.injuredWeeks > 0, p.injuredWeeks > 0 ? `Injured: out ${p.injuredWeeks} wk` : `Fitness ${fit}%: 100 less his injury risk (${p.injuryRisk})`),
         el('span', { class: `nrl-num nrl-row-dim${expiring ? ' nrl-row-attn' : ''}`, text: `${p.contractWeeks} wk`, attrs: { title: expiring ? 'Contract running down' : 'Weeks left on his contract' } }),
-        el('span', { class: 'nrl-num nrl-row-dim nrl-sq-wide', text: money(p.wage), attrs: { title: 'Weekly wage' } }),
+        el('span', { class: 'nrl-num nrl-row-dim nrl-sq-wide', text: fmtMoney(p.wage), attrs: { title: 'Weekly wage' } }),
         el('span', { class: `nrl-sq-wide ${unhappy ? 'nrl-row-bad' : 'nrl-row-dim'}`, text: moraleWord(p.morale), attrs: { title: `Morale ${p.morale}` } }),
       ], () => openPlayerPage(p, { kind: 'squad' })));
     }
+    fitChips(list);
+    fitted = list.clientWidth;
   };
+  // The phone turned or the window moved: the chips fold again for the room the cells have now (#614).
+  let fitted = 0;
+  const turned = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (list.clientWidth !== fitted) render(); }) : null;
 
   const head = screenHead('', { lead: [squadTabs('squad')], sub, controls: [training.button, sort.button] });
   const screen = el('div', { class: 'nrl-screen nrl-sq nrl-squad' }, head,
-    gridHead(['#', 'Player', 'Pos', 'Ovr', 'Fitness', 'To', ['Wage', 'nrl-sq-wide'], ['Morale', 'nrl-sq-wide']]), list);
+    gridHead(['#', 'Player', 'Pos', ['Ovr', 'nrl-col-ovr'], 'Fitness', 'To', ['Wage', 'nrl-sq-wide'], ['Morale', 'nrl-sq-wide']]), list);
   // openScreen closes any other open screen (running its teardown) first.
   openScreen(screen, onSquadClosed, 'squad');
   render();
-  unsub = bus.on('state:changed', render);
+  const off = bus.on('state:changed', render);
+  turned?.observe(list);
+  unsub = () => { off(); turned?.disconnect(); };
 }

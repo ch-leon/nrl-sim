@@ -11,6 +11,7 @@ import { registerSeasonHook } from '../core/time';
 import { hasStructuralCalendar } from './competitionCalendar';
 import { earnMoney } from '../data/club';
 import { makeRng } from '../utils/rng';
+import { fmtMoney } from '../utils/money';
 import { BOARD, PRIZE, SEASON_ROUNDS, WEEKS_PER_SEASON, difficultyMultipliers, scaledMoney } from '../config';
 import { repayBoardLoan } from './contracts';
 
@@ -57,7 +58,7 @@ export function generateObjectives(state: GameState): Objective[] {
     { id: `s${season}-finals`, kind: 'finals', text: `Finish in the top ${top}`, target: top, status: 'pending' },
     {
       id: `s${season}-solvent`, kind: 'solvent', target: floor, status: 'pending',
-      text: floor > 0 ? `Finish the season with at least $${floor.toLocaleString()}` : 'Finish the season solvent',
+      text: floor > 0 ? `Finish the season with at least ${fmtMoney(floor)}` : 'Finish the season solvent',
     },
   ];
   const derby = derbyRival(state);
@@ -158,13 +159,13 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
   const prize = scaledMoney(finalsPrize(outcome), difficultyMultipliers(s.settings.difficulty).prize);
   if (prize > 0) {
     earnMoney(prize, 'finals prize money');
-    bus.emit('ui:notify', { text: `Finals prize money: $${prize.toLocaleString()}.`, kind: 'success' });
+    bus.emit('ui:notify', { text: `Finals prize money: ${fmtMoney(prize)}.`, kind: 'success' });
   }
 
   // The season's board loan (N14.3) is repaid before the board judges the season, so a
   // club is not "solvent" on borrowed money; the prize just paid helps cover it.
   const repaid = repayBoardLoan();
-  if (repaid > 0) bus.emit('ui:notify', { text: `Board loan repaid: $${repaid.toLocaleString()}.`, kind: 'info' });
+  if (repaid > 0) bus.emit('ui:notify', { text: `Board loan repaid: ${fmtMoney(repaid)}.`, kind: 'info' });
 
   const after = getState();
   const review = reviewObjectives(after, outcome);
@@ -180,7 +181,7 @@ export function applyBoardReview(outcome: SeasonOutcome): BoardReview {
   if (review.objectives.length > 0) {
     bus.emit('ui:notify', {
       text: review.missed === 0
-        ? `Board: all ${review.met} objectives met. +$${review.grant.toLocaleString()} grant, reputation up.`
+        ? `Board: all ${review.met} objectives met. +${fmtMoney(review.grant)} grant, reputation up.`
         : `Board: ${review.met} met, ${review.missed} missed. Patience ${review.patience}/${BOARD.MAX_PATIENCE}.`,
       kind: review.missed === 0 ? 'success' : 'danger',
       quiet: true, // the review's Board line (N14)
@@ -208,7 +209,7 @@ function ladderOrder(state: Pick<GameState, 'league'>): GameState['league']['lad
 export function objectiveLine(o: Objective, state: GameState): string {
   if (o.status !== 'pending') return `${o.text} — ${o.status === 'met' ? 'met' : 'missed'}`;
   switch (o.kind) {
-    case 'solvent': return `${o.text} — now $${state.money.toLocaleString()}`;
+    case 'solvent': return `${o.text} — now ${fmtMoney(state.money)}`;
     case 'build': return `${o.text} — ${state.facilities.length} now`;
     case 'finals': {
       const rank = ladderOrder(state).findIndex((r) => r.clubId === state.clubId) + 1;

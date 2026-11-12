@@ -9,9 +9,9 @@ import { bus } from '../../src/core/events';
 import { CSS } from '../../src/ui/dom';
 import { ECON } from '../../src/config';
 
-// DOM tests (createHud rendering / flash / bus wiring) are skipped: jsdom is not
-// installed and the vitest environment is 'node' (see vite.config.ts). The
-// money formatter is extracted as a pure function so it is covered here.
+// jsdom is not installed and the vitest environment is 'node' (see vite.config.ts),
+// so the money formatter is extracted as a pure function and covered here. The
+// createHud tests at the foot of the file (routes, the flash) mount it on the stub DOM.
 describe('fmtMoney', () => {
   it('formats positive balances with thousands separators and a $ prefix', () => {
     expect(fmtMoney(0)).toBe('$0');
@@ -71,6 +71,13 @@ describe('moneyTile (N12.5)', () => {
     expect(IN_DEBT_CLASS).toBe('nrl-money-negative');
     expect(CSS).toMatch(new RegExp(`\\.nrl-dock-money\\.${IN_DEBT_CLASS} \\{[^}]*color: var\\(--nrl-neg\\)`));
     expect(CSS).toMatch(/\.nrl-hud-debt \{[^}]*background: var\(--nrl-out\);[^}]*color: #fff/);
+  });
+
+  it('on a phone (to 960px) the tag is out of sight and out of the row, not out of the text a screen reader gets (#607, #239)', () => {
+    const phone = CSS.slice(CSS.indexOf('@media (max-width: 960px)'));
+    const tag = phone.slice(0, phone.indexOf('}'));
+    expect(tag).toMatch(/^@media \(max-width: 960px\) \{\s*\.nrl-hud-debt \{ position: absolute; width: 1px; height: 1px;[^}]*clip-path: inset\(50%\)/);
+    expect(tag).not.toMatch(/display: none|visibility: hidden/);
   });
 
   it('the dock keeps the tag on one row: it is part of the status block, never wrapped onto a second line', () => {
@@ -277,6 +284,22 @@ import { stubDocument, StubNode } from './stubDom';
 import { screenLockReason } from '../../src/systems/unlocks';
 import { tickContracts } from '../../src/systems/economy';
 
+describe('the money tile in debt (N12.5, #607)', () => {
+  beforeEach(() => { stubDocument(); bus.clear(); createNewGame('Debt', 2); });
+  afterEach(() => vi.unstubAllGlobals());
+  it('says "in debt" in its text and its label, whether or not a narrow dock shows the tag', () => {
+    setState({ money: -150_000 });
+    const hud = createHud({ onMoney: () => {} });
+    const body = document.body as unknown as StubNode;
+    const money = body.querySelector('[data-hud="money"]')!;
+    expect(money.words()).toMatch(/-\$150,000\s+in debt/);
+    expect(money.querySelector('.nrl-hud-debt')!.textContent).toBe(IN_DEBT_TEXT);
+    expect(money.classList.contains(IN_DEBT_CLASS)).toBe(true);
+    expect(body.querySelector('.nrl-dock-statusbox')!.getAttribute('aria-label')).toBe('Money -$150,000, in debt. Tap for Finance');
+    hud.destroy();
+  });
+});
+
 describe('essential routes bypass Office locks (#482)', () => {
   beforeEach(() => { stubDocument(); bus.clear(); createNewGame('Locked', 2); });
   afterEach(() => vi.unstubAllGlobals());
@@ -301,5 +324,114 @@ describe('essential routes bypass Office locks (#482)', () => {
     tickContracts(getState());
     expect(action).toBeDefined(); action!(); expect(contracts).toHaveBeenCalledOnce();
     hud.destroy(); nav.destroy();
+  });
+});
+
+import { earnMoney } from '../../src/data/club';
+import { MATCH_ACTIVE_CLASS } from '../../src/ui/screens/matchOverlay';
+
+describe('the balance flashes the way the week went (#599)', () => {
+  // The body class is how the HUD knows the match view has gone; the stub DOM has no observers.
+  let bodyClassChanged: () => void;
+  beforeEach(() => {
+    stubDocument();
+    bodyClassChanged = () => {};
+    vi.stubGlobal('MutationObserver', class {
+      constructor(fn: () => void) { bodyClassChanged = fn; }
+      observe(): void {}
+      disconnect(): void {}
+    });
+    vi.useFakeTimers();
+    bus.clear();
+    createNewGame('Flash', 2);
+    setState({ money: 200_000 });
+  });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  const body = (): StubNode => document.body as unknown as StubNode;
+  const flash = (): string => {
+    const money = body().querySelector('[data-hud="money"]')!;
+    return ['nrl-flash-up', 'nrl-flash-down'].filter((c) => money.classList.contains(c)).join(' ');
+  };
+  /** A week's ledger lines, as the economy posts them: one money:changed each. */
+  const week = (...lines: number[]): void => lines.forEach((amount, i) => earnMoney(amount, `line-${i}`));
+  const matchView = (on: boolean): void => { body().classList.toggle(MATCH_ACTIVE_CLASS, on); bodyClassChanged(); };
+
+  it('a week that loses money flashes the loss colour though its last line is income', () => {
+    const hud = createHud();
+    week(-17_323, -1_500, 1_200, 5_593); // $200,000 to $187,970
+    expect(getState().money).toBe(187_970);
+    expect(flash()).toBe('nrl-flash-down');
+    vi.advanceTimersByTime(450);
+    expect(flash()).toBe('');
+    hud.destroy();
+  });
+
+  it('a week that makes money flashes the gain colour though its last line is a cost', () => {
+    const hud = createHud();
+    week(25_200, 1_200, -17_323, -1_500);
+    expect(flash()).toBe('nrl-flash-up');
+    // The next week is coloured on its own once this flash has run out.
+    vi.advanceTimersByTime(450);
+    week(-17_323, 1_200);
+    expect(flash()).toBe('nrl-flash-down');
+    hud.destroy();
+  });
+
+  it('lines that land while a flash is showing count against the balance it started from', () => {
+    const hud = createHud();
+    week(-17_323);
+    vi.advanceTimersByTime(200);
+    week(6_300);
+    expect(flash()).toBe('nrl-flash-down');
+    hud.destroy();
+  });
+
+  it('a burst that ends on the balance it started from shows no flash', () => {
+    const hud = createHud();
+    week(-17_323, -1_500, 18_823);
+    expect(getState().money).toBe(200_000);
+    expect(flash()).toBe('');
+    hud.destroy();
+  });
+
+  it('a played week flashes again when the club is back: the match hid the dock on the first one', () => {
+    const hud = createHud();
+    week(-17_323, -1_500, 1_200, 6_300);
+    bus.emit('match:started', {} as never);
+    matchView(true);
+    vi.advanceTimersByTime(450);
+    // Full time: the dock is still hidden behind the full-time card.
+    bus.emit('match:finished', {} as never);
+    vi.advanceTimersByTime(2_000);
+    expect(flash()).toBe('');
+    matchView(false);
+    expect(flash()).toBe('nrl-flash-down');
+    vi.advanceTimersByTime(450);
+    expect(flash()).toBe('');
+    // Only once: another change of the body class shows nothing more.
+    matchView(true);
+    matchView(false);
+    expect(flash()).toBe('');
+    hud.destroy();
+  });
+
+  it('a played week that made money comes back in the gain colour, and one that broke even shows nothing', () => {
+    const hud = createHud();
+    week(-17_323, -1_500, 1_200, 25_200);
+    bus.emit('match:started', {} as never);
+    matchView(true);
+    vi.advanceTimersByTime(450);
+    matchView(false);
+    expect(flash()).toBe('nrl-flash-up');
+    vi.advanceTimersByTime(450);
+
+    week(-1_500, 1_500);
+    bus.emit('match:started', {} as never);
+    matchView(true);
+    vi.advanceTimersByTime(450);
+    matchView(false);
+    expect(flash()).toBe('');
+    hud.destroy();
   });
 });

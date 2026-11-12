@@ -8,7 +8,7 @@ import { coachSays } from '../../src/ui/coachSays';
 import { summaryRemark, SUMMARY_REMARKS } from '../../src/ui/coachVoice';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  weekSummary, weekSnapshot, boardMood, capList, fmtSigned, summaryCanShow, TOP_GAINS,
+  weekSummary, weekSnapshot, boardMood, capList, sidelineLines, fmtSigned, summaryCanShow, TOP_GAINS, SIDELINE_MAX,
   type WeekSnapshot,
 } from '../../src/ui/weekSummary';
 import { createNewGame, getState, FINANCE_LINES, type FinanceLine, type PlayerStats } from '../../src/core/state';
@@ -168,6 +168,42 @@ describe('the card waits (#368)', () => {
   });
 });
 
+describe('the injuries-and-bans section is capped as a whole (#610)', () => {
+  const hurt = ['A out 3 wks', 'B out 2 wks', 'C out 1 wk'];
+  const banned = ['D banned 2 wks', 'E banned 1 wk'];
+
+  it('a week with three hurt, two banned and two back is four lines, not seven', () => {
+    expect(SIDELINE_MAX).toBe(4);
+    expect(sidelineLines({ injuries: hurt, bans: banned, back: ['F', 'G'] })).toEqual(['A out 3 wks', 'B out 2 wks', '+3 more', 'Back: F, G']);
+  });
+
+  it('with nobody back the men out take all four lines', () => {
+    expect(sidelineLines({ injuries: hurt, bans: banned, back: [] })).toEqual(['A out 3 wks', 'B out 2 wks', 'C out 1 wk', '+2 more']);
+    expect(sidelineLines({ injuries: hurt, bans: ['D banned 2 wks'], back: [] })).toEqual([...hurt, 'D banned 2 wks']);
+  });
+
+  it('an ordinary week is written out whole: the hurt, then the banned, then who is back', () => {
+    expect(sidelineLines({ injuries: ['A out 3 wks'], bans: [], back: [] })).toEqual(['A out 3 wks']);
+    expect(sidelineLines({ injuries: ['A out 3 wks'], bans: ['D banned 2 wks'], back: ['F'] })).toEqual(['A out 3 wks', 'D banned 2 wks', 'Back: F']);
+    expect(sidelineLines({ injuries: [], bans: [], back: [] })).toEqual([]);
+  });
+
+  it('the Back line is one line however many are back', () => {
+    expect(sidelineLines({ injuries: [], bans: [], back: ['F', 'G', 'H', 'I', 'J'] })).toEqual(['Back: F, G, +3 more']);
+    expect(sidelineLines({ injuries: hurt, bans: banned, back: ['F', 'G', 'H', 'I'] })).toHaveLength(SIDELINE_MAX);
+  });
+
+  it('never runs past the cap, whatever the week', () => {
+    for (let i = 0; i <= 6; i++) for (let b = 0; b <= 4; b++) for (let k = 0; k <= 4; k++) {
+      const lines = sidelineLines({
+        injuries: Array.from({ length: i }, (_, n) => `I${n}`), bans: Array.from({ length: b }, (_, n) => `B${n}`), back: Array.from({ length: k }, (_, n) => `K${n}`),
+      });
+      expect(lines.length).toBeLessThanOrEqual(SIDELINE_MAX);
+      expect(lines.length).toBe(Math.min(SIDELINE_MAX, i + b + (k ? 1 : 0)));
+    }
+  });
+});
+
 
 describe('summaryRemark (#476)', () => {
   const quiet = () => weekSummary(snap(), snap({ week: 6 }));
@@ -200,6 +236,18 @@ describe('weekly Coach says (#477)', () => {
     const card = openWeekSummary(v, { onAdvance: vi.fn(), coach }) as unknown as StubNode;
     expect(card.textContent).toContain(coach.text);
     expect(card.textContent).not.toContain(summaryRemark(v));
+  });
+  it('writes a busy week in four lines under Injuries & bans (#610)', () => {
+    createNewGame('Test Club', 1);
+    coachDocument();
+    const s = getState();
+    const v = {
+      ...weekSummary(weekSnapshot(s), weekSnapshot({ ...s, week: s.week + 1 })),
+      injuries: ['A out 3 wks', 'B out 2 wks', 'C out 1 wk'], bans: ['D banned 2 wks', 'E banned 1 wk'], back: ['F', 'G'],
+    };
+    const card = openWeekSummary(v, { onAdvance: vi.fn() }) as unknown as StubNode;
+    const section = card.querySelectorAll('.nrl-summary-sec').find((n) => n.textContent.startsWith('Injuries & bans'))!;
+    expect(section.children.filter((n) => n.tagName === 'P').map((n) => n.textContent)).toEqual(['A out 3 wks', 'B out 2 wks', '+3 more', 'Back: F, G']);
   });
   it('keeps the existing remark when rule 7 has no suggestion', () => {
     createNewGame('Test Club', 1);

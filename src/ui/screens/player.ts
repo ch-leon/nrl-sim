@@ -27,7 +27,7 @@ import { PLAYER_ID } from '../../systems/fixtures';
 import { DEFAULT_PLAYER_COLORS } from '../../config';
 import { kitFromColors, type Kit } from '../../art/match/kit';
 import { PORTRAIT_H, PORTRAIT_W, TRAINING_KIT, portraitDataUrl } from '../../art/portrait';
-import { backButton, button, closeModal, el, openModal } from '../dom';
+import { ARMED_CLASS, armGuard, armedTap, backButton, button, closeModal, el, openModal } from '../dom';
 import { ensureScreenStyles, fitColour } from './recruit';
 import { fmtMoney } from './finance';
 import { focusLabel } from '../../systems/training';
@@ -488,6 +488,18 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   ensurePlayerStyles();
   const content = el('div', { class: `nrl-player${ctx.kind === 'rival' ? ' nrl-player-rival' : ''}`, attrs: { 'data-player-page': player.id } });
   let armed: PlayerActionId | null = null;
+  // The armed button's wait (#612, dom.ts armGuard): four seconds or a tap anywhere else puts
+  // it back in place, with no re-render under that tap.
+  let stopWait: (() => void) | null = null;
+  let atRest: (() => void) | null = null;
+  // When it was armed: a second tap inside ARMED_REPEAT_MS is the first one again (#617).
+  let armedAt = 0;
+  const arm = (id: PlayerActionId | null): void => {
+    armed = id;
+    armedAt = performance.now();
+    stopWait?.();
+    stopWait = id ? armGuard(() => { armed = null; stopWait = null; atRest?.(); }) : null;
+  };
   let closed = false;
   // Rename (#398): the field's open, and what's typed survives a re-render.
   let renaming: string | null = null;
@@ -495,6 +507,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   const finish = (): void => {
     if (closed) return;
     closed = true;
+    stopWait?.();
     off();
     closeModal();
     opts.onClose?.();
@@ -520,6 +533,7 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       ? null
       : nameField({
         value: renaming,
+        kept: p.name,
         label: 'Player name',
         attr: 'data-player-rename',
         onDraft: (text) => { renaming = text; },
@@ -609,17 +623,21 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       side.append(el('div', { class: 'nrl-player-why' },
         ...notes.map((n) => el('div', { class: n.attn ? 'nrl-attn' : '', text: n.text, attrs: { title: n.text } }))));
     }
+    atRest = null;
     if (m.actions.length) {
       const actions = el('div', { class: 'nrl-player-actions' });
       for (const a of m.actions) {
         // Renew or Sign is the page's one primary; Sell and Release share the row under it.
         const primary = a.id === 'renew' || a.id === 'sign';
-        const btn = button(armed === a.id && a.confirm ? a.confirm : a.label, () => {
-          if (a.confirm && armed !== a.id) { armed = a.id; render(); return; }
-          armed = null;
+        const ask = armed === a.id ? a.confirm : undefined;
+        const btn = button(ask ?? a.label, () => {
+          if (a.confirm && armed !== a.id) { arm(a.id); render(); return; }
+          if (a.confirm && !armedTap(performance.now() - armedAt)) return;
+          arm(null);
           const res = runAction(a.id, p.id);
           if (!res.ok) bus.emit('ui:notify', { text: FAILURE[res.reason ?? ''] ?? 'Not possible.', kind: 'info' });
-        }, { class: primary ? 'nrl-btn-primary' : 'nrl-btn-danger' });
+        }, { class: primary ? 'nrl-btn-primary' : ask ? `nrl-btn-danger ${ARMED_CLASS}` : 'nrl-btn-danger' });
+        if (ask) atRest = () => { btn.classList.remove(ARMED_CLASS); btn.textContent = a.label; };
         btn.setAttribute('data-player-action', a.id);
         if (!a.enabled) { btn.disabled = true; btn.title = a.why ?? ''; }
         else if (a.detail) btn.title = a.detail;
@@ -628,11 +646,15 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
       side.append(actions);
     }
 
+    // A redraw (a job switched, Sell armed, Rename) builds the columns again: each keeps its place (#614).
+    // Upright the sheet scrolls, not the columns, and it holds its own place.
+    const tops = Array.from(content.children, (col) => col.scrollTop);
     // A rival's man has no jobs or deals here: two columns, the note under his card.
     if (ctx.kind === 'rival') {
       card.append(...side.childNodes);
       content.replaceChildren(card, about);
     } else content.replaceChildren(card, about, side);
+    Array.from(content.children).forEach((col, i) => { if (tops[i]) col.scrollTop = tops[i]; });
   };
 
   const off = bus.on('state:changed', () => {
@@ -641,7 +663,8 @@ export function openPlayerPage(player: Player, ctx: PlayerContext, opts: { onClo
   });
   render();
   // A full sheet in the band above the dock (#203); ◂ back is the one close (#349 A5).
-  const backdrop = openModal(content, { class: 'nrl-player-modal', region: true });
+  // A drill-in from a list: it cuts in, with no dialog's entrance (#606).
+  const backdrop = openModal(content, { class: 'nrl-player-modal', region: true, cut: true, onRemove: () => stopWait?.() });
   // The backdrop's own listener has closed the dialog; tell whoever opened it.
   backdrop.addEventListener('click', () => { if (!closed) { closed = true; off(); opts.onClose?.(); } });
   return backdrop;

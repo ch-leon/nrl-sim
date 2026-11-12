@@ -80,6 +80,7 @@ export async function runCoachVoice(browser) {
       // the Club home transition. This also checks the mounted card survives rotation.
       if (height > width) await viewport(width, height);
       await page.locator('[data-week-summary]').waitFor({ state: 'visible' });
+      await page.waitForTimeout(250); // the card's entrance (#606): its buttons are measured at full size
       const fit = await page.evaluate(() => {
         const scroll = document.querySelector('.nrl-summary-modal .nrl-modal-scroll');
         return [...document.querySelectorAll('[data-summary-advance], [data-summary-close]')].map((b) => {
