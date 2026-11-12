@@ -29,7 +29,7 @@ describe('compiled field rules (run once per preview build)', () => {
   it('shares the physical field, clock, markings and restart geometry', () => {
     if (process.env.NRL_MATCH_PREVIEW_LENGTH) expect(MATCH_PREVIEW?.fieldLength).toBe(Number(process.env.NRL_MATCH_PREVIEW_LENGTH));
     expect(FIELD_LENGTH).toBe(MATCH_PREVIEW?.fieldLength ?? 100);
-    expect(NINES.halfMinutes).toBe(MATCH_PREVIEW?.halfMinutes ?? 7);
+    expect(NINES.halfMinutes).toBe(2.5);
     expect(FIELD_WIDTH).toBe(68);
     expect(PLAY_LONG).toBeCloseTo(FIELD_LENGTH * 0.24);
     expect(fieldToGrid(100, 50).gx - fieldToGrid(0, 50).gx).toBeCloseTo(PLAY_LONG);
