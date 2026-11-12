@@ -64,7 +64,9 @@ What's in the game, with the PR that added each.
 
 ## Recently added
 
-- Defenders other than the markers must physically retreat 10m (or to their goal line) after each ruck before they can rejoin the defence, including after quick heels, handovers, sin bins and substitutions ([PR](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
+- **Draft comparison, awaiting Leon’s play-test:** separate 100m/80m/60m fields with 2:30 clock halves, equal seeded teams and per-half viewing timers. Defaults stay 100m/seven-minute halves ([issue #513](https://github.com/ch-leon/nrl-sim/issues/513)).
+
+- **Draft, awaiting Leon’s play-test:** non-markers physically retreat 10m (or to their goal line) before defensive involvement. Covers quick heels, handovers, bins and substitutions ([draft PR #677](https://github.com/ch-leon/nrl-sim/pull/677), [evidence](../specs/625-retreat-validation.md)).
 
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 

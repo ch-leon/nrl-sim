@@ -30,8 +30,9 @@ live gameplay change; work still open below has not shipped.
   strength), well under the other attacks. The next pass looks at why a rushing line
   shuts out the wide game; it is not a Speed question.
 - **Labs: shorter matches** ([issue #513](https://github.com/ch-leon/nrl-sim/issues/513)):
-  about 4 minutes of watching at ×1, behind a Labs toggle that is off by default.
-  Planned and awaiting Leon's go; no PR yet.
+  Leon approved separate 100m/80m/60m preview builds after the retreat fix, targeting
+  2–2.5 minutes of actual watching per half at ×1. The first comparison uses 2:30
+  clock halves. Hold both drafts until his play-test; no production setting changed.
 
 ## Next
 

@@ -328,6 +328,10 @@ function ensureLabStyles(): void {
 .nrl-lab .nrl-lab-mini { padding: 0.15rem 0.4rem; }
 .nrl-lab[data-preview] .nrl-lab-mini, .nrl-lab[data-preview] a { min-width: 44px; min-height: 44px; }
 .nrl-lab[data-preview] a { color: #f4d03f; display: inline-flex; align-items: center; justify-content: center; }
+.nrl-lab[data-preview] { font-size: 13px; }
+.nrl-lab[data-preview] .nrl-lab-title { font-size: 13px; }
+.nrl-lab[data-preview] .nrl-btn { font-size: 13px; }
+.nrl-lab[data-preview] .nrl-lab-label { color: #c9d1ea; }
 .nrl-lab-readout { margin-left: auto; font-family: var(--nrl-f-num); font-variant-numeric: tabular-nums; }
 .nrl-lab-scrub { width: 100%; margin: 0; accent-color: #f4d03f; }
 .nrl-lab-label { color: #9aa6c7; }
