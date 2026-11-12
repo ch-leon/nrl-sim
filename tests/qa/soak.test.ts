@@ -65,74 +65,100 @@ describe('soak P&L (#161)', () => {
 
 describe('soak', () => {
   it('plays two seasons idle and managed with no problems, reporting the record and the gap (#138)', () => {
-    const runs = [];
-    for (const mode of ['idle', 'managed'] as const) {
-      const r = runSoak({ seed: 101, seasons: 2, mode });
-      expect(r.problems, mode).toEqual([]);
-      expect(r.seasons.length).toBe(2);
-      // The start gap is the new game's: the same squad and league whichever way it is managed.
-      expect(r.start.bestNine).toBeGreaterThan(0);
-      expect(r.start.rivalRange[0]).toBeLessThanOrEqual(r.start.rivalMean);
-      expect(r.start.rivalMean).toBeLessThanOrEqual(r.start.rivalRange[1]);
-      for (const s of r.seasons) {
-        expect(s.wins + s.draws + s.losses).toBe(SEASON_ROUNDS);
-        // A squad with room for the Academy's call-up (#285) never forfeits (finding 20).
-        expect(s.forfeits, `${mode} S${s.season}`).toBe(0);
-        // N12.1: the finals cut is the top eight, and each near rival is met once or twice in 24 rounds.
-        expect(s.madeFinals).toBe(s.ladderPosition <= 8);
-        expect(s.nearRivalGames).toBeGreaterThanOrEqual(NEAR_RIVALS);
-        expect(s.nearRivalGames).toBeLessThanOrEqual(2 * NEAR_RIVALS);
-        expect(s.nearRivalWinRate).toBeGreaterThanOrEqual(0);
-        expect(s.nearRivalWinRate).toBeLessThanOrEqual(1);
-        expect(s.ladderPosition).toBeGreaterThanOrEqual(1);
-        expect(s.ladderPosition).toBeLessThanOrEqual(16);
-        expect(s.bestNine).toBeGreaterThan(30);
-        expect(s.rivalMean).toBeGreaterThan(30);
-        expect(s.rivalRange[0]).toBeLessThanOrEqual(s.rivalRange[1]);
-        if (mode === 'idle') expect(s.signings).toBe(0);
-        else expect(s.signingFees).toBeGreaterThanOrEqual(0);
-        // The season's P&L adds up to the balance, line by line (#161).
-        expect(s.finance.wages).toBeLessThan(0);
-        expect(s.finance.grant).toBeGreaterThan(0);
-        expect(s.finance.sponsor).toBe(0); // the soak manager never builds a Sponsor Board
-        expect(s.finance.gate).toBeGreaterThan(0);
-        expect(s.finance.other).toBe(0);
-        if (mode === 'idle') {
-          expect(s.finance.transfers).toBe(0);
-          expect(s.finance.facilities).toBe(0);
-          expect(s.finance.upkeep).toBe(0);
-        } else {
-          expect(s.finance.transfers).toBeCloseTo(-s.signingFees, 5); // −0 when nobody was signed
-          expect(s.finance.upkeep).toBeLessThanOrEqual(0);
+    // Predeclared contiguous paired seeds include the original 101; each keeps every invariant.
+    // The managerial balance claim is a mean across paths, rather than one injury/recruitment path.
+    const pairs: { seed: number; idle: number; managed: number }[] = [];
+    for (const seed of [101, 102, 103, 104]) {
+      const runs = [];
+      for (const mode of ['idle', 'managed'] as const) {
+        const r = runSoak({ seed, seasons: 2, mode });
+        expect(r.problems, mode).toEqual([]);
+        expect(r.seasons.length).toBe(2);
+        // The start gap is the new game's: the same squad and league whichever way it is managed.
+        expect(r.start.bestNine).toBeGreaterThan(0);
+        expect(r.start.rivalRange[0]).toBeLessThanOrEqual(r.start.rivalMean);
+        expect(r.start.rivalMean).toBeLessThanOrEqual(r.start.rivalRange[1]);
+        for (const s of r.seasons) {
+          expect(s.wins + s.draws + s.losses).toBe(SEASON_ROUNDS);
+          // A squad with room for the Academy's call-up (#285) never forfeits (finding 20).
+          expect(s.forfeits, `${mode} S${s.season}`).toBe(0);
+          // N12.1: the finals cut is the top eight, and each near rival is met once or twice in 24 rounds.
+          expect(s.madeFinals).toBe(s.ladderPosition <= 8);
+          expect(s.nearRivalGames).toBeGreaterThanOrEqual(NEAR_RIVALS);
+          expect(s.nearRivalGames).toBeLessThanOrEqual(2 * NEAR_RIVALS);
+          expect(s.nearRivalWinRate).toBeGreaterThanOrEqual(0);
+          expect(s.nearRivalWinRate).toBeLessThanOrEqual(1);
+          expect(s.ladderPosition).toBeGreaterThanOrEqual(1);
+          expect(s.ladderPosition).toBeLessThanOrEqual(16);
+          expect(s.bestNine).toBeGreaterThan(30);
+          expect(s.rivalMean).toBeGreaterThan(30);
+          expect(s.rivalRange[0]).toBeLessThanOrEqual(s.rivalRange[1]);
+          if (mode === 'idle') expect(s.signings).toBe(0);
+          else expect(s.signingFees).toBeGreaterThanOrEqual(0);
+          // The season's P&L adds up to the balance, line by line (#161).
+          expect(s.finance.wages).toBeLessThan(0);
+          expect(s.finance.grant).toBeGreaterThan(0);
+          expect(s.finance.sponsor).toBe(0); // the soak manager never builds a Sponsor Board
+          expect(s.finance.gate).toBeGreaterThan(0);
+          expect(s.finance.other).toBe(0);
+          if (mode === 'idle') {
+            expect(s.finance.transfers).toBe(0);
+            expect(s.finance.facilities).toBe(0);
+            expect(s.finance.upkeep).toBe(0);
+          } else {
+            expect(s.finance.transfers).toBeCloseTo(-s.signingFees, 5); // −0 when nobody was signed
+            expect(s.finance.upkeep).toBeLessThanOrEqual(0);
+          }
         }
+        expect(tallyNet(r.seasons[0]!.finance)).toBeCloseTo(r.seasons[0]!.money - STARTING_MONEY, 0);
+        expect(tallyNet(r.seasons[1]!.finance)).toBeCloseTo(r.seasons[1]!.money - r.seasons[0]!.money, 0);
+        runs.push(r);
       }
-      expect(tallyNet(r.seasons[0]!.finance)).toBeCloseTo(r.seasons[0]!.money - STARTING_MONEY, 0);
-      expect(tallyNet(r.seasons[1]!.finance)).toBeCloseTo(r.seasons[1]!.money - r.seasons[0]!.money, 0);
-      runs.push(r);
+      expect(runs[0]!.start).toEqual(runs[1]!.start);
+      // The game's own books (#172) agree with the soak's tally: the soak reports any line that differs as a problem (none above).
+      pairs.push({ seed, idle: runs[0]!.seasons[1]!.bestNine, managed: runs[1]!.seasons[1]!.bestNine });
+      const summary = summariseSeasons(runs);
+      expect(summary.map((s) => `${s.mode}:${s.season}`)).toEqual(['idle:1', 'idle:2', 'managed:1', 'managed:2']);
+      // Optional buildings must be affordable; any built still incurs its real upkeep (#164).
+      // The healthy-budget control below proves that affordable builds and hires actually occur.
+      const facilitySpend = runs[1]!.seasons[0]!.finance.facilities + runs[1]!.seasons[1]!.finance.facilities;
+      expect(facilitySpend).toBeLessThanOrEqual(0);
+      if (facilitySpend < 0) expect(runs[1]!.seasons[1]!.finance.upkeep).toBeLessThan(0);
+      else expect(runs[1]!.seasons[1]!.finance.upkeep).toBe(0);
+      for (const row of summary) {
+        expect(row.runs).toBe(1);
+        expect(row.finance.wages).toBeLessThan(0);
+        expect(tallyNet(row.finance)).toBeCloseTo(row.money - (row.season === 1 ? STARTING_MONEY : summary.find((x) => x.mode === row.mode && x.season === row.season - 1)!.money), -1);
+        expect(row.gap).toBeCloseTo(row.bestNine - row.rivalMean, 0);
+        expect(row.finals).toBe(row.ladderPosition <= 8 ? 1 : 0);
+        const run = runs.find((r) => r.mode === row.mode)!;
+        const sample = run.seasons[row.season - 1]!;
+        expect(row.nearRivalGames).toBe(sample.nearRivalGames);
+        expect(row.nearRivalWinRate).toBeCloseTo(sample.nearRivalWinRate, 2);
+        expect(row.finalsAppearances).toBe(run.seasons.slice(0, row.season).filter((x) => x.madeFinals).length);
+      }
     }
-    expect(runs[0]!.start).toEqual(runs[1]!.start);
-    // The game's own books (#172) agree with the soak's tally: the soak reports any line that differs as a problem (none above).
-    // The managed manager builds and signs; its club should be at least as strong as the idle one.
-    expect(runs[1]!.seasons[1]!.bestNine).toBeGreaterThanOrEqual(runs[0]!.seasons[1]!.bestNine);
-    const summary = summariseSeasons(runs);
-    expect(summary.map((s) => `${s.mode}:${s.season}`)).toEqual(['idle:1', 'idle:2', 'managed:1', 'managed:2']);
-    // The managed manager built at least a Paddock over two seasons.
-    expect(runs[1]!.seasons[0]!.finance.facilities + runs[1]!.seasons[1]!.finance.facilities).toBeLessThan(0);
-    // …and pays upkeep on it from then on (#164).
-    expect(runs[1]!.seasons[1]!.finance.upkeep).toBeLessThan(0);
-    for (const row of summary) {
-      expect(row.runs).toBe(1);
-      expect(row.finance.wages).toBeLessThan(0);
-      expect(tallyNet(row.finance)).toBeCloseTo(row.money - (row.season === 1 ? STARTING_MONEY : summary.find((x) => x.mode === row.mode && x.season === row.season - 1)!.money), -1);
-      expect(row.gap).toBeCloseTo(row.bestNine - row.rivalMean, 0);
-      expect(row.finals).toBe(row.ladderPosition <= 8 ? 1 : 0);
-      const run = runs.find((r) => r.mode === row.mode)!;
-      const sample = run.seasons[row.season - 1]!;
-      expect(row.nearRivalGames).toBe(sample.nearRivalGames);
-      expect(row.nearRivalWinRate).toBeCloseTo(sample.nearRivalWinRate, 2);
-      expect(row.finalsAppearances).toBe(run.seasons.slice(0, row.season).filter((x) => x.madeFinals).length);
-    }
+    const idleMean = pairs.reduce((sum, pair) => sum + pair.idle, 0) / pairs.length;
+    const managedMean = pairs.reduce((sum, pair) => sum + pair.managed, 0) / pairs.length;
+    console.info('Managed vs idle final best nine:', JSON.stringify({ pairs, idleMean, managedMean }));
+    expect(managedMean, JSON.stringify(pairs)).toBeGreaterThanOrEqual(idleMean);
   }, 180_000);
+
+  it.each([{ wage: 4000, affordable: false }, { wage: 100, affordable: true }])(
+    'the managed policy checks recurring affordability, not just cash ($wage weekly wages per player)',
+    ({ wage, affordable }) => {
+      createNewGame('Budget', 101);
+      initLeague(getState());
+      const initial = getState();
+      const fromSave = { ...initial, money: 1_000_000, freeAgents: [],
+        squad: initial.squad.map((player) => ({ ...player, wage })) };
+      // Both have ample cash. Only the low-wage club can carry new running costs.
+      const result = runSoak({ seed: 101, seasons: 1, weeks: 1, mode: 'managed', fromSave });
+      expect(result.problems).toEqual([]);
+      expect(getState().facilities.some((facility) => facility.defId === 'trainingPaddock')).toBe(affordable);
+      expect(getState().staff.map((member) => member.role)).toEqual(affordable ? ['assistantCoach', 'analyst', 'welfare'] : []);
+    },
+  );
 
   it('gapSample reads the player\'s best nine against the rivals', () => {
     createNewGame('Gap', 5);

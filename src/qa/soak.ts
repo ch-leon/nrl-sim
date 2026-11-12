@@ -472,7 +472,7 @@ interface Signed { count: number; fees: number; overall: number }
 
 /** The managed manager's policy (#138). Assumed (needs Leon): a plain, sensible club. */
 export const MANAGED = {
-  /** Facilities it builds, in order, as soon as it can keep BUILD_RESERVE afterwards. */
+  /** Facilities it builds, in order, while the reserve and recurring costs remain affordable. */
   BUILDS: ['trainingPaddock', 'teamGym'] as readonly FacilityDefId[],
   BUILD_RESERVE: 40_000,
   /** Never let the squad fall below this many players. */
@@ -486,7 +486,7 @@ export const MANAGED = {
   BURN_ALLOWED: 3_000,
   /** Build or upgrade the Grandstand when the next home gate is sold out and this much is left after paying (#169). */
   STAND_RESERVE: 60_000,
-  /** Hire staff (N14.5) while a season of the hire's wage still leaves this much. */
+  /** Hire staff (N14.5) only with nonnegative projected weekly net and this much after a season of wages. */
   STAFF_RESERVE: 40_000,
 } as const;
 
@@ -509,6 +509,15 @@ function weeklyNet(s: GameState): number {
   return weeklyIncome(s) + gate - weeklyWages(s) - weeklyUpkeep(s) - weeklyOverhead(s);
 }
 
+/** Check the candidate facility's real upkeep and projected gates before adding a recurring bill. */
+function canCarryFacility(s: GameState, defId: FacilityDefId, level: 1 | 2 | 3 = 1): boolean {
+  const existing = s.facilities.find((facility) => facility.defId === defId);
+  const facilities = existing
+    ? s.facilities.map((facility) => facility === existing ? { ...facility, level } : facility)
+    : [...s.facilities, { id: `managed-budget-${defId}`, defId, level, x: 0, y: 0 }];
+  return weeklyNet({ ...s, facilities }) >= 0;
+}
+
 /** Seats for a sold-out crowd (#169): a Grandstand, then its upgrades, while the money allows. */
 function seatTheCrowd(): void {
   const s = getState();
@@ -517,11 +526,11 @@ function seatTheCrowd(): void {
   const def = FACILITY_CATALOG.grandstand;
   const stand = s.facilities.find((f) => f.defId === 'grandstand');
   if (!stand) {
-    if (s.money - def.cost >= MANAGED.STAND_RESERVE) buildFirstFree('grandstand');
+    if (s.money - def.cost >= MANAGED.STAND_RESERVE && canCarryFacility(s, 'grandstand')) buildFirstFree('grandstand');
   } else if (stand.level < 3) {
     const level = (stand.level + 1) as 2 | 3;
     const cost = upgradeCost(def, level);
-    if (s.money - cost < MANAGED.STAND_RESERVE || !spendMoney(cost, 'upgrade:grandstand')) return;
+    if (s.money - cost < MANAGED.STAND_RESERVE || !canCarryFacility(s, 'grandstand', level) || !spendMoney(cost, 'upgrade:grandstand')) return;
     setState({ facilities: getState().facilities.map((f) => (f.id === stand.id ? { ...f, level } : f)) });
   }
 }
@@ -580,14 +589,16 @@ function manage(): Signed {
     const st = getState();
     if (!isFacilityOpen(st, defId) || st.facilities.some((f) => f.defId === defId)) continue;
     if (st.money - FACILITY_CATALOG[defId].cost < MANAGED.BUILD_RESERVE) break;
+    if (!canCarryFacility(st, defId)) continue;
     buildFirstFree(defId);
   }
   seatTheCrowd();
-  // Staff: each once a season of his wage is affordable. Assistant Coach, then Analyst, then Welfare.
+  // Staff: preserve a season of wages in cash and cover each new weekly bill from projected income.
   for (const role of MANAGED_STAFF) {
     const st = getState();
     if (hasStaff(st, role)) continue;
     if (st.money - staffWage(st, role) * WEEKS_PER_SEASON < MANAGED.STAFF_RESERVE) break;
+    if (weeklyNet(st) - staffWage(st, role) < 0) continue;
     hireStaff(role);
   }
   const out: Signed = { count: 0, fees: 0, overall: 0 };
