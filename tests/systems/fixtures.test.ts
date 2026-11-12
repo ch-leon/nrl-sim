@@ -23,6 +23,7 @@ import {
 import { RIVAL_CLUBS } from '../../src/data/league';
 import { createNewGame, getState, setState, type Fixture, type LadderRow, type RivalClub, type GameState } from '../../src/core/state';
 import { makeRng } from '../../src/utils/rng';
+import { NINES } from '../../src/match/league/rules';
 import { bus } from '../../src/core/events';
 import { SEASON_ROUNDS, LEAGUE } from '../../src/config';
 import { advanceWeek, advanceWeeks, clearTickHooks, clearSeasonHooks } from '../../src/core/time';
@@ -307,7 +308,7 @@ describe('cheapSimScore', () => {
     }
     expect(strongWins / N).toBeGreaterThan(0.6);
   });
-  it('scores on the live sim’s scale (N9.2): about 30 a match, a margin of about 10, no home edge, 75% at a 25-point gap', () => {
+  it('scores at the live sim’s rate (N9.2): about 30 per fourteen minutes, margin 10, no home edge, 75% at a 25-point gap', () => {
     const club = (id: string, strength: number): RivalClub => ({ id, name: id, colors: ['#000000', '#ffffff'], strength });
     const N = 3000;
     let points = 0;
@@ -322,10 +323,12 @@ describe('cheapSimScore', () => {
       const gap = cheapSimScore(club('w', 45), club('s', 70), makeRng(seed + N));
       if (gap.awayScore > gap.homeScore) strongWins++;
     }
-    expect(points / N).toBeGreaterThan(27);
-    expect(points / N).toBeLessThan(33);
-    expect(margin / N).toBeGreaterThan(8);
-    expect(margin / N).toBeLessThan(12);
+    // Preserve the historical rate bands while the actual cheap scores follow the short default.
+    const durationScale = NINES.halfMinutes / 7;
+    expect(points / N / durationScale).toBeGreaterThan(27);
+    expect(points / N / durationScale).toBeLessThan(33);
+    expect(margin / N / durationScale).toBeGreaterThan(8);
+    expect(margin / N / durationScale).toBeLessThan(12);
     expect(homeWins / N).toBeGreaterThan(0.44);
     expect(homeWins / N).toBeLessThan(0.53);
     expect(strongWins / N).toBeGreaterThan(0.68);
