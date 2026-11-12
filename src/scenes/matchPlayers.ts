@@ -13,20 +13,48 @@ import type { ContactAnimation } from '../match/view/contactAnimation';
 import type { ContactLayout } from '../match/view/contactLayout';
 import type { Side } from '../match/core/snapshot';
 
+/**
+ * Frames kept, 7 KB each (44×40 RGBA): 768 is 5.4 MB. A whole match draws about 3,600 distinct
+ * frames and the busiest passage wants some 465 at once; at 512 one lookup in nine missed, at
+ * 768 one in twenty (#646). A miss is a 0.1 ms repaint, so this is headroom for more poses, not a fix.
+ */
+export const FRAME_CACHE_SIZE = 768;
+
+/** What the cache has done since it was built (the perf harness and the lab read it). */
+export interface FrameCacheStats { hits: number; misses: number; evictions: number; peak: number }
+
+/** The fields of a picture that decide which frame is drawn. */
+function frameKey(side: Side, p: PlayerPicture): string {
+  return `${side}/${p.who}/${p.action}/${p.frame}/${p.strideFrame ?? 'legacy'}/${p.facing}/${p.possession}`;
+}
+
 /** CPU frames only: bounded independently of match length and interchanges. */
 export class PlayerFrameCache {
-  private frames = new Map<string, PixelBuffer>();
-  constructor(private readonly kits: Record<Side, Kit>, private readonly look: (who: string) => Appearance = appearanceFor) {}
+  /** key → frame and the use counter it was last asked for at (least recently used goes first). */
+  private frames = new Map<string, { pixels: PixelBuffer; used: number }>();
+  private clock = 0;
+  private counts: FrameCacheStats = { hits: 0, misses: 0, evictions: 0, peak: 0 };
+  constructor(private readonly kits: Record<Side, Kit>, private readonly look: (who: string) => Appearance = appearanceFor, readonly capacity = FRAME_CACHE_SIZE) {}
   get(side: Side, p: PlayerPicture): PixelBuffer {
-    const key = `${side}/${p.who}/${p.action}/${p.frame}/${p.strideFrame ?? "legacy"}/${p.facing}/${p.possession}`;
+    const key = frameKey(side, p);
     const hit = this.frames.get(key);
-    if (hit) { this.frames.delete(key); this.frames.set(key, hit); return hit; }
+    // A hit is a stamp, not a delete-and-reinsert: the Map is not reshuffled 600 times a second.
+    if (hit) { hit.used = ++this.clock; this.counts.hits++; return hit.pixels; }
+    this.counts.misses++;
     const pixels = drawLivePlayer(this.look(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession, p.strideFrame);
-    if (this.frames.size >= 512) this.frames.delete(this.frames.keys().next().value!);
-    this.frames.set(key, pixels); return pixels;
+    if (this.frames.size >= this.capacity) this.evict();
+    this.frames.set(key, { pixels, used: ++this.clock });
+    if (this.frames.size > this.counts.peak) this.counts.peak = this.frames.size;
+    return pixels;
+  }
+  private evict(): void {
+    let oldest = Infinity; let victim = '';
+    for (const [key, e] of this.frames) if (e.used < oldest) { oldest = e.used; victim = key; }
+    this.frames.delete(victim); this.counts.evictions++;
   }
   clear(): void { this.frames.clear(); }
   get size(): number { return this.frames.size; }
+  stats(): FrameCacheStats { return { ...this.counts }; }
 }
 
 /** One small reusable GPU texture per actor, not a texture for every appearance/frame. */
@@ -45,12 +73,19 @@ class PaintedTexture {
   }
 }
 
+/** The same frame to draw (position, lift and mirroring are not part of it). */
+function samePicture(a: PlayerPicture, b: PlayerPicture): boolean {
+  return a.who === b.who && a.action === b.action && a.frame === b.frame && a.strideFrame === b.strideFrame && a.facing === b.facing && a.possession === b.possession;
+}
+
 export class MatchActor {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly ring: Phaser.GameObjects.Graphics;
   private readonly texture: PaintedTexture;
   private previousPixels: PixelBuffer | null = null;
+  /** The picture behind `previousPixels`: asked again, the cache and the texture are left alone. */
+  private shown: PlayerPicture | null = null;
   private lift = 0;
   private who: string;
   constructor(scene: Phaser.Scene, art: MatchArtRegistry, private readonly cache: PlayerFrameCache, private readonly side: Side, slot: number, who: string, shadowKey: string, ringColor: number, ringStyle: RingStyle) {
@@ -70,8 +105,11 @@ export class MatchActor {
     this.who = picture.who;
     this.lift = picture.lift ?? 0;
     this.sprite.setY(this.shadow.y - this.lift);
-    const pixels = this.cache.get(this.side, picture);
-    if (pixels !== this.previousPixels) { this.texture.paint(pixels); this.previousPixels = pixels; }
+    if (!this.shown || !samePicture(this.shown, picture)) {
+      const pixels = this.cache.get(this.side, picture);
+      if (pixels !== this.previousPixels) { this.texture.paint(pixels); this.previousPixels = pixels; }
+      this.shown = { ...picture };
+    }
     // Mirroring a non-centred frame must preserve its feet origin.
     this.sprite.setOrigin((picture.left ? WIDTH - CENTRE : CENTRE) / WIDTH, FOOT / HEIGHT).setFlipX(picture.left);
   }
