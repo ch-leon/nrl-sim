@@ -127,8 +127,12 @@ export class MatchOfficials {
     return binnedSpot(p, s);
   }
 
+  /** The tick on screen (a replay's while it plays): the crowd reads the score and the ball's height from it. */
+  latest: Snapshot | null = null;
+
   /** Draw everyone for the frame between `prev` and `cur` at `alpha` (LiveView calls this after the players). */
   draw(prev: Snapshot, cur: Snapshot, alpha: number): void {
+    this.latest = cur;
     this.drawReferee(prev, cur, alpha);
     for (const side of ['home', 'away'] as const) this.drawBench(side, cur);
   }

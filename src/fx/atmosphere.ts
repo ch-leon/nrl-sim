@@ -287,7 +287,7 @@ export function attachMatchAtmosphere(scene: Phaser.Scene, opts: AtmosphereOptio
   for (const seat of crowdSeats()) {
     if (seat.layer !== 'back') continue; // the stands that face the camera
     const w = isoProject(seat.gx, seat.gy, seat.z, offsetX);
-    const pt = { x: w.x, y: w.y - 7 };
+    const pt = { x: w.x, y: w.y - 18 }; // a fan's head (crowd.ts: waist-up, 20 px)
     seats.all.push(pt);
     const side = shirtSide(shirtForSeat(seat));
     if (side) seats[side].push(pt);

@@ -69,13 +69,20 @@ import type { BallMotion } from '../match/view/liveView';
 import {
   CROWD_BASE,
   CROWD_FW,
+  FLAG_HAND_X,
+  FLAG_HAND_Y,
+  POSE_FRAME,
+  POSE_LIFT,
   crowdFrameName,
   crowdPose,
+  flagFrameName,
+  flipForSeat,
   lookForSeat,
   shirtForSeat,
   shirtSide,
   type CrowdMood,
 } from '../art/match/crowd';
+import { reducedMotion } from '../match/view/impact';
 import { isoProject } from '../art/match/iso3d';
 import { MatchArtRegistry } from './matchArt';
 import { MatchActor, MatchContactLayer, PlayerFrameCache } from './matchPlayers';
@@ -164,6 +171,14 @@ function nextFrame(): Promise<void> {
 }
 /** Crowd animation tick (real ms). */
 const CROWD_TICK_MS = 220;
+/** Heads go up while the loose ball is higher than this (metres): a bomb, a kick at goal (#641). */
+const CROWD_HEADS_UP_M = 6;
+/** A Mexican wave (#641): a side this many points clear, nothing for this long (real ms), round the stands at this share a crowd tick (about 10 s a lap), twice, then a rest. */
+const WAVE_MARGIN = 18;
+const WAVE_LULL_MS = 9000;
+const WAVE_PER_TICK = 0.022;
+const WAVE_LAPS = 2;
+const WAVE_REST_MS = 40_000;
 /** Width (world px) of the team ring under every player (#340); the carrier's ring is 22. */
 const CARRIER_RING_W = 22;
 
@@ -283,10 +298,20 @@ export class MatchScene extends Phaser.Scene {
   protected backBtn: HTMLButtonElement | null = null;
 
   // Crowd.
-  private crowdBobs: { bob: Phaser.GameObjects.Bob; seat: CrowdSeat; shirt: number; look: number; side: 'home' | 'away' | null }[] = [];
+  private crowdBobs: { bob: Phaser.GameObjects.Bob; seat: CrowdSeat; shirt: number; look: number; side: 'home' | 'away' | null; y: number; flag?: Phaser.GameObjects.Bob; flagY?: number }[] = [];
   private crowdTick = 0;
   private mood: CrowdMood = { home: 0, away: 0 };
   private moodUntil = { home: 0, away: 0 };
+  private groanMood = { home: 0, away: 0 };
+  private groanUntil = { home: 0, away: 0 };
+  private riseMood = 0;
+  private riseUntil = 0;
+  private upMood = 0;
+  /** When something last stirred the crowd (real ms): a Mexican wave waits for a lull. */
+  private crowdBusyAt = 0;
+  private waveFrom: number | null = null;
+  private waveNext = 0;
+  private crowdReduced = false;
   private offCrowd: (() => void) | null = null;
   private offZoom: (() => void) | null = null;
 
@@ -349,6 +374,12 @@ export class MatchScene extends Phaser.Scene {
     this.players.home = [];
     this.players.away = [];
     this.crowdBobs = [];
+    this.mood = { home: 0, away: 0 };
+    this.moodUntil = { home: 0, away: 0 };
+    this.groanMood = { home: 0, away: 0 };
+    this.groanUntil = { home: 0, away: 0 };
+    this.riseMood = this.riseUntil = this.upMood = this.crowdBusyAt = this.waveNext = 0;
+    this.waveFrom = null;
     this.finished = false;
     this.built = false;
     // Phaser keeps this scene between matches: the last match's half-time sheet must
@@ -800,13 +831,15 @@ export class MatchScene extends Phaser.Scene {
       const shirt = shirtForSeat(seat);
       const look = lookForSeat(seat);
       const blitter = seat.layer === 'back' ? back : front;
-      const bob = blitter.create(
-        Math.round(w.x - Math.floor(CROWD_FW / 2)),
-        Math.round(w.y - CROWD_BASE),
-        crowdFrameName(shirt, look, seat.view, 0),
-      );
-      this.crowdBobs.push({ bob, seat, shirt, look, side: shirtSide(shirt) });
+      const x = Math.round(w.x - Math.floor(CROWD_FW / 2));
+      const y = Math.round(w.y - CROWD_BASE);
+      const bob = blitter.create(x, y, crowdFrameName(shirt, look, seat.view, 0));
+      bob.setFlipX(flipForSeat(seat));
+      // A flag is held up from his hand, in front of him and behind the row in front.
+      const flag = seat.flag ? blitter.create(x + CROWD_FW - 4 - FLAG_HAND_X, y + CROWD_BASE - 10 - FLAG_HAND_Y, flagFrameName(0)) : undefined;
+      this.crowdBobs.push({ bob, seat, shirt, look, side: shirtSide(shirt), y, ...(flag ? { flag, flagY: flag.y } : {}) });
     }
+    this.crowdReduced = reducedMotion();
     this.time.addEvent({ delay: CROWD_TICK_MS, loop: true, callback: () => this.animateCrowd() });
     this.offCrowd = bus.on('match:event', (ev) => this.crowdReact(ev));
   }
@@ -815,20 +848,38 @@ export class MatchScene extends Phaser.Scene {
   private hype(side: 'home' | 'away', level: number, ms: number): void {
     this.mood[side] = Math.max(this.mood[side], level);
     this.moodUntil[side] = Math.max(this.moodUntil[side], this.time.now + ms);
+    this.crowdBusyAt = this.time.now;
+  }
+
+  /** A side's fans with their hands on their heads for a while: a try against them, a kick at goal missed (#641). */
+  private groan(side: 'home' | 'away', level: number, ms: number): void {
+    this.groanMood[side] = Math.max(this.groanMood[side], level);
+    this.groanUntil[side] = Math.max(this.groanUntil[side], this.time.now + ms);
+    this.crowdBusyAt = this.time.now;
+  }
+
+  /** The whole ground on its feet for a while: the kick-off, the whistles (#641). */
+  private rise(level: number, ms: number): void {
+    this.riseMood = Math.max(this.riseMood, level);
+    this.riseUntil = Math.max(this.riseUntil, this.time.now + ms);
+    this.crowdBusyAt = this.time.now;
   }
 
   private crowdReact(ev: MatchEvent): void {
     const side = ev.teamId === this.home.clubId ? 'home' : 'away';
+    const other = side === 'home' ? 'away' : 'home';
     switch (ev.kind) {
       case 'try':
         this.hype(side, 0.95, 3200);
+        this.groan(other, 0.9, 2600);
         break;
       case 'conversion':
-        if (ev.detail !== 'missed') this.hype(side, 0.7, 1800);
-        break;
       case 'penalty-goal':
       case 'field-goal':
-        this.hype(side, 0.7, 1800);
+        if (ev.detail === 'missed') {
+          this.groan(side, 0.85, 1800);
+          this.hype(other, 0.25, 900);
+        } else this.hype(side, 0.7, 1800);
         break;
       case 'break':
         this.hype(side, 0.35, 1200);
@@ -836,6 +887,18 @@ export class MatchScene extends Phaser.Scene {
       case 'big-hit':
         this.hype(side, 0.3, 900);
         break;
+      case 'kickoff':
+        this.rise(1, 2400);
+        break;
+      case 'half-time':
+        this.rise(0.6, 2400);
+        break;
+      case 'full-time': {
+        this.rise(1, 6000);
+        const sc = this.officials?.latest?.score;
+        if (sc && sc.home !== sc.away) this.hype(sc.home > sc.away ? 'home' : 'away', 0.9, 5000);
+        break;
+      }
       default:
         break;
     }
@@ -843,13 +906,53 @@ export class MatchScene extends Phaser.Scene {
 
   private animateCrowd(): void {
     this.crowdTick++;
+    const now = this.time.now;
     for (const s of ['home', 'away'] as const) {
-      if (this.time.now > this.moodUntil[s]) this.mood[s] = Math.max(0, this.mood[s] - 0.2);
+      if (now > this.moodUntil[s]) this.mood[s] = Math.max(0, this.mood[s] - 0.2);
+      if (now > this.groanUntil[s]) this.groanMood[s] = Math.max(0, this.groanMood[s] - 0.25);
     }
+    if (now > this.riseUntil) this.riseMood = Math.max(0, this.riseMood - 0.25);
+    // Heads up while the ball is high (a bomb, a kick at goal), from the picture on screen.
+    const ball = this.officials?.latest?.ball;
+    const high = !!ball && !ball.holder && ball.lift > CROWD_HEADS_UP_M;
+    this.upMood = high ? 1 : Math.max(0, this.upMood - 0.34);
+    this.mood.groan = this.groanMood;
+    this.mood.up = this.upMood;
+    this.mood.rise = this.riseMood;
+    this.stepWave(now);
+    const homeFlags = this.mood.home >= 0.5;
     for (const c of this.crowdBobs) {
-      const pose = crowdPose(c.seat.r, c.side, this.crowdTick, this.mood);
-      c.bob.setFrame(crowdFrameName(c.shirt, c.look, c.seat.view, pose));
+      const pose = crowdPose(c.seat.r, c.side, this.crowdTick, this.mood, c.seat.along ?? -1);
+      const lift = POSE_LIFT[pose];
+      c.bob.setFrame(crowdFrameName(c.shirt, c.look, c.seat.view, POSE_FRAME[pose]));
+      c.bob.y = c.y - lift;
+      if (c.flag) {
+        // Furled until the home side scores; then flown, the fan on his feet.
+        const waving = homeFlags || (this.mood.wave !== undefined && pose === 3);
+        const frame = waving ? (this.crowdReduced ? 2 : 1 + ((this.crowdTick + Math.floor(c.seat.r * 7)) % 3)) : 0;
+        c.flag.setFrame(flagFrameName(frame));
+        c.flag.y = c.flagY! - (waving ? Math.max(lift, POSE_LIFT[2]) : lift);
+      }
     }
+  }
+
+  /**
+   * A Mexican wave round the stands facing the camera (#641): when one side is well
+   * clear and nothing has happened for a while, it goes round twice; anything that
+   * stirs the crowd stops it. Never under reduced motion.
+   */
+  private stepWave(now: number): void {
+    const sc = this.officials?.latest?.score;
+    const quiet = now - this.crowdBusyAt > WAVE_LULL_MS && this.upMood === 0;
+    if (this.waveFrom === null) {
+      const blowout = !!sc && Math.abs(sc.home - sc.away) >= WAVE_MARGIN;
+      if (!this.crowdReduced && blowout && quiet && now >= this.waveNext) this.waveFrom = this.crowdTick;
+    } else if (!quiet || (this.crowdTick - this.waveFrom) * WAVE_PER_TICK > WAVE_LAPS) {
+      this.waveFrom = null;
+      this.waveNext = now + WAVE_REST_MS;
+    }
+    if (this.waveFrom === null) delete this.mood.wave;
+    else this.mood.wave = ((this.crowdTick - this.waveFrom) * WAVE_PER_TICK) % 1;
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
