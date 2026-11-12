@@ -32,7 +32,8 @@ export async function runCounterText(browser) {
         const s = window.__nrlState();
         s.settings.textSize = size;
         s.settings.hints = false;
-        s.rngSeed = 468;
+        // #618: seed 468 no longer ranks Out-schemed in the final loss report.
+        s.rngSeed = 469;
         s.lineup.tactics = { attack: 'grind', defence: 'slide' };
         s.lineup.rotation = 'standard';
         // Normal reads recent habits (#469): this fixture needs Compressed v Tight.
