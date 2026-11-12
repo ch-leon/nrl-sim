@@ -267,6 +267,15 @@ wingers). **Overlap** (all presets): when a side has more players than the defen
 20 m on one side of the passer, receivers that way get +0.8 (×1 + width).
 
 ### 5.2 Defence presets
+
+The two ruck markers stand square with the play-the-ball, one behind the other
+toward their own goal line. First marker is 1.8 m from the mark, second another
+1.8 m behind him; both share the mark's lateral coordinate. One body diameter per
+gap keeps settled bodies from overlapping. Targets mirror when play reverses.
+Selection and the preset-scaled hold/release window are unchanged; markers can
+still react early to a dummy-half dart. Nines retains ordinary play-the-ball
+positioning; see [#618's rules sources and regression plan](618-marker-alignment.md).
+
 | Preset | Line speed | Commits | Lanes | Markers hold | Every tackle | Stepped |
 |---|---|---|---|---|---|---|
 | **Slide** (default) | 5 m/s | 2 (3–4 when the line is broken) | normal | ×1.0 | — | — |

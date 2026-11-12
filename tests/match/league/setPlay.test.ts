@@ -118,16 +118,16 @@ describe('no plays: the match it always was', () => {
 });
 
 describe('the launch and the script (plan §3.3)', () => {
-  it('a block play launches at tackle 2 in the attacking half (seed 1) and the second-row takes the pass', () => {
-    const sim = new PlaySim(flat(['block-play']), A, 1);
+  it('a block play launches at tackle 2 in the attacking half (seed 3) and the second-row takes the pass', () => {
+    const sim = new PlaySim(flat(['block-play']), A, 3);
     let launch: SimEvent | null = null;
-    // Its first launches are from deeper; seed 1's first in their half is at tick 1705.
+    // Seed 3 reaches tackle 2 in their half after the square-marker alignment.
     while (!launch) {
       const e = until(sim, (x) => x.kind === 'set-play');
       expect(e).not.toBeNull();
       if (sim.tackleCount === 1 && zoneOf(sim.toLineNow('home')) === 'attackingHalf') launch = e;
     }
-    expect(launch.tick).toBe(1705);
+    expect(launch.tick).toBe(15300);
     expect(launch.detail).toBe('block-play');
     expect(launch.player).toBe(sim.man('home', 5).name); // the halfback calls it
     expect(launch.text).toMatch(/calls the block play/);
@@ -182,7 +182,8 @@ describe('the launch and the script (plan §3.3)', () => {
 
   it('an intercept flies to the lane defender', () => {
     let intercepts = 0;
-    for (const seed of [1, 2, 3]) {
+    // Keep multiple trajectories; seed 15 supplies the interception after #618.
+    for (const seed of [1, 2, 15]) {
       const sim = new PlaySim(flat(['block-play', 'second-man']), A, seed, { length: { halves: 1, halfMinutes: 7 } });
       sim.force = 0.0001;
       let thrown = -1;
@@ -217,9 +218,9 @@ describe('the launch and the script (plan §3.3)', () => {
   }, 60_000);
 
   it('a kick play sends the winger early for the corner, then the kick goes cross-field', () => {
-    const sim = new PlaySim(flat(['kick-pass']), A, 1);
+    const sim = new PlaySim(flat(['kick-pass']), A, 2);
     const e = until(sim, (x) => x.kind === 'set-play');
-    expect(e?.tick).toBe(1479);
+    expect(e?.tick).toBe(826);
     sim.retarget();
     const s = sim.script!;
     const wing = sim.man('home', s.edge === 'left' ? 1 : 2);
@@ -281,7 +282,7 @@ describe('calling a play (plan §3.2)', () => {
     const ai = new PlaySim(flat(plays), A, 1, { aiCoach: ['home'] });
     const call = until(ai, (e) => e.kind === 'coach-call' && e.side === 'home');
     expect(call?.detail).toBe('set-play:block-play');
-    expect(call?.tick).toBe(665);
+    expect(call?.tick).toBe(759);
     const launch = until(ai, (e) => e.kind === 'set-play');
     expect(launch?.text).toBe('H run the block play');
     const none = stream(flat(plays), A, 1);
@@ -328,16 +329,16 @@ describe('the lab and the harness', () => {
     expect(sheet.plays).toEqual(['block-play', 'inside-ball', 'short-side-raid']);
     expect(withPlays(labSheet(DEFAULT_HOME), false).plays).toBeUndefined();
   });
-  it('the lab’s named seeds: a block play launched (seed 1, tick 743) and one breaking down (seed 4, tick 563)', () => {
+  it('the lab’s named seeds: a block play launched (seed 1, tick 572) and one breaking down (seed 4, tick 6913)', () => {
     const lab = (seed: number): PlaySim =>
       new PlaySim(withPlays({ ...labSheet(DEFAULT_HOME, 'gen', { attack: 'grind' }), rotation: 'standard' }, true), withPlays({ ...labSheet(DEFAULT_AWAY, 'gen', {}), rotation: 'standard' }, true), seed, { energy: LEGS_ENERGY.fresh, weather: 'clear', calls: [] });
     const one = lab(1);
     const launch = until(one, (e) => e.kind === 'set-play' && e.side === 'home');
-    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([743, 'block-play', 'ok']);
+    expect([launch?.tick, launch?.detail, one.script?.outcome]).toEqual([572, 'block-play', 'ok']);
     expect(one.script?.decoys.map((d) => d.idx % 9)).toEqual([7]);
     const four = lab(4);
     const bd = until(four, (e) => e.kind === 'play-breaks-down');
-    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([563, 'block-play', 'home']);
+    expect([bd?.tick, bd?.detail, bd?.side]).toEqual([6913, 'block-play', 'home']);
   }, 60_000);
   it('a scenario names its plays (`plays`), a typo fails fast, and the cell plays them', () => {
     const plan = (plays: PlayId[]): Plan => ({ name: 'p', seeds: 1, minutes: 4, scenarios: [{ name: 's', home: { rating: 60, plays }, away: { rating: 60 } }] });
