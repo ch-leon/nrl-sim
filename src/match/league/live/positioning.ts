@@ -478,8 +478,9 @@ export abstract class LivePositioning extends LiveContact {
     const hold = r && p.side === r.side && r.markers.get(p) !== p.key
       && this.phase.kind === 'ruck' && this.phase.handover && this.phase.stage !== 'dh';
     if (pending === null && !hold) return false;
+    // Pending men cross the legal line; eligible men keep their current depth.
     // Arrive steering stops short, so aim a body radius beyond the legal line.
-    p.target = { x: (pending ?? r!.line) + r!.dir * BODY_RADIUS, y: p.body.pos.y };
+    p.target = { x: pending === null ? p.body.pos.x : pending + r!.dir * BODY_RADIUS, y: p.body.pos.y };
     p.through = false;
     // Once back, hold the line until the handover heel without burning gas.
     p.wantsSprint = pending !== null;

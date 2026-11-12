@@ -194,10 +194,10 @@ export abstract class LivePenalties extends LiveRestarts {
     const k = this.players[g.kicker]!;
     const dir = this.dirOf(k.side);
     if (this.rng.next() < GOALS.chargeDown) {
-      const d = this.side(other(k.side))
-        .filter(p => !this.locked(p) && this.retreatLine(p) === null)
+      const d = [...this.side(other(k.side))]
         .sort((a, b) => dist(a.body.pos, k.body.pos) - dist(b.body.pos, k.body.pos))[0];
-      if (d) {
+      // A short or grounded nearest man cannot be replaced by a distant defender.
+      if (d && !this.locked(d) && this.retreatLine(d) === null) {
         this.emit('charge-down', `${d.name} charges down the field goal!`, d);
         this.ball = bounceFlight(k.body.pos, { x: -dir, y: (this.rng.next() - 0.5) * 1.2 }, this.tick, 4, 14, 2);
         this.looseFor = null;

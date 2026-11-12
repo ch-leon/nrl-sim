@@ -104,11 +104,21 @@ class RetreatSim extends LiveSim {
     this.landFreshLegs();
     return p.key === key;
   }
-  chargeDown(onside: boolean) {
+  deepHandoverMovement() {
+    const p = this.players[0]!; const before = p.body.pos.x;
+    for (let i = 0; i < 20; i++) this.moveRetreat();
+    return p.body.pos.x - before;
+  }
+  chargeDown(onside: boolean, remote = false) {
     this.release();
     for (const p of this.side('away')) p.lockUntil = this.tick + 1000;
     const d = this.players[14]!; d.lockUntil = 0;
     if (onside) { this.position(10); this.eligible(); this.position(7); }
+    this.players[5]!.body.pos = { ...d.body.pos };
+    if (remote) {
+      const far = this.players[9]!; far.lockUntil = 0;
+      far.body.pos = { x: this.spot + this.dir * 25, y: 34 };
+    }
     this.pendingGoal = { at: this.tick, kicker: 5 };
     this.launchGoal();
     return this.tickEvents.filter(e => e.kind === 'charge-down');
@@ -185,6 +195,9 @@ describe('defensive retreat', () => {
       sim.advanceHandover(); sim.heelHandover();
       expect(sim.shortHandover()).toBeNull();
     });
+    it(`keeps a deep handover defender at his current depth before release in direction ${dir}`, () => {
+      expect(new RetreatSim(dir, undefined, true).deepHandoverMovement()).toBe(0);
+    });
     it(`leaves the future defence's binned man on the touchline in direction ${dir}`, () => {
       const sim = new RetreatSim(dir, undefined, true);
       expect(sim.binnedHandoverMovement()).toBe(0);
@@ -220,6 +233,12 @@ describe('defensive retreat', () => {
       try {
         expect(new RetreatSim(dir).chargeDown(false)).toHaveLength(0);
         expect(new RetreatSim(dir).chargeDown(true)).toHaveLength(1);
+      } finally { GOALS.chargeDown = before; }
+    });
+    it(`does not replace a nearby offside charge-down candidate with a remote eligible man in direction ${dir}`, () => {
+      const before = GOALS.chargeDown; GOALS.chargeDown = 1;
+      try {
+        expect(new RetreatSim(dir).chargeDown(false, true)).toHaveLength(0);
       } finally { GOALS.chargeDown = before; }
     });
     it(`starts fresh obligations at a handover in direction ${dir}`, () => {
