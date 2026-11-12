@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ANIM_ORDER, opaqueBounds } from '../../../src/art/match/players';
 import { drawLivePlayer } from '../../../src/art/match/livePlayer';
 import { HEAD_OPTIONS, appearanceFor, castLooks } from '../../../src/art/prototype/player';
+import { drawHead } from '../../../src/art/prototype/head';
 import { buildKit } from '../../../src/art/match/kit';
 import { FRAME_CACHE_SIZE, PlayerFrameCache } from '../../../src/scenes/matchPlayers';
 const kit = buildKit(0xccbb22, 0x213344, 'v');
@@ -96,6 +97,42 @@ describe('live match artwork', () => {
         if (stride >= 0) expect(legs(pic)).toEqual(legs(drawLivePlayer(a, kit, 'run', 0, facing, false, stride)));
         expect(pic.data).not.toEqual(drawLivePlayer(a, kit, stride >= 0 ? 'run' : 'idle', frame, facing, false, stride >= 0 ? stride : undefined).data);
       }
+    }
+  });
+  it('swings long hair a pixel against the stride and leaves the rest of the head alone (#670)', () => {
+    const LONG = ['mullet', 'ponytail', 'braids', 'headband'];
+    for (const head of HEAD_OPTIONS) for (const facing of ['front', 'back'] as const) {
+      const a = { ...appearanceFor('same-player'), head };
+      const still = drawHead(a, kit, facing).data;
+      expect(drawHead(a, kit, facing, 0).data).toEqual(still);
+      for (const s of [-1, 1]) {
+        if (LONG.includes(head)) expect(drawHead(a, kit, facing, s).data).not.toEqual(still);
+        else expect(drawHead(a, kit, facing, s).data).toEqual(still);
+      }
+    }
+    // The tail's lowest pixel against the top of his head: it lags the bob on the run, and is fixed stood still.
+    const pony = { ...appearanceFor('same-player'), head: 'ponytail' as const, beard: false };
+    const tail = (p: ReturnType<typeof drawLivePlayer>) => {
+      const rows: number[] = [];
+      for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) if (p.get(x, y).alpha && p.get(x, y).color === pony.hair) rows.push(y);
+      return Math.max(...rows) - opaqueBounds(p)!.y0;
+    };
+    const run = [0, 1, 2, 3, 4, 5].map(g => tail(drawLivePlayer(pony, kit, 'run', g, 'front', false, g)));
+    expect(new Set(run).size).toBeGreaterThan(1);
+    expect(tail(drawLivePlayer(pony, kit, 'idle', 0, 'front', false))).toBe(tail(drawLivePlayer(pony, kit, 'idle', 1, 'front', false)));
+  });
+  it('trails the jersey tail and shorts hem a pixel behind on the push-off and in flight (#670)', () => {
+    const look = appearanceFor('same-player');
+    const hemX = (p: ReturnType<typeof drawLivePlayer>) => {
+      let min = Infinity;
+      for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) if (p.get(x, y).alpha && p.get(x, y).color === kit.shortsShade) min = Math.min(min, x);
+      return min;
+    };
+    for (const build of ['lean', 'athletic', 'stocky'] as const) {
+      const a = { ...look, build };
+      const hem = [0, 1, 2, 3, 4, 5].map(g => hemX(drawLivePlayer(a, kit, 'run', g, 'front', false, g)));
+      for (const g of [2, 3, 5]) expect(hem[g]).toBe(hem[0]! - 1);
+      for (const g of [1, 4]) expect(hem[g]).toBe(hem[0]);
     }
   });
   it('caches hand progress and gait separately', () => {

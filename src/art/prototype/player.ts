@@ -261,6 +261,11 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
   }
   b.fillRect(left + 1, hipY, bodyW - 1, 3, kit.shorts);
   b.fillRect(left + 1, hipY + 2, bodyW - 1, 1, kit.shortsShade);
+  // On the push-off and in flight the jersey tail and shorts hem trail a pixel behind (#670).
+  if (running && (gait === 2 || gait === 3 || gait === 5)) {
+    b.fillRect(left - 1, shoulderY + 5 + breath, 1, 2, kit.jerseyShade);
+    b.fillRect(left, hipY + 1, 1, 2, kit.shortsShade);
+  }
   const nearX = left + bodyW - 4;
   if (running) runLeg(nearX, hipY + 2, gait, a.skin, a.boots, kit.trim);
   else {
@@ -280,7 +285,8 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action | Re
     line(shX, shY, headX + 16, headY + 12, a.skin, 2);
     line(headX + 16, headY + 12, headX + 11, headY + 7, a.skin, 2);
   }
-  b.blit(drawHead(a, kit, facing), headX, headY);
+  // Long hair swings against the bob: it stays where it was a beat ago while the head rises or drops (#670).
+  b.blit(drawHead(a, kit, facing, running ? -bob : 0), headX, headY);
 
   let handX = shX + 1;
   let handY = shY + 6;

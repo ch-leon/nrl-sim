@@ -60,6 +60,13 @@ The sim remains the authority for movement, participants, timing and possession.
   `blowing` (`moments.ts`): two frames, the back heaving every six ticks. A
   blown sprinter slumps as he slows. The picture carries `tired`, which joins the
   frame-cache key only when set, so a fresh man's frames and key are unchanged.
+- **Hair and kit move with the stride (#670).** On the run, long hair (the
+  mullet's and ponytail's tails, the braids' side strands, the headband's tails)
+  is drawn a pixel against the bob (`drawHead`'s `sway`, `-bob`): it hangs where
+  it was while the head rises or drops. On the push-off and flight beats (2, 3
+  and 5) the jersey tail and shorts hem trail a pixel behind. Standing, nothing
+  moves. Both come from the stride frame the picture already carries, so the
+  frame cache gains no entries (the same hits and misses over the same passage).
 
 No engine, save, appearance assignment, rules, odds, fatigue or RNG changes.
 The earlier ordinary-player art study keeps its old frame API; `/#lab` and career
