@@ -36,6 +36,7 @@ export abstract class LiveClock extends LiveSetPlays {
 
   /** The ball is dead after the siren: half-time, or full time. */
   protected endHalf(): void {
+    this.retreat = null;
     const score = `${this.names.home} ${this.points.home} – ${this.points.away} ${this.names.away}`;
     this.pendingKick = null;
     this.outPending = null;
@@ -59,6 +60,7 @@ export abstract class LiveClock extends LiveSetPlays {
 
   /** Golden point is won: full time on the spot. */
   protected endGoldenPoint(winner: Side): void {
+    this.retreat = null;
     this.pendingKick = null;
     this.outPending = null;
     this.penaltyKickUp = null;
@@ -182,6 +184,8 @@ export abstract class LiveClock extends LiveSetPlays {
     const b = this.bench[p.side][bi];
     if (!b) return;
     this.bench[p.side][bi] = { name: p.name, key: p.key, ...(p.id ? { id: p.id } : {}), injuryRisk: p.injuryRisk, injured: p.hurt, stats: p.stats, traits: p.traits, stamina: p.stamina, energy: p.energy, position: ROLES[p.slot]!.name };
+    this.retreat?.eligible.delete(p);
+    this.retreat?.markers.delete(p);
     const out = p.name;
     const wasHurt = p.hurt;
     p.name = b.name;

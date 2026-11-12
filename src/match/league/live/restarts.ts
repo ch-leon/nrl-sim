@@ -35,7 +35,7 @@ export abstract class LiveRestarts extends LivePlay {
         this.dir = this.dirOf(this.attacking);
         this.tackles = 0;
         this.lastPlay = false;
-        this.lineX = this.mark.x + this.dir * LIVE.onsideM;
+        this.startRetreat();
       }
       // Offside as the ball is played (2e): more likely in a defence that rushes up.
       const defSide = other(this.attacking);
@@ -136,6 +136,7 @@ export abstract class LiveRestarts extends LivePlay {
       this.endHalf(); // the last play of the half
       return;
     }
+    this.retreat = null;
     const kicking = other(scoringSide);
     this.ball = { kind: 'held', by: this.indexOf(this.kicker(kicking)) };
     this.attacking = other(kicking);
@@ -281,6 +282,7 @@ export abstract class LiveRestarts extends LivePlay {
     this.pendingKick = null;
     this.looseFor = null;
     this.markers = [];
+    this.retreat = null;
     this.kickFrom = null;
     this.mark = { ...spot };
     this.lineX = spot.x + this.dir * LIVE.onsideM;
@@ -319,6 +321,7 @@ export abstract class LiveRestarts extends LivePlay {
     const marker = [...this.side(other(ph.side))].sort((a, b) => dist(a.body.pos, ph.spot) - dist(b.body.pos, ph.spot))[0]!;
     this.lock(p, 'ptb', LIVE.ptbTicks);
     this.phase = { kind: 'ruck', t0: this.tick, carrier: ph.player, tackler: this.indexOf(marker), stage: 'ptb', handover: false, heldAt: 0, down: 0, pace: null };
+    this.startRetreat();
   }
 
   /** A goal-line drop-out by `side`, from the middle of its own try line. */
@@ -333,6 +336,7 @@ export abstract class LiveRestarts extends LivePlay {
     this.pendingKick = null;
     this.looseFor = null;
     this.markers = [];
+    this.retreat = null;
     this.kickFrom = null;
     this.phase = { kind: 'restart', t0: this.tick, kicking, from: 'goal-line' };
     this.callSwaps();

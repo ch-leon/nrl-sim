@@ -1,7 +1,7 @@
 import { SET_TACKLES } from '../../../config';
 import { TICK_S } from '../../core/engine';
 import { FIELD_LENGTH, FIELD_WIDTH, MID_Y, clampToGround } from '../../core/field';
-import { arrive, integrate, separate, speedOf, type Body } from '../../core/body';
+import { BODY_RADIUS, arrive, integrate, separate, speedOf, type Body } from '../../core/body';
 import type { Side } from '../../core/snapshot';
 import { add, clamp, dist, type Vec } from '../../core/vec';
 import { ROLES, formationTarget } from '../roles';
@@ -72,6 +72,8 @@ export abstract class LivePositioning extends LiveContact {
     const ph = this.phase;
     if (ph.kind !== 'tackle' && ph.kind !== 'ruck') return [];
     const t = this.players[ph.tackler]!;
+    if (t.side === this.attacking) return [];
+    if (ph.kind === 'ruck' && this.retreat) return [...this.retreat.markers].filter(([p, key]) => this.onField(p) && p.key === key).map(([p]) => p);
     const second = this.side(t.side)
       .filter((d) => d !== t && d !== this.fullback(t.side))
       .sort((a, b) => dist(a.body.pos, this.mark) - dist(b.body.pos, this.mark))[0];
@@ -367,7 +369,12 @@ export abstract class LivePositioning extends LiveContact {
     for (const p of defenders) {
       const role = ROLES[p.slot]!;
       p.through = false;
-      if (chasers.has(p) && looseAt) {
+      const retreat = this.retreatLine(p);
+      if (retreat !== null) {
+        // Aim just beyond the line: arrive steering stops short of its target.
+        p.target = { x: retreat + this.dir * BODY_RADIUS, y: p.body.pos.y };
+        p.wantsSprint = false;
+      } else if (chasers.has(p) && looseAt) {
         p.target = { ...looseAt };
         p.wantsSprint = true;
       } else if (kickUp && kickChasers.has(p)) {
@@ -483,6 +490,13 @@ export abstract class LivePositioning extends LiveContact {
         continue;
       }
       p.slide = null;
+      const retreat = this.retreatLine(p);
+      if (retreat !== null) {
+        // Rucks can begin between targeting decisions: retire immediately.
+        p.target = { x: retreat + this.dir * BODY_RADIUS, y: p.body.pos.y };
+        p.through = false;
+        p.wantsSprint = false;
+      }
       // Cruise unless he wants to go and has the gas; blown, less than cruise (§8.2).
       p.sprinting = p.wantsSprint && canSprint(p.gas);
       let max = p.body.maxSpeed * paceMult(p.gas, p.sprinting);
@@ -512,6 +526,7 @@ export abstract class LivePositioning extends LiveContact {
       separate(bodies, undefined, held);
       for (const b of bodies) b.pos = clampToGround(b.pos, 0.5);
     }
+    this.observeRetreat();
     for (const p of this.players) {
       if (this.locked(p) || this.tick < p.poseUntil) continue;
       p.pose = speedOf(p.body) > 0.6 ? 'run' : 'idle';

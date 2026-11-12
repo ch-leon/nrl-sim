@@ -72,6 +72,7 @@ export abstract class LivePenalties extends LiveRestarts {
     this.kickCall = this.fgCall = null;
     this.looseFor = null;
     this.markers = [];
+    this.retreat = null;
     if (choice === 'tap') this.startSetPiece(award, mark, 'tap');
     else {
       this.ball = { kind: 'held', by: this.indexOf(taker) };
@@ -150,6 +151,8 @@ export abstract class LivePenalties extends LiveRestarts {
   protected binClock(): void {
     for (const p of this.players) {
       if (p.binUntilS < 0 || this.matchSeconds < p.binUntilS) continue;
+      this.retreat?.eligible.delete(p);
+      this.retreat?.markers.delete(p);
       p.binUntilS = -1;
       this.refreshOnField();
       this.emit('sin-bin-return', `${p.name} is back from the sin bin`, p);
