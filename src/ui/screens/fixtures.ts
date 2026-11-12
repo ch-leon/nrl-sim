@@ -249,8 +249,10 @@ function openLeagueScreen(key: 'fixtures' | 'ladder'): HTMLElement {
   ensureLeagueStyles();
   const sheet = el('div', { class: 'nrl-screen nrl-league' });
   let cols: LeagueColumn[] = [];
+  const drop = (): void => { for (const c of cols) c.drop?.(); };
   const draw = (): void => {
     const state = getState();
+    drop();
     cols = [buildLadder(state), buildFixtures(state)];
     sheet.replaceChildren(...cols.map((c) => c.el));
   };
@@ -275,6 +277,7 @@ function openLeagueScreen(key: 'fixtures' | 'ladder'): HTMLElement {
   const off = bus.on('state:changed', soon);
   const opened = openScreen(sheet, () => {
     off();
+    drop();
     if (frame !== null) cancelAnimationFrame(frame);
   }, key);
   // Once laid out: the club's row and the next match in view.
@@ -303,6 +306,8 @@ interface LeagueColumn {
   where(): ScrollSpot;
   /** Put this column, just drawn, where the one before it was. */
   resume(at: ScrollSpot): void;
+  /** Let go of the box as the column is replaced or the sheet closes: the shared size observer would hold every old ladder. */
+  drop?(): void;
 }
 
 /**
@@ -397,9 +402,9 @@ function buildLadder(state: GameState): LeagueColumn {
   }
   table.append(tbody);
   const scroll = el('div', { class: 'nrl-ladder-scroll' }, table);
-  hintScroll(scroll); // five rows of sixteen looked like the ladder (#610); each redraw's box gets its own
+  const drop = hintScroll(scroll); // five rows of sixteen looked like the ladder (#610); each redraw's box gets its own
   col.append(scroll, el('div', { class: 'nrl-league-foot', text: `Top ${cut} make the finals · tap a club for its squad` }));
-  return { el: col, ...columnScroll(scroll, () => centreIn(scroll, mine)) };
+  return { el: col, drop, ...columnScroll(scroll, () => centreIn(scroll, mine)) };
 }
 
 // ── The fixtures ───────────────────────────────────────────────────────────────

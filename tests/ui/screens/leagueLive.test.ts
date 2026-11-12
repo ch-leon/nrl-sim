@@ -238,6 +238,26 @@ describe('the League sheet with the week moving on under it (#603)', () => {
     expect(body().querySelector('.nrl-league')).toBeNull();
   });
 
+  it('lets go of each old ladder as it draws a new one, and of the last as it closes', () => {
+    // hintScroll's size observer is one for every list and made on first use: this stand-in is it for the rest of the file.
+    const watched = new Set<StubNode>();
+    vi.stubGlobal('ResizeObserver', class {
+      observe(n: StubNode): void { watched.add(n); }
+      unobserve(n: StubNode): void { watched.delete(n); }
+      disconnect(): void {}
+    });
+    const ladders = (): StubNode[] => [...watched].filter((n) => n.classList.contains('nrl-ladder-scroll'));
+    openLeague();
+    expect(ladders()).toEqual([q('.nrl-ladder-scroll')]);
+    for (let i = 0; i < 4; i++) {
+      advanceWeeks(1);
+      runFrame();
+    }
+    expect(ladders()).toEqual([q('.nrl-ladder-scroll')]);
+    closeScreen();
+    expect(ladders()).toEqual([]);
+  });
+
   it('draws nothing when a match starting closes it and the week’s change comes after', () => {
     // As main.ts has it: the match takes the view in the same breath as the change that starts it.
     bus.on('state:changed', () => { closeScreen(); });
