@@ -7,6 +7,7 @@ import { toFieldPt } from '../core/field';
 import type { PlayerSnap, Snapshot, Side } from '../core/snapshot';
 import type { PlayerAnim } from '../../art/match/players';
 import { pictureContext, playerPicture, type PlayerPicture } from './playerPicture';
+import { tryScene, type TryScene } from './tryMob';
 import { screenFacing } from './screenFacing';
 import { advanceContactAnimation, type ContactAnimation } from './contactAnimation';
 import { contactLayout, type ContactLayout, type ContactPoint } from './contactLayout';
@@ -61,6 +62,8 @@ const SNAP_M = 4;
 const CUT_BODIES = 6;
 /** The same for the ball (a kick or pass is under 2.5 m a tick). */
 const BALL_SNAP_M = 6;
+/** A mob member drawn moving more than this (m) in a tick runs; less, he cheers on the spot. */
+const MOB_STEP_M = 0.12;
 /** Run-cycle rate is 1 at this ground speed (m/s). */
 const CADENCE_SPEED = 7;
 
@@ -84,19 +87,37 @@ export class LiveView {
     const points: ContactPoint[] = [];
     let placed = 0;
     const ctx = pictureContext(cur);
+    // After a try (#668): mates drawn gathered round the scorer, interpolated like any position.
+    const mobNow = tryScene(cur); const mobBefore = tryScene(prev);
+    const offset = (scene: TryScene | null, c: PlayerSnap) => scene?.offsets.find(o => o.side === c.side && o.slot === c.slot) ?? { dx: 0, dy: 0 };
+    if (mobNow) {
+      ctx.tryScene = { side: mobNow.side, age: mobNow.age, mob: new Map() };
+      for (const o of mobNow.offsets) ctx.tryScene.mob.set(`${o.side}/${o.slot}`, { moving: false, left: false });
+    }
     for (let i = 0; i < cur.players.length; i++) {
       const c = cur.players[i]!;
       let p = this.before(prev, c);
       // Put somewhere new in a tick (the restart of a half): snap rather than streak across the pitch.
+      let jumped = false;
       if (Math.hypot(c.x - p.x, c.y - p.y) > SNAP_M) {
         p = c;
         placed++;
+        jumped = true;
       }
       const actor = this.s.players[c.side][c.slot];
       if (!actor) continue;
       if (c.who !== undefined) actor.wear?.(c.who);
       this.fadeIn(actor, prev, cur, c, a);
-      const f = toFieldPt({ x: p.x + (c.x - p.x) * a, y: p.y + (c.y - p.y) * a });
+      const on = offset(mobNow, c); const was = jumped ? on : offset(mobBefore, c);
+      const member = ctx.tryScene?.mob.get(`${c.side}/${c.slot}`);
+      if (member) {
+        // Drawn on the move while the gather or the ease back carries him; facing the way he goes on screen.
+        const step = Math.hypot(on.dx - was.dx + c.x - p.x, on.dy - was.dy + c.y - p.y);
+        member.moving = step > MOB_STEP_M;
+        const from = toFieldPt({ x: p.x + was.dx, y: p.y + was.dy }); const to = toFieldPt({ x: c.x + on.dx, y: c.y + on.dy });
+        member.left = this.s.fieldToWorld(to.fx, to.fy).x < this.s.fieldToWorld(from.fx, from.fy).x;
+      }
+      const f = toFieldPt({ x: p.x + was.dx + (c.x + on.dx - p.x - was.dx) * a, y: p.y + was.dy + (c.y + on.dy - p.y - was.dy) * a });
       const w = snap(this.s.fieldToWorld(f.fx, f.fy));
       // Feet y is the iso sort key; a tiny per-slot bias stops z-fighting flicker.
       actor.place(w.x, w.y, w.y + 1 + c.slot * 0.001 + (c.side === 'away' ? 0.0005 : 0));

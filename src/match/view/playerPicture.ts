@@ -46,7 +46,11 @@ export interface PictureContext {
   ruck?: { side: Side; x: number; y: number; rising: boolean };
   /** Who has the ball and where (a reaction gives way to it when the man with it is close, #667). */
   carrier?: { side: Side; x: number; y: number };
+  /** A try (#668): the scoring side, ticks since, and the mates the view draws gathering round the scorer. */
+  tryScene?: { side: Side; age: number; mob: Map<string, { moving: boolean; left: boolean }> };
 }
+/** Ticks after a try before the side that conceded slumps (the scorer is still going over). */
+const SLUMP_AFTER = 8;
 /** Ticks a reaction is shown for (#667), from the error, miss or bin: about a second at ×1. */
 export const REACT_HOLD_TICKS = 24;
 /** An opponent with the ball this close (m) needs him: no reaction. */
@@ -160,9 +164,28 @@ export function playerPicture(p: PlayerSnap, previous: PlayerSnap, tick: number,
     action = (['fistPump', 'point', 'celebrate', 'kneeSlide'] as const)[hashString(`${p.who ?? p.slot}/${p.celebrationTick}`) % 4]!;
     frame = Math.floor((tick - p.celebrationTick) / 3 + p.slot) % 6;
   }
+  // After a try (#668): the mates the view gathers round the scorer run in, cheer on their own, run back;
+  // the side that conceded slumps, hands on hips, or trudges back head down.
+  let gait = stride;
+  let facing = screenFacing(p, previous, screenDir);
+  let slump = false;
+  const scene = ctx.tryScene;
+  const member = scene?.mob.get(`${p.side}/${p.slot}`);
+  if (member && p.celebrationTick !== undefined && tryAge < 0 && !possession) {
+    if (member.moving) {
+      gait = Math.floor(tick * .6 + p.slot) % 6 + (p.speed < JOG_SPEED ? 6 : 0);
+      action = 'run'; frame = gait % 6; facing = { ...facing, left: member.left };
+    } else {
+      action = (['fistPump', 'celebrate'] as const)[hashString(`${p.who ?? p.slot}/${p.celebrationTick}`) % 2]!;
+      frame = Math.floor((tick - p.celebrationTick) / 3 + p.slot) % 6;
+    }
+  } else if (scene && p.side !== scene.side && scene.age >= SLUMP_AFTER && !possession && !p.binned && (action === 'idle' || action === 'run' || action === 'ready' || action === 'blowing')) {
+    if (stride === -1) { action = 'handsOnHips'; frame = Math.floor(scene.age / NOD_TICKS + p.slot) % 2; }
+    else slump = action === 'run';
+  }
   const lift = MOMENT_ACTIONS.includes(action as MomentAction) ? momentLift(action as MomentAction, frame) : 0;
   const strideFrame = ['run', 'carry', 'catch', 'pass', 'airCatch', 'fend', 'handsOnHead', 'handsOnHips', 'armsFolded'].includes(action)
-    ? stride : undefined;
-  const tired = weary && (action === 'run' || action === 'carry' || action === 'idle') ? weary : 0;
-  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(tired ? { tired } : {}), ...screenFacing(p, previous, screenDir), possession };
+    ? gait : undefined;
+  const tired = slump ? 2 : weary && (action === 'run' || action === 'carry' || action === 'idle') ? weary : 0;
+  return { who: p.who ?? `${p.side}/${p.slot}`, action, frame, lift, ...(strideFrame === undefined ? {} : { strideFrame }), ...(tired ? { tired } : {}), ...facing, possession };
 }

@@ -17,7 +17,8 @@ predicts a winner.
 Done when the kick clearly reaches the strike on the real release tick, a
 successful high reception has a distinct airborne take and landing, and the
 scorer grounds the ball, recovers and celebrates without an abrupt pose change.
-Teammates can react differently without inventing a paired interaction.
+Teammates can react differently without inventing a paired interaction; since #668 they
+gather round the scorer to do it, each on his own.
 
 ## Implementation
 
@@ -59,6 +60,27 @@ No movement, rules, contest probabilities, timing knobs, match RNG, saves or
 appearance assignments change. The frame cache remains bounded (768 since #646) CPU
 frames, with one reusable GPU texture per actor. Pause and seek sample from the
 snapshot alone; no wall-clock animation state is accumulated.
+
+## The mob and the slump (#668)
+
+From the scorer's `tryTick` the view (`src/match/view/tryMob.ts`) draws his
+nearest team-mates gathering round him: up to four, those within 10 m, the pull
+fading out by 14 m and as a fifth man closes on the fourth, so nobody joins or
+leaves in a single tick. Each comes in from his own side of the scorer and stops
+2.6 m short, drawn at most 6 m from where the sim has him. They gather over 18
+ticks, hold to 28, and are eased back by 48, two ticks before the try phase ends
+(`live.tryTicks`, 50) and the conversion's positions take over. They run while
+the view carries them and cheer on the spot otherwise, each on his own
+(`fistPump` or `celebrate`, from his identity): still no hugs, handshakes or
+chest-bumps, and no partner. Like the contact layout, this changes only where
+they are drawn; the sim's positions, and the snap test on them (a body placed
+more than 4 m in a tick), are untouched, and the offsets are interpolated
+between ticks like any position. The worst drawn step through a try is about
+10 world px a tick, under a sprinter's and far under a snap.
+
+The side that conceded slumps 8 ticks after the try: standing, hands on hips
+with the head down (the pose painted for #667); on the move back to their
+positions, the spent trudge (#666's level 2: hunched, head down, no spring).
 
 ## Reactions (#667)
 
