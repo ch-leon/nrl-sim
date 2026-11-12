@@ -33,7 +33,8 @@ export async function runCounterText(browser) {
         s.settings.textSize = size;
         s.settings.hints = false;
         // #618: seed 468 no longer ranks Out-schemed in the final loss report.
-        s.rngSeed = 469;
+        // #625: the defensive retreat turns seed 469 into a win.
+        s.rngSeed = 470;
         s.lineup.tactics = { attack: 'grind', defence: 'slide' };
         s.lineup.rotation = 'standard';
         // Normal reads recent habits (#469): this fixture needs Compressed v Tight.
