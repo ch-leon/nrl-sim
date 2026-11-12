@@ -103,8 +103,8 @@ export abstract class LiveCalls extends LiveBase {
     // Grubber and 40/20 (#396): not once the set's kick is struck, and from where the ball is now (the mark at a ruck).
     if ((call === 'grubber' || call === 'forty-twenty') && this.pendingKick) return 'the kick’s away';
     if (call === 'grubber' && this.toLineFor(side, this.ballPos()) > CALLS.grubberInsideM) return 'not inside their 25';
-    if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) < CALLS.fortyTwentyFromM) return 'not behind your 40';
     if (call === 'forty-twenty' && !FORTY_TWENTY_ENABLED) return '40/20 off on this field';
+    if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) < CALLS.fortyTwentyFromM) return 'not behind your 40';
     if (call === 'forty-twenty' && this.toLineFor(side, this.ballPos()) > this.fortyTwentyReach(side)) return 'out of reach of their 20';
     if (call === 'field-goal') {
       const h = this.holder();

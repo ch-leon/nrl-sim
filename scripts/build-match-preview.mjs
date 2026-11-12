@@ -15,6 +15,9 @@ function run(script, args, env = {}) {
 run('node_modules/typescript/bin/tsc', ['--noEmit']);
 run('node_modules/vite-node/vite-node.mjs', ['scripts/gen-icons.mjs']);
 for (const length of [100, 80, 60]) {
+  run('node_modules/vitest/vitest.mjs', ['run', 'tests/match/preview.test.ts', 'tests/match/previewRules.test.ts'], {
+    NRL_MATCH_PREVIEW_LENGTH: String(length),
+  });
   run('node_modules/vite/bin/vite.js', ['build', '--outDir', resolve(out, `${length}m`)], {
     NRL_MATCH_PREVIEW_LENGTH: String(length), BASE_PATH: './',
   });
