@@ -38,7 +38,7 @@ import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
 import { HALF_BREAK, shownBreak } from './lineBreak';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
-import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer } from './traitLayer';
+import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer, TraitRoster } from './traitLayer';
 import { ContestLayer } from './contestLayer';
 import type { PopupView } from './popups';
 import { replayFrame, replayFrom, REPLAY_WORKER_MS } from './replay';
@@ -355,6 +355,7 @@ export class LivePlayback {
     this.factory = (seed) => new LiveSim(home, away, seed, simOpts);
     // Over the kick's trail, under the pop-ups. Built before a resume steps the sim, which clears it.
     this.traits = new TraitLayer(scene, DEPTH_POPUP - 0.5);
+    this.traits.setRoster(new TraitRoster({ home, away }));
     this.contest = new ContestLayer(scene, DEPTH_POPUP - 3);
     this.speed = playbackSpeedOf(opts.speed);
     this.runner = new Runner(this.factory, opts.seed);
@@ -393,6 +394,7 @@ export class LivePlayback {
     this.popups = new PopupLayer(scene, DEPTH_POPUP);
     this.wrestleBar = new WrestleBar(scene, DEPTH_POPUP);
     this.sprintLayer = new SprintLayer(scene, DEPTH_POPUP - 1);
+    this.sprintLayer.setRoster(new TraitRoster({ home, away }));
     this.zone = new ZoneLayer(scene, DEPTH_ZONE, (fx, fy) => scene.fieldToWorld(fx, fy));
     this.kickLayer = new KickLayer(scene, { air: DEPTH_KICK_AIR, ground: DEPTH_KICK_GROUND }, () => scene.sideColors ?? { home: 0xffffff, away: 0xffffff });
     this.view.draw(this.runner.prev, this.runner.cur, 0, 1);
@@ -878,11 +880,15 @@ export class LivePlayback {
       if (this.skipping) {
         this.kicks.clear();
         this.traits.clear();
+        this.traits.tally(e, cur); // a Workhorse's set is still counted
         this.contest.clear();
       } else {
         this.kicks.event(e, cur);
         // At ×4 and ×8 a one-second move is gone before it can be read. Ease the match; the mark also holds longer.
-        if (this.traits.note(e, cur) && this.runner.speed >= TRAIT_FAST_FROM) this.runner.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
+        const cue = this.traits.note(e, cur);
+        if (cue && this.runner.speed >= TRAIT_FAST_FROM) this.runner.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
+        // A cue that earns a beat its own event lacks (Last Line's held frame): note() asks for one only when the moment has none.
+        if (cue?.tier && playImpact(cue.tier, { runner: this.runner, camera: this.scene.cameras.main })) this.closeupUntil = this.now + CLOSEUP_MS;
         this.contest.note(e, cur);
         if (this.opts.keyMoments?.()) this.keyMoments.note(e);
       }

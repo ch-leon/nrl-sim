@@ -18,6 +18,7 @@ import { popupFor, type PopupView } from '../view/popups';
 import { impactTier, playImpact } from '../view/impact';
 import { WrestleBar } from '../view/wrestleBar';
 import { SprintLayer } from '../view/sprintLayer';
+import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer, TraitRoster } from '../view/traitLayer';
 import { LegsLayer } from '../view/legsLayer';
 import { FATIGUE } from '../league/fatigue';
 import type { LabController } from './controller';
@@ -40,10 +41,12 @@ export class LabScene extends MatchScene {
   private view: LiveView | null = null;
   private popups: PopupLayer | null = null;
   private contest: ContestLayer | null = null;
+  private traits: TraitLayer | null = null;
   private wrestleBar: WrestleBar | null = null;
   private sprintLayer: SprintLayer | null = null;
   private legsLayer: LegsLayer | null = null;
   private ids!: Record<Side, string>;
+  private sheets!: Record<Side, TeamSheet>;
   private closeupUntil = 0;
 
   constructor() {
@@ -54,6 +57,7 @@ export class LabScene extends MatchScene {
     super.init({ home: data.home, away: data.away, ...(data.weather ? { weather: data.weather } : {}) });
     this.controller = data.controller;
     this.ids = { home: data.home.clubId, away: data.away.clubId };
+    this.sheets = { home: data.home, away: data.away };
   }
 
   override create(): void {
@@ -64,8 +68,11 @@ export class LabScene extends MatchScene {
     this.view = new LiveView(this);
     this.popups = new PopupLayer(this, DEPTH_POPUP);
     this.contest = new ContestLayer(this, DEPTH_POPUP - 3);
+    this.traits = new TraitLayer(this, DEPTH_POPUP - 0.5);
+    this.traits.setRoster(new TraitRoster({ home: this.sheets.home, away: this.sheets.away }));
     this.wrestleBar = new WrestleBar(this, DEPTH_POPUP);
     this.sprintLayer = new SprintLayer(this, DEPTH_POPUP - 1);
+    this.sprintLayer.setRoster(new TraitRoster({ home: this.sheets.home, away: this.sheets.away }));
     this.legsLayer = new LegsLayer(this, DEPTH_POPUP - 2, FATIGUE);
     const r = this.controller.runner;
     r.onEvents = (events) => this.onSimEvents(events);
@@ -76,6 +83,8 @@ export class LabScene extends MatchScene {
       this.popups = null;
       this.contest?.destroy();
       this.contest = null;
+      this.traits?.destroy();
+      this.traits = null;
       this.wrestleBar?.destroy();
       this.wrestleBar = null;
       this.sprintLayer?.destroy();
@@ -90,6 +99,10 @@ export class LabScene extends MatchScene {
     for (const sim of events) {
       const e = shownBreak(sim, r.cur);
       this.contest?.note(e, r.cur);
+      // The trait cues (#654): the same layer a real match draws, so the lab can sign each one off.
+      const cue = this.traits?.note(e, r.cur);
+      if (cue && r.speed >= TRAIT_FAST_FROM) r.slowMo(TRAIT_SLOW_MS, TRAIT_SLOW_FACTOR);
+      if (cue?.tier && playImpact(cue.tier, { runner: r, camera: this.cameras.main })) this.closeupUntil = this.time.now + CLOSEUP_MS;
       const p = popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
         this.popups?.show(p, e.side, e.slot);
@@ -131,6 +144,7 @@ export class LabScene extends MatchScene {
     const view: PopupView = { left: v.x, top: v.y, width: v.width, height: v.height };
     this.popups?.update(delta, zoom, feet, view);
     this.contest?.update(delta, zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet);
+    this.traits?.update(delta, zoom, (fx, fy) => this.fieldToWorld(fx, fy), feet, r.speed);
     // The wrestle bar: the fight left in the carrier while he is in a tackle (§8.1).
     this.wrestleBar?.update(r.cur.wrestle, zoom, (w) => feet(w.side, w.slot));
     // Legs (§8): a bar under everyone, green → amber once tired → red once spent.

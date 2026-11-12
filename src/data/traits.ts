@@ -35,8 +35,8 @@ export interface TraitDef {
   blurb: string;
   /**
    * What a firing looks like on the pitch (N15.4), appended on the player page as
-   * "You will see it as …". Absent for a trait with no move of its own (Workhorse,
-   * Hothead, and the ones that only change a number).
+   * "You will see it as …". Absent only for the off-field traits (Young Gun, Veteran,
+   * Club Legend, Injury Prone); every on-field trait has a cue (traitLayer.ts, sprintLayer.ts).
    */
   seen?: string;
   /** Positions it is rolled for most often; null = any. */
@@ -56,20 +56,20 @@ export const TRAITS: Readonly<Record<TraitId, TraitDef>> = {
   dancingFeet: { name: 'Dancing Feet', short: 'FEET', group: 'attack', blurb: 'Steps a lone defender more often (+15% at I)', seen: 'a sidestep cut', fit: OUTSIDE, pool: true },
   wreckingBall: { name: 'Wrecking Ball', short: 'WRECK', group: 'attack', blurb: 'Busts tackles (+12% at I) and keeps driving when held', seen: 'a drive through the tackle', fit: FORWARDS, pool: true },
   dontArgue: { name: "Don't Argue", short: 'FEND', group: 'attack', blurb: 'Palms off tacklers (+12% fend at I)', seen: 'a straight arm', fit: [...OUTSIDE, 'second-row'], pool: true },
-  offloadKing: { name: 'Offload King', short: 'OFFL', group: 'attack', blurb: 'Gets the ball away in the tackle (+12% offload at I)', fit: FORWARDS, pool: true },
+  offloadKing: { name: 'Offload King', short: 'OFFL', group: 'attack', blurb: 'Gets the ball away in the tackle (+12% offload at I)', seen: 'the ball arcing out the back of the tackle to his support', fit: FORWARDS, pool: true },
   finisher: { name: 'Finisher', short: 'FIN', group: 'attack', blurb: 'Inside the opposition 20 m: busts and steps more, and gets over', seen: 'the step, the fend or the drive', fit: ['winger', 'centre', 'fullback'], pool: true },
-  jets: { name: 'Jets', short: 'JETS', group: 'attack', blurb: 'A bigger gas tank for sprinting (×1.4 at I); quicker on the kick chase (+8% at I)', fit: OUTSIDE, pool: true },
+  jets: { name: 'Jets', short: 'JETS', group: 'attack', blurb: 'A bigger gas tank for sprinting (×1.4 at I); quicker on the kick chase (+8% at I)', seen: 'a long streak and a trail of dust behind him when he is flat out', fit: OUTSIDE, pool: true },
   playmaker: { name: 'Playmaker', short: 'PLAY', group: 'attack', blurb: 'Reads the shift: passes more, throws the cut-out ball', seen: 'a line through the man he skips', fit: BALL_PLAYERS, pool: true },
   bigBoot: { name: 'Big Boot', short: 'BOOT', group: 'attack', blurb: 'Kicks longer (+10% at I) and more accurately', seen: 'a longer, higher kick', fit: HALVES, pool: true },
   hitman: { name: 'Hitman', short: 'HIT', group: 'defence', blurb: 'Square one-on-one: the big hit (+12% at I)', seen: 'a shock on the big hit', fit: FORWARDS, pool: true },
-  lastLine: { name: 'Last Line', short: 'LAST', group: 'defence', blurb: 'Cover defender: quicker chasing a break, harder to beat one-on-one', fit: ['fullback', 'winger'], pool: true },
-  pickpocket: { name: 'Pickpocket', short: 'PICK', group: 'defence', blurb: 'Strips the ball one-on-one (+8% at I)', fit: null, pool: true },
-  brickWall: { name: 'Brick Wall', short: 'WALL', group: 'defence', blurb: 'In a two-man tackle the carrier busts and offloads less (−10% at I)', fit: FORWARDS, pool: true },
-  poacher: { name: 'Poacher', short: 'POACH', group: 'defence', blurb: 'Picks off passes in his lane (+10% at I)', fit: OUTSIDE, pool: true },
-  hothead: { name: 'Hothead', short: 'HOT', group: 'edge', blurb: 'Hits hard (+12% big hit at I) but flies out of the line: busted and stepped more', fit: FORWARDS, pool: true, bad: true },
-  razzleDazzle: { name: 'Razzle Dazzle', short: 'RAZZ', group: 'edge', blurb: 'Throws the miracle offload (+20% at I) — and spills a few', fit: null, pool: true, bad: true },
-  gambler: { name: 'Gambler', short: 'GAMB', group: 'edge', blurb: 'Shoots for the intercept (+15% at I); a wrong read leaves him beaten', fit: OUTSIDE, pool: true, bad: true },
-  workhorse: { name: 'Workhorse', short: 'WORK', group: 'meta', blurb: 'Trains harder (×1.2 at I)', fit: null, pool: true },
+  lastLine: { name: 'Last Line', short: 'LAST', group: 'defence', blurb: 'Cover defender: quicker chasing a break, harder to beat one-on-one', seen: 'a marker over him as the last man, and a held frame on his tackle of a runner who has broken the line', fit: ['fullback', 'winger'], pool: true },
+  pickpocket: { name: 'Pickpocket', short: 'PICK', group: 'defence', blurb: 'Strips the ball one-on-one (+8% at I)', seen: 'a spark where the ball comes loose and a line to his hands', fit: null, pool: true },
+  brickWall: { name: 'Brick Wall', short: 'WALL', group: 'defence', blurb: 'In a two-man tackle the carrier busts and offloads less (−10% at I)', seen: 'a brick wall and a shock where a two-man tackle stops the carrier dead', fit: FORWARDS, pool: true },
+  poacher: { name: 'Poacher', short: 'POACH', group: 'defence', blurb: 'Picks off passes in his lane (+10% at I)', seen: 'a line down the pass lane and a spark in his hands as he plucks it', fit: OUTSIDE, pool: true },
+  hothead: { name: 'Hothead', short: 'HOT', group: 'edge', blurb: 'Hits hard (+12% big hit at I) but flies out of the line: busted and stepped more', seen: 'a red flash of temper over him after a penalty against him', fit: FORWARDS, pool: true, bad: true },
+  razzleDazzle: { name: 'Razzle Dazzle', short: 'RAZZ', group: 'edge', blurb: 'Throws the miracle offload (+20% at I) — and spills a few', seen: 'sparkles round the flick pass, whether it sticks or is spilled', fit: null, pool: true, bad: true },
+  gambler: { name: 'Gambler', short: 'GAMB', group: 'edge', blurb: 'Shoots for the intercept (+15% at I); a wrong read leaves him beaten', seen: 'a lunge and a tumbling die over him, gold if the intercept comes off and red if he is beaten', fit: OUTSIDE, pool: true, bad: true },
+  workhorse: { name: 'Workhorse', short: 'WORK', group: 'meta', blurb: 'Trains harder (×1.2 at I)', seen: 'a horseshoe over him on his third tackle of a set', fit: null, pool: true },
   youngGun: { name: 'Young Gun', short: 'YNG', group: 'meta', blurb: 'Develops quickly (training ×1.3)', fit: null, pool: false },
   veteran: { name: 'Veteran', short: 'VET', group: 'meta', blurb: 'Been around', fit: null, pool: false },
   clubLegend: { name: 'Club Legend', short: 'LEG', group: 'meta', blurb: 'Club legend', fit: null, pool: false },
