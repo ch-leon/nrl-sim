@@ -10,6 +10,8 @@ import {
   sfxForTry,
   SFX_PRESETS,
   AudioEngine,
+  installAudioUnlock,
+  UNLOCK_EVENTS,
   type MusicLoop,
 } from '../../src/fx/audio';
 import { createNewGame, getState } from '../../src/core/state';
@@ -217,7 +219,23 @@ function makeParam(v = 0): FakeParam {
 }
 
 class FakeAudioContext {
-  state: 'suspended' | 'running' | 'closed' = 'suspended';
+  state: 'suspended' | 'running' | 'closed' | 'interrupted' = 'suspended';
+  /** A context that refuses to resume (no gesture yet) stays as it is. */
+  stubborn = false;
+  private listeners: Record<string, (() => void)[]> = {};
+  addEventListener(t: string, fn: () => void) {
+    (this.listeners[t] ??= []).push(fn);
+  }
+  removeEventListener(t: string, fn: () => void) {
+    this.listeners[t] = (this.listeners[t] ?? []).filter((f) => f !== fn);
+  }
+  setState(s: FakeAudioContext['state']) {
+    this.state = s;
+    for (const f of this.listeners.statechange ?? []) f();
+  }
+  createDynamicsCompressor() {
+    return { threshold: makeParam(), knee: makeParam(), ratio: makeParam(), attack: makeParam(), release: makeParam(), connect: vi.fn(), disconnect: vi.fn() };
+  }
   currentTime = 0;
   sampleRate = 44100;
   destination = {};
@@ -248,7 +266,7 @@ class FakeAudioContext {
     return { getChannelData: () => new Float32Array(len) };
   }
   async resume() {
-    this.state = 'running';
+    if (!this.stubborn) this.state = 'running';
   }
   async close() {
     this.state = 'closed';
@@ -394,6 +412,113 @@ describe('AudioEngine (fake context)', () => {
     const before = fake.oscillators;
     bus.emit('ui:notify', { text: 'x', kind: 'info' });
     expect(fake.oscillators).toBe(before);
+  });
+});
+
+/** A tiny window/document: records listeners so the test can fire them. */
+class FakeTarget {
+  handlers = new Map<string, Set<() => void>>();
+  visibilityState = 'visible';
+  addEventListener(t: string, fn: () => void) {
+    if (!this.handlers.has(t)) this.handlers.set(t, new Set());
+    this.handlers.get(t)!.add(fn);
+  }
+  removeEventListener(t: string, fn: () => void) {
+    this.handlers.get(t)?.delete(fn);
+  }
+  count(t: string) {
+    return this.handlers.get(t)?.size ?? 0;
+  }
+  fire(t: string) {
+    for (const f of [...(this.handlers.get(t) ?? [])]) f();
+  }
+}
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('audio unlock and re-arm (#636)', () => {
+  let fake: FakeAudioContext;
+  let engine: AudioEngine;
+  let win: FakeTarget;
+  let doc: FakeTarget;
+  let unlocked: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    createNewGame('Test FC', 42);
+    fake = new FakeAudioContext();
+    engine = new AudioEngine(fake as unknown as AudioContext);
+    win = new FakeTarget();
+    doc = new FakeTarget();
+    unlocked = vi.fn();
+    installAudioUnlock(engine, win, doc, unlocked);
+  });
+  afterEach(() => {
+    engine.dispose();
+    bus.clear();
+  });
+
+  it('listens for touchend and click as well as pointerdown and keydown', () => {
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(1);
+    expect(UNLOCK_EVENTS).toEqual(expect.arrayContaining(['touchend', 'click', 'pointerdown', 'keydown']));
+  });
+
+  it('keeps listening while a gesture leaves the context suspended, and stands down once it runs', async () => {
+    fake.stubborn = true;
+    win.fire('touchend');
+    await flush();
+    expect(unlocked).not.toHaveBeenCalled();
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(1);
+    fake.stubborn = false;
+    win.fire('click');
+    await flush();
+    expect(fake.state).toBe('running');
+    expect(unlocked).toHaveBeenCalledTimes(1);
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(0);
+  });
+
+  it('re-arms and resumes when the context is interrupted, and again on the next tap', async () => {
+    win.fire('pointerdown');
+    await flush();
+    expect(engine.running).toBe(true);
+    expect(win.count('click')).toBe(0);
+    fake.stubborn = true; // a call: iOS will not resume without a gesture
+    fake.setState('interrupted');
+    await flush();
+    expect(engine.running).toBe(false);
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(1);
+    fake.stubborn = false;
+    win.fire('touchend');
+    await flush();
+    expect(engine.running).toBe(true);
+    expect(unlocked).toHaveBeenCalledTimes(2);
+    for (const t of UNLOCK_EVENTS) expect(win.count(t)).toBe(0);
+  });
+
+  it('on coming back to the foreground, tries to resume and re-arms if it cannot', async () => {
+    win.fire('keydown');
+    await flush();
+    fake.state = 'suspended';
+    fake.stubborn = true;
+    doc.visibilityState = 'hidden';
+    doc.fire('visibilitychange');
+    await flush();
+    expect(win.count('click')).toBe(0); // hidden: nothing to do
+    doc.visibilityState = 'visible';
+    doc.fire('visibilitychange');
+    await flush();
+    expect(win.count('click')).toBe(1);
+    fake.stubborn = false;
+    doc.fire('visibilitychange');
+    await flush();
+    expect(engine.running).toBe(true);
+    expect(win.count('click')).toBe(0);
+  });
+
+  it('puts a limiter between the master gain and the destination', () => {
+    // The fake records connections: master -> compressor -> destination.
+    const master = (engine as unknown as { master: { connect: ReturnType<typeof vi.fn> } }).master;
+    const limiter = (engine as unknown as { limiter: { connect: ReturnType<typeof vi.fn> } }).limiter;
+    expect(master.connect).toHaveBeenCalledWith(limiter);
+    expect(limiter.connect).toHaveBeenCalledWith(fake.destination);
   });
 });
 

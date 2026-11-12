@@ -382,6 +382,7 @@ interface ActiveMusic {
 export class AudioEngine {
   private ctx: AudioContext | null;
   private master: GainNode | null = null;
+  private limiter: DynamicsCompressorNode | null = null;
   private schedulerId: ReturnType<typeof setInterval> | null = null;
   private active: ActiveMusic | null = null;
 
@@ -408,7 +409,15 @@ export class AudioEngine {
     if (this.ctx) {
       this.master = this.ctx.createGain();
       this.master.gain.value = masterGainFor(getState().settings);
-      this.master.connect(this.ctx.destination);
+      // A limiter after the master (#636): music, a tackle and a cheer can sum past full scale, which clips.
+      this.limiter = this.ctx.createDynamicsCompressor();
+      this.limiter.threshold.value = -10;
+      this.limiter.knee.value = 8;
+      this.limiter.ratio.value = 12;
+      this.limiter.attack.value = 0.003;
+      this.limiter.release.value = 0.25;
+      this.master.connect(this.limiter);
+      this.limiter.connect(this.ctx.destination);
     }
   }
 
@@ -417,12 +426,37 @@ export class AudioEngine {
     return this.ctx !== null;
   }
 
-  /** Resume the context after a user gesture. No-op if running/unavailable. */
+  /** True when the context is actually running (not suspended, or interrupted by a call or the lock screen). */
+  get running(): boolean {
+    return this.ctx?.state === 'running';
+  }
+
+  /**
+   * Resume the context. No-op if running/unavailable. Safari also reports 'interrupted' (a call, the
+   * lock screen), which resumes the same way. Call it synchronously inside a gesture: iOS only honours that.
+   */
   async resume(): Promise<void> {
     if (!this.ctx) return;
-    if (this.ctx.state === 'suspended') {
-      await this.ctx.resume();
+    const state = this.ctx.state as string;
+    if (state === 'suspended' || state === 'interrupted') {
+      try {
+        await this.ctx.resume();
+      } catch {
+        /* refused outside a gesture: the unlock listeners try again on the next tap */
+      }
     }
+  }
+
+  /** Call `fn` whenever the context drops to suspended or interrupted. Returns the unsubscribe. */
+  onStalled(fn: () => void): () => void {
+    const ctx = this.ctx;
+    if (!ctx || typeof ctx.addEventListener !== 'function') return () => {};
+    const h = (): void => {
+      const state = ctx.state as string;
+      if (state === 'suspended' || state === 'interrupted') fn();
+    };
+    ctx.addEventListener('statechange', h);
+    return () => ctx.removeEventListener('statechange', h);
   }
 
   /** Set volume [0,1] (clamps) and persist through the store. */
@@ -448,7 +482,7 @@ export class AudioEngine {
   /** Play a one-shot SFX. No-op if muted, unavailable, or context suspended. */
   playSfx(name: SfxName): void {
     if (!this.ctx || !this.master) return;
-    if (this.ctx.state === 'suspended') return;
+    if (this.ctx.state !== 'running') return;
     if (getState().settings.muted) return;
     const now = this.ctx.currentTime;
     // A skipped match lands the rest of its events in one go (N10.4): hundreds of the same few
@@ -672,6 +706,68 @@ export class AudioEngine {
 
 let engine: AudioEngine | null = null;
 
+/** The gestures that can unlock audio. touchend and click are the ones iOS accepts; pointerdown alone is not enough there. */
+export const UNLOCK_EVENTS = ['pointerdown', 'keydown', 'touchend', 'click'] as const;
+
+interface ListenTarget {
+  addEventListener(type: string, fn: () => void, opts?: unknown): void;
+  removeEventListener(type: string, fn: () => void): void;
+}
+
+/**
+ * Keep audio unlocked (#636). Listens for a gesture until the context is actually running (a gesture
+ * that leaves it suspended keeps the listeners), then stands down. If the context is later suspended or
+ * interrupted (a call, the lock screen, switching apps), or the page comes back to the foreground and it
+ * is not running, it tries `resume()` and arms the listeners again. `onUnlocked` runs each time it gets going.
+ * Returns a remover. `win` and `doc` are injectable for the unit test.
+ */
+export function installAudioUnlock(
+  eng: AudioEngine,
+  win: ListenTarget,
+  doc: ListenTarget & { visibilityState?: string },
+  onUnlocked: () => void = () => {},
+): () => void {
+  let armed = false;
+  const disarm = (): void => {
+    if (!armed) return;
+    armed = false;
+    for (const t of UNLOCK_EVENTS) win.removeEventListener(t, onGesture);
+  };
+  const arm = (): void => {
+    if (armed) return;
+    armed = true;
+    for (const t of UNLOCK_EVENTS) win.addEventListener(t, onGesture);
+  };
+  function onGesture(): void {
+    void eng.resume().then(() => {
+      if (!eng.running) return; // still asleep: stay armed for the next tap
+      disarm();
+      onUnlocked();
+    });
+  }
+  const retry = (): void => {
+    if (eng.running) return;
+    arm();
+    void eng.resume().then(() => {
+      if (eng.running) {
+        disarm();
+        onUnlocked();
+      }
+    });
+  };
+  const onVisible = (): void => {
+    if (doc.visibilityState === 'visible') retry();
+  };
+  arm();
+  doc.addEventListener('visibilitychange', onVisible);
+  const offStalled = eng.onStalled(retry);
+  return () => {
+    disarm();
+    doc.removeEventListener('visibilitychange', onVisible);
+    offStalled();
+  };
+}
+
 /**
  * Create (once) the AudioEngine singleton, subscribe it to the bus, and register
  * a one-time self-removing gesture listener that resumes the context and starts
@@ -682,18 +778,13 @@ export function initAudio(): AudioEngine {
   engine = new AudioEngine();
   engine.subscribeBus();
 
-  if (typeof window !== 'undefined' && engine.available) {
-    const onGesture = (): void => {
-      window.removeEventListener('pointerdown', onGesture);
-      window.removeEventListener('keydown', onGesture);
-      void engine?.resume().then(() => {
-        // The gesture may itself have triggered a match (Advance Week click);
-        // don't crossfade grounds music over a track that already started.
-        if (!engine?.musicPlaying) engine?.playMusic('grounds');
-      });
-    };
-    window.addEventListener('pointerdown', onGesture, { once: true });
-    window.addEventListener('keydown', onGesture, { once: true });
+  if (typeof window !== 'undefined' && typeof document !== 'undefined' && engine.available) {
+    const eng = engine;
+    installAudioUnlock(eng, window, document, () => {
+      // The gesture may itself have triggered a match (Advance Week click);
+      // don't crossfade grounds music over a track that already started.
+      if (!eng.musicPlaying) eng.playMusic('grounds');
+    });
   }
 
   return engine;

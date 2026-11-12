@@ -97,3 +97,13 @@ club plays `try` + `cheer`; the other side's try plays `groan` (low falling sawt
 jingle. With no `match:started` (the match lab) nobody is coached and both sides' tries get the fanfare and cheer;
 the lab emits no start event, so "home is ours" there would need one (not added: it would wake the overlay and tutorial).
 Pure mapping: `sfxForTry(ours)`.
+
+### Resume and limiter (#636)
+The unlock is `installAudioUnlock(engine, window, document, onUnlocked)`: pointerdown, keydown, touchend and
+click, kept armed until `ctx.state === 'running'` (a gesture that leaves it suspended does not stand it down).
+A `statechange` to `suspended` / `interrupted` (Safari's call and lock-screen state), or `visibilitychange`
+back to visible with the context not running, calls `resume()` and re-arms the listeners. `playSfx` now
+returns unless the context is `running`. The master gain feeds a `DynamicsCompressor` (threshold -10 dB,
+knee 8, ratio 12, attack 3 ms, release 250 ms) that feeds the destination, so music + tackle + cheer do not clip.
+Reported from reading the code; not reproduced on an iPhone. The re-arm logic is covered by a unit test with
+fakes; on-device confirmation (lock the phone or take a call, come back, tap) is still owed.
