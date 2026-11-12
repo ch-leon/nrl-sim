@@ -1,6 +1,6 @@
 # Features
 
-Last updated: 2026-11-11
+Last updated: 2026-11-12
 
 What's in the game, with the PR that added each.
 
@@ -62,6 +62,14 @@ What's in the game, with the PR that added each.
 - Android test APK ([PR](https://github.com/ch-leon/nrl-sim/pull/394)); CI ([PR](https://github.com/ch-leon/nrl-sim/pull/442))
 
 ## Recently added
+
+- Match watchability, wave 1 ([PR](https://github.com/ch-leon/nrl-sim/pull/676), [tracker](https://github.com/ch-leon/nrl-sim/issues/626)):
+  - A phone shows more of the play: the canvas renders at the screen's pixel density, so a 2× phone sits at ×1.5 (about 14 of 18 players in view, was 11) and big hits and tries zoom in. Developer settings can switch back to the old resolution to compare frame rate.
+  - A match starts at ×2. Contact plays at the chosen speed, and the ruck is not doubled again at ×2.
+  - Players face the way they move on screen, and the run is a real stride driven by distance run, with a breathing idle.
+  - Three sizes of big moment: a try, a clean break or a 40/20 slows the match; a big hit, bust, strip or intercept freezes for a beat and shakes; the rest keep their pop-up. Only a clean break (about 3 a match) gets the big call.
+  - Match sound: a crowd that rises near the try line and on a break, the whistle, the siren, a boot on the ball, a heavier big hit, and a groan when you concede. Not yet listened to by a person.
+  - The balance report has a watchability table: lead changes, late margins, how tries are scored and what sides do on the last tackle.
 
 - Ruck markers line up square with the play-the-ball, one behind the other in both attacking directions, with room between bodies ([PR](https://github.com/ch-leon/nrl-sim/pull/621), [spec](../specs/618-marker-alignment.md)).
 
