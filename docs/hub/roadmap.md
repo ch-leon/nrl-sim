@@ -1,11 +1,13 @@
 # Roadmap
 
-Last updated: 2026-11-11
+Last updated: 2026-11-13
 
 Status checked against GitHub on 7 Nov 2026. Merged tooling is not the same as a
 live gameplay change; work still open below has not shipped.
 
 ## Now
+
+- **Defensive retreat correction** ([issue #625](https://github.com/ch-leon/nrl-sim/issues/625)): built on an isolated branch; independent review and checks in progress. Leon must play-test before merge.
 
 - **[Match transition and big-moment release](../specs/match-big-moments.md)** ([issue #588](https://github.com/ch-leon/nrl-sim/issues/588)): integrate the completed catch/pass/ruck transitions and kicks/high-takes/try celebrations onto released build #584. The candidate is being checked for the next playable build; release evidence belongs in its PR.
 

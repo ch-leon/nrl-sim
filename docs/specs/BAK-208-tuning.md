@@ -1664,3 +1664,22 @@ as a new draw). Phase 5 adds the per-play table and the balance runs.
 A botched play is mostly a wasted tackle: its caller tucks it (no step, no
 offload, no kick) and takes the tackle. The intercept band (fail × intercept)
 throws the pass to the lane defender; with nobody in the lane it is a breakdown.
+
+
+## Defensive retreat correction (#625, draft)
+
+The legal retreat distance remains 10m. At tackle completion the current ruck
+records a fixed legal line, clamped to the defending goal line. Non-markers must
+physically reach it before committing, reading a pass, joining contact, gathering
+a loose ball or charging down a field goal. Reaching it grants eligibility for
+that ruck; the moving tactical `lineX` stays unchanged. A pending player targets
+one `BODY_RADIUS` beyond the line so arrival tolerance does not strand him short;
+he may sprint using the existing gas rules. There are no new tuning knobs or dice.
+
+Two available standing markers are exempt. A handover chooses the new defence’s
+markers before release, excluding the grounded carrier, and retains the new
+defence’s retreat history across the heel. Bin returns/substitutions invalidate
+the replaced player’s eligibility. Possession changes and restarts clear the old
+ruck obligation, including a launched territorial kick (the receiving side becomes
+the attack). Normal tactical positioning, kick distances and fatigue costs remain
+as configured. This correction is held for Leon’s play-test before merge.
