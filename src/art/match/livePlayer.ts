@@ -2,7 +2,7 @@
 import { PixelBuffer } from '../pixel';
 import { OUTLINE, type Kit } from './kit';
 import type { PlayerAnim } from './players';
-import { drawPrototypePlayer, ballPixels, WIDTH, HEIGHT, type Appearance, type Action, type Facing } from '../prototype/player';
+import { drawPrototypePlayer, ballPixels, stand, WIDTH, PAINT_H, type Appearance, type Action, type Facing } from '../prototype/player';
 import { drawHead } from '../prototype/head';
 import { body, contactPainter, add, type Point } from '../prototype/tackle';
 import { bentContactArm } from './limbs';
@@ -21,7 +21,7 @@ export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAct
   let basic = BASIC[action];
   if (possession && (basic === 'wrap' || basic === 'idle')) basic = 'carry';
   if (basic) return drawPrototypePlayer(look, kit, basic, frame, facing, possession, strideFrame);
-  const out = new PixelBuffer(WIDTH, HEIGHT); const brush = contactPainter(out);
+  const out = new PixelBuffer(WIDTH, PAINT_H); const brush = contactPainter(out);
   const p = body([19, 27], [19, 20], [12, 3], [23, 31], [24, 35], [16, 31], [15, 35]);
   brush.legs(p, look, kit); brush.torso(p, look, kit);
   out.blit(drawHead(look, kit, facing), p.head[0], p.head[1]);
@@ -34,5 +34,5 @@ export function drawLivePlayer(look: Appearance, kit: Kit, action: LivePlayerAct
   arm(add(p.shoulder, -3, 1), far, true);
   if (possession) out.blit(ballPixels(), action === 'fend' ? 13 : 23, 23);
   arm(add(p.shoulder, 3, 1), near, false);
-  out.outline(OUTLINE); return out;
+  out.outline(OUTLINE); return stand(out, look.stature);
 }

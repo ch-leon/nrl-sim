@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONTACT_CASES, caseDuration, contactCaseAt } from '../../../src/labs/art/contactCases';
-import { bentContactArm, contactLeg, contactPoseAt, drawContact } from '../../../src/art/prototype/contact';
+import { bentContactArm, contactLeg, contactPoseAt, drawContact, standContact } from '../../../src/art/prototype/contact';
 import { appearanceFor, HEAD_OPTIONS } from '../../../src/art/prototype/player';
 import { buildKit } from '../../../src/art/match/kit';
 import { opaqueBounds } from '../../../src/art/match/players';
@@ -80,6 +80,26 @@ describe('contact situation artwork', () => {
       const state = contactCaseAt('three', 1.95).state!;
       const pixels = drawContact(state, p => ({ ...appearanceFor(p.who), head }), () => kit);
       expect(opaqueBounds(pixels)!.y1).toBeLessThan(pixels.h - 1);
+    }
+  });
+  it('draws each man at his own height on his feet, with hands and ball riding the carrier (#643)', () => {
+    for (const { id } of CONTACT_CASES) for (let t = 0; t <= caseDuration(id); t += .1) {
+      const state = contactCaseAt(id, t).state; if (!state) continue;
+      const pose = contactPoseAt(state);
+      for (const rise of [-2, 2]) {
+        const tall = standContact(pose, () => ({ ...appearanceFor('x'), stature: rise }));
+        for (const [a, b] of [[pose.carrier, tall.carrier], ...pose.defenders.map((d, i) => [d, tall.defenders[i]!] as const)] as const) {
+          expect(b.pose.foot).toEqual(a.pose.foot); expect(b.pose.farFoot).toEqual(a.pose.farFoot);
+          const dy = b.pose.head[1] - a.pose.head[1];
+          expect(Math.abs(dy)).toBeLessThanOrEqual(2);
+          // Upright men take the whole height; nobody grows while lying down.
+          if (a.pose.foot[1] - a.pose.shoulder[1] >= 16 && !a.running && !(a.role === 'carrier' && pose.ptb)) expect(dy).toBeCloseTo(-rise);
+          if (a.pose.foot[1] - a.pose.shoulder[1] <= 6) expect(dy).toBeCloseTo(0);
+        }
+        const carrierDy = tall.carrier.pose.shoulder[1] - pose.carrier.pose.shoulder[1];
+        if (pose.owner === state.contact.carrier) expect(tall.ball[1] - pose.ball[1]).toBeCloseTo(carrierDy);
+        expect(standContact(pose, () => ({ ...appearanceFor('x'), stature: 0 }))).toEqual(pose);
+      }
     }
   });
 });

@@ -2,7 +2,7 @@
 import { PixelBuffer } from '../pixel';
 import { OUTLINE, type Kit } from './kit';
 import { drawHead } from '../prototype/head';
-import { WIDTH, HEIGHT, ballPixels, type Appearance, type Facing } from '../prototype/player';
+import { WIDTH, PAINT_H, ballPixels, stand, type Appearance, type Facing } from '../prototype/player';
 import { add, body, contactPainter, type Body, type Point } from '../prototype/tackle';
 import { fitLegs, bentContactArm } from './limbs';
 
@@ -27,7 +27,7 @@ export function ruckPoseAt(action: RuckAction, frame: number): RuckPose {
 }
 
 export function drawRuckPlayer(look: Appearance, kit: Kit, action: RuckAction, frame: number, facing: Facing, possession: boolean): PixelBuffer {
-  const out = new PixelBuffer(WIDTH, HEIGHT); const brush = contactPainter(out);
+  const out = new PixelBuffer(WIDTH, PAINT_H); const brush = contactPainter(out);
   const { pose: p, ball, near, far } = ruckPoseAt(action, frame);
   brush.legs(p, look, kit);
   const arm = (start: Point, target: Point, dark: boolean) => {
@@ -39,5 +39,5 @@ export function drawRuckPlayer(look: Appearance, kit: Kit, action: RuckAction, f
   out.blit(drawHead(look, kit, facing), p.head[0], p.head[1]);
   if (possession) out.blit(ballPixels(), ball[0], ball[1]);
   arm(add(p.shoulder, 3, 1), near, false);
-  out.outline(OUTLINE); return out;
+  out.outline(OUTLINE); return stand(out, look.stature);
 }

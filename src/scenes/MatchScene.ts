@@ -79,6 +79,7 @@ import {
 import { isoProject } from '../art/match/iso3d';
 import { MatchArtRegistry } from './matchArt';
 import { MatchActor, MatchContactLayer, PlayerFrameCache } from './matchPlayers';
+import { castLooks } from '../art/prototype/player';
 export { MatchActor } from './matchPlayers';
 import { fixtureArtFor, takeFixtureArt } from './matchArtAhead';
 import {
@@ -419,8 +420,9 @@ export class MatchScene extends Phaser.Scene {
 
     // Players + ball.
     // The live actors use small reusable textures and a bounded cache of approved character frames.
-    this.playerFrames = new PlayerFrameCache({ home: kits.home, away: kits.away });
-    this.contact = new MatchContactLayer(this, this.art, { home: kits.home, away: kits.away });
+    const looks = castLooks([this.home, this.away]); // each man's build and height by his own position (#643)
+    this.playerFrames = new PlayerFrameCache({ home: kits.home, away: kits.away }, looks);
+    this.contact = new MatchContactLayer(this, this.art, { home: kits.home, away: kits.away }, looks);
     for (let i = 0; i < ON_FIELD; i++) {
       const h = this.home.roster?.[i]; const a = this.away.roster?.[i];
       this.players.home.push(new MatchActor(this, this.art, this.playerFrames, 'home', i, h?.id ?? h?.name ?? `home/${i}`, props.shadow, kits.rings.home, kits.ringStyles.home));

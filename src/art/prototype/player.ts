@@ -1,9 +1,10 @@
-// Approved match characters. Legacy LOOKS and its hash remain the identity authority.
+// Approved match characters. Legacy LOOKS and its hash keep each player's colours and beard.
 // No atlas of every cosmetic combination: callers cache only the people on screen.
 import { PixelBuffer, shade } from '../pixel';
 import { LOOKS, lookForPlayer } from '../match/players';
 import { hashString, OUTLINE, type Kit } from '../match/kit';
-import { drawHead, type Head, type Facing } from './head';
+import { drawHead, HEAD_OPTIONS, type Head, type Facing } from './head';
+import type { Position } from '../../core/state';
 export { HEAD_OPTIONS, type Head, type Facing } from './head';
 
 export type Build = 'lean' | 'athletic' | 'stocky';
@@ -16,23 +17,92 @@ export interface Appearance {
   build: Build;
   tape: boolean;
   boots: number;
+  /** Rows taller (+) or shorter (−) than the approved figure, −2…2: the shins carry it. */
+  stature: number;
 }
 export const WIDTH = 44;
-export const HEIGHT = 40;
-export const FOOT = 35;
+/** The frame: two spare rows above the approved 40-row figure leave the tallest man his head. */
+export const HEIGHT = 42;
+export const FOOT = 37;
 export const CENTRE = 19;
+/** Painters draw the approved figure on a 40-row canvas, boots on row 35; `stand` fits it to the frame. */
+export const PAINT_H = 40;
+export const PAINT_FOOT = FOOT - (HEIGHT - PAINT_H);
+/** Shin rows that a taller man repeats and a shorter man loses, in painter rows. */
+const SHINS = [32, 33];
 
-/** Existing faces keep their colours, hairstyle and beard; new details use a separate hash. */
-export function appearanceFor(id: string): Appearance {
+/** Fits a painted figure to the frame: boots on FOOT, `rise` shin rows added (or taken away). */
+export function stand(paint: PixelBuffer, rise = 0): PixelBuffer {
+  const out = new PixelBuffer(paint.w, HEIGHT);
+  const extra = new Set(SHINS.slice(0, Math.max(0, rise)));
+  const lost = new Set(SHINS.slice(0, Math.max(0, -rise)));
+  // Bottom up: rows under the shins drop straight by the frame's spare rows.
+  let from = paint.h - 1;
+  for (let y = HEIGHT - 1; y >= 0 && from >= 0; y--) {
+    while (lost.has(from)) from--;
+    for (let x = 0; x < paint.w; x++) {
+      const i = (from * paint.w + x) * 4;
+      if (paint.data[i + 3]) out.data.set(paint.data.subarray(i, i + 4), (y * paint.w + x) * 4);
+    }
+    if (extra.delete(from)) continue;
+    from--;
+  }
+  return out;
+}
+
+const BUILDS = ['lean', 'athletic', 'stocky'] as const;
+/** Props and locks are big men, outside backs run lean; the rest keep the old hash (second-rowers never lean). */
+const BUILD_BY_POSITION: Partial<Record<Position, readonly Build[]>> = {
+  prop: ['stocky'], lock: ['stocky'], 'second-row': ['athletic', 'stocky'],
+  fullback: ['lean'], winger: ['lean'], centre: ['lean'],
+};
+/** Height range in rows: tall back-rowers, short hookers and halves. */
+const STATURE_BY_POSITION: Record<Position, readonly [number, number]> = {
+  prop: [0, 1], lock: [0, 2], 'second-row': [1, 2], hooker: [-2, -1], halfback: [-2, 0],
+  'five-eighth': [-1, 1], centre: [0, 1], winger: [-1, 1], fullback: [-1, 1],
+};
+/** Head styles no legacy look reaches. */
+const NEW_HEADS = HEAD_OPTIONS.filter(h => !LOOKS.some(l => l.style === h));
+
+/** Every head turns up about equally often: a legacy style keeps its share of 1/11 and passes the rest to the new ones. */
+function headFor(id: string, legacy: Head): Head {
+  const h = hashString(`${id}/head-v2`);
+  const share = LOOKS.filter(l => l.style === legacy).length / LOOKS.length;
+  const keep = 1 / HEAD_OPTIONS.length / share;
+  return (h % 1000) / 1000 < keep ? legacy : NEW_HEADS[(h >>> 10) % NEW_HEADS.length]!;
+}
+
+/**
+ * A pure function of the player: the same id and position give the same man in every
+ * match and on every screen. Colours and beard come from the legacy look; head, build
+ * and height from their own hashes, build and height biased by position.
+ */
+export function appearanceFor(id: string, position?: Position): Appearance {
   const legacy = LOOKS[lookForPlayer(id)]!;
   const h = hashString(`${id}/body-v1`);
+  const builds = (position && BUILD_BY_POSITION[position]) || BUILDS;
+  const [low, high] = position ? STATURE_BY_POSITION[position] : [-1, 1];
   return {
-    skin: legacy.skin, hair: legacy.hair, head: legacy.style, beard: legacy.beard,
-    build: (['lean', 'athletic', 'stocky'] as const)[h % 3]!,
+    skin: legacy.skin, hair: legacy.hair, head: headFor(id, legacy.style), beard: legacy.beard,
+    build: builds[h % 3 % builds.length]!,
     tape: (h >>> 4) % 2 === 0,
     boots: [0xe6be57, 0xf3eee0, 0xd66a50, 0x293449][(h >>> 6) % 4]!,
+    stature: low + hashString(`${id}/stature-v1`) % (high - low + 1),
   };
 }
+
+/** One match's cast: who (squad id, or name for a generated rival) → his look, by his own position. */
+export function castLooks(sheets: readonly { roster?: readonly CastEntry[]; bench?: readonly CastEntry[] }[]): (who: string) => Appearance {
+  const positions = new Map<string, Position>();
+  for (const sheet of sheets) for (const entry of [...sheet.roster ?? [], ...sheet.bench ?? []]) positions.set(entry.id ?? entry.name, entry.position);
+  const looks = new Map<string, Appearance>();
+  return who => {
+    let look = looks.get(who);
+    if (!look) { look = appearanceFor(who, positions.get(who)); looks.set(who, look); }
+    return look;
+  };
+}
+interface CastEntry { id?: string; name: string; position: Position }
 
 /** A small rugby ball with a dark edge and white central panel. */
 export function ballPixels(): PixelBuffer {
@@ -66,7 +136,7 @@ const ARM_SWING = [2, 1, -1, -2, -1, 1];
 
 /** Frames are sampled on a six-step cycle; directions are painted, never skewed. Idle breathes over frames 0–1. */
 export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, frame: number, facing: Facing = 'front', possession = false, strideFrame?: number): PixelBuffer {
-  const b = new PixelBuffer(WIDTH, HEIGHT);
+  const b = new PixelBuffer(WIDTH, PAINT_H);
   const f = ((Math.floor(frame) % 6) + 6) % 6;
   const stocky = a.build === 'stocky';
   const bodyW = stocky ? 11 : a.build === 'athletic' ? 9 : 7;
@@ -91,7 +161,7 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
     if (possession) heldBall(25, 32);
     line(23, 31, 29, 34, a.skin, 2);
     b.outline(OUTLINE);
-    return b;
+    return stand(b);
   }
 
   const running = strideFrame !== -1 && (action === 'run' || action === 'carry' || action === 'catch' || (action === 'pass' && strideFrame !== undefined));
@@ -216,6 +286,6 @@ export function drawPrototypePlayer(a: Appearance, kit: Kit, action: Action, fra
   b.fillRect(shX, shY - 1, 3, 2, kit.pattern === 'sleeves' ? kit.trim : kit.jerseyShade);
   if (a.tape) b.fillRect(handX, handY - 1, 2, 2, 0xf6edda);
   b.outline(OUTLINE);
-  return b;
+  return stand(b, a.stature);
 }
 

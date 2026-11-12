@@ -4,7 +4,7 @@ import type { Kit } from '../art/match/kit';
 import type { PlayerAnim } from '../art/match/players';
 import type { RingStyle } from '../art/match/kitClash';
 import { drawRing } from '../match/view/rings';
-import { appearanceFor, WIDTH, HEIGHT, CENTRE, FOOT } from '../art/prototype/player';
+import { appearanceFor, WIDTH, HEIGHT, CENTRE, FOOT, type Appearance } from '../art/prototype/player';
 import { drawLivePlayer } from '../art/match/livePlayer';
 import { CONTACT_W, CONTACT_H, CONTACT_X, CONTACT_FOOT, drawContact } from '../art/prototype/contact';
 import type { MatchArtRegistry } from './matchArt';
@@ -16,12 +16,12 @@ import type { Side } from '../match/core/snapshot';
 /** CPU frames only: bounded independently of match length and interchanges. */
 export class PlayerFrameCache {
   private frames = new Map<string, PixelBuffer>();
-  constructor(private readonly kits: Record<Side, Kit>) {}
+  constructor(private readonly kits: Record<Side, Kit>, private readonly look: (who: string) => Appearance = appearanceFor) {}
   get(side: Side, p: PlayerPicture): PixelBuffer {
     const key = `${side}/${p.who}/${p.action}/${p.frame}/${p.strideFrame ?? "legacy"}/${p.facing}/${p.possession}`;
     const hit = this.frames.get(key);
     if (hit) { this.frames.delete(key); this.frames.set(key, hit); return hit; }
-    const pixels = drawLivePlayer(appearanceFor(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession, p.strideFrame);
+    const pixels = drawLivePlayer(this.look(p.who), this.kits[side], p.action, p.frame, p.facing, p.possession, p.strideFrame);
     if (this.frames.size >= 512) this.frames.delete(this.frames.keys().next().value!);
     this.frames.set(key, pixels); return pixels;
   }
@@ -87,7 +87,7 @@ export class MatchContactLayer {
   private readonly texture: PaintedTexture;
   readonly sprite: Phaser.GameObjects.Image;
   private key = '';
-  constructor(scene: Phaser.Scene, art: MatchArtRegistry, private readonly kits: Record<Side, Kit>) {
+  constructor(scene: Phaser.Scene, art: MatchArtRegistry, private readonly kits: Record<Side, Kit>, private readonly look: (who: string) => Appearance = appearanceFor) {
     this.texture = new PaintedTexture(scene, art, 'live-contact', CONTACT_W, CONTACT_H);
     this.sprite = scene.add.image(0, 0, this.texture.key).setVisible(false);
   }
@@ -96,7 +96,7 @@ export class MatchContactLayer {
     // Rounded local positions bound work to changed pixel poses; pauses upload nothing.
     const key = JSON.stringify([state.tick, state.contact.startedTick, state.kind, facing, layout.pose]);
     if (key !== this.key) {
-      this.texture.paint(drawContact(state, p => appearanceFor(p.who), p => this.kits[p.side], facing, layout.pose)); this.key = key;
+      this.texture.paint(drawContact(state, p => this.look(p.who), p => this.kits[p.side], facing, layout.pose)); this.key = key;
     }
     this.sprite.setOrigin((layout.left ? CONTACT_W - CONTACT_X : CONTACT_X) / CONTACT_W, CONTACT_FOOT / CONTACT_H)
       .setFlipX(layout.left).setPosition(layout.x, layout.y).setDepth(Math.max(...layout.feet.map(p => p.y)) + 1.02).setVisible(true);

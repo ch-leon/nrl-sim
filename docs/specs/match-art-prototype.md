@@ -14,7 +14,7 @@ and big-moment animation work follow that release and phone play-test.
 
 ## Live match integration
 
-- `MatchScene` paints stable player identities in reusable 44×40 textures. Kicks,
+- `MatchScene` paints stable player identities in reusable 44×42 textures. Kicks,
   fends, dummy-half pickups and celebrations share the approved head proportions.
   Catches keep the running legs, then tuck into a carry after four simulation ticks.
 - `LiveView` draws only the carrier and defenders named by the sim in a shared
@@ -29,6 +29,15 @@ and big-moment animation work follow that release and phone play-test.
   frames, replay, seeking and resume do not need to have observed the first hit.
   Old recordings without contact references use individual character poses.
 - Appearance uses the existing player ID mapping and follows interchanges.
+  Build, height and head (#643) are a pure function of the player's id and his own
+  squad position (`appearanceFor(id, position)`; the match builds `castLooks` from
+  both sheets' rosters and benches): props and locks are stocky, fullbacks, wingers
+  and centres lean, second-rowers athletic or stocky, the rest by hash. Height is
+  −2…+2 rows by position (second-rowers tallest, hookers and halves shortest), carried
+  in the shins: painters draw the approved 40-row figure and `stand` fits it to the
+  42-row frame with the boots on row 37, repeating or dropping shin rows; the shared
+  contact picture lifts each upright man's skeleton the same way (`standTall`).
+  All eleven head styles are reachable, about one player in eleven each.
   Simulation-tick frame selection keeps pauses and replays consistent. The CPU
   frame cache is capped at 512; each fixture owns one texture per player and one
   contact texture, all freed at scene shutdown.
@@ -56,7 +65,11 @@ and big-moment animation work follow that release and phone play-test.
 
 Contest odds, RNG, movement, fatigue and strip rules are unchanged. Portraits and
 grounds characters remain a later art pass. The larger head catalogue stays
-available in the art study; existing careers retain their assigned hair and colours.
+available in the match since #643; existing careers keep their skin, hair colour,
+beard, tape and boots. Some players changed look once with #643: about half changed
+head style (a legacy style over its 1/11 share passes the rest to the six new ones),
+props, locks, second-rowers and outside backs whose hashed build disagreed with their
+position changed build, and everyone gained a height.
 
 ## Review
 

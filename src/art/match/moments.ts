@@ -1,7 +1,7 @@
 // The same short-limbed characters through kicks, high takes and scored tries.
 import { PixelBuffer } from '../pixel';
 import { OUTLINE, type Kit } from './kit';
-import { WIDTH, HEIGHT, ballPixels, drawPrototypePlayer, type Appearance, type Facing } from '../prototype/player';
+import { WIDTH, PAINT_H, ballPixels, drawPrototypePlayer, stand as standFrame, type Appearance, type Facing } from '../prototype/player';
 import { add, body, blend, blendBody, contactPainter, type Body, type Point } from '../prototype/tackle';
 import { tiltedHead } from '../prototype/contact';
 import { fitLegs, bentContactArm } from './limbs';
@@ -64,7 +64,7 @@ export function momentPoseAt(action: MomentAction, frame: number, possession = f
 
 export function drawMomentPlayer(look: Appearance, kit: Kit, action: MomentAction, frame: number, facing: Facing, possession: boolean, strideFrame?: number): PixelBuffer {
   if (action === 'airCatch' && frame === 5) return drawPrototypePlayer(look, kit, 'carry', 0, facing, possession, strideFrame);
-  const out = new PixelBuffer(WIDTH, HEIGHT); const brush = contactPainter(out);
+  const out = new PixelBuffer(WIDTH, PAINT_H); const brush = contactPainter(out);
   const { pose: p, ball, near, far, tilt } = momentPoseAt(action, frame, possession);
   const arm = (start: Point, target: Point, dark: boolean) => {
     const a = bentContactArm(start, target, target[1] < start[1] ? -1 : 1);
@@ -79,5 +79,9 @@ export function drawMomentPlayer(look: Appearance, kit: Kit, action: MomentActio
   if (action === 'dive' && frame >= 2 && frame <= 4) {
     out.fillRect(4, 35, 2, 1, 0x98b765); out.fillRect(6, 32, 2, 1, 0xc0b77b);
   }
-  out.outline(OUTLINE); return out;
+  out.outline(OUTLINE);
+  // Height lives in the shins: it goes as he leaves his feet and comes back as he rises.
+  const f = Math.max(0, Math.min(5, Math.floor(frame)));
+  const upright = action === 'dive' ? [1, .5, 0, 0, 0, 0][f]! : action === 'tryRise' ? f / 5 : 1;
+  return standFrame(out, Math.round(look.stature * upright));
 }

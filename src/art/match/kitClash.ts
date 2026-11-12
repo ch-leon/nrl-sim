@@ -47,7 +47,7 @@ export function roleCoverage(pattern: KitPattern): ReadonlyMap<Role, number> {
   let total = 0;
   const first = LOOKS[0]!;
   for (const build of BUILDS) {
-    const look: Appearance = { skin: first.skin, hair: first.hair, head: first.style, beard: first.beard, build, tape: false, boots: 0x293449 };
+    const look: Appearance = { skin: first.skin, hair: first.hair, head: first.style, beard: first.beard, build, tape: false, boots: 0x293449, stature: 0 };
     for (const [action, frame] of FRAMES) {
       const buf = drawPrototypePlayer(look, kit, action, frame);
       for (let y = 0; y < buf.h; y++) {

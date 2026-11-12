@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ruckPoseAt } from '../../../src/art/match/ruck';
 import { CONTACT_CASES, contactCaseAt } from '../../../src/labs/art/contactCases';
 import { CONTACT_X, CONTACT_FOOT, contactPoseAt } from '../../../src/art/prototype/contact';
-import { CENTRE, FOOT } from '../../../src/art/prototype/player';
+import { CENTRE, PAINT_FOOT } from '../../../src/art/prototype/player';
 import { add } from '../../../src/art/prototype/tackle';
 
 const distance = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!);
@@ -22,8 +22,8 @@ describe('ruck transitions', () => {
   });
   it('recovers into the same body and ball anchors as the play-the-ball, including quick rucks', () => {
     const ready = ruckPoseAt('ptb', 0);
-    const targetHead = add(ready.pose.head, CONTACT_X - CENTRE, CONTACT_FOOT - FOOT);
-    const targetBall = add(ready.ball, CONTACT_X - CENTRE, CONTACT_FOOT - FOOT);
+    const targetHead = add(ready.pose.head, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT);
+    const targetBall = add(ready.ball, CONTACT_X - CENTRE, CONTACT_FOOT - PAINT_FOOT);
     for (const { id, end, outcome } of CONTACT_CASES) {
       if (outcome === 'strip' || outcome === 'break-tackle') continue;
       for (const variant of [0, 1]) for (const duration of [7, 14, 22]) {
