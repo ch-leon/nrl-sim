@@ -32,6 +32,8 @@ screen had (traits, training focus, the next-match preview, …) in the new look
   - Tabs: CLUB · SQUAD · LEAGUE · BUILD · OFFICE. Each is 44 tall, padding 0 12, Barlow Condensed 16/600, letter-spacing .06em, #c9d1ea. Active tab: bg #1f2b55, radius 10, colour #f4d03f, weight 700. An alert is an 8px #e0574a dot after the label.
   - Right: **PLAY WEEK ▸**. Height 50, radius 12, bg #f4d03f, text #0e1630, Barlow Condensed 19/700, letter-spacing .04em. Sub-line "v Darwin · away" in Plex Sans 12/500. Optional ▾ split (40 wide, left border `rgba(14,22,48,.25)`) for multi-week advance.
   - The dock **never moves or changes layout** between screens.
+    - ▴ keeps its room on every tab but CLUB and shows on the open one only, so a tab opening moves no other tab (#607). For that room a phone's tabs give padding back at Normal text: `0 8` from 761 to 900px wide, `0 6` from 621 to 760px. At Large and Larger text, and in a dock of 620px or less, ▴ takes room on the open tab only.
+    - In debt the bank is red with a minus sign. The "IN DEBT" tag beside it shows from 961px wide; narrower it is hidden from sight (not from screen readers), so the tabs keep their room.
 - **Menu sheets**: the content of every tab opens as a navy sheet **above the dock**.
   - Position: `top 12, left 12, right 12, bottom 88`; radius 16; bg `rgba(14,22,48,.97)`; padding 10 14; `overflow:hidden`.
   - Long lists scroll **inside** the sheet (`flex:1; min-height:0; overflow-y:auto`); the header row stays fixed.

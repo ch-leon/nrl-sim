@@ -231,7 +231,7 @@ export function createNav(opts: NavOptions = {}): Nav {
     setSheet(false);
     if (screenKey() !== HOME_ID) closeScreen();
     opts.onTabView?.(HOME_ID);
-  });
+  }, true);
   club.setAttribute('data-screen', HOME_ID);
   club.setAttribute('data-nav-home', '');
   club.setAttribute('aria-label', 'Club');
@@ -256,9 +256,13 @@ export function createNav(opts: NavOptions = {}): Nav {
   more.setAttribute('aria-controls', sheet.id);
   more.setAttribute('aria-expanded', 'false');
 
-  function tabButton(label: string, onTap: () => void): HTMLButtonElement {
+  function tabButton(label: string, onTap: () => void, home = false): HTMLButtonElement {
     const b = button('', onTap);
     b.append(el('span', { class: 'nrl-nav-label', text: tabText(label, false) }));
+    // ▴'s room, on every tab that can show it (#607): hidden, and as wide as the ▴ an open tab's
+    // label gains, which takes its place (dom.ts). So opening a tab doesn't move the tabs after it.
+    const room = tabText(label, true, home).slice(tabText(label, false).length);
+    if (room) b.append(el('span', { class: 'nrl-nav-room', text: room }));
     b.setAttribute('data-label', label);
     return b;
   }

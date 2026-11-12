@@ -860,6 +860,12 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   border-radius: 2px;
   background: var(--nrl-accent);
 }
+/* ▴'s room (#607): a closed tab holds the width its label gains with ▴, so opening a sheet never
+   moves the next tab. It sits after the alert dot (the dot stays by its label) and takes the tab's
+   6px gap back; an open tab's own ▴ takes its place. Large and Larger have no room to spare for it
+   (nor has a dock of 620px or less, below): there ▴ takes room on the open tab only, as it did. */
+.nrl-nav-room { order: 1; flex: 0 0 auto; margin-left: -6px; white-space: pre; visibility: hidden; }
+.nrl-dock-tabs > .nrl-btn:has(.nrl-nav-caret) > .nrl-nav-room, html[data-text-size] .nrl-nav-room { display: none; }
 /* An alert: an 8px dot after the label (the count is in its spoken label). */
 .nrl-nav-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--nrl-alert); flex: 0 0 auto; }
 .nrl-dock-spacer { flex: 1 1 auto; min-width: 4px; }
@@ -938,6 +944,12 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
 /* #350: the menu rises into the screen region, so while it is open the dock goes above a
    region dialog (100): over a decision card, a tap on ×4 weeks must not answer it. */
 .nrl-dock-wrap:has(.nrl-hud-menu:not([hidden])) { z-index: 101; }
+/* In debt on a phone (#607) the tag made the status block half as wide again and the tabs paid for it:
+   "SQUA… LEAG…" at 667, and inside the notch's insets at 844 too. The red, minus-signed balance says
+   it on screen; the tag stays in the tile's text for screen readers (#239). To 960px: an iPhone at 956. */
+@media (max-width: 960px) {
+  .nrl-hud-debt { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 /* Large and Larger text (#371): the tabs close up so all five, ▴ and an alert dot stay whole.
    Up to 900px, not 760 (#344): at 844×390 with the notch's insets Large clipped them too.
    Larger: no gap and no tracking between them, 18px more. */
@@ -960,8 +972,14 @@ button.nrl-dock-statusbox:focus-visible { outline: 2px solid var(--nrl-accent); 
   html[data-text-size="larger"] .nrl-dock-tabs > .nrl-btn { padding: 0 4px; }
   html[data-text-size="larger"] .nrl-dock-advance { padding: 0 6px; }
 }
+/* ▴'s room is 12px of air after each label (#607), so on a phone at Normal the tabs give some of
+   their padding back and what fitted before still does: a decisions count on PLAY WEEK inside the
+   notch's insets at 844, RESUME MATCH with one at 667. */
+@media (min-width: 761px) and (max-width: 900px) { .nrl-dock-tabs > .nrl-btn { padding: 0 8px; } }
+@media (min-width: 621px) and (max-width: 760px) { .nrl-dock-tabs > .nrl-btn { padding: 0 6px; } }
 @media (max-width: 620px) {
   .nrl-dock-advance-sub, .nrl-dock-week-total { display: none; }
+  .nrl-nav-room { display: none; }
   /* An alert dot in its tab's corner, not after the label (#344: 11px a tab back at 568). */
   .nrl-dock-tabs > .nrl-btn > .nrl-nav-dot { position: absolute; top: 5px; right: 5px; }
 }

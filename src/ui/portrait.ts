@@ -191,7 +191,7 @@ export const PORTRAIT_CSS = `
   }
   html:root .nrl-dock-status { grid-area: status; min-width: 0; }
   html:root .nrl-dock-statusbox { padding: 0 0 0 4px; min-width: 0; }
-  html:root .nrl-dock-divider, html:root .nrl-dock-spacer, html:root .nrl-dock-advance-sub, html:root .nrl-dock-week-total, html:root .nrl-nav-caret { display: none; }
+  html:root .nrl-dock-divider, html:root .nrl-dock-spacer, html:root .nrl-dock-advance-sub, html:root .nrl-dock-week-total, html:root .nrl-nav-caret, html:root .nrl-nav-room { display: none; }
   html:root .nrl-dock-money { font-size: 0.875rem; }
   /* PLAY WEEK takes what the money leaves; short of room (320 wide at Larger, a decision's count, a
      run's "WEEK 12 OF 27…" beside Stop) its words go to two lines inside the button, never under the money. */

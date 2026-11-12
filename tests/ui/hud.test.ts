@@ -73,6 +73,13 @@ describe('moneyTile (N12.5)', () => {
     expect(CSS).toMatch(/\.nrl-hud-debt \{[^}]*background: var\(--nrl-out\);[^}]*color: #fff/);
   });
 
+  it('on a phone (to 960px) the tag is out of sight and out of the row, not out of the text a screen reader gets (#607, #239)', () => {
+    const phone = CSS.slice(CSS.indexOf('@media (max-width: 960px)'));
+    const tag = phone.slice(0, phone.indexOf('}'));
+    expect(tag).toMatch(/^@media \(max-width: 960px\) \{\s*\.nrl-hud-debt \{ position: absolute; width: 1px; height: 1px;[^}]*clip-path: inset\(50%\)/);
+    expect(tag).not.toMatch(/display: none|visibility: hidden/);
+  });
+
   it('the dock keeps the tag on one row: it is part of the status block, never wrapped onto a second line', () => {
     expect(CSS).toMatch(/\.nrl-dock-money \{[^}]*white-space: nowrap/);
     expect(CSS).toMatch(/\.nrl-dock \{[^}]*height: 64px/);
@@ -276,6 +283,22 @@ import { createNav } from '../../src/ui/nav';
 import { stubDocument, StubNode } from './stubDom';
 import { screenLockReason } from '../../src/systems/unlocks';
 import { tickContracts } from '../../src/systems/economy';
+
+describe('the money tile in debt (N12.5, #607)', () => {
+  beforeEach(() => { stubDocument(); bus.clear(); createNewGame('Debt', 2); });
+  afterEach(() => vi.unstubAllGlobals());
+  it('says "in debt" in its text and its label, whether or not a narrow dock shows the tag', () => {
+    setState({ money: -150_000 });
+    const hud = createHud({ onMoney: () => {} });
+    const body = document.body as unknown as StubNode;
+    const money = body.querySelector('[data-hud="money"]')!;
+    expect(money.words()).toMatch(/-\$150,000\s+in debt/);
+    expect(money.querySelector('.nrl-hud-debt')!.textContent).toBe(IN_DEBT_TEXT);
+    expect(money.classList.contains(IN_DEBT_CLASS)).toBe(true);
+    expect(body.querySelector('.nrl-dock-statusbox')!.getAttribute('aria-label')).toBe('Money -$150,000, in debt. Tap for Finance');
+    hud.destroy();
+  });
+});
 
 describe('essential routes bypass Office locks (#482)', () => {
   beforeEach(() => { stubDocument(); bus.clear(); createNewGame('Locked', 2); });
