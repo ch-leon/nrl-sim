@@ -46,6 +46,7 @@ export function contestAlpha(ageMs: number): number {
  */
 export function contestMarkFor(e: SimEvent, snap: Snapshot): ContestMark | null {
   if (e.kind === 'line-break') {
+    if (e.detail === 'half') return null;
     if (e.side === undefined || e.slot === undefined) return null;
     const p = snap.players.find((q) => q.side === e.side && q.slot === e.slot);
     if (!p) return null;

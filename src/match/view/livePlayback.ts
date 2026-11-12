@@ -35,6 +35,7 @@ import { SprintLayer } from './sprintLayer';
 import { WrestleBar } from './wrestleBar';
 import { ZoneLayer, bonusTryEnd } from './zoneLayer';
 import { Commentator } from './commentary';
+import { HALF_BREAK, shownBreak } from './lineBreak';
 import { KickLayer, KickWatch, framingHeld, kickFrame, kickPoints, type Frame } from './kickLayer';
 import { TRAIT_FAST_FROM, TRAIT_SLOW_FACTOR, TRAIT_SLOW_MS, TraitLayer } from './traitLayer';
 import { ContestLayer } from './contestLayer';
@@ -151,8 +152,11 @@ export class KeyMoments {
   private lateWaived = 0;
 
   /** A sim event on screen (not a skipped or resumed stretch). */
-  note(e: { kind: string }): void {
-    if (e.kind === 'line-break') this.moment ??= 'break';
+  note(e: { kind: string; detail?: string }): void {
+    if (e.kind === 'line-break') {
+      // A half break (#638) is the plain thing it sounds like: no slow-down.
+      if (e.detail !== HALF_BREAK) this.moment ??= 'break';
+    }
     else if (e.kind === 'try') this.moment = 'try';
     else if (this.moment === 'try' && (e.kind === 'conversion' || e.kind === 'full-time' || e.kind === 'half-time')) this.moment = null;
   }
@@ -834,7 +838,9 @@ export class LivePlayback {
 
   private onSimEvents(events: readonly SimEvent[]): void {
     const cur = this.runner.cur;
-    for (const e of events) {
+    for (const sim of events) {
+      // A line break the view calls half (#638) reads and plays as a plain line; the recorded events below are the sim's own.
+      const e = shownBreak(sim, cur);
       // A kick struck or brought down (N15.3); a skipped or resumed stretch shows none.
       if (this.skipping) {
         this.kicks.clear();

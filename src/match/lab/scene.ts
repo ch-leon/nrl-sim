@@ -13,6 +13,7 @@ import { toMatchEvent } from '../league/events';
 import { LiveView } from '../view/liveView';
 import { PopupLayer } from '../view/popupLayer';
 import { ContestLayer } from '../view/contestLayer';
+import { shownBreak } from '../view/lineBreak';
 import { SLOWMO_FACTOR, SLOWMO_MS, popupFor, type PopupView } from '../view/popups';
 import { WrestleBar } from '../view/wrestleBar';
 import { SprintLayer } from '../view/sprintLayer';
@@ -85,7 +86,8 @@ export class LabScene extends MatchScene {
 
   private onSimEvents(events: readonly SimEvent[]): void {
     const r = this.controller.runner;
-    for (const e of events) {
+    for (const sim of events) {
+      const e = shownBreak(sim, r.cur);
       this.contest?.note(e, r.cur);
       const p = popupFor(e);
       if (p && e.side !== undefined && e.slot !== undefined) {
@@ -97,7 +99,7 @@ export class LabScene extends MatchScene {
       }
       // Light up the stadium the way a real match does: particles, crowd,
       // camera. The subscribers pick what they react to by event kind.
-      const ev = toMatchEvent(e, r.cur, this.ids);
+      const ev = toMatchEvent(sim, r.cur, this.ids);
       if (ev) bus.emit('match:event', ev);
       if (e.kind === 'penalty') bus.emit('match:penalty', { tick: e.tick });
     }

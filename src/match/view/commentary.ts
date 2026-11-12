@@ -107,6 +107,8 @@ export const LINES: Readonly<Record<string, readonly string[]>> = {
   dart: ['{player} darts from dummy-half.', '{player} goes himself from dummy-half.', 'Out of dummy-half goes {player}.'],
   // ── Attack ──
   'line-break': ['{player} breaks the line!', 'Line break! {player} is away.', '{player} is through the line!', '{player} finds the gap and goes.'],
+  // A half break (#638): the carrier is through one gap but the cover is still there. Plain words, no shout.
+  'line-break:half': ['{player} busts through.', '{player} gets outside his man.', '{player} slips the first defender.', '{player} finds a bit of room.'],
   step: ['{player} steps his man!', 'A big step from {player}.', "{player} steps inside and he's gone."],
   fend: ['{player} palms off the tackler.', 'Strong fend from {player}.', '{player} fends him away.'],
   'break-tackle': ['{player} busts through the tackle!', '{player} bumps off the defender.', '{player} breaks the tackle!'],
@@ -244,6 +246,8 @@ export function lineKey(e: SimEvent, kickInAir: boolean, score?: Readonly<Record
       return e.player ? 'loose' : 'loose:nobody';
     case 'error':
       return d === 'contact' ? 'error:contact' : 'error';
+    case 'line-break':
+      return d === 'half' ? 'line-break:half' : 'line-break';
     case 'break-tackle':
       return d === 'wrestle' ? 'break-tackle:wrestle' : 'break-tackle';
     case 'tackle':

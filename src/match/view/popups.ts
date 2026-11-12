@@ -47,6 +47,8 @@ const WORDS: Readonly<Record<string, { word: string; tone: PopupTone; big?: bool
   drop: { word: 'DROPPED!', tone: 'bad' },
   // Kick contests (#99): a loose ball both sides are near, over the man nearest it.
   'loose-ball': { word: 'LOOSE BALL!', tone: 'neutral' },
+  // A clean break only (#638); popupFor drops a half break.
+  'line-break': { word: 'LINE BREAK!', tone: 'attack', big: true },
   try: { word: 'TRY!', tone: 'attack', big: true },
   // Legs and the wrestle (§8): a quick play-the-ball off a short wrestle, a player whose legs are gone (COOKED!, not to be confused with running out of gas).
   'quick-ptb': { word: 'QUICK PTB!', tone: 'attack' },
@@ -112,6 +114,7 @@ export function surnameOf(name: string | undefined): string {
  * one, so every firing trait is seen.
  */
 export function popupFor(e: SimEvent): Popup | null {
+  if (e.kind === 'line-break' && e.detail === 'half') return null;
   const w = WORDS[e.kind] ?? (e.trait && e.kind === 'tackle' ? { word: 'DRIVE!', tone: 'attack' as const } : undefined);
   if (!w) return null;
   // A kick at goal that misses reads as a miss, whichever kind it was.
