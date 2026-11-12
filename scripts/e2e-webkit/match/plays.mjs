@@ -92,8 +92,14 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
       const shutTray = async () => {
         if (!(await page.locator('.nrl-mo-calls[hidden]').count())) await page.locator('.nrl-mo-bar [data-coach]').tap();
       };
+      /**
+       * The match holds at ×1 while the tray is open (#639), whatever speed was picked, so a wait made with
+       * it open covers a quarter of the match time it did at this check's ×4. The waits below are sized for ×1:
+       * a change of possession, or a set reaching a tackle a play can be called on, can take over a minute.
+       */
+      const TRAY_OPEN_WAIT_MS = 240000;
       /** Wait for the tray's title to read `title` (his side's ball, or theirs) with it open. */
-      const waitTitle = (title) => page.waitForFunction((t) => document.querySelector('.nrl-mo-tray-title')?.textContent === t, title, { timeout: 90000 });
+      const waitTitle = (title) => page.waitForFunction((t) => document.querySelector('.nrl-mo-tray-title')?.textContent === t, title, { timeout: TRAY_OPEN_WAIT_MS });
       const problems = [];
       try {
         await page.goto(BASE);
@@ -224,7 +230,7 @@ export async function runMatchPlays(browser, sizes = [[844, 390], [667, 375], [5
               if (!b) return null;
               b.click();
               return b.dataset.play;
-            }, null, { timeout: 60000 }).then((hdl) => hdl.jsonValue());
+            }, null, { timeout: TRAY_OPEN_WAIT_MS }).then((hdl) => hdl.jsonValue());
             called = play;
             if (!(await page.locator('.nrl-mo-calls[hidden]').count())) problems.push('the tray stayed open after the play was called');
             const badge = await page.locator('.nrl-mo-coach-badge').textContent();
