@@ -12,6 +12,7 @@
 //   3  Every other big pop-up: the pop-up alone.
 import type { SimEvent } from '../core/snapshot';
 import type { Popup } from './popups';
+import { screenDensity } from '../../world/viewport';
 
 export type ImpactTier = 1 | 2 | 3;
 
@@ -67,7 +68,8 @@ export interface ImpactRig {
 }
 
 /**
- * Play a tier's beat. Returns whether the camera should close in (tier 1). Under
+ * Play a tier's beat. Returns whether the moment has a close-up for its playback to let go
+ * (tiers 1 and 2: the scene closes in on a try and a big hit, #627). Under
  * reduced motion there is no freeze, shake or slow-motion: the pop-up and the
  * close-up still come.
  */
@@ -78,8 +80,9 @@ export function playImpact(tier: ImpactTier, rig: ImpactRig, reduced: boolean = 
       rig.runner.freeze(FREEZE_MS);
       const cam = rig.camera;
       const width = cam.width ?? cam.worldView.width * cam.zoom;
-      cam.shake?.(SHAKE_MS, shakeIntensity(SHAKE_PX, width, cam.zoom));
+      // The camera's units are canvas px (#627): SHAKE_PX is CSS px, so scale it by the screen's density.
+      cam.shake?.(SHAKE_MS, shakeIntensity(SHAKE_PX * screenDensity(), width, cam.zoom));
     }
   }
-  return tier === 1;
+  return tier !== 3;
 }

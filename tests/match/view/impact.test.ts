@@ -64,7 +64,7 @@ describe('playing a tier', () => {
     expect(a.calls).toEqual([`slow ${TIER1_MS} ${TIER1_FACTOR} ${TIER1_RAMP_MS}`]);
     expect(a.shakes).toEqual([]);
     const b = rig();
-    expect(playImpact(2, b.r, false)).toBe(false);
+    expect(playImpact(2, b.r, false)).toBe(true);
     expect(b.calls).toEqual([`freeze ${FREEZE_MS}`]);
     expect(b.shakes).toHaveLength(1);
     expect(b.shakes[0]!.ms).toBe(SHAKE_MS);
