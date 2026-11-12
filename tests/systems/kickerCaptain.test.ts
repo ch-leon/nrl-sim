@@ -10,6 +10,8 @@ import { migrateState } from '../../src/core/save';
 import { autoPick, resolveLineup, setCaptain, setKicker } from '../../src/systems/lineup';
 import { kickerAndCaptain, teamSheetFromSquad } from '../../src/match/league/sheets';
 import { runMatch } from '../../src/match/league/match';
+import { LiveSim } from '../../src/match/league/live';
+import { GOALS } from '../../src/match/league/goals';
 import { sideSheet } from '../../src/match/balance/measure';
 import { NEUTRAL_CAPTAIN, PENALTY, choosePenalty, type PenaltySituation } from '../../src/match/league/penalties';
 import type { Player } from '../../src/core/state';
@@ -106,10 +108,9 @@ describe('the goal-kicker and the captain (N11)', () => {
     const away = sideSheet('A', { rating: 60 });
     const plain = named('H');
     const fullbackKicks = { ...plain, kicker: plain.roster![0]!.id! };
-    const count = (sheet: TeamSheet): { inPlay: number; byFullback: number; fieldGoals: number } => {
+    const count = (sheet: TeamSheet): { inPlay: number; byFullback: number } => {
       let inPlay = 0;
       let byFullback = 0;
-      let fieldGoals = 0;
       for (let seed = 1; seed <= 20; seed++) {
         for (const e of runMatch(sheet, away, { seed }).events) {
           if (e.teamId !== sheet.clubId) continue;
@@ -117,17 +118,58 @@ describe('the goal-kicker and the captain (N11)', () => {
             inPlay++;
             if (e.player === sheet.roster![0]!.name) byFullback++;
           }
-          if (e.kind === 'field-goal') fieldGoals++;
         }
       }
-      return { inPlay, byFullback, fieldGoals };
+      return { inPlay, byFullback };
     };
     const before = count(plain);
     const after = count(fullbackKicks);
     // The fullback kicks in play no more than he did unnamed (a scramble now and then), and the side kicks as much.
     expect(after.byFullback).toBeLessThanOrEqual(before.byFullback + 2);
     expect(after.inPlay).toBeGreaterThan(before.inPlay * 0.8);
-    expect(after.fieldGoals).toBeGreaterThanOrEqual(Math.floor(before.fieldGoals * 0.5));
+    // Naming a goal-kicker changes conversions and the late score-margin gate,
+    // so rare whole-match field-goal counts cannot isolate role eligibility.
+    class GoalRoleSim extends LiveSim {
+      attempt(slot: number) {
+        this.tick = 100; this.attacking = 'home'; this.dir = 1; this.ends = 1;
+        this.phase = { kind: 'play' };
+        this.clockTicks = (this.length.halfMinutes * 60 - 60) * 20;
+        this.tackles = GOALS.fieldGoalFromTackle;
+        for (const p of this.players) {
+          p.body.pos = { x: p.side === 'home' ? 40 : 95, y: 5 + p.slot * 7 };
+          p.body.vel = { x: 0, y: 0 };
+          p.lockUntil = 0; p.busyUntil = 0; p.cooldownUntil = 0;
+        }
+        const carrier = this.players[slot]!;
+        carrier.body.pos = { x: 80, y: 34 };
+        carrier.catchTick = 0; carrier.decided = false;
+        this.ball = { kind: 'held', by: slot };
+        this.rng.next = () => 0.5; // attempt it, avoid the charge-down; same roll for each role
+        this.stepPlay();
+        const planned = this.pendingGoal;
+        if (planned) {
+          this.tick = planned.at;
+          this.launchGoal();
+          this.resolveGoal();
+        }
+        return this.tickEvents.filter(e => e.kind === 'drop-goal' || e.kind === 'field-goal');
+      }
+    }
+    const attempt = (sheet: TeamSheet, slot: number) =>
+      new GoalRoleSim(sheet, away, 1, { length: { halves: 1, halfMinutes: 7 } }).attempt(slot);
+    // Both the live slot-5 kicker and a named goal-kicker can drop for goal;
+    // naming the fullback never transfers an in-play halfback's ball to him.
+    for (const sheet of [plain, fullbackKicks]) {
+      expect(attempt(sheet, 5)).toMatchObject([
+        { kind: 'drop-goal', slot: 5, player: plain.roster![5]!.name },
+        { kind: 'field-goal', slot: 5, player: plain.roster![5]!.name },
+      ]);
+    }
+    expect(attempt(fullbackKicks, 0)).toMatchObject([
+      { kind: 'drop-goal', slot: 0, player: plain.roster![0]!.name },
+      { kind: 'field-goal', slot: 0, player: plain.roster![0]!.name },
+    ]);
+    expect(attempt(plain, 0)).toEqual([]);
   }, 240_000);
 
   it('the captain’s Footy IQ and Hothead move the penalty call', () => {
