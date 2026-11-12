@@ -1,8 +1,9 @@
 // src/match/balance/measure.ts — play one cell of an experiment (a variant on
 // a scenario) over its seeds, headless, and count what happened per match.
-// By default each seed is a whole match (two 7:00 halves to full time); a plan
+// By default each seed is a whole match (two 2:30 halves to full time); a plan
 // or scenario can ask for a single stretch of N minutes instead, whose counts
-// are scaled to a 14-minute match so they still read against the §7 targets.
+// are scaled to MATCH_MINUTES (the configured default match length). Historical
+// §7 target bands were calibrated on 14-minute matches; compare units explicitly.
 // A side is a flat squad, a league club's generated roster, or (N12.2) a squad
 // built the way the game builds it, a new one every seed.
 import type { RosterEntry, TeamSheet } from '../../sim/events';
