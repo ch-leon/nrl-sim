@@ -7,16 +7,15 @@
 // match and art workers read only those (src/content/index.ts activeLeague and
 // friends), so the clubs, names and card text stay out of their bundles.
 import type { ContentPack, LeagueShape, MatchRules, Vocabulary } from './pack';
-import { MATCH_PREVIEW } from '../match/preview';
 
 /**
  * The Nines rules (tuning reference §13; match/league/rules.ts says how they
- * play and why the halves are 7:00). Re-exported as NINES, the object the
+ * play and why the halves are 2:30). Re-exported as NINES, the object the
  * balance harness overrides by name (tuning.ts), so it is not frozen.
  */
 export const AU_RULES: MatchRules = {
-  /** Length of each half, minutes of sim time. Was 9. */
-  halfMinutes: MATCH_PREVIEW?.halfMinutes ?? 7,
+  /** Length of each half, minutes of sim time. Was 7. */
+  halfMinutes: 2.5,
   /** Points for a try, a conversion (a drop kick in Nines) and a field goal (penalty goals come with 2e). */
   tryPoints: 4,
   /** A try grounded in the bonus zone, the in-goal between the posts (Nines; goals.ts). */
